@@ -19,7 +19,7 @@ import { StageLight } from "./scene/objects/StageLight";
 import { SceneRig } from "./scene/objects/SceneRig";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
 import { METAGRAPHS, NET, netUrl } from "@/src/net/current";
-import { COLORS } from "@/src/engine/config";
+import { COLORS, POLL } from "@/src/engine/config";
 import { BYTE_SCALE_KB, type RailGroup } from "./domain/ledgerLayout";
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
 import { readSceneColors, type SceneColors, LIGHT_TUNE } from "./sceneColors";
@@ -38,7 +38,7 @@ import { compositionGroups, compositionKey, compositionRows } from "@/src/data/c
 import { metaSnapDeepKey, metaSnapHoverKey } from "@/src/data/types";
 import { snapsAtTick } from "@/src/data/anchorLog";
 import { breakpointOf } from "@/src/data/breakpoint";
-import { calloutPlacement, CALLOUT_OFF_X, CALLOUT_OFF_Y } from "./domain/calloutPlacement";
+import { calloutPlacement, CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET } from "./domain/calloutPlacement";
 import type { GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 
@@ -732,7 +732,7 @@ export class Engine {
     // client-side (NetworkData), but the metagraph SET is fetched once — so re-pull
     // it on an interval too (Vercel never restarts; ISR only freshens the server
     // cache, not an idle client). Matches the route's revalidate window.
-    this.metaTimer = setInterval(() => this.refreshMeta(false), 5 * 60 * 1000); // matches the route's 5m revalidate
+    this.metaTimer = setInterval(() => this.refreshMeta(false), POLL.metaRefreshMs); // one home with the FEEDS row
   }
 
   // Fetch the (server-cached, live) metagraph set + node geo. On the initial load we
@@ -2016,13 +2016,30 @@ export class Engine {
   // others. The corner is the .co-leader's own panel end (CALLOUT_OFF_X/Y, mirrored by the
   // flip/drop the placement just decided), so the primary's leader and the sibling legs all
   // meet at one point and the beads read as peers.
+  // The legs are STATIC children React renders once per wrapper mount, so the DOM refs are
+  // cached per element identity (a subject change remounts the wrapper — fresh element, fresh
+  // cache, every leg back at its hidden default) and the hidden steady state — most frames, in
+  // every view — costs one flag check with NO DOM reads. querySelectorAll ran here per frame
+  // before, on the !on path included (review, 2026-08-31 — rule-5 discipline applied to DOM).
+  private _mlegHost: HTMLElement | null = null;
+  private _mlegs: { g: SVGGElement; line: SVGLineElement; ring: SVGCircleElement }[] = [];
+  private _mlegShown = 0;
   private _syncCalloutMulti(el: HTMLElement, ax: number, ay: number, r: DOMRect | null, flip: boolean, drop: boolean): void {
-    const legs = el.querySelectorAll<SVGGElement>(".co-mleg");
+    const want = r != null && this.mode === "hyper" && this._calloutNodeAnchor;
+    if (!want && this._mlegShown === 0 && this._mlegHost === el) return;
+    if (this._mlegHost !== el) {
+      this._mlegHost = el;
+      this._mlegs = Array.from(el.querySelectorAll<SVGGElement>(".co-mleg"), (g) => ({
+        g, line: g.querySelector("line")!, ring: g.querySelector("circle")!,
+      }));
+      this._mlegShown = 0; // a fresh mount renders every leg hidden
+    }
+    const legs = this._mlegs;
     if (legs.length === 0) return;
     const cx = flip ? -CALLOUT_OFF_X : CALLOUT_OFF_X;
-    const cy = drop ? CALLOUT_OFF_Y - 2 : -(CALLOUT_OFF_Y - 2);
+    const cy = drop ? CALLOUT_OFF_Y - CALLOUT_LEG_INSET : -(CALLOUT_OFF_Y - CALLOUT_LEG_INSET);
     let n = 0;
-    if (r && this.mode === "hyper" && this._calloutNodeAnchor) {
+    if (want && r) {
       const count = this.globe.selectedNodeHyperAnchors(this._calloutSibs);
       for (let i = 0; i < count && n < legs.length; i++) {
         const v = this._calloutSibs[i]!;
@@ -2032,22 +2049,19 @@ export class Engine {
         v.applyMatrix4(this.ctx.camera.projectionMatrix);
         const sx = r.left + (v.x * 0.5 + 0.5) * r.width - ax;
         const sy = r.top + (-v.y * 0.5 + 0.5) * r.height - ay;
-        const leg = legs[n]!;
-        const line = leg.querySelector("line")!;
-        const ring = leg.querySelector("circle")!;
+        const { g, line, ring } = legs[n]!;
         line.setAttribute("x1", cx.toFixed(1));
         line.setAttribute("y1", cy.toFixed(1));
         line.setAttribute("x2", sx.toFixed(1));
         line.setAttribute("y2", sy.toFixed(1));
         ring.setAttribute("cx", sx.toFixed(1));
         ring.setAttribute("cy", sy.toFixed(1));
-        if (leg.getAttribute("visibility") !== "visible") leg.setAttribute("visibility", "visible");
+        if (n >= this._mlegShown) g.setAttribute("visibility", "visible");
         n++;
       }
     }
-    for (let i = n; i < legs.length; i++) {
-      if (legs[i]!.getAttribute("visibility") !== "hidden") legs[i]!.setAttribute("visibility", "hidden");
-    }
+    for (let i = n; i < this._mlegShown; i++) legs[i]!.g.setAttribute("visibility", "hidden");
+    this._mlegShown = n;
   }
 
   // HYPER anchors the committed NODE's own bead when one is committed (user, 2026-08-15 —

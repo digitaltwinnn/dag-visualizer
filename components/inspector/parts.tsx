@@ -421,15 +421,24 @@ export function nodeComposition(nodes: NodeInfo[]): Composition {
 // from the SAME composition read as the old "data metagraph · no token" body line (reused, not
 // re-derived): a metagraph is a "data"/"currency"/"data and currency" metagraph by whether it
 // runs dL1/cL1 nodes; the DAG core is the one exception ("hypergraph", not a metagraph at all).
-export function networkKind(id: string, nodes: NodeInfo[]): string {
+// The STRUCTURED type read (2026-08-31) — networkKind's prose derives from this, and any
+// classifier (the vitals donut's buckets) branches on THESE values, never on the display
+// sentence: a copy edit to the prose must not silently reclassify every metagraph.
+export type MetaType = "hypergraph" | "unknown" | "data" | "currency" | "data + currency";
+export function metaType(id: string, nodes: NodeInfo[]): MetaType {
   if (id === "dag") return "hypergraph";
   // With zero locatable nodes the roles are unknown — claiming a type would be a guess.
-  if (nodes.length === 0) return "metagraph";
+  if (nodes.length === 0) return "unknown";
   const { present, hasCurrency } = nodeComposition(nodes);
   const hasData = present.includes("dl1");
-  if (hasCurrency && hasData) return "data and currency metagraph";
-  if (hasCurrency) return "currency metagraph";
-  return "data metagraph";
+  return hasCurrency && hasData ? "data + currency" : hasCurrency ? "currency" : "data";
+}
+export function networkKind(id: string, nodes: NodeInfo[]): string {
+  const t = metaType(id, nodes);
+  if (t === "hypergraph") return "hypergraph";
+  if (t === "unknown") return "metagraph";
+  if (t === "data + currency") return "data and currency metagraph";
+  return `${t} metagraph`;
 }
 
 // Long description with a 3-line clamp + "Show more" (replaces ui.js _descHTML + the delegated

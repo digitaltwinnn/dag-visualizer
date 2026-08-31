@@ -181,6 +181,10 @@ export const POLL = {
                            // LiveStrip bar count — the strip fills with this whole retained window)
   pollMs: 4000,            // how often to poll for new snapshots
   clusterMs: 25000,        // how often to refresh validator membership
+  metaRefreshMs: 5 * 60_000, // /api/metagraphs re-pull — matches the route's 5-min revalidate.
+                           // ONE home (2026-08-31): Engine.metaTimer and the pulse strip's FEEDS
+                           // row both read it, so a cadence retune can't leave the liveliness
+                           // instrument deriving STALE from a stale interval (rule 10 by drift).
 
   // Per-metagraph snapshot history (the shared data layer behind the ribbon's
   // derived DAG fee and the Snapshot DAG / ledger view).

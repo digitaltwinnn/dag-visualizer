@@ -7,7 +7,7 @@ import { SELECTED_ROW } from "@/components/selection";
 import { useStore } from "@/src/store/store";
 import { applyThemePref } from "@/components/ThemeController";
 import { cn } from "@/lib/utils";
-import type { ThemePref } from "@/src/theme/resolve";
+import { resolveTheme, type ThemePref } from "@/src/theme/resolve";
 
 // The theme control — a POPOVER MENU in the NetworkSwitch's idiom, sitting between the
 // PresentationToggle and the NetworkSwitch. It began as an icon cycle button (System → Light →
@@ -37,8 +37,10 @@ export default function ThemeToggle() {
   // What System currently resolves to — read once per render, never subscribed: the popover
   // only renders on the client (content mounts on open), and ThemeController stays the app's
   // one matchMedia LISTENER.
-  const sysTheme =
-    typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  const sysTheme = resolveTheme(
+    "system",
+    typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches,
+  );
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>

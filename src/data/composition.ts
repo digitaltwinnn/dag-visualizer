@@ -105,10 +105,18 @@ export function parseCompositionKey(key: string): { label: string; codes: string
   return { label, codes: codeStr ? codeStr.split(CODE_SEP) : [] };
 }
 
+/** THE machine-dedup key (one home, 2026-08-31): a machine is one HOST, so the IP is the key
+ *  and a stable id the fallback. Grown from compositionGroups' inline key when the vitals band
+ *  wrote its own two copies (one of them `JSON.stringify(n)` — a different rule); the band's
+ *  donut, its layer bars and the explorer's groups must count the same fleet the same way. */
+export function machineKey(ip: string | null | undefined, fallback: string): string {
+  return ip || fallback;
+}
+
 export function compositionGroups(rows: NodeRow[]): CompGroup[] {
   const machines = new Map<string, NodeRow>();
   for (const r of rows) {
-    const mk = ("node" in r.pick && r.pick.node?.ip) || r.id || r.label;
+    const mk = machineKey("node" in r.pick ? r.pick.node?.ip : undefined, r.id || r.label);
     if (!machines.has(mk)) machines.set(mk, r);
   }
   const by = new Map<string, CompGroup>();

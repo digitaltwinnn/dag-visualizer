@@ -49,7 +49,7 @@ import { layerCodesOf } from "@/src/data/composition";
 import { useNowTick } from "@/components/useNowTick";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { relativeAge } from "@/src/util/relativeAge";
-import { CALLOUT_OFF_X, CALLOUT_OFF_Y } from "@/src/engine/domain/calloutPlacement";
+import { CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET } from "@/src/engine/domain/calloutPlacement";
 import type { GeoInfo } from "@/src/data/types";
 
 // The panel's standoff from the anchor lives in `src/engine/domain/calloutPlacement.ts`, with the
@@ -389,7 +389,7 @@ export default function SceneCallout() {
           x1={6}
           y1={-6}
           x2={CALLOUT_OFF_X}
-          y2={-CALLOUT_OFF_Y + 2}
+          y2={-(CALLOUT_OFF_Y - CALLOUT_LEG_INSET)}
           stroke="var(--primary)"
           strokeOpacity="0.55"
           strokeWidth="1.5"

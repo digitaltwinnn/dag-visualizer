@@ -31,7 +31,7 @@ const FEEDS = {
   global: { label: "Global snapshots", target: "block explorer", everyMs: POLL.pollMs },
   metasnaps: { label: "Metagraph snapshots", target: "block explorer", everyMs: POLL.pollMs },
   clusters: { label: "DAG nodes", target: "L0 + L1 load balancers", everyMs: POLL.clusterMs },
-  "api-metagraphs": { label: "Metagraph directory", target: "app API", everyMs: 5 * 60_000 },
+  "api-metagraphs": { label: "Metagraph directory", target: "app API", everyMs: POLL.metaRefreshMs },
   "api-geo": { label: "Validator geo map", target: "app API", everyMs: null },
 } as const;
 export type FeedId = keyof typeof FEEDS;

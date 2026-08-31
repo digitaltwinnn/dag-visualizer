@@ -312,7 +312,7 @@ nodes.
 
 | Path | Responsibility |
 |---|---|
-| `app/` | Next App Router. `globals.css` is **the one stylesheet**; `design/page.tsx` is the token reference; `about/page.tsx` is the project's own page — Instrument-Glass like the HUD, and the home of the **experimental disclosure** that used to be an always-on banner (retired 2026-08-09: a permanent banner over a live instrument reads as an alarm; the footer links here — the wordmark is plain unlinked chrome and the ECG opens the pulse strip, both 2026-08-30). `--warn-soft` is its amber (shared only with the raw layer's JSON booleans). `api/*` are the server-side data routes. |
+| `app/` | Next App Router. `globals.css` is **the one stylesheet**; `design/page.tsx` is the token reference; `about/page.tsx` is the project's own page — Instrument-Glass like the HUD, and the home of the **experimental disclosure** that used to be an always-on banner (retired 2026-08-09: a permanent banner over a live instrument reads as an alarm; the footer links here — the wordmark is plain unlinked chrome and the ECG opens the pulse strip, both 2026-08-30. ⚠️ Open gap: the footer hides below 700px, so PHONE currently has no route to /about — a decision to make, not an oversight to patch silently). `--warn-soft` is its amber (shared with the raw layer's JSON booleans and the pulse strip's STALE dot). `api/*` are the server-side data routes. |
 | `components/` | React panels, each reading/writing the store. `SceneCanvas` mounts the engine (dynamic-imported so Three never enters the server bundle). |
 | `components/ui/` | The adopted shadcn/Radix primitives. |
 | `src/store/store.ts` | The Zustand store — mode, filter, selection, hover channels, `section`, phone UI state. |
@@ -914,9 +914,12 @@ snapshots-only rule (2026-08-12): each band is the view's OWN vitals — the num
 region used to show — so nothing generic returned. **The band takes no pointer events at all**
 (`pointer-events-none` — user: "no clicking etc required"): every route the old strip's clicks served
 survives in the explorer rows and the global card's pager. Colour is rule 3's: structural cyan, the
-identity hue only under a committed filter (one inline `--vb-accent`), with the filter-scope hairline
-along the band's bottom edge. Identity is never colour-alone — every donut segment, country bar and
-rate is named by its own label.
+identity hue only under a committed filter — resolved once per band (`useVitalsScope`) and handed to
+every chart as its `accent` prop; the band wears NO filter-scope hairline (user, 2026-08-30 — the
+charts themselves state the scope). Identity is never colour-alone — every donut segment, country bar
+and rate is named by its own label. Both presentations (the desktop band and the phone strip row)
+render ONE `ViewCells` dispatch, so a cell added or gated reaches both in the same edit; the ledger
+row reads the snapshot feed ONCE and passes it down.
 
 The cells are per-view and ordered by the user (2026-08-30): hyper coarse→fine (METAGRAPHS with a
 by-type breakdown — `networkKind` is the type's one home, icons from `METATYPE_ICONS` on the
@@ -934,8 +937,12 @@ the one policy flag `VIEW_POLICIES[mode].vitalsLane` **AND three deliberate gate
 rails (user, 2026-08-30: presentation mode shows just the 3D, so rails-hidden hides the band too), and
 the phone (the dock + sheet own that edge; the filter strip's second row renders the SAME cards
 as a horizontal scroll instead — `VitalsStripRow`, one vitals design on every tier). Presence and
-reserved space can't drift. The token's static default in `globals.css`
-stays **`0px`**.
+reserved space can't drift once hydrated; the token's static default in `globals.css` is the band's
+own reserve (**`92px`**), matching the BOOT state (hyper's lane is on, SSR assumes desktop) so the
+rails keep clear of the band before the effect runs. The SCENE⇄HUD toggle is the one `railsHidden`
+writer, and it clears its own state when the viewport drops below 1100px — below that the control is
+CSS-hidden and SCENE has no meaning, so a stuck `true` would strand the band and the camera's
+rails-lean with no visible way back.
 
 ### Responsive shell
 

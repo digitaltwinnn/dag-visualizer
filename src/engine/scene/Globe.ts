@@ -234,6 +234,7 @@ export class Globe implements GeoViewHost {
   // setSelectedNode, which the rebuilds (setNodes/setMetagraphs) re-run so the cache never dangles.
   private readonly stage: StageLight;
   private _selNodeRec: ValidatorRecord | MetaNodeRecord | null = null;
+  private _selNodeSibs: (ValidatorRecord | MetaNodeRecord)[] = []; // the non-primary layer records — see setSelectedNode
   private _spotPos = new THREE.Vector3();
   private _spotN = new THREE.Vector3();
 
@@ -579,7 +580,7 @@ export class Globe implements GeoViewHost {
     this._edgeColor.setHex(c.core);
     this._edgeTarget.setHex(c.core);
     this.geoPaper = isLightGround(c);
-    this.fabric.applyGroundEnv(this.geoPaper); // the chip env sheen is the GROUND's — see NodeFabric
+    this.fabric.applyGroundEnv(); // the chip env sheen is the GROUND's — see NodeFabric
     retintGeoView(this);
     this._retintNetworks();
     // Canvas-texture ink cannot be re-pointed, so the labels redraw. The method is self-cleaning
@@ -1126,6 +1127,14 @@ export class Globe implements GeoViewHost {
       : this.nodes.find((n) => n.nodeId === id && n.geoPrimary) ??
         this.metaNodes.find((n) => n.nodeId === id && n.geoPrimary) ??
         null;
+    // The machine's OTHER layer records (the multi-leader's sibling beads) resolve here too —
+    // the callout asks per frame, and scanning both pools per frame for a set that only changes
+    // at selection/rebuild time was the same cost _selNodeRec already exists to avoid.
+    this._selNodeSibs.length = 0;
+    if (id) {
+      for (const n of this.nodes) if (n.nodeId === id && !n.geoPrimary) this._selNodeSibs.push(n);
+      for (const n of this.metaNodes) if (n.nodeId === id && !n.geoPrimary) this._selNodeSibs.push(n);
+    }
   }
 
   /** The SELECTED node's own chip position in globe-LOCAL coordinates — the same resolution
@@ -1180,16 +1189,10 @@ export class Globe implements GeoViewHost {
    *  record is skipped because the primary anchor already points at it. Fills `out` up to its
    *  length (the caller owns the scratch — rule 5), returns the count. */
   selectedNodeHyperAnchors(out: THREE.Vector3[]): number {
-    const id = this._selectedNodeId;
-    if (!id) return 0;
     let n = 0;
-    for (const r of this.nodes) {
-      if (n >= out.length) return n;
-      if (r.nodeId === id && !r.geoPrimary && this._hyperAnchorOf(r, out[n]!)) n++;
-    }
-    for (const r of this.metaNodes) {
-      if (n >= out.length) return n;
-      if (r.nodeId === id && !r.geoPrimary && this._hyperAnchorOf(r, out[n]!)) n++;
+    for (const r of this._selNodeSibs) {
+      if (n >= out.length) break;
+      if (this._hyperAnchorOf(r, out[n]!)) n++;
     }
     return n;
   }

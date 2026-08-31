@@ -168,9 +168,10 @@ export default function TopBar() {
         {/* The HEARTBEAT — the PULSE STRIP's toggle (user, 2026-08-30: "when I click the top
             bar heartbeat it should show a bottom section with relevant information about the
             liveliness of the app", superseding the 2026-08-09 /about route — the mark IS the
-            liveliness cue, so it opens the liveliness instrument; /about moves to the wordmark
-            and rides the pulse strip's own trailing link, which is what keeps the route at
-            every width including phone). */}
+            liveliness cue, so it opens the liveliness instrument; /about moved to the FOOTER
+            (the wordmark is plain chrome and the strip's own about link was removed by the
+            user the same day). ⚠️ Known gap: the footer hides below 700px, so phone currently
+            has NO route to /about — an open decision, not an oversight to "fix" silently. */}
         <button
           type="button"
           aria-expanded={strip === "pulse"}
@@ -381,7 +382,11 @@ export default function TopBar() {
                 {/* The band's own cards, horizontally scrollable (user pick, 2026-08-30 — one
                     vitals design on every tier; the bare-number cluster is retired). Gated on
                     the band's own policy flag so a flat view's row carries controls alone. */}
-                {VIEW_POLICIES[mode].vitalsLane && <VitalsStripRow />}
+                {/* Mounted only while the strip is OPEN: collapsed, the row is invisible
+                    but a mounted VitalsStripRow still runs the snapshot-feed subscriptions
+                    and per-render tallies — refolding the window every poll on the lowest-
+                    powered tier for pixels no one can see. */}
+                {open && VIEW_POLICIES[mode].vitalsLane && <VitalsStripRow />}
                 {/* The phone home of the network switch (its bar slot is desktop/tablet-only):
                     the strip row is the one place the bar grows, and it has the width the
                     right zone doesn't. */}

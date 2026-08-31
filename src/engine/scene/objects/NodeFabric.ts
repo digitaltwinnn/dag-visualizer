@@ -245,8 +245,9 @@ export class NodeFabric {
   /** Theme fan-out (Globe.setColors): the chip env sheen is the GROUND's — paper welcomes it,
    *  dark keeps it subtle under the emissive look. A material built later reads the same pair
    *  through `_paper` at creation, so the two paths cannot disagree. */
-  applyGroundEnv(paper: boolean): void {
-    void paper; // _paper (set by setNodeDimTarget before this runs) is the one ground flag
+  applyGroundEnv(): void {
+    // No parameter on purpose: _paper (set by setNodeDimTarget before this runs) is the one
+    // ground flag — a paper argument here was a decoy that silently ignored its caller's value.
     this._applyEnv();
   }
 
@@ -619,7 +620,7 @@ export class NodeFabric {
       // hover/selection read as nothing in the DAG's crowded shells (user: "shows all nodes in
       // that cohort, not just that node"). With the ratio branch engaged, `back` and `boost`
       // separate on paper exactly as they do on dark. Dark is untouched (inkPresence returns s).
-      const restRef = nodeEmissive(c, d, flRaw, 0, false);
+      const restRef = _paper ? nodeEmissive(c, d, flRaw, 0, false) : 0; // paper-only input — dark's inkPresence returns s untouched
       const emiT = inkPresence(nodeEmissive(c, d, flRaw, fw, !!focusId), _paper, restRef)
         * chipPaperCalm(wChip, u.fw); // rest-only tip calm, chip share only (hyper spheres exempt)
       emi[u.index] += (emiT - emi[u.index]) * ek;
@@ -686,7 +687,7 @@ export class NodeFabric {
       // boost/dim-back — one function, both loops. The write EASES toward it
       // (dimModel.emphasisK), with metaEmi itself as the state — same as the validator loop.
       // REF engages the ratio branch for the focus vocabulary on paper — see the validator loop.
-      const restRefM = nodeEmissive(c, dEff, flRaw, 0, false);
+      const restRefM = _paper ? nodeEmissive(c, dEff, flRaw, 0, false) : 0; // paper-only — see the validator loop
       const emiT = inkPresence(nodeEmissive(c, dEff, flRaw, fw, !!focusId), _paper, restRefM)
         * chipPaperCalm(c.ledger ? 1 : wEff, r.fw); // rest-only tip calm — see the validator loop
       emi[r.index] += (emiT - emi[r.index]) * ek;

@@ -3,8 +3,8 @@
 import { useStore } from "@/src/store/store";
 import { metagraphById, filterAccent, getAnchor } from "@/src/data/network";
 import { displayNetwork } from "@/src/data/unlisted";
-import { networkKind, rolesOf, IdentityDot, RoleChips } from "@/components/inspector/parts";
-import { compositionRows } from "@/src/data/composition";
+import { metaType, rolesOf, IdentityDot, RoleChips } from "@/components/inspector/parts";
+import { compositionRows, machineKey } from "@/src/data/composition";
 import type { NodeInfo } from "@/src/data/types";
 import { identityHudCss } from "@/src/palette/identity";
 import { METATYPE_ICONS, VIEW_ICONS } from "@/components/icons";
@@ -16,7 +16,7 @@ import { POLL } from "@/src/engine/config";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { useSceneYield } from "@/components/RailShade";
 import { cn } from "@/lib/utils";
-import type { CSSProperties } from "react";
+import { useMemo } from "react";
 
 // THE VITALS BAND — the bottom instrument lane (2026-08-30, replacing the bar's vitals region;
 // docs/superpowers/plans/2026-08-30-vitals-bottom-band.md). One slim full-width row of read-only
@@ -31,9 +31,10 @@ import type { CSSProperties } from "react";
 // elsewhere: the explorer rows and the global card's pager commit ticks.
 //
 // Colour follows rule 3: micro-charts in structural cyan; the identity hue appears only under a
-// committed filter, exactly the strip's old rule — the donut and bars read `--vb-accent`, one
-// inline var per band. Identity is never colour-alone: every donut segment is named by its
-// legend row, every country bar by its code, every rate by its eyebrow (dataviz discipline).
+// committed filter, exactly the strip's old rule — resolved once per band (useVitalsScope) and
+// handed to every chart as its `accent` prop. Identity is never colour-alone: every donut
+// segment is named by its legend row, every country bar by its code, every rate by its eyebrow
+// (dataviz discipline).
 
 // The four composition segments' opacity STEPS over the one accent hue (the house device: calm
 // and dim variants are the same token at low opacity, never a bespoke tone). Fixed order, fixed
@@ -56,7 +57,7 @@ export function compositionCounts(
   for (const mg of cores) {
     const machines = new Map<string, NodeInfo>();
     for (const n of mg.nodes) {
-      const k = n.ip || JSON.stringify(n);
+      const k = machineKey(n.ip, n.id ?? JSON.stringify(n)); // THE dedup key — one home with compositionGroups
       if (!machines.has(k)) machines.set(k, n);
     }
     for (const row of compositionRows([...machines.values()]))
@@ -65,11 +66,13 @@ export function compositionCounts(
   return counts;
 }
 
+function windowSpan(a: Activity): string {
+  const mins = a.spanHr * 60;
+  return mins < 1 ? `${Math.round(mins * 60)}s` : `~${Math.round(mins)} min`;
+}
 function windowNote(a: Activity | null | undefined, unit: string): string | undefined {
   if (!a) return undefined;
-  const mins = a.spanHr * 60;
-  const span = mins < 1 ? `${Math.round(mins * 60)}s` : `${Math.round(mins)} min`;
-  return `Rate extrapolated from ${a.samples} ${unit} over ~${span}.`;
+  return `Rate extrapolated from ${a.samples} ${unit} over ${windowSpan(a)}.`;
 }
 
 /** The band's one cell recipe: a quiet plate (spineless — cards carry no resting edge signal),
@@ -77,7 +80,7 @@ function windowNote(a: Activity | null | undefined, unit: string): string | unde
  *  row DISTRIBUTES EVENLY across the full width (user, 2026-08-30 — a centred clump read as
  *  leftover; equal cards read as one designed instrument strip); a wider instrument passes its
  *  own flex via className. */
-function BandCard({ label, children, className }: { label: string; children: React.ReactNode; className?: string }) {
+export function BandCard({ label, children, className, mark }: { label: string; children: React.ReactNode; className?: string; mark?: React.ReactNode }) {
   return (
     <div className={cn(
       // The plate is the COMMAND BAR's own glass (`--topbar-glass` — a gradient token, so the
@@ -87,7 +90,10 @@ function BandCard({ label, children, className }: { label: string; children: Rea
       "flex flex-col gap-1 rounded-lg border border-border/60 [background:var(--topbar-glass)] backdrop-blur-sm px-3 py-1.5 min-w-0 flex-1 basis-0",
       className,
     )}>
-      <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground whitespace-nowrap leading-none">{label}</span>
+      <span className="flex items-center gap-1.5 leading-none">
+        {mark}
+        <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground whitespace-nowrap leading-none">{label}</span>
+      </span>
       <div className="flex items-center gap-2 min-h-0 flex-1">{children}</div>
     </div>
   );
@@ -182,33 +188,37 @@ function HyperCells({ accent }: { accent: string }) {
   const selNodes = useStore((s) => s.selNodes);
   const cfg = metagraphById(filter);
   const scoped = !!cfg || displayNetwork(filter)?.virtual === true;
-  const counts = compositionCounts(metaList, filter);
+  // Memoized on the DATA inputs: the band re-renders on every scene-yield flip and feed
+  // publish, and these fleet folds don't change with them (review, 2026-08-31).
+  const { counts, types, layers } = useMemo(() => {
+    const counts = compositionCounts(metaList, filter);
 
-  // Metagraphs by TYPE — the DAG core is not a metagraph (one node model: it is the
-  // metagraph-shaped CORE), so it stays out of this count; a committed filter scopes to it.
-  const metas = metaList.filter((m) => m.id !== "dag" && (!cfg || m.id === cfg.id));
-  const types: Record<string, number> = { data: 0, currency: 0, "data + currency": 0, unknown: 0 };
-  for (const m of metas) {
-    const kind = networkKind(m.id, m.nodes);
-    if (kind === "data and currency metagraph") types["data + currency"]!++;
-    else if (kind === "currency metagraph") types.currency!++;
-    else if (kind === "data metagraph") types.data!++;
-    else types.unknown!++; // bare "metagraph": zero locatable nodes, roles unknowable
-  }
-
-  // The layers' populations: one count per PROCESS layer across the selection's machines —
-  // rolesOf is the one fallback home (a role list, else the single primary layer).
-  const layers: Record<string, number> = { l0: 0, cl1: 0, dl1: 0 };
-  const layerScope = cfg ? metaList.filter((m) => m.id === cfg.id) : displayNetwork(filter)?.virtual === true ? [] : metaList;
-  for (const m of layerScope) {
-    const seen = new Set<string>();
-    for (const n of m.nodes) {
-      const k = n.ip || JSON.stringify(n);
-      if (seen.has(k)) continue;
-      seen.add(k);
-      for (const r of rolesOf(n)) if (r in layers) layers[r]!++;
+    // Metagraphs by TYPE — the DAG core is not a metagraph (one node model: it is the
+    // metagraph-shaped CORE), so it stays out of this count; a committed filter scopes to it.
+    // metaType is the STRUCTURED read (parts.tsx) — never a match on networkKind's prose,
+    // which a copy edit could reword without any type error reaching this bucket loop.
+    const metas = metaList.filter((m) => m.id !== "dag" && (!cfg || m.id === cfg.id));
+    const types: Record<string, number> = { data: 0, currency: 0, "data + currency": 0, unknown: 0 };
+    for (const m of metas) {
+      const t = metaType(m.id, m.nodes);
+      if (t in types) types[t]!++; // "hypergraph" can't occur — the dag row is filtered above
     }
-  }
+
+    // The layers' populations: one count per PROCESS layer across the selection's machines —
+    // rolesOf is the one fallback home (a role list, else the single primary layer).
+    const layers: Record<string, number> = { l0: 0, cl1: 0, dl1: 0 };
+    const layerScope = cfg ? metaList.filter((m) => m.id === cfg.id) : displayNetwork(filter)?.virtual === true ? [] : metaList;
+    for (const m of layerScope) {
+      const seen = new Set<string>();
+      for (const n of m.nodes) {
+        const k = machineKey(n.ip, n.id ?? JSON.stringify(n)); // one home with compositionCounts/compositionGroups
+        if (seen.has(k)) continue;
+        seen.add(k);
+        for (const r of rolesOf(n)) if (r in layers) layers[r]!++;
+      }
+    }
+    return { counts, types, layers };
+  }, [metaList, filter, cfg]);
 
   // A COMMITTED SCOPE flips the card from a DISTRIBUTION to a CHARACTERISTIC (user, 2026-08-30:
   // "'currency 1' and a bar ... is more a single characteristic than a count"): one network has a
@@ -286,12 +296,14 @@ function GeoCells({ accent }: { accent: string }) {
   const selNodes = useStore((s) => s.selNodes);
   const countries = lb?.countries ?? [];
   const total = selNodes.length;
-  const ispCounts = new Map<string, number>();
-  for (const r of selNodes) {
-    const isp = "geo" in r.pick ? r.pick.geo?.isp : undefined;
-    if (isp) ispCounts.set(isp, (ispCounts.get(isp) ?? 0) + 1);
-  }
-  const topIsps = [...ispCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
+  const { ispCounts, topIsps } = useMemo(() => {
+    const ispCounts = new Map<string, number>();
+    for (const r of selNodes) {
+      const isp = "geo" in r.pick ? r.pick.geo?.isp : undefined;
+      if (isp) ispCounts.set(isp, (ispCounts.get(isp) ?? 0) + 1);
+    }
+    return { ispCounts, topIsps: [...ispCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3) };
+  }, [selNodes]);
   const topCountries = countries.slice(0, 3);
   const restC = countries.slice(3).reduce((s, c) => s + c.count, 0);
   return (
@@ -322,10 +334,9 @@ function GeoCells({ accent }: { accent: string }) {
 // interaction: unfiltered each bar is the tick's TOTAL anchors in cyan on the window max;
 // filtered it is THAT network's own anchors on its OWN scale in its identity hue, empty ticks
 // as honest gaps. Only the newest bar glows. A regular bar chart, nothing more.
-function TickBars({ accent, isMeta, filter }: { accent: string; isMeta: boolean; filter: string }) {
-  // The FULL retained window (the old strip's own choice): a fixed slice left the wide card's
-  // right side empty (user, 2026-08-30 — "a lot of room available to the right").
-  const { snaps } = useSnapshotFeed(POLL.maxSnapshots);
+type Snaps = ReturnType<typeof useSnapshotFeed>["snaps"];
+
+function TickBars({ accent, isMeta, filter, snaps }: { accent: string; isMeta: boolean; filter: string; snaps: Snaps }) {
   const bars = snaps.map((d) => {
     const total = typeof d.metagraphSnapshotCount === "number" ? d.metagraphSnapshotCount : 0;
     const mine = isMeta ? getAnchor(d.timestamp)?.metaCounts?.get(filter) ?? 0 : total;
@@ -342,9 +353,14 @@ function TickBars({ accent, isMeta, filter }: { accent: string; isMeta: boolean;
             key={b.ord}
             className="flex-1 max-w-[9px] rounded-t-[2px]"
             style={{
-              height: b.v > 0 ? `${Math.max(8, (b.v / max) * 100)}%` : "2px",
-              background: accent,
-              opacity: b.v > 0 ? (latest ? 1 : 0.55) : 0.18,
+              // Zero anchors = an HONEST GAP (rule 10, the strip's own rendering carried over
+              // exactly): no body at all, never a stub — a 2px tinted mark read as
+              // small-but-nonzero activity, precisely the fabricated quantity the filtered
+              // sparse-cadence read exists to avoid. The span keeps its flex slot so the
+              // window's rhythm (position = time) survives the empty ticks.
+              height: b.v > 0 ? `${Math.max(8, (b.v / max) * 100)}%` : "0",
+              background: b.v > 0 ? accent : "none",
+              opacity: b.v > 0 ? (latest ? 1 : 0.55) : 0,
               boxShadow: latest && b.v > 0 ? `0 0 6px ${accent}` : undefined,
             }}
           />
@@ -359,6 +375,11 @@ function TickBars({ accent, isMeta, filter }: { accent: string; isMeta: boolean;
 // the network's DAG fees show instead), and the tick chart as one wide card.
 function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
   const activity = useStore((s) => s.activity);
+  // ONE feed subscription for the whole row (review, 2026-08-31 — TickBars and
+  // AnchoringNetworks each kept their own duplicate window state and listeners). The FULL
+  // retained window is the old strip's own choice: a fixed slice left the wide card's right
+  // side empty (user, 2026-08-30 — "a lot of room available to the right").
+  const { snaps } = useSnapshotFeed(POLL.maxSnapshots);
   const scoped = !isGlobalActivityScope(filter);
   const cfg = metagraphById(filter);
   const isMeta = !!cfg && filter !== "all" && filter !== "dag";
@@ -368,6 +389,10 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
       <span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap"><Odometer value={value} /></span>
       {/* stretch: the fixed 64px chart left the card's right half empty (user, 2026-08-30) */}
       <span className="flex-1 min-w-0 self-center"><Sparkline data={spark} color="var(--primary)" height={26} stretch /></span>
+      {/* The extrapolation window, VISIBLE (rule 10): the basis is part of the reading, and the
+          band's pointer-events-none root means a title tooltip can never fire — sr-only alone
+          left sighted pointer users reading an extrapolated rate as a measured fact. */}
+      {activity && <span className="text-micro text-muted-foreground whitespace-nowrap self-end pb-1">{windowSpan(activity)}</span>}
       {note && <span className="sr-only">{note}</span>}
     </BandCard>
   );
@@ -375,13 +400,13 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
   // the roster leads, the anchor rate beside it, the cadence, and the chart closes the row.
   return (
     <>
-      <AnchoringNetworks />
+      <AnchoringNetworks snaps={snaps} />
       {scoped
         ? rate("DAG fees/hour", activity?.feesPerHour, activity?.feesSeries, basis && `$DAG this network pays to anchor. ${basis}`)
         : rate("Anchors/hour", activity?.anchorsPerHour, activity?.anchoredSeries, basis && `Metagraph snapshots anchored into the global chain. ${basis}`)}
       {rate("Snapshots/hour", activity?.snapsPerHour, activity?.cadenceSeries, basis)}
       <BandCard label="Anchors per global snapshot" className="flex-[2] min-w-[220px]">
-        <TickBars accent={accent} isMeta={isMeta} filter={filter} />
+        <TickBars accent={accent} isMeta={isMeta} filter={filter} snaps={snaps} />
       </BandCard>
     </>
   );
@@ -391,8 +416,7 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
 // own id sets, never inferred) — with each network's identity dot: the app-wide identity-dot
 // language (a presence roster, not a chart series), names carried sr-only since the band takes
 // no pointer events. A committed filter is a LENS: the window-wide fact stands un-edited.
-function AnchoringNetworks() {
-  const { snaps } = useSnapshotFeed(POLL.maxSnapshots);
+function AnchoringNetworks({ snaps }: { snaps: Snaps }) {
   const ids = new Set<string>();
   for (const d of snaps) {
     const mc = getAnchor(d.timestamp)?.metaCounts;
@@ -410,41 +434,56 @@ function AnchoringNetworks() {
   );
 }
 
-/** The band. Mounted by BottomStream (per viewPolicy.vitalsLane + scene pose + rails visible);
- *  this component reads the mode only to pick which view's cells to lay out. */
-export default function VitalsBand() {
+/** The one scope read both presentations share (review, 2026-08-31 — the band and the phone
+ *  strip row are billed as THE SAME cards, so their store reads and accent rule live once).
+ *  Rule 3: structural cyan is the charts' resting hue; a committed filter re-points the accent
+ *  at the identity hue (the strip's old rule, kept). */
+function useVitalsScope() {
   const mode = useStore((s) => s.mode);
   const live = useStore((s) => s.live);
   const filter = useStore((s) => s.filter);
+  const accent = (filter !== "all" ? filterAccent(filter) : null) ?? "var(--primary)";
+  return { mode, live, filter, accent };
+}
+
+/** The one view→cells dispatch — a cell added or gated here reaches desktop and phone in the
+ *  same edit, which is the whole point of extracting it. */
+function ViewCells({ mode, accent, filter }: { mode: string; accent: string; filter: string }) {
+  return (
+    <>
+      {mode === "hyper" && <HyperCells accent={accent} />}
+      {mode === "geo" && <GeoCells accent={accent} />}
+      {mode === "ledger" && <LedgerCells accent={accent} filter={filter} />}
+    </>
+  );
+}
+
+/** The band. Mounted by BottomStream (per viewPolicy.vitalsLane + scene pose + rails visible);
+ *  this component reads the mode only to pick which view's cells to lay out. */
+export default function VitalsBand() {
+  const { mode, live, filter, accent } = useVitalsScope();
   // The band steps back with the rails while the user's hand is on the camera (user, 2026-08-30)
   // — the same one read the RailShade dims on, at the recipe's own tempos (away 0.3s, the return
   // faster: it answers a gesture already finished).
   const yielding = useSceneYield();
-  const scopeHue = filter !== "all" ? filterAccent(filter) : null;
-  // Rule 3: structural cyan is the charts' resting hue; a committed filter re-points the one
-  // accent var at the identity hue (the strip's old rule, kept).
-  const accent = scopeHue ?? "var(--primary)";
   return (
     <section
       id="vitalsband"
       aria-label="View vitals"
       className={cn(
         // pointer-events-none: the band is a read-only instrument — orbit drags pass through it.
-        // 26px each side — the RAILS' own outer margin (#leftcol/#rightcol, globals.css), so the
+        // --rail-margin each side — the RAILS' own outer margin token (globals.css), so the
         // band's edges align with the rail cards and never cover the RailThread rulers that live
         // in that margin (user, 2026-08-30: the band "sits on top of the rail of the side panels").
-        "fixed z-10 left-[26px] right-[26px] bottom-[calc(var(--footer-h,0px)+10px)] pointer-events-none",
+        "fixed z-10 left-[var(--rail-margin)] right-[var(--rail-margin)] bottom-[calc(var(--footer-h,0px)+10px)] pointer-events-none",
         "flex items-stretch gap-2",
         "transition-opacity duration-[180ms] ease-out motion-reduce:transition-none",
         yielding && "opacity-40 duration-300",
         !live && "saturate-[.45]",
       )}
-      style={{ ["--vb-accent"]: accent } as CSSProperties}
     >
       {!live && <span className="self-center"><NoSignalDot /></span>}
-      {mode === "hyper" && <HyperCells accent={accent} />}
-      {mode === "geo" && <GeoCells accent={accent} />}
-      {mode === "ledger" && <LedgerCells accent={accent} filter={filter} />}
+      <ViewCells mode={mode} accent={accent} filter={filter} />
       {/* NO filter-scope hairline (user, 2026-08-30 — removed): unlike the old bar cluster's
           bare numbers, the band's own charts already wear the identity accent under a filter,
           so the scope is stated by the vitals themselves. */}
@@ -457,13 +496,9 @@ export default function VitalsBand() {
  *  already where phone vitals live and growing downward is its one mechanism, so no new surface
  *  or vertical space is claimed. Cards go content-sized (`flex-none basis-auto` overrides the
  *  band's even distribution at higher specificity) with a floor so the stretch sparklines have
- *  real width to measure. TopBar gates the row on `vitalsLane`, the band's own policy flag. */
+ *  real width to measure. TopBar gates the row on `vitalsLane` AND on the strip being open. */
 export function VitalsStripRow() {
-  const mode = useStore((s) => s.mode);
-  const live = useStore((s) => s.live);
-  const filter = useStore((s) => s.filter);
-  const scopeHue = filter !== "all" ? filterAccent(filter) : null;
-  const accent = scopeHue ?? "var(--primary)";
+  const { mode, live, filter, accent } = useVitalsScope();
   return (
     <div
       className={cn(
@@ -471,12 +506,9 @@ export function VitalsStripRow() {
         "[&>*]:flex-none [&>*]:basis-auto [&>*]:min-w-[150px]",
         !live && "saturate-[.45]",
       )}
-      style={{ ["--vb-accent"]: accent } as CSSProperties}
     >
       {!live && <span className="self-center flex-none min-w-0!"><NoSignalDot /></span>}
-      {mode === "hyper" && <HyperCells accent={accent} />}
-      {mode === "geo" && <GeoCells accent={accent} />}
-      {mode === "ledger" && <LedgerCells accent={accent} filter={filter} />}
+      <ViewCells mode={mode} accent={accent} filter={filter} />
     </div>
   );
 }

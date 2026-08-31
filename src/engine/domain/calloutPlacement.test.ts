@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CALLOUT_LEG_INSET,
   CALLOUT_OFF_X,
   CALLOUT_OFF_Y,
   CALLOUT_REACH_X,
@@ -97,5 +98,15 @@ describe("calloutPlacement against an overlaying sheet", () => {
   it("declines when the sheets leave no band at all", () => {
     expect(calloutPlacement(450, 500, 600, 300, 0).show).toBe(false);
     expect(calloutPlacement(450, 500, 450, 450, 0).show).toBe(false);
+  });
+});
+
+// The leader-end inset — where the leader INK stops short of the panel corner. Both owners
+// (SceneCallout's primary leader, Engine's multi-leader fan corner) read this one constant;
+// the pin is that it stays a small positive inset, well inside the leader's own run.
+describe("CALLOUT_LEG_INSET", () => {
+  it("is a small positive inset inside the leader's run", () => {
+    expect(CALLOUT_LEG_INSET).toBeGreaterThan(0);
+    expect(CALLOUT_LEG_INSET).toBeLessThan(CALLOUT_OFF_Y);
   });
 });
