@@ -4,7 +4,7 @@ import { useStore, type Mode } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR, resolveSignerIps } from "@/src/data/network";
 import { ledgerLens, tickInStory } from "@/src/data/ledgerStory";
-import { reportPoll } from "@/src/data/api";
+import { reportPoll, touchPoll } from "@/src/data/api";
 import { STALE_FACTOR } from "@/src/data/pollStatus";
 import { LISTED_IDS, UNLISTED_ID, UNLISTED_SCENE_HEX_BY_THEME } from "@/src/data/unlisted";
 import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
@@ -41,7 +41,7 @@ import { snapsAtTick } from "@/src/data/anchorLog";
 // CameraDirector's (see its header).
 import { type Tap, DOUBLE_TAP_SLOP, isDoubleTap } from "./domain/tapZoom";
 import { auditInstances, findingKey, type InstanceFinding } from "./scene/instanceAudit";
-import { CalloutSync } from "./CalloutSync";
+import { CalloutSync, type CalloutState } from "./CalloutSync";
 import { DevTunePanel } from "./DevTunePanel";
 import { CameraDirector } from "./CameraDirector";
 import type { GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
@@ -828,6 +828,12 @@ export class Engine {
       // real, just old, and "failing" is a different and louder claim. A route that doesn't publish
       // `ageMs` (an older deploy) counts as fresh — fail open, never invent staleness.
       const fresh = typeof ageMs !== "number" || ageMs <= POLL.metaRefreshMs * STALE_FACTOR;
+      // The row must EXIST either way. If the very first response is reachable-but-stale, reporting
+      // nothing would leave the feed missing from the strip entirely rather than showing its state
+      // — silence standing in for a reading, which is the exact gap this change set closes
+      // elsewhere. `touchPoll` creates it with no outcome, so it reads "acquiring" until a fresh
+      // payload lands and then ages into STALE on its own.
+      touchPoll("api-metagraphs");
       if (fresh) reportPoll("api-metagraphs", true);
       if (geo) this.geoMap = { ...this.geoMap, ...geo };
       const changed = JSON.stringify(metagraphs) !== JSON.stringify(this.metaData);
@@ -1926,13 +1932,22 @@ export class Engine {
   // resolution that shared nothing with the rest of the Engine. What stays here is the BRIDGE:
   // the Engine reads the store once and hands the callout the narrow slice it declares, so
   // rule 1's "Engine.ts is the only store bridge" survives the extraction.
+  // ⚠️ MUTATED, NEVER RE-ALLOCATED (rule 5). This runs every frame, and the first cut built a fresh
+  // eight-property literal each time — contradicting CalloutSync's own header and invisible to
+  // `noFrameAllocations.test.ts`, which matches `new THREE.*`/`.clone()` and cannot see an object
+  // literal. `CalloutSync` copies nothing out of it and holds it only for the duration of `sync`,
+  // so one buffer is safe; nothing may retain the reference across frames.
+  private _calloutState: CalloutState = {
+    inspect: null, snap: null, metaSnap: null, boxedCard: null,
+    country: null, cohort: null, sceneCoverL: 0, sceneCoverR: 0,
+  };
   private _syncCallout(): void {
     const st = useStore.getState();
-    this.callout.sync({
-      inspect: st.inspect, snap: st.snap, metaSnap: st.metaSnap,
-      boxedCard: st.boxedCard, country: st.country, cohort: st.cohort,
-      sceneCoverL: st.sceneCoverL, sceneCoverR: st.sceneCoverR,
-    });
+    const c = this._calloutState;
+    c.inspect = st.inspect; c.snap = st.snap; c.metaSnap = st.metaSnap;
+    c.boxedCard = st.boxedCard; c.country = st.country; c.cohort = st.cohort;
+    c.sceneCoverL = st.sceneCoverL; c.sceneCoverR = st.sceneCoverR;
+    this.callout.sync(c);
   }
 
 

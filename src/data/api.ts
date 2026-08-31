@@ -44,6 +44,20 @@ export function reportPoll(id: FeedId, ok: boolean): void {
   if (!r) { r = { id, label: d.label, target: d.target, everyMs: d.everyMs, lastOkAt: null, lastErrAt: null, ok: 0, err: 0 }; POLL_HEALTH.set(id, r); }
   if (ok) { r.lastOkAt = Date.now(); r.ok++; } else { r.lastErrAt = Date.now(); r.err++; }
 }
+/** Ensure a feed has a ROW without recording an outcome.
+ *
+ *  A feed that has been reached but has never delivered anything usable still belongs in the strip
+ *  — as "acquiring", which is exactly what `pollStatusOf` returns for a row with no `lastOkAt`.
+ *  Without this, a first response that is reachable but STALE reports nothing at all and the feed
+ *  is simply absent from the panel: the same silent denial this registry exists to prevent, one
+ *  level up. */
+export function touchPoll(id: FeedId): void {
+  const d = FEEDS[id];
+  if (!POLL_HEALTH.has(id)) {
+    POLL_HEALTH.set(id, { id, label: d.label, target: d.target, everyMs: d.everyMs, lastOkAt: null, lastErrAt: null, ok: 0, err: 0 });
+  }
+}
+
 /** The registry, in stable insertion order — the pulse strip's one read. */
 export function pollHealthRows(): PollHealth[] {
   return [...POLL_HEALTH.values()];

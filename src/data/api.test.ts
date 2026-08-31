@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { staleTickKeys, isGlobalActivityScope, shortHash, fanOut, cycleOk } from "./api";
+import { staleTickKeys, isGlobalActivityScope, shortHash, fanOut, cycleOk, touchPoll, reportPoll, pollHealthRows } from "./api";
 import { vi, afterEach } from "vitest";
 
 // api.ts is exempt from dataExportCoverage (it IS the live feed). These cover the PURE parts only
@@ -128,5 +128,29 @@ describe("cycleOk", () => {
   it("a wholly healthy cycle passes", () => {
     expect(cycleOk([ok(true), ok(true), ok(true)])).toBe(true);
     expect(cycleOk([])).toBe(true); // nothing asked, nothing failed
+  });
+});
+
+describe("touchPoll", () => {
+  it("creates a feed's row without claiming an outcome", () => {
+    // The gap this closes: a first response that is reachable but STALE reports nothing, and the
+    // feed then goes MISSING from the pulse strip rather than showing a state — silence standing
+    // in for a reading. A row with no lastOkAt reads as "acquiring", which is the truth.
+    touchPoll("api-geo");
+    const row = pollHealthRows().find((r) => r.id === "api-geo");
+    expect(row).toBeDefined();
+    expect(row!.lastOkAt).toBeNull();
+    expect(row!.ok).toBe(0);
+    expect(row!.err).toBe(0);
+  });
+
+  it("never disturbs a row that already has outcomes", () => {
+    reportPoll("clusters", true);
+    const before = pollHealthRows().find((r) => r.id === "clusters")!;
+    const okAt = before.lastOkAt, okN = before.ok;
+    touchPoll("clusters");
+    const after = pollHealthRows().find((r) => r.id === "clusters")!;
+    expect(after.lastOkAt).toBe(okAt);
+    expect(after.ok).toBe(okN);
   });
 });

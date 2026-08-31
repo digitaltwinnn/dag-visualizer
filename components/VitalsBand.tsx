@@ -324,7 +324,13 @@ function GeoCells({ accent }: { accent: string }) {
   }, [selNodes]);
   const topCountries = countries.slice(0, 3);
   const restC = countries.slice(3).reduce((s, c) => s + c.count, 0);
-  const restI = total - topIsps.reduce((s, [, n]) => s + n, 0);
+  // ⚠️ THE REMAINDER MUST SHARE THE RING'S OWN BASIS. Against `total` (every selected node) this
+  // swept nodes with NO reported provider into `other`, so the ring described a population the
+  // hole's `ispCounts.size` never counted — the slices' proportions were of one set and the number
+  // beside them of another. Summing ispCounts keeps both on the nodes that actually report one.
+  // (The country ring was already right: its remainder is summed from `countries`.)
+  const ispTotal = [...ispCounts.values()].reduce((a, b) => a + b, 0);
+  const restI = ispTotal - topIsps.reduce((s, [, n]) => s + n, 0);
 
   // THE TOTAL MOVES INTO ITS OWN BREAKDOWN (user, 2026-08-31): "countries" and "providers" were
   // bare number cards sitting next to the very lists that break those numbers down, so the row

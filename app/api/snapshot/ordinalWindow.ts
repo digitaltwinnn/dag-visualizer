@@ -43,6 +43,12 @@ export function inServedWindow(ordinal: number, latest: number | null): boolean 
 // gate and the truth. Per-instance rather than shared, which costs at most one 20-byte read per
 // instance per minute — a price worth paying to make a correctness gate deterministic.
 const REF_TTL_MS = 60_000;
+// ⚠️ THE FORCED RE-READ NEEDS ITS OWN FLOOR, or it hands back the abuse bound the gate exists for:
+// every out-of-window request would force an uncoalesced upstream call, so a loop over nonsense
+// ordinals costs one ~4s L0 round trip EACH instead of being refused for free. Within the floor a
+// burst of refusals shares a single read — which loses nothing, because the case the force exists
+// for is a reference stale by MINUTES, not by five seconds.
+const REF_FLOOR_MS = 5_000;
 const refCache = new Map<NetworkId, { value: number; at: number }>();
 
 async function readLatest(net: NetworkId): Promise<number> {
@@ -60,7 +66,8 @@ async function readLatest(net: NetworkId): Promise<number> {
 /** The reference, refreshed past its TTL. Throwing keeps a blip from being stored (caller fails open). */
 async function latestOrdinal(net: NetworkId, force = false): Promise<number> {
   const hit = refCache.get(net);
-  if (!force && hit && Date.now() - hit.at < REF_TTL_MS) return hit.value;
+  const age = hit ? Date.now() - hit.at : Infinity;
+  if (hit && age < (force ? REF_FLOOR_MS : REF_TTL_MS)) return hit.value;
   const value = await readLatest(net);
   refCache.set(net, { value, at: Date.now() });
   return value;
@@ -80,7 +87,11 @@ export async function withinServedWindow(net: NetworkId, ordinal: number): Promi
     latest = await latestOrdinal(net);
     if (!inServedWindow(ordinal, latest)) latest = await latestOrdinal(net, true);
   } catch {
-    /* reference unavailable — fail open (see inServedWindow) */
+    // FAIL OPEN, and that means DISCARDING what we had. Leaving the first read's value here would
+    // refuse the ordinal on the very reference the forced re-read was called to distrust — a
+    // transient LB blip would then deny a perfectly servable ordinal, which is the failure this
+    // whole function was rewritten to prevent.
+    latest = null;
   }
   return inServedWindow(ordinal, latest);
 }
