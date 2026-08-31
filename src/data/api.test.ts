@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { staleTickKeys, isGlobalActivityScope, shortHash } from "./api";
+import { staleTickKeys, isGlobalActivityScope, shortHash, fanOut, cycleOk } from "./api";
+import { vi, afterEach } from "vitest";
 
 // api.ts is exempt from dataExportCoverage (it IS the live feed). These cover the PURE parts only
 // — nothing here touches the singleton, the network or timers.
@@ -73,5 +74,59 @@ describe("shortHash", () => {
   });
   it("elides the middle, keeping both ends addressable", () => {
     expect(shortHash("245916e12f200122a3943e2ed4c525148bb8f80c5a583")).toBe("245916e1…c5a583");
+  });
+});
+
+// Both of these were CHANGED on 2026-08-31 with no coverage at all, because api.ts is exempt from
+// dataExportCoverage (it IS the live feed). The exemption is about I/O; these two are logic, so
+// they were pulled out to where a test can reach them.
+
+describe("fanOut", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("one throwing listener does not silence the ones after it", () => {
+    // The defect: an unguarded forEach stopped the whole fan-out at the first throw, so a single
+    // buggy consumer froze every listener registered later — for that event, for the session.
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const seen: string[] = [];
+    fanOut(
+      [
+        () => seen.push("first"),
+        () => { throw new Error("boom"); },
+        () => seen.push("third"),
+      ],
+      null,
+    );
+    expect(seen).toEqual(["first", "third"]);
+  });
+
+  it("never rethrows, and never swallows in silence", () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() => fanOut([() => { throw new Error("boom"); }], null, "status")).not.toThrow();
+    expect(err).toHaveBeenCalledTimes(1);
+    expect(String(err.mock.calls[0]?.[0])).toContain("status");
+  });
+
+  it("delivers the payload to every listener", () => {
+    const got: number[] = [];
+    fanOut([(p: number) => got.push(p), (p: number) => got.push(p * 2)], 21);
+    expect(got).toEqual([21, 42]);
+  });
+});
+
+describe("cycleOk", () => {
+  const ok = (v: boolean): PromiseSettledResult<boolean> => ({ status: "fulfilled", value: v });
+  const rejected: PromiseSettledResult<boolean> = { status: "rejected", reason: new Error("x") };
+
+  it("one sick metagraph fails the CYCLE — it cannot hide behind healthy siblings", () => {
+    // The defect: reporting per metagraph meant eleven successes refreshed `lastOkAt` in the same
+    // cycle as one persistent failure, so the pulse strip's dot stayed green while a feed was down.
+    expect(cycleOk([ok(true), ok(true), ok(false)])).toBe(false);
+    expect(cycleOk([ok(true), rejected, ok(true)])).toBe(false);
+  });
+
+  it("a wholly healthy cycle passes", () => {
+    expect(cycleOk([ok(true), ok(true), ok(true)])).toBe(true);
+    expect(cycleOk([])).toBe(true); // nothing asked, nothing failed
   });
 });

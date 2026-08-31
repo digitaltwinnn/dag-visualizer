@@ -63,6 +63,30 @@ export function staleTickKeys(keys: Iterable<string>, max: number): string[] {
   return all.sort().slice(0, all.length - max);
 }
 
+/** Fan one event out to its listeners, each ISOLATED.
+ *
+ *  These reach the scene, the store and the panels, and an unguarded `forEach` let ONE throwing
+ *  consumer silence every listener registered after it — for that event, for the rest of the
+ *  session — surfacing as unrelated frozen UI far from the cause. Rethrow-free but never silent:
+ *  the error still reaches the console. Pure enough to test; exported for that reason. */
+export function fanOut<T>(listeners: ReadonlyArray<(p: T) => void>, payload: T, evt = ""): void {
+  for (const f of listeners) {
+    try {
+      f(payload);
+    } catch (err) {
+      console.error(`NetworkData: a "${evt}" listener threw`, err);
+    }
+  }
+}
+
+/** Did a whole metagraph refresh CYCLE succeed? One row per FEED means the row must answer for the
+ *  feed, not for whichever member reported last: reporting per metagraph let a single persistently
+ *  failing one hide behind its healthy siblings refreshing `lastOkAt` in the same cycle. A settled
+ *  rejection counts as failure, and so does an explicit `false` from `_refreshOneMeta`. */
+export function cycleOk(results: ReadonlyArray<PromiseSettledResult<boolean>>): boolean {
+  return results.every((r) => r.status === "fulfilled" && r.value !== false);
+}
+
 export interface NetworkEvents {
   global: { reset: boolean; snapshots?: GlobalSnapshot[]; snapshot?: GlobalSnapshot; latest: GlobalSnapshot | null };
   status: { live: boolean; lastGoodAt: number | null };
@@ -183,18 +207,8 @@ export class NetworkData {
     this.listeners[evt] = (this.listeners[evt] || []).filter((f) => f !== fn) as ListenerMap[K];
     return this;
   }
-  // Each listener is isolated. These are fanned out to the scene, the store and the panels, and
-  // an unguarded forEach let ONE throwing consumer silence every listener registered after it —
-  // for that event, for the rest of the session, with the failure appearing as unrelated frozen
-  // UI far from its cause. Rethrow-free but never silent: the error still reaches the console.
   private _emit<K extends keyof NetworkEvents>(evt: K, payload: NetworkEvents[K]): void {
-    for (const f of this.listeners[evt]) {
-      try {
-        f(payload);
-      } catch (err) {
-        console.error(`NetworkData: a "${evt}" listener threw`, err);
-      }
-    }
+    fanOut(this.listeners[evt], payload, evt);
   }
 
   private async _fetchJson(url: string): Promise<any> {
@@ -373,7 +387,7 @@ export class NetworkData {
     // cycle, so the strip's derived dot stayed green while a feed was down. One row per FEED means
     // the row must answer for the whole feed.
     const results = await Promise.allSettled(METAGRAPHS.map((m) => this._refreshOneMeta(m, limit)));
-    reportPoll("metasnaps", results.every((r) => r.status === "fulfilled" && r.value !== false));
+    reportPoll("metasnaps", cycleOk(results));
   }
 
   /** Returns false when this metagraph's read failed — `_refreshMeta` aggregates the cycle's
