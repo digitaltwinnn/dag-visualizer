@@ -412,4 +412,7 @@ none does — and its data, derived from the exact reads, **the only honest sour
 buffers only track the catalog. It is committable in every view: geo and hyper land in the honest
 quiet-empty state (no machines are knowable), the ledger lights its lane and dims the rest.
 
-`components/unlistedBoundary.test.ts` enforces the single home.
+`components/unlistedBoundary.test.ts` enforces the single home. Its two identity LITERALS sit one
+file down in `src/data/unlistedId.ts`, a leaf with no imports, re-exported by `unlisted.ts` — the
+only way network.ts and ledgerStory.ts can name the id without closing an import cycle back
+through it (`src/data/noImportCycles.test.ts` keeps the graph acyclic).

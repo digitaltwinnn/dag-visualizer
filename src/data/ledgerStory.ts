@@ -13,7 +13,8 @@
 // index; the UNLISTED set answers from the exact reads (the only honest source); "all"/"dag"
 // have no per-network story (null/undefined — the filter never releases).
 import { metagraphById } from "@/src/data/network";
-import { UNLISTED_ID } from "@/src/data/unlisted";
+import { UNLISTED_ID } from "@/src/data/unlistedId";  // the LEAF, not unlisted.ts: importing the
+// network module here would close an import cycle (see src/data/unlistedId.ts).
 import type { Anchor, SnapshotExact } from "@/src/data/types";
 
 /** How many snapshots `filter` anchored into a tick — its story-membership count, or null when
