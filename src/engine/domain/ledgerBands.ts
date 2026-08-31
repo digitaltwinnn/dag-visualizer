@@ -5,14 +5,14 @@
 // Honesty rules encoded here, not in the adapter:
 //   • no exact read yet          → `measured: false`, minimum width, NO bands (never inferred
 //                                  from anchor count and never from the fee)
-//   • measured, anchored nothing → a minimum-width SEAM (the tick still happened)
+//   • measured, anchored nothing → the SEAM at the SEED's square footprint, full height
 //   • over the fixed reference   → the WIDTH clips at the floor edge rather than rescaling the
 //                                  whole past; the scene's SIZE column states the true size in
 //                                  words, which is the honest answer the clip itself can't give
 //
 // Allocation-free after construction: `makeBarSpec()` preallocates one band record per listed
 // metagraph plus the unlisted aggregate, and `fillBarSpec()` only writes into them.
-import { BAR_MAX_W, BAR_MIN_W, BYTE_SCALE_KB, lanePlaneHalf } from "./ledgerLayout";
+import { BAR_MAX_W, BAR_MIN_W, SEED_W, BYTE_SCALE_KB, lanePlaneHalf } from "./ledgerLayout";
 import { METAGRAPHS } from "@/src/net/current";
 
 /** The band key for every anchor from a metagraph that isn't publicly listed. */
@@ -78,7 +78,14 @@ export function fillBarSpec(
   }
   out.z0 = -out.width / 2; // centered on the lane field (user, 2026-08-06)
 
-  if (total <= 0) return out; // a measured tick that anchored nothing: the seam, no bands
+  if (total <= 0) {
+    // The SEAM — measured, anchored nothing. It wears the SEED's own square footprint (user,
+    // 2026-08-30): the two special rows share one shape and HEIGHT alone separates them (flat =
+    // unread, full = measured-empty), so neither ever makes a width claim the other doesn't.
+    out.width = SEED_W;
+    out.z0 = -SEED_W / 2;
+    return out;
+  }
 
   let z = out.z0;
   let n = 0;

@@ -3,7 +3,7 @@ import { METAGRAPHS } from "@/src/net/current";
 import {
   LEDGER, LAYER_GEOM, ledgerSite, clusterRadius, ledgerSpread,
   FLOOR_IDS, FLOOR_Y, LANE_HALF_Z, PLANE_FIELD_HALF,
-  BAR_MAX_W, BAR_MIN_W, BAR_H, BAR_D, BYTE_SCALE_KB, BYTE_SCALE_KB_BY_NET, BAR_EDGE_MARGIN,
+  BAR_MAX_W, BAR_MIN_W, SEED_W, BAR_H, BAR_D, BYTE_SCALE_KB, BYTE_SCALE_KB_BY_NET, BAR_EDGE_MARGIN,
   CONT_X, CONT_TOP_GAP, CONT_CHIP_Z, CONT_ROW_Y, CONT_PAD, CONT_Z0, CONT_Z1,
   LEAD_X, TILE_LIFT, BAR_LIFT,
   FLOOR_W, FLOOR_CX, FLOOR_FRONT_X, FLOOR_BACK_X,
@@ -116,6 +116,10 @@ describe("two-floor chamber (redesign 2026-08-04)", () => {
     expect(BAR_EDGE_MARGIN).toBeGreaterThan(0);
     expect(BAR_MIN_W).toBeGreaterThan(0);
     expect(BAR_MIN_W).toBeLessThan(BAR_MAX_W);
+    // The special rows' shared footprint: wider than the measured floor (it is a SHAPE, not a
+    // width claim) and nowhere near a real bar's reach.
+    expect(SEED_W).toBeGreaterThan(BAR_MIN_W);
+    expect(SEED_W).toBeLessThan(BAR_MAX_W);
     expect(BAR_H).toBeGreaterThan(0);
     // Depth stays inside one slot so consecutive ticks never touch.
     expect(BAR_D).toBeLessThan(3.6);

@@ -489,7 +489,7 @@
      deeper grey than the page so ink pops, marks can exceed the ground, and a calm bloom is
      physically possible again. The HUD page keeps --background's paper; dark side is
      --background's dark verbatim, so the dark scene is byte-identical. */
-  --scene-ground: light-dark(oklch(0.81 0.005 85), oklch(0.09 0.02 265)); /* near-neutral, faint warm bias oklch(0.81 0.005 85) — blue read cold, full greige read dirty (user, 2026-08-29); keep LIGHT_TUNE.groundL AND devTune's ground override in sync */
+  --scene-ground: light-dark(oklch(0.88 0.01 250), oklch(0.09 0.02 265)); /* cool silver oklch(0.88 0.01 250) — the warm greige read brown; L raised 0.81 → 0.88 with the user's 2026-08-30 export (pairs with bgTint 1); keep LIGHT_TUNE.groundL AND devTune's ground override in sync */
   /* The card elevation pair, ONE home for three recipes (`.ig-panel`, `.subject-paired`, the boxed
      rail rung) — they must keep matching, and a token matches by construction where the previous
      "restate the literal" arrangement matched by discipline. Theme-aware since 2026-08-29: pure
@@ -626,11 +626,6 @@
     light-dark(rgba(240, 244, 252, 0.80), rgba(10, 14, 28, 0.76)));
   --scrim: light-dark(rgba(235, 240, 250, 0.16), rgba(3, 5, 12, 0.16));
   --scrim-shadow: light-dark(rgba(235, 240, 250, 0.7), rgba(3, 5, 12, 0.7));
-  /* The footer's legibility halo over the scene — dark glow on the dark scene, a paper glow on
-     the light wall (the hardcoded black pair read as a dirty smudge there — user, 2026-08-29).
-     light-dark() per colour stop, since it is <color>-only. */
-  --footer-halo: 0 0 3px light-dark(rgba(248, 250, 255, 0.9), rgba(0, 0, 0, 0.9)),
-    0 0 10px light-dark(rgba(248, 250, 255, 0.95), rgba(0, 0, 0, 0.95));
   /* The thread's punch-through tone — the PAGE, so the ruler reads as cut out of the ground
      rather than drawn on it. It duplicates --background's light value on purpose (a var() here
      would resolve against the wrong element in the SVG); the two move together. */
@@ -644,7 +639,7 @@
      spacing scale, one "selected" treatment; component utilities reference these. */
   --panel-pad-x: 16px;     /* horizontal padding inside a panel header/section */
   --panel-pad-y: 12px;     /* vertical   padding inside a panel header/section */
-  --rail-gap: 12px;        /* gap between stacked panels in a column */
+  --rail-gap: 16px;        /* gap between stacked panels in a column — 12 → 16 (user, 2026-08-30: the explore rail's cards sat too close, felt on paper where both are bright glass) */
   --topbar-extra: 0px;     /* how far the command bar has GROWN downward (the attached filter
                               strip, 2026-07-12) — published live by TopBar via ResizeObserver;
                               the rails add it to their top so the strip PUSHES the layout
@@ -661,12 +656,19 @@
                                               finer rung is) — same language, half a voice, so one
                                               list can't show three equally loud selections */
   --sel-border-dim: light-dark(rgba(9, 133, 133, 0.25), rgba(42, 245, 255, 0.22));
-  --bottom-reserve: 0px;   /* vertical space the bottom LiveStrip lane reserves. The lane is
-                              SNAPSHOTS-ONLY, so 0 is the correct static default — the store boots
-                              in `hyper`, which mounts no strip. `BottomStream` is the one writer
-                              (it publishes the real height from the same policy flag that decides
-                              whether the strip mounts at all), so this value is only ever what the
-                              stylesheet answers before that effect runs. */
+  --bottom-reserve: 92px;  /* vertical space the bottom VITALS BAND reserves (BottomStream's own
+                              RESERVE). The static default matches the BOOT view: the store boots
+                              in `hyper`, whose vitalsLane is on, and SSR/first paint assume
+                              desktop — so before BottomStream's effect runs the rails already
+                              keep clear of the band instead of painting under it for the first
+                              frames (review, 2026-08-31; the old 0px matched the retired
+                              snapshots-only LiveStrip). `BottomStream` is the one writer — it
+                              publishes from the same conditions that mount the band, so presence
+                              and reserve can't drift once hydrated. */
+  --rail-margin: 26px;     /* both rails' outer margin — room for the mirrored RailThread rulers.
+                              ONE home (review, 2026-08-31): #leftcol/#rightcol and the vitals
+                              band's edges all read it, so the band stays aligned with the rail
+                              cards through any margin retune. */
   --footer-h: 26px;        /* the site footer's band along the very bottom edge (SiteFooter.tsx,
                               2026-08-18) — site chrome, not view chrome, so it is a STATIC token
                               rather than a published one. Everything above it ADDS this to its own
@@ -685,10 +687,10 @@
      var() even though a presentation ATTRIBUTE (`stroke="…"`) doesn't, which is why the ruler
      mirrored these as literal consts until 2026-08-21.
      `--axis-hairlines` is the reusable recipe for a horizontal axis (the bar chart). */
-  --thread-line: light-dark(rgba(40, 55, 95, 0.40), rgba(178, 193, 223, 0.40));        /* the neutral base line the ticks hang off */
-  --thread-tick: light-dark(rgba(40, 55, 95, 0.30), rgba(178, 193, 223, 0.30));        /* minor hairline */
-  --thread-tick-major: light-dark(rgba(40, 55, 95, 0.42), rgba(178, 193, 223, 0.42));  /* every 4th — longer + brighter */
-  --thread-faint: light-dark(rgba(40, 55, 95, 0.10), rgba(178, 193, 223, 0.10));       /* faintest thread-family hairline (dock borders) */
+  --thread-line: light-dark(rgba(40, 55, 95, 0.55), rgba(178, 193, 223, 0.40));        /* the neutral base line the ticks hang off — light face raised .40 → .55 (user, 2026-08-30: the rules read too soft on paper; the same alpha carries less on a bright ground) */
+  --thread-tick: light-dark(rgba(40, 55, 95, 0.42), rgba(178, 193, 223, 0.30));        /* minor hairline (light .30 → .42) */
+  --thread-tick-major: light-dark(rgba(40, 55, 95, 0.58), rgba(178, 193, 223, 0.42));  /* every 4th — longer + brighter (light .42 → .58) */
+  --thread-faint: light-dark(rgba(40, 55, 95, 0.14), rgba(178, 193, 223, 0.10));       /* faintest thread-family hairline (dock borders; light .10 → .14) */
   --thread-tick-pitch: 13px;                        /* spacing between hairlines */
   /* Horizontal baseline → vertical ticks HANGING DOWN from it (the bar-chart axis, so the ruler
      sits under the bars, not through them). Anchored to the TOP so ticks grow downward; major
@@ -717,6 +719,12 @@
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; background: var(--background); overflow: hidden; }
   body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--foreground); }
+  /* Interactive things get the hand (user, 2026-08-30: "quite a lot of elements don't have the
+     fingerpointer while interactive") — Tailwind v4's preflight follows the spec and leaves
+     buttons at `cursor: default`, so every custom button here silently lost the hand unless it
+     carried cursor-pointer itself. One base rule instead of chasing call sites; a rare utility
+     (e.g. the pager wrapper's grab cursor) still wins from the utilities layer. */
+  button:not(:disabled), [role="button"]:not([aria-disabled="true"]), [role="radio"]:not([aria-disabled="true"]), [role="option"], [cmdk-item], a[href], summary { cursor: pointer; }
 }
 
 /* ── Scene canvas + rail containers (was app/styles/00-base.css) ──────────────────
@@ -749,17 +757,18 @@
      margin matches the right rail's, making room for the mirrored identity RailThread
      (design evolution, Task 12: both rails carry the identity thread). */
   #leftcol {
-    position: fixed; z-index: 10; top: calc(var(--rail-top) + var(--topbar-extra, 0px)); left: 26px;
+    position: fixed; z-index: 10; top: calc(var(--rail-top) + var(--topbar-extra, 0px)); left: var(--rail-margin);
     transition: top 0.25s ease-out;
     width: var(--rail-w);
     display: flex; flex-direction: column; gap: var(--rail-gap);
-    /* The box's own bottom must never enter the LiveStrip's reserved band — the rail-clip fade
+    /* The box's own bottom must never enter the bottom lane's reserved band — the rail-clip fade
        below only dims PIXELS (mask-image), it doesn't disable clicks, so a box that physically
        overlapped the strip left a masked-to-invisible card control still fully interactive —
-       and since #livestrip mounts after this rail at the same z-index, it won the hit-test
+       and since the bottom lane's occupant (now #vitalsband; #livestrip then) mounted after
+       this rail at the same z-index, it won the hit-test
        underneath (bug, 2026-07-18: a 5-card #rightcol stack's trailing card × silently clicked
        a LiveStrip bar it was invisibly sitting on top of). Subtracting --bottom-reserve here
-       keeps the box entirely above the strip; the rail-clip mask/runway then fades/scrolls
+       keeps the box entirely above the band; the rail-clip mask/runway then fades/scrolls
        purely WITHIN that bound, never over live chrome.
        The trailing `max(14px, --footer-h)` is the rail's bottom breather AND the site footer's
        band in one term (2026-08-18): the footer is the taller of the two on the desktop, and on
@@ -813,13 +822,13 @@
      through to the scene/bottom strip below; each card re-enables it via the
      `pointer-events-auto` in RIGHT_CARD (CardHead.tsx). */
   #rightcol {
-    position: fixed; z-index: 10; top: calc(var(--rail-top) + var(--topbar-extra, 0px)); right: 26px;
+    position: fixed; z-index: 10; top: calc(var(--rail-top) + var(--topbar-extra, 0px)); right: var(--rail-margin);
     transition: top 0.25s ease-out;
     width: var(--detail-w);
     display: flex; flex-direction: column; gap: var(--rail-gap);
-    /* Must never enter the LiveStrip's reserved band — see the matching #leftcol comment above
-       (same bug: a masked-invisible trailing card was still fully clickable, and #livestrip's
-       later DOM position won the hit-test at equal z-index). */
+    /* Must never enter the bottom lane's reserved band — see the matching #leftcol comment above
+       (same bug: a masked-invisible trailing card was still fully clickable, and the bottom
+       lane occupant's later DOM position won the hit-test at equal z-index). */
     max-height: calc(100vh - var(--rail-top) - var(--topbar-extra, 0px) - var(--bottom-reserve, 0px) - max(14px, var(--footer-h, 0px)));
     overflow-y: auto;
     pointer-events: none;
@@ -927,8 +936,10 @@
   --animate-breathe: breathe 1.5s ease-in-out infinite;
 }
 
-/* The footer hides on the phone (the 56px dock owns that edge), so its band must go to 0 in the
-   same breath or every consumer would keep reserving space for a strip that isn't drawn. Written
+/* On the phone the footer RIDES ABOVE the dock as overlay chrome (SiteFooter.tsx, 2026-08-31 —
+   it is the app's one /about route, so it stays visible), but its band still zeroes here: it
+   reserves nothing on that tier, exactly as the dock itself reserves nothing, so no consumer
+   holds space for a row that floats over the scene edge. Written
    as `not (min-width: …)` rather than `max-width` because that is what Tailwind's
    `max-[700px]:hidden` compiles to on the component itself — CSS trap 8, where the two forms
    disagree by exactly one pixel. 700 is `breakpointOf`'s own phone boundary, and every arm of it
@@ -1031,21 +1042,6 @@
 @keyframes boot-shell {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
-}
-
-/* The LiveStrip bar-chart's entry animation (components/LiveStrip.tsx) — a new bar streams in
-   from the right and grows up from the baseline. Kept as a real keyframe (a Tailwind arbitrary
-   `animation` value can't declare the keyframe itself), same idiom as `.odometer-in`/`.ecg-scan`
-   above. */
-@keyframes ls-bar-in {
-  from { opacity: 0; transform: translateX(9px) scaleY(0.55); }
-  to   { opacity: 1; transform: translateX(0) scaleY(1); }
-}
-@layer components {
-  .ls-bar-anim { animation: ls-bar-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .ls-bar-anim { animation: none; }
 }
 
 /* ── The app's ONE slim scrollbar — the same instrument the rails carry (`#leftcol`/`#rightcol`,

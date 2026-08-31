@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { compositionRows, nodeCompositionLabel, compositionKey, parseCompositionKey, compositionClause, ROLE_SHORT, layerCodesOf, compositionGroups } from "./composition";
+import { compositionRows, nodeCompositionLabel, compositionKey, parseCompositionKey, compositionClause, ROLE_SHORT, layerCodesOf, compositionGroups, machineKey } from "./composition";
 import type { NodeInfo, NodeRow } from "@/src/data/types";
 
 const n = (roles: string[]): NodeInfo => ({ ip: "x", state: "Ready", layer: roles[0], roles }) as NodeInfo;
@@ -120,5 +120,16 @@ describe("compositionGroups", () => {
   it("orders rows within a group deterministically", () => {
     const groups = compositionGroups([nrow("9.9.9.9", ["dl1"]), nrow("1.1.1.1", ["dl1"])]);
     expect(groups[0].rows.map((r) => r.id)).toEqual(["1.1.1.1", "9.9.9.9"]);
+  });
+});
+
+// THE MACHINE KEY — ip first (a machine is one host), stable fallback second; the one dedup
+// rule the vitals band's donut/layer bars and the explorer's groups all count through.
+describe("machineKey", () => {
+  it("keys on the ip when present, the fallback otherwise", () => {
+    expect(machineKey("1.2.3.4", "peerid")).toBe("1.2.3.4");
+    expect(machineKey(undefined, "peerid")).toBe("peerid");
+    expect(machineKey(null, "peerid")).toBe("peerid");
+    expect(machineKey("", "peerid")).toBe("peerid");
   });
 });

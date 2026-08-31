@@ -7,7 +7,7 @@
 // owned imperatively — the values here reproduce the previous hand-written gates exactly.
 //
 // Mostly the ENGINE's table, but not exclusively: a gate the HUD owns belongs here too when it is
-// the same per-view question (`timeLane` below). The module is pure data with no THREE, scene or
+// the same per-view question (`vitalsLane` below). The module is pure data with no THREE, scene or
 // store-value imports, so a React component may read it as freely as the render loop does.
 //
 // This lives in domain/ (pure data, no THREE / no scene / no store VALUE import) so it stays
@@ -62,12 +62,17 @@ export interface ViewPolicy {
   // card? geo (Nodes by country) + hyper (Nodes by layer); elsewhere the list empties so the
   // browsers stay quiet.
   nodeList: boolean;
-  // Does the bottom lane mount at all? The lane is a TIME instrument (one bar per global tick,
-  // height = anchors), so it belongs to the *when* view and nothing else — hyper and geo answer
-  // `where`/`who` and have no time axis to plot. `BottomStream` is the one reader: it mounts the
-  // strip and publishes `--bottom-reserve` from this flag, so the lane's presence and the space it
-  // reserves can never disagree.
-  timeLane: boolean;
+  // Does the bottom VITALS BAND mount? (2026-08-30 — the vitals leave the crowded command bar
+  // for a slim bottom instrument band; docs/superpowers/plans/2026-08-30-vitals-bottom-band.md.)
+  // This deliberately widens the old `timeLane` (snapshots-only, 2026-08-12): the band shows each
+  // 3D view's OWN vitals — the exact numbers the bar's vitals region showed for that view — so
+  // the old rule's reasoning ("structure is already the subject of the view above") is answered
+  // by keeping every cell view-scoped. The declicked tick bar-chart rides along as one of the
+  // ledger's cells. `BottomStream` is the one reader: it mounts the band and publishes
+  // `--bottom-reserve` from this flag, so presence and reserved space can never disagree. Flat
+  // views stay false — numbers beside a `preview` wireframe would be the mixed signal rule 10
+  // exists to prevent.
+  vitalsLane: boolean;
   // Does this view anchor the SUBJECT CALLOUT (user, 2026-08-15) — the HUD-layer label the Engine
   // positions over the committed subject's projected anchor each frame? Two readers: SceneCallout
   // mounts on it, the Engine's per-frame sync gates on it — one flag, so the label and its
@@ -80,6 +85,17 @@ export interface ViewPolicy {
   // fuller bloom the design wants. strength is the dominant lever (the halo "vanishes with
   // strength"). All three are read live by UnrealBloomPass.render, so a per-frame set is enough.
   bloom: { strength: number; radius: number; threshold: number };
+  // Multiplier on the chip materials' env-sheen intensity (NodeFabric's ENV_INT × this), applied
+  // by the Engine on a view change. The ledger runs LOW: its trays hold COPLANAR flat chips, so at
+  // the chamber's resting pose every chip mirrors the env's bright region at once and full sheen
+  // washes the whole tray toward white (user, 2026-08-30: "the nodes are much lighter than in the
+  // other views") — geo's chips sit on a curved globe at varied normals, so the same intensity
+  // reads as a sweeping sheen there, not a wash. But ZERO overshot (user, same day: colors "very
+  // bland", and the parked grids "completely loose their bloom" at the boundary — on paper the env
+  // reflection also feeds the selective bloom layer): the ledger keeps HALF, enough liveliness to
+  // match the other views without the wash, and the boundary flip becomes a half-step instead of a
+  // cliff on chips that are in plain view at the staging grids.
+  chipEnv: number;
 }
 
 // The calm bloom the ledger view uses — the reference the design likes (thin lines, sparse
@@ -102,9 +118,10 @@ const FLAT: ViewPolicy = {
   minCamAlt: null,
   minPolarAngle: 0.25,
   nodeList: false,
-  timeLane: false,
+  vitalsLane: false,
   callout: false,
   bloom: BLOOM_CALM,
+  chipEnv: 1,
 };
 
 export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
@@ -128,10 +145,11 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minPolarAngle: 0.25, // standard clamp: the structure is TILTED (HYPER_TILT), not the camera —
     // so hyper shares the overview pose with the other views and never needs the pole-crossing relax
     nodeList: true,
-    timeLane: false,
+    vitalsLane: true,
     callout: true, // first consumer of the subject callout (rolling out view by view)
     // Calmer than ledger: the core + dense node field piled up an additive bleed on OLED/HDR.
     bloom: { strength: 0.27, radius: 0.32, threshold: 0.14 },
+    chipEnv: 1,
     },
   // Footprint: the holographic globe + travelling packets; picks the globe nodes only.
   geo: {
@@ -146,11 +164,12 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minCamAlt: 18, // above the land plateau (R 16 + LAND_H 1.0) + chip stacks — no zooming inside
     minPolarAngle: 0.25,
     nodeList: true,
-    timeLane: false,
+    vitalsLane: true,
     callout: true, // node > cohort > country anchors; the distributed network rung has none
     // The lowest bloom of the three views: strength drives the "black halo" ring the saturated
     // node/wall hues cast on the globe, and the additive coastal walls read fuzzy under bloom.
     bloom: { strength: 0.20, radius: 0.30, threshold: 0.16 },
+    chipEnv: 1,
     },
   // Snapshots: the settlement chamber. Morph frozen (nodes fly into lanes); picks the centred
   // snapshot + the reused producer dots. (The ledger-specific depth-fog recency treatment was
@@ -168,9 +187,10 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minPolarAngle: 0.25,
     // The Snapshots node browser (LedgerPanel's floor disclosures) reads store.selNodes.
     nodeList: true,
-    timeLane: true, // the ONLY view with a time axis — the tick bar-chart is this view's instrument
+    vitalsLane: true,
     callout: true, // the pinned snapshot — the lane lead tile, or the global tick's bar
     bloom: BLOOM_CALM, // the reference look the design likes — unchanged
+    chipEnv: 0.5, // low, not zero — coplanar trays wash at full sheen, go bland at none (field note)
   },
   status: FLAT,
   transactions: FLAT,

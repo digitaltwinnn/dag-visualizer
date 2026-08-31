@@ -16,6 +16,7 @@
 // `--primary`, so they match by construction).
 
 import * as THREE from "three";
+import { SCENE_L_LIGHT, SCENE_C_LIGHT } from "../palette/identity";
 
 export interface SceneColors {
   core: number; //    --primary   (accent cyan — the DAG spine, live/selected signals, the geo
@@ -228,7 +229,12 @@ export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
   // Settled from the user's own EXPORT (2026-08-28, second round): with the inactive marks
   // thinned (inkDimG 1.1 → 1.35) the identity lane could come UP (laneL 0.51 → 0.61) —
   // brighter ink reads right once the de-emphasized field around it is genuinely thin.
-  laneL: 0.61, laneC: 0.28, groundL: 0.81, // groundL settled 0.72 → 0.78 → 0.80 → 0.81 across the wall iterations (user, 2026-08-29); keep globals.css --scene-ground AND devTune's override in sync
+  // ⚠️ laneL/laneC DERIVE from the palette's own SCENE_L_LIGHT/SCENE_C_LIGHT — one home
+  // (src/palette/identity.ts, where the lane is actually baked at boot). Two literals drifted
+  // once (found 2026-08-30: a fresh load baked the lane at a stale 0.70 and the shipped look
+  // only appeared after a slider touch, which routes through setSceneLaneLight); deriving makes
+  // boot and knob agree by construction. Bake a user's laneL/laneC export in identity.ts.
+  laneL: SCENE_L_LIGHT, laneC: SCENE_C_LIGHT, groundL: 0.88, // groundL settled 0.72 → 0.78 → 0.80 → 0.81 → 0.88 across the wall iterations (user, 2026-08-29/30); keep globals.css --scene-ground AND devTune's override in sync
   inkGamma: 0.15, inkDimG: 1.35, inkLift: 0.6,
   // THE WHOLE-FRAME PASS IS OFF ON PAPER. It is a luminance highpass over the finished frame, and
   // on paper the marks are INK — darker than the ground they lie on — so no threshold selects them;
@@ -237,8 +243,25 @@ export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
   // and a full-res pass off the light path both. `bloomFloor` is inert while this is 0 — it shapes
   // that pass's threshold alone — and stays as the lever if the whole-frame look is ever wanted back.
   bloomMul: 0, bloomFloor: 0.5,
-  selBleed: 0.35, selGlow: 0.05, selRadius: 0.45, // the user's settled halo (2026-08-28)
-  bgTint: 1, bgGrid: 0.07,
+  // Raised from the 2026-08-28 settled 0.35/0.05/0.45: the rest-only chip calm and the
+  // hubMatchBoost retirement (both 2026-08-30) fed this layer visibly less input, and the
+  // resting halo starved — "we've lost the bloom effect, I'd still like a subtle bloom also in
+  // light mode" (user, same day). The lift restores a resting glow WITHOUT the old fat tips:
+  // the calm evened out the cap hotspots that used to concentrate the halo.
+  // Re-balanced by the user live (2026-08-30, after the chip env landed): the bleed comes DOWN
+  // (0.55 → 0.3) and the spread OUT — a wider, gentler halo now that the env sheen carries part
+  // of the marks' presence on paper. Second export same day, alongside the quiet-tray glass:
+  // glow UP (0.12 → 0.27) and spread further out (1 → 1.35) — with the trays' milky plates gone
+  // the halo is the marks' main paper presence again, and it can afford more light. Fourth export
+  // eased both a step back (bleed 0.3 → 0.2, glow 0.27 → 0.22) against the lighter 0.88 wall.
+  // Fifth (same day, with the chamber's halo input lift landed): bleed back UP 0.2 → 0.35 — the
+  // lift feeds the tint term real input from the snapshots, so the bleed now has ink to spend.
+  selBleed: 0.35, selGlow: 0.22, selRadius: 1.35,
+  // bgTint returned (0 → 0.5 → 1 across the user's exports, 2026-08-30): the ivory drift read
+  // BROWN at the first shipped chroma and was zeroed the same day — re-picked at half and then
+  // full strength as the quiet-tray glass, the brighter halo and the lighter wall (groundL 0.88)
+  // changed what the tint sits over.
+  bgTint: 1, bgGrid: 0.05, // grid eased 0.07 → 0.05 (user export, 2026-08-30 — a touch quieter under the full ivory)
 });
 export const LIGHT_TUNE: LightTune = { ...LIGHT_TUNE_DEFAULTS };
 export const LIGHT_TUNE_SCHEMA: import("./tune").TuneSchema<LightTune> = {

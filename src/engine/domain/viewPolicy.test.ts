@@ -35,12 +35,12 @@ describe("VIEW_POLICIES", () => {
     for (const m of MODES) expect(VIEW_POLICIES[m].show.ledger).toBe(m === "ledger");
   });
 
-  // The bottom lane is a TIME instrument, so it belongs to the *when* view alone — hyper answers
-  // who/what and geo answers where, and neither has a time axis to plot. Pinned here rather than
-  // left to `BottomStream` because the flag governs TWO things that must agree: whether the strip
+  // The bottom vitals band (2026-08-30 — the vitals leave the command bar) mounts in every 3D
+  // view and never beside a flat view's `preview` wireframe (rule 10). Pinned here rather than
+  // left to `BottomStream` because the flag governs TWO things that must agree: whether the band
   // mounts, and whether `--bottom-reserve` reserves any space for it.
-  it("mounts the bottom time lane ONLY in ledger", () => {
-    for (const m of MODES) expect(VIEW_POLICIES[m].timeLane).toBe(m === "ledger");
+  it("mounts the bottom vitals band in every 3D view and no flat one", () => {
+    for (const m of MODES) expect(VIEW_POLICIES[m].vitalsLane).toBe(VIEW_POLICIES[m].canvas);
   });
 
   it("gives flat views NO sims, NO picks, NO DoF, NO canvas, NO show", () => {
@@ -62,5 +62,18 @@ describe("VIEW_POLICIES", () => {
 
   it("freezes hub orbits everywhere except hyper", () => {
     for (const m of MODES) expect(VIEW_POLICIES[m].sims.hubOrbits).toBe(m === "hyper");
+  });
+
+  // The chip env sheen is per-view, and the RELATION is the design (the numbers may move):
+  // the ledger runs LOWER than every other view — its trays hold coplanar flat chips, so at the
+  // resting pose full sheen mirrors on every chip at once and washes the tray toward white — but
+  // NOT zero: zero went bland and dropped the parked grids' bloom in one visible step at the
+  // transition boundary (user, 2026-08-30, both directions the same day).
+  it("keeps the ledger's chip env sheen lowest but above zero", () => {
+    const ledger = VIEW_POLICIES.ledger.chipEnv;
+    expect(ledger).toBeGreaterThan(0);
+    for (const m of MODES) {
+      if (m !== "ledger") expect(VIEW_POLICIES[m].chipEnv).toBeGreaterThan(ledger);
+    }
   });
 });

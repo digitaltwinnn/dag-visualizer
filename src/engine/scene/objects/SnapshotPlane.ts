@@ -74,8 +74,27 @@ export const GLASS_TUNE_DEFAULTS: Readonly<GlassTune> = Object.freeze({
   // under a committed filter: the polished edge was the hot term (0.32 → 0.08), rim and the
   // reflection lobes came down a step — and the TRAYS came UP (0.12 → 0.42): with the planes
   // calmed, the trays finally earn real presence.
-  body: 0.185, sky: 0.33, rim: 0.3, spec: 0.5, specPow: 19, edge: 0.16, env: 0.48, trayBody: 0.42, // user export 2026-08-29: more body/edge/env, less sky — glass presence up on the lighter wall
-  laneBody: 1.75, laneTint: 0.8,
+  // 2026-08-30 first pass at "too glossy, want shiny but not too much" (user): the DIFFUSE film
+  // steps down (sky 0.33 → 0.26, env 0.48 → 0.40 — the milky all-over gloss) and the CRISP terms
+  // step up and tighten (spec 0.5 → 0.62, specPow 19 → 30, edge 0.16 → 0.22, rim 0.3 → 0.34) —
+  // sheen concentrated into highlights instead of spread as film.
+  // Second pass same day ("more glass, less gloss"): the film comes down again (sky 0.26 → 0.17,
+  // env 0.40 → 0.28, rim 0.34 → 0.26) and GLASSNESS is bought with clarity instead — body tint
+  // thinner (0.185 → 0.155, you see more THROUGH the pane) and the polished edge up
+  // (0.22 → 0.28, the one term that says "cut glass" without filming the face).
+  // 2026-08-30 third pass — "I want them more shiny glass" (user), after the chip-env wash was
+  // fixed (viewPolicy.chipEnv): while every tray chip washed white, the glass terms were visually
+  // swamped and the knobs read as dead; with the chips back to ink the same terms show again, and
+  // shine comes UP across the board — bought with the crisp terms (edge, window, softboxes) plus a
+  // step of rim/sky, while body stays at the second pass's clarity so the trail stays readable.
+  // Settled from the user's own EXPORT (same day): edge 0.45 → 0.25 (the white border calmed),
+  // trayBody 0.42 → 0.075 (the milky plates behind the chips were half of what read as washed
+  // nodes — quiet trays let the chips carry their own colour), laneTint 0.8 → 1 (the committed
+  // pane goes fully to its lane's identity). Next export the same day trades edge for body —
+  // 0.25 → 0.15 and body 0.155 → 0.26: the pane's presence moves from the cut border into the
+  // tint itself, more pane and less outline over the lighter 0.88 wall.
+  body: 0.26, sky: 0.3, rim: 0.4, spec: 0.85, specPow: 18, edge: 0.15, env: 0.5, trayBody: 0.075,
+  laneBody: 1.75, laneTint: 1,
 });
 /** The live struct the `?tune` panel binds; DEFAULTS above is the shipped look and what tests pin. */
 export const GLASS_TUNE: GlassTune = { ...GLASS_TUNE_DEFAULTS };

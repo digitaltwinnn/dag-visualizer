@@ -28,8 +28,8 @@ export const HUD_C = 0.19;
 // exactly the behaviour that lets one pair serve all of them. The HUD lane needs no light pair:
 // identityHudCss() defers L/C to the CSS tokens (--ident-l/--ident-c), which already carry both
 // themes' values, so the HUD retints for free with zero re-renders.
-export const SCENE_L_LIGHT = 0.70; // NOT 0.68 — that is SCENE_L's dark value, and a shared L makes gamut-capped hues chroma-reduce to identical hexes in both lanes (identity.test.ts pins that the lanes differ) // matched to the HUD light lane (user, 2026-08-25: scene nodes read "a lot darker than the filter section") — the scene also attenuates at rest, so the lane itself must not start darker than the HUD's
-export const SCENE_C_LIGHT = 0.25;
+export const SCENE_L_LIGHT = 0.57; // NOT 0.68 — that is SCENE_L's dark value, and a shared L makes gamut-capped hues chroma-reduce to identical hexes in both lanes (identity.test.ts pins that the lanes differ). ⚠️ ONE HOME: LIGHT_TUNE_DEFAULTS.laneL derives from THIS constant — bake a user's laneL export HERE (found 2026-08-30: the pair drifted, so a fresh load baked the lane at the old 0.70 and the shipped look only appeared after a slider touch). Settled 0.70 → 0.61 → 0.57 across the user's exports (2026-08-28/30).
+export const SCENE_C_LIGHT = 0.28; // one home likewise — LIGHT_TUNE_DEFAULTS.laneC derives from this (0.25 → 0.28, user export 2026-08-28)
 
 export interface IdentityHue {
   id: string;

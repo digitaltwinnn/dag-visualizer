@@ -234,6 +234,7 @@ export class Globe implements GeoViewHost {
   // setSelectedNode, which the rebuilds (setNodes/setMetagraphs) re-run so the cache never dangles.
   private readonly stage: StageLight;
   private _selNodeRec: ValidatorRecord | MetaNodeRecord | null = null;
+  private _selNodeSibs: (ValidatorRecord | MetaNodeRecord)[] = []; // the non-primary layer records — see setSelectedNode
   private _spotPos = new THREE.Vector3();
   private _spotN = new THREE.Vector3();
 
@@ -332,8 +333,7 @@ export class Globe implements GeoViewHost {
   // arcs + globeSpin flags concern the Globe; the rest of the sims object is ignored here.
   setSimFlags(sims: { arcs: boolean; globeSpin: boolean }): void {
     this.simArcs = sims.arcs;
-    this.simSpin = sims.globeSpin;
-    // ⚠️ THE GATES FLIP HERE, THE ORIENTATION DOES NOT (user, 2026-08-12 — "when we switch from geo
+    this.simSpin = sims.globeSpin;    // ⚠️ THE GATES FLIP HERE, THE ORIENTATION DOES NOT (user, 2026-08-12 — "when we switch from geo
     // to another view, the globe rotation changes before it fades"). This used to hard-write hyper's
     // Euler rig the moment `globeSpin` dropped, and the Engine calls it at switch time, one phase
     // BEFORE the choreography's boundary — so leaving geo for ANY view (hyper, ledger, or a flat
@@ -344,6 +344,13 @@ export class Globe implements GeoViewHost {
     // Engine then re-asserts every hyper frame. Ledger zeroes its own rotation in updateRotation,
     // and a flat view draws nothing to orient. Same rule as the camera hold (viewTransition
     // .holdCamera) and the _integrateMotion guard that fixed this bug's sibling half.
+  }
+
+  /** View fan-out (Engine, viewPolicy.chipEnv → the fabric's per-view env-sheen gain). Applied at
+   *  the transition BOUNDARY for 3D↔3D switches — the setSimFlags rule above: the from-view's
+   *  still-visible chips must not change at switch time. */
+  setChipEnv(mul: number): void {
+    this.fabric.setEnvView(mul);
   }
 
   // Set the hyper-structure spin: the node group is tilted by HYPER_TILT and spun about its own
@@ -573,6 +580,7 @@ export class Globe implements GeoViewHost {
     this._edgeColor.setHex(c.core);
     this._edgeTarget.setHex(c.core);
     this.geoPaper = isLightGround(c);
+    this.fabric.applyGroundEnv(); // the chip env sheen is the GROUND's — see NodeFabric
     retintGeoView(this);
     this._retintNetworks();
     // Canvas-texture ink cannot be re-pointed, so the labels redraw. The method is self-cleaning
@@ -843,8 +851,14 @@ export class Globe implements GeoViewHost {
   }
 
   // Set the dim TARGETS for a selection (the dim itself eases each frame).
+  // ⚠️ In the LEDGER the DAG core is ALWAYS lit (user, 2026-08-30: "the DAG nodes should never be
+  // dimmed since in this view the global snapshot is part of our active/selected scope"): every
+  // metagraph anchors INTO the global, so the global layer — floor, fleet tray — is inside every
+  // committed story, and the L0 validators under it show at rest whatever the filter says. This is
+  // a WHO-is-in-scope statement, so it lives here at the TARGET (the view rows keep saying how
+  // MUCH); applyLedgerLayout re-derives it when the flag flips, and the ease carries the change.
   private _applyDim(sel: string): void {
-    const dagLit = sel === "all" || sel === "dag";
+    const dagLit = sel === "all" || sel === "dag" || this.ledger;
     this.dimTarget = dagLit ? 0 : 1;
     for (const r of this.metaNodes) r.dimTarget = (sel === "all" || sel === r.metaId) ? 0 : 1;
   }
@@ -1113,6 +1127,14 @@ export class Globe implements GeoViewHost {
       : this.nodes.find((n) => n.nodeId === id && n.geoPrimary) ??
         this.metaNodes.find((n) => n.nodeId === id && n.geoPrimary) ??
         null;
+    // The machine's OTHER layer records (the multi-leader's sibling beads) resolve here too —
+    // the callout asks per frame, and scanning both pools per frame for a set that only changes
+    // at selection/rebuild time was the same cost _selNodeRec already exists to avoid.
+    this._selNodeSibs.length = 0;
+    if (id) {
+      for (const n of this.nodes) if (n.nodeId === id && !n.geoPrimary) this._selNodeSibs.push(n);
+      for (const n of this.metaNodes) if (n.nodeId === id && !n.geoPrimary) this._selNodeSibs.push(n);
+    }
   }
 
   /** The SELECTED node's own chip position in globe-LOCAL coordinates — the same resolution
@@ -1158,6 +1180,21 @@ export class Globe implements GeoViewHost {
   selectedNodeHyperAnchor(out: THREE.Vector3): boolean {
     const rec = this._selNodeRec;
     return rec ? this._hyperAnchorOf(rec, out) : false;
+  }
+
+  /** The selected MACHINE's other layer beads (globe-LOCAL) — every non-primary record sharing
+   *  its nodeId (a hybrid runs one record per layer, so one machine is several beads on several
+   *  shells). The callout's MULTI-LEADER (user, 2026-08-30: "the node's callout shows multiple
+   *  layers — draw the dotted connecting line to each of the active elements"); the geoPrimary
+   *  record is skipped because the primary anchor already points at it. Fills `out` up to its
+   *  length (the caller owns the scratch — rule 5), returns the count. */
+  selectedNodeHyperAnchors(out: THREE.Vector3[]): number {
+    let n = 0;
+    for (const r of this._selNodeSibs) {
+      if (n >= out.length) break;
+      if (this._hyperAnchorOf(r, out[n]!)) n++;
+    }
+    return n;
   }
 
   /** One home for "where is this node in hyper" (globe-LOCAL), shared by the callout's committed
@@ -1503,6 +1540,9 @@ export class Globe implements GeoViewHost {
   // gather dissolve).
   applyLedgerLayout(on: boolean): void {
     this.ledger = on;
+    // The core's dim target keys on this flag (the ledger always lights the DAG — see _applyDim),
+    // so a flip re-derives it under the current filter; the per-frame ease makes the change soft.
+    this._applyDim(this.filter);
     if (on) {
       this.group.rotation.set(0, 0, 0);
       this.ledgerT = 1;
