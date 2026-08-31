@@ -20,6 +20,11 @@
 /** Panel standoff from the anchor: up and to the right. The leader spans exactly this diagonal. */
 export const CALLOUT_OFF_X = 100;
 export const CALLOUT_OFF_Y = 140;
+/** Where the leader INK actually ends, inset from the panel corner — the point the multi-leader
+ *  legs must fan from so leader and legs meet exactly. Shared by SceneCallout's primary leader
+ *  (y2) and Engine._syncCalloutMulti (the fan corner); it was retuned once already (8 → 2) with
+ *  the two literals held in sync only by memory (review, 2026-08-31). */
+export const CALLOUT_LEG_INSET = 2;
 
 /**
  * The panel's full reach from the anchor on each axis — the standoff plus the widest / tallest

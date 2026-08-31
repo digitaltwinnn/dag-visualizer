@@ -157,7 +157,12 @@ export const LEAD_X = 3.9;
  *  BOTH sides (centred bar, one margin each end) instead of running into the text. */
 export const BAR_EDGE_MARGIN = 2.4;
 export const BAR_MAX_W = 2 * (LANE_HALF_Z - BAR_EDGE_MARGIN);
-export const BAR_MIN_W = 0.55; // the zero-anchor SEAM: a tick that carried nothing still happened
+export const BAR_MIN_W = 0.55; // floor for a MEASURED bar with bytes — a tiny tick still reads as a bar
+/** The two SPECIAL rows' shared square footprint (promoted from ByteBar 2026-08-30): the flat
+ *  SEED (no read yet) and the standing SEAM (measured, anchored nothing) wear ONE footprint, so
+ *  HEIGHT is the only thing separating them — flat = unread, full = measured-empty (user: "use
+ *  the same shape ... and just use the height"). Neither makes a width claim. */
+export const SEED_W = 1.3;
 export const BAR_H = 0.9;
 export const BAR_D = 1.6;
 /** The snapshots SIT ON their planes (user, 2026-08-07 — they used to be centred on the plane

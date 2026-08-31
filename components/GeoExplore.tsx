@@ -239,7 +239,12 @@ export default function GeoExplore() {
                       className="block h-full rounded-xs"
                       style={{
                         width: `${Math.round((c.count / max) * 100)}%`,
-                        background: barHue ?? "linear-gradient(90deg, var(--core), var(--primary))",
+                        // ONE colour, both cases: the filtered bar is already flat barHue, and the
+                        // "all" bar is the list's own identity — structural cyan. The old
+                        // --core→--primary gradient was designed on dark, where the two are
+                        // neighbours; on paper --primary reads teal-green against --core's blue
+                        // and the bar split into two colours (user, 2026-08-30).
+                        background: barHue ?? "var(--primary)",
                         boxShadow: `0 0 6px color-mix(in oklch, ${barHue ?? "var(--primary)"} 40%, transparent)`,
                       }}
                     />

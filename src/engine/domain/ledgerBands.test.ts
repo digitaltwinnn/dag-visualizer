@@ -3,7 +3,7 @@ import {
   UNLISTED_KEY, makeBarSpec, fillBarSpec, ribbonQuad, RIBBON_LANE_HALF,
   type RibbonQuad,
 } from "./ledgerBands";
-import { BAR_MAX_W, BAR_MIN_W, BYTE_SCALE_KB, LANE_HALF_Z } from "./ledgerLayout";
+import { BAR_MAX_W, BAR_MIN_W, SEED_W, BYTE_SCALE_KB, LANE_HALF_Z } from "./ledgerLayout";
 import { METAGRAPHS } from "@/src/net/current";
 
 const KB = 1024;
@@ -20,10 +20,13 @@ describe("fillBarSpec", () => {
     expect(s.kb).toBe(0);
   });
 
-  it("renders a measured tick that anchored nothing as a minimum-width seam", () => {
+  it("renders a measured tick that anchored nothing as a seam at the SEED's own footprint", () => {
+    // The seam wears the seed's square (user, 2026-08-30): the two special rows share ONE shape
+    // and height alone separates them — flat = unread, full = measured-empty.
     const s = fillBarSpec(makeBarSpec(), new Map(), ORDER, 0);
     expect(s.measured).toBe(true);
-    expect(s.width).toBeCloseTo(BAR_MIN_W, 6);
+    expect(s.width).toBeCloseTo(SEED_W, 6);
+    expect(s.z0).toBeCloseTo(-SEED_W / 2, 6);
     expect(s.bandCount).toBe(0);
   });
 

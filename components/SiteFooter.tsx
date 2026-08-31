@@ -10,8 +10,12 @@
 // add `--topbar-extra` at the top; `--bottom-reserve` keeps its meaning as the lane's own band above
 // the footer.
 //
-// Hidden on the PHONE, where the 56px dock owns the bottom edge and the brand→/about route is
-// unchanged. The token zeroes on the same boundary, so nothing keeps reserving the space.
+// On the PHONE the dock owns bottom:0, so the row rides directly ABOVE it (user, 2026-08-31 —
+// "keep footer link visible in phone": with the wordmark unlinked and the strip's about link
+// removed, this row had become the app's ONLY route to /about, and hiding it left phone with
+// none). It is overlay chrome there, like the dock itself: `--footer-h` still zeroes on the
+// phone boundary so no consumer reserves a band for it — the row takes its 26px height
+// explicitly, and an open sheet (higher z) covers it exactly as it covers the scene.
 //
 // The links are plain anchors, not next/link: /about and /design are ordinary documents, and a
 // client-side route change would tear down and rebuild the WebGL engine (the same reason TopBar's
@@ -30,16 +34,14 @@ export default function SiteFooter() {
     // canvas, and an orbit drag started along the bottom edge must still reach the scene.
     <footer
       id="sitefoot"
-      className="fixed inset-x-0 bottom-0 z-10 h-[var(--footer-h)] flex items-center justify-center pointer-events-none max-[700px]:hidden"
+      className="fixed inset-x-0 bottom-0 z-10 h-[var(--footer-h)] flex items-center justify-center pointer-events-none max-[700px]:bottom-[var(--phone-dock-h)] max-[700px]:h-[26px]"
     >
-      {/* ⚠️ The band is TRANSPARENT over a live scene, so its ground is whatever orbits past — in
-          hyper a metagraph hub sweeps the bottom edge and its bloom washed "Design" out entirely
-          (measured at 1600×950 and again at 900×900). The answer is a shadow, not a plate: a plate
-          would be the surface the brief ruled out, and it would sit there at full weight over the
-          black the footer rests on 95% of the time (in dark). A halo costs nothing over black and only
-          appears where something bright is behind it. Grayscale by rule — a tinted halo would read
-          as an accent. */}
-      <nav className="flex items-center gap-2 text-micro text-muted-foreground/70 [text-shadow:var(--footer-halo)] [&_a]:pointer-events-auto">
+      {/* The halo text-shadow is GONE (user, 2026-08-30: "it has some shadow which for text is
+          not great") — it existed for bloom sweeping the bottom edge, but the vitals band now
+          stands between the scene and this line in every 3D view, so the wash-out it answered
+          no longer reaches here. Readability comes from real ink instead: full muted-foreground,
+          up from the /70 tint. */}
+      <nav className="flex items-center gap-2 text-micro text-muted-foreground [&_a]:pointer-events-auto">
         <a href={GITHUB} target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
           GitHub
         </a>

@@ -1,22 +1,36 @@
 "use client";
 
-import { LineChart, Line, YAxis } from "recharts";
+import { LineChart, Line, YAxis, ResponsiveContainer } from "recharts";
 
 // Tiny inline trend line (Recharts) — used in the stats header. Recharts is also the
 // foundation for the larger charts to come (axes/tooltips/area/bar), so reuse it.
+// `stretch` fills the parent's width instead of the fixed box (the vitals band's rate cards —
+// the fixed 64px chart left the card's right half empty; user, 2026-08-30).
 export default function Sparkline({
   data,
   color,
   width = 60,
   height = 22,
+  stretch = false,
 }: {
   data: number[] | undefined;
   color: string;
   width?: number;
   height?: number;
+  stretch?: boolean;
 }) {
   if (!data || data.length < 2) return null;
   const points = data.map((v, i) => ({ i, v }));
+  if (stretch) {
+    return (
+      <ResponsiveContainer width="100%" height={height}>
+        <LineChart data={points} margin={{ top: 3, right: 1, bottom: 3, left: 1 }}>
+          <YAxis hide domain={["dataMin", "dataMax"]} />
+          <Line type="monotone" dataKey="v" stroke={color} strokeWidth={1.5} dot={false} isAnimationActive={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    );
+  }
   return (
     <LineChart width={width} height={height} data={points} margin={{ top: 3, right: 1, bottom: 3, left: 1 }}>
       {/* hidden axis, scaled to the data so the line uses the full height */}

@@ -275,8 +275,13 @@ identical bodies, twin emissive resolvers differing by a sub-1% coefficient, and
 ≈ 0.33` glow). With the dim pre-applied as the resting look, the live dim *had* to be zeroed or it would
 apply twice; that zero is the whole origin of the split, never a design decision. `domain/dimModel.ts`
 now exposes ONE `dim` row field and one `nodeDim`/`nodeGlow`/`nodeEmissive` triple that both pools call.
-The one surviving asymmetry is deliberate: `hubMatchBoost` targets the metagraph **hub's** resting glow,
-which is view furniture — about what a node orbits, not what a node is. The core's own SPHERE follows
+That asymmetry's last survivor, `hubMatchBoost`, is RETIRED (user, 2026-08-30, structural): **a
+committed filter adds NO light to member nodes, in any view.** The commit is answered by each
+view's own channel — hyper by the HUB and the others' `elem`/`dim` drops, geo by the isolate
+(`hide`; no per-network furniture exists there), the ledger by the coloured dim — and light added
+to a node is reserved for the FOCUS vocabulary (the hovered/committed node, a group while it is
+the finest rung). Member nodes keep their at-rest colour under a filter everywhere; the rule's
+executable pin is in `dimModel.test.ts`. The core's own SPHERE follows
 the same rule and is now the shared `HUB_ORB` geometry at hub size (was r 1.5 vs the hubs' 0.9): *"its
 central position already tells it's a bit different from the others, not size"* (user, 2026-08-11).
 
@@ -307,7 +312,7 @@ nodes.
 
 | Path | Responsibility |
 |---|---|
-| `app/` | Next App Router. `globals.css` is **the one stylesheet**; `design/page.tsx` is the token reference; `about/page.tsx` is the project's own page — Instrument-Glass like the HUD, and the home of the **experimental disclosure** that used to be an always-on banner (retired 2026-08-09: a permanent banner over a live instrument reads as an alarm; the TopBar links here instead). `--warn-soft` is its amber (shared only with the raw layer's JSON booleans). `api/*` are the server-side data routes. |
+| `app/` | Next App Router. `globals.css` is **the one stylesheet**; `design/page.tsx` is the token reference; `about/page.tsx` is the project's own page — Instrument-Glass like the HUD, and the home of the **experimental disclosure** that used to be an always-on banner (retired 2026-08-09: a permanent banner over a live instrument reads as an alarm; the footer links here — the wordmark is plain unlinked chrome and the ECG opens the pulse strip, both 2026-08-30. On phone the footer rides ABOVE the dock — user decision 2026-08-31, keeping /about reachable on every tier — with `--footer-h` still zeroed there, since the row is overlay chrome that reserves nothing). `--warn-soft` is its amber (shared with the raw layer's JSON booleans and the pulse strip's STALE dot). `api/*` are the server-side data routes. |
 | `components/` | React panels, each reading/writing the store. `SceneCanvas` mounts the engine (dynamic-imported so Three never enters the server bundle). |
 | `components/ui/` | The adopted shadcn/Radix primitives. |
 | `src/store/store.ts` | The Zustand store — mode, filter, selection, hover channels, `section`, phone UI state. |
@@ -350,7 +355,10 @@ every node from a different direction, so the population never resolves into one
 sphere reads as a flat disc. The fill is directional for the same reason — ambient lifts every face
 equally, which is the flatness the rig exists to undo. **Aimed from the CAMERA** (the studio
 convention: the rig follows the actor), so orbiting can never swing the lit side out of view;
-elevation is world-absolute. **A light is a TEMPERATURE, not a palette hue** — rows carry a −1…+1
+elevation follows the camera's PITCH as a delta from the view's resting pitch
+(`domain/cameraRig.restPitch`) — byte-identical at the resting poses the rows were tuned on, and a
+dive or vertical orbit carries the whole rig, the geo sun included (was world-absolute, which died
+at any pose off the resting pitch — user, 2026-08-30). **A light is a TEMPERATURE, not a palette hue** — rows carry a −1…+1
 axis resolved by `tempTint`, which is why lighting owns no colour literal and no allowlist entry.
 `RIG_PAPER` takes every channel down on the light ground (ambient hardest, key least): a ~0.8-L page
 is its own bounce card, so on paper the rig narrows to FORM and presence keeps riding the ink system.
@@ -364,6 +372,16 @@ viewed hemisphere dark would be the wrong kind of honest. Both grounds shade thr
 with opposite numbers, because they are opposite substances — dark is emitted light (the day side
 glows more), paper is ink (a lit face carries LESS of it) — and the channel follows the substance:
 dark shades colour, paper shades presence.
+
+**The chips mirror a stock studio environment** (2026-08-30): `SceneContext.nodeEnv` bakes three's
+own `RoomEnvironment` once (PMREM, sigma 0.35 — the lamps SMEARED so no grazing view can spike the
+bloom; found live as a vertical bloom gradient on the parked grids and a bottom-front flash),
+`envMapRotation` aims the lit ceiling at the resting ~40° camera, and `NodeFabric.ENV_INT` states
+the per-ground intensities. Per-view gain rides `viewPolicy.chipEnv` — the ledger runs HALF: its
+coplanar trays mirror the env in unison and wash at full sheen, but zero went bland and cut the
+chips' selective-bloom feed (both user-corrected the same day). Flipped at the transition BOUNDARY
+for 3D↔3D (the setSimFlags rule — parked chips are in plain view), at switch time only on the
+flat park path. The spheres skip the env — hyper's orb look is fresnel-carried.
 
 ### The stage light claims, it is never switched off
 
@@ -598,7 +616,7 @@ The design rules behind the table, which the tests pin but don't explain:
   (`metagraph.timestamp === global.timestamp`), so committing a DIFFERENT tick provably means the held
   snapshot didn't anchor here. Left in place it sat directly under the global card in the pile — where
   ADJACENCY IS CONTAINMENT — stating that tick B contains a snapshot that landed in tick A. It lives in
-  `snapshotSelectActions`, so all four consumers (explorer row, LiveStrip bar, the global card's pager,
+  `snapshotSelectActions`, so all remaining consumers (explorer row, the global card's pager,
   the 3D band click) inherit it.
 - **New click/select semantics go in the table with a test**, their effects in the executor, never
   inline. `components/selectionBoundary.test.ts` enforces this — and note the rule is **write**-based,
@@ -625,6 +643,12 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
   the same state that renders the box), exactly as the camera answers it; the component picks the
   MODEL and the Engine the ANCHOR from one mirrored preference, falling through to the finest
   committed rung.
+- **A hyper NODE's callout points at EVERY layer bead** (the multi-leader, 2026-08-30): a machine
+  is one record per layer on separate shells, so up to two extra dashed legs fan **from the
+  panel's own corner** (the beads are peers — user's second-round correction of a bead-to-bead
+  chain) to the non-primary beads, each ending in a small identity ring. Engine-written per frame
+  into the callout's `.co-multi` SVG (the Tooltip discipline); `Globe.selectedNodeHyperAnchors`
+  resolves the siblings by `nodeId` through the one `_hyperAnchorOf` home.
 - **Anchors are object-level**: a geo node's own chip (the spotlight's per-record resolution), the
   pinned snapshot's own tile (live position recorded as the trail draws, rewind included). Group
   anchors are fallbacks only. A distributed subject (a filtered fleet in geo, unlisted anywhere)
@@ -670,36 +694,37 @@ mirror, with three ways to ask for it — the switch, Escape, the layer's own ×
 
 **The page never scrolls.** The scene wrapper is `position:fixed; inset:0` with an identity transform
 from first paint, which makes it the containing block for every fixed descendant — see CSS trap 2,
-where both halves of that arrangement are load-bearing. The raw layer and the `LiveStrip` are siblings
+where both halves of that arrangement are load-bearing. The raw layer and the vitals band are siblings
 of that wrapper, not children. Whichever layer is away carries `inert`.
 
 The HUD is **four fixed zones, one scope each, stable across views. Gate new chrome by which
 zone/scope it belongs to, not by what a particular view puts there** — a card is defined by its scope,
 and its contents are view-specific examples that keep changing.
 
-**Top — the command bar.** One full-width glass bar, edges aligned with the rail columns: status +
-filter on the left, the view switch centered, view vitals and the RAW switch on the right (RAW last,
-because it acts on everything to its left). The filter button toggles an **attached filter strip** that
-grows the bar downward by a row of network chips; hovering previews the dim, picking closes it. The
-strip is a **layout participant, not a popup** — TopBar publishes its height and both the rails and the
-canvas add it to their `top`, a pure position shift that keeps the buffer viewport-sized so nothing
-distorts and the engine never resizes. The vitals region is constant-width (all view clusters render
-stacked in one grid cell) so the centered view switch never jumps.
+**Top — the command bar.** One full-width glass bar, edges aligned with the rail columns: the ECG +
+wordmark + filter on the left, the view switch centered, presentation/theme/network on the right
+(the vitals left the bar for the bottom band, 2026-08-30; RAW last, because it acts on everything
+to its left). The bar has **one grow-downward slot with two tenants** (a which-strip enum makes
+them mutually exclusive by construction): the FILTER button opens the network-chip strip (hovering
+previews the dim, picking closes it), and the ECG opens the **pulse strip** — one read-only cell
+per data FEED from the poll-health registry (`src/data/api.ts` `reportPoll`/`pollHealthRows`; the
+five real fetch sites report their own outcomes), each with a derived status dot (ok / stale past
+~2.5× its own cadence / error — never fabricated, rule 10), the last success ticking, the cadence
+and target in words. Either strip is a **layout participant, not a popup** — TopBar publishes its
+height and both the rails and the canvas add it to their `top`, a pure position shift that keeps
+the buffer viewport-sized so nothing distorts and the engine never resizes.
 
-The command bar is spineless — the ECG mark is its identity cue. With a network committed, the active
-vitals cluster wears a soft-tipped hairline in the filter's identity hue; "all" renders nothing, and
-numbers stay untinted.
-
-**The bar's narrow-width thresholds are MEASURED, not guessed** (2026-08-09): the view-switch labels drop
-at `max-[1299px]`, the wordmark at `max-[1439px]`, and the dividers plus the "soon" placeholder views at
-`max-[820px]` — each measured from where the real cluster starts to crowd, with slack, because the bar's
-content width changes with the committed filter's own name. One threshold per decision, shared by
-everything that must change on the same line. When the labels go, the ACTIVE view's name reappears as a
-caption strip under the bar — a decorative echo of the radiogroup's own state (`aria-hidden`,
-non-interactive), living outside the bar surface so its `overflow-hidden` can't clip it.
-
-⚠️ The hyper vitals columns are **every label `compositionRows` can emit, so they sum to the
-selection** — a new composition label needs a column, not an exclusion.
+The command bar is spineless — the ECG mark is its identity cue (a BUTTON now, the pulse strip's
+toggle). The wordmark is plain unlinked chrome (`select-none`, default cursor — the footer owns
+/about) shown at every width except phone, where it doesn't fit; the old 1439 hide band was
+measured with the vitals cluster aboard and died with it. The presentation control is TWO controls
+on the store's own axes (2026-08-30): a SCENE⇄HUD toggle over `railsHidden` (one button that
+flips, desktop-only) beside a RAW pressed-toggle over `section` — popping out of RAW restores
+whichever presentation you had. **The bar's remaining narrow-width thresholds are MEASURED, not
+guessed**: the view-switch labels drop at `max-[1299px]`, the dividers plus the "soon" views at
+`max-[820px]` — re-measure any threshold when content moves in or out of the bar (the vitals'
+departure is what freed the wordmark). When the labels go, the ACTIVE view's name reappears as a
+caption strip under the bar (`aria-hidden`, non-interactive).
 
 **Left rail — the explore/interact scope.** Every view leads with the **About** orientation card, then
 the view's one tool card if it has one. What each explorer contains is view-specific, but three
@@ -817,11 +842,12 @@ into one tick (DOR routinely 9-plus), so a tick-wide `N` would contradict the br
 
 **The global snapshot's set is OPEN** (user, 2026-08-09): time is ongoing, so the same plank steps one
 tick at a time but shows **no `n / N`** — a window into an unbounded chain has no total to state, and
-`SiblingSet.open` is what says so. That is also what keeps it from rivalling the `LiveStrip`: **the strip
-is the time INSTRUMENT** (scale, window, cadence), the plank is a nudge to the adjacent tick. It steps the
-strip's own buffer in the strip's own order (oldest→newest) through the same descriptor a bar click
-builds, so stepping back from the front pins and stepping onto the live tip resumes following; a pin aged
-out of the retained window gets no pager rather than a guessed neighbour.
+`SiblingSet.open` is what says so. The plank is a nudge to the adjacent tick: it steps the retained
+global window (the same buffer the vitals band's tick chart plots) oldest→newest through the same
+descriptor the old strip's bar click built (the chart is non-interactive now, 2026-08-30 — the plank
+and the explorer rows ARE the tick-stepping routes), so stepping back from the front pins and stepping
+onto the live tip resumes following; a pin aged out of the retained window gets no pager rather than a
+guessed neighbour.
 
 **Expanding a rung's card FLIES THE CAMERA to it** (user, 2026-08-09 — "we do the same when we click a
 row in the explorer"): the box is the subject, so it gets the subject's pose. `ladderLevelOfSlot()` in
@@ -848,7 +874,7 @@ already names — and the metagraph TICKER that shared that row went with it und
 the METAGRAPH card sits directly above and this card's own mark already carries the hue.
 
 **An ordinal is written BARE — no `#`** (user, 2026-08-10). Every surface that renders one as a value
-already did (the snapshot card titles, the explorer rows, the anchor-log cells, the LiveStrip's tooltip
+already did (the snapshot card titles, the explorer rows, the anchor-log cells, the old strip's tooltip
 head); the sigil only survived where a number got glued into a sentence — this aside, the raw layer's
 channel pane head, the pager's step labels, the ledger explorer's tooltips and the scene tooltip. It is
 noise in all of them: the label beside it already says what the number is. Internal `PickDescriptor.title`
@@ -878,20 +904,45 @@ re-grew Country and Hosting, since the pile-dedup rule found no ancestors. It is
 selection change: the store is untouched, so returning to a 3D view restores the whole pile. This
 matches the left rail, which shows About and no tool card there.
 
-**Bottom — the live/time lane, and it is SNAPSHOTS-ONLY** (user, 2026-08-12). The lane holds one
-instrument, the `LiveStrip`'s tick bar-chart, and a bar-chart over ticks is a TIME instrument — so it
-belongs to the *when* view and nothing else. hyper and geo carried a node-count readout in the same
-footprint to keep the lane from reading as blank; that answered the wrong question, since a per-network
-node tally is structure and structure is already the subject of the view above it. The lane is now
-simply absent there and the space comes back to the rails and the raw layer.
+**Bottom — the VITALS BAND** (`components/VitalsBand.tsx`, 2026-08-30 — the vitals left the crowded
+command bar; docs/superpowers/plans/2026-08-30-vitals-bottom-band.md is the plan). A slim full-width
+row of **read-only info cards**, one set per 3D view: hyper leads with a composition DONUT (the four
+counts are shares of one fleet — the one honest home for a donut) plus its legend; geo shows its
+footprint numbers plus a nodes-by-country micro-bar row; the ledger shows its two rate cards (number +
+sparkline off the live buffers) beside the declicked tick bar-chart. This deliberately widens the old
+snapshots-only rule (2026-08-12): each band is the view's OWN vitals — the numbers the bar's vitals
+region used to show — so nothing generic returned. **The band takes no pointer events at all**
+(`pointer-events-none` — user: "no clicking etc required"): every route the old strip's clicks served
+survives in the explorer rows and the global card's pager. Colour is rule 3's: structural cyan, the
+identity hue only under a committed filter — resolved once per band (`useVitalsScope`) and handed to
+every chart as its `accent` prop; the band wears NO filter-scope hairline (user, 2026-08-30 — the
+charts themselves state the scope). Identity is never colour-alone — every donut segment, country bar
+and rate is named by its own label. Both presentations (the desktop band and the phone strip row)
+render ONE `ViewCells` dispatch, so a cell added or gated reaches both in the same edit; the ledger
+row reads the snapshot feed ONCE and passes it down.
 
-`BottomStream` is the **one publisher**: it both mounts the strip and writes `--bottom-reserve`, from the
-one policy flag `VIEW_POLICIES[mode].timeLane` **AND the scene pose**, so presence and reserved space
-can't drift (the previous arrangement published the reserve per view while the strip mounted
-unconditionally — two values for one token). The token's static default in `globals.css` is therefore
-**`0px`**, matching the boot view. The lane is **scene-pose only** (user, 2026-08-15): the raw anchor log
-pages arbitrarily deep into history, so the strip's retained window is no longer 1-1 with the table it
-would float over, and its reserve goes back to the raw layer — which the phone pane needs.
+The cells are per-view and ordered by the user (2026-08-30): hyper coarse→fine (METAGRAPHS with a
+by-type breakdown — `networkKind` is the type's one home, icons from `METATYPE_ICONS` on the
+filtered face — then NODES, the NODE COMPOSITION donut, NETWORK LAYERS as RoleChips micro-bars);
+geo pairs each total with its breakdown (NODES · COUNTRIES · nodes-by-country · PROVIDERS ·
+top-providers); the ledger leads with WHO (METAGRAPHS ANCHORING, exact from the anchor index, with
+identity dots) then the rates (number + stretch sparkline, units spelled `/hour`) and the
+declicked tick bar-chart. `compositionCounts` lives IN VitalsBand (its one consumer since the
+top-bar cluster retired). The band dims with the rails on `useSceneYield` and its plate is the
+command bar's own `--topbar-glass`.
+
+`BottomStream` is the **one publisher**: it both mounts the band and writes `--bottom-reserve`, from
+the one policy flag `VIEW_POLICIES[mode].vitalsLane` **AND three deliberate gates** — the scene pose
+(user, 2026-08-15: the raw layer pages history the lane wouldn't describe, and needs the space), the
+rails (user, 2026-08-30: presentation mode shows just the 3D, so rails-hidden hides the band too), and
+the phone (the dock + sheet own that edge; the filter strip's second row renders the SAME cards
+as a horizontal scroll instead — `VitalsStripRow`, one vitals design on every tier). Presence and
+reserved space can't drift once hydrated; the token's static default in `globals.css` is the band's
+own reserve (**`92px`**), matching the BOOT state (hyper's lane is on, SSR assumes desktop) so the
+rails keep clear of the band before the effect runs. The SCENE⇄HUD toggle is the one `railsHidden`
+writer, and it clears its own state when the viewport drops below 1100px — below that the control is
+CSS-hidden and SCENE has no meaning, so a stuck `true` would strand the band and the camera's
+rails-lean with no visible way back.
 
 ### Responsive shell
 
@@ -1229,7 +1280,7 @@ were reading. Same builder as the anchor-log row, so a read and the equivalent r
 ### shadcn primitives
 
 `components/ui/` holds the adopted primitives; compose classes with `cn()`. **`Button` is adopted only
-for small text/icon controls that map cleanly onto a variant** — the LiveStrip bars, accordion rows,
+for small text/icon controls that map cleanly onto a variant** — accordion rows,
 rail edge-tabs, phone-dock halves, the view switch and the filter button are deliberately NOT Buttons,
 and that boundary is the convention. `Command` backs the filter picker (its cursor wash is overridden
 to a faint neutral — the bright accent fill washed text out). `Table` + `ScrollArea` are the raw layer
@@ -1315,7 +1366,7 @@ seam and corner rules select on the same markers the thread measures:
 
 Global L0 produces a snapshot roughly every **28 seconds** — measured live, mean 28.1s over a full
 window, range 4.6–114.8, so the cadence is irregular and a "few seconds" intuition will mislead any
-timing you build on it (the LiveStrip's window, a hold, a settle gate). Three counters, which the UI
+timing you build on it (the tick chart's window, a hold, a settle gate). Three counters, which the UI
 keeps separate on purpose:
 
 - **`ordinal`** — sequence number, +1 every snapshot even when empty.
@@ -1331,13 +1382,13 @@ scale by anchors, and the snapshot card leads with the anchors, breaks them down
 states the derived fee and the bytes anchored. **The card carries no height, sub-height or block
 count at all** — a counter that answers no question the card raises, culled 2026-08-10 with the rest.
 
-**`LiveStrip`** is the bottom lane's one instrument and mounts in **Snapshots alone** (above). One bar per
-tick, height = anchors. Unfiltered, bars plot each tick's total in cyan. **Filtered, each bar plots
-that metagraph's own anchors on its OWN scale in its identity hue** — its own cadence, with empty ticks
-as honest gaps. A ~1-anchor-per-tick metagraph reads sparse and 0-in-window reads blank; that honesty
-is the design. Clicking a bar selects that snapshot in place, through the same table and executor as
-the 3D tile. Hovering cross-highlights the matching ledger block, and the hover is cleared on each new
-tick, because bars shift under a stationary cursor that never fires mouseleave.
+**The tick bar-chart** is the vitals band's ledger cell (`VitalsBand`'s `TickBars` — the LiveStrip's
+successor, 2026-08-30, declicked per the plan). One bar per tick, height = anchors, last ~32 ticks.
+Unfiltered, bars plot each tick's total in cyan. **Filtered, each bar plots that metagraph's own
+anchors on its OWN scale in its identity hue** — its own cadence, with empty ticks as honest gaps. A
+~1-anchor-per-tick metagraph reads sparse and 0-in-window reads blank; that honesty is the design.
+**No interaction at all** — the strip's bar-click (pin) and hover cross-highlight died with the band's
+`pointer-events-none`; the pin routes live on in the explorer rows and the global card's pager.
 
 **The raw data layer's table** is the same per-view projection in table form, dispatching on `mode`.
 The ledger one is a master–detail split: the anchor log on the left, the channel-state panel as the
@@ -1440,9 +1491,11 @@ sparse by review, the line's own behaviour says all three states, and words abou
 to the HUD, where the global snapshot card already ticks its age. Don't re-grow it without a live look.
 
 And the **SEAM** — a measured tick that anchored nothing — is a MEASUREMENT, so it draws at full
-height: `ledgerBands.ts` has specified a minimum-width bar for it since the redesign, but the adapter's
-one `!measured || bandCount === 0` branch lumped it in with the unmeasured case and never drew it. It
-now rides the real write path through one synthetic neutral band.
+height, riding the real write path through one synthetic neutral band. Since 2026-08-30 it wears
+**the SEED's own square footprint** (`SEED_W`, promoted to `domain/ledgerLayout.ts` as the two
+special rows' SHARED shape): height is the only thing separating them — flat = unread, standing =
+measured-empty — so neither ever makes a width claim (user: "use the same shape and just use the
+height").
 
 **Ribbons carry the anchor.** One tapering sheet per anchoring lane, from that metagraph's lane tiles
 down to **its own band** — the literal statement of which bytes came from where. Both edges are eased
@@ -1467,6 +1520,12 @@ the plane above each one is already named — but the machines inside stay picka
 rewrite *those* matrices to the tray positions. The Engine freezes `morph` while settled here, and
 `ledgerT` is a boundary-snapped layout parameter, not an eased blend. The hubs, the globe surface and
 the starfield are gated off so none lingers when arriving from geo.
+
+**The DAG core never dims in the chamber** (user, 2026-08-30): every metagraph anchors INTO the
+global, so the global layer — floor, fleet tray, its L0 validators — is inside every committed
+story, not an off-filter bystander. A WHO-is-in-scope statement, so it lives at the dim TARGET
+(`Globe._applyDim`'s ledger clause, re-derived by `applyLedgerLayout` on the flag flip); the view
+rows keep saying how much, and every other view still dims the DAG under a metagraph filter.
 
 **Lanes and the committed filter. The field is fixed**: every lane always owns its own slice, and a
 committed filter never moves or hides geometry — only the shared commit tilt answers it with the camera.
@@ -2011,3 +2070,13 @@ KV/Postgres/Blob (no persistence), Edge Config / env vars (no secrets).
 - **Commit trailer**: end commit messages with `Co-Authored-By: Claude <noreply@anthropic.com>` — no
   model name, so the line can't go stale (PR bodies: `🤖 Generated with
   [Claude Code](https://claude.com/claude-code)`).
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

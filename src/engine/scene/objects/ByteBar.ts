@@ -11,12 +11,12 @@ import * as THREE from "three";
 import { isLightGround, inkPresence, type SceneColors } from "../../sceneColors";
 import type { PickDescriptor } from "@/src/data/types";
 import { METAGRAPHS } from "@/src/net/current";
-import { BAR_H, BAR_D, BAR_LIFT, FLOOR_Y, LEAD_X } from "../../domain/ledgerLayout";
+import { BAR_H, BAR_D, BAR_LIFT, FLOOR_Y, LEAD_X, SEED_W } from "../../domain/ledgerLayout";
 import { type Band, type BarSpec } from "../../domain/ledgerBands";
 import { SLOT_SP, SLOT_N, horizonAt, frontAt, rowOnChamber } from "../../domain/ledgerModel";
 import { snapBright, snapFocusOf, emphasisK } from "../../domain/dimModel";
 import type { TuneSchema } from "../../tune";
-import { joinBloom } from "../SceneContext";
+import { joinBloom, inMarkPass } from "../SceneContext";
 
 const BANDS_PER_SLOT = METAGRAPHS.length + 1;
 
@@ -27,6 +27,11 @@ const BANDS_PER_SLOT = METAGRAPHS.length + 1;
  *  ledger row's knobs, the same ones the node chips in the trays answer to. */
 export interface BarTune {
   rest: number; // a resting band's opacity
+  // Sub-pass input × for the selective paper halo (SceneContext.inMarkPass): a band's ink is
+  // darker than the ground by design, so at the main-pass colour it feeds the mark target too
+  // little to halo — geo's chips get the same lift for free from their env sheen. Raised only
+  // while the mark pass renders; the visible frame never sees it.
+  halo: number;
 }
 
 // rest user-tuned via ?tune, 2026-08-07; raised 0.05 → 0.12 (user, 2026-08-16): under a committed
@@ -35,11 +40,12 @@ export interface BarTune {
 // base was below the range any multiplicative dim can survive; the dim knob itself is untouched.
 // (`hot` retired 2026-08-11 — it was exactly the ledger
 // row's `boost`, and a snapshot is data, so it takes the node's focus knob instead.)
-export const BAR_TUNE_DEFAULTS: BarTune = { rest: 0.12 };
+export const BAR_TUNE_DEFAULTS: BarTune = { rest: 0.12, halo: 2.4 };
 
 /** The `?tune` knob ranges (contract: src/engine/tune.ts), colocated with the numbers they bound. */
 export const BAR_TUNE_SCHEMA: TuneSchema<BarTune> = {
   rest: { min: 0, max: 1 },
+  halo: { min: 1, max: 6, step: 0.1, label: "halo input × (light)" },
 };
 
 interface Slot {
@@ -72,9 +78,10 @@ interface Slot {
   tw: number[]; // per-band target width
 }
 
-// The SEED's fixed footprint — nominal, deliberately unrelated to any byte count (it lies flush,
-// so it isn't a bar and claims no width; the tone and the beat say which absence it is).
-export const SEED_W = 1.3;
+// The SEED's footprint now lives in domain/ledgerLayout (SEED_W — shared with the SEAM, which
+// wears the same square so height alone separates the two special rows); re-exported for
+// LedgerView's callout-edge math.
+export { SEED_W };
 // …and its height, as a fraction of the bar's (user, 2026-08-18: the seed "sits in front of the
 // plane rather than within"). At full BAR_H the seed was a near-cube — 1.6 deep, 0.9 tall, 1.3
 // wide — standing proud of the floor beside a trail of long flat bars, so it read as an object
@@ -125,6 +132,14 @@ export class ByteBar {
         mesh.scale.set(0, 0, 0);
         mesh.visible = false;
         joinBloom(mesh); // a band is the tick's own ink — see BLOOM_LAYER
+        // The paper halo's input lift (BarTune.halo): the material colour rides above its own
+        // value only while the selective mark pass renders, un-multiplied inside the same pass —
+        // the main frame always draws the band's true colour. ⚠️ MULTIPLY, never set: a band's
+        // identity lives IN mat.color (update() rewrites it per frame), so a setScalar restore
+        // stomped every band to white (found live 2026-08-30). Both hooks gate on the flag so
+        // dark pays nothing.
+        mesh.onBeforeRender = () => { if (inMarkPass()) mat.color.multiplyScalar(this.tune.halo); };
+        mesh.onAfterRender = () => { if (inMarkPass()) mat.color.multiplyScalar(1 / this.tune.halo); };
         this.group.add(mesh);
         bands.push(mesh);
         mats.push(mat);

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { NET_ICONS } from "@/components/icons";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { SELECTED_ROW } from "@/components/selection";
 import { cn } from "@/lib/utils";
@@ -65,6 +66,7 @@ export default function NetworkSwitch() {
             net === "mainnet" ? "text-muted-foreground hover:text-foreground" : "text-[var(--primary)]",
           )}
         >
+          {(() => { const FaceIcon = NET_ICONS[net]; return <FaceIcon aria-hidden className="size-3.5" />; })()}
           <span className="text-micro tracking-caps uppercase">{cur.code}</span>
           <ChevronDown aria-hidden className="size-3.5 opacity-70" />
         </button>
@@ -89,9 +91,10 @@ export default function NetworkSwitch() {
               r.id === net && SELECTED_ROW,
             )}
           >
-            {/* Each network's own accent token — defined in :root ALWAYS (globals.css), exactly
-                so this popover can name all three hues on any network. */}
-            <span aria-hidden className="size-2 rounded-full flex-none" style={{ background: `var(--net-${r.id})` }} />
+            {/* Each network's mark in its own accent token — defined in :root ALWAYS
+                (globals.css), exactly so this popover can name all three hues on any network.
+                The icon replaces the bare dot (user, 2026-08-30): colour + glyph, one mark. */}
+            {(() => { const RowIcon = NET_ICONS[r.id]; return <RowIcon aria-hidden className="size-4 flex-none" style={{ color: `var(--net-${r.id})` }} />; })()}
             <span className="flex-1">{r.name}</span>
             <span className="text-micro tracking-caps uppercase opacity-60">{r.code}</span>
           </a>

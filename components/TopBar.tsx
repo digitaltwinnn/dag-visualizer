@@ -7,14 +7,15 @@ import { useStore } from "@/src/store/store";
 import { displayNetwork } from "@/src/data/unlisted";
 import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import Vitals, { VitalsCluster } from "@/components/topbar/Vitals";
+import { VitalsStripRow } from "@/components/VitalsBand";
 import FilterPicker from "@/components/topbar/FilterPicker";
+import PulseStrip from "@/components/topbar/PulseStrip";
 import EcgMark from "@/components/topbar/EcgMark";
 import PresentationToggle from "@/components/topbar/PresentationToggle";
 import ThemeToggle from "@/components/topbar/ThemeToggle";
 import NetworkSwitch, { NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
-import NetLink from "@/components/NetLink";
 import { useBreakpoint } from "@/components/useBreakpoint";
+import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import type { Mode } from "@/src/store/store";
 
 const VIEWS = [
@@ -42,16 +43,17 @@ export default function TopBar() {
   const mode = useStore((s) => s.mode);
   const setMode = useStore((s) => s.setMode);
 
-  // The filter strip's open state — COLLAPSED BY DEFAULT (user): it's a persistent part of the
-  // bar, not a popup, but starts closed on every load/view. The FILTER button toggles it, Escape
-  // closes it, and picking a chip closes it too (user, 2026-08-02 — see the strip note below).
-  // The phone effect below still force-closes it if the viewport becomes phone-width after a
-  // manual open.
-  const [open, setOpen] = useState(false);
+  // The bar's ONE grow-downward slot, two tenants (2026-08-30 — the PULSE strip joined the
+  // filter strip): `strip` names which row is open, null = closed. One slot makes them mutually
+  // exclusive by construction — the ECG toggles "pulse", the FILTER button "filter", Escape and
+  // a picked chip close whichever is open. The phone effect below still force-closes on a
+  // viewport change to phone-width.
+  const [strip, setStrip] = useState<null | "filter" | "pulse">(null);
+  const open = strip != null;
 
   const bp = useBreakpoint();
   useEffect(() => {
-    if (bp === "phone") setOpen(false);
+    if (bp === "phone") setStrip(null);
   }, [bp]);
 
   // Consume the NetworkSwitch's one-shot view handoff (see its header): a network switch is a
@@ -163,38 +165,43 @@ export default function TopBar() {
         {/* LEFT zone: brand + filter. A real flex container at every width now that the grid
             is the base layout — the in-zone gaps mirror the row's own gap steps. */}
         <div className="flex items-center gap-3 max-[1260px]:gap-2.5 max-[940px]:gap-2 max-[700px]:gap-1 min-w-0">
-        {/* Brand — AND the one route to /about (user, 2026-08-09, replacing the always-on
-            experimental banner). The identity mark is the honest affordance for "what is this
-            thing?": clicking the app's own name to read what it is, who made it and that it's
-            unofficial needs no new chrome in a bar that has none to spare, and it works at every
-            breakpoint because the ECG mark survives when the wordmark hides. A plain <a>, not a
-            Link: /about is a separate document with its own scroll, and the app is a long-lived
-            WebGL tab — a client-side route change would tear the engine down and rebuild it on
-            return, so the full navigation is the cheaper one. */}
-        <NetLink
-          href="/about"
-          title="About DAG Visualizer, an unofficial community project"
+        {/* The HEARTBEAT — the PULSE STRIP's toggle (user, 2026-08-30: "when I click the top
+            bar heartbeat it should show a bottom section with relevant information about the
+            liveliness of the app", superseding the 2026-08-09 /about route — the mark IS the
+            liveliness cue, so it opens the liveliness instrument; /about moved to the FOOTER
+            (the wordmark is plain chrome and the strip's own about link was removed by the
+            user the same day). On phone the footer rides above the dock (user, 2026-08-31),
+            so the route holds on every tier. */}
+        <button
+          type="button"
+          aria-expanded={strip === "pulse"}
+          aria-controls="filter-strip"
+          title="App liveliness — the polls behind the numbers"
+          onClick={() => setStrip((cur) => (cur === "pulse" ? null : "pulse"))}
+          onKeyDown={(e) => { if (e.key === "Escape") setStrip(null); }}
           className={cn(
-            "flex items-center gap-2 rounded-btn -mx-1 px-1 py-0.5 no-underline",
+            "flex items-center rounded-btn -mx-1 px-1 py-0.5 bg-transparent border-0 cursor-pointer",
             "hover:bg-wash-soft transition-colors duration-150 motion-reduce:transition-none",
+            strip === "pulse" && "bg-wash-soft",
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
           )}
         >
           <EcgMark />
-          {/* Wordmark hides below 1439. The thresholds in this bar are MEASURED, not guessed —
-              the bar is `overflow-hidden`, so anything that doesn't fit is silently clipped off
-              the right edge, and the first thing to go is the presentation toggle (user bug,
-              2026-08-09: "the right view type buttons go out of view"). Measured needs, at the
-              vitals cluster's present 250px: labels + wordmark → 1392px; labels alone → 1257px.
-              So the wordmark waits for 1439 and the labels for 1299, each with real slack. (`max-[N]`
-              compiles to `not (min-width: N)` — EXCLUSIVE, so N itself is already the wide face.)
-              Raise them together with any part that grows; the dev overflow warning in the effect
-              above shouts if they drift again. */}
-              <span className="font-semibold tracking-[-0.01em] text-title whitespace-nowrap max-[1439px]:hidden">
-            <span className={live ? "text-foreground" : "text-muted-foreground opacity-70"}>DAG</span>{" "}
-            <span className={cn("text-muted-foreground", !live && "opacity-70")}>Visualizer</span>
-          </span>
-        </NetLink>
+        </button>
+        {/* The WORDMARK — plain identity text since 2026-08-30 (user: the footer owns /about
+            now, "don't link it here"; the ECG beside it owns the pulse strip). Shown at every
+            width: the old 1439 hide was measured WITH the vitals cluster in the bar, and the
+            vitals left for the bottom band — re-measured after, the full wordmark fits down to
+            phone with zero zone overflow (the dev overflow alarm above still shouts if content
+            grows and this drifts again). */}
+        {/* Hidden on PHONE only (user, 2026-08-30: "it does not fit there" — the bar's content
+            is data-dependent, a committed network's name widens the filter face past what the
+            390px sweep measured). 700 is breakpointOf's own boundary, same arm every phone gate
+            names (CSS trap 8: max-[700px] stops applying AT 700, the wide face). */}
+        <span className="flex items-center gap-2 font-semibold tracking-[-0.01em] text-title whitespace-nowrap select-none cursor-default max-[700px]:hidden">
+          <span className={live ? "text-foreground" : "text-muted-foreground opacity-70"}>DAG</span>{" "}
+          <span className={cn("text-muted-foreground", !live && "opacity-70")}>Visualizer</span>
+        </span>
         <span className="w-px self-stretch bg-border my-1 max-[860px]:hidden" />
 
         {/* Filter (toned, de-nested) — toggles the ATTACHED filter strip below (user,
@@ -202,14 +209,14 @@ export default function TopBar() {
             the bar's own surface so the scene reacts in the open while you hover networks). */}
         <button
           type="button"
-          aria-expanded={open}
+          aria-expanded={strip === "filter"}
           aria-controls="filter-strip"
-          onClick={() => setOpen((o) => !o)}
-          onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
+          onClick={() => setStrip((cur) => (cur === "filter" ? null : "filter"))}
+          onKeyDown={(e) => { if (e.key === "Escape") setStrip(null); }}
           className={cn(
             "flex items-center gap-[7px] bg-transparent border-0 cursor-pointer py-1.5 px-2 rounded-btn",
             "hover:bg-wash-soft",
-            open && "bg-wash-soft",
+            strip === "filter" && "bg-wash-soft",
             // The 44px tap minimum keys on the POINTER, not the width (user, 2026-08-14 —
       // resizing a desktop window smaller made the bar GROW): a coarse pointer is a
       // touch device wherever the window edge sits; a fine pointer never needs it.
@@ -231,7 +238,7 @@ export default function TopBar() {
             className={cn(
               "text-micro tracking-caps uppercase max-[940px]:hidden",
               "transition-colors duration-150 motion-reduce:transition-none",
-              open ? "text-primary" : "text-muted-foreground",
+              strip === "filter" ? "text-primary" : "text-muted-foreground",
             )}
           >
             Filter
@@ -251,7 +258,7 @@ export default function TopBar() {
             className={cn(
               "size-3.5 flex-none text-muted-foreground transition-transform motion-reduce:transition-none",
               "max-[700px]:hidden",
-              open && "rotate-180",
+              strip === "filter" && "rotate-180",
             )}
           />
         </button>
@@ -309,21 +316,17 @@ export default function TopBar() {
           })}
         </ToggleGroup>
 
-        {/* RIGHT zone: vitals + presentation. Mirrors the left zone; `justify-self-end` pins
-            it to the bar's right edge in the grid. */}
+        {/* RIGHT zone: presentation + theme + network. The vitals LEFT the bar (2026-08-30 —
+            the bottom VitalsBand is their home now; docs/superpowers/plans/
+            2026-08-30-vitals-bottom-band.md), so the zone is the control group alone. On phone
+            the vitals still ride the filter strip below as a second row, unchanged. */}
         <div className="flex items-center gap-3 max-[1260px]:gap-2.5 max-[940px]:gap-2 max-[700px]:gap-1.5 justify-self-end">
-        <span className="w-px self-stretch bg-border my-1 max-[860px]:hidden" />
 
-        {/* Vitals — inline on tablet/desktop. On phone they render nothing here: the vitals
-            ride the filter strip below as a second row (user, 2026-08-15 — the separate 44px
-            vitals toggle starved the bar, and the strip is already the bar's one "grow
-            downward" mechanism), so the right zone is the presentation toggle alone. */}
-        <Vitals />
-
-        {/* PRESENTATION — the bar's trailing control: ONE axis for how the view's information
-            is presented (SCENE / CARDS / RAW — replacing the separate Focus icon + RAW switch,
-            user 2026-08-08). It sits in the COMMAND bar (this zone's scope is the whole
-            instrument) rather than the live lane. */}
+        {/* PRESENTATION — the bar's trailing group: the SCENE⇄HUD chrome toggle + the RAW
+            layer toggle, adjacent as one pair (user, 2026-08-30 — re-split along the store's
+            own axes; the 2026-08-08 one-axis control flattened two independent axes into three
+            states). It sits in the COMMAND bar (this zone's scope is the whole instrument)
+            rather than the live lane. */}
         <span className="w-px self-stretch bg-border my-1 max-[860px]:hidden" />
         <PresentationToggle />
 
@@ -364,11 +367,11 @@ export default function TopBar() {
           open ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
         )}
         aria-hidden={!open}
-        onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
+        onKeyDown={(e) => { if (e.key === "Escape") setStrip(null); }}
       >
         <div className={cn("overflow-hidden min-h-0", !open && "invisible")}>
           <div ref={stripInner}>
-            <FilterPicker onPicked={() => setOpen(false)} />
+            {strip === "pulse" ? <PulseStrip /> : <FilterPicker onPicked={() => setStrip(null)} />}
             {/* PHONE: the vitals ride the SAME strip as a second row (user, 2026-08-15) — one
                 dropdown control on the filter face instead of a separate 44px toggle starving
                 the bar row. Inside `stripInner`, so the published `--topbar-extra` height and
@@ -376,7 +379,14 @@ export default function TopBar() {
                 desktop cluster; the hairline is the phone vitals row's own border-t device. */}
             {bp === "phone" && (
               <div className="flex items-center justify-center gap-2 mx-2 px-2 pb-2 pt-1.5 border-t border-border/60">
-                <VitalsCluster align="center" />
+                {/* The band's own cards, horizontally scrollable (user pick, 2026-08-30 — one
+                    vitals design on every tier; the bare-number cluster is retired). Gated on
+                    the band's own policy flag so a flat view's row carries controls alone. */}
+                {/* Mounted only while the strip is OPEN: collapsed, the row is invisible
+                    but a mounted VitalsStripRow still runs the snapshot-feed subscriptions
+                    and per-render tallies — refolding the window every poll on the lowest-
+                    powered tier for pixels no one can see. */}
+                {open && VIEW_POLICIES[mode].vitalsLane && <VitalsStripRow />}
                 {/* The phone home of the network switch (its bar slot is desktop/tablet-only):
                     the strip row is the one place the bar grows, and it has the width the
                     right zone doesn't. */}

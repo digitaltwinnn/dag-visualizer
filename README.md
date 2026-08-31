@@ -13,19 +13,20 @@ can understand how it works and why it's powerful.
 - A per-view "About" card explains what each view shows
 - Hover any element for a tooltip; **click** for an inspector with real on-chain values and other details alongside **live
   activity** cards
-- The top bar carries view-specific
-  vitals (structure / footprint / live activity).
+- A bottom **vitals band** carries each view's own instruments — donut, micro-bars,
+  sparklines and the snapshot bar-chart — and the top-bar heartbeat opens a **pulse strip**
+  showing every data feed's last successful poll.
 
 ## Design language
 
 The HUD is four fixed zones over the canvas, each with **one role** that holds in every
 view, so switching views never relearns the screen:
 
-- **Top** — the command bar: status + the global network filter +
-  the view switch + view-specific vitals.
+- **Top** — the command bar: the heartbeat (pulse strip) + the global network filter +
+  the view switch + presentation/theme/network controls.
 - **Left rail** — explore & interact: a collapsed "About this view" card and view specific explorer cards
 - **Right rail** — facts on demand: a stack of selected-subject cards.
-- **Bottom** — the **live/time lane**: the snapshot barchart
+- **Bottom** — the **vitals band**: per-view instrument cards (the ledger keeps the snapshot bar-chart as one of them)
 
 **Cards tell the story, not a static record.** A card is its subject *as seen from the current
 scene*: the same facts, redistributed to lead with what the context makes relevant. Select a node
@@ -40,7 +41,7 @@ orthogonal question and owns one "signature" detail card, so the views never ove
 
 | View | Question | Explore tool (left rail) | Signature (detail) slot |
 |------|----------|--------------------------|-------------------------|
-| **Hypergraph** | *who / what* — architecture + economic weight | nodes-by-network explorer | **Node card**; structure counts live in the top-bar vitals |
+| **Hypergraph** | *who / what* — architecture + economic weight | nodes-by-network explorer | **Node card**; structure counts live in the bottom vitals band |
 | **Node geography** | *where* — footprint & decentralization | country→nodes explorer (countries → provider cohorts → nodes) | **Node card** (state, roles, location) + country / provider cards |
 | **Snapshots** | *when* — how the ledger advances + cost | settlement-layers explorer (floors disclose each lane's nodes) | **Snapshot card** (DAG position, anchors, fees) |
 
@@ -145,7 +146,7 @@ absent data reads as an instrument state (NO SIGNAL, acquiring), never as fabric
 | Path | Purpose |
 |------|---------|
 | `app/` | Next App Router — `page.tsx` (mounts panels + canvas), `globals.css`, `api/{metagraphs,geo}/route.ts` (server-side data) |
-| `components/` | React panels (SceneCanvas, `TopBar` (status + filter + view switch + vitals), ExploreRail, Inspector, ContextCard, Tooltip, FollowController, …); `CardHead` (the shared card header), `BottomStream` + `LiveStrip` (the bottom heartbeat strip) + `useSnapshotFeed` (shared live feed), `GeoExplore` (geo country→nodes explorer), `Blueprint` (scaffolded-view schematics); `components/inspector/` holds the inspector cards |
+| `components/` | React panels (SceneCanvas, `TopBar` (heartbeat/pulse strip + filter + view switch + presentation), ExploreRail, Inspector, ContextCard, Tooltip, FollowController, …); `CardHead` (the shared card header), `BottomStream` + `VitalsBand` (the bottom per-view instrument band) + `useSnapshotFeed` (shared live feed), `GeoExplore` (geo country→nodes explorer), `Blueprint` (scaffolded-view schematics); `components/inspector/` holds the inspector cards |
 | `src/store/store.ts` | Zustand store (the React↔engine command/state bridge) |
 | `src/data/` | `network.ts` (wraps `NetworkData`), `follow.ts`, `types.ts` |
 | `src/util/format.ts` | Shared formatters — `hex` (colour), `fmtDag` (fee) |

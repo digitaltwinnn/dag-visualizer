@@ -111,6 +111,18 @@ export function restOrbit(view: View3D): number {
   const f = FOCI[REST_POSE[view]];
   return f.pos.distanceTo(f.target);
 }
+/** The resting pose's PITCH — how far above its target the camera sits at rest, in radians.
+ *  The scene rig measures the live camera's pitch against this so the lamps can follow pitch as
+ *  a DELTA (SceneRig): at the resting pose the delta is zero and the shipped look is untouched;
+ *  a dive to a node or a free vertical orbit carries the rig with the view instead of leaving
+ *  the lit side behind (user, 2026-08-30 — "a lot of the lighting effects get lost"). Read out
+ *  of FOCI like restOrbit, so re-tuning a resting pose re-tunes the reference with it. */
+export function restPitch(view: View3D): number {
+  const f = FOCI[REST_POSE[view]];
+  const dy = f.pos.y - f.target.y;
+  const dx = f.pos.x - f.target.x, dz = f.pos.z - f.target.z;
+  return Math.atan2(dy, Math.hypot(dx, dz));
+}
 /** Lean `pos` toward `target`, at full strength only while the pose orbits as wide as its view's
  *  resting one. `restDist <= 0` means "no resting pose to measure against" (a flat view, which has
  *  no canvas anyway) and takes the full lean, exactly as the un-ramped lever did. */

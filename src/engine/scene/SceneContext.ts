@@ -6,6 +6,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { BokehPass, type BokehPassParameters } from "three/addons/postprocessing/BokehPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
@@ -60,6 +61,14 @@ export function joinBloom(o: THREE.Object3D): void {
   o.layers.enable(BLOOM_LAYER);
 }
 
+// True only while the selective MARK pass is rendering (paper frames; see renderFrame). A member
+// whose main-pass ink is too dark to halo — the chamber's bands and tiles are ink on paper, where
+// geo's chips get free sub-pass brightness from their env sheen — checks this in onBeforeRender
+// and raises its own contribution for that render alone (restored in onAfterRender), so the
+// visible frame never changes. One flag, owned here beside the pass that defines it.
+let markPass = false;
+export const inMarkPass = (): boolean => markPass;
+
 // The bloom target runs at half resolution. Standard for a blur pyramid (the pass mips down from
 // here anyway) and it is what keeps the second scene render off the frame budget.
 const SEL_SCALE = 0.5;
@@ -112,7 +121,10 @@ const SEL_MIX_SHADER = {
       float m = max(b.r, max(b.g, b.b));
       vec3 ink = b / max(m, 1e-4);
       float a = clamp(bleed * m, 0.0, 1.0);
-      vec3 rgb = base.rgb * mix(vec3(1.0), ink, a) + glow * b;
+      // The glow input is CAPPED like the bleed's: the mark-pass input lifts (BarTune/TileTune
+      // .halo) push b past 1 at a boosted lead, and an uncapped add there climbs to white — the
+      // one thing paper emphasis must never do. Below 1 the term is byte-identical to before.
+      vec3 rgb = base.rgb * mix(vec3(1.0), ink, a) + glow * min(b, vec3(1.0));
       gl_FragColor = vec4(rgb, base.a);
     }
   `,
@@ -147,6 +159,12 @@ export interface SceneCtx {
    */
   setClearColor(bg: number): void;
   setGround(light: boolean): void;
+  /**
+   * The shared chip environment texture (built lazily on first ask — PMREM needs the renderer).
+   * The Engine hands it to NodeFabric.setNodeEnv once at construction; see the note at the
+   * builder for the physics (a flat cap only answers a top-down camera by reflection).
+   */
+  nodeEnv(): THREE.Texture;
   /** Tear down both composers and every render target either of them allocated. */
   dispose(): void;
 }
@@ -338,7 +356,9 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     const mask = camera.layers.mask;
     scene.background = null;
     camera.layers.set(BLOOM_LAYER);
+    markPass = true;
     s.composer.render();
+    markPass = false;
     camera.layers.mask = mask;
     scene.background = bg;
 
@@ -366,6 +386,7 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     sel?.bloom.dispose();
     composer.dispose();
     backdrop?.dispose(); // the paper cyclorama's CanvasTexture (null on a dark-only session)
+    nodeEnvTex?.dispose(); // the chips' PMREM studio env (null if no chip material ever built)
   }
 
   // The clear colour is the one construction-time capture of a threaded token in this module
@@ -409,6 +430,9 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   // WARM GREIGE, not blue (user, 2026-08-29: "blue... is a bit of a cold color"): the drift
   // axis now runs toward ivory (+R, −B) high on the wall — the gallery-wall answer, and the
   // cool instruments pop by complement. Signed use unchanged (+k warm, −k cool at the stage).
+  // ⚠️ SHIPPED INERT since 2026-08-30: even halved, the ivory read BROWN across the lower wall
+  // (measured R−B +18 at the floor) — `bgTint` now defaults 0 and the cool-silver token carries
+  // the wall's colour alone. The vector stays as the knob's axis, not the shipped look.
   const coolDrift = [1 + 0.028, 1 + 0.006, 1 - 0.030]; // halved: full ivory read DIRTY at wall lightness — a whisper of warmth is the ceiling (user, 2026-08-29)
   // The multiply pass's base — white is a multiply's identity, so its stops read as fractions of
   // whatever the sweep already laid down. Grayscale, so rule 3 has nothing to say about it.
@@ -564,10 +588,36 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     applyBackground();
   }
 
+  // THE NODE ENVIRONMENT — the stock three.js studio (RoomEnvironment) the chip materials mirror
+  // (user, 2026-08-30: "from the side the light effect is nice, but viewed from the top the
+  // surface does nothing"). The physics of the complaint: a flat cap has ONE normal, so a
+  // directional key mirrors away from a top-down camera and diffuse is a single value — no
+  // material PARAMETER can answer from above. A reflection can: the env lookup rides the
+  // per-fragment view vector, so the cap carries a sheen that sweeps as the camera orbits, from
+  // any angle. Deliberately the BUILT-IN room (user: "check the three.js capabilities … before
+  // custom shaders, keep it simple") — its lit boxes are the softbox structure the sweep
+  // reveals, and the material side stays plain envMap/envMapIntensity. Built lazily ONCE (PMREM
+  // needs the renderer), shared by every chip material; the spheres skip it — hyper's orb look
+  // is fresnel-carried and tuned.
+  let nodeEnvTex: THREE.Texture | null = null;
+  function nodeEnv(): THREE.Texture {
+    if (nodeEnvTex) return nodeEnvTex;
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const room = new RoomEnvironment();
+    // Sigma SMEARS the room's discrete lamps into a soft top-lit gradient. At the stock 0.04 the
+    // lamps survive as near-mirror hot spots, and a grazing view (the ledger seen from
+    // bottom-front, the parked grid's top rows) catches one and BLOOMS it — a brightness spike at
+    // poses users never take, proven by zeroing the env (2026-08-30). The sweep survives the blur;
+    // the spikes don't.
+    nodeEnvTex = pmrem.fromScene(room, 0.35).texture;
+    pmrem.dispose();
+    return nodeEnvTex;
+  }
+
   applyBackground(); // construction honours the current ground (a light boot starts on the backdrop)
 
   return {
     scene, camera, renderer, controls, composer, dof, bloom,
-    renderFrame, resize, setClearColor, setGround, dispose,
+    renderFrame, resize, setClearColor, setGround, nodeEnv, dispose,
   };
 }

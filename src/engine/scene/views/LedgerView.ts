@@ -63,7 +63,7 @@ import {
   horizonAt,
   liveEdgePhase,
 } from "../../domain/ledgerModel";
-import { makeBarSpec, fillBarSpec, UNLISTED_KEY, type BarSpec } from "../../domain/ledgerBands";
+import { makeBarSpec, fillBarSpec, UNLISTED_KEY, RIBBON_LANE_HALF, type BarSpec } from "../../domain/ledgerBands";
 import type { ContainerSpec } from "../../domain/ledgerRails";
 import type {
   GlobalSnapshot,
@@ -84,7 +84,7 @@ import type { StageLight } from "../objects/StageLight";
 import { STAGE_LIGHTS } from "../../domain/stageLight";
 import { FadeSet } from "../objects/FadeSet";
 import type { SceneView } from "./SceneView";
-import { joinBloom } from "../SceneContext";
+import { joinBloom, inMarkPass } from "../SceneContext";
 import type { TuneSchema } from "../../tune";
 
 const META_TRAIL_MAX = 1500;
@@ -156,16 +156,21 @@ export interface TileTune {
   // its order. Applied to the EMPHASIS alone — the horizon, front and entry ramps are geometry and a
   // fully dissolved row still zero-scales.
   ink: number;
+  // Sub-pass input × for the selective paper halo (SceneContext.inMarkPass) — the bar's twin
+  // (ByteBar's BarTune.halo carries the same note): raised only while the mark pass renders, so
+  // the visible tile never changes.
+  halo: number;
 }
 
 // rest user-tuned via ?tune, 2026-08-07. (`hot` retired 2026-08-11 — it was exactly the ledger
 // row's `boost`, and a snapshot is data, so it takes the node's focus knob instead.)
-export const TILE_TUNE_DEFAULTS: TileTune = { rest: 0.1, ink: 0.3 };
+export const TILE_TUNE_DEFAULTS: TileTune = { rest: 0.1, ink: 0.3, halo: 2.5 };
 
 /** The `?tune` knob ranges (contract: src/engine/tune.ts), colocated with the numbers they bound. */
 export const TILE_TUNE_SCHEMA: TuneSchema<TileTune> = {
   rest: { min: 0, max: 2, step: 0.05 },
   ink: { min: 0, max: 0.8, step: 0.02, label: "hue floor (light)" },
+  halo: { min: 1, max: 6, step: 0.1, label: "halo input × (light)" },
 };
 
 // The view-entry drop's shape (see the VIEW-ENTRY DROP note in the class): fall height and
@@ -224,6 +229,23 @@ export class LedgerView implements SceneView {
   /** Ribbons' lane resolver. The lane field is FIXED now (user reversal 2026-08-07 — a filter
    *  dims, it never hides/moves lanes), so every roster key resolves. */
   private readonly _laneZOf = (key: string): number | null => this._laneZ.get(key) ?? null;
+  /** Ribbons' TOP-EDGE half-width resolver, the `_laneZOf` pattern (a stable arrow + a slot field
+   *  written before each setRow, so the event-time sync allocates no closures). The sheet's top
+   *  leaves the TILES, not the plane (user, 2026-08-30: full lane width "while the metagraph
+   *  snapshots are smaller") — the tile grid's own measured z-extent from the model's blocks,
+   *  layout data exactly as the bottom edge reads the band's z0/z1. A lane whose tiles aren't
+   *  knowable for the slot (no exact read yet) answers the lane-cell fallback, the old look. */
+  private _ribbonTopSlot = 0;
+  private readonly _topHalfOf = (key: string): number => {
+    const lane = this.model.lanes.get(key);
+    let h = 0;
+    if (lane) {
+      for (const b of lane.blocks) {
+        if (b.slot === this._ribbonTopSlot && b.filled) h = Math.max(h, Math.abs(b.oz) + b.size / 2);
+      }
+    }
+    return h > 0 ? h : RIBBON_LANE_HALF;
+  };
 
   // ── per-slot bar specs + the snapshot each slot stands for
   private readonly _specs: BarSpec[] = [];
@@ -358,6 +380,12 @@ export class LedgerView implements SceneView {
       META_TRAIL_MAX,
     );
     joinBloom(this._metaTrailMesh); // the lane tiles are the trail's identity marks — see BLOOM_LAYER
+    // The paper halo's input lift (TileTune.halo, the bar's twin): multiplied up only while the
+    // selective mark pass renders, un-multiplied inside the same pass — the main frame always
+    // draws the tiles at their true colour (multiply, never set — the bar's rule).
+    const tileMat = this._metaTrailMesh.material as THREE.MeshBasicMaterial;
+    this._metaTrailMesh.onBeforeRender = () => { if (inMarkPass()) tileMat.color.multiplyScalar(this.tiles.halo); };
+    this._metaTrailMesh.onAfterRender = () => { if (inMarkPass()) tileMat.color.multiplyScalar(1 / this.tiles.halo); };
     this._metaTrailMesh.frustumCulled = false;
     this._metaTrailMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     for (let i = 0; i < META_TRAIL_MAX; i++) this._metaTrailMesh.setColorAt(i, _col.set(0xffffff));
@@ -966,18 +994,21 @@ export class LedgerView implements SceneView {
   }
 
   private _syncRibbonRows(): void {
-    this._ribbons.setRow(0, 0, this._slotSnap[0] ? this._specs[0] : null, this._laneZOf);
+    this._ribbonTopSlot = 0;
+    this._ribbons.setRow(0, 0, this._slotSnap[0] ? this._specs[0] : null, this._laneZOf, this._topHalfOf);
     // Row 1 = the COMMITTED row (full strength); row 2 = the HOVER preview (colored dim).
     // Separate rows (2026-08-07): with a snapshot pinned, a hover needs its own sheet — the
     // active row keeps its ribbons regardless of hover, and the preview never goes missing.
     const hot = this.model.selectedSlot;
     if (hot > 0 && hot < SLOT_N && this._slotSnap[hot]) {
-      this._ribbons.setRow(1, hot, this._specs[hot], this._laneZOf);
+      this._ribbonTopSlot = hot;
+      this._ribbons.setRow(1, hot, this._specs[hot], this._laneZOf, this._topHalfOf);
       this._ribbons.setRowFade(1, 1);
     } else this._ribbons.clearRow(1);
     const hov = this._hoverSlot;
     if (hov > 0 && hov < SLOT_N && hov !== hot && this._slotSnap[hov]) {
-      this._ribbons.setRow(2, hov, this._specs[hov], this._laneZOf);
+      this._ribbonTopSlot = hov;
+      this._ribbons.setRow(2, hov, this._specs[hov], this._laneZOf, this._topHalfOf);
       // The hover ribbon IS the group tier — a hovered row is a preview of what a click would pin,
       // so it rides the same shared focus ranking every node loop uses.
       this._ribbons.setRowFade(2, focusWeightOf(false, true));
@@ -989,7 +1020,8 @@ export class LedgerView implements SceneView {
       for (const tr of this.model.trail) if (tr.ordinal === this._graceOrd) { g = tr.slot; break; }
     }
     if (g > 0 && g < SLOT_N && g !== hot && this._slotSnap[g] && this._specs[g].measured) {
-      this._ribbons.setRow(3, g, this._specs[g], this._laneZOf);
+      this._ribbonTopSlot = g;
+      this._ribbons.setRow(3, g, this._specs[g], this._laneZOf, this._topHalfOf);
     } else {
       // Clear the SHEET but never the grace itself here: on the very first sync after a tick
       // the trail may not carry the outgoing lead yet, and killing the grace at arm time was
@@ -1170,9 +1202,15 @@ export class LedgerView implements SceneView {
         // eat a click. Zero-scaling is the same answer an unfilled tick already gets.
         const wx = bx + this._trailOff;
         const edge = this._rewind.fadeAtX(wx) * horizonAt(wx);
+        // The entry drop's per-slot fade, hoisted above the branch: a HELD subject (entryF 0,
+        // parked 2.6 units up through the transition) must zero-scale like a dissolved row —
+        // brightness 0 is invisible on the dark ground but on paper it is GROUND-COLOURED INK,
+        // and an opaque ground-tinted slab hanging over the planes read as a transparent ghost
+        // (user, 2026-08-30 — the bands never showed this: their entry fade rides OPACITY).
+        const entryF = this._entryT < 1 && b.slot >= 0 && b.slot < SLOT_N ? this._entryFade[b.slot] : 1;
         // A tick this lane anchored NOTHING into draws NOTHING (user, 2026-08-07 — the small
         // dimmed placeholder block is gone; the model keeps the slot, the mesh zero-scales).
-        if (!b.filled || edge <= 0) {
+        if (!b.filled || edge <= 0 || entryF <= 0) {
           _dummy.position.set(0, 0, 0);
           _dummy.rotation.set(0, 0, 0);
           _dummy.scale.setScalar(0);
@@ -1225,7 +1263,7 @@ export class LedgerView implements SceneView {
         // the RIBBON leaving this tile takes, so a ribbon and the two ends it connects now read at
         // one level; compounding dim × back left the endpoints near-black under their own ribbon.
         const rowFocus = pinned || hov;
-        const entryF = this._entryT < 1 && b.slot >= 0 && b.slot < SLOT_N ? this._entryFade[b.slot] : 1;
+        // (entry fade hoisted above the zero-scale branch — a held subject is not drawn at all)
         // `tileRest` is the curve's REFERENCE on paper — the tiles' own resting weight, taken
         // UNFADED so `b.fade` reads as the ratio it is rather than moving the reference itself.
         const emph = inkPresence(snapBright(tileRest * b.fade, offNet, focus, anyFocus && !rowFocus), this._paper, tileRest);

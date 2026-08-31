@@ -17,6 +17,7 @@
 // technicality, decoupled from the design tokens both ways).
 import * as THREE from "three";
 import { SCENE_RIG, RIG_PAPER, tempTint, type RigRow } from "../../domain/sceneRig";
+import { restPitch } from "../../domain/cameraRig";
 
 /** How far the lamps are staged from the origin. Cosmetic — see the header. */
 const RIG_R = 120;
@@ -28,6 +29,8 @@ export class SceneRig {
   private readonly rim: THREE.DirectionalLight;
   /** The frame's blended row. Allocated once and rewritten in place — never replaced. */
   private readonly mix: RigRow;
+  /** The blended resting pitch the pitch-follow measures against — held like `mix` at zero weight. */
+  private restEl = 0;
   private paper = false;
   /** The key's world direction (subject → lamp), published for the views that need to agree with
    *  it. Geo's globe shades its day side from exactly this vector, which is what makes ONE light
@@ -68,6 +71,9 @@ export class SceneRig {
       const m = this.mix;
       // Hoist rule: each row is read once per FRAME here, and every consumer below reads `m`.
       for (const f of RIG_FIELDS) m[f] = h[f] * kh + g[f] * kg + l[f] * kl;
+      // The pitch-follow's reference blends by the same weights (and holds at zero weight, like
+      // the mix itself) — see the delta below.
+      this.restEl = restPitch("hyper") * kh + restPitch("geo") * kg + restPitch("ledger") * kl;
     }
     const m = this.mix;
     const paper = this.paper;
@@ -79,16 +85,28 @@ export class SceneRig {
     // The camera's own bearing — every azimuth in a row is an offset from THIS, so the lit side is
     // always a side the viewer can see (the rig follows the actor).
     const camAz = Math.atan2(camera.position.x - target.x, camera.position.z - target.z);
+    // THE RIG FOLLOWS PITCH TOO (user, 2026-08-30 — "a lot of the lighting effects get lost"
+    // when a pose dives or the orbit goes vertical). Elevation used to be world-absolute, which
+    // was right at the resting poses it was tuned on and wrong everywhere else: a node framing
+    // that looks steeply down left the world-fixed key grazing at an angle the view no longer
+    // related to, and the sculpt died. The lamps now ride the camera's pitch as a DELTA from the
+    // view's RESTING pitch (domain/cameraRig.restPitch, blended by the same weights as the rows):
+    // at rest the delta is zero and the shipped look is byte-identical; off rest the whole rig —
+    // the geo sun included, one vector — pitches with the boom. Clamped so an extreme pose can
+    // never push the key under the floor or over the zenith.
+    const dy = camera.position.y - target.y;
+    const camEl = Math.atan2(dy, Math.hypot(camera.position.x - target.x, camera.position.z - target.z));
+    const dEl = THREE.MathUtils.clamp(camEl - this.restEl, -0.9, 0.9);
 
     this.ambient.intensity = m.ambInt * gAmb;
     tempTint(m.ambTemp, this.ambient.color);
 
-    this._aim(this.key, camAz + m.keyAz, m.keyEl, m.keyInt * gKey, m.keyTemp);
+    this._aim(this.key, camAz + m.keyAz, m.keyEl + dEl, m.keyInt * gKey, m.keyTemp);
     this.keyDir.copy(this.key.position).normalize();
     // The fill is staged OPPOSITE the key (+ its own offset) — the shadow side is by definition the
     // side the key is not on, so it is derived rather than aimed independently.
-    this._aim(this.fill, camAz + m.keyAz + Math.PI + m.fillAz, m.fillEl, m.fillInt * gFill, m.fillTemp);
-    this._aim(this.rim, camAz + m.rimAz, m.rimEl, m.rimInt * gRim, m.rimTemp);
+    this._aim(this.fill, camAz + m.keyAz + Math.PI + m.fillAz, m.fillEl + dEl, m.fillInt * gFill, m.fillTemp);
+    this._aim(this.rim, camAz + m.rimAz, m.rimEl + dEl, m.rimInt * gRim, m.rimTemp);
   }
 
   private _aim(light: THREE.DirectionalLight, az: number, el: number, intensity: number, temp: number): void {

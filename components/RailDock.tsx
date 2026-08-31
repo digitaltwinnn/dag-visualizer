@@ -645,7 +645,12 @@ export default function RailDock({
               `.ig-sheet-edge` spine is the single identity cue (no double spine); the transient
               edge PULSE still plays on each card's own edge. */}
           <div className="sheet-cards flex-1 min-h-0 flex flex-col gap-[var(--rail-gap)] overflow-y-auto overscroll-contain [scrollbar-width:none] [-webkit-overflow-scrolling:touch] [&::-webkit-scrollbar]:hidden">
-            <div ref={fitRef}>{children}</div>
+            {/* fitRef is the height-measuring wrapper — and it must repeat the column+gap recipe,
+                or it swallows the cards into one block child and the sheet's gap separates
+                nothing: hosted cards rendered flush (user, 2026-08-30 — "zero gap between the
+                cards", tablet/phone only, desktop's #leftcol has no such wrapper). The gaps are
+                part of the content height, so the fit measurement stays honest. */}
+            <div ref={fitRef} className="flex flex-col gap-[var(--rail-gap)]">{children}</div>
           </div>
         </SheetContent>
       </Sheet>

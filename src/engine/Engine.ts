@@ -4,6 +4,7 @@ import { useStore, type Mode } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR, resolveSignerIps } from "@/src/data/network";
 import { ledgerLens, tickInStory } from "@/src/data/ledgerStory";
+import { reportPoll } from "@/src/data/api";
 import { LISTED_IDS, UNLISTED_ID, UNLISTED_SCENE_HEX_BY_THEME } from "@/src/data/unlisted";
 import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
@@ -18,11 +19,11 @@ import { StageLight } from "./scene/objects/StageLight";
 import { SceneRig } from "./scene/objects/SceneRig";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
 import { METAGRAPHS, NET, netUrl } from "@/src/net/current";
-import { COLORS } from "@/src/engine/config";
+import { COLORS, POLL } from "@/src/engine/config";
 import { BYTE_SCALE_KB, type RailGroup } from "./domain/ledgerLayout";
 import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
 import { readSceneColors, type SceneColors, LIGHT_TUNE } from "./sceneColors";
-import { setNodeDimTarget } from "./scene/objects/NodeFabric";
+import { setNodeDimTarget, setNodeEnv } from "./scene/objects/NodeFabric";
 import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme/resolve";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
 import { FOCI, hubFraming, geoFraming, nodeFraming, cohortFraming, ledgerCommitTilt, dollyBack, railsLean, restOrbit, easeInOutQuad, isSamePose, nudgeMix, NUDGE_DUR, type CameraFraming, type FocusName } from "./domain/cameraRig";
@@ -37,7 +38,7 @@ import { compositionGroups, compositionKey, compositionRows } from "@/src/data/c
 import { metaSnapDeepKey, metaSnapHoverKey } from "@/src/data/types";
 import { snapsAtTick } from "@/src/data/anchorLog";
 import { breakpointOf } from "@/src/data/breakpoint";
-import { calloutPlacement } from "./domain/calloutPlacement";
+import { calloutPlacement, CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET } from "./domain/calloutPlacement";
 import type { GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 
@@ -104,7 +105,12 @@ export class Engine {
   private _dofTmp = new THREE.Vector3();
   /** Scratch for the follow-spot's per-frame anchor hand-off (Globe records → HyperView's claim). */
   private _stageNodeTmp = new THREE.Vector3();
-  private _calloutV = new THREE.Vector3(); // scratch: the subject callout's anchor, world → NDC
+  private _calloutV = new THREE.Vector3();
+  // The multi-leader's scratch + state (rule 5: allocated once). `_calloutNodeAnchor` is set by
+  // _hyperCalloutAnchor: only the NODE branch anchors a machine, and only a machine has sibling
+  // layer beads to point at.
+  private _calloutSibs = [new THREE.Vector3(), new THREE.Vector3()];
+  private _calloutNodeAnchor = false; // scratch: the subject callout's anchor, world → NDC
   // Geo callout anchors, cached EVENT-TIME (latLonToVec3 allocates and ring extraction is
   // heavy — neither may run per frame): the node anchor recomputes when the pick REFERENCE
   // changes, the country centroid when the cc string does; the cohort dir is already
@@ -392,6 +398,9 @@ export class Engine {
     }
     setNodeDimTarget(colors); // the fabrics' shared mute target follows the ground (see NodeFabric)
     this.ctx = createScene(canvas, colors);
+    // The shared chip studio env, handed over before any fabric builds a material — every chip
+    // material born after this carries it (see NodeFabric's note for the physics).
+    setNodeEnv(this.ctx.nodeEnv());
     // HyperView builds all its hubs synchronously from config.METAGRAPHS inside its
     // constructor (before any API data exists), so the identity scene-color map has to be
     // handed in at construction — passing it as a 2nd ctor arg (read by _buildMetagraphs) means
@@ -723,7 +732,7 @@ export class Engine {
     // client-side (NetworkData), but the metagraph SET is fetched once — so re-pull
     // it on an interval too (Vercel never restarts; ISR only freshens the server
     // cache, not an idle client). Matches the route's revalidate window.
-    this.metaTimer = setInterval(() => this.refreshMeta(false), 5 * 60 * 1000); // matches the route's 5m revalidate
+    this.metaTimer = setInterval(() => this.refreshMeta(false), POLL.metaRefreshMs); // one home with the FEEDS row
   }
 
   // Fetch the (server-cached, live) metagraph set + node geo. On the initial load we
@@ -770,6 +779,7 @@ export class Engine {
   private async refreshMeta(initial: boolean) {
     try {
       const r = await fetch(netUrl("/api/metagraphs"));
+      reportPoll("api-metagraphs", r.ok);
       if (!r.ok) return;
       const { metagraphs, geo } = await r.json();
       if (geo) this.geoMap = { ...this.geoMap, ...geo };
@@ -796,6 +806,7 @@ export class Engine {
         this._publishLeaderboard();
       }
     } catch {
+      reportPoll("api-metagraphs", false);
       /* keep showing the last good data */
     }
   }
@@ -985,6 +996,10 @@ export class Engine {
       // flat/boot origin there is nothing to gather — the machine parks instantly.
       this._pendingBoundary = null;
       this._resettleFocus = false; // any pending reversal re-resolve is moot — this path resolves/parks on its own
+      // The parked grids ride the flat rows' chipEnv (1): applied at switch time here — a flat
+      // view has no boundary, and coming from the ledger the chips are already mid-gather, so
+      // the scalar change rides the flight rather than popping a resting view.
+      this.globe.setChipEnv(policy.chipEnv);
       if (is3D(prevMode)) this.transition.stage(prevMode);
       else this.transition.stageInstant();
     } else {
@@ -1008,6 +1023,10 @@ export class Engine {
   private _applyBoundary(dest: Mode): void {
     if (dest === "geo") this.morph = 1;
     if (dest === "hyper") this.morph = 0;
+    // The chip env sheen is per-view (viewPolicy.chipEnv — the ledger's coplanar trays zero it)
+    // and flips HERE, not at switch time, so the from-view's chips hold their look through the
+    // visible OUT phase (the setSimFlags orientation rule).
+    this.globe.setChipEnv(VIEW_POLICIES[dest].chipEnv);
     // ledger snaps nothing — it freezes morph at the source view's value.
     // Bring the DESTINATION's frame state up BEFORE any framing math reads it: the hyper
     // root's scale is still collapsed from geo's morph 1 at this instant (a hub
@@ -1972,14 +1991,77 @@ export class Engine {
               if (p.drop) el.dataset.drop = "";
               else delete el.dataset.drop;
             }
+            this._syncCalloutMulti(el, x, y, r, p.flip, p.drop);
           }
         }
       }
     }
+    if (!on) this._syncCalloutMulti(el, 0, 0, null, false, false);
     // Guard on the ELEMENT's own attribute, not a cached flag: React remounts the wrapper on a
     // subject change (fresh data-on="0"), so a field would go stale exactly then.
     const flag = on ? "1" : "0";
     if (el.dataset.on !== flag) el.dataset.on = flag;
+  }
+
+  // THE MULTI-LEADER (user, 2026-08-30): a machine is SEVERAL beads in hyper — one per layer it
+  // runs — and its callout points at each of them, not just the primary. Projects the sibling
+  // beads (Globe.selectedNodeHyperAnchors) and writes the extra dashed legs in PANEL-LOCAL
+  // pixels (the wrapper's origin IS the primary anchor). DOM writes only — position never
+  // renders React (the Tooltip discipline). `r == null` (or a non-node anchor, or any other
+  // view) hides every leg.
+  //
+  // EVERY LEG FANS FROM THE PANEL'S OWN CORNER (user, same day, second round: "connect the
+  // anchor itself to all spheres — they are considered equal"): the first cut ran the extra
+  // legs bead-to-bead from the primary, which read as one privileged sphere chained to the
+  // others. The corner is the .co-leader's own panel end (CALLOUT_OFF_X/Y, mirrored by the
+  // flip/drop the placement just decided), so the primary's leader and the sibling legs all
+  // meet at one point and the beads read as peers.
+  // The legs are STATIC children React renders once per wrapper mount, so the DOM refs are
+  // cached per element identity (a subject change remounts the wrapper — fresh element, fresh
+  // cache, every leg back at its hidden default) and the hidden steady state — most frames, in
+  // every view — costs one flag check with NO DOM reads. querySelectorAll ran here per frame
+  // before, on the !on path included (review, 2026-08-31 — rule-5 discipline applied to DOM).
+  private _mlegHost: HTMLElement | null = null;
+  private _mlegs: { g: SVGGElement; line: SVGLineElement; ring: SVGCircleElement }[] = [];
+  private _mlegShown = 0;
+  private _syncCalloutMulti(el: HTMLElement, ax: number, ay: number, r: DOMRect | null, flip: boolean, drop: boolean): void {
+    const want = r != null && this.mode === "hyper" && this._calloutNodeAnchor;
+    if (!want && this._mlegShown === 0 && this._mlegHost === el) return;
+    if (this._mlegHost !== el) {
+      this._mlegHost = el;
+      this._mlegs = Array.from(el.querySelectorAll<SVGGElement>(".co-mleg"), (g) => ({
+        g, line: g.querySelector("line")!, ring: g.querySelector("circle")!,
+      }));
+      this._mlegShown = 0; // a fresh mount renders every leg hidden
+    }
+    const legs = this._mlegs;
+    if (legs.length === 0) return;
+    const cx = flip ? -CALLOUT_OFF_X : CALLOUT_OFF_X;
+    const cy = drop ? CALLOUT_OFF_Y - CALLOUT_LEG_INSET : -(CALLOUT_OFF_Y - CALLOUT_LEG_INSET);
+    let n = 0;
+    if (want && r) {
+      const count = this.globe.selectedNodeHyperAnchors(this._calloutSibs);
+      for (let i = 0; i < count && n < legs.length; i++) {
+        const v = this._calloutSibs[i]!;
+        this.globe.group.localToWorld(v); // the rendered structure transform — a label read. render-state OK
+        v.applyMatrix4(this.ctx.camera.matrixWorldInverse);
+        if (v.z > -0.1) continue; // behind the camera plane — this bead gets no leg this frame
+        v.applyMatrix4(this.ctx.camera.projectionMatrix);
+        const sx = r.left + (v.x * 0.5 + 0.5) * r.width - ax;
+        const sy = r.top + (-v.y * 0.5 + 0.5) * r.height - ay;
+        const { g, line, ring } = legs[n]!;
+        line.setAttribute("x1", cx.toFixed(1));
+        line.setAttribute("y1", cy.toFixed(1));
+        line.setAttribute("x2", sx.toFixed(1));
+        line.setAttribute("y2", sy.toFixed(1));
+        ring.setAttribute("cx", sx.toFixed(1));
+        ring.setAttribute("cy", sy.toFixed(1));
+        if (n >= this._mlegShown) g.setAttribute("visibility", "visible");
+        n++;
+      }
+    }
+    for (let i = n; i < this._mlegShown; i++) legs[i]!.g.setAttribute("visibility", "hidden");
+    this._mlegShown = n;
   }
 
   // HYPER anchors the committed NODE's own bead when one is committed (user, 2026-08-15 —
@@ -1989,6 +2071,7 @@ export class Engine {
   private _hyperCalloutAnchor(v: THREE.Vector3): boolean {
     const st = useStore.getState();
     const p = st.inspect;
+    this._calloutNodeAnchor = false;
     // THE BOX LEADS (user, 2026-08-15): re-boxing an ancestor card (clicking a committed
     // node's hub) steps the callout up to the network — the box is the subject, exactly as
     // the camera answers it. SceneCallout mirrors this preference for the content.
@@ -1998,6 +2081,7 @@ export class Engine {
       this.globe.selectedNodeHyperAnchor(v)
     ) {
       this.globe.group.localToWorld(v); // the rendered structure transform — a label read. render-state OK
+      this._calloutNodeAnchor = true;
       return true;
     }
     if (this.filter === "all") return false;

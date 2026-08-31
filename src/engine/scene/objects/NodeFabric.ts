@@ -16,7 +16,7 @@ import * as THREE from "three";
 import { LEDGER } from "../../domain/ledgerLayout";
 import { HEX_H } from "../../domain/geoLayout";
 import { discFall, lerp, smooth } from "../../domain/nodeLayout";
-import { nodeDim, nodeEmissive, nodeGlow, hubMatchBoost, focusWeightOf, focusGrow, hideFrac, gatherRaw, emphasisK } from "../../domain/dimModel";
+import { nodeDim, nodeEmissive, focusWeightOf, focusGrow, hideFrac, gatherRaw, emphasisK } from "../../domain/dimModel";
 import type { DimContext } from "../../domain/dimModel";
 import type { MetaNodeRecord, ValidatorRecord } from "../../domain/records";
 import type { ViewTransition } from "../../domain/viewTransition";
@@ -60,6 +60,41 @@ export function setNodeDimTarget(colors: SceneColors): void {
 // The ground flag for the per-frame emissive mapping below — module-level for the same reason
 // as DIM (one shared value, per-frame readers hold no copy).
 let _paper = false;
+// THE TIP-CALM, second cut (2026-08-30). The chips' edge-lit cap redistribution is a dark-ground
+// idiom; on paper the same numbers blew RESTING stack tips toward white and the selective bloom
+// haloed them fat (user: "too bright and a bit too large"). The first cut reduced the shader's
+// cap/fresnel coefficients under a paper uniform — which scaled the FOCUSED chip and its halo
+// down too, and geo's hover/selection highlight vanished (user, same day). The calm is rest-only
+// now: applied to the emissive input on the CPU, where the focus weight is known — a resting chip
+// on paper drops to CHIP_PAPER_CALM of its emissive, a focused one keeps full ink and full halo.
+// Scoped to the CHIP presentation (the globe's wEff crossfade / the ledger's trays): hyper's
+// sphere day look was tuned separately and must not ride along. Dark never reads it (_paper).
+const CHIP_PAPER_CALM = 0.55;
+const chipPaperCalm = (chipShare: number, fw: number): number =>
+  _paper ? 1 - (1 - CHIP_PAPER_CALM) * chipShare * (1 - Math.min(1, fw * 2)) : 1;
+// THE CHIP ENVIRONMENT (SceneContext.nodeEnv — see its note for the physics): shared by every
+// CHIP material so a flat cap answers a top-down view with a reflection sweep; the spheres skip
+// it (hyper's orb look is fresnel-carried and tuned). Module-level like DIM: one value, set once
+// by the Engine before the first build; intensity is the GROUND's (paper welcomes the sheen, the
+// dark emissive look keeps it subtle) and is re-applied through the theme fan-out
+// (Globe.setColors → setEnvIntensity below).
+let _env: THREE.Texture | null = null;
+export const ENV_INT = { dark: 0.3, paper: 0.65 } as const;
+// The room's bright region sits at its zenith, which only a straight-down camera mirrors off a
+// flat cap — the STANDARD poses (elevated front orbit) reflected the dim walls instead, while a
+// bottom-front dive caught the lamps at grazing angle and bloomed (user, 2026-08-30: "move that
+// light [to] the standard view pose, and probably can be tuned down"). This stock
+// `material.envMapRotation` tilts the env so the lit ceiling mirrors into a ~40° camera; the
+// intensities above are tuned DOWN to match, since the sheen now lands where it is actually seen.
+export const ENV_ROT = new THREE.Euler(0.9, 0, 0);
+// Per-VIEW gain on the sheen (viewPolicy.chipEnv, set by the Engine on a view change) — module
+// level like _paper: one value, both write paths below read it, so a material built later and a
+// re-apply cannot disagree. The applied intensity is always ENV_INT[ground] × this.
+let _envMul = 1;
+const envIntensity = (): number => (_paper ? ENV_INT.paper : ENV_INT.dark) * _envMul;
+export function setNodeEnv(tex: THREE.Texture): void {
+  _env = tex;
+}
 const _dummy = new THREE.Object3D(); // reused to compose per-instance matrices
 const _vec = new THREE.Vector3();
 const _geoVec = new THREE.Vector3(); // scratch for the morph-fly interpolation
@@ -150,10 +185,15 @@ export class NodeFabric {
     const mat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       roughness: flat ? 0.3 : 0.5, metalness: flat ? 0.35 : 0.2,
+      // The chip mirrors the stock studio env (SceneContext.nodeEnv — plain built-in
+      // envMap/envMapIntensity, no shader work): a flat cap's one normal mirrors the key away
+      // from a top-down camera, so the reflection is the only channel that answers from above.
+      ...(flat && _env ? { envMap: _env, envMapIntensity: envIntensity() } : {}),
       // smooth-shaded everywhere: the chips are ROUND now (flat shading was the hex prisms'
       // facet-definition trick); the edge-lit cap/fresnel treatment is shading-independent.
       transparent: alpha < 1, opacity: alpha,
     });
+    if (flat && _env) mat.envMapRotation.copy(ENV_ROT); // aim the lit ceiling at the resting pose
     mat.onBeforeCompile = (shader) => {
       shader.vertexShader = shader.vertexShader
         .replace("#include <common>", "#include <common>\nattribute vec3 aBase;\nattribute float aEmissive;\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;")
@@ -166,6 +206,11 @@ export class NodeFabric {
           flat
             ? // edge-lit chip: dim sides + bright cap + fresnel rim (`normal` is the flat-shaded
               // view-space normal here; vViewPosition normalized points fragment→camera).
+              // ⚠️ The coefficients are CONSTANT again (2026-08-30, round 2): a paper-side
+              // uniform reduction here scaled the WHOLE emissive channel — the focused chip and
+              // its bloom halo dimmed with the resting tips, and geo's hover/selection highlight
+              // vanished on light (user). The tip-calming is rest-only now, on the CPU where fw
+              // is known (see CHIP_PAPER_CALM below).
               "#include <emissivemap_fragment>\n" +
               "float fres = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 3.0);\n" +
               "totalEmissiveRadiance = vBase * vEmi * (0.5 + 0.95 * vCap + 1.1 * fres);"
@@ -195,6 +240,30 @@ export class NodeFabric {
    */
   invalidateBases(): void {
     this._appliedDim = -1;
+  }
+
+  /** Theme fan-out (Globe.setColors): the chip env sheen is the GROUND's — paper welcomes it,
+   *  dark keeps it subtle under the emissive look. A material built later reads the same pair
+   *  through `_paper` at creation, so the two paths cannot disagree. */
+  applyGroundEnv(): void {
+    // No parameter on purpose: _paper (set by setNodeDimTarget before this runs) is the one
+    // ground flag — a paper argument here was a decoy that silently ignored its caller's value.
+    this._applyEnv();
+  }
+
+  /** View fan-out (Engine, from viewPolicy.chipEnv on a view change): the ledger zeroes the
+   *  sheen — its coplanar trays mirror the env in unison and wash out (the policy field's note). */
+  setEnvView(mul: number): void {
+    if (mul === _envMul) return;
+    _envMul = mul;
+    this._applyEnv();
+  }
+
+  private _applyEnv(): void {
+    for (const mesh of [this.instHex, this.metaHex]) {
+      const m = mesh?.material as THREE.MeshStandardMaterial | undefined;
+      if (m?.envMap) m.envMapIntensity = envIntensity();
+    }
   }
 
   buildValidators(records: ValidatorRecord[]): void {
@@ -454,7 +523,11 @@ export class NodeFabric {
       _dummy.quaternion.copy(_qRadial);
       // fall lifts with gw: a far-side chip must still fill its staging pixel mid-flight.
       const gV = u.noGeo ? 0 : wEff * (fall + (1 - fall) * gw) * show;
-      _dummy.scale.set(u.geoSize * gV, HEX_H * gV, u.geoSize * gV);
+      // dimModel.focusGrow reaches the CHIP too (user, 2026-08-30 — the 2026-08-28 "every view
+      // grows" was wired on the sphere matrices alone, so geo never actually swelled). DIAMETER
+      // only: a stacked chip that grew in height would push into the chip above it.
+      const gN = 1 + grow * u.fw;
+      _dummy.scale.set(u.geoSize * gV * gN, HEX_H * gV, u.geoSize * gV * gN);
       this._applyGather(ctx, u, gw, prim);
       _dummy.updateMatrix();
       this.instHex.setMatrixAt(u.index, _dummy.matrix);
@@ -496,6 +569,11 @@ export class NodeFabric {
     // snapshots did — nodes and snapshots are two subjects sharing one emphasis vocabulary, and
     // within each the dim-back must fire exactly when that subject's focus takes its boost.
     const focusId = c.hoverNodeId || c.selectedNodeId || c.hoverCohort;
+    // The CHIP presentation share for the rest-only tip calm below — the same sphere→chip
+    // crossfade window placeValidators uses (per-pass, not per-record: the calm may lag the
+    // per-record gather crossfade by the flight window, which the transition's full-brightness
+    // staging already owns). Ledger trays are chips outright.
+    const wChip = c.ledger ? 1 : smooth(THREE.MathUtils.clamp((c.morph - 0.82) / 0.16, 0, 1));
     for (const u of records) {
       const geoCc = geoCcOf(u.pick);
       // dimModel.gatherRaw: the same escape hatch placeValidators applies to the SIZE, read here so
@@ -527,18 +605,24 @@ export class NodeFabric {
       // hyper→globe endpoints live in the domain, so the two call sites cannot pass different
       // ones. Steady; the old twinkle shimmer was removed. Also composes the hover/selection
       // focus boost/dim-back inside.
-      // dimModel.hubMatchBoost, same call as the metagraph loop (user, 2026-08-18): the core IS a
-      // hub under ONE NODE MODEL, so committing the DAG lifts its validators to hub level exactly
-      // as committing a metagraph lifts that network's nodes. Same replace-not-stack rule — a
-      // FOCUSED node takes its own boost instead, never both.
-      const hubBoost = hubMatchBoost(c, nodeGlow(c, d), c.filter === "dag");
+      // NO FILTER LIFT (hubMatchBoost retired 2026-08-30 — see dimModel's note): a committed
+      // network's nodes keep their at-rest glow; the commit is answered by the view's own
+      // channel (hyper's hub + elem/dim, geo's hide, the ledger's coloured dim), never by
+      // adding light to the members.
       const flRaw = u._flash || 0; // brief flash when an arc pulse reaches this node
       // The buffer IS the easing state — emiArr persists across frames and a node keeps its slot,
       // so approaching the target in place costs one array read and allocates nothing.
       // On paper the emissive term multiplies INK, not glow — map it through the one
       // presence curve so resting nodes read as full ink (measured 2026-08-25: nodes sat at
       // ~0.78x of the hub's lit face before this asked the ground question).
-      const emiT = inkPresence(nodeEmissive(c, d, flRaw, fw, !!focusId, fw > 0 ? 0 : hubBoost), _paper);
+      // ⚠️ REF is the node's own RESTING emissive (2026-08-30): without it the curve's gamma
+      // (0.15) flattened the focus vocabulary — a back-stepped node kept ~87% of its ink and a
+      // hover/selection read as nothing in the DAG's crowded shells (user: "shows all nodes in
+      // that cohort, not just that node"). With the ratio branch engaged, `back` and `boost`
+      // separate on paper exactly as they do on dark. Dark is untouched (inkPresence returns s).
+      const restRef = _paper ? nodeEmissive(c, d, flRaw, 0, false) : 0; // paper-only input — dark's inkPresence returns s untouched
+      const emiT = inkPresence(nodeEmissive(c, d, flRaw, fw, !!focusId), _paper, restRef)
+        * chipPaperCalm(wChip, u.fw); // rest-only tip calm, chip share only (hyper spheres exempt)
       emi[u.index] += (emiT - emi[u.index]) * ek;
       if (flRaw) u._flash = flRaw * flashDecay;
 
@@ -591,13 +675,7 @@ export class NodeFabric {
       // 0 in hyper, where a turned-up dim mutes in place at full size. It reads the RAW ramp, not
       // dEff, so `dim` and `hide` move one effect each.
       const vis = 1 - hideFrac(c, rawEff);
-      // dimModel.hubMatchBoost: the COMMITTED metagraph's own nodes glow at the hub's resting
-      // level (HyperView hub base 0.72) in the Hypergraph, so the picked network's nodes bloom
-      // like its hub instead of sitting at the dimmer node base (user). Fades out with the hubs
-      // by morph 0.3 — there's no hub on the globe. It measures the GAP up from this node's own
-      // pre-floor glow, which is why the domain exports nodeGlow rather than leaving the call
-      // site to re-derive it.
-      const hubBoost = hubMatchBoost(c, nodeGlow(c, dEff), c.filter === r.metaId);
+      // NO FILTER LIFT (hubMatchBoost retired 2026-08-30 — see the validator loop and dimModel).
       // Tiered focus, same ranking as the validator loop (dimModel.focusWeightOf).
       const fw = focusWeightOf(
         r.nodeId === c.hoverNodeId || r.nodeId === c.selectedNodeId,
@@ -605,14 +683,13 @@ export class NodeFabric {
       );
       r.fw += (fw - r.fw) * ek; // the size channel's eased state — see the validator loop
       const flRaw = r._flash || 0; // brief flash when an arc pulse reaches this node
-      // dimModel.nodeEmissive: composes glow + arc flash + hubBoost inside its floor, then the
-      // hover/selection focus boost/dim-back — one function, both loops. The write EASES toward it
+      // dimModel.nodeEmissive: composes glow + arc flash, then the hover/selection focus
+      // boost/dim-back — one function, both loops. The write EASES toward it
       // (dimModel.emphasisK), with metaEmi itself as the state — same as the validator loop.
-      // ⚠️ A FOCUSED node takes its boost INSTEAD of the hub-match, never stacked (user,
-      // 2026-08-16): the sum left the palette's hue-keeping range and the subject blew out to a
-      // pale point — the "inverse" read. One emphasis at a time: the hub-match is the committed
-      // network's RESTING lift; the subject has its own.
-      const emiT = inkPresence(nodeEmissive(c, dEff, flRaw, fw, !!focusId, fw > 0 ? 0 : hubBoost), _paper);
+      // REF engages the ratio branch for the focus vocabulary on paper — see the validator loop.
+      const restRefM = _paper ? nodeEmissive(c, dEff, flRaw, 0, false) : 0; // paper-only — see the validator loop
+      const emiT = inkPresence(nodeEmissive(c, dEff, flRaw, fw, !!focusId), _paper, restRefM)
+        * chipPaperCalm(c.ledger ? 1 : wEff, r.fw); // rest-only tip calm — see the validator loop
       emi[r.index] += (emiT - emi[r.index]) * ek;
       if (flRaw) r._flash = flRaw * flashDecay;
 
@@ -675,7 +752,8 @@ export class NodeFabric {
       _qRadial.setFromUnitVectors(Y_AXIS, r.geoDir);
       _dummy.quaternion.copy(_qRadial);
       const gM = wEff * (fall + (1 - fall) * gw) * vis; // fall lifts with gw (see validators)
-      _dummy.scale.set(r.geoSize * gM, HEX_H * gM, r.geoSize * gM);
+      const gN2 = 1 + grow * r.fw; // the chip's grow — diameter only, see the validator loop
+      _dummy.scale.set(r.geoSize * gM * gN2, HEX_H * gM, r.geoSize * gM * gN2);
       this._applyGather(ctx, r, gw, prim);
       _dummy.updateMatrix();
       this.metaHex.setMatrixAt(r.index, _dummy.matrix);

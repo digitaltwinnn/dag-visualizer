@@ -5,6 +5,7 @@ import { identityMap } from "@/src/palette/identity";
 import CardHeadDemo from "./CardHeadDemo";
 import CardSignalsDemo from "./CardSignalsDemo";
 import IconLegend from "./IconLegend";
+import MicroInstrumentsDemo from "./MicroInstrumentsDemo";
 import StatusDemo from "./StatusDemo";
 import OdometerDemo from "./OdometerDemo";
 import EcgDemo from "./EcgDemo";
@@ -263,6 +264,20 @@ export default function DesignPage() {
           <span className="flex items-center gap-2"><SonarRing /> no signal (sonar)</span>
           <span className="flex items-center gap-2"><StandbyHalo /> standby</span>
         </div>
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-sm uppercase tracking-widest text-muted-foreground mb-3">
+          Micro-instruments — <code className="font-mono">VitalsBand</code>
+        </h2>
+        <p className="text-sm text-muted-foreground mb-3 max-w-2xl">
+          The bottom vitals band&apos;s chart vocabulary (2026-08-30): shares of one whole take a{" "}
+          <code className="font-mono">Donut</code> (stepped opacities of the ONE accent hue — the
+          identity hue only under a committed filter), magnitudes take{" "}
+          <code className="font-mono">MicroBars</code>. Non-interactive by rule — the band takes
+          no pointer events. Rendered from the real components.
+        </p>
+        <MicroInstrumentsDemo />
       </section>
 
       <section className="mb-10">
