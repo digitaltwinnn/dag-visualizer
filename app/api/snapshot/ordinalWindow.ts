@@ -1,4 +1,3 @@
-import { unstable_cache } from "next/cache";
 import { NETWORKS, type NetworkId } from "@/src/engine/config";
 
 // The SERVED ORDINAL WINDOW — the bound that turns the snapshot routes from a walkable surface
@@ -28,31 +27,58 @@ export function inServedWindow(ordinal: number, latest: number | null): boolean 
   return ordinal >= 1 && ordinal <= latest + FUTURE_WINDOW;
 }
 
-// The reference point: the LB's own latest ordinal — a tiny (~20 B) read, cached across
-// requests/instances for a minute so the bound costs ~one upstream call per minute, not one per
-// request. Throwing on a bad shape keeps a blip from being cached (the caller fails open).
-const cachedLatest = (net: NetworkId) =>
-  unstable_cache(
-  async (): Promise<number> => {
-    const r = await fetch(`${NETWORKS[net].l0}/global-snapshots/latest/ordinal`, {
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-      signal: AbortSignal.timeout(4000),
-    });
-    if (!r.ok) throw new Error(`l0 ${r.status}`);
-    const j = (await r.json()) as { value?: unknown };
-    if (typeof j?.value !== "number") throw new Error("no ordinal");
-    return j.value;
-  },
-  ["l0-latest-ordinal-v1", net],
-  { revalidate: 60 },
-  )();
+// The reference point: the LB's own latest ordinal — a tiny (~20 B) read.
+//
+// ⚠️ AN EXPLICIT TTL, NOT `unstable_cache`. It was the latter, and the entry went stale and STOPPED
+// REVALIDATING over the process's lifetime. Measured live 2026-08-31 on a dev server that had been
+// up a few hours: the reference sat 148 ordinals — about 70 minutes — behind the LB, and a restart
+// snapped it back to 0 behind. That is not a caching nicety here, it is a CORRECTNESS gate: every
+// ordinal above `latest + FUTURE_WINDOW` was refused in ~5ms without the upstream ever being
+// asked, so the exact read failed for the live tick and the whole recent trail while the raw
+// snapshot was sitting there, served in 1.6s. The symptom is a rising tide — the longer the
+// process runs, the more of the present it denies — which is the worst shape for a host that
+// keeps instances warm (Vercel's Fluid Compute reuses them; "Vercel never restarts").
+//
+// So the TTL is a plain module-scope timestamp: no framework revalidation semantics between this
+// gate and the truth. Per-instance rather than shared, which costs at most one 20-byte read per
+// instance per minute — a price worth paying to make a correctness gate deterministic.
+const REF_TTL_MS = 60_000;
+const refCache = new Map<NetworkId, { value: number; at: number }>();
 
-/** Is this ordinal one the app could legitimately be asking about? */
+async function readLatest(net: NetworkId): Promise<number> {
+  const r = await fetch(`${NETWORKS[net].l0}/global-snapshots/latest/ordinal`, {
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+    signal: AbortSignal.timeout(4000),
+  });
+  if (!r.ok) throw new Error(`l0 ${r.status}`);
+  const j = (await r.json()) as { value?: unknown };
+  if (typeof j?.value !== "number") throw new Error("no ordinal");
+  return j.value;
+}
+
+/** The reference, refreshed past its TTL. Throwing keeps a blip from being stored (caller fails open). */
+async function latestOrdinal(net: NetworkId, force = false): Promise<number> {
+  const hit = refCache.get(net);
+  if (!force && hit && Date.now() - hit.at < REF_TTL_MS) return hit.value;
+  const value = await readLatest(net);
+  refCache.set(net, { value, at: Date.now() });
+  return value;
+}
+
+/** Is this ordinal one the app could legitimately be asking about?
+ *
+ *  ⚠️ A REFUSAL RE-READS FIRST. Refusing is the expensive mistake — it denies a real ordinal
+ *  without asking upstream — and the only way to refuse wrongly is a stale reference. So a
+ *  would-be refusal spends one forced 20-byte read to be sure. That is bounded by construction:
+ *  normal traffic is inside the window and never reaches it, and a genuine walk over nonsense
+ *  ordinals pays one tiny read per request, not the ~400 KB snapshot pull the gate exists to
+ *  prevent. It also makes the gate self-healing whatever the cache underneath it does. */
 export async function withinServedWindow(net: NetworkId, ordinal: number): Promise<boolean> {
   let latest: number | null = null;
   try {
-    latest = await cachedLatest(net);
+    latest = await latestOrdinal(net);
+    if (!inServedWindow(ordinal, latest)) latest = await latestOrdinal(net, true);
   } catch {
     /* reference unavailable — fail open (see inServedWindow) */
   }

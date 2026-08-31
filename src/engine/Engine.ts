@@ -26,23 +26,25 @@ import { readSceneColors, type SceneColors, LIGHT_TUNE } from "./sceneColors";
 import { setNodeDimTarget, setNodeEnv } from "./scene/objects/NodeFabric";
 import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme/resolve";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
-import { FOCI, hubFraming, geoFraming, nodeFraming, cohortFraming, ledgerCommitTilt, dollyBack, railsLean, restOrbit, easeInOutQuad, isSamePose, nudgeMix, NUDGE_DUR, type CameraFraming, type FocusName } from "./domain/cameraRig";
+import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
 import { ViewTransition, is3D } from "./domain/viewTransition";
 import { gatherBand, type GatherBand } from "./domain/gatherLayout";
-import { isDoubleTap, tapZoomAround, tapZoomDistance, DOUBLE_TAP_SLOP, TAP_ZOOM_DUR, type Tap } from "./domain/tapZoom";
 import { LADDERS, LEVEL_CARRY, hasLevel, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
 import { metaSnapDeepKey, metaSnapHoverKey } from "@/src/data/types";
 import { snapsAtTick } from "@/src/data/anchorLog";
+// The tap RECOGNIZER stays here — it is input plumbing. The step it triggers is the
+// CameraDirector's (see its header).
+import { type Tap, DOUBLE_TAP_SLOP, isDoubleTap } from "./domain/tapZoom";
 import { CalloutSync } from "./CalloutSync";
 import { DevTunePanel } from "./DevTunePanel";
+import { CameraDirector } from "./CameraDirector";
 import type { GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 
-type Vec = THREE.Vector3;
 
 // View-transition staging plane (the gather grids the nodes fly to at the top of the viewport).
 // GATHER_DIST is the plane's depth in front of the camera; WHERE the band sits and how wide it
@@ -89,6 +91,8 @@ export class Engine {
   private callout!: CalloutSync;
   /** The dev tuning panel (?tune / the dev switch) — see DevTunePanel. */
   private devTune!: DevTunePanel;
+  /** Camera motion — pose tweens and the double-tap dolly. See CameraDirector. */
+  private cam!: CameraDirector;
   private ctx: SceneCtx;
   private layers: HyperView;
   private globe: Globe;
@@ -129,23 +133,11 @@ export class Engine {
   // reads it for camera resolution).
   private cohortSel: CohortSel | null = null;
   private morph = 0; // 0 = hypergraph, 1 = globe (eased each frame)
-  // A persistent tween record (never re-allocated per focus) — `active` replaces the old
-  // null-the-object pattern; `_tweenTo` copies into these four vectors instead of `.clone()`ing.
-  private _tween = {
-    fromPos: new THREE.Vector3(), toPos: new THREE.Vector3(),
-    fromTgt: new THREE.Vector3(), toTgt: new THREE.Vector3(),
-    t: 0, dur: 1.4, active: false, nudge: false,
-  };
-  // Scratch framing struct handed to hubFraming/geoFraming — its values are copied into
-  // `_tween` immediately by `_tweenTo`, so reusing it across every focus call is safe.
-  private _framingOut: CameraFraming = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
   // The mesh that produced the LAST pick returned by `_pickAt` (null when nothing was picked).
   // Some ledger subjects carry a second fact on the hit object itself rather than in the descriptor
   // — a byte-bar band's `userData.bandKey` beside its tick `userData.pick` — and the click handler
   // needs both. Event-time only; never read from the render loop.
   private _hitObj: THREE.Object3D | null = null;
-  private _hubWorld = new THREE.Vector3(); // scratch: hub local pos tilted into world for framing
-  private _focusEuler = new THREE.Euler(); // scratch: the focus TARGET rotation (flat tilt + spin)
   private _hyperSpinY = 0; // shared hyper-structure spin angle (globe group + root + core, in lockstep)
   // The shared structure TILT, eased per frame: HYPER_TILT at rest → HYPER_TILT_FOCUS while a
   // metagraph is committed (the structure flattens so the side-on hub pose sees horizontal discs).
@@ -205,7 +197,7 @@ export class Engine {
       // single-finger orbit is left alone (it rotates, it doesn't dolly) and a pan re-anchors for
       // free, because the step measures against the live `controls.target` every frame.
       this._lastTap = null;
-      this._zoom.active = false;
+      this.cam.cancelZoom();
     }
   };
   private _downX = 0;
@@ -217,9 +209,6 @@ export class Engine {
   private _ptrDown = 0; //             pointers currently down, for the multi-touch invalidation
   private _lastTap: Tap | null = null; // the unpaired tap waiting for its partner
   private _eatClick = false; //        set when a pair fires; `_handleClick` spends it
-  // The step's own eased dolly, owned here because it is not a POSE: it composes onto whatever the
-  // controls and the tween have already put the camera at (see _updateTapZoom's ordering note).
-  private _zoom = { active: false, t: 0, from: 0, to: 0 };
   private onCancelTap = () => {
     this._ptrDown = 0;
     this._lastTap = null;
@@ -240,7 +229,7 @@ export class Engine {
       // never deselects a NODE, hub / country / cohort / tile / band clicks all TOGGLE — so an
       // unsuppressed second tap would undo exactly what the first one just committed.
       this._eatClick = true;
-      this._tapZoom();
+      this.cam.tapZoom();
       return;
     }
     this._lastTap = now;
@@ -434,6 +423,17 @@ export class Engine {
       transitionActive: () => this.transition.active(),
       calloutAllowed: () => this._policy.callout,
       dofMeta: () => this._dofMeta,
+    });
+    this.cam = new CameraDirector({
+      ctx: this.ctx,
+      layers: this.layers,
+      transition: this.transition,
+      get mode() { return engineSelf.mode; },
+      policy: () => this._policy,
+      railsHidden: () => this.railsHidden,
+      slowmo: () => this._slowmo,
+      setFlying: (v) => useStore.getState().setCameraFlying(v),
+      flyingNow: () => useStore.getState().cameraFlying,
     });
     this.devTune = new DevTunePanel({
       ctx: this.ctx,
@@ -1196,8 +1196,8 @@ export class Engine {
     geoCohort: () => {
       if (!this.globe.focusCohort()) return false;
       this.ctx.controls.autoRotate = false;
-      cohortFraming(this._framingOut);
-      this._tweenTo(this._framingOut.pos, this._framingOut.target, false); // dolly-exempt, like nodeFraming
+      cohortFraming(this.cam.out);
+      this.cam.tweenTo(this.cam.out.pos, this.cam.out.target, false); // dolly-exempt, like nodeFraming
       return true;
     },
     geoCountry: () => {
@@ -1207,8 +1207,8 @@ export class Engine {
       // where its nodes cluster.
       const shape = this.globe.focusCountryShape(this.country);
       if (shape) {
-        countryFraming(shape.latAngle, shape.angularRadius, this._framingOut);
-        this._tweenTo(this._framingOut.pos, this._framingOut.target);
+        countryFraming(shape.latAngle, shape.angularRadius, this.cam.out);
+        this.cam.tweenTo(this.cam.out.pos, this.cam.out.target);
         return true;
       }
       // Degraded mode while the countries topology loads: the node-mean concentration framing
@@ -1216,7 +1216,7 @@ export class Engine {
       // the network rung; matches the pre-ladder behaviour).
       const R = this.globe.focusDensest(true);
       if (R == null) return false;
-      this._focusGeo(R);
+      this.cam.focusGeo(R);
       return true;
     },
     geoNetwork: () => {
@@ -1225,12 +1225,12 @@ export class Engine {
       // Three zoom LEVELS (user design): metagraph = a WIDE network pose (rotated to the
       // densest cluster, held clearly farther out than the country pose so the country drill
       // still reads as a zoom).
-      this.focus("geoNetwork");
+      this.cam.focus("geoNetwork");
       return true;
     },
     geoOverview: () => {
       this.globe.focusDensest(false);
-      this.focus("geo");
+      this.cam.focus("geo");
       return true;
     },
     hyperNode: () => {
@@ -1251,12 +1251,12 @@ export class Engine {
     },
     hyperNetwork: () => {
       this.globe.focusDensest(false);
-      this._focusFilter(this.filter); // handles hub-not-found by falling to overview internally
+      this.cam.focusFilter(this.filter); // handles hub-not-found by falling to overview internally
       return true;
     },
     hyperOverview: () => {
       this.globe.focusDensest(false);
-      this._focusFilter("all"); // the existing "all" path: focusId cleared, tilt eased, overview pose
+      this.cam.focusFilter("all"); // the existing "all" path: focusId cleared, tilt eased, overview pose
       return true;
     },
     // The Snapshots view has ONE camera POSE (user, 2026-08-09) — both finer rungs delegate to the
@@ -1285,12 +1285,12 @@ export class Engine {
       // clearing the filter tweens back to frontal on its own.
       const f = FOCI.ledger;
       if (!this.filter || this.filter === "all") {
-        this.focus("ledger");
+        this.cam.focus("ledger");
         return true;
       }
-      ledgerCommitTilt(f.pos, f.target, this._framingOut.pos);
-      this._framingOut.target.copy(f.target);
-      this._tweenTo(this._framingOut.pos, this._framingOut.target);
+      ledgerCommitTilt(f.pos, f.target, this.cam.out.pos);
+      this.cam.out.target.copy(f.target);
+      this.cam.tweenTo(this.cam.out.pos, this.cam.out.target);
       return true;
     },
   };
@@ -1330,8 +1330,8 @@ export class Engine {
   private _focusNode() {
     // The one geo node pose (cameraRig.nodeFraming — latitude-independent via Globe.focusNode's
     // NODE_RAISE contract). Dolly-exempt: its numbers are absolute (see CAM_ZOOM's note).
-    nodeFraming(this._framingOut);
-    this._tweenTo(this._framingOut.pos, this._framingOut.target, false);
+    nodeFraming(this.cam.out);
+    this.cam.tweenTo(this.cam.out.pos, this.cam.out.target, false);
   }
 
   // Compute the per-country leaderboard for the active filter and push it to the store
@@ -1582,94 +1582,6 @@ export class Engine {
     return g.rows.map((r) => hoverKeyOf(r.pick)).filter((k): k is string => !!k);
   }
 
-  private focus(name: FocusName) {
-    const f = FOCI[name];
-    this._tweenTo(f.pos, f.target);
-  }
-
-
-  private _tweenTo(toPos: Vec, toTgt: Vec, dolly = true) {
-    // OUT-phase camera hold (spec A#6): the state commit stands; the boundary's
-    // _applyDestLayout re-derives this pose from it, so dropping the tween loses nothing.
-    if (this.transition.holdCamera()) return;
-    const tw = this._tween;
-    tw.fromPos.copy(this.ctx.camera.position);
-    // The global CAM_ZOOM dolly (see cameraRig) — writes straight into tw.toPos, no extra
-    // allocation. `dolly: false` is for poses whose TARGET is a composed look-at rather than
-    // the subject (nodeFraming — see the exemption note next to CAM_ZOOM).
-    if (dolly) dollyBack(toPos, toTgt, tw.toPos);
-    else tw.toPos.copy(toPos);
-    tw.fromTgt.copy(this.ctx.controls.target);
-    tw.toTgt.copy(toTgt);
-    // The rails-hidden LEAN composes into every destination a dolly may touch (2026-08-08,
-    // review-hardened): a property of pose resolution, so focus flights, transition landings and
-    // the presentation toggle can never disagree about it. In place (railsLean is outPos===pos
-    // safe). It rides the SAME `dolly` gate as dollyBack — both scale (pos − target) about the
-    // target, so a pose whose target is a composed look-at is exempt from both (see the exemption
-    // note next to CAM_ZOOM). And it RAMPS with how close the pose already sits to the view's
-    // resting orbit, which is what `restOrbit` measures — see railsLean's own note.
-    if (dolly && this.railsHidden) railsLean(tw.toPos, tw.toTgt, is3D(this.mode) ? restOrbit(this.mode) : 0, tw.toPos);
-    // THE COMMIT NUDGE (user, 2026-08-13): "we always animate the position but a 'nudge' is allowed
-    // which means the new pos will be same as old pos". Every rung answers a click, including the
-    // ones whose pose is their parent's — hyper's node and composition rungs resolve to the network
-    // they belong to, so committing one lands exactly where the camera already is. A dead 1.4s
-    // no-op reads as a broken click; the nudge is the acknowledgement, and it ends on this same
-    // committed pose, so nothing is lost by taking it.
-    tw.nudge = isSamePose(tw.fromPos, tw.fromTgt, tw.toPos, tw.toTgt);
-    tw.t = 0;
-    tw.dur = tw.nudge ? NUDGE_DUR : 1.4;
-    tw.active = true;
-    // The HUD yields while this flight runs (store.cameraFlying — see its comment): a commit made
-    // from a card is a request to LOOK at what was committed, so the cards step back out of the
-    // way exactly as they do under a direct drag. NOT during a view transition: that choreography
-    // is already the 3.9s answer to the user's gesture, and a 1.4s dim inside it reads as a blink.
-    // And NOT for a nudge: the dim exists so the scene can be SEEN changing, and here it doesn't.
-    if (!tw.nudge && !this.transition.active() && !useStore.getState().cameraFlying) useStore.getState().setCameraFlying(true);
-  }
-
-
-  private _focusGeo(R: number) {
-    // Look head-on at the FRONT of the globe (target pushed forward in +Z, toward where the
-    // focused country/selection is aimed) so it sits centred in the view rather than low.
-    geoFraming(R, this._framingOut);
-    this._tweenTo(this._framingOut.pos, this._framingOut.target);
-  }
-
-  private _focusFilter(filter: string) {
-    this.layers.focusId = null;
-    if (filter === "all") {
-      this.ctx.controls.autoRotate = false; // the STRUCTURE spins (setHyperSpin), not the camera
-      this.focus("overview"); // SHARED pose — the hyper structure is tilted (HYPER_TILT) to read
-      return; // top-down instead of moving the camera, so other views tween cleanly from here.
-    }
-    this.ctx.controls.autoRotate = false;
-    if (filter === "dag") {
-      this.focus("dag"); // the central core — framed to fit both the L0 and cL1 shells
-      return;
-    }
-    const meta = this.layers.metas.find((x) => x.cfg.id === filter);
-    if (!meta) {
-      this.focus("overview");
-      return;
-    }
-    this.layers.focusId = filter; // anchor this hub so it stays framed (its orbit + the spin freeze)
-    // Frame against the hub's morph-0 world position: root carries the structure's tilt+spin in its
-    // ROTATION and the morph collapse in its SCALE. On a geo→hyper switch morph is still 1 at this
-    // instant (it eases to 0 over the next frames), so root.scale ≈ 0 and getWorldPosition would
-    // return the origin (the "doesn't focus the metagraph" bug). Apply ONLY the rotation to the
-    // hub's local orbit position — that's where the hub lands once the morph settles; the spin/orbit
-    // are frozen (focusId + non-"all" filter) so it stays valid for the whole tween.
-    // Frame against the TARGET rotation — the flattened focus tilt + the (frozen) spin — not the
-    // still-easing current root.rotation, so the tween ends exactly where the structure settles.
-    this._focusEuler.set(HYPER_TILT_FOCUS, this.layers.root.rotation.y, 0);
-    this._hubWorld.copy(meta.group.position).applyEuler(this._focusEuler);
-    // Plain radial hub framing, world-up, NO camera roll and NO core-corner composition
-    // (user, 2026-07-17: the rolled pose + DoF read fuzzy/off — keep the focused pose simple
-    // and correct; the rolled hub-focus camera-roll pose was deleted — structure-tilt + plain
-    // hubFraming won).
-    hubFraming(this._hubWorld, this._framingOut);
-    this._tweenTo(this._framingOut.pos, this._framingOut.target);
-  }
 
   // ---- render loop (ports main.js animate) ----
   private start() {
@@ -1754,8 +1666,7 @@ export class Engine {
     // the camera, and computing it from a pre-tween pose made every staged node trail the
     // camera by one frame — a visible drift-and-return on the hyper→geo flight (user,
     // 2026-07-17). Tween → roll ease → controls → altitude clamp, THEN the plane.
-    this._updateTween(dt);
-    this._updateTapZoom(dt);
+    this.cam.update(dt);
     this.ctx.controls.update();
     // Altitude clamp (policy.minCamAlt): OrbitControls' minDistance is target-relative, and
     // the geo target is off-centre — so after the controls settle, push the camera back out
@@ -1958,79 +1869,7 @@ export class Engine {
   }
 
 
-  /**
-   * One double-tap step (domain/tapZoom owns the arithmetic). Two branches, because the camera has
-   * two owners:
-   *
-   * - A commit flight in the air → scale its DESTINATION once, in place, and let the flight land
-   *   zoomed in. ⚠️ NOT through `_tweenTo`, which composes `dollyBack` and `railsLean` into every
-   *   destination it is handed — routing a direct dolly through it would apply both levers a
-   *   second time.
-   * - Settled → the eased step below, which is the only camera motion the Engine owns that isn't
-   *   a pose.
-   */
-  private _tapZoom() {
-    if (!this._policy.canvas) return; // the flat placeholder views are inert (convention 7)
-    if (this.transition.active()) return; // the choreography owns the camera
-    const controls = this.ctx.controls;
-    const tw = this._tween;
-    if (tw.active) {
-      tapZoomAround(tw.toPos, tw.toTgt, controls.minDistance, controls.maxDistance, tw.toPos);
-      return;
-    }
-    // Measured live, so a second pair mid-step continues from where the first one has got to.
-    const from = this.ctx.camera.position.distanceTo(controls.target);
-    const to = tapZoomDistance(from, controls.minDistance, controls.maxDistance);
-    if (to === from) return; // already at the floor — nothing to animate
-    const z = this._zoom;
-    z.from = from;
-    z.to = to;
-    z.t = 0;
-    z.active = true;
-  }
 
-  /**
-   * The step, applied between the tween and `controls.update()` — so OrbitControls recomputes its
-   * spherical from the position we wrote (exactly as it does for the tween), and the altitude
-   * clamp downstream still gets the last word. Distance only: the direction is whatever the user
-   * has orbited to, and the anchor is the live `controls.target`, so a pan mid-step composes.
-   */
-  private _updateTapZoom(dt: number) {
-    const z = this._zoom;
-    if (!z.active) return;
-    // A commit flight is a POSE and outranks a nudge along the view vector — drop the step rather
-    // than fight it for the camera position.
-    if (this._tween.active) {
-      z.active = false;
-      return;
-    }
-    z.t = Math.min(1, z.t + dt / TAP_ZOOM_DUR);
-    const d = z.from + (z.to - z.from) * easeInOutQuad(z.t);
-    const tgt = this.ctx.controls.target;
-    this.ctx.camera.position.sub(tgt).setLength(d).add(tgt);
-    if (z.t >= 1) z.active = false;
-  }
-
-  private _updateTween(dt: number) {
-    const tw = this._tween;
-    if (!tw.active) return;
-    // Scale ONLY while the transition choreography is live, so an ordinary focus flight (a
-    // click while settled — no transition running) stays full speed under ?slowmo.
-    tw.t = Math.min(1, tw.t + dt / (tw.dur * (this.transition.active() ? this._slowmo : 1)));
-    const e = easeInOutQuad(tw.t);
-    this.ctx.camera.position.lerpVectors(tw.fromPos, tw.toPos, e);
-    this.ctx.controls.target.lerpVectors(tw.fromTgt, tw.toTgt, e);
-    // The nudge rides ON TOP of what is otherwise a zero-length flight: a soft push toward the
-    // pose's own target and back out, contributing exactly 0 at t=1 so the tween still lands on
-    // the committed pose to the pixel.
-    if (tw.nudge) this.ctx.camera.position.lerp(tw.toTgt, nudgeMix(tw.t));
-    if (tw.t >= 1) {
-      tw.active = false;
-      // The flight's trailing edge — one write, and unconditionally, so a tween STARTED before a
-      // transition (or suppressed by one) can never strand the HUD dimmed.
-      if (useStore.getState().cameraFlying) useStore.getState().setCameraFlying(false);
-    }
-  }
 
 
 
