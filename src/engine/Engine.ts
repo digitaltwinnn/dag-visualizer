@@ -40,6 +40,7 @@ import { snapsAtTick } from "@/src/data/anchorLog";
 // The tap RECOGNIZER stays here — it is input plumbing. The step it triggers is the
 // CameraDirector's (see its header).
 import { type Tap, DOUBLE_TAP_SLOP, isDoubleTap } from "./domain/tapZoom";
+import { auditInstances, findingKey, type InstanceFinding } from "./scene/instanceAudit";
 import { CalloutSync } from "./CalloutSync";
 import { DevTunePanel } from "./DevTunePanel";
 import { CameraDirector } from "./CameraDirector";
@@ -52,6 +53,15 @@ import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/ty
 // may run is `gatherBand` (domain/gatherLayout), which measures the HUD rather than guessing —
 // the top edge lines up with the rail cards' own top, and the band spans the whole viewport
 // when the rails are hidden (user, 2026-08-12). Camera-anchored, so it reads the same at any pose.
+/** How often the dev instance audit sweeps — every Nth frame, one mesh per sweep. ~1s of coverage
+ *  per mesh at 60fps, which finds a corrupt buffer promptly while costing nothing measurable. */
+const AUDIT_EVERY = 15;
+/** Dev, or `?audit` in any build — the `?stats` idiom, so a deployed instance can be checked
+ *  without shipping the pass to every visitor. */
+const AUDIT_ON =
+  process.env.NODE_ENV === "development" ||
+  (typeof window !== "undefined" && /[?#&]audit/.test(window.location.search + window.location.hash));
+
 const GATHER_DIST = 34;
 
 // id[] -> { id: sceneColorNumber }, resolved through the identity map (Task 1). The scene
@@ -1873,7 +1883,44 @@ export class Engine {
     }
 
     this._syncCallout();
+    if (AUDIT_ON) this._auditPass();
   }
+  // ---- the instance audit (dev only) -------------------------------------------------------
+  // Runs AFTER the scene writes, on what the frame actually put in the buffers. See
+  // scene/instanceAudit.ts for what it checks and — as importantly — what it refuses to claim.
+  //
+  // Cheap by construction: every AUDIT_EVERY-th frame, one mesh per pass in rotation, capped
+  // findings, and each distinct problem reported once for the session. A check that costs a frame
+  // is a check that gets switched off.
+  private _auditFrame = 0;
+  private _auditSeen = new Set<string>();
+  private _auditPass(): void {
+    if (++this._auditFrame % AUDIT_EVERY !== 0) return;
+    const meshes = this.globe?.auditMeshes();
+    if (!meshes || !meshes.length) return;
+    // One mesh per pass — the buffers are large and a full sweep every frame is the cost that
+    // makes a dev check unwelcome.
+    const pick = meshes[(this._auditFrame / AUDIT_EVERY) % meshes.length]!;
+    const [label, mesh] = pick;
+    if (!mesh) return;
+    const found: InstanceFinding[] = auditInstances(
+      label,
+      mesh.instanceMatrix.array as unknown as ArrayLike<number>,
+      mesh.count,
+      (mesh.instanceColor?.array as unknown as ArrayLike<number>) ?? null,
+    );
+    for (const f of found) {
+      const k = findingKey(f);
+      if (this._auditSeen.has(k)) continue; // once per session, not once per frame
+      this._auditSeen.add(k);
+      console.error(
+        `[instanceAudit] ${f.mesh} slot ${f.slot}: ${f.kind} — ${f.detail}. ` +
+        `A corrupt instance transform renders as a MISSING object, not an error; ` +
+        `this is that failure made loud. Reported once per mesh+kind per session.`,
+      );
+    }
+  }
+
   // ---- the subject callout ---------------------------------------------------------------
   // Placement moved to CalloutSync (2026-08-31) — ten methods and ~270 lines of per-view anchor
   // resolution that shared nothing with the rest of the Engine. What stays here is the BRIDGE:

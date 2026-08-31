@@ -416,3 +416,29 @@ quiet-empty state (no machines are knowable), the ledger lights its lane and dim
 file down in `src/data/unlistedId.ts`, a leaf with no imports, re-exported by `unlisted.ts` — the
 only way network.ts and ledgerStory.ts can name the id without closing an import cycle back
 through it (`src/data/noImportCycles.test.ts` keeps the graph acyclic).
+
+## The instance audit (dev only)
+
+`scene/instanceAudit.ts` + `Engine._auditPass` sweep what the frame ACTUALLY wrote into the node
+fabric's instanced buffers, and report a corrupt slot as a console error naming the mesh and index.
+
+It exists because this directory is the app's largest untested surface and its bugs are silent by
+nature: measured 2026-08-31, `scene/` is ~8,400 lines at a ~0.03 test ratio with a HIGHER branch
+density than pure `domain/` (6.6 vs 5.4 decisions per 100 lines). That is not neglect — these
+modules write GPU buffers, so their correctness is pixels and no unit test can see them — but it is
+why a defect survives here: a single NaN entering a transform renders as an object silently
+VANISHING, which looks exactly like a node that legitimately left the set.
+
+Two checks, both about that one failure: non-finite values in a matrix or instance colour, and
+finite-but-absurd coordinates (drawn, but nowhere the camera goes). Cheap by construction — every
+15th frame, one mesh per sweep in rotation, findings capped, and each distinct problem reported
+ONCE per session rather than once per frame. Dev, or `?audit` in any build (the `?stats` idiom).
+
+⚠️ **It finds corruption, not omission.** "Every instanced slot is written or zero-scaled every
+frame" is a real discipline here, but proving it needs the WRITE PATH instrumented — in the buffer,
+an unwritten slot and a deliberately zero-scaled one are the same bytes. The audit reads buffers
+only and stays honest about that limit; don't cite it as enforcing the write rule.
+
+`Globe.auditMeshes()` is the one accessor it uses, deliberately narrow: the audit needs to READ four
+buffers, not to reach `fabric`, and keeping that distinction is what stops a dev-only check from
+becoming a public seam into the node pool.
