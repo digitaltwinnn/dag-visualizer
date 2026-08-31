@@ -684,7 +684,7 @@ seam and corner rules select on the same markers the thread measures:
 | `data-depth` / `data-focus` / `data-ghost` | The thread's read — depth dimming and dot state |
 | `.nb-row` | The pairing row-wash selector |
 | `#topbar`, `#metapane`, `#tooltip` | Layout and positioning |
-| `#callout` (+ `data-on`) | The subject callout's 0-size anchor wrapper — `SceneCallout` renders it, `Engine._syncCallout` writes its transform + `data-on` per frame (the Tooltip discipline: position never renders React) |
+| `#callout` (+ `data-on`) | The subject callout's 0-size anchor wrapper — `SceneCallout` renders it, `CalloutSync` writes its transform + `data-on` per frame (the Tooltip discipline: position never renders React) |
 
 ⚠️ The card query is deliberately **depth-agnostic** (filtered to outermost panels): a `:scope >
 .ig-panel` form silently matches nothing once the ladder lane nests the cards.
@@ -701,7 +701,7 @@ projection while adding its container, render pass and a React-portal handshake.
 callouts ever multiply.
 
 **`components/calloutBoundary.test.ts` pins the contracts**: `#callout` has exactly two homes (React
-renders + owns content, `Engine._syncCallout` writes transform + `data-on` per frame — the Tooltip
+renders + owns content, `CalloutSync` writes transform + `data-on` per frame — the Tooltip
 discipline); BOTH owners consult `store.boxedCard`; and `SCENE_GLASS` is the one container the hover
 Tooltip shares (hover and commit are one species — identity never tints the frame; it lives on the
 hued ticker, the anchor ring and the `.edge-spine`). The design rules the test can't carry:

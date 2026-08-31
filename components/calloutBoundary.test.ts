@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 // The SUBJECT CALLOUT's contracts, made executable (2026-08-16 — the boundary-test idiom).
 // The callout is split across two owners on purpose — React owns the DOM and content
-// (components/SceneCallout.tsx), the Engine owns per-frame placement (Engine._syncCallout) —
+// (components/SceneCallout.tsx), CalloutSync owns per-frame placement (src/engine/CalloutSync.ts) —
 // and three agreements keep the split from drifting:
 //
 //  1. `#callout` has exactly TWO homes: SceneCallout renders the marker element, the Engine
