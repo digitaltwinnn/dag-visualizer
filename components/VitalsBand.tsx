@@ -101,7 +101,10 @@ export function BandCard({ label, children, className, mark }: { label: string; 
 
 /** A row of labelled micro horizontal bars (the geo country / provider / layer read) — one
  *  measure, one hue, widths on the row max, every bar named (identity never colour-alone). */
-export function MicroBars({ rows, accent, labelW = 26 }: { rows: { key: string; label: React.ReactNode; count: number }[]; accent: string; labelW?: number }) {
+/** `steps` mirrors the donut's per-segment opacities onto the bars, in the same order.
+ *  Without it a donut standing beside these rows loses its key: the ring separates its slices by
+ *  opacity, and uniform bars give the reader nothing to match them against. */
+export function MicroBars({ rows, accent, labelW = 26, steps, dashZero }: { rows: { key: string; label: React.ReactNode; count: number }[]; accent: string; labelW?: number; steps?: readonly number[]; dashZero?: boolean }) {
   const max = Math.max(1, ...rows.map((r) => r.count));
   return (
     <div className="flex flex-col gap-[3px] w-full self-center min-w-0">
@@ -110,8 +113,13 @@ export function MicroBars({ rows, accent, labelW = 26 }: { rows: { key: string; 
           {/* NO uppercase transform: the layer codes are ONE vocabulary (L0/cL1/dL1 — case is
               part of the code) and provider names are names; country codes arrive uppercase. */}
           <span className="text-micro text-muted-foreground flex-none truncate leading-none" style={{ width: labelW }}>{r.label}</span>
-          <span aria-hidden className="h-[5px] rounded-full flex-none" style={{ background: accent, opacity: 0.75, width: `${Math.max(4, (r.count / max) * 72)}px` }} />
-          <span className="font-mono text-micro tabular-nums text-foreground">{r.count}</span>
+          <span aria-hidden className="h-[5px] rounded-full flex-none" style={{ background: accent, opacity: steps ? (steps[rows.indexOf(r)] ?? 0.2) : 0.75, width: `${Math.max(4, (r.count / max) * 72)}px` }} />
+          {/* Under a COMMITTED scope a 0 is "this network has none of these", not a measurement of
+              zero — the dash says so where a numeral would read as a count (kept from the dot-legend
+              design this replaced). Unscoped, every row is a real count and prints as one. */}
+          <span className="font-mono text-micro tabular-nums text-foreground">
+            {dashZero && r.count === 0 ? <span className="text-muted-foreground italic opacity-60">—</span> : r.count}
+          </span>
         </span>
       ))}
     </div>
@@ -121,12 +129,10 @@ export function MicroBars({ rows, accent, labelW = 26 }: { rows: { key: string; 
 /** The composition donut — four shares of one fleet as stroke arcs on a single accent hue at
  *  stepped opacities, the total in the hole. Pure SVG, no interaction; 2px surface gaps between
  *  segments (the dataviz spacer rule) via a gap subtracted from each arc. */
-/** `centre` overrides the number in the hole. It DEFAULTS to the segment sum, which is the right
- *  reading when the ring partitions a population (node composition: four shares of one fleet).
- *  A merged total card passes its own instead — "how many COUNTRIES" over a ring of nodes-by-
- *  country — because there the hole answers a different question from the ring: how many
- *  categories there are, versus how the population spreads across them. */
-export function Donut({ counts, accent, centre }: { counts: Record<string, number>; accent: string; centre?: number | null }) {
+/** The ring alone — the number that totals it is `DonutTotal`'s, standing outside at headline
+ *  size. Segment opacities come from DONUT_STEPS in entry order; `MicroBars`' `steps` mirrors
+ *  them so a ring and its rows can be read against each other. */
+export function Donut({ counts, accent }: { counts: Record<string, number>; accent: string }) {
   const entries = Object.entries(counts);
   const total = entries.reduce((s, [, n]) => s + n, 0);
   const R = 15.5, C = 2 * Math.PI * R, GAP = 2;
@@ -154,10 +160,26 @@ export function Donut({ counts, accent, centre }: { counts: Record<string, numbe
           );
         })}
       {total === 0 && <circle cx="22" cy="22" r={R} fill="none" stroke="var(--border)" strokeWidth="6" />}
-      <text x="22" y="22" transform="rotate(90 22 22)" textAnchor="middle" dominantBaseline="central" className="font-mono font-bold fill-[var(--foreground)]" fontSize="11">
-        {(centre === undefined ? total : centre) || "—"}
-      </text>
     </svg>
+  );
+}
+
+/** A donut and the number it totals, as one unit.
+ *
+ *  ⚠️ THE TOTAL IS THE HEADLINE, so it wears the band's own number size and stands OUTSIDE the
+ *  ring (user, 2026-08-31: "shouldn't the total be the largest font instead of the smallest?").
+ *  It used to sit in the 44px hole at 11px — which made the merge a DEMOTION: the standalone
+ *  cards it replaced showed that same figure at headline size, so folding them in shrank the very
+ *  number the card exists to lead with, below even its own breakdown values. The hole is now
+ *  empty on purpose: the ring carries the shape, the numeral carries the reading. */
+export function DonutTotal({ counts, accent, total, className }: { counts: Record<string, number>; accent: string; total: number | null; className?: string }) {
+  return (
+    <span className={cn("flex items-center gap-2 flex-none", className)}>
+      <Donut counts={counts} accent={accent} />
+      <span className="font-mono font-bold text-foreground tabular-nums leading-none">
+        <Odometer int value={total || null} />
+      </span>
+    </span>
   );
 }
 
@@ -255,16 +277,9 @@ function HyperCells({ accent }: { accent: string }) {
             4 subsets) — the one used for node composition looks best"): the two cards are sibling
             share-of-whole readings, so they wear one donut + dot-legend design. The type GLYPHS
             keep their home on the filtered face, where the card states a single characteristic. */}
-        <Donut counts={types} accent={accent} />
-        <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
-          {TYPE_ORDER.map((t, i) => (
-            <span key={t} className="flex items-center gap-1.5 whitespace-nowrap">
-              <span aria-hidden className="size-1.5 rounded-full flex-none" style={{ background: accent, opacity: DONUT_STEPS[i] ?? 0.2 }} />
-              <span className="text-micro tracking-[0.08em] uppercase text-muted-foreground">{t === "data + currency" ? "both" : t}</span>
-              <span className="font-mono font-bold text-caption tabular-nums text-foreground"><Odometer int value={types[t]!} /></span>
-            </span>
-          ))}
-        </div>
+        <DonutTotal counts={types} accent={accent} total={TYPE_ORDER.reduce((n, t) => n + types[t]!, 0)} />
+        <MicroBars accent={accent} labelW={58} steps={DONUT_STEPS}
+          rows={TYPE_ORDER.map((t) => ({ key: t, label: t === "data + currency" ? "both" : t, count: types[t]! }))} />
       </BandCard>
       )}
       {/* NO SEPARATE "NODES" CARD (user, 2026-08-31). The composition counts PARTITION the fleet,
@@ -272,18 +287,13 @@ function HyperCells({ accent }: { accent: string }) {
           the neighbouring card printed, twice on one row. The card that keeps it is the one that
           also says how it splits. */}
       <BandCard label="Node composition" className="flex-[1.5]">
-        <Donut counts={counts} accent={accent} />
-        <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
-          {Object.entries(counts).map(([label, n], i) => (
-            <span key={label} className="flex items-center gap-1.5 whitespace-nowrap">
-              <span aria-hidden className="size-1.5 rounded-full flex-none" style={{ background: accent, opacity: DONUT_STEPS[i] ?? 0.2 }} />
-              <span className="text-micro tracking-[0.08em] uppercase text-muted-foreground">{label}</span>
-              <span className="font-mono font-bold text-caption tabular-nums text-foreground">
-                {scoped && n === 0 ? <span className="text-muted-foreground italic opacity-60">—</span> : <Odometer int value={n} />}
-              </span>
-            </span>
-          ))}
-        </div>
+        {/* Geo's treatment, adopted here (user, 2026-08-31: "in hyper view, geo looks better"):
+            the dot legend named each slice but said nothing about SIZE, so the ring carried the
+            proportions alone and the numbers sat in a grid beside it. Bars carry both — and
+            `steps` keeps them keyed to their own segment. */}
+        <DonutTotal counts={counts} accent={accent} total={Object.values(counts).reduce((a, b) => a + b, 0)} />
+        <MicroBars accent={accent} labelW={72} steps={DONUT_STEPS} dashZero={scoped}
+          rows={Object.entries(counts).map(([label, n]) => ({ key: label, label, count: n }))} />
       </BandCard>
       <BandCard label="Network layers">
         <MicroBars accent={accent} labelW={34} rows={[
@@ -338,19 +348,19 @@ function GeoCells({ accent }: { accent: string }) {
         <BandCard label="Nodes by country" className="flex-[1.6]">
           {/* The hole counts COUNTRIES, the ring spreads NODES across them — two different
               questions, which is why the centre is passed rather than left as the sum. */}
-          <Donut counts={countryRing} accent={accent} centre={countries.length} />
+          <DonutTotal counts={countryRing} accent={accent} total={countries.length} />
           <div className="flex w-full items-center gap-2">
-            <MicroBars accent={accent} labelW={18} rows={topCountries.map((c) => ({ key: c.cc, label: c.cc, count: c.count }))} />
+            <MicroBars accent={accent} labelW={18} steps={DONUT_STEPS} rows={topCountries.map((c) => ({ key: c.cc, label: c.cc, count: c.count }))} />
             {restC > 0 && <span className="text-micro text-muted-foreground whitespace-nowrap self-end pb-0.5">+{countries.length - topCountries.length} more · {restC}</span>}
           </div>
         </BandCard>
       )}
       {topIsps.length > 0 && (
         <BandCard label="Top providers" className="flex-[1.8]">
-          <Donut counts={ispRing} accent={accent} centre={ispCounts.size} />
+          <DonutTotal counts={ispRing} accent={accent} total={ispCounts.size} />
           {/* labelW 92 → 150 (user, 2026-08-30): the card had spare width while "Hetzner
               Online GmbH" truncated — the name is the row's identity, so it gets the room. */}
-          <MicroBars accent={accent} labelW={150} rows={topIsps.map(([isp, n]) => ({ key: isp, label: isp, count: n }))} />
+          <MicroBars accent={accent} labelW={150} steps={DONUT_STEPS} rows={topIsps.map(([isp, n]) => ({ key: isp, label: isp, count: n }))} />
         </BandCard>
       )}
     </>

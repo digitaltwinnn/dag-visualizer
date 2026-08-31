@@ -249,10 +249,20 @@ row reads the snapshot feed ONCE and passes it down.
 The cells are per-view and ordered by the user (2026-08-30): hyper coarse→fine (METAGRAPHS with a
 by-type breakdown — `networkKind` is the type's one home, icons from `METATYPE_ICONS` on the
 filtered face — then NODES, the NODE COMPOSITION donut, NETWORK LAYERS as RoleChips micro-bars);
-geo pairs each total with its breakdown (NODES · COUNTRIES · nodes-by-country · PROVIDERS ·
+geo pairs each total with its breakdown (NODES · nodes-by-country · top-providers —
 top-providers); the ledger leads with WHO (METAGRAPHS ANCHORING, exact from the anchor index, with
 identity dots) then the rates (number + stretch sparkline, units spelled `/hour`) and the
-declicked tick bar-chart. `compositionCounts` lives IN VitalsBand (its one consumer since the
+declicked tick bar-chart. **A TOTAL LIVES INSIDE ITS OWN BREAKDOWN, AND LEADS IT** (user, 2026-08-31): a bare number card
+beside the list that breaks that number down says the same thing twice, so `COUNTRIES` folded into
+nodes-by-country and `PROVIDERS` into top-providers, and hyper's `NODES` went entirely — the
+composition donut already totalled the same fleet. The merged shape is `DonutTotal` + `MicroBars`:
+ring, then the total at the band's own number size, then the rows. Two rules hold it honest — the
+ring must PARTITION the population, so a top-N chart carries its remainder as an `other` segment
+rather than drawing three slices as the whole; and the total is the LARGEST type in the card, never
+the smallest (it briefly sat in the 44px donut hole at 11px, which made merging a demotion). Rows
+wear the donut's own stepped opacities via `MicroBars`' `steps`, or the ring loses its key.
+
+`compositionCounts` lives IN VitalsBand (its one consumer since the
 top-bar cluster retired). The band dims with the rails on `useSceneYield` and its plate is the
 command bar's own `--topbar-glass`.
 
