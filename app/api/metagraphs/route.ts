@@ -69,7 +69,7 @@ async function clusterNodes(base: string): Promise<Array<{ ip: string; state: st
   }
 }
 
-async function fetchLive(net: NetworkId): Promise<{ metagraphs: Metagraph[]; geo: GeoMap }> {
+async function fetchLive(net: NetworkId): Promise<{ metagraphs: Metagraph[]; geo: GeoMap; builtAt: number }> {
   const API = NETWORKS[net].directory;
   const list = ((await getJson(`${API}/metagraphs?limit=100`)) as { data?: unknown[] }).data ?? [];
   const ips = new Set<string>();
@@ -133,7 +133,8 @@ async function fetchLive(net: NetworkId): Promise<{ metagraphs: Metagraph[]; geo
   );
 
   const geo = await geolocate([...ips]);
-  return { metagraphs: metagraphs.filter((m): m is Metagraph => m !== null), geo };
+  // Stamped so the CLIENT can tell a fresh payload from a frozen cache — see the ageMs note on GET.
+  return { metagraphs: metagraphs.filter((m): m is Metagraph => m !== null), geo, builtAt: Date.now() };
 }
 
 // Cache the live fan-out across requests/instances for `revalidate` seconds, so the
@@ -148,7 +149,7 @@ const getLive = (net: NetworkId) =>
     if (!live.metagraphs.length) throw new Error("empty live result");
     return live;
   },
-  ["metagraphs-live-v3", net], // v3: +per-layer node `ids` (v2 was +isp/asn geo fields)
+  ["metagraphs-live-v4", net], // v4: +builtAt (v3 was +per-layer node `ids`, v2 +isp/asn geo)
   { revalidate },
   )();
 
@@ -167,9 +168,26 @@ export async function GET(req: Request) {
   const net = netOf(req);
   try {
     const live = await getLive(net);
-    // Dynamic since ?net= — the CDN caches per URL via s-maxage (multi-network design §3).
+    // AGE, NOT A TIMESTAMP. The client needs to know whether this payload is current, and the only
+    // reliable subtraction is one done on a single clock: `builtAt` is server time, and a viewer's
+    // clock can be minutes off, which would invent staleness that isn't there. Both terms here are
+    // this server's own `Date.now()`, so what crosses the wire is already an elapsed duration.
+    //
+    // WHY IT IS PUBLISHED AT ALL: `unstable_cache` is demonstrably capable of going stale and
+    // ceasing to revalidate over a long-lived process — that is exactly what broke the snapshot
+    // route's served-window gate (app/api/snapshot/ordinalWindow.ts, 2026-08-31, measured 148
+    // ordinals behind). This route is the same construct over a time-varying value, and it feeds
+    // the whole app's node set. It is NOT swapped for a per-instance TTL the way the gate was: the
+    // shared cache is load-bearing here, holding an expensive fan-out — dozens of cluster calls
+    // plus ip-api, which is rate-limited free-tier — down to once per window across instances.
+    // So this measures rather than re-plumbs: a freeze becomes visible in the pulse strip instead
+    // of silently serving last week's fleet, and that evidence is what should decide any deeper fix.
+    // A payload cached before builtAt existed has none — omit the field rather than serialising a
+    // NaN, which JSON turns into null and the client would then have to special-case. Its absence
+    // already means "fail open, treat as fresh" on the client, so omission is the honest signal.
+    const ageMs = typeof live.builtAt === "number" ? Math.max(0, Date.now() - live.builtAt) : undefined;
     return NextResponse.json(
-      { ...live, metagraphs: withHues(live.metagraphs, net) },
+      { ...live, ageMs, metagraphs: withHues(live.metagraphs, net) },
       { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } },
     );
   } catch {

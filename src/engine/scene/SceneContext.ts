@@ -609,7 +609,16 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     // bottom-front, the parked grid's top rows) catches one and BLOOMS it — a brightness spike at
     // poses users never take, proven by zeroing the env (2026-08-30). The sweep survives the blur;
     // the spikes don't.
-    nodeEnvTex = pmrem.fromScene(room, 0.35).texture;
+    //
+    // ⚠️ SIZE IS PART OF THE SIGMA. PMREM's blur cost is angular: it needs
+    // `1 + floor(3 × sigma / radiansPerPixel)` taps and CLIPS at 20, and radiansPerPixel is
+    // `π / (2 × (size − 1))` — so at the default size 256 this sigma asked for 171 taps and
+    // three truncated the Gaussian to 20, warning on every boot. Truncation is not what was
+    // tuned here: dropping sigma to fit 256 means ~0.04, which IS the stock value whose
+    // surviving hot spots this line exists to kill. Shrinking the SOURCE instead keeps the
+    // full 0.35 smear and lands at 11 taps — the whole, untruncated Gaussian, no warning.
+    // 16px of cube face is ample for a texture whose entire job is to have no detail left.
+    nodeEnvTex = pmrem.fromScene(room, 0.35, 0.1, 100, { size: 16 }).texture;
     pmrem.dispose();
     return nodeEnvTex;
   }

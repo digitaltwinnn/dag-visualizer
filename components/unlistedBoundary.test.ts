@@ -6,7 +6,10 @@ import { join } from "node:path";
 // selectionBoundary idiom). Every scattered `filter === "unlisted"` branch grew its own bug
 // during the 2026-08-07 session; the id string may exist as a LITERAL only in its two homes:
 //
-//   · src/data/unlisted.ts            — UNLISTED_ID + the display/data helpers (the one home)
+//   · src/data/unlistedId.ts          — UNLISTED_ID itself. The literal moved here 2026-08-31 so
+//     network.ts and ledgerStory.ts could reach it without closing an import cycle back through
+//     unlisted.ts (src/data/noImportCycles.test.ts); unlisted.ts re-exports it, so this is a
+//     change of FILE, not of the rule — there are still exactly two homes for the bare literal.
 //   · src/engine/domain/ledgerBands.ts — UNLISTED_KEY (the domain twin; the ledger's lane/band
 //     machinery matches the filter id by construction and the domain layer may not import the
 //     data-layer home)
@@ -14,7 +17,7 @@ import { join } from "node:path";
 // Everything else imports one of the two. Comments may say the word; CODE may not carry the
 // quoted literal.
 const ROOTS = ["components", "src"];
-const HOMES = new Set(["src/data/unlisted.ts", "src/engine/domain/ledgerBands.ts"]);
+const HOMES = new Set(["src/data/unlistedId.ts", "src/engine/domain/ledgerBands.ts"]);
 
 const walk = (dir: string): string[] =>
   readdirSync(dir).flatMap((name) => {

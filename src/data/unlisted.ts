@@ -18,22 +18,17 @@
 // The ledger scene needs no import: `ledgerBands.UNLISTED_KEY` carries the same id string, so
 // the lane, band and dim machinery match by construction.
 import { METAGRAPHS } from "@/src/net/current";
+import { UNLISTED_ID, UNLISTED_HUE, UNLISTED_LABEL } from "@/src/data/unlistedId";
 import { metagraphById } from "@/src/data/network";
 import { identityHudCss } from "@/src/palette/identity";
 import { buildUnlistedLog } from "@/src/data/anchorLog";
 import type { GlobalSnapshot, MetaCfg, SnapshotExact } from "@/src/data/types";
 import type { Theme } from "@/src/theme/resolve";
 
-export const UNLISTED_ID = "unlisted";
-
-// The unlisted set's NEUTRAL identity — gray in BOTH lanes (user, 2026-08-08: it wore three
-// different colours — core-blue chips, cyan scene blocks, and address-hashed hues on the
-// snapshot card. No single identity can speak for a mixed uncataloged set, so none does):
-//   · HUD lane — the muted-foreground token (CSS var, resolves ~#8a96b8);
-//   · scene lane — the same tone as a baked number (the scene can't resolve CSS vars;
-//     Engine folds it into every scene-color map it builds, so lanes/bands/ribbons/tiles
-//     pick it up like any catalog hue).
-export const UNLISTED_HUE = "var(--muted-foreground)";
+// The identity tokens live in a LEAF module so network.ts and ledgerStory.ts can reach them
+// without closing an import cycle back through here (see src/data/unlistedId.ts). Re-exported
+// so this module stays the one place consumers import the unlisted network from.
+export { UNLISTED_ID, UNLISTED_HUE, UNLISTED_LABEL };
 // The same tone as a RESOLVED hex, for the one surface that can't resolve a CSS var: the
 // scene (the HUD's last resolved-hex consumer, RailThread, now rides currentColor).
 // One neutral pair per theme — dark keeps the original tone, light is the darker read that
@@ -50,8 +45,8 @@ export const LISTED_IDS: ReadonlySet<string> = new Set(METAGRAPHS.map((m) => m.i
  *  the card from its observed members, so it stays empty here. */
 export const UNLISTED_CFG: MetaCfg = {
   id: UNLISTED_ID,
-  name: "unlisted",
-  ticker: "unlisted",
+  name: UNLISTED_LABEL,
+  ticker: UNLISTED_LABEL,
   color: UNLISTED_SCENE_HEX,
   blurb: "",
 };
@@ -69,8 +64,8 @@ export interface DisplayNetwork {
 
 const UNLISTED_DISPLAY: DisplayNetwork = {
   id: UNLISTED_ID,
-  name: "unlisted",
-  ticker: "unlisted",
+  name: UNLISTED_LABEL,
+  ticker: UNLISTED_LABEL,
   hue: UNLISTED_HUE,
   virtual: true,
 };

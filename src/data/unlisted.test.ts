@@ -5,6 +5,7 @@ import {
   UNLISTED_CFG,
   UNLISTED_HUE,
   UNLISTED_ID,
+  UNLISTED_LABEL,
   UNLISTED_SCENE_HEX,
   UNLISTED_SCENE_HEX_BY_THEME,
   displayNetwork,
@@ -42,6 +43,10 @@ describe("the unlisted identity", () => {
 
   it("ships a MetaCfg carrying that same identity, so the shared dossier renders it", () => {
     expect(UNLISTED_CFG.id).toBe(UNLISTED_ID);
+    // The dossier renders the LABEL, never the id — they are re-exported from the same leaf and
+    // spelled alike today, so this is what would catch a rename wiring itself to the wrong one.
+    expect(UNLISTED_CFG.name).toBe(UNLISTED_LABEL);
+    expect(UNLISTED_CFG.ticker).toBe(UNLISTED_LABEL);
     expect(UNLISTED_CFG.color).toBe(UNLISTED_SCENE_HEX);
     // The card builds the blurb from observed members, so the record must not carry one.
     expect(UNLISTED_CFG.blurb).toBe("");

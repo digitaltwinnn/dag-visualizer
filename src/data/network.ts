@@ -4,7 +4,8 @@ import { NetworkData, shortHash } from "@/src/data/api";
 import { METAGRAPHS } from "@/src/net/current";
 import { COLORS as RAW_COLORS, DEFAULT_META_COLOR as RAW_DEFAULT_META } from "@/src/engine/config";
 import { identityHudCss, identityHudNumber } from "@/src/palette/identity";
-import { UNLISTED_ID, UNLISTED_HUE } from "@/src/data/unlisted";
+import { UNLISTED_ID, UNLISTED_HUE } from "@/src/data/unlistedId";  // the LEAF, not unlisted.ts: importing the
+// network module here would close an import cycle (see src/data/unlistedId.ts).
 import { pickNetId } from "@/src/engine/domain/pickActions";
 
 export { shortHash };

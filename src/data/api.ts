@@ -44,9 +44,61 @@ export function reportPoll(id: FeedId, ok: boolean): void {
   if (!r) { r = { id, label: d.label, target: d.target, everyMs: d.everyMs, lastOkAt: null, lastErrAt: null, ok: 0, err: 0 }; POLL_HEALTH.set(id, r); }
   if (ok) { r.lastOkAt = Date.now(); r.ok++; } else { r.lastErrAt = Date.now(); r.err++; }
 }
+/** Ensure a feed has a ROW without recording an outcome.
+ *
+ *  A feed that has been reached but has never delivered anything usable still belongs in the strip
+ *  — as "acquiring", which is exactly what `pollStatusOf` returns for a row with no `lastOkAt`.
+ *  Without this, a first response that is reachable but STALE reports nothing at all and the feed
+ *  is simply absent from the panel: the same silent denial this registry exists to prevent, one
+ *  level up. */
+export function touchPoll(id: FeedId): void {
+  const d = FEEDS[id];
+  if (!POLL_HEALTH.has(id)) {
+    POLL_HEALTH.set(id, { id, label: d.label, target: d.target, everyMs: d.everyMs, lastOkAt: null, lastErrAt: null, ok: 0, err: 0 });
+  }
+}
+
 /** The registry, in stable insertion order — the pulse strip's one read. */
 export function pollHealthRows(): PollHealth[] {
   return [...POLL_HEALTH.values()];
+}
+
+/** The anchor-index keys to drop when it is over `max`: the CHRONOLOGICALLY oldest, which is not
+ *  the insertion-oldest (see the cap in _recordMetaSnaps for why they diverge). Pure, for the test.
+ *
+ *  ⚠️ Sorts the keys as STRINGS. That is chronological only because every key is the explorer's
+ *  own `timestamp` in the one format it emits — ISO-8601 UTC, millisecond precision, `Z` suffix,
+ *  so all keys are equal-length and lexicographic order IS time order. If the feed ever returns a
+ *  numeric offset or variable precision this must become a Date.parse comparison; the test pins
+ *  the assumption so that change fails loudly rather than silently evicting the wrong ticks. */
+export function staleTickKeys(keys: Iterable<string>, max: number): string[] {
+  const all = [...keys];
+  if (all.length <= max) return [];
+  return all.sort().slice(0, all.length - max);
+}
+
+/** Fan one event out to its listeners, each ISOLATED.
+ *
+ *  These reach the scene, the store and the panels, and an unguarded `forEach` let ONE throwing
+ *  consumer silence every listener registered after it — for that event, for the rest of the
+ *  session — surfacing as unrelated frozen UI far from the cause. Rethrow-free but never silent:
+ *  the error still reaches the console. Pure enough to test; exported for that reason. */
+export function fanOut<T>(listeners: ReadonlyArray<(p: T) => void>, payload: T, evt = ""): void {
+  for (const f of listeners) {
+    try {
+      f(payload);
+    } catch (err) {
+      console.error(`NetworkData: a "${evt}" listener threw`, err);
+    }
+  }
+}
+
+/** Did a whole metagraph refresh CYCLE succeed? One row per FEED means the row must answer for the
+ *  feed, not for whichever member reported last: reporting per metagraph let a single persistently
+ *  failing one hide behind its healthy siblings refreshing `lastOkAt` in the same cycle. A settled
+ *  rejection counts as failure, and so does an explicit `false` from `_refreshOneMeta`. */
+export function cycleOk(results: ReadonlyArray<PromiseSettledResult<boolean>>): boolean {
+  return results.every((r) => r.status === "fulfilled" && r.value !== false);
 }
 
 export interface NetworkEvents {
@@ -170,7 +222,7 @@ export class NetworkData {
     return this;
   }
   private _emit<K extends keyof NetworkEvents>(evt: K, payload: NetworkEvents[K]): void {
-    this.listeners[evt].forEach((f) => f(payload));
+    fanOut(this.listeners[evt], payload, evt);
   }
 
   private async _fetchJson(url: string): Promise<any> {
@@ -197,15 +249,28 @@ export class NetworkData {
       this.globalSnapshots = list;
       this.latest = list[list.length - 1];
       this._setLive(true, Date.now());
+      reportPoll("global", true);
     } catch (e) {
       // No simulation — a real site stays factual. Show "no data" and recover on a
       // later poll once the API responds again.
       this._setLive(false);
+      // The SEED reports too. Without this the pulse strip had no "Global snapshots" row at all
+      // until the first _tick a poll-interval later, and — worse — a failed boot fetch left no
+      // trace: the strip is measured facts only (rule 10), so an error it never counted is an
+      // error it silently denies happened.
+      reportPoll("global", false);
     }
     this._emit("global", { reset: true, snapshots: this.globalSnapshots, latest: this.latest });
-    await this._fetchClusters();
-    await this._refreshMeta(POLL.metaSnapSeed); // seed each metagraph's history
-    this.start();
+    // The seed is best-effort; POLLING IS NOT. Whatever the seed manages, the timers must start,
+    // or the module cannot honour its own header ("keeps polling, recovering on its own once it
+    // responds again") — and `initNetwork` calls this without awaiting or catching, so a throw
+    // here would be an unhandled rejection that silently leaves the app frozen on boot data.
+    try {
+      await this._fetchClusters();
+      await this._refreshMeta(POLL.metaSnapSeed); // seed each metagraph's history
+    } finally {
+      this.start(); // idempotent — guards on _timer
+    }
   }
 
   // ---- validator membership (the real ~160-node clusters) ----
@@ -321,11 +386,28 @@ export class NetworkData {
   private async _refreshMeta(limit: number = POLL.metaSnapTail): Promise<void> {
     // Refresh every metagraph in parallel — there are ~10 real ones, so serial
     // awaits would stall the tick.
-    await Promise.all(METAGRAPHS.map((m) => this._refreshOneMeta(m, limit)));
+    //
+    // allSettled, NOT all: `_refreshOneMeta` catches its own fetch, but it can still throw on
+    // MALFORMED data that gets past that (a null entry makes `list[list.length - 1].ordinal`
+    // a TypeError). Under Promise.all one such metagraph rejects the whole batch, and in `init`
+    // that await sits BEFORE `start()` — so a single bad response would mean the poll timers
+    // never start and the app sits silently frozen forever, which is the exact opposite of this
+    // module's contract ("keeps polling, recovering on its own"). It also stops the un-awaited
+    // call in `_tick` from raising an unhandled rejection every 4s.
+    //
+    // The feed reports ONCE PER CYCLE, from the aggregate. Reporting inside _refreshOneMeta made
+    // ~12 calls per tick against `global`'s one, and — the real defect — a single persistently
+    // failing metagraph was MASKED: its eleven healthy siblings refreshed `lastOkAt` in the same
+    // cycle, so the strip's derived dot stayed green while a feed was down. One row per FEED means
+    // the row must answer for the whole feed.
+    const results = await Promise.allSettled(METAGRAPHS.map((m) => this._refreshOneMeta(m, limit)));
+    reportPoll("metasnaps", cycleOk(results));
   }
 
-  private async _refreshOneMeta(m: MetaConfig, limit: number = POLL.metaSnapTail): Promise<void> {
-    if (!m.id) return;
+  /** Returns false when this metagraph's read failed — `_refreshMeta` aggregates the cycle's
+   *  verdict into the one poll-health row. An empty or absent list is NOT a failure. */
+  private async _refreshOneMeta(m: MetaConfig, limit: number = POLL.metaSnapTail): Promise<boolean> {
+    if (!m.id) return true;
     // The newest ordinal we already hold for this metagraph.
     const have = this.metaSnaps.get(m.id);
     const haveTo = have && have.length ? have[have.length - 1].ordinal : -1;
@@ -342,13 +424,11 @@ export class NetworkData {
       let json;
       try {
         json = await this._get(`/currency/${m.id}/snapshots?limit=${lim}`);
-        reportPoll("metasnaps", true);
       } catch {
-        reportPoll("metasnaps", false);
-        return; // no data this tick — stay factual, try again next poll
+        return false; // no data this tick — stay factual, try again next poll
       }
       list = json.data || [];
-      if (!list.length) return;
+      if (!list.length) return true;
       const oldest = list[list.length - 1].ordinal; // newest-first → last is oldest
       if (haveTo < 0 || oldest <= haveTo + 1 || list.length < lim || lim >= 600) break;
       lim = Math.min(600, lim * 3); // gap not yet covered — fetch deeper and retry
@@ -362,6 +442,7 @@ export class NetworkData {
       blocks: Array.isArray(s.blocks) ? s.blocks.length : 0,
       epochProgress: s.epochProgress || 0,
     })));
+    return true;
   }
 
   // Append new snapshot records (dedup by ordinal) to a metagraph's rolling buffer
@@ -387,11 +468,19 @@ export class NetworkData {
     if (buf.length > POLL.metaSnapBuffer) buf.splice(0, buf.length - POLL.metaSnapBuffer);
     this.metaSnaps.set(m.id, buf);
 
-    // Cap the anchor index (Map keeps insertion order — drop the oldest ticks).
-    while (this.anchorIndex.size > POLL.anchorIndexMax) {
-      const oldestKey = this.anchorIndex.keys().next().value;
-      if (oldestKey === undefined) break;
-      this.anchorIndex.delete(oldestKey);
+    // Cap the anchor index by TICK AGE. This used to walk Map insertion order on the belief that
+    // it was chronological; it is not, and the gap is not theoretical. Metagraphs seed in
+    // PARALLEL, so completion order decides insertion order, and several catalog metagraphs are
+    // DORMANT — measured live 2026-08-31, their newest snapshot is months old (one 2025-09-05).
+    // A dormant one's 60 ancient timestamps therefore land AFTER a live one's recent ticks, and
+    // an insertion-order cap then evicts the recent ticks and keeps the year-old ones. Measured
+    // the same day: the seed inserts 428 distinct timestamps against a 400 cap spanning ~8,600
+    // hours, so this evicts on every cold load. Every consumer looks the index up by a GLOBAL
+    // SNAPSHOT's timestamp, and that buffer is the 52 most recent ticks — so the evicted entries
+    // were the only ones anyone would ever read, and the tick went on to read as unidentified
+    // while we were holding its anchors (rule 10).
+    for (const k of staleTickKeys(this.anchorIndex.keys(), POLL.anchorIndexMax)) {
+      this.anchorIndex.delete(k);
     }
     this._emit("anchor", { metaId: m.id, timestamps: fresh.map((r) => r.ts), seed: lastOrd === -1 });
   }

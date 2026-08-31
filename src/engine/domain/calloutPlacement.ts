@@ -2,7 +2,7 @@
 // all. Pure scalars — no DOM, no store, no THREE.
 //
 // The callout has two owners (`components/SceneCallout.tsx` renders + owns content,
-// `Engine._syncCallout` writes the per-frame transform and the flip/drop attributes), and the
+// `CalloutSync` writes the per-frame transform and the flip/drop attributes), and the
 // standoff numbers below used to live in BOTH of them: the component as `OFF_X`/`OFF_Y`, the
 // Engine as the two reach thresholds derived from them, with a comment asking the next reader to
 // "change all four together". They are one concern, so they get one home. `app/globals.css` still
@@ -22,7 +22,7 @@ export const CALLOUT_OFF_X = 100;
 export const CALLOUT_OFF_Y = 140;
 /** Where the leader INK actually ends, inset from the panel corner — the point the multi-leader
  *  legs must fan from so leader and legs meet exactly. Shared by SceneCallout's primary leader
- *  (y2) and Engine._syncCalloutMulti (the fan corner); it was retuned once already (8 → 2) with
+ *  (y2) and CalloutSync's multi-leader (the fan corner); it was retuned once already (8 → 2) with
  *  the two literals held in sync only by memory (review, 2026-08-31). */
 export const CALLOUT_LEG_INSET = 2;
 

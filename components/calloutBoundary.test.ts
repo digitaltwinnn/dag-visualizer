@@ -4,24 +4,27 @@ import { join } from "node:path";
 
 // The SUBJECT CALLOUT's contracts, made executable (2026-08-16 — the boundary-test idiom).
 // The callout is split across two owners on purpose — React owns the DOM and content
-// (components/SceneCallout.tsx), the Engine owns per-frame placement (Engine._syncCallout) —
+// (components/SceneCallout.tsx), CalloutSync owns per-frame placement (src/engine/CalloutSync.ts) —
 // and three agreements keep the split from drifting:
 //
 //  1. `#callout` has exactly TWO homes: SceneCallout renders the marker element, the Engine
 //     queries it. A third home would be a second positioning or content path.
 //  2. BOTH owners consult `boxedCard`. The box-led subject preference is deliberately mirrored
-//     (the component picks the MODEL, the Engine picks the ANCHOR); an owner that stops reading
+//     (the component picks the MODEL, CalloutSync picks the ANCHOR); an owner that stops reading
 //     the channel would label one subject while pointing at another.
 //  3. `SCENE_GLASS` (components/selection.tsx, the shared-recipe home) is the ONE container
 //     for scene-anchored labels: SceneCallout and Tooltip both wear it (user, 2026-08-15 —
 //     "align the hover and the click card"). Neither may re-grow its own glass recipe.
 //  4. BOTH owners decline on a PHONE, through `breakpointOf`'s one home (the component via
-//     `useBreakpoint`, the Engine directly). The callout's value is co-location with its
+//     `useBreakpoint`, CalloutSync directly). The callout's value is co-location with its
 //     subject and its ~298px reach cannot deliver that under 700px; a hard-coded width in
 //     either owner would let the DOM and the placement disagree about where the tier ends.
 
 const ROOTS = ["components", "src", "app"];
-const CALLOUT_HOMES = new Set(["components/SceneCallout.tsx", "src/engine/Engine.ts"]);
+// The engine-side home moved out of Engine.ts into CalloutSync.ts (2026-08-31) — the placement
+// was ten methods and ~270 lines that shared no state with the rest of the Engine. A change of
+// FILE, not of the rule: there are still exactly two owners, one rendering and one positioning.
+const CALLOUT_HOMES = new Set(["components/SceneCallout.tsx", "src/engine/CalloutSync.ts"]);
 
 const walk = (dir: string): string[] =>
   readdirSync(dir).flatMap((name) => {

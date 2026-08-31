@@ -18,7 +18,7 @@
 // adding its own overlay container, render pass and a React-portal handshake.
 //
 // OWNERSHIP: React owns this DOM and its content (from committed store state); the ENGINE owns its
-// per-frame placement — `Engine._syncCallout()` projects the subject's rendered anchor and writes
+// per-frame placement — `CalloutSync.sync()` projects the subject's rendered anchor and writes
 // `transform` + `data-on` straight to `#callout` (the Tooltip discipline: position never triggers
 // a React render). `#callout` is therefore a marker contract (CLAUDE.md table) — the wrapper is a
 // 0-size ANCHOR at the projected point, and everything inside is laid out relative to it, so the
@@ -54,7 +54,7 @@ import type { GeoInfo } from "@/src/data/types";
 
 // The panel's standoff from the anchor lives in `src/engine/domain/calloutPlacement.ts`, with the
 // reach thresholds derived from it and the placement rules that read them. It used to be a local
-// pair here plus two derived constants in `Engine._syncCallout`, under a comment asking the next
+// pair here plus two derived constants in `CalloutSync`, under a comment asking the next
 // reader to "change all four together" — one concern, so now one home. The leader below spans
 // exactly this diagonal, so the three pieces (ring, line, panel corner) stay attached by
 // construction.
@@ -398,7 +398,7 @@ export default function SceneCallout() {
       </svg>
       {/* MULTI-LEADER (user, 2026-08-30): a machine's callout points at EACH of its layer beads
           — up to two extra dashed legs from the anchor to the non-primary shells, written per
-          frame by Engine._syncCalloutMulti (the Tooltip discipline: position never renders
+          frame by CalloutSync's multi-leader (the Tooltip discipline: position never renders
           React). Same leader ink; each leg ends in a smaller identity ring. Hidden until the
           Engine reveals a leg, and only the hyper node anchor ever does. */}
       <svg className="co-multi absolute left-0 top-0 overflow-visible" width="1" height="1" aria-hidden>

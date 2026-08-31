@@ -259,6 +259,19 @@ export class Globe implements GeoViewHost {
   onCountriesReady?: GeoViewHost["onCountriesReady"];
 
   private fabric: NodeFabric;
+
+  /** DEV AUDIT ONLY — the instanced buffers `scene/instanceAudit.ts` sweeps, each with the label
+   *  its findings are reported under. A named accessor rather than widening `fabric`: the audit
+   *  needs to READ four buffers, not to reach the fabric, and keeping that distinction is what
+   *  stops a dev-only check from quietly becoming a public seam into the node pool. */
+  auditMeshes(): Array<[string, THREE.InstancedMesh | null]> {
+    return [
+      ["validators/sphere", this.fabric.instSphere],
+      ["validators/hex", this.fabric.instHex],
+      ["metanodes/sphere", this.fabric.metaSphere],
+      ["metanodes/hex", this.fabric.metaHex],
+    ];
+  }
   private arcs: Arcs;
   private arcSim = new ArcSim();
 
