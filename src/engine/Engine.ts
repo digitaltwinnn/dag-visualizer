@@ -4,7 +4,8 @@ import { useStore, type Mode } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR, resolveSignerIps } from "@/src/data/network";
 import { ledgerLens, tickInStory } from "@/src/data/ledgerStory";
-import { reportPoll } from "@/src/data/api";
+import { reportPoll, touchPoll } from "@/src/data/api";
+import { STALE_FACTOR } from "@/src/data/pollStatus";
 import { LISTED_IDS, UNLISTED_ID, UNLISTED_SCENE_HEX_BY_THEME } from "@/src/data/unlisted";
 import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
@@ -26,29 +27,41 @@ import { readSceneColors, type SceneColors, LIGHT_TUNE } from "./sceneColors";
 import { setNodeDimTarget, setNodeEnv } from "./scene/objects/NodeFabric";
 import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme/resolve";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
-import { FOCI, hubFraming, geoFraming, nodeFraming, cohortFraming, ledgerCommitTilt, dollyBack, railsLean, restOrbit, easeInOutQuad, isSamePose, nudgeMix, NUDGE_DUR, type CameraFraming, type FocusName } from "./domain/cameraRig";
+import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
-import { R as GEO_R, LAND_H, latLonToVec3 } from "./domain/geoLayout";
+import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
 import { ViewTransition, is3D } from "./domain/viewTransition";
 import { gatherBand, type GatherBand } from "./domain/gatherLayout";
-import { isDoubleTap, tapZoomAround, tapZoomDistance, DOUBLE_TAP_SLOP, TAP_ZOOM_DUR, type Tap } from "./domain/tapZoom";
 import { LADDERS, LEVEL_CARRY, hasLevel, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
 import { metaSnapDeepKey, metaSnapHoverKey } from "@/src/data/types";
 import { snapsAtTick } from "@/src/data/anchorLog";
-import { breakpointOf } from "@/src/data/breakpoint";
-import { calloutPlacement, CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET } from "./domain/calloutPlacement";
+// The tap RECOGNIZER stays here — it is input plumbing. The step it triggers is the
+// CameraDirector's (see its header).
+import { type Tap, DOUBLE_TAP_SLOP, isDoubleTap } from "./domain/tapZoom";
+import { auditInstances, findingKey, type InstanceFinding } from "./scene/instanceAudit";
+import { CalloutSync, type CalloutState } from "./CalloutSync";
+import { DevTunePanel } from "./DevTunePanel";
+import { CameraDirector } from "./CameraDirector";
 import type { GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 
-type Vec = THREE.Vector3;
 
 // View-transition staging plane (the gather grids the nodes fly to at the top of the viewport).
 // GATHER_DIST is the plane's depth in front of the camera; WHERE the band sits and how wide it
 // may run is `gatherBand` (domain/gatherLayout), which measures the HUD rather than guessing —
 // the top edge lines up with the rail cards' own top, and the band spans the whole viewport
 // when the rails are hidden (user, 2026-08-12). Camera-anchored, so it reads the same at any pose.
+/** How often the dev instance audit sweeps — every Nth frame, one mesh per sweep. ~1s of coverage
+ *  per mesh at 60fps, which finds a corrupt buffer promptly while costing nothing measurable. */
+const AUDIT_EVERY = 15;
+/** Dev, or `?audit` in any build — the `?stats` idiom, so a deployed instance can be checked
+ *  without shipping the pass to every visitor. */
+const AUDIT_ON =
+  process.env.NODE_ENV === "development" ||
+  (typeof window !== "undefined" && /[?#&]audit/.test(window.location.search + window.location.hash));
+
 const GATHER_DIST = 34;
 
 // id[] -> { id: sceneColorNumber }, resolved through the identity map (Task 1). The scene
@@ -85,6 +98,12 @@ const resolveGeo = resolveMissing;
 // camera-focus tweens, and the command surface React drives via the store. Ports
 // main.js's render loop + ui.js's camera focus, decoupled from any DOM/panels.
 export class Engine {
+  /** The subject callout's per-frame placement — see CalloutSync. */
+  private callout!: CalloutSync;
+  /** The dev tuning panel (?tune / the dev switch) — see DevTunePanel. */
+  private devTune!: DevTunePanel;
+  /** Camera motion — pose tweens and the double-tap dolly. See CameraDirector. */
+  private cam!: CameraDirector;
   private ctx: SceneCtx;
   private layers: HyperView;
   private globe: Globe;
@@ -105,21 +124,13 @@ export class Engine {
   private _dofTmp = new THREE.Vector3();
   /** Scratch for the follow-spot's per-frame anchor hand-off (Globe records → HyperView's claim). */
   private _stageNodeTmp = new THREE.Vector3();
-  private _calloutV = new THREE.Vector3();
   // The multi-leader's scratch + state (rule 5: allocated once). `_calloutNodeAnchor` is set by
   // _hyperCalloutAnchor: only the NODE branch anchors a machine, and only a machine has sibling
   // layer beads to point at.
-  private _calloutSibs = [new THREE.Vector3(), new THREE.Vector3()];
-  private _calloutNodeAnchor = false; // scratch: the subject callout's anchor, world → NDC
   // Geo callout anchors, cached EVENT-TIME (latLonToVec3 allocates and ring extraction is
   // heavy — neither may run per frame): the node anchor recomputes when the pick REFERENCE
   // changes, the country centroid when the cc string does; the cohort dir is already
   // event-time in Globe and read through its getter.
-  private _geoNodePick: unknown = null;
-  private _geoNodeLocal = new THREE.Vector3();
-  private _geoCcKey: string | null = null;
-  private _geoCcDir = new THREE.Vector3();
-  private _geoCcOk = false;
 
   private mode: Mode = "hyper";
   // This frame's view-policy row (domain/viewPolicy.ts), resolved once in _integrateInputs and
@@ -133,23 +144,11 @@ export class Engine {
   // reads it for camera resolution).
   private cohortSel: CohortSel | null = null;
   private morph = 0; // 0 = hypergraph, 1 = globe (eased each frame)
-  // A persistent tween record (never re-allocated per focus) — `active` replaces the old
-  // null-the-object pattern; `_tweenTo` copies into these four vectors instead of `.clone()`ing.
-  private _tween = {
-    fromPos: new THREE.Vector3(), toPos: new THREE.Vector3(),
-    fromTgt: new THREE.Vector3(), toTgt: new THREE.Vector3(),
-    t: 0, dur: 1.4, active: false, nudge: false,
-  };
-  // Scratch framing struct handed to hubFraming/geoFraming — its values are copied into
-  // `_tween` immediately by `_tweenTo`, so reusing it across every focus call is safe.
-  private _framingOut: CameraFraming = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
   // The mesh that produced the LAST pick returned by `_pickAt` (null when nothing was picked).
   // Some ledger subjects carry a second fact on the hit object itself rather than in the descriptor
   // — a byte-bar band's `userData.bandKey` beside its tick `userData.pick` — and the click handler
   // needs both. Event-time only; never read from the render loop.
   private _hitObj: THREE.Object3D | null = null;
-  private _hubWorld = new THREE.Vector3(); // scratch: hub local pos tilted into world for framing
-  private _focusEuler = new THREE.Euler(); // scratch: the focus TARGET rotation (flat tilt + spin)
   private _hyperSpinY = 0; // shared hyper-structure spin angle (globe group + root + core, in lockstep)
   // The shared structure TILT, eased per frame: HYPER_TILT at rest → HYPER_TILT_FOCUS while a
   // metagraph is committed (the structure flattens so the side-on hub pose sees horizontal discs).
@@ -209,7 +208,7 @@ export class Engine {
       // single-finger orbit is left alone (it rotates, it doesn't dolly) and a pan re-anchors for
       // free, because the step measures against the live `controls.target` every frame.
       this._lastTap = null;
-      this._zoom.active = false;
+      this.cam.cancelZoom();
     }
   };
   private _downX = 0;
@@ -221,9 +220,6 @@ export class Engine {
   private _ptrDown = 0; //             pointers currently down, for the multi-touch invalidation
   private _lastTap: Tap | null = null; // the unpaired tap waiting for its partner
   private _eatClick = false; //        set when a pair fires; `_handleClick` spends it
-  // The step's own eased dolly, owned here because it is not a POSE: it composes onto whatever the
-  // controls and the tween have already put the camera at (see _updateTapZoom's ordering note).
-  private _zoom = { active: false, t: 0, from: 0, to: 0 };
   private onCancelTap = () => {
     this._ptrDown = 0;
     this._lastTap = null;
@@ -244,7 +240,7 @@ export class Engine {
       // never deselects a NODE, hub / country / cohort / tile / band clicks all TOGGLE — so an
       // unsuppressed second tap would undo exactly what the first one just committed.
       this._eatClick = true;
-      this._tapZoom();
+      this.cam.tapZoom();
       return;
     }
     this._lastTap = now;
@@ -307,7 +303,6 @@ export class Engine {
   // (unlike `stats`, which toggles a visible DOM panel and so needs an explicit environment check).
   private _slowmo = 1;
   // The live-tuning panel's handle (devTune.ts) — dev tooling, disposed with the engine.
-  private _devTune?: { dispose(): void };
   // Its dev-only DOM switch (user, 2026-08-18 — "can't we just add a switch and show it only for
   // dev?"). `?tune` still opens the panel anywhere, which is what makes it usable against a
   // DEPLOYED build; the switch is the everyday route and exists in `next dev` alone, so nothing
@@ -315,7 +310,6 @@ export class Engine {
   // zones — dev chrome is not view chrome, and the same reasoning that keeps Stats out of React
   // keeps this out of it. Grayscale only, per the colour rule: dev tooling states nothing about
   // the palette.
-  private _tuneBtn?: HTMLButtonElement;
   // Fired once, after the first frame actually renders (see start()'s loop) — lets callers
   // (SceneCanvas → store.engineReady) know the scene has painted, not just constructed.
   private _onReady?: () => void;
@@ -426,6 +420,40 @@ export class Engine {
     // config colour ("dag" included — its own brand hue, distinct from structural cyan; see
     // palette/identity.ts). refreshMeta below refreshes/extends both once the live set is known.
     this.ledger = new LedgerView(this.ctx.scene, colors, this._sceneColorMap, this._stageLight);
+
+    const engineSelf = this;
+    // Bound ONCE (rule 5: nothing per frame). The host carries the stable view refs plus getters
+    // for the few values that change, so `sync` allocates nothing.
+    this.callout = new CalloutSync({
+      ctx: this.ctx,
+      globe: this.globe,
+      ledger: this.ledger,
+      layers: this.layers,
+      get mode() { return engineSelf.mode; },
+      get filter() { return engineSelf.filter; },
+      transitionActive: () => this.transition.active(),
+      calloutAllowed: () => this._policy.callout,
+      dofMeta: () => this._dofMeta,
+    });
+    this.cam = new CameraDirector({
+      ctx: this.ctx,
+      layers: this.layers,
+      transition: this.transition,
+      get mode() { return engineSelf.mode; },
+      policy: () => this._policy,
+      railsHidden: () => this.railsHidden,
+      slowmo: () => this._slowmo,
+      setFlying: (v) => useStore.getState().setCameraFlying(v),
+      flyingNow: () => useStore.getState().cameraFlying,
+    });
+    this.devTune = new DevTunePanel({
+      ctx: this.ctx,
+      globe: this.globe,
+      ledger: this.ledger,
+      layers: this.layers,
+      refreshTheme: () => this._refreshTheme(this._theme),
+      disposed: () => this.disposed,
+    });
     // The theme fan-out, in construction order. Each holds construction-time captures of one or
     // both palettes (materials, shader uniforms, baked vertex colours, canvas-texture labels);
     // everything else in the scene reads the mutated objects per frame and needs no call.
@@ -500,7 +528,17 @@ export class Engine {
       const d = this.stats.dom;
       d.style.left = "8px";
       d.style.top = "auto";
-      d.style.bottom = "56px"; // clear the bottom-left logo + the ribbon
+      // RIDE THE BAND'S OWN RESERVE. A flat 56px predates the vitals band (2026-08-30) and put
+      // this panel squarely ON its first card — which is how a card's donut total came to look
+      // missing in dev when it was simply covered (user, 2026-08-31). `--bottom-reserve` is
+      // BottomStream's one publish, so the meter now sits above the band when there is one and
+      // drops back down when there isn't (rails hidden, the raw layer, phone).
+      // +24, not +8: measured 2026-08-31 the band's cards render a little TALLER than the
+      // reserve they publish (label baseline ~844 against the 858 a 92px reserve implies), so a
+      // hairline clearance still clipped the first card's eyebrow. The overflow itself is worth a
+      // look — BottomStream is meant to be the one publisher of both — but a dev meter should not
+      // be what depends on that being exact.
+      d.style.bottom = "calc(var(--bottom-reserve, 92px) + 24px)";
       document.body.appendChild(d);
     }
 
@@ -511,8 +549,8 @@ export class Engine {
     // Live tuning panel — `?tune` (the ?stats idiom): tweakpane is dynamically imported so it
     // never enters the normal bundle; the panel binds the scene's *TUNE_DEFAULTS-backed objects.
     // In `next dev` a switch offers the same thing without a reload (see _tuneBtn).
-    if (/[?#&]tune/.test(window.location.search + window.location.hash)) this._openDevTune();
-    if (process.env.NODE_ENV === "development") this._mountTuneSwitch();
+    if (/[?#&]tune/.test(window.location.search + window.location.hash)) void this.devTune.open();
+    if (process.env.NODE_ENV === "development") this.devTune.mountSwitch();
 
     // Apply current store state, then react to changes (Lane B command bridge).
     const s = useStore.getState();
@@ -779,9 +817,24 @@ export class Engine {
   private async refreshMeta(initial: boolean) {
     try {
       const r = await fetch(netUrl("/api/metagraphs"));
-      reportPoll("api-metagraphs", r.ok);
-      if (!r.ok) return;
-      const { metagraphs, geo } = await r.json();
+      if (!r.ok) { reportPoll("api-metagraphs", false); return; }
+      const { metagraphs, geo, ageMs } = await r.json();
+      // A REACHED ROUTE IS NOT A FRESH FEED. Reporting `r.ok` counted a 200 as a success even when
+      // the payload behind it was frozen, which is the masking class this registry keeps catching:
+      // the strip's dot stayed green while the data underneath stopped moving. The route publishes
+      // how old its payload is (server-side subtraction — see its ageMs note), so a stale one
+      // simply does not refresh `lastOkAt`, and `pollStatusOf`'s existing rule surfaces it as STALE
+      // on its own. Deliberately NOT reported as an error: the feed is reachable and the data is
+      // real, just old, and "failing" is a different and louder claim. A route that doesn't publish
+      // `ageMs` (an older deploy) counts as fresh — fail open, never invent staleness.
+      const fresh = typeof ageMs !== "number" || ageMs <= POLL.metaRefreshMs * STALE_FACTOR;
+      // The row must EXIST either way. If the very first response is reachable-but-stale, reporting
+      // nothing would leave the feed missing from the strip entirely rather than showing its state
+      // — silence standing in for a reading, which is the exact gap this change set closes
+      // elsewhere. `touchPoll` creates it with no outcome, so it reads "acquiring" until a fresh
+      // payload lands and then ages into STALE on its own.
+      touchPoll("api-metagraphs");
+      if (fresh) reportPoll("api-metagraphs", true);
       if (geo) this.geoMap = { ...this.geoMap, ...geo };
       const changed = JSON.stringify(metagraphs) !== JSON.stringify(this.metaData);
       this.metaData = metagraphs;
@@ -1179,8 +1232,8 @@ export class Engine {
     geoCohort: () => {
       if (!this.globe.focusCohort()) return false;
       this.ctx.controls.autoRotate = false;
-      cohortFraming(this._framingOut);
-      this._tweenTo(this._framingOut.pos, this._framingOut.target, false); // dolly-exempt, like nodeFraming
+      cohortFraming(this.cam.out);
+      this.cam.tweenTo(this.cam.out.pos, this.cam.out.target, false); // dolly-exempt, like nodeFraming
       return true;
     },
     geoCountry: () => {
@@ -1190,8 +1243,8 @@ export class Engine {
       // where its nodes cluster.
       const shape = this.globe.focusCountryShape(this.country);
       if (shape) {
-        countryFraming(shape.latAngle, shape.angularRadius, this._framingOut);
-        this._tweenTo(this._framingOut.pos, this._framingOut.target);
+        countryFraming(shape.latAngle, shape.angularRadius, this.cam.out);
+        this.cam.tweenTo(this.cam.out.pos, this.cam.out.target);
         return true;
       }
       // Degraded mode while the countries topology loads: the node-mean concentration framing
@@ -1199,7 +1252,7 @@ export class Engine {
       // the network rung; matches the pre-ladder behaviour).
       const R = this.globe.focusDensest(true);
       if (R == null) return false;
-      this._focusGeo(R);
+      this.cam.focusGeo(R);
       return true;
     },
     geoNetwork: () => {
@@ -1208,12 +1261,12 @@ export class Engine {
       // Three zoom LEVELS (user design): metagraph = a WIDE network pose (rotated to the
       // densest cluster, held clearly farther out than the country pose so the country drill
       // still reads as a zoom).
-      this.focus("geoNetwork");
+      this.cam.focus("geoNetwork");
       return true;
     },
     geoOverview: () => {
       this.globe.focusDensest(false);
-      this.focus("geo");
+      this.cam.focus("geo");
       return true;
     },
     hyperNode: () => {
@@ -1234,12 +1287,12 @@ export class Engine {
     },
     hyperNetwork: () => {
       this.globe.focusDensest(false);
-      this._focusFilter(this.filter); // handles hub-not-found by falling to overview internally
+      this.cam.focusFilter(this.filter); // handles hub-not-found by falling to overview internally
       return true;
     },
     hyperOverview: () => {
       this.globe.focusDensest(false);
-      this._focusFilter("all"); // the existing "all" path: focusId cleared, tilt eased, overview pose
+      this.cam.focusFilter("all"); // the existing "all" path: focusId cleared, tilt eased, overview pose
       return true;
     },
     // The Snapshots view has ONE camera POSE (user, 2026-08-09) — both finer rungs delegate to the
@@ -1268,12 +1321,12 @@ export class Engine {
       // clearing the filter tweens back to frontal on its own.
       const f = FOCI.ledger;
       if (!this.filter || this.filter === "all") {
-        this.focus("ledger");
+        this.cam.focus("ledger");
         return true;
       }
-      ledgerCommitTilt(f.pos, f.target, this._framingOut.pos);
-      this._framingOut.target.copy(f.target);
-      this._tweenTo(this._framingOut.pos, this._framingOut.target);
+      ledgerCommitTilt(f.pos, f.target, this.cam.out.pos);
+      this.cam.out.target.copy(f.target);
+      this.cam.tweenTo(this.cam.out.pos, this.cam.out.target);
       return true;
     },
   };
@@ -1313,8 +1366,8 @@ export class Engine {
   private _focusNode() {
     // The one geo node pose (cameraRig.nodeFraming — latitude-independent via Globe.focusNode's
     // NODE_RAISE contract). Dolly-exempt: its numbers are absolute (see CAM_ZOOM's note).
-    nodeFraming(this._framingOut);
-    this._tweenTo(this._framingOut.pos, this._framingOut.target, false);
+    nodeFraming(this.cam.out);
+    this.cam.tweenTo(this.cam.out.pos, this.cam.out.target, false);
   }
 
   // Compute the per-country leaderboard for the active filter and push it to the store
@@ -1565,94 +1618,6 @@ export class Engine {
     return g.rows.map((r) => hoverKeyOf(r.pick)).filter((k): k is string => !!k);
   }
 
-  private focus(name: FocusName) {
-    const f = FOCI[name];
-    this._tweenTo(f.pos, f.target);
-  }
-
-
-  private _tweenTo(toPos: Vec, toTgt: Vec, dolly = true) {
-    // OUT-phase camera hold (spec A#6): the state commit stands; the boundary's
-    // _applyDestLayout re-derives this pose from it, so dropping the tween loses nothing.
-    if (this.transition.holdCamera()) return;
-    const tw = this._tween;
-    tw.fromPos.copy(this.ctx.camera.position);
-    // The global CAM_ZOOM dolly (see cameraRig) — writes straight into tw.toPos, no extra
-    // allocation. `dolly: false` is for poses whose TARGET is a composed look-at rather than
-    // the subject (nodeFraming — see the exemption note next to CAM_ZOOM).
-    if (dolly) dollyBack(toPos, toTgt, tw.toPos);
-    else tw.toPos.copy(toPos);
-    tw.fromTgt.copy(this.ctx.controls.target);
-    tw.toTgt.copy(toTgt);
-    // The rails-hidden LEAN composes into every destination a dolly may touch (2026-08-08,
-    // review-hardened): a property of pose resolution, so focus flights, transition landings and
-    // the presentation toggle can never disagree about it. In place (railsLean is outPos===pos
-    // safe). It rides the SAME `dolly` gate as dollyBack — both scale (pos − target) about the
-    // target, so a pose whose target is a composed look-at is exempt from both (see the exemption
-    // note next to CAM_ZOOM). And it RAMPS with how close the pose already sits to the view's
-    // resting orbit, which is what `restOrbit` measures — see railsLean's own note.
-    if (dolly && this.railsHidden) railsLean(tw.toPos, tw.toTgt, is3D(this.mode) ? restOrbit(this.mode) : 0, tw.toPos);
-    // THE COMMIT NUDGE (user, 2026-08-13): "we always animate the position but a 'nudge' is allowed
-    // which means the new pos will be same as old pos". Every rung answers a click, including the
-    // ones whose pose is their parent's — hyper's node and composition rungs resolve to the network
-    // they belong to, so committing one lands exactly where the camera already is. A dead 1.4s
-    // no-op reads as a broken click; the nudge is the acknowledgement, and it ends on this same
-    // committed pose, so nothing is lost by taking it.
-    tw.nudge = isSamePose(tw.fromPos, tw.fromTgt, tw.toPos, tw.toTgt);
-    tw.t = 0;
-    tw.dur = tw.nudge ? NUDGE_DUR : 1.4;
-    tw.active = true;
-    // The HUD yields while this flight runs (store.cameraFlying — see its comment): a commit made
-    // from a card is a request to LOOK at what was committed, so the cards step back out of the
-    // way exactly as they do under a direct drag. NOT during a view transition: that choreography
-    // is already the 3.9s answer to the user's gesture, and a 1.4s dim inside it reads as a blink.
-    // And NOT for a nudge: the dim exists so the scene can be SEEN changing, and here it doesn't.
-    if (!tw.nudge && !this.transition.active() && !useStore.getState().cameraFlying) useStore.getState().setCameraFlying(true);
-  }
-
-
-  private _focusGeo(R: number) {
-    // Look head-on at the FRONT of the globe (target pushed forward in +Z, toward where the
-    // focused country/selection is aimed) so it sits centred in the view rather than low.
-    geoFraming(R, this._framingOut);
-    this._tweenTo(this._framingOut.pos, this._framingOut.target);
-  }
-
-  private _focusFilter(filter: string) {
-    this.layers.focusId = null;
-    if (filter === "all") {
-      this.ctx.controls.autoRotate = false; // the STRUCTURE spins (setHyperSpin), not the camera
-      this.focus("overview"); // SHARED pose — the hyper structure is tilted (HYPER_TILT) to read
-      return; // top-down instead of moving the camera, so other views tween cleanly from here.
-    }
-    this.ctx.controls.autoRotate = false;
-    if (filter === "dag") {
-      this.focus("dag"); // the central core — framed to fit both the L0 and cL1 shells
-      return;
-    }
-    const meta = this.layers.metas.find((x) => x.cfg.id === filter);
-    if (!meta) {
-      this.focus("overview");
-      return;
-    }
-    this.layers.focusId = filter; // anchor this hub so it stays framed (its orbit + the spin freeze)
-    // Frame against the hub's morph-0 world position: root carries the structure's tilt+spin in its
-    // ROTATION and the morph collapse in its SCALE. On a geo→hyper switch morph is still 1 at this
-    // instant (it eases to 0 over the next frames), so root.scale ≈ 0 and getWorldPosition would
-    // return the origin (the "doesn't focus the metagraph" bug). Apply ONLY the rotation to the
-    // hub's local orbit position — that's where the hub lands once the morph settles; the spin/orbit
-    // are frozen (focusId + non-"all" filter) so it stays valid for the whole tween.
-    // Frame against the TARGET rotation — the flattened focus tilt + the (frozen) spin — not the
-    // still-easing current root.rotation, so the tween ends exactly where the structure settles.
-    this._focusEuler.set(HYPER_TILT_FOCUS, this.layers.root.rotation.y, 0);
-    this._hubWorld.copy(meta.group.position).applyEuler(this._focusEuler);
-    // Plain radial hub framing, world-up, NO camera roll and NO core-corner composition
-    // (user, 2026-07-17: the rolled pose + DoF read fuzzy/off — keep the focused pose simple
-    // and correct; the rolled hub-focus camera-roll pose was deleted — structure-tilt + plain
-    // hubFraming won).
-    hubFraming(this._hubWorld, this._framingOut);
-    this._tweenTo(this._framingOut.pos, this._framingOut.target);
-  }
 
   // ---- render loop (ports main.js animate) ----
   private start() {
@@ -1737,8 +1702,7 @@ export class Engine {
     // the camera, and computing it from a pre-tween pose made every staged node trail the
     // camera by one frame — a visible drift-and-return on the hyper→geo flight (user,
     // 2026-07-17). Tween → roll ease → controls → altitude clamp, THEN the plane.
-    this._updateTween(dt);
-    this._updateTapZoom(dt);
+    this.cam.update(dt);
     this.ctx.controls.update();
     // Altitude clamp (policy.minCamAlt): OrbitControls' minDistance is target-relative, and
     // the geo target is off-centre — so after the controls settle, push the camera back out
@@ -1925,432 +1889,71 @@ export class Engine {
     }
 
     this._syncCallout();
+    if (AUDIT_ON) this._auditPass();
+  }
+  // ---- the instance audit (dev only) -------------------------------------------------------
+  // Runs AFTER the scene writes, on what the frame actually put in the buffers. See
+  // scene/instanceAudit.ts for what it checks and — as importantly — what it refuses to claim.
+  //
+  // Cheap by construction: every AUDIT_EVERY-th frame, one mesh per pass in rotation, capped
+  // findings, and each distinct problem reported once for the session. A check that costs a frame
+  // is a check that gets switched off.
+  private _auditFrame = 0;
+  private _auditSeen = new Set<string>();
+  private _auditPass(): void {
+    if (++this._auditFrame % AUDIT_EVERY !== 0) return;
+    const meshes = this.globe?.auditMeshes();
+    if (!meshes || !meshes.length) return;
+    // One mesh per pass — the buffers are large and a full sweep every frame is the cost that
+    // makes a dev check unwelcome.
+    const pick = meshes[(this._auditFrame / AUDIT_EVERY) % meshes.length]!;
+    const [label, mesh] = pick;
+    if (!mesh) return;
+    const found: InstanceFinding[] = auditInstances(
+      label,
+      mesh.instanceMatrix.array as unknown as ArrayLike<number>,
+      mesh.count,
+      (mesh.instanceColor?.array as unknown as ArrayLike<number>) ?? null,
+    );
+    for (const f of found) {
+      const k = findingKey(f);
+      if (this._auditSeen.has(k)) continue; // once per session, not once per frame
+      this._auditSeen.add(k);
+      console.error(
+        `[instanceAudit] ${f.mesh} slot ${f.slot}: ${f.kind} — ${f.detail}. ` +
+        `A corrupt instance transform renders as a MISSING object, not an error; ` +
+        `this is that failure made loud. Reported once per mesh+kind per session.`,
+      );
+    }
   }
 
-  // ---- the subject callout (policy.callout) --------------------------------------------------
-  // components/SceneCallout.tsx renders the label; `#callout` is the marker contract, and the
-  // Engine owns only its per-frame PLACEMENT: the committed subject's rendered anchor projected
-  // to screen, written straight to the DOM — the Tooltip discipline, so following the subject
-  // never triggers a React render (getElementById survives the component's own remounts). The
-  // anchor reads the RENDERED world transform on purpose: a label must track where the object is
-  // THIS frame — orbit spin, structure tilt and morph included — this is not framing math.
-  // render-state OK. Hidden during the view transition (mid-flight positions mislead, same reason
-  // picking is suppressed), behind the camera, and wherever the policy or subject says no; the
-  // component independently declines to render the same cases from store state, so `data-on` is
-  // belt on top of braces, never the only gate.
-  //
-  // NOT ON A PHONE (user, 2026-08-18 — "drop the callout when in mobile mode"). The label's whole
-  // value is CO-LOCATION with its subject, and under 700px the ~298px reach can't deliver it:
-  // shortening the leader parks the panel ON the thing it points at, clamping points it sideways
-  // at nothing — both keep the pixels and throw the meaning away. It is the same judgement the
-  // view already makes for a distributed subject (a filtered fleet gets no callout, because "a
-  // single anchor would lie about where it is"); a callout that cannot say WHERE is not a smaller
-  // callout, it is a wrong one. Nothing is lost that isn't one tap away — the phone's Details
-  // sheet carries the box and the dock's icon tray announces when it updates. `breakpointOf` is
-  // the ONE home for the tier (the component gates on the same call through `useBreakpoint`), so
-  // the two owners cannot drift apart at the boundary.
+  // ---- the subject callout ---------------------------------------------------------------
+  // Placement moved to CalloutSync (2026-08-31) — ten methods and ~270 lines of per-view anchor
+  // resolution that shared nothing with the rest of the Engine. What stays here is the BRIDGE:
+  // the Engine reads the store once and hands the callout the narrow slice it declares, so
+  // rule 1's "Engine.ts is the only store bridge" survives the extraction.
+  // ⚠️ MUTATED, NEVER RE-ALLOCATED (rule 5). This runs every frame, and the first cut built a fresh
+  // eight-property literal each time — contradicting CalloutSync's own header and invisible to
+  // `noFrameAllocations.test.ts`, which matches `new THREE.*`/`.clone()` and cannot see an object
+  // literal. `CalloutSync` copies nothing out of it and holds it only for the duration of `sync`,
+  // so one buffer is safe; nothing may retain the reference across frames.
+  private _calloutState: CalloutState = {
+    inspect: null, snap: null, metaSnap: null, boxedCard: null,
+    country: null, cohort: null, sceneCoverL: 0, sceneCoverR: 0,
+  };
   private _syncCallout(): void {
-    const el = document.getElementById("callout");
-    if (!el) return;
-    let on =
-      this._policy.callout && !this.transition.active() && breakpointOf(window.innerWidth) !== "phone";
-    if (on) {
-      const v = this._calloutV;
-      on =
-        this.mode === "geo"
-          ? this._geoCalloutAnchor(v)
-          : this.mode === "ledger"
-            ? this._ledgerCalloutAnchor(v)
-            : this._hyperCalloutAnchor(v);
-      if (on) {
-        v.applyMatrix4(this.ctx.camera.matrixWorldInverse); // world → view (camera looks −z)
-        if (v.z > -0.1) on = false; // behind (or grazing) the camera plane
-        else {
-          v.applyMatrix4(this.ctx.camera.projectionMatrix); // view → NDC (w-divide included)
-          const r = this.ctx.renderer.domElement.getBoundingClientRect();
-          const x = r.left + (v.x * 0.5 + 0.5) * r.width;
-          const y = r.top + (-v.y * 0.5 + 0.5) * r.height;
-          // Placement is `domain/calloutPlacement.ts` — the flip/drop rules and the panel's reach
-          // live there with their test, and globals.css mirrors the geometry off the attributes
-          // written below (guarded writes, like data-on).
-          // ⚠️ MEASURE THE FREE CANVAS BAND, NOT THE CANVAS. Below 1100px the rails are
-          // sheets that OVERLAY a still-viewport-sized canvas, so `r.left`/`r.right` describe room
-          // the callout does not have: at 900px with both sheets open a geo node's panel rendered
-          // as a ~25px fragment in the strip between them. `sceneCoverL`/`sceneCoverR` are what the
-          // open sheets measured off themselves (0 on desktop and phone, so this is a no-op there).
-          const st = useStore.getState();
-          const p = calloutPlacement(x, y, r.left + st.sceneCoverL, r.right - st.sceneCoverR, r.top);
-          if (!p.show) on = false;
-          else {
-            el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
-            if ((el.dataset.flip != null) !== p.flip) {
-              if (p.flip) el.dataset.flip = "";
-              else delete el.dataset.flip;
-            }
-            if ((el.dataset.drop != null) !== p.drop) {
-              if (p.drop) el.dataset.drop = "";
-              else delete el.dataset.drop;
-            }
-            this._syncCalloutMulti(el, x, y, r, p.flip, p.drop);
-          }
-        }
-      }
-    }
-    if (!on) this._syncCalloutMulti(el, 0, 0, null, false, false);
-    // Guard on the ELEMENT's own attribute, not a cached flag: React remounts the wrapper on a
-    // subject change (fresh data-on="0"), so a field would go stale exactly then.
-    const flag = on ? "1" : "0";
-    if (el.dataset.on !== flag) el.dataset.on = flag;
-  }
-
-  // THE MULTI-LEADER (user, 2026-08-30): a machine is SEVERAL beads in hyper — one per layer it
-  // runs — and its callout points at each of them, not just the primary. Projects the sibling
-  // beads (Globe.selectedNodeHyperAnchors) and writes the extra dashed legs in PANEL-LOCAL
-  // pixels (the wrapper's origin IS the primary anchor). DOM writes only — position never
-  // renders React (the Tooltip discipline). `r == null` (or a non-node anchor, or any other
-  // view) hides every leg.
-  //
-  // EVERY LEG FANS FROM THE PANEL'S OWN CORNER (user, same day, second round: "connect the
-  // anchor itself to all spheres — they are considered equal"): the first cut ran the extra
-  // legs bead-to-bead from the primary, which read as one privileged sphere chained to the
-  // others. The corner is the .co-leader's own panel end (CALLOUT_OFF_X/Y, mirrored by the
-  // flip/drop the placement just decided), so the primary's leader and the sibling legs all
-  // meet at one point and the beads read as peers.
-  // The legs are STATIC children React renders once per wrapper mount, so the DOM refs are
-  // cached per element identity (a subject change remounts the wrapper — fresh element, fresh
-  // cache, every leg back at its hidden default) and the hidden steady state — most frames, in
-  // every view — costs one flag check with NO DOM reads. querySelectorAll ran here per frame
-  // before, on the !on path included (review, 2026-08-31 — rule-5 discipline applied to DOM).
-  private _mlegHost: HTMLElement | null = null;
-  private _mlegs: { g: SVGGElement; line: SVGLineElement; ring: SVGCircleElement }[] = [];
-  private _mlegShown = 0;
-  private _syncCalloutMulti(el: HTMLElement, ax: number, ay: number, r: DOMRect | null, flip: boolean, drop: boolean): void {
-    const want = r != null && this.mode === "hyper" && this._calloutNodeAnchor;
-    if (!want && this._mlegShown === 0 && this._mlegHost === el) return;
-    if (this._mlegHost !== el) {
-      this._mlegHost = el;
-      this._mlegs = Array.from(el.querySelectorAll<SVGGElement>(".co-mleg"), (g) => ({
-        g, line: g.querySelector("line")!, ring: g.querySelector("circle")!,
-      }));
-      this._mlegShown = 0; // a fresh mount renders every leg hidden
-    }
-    const legs = this._mlegs;
-    if (legs.length === 0) return;
-    const cx = flip ? -CALLOUT_OFF_X : CALLOUT_OFF_X;
-    const cy = drop ? CALLOUT_OFF_Y - CALLOUT_LEG_INSET : -(CALLOUT_OFF_Y - CALLOUT_LEG_INSET);
-    let n = 0;
-    if (want && r) {
-      const count = this.globe.selectedNodeHyperAnchors(this._calloutSibs);
-      for (let i = 0; i < count && n < legs.length; i++) {
-        const v = this._calloutSibs[i]!;
-        this.globe.group.localToWorld(v); // the rendered structure transform — a label read. render-state OK
-        v.applyMatrix4(this.ctx.camera.matrixWorldInverse);
-        if (v.z > -0.1) continue; // behind the camera plane — this bead gets no leg this frame
-        v.applyMatrix4(this.ctx.camera.projectionMatrix);
-        const sx = r.left + (v.x * 0.5 + 0.5) * r.width - ax;
-        const sy = r.top + (-v.y * 0.5 + 0.5) * r.height - ay;
-        const { g, line, ring } = legs[n]!;
-        line.setAttribute("x1", cx.toFixed(1));
-        line.setAttribute("y1", cy.toFixed(1));
-        line.setAttribute("x2", sx.toFixed(1));
-        line.setAttribute("y2", sy.toFixed(1));
-        ring.setAttribute("cx", sx.toFixed(1));
-        ring.setAttribute("cy", sy.toFixed(1));
-        if (n >= this._mlegShown) g.setAttribute("visibility", "visible");
-        n++;
-      }
-    }
-    for (let i = n; i < this._mlegShown; i++) legs[i]!.g.setAttribute("visibility", "hidden");
-    this._mlegShown = n;
-  }
-
-  // HYPER anchors the committed NODE's own bead when one is committed (user, 2026-08-15 —
-  // clickable, has a card, so it gets its callout; the CAMERA still answers a node with its
-  // network's framing, but the label points at the thing itself), else the network's hub or
-  // the core. The label needs the RENDERED position, not a layout anchor — not framing math.
-  private _hyperCalloutAnchor(v: THREE.Vector3): boolean {
     const st = useStore.getState();
-    const p = st.inspect;
-    this._calloutNodeAnchor = false;
-    // THE BOX LEADS (user, 2026-08-15): re-boxing an ancestor card (clicking a committed
-    // node's hub) steps the callout up to the network — the box is the subject, exactly as
-    // the camera answers it. SceneCallout mirrors this preference for the content.
-    if (
-      st.boxedCard !== "context" &&
-      p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode") &&
-      this.globe.selectedNodeHyperAnchor(v)
-    ) {
-      this.globe.group.localToWorld(v); // the rendered structure transform — a label read. render-state OK
-      this._calloutNodeAnchor = true;
-      return true;
-    }
-    if (this.filter === "all") return false;
-    if (this.filter === "dag") {
-      this.layers.coreGroup.getWorldPosition(v); // render-state OK
-      return true;
-    }
-    if (!this._dofMeta) return false; // unlisted / unknown: no 3D anchor — honest absence
-    this._dofMeta.group.getWorldPosition(v); // render-state OK
-    return true;
+    const c = this._calloutState;
+    c.inspect = st.inspect; c.snap = st.snap; c.metaSnap = st.metaSnap;
+    c.boxedCard = st.boxedCard; c.country = st.country; c.cohort = st.cohort;
+    c.sceneCoverL = st.sceneCoverL; c.sceneCoverR = st.sceneCoverR;
+    this.callout.sync(c);
   }
 
-  // GEO anchors the finest committed rung with a POINT to point at — node > cohort > country.
-  // The network rung deliberately has none: a filtered fleet is spread across the globe, and a
-  // single anchor would lie about where it is (the component agrees and renders nothing).
-  // Anchors are globe-LOCAL surface points lifted just above the land, carried into world
-  // space through the rotating globe group each frame — a render-path label read, the same
-  // justification as the hyper anchors above.
-  private _geoCalloutAnchor(v: THREE.Vector3): boolean {
-    const st = useStore.getState();
-    const lift = GEO_R + LAND_H + 0.5;
-    // THE BOX LEADS (user, 2026-08-15), then the default finest-first order — a boxed rung
-    // whose anchor can't resolve falls through rather than blanking the callout.
-    const boxed = st.boxedCard;
-    const ok =
-      (boxed === "cohort" && this._geoAnchorCohort(st, v, lift)) ||
-      (boxed === "country" && this._geoAnchorCountry(st, v, lift)) ||
-      this._geoAnchorNode(st, v, lift) ||
-      this._geoAnchorCohort(st, v, lift) ||
-      this._geoAnchorCountry(st, v, lift);
-    if (!ok) return false;
-    this.globe.group.localToWorld(v); // the rendered globe rotation — a label read. render-state OK
-    return true;
-  }
 
-  private _geoAnchorNode(st: ReturnType<typeof useStore.getState>, v: THREE.Vector3, lift: number): boolean {
-    const p = st.inspect;
-    if (!p || (p.kind !== "l0" && p.kind !== "l1" && p.kind !== "metanode") || p.geo?.lat == null || p.geo.lon == null)
-      return false;
-    // THE chip, not the stack's base (user, 2026-08-15): the spotlight's own per-record
-    // resolution, exposed by Globe. The lat/lon surface point stays as the fallback for the
-    // brief window before the selection record resolves on fresh data.
-    if (!this.globe.selectedNodeAnchor(v)) {
-      if (this._geoNodePick !== p) {
-        this._geoNodePick = p;
-        this._geoNodeLocal.copy(latLonToVec3(p.geo.lat, p.geo.lon, lift)); // event-time
-      }
-      v.copy(this._geoNodeLocal);
-    }
-    return true;
-  }
 
-  private _geoAnchorCohort(st: ReturnType<typeof useStore.getState>, v: THREE.Vector3, lift: number): boolean {
-    if (!st.cohort) return false;
-    const d = this.globe.cohortAnchorDir;
-    if (!d) return false;
-    v.copy(d).multiplyScalar(lift);
-    return true;
-  }
 
-  private _geoAnchorCountry(st: ReturnType<typeof useStore.getState>, v: THREE.Vector3, lift: number): boolean {
-    if (!st.country) return false;
-    if (this._geoCcKey !== st.country) {
-      this._geoCcKey = st.country;
-      this._geoCcOk = this.globe.countryAnchorDir(st.country, this._geoCcDir); // event-time
-    }
-    if (!this._geoCcOk) return false;
-    v.copy(this._geoCcDir).multiplyScalar(lift);
-    return true;
-  }
 
-  // LEDGER anchors the pinned SNAPSHOT — the metagraph snapshot's lane lead, or the committed
-  // global tick's byte-bar lead one storey down. The rewind brings a committed row to the lead
-  // position, so the lead slot IS where the subject settles (LedgerView.calloutAnchor is pure
-  // layout data). An uncataloged channel's rows live on the unlisted lane.
-  private _ledgerCalloutAnchor(v: THREE.Vector3): boolean {
-    const st = useStore.getState();
-    // THE BOX LEADS (user, 2026-08-15/16): the boxed NODE card anchors the machine's own tray
-    // chip; the boxed GLOBAL card anchors the tick's bar — even while a finer subject stays
-    // committed. The boxed METAGRAPH card shows NOTHING (user, 2026-08-16 — like geo's network
-    // rung: a network in the chamber is a whole LANE, and a single anchor would lie about it).
-    // Then the default order: metagraph tile > global bar > tray node.
-    if (st.boxedCard === "context") return false;
-    if (st.boxedCard === "node" && this._ledgerNodeAnchor(st, v)) return true;
-    if (st.boxedCard === "snap" && st.snap) {
-      this._ledgerBarAnchor(v);
-      this.ledger.group.localToWorld(v); // render-state OK
-      return true;
-    }
-    if (st.metaSnap) {
-      // THE committed snapshot's tile (user, 2026-08-15), rewind offsets included; the lane
-      // lead stays as the fallback while the tile is off-trail (aged out of the window or not
-      // drawn this frame).
-      if (!this.ledger.selectedTileAnchor(v)) {
-        if (!this.ledger.calloutAnchor(st.metaSnap.metaId, v) && !this.ledger.calloutAnchor(UNLISTED_ID, v)) return false;
-      }
-    } else if (st.snap) {
-      this._ledgerBarAnchor(v);
-    } else if (this._ledgerNodeAnchor(st, v)) return true;
-    else return false;
-    this.ledger.group.localToWorld(v); // the rendered chamber transform — a label read. render-state OK
-    return true;
-  }
-
-  // The tick's byte-bar anchor: under a committed filter, the network's OWN band on the shown
-  // row (user, 2026-08-16 — "the correct segment of the byte bar"); unfiltered, or when the
-  // band isn't drawn (unmeasured tick), the bar's lead centre. Chamber-local (caller lifts).
-  private _ledgerBarAnchor(v: THREE.Vector3): void {
-    const lens = ledgerLens(this.filter);
-    if (lens !== "all" && this.ledger.bandAnchor(lens, v)) return;
-    this.ledger.calloutAnchor(null, v);
-  }
-
-  // The committed node's tray chip — the same `ledgerPos` its instance lerps to. The chips
-  // live in the GLOBE group's space (the fabric is shared), so the lift goes through it.
-  private _ledgerNodeAnchor(st: ReturnType<typeof useStore.getState>, v: THREE.Vector3): boolean {
-    const p = st.inspect;
-    if (!p || (p.kind !== "l0" && p.kind !== "l1" && p.kind !== "metanode")) return false;
-    if (!this.globe.selectedNodeLedgerAnchor(v)) return false;
-    this.globe.group.localToWorld(v); // render-state OK
-    return true;
-  }
-
-  /**
-   * One double-tap step (domain/tapZoom owns the arithmetic). Two branches, because the camera has
-   * two owners:
-   *
-   * - A commit flight in the air → scale its DESTINATION once, in place, and let the flight land
-   *   zoomed in. ⚠️ NOT through `_tweenTo`, which composes `dollyBack` and `railsLean` into every
-   *   destination it is handed — routing a direct dolly through it would apply both levers a
-   *   second time.
-   * - Settled → the eased step below, which is the only camera motion the Engine owns that isn't
-   *   a pose.
-   */
-  private _tapZoom() {
-    if (!this._policy.canvas) return; // the flat placeholder views are inert (convention 7)
-    if (this.transition.active()) return; // the choreography owns the camera
-    const controls = this.ctx.controls;
-    const tw = this._tween;
-    if (tw.active) {
-      tapZoomAround(tw.toPos, tw.toTgt, controls.minDistance, controls.maxDistance, tw.toPos);
-      return;
-    }
-    // Measured live, so a second pair mid-step continues from where the first one has got to.
-    const from = this.ctx.camera.position.distanceTo(controls.target);
-    const to = tapZoomDistance(from, controls.minDistance, controls.maxDistance);
-    if (to === from) return; // already at the floor — nothing to animate
-    const z = this._zoom;
-    z.from = from;
-    z.to = to;
-    z.t = 0;
-    z.active = true;
-  }
-
-  /**
-   * The step, applied between the tween and `controls.update()` — so OrbitControls recomputes its
-   * spherical from the position we wrote (exactly as it does for the tween), and the altitude
-   * clamp downstream still gets the last word. Distance only: the direction is whatever the user
-   * has orbited to, and the anchor is the live `controls.target`, so a pan mid-step composes.
-   */
-  private _updateTapZoom(dt: number) {
-    const z = this._zoom;
-    if (!z.active) return;
-    // A commit flight is a POSE and outranks a nudge along the view vector — drop the step rather
-    // than fight it for the camera position.
-    if (this._tween.active) {
-      z.active = false;
-      return;
-    }
-    z.t = Math.min(1, z.t + dt / TAP_ZOOM_DUR);
-    const d = z.from + (z.to - z.from) * easeInOutQuad(z.t);
-    const tgt = this.ctx.controls.target;
-    this.ctx.camera.position.sub(tgt).setLength(d).add(tgt);
-    if (z.t >= 1) z.active = false;
-  }
-
-  private _updateTween(dt: number) {
-    const tw = this._tween;
-    if (!tw.active) return;
-    // Scale ONLY while the transition choreography is live, so an ordinary focus flight (a
-    // click while settled — no transition running) stays full speed under ?slowmo.
-    tw.t = Math.min(1, tw.t + dt / (tw.dur * (this.transition.active() ? this._slowmo : 1)));
-    const e = easeInOutQuad(tw.t);
-    this.ctx.camera.position.lerpVectors(tw.fromPos, tw.toPos, e);
-    this.ctx.controls.target.lerpVectors(tw.fromTgt, tw.toTgt, e);
-    // The nudge rides ON TOP of what is otherwise a zero-length flight: a soft push toward the
-    // pose's own target and back out, contributing exactly 0 at t=1 so the tween still lands on
-    // the committed pose to the pixel.
-    if (tw.nudge) this.ctx.camera.position.lerp(tw.toTgt, nudgeMix(tw.t));
-    if (tw.t >= 1) {
-      tw.active = false;
-      // The flight's trailing edge — one write, and unconditionally, so a tween STARTED before a
-      // transition (or suppressed by one) can never strand the HUD dimmed.
-      if (useStore.getState().cameraFlying) useStore.getState().setCameraFlying(false);
-    }
-  }
-
-  // ── The dev tuning panel: one open path, whether the URL flag or the switch asked ──────────
-  // `_tuneOpening` is the re-entrancy guard: the import is async, so without it a second click
-  // during the load mounts a second panel bound to the same objects.
-  private _tuneOpening = false;
-  private async _openDevTune(): Promise<void> {
-    if (this._devTune || this._tuneOpening) return;
-    this._tuneOpening = true;
-    try {
-      const m = await import("./devTune");
-      if (this.disposed) return;
-      this._devTune = await m.mountDevTune({
-        ledger: this.ledger,
-        hyper: this.layers,
-        camera: this.ctx.camera,
-        controls: this.ctx.controls,
-        // The light-look group's onChange re-runs the whole theme thread (token re-read, scene
-        // map rebuild, bloom re-apply) so every dial lands the same way a real flip does.
-        refreshTheme: () => this._refreshTheme(this._theme),
-      });
-      if (this.disposed) this._devTune.dispose();
-    } finally {
-      this._tuneOpening = false;
-      this._syncTuneSwitch();
-    }
-  }
-
-  private _closeDevTune(): void {
-    this._devTune?.dispose();
-    this._devTune = undefined;
-    this._syncTuneSwitch();
-  }
-
-  private _syncTuneSwitch(): void {
-    const b = this._tuneBtn;
-    if (!b) return;
-    const on = !!this._devTune;
-    b.setAttribute("aria-pressed", String(on));
-    b.style.opacity = on ? "1" : "0.55";
-  }
-
-  // The switch itself. Plain DOM beside Stats, built here rather than in devTune.ts because it has
-  // to exist BEFORE the panel module loads — it is what asks for the load.
-  private _mountTuneSwitch(): void {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.textContent = "tune";
-    b.title = "Live-tune the scene look (dev only). Same panel as ?tune.";
-    b.setAttribute("aria-pressed", "false");
-    // Offset right of Next's own dev-tools badge, which claims the bottom-left corner in `next dev`
-    // and was covering half this pill — including its hit area.
-    Object.assign(b.style, {
-      position: "fixed",
-      left: "66px",
-      bottom: "8px",
-      zIndex: "10000",
-      padding: "3px 8px",
-      font: "11px/1.4 ui-monospace, monospace",
-      letterSpacing: "0.06em",
-      color: "#fff",
-      background: "rgba(0,0,0,0.72)",
-      border: "1px solid rgba(255,255,255,0.22)",
-      borderRadius: "4px",
-      cursor: "pointer",
-      opacity: "0.55",
-    } satisfies Partial<CSSStyleDeclaration>);
-    b.addEventListener("click", () => {
-      if (this._devTune) this._closeDevTune();
-      else void this._openDevTune();
-    });
-    document.body.appendChild(b);
-    this._tuneBtn = b;
-  }
 
   dispose() {
     this.disposed = true;
@@ -2372,8 +1975,7 @@ export class Engine {
     if (useStore.getState().sceneDragging) useStore.getState().setSceneDragging(false);
     if (useStore.getState().cameraFlying) useStore.getState().setCameraFlying(false);
     this.stats?.dom.remove();
-    this._tuneBtn?.remove();
-    this._devTune?.dispose();
+    this.devTune.dispose();
     this.unsub.forEach((u) => u());
     cancelAnimationFrame(this.raf);
     this.ctx.controls.dispose?.();

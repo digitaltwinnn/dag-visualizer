@@ -25,6 +25,32 @@ const deepInflight = new Set<string>();
 export const BACKFILL_N = 8;
 export const BACKFILL_GAP_MS = 450;
 
+// A BACKFILL miss is usually about TIMING, not about the ordinal. The client's ordinals come from
+// the EXPLORER while the payload comes from the L0 LB, and a just-finalized snapshot is not yet
+// fetchable from whichever node the LB routes to (the per-request lottery). Measured live
+// 2026-08-31: the newest 1-3 ordinals of a cold load 404, and the SAME ordinals answer 200 a few
+// seconds later. Left alone those rows stay unmeasured seeds for the whole session, because
+// `ensure` only ever re-fires for the LIVE and SELECTED ticks — nothing revisits the trail.
+//
+// So a backfill miss gets a bounded retry, and the bounds are the whole design:
+//   • BY COUNT — a fixed tiny budget per ordinal, so this can never become the poll the deep-read
+//     rule exists to prevent. Two retries over ~15s, inside one ~28s snapshot cadence.
+//   • BY ORIGIN — only ordinals the BACKFILL queued. A miss on a user-SELECTED ordinal is left
+//     exactly as it was: that one is the honest give-up the acquiring surfaces key on (rule 10),
+//     and an old ordinal outside the LB's serving band would never come good anyway.
+// A landed read clears the miss through `setSnapshotExact`, so a successful retry needs no
+// special path — and `ensure`'s own early-out means a row that arrived some other way is skipped.
+export const RETRY_MAX = 2;
+export const RETRY_BASE_MS = 5000;
+
+/** Delay before retry `attempt` (0-based), or null once the budget is spent. Pure for the test. */
+export function retryDelay(attempt: number): number | null {
+  return attempt < RETRY_MAX ? RETRY_BASE_MS * (attempt + 1) : null;
+}
+
+const retried = new Map<number, number>(); // ordinal -> retries already SPENT
+const retryTimers = new Set<ReturnType<typeof setTimeout>>();
+
 export function backfillOrdinals(
   latest: number | null,
   have: Readonly<Record<number, unknown>>,
@@ -40,7 +66,19 @@ export function backfillOrdinals(
   return out;
 }
 
-function ensure(ordinal: number | null | undefined) {
+function scheduleRetry(ordinal: number) {
+  const spent = retried.get(ordinal) ?? 0;
+  const delay = retryDelay(spent);
+  if (delay == null) return; // budget spent — the recorded miss stands
+  retried.set(ordinal, spent + 1);
+  const t = setTimeout(() => {
+    retryTimers.delete(t);
+    ensure(ordinal, true);
+  }, delay);
+  retryTimers.add(t);
+}
+
+function ensure(ordinal: number | null | undefined, retry = false) {
   if (ordinal == null) return;
   const st = useStore.getState();
   if (st.snapshotExact[ordinal] || inflight.has(ordinal)) return; // already have it / fetching
@@ -54,9 +92,15 @@ function ensure(ordinal: number | null | undefined) {
       // their give-up on it, so a failed read on a pinned tick terminates honestly instead of
       // twinkling forever with nothing in flight (rule 10). A later trigger (reselecting, the
       // next live tick) still retries exactly as before, and a landing read clears the miss.
-      else st.setExactMiss(ordinal);
+      else {
+        st.setExactMiss(ordinal);
+        if (retry) scheduleRetry(ordinal);
+      }
     })
-    .catch(() => st.setExactMiss(ordinal))
+    .catch(() => {
+      st.setExactMiss(ordinal);
+      if (retry) scheduleRetry(ordinal);
+    })
     .finally(() => inflight.delete(ordinal));
 }
 
@@ -87,12 +131,14 @@ export default function RawSnapshotBridge() {
         backfillTimer.current = null;
         return;
       }
-      ensure(queue[i++]);
+      ensure(queue[i++], true); // backfill misses retry; the live/selected ones do not
     }, BACKFILL_GAP_MS);
   }, [liveOrd]);
   useEffect(
     () => () => {
       if (backfillTimer.current) clearInterval(backfillTimer.current);
+      for (const t of retryTimers) clearTimeout(t);
+      retryTimers.clear();
     },
     [],
   );

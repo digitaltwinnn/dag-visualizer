@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- The app's own brand mark: the ECG trace from components/topbar/EcgMark.tsx, re-cut for a
+       32px square. Static (a favicon has no beat) and thicker-stroked than the HUD mark so the
+       spike survives a 16px tab. Colours are literals on purpose — a favicon is fetched outside
+       the document, so no CSS token or `currentColor` can reach it. They mirror config.COLORS:
+       ground = COLORS.bg (0x010207), trace = COLORS.core (0x53f2f2, the resolved cyan of the
+       primary token). NB: no double hyphen anywhere in this comment — XML forbids it inside a
+       comment, and a browser silently fails to DECODE the whole file rather than warning. -->
+  <rect width="32" height="32" rx="7" fill="#010207"/>
+  <path d="M3 16 H10.65 L12.9 16 L14.5 9.9 L16.8 22.1 L19.1 13.7 L21.4 16 H29"
+        fill="none" stroke="#53f2f2" stroke-width="2.4"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -29,3 +29,30 @@ describe("inServedWindow", () => {
     expect(inServedWindow(6_757_440, null)).toBe(true);
   });
 });
+
+// The staleness defect this module was rewritten for (2026-08-31). `inServedWindow` is the pure
+// half and was never wrong; what failed was the REFERENCE feeding it, which went stale and stopped
+// revalidating over a long-lived process — measured 148 ordinals (~70 min) behind on a dev server
+// up a few hours, snapping back to 0 on restart. These pin the property that makes the gate safe
+// to be wrong about: the direction of its errors.
+describe("the window's error direction", () => {
+  it("a STALE-LOW reference is what refuses real ordinals — the failure the re-read exists for", () => {
+    const trueLatest = 6856080;
+    const stale = trueLatest - 148; // the measured staleness
+    // A live ordinal, refused against the stale reference…
+    expect(inServedWindow(trueLatest - 2, stale)).toBe(false);
+    // …and accepted the moment the reference is current. withinServedWindow forces exactly that
+    // re-read before it refuses, so this row can no longer be reached with a fresh reference.
+    expect(inServedWindow(trueLatest - 2, trueLatest)).toBe(true);
+  });
+
+  it("fails OPEN with no reference — an unreadable reference must never deny history", () => {
+    expect(inServedWindow(1, null)).toBe(true);
+    expect(inServedWindow(9_999_999, null)).toBe(true);
+  });
+
+  it("still refuses nonsense above the future bound", () => {
+    expect(inServedWindow(6856080 + FUTURE_WINDOW + 1, 6856080)).toBe(false);
+    expect(inServedWindow(6856080 + FUTURE_WINDOW, 6856080)).toBe(true);
+  });
+});
