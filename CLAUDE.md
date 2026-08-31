@@ -1282,8 +1282,10 @@ were reading. Same builder as the anchor-log row, so a read and the equivalent r
 `components/ui/` holds the adopted primitives; compose classes with `cn()`. **`Button` is adopted only
 for small text/icon controls that map cleanly onto a variant** — accordion rows,
 rail edge-tabs, phone-dock halves, the view switch and the filter button are deliberately NOT Buttons,
-and that boundary is the convention. `Command` backs the filter picker (its cursor wash is overridden
-to a faint neutral — the bright accent fill washed text out). `Table` + `ScrollArea` are the raw layer
+and that boundary is the convention. The filter picker is NOT a `Command` palette — it is the top
+bar's own network-chip strip (see the command bar's grow-downward slot); `cmdk` and the adopted
+`Command` were removed 2026-08-31 once nothing had imported them for some time, so don't reach for a
+palette here without deciding it afresh. `Table` + `ScrollArea` are the raw layer
 only, with `Table` adopted MINUS its scroll container so the header stays sticky while the body scrolls
 under it. The engine-anchored `Tooltip` stays custom, because a Radix tooltip can't track a raycast.
 
