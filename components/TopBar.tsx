@@ -170,8 +170,8 @@ export default function TopBar() {
             liveliness of the app", superseding the 2026-08-09 /about route — the mark IS the
             liveliness cue, so it opens the liveliness instrument; /about moved to the FOOTER
             (the wordmark is plain chrome and the strip's own about link was removed by the
-            user the same day). ⚠️ Known gap: the footer hides below 700px, so phone currently
-            has NO route to /about — an open decision, not an oversight to "fix" silently. */}
+            user the same day). On phone the footer rides above the dock (user, 2026-08-31),
+            so the route holds on every tier. */}
         <button
           type="button"
           aria-expanded={strip === "pulse"}

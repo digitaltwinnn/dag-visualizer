@@ -936,8 +936,10 @@
   --animate-breathe: breathe 1.5s ease-in-out infinite;
 }
 
-/* The footer hides on the phone (the 56px dock owns that edge), so its band must go to 0 in the
-   same breath or every consumer would keep reserving space for a strip that isn't drawn. Written
+/* On the phone the footer RIDES ABOVE the dock as overlay chrome (SiteFooter.tsx, 2026-08-31 —
+   it is the app's one /about route, so it stays visible), but its band still zeroes here: it
+   reserves nothing on that tier, exactly as the dock itself reserves nothing, so no consumer
+   holds space for a row that floats over the scene edge. Written
    as `not (min-width: …)` rather than `max-width` because that is what Tailwind's
    `max-[700px]:hidden` compiles to on the component itself — CSS trap 8, where the two forms
    disagree by exactly one pixel. 700 is `breakpointOf`'s own phone boundary, and every arm of it
