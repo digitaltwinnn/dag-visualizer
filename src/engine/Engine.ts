@@ -5,6 +5,7 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR, resolveSignerIps } from "@/src/data/network";
 import { ledgerLens, tickInStory } from "@/src/data/ledgerStory";
 import { reportPoll } from "@/src/data/api";
+import { STALE_FACTOR } from "@/src/data/pollStatus";
 import { LISTED_IDS, UNLISTED_ID, UNLISTED_SCENE_HEX_BY_THEME } from "@/src/data/unlisted";
 import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
@@ -806,9 +807,18 @@ export class Engine {
   private async refreshMeta(initial: boolean) {
     try {
       const r = await fetch(netUrl("/api/metagraphs"));
-      reportPoll("api-metagraphs", r.ok);
-      if (!r.ok) return;
-      const { metagraphs, geo } = await r.json();
+      if (!r.ok) { reportPoll("api-metagraphs", false); return; }
+      const { metagraphs, geo, ageMs } = await r.json();
+      // A REACHED ROUTE IS NOT A FRESH FEED. Reporting `r.ok` counted a 200 as a success even when
+      // the payload behind it was frozen, which is the masking class this registry keeps catching:
+      // the strip's dot stayed green while the data underneath stopped moving. The route publishes
+      // how old its payload is (server-side subtraction — see its ageMs note), so a stale one
+      // simply does not refresh `lastOkAt`, and `pollStatusOf`'s existing rule surfaces it as STALE
+      // on its own. Deliberately NOT reported as an error: the feed is reachable and the data is
+      // real, just old, and "failing" is a different and louder claim. A route that doesn't publish
+      // `ageMs` (an older deploy) counts as fresh — fail open, never invent staleness.
+      const fresh = typeof ageMs !== "number" || ageMs <= POLL.metaRefreshMs * STALE_FACTOR;
+      if (fresh) reportPoll("api-metagraphs", true);
       if (geo) this.geoMap = { ...this.geoMap, ...geo };
       const changed = JSON.stringify(metagraphs) !== JSON.stringify(this.metaData);
       this.metaData = metagraphs;
