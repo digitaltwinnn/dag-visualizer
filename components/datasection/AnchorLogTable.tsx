@@ -128,7 +128,7 @@ export default function AnchorLogTable() {
     pages: new Map(),
     latest: 0,
   });
-  const resolved = useRef(new Map<string, { ordinal: number; hash: string }>()); // ts → global
+  const resolved = useRef(new Map<string, { ordinal: number; hash: string; lastSnapshotHash?: string }>()); // ts → global
   const inFlight = useRef(new Set<string>());
   const [version, setVersion] = useState(0);
   const [histErr, setHistErr] = useState(false);
@@ -205,14 +205,14 @@ export default function AnchorLogTable() {
       if (resolved.current.has(r.ts) || inFlight.current.has(r.ts)) continue;
       const g = byTs.get(r.ts);
       if (g) {
-        resolved.current.set(r.ts, { ordinal: g.ordinal, hash: g.hash });
+        resolved.current.set(r.ts, { ordinal: g.ordinal, hash: g.hash, lastSnapshotHash: g.lastSnapshotHash });
         continue;
       }
       inFlight.current.add(r.ts);
       fetch(netUrl(`/api/global/at?ts=${encodeURIComponent(r.ts)}`))
-        .then((res) => (res.ok ? (res.json() as Promise<{ ordinal: number; hash: string }>) : Promise.reject()))
+        .then((res) => (res.ok ? (res.json() as Promise<{ ordinal: number; hash: string; lastSnapshotHash?: string }>) : Promise.reject()))
         .then((g2) => {
-          resolved.current.set(r.ts, { ordinal: g2.ordinal, hash: g2.hash });
+          resolved.current.set(r.ts, { ordinal: g2.ordinal, hash: g2.hash, lastSnapshotHash: g2.lastSnapshotHash });
           setVersion((v) => v + 1);
         })
         .catch(() => {
@@ -256,7 +256,11 @@ export default function AnchorLogTable() {
         fee: r.fee,
         sizeInKB: r.sizeInKB,
         ts: r.ts,
-        global: { ordinal: g?.ordinal ?? 0, timestamp: r.ts, hash: g?.hash ?? "" },
+        // ⚠️ The chain link rides along. History mode REBUILDS the global rather than reading the
+        // live buffer's record, so anything left out here is simply gone by the time the card
+        // renders — which is how the Global snapshot card lost its Previous hash on exactly the
+        // rows a reader pages back to (user, 2026-09-01).
+        global: { ordinal: g?.ordinal ?? 0, timestamp: r.ts, hash: g?.hash ?? "", lastSnapshotHash: g?.lastSnapshotHash },
         pending: !g,
       };
     });
