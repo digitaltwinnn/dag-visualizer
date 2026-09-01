@@ -190,9 +190,24 @@ export class LedgerView implements SceneView {
   private _latest: GlobalSnapshot | null;
   /** Scratch for `_syncThreads` — event-time only, so one array is reused rather than rebuilt. */
   private _threadSpecs: { slot: number; spec: BarSpec | null }[] = [];
-  /** Bound once (rule 5: no per-frame closure allocation) — the trail's front/horizon ramp at a slot. */
-  private _threadFadeOf = (slot: number): number =>
-    this._rewind.fadeAtX(LEAD_X - slot * SLOT_SP + this._trailOff) * this._fades.alpha;
+  /** Bound once (rule 5: no per-frame closure allocation) — every ramp a thread must answer.
+   *
+   *  ⚠️ THE ENTRY TERMS ARE NOT OPTIONAL (user, 2026-09-01: the hairlines "should appear like the
+   *  other objects, currently it's already there the moment the scene is still building up"). The
+   *  first cut carried only the rewind boundary and the view alpha, so a thread drew at full weight
+   *  over a chamber that had not arrived yet — the one element in the view not riding the entry.
+   *  Both terms are needed and they are different: `_entryFade[slot]` is the PER-ROW stagger each
+   *  band and tile answers, so a thread lands with the row it belongs to rather than with the view;
+   *  `_entryRib` is the ribbons' own later, steeper curve, which is what keeps the relation layer
+   *  from arriving before the things it relates. */
+  private _threadFadeOf = (slot: number): number => {
+    const entryRow = this._entryT < 1 && slot >= 0 && slot < SLOT_N ? this._entryFade[slot] : 1;
+    return this._rewind.fadeAtX(LEAD_X - slot * SLOT_SP + this._trailOff)
+      * horizonAt(LEAD_X - slot * SLOT_SP + this._trailOff)
+      * entryRow * this._entryRib * this._fades.alpha;
+  };
+  /** The ribbons' entry curve, hoisted per frame so the bound thread fade can read it. */
+  private _entryRib = 1;
   /** The COMMITTED network — the only thing that may move geometry (the lane field, the gutter). */
   private _filter: string;
   /** The HOVERED network, a pure preview that overrides the committed one for DIMMING only. */
@@ -1139,6 +1154,7 @@ export class LedgerView implements SceneView {
     // Entry ramp tail: ribbons arrive after the tiles have mostly landed (squared ease), so a
     // sheet never hangs from a tile still in the air.
     const entryRib = this._entryT >= 1 ? 1 : Math.max(0, this._entryT * 1.6 - 0.6) ** 2;
+    this._entryRib = entryRib; // the threads read it through _threadFadeOf
     // The incoming lead sheet's own ease-in (see the field note) — armed the frame its spec
     // first becomes drawable, so the crossfade has two soft sides.
     const lead0 = this._slotSnap[0];

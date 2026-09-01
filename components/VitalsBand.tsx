@@ -420,13 +420,18 @@ function GeoCells({ accent }: { accent: string }) {
   const selNodes = useStore((s) => s.selNodes);
   const countries = lb?.countries ?? [];
   const total = selNodes.length;
-  const { ispCounts, topIsps } = useMemo(() => {
+  const { ispCounts, topIsps, located } = useMemo(() => {
     const ispCounts = new Map<string, number>();
+    let located = 0;
     for (const r of selNodes) {
       const isp = "geo" in r.pick ? r.pick.geo?.isp : undefined;
       if (isp) ispCounts.set(isp, (ispCounts.get(isp) ?? 0) + 1);
+      // PLACED = the row resolved to a country, which is exactly the test the country ring below
+      // is built on. Reading the same field is the point: the two cards can then never disagree
+      // about how many nodes this view is actually able to draw.
+      if (r.cc) located++;
     }
-    return { ispCounts, topIsps: [...ispCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3) };
+    return { ispCounts, topIsps: [...ispCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3), located };
   }, [selNodes]);
   const topCountries = countries.slice(0, 3);
   const restC = countries.slice(3).reduce((s, c) => s + c.count, 0);
@@ -455,14 +460,29 @@ function GeoCells({ accent }: { accent: string }) {
 
   return (
     <>
-      {/* LEAD-ONLY, and therefore CONTENT-SIZED: a lone numeral has no breakdown to spend an
-          equal share of the row on, and holding one left the widest empty plate in the band. */}
-      <BandCard label="Nodes" size="sm"
-        lead={<span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={total || null} /></span>} />
-      {/* The hole counts COUNTRIES, the ring spreads NODES across them — two different
-          questions, which is why the centre is passed rather than left as the sum. */}
+      {/* THE FLEET, AND WHETHER GEO CAN ACTUALLY DRAW IT (user, 2026-09-01: the lone numeral
+          "looks very boring, is there a nicer way to present the 1 number?"). A card with no
+          breakdown is the boring case by construction — the band's grammar is lead + detail — and
+          this is the one breakdown that belongs to THIS view rather than to its neighbours: a node
+          the lookup could not place sits in no country ring and no provider ring, so the split is
+          also the basis both cards beside it silently assume. Rule 10: an unplaced node is an
+          instrument state, not a rounding error, and stating it is how the fleet total and the
+          rings are allowed to differ honestly. `unplaced` reading 0 is itself a reading — the
+          fleet is fully drawn — and MicroBars renders no bar for it, only the numeral. */}
+      <BandCard label="Nodes"
+        lead={<span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={total || null} /></span>}>
+        <MicroBars accent={accent} labelW={56} rows={[
+          { key: "located", label: "located", count: located },
+          { key: "unplaced", label: "unplaced", count: Math.max(0, total - located) },
+        ]} />
+      </BandCard>
+      {/* "Top countries", not "Nodes by country" (user, 2026-09-01): the card shows the top three
+          plus an `other` remainder, so the old name promised the whole distribution and the row
+          beside it now states the fleet total anyway.
+          The hole counts COUNTRIES, the ring spreads NODES across them — two different questions,
+          which is why the centre is passed rather than left as the sum. */}
       {topCountries.length > 0 && (
-        <BandCard label="Nodes by country"
+        <BandCard label="Top countries"
           lead={<DonutTotal counts={countryRing} accent={accent} total={countries.length} />}>
           <div className="flex w-full items-center gap-2 min-w-0">
             <MicroBars accent={accent} labelW={18} rows={topCountries.map((c) => ({ key: c.cc, label: c.cc, count: c.count }))} />
@@ -547,7 +567,15 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
           reading (rule 10) — so it contributes NOTHING to the card's intrinsic width and gives its
           space back before the basis note can be clipped off the plate. That is also what lets the
           tick chart, the row's headline instrument, keep its own 220px floor at tablet width. */}
-      <span className="flex-1 min-w-0 self-center"><Sparkline data={spark} color="var(--primary)" height={26} stretch /></span>
+      {/* `accent`, NOT a hardcoded `var(--primary)` (user, 2026-09-01: the ledger's vitals should be
+          "metagraph color-aware — only anchors per global snapshot currently does that"). This was
+          the band's own rule already: structural cyan at rest, the identity hue under a committed
+          filter, resolved once in useVitalsScope and handed to EVERY chart as `accent`. The donut,
+          the bars and the tick chart all took it; the sparkline alone had been wired to the literal,
+          so a committed network re-tinted three of the row's four instruments and left this one
+          cyan. Not a rule-3 exception — rule 3 forbids repointing the structural TOKEN, and this
+          passes an identity hue to a chart, which is what the band has always done under a scope. */}
+      <span className="flex-1 min-w-0 self-center"><Sparkline data={spark} color={accent} height={26} stretch /></span>
       {/* The extrapolation window, VISIBLE (rule 10): the basis is part of the reading, and the
           band's pointer-events-none root means a title tooltip can never fire — sr-only alone
           left sighted pointer users reading an extrapolated rate as a measured fact. */}

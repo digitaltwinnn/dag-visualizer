@@ -249,8 +249,13 @@ row reads the snapshot feed ONCE and passes it down.
 The cells are per-view and ordered by the user (2026-08-30): hyper coarse→fine (METAGRAPHS with a
 by-type breakdown — `networkKind` is the type's one home, icons from `METATYPE_ICONS` on the
 filtered face — then NODES, the NODE COMPOSITION donut, NETWORK LAYERS as RoleChips micro-bars);
-geo pairs each total with its breakdown (NODES · nodes-by-country · top-providers —
-top-providers); the ledger leads with WHO (METAGRAPHS ANCHORING, exact from the anchor index, with
+geo pairs each total with its breakdown (NODES · TOP COUNTRIES · TOP PROVIDERS — the first two
+renamed/reshaped 2026-09-01: NODES gained a located/unplaced split, because a card with no breakdown
+is the boring case by construction and that split is the one breakdown belonging to THIS view rather
+than its neighbours — a node the lookup could not place sits in no country ring and no provider ring,
+so it is also the basis both cards beside it silently assume; and "nodes by country" became "top
+countries", since the card shows three plus a remainder and the old name promised the whole
+distribution); the ledger leads with WHO (METAGRAPHS ANCHORING, exact from the anchor index, with
 identity dots) then the rates (number + stretch sparkline, units spelled `/hour`) and the
 declicked tick bar-chart. **A TOTAL LIVES INSIDE ITS OWN BREAKDOWN, AND LEADS IT** (user, 2026-08-31): a bare number card
 beside the list that breaks that number down says the same thing twice, so `COUNTRIES` folded into
