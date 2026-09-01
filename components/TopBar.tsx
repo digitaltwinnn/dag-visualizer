@@ -132,7 +132,10 @@ export default function TopBar() {
           39px to clear the banner's 28px ribbon plus an 11px breather, and it now floats at the
           viewport edge with a breather of its own — close to the 16px side inset, so the glass
           sits in an even frame. Everything below rides `--rail-top`, which moved by the same 25px. */}
-      <div className="fixed top-[14px] inset-x-4 min-[1100px]:inset-x-[26px] z-40 pointer-events-none">
+      {/* --bar-margin, not two literals: the vitals band mirrors this inset exactly (user,
+          2026-09-01 — "the bottom bar should be the same exactly as the top bar"), and the token
+          carries the 1100px step so neither bar can drift from the other. */}
+      <div className="fixed top-[14px] inset-x-[var(--bar-margin)] z-40 pointer-events-none">
       <div
         id="topbar"
         className={cn(

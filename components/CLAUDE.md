@@ -259,12 +259,46 @@ composition donut already totalled the same fleet. The merged shape is `DonutTot
 ring, then the total at the band's own number size, then the rows. Two rules hold it honest — the
 ring must PARTITION the population, so a top-N chart carries its remainder as an `other` segment
 rather than drawing three slices as the whole; and the total is the LARGEST type in the card, never
-the smallest (it briefly sat in the 44px donut hole at 11px, which made merging a demotion). Rows
-wear the donut's own stepped opacities via `MicroBars`' `steps`, or the ring loses its key.
+the smallest (it briefly sat in the 44px donut hole at 11px, which made merging a demotion).
+
+**A card is TWO SEGMENTS: a LEAD and a DETAIL, split by a hairline** (user, 2026-09-01). The lead is
+the headline total the card exists to say; the detail is its breakdown. `BandCard` takes the lead as
+a prop and the detail as children, and draws the divider only when both are present — either may
+stand alone (geo's `NODES` is lead-only; `NETWORK LAYERS` and PulseStrip's poll cards are
+detail-only). Three rules keep the row from going ragged, and all three answer the same complaint
+("the details are right next to the total while there is a lot of white space on the right"):
+
+- **`size` is the one width vocabulary** — `sm` (one reading, no breakdown) / `md` (a reading and its
+  breakdown) / `lg` (a chart that reads better wide). It replaced six hand-picked flex values that
+  each encoded a guess about one card's content. **Every tier keeps an `auto` basis**, never
+  `basis-0`: a share computed with no reference to the card's content is what clipped the rate cards'
+  extrapolation note off the plate at tablet width. **And every tier has a CEILING** — without one an
+  `md` card grows to whatever the viewport gives it, and at 1600px three of them each held ~500px
+  with a void between lead and breakdown. Past the ceilings the row centres; below them the cards
+  still span margin to margin, so the centring is a no-op wherever width is scarce.
+- **`MicroBars`' track is proportional but CAPPED** (`BAR_TRACK_MAX`), and each row is `justify-end`,
+  so value columns line up on the card's right edge and the slack collects behind the block. The
+  original 72px constant made every bar row intrinsically sized, which is where the dangling white
+  space came from; an uncapped track is the opposite failure — a bar running the width of a 1600px
+  row stops reading as a quantity.
+- **The band's height is FIXED** (`--vitals-h`), not content height. Left to its content it measured
+  81 / 72 / 62px across hyper / geo / ledger, and since the band is anchored at the BOTTOM that
+  showed up as its top edge jumping on every view switch.
+
+⚠️ **THE OPACITY LADDER IS THE DONUT'S ALONE.** `MicroBars` mirrored `DONUT_STEPS` until 2026-09-01
+so a ring beside rows had a key — but only the cards WITH a ring passed them, so `Node composition`
+ran bright→faint beside `Network layers` running flat, and two cards in one row read as two different
+hues of one token (user). Adjacent arcs of a single colour genuinely need separating; labelled rows
+do not — every row is NAMED and the slices are in the same order, which is how a legend works.
+Don't reintroduce per-bar opacity.
 
 `compositionCounts` lives IN VitalsBand (its one consumer since the
 top-bar cluster retired). The band dims with the rails on `useSceneYield` and its plate is the
-command bar's own `--topbar-glass`.
+command bar's own `--topbar-glass`. **Its horizontal inset is `--bar-margin`, the COMMAND BAR's own**
+(user, 2026-09-01: "the bottom bar should be the same exactly as the top bar") — one token read by
+both, resolving to `--rail-margin` at desktop, where the band's edges must align with the rail cards
+and clear the RailThread rulers, and to a wider 16px below 1100px, where the rails are edge tabs and
+there is nothing to align with.
 
 `BottomStream` is the **one publisher**: it both mounts the band and writes `--bottom-reserve`, from
 the one policy flag `VIEW_POLICIES[mode].vitalsLane` **AND three deliberate gates** — the scene pose

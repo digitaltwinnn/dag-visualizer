@@ -624,6 +624,13 @@
   --topbar-glass: linear-gradient(180deg,
     light-dark(rgba(250, 252, 255, 0.86), rgba(20, 26, 46, 0.82)),
     light-dark(rgba(240, 244, 252, 0.80), rgba(10, 14, 28, 0.76)));
+  /* The site footer's lozenge — a VEIL, not a panel. It first borrowed --topbar-glass and read
+     "too dominant white" on the light ground (user, 2026-09-01), which is right: that token is a
+     0.86-alpha lit SURFACE for a full-width bar, and a 22px pill has no room to be a surface. This
+     fill exists only to keep the link row legible where a bright scene element passes under it, so
+     it is flat (no gradient — nothing to light) and low. NOT --scrim, whose 0.16 belongs to the
+     sheet overlay: one number can't serve both looks without shifting one of them. */
+  --footer-glass: light-dark(rgba(250, 252, 255, 0.34), rgba(10, 14, 28, 0.46));
   --scrim: light-dark(rgba(235, 240, 250, 0.16), rgba(3, 5, 12, 0.16));
   --scrim-shadow: light-dark(rgba(235, 240, 250, 0.7), rgba(3, 5, 12, 0.7));
   /* The thread's punch-through tone — the PAGE, so the ruler reads as cut out of the ground
@@ -656,6 +663,14 @@
                                               finer rung is) — same language, half a voice, so one
                                               list can't show three equally loud selections */
   --sel-border-dim: light-dark(rgba(9, 133, 133, 0.25), rgba(42, 245, 255, 0.22));
+  /* THE VITALS BAND'S OWN HEIGHT — fixed, so the lane does not change shape when the view does
+     (user, 2026-09-01: "the height of the vitals differs per view; can we make it uniform?").
+     Left to its content the band measured 81px in hyper (four bar rows), 72 in geo and 62 in the
+     ledger, and since it is anchored at the BOTTOM the difference showed up as its top edge
+     jumping on every view switch. Sized to the tallest cell — four MicroBars rows plus the eyebrow
+     and the plate's padding — with a couple of pixels of headroom, and it must stay under
+     --bottom-reserve minus the band's 4px offset or the rails would paint into it. */
+  --vitals-h: 84px;
   --bottom-reserve: 92px;  /* vertical space the bottom VITALS BAND reserves (BottomStream's own
                               RESERVE). The static default matches the BOOT view: the store boots
                               in `hyper`, whose vitalsLane is on, and SSR/first paint assume
@@ -665,11 +680,25 @@
                               snapshots-only LiveStrip). `BottomStream` is the one writer — it
                               publishes from the same conditions that mount the band, so presence
                               and reserve can't drift once hydrated. */
+  /* THE TWO BARS' OUTER INSET — the command bar's and the vitals band's, one token so "the bottom
+     bar is exactly the top bar" is true by construction rather than by two matching literals
+     (user, 2026-09-01). It is NOT --rail-margin below 1100px: the rails only exist at desktop, so
+     aligning the band's edges with rail cards buys nothing on tablet and merely narrows the lane —
+     there, both bars take the wider 16px inset instead. At desktop it resolves TO --rail-margin,
+     which is what keeps the band's edges off the RailThread rulers. The override lives beside the
+     phone block at the foot of this file. */
+  --bar-margin: 16px;
   --rail-margin: 26px;     /* both rails' outer margin — room for the mirrored RailThread rulers.
                               ONE home (review, 2026-08-31): #leftcol/#rightcol and the vitals
                               band's edges all read it, so the band stays aligned with the rail
                               cards through any margin retune. */
-  --footer-h: 26px;        /* the site footer's band along the very bottom edge (SiteFooter.tsx,
+  --footer-h: 22px;        /* the site footer's band along the very bottom edge (SiteFooter.tsx,
+                              2026-08-18). 26px → 22px (user, 2026-09-01: "a bit less margin at the
+                              top of the footer"): the band held an 11px line with 18px of air
+                              above it and 7px below, so the gap read as a margin rather than as a
+                              centred row. Four pixels off the band and six off the vitals lane's
+                              own offset bring it to ~6/10, and the rails — which subtract
+                              max(14px, this) — get the difference back.
                               2026-08-18) — site chrome, not view chrome, so it is a STATIC token
                               rather than a published one. Everything above it ADDS this to its own
                               bottom inset, exactly as the rails add --topbar-extra at the top, and
@@ -1191,4 +1220,14 @@
     -webkit-mask-image: linear-gradient(to right, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
             mask-image: linear-gradient(to right, transparent 0, #000 40px, #000 calc(100% - 40px), transparent 100%);
   }
+}
+
+/* At DESKTOP the two bars pull in to the rails' own margin, so the vitals band's edges align with
+   the rail cards and stay clear of the RailThread rulers that live in that gutter. Below 1100px
+   the rails are edge tabs and there is nothing to align with, so --bar-margin keeps its wider
+   default (see the token). 1100 is `breakpointOf`'s own desktop boundary, and the `min-width`
+   form is what TopBar's `min-[1100px]:` compiles to — CSS trap 8: never restate this as a
+   max-width, which disagrees by exactly one pixel. */
+@media (min-width: 1100px) {
+  :root { --bar-margin: var(--rail-margin); }
 }
