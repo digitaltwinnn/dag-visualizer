@@ -139,6 +139,19 @@ function freezeMotion(clone: HTMLElement): void {
   clone.setAttribute("data-pager-ghost", "");
 }
 
+/** The air between the outgoing card and the one arriving behind it.
+ *
+ *  Offsetting by the card's WIDTH alone butts the two flush, which is a rhythm the app uses nowhere:
+ *  stacked rail panels breathe by `--rail-gap`, and a card never sits tight against anything (user,
+ *  2026-09-01: "the swipe has no padding while the card does not sit tight to the view edge"). Read
+ *  from the token rather than restated, so re-spacing the rail re-spaces the swipe with it; the
+ *  fallback only covers a caller with no computed style to read. */
+const slideGap = (): number => {
+  if (typeof getComputedStyle !== "function") return 16;
+  const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--rail-gap"));
+  return Number.isFinite(v) ? v : 16;
+};
+
 const SLIDE_MS = 820;
 const SLIDE_EASE = "cubic-bezier(0.45, 0.05, 0.25, 1)";
 const FLICK_V = 0.35; // px/ms at release — a throw this fast commits regardless of travel. Measured
@@ -269,7 +282,7 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     g.setAttribute("data-pager-ghost", "");    // and the only thing that animates — see globals.css
     g.style.cssText =
       `position:absolute;left:0;top:0;width:${el.offsetWidth}px;height:${el.offsetHeight}px;` +
-      `margin:0;pointer-events:none;transition:none;box-sizing:border-box;`;
+      `margin:0;pointer-events:none;transition:none;box-sizing:border-box;opacity:0;`;
     copyLook(card, g);                         // the card's own glass, so it reads as a card arriving
     const name = document.createElement("div");
     name.textContent = set.items[set.index + dir].label;
@@ -345,12 +358,13 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     parent.appendChild(clone);
     step(dir); // the heavy subject swap runs NOW, with both cards visible and at rest
     el.style.transition = "none";
-    el.style.transform = `translateX(${dir * w}px)`; // the new card waits just offstage
+    const gap = slideGap();
+    el.style.transform = `translateX(${dir * (w + gap)}px)`; // the new card waits just offstage
     void el.offsetWidth; // flush, so both start their slide together
     el.style.transition = `transform ${SLIDE_MS}ms ${SLIDE_EASE}`;
     el.style.transform = "";
     clone.style.transition = `transform ${SLIDE_MS}ms ${SLIDE_EASE}, opacity ${SLIDE_MS}ms ease-out`;
-    clone.style.transform = `translateX(${-dir * w}px)`;
+    clone.style.transform = `translateX(${-dir * (w + gap)}px)`;
     clone.style.opacity = "0.5"; // a light fade as it leaves — motion carries the story
     const fin = () => {
       clone.remove();
@@ -405,8 +419,20 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     setTx(tx, false);
     // The neighbour rides the SAME damped travel, one card-width out on the side it will arrive
     // from — so the pair moves as one strip and the pull reveals rather than merely resists.
-    const g = showPeek(ddx < 0 ? 1 : -1);
-    if (g) g.style.transform = `translateX(${(ddx < 0 ? 1 : -1) * g.offsetWidth + tx}px)`;
+    const dir = ddx < 0 ? 1 : -1;
+    const g = showPeek(dir);
+    if (g) {
+      g.style.transform = `translateX(${dir * (g.offsetWidth + slideGap()) + tx}px)`;
+      // ⚠️ THE NEIGHBOUR ARRIVES WITH THE PULL, it does not switch on at the engage threshold (user:
+      // "it already highlights the next card, it should be more gradual/smooth because I'm now
+      // dragging the immediately inactive card"). A peek at full strength the moment the drag
+      // engages reads as the next card having already won, while the card under the finger — still
+      // the live one — reads as discarded. Opacity rides the SAME progress the commit does, on a
+      // smoothstep so it stays faint through the early travel a cancel lives in and only becomes
+      // present as the step becomes likely.
+      const p = Math.min(1, Math.abs(ddx) / STEP_PX);
+      g.style.opacity = String(p * p * (3 - 2 * p));
+    }
   };
   const endDrag = (e: PointerEvent<HTMLDivElement>) => {
     const st = start.current;

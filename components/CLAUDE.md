@@ -219,6 +219,15 @@ different piece of work, not a tweak to this one. The peek is built imperatively
 the drag transform is: a pull touches the DOM and never React state, so a 60-120Hz gesture cannot
 re-render a subscribed card. It carries `data-pager-ghost` too, so it neither animates nor is heard.
 
+Two details the first cut got wrong, both reported: it offset by the card's WIDTH alone, butting the
+two flush — a rhythm the app uses nowhere, since stacked panels breathe by `--rail-gap` and a card
+never sits tight against anything. The gap is READ from that token (and the commit slide takes it
+too, so the release continues the gesture's spacing rather than changing it). And it appeared at full
+strength the moment the drag engaged, which read as the next card having already won while the card
+under the finger — still the live one — read as discarded. Its opacity now rides the SAME progress
+the commit does, on a smoothstep, reaching full exactly at `STEP_PX`: faint through the early travel
+a cancel lives in, present only once the step is certain.
+
 **The box can carry a SIBLING PAGER** (`RailPager`): where the expanded rung has 1-N siblings under the
 same committed parent, a slim `‹ n / N ›` plank rides the card's OWN bottom edge, inside the glass, plus
 a horizontal swipe on the body. The set comes from the pure resolver `railSiblings.ts` and every step
