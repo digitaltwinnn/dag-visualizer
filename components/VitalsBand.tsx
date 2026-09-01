@@ -212,6 +212,10 @@ const BAR_TRACK_MAX = 150;
  *  arcs of a single colour and genuinely need separating. A bar row does not — every row is NAMED,
  *  and the ring's slices are in the same order, which is how a legend works. */
 export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key: string; label: React.ReactNode; count: number }[]; accent: string; labelW?: number; dashZero?: boolean }) {
+  // ⚠️ THE CALLER'S ORDER STANDS — see `Donut` for the full reasoning. In short: a magnitude sort
+  // here would re-shuffle the structural cards (type, composition, layers) every time the subject
+  // changes, and a row that moves cannot be followed; the ranked cards already arrive sorted from
+  // their builders. Ordering is a property of the DATA, not of this component.
   const max = Math.max(1, ...rows.map((r) => r.count));
   return (
     // `justify-evenly` over the full height rather than a fixed gap: a four-row card already
@@ -272,6 +276,19 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
  *  size. Segment opacities come from DONUT_STEPS in entry order, which is also the order the
  *  bar rows beside it are built in — order and label are what key a slice to its row. */
 export function Donut({ counts, accent }: { counts: Record<string, number>; accent: string }) {
+  // ⚠️ ENTRY ORDER, NEVER SORTED BY SIZE — and the ring is only half the reason. Sorting was
+  // tried on 2026-09-01 and withdrawn the same minute: "it does not make sense for structural
+  // items like metagraph type and composition; it will look strange when they switch when swiping
+  // between metagraphs" (user). That is the tick bars' own rule reaching a second instrument — a
+  // slice that re-sorts as the subject changes cannot be followed from one subject to the next,
+  // and every donut in this band charts a FIXED VOCABULARY (the four metagraph types, the four
+  // composition roles) whose whole value is sitting in the same place every time. The RANKED
+  // breakdowns beside them — top countries, top providers — arrive sorted from their own
+  // builders, where sorting is the reading rather than a re-shuffle.
+  //
+  // The pairing makes it stricter still: `DONUT_STEPS[i]` keys a slice's opacity to its POSITION
+  // and the bar row beside it is identified by holding the same position, so this order and
+  // `MicroBars`' must never be decided separately.
   const entries = Object.entries(counts);
   const total = entries.reduce((s, [, n]) => s + n, 0);
   const R = 15.5, C = 2 * Math.PI * R, GAP = 2;
