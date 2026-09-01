@@ -4,34 +4,34 @@ import { Loader2 } from "lucide-react";
 
 import DateRange from "@/components/datasection/DateRange";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { displayNetwork } from "@/src/data/unlisted";
 import { cn } from "@/lib/utils";
 
-export type SearchAxis = "snapshot" | "tick" | "age";
-
-// THE ANCHOR LOG'S SEARCH BAR — one axis at a time, one input, one button.
+// THE ANCHOR LOG'S SEARCH BAR — three named criteria and ONE button (user, 2026-09-01).
 //
-// ⚠️ ONE BUTTON, NOT ONE PER FIELD (user, 2026-09-01: "don't add a button next to each field, I
-// want a search button or 'go' or something"). Three fields each with their own submit was the
-// previous cut, and the objection is right: three buttons is three offers where the reader makes
-// one choice. But a single button over three simultaneous fields has to GUESS which one you meant,
-// so the fields stopped being simultaneous — an axis is CHOSEN, its input is the only one on
-// screen, and the button acts on it. That is also the grouping the guidance names for exactly this
-// case: a search input paired with a control that limits which parameter the search covers.
+// ⚠️ THE FIELDS ARE ALL PRESENT; THE BUTTON IS THE ONLY ACTION. Two earlier cuts got that split
+// wrong in opposite directions — a submit beside every field ("don't add a button next to each
+// field, I want a search button"), then a "search by" chooser that HID two criteria so one button
+// could be unambiguous ("no 'search by'"). What a reader wants to see is everything they can search
+// by, with one thing to press.
 //
-// ⚠️ A METAGRAPH SNAPSHOT ORDINAL IS MEANINGLESS WITHOUT ITS NETWORK (user, same). Ordinals are
-// per-chain — DOR's 27,813,700 and DED's 27,813,700 are unrelated snapshots of unrelated ledgers —
-// so `SNAPSHOT` needs to know whose chain it is counting on. It does NOT ask in a popup: this app
-// already has one committed network, it is the top bar's filter, and under a commit this table IS
-// that network's chain. So the axis states the network it will search and refuses to guess when
-// none is committed. That also keeps the answer honest in the other direction: an unfiltered log
-// is a window over EVERY network, where the same ordinal can legitimately match several rows.
+// ⚠️ A METAGRAPH SNAPSHOT ORDINAL IS MEANINGLESS WITHOUT ITS NETWORK, so that criterion is ONE
+// composite field: the chain and the number, joined. Ordinals are per-chain — DOR's 27,813,700 and
+// DED's are unrelated snapshots of unrelated ledgers — and the log's "all" lens is a window over
+// every network at once, so there is nothing to infer from (user: "in all there are multiple
+// networks, so it's needed"). Under a committed filter the picker is PRESELECTED with it ("in a
+// filter you can preselect it no?"), which answers the common case without a click.
 //
-// The other two axes need no network. ANCHORED INTO addresses a GLOBAL snapshot, which is the one
-// chain everyone shares; AGE is a timestamp, likewise.
+// The other two need no network: GLOBAL SNAPSHOT addresses the one chain everyone shares, and a
+// DATE is a timestamp.
+//
+// ⚠️ THE LABEL CARRIES THE MEANING, NOT A PLACEHOLDER. The row this replaces put its hints inside
+// the boxes, where they read as a first row of data ("the hint looks ugly"); here each field is
+// named beside it, and the global-snapshot box holds no hint at all, per the user.
 export default function LogSearchBar({
-  axis,
-  setAxis,
-  network,
+  networks,
+  metaId,
+  setMetaId,
   seeking,
   snapshot,
   tick,
@@ -44,10 +44,10 @@ export default function LogSearchBar({
   onSubmit,
   onClose,
 }: {
-  axis: SearchAxis;
-  setAxis: (a: SearchAxis) => void;
-  /** The committed network's short name, or null under "all" — SNAPSHOT's scope, stated. */
-  network: string | null;
+  /** The chains that can be searched, in the order the explorer lists them. */
+  networks: { id: string; label: string }[];
+  metaId: string | null;
+  setMetaId: (id: string) => void;
   seeking: boolean;
   snapshot: string;
   tick: string;
@@ -57,101 +57,128 @@ export default function LogSearchBar({
   onTick: (v: string) => void;
   onFrom: (v: string) => void;
   onTo: (v: string) => void;
-  onSubmit: (which: SearchAxis) => void;
+  onSubmit: () => void;
   /** Escape folds the bar away — the same key that dismisses every other transient surface here. */
   onClose: () => void;
 }) {
-  const needsNet = axis === "snapshot" && !network;
-  const value = axis === "snapshot" ? snapshot : tick;
-  const canGo = axis === "age" ? !!from : !!value && !needsNet;
-
   const field =
-    "w-full min-w-0 h-6 px-1.5 py-0 bg-[var(--panel-plate)] border border-border/50 rounded-xs " +
-    "font-mono text-body tabular-nums text-foreground placeholder:text-muted-foreground placeholder:font-sans " +
-    "hover:border-border focus:border-transparent disabled:opacity-40 " +
+    "min-w-0 h-6 px-1.5 py-0 bg-[var(--panel-plate)] border border-border/50 rounded-xs " +
+    "font-mono text-body tabular-nums text-foreground " +
+    "hover:border-border focus:border-transparent " +
     "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] transition-colors";
+  const label = "flex-none text-micro uppercase tracking-caps text-muted-foreground";
+
+  // What the one button would actually do — so it can refuse a press it has nothing to answer
+  // with, rather than accepting it and reporting a miss.
+  const canGo = (!!metaId && !!snapshot) || !!tick || !!from;
 
   return (
     <div
-      className="flex-none flex flex-wrap items-center gap-x-2 gap-y-1.5 pb-1.5"
-      onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
+      // ⚠️ THE BAR IS ITS OWN BOX (user, 2026-09-01: "can you check the margins? it looks like it's
+      // all a bit crammed", then "maybe put the search fields in a subtle outline"). Measured
+      // before: the toolbar, this row and the table header sat at 0px from each other, three
+      // stacked strips separated by nothing but their own 4-6px padding — so the criteria read as
+      // more table chrome. A hairline box does both jobs at once: it groups the three criteria as
+      // one thing and it buys the margin, since a box needs air on both sides to be a box.
+      //
+      // OUTLINE ONLY, no fill: the fields inside carry `--panel-plate`, and a plate on a plate
+      // would flatten them into the container. Same weight as every other resting division here.
+      className="flex-none flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-border/50 px-3 py-2 mt-0.5 mb-2"
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+        // Enter anywhere in the bar runs the same search the button runs — implicit submission for
+        // everyone who expects it, one visible control for everyone who does not.
+        if (e.key === "Enter" && canGo) { e.preventDefault(); onSubmit(); }
+      }}
     >
-      {/* THE AXIS CHOOSER IS A DROPDOWN (user, 2026-09-01: "it should also be that shadcn dropdown
-          thing no?") — and it is the shape the guidance names for precisely this control: "a search
-          input paired with a dropdown that limits which parameters the search covers". A segmented
-          control was the first cut and spends three slots stating a single choice; a dropdown
-          spends one and scales if a fourth axis ever earns its place. The three options ARE the
-          statement the old per-column row made with empty cells: these axes can be searched across
-          the whole chain, and nothing else can. */}
+      {/* ── METAGRAPH SNAPSHOT — the chain, then its ordinal, as one control ─────────────────── */}
       <span className="flex flex-none items-center gap-1.5">
-        <span className="text-micro uppercase tracking-caps text-muted-foreground">search by</span>
-        <Select value={axis} onValueChange={(v) => setAxis(v as SearchAxis)}>
+        {/* ⚠️ THE NOUN IS SAID ONCE, BY THE TOGGLE (user, 2026-09-01: "remove 'snapshot' from the
+            filter texts? say 'search snapshots' instead?"). "SEARCH SNAPSHOTS" opens the bar, so
+            repeating "snapshot" in all three labels only crowded them — each field names the axis
+            that distinguishes it and nothing more. The aria-labels stay unabbreviated: a reader
+            hears one field at a time, with no toggle above it to carry the noun. */}
+        <span className={label}>metagraph</span>
+        {/* ⚠️ The trigger COLLAPSES TO ITS MARK once chosen: an identity bullet and the ticker, the
+            same two-part identity every row and card in this app wears (user: "you'll see the
+            metagraph coloured bullet with the selected snapshot number in the field"). The two
+            halves are JOINED — squared inner corners, no gap — because they are one criterion, and
+            a gap between them would read as two. */}
+        <Select value={metaId ?? undefined} onValueChange={setMetaId}>
           <SelectTrigger
             size="sm"
-            aria-label="What to search by"
-            className="h-6 w-[152px] rounded-xs border-border/50 bg-[var(--panel-plate)] px-1.5 text-micro uppercase tracking-caps text-foreground focus-visible:ring-0 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
+            aria-label="Which metagraph's chain"
+            // ⚠️ `h-6!` — CSS trap 4. The primitive sizes itself with `data-[size=sm]:h-8`, an
+            // attribute selector at (0,2,0) that beats a plain `h-6` at (0,1,0), so the picker sat
+            // 32px tall beside 24px inputs. The important modifier is the documented escape.
+            className="h-6! w-[116px] flex-none rounded-l-xs rounded-r-none border-r-0 border-border/50 bg-[var(--panel-plate)] px-1.5 py-0! text-micro uppercase tracking-caps focus-visible:ring-0 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
           >
-            <SelectValue />
+            <SelectValue placeholder="network" />
           </SelectTrigger>
           <SelectContent className="rounded-btn">
-            <SelectItem value="snapshot" className="text-micro uppercase tracking-caps">snapshot</SelectItem>
-            <SelectItem value="tick" className="text-micro uppercase tracking-caps">anchored into</SelectItem>
-            <SelectItem value="age" className="text-micro uppercase tracking-caps">date</SelectItem>
+            {networks.map((n) => (
+              <SelectItem key={n.id} value={n.id} className="text-micro uppercase tracking-caps">
+                <span className="flex items-center gap-1.5">
+                  <span
+                    aria-hidden
+                    className="size-2 flex-none rounded-full"
+                    style={{ background: displayNetwork(n.id)?.hue ?? "var(--core)" }}
+                  />
+                  {n.label}
+                </span>
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={snapshot}
+          aria-label="Metagraph snapshot ordinal"
+          onChange={(e) => onSnapshot(e.target.value)}
+          className={cn(field, "w-[124px] rounded-l-none text-right")}
+        />
       </span>
 
-      {/* THE ONE INPUT, whichever axis is chosen. */}
-      {axis === "age" ? (
-        <DateRange from={from} to={to} seeking={false} onFrom={onFrom} onTo={onTo} onSubmit={() => onSubmit("age")} />
-      ) : (
-        <span className="flex flex-none items-center gap-1.5">
-          {/* SNAPSHOT states whose chain it counts on — and says so rather than searching one it
-              was never told (see the header). The chip is the committed network's own short name. */}
-          {axis === "snapshot" && network && (
-            <span className="flex-none rounded-xs border border-border/50 px-1 py-0.5 text-micro uppercase tracking-caps text-foreground-dim">
-              {network}
-            </span>
-          )}
-          <input
-            type="text"
-            inputMode="numeric"
-            value={value}
-            disabled={needsNet}
-            placeholder={axis === "snapshot" ? "snapshot #" : "global snapshot #"}
-            aria-label={axis === "snapshot" ? "Metagraph snapshot ordinal" : "Global snapshot ordinal"}
-            onChange={(e) => (axis === "snapshot" ? onSnapshot : onTick)(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && canGo) { e.preventDefault(); onSubmit(axis); } }}
-            className={cn(field, "w-[150px] text-right")}
-          />
-        </span>
-      )}
+      {/* ── GLOBAL SNAPSHOT — no hint inside the box; the label is the hint ──────────────────── */}
+      <span className="flex flex-none items-center gap-1.5">
+        <span className={label}>global</span>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={tick}
+          aria-label="Global snapshot ordinal"
+          onChange={(e) => onTick(e.target.value)}
+          className={cn(field, "w-[124px] text-right")}
+        />
+      </span>
 
-      {/* ONE submit. Enter still works inside the input — both, never one: implicit submission for
-          everyone who knows it, a visible control for everyone who does not. */}
+      {/* ── DATE RANGE — the calendar ───────────────────────────────────────────────────────── */}
+      <span className="flex flex-none items-center gap-1.5">
+        <span className={label}>date</span>
+        <DateRange from={from} to={to} seeking={false} onFrom={onFrom} onTo={onTo} onSubmit={onSubmit} />
+      </span>
+
       <button
         type="button"
-        onClick={() => onSubmit(axis)}
+        onClick={onSubmit}
         disabled={!canGo}
         className={cn(
-          "inline-flex flex-none items-center gap-1 h-6 px-2 rounded-xs cursor-pointer",
+          // RIGHT-ALIGNED ON THE FIELDS' OWN LINE (user, 2026-09-01: "why is search on the left,
+          // can't it be on the right and same line as the input fields?"). `ml-auto` pushes it to
+          // the far end of whatever line it lands on, so the criteria read left-to-right and the
+          // action sits where an action sits — and on a narrow pane, where the row wraps, it still
+          // ends its own line rather than floating mid-row.
+          "ml-auto inline-flex flex-none items-center gap-1 h-6 px-2.5 rounded-xs cursor-pointer",
           "text-micro uppercase tracking-caps transition-colors",
           "border border-[var(--primary)]/40 bg-[var(--wash-soft)] text-[var(--primary)]",
           "hover:bg-[var(--wash-hover)] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
           "disabled:opacity-30 disabled:cursor-default disabled:hover:bg-[var(--wash-soft)]",
         )}
       >
-        {seeking ? <Loader2 aria-hidden className="size-3 animate-spin motion-reduce:animate-none" /> : null}
+        {seeking && <Loader2 aria-hidden className="size-3 animate-spin motion-reduce:animate-none" />}
         search
       </button>
-
-      {/* The refusal, in words. It names the control that fixes it — the top bar's own filter — so
-          the reader is not left to guess what "a network" means here. */}
-      {needsNet && (
-        <span className="text-micro text-muted-foreground">
-          pick a network in the top bar — a snapshot number counts on its own chain
-        </span>
-      )}
     </div>
   );
 }

@@ -77,11 +77,16 @@ export default function DateRange({
         <PopoverTrigger
           // SPINELESS AT REST, like every control in this row and every card in this app: a
           // placeholder on a hairline, taking the plate and the ring only once it is being used.
+          // ⚠️ A BOXED FIELD, matching its two siblings exactly (user, 2026-09-01: "the input for
+          // metagraphs selection is higher than the other inputs; standardize"). It wore an
+          // underline at `h-5` from when it lived in a table cell, where a spineless control was
+          // right; in the search bar it stands beside two boxed inputs, so it takes their box and
+          // their 24px height. One recipe, three controls, one line.
           className={cn(
-            "flex h-5 min-w-0 items-center gap-1.5 rounded-none border-0 border-b border-border/50 px-1 py-0",
+            "flex h-6 min-w-0 items-center gap-1.5 rounded-xs border border-border/50 bg-[var(--panel-plate)] px-1.5 py-0",
             "text-body font-sans transition-colors hover:border-border",
             "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
-            "data-[state=open]:bg-[var(--panel-plate)] data-[state=open]:rounded-xs data-[state=open]:border-transparent",
+            "data-[state=open]:border-transparent",
             armed ? "text-foreground" : "text-muted-foreground",
           )}
           title={title}

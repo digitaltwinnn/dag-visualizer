@@ -1,8 +1,8 @@
 "use client";
 
 import { netUrl } from "@/src/net/current";
-import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Search, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowDown, ArrowUp, ChevronRight, Search, X } from "lucide-react";
 import { useStore } from "@/src/store/store";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { getNetwork, metagraphById } from "@/src/data/network";
@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import TablePager from "@/components/datasection/TablePager";
-import LogSearchBar, { type SearchAxis } from "@/components/datasection/LogSearchBar";
+import LogSearchBar from "@/components/datasection/LogSearchBar";
 import { pageOfOrdinal, seekOrdinalByTime, dayStartMs, dayEndMs, tsInRange } from "@/src/data/chainSeek";
 import { POLL } from "@/src/engine/config";
 
@@ -111,11 +111,13 @@ export default function AnchorLogTable() {
   // someone who just asked for them, which is also the one moment they stop being noise and
   // start being the column key.
   const [searchOpen, setSearchOpen] = useState(false);
-  // ⚠️ THE AXIS IS THE SEARCH'S SUBJECT, and it defaults to the one that always works. SNAPSHOT
-  // needs a committed network (a metagraph ordinal counts on its own chain), so under "all" the bar
-  // would open on a field it has to refuse — it opens on ANCHORED INTO instead, which addresses the
-  // one chain everyone shares.
-  const [axis, setAxis] = useState<SearchAxis>("tick");
+  // ⚠️ WHICH CHAIN THE SNAPSHOT ORDINAL COUNTS ON. Null until chosen, and PRESELECTED from the
+  // committed filter whenever there is one (user: "in a filter you can preselect it no?") — under
+  // "all" the log is a window over every network at once, so there is nothing to infer and the
+  // reader picks (user: "in all there are multiple networks, so it's needed").
+  const [searchMeta, setSearchMeta] = useState<string | null>(null);
+  const metaList = useStore((st) => st.metaList);
+  const searchNet = searchMeta ?? (histNet || null);
   const [qSnapshot, setQSnapshot] = useState("");
   const [qTick, setQTick] = useState("");
   const [qFrom, setQFrom] = useState("");
@@ -468,10 +470,27 @@ export default function AnchorLogTable() {
     }
   };
 
-  const onSubmit = (which: "snapshot" | "tick" | "age") => {
-    if (which === "snapshot") seekSnapshot();
-    else if (which === "tick") void seekTick();
-    else void seekAge();
+  /** The chains the picker offers — the catalog as the explorer lists it, plus whatever network is
+   *  already committed, so a filter can always preselect something the list actually contains. */
+  const searchNets = useMemo(() => {
+    const seen = new Set<string>();
+    const out: { id: string; label: string }[] = [];
+    for (const m of metaList) {
+      if (m.isRoot || seen.has(m.id)) continue;
+      seen.add(m.id);
+      out.push({ id: m.id, label: displayNetwork(m.id)?.ticker ?? m.symbol ?? m.name });
+    }
+    return out;
+  }, [metaList]);
+
+  // ⚠️ ONE BUTTON, SO THE PRECEDENCE IS STATED HERE — most specific first. A metagraph snapshot is
+  // an exact address on one chain, a global snapshot is an exact address on the shared one, and a
+  // date is a position to land NEAR. Filling more than one is not an error; the search simply
+  // answers the most precise thing it was given, and the toolbar reports what is applied.
+  const onSubmit = () => {
+    if (searchNet && qSnapshot) seekSnapshot();
+    else if (qTick) void seekTick();
+    else if (qFrom) void seekAge();
   };
 
   /** Any criterion typed — the toggle says so while the row is folded away, or a search would be
@@ -482,10 +501,9 @@ export default function AnchorLogTable() {
   // while a page is fetched, and unmounting the controls mid-seek loses what was typed.
   const search = !searchOpen ? null : (
     <LogSearchBar
-      axis={axis}
-      setAxis={setAxis}
-      // The committed network's own short name — SNAPSHOT's scope, stated rather than assumed.
-      network={histNet ? (displayNetwork(histNet)?.ticker ?? "this network") : null}
+      networks={searchNets}
+      metaId={searchNet}
+      setMetaId={setSearchMeta}
       seeking={seeking}
       snapshot={qSnapshot}
       tick={qTick}
@@ -548,7 +566,17 @@ export default function AnchorLogTable() {
         )}
       >
         <Search aria-hidden className="size-3" />
-        search fields
+        search snapshots
+        {/* The disclosure chevron this control was missing (user, 2026-09-01: "the 'search fields'
+            needs a > as well no?") — the app's one expand affordance, on its own 150ms clock, so
+            the button says at rest that there is something behind it. */}
+        <ChevronRight
+          aria-hidden
+          className={cn(
+            "size-3 transition-transform duration-150 motion-reduce:transition-none",
+            searchOpen && "rotate-90",
+          )}
+        />
       </button>
     </div>
   );
