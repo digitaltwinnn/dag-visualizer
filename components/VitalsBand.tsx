@@ -16,6 +16,7 @@ import { isGlobalActivityScope, type Activity } from "@/src/data/api";
 import { POLL } from "@/src/engine/config";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { useSceneYield } from "@/components/RailShade";
+import { ageWords } from "@/src/util/relativeAge";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
 
@@ -85,20 +86,6 @@ const RATE_STALE_MS = 3600_000;
 function staleFor(a: Activity | null | undefined): number | null {
   return a && a.staleMs != null && a.staleMs > RATE_STALE_MS ? a.staleMs : null;
 }
-/** ⚠️ THE UNIT IS SPELLED OUT (user, 2026-09-01: "d = days? write it in full so people actually
- *  understand"). The log's AGE column abbreviates because it repeats down 25 rows and its header
- *  names the quantity; this appears ONCE, inside a sentence, where `315d` asks the reader to decode
- *  a letter to learn the single most important thing the card is telling them — that the chain has
- *  been silent for the better part of a year. The coarsest unit that is still true, pluralised. */
-function agoLabel(ms: number): string {
-  const unit = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-  const m = Math.round(ms / 60000);
-  if (m < 60) return unit(Math.max(1, m), "minute");
-  const h = Math.round(m / 60);
-  if (h < 48) return unit(h, "hour");
-  return unit(Math.round(h / 24), "day");
-}
-
 function windowSpan(a: Activity): string {
   const mins = a.spanHr * 60;
   return mins < 1 ? `${Math.round(mins * 60)}s` : `~${Math.round(mins)} min`;
@@ -672,11 +659,24 @@ function TickBars({ accent, isMeta, filter, snaps }: { accent: string; isMeta: b
     return { v: total, ord: d.ordinal, segs };
   });
   const max = Math.max(1, ...bars.map((b) => b.v));
+  // EVERY BAR AT ZERO IS A READING, AND IT HAS TO SAY SO (user, 2026-09-01: "'anchors per
+  // snapshot' is completely empty when a metagraph does nothing; how do we show that instead of
+  // just a blank space?"). A single zero tick is an HONEST GAP — no body, never a stub, because a
+  // 2px mark would read as small-but-nonzero — and that rule is right per bar. But when the whole
+  // window is gaps the card renders 52 invisible spans and states nothing at all, which is the one
+  // outcome rule 10 cares about more than the stub it was avoiding.
+  //
+  // AND THE WORD IS `none`, NOT `acquiring`. The two are different facts (the acquiring-state
+  // rule): the sparkline beside it says acquiring because its window has not filled, while here
+  // the window IS full and the answer in it is zero. Saying acquiring would promise an arrival
+  // that the data has already ruled out for this window.
+  const allZero = bars.length > 0 && bars.every((b) => b.v === 0);
   return (
     // Full height, not a fixed 34px: the bars grow from a baseline, so every pixel of card height
     // is resolution the chart can actually spend (user, 2026-09-01).
     <div className="flex items-end justify-end gap-[2px] h-full w-full self-stretch pb-0.5" aria-hidden>
       {bars.length === 0 && <span className="text-micro text-muted-foreground self-center">acquiring…</span>}
+      {allZero && <span className="text-micro text-muted-foreground self-center">no anchors in this window</span>}
       {bars.map((b, i) => {
         const latest = i === bars.length - 1;
         return (
@@ -734,7 +734,7 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
           lead={<span className="font-mono font-bold text-muted-foreground tabular-nums whitespace-nowrap">idle</span>}
         >
           <span className="flex items-center self-stretch text-micro text-muted-foreground">
-            no snapshots for {agoLabel(stale)}
+            no snapshots for {ageWords(stale)}
           </span>
         </BandCard>
       );
@@ -775,7 +775,7 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
   // the roster leads, the anchor rate beside it, the cadence, and the chart closes the row.
   return (
     <>
-      <AnchoringNetworks snaps={snaps} />
+      <AnchoringNetworks snaps={snaps} filter={filter} />
       {scoped
         ? rate("DAG fees/hour", activity?.feesPerHour, activity?.feesSeries, basis && `$DAG this network pays to anchor. ${basis}`)
         : rate("Anchors/hour", activity?.anchorsPerHour, activity?.anchoredSeries, basis && `Metagraph snapshots anchored into the global chain. ${basis}`)}
@@ -791,7 +791,7 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
 // own id sets, never inferred) — with each network's identity dot: the app-wide identity-dot
 // language (a presence roster, not a chart series), names carried sr-only since the band takes
 // no pointer events. A committed filter is a LENS: the window-wide fact stands un-edited.
-function AnchoringNetworks({ snaps }: { snaps: Snaps }) {
+function AnchoringNetworks({ snaps, filter }: { snaps: Snaps; filter: string }) {
   const ids = new Set<string>();
   for (const d of snaps) {
     const mc = getAnchor(d.timestamp)?.metaCounts;
@@ -806,10 +806,32 @@ function AnchoringNetworks({ snaps }: { snaps: Snaps }) {
       size="sm"
       lead={<span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={list.length || null} /></span>}
     >
+      {/* ⚠️ THE LENS DIMS, IT DOES NOT EDIT (user, 2026-09-01: "if we filter, should we then also
+          dim the filtered bullets?"). Yes — this roster was the one surface in the band ignoring the
+          committed filter while every chart beside it re-tinted. But the COUNT above stays the
+          honest total: five networks really did anchor in this window, and a lens is not allowed to
+          change that (the explorer draws the same line — a tick still LISTS every contributor under
+          a commit, it just makes only one of them drillable). So the number says how many anchored
+          and the dim says which one you are looking through.
+          `opacity-45` is the app's existing "present, but not your subject" step — the same one the
+          filter picker's 0-count rows and hyper's 0-node networks wear. */}
       <span className="flex flex-wrap items-center gap-1 max-w-[120px]">
-        {list.slice(0, 12).map((id) => <IdentityDot key={id} hue={identityHudCss(id)} />)}
+        {list.slice(0, 12).map((id) => (
+          <span key={id} className={cn("flex", filter !== "all" && id !== filter && "opacity-45")}>
+            <IdentityDot hue={identityHudCss(id)} />
+          </span>
+        ))}
       </span>
-      <span className="sr-only">{list.map((id) => metagraphById(id)?.name ?? id).join(", ")}</span>
+      {/* Identity is never colour-alone, and the lens has to reach the spoken form too, or a
+          screen reader hears five equal names where the eye sees one subject among four others. */}
+      <span className="sr-only">
+        {list
+          .map((id) => {
+            const name = metagraphById(id)?.name ?? id;
+            return filter !== "all" && id === filter ? `${name} (filtered)` : name;
+          })
+          .join(", ")}
+      </span>
     </BandCard>
   );
 }
