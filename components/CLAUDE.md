@@ -257,7 +257,18 @@ so it is also the basis both cards beside it silently assume; and "nodes by coun
 countries", since the card shows three plus a remainder and the old name promised the whole
 distribution); the ledger leads with WHO (METAGRAPHS ANCHORING, exact from the anchor index, with
 identity dots) then the rates (number + stretch sparkline, units spelled `/hour`) and the
-declicked tick bar-chart. **A TOTAL LIVES INSIDE ITS OWN BREAKDOWN, AND LEADS IT** (user, 2026-08-31): a bare number card
+declicked tick bar-chart, which is **STACKED per metagraph when unfiltered** (user pick,
+2026-09-01 — every metagraph, always, not a top-N). The bar's HEIGHT is unchanged, so it reads as it
+always did at a glance and gains WHO underneath. Three rules keep it honest: the segments must SUM
+to the bar, so whatever `metaCounts` could not attribute is drawn as its own neutral segment rather
+than dropped (the donuts' `other` rule); a tick with no attribution is not a tick with no anchors,
+so it paints whole in the accent — "this many anchored, by whom is not known here"; and order is the
+CATALOG's, never the per-tick counts, since sorting by size repaints every bar as the window shifts
+and a segment that moves cannot be followed. Identity is not colour-alone: the METAGRAPHS ANCHORING
+card immediately to its left is the legend, reading the same `getAnchor(...).metaCounts` and the same
+`identityHudCss` hues, named sr-only.
+
+**A TOTAL LIVES INSIDE ITS OWN BREAKDOWN, AND LEADS IT** (user, 2026-08-31): a bare number card
 beside the list that breaks that number down says the same thing twice, so `COUNTRIES` folded into
 nodes-by-country and `PROVIDERS` into top-providers, and hyper's `NODES` went entirely — the
 composition donut already totalled the same fleet. The merged shape is `DonutTotal` + `MicroBars`:

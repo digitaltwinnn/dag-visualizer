@@ -8,6 +8,7 @@ import { compositionRows, machineKey } from "@/src/data/composition";
 import type { NodeInfo } from "@/src/data/types";
 import { identityHudCss } from "@/src/palette/identity";
 import { METATYPE_ICONS, VIEW_ICONS } from "@/components/icons";
+import { METAGRAPHS } from "@/src/net/current";
 import Sparkline from "@/components/Sparkline";
 import Odometer from "@/components/Odometer";
 import { NoSignalDot } from "@/components/state/StateAtoms";
@@ -528,16 +529,56 @@ function GeoCells({ accent }: { accent: string }) {
 }
 
 // The declicked tick bar-chart — the LiveStrip's honesty rules verbatim, minus every
-// interaction: unfiltered each bar is the tick's TOTAL anchors in cyan on the window max;
-// filtered it is THAT network's own anchors on its OWN scale in its identity hue, empty ticks
-// as honest gaps. Only the newest bar glows. A regular bar chart, nothing more.
+// interaction: filtered, a bar is THAT network's own anchors on its OWN scale in its identity hue,
+// empty ticks as honest gaps. Only the newest bar glows.
+//
+// UNFILTERED IT IS STACKED, one segment per anchoring metagraph in that network's own identity hue
+// (user pick, 2026-09-01: every metagraph, always — not a top-N). The bar's HEIGHT is unchanged —
+// the tick's total anchors on the window max — so the chart reads exactly as it did at a glance and
+// gains WHO underneath. Three rules keep it honest:
+//
+//   · THE SEGMENTS MUST SUM TO THE BAR. `metaCounts` attributes what the anchor index could
+//     identify, which is not always the whole tick, so the shortfall is drawn as its own neutral
+//     segment rather than dropped — otherwise the coloured run would silently claim a total it does
+//     not account for. Same rule as the donuts' `other`.
+//   · A TICK WITH NO ATTRIBUTION IS NOT A TICK WITH NO ANCHORS. If the index carries nothing for a
+//     timestamp we still know the count, so the bar draws whole in the accent: "this many anchored,
+//     by whom is not known here" — never zero, which would be a different and false claim.
+//   · IDENTITY IS NEVER COLOUR-ALONE (dataviz discipline, and the band takes no pointer events so
+//     there can be no tooltip). The legend is the METAGRAPHS ANCHORING card standing immediately to
+//     the left: the same ids, the same `identityHudCss` hues, named sr-only. The two read from one
+//     source — `getAnchor(...).metaCounts` — so a colour in the chart always has a dot beside it.
+//
+// Order is the CATALOG's, never the per-tick counts: sorting by size would repaint every bar as the
+// window shifts, and a segment that changes place tick to tick cannot be followed.
+const STACK_ORDER: string[] = METAGRAPHS.map((m) => m.id);
+const STACK_SET = new Set(STACK_ORDER);
+
 type Snaps = ReturnType<typeof useSnapshotFeed>["snaps"];
+interface StackSeg { key: string; n: number; color: string }
 
 function TickBars({ accent, isMeta, filter, snaps }: { accent: string; isMeta: boolean; filter: string; snaps: Snaps }) {
   const bars = snaps.map((d) => {
     const total = typeof d.metagraphSnapshotCount === "number" ? d.metagraphSnapshotCount : 0;
-    const mine = isMeta ? getAnchor(d.timestamp)?.metaCounts?.get(filter) ?? 0 : total;
-    return { v: isMeta ? mine : total, ord: d.ordinal };
+    const mc = getAnchor(d.timestamp)?.metaCounts;
+    if (isMeta) return { v: mc?.get(filter) ?? 0, ord: d.ordinal, segs: null as StackSeg[] | null };
+    let segs: StackSeg[] | null = null;
+    if (mc && mc.size > 0 && total > 0) {
+      segs = [];
+      let named = 0;
+      for (const id of STACK_ORDER) {
+        const n = mc.get(id);
+        if (n) { segs.push({ key: id, n, color: identityHudCss(id) }); named += n; }
+      }
+      // A network anchoring that the catalog does not list still anchored — it takes its own hue
+      // after the listed ones rather than being folded into the shortfall.
+      for (const [id, n] of mc) {
+        if (n && !STACK_SET.has(id)) { segs.push({ key: id, n, color: identityHudCss(id) }); named += n; }
+      }
+      const rest = total - named;
+      if (rest > 0) segs.push({ key: "__unattributed", n: rest, color: "var(--muted-foreground)" });
+    }
+    return { v: total, ord: d.ordinal, segs };
   });
   const max = Math.max(1, ...bars.map((b) => b.v));
   return (
@@ -550,7 +591,9 @@ function TickBars({ accent, isMeta, filter, snaps }: { accent: string; isMeta: b
         return (
           <span
             key={b.ord}
-            className="flex-1 max-w-[9px] rounded-t-[2px]"
+            // `flex-col-reverse`: segments are written in catalog order and stack UP from the
+            // baseline, so the first listed network is the foot of every bar in the window.
+            className="flex-1 max-w-[9px] rounded-t-[2px] overflow-hidden flex flex-col-reverse"
             style={{
               // Zero anchors = an HONEST GAP (rule 10, the strip's own rendering carried over
               // exactly): no body at all, never a stub — a 2px tinted mark read as
@@ -558,11 +601,16 @@ function TickBars({ accent, isMeta, filter, snaps }: { accent: string; isMeta: b
               // sparse-cadence read exists to avoid. The span keeps its flex slot so the
               // window's rhythm (position = time) survives the empty ticks.
               height: b.v > 0 ? `${Math.max(8, (b.v / max) * 100)}%` : "0",
-              background: b.v > 0 ? accent : "none",
+              // A stacked bar's colour comes from its segments; an unattributed one paints whole.
+              background: b.v > 0 && !b.segs ? accent : "none",
               opacity: b.v > 0 ? (latest ? 1 : 0.55) : 0,
               boxShadow: latest && b.v > 0 ? `0 0 6px ${accent}` : undefined,
             }}
-          />
+          >
+            {b.segs?.map((sg) => (
+              <span key={sg.key} className="w-full flex-none" style={{ height: `${(sg.n / b.v) * 100}%`, background: sg.color }} />
+            ))}
+          </span>
         );
       })}
     </div>
