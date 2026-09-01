@@ -9,19 +9,33 @@ the architecture map and the dev workflow; **its rules govern this file too**.
 ## Layout — the four-zone HUD over a raw data layer
 
 The page is one fixed shell in **two layers at different depths** (`SectionShell` + `store.section`).
-**The raw layer's anchor log carries an ORDINAL JUMP, not a filter** (`datasection/OrdinalJump.tsx`,
-2026-09-01). The distinction is load-bearing: under a committed network the log pages that network's
-ENTIRE chain server-side, 25 rows at a time, so a text filter would search the 25 rows on screen and
-report "no match" for a snapshot three thousand pages back. Ordinals are sequential and gapless, so
-the page holding ordinal X is arithmetic and the seek is one request deep — the same property the
-pager's «/» genesis jumps already ride. In WINDOW mode there is no chain to seek, so it searches the
-loaded rows and says so when the ordinal is outside the window rather than implying it doesn't exist.
-⚠️ Two traps it already fell into: the control must render in the table's LOADING branch too (a jump
-swaps the table into that state, and unmounting the field mid-jump loses what you typed), and its
-"clear" must fire from the change EVENT rather than an effect on the empty value — an effect also
-fires on mount, so every remount silently wiped the landing mark. The landing mark is an OUTLINE and
-deliberately not a wash: the washes are the selection language, and looking something up is not
-committing it (rule 2 keeps one write path for that).
+**The raw layer's anchor log carries a COLUMN SEARCH ROW** (`datasection/LogSearchRow.tsx` +
+`src/data/chainSeek.ts`, 2026-09-01) — controls sitting under the header cells they can answer for.
+
+⚠️ **THE EMPTY CELLS ARE THE DESIGN.** Under a committed network this table pages a chain of >1M
+pages server-side, 25 rows at a time, so a control on a column IMPLIES that column is searchable
+across all of it — and only three are. SNAPSHOT is arithmetic (ordinals are gapless), one request.
+ANCHORED INTO resolves a global ordinal to a timestamp for one ~320 B cached read
+(`/api/global/at?ordinal=`) and then walks. AGE is a date, so the same walk. FEE and SIZE have no
+index at any layer — a control there could only filter the 25 rows on screen, and a reader who typed
+a fee and got "no match" would reasonably conclude no such snapshot exists when we looked at 25 of
+1.1 million. NETWORK is inert because under a commit the table IS one network. An absent affordance
+tells the truth; a disabled or scoped-to-page one asks the reader to notice a qualifier first.
+
+The walk is **interpolating, not bisecting** — cadence is regular enough that false position lands in
+a handful of probes where binary search needs ~21. ⚠️ But false position **stagnates one-sided on a
+curved chain** (a network that changed cadence), so it carries the textbook guard: after the same end
+is kept twice running, that probe bisects. Measured, without the guard a synthetic chain that sped up
+midway failed to converge in 24 probes. It returns **null rather than a plausible page** when it runs
+out — a walk that did not prove a bracket has not searched the chain, and paging somewhere close
+would let the reader believe it had.
+
+Two traps already paid for: the controls must render in the table's LOADING branch too (a seek swaps
+the table into that state, and unmounting mid-seek loses what was typed), and a "clear" must fire
+from the change EVENT rather than an effect on the empty value — an effect also fires on mount, so
+every remount silently wiped the landing mark. That mark is an OUTLINE and deliberately not a wash:
+the washes are the selection language, and looking something up is not committing it (rule 2 keeps
+one write path).
 
 The scene layer is the four-zone HUD over the 3D canvas; the raw layer is the view's raw-data table —
 *the same data one level down*, not a second page. ⚠️ The store value for that layer is **`"data"`,

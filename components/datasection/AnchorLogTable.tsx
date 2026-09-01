@@ -20,13 +20,25 @@ import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import TablePager from "@/components/datasection/TablePager";
-import OrdinalJump from "@/components/datasection/OrdinalJump";
+import LogSearchRow from "@/components/datasection/LogSearchRow";
+import { pageOfOrdinal, seekOrdinalByTime, dayStartMs, dayEndMs, tsInRange } from "@/src/data/chainSeek";
 import { POLL } from "@/src/engine/config";
 
 // The retained global window the log joins against — the same buffer the strip's bars plot,
 // one row per anchored metagraph snapshot inside it.
 const MAX = POLL.maxSnapshots;
 const PAGE = 25;
+
+// ONE COLUMN LIST, read by the header AND by the search row beneath it — a second literal is how the
+// two silently fall out of alignment when a column is added.
+const COLUMNS: { key: AnchorLogSortKey; label: string }[] = [
+  { key: "net", label: "Network" },
+  { key: "ordinal", label: "Snapshot" },
+  { key: "fee", label: "Fee (DAG)" },
+  { key: "size", label: "Size" },
+  { key: "tick", label: "Anchored into" },
+  { key: "age", label: "Age" },
+];
 
 // The ledger data table (spec 2026-08-01): the per-metagraph ANCHOR LOG — one row per anchored
 // metagraph snapshot, finer-grained than the strip's per-tick bars. SORTABLE like the roster
@@ -76,6 +88,11 @@ export default function AnchorLogTable() {
   // no store write, and a real selection still paints over it.
   const [marked, setMarked] = useState<number | null>(null);
   const [jumpMiss, setJumpMiss] = useState<string | null>(null);
+  const [qSnapshot, setQSnapshot] = useState("");
+  const [qTick, setQTick] = useState("");
+  const [qFrom, setQFrom] = useState("");
+  const [qTo, setQTo] = useState("");
+  const [seeking, setSeeking] = useState(false);
   const [page, setPageState] = useState(1);
 
   // ── History state (refs so fetches don't churn the effect graph; `version` re-renders) ──────
@@ -256,49 +273,129 @@ export default function AnchorLogTable() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, metaSnap, windowFirst?.metaId, windowFirst?.ordinal]);
 
-  // THE JUMP. History mode is a true seek: ordinals are sequential and gapless, so the page holding
-  // ordinal X is `floor((latest − X) / PAGE) + 1` and the existing ?before arithmetic fetches it in
-  // one request, genesis included. Window mode CANNOT seek — there is no merged cross-network
-  // history feed to page (the pager already says so in words) — so it searches what is actually
-  // loaded and says plainly when the ordinal is outside that window rather than implying it does
-  // not exist. Two different mechanisms behind one control, and the miss copy names which one ran.
-  const doJump = (target: number) => {
-    setJumpMiss(null);
-    if (histNet) {
-      if (!latest) { setJumpMiss("still reading the chain"); return; }
-      const p = Math.min(Math.max(1, Math.floor((latest - target) / PAGE) + 1), pages);
-      setPageState(p);
-      setMarked(target);
-      return;
-    }
-    const idx = allRows.findIndex((r) => r.ordinal === target || r.global.ordinal === target);
-    if (idx < 0) { setMarked(null); setJumpMiss("not in the retained window — pick a network to page all time"); return; }
-    setPageState(Math.floor(idx / PAGE) + 1);
-    setMarked(target);
+  // ── THE THREE SEEKS ─────────────────────────────────────────────────────────────────────────
+  // Each column's control answers with the cheapest mechanism that can reach the WHOLE chain, and
+  // the differences between them are the reason only these three have controls at all.
+  const netAddr = histNet;
+
+  /** The chain pager, as `seekOrdinalByTime` wants it — and it reuses the walk's own page cache, so
+   *  a probe already visited costs nothing and a completed seek leaves its landing page warm. */
+  const loadPage = async (before: number) => {
+    const cached = hist.current.net === netAddr ? hist.current.pages.get(pageOfOrdinal(before, latest, PAGE)) : null;
+    if (cached && cached.length && cached[0].ordinal === before) return cached.map((r) => ({ ordinal: r.ordinal, ts: r.ts }));
+    const r = await fetch(netUrl(`/api/network/${netAddr}/snapshots?before=${before}`));
+    if (!r.ok) throw new Error(`chain ${r.status}`);
+    const d = (await r.json()) as { rows: { ordinal: number; ts: string }[] };
+    return d.rows;
   };
 
-  // Built ONCE and rendered by BOTH branches below — see the note in the empty branch.
-  // A JUMP, NOT A FILTER: see OrdinalJump's header for why that distinction is load-bearing under a
-  // committed network. In window mode it matches either ordinal on the row, since the reader there
-  // is as likely to be holding a global tick as a metagraph snapshot.
-  const jump = (
-    <OrdinalJump
-      label={histNet ? "Go to metagraph snapshot ordinal" : "Find snapshot ordinal in the window"}
-      hint={histNet ? "go to snapshot #" : "find snapshot or tick #"}
-      max={histNet ? latest : 0}
-      miss={jumpMiss}
-      onJump={doJump}
-      onClear={() => { setJumpMiss(null); setMarked(null); }}
+  const landOn = (ordinal: number) => {
+    setPageState(pageOfOrdinal(ordinal, latest, PAGE));
+    setMarked(ordinal);
+  };
+
+  /** SNAPSHOT — pure arithmetic, one request. */
+  const seekSnapshot = () => {
+    const n = Number(qSnapshot.replace(/[^\d]/g, ""));
+    if (!Number.isFinite(n) || n < 1) return;
+    setJumpMiss(null);
+    if (!histNet) {
+      const idx = allRows.findIndex((r) => r.ordinal === n);
+      if (idx < 0) { setMarked(null); setJumpMiss("not in the retained window — pick a network to page all time"); return; }
+      setPageState(Math.floor(idx / PAGE) + 1);
+      setMarked(n);
+      return;
+    }
+    if (!latest) { setJumpMiss("still reading the chain"); return; }
+    if (n > latest) { setJumpMiss(`newest is ${latest.toLocaleString()}`); return; }
+    landOn(n);
+  };
+
+  /** ANCHORED INTO — a global ordinal is not this chain's address, but it resolves to a TIMESTAMP
+   *  for one ~320 B cached read, and the chain is monotonic in time. So: one lookup, then the walk. */
+  const seekTick = async () => {
+    const n = Number(qTick.replace(/[^\d]/g, ""));
+    if (!Number.isFinite(n) || n < 1) return;
+    setJumpMiss(null);
+    if (!histNet) {
+      const idx = allRows.findIndex((r) => r.global.ordinal === n);
+      if (idx < 0) { setMarked(null); setJumpMiss("not in the retained window — pick a network to page all time"); return; }
+      setPageState(Math.floor(idx / PAGE) + 1);
+      setMarked(allRows[idx].ordinal);
+      return;
+    }
+    if (!latest) { setJumpMiss("still reading the chain"); return; }
+    setSeeking(true);
+    try {
+      const g = await fetch(netUrl(`/api/global/at?ordinal=${n}`));
+      if (!g.ok) { setJumpMiss("no such global snapshot"); return; }
+      const rec = (await g.json()) as { timestamp: string };
+      const ms = Date.parse(rec.timestamp);
+      if (!Number.isFinite(ms)) { setJumpMiss("that tick has no usable timestamp"); return; }
+      const hit = await seekOrdinalByTime(ms, latest, loadPage);
+      // NULL means the walk did not prove a bracket — say so rather than paging somewhere plausible.
+      if (hit == null) { setJumpMiss("could not locate it in the chain"); return; }
+      landOn(hit);
+    } catch {
+      setJumpMiss("the chain read failed — try again");
+    } finally {
+      setSeeking(false);
+    }
+  };
+
+  /** AGE — the FROM bound is the destination; `to` only bounds which rows the landing marks. */
+  const seekAge = async () => {
+    const fromMs = dayStartMs(qFrom);
+    setJumpMiss(null);
+    if (fromMs == null) { setJumpMiss("pick a from-date"); return; }
+    if (!histNet) {
+      const toMs = dayEndMs(qTo);
+      const idx = allRows.findIndex((r) => tsInRange(r.ts, fromMs, toMs));
+      if (idx < 0) { setMarked(null); setJumpMiss("nothing in that range inside the window"); return; }
+      setPageState(Math.floor(idx / PAGE) + 1);
+      setMarked(allRows[idx].ordinal);
+      return;
+    }
+    if (!latest) { setJumpMiss("still reading the chain"); return; }
+    setSeeking(true);
+    try {
+      const hit = await seekOrdinalByTime(fromMs, latest, loadPage);
+      if (hit == null) { setJumpMiss("could not locate that date in the chain"); return; }
+      landOn(hit);
+    } catch {
+      setJumpMiss("the chain read failed — try again");
+    } finally {
+      setSeeking(false);
+    }
+  };
+
+  const onSubmit = (which: "snapshot" | "tick" | "age") => {
+    if (which === "snapshot") seekSnapshot();
+    else if (which === "tick") void seekTick();
+    else void seekAge();
+  };
+
+  // Built ONCE and rendered by BOTH branches below — a seek swaps the table into its loading state
+  // while a page is fetched, and unmounting the controls mid-seek loses what was typed.
+  const search = (
+    <LogSearchRow
+      columns={COLUMNS}
+      seeking={seeking}
+      snapshot={qSnapshot}
+      tick={qTick}
+      from={qFrom}
+      to={qTo}
+      onSnapshot={(v) => { setQSnapshot(v); if (v === "") { setMarked(null); setJumpMiss(null); } }}
+      onTick={(v) => { setQTick(v); if (v === "") { setMarked(null); setJumpMiss(null); } }}
+      onFrom={setQFrom}
+      onTo={setQTo}
+      onSubmit={onSubmit}
     />
   );
 
   if (rows.length === 0)
     return (
       <>
-        {/* ⚠️ THE CONTROL RENDERS IN THIS BRANCH TOO. A jump swaps the table into this loading state
-            while its page is fetched, so leaving it out unmounted the field mid-jump: the typed
-            ordinal vanished and the control's own mount cleared the landing mark it had just set. */}
-        {jump}
         <p className="m-auto text-label text-muted-foreground">
           {!live ? "NO SIGNAL" : histNet ? (histErr ? "history unavailable — the explorer read failed; paging again retries" : "reading the chain…") : "Waiting for anchored metagraph snapshots…"}
         </p>
@@ -309,21 +406,11 @@ export default function AnchorLogTable() {
 
   return (
     <>
-      {jump}
       <ScrollArea className="flex-1 min-h-0">
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-[var(--panel-solid)] backdrop-blur-md">
             <TableRow className="border-border">
-              {(
-                [
-                  { key: "net", label: "Network" },
-                  { key: "ordinal", label: "Snapshot" },
-                  { key: "fee", label: "Fee (DAG)" },
-                  { key: "size", label: "Size" },
-                  { key: "tick", label: "Anchored into" },
-                  { key: "age", label: "Age" },
-                ] as { key: AnchorLogSortKey; label: string }[]
-              ).map((c, i) => (
+              {COLUMNS.map((c, i) => (
                 <TableHead
                   key={c.key}
                   aria-sort={sort.key === c.key ? (sort.dir === 1 ? "ascending" : "descending") : "none"}
@@ -344,6 +431,7 @@ export default function AnchorLogTable() {
                 </TableHead>
               ))}
             </TableRow>
+            {search}
           </TableHeader>
           <TableBody>
             {rows.map((r) => {
@@ -435,6 +523,11 @@ export default function AnchorLogTable() {
           </TableBody>
         </Table>
       </ScrollArea>
+      {/* THE MISS IS STATED, never swallowed (rule 10). It sits by the pager rather than in a header
+          cell because that is the strip already describing WHERE in the chain you are. */}
+      {jumpMiss && (
+        <p className="flex-none pt-1 text-micro text-muted-foreground">{jumpMiss}</p>
+      )}
       <TablePager
         page={histNet ? page : Math.min(page, pages)}
         pages={pages}

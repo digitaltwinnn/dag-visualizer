@@ -69,7 +69,28 @@ const cachedResolve = (net: NetworkId, ts: string) =>
   unstable_cache(() => resolve(net, ts), ["global-at-v1", net, ts], { revalidate: 86400 })();
 
 export async function GET(req: Request) {
-  const ts = new URL(req.url).searchParams.get("ts");
+  const params = new URL(req.url).searchParams;
+
+  // ?ordinal=N — THE OTHER DIRECTION (2026-09-01), and it is the cheap one. `fetchGlobal` already
+  // reads a single ~320-byte per-ordinal record, so a caller holding a global ordinal can learn its
+  // TIMESTAMP for one tiny cached request. That is what makes the raw log's "anchored into" search
+  // affordable: the alternative was /api/snapshot/[ordinal], which decompresses a ~2.5 MB payload to
+  // reach the same field. No binary search here — the ordinal IS the address.
+  const byOrdinal = params.get("ordinal");
+  if (byOrdinal != null) {
+    const n = Number(byOrdinal);
+    if (!Number.isInteger(n) || n < 1) return NextResponse.json({ error: "bad ordinal" }, { status: 400 });
+    try {
+      const g = await cachedGlobal(netOf(req), n);
+      return NextResponse.json(g, { headers: { "Cache-Control": "public, max-age=86400, immutable" } });
+    } catch {
+      // Indistinguishable here from "not yet minted", so it stays a 404 rather than claiming the
+      // upstream is down — the caller shows it as not found either way.
+      return NextResponse.json({ available: false, ordinal: n }, { status: 404 });
+    }
+  }
+
+  const ts = params.get("ts");
   // The explorer's own stamp format — reject anything else before it reaches upstream.
   if (!ts || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/.test(ts)) {
     return NextResponse.json({ error: "bad ts" }, { status: 400 });

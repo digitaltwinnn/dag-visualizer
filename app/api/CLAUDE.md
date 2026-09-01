@@ -20,6 +20,13 @@ them — but the Next Node server can.
   budget.
 - **`/api/geo`** serves the validator IP→geo map live (cached 1h, 503 on failure) so the globe plots
   from one request; the client-side resolver fills any misses.
+- **`/api/global/at`** answers BOTH directions between a global ordinal and its timestamp, and the
+  asymmetry between them is the point. `?ts=` binary-searches ~23 tiny per-ordinal records to find the
+  global carrying that exact stamp (the anchor join is timestamp EQUALITY). `?ordinal=` (2026-09-01)
+  is the cheap direction — the ordinal IS the address, so it is one ~320 B cached read with no search
+  at all. That is what makes the raw log's "anchored into" column affordable: the alternative was
+  `/api/snapshot/[ordinal]`, which decompresses ~2.5 MB to reach the same field. Both results are
+  immutable and cached for a day.
 - **`/api/snapshot/[ordinal]`** reads the raw L0 global snapshot (~2.5 MB) and returns a tiny exact
   summary plus one row per anchored channel entry. **An `ordinal: 0` marks a payload the decoder
   couldn't read, which the UI must show as undecoded rather than as zero.** Cached per ordinal
