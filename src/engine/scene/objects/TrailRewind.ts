@@ -47,7 +47,7 @@ export class TrailRewind {
 
   /** Advance one frame. `slotOf` resolves the held ordinal's CURRENT slot (−1 = not visible —
    *  the trail slides home). */
-  update(dt: number, slotOf: (ordinal: number) => number): void {
+  update(dt: number, slotOf: (ordinal: number) => number, advanced = false): void {
     const slot = this._pinnedOrd != null ? slotOf(this._pinnedOrd) : -1;
     const target = slot > 0 ? slot * SLOT_SP : 0;
     // `>= 0` is "was the held row VISIBLE", and slot 0 — the LEAD — is visible. Written `> 0` it
@@ -59,9 +59,25 @@ export class TrailRewind {
     if (slot > 0 && this._slotPrev >= 0 && slot !== this._slotPrev && this._pinnedOrd === this._ordPrev) {
       this._off += (slot - this._slotPrev) * SLOT_SP; // the calm jump — same ordinal, shifted slot
     }
+    // ⚠️ AN UNHELD TRAIL USED TO SNAP (user, 2026-09-01: "the bytebars move backwards, direction
+    // of the trail, a bit abruptly — can you slow that movement down?"). Every row is drawn at
+    // `LEAD_X − slot * SLOT_SP`, so when a tick advances each slot increments and the row's x
+    // TELEPORTS one slot back in a single frame. The jump above hides that for the HELD row only,
+    // which is why a follow looks calm and an unheld trail does not.
+    //
+    // The cure is the mechanism that already exists: push the offset forward by the slot the trail
+    // just gained, so the frame renders every row where it already was, and let the damper below
+    // carry it back. One movement, in one direction — the invariant this class is built on.
+    //
+    // ⚠️ `else`, NEVER both: on an advance WITH a held row the jump above has already accounted for
+    // that same slot, and adding this on top would step the trail two slots for one tick.
+    else if (advanced) this._off += SLOT_SP;
     this._slotPrev = slot;
     this._ordPrev = this._pinnedOrd;
-    this._off += (target - this._off) * Math.min(1, dt * 3.2);
+    // 2.0, down from 3.2: with the glide above this is now the trail's VISIBLE per-tick motion
+    // rather than a correction nobody was meant to watch, and at 3.2 it arrived in ~1s, which read
+    // as the snap it replaced. Ticks are ~28 s apart, so an unhurried ~2 s costs nothing.
+    this._off += (target - this._off) * Math.min(1, dt * 2.0);
     if (Math.abs(target - this._off) < 0.002) this._off = target;
   }
 

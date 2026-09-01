@@ -815,12 +815,20 @@ function AnchoringNetworks({ snaps, filter }: { snaps: Snaps; filter: string }) 
           and the dim says which one you are looking through.
           `opacity-45` is the app's existing "present, but not your subject" step — the same one the
           filter picker's 0-count rows and hyper's 0-node networks wear. */}
+      {/* TWO CHANNELS FOR ONE LENS: the others step back, the subject steps FORWARD (user,
+          2026-09-01). Dimming alone left the committed network the same size as the four it was
+          being distinguished from — the eye had to find the bright one among five identical marks
+          rather than being handed it. `items-center` keeps the row's baseline steady while one dot
+          grows, so nothing below it shifts. */}
       <span className="flex flex-wrap items-center gap-1 max-w-[120px]">
-        {list.slice(0, 12).map((id) => (
-          <span key={id} className={cn("flex", filter !== "all" && id !== filter && "opacity-45")}>
-            <IdentityDot hue={identityHudCss(id)} />
-          </span>
-        ))}
+        {list.slice(0, 12).map((id) => {
+          const on = filter !== "all" && id === filter;
+          return (
+            <span key={id} className={cn("flex", filter !== "all" && !on && "opacity-45")}>
+              <IdentityDot hue={identityHudCss(id)} className={on ? "w-3 h-3" : undefined} />
+            </span>
+          );
+        })}
       </span>
       {/* Identity is never colour-alone, and the lens has to reach the spoken form too, or a
           screen reader hears five equal names where the eye sees one subject among four others. */}

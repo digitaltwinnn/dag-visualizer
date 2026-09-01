@@ -309,6 +309,8 @@ export class LedgerView implements SceneView {
   private _rewind = new TrailRewind();
   /** Mirror of the rewind offset for the frame's read sites (updated once per update()). */
   private _trailOff = 0;
+  /** Set when a tick shifted every row a slot back; consumed by the next `_rewind.update`. */
+  private _advanced = false;
   private _slotOfOrd = (ordinal: number): number => this.model.slotOf(ordinal);
   /** The transient HOVER row (split from the committed selection, user 2026-08-07): previews at the
    *  GROUP focus tier without demoting the active row. */
@@ -732,6 +734,9 @@ export class LedgerView implements SceneView {
       this._graceOrd = prevLead;
       this._graceT = 1;
     }
+    // The trail gained a slot — armed here (data time) and consumed by the rewind on the next
+    // frame, which is the one place trail motion is allowed to live.
+    if (prevLead != null && this.model.tickOrdinal !== prevLead) this._advanced = true;
 
     for (let s = 0; s < SLOT_N; s++) this._slotSnap[s] = null;
     if (this.model.tickOrdinal != null)
@@ -1148,7 +1153,8 @@ export class LedgerView implements SceneView {
 
     // ── the TRAIL REWIND (objects/TrailRewind.ts): the shown snapshot owns the front; rows
     // newer than it slide past the edge and dissolve. All scalar logic lives in the adapter.
-    this._rewind.update(dt, this._slotOfOrd);
+    this._rewind.update(dt, this._slotOfOrd, this._advanced);
+    this._advanced = false;
     this._trailOff = this._rewind.offset;
     // Hoisted per frame (the tune hoist rule): the SELECTED row — the one that owns the focus — or -1.
     const pinSlot = this.model.selectedSlot;
