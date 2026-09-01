@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import TablePager from "@/components/datasection/TablePager";
+import OrdinalJump from "@/components/datasection/OrdinalJump";
 import { POLL } from "@/src/engine/config";
 
 // The retained global window the log joins against — the same buffer the strip's bars plot,
@@ -68,6 +69,13 @@ export default function AnchorLogTable() {
   const histNet = lens !== "all" && lens !== UNLISTED_ID && metagraphById(lens) ? lens : null;
 
   const [sort, setSort] = useState<{ key: AnchorLogSortKey; dir: 1 | -1 }>({ key: "age", dir: 1 });
+  // THE JUMP'S LANDING MARK. A jump that only changed the page would leave the reader hunting the
+  // ordinal they just typed among 25 near-identical rows, so the row is marked when it arrives.
+  // It is LOCAL state and deliberately not a selection: rule 2 keeps one write path for that, and
+  // "I looked this up" is not "I committed this" — the mark carries no card, no scene subject and
+  // no store write, and a real selection still paints over it.
+  const [marked, setMarked] = useState<number | null>(null);
+  const [jumpMiss, setJumpMiss] = useState<string | null>(null);
   const [page, setPageState] = useState(1);
 
   // ── History state (refs so fetches don't churn the effect graph; `version` re-renders) ──────
@@ -248,17 +256,60 @@ export default function AnchorLogTable() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, metaSnap, windowFirst?.metaId, windowFirst?.ordinal]);
 
+  // THE JUMP. History mode is a true seek: ordinals are sequential and gapless, so the page holding
+  // ordinal X is `floor((latest − X) / PAGE) + 1` and the existing ?before arithmetic fetches it in
+  // one request, genesis included. Window mode CANNOT seek — there is no merged cross-network
+  // history feed to page (the pager already says so in words) — so it searches what is actually
+  // loaded and says plainly when the ordinal is outside that window rather than implying it does
+  // not exist. Two different mechanisms behind one control, and the miss copy names which one ran.
+  const doJump = (target: number) => {
+    setJumpMiss(null);
+    if (histNet) {
+      if (!latest) { setJumpMiss("still reading the chain"); return; }
+      const p = Math.min(Math.max(1, Math.floor((latest - target) / PAGE) + 1), pages);
+      setPageState(p);
+      setMarked(target);
+      return;
+    }
+    const idx = allRows.findIndex((r) => r.ordinal === target || r.global.ordinal === target);
+    if (idx < 0) { setMarked(null); setJumpMiss("not in the retained window — pick a network to page all time"); return; }
+    setPageState(Math.floor(idx / PAGE) + 1);
+    setMarked(target);
+  };
+
+  // Built ONCE and rendered by BOTH branches below — see the note in the empty branch.
+  // A JUMP, NOT A FILTER: see OrdinalJump's header for why that distinction is load-bearing under a
+  // committed network. In window mode it matches either ordinal on the row, since the reader there
+  // is as likely to be holding a global tick as a metagraph snapshot.
+  const jump = (
+    <OrdinalJump
+      label={histNet ? "Go to metagraph snapshot ordinal" : "Find snapshot ordinal in the window"}
+      hint={histNet ? "go to snapshot #" : "find snapshot or tick #"}
+      max={histNet ? latest : 0}
+      miss={jumpMiss}
+      onJump={doJump}
+      onClear={() => { setJumpMiss(null); setMarked(null); }}
+    />
+  );
+
   if (rows.length === 0)
     return (
-      <p className="m-auto text-label text-muted-foreground">
-        {!live ? "NO SIGNAL" : histNet ? (histErr ? "history unavailable — the explorer read failed; paging again retries" : "reading the chain…") : "Waiting for anchored metagraph snapshots…"}
-      </p>
+      <>
+        {/* ⚠️ THE CONTROL RENDERS IN THIS BRANCH TOO. A jump swaps the table into this loading state
+            while its page is fetched, so leaving it out unmounted the field mid-jump: the typed
+            ordinal vanished and the control's own mount cleared the landing mark it had just set. */}
+        {jump}
+        <p className="m-auto text-label text-muted-foreground">
+          {!live ? "NO SIGNAL" : histNet ? (histErr ? "history unavailable — the explorer read failed; paging again retries" : "reading the chain…") : "Waiting for anchored metagraph snapshots…"}
+        </p>
+      </>
     );
 
   const now = Date.now();
 
   return (
     <>
+      {jump}
       <ScrollArea className="flex-1 min-h-0">
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-[var(--panel-solid)] backdrop-blur-md">
@@ -322,6 +373,13 @@ export default function AnchorLogTable() {
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                     rowSel && "bg-[var(--sel-bg)] text-foreground",
                     tickMate && "bg-wash-faint",
+                    // The jump's landing mark — an OUTLINE, never a wash: the two washes above are
+                    // the selection language (committed row, its tick-mates), and a third fill
+                    // would read as a third selection strength. An outline says "this is the one
+                    // you asked for" without joining that vocabulary, and it loses to a real
+                    // selection painting over it.
+                    !rowSel && marked != null && (r.ordinal === marked || r.global.ordinal === marked) &&
+                      "outline outline-1 outline-offset-[-1px] outline-[var(--primary)]",
                   )}
                   // A <tr> is not natively focusable — tabIndex + Enter/Space give the keyboard
                   // the same commit, and focus previews what hover previews (rule 9).
