@@ -14,8 +14,16 @@
 // Brightness/opacity are TUNABLE (RibbonTune) — the dev ?tune panel binds them live; the defaults
 // here are the shipped look.
 //
-// Drawn on the LEAD row and the HOT row only, so the trail stays calm; older ticks keep a hairline
-// strut drawn by the view. One Mesh, one preallocated geometry, rewritten event-time.
+// Drawn on FOUR rows only (see RIBBON_ROWS), so the trail stays calm.
+//
+// ⚠️ Older ticks used to be described here as keeping "a hairline strut drawn by the view". They did
+// not — that strut had been retired and the comment outlived it, so the trail's older rows stated no
+// relation between a lane tile and the band it anchored into at all (found 2026-09-01, when the user
+// asked why "the trail when filtered doesn't show any relation between global and meta snapshot").
+// The THREADS below are the honest version of that sentence: see setThreads.
+//
+// Two meshes, both preallocated and rewritten event-time: the sheets, and the committed network's
+// hairline threads.
 import * as THREE from "three";
 import { glowBlend, inkMix, inkPresence, isLightGround, type SceneColors } from "../../sceneColors";
 import type { TuneSchema } from "../../tune";
@@ -34,6 +42,11 @@ import { snapBright } from "../../domain/dimModel";
 // row stops being the lead (user: "the ribbon and snapshot selection effect disappear
 // immediate"). LedgerView owns the handoff timing; this row is just one more sheet.
 export const RIBBON_ROWS = 4;
+/** Trail slots a thread can be drawn for — the retained window, so every visible row can carry one. */
+const MAX_THREADS = 64;
+/** Subdivisions per thread, and the LineSegments vertex count that follows (two per segment). */
+const THREAD_SEG = 12;
+const VERTS_PER_THREAD = THREAD_SEG * 2;
 /** Vertical subdivisions per ribbon — enough for the eased sweep to read as a curve. */
 export const RIBBON_SEG = 16;
 const PER_ROW = METAGRAPHS.length + 1;
@@ -44,6 +57,7 @@ export interface RibbonTune {
   restOp: number;    // resting sheet opacity (× view alpha)
   brightness: number; // vertex-colour multiplier (additive blending → perceived brightness)
   curve: number;     // 0 = straight diagonal sheet, 1 = full smootherstep S-sweep
+  threadAlpha: number; // the committed network's hairline thread (setThreads) — a HINT, not a sheet
 }
 
 // User-tuned via ?tune, 2026-08-07.
@@ -51,6 +65,9 @@ export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
   restOp: 0.21, // 0.25 → 0.21 with brightness 0.85 → 1.1 (user export, 2026-08-30): a touch less film, more vivid colour — beside the snapshots' new halo lift
   brightness: 1.1,
   curve: 1,
+  // Deliberately low: the thread's job is to say a relation EXISTS down the trail, not to compete
+  // with the four sheets that show it in full. Raise it and the chamber becomes a harp.
+  threadAlpha: 0.4,
 };
 
 /** The `?tune` knob ranges (contract: src/engine/tune.ts) — colocated so a range sits next to the
@@ -59,6 +76,7 @@ export const RIBBON_TUNE_SCHEMA: TuneSchema<RibbonTune> = {
   restOp: { min: 0, max: 1, label: "opacity" },
   brightness: { min: 0.1, max: 2, step: 0.05 },
   curve: { min: 0, max: 1, step: 0.05 },
+  threadAlpha: { min: 0, max: 1, step: 0.02, label: "thread alpha" },
 };
 
 /** The eased Z progress at vertical progress `t` — linear blended toward smootherstep. */
@@ -83,6 +101,18 @@ export class Ribbons {
   private _mat: THREE.MeshBasicMaterial;
   private _mesh: THREE.Mesh;
   private _rows: RowState[] = [];
+  // ── the committed network's hairline THREADS (2026-09-01) ────────────────────────────────────
+  private _thGeo = new THREE.BufferGeometry();
+  private _thPos: THREE.Float32BufferAttribute;
+  private _thCol: THREE.Float32BufferAttribute;
+  private _thMat: THREE.LineBasicMaterial;
+  private _thLines: THREE.LineSegments;
+  /** One entry per drawn thread: the slot it belongs to and its first vertex, so the per-frame
+   *  fade pass can write alpha without recomputing any geometry. */
+  private _thSlots: number[] = [];
+  private _thStart: number[] = [];
+  private _thCount = 0;
+  private _thAlpha: number[] = [];
   private _sceneColors: Record<string, number>;
   private _neutral: number;
   /** Per-row brightness scale — the trail REWIND fades the live lead row's sheet while an older
@@ -90,6 +120,8 @@ export class Ribbons {
   private _rowFade = [1, 1, 1];
   private _filter = "all";
   private _c = new THREE.Color();
+  /** Scratch quad for the thread pass — event-time only, never per frame. */
+  private _q: RibbonQuad = { topZ0: 0, topZ1: 0, botZ0: 0, botZ1: 0 };
   /** The live palette — the sheet is normal-blended INK on paper, additive GLOW on the dark
    *  ground, and its per-row brightness has to be expressed for whichever one it lands on. */
   private _colors: SceneColors;
@@ -124,6 +156,27 @@ export class Ribbons {
     this._mesh.frustumCulled = false;
     this.group.add(this._mesh);
 
+    // The threads: one polyline per trail slot, subdivided along the SAME eased sweep the sheets
+    // use (see setThreads). Sized for every slot the trail can hold.
+    const thVerts = MAX_THREADS * VERTS_PER_THREAD;
+    this._thPos = new THREE.Float32BufferAttribute(new Float32Array(thVerts * 3), 3);
+    this._thCol = new THREE.Float32BufferAttribute(new Float32Array(thVerts * 4), 4);
+    this._thPos.setUsage(THREE.DynamicDrawUsage);
+    this._thCol.setUsage(THREE.DynamicDrawUsage);
+    this._thGeo.setAttribute("position", this._thPos);
+    this._thGeo.setAttribute("color", this._thCol);
+    this._thGeo.setDrawRange(0, 0);
+    // A LINE, not a thin sheet: the whole point is that it states the relation without adding
+    // area to a chamber that is already full of glass. Same blend and depth rules as the sheets,
+    // and out of the bloom layer for the same reason they are.
+    this._thMat = new THREE.LineBasicMaterial({
+      vertexColors: true, transparent: true, opacity: 0,
+      depthWrite: false, blending: glowBlend(colors),
+    });
+    this._thLines = new THREE.LineSegments(this._thGeo, this._thMat);
+    this._thLines.frustumCulled = false;
+    this.group.add(this._thLines);
+
     for (let r = 0; r < RIBBON_ROWS; r++) {
       const quads: RibbonQuad[] = [];
       for (let i = 0; i < PER_ROW; i++) quads.push({ topZ0: 0, topZ1: 0, botZ0: 0, botZ1: 0 });
@@ -146,6 +199,8 @@ export class Ribbons {
     // on the dark ground is a no-op on paper — the ribbons vanished outright before this line.
     this._mat.blending = glowBlend(c);
     this._mat.needsUpdate = true; // three caches the program per blending mode
+    this._thMat.blending = glowBlend(c);
+    this._thMat.needsUpdate = true;
     this._writeGeometry(); // event-time: a theme flip, not a frame
   }
 
@@ -182,6 +237,102 @@ export class Ribbons {
     this._writeGeometry();
   }
 
+  /** THE COMMITTED NETWORK'S HAIRLINE THREADS — one per trail slot that actually anchored it.
+   *
+   *  Under a commit the chamber's two readings both run the length of the trail (the lane's tiles
+   *  above, its bands below) with nothing joining them: the sheets stop after four rows, because
+   *  N networks × every row is a wall of glass. That cap answers the UNFILTERED chamber. Commit a
+   *  network and there is at most ONE line per row — a twelfth of the load the cap was protecting
+   *  against — so the cap should not be inherited, and it isn't.
+   *
+   *  Three rules hold it honest and quiet:
+   *   · ONLY under a commit, and only for the committed key. Unfiltered, nothing is drawn and the
+   *     chamber is byte-identical to before.
+   *   · ONLY where the anchor exists (rule 10). A tick this network did not anchor into draws no
+   *     line — the gap IS the fact, exactly as the byte bar draws no body for a zero.
+   *   · It follows the SHEETS' OWN eased sweep, never a straight segment. The ribbon design falls
+   *     from the lane, sweeps mid-run and lands vertically precisely so nothing slices diagonally
+   *     across the chamber; a straight thread would reintroduce the diagonal that was designed out.
+   *     Sharing `sweep()` with the sheets is also what keeps a thread from drifting off the ribbon
+   *     it stands in for.
+   *
+   *  Geometry is event-time (the caller rebuilds when the trail or the filter changes); the
+   *  per-frame half is `setThreadFades`, which writes alpha alone. */
+  setThreads(
+    slots: { slot: number; spec: BarSpec | null }[],
+    laneZ: (key: string) => number | null,
+    topHalf: (key: string) => number,
+  ): void {
+    this._thCount = 0;
+    this._thSlots.length = 0;
+    this._thStart.length = 0;
+    this._thAlpha.length = 0;
+    const key = this._filter;
+    if (key === "all") { this._thGeo.setDrawRange(0, 0); return; }
+    const hex = this._sceneColors[key] ?? this._neutral;
+    this._c.setHex(hex);
+    const z = laneZ(key);
+    const p = this._thPos.array as Float32Array;
+    const c = this._thCol.array as Float32Array;
+    const yTop = FLOOR_Y.msnap + TILE_LIFT;
+    const yBot = FLOOR_Y.gl0 + BAR_LIFT + BAR_H;
+    const curve = this.tune.curve;
+    let v = 0;
+    if (z != null) {
+      for (const { slot, spec } of slots) {
+        if (!spec || this._thCount >= MAX_THREADS) continue;
+        let band: BarSpec["bands"][number] | null = null;
+        for (let i = 0; i < spec.bandCount; i++) if (spec.bands[i].key === key) { band = spec.bands[i]; break; }
+        if (!band) continue; // this tick carried nothing for the committed network — no line
+        ribbonQuad(z, topHalf(key), band, this._q);
+        const x = LEAD_X - slot * SLOT_SP;
+        this._thSlots.push(slot);
+        this._thStart.push(v);
+        this._thAlpha.push(0);
+        this._thCount++;
+        // The thread is the quad's CENTRE line, so it stands exactly where the sheet's own middle
+        // would be if this row had one.
+        for (let j = 0; j < THREAD_SEG; j++) {
+          const t0 = j / THREAD_SEG, t1 = (j + 1) / THREAD_SEG;
+          const s0 = sweep(t0, curve), s1 = sweep(t1, curve);
+          const mid = (a: number) => {
+            const l = this._q.topZ0 + (this._q.botZ0 - this._q.topZ0) * a;
+            const r = this._q.topZ1 + (this._q.botZ1 - this._q.topZ1) * a;
+            return (l + r) / 2;
+          };
+          const y0 = yTop + (yBot - yTop) * t0, y1 = yTop + (yBot - yTop) * t1;
+          p[v * 3] = x; p[v * 3 + 1] = y0; p[v * 3 + 2] = mid(s0);
+          c[v * 4] = this._c.r; c[v * 4 + 1] = this._c.g; c[v * 4 + 2] = this._c.b; c[v * 4 + 3] = 0;
+          v++;
+          p[v * 3] = x; p[v * 3 + 1] = y1; p[v * 3 + 2] = mid(s1);
+          c[v * 4] = this._c.r; c[v * 4 + 1] = this._c.g; c[v * 4 + 2] = this._c.b; c[v * 4 + 3] = 0;
+          v++;
+        }
+      }
+    }
+    this._thPos.needsUpdate = true;
+    this._thCol.needsUpdate = true;
+    this._thGeo.setDrawRange(0, v);
+  }
+
+  /** The per-frame half: `fadeOf(slot)` is the trail's own front/horizon ramp, so a thread leaves
+   *  the chamber on exactly the boundary its band and its tile leave on. Writes ALPHA only — no
+   *  geometry, no allocation (rule 5). */
+  setThreadFades(fadeOf: (slot: number) => number): void {
+    if (this._thCount === 0) return;
+    const c = this._thCol.array as Float32Array;
+    let dirty = false;
+    for (let i = 0; i < this._thCount; i++) {
+      const a = fadeOf(this._thSlots[i]) * this.tune.threadAlpha;
+      if (Math.abs(a - this._thAlpha[i]) < 0.004) continue;
+      this._thAlpha[i] = a;
+      dirty = true;
+      const start = this._thStart[i];
+      for (let v = start; v < start + VERTS_PER_THREAD; v++) c[v * 4 + 3] = a;
+    }
+    if (dirty) this._thCol.needsUpdate = true;
+  }
+
   clearRow(row: 0 | 1 | 2 | 3): void {
     this._rows[row].count = 0;
     this._rows[row].keys.length = 0;
@@ -203,11 +354,13 @@ export class Ribbons {
    *  visibly trailing them out of the view by ~half a second. `restOp` is read per frame here like
    *  every other tune row, so the knob still lives without an onChange. */
   setAlpha(a: number): void {
+    // The threads ride the same view alpha as the sheets — one fade for the whole relation layer.
     // `restOp` is the level of an ADDITIVE sheet over black, where the bloom lifts it clear; the same
     // number as normal-blended ink on paper composites the (already ink-mixed) vertex colour at a
     // quarter strength, which is precisely how the ribbons read as white ghosts on the light ground.
     // Presence, so it asks the ground — see inkPresence.
     this._mat.opacity = inkPresence(this.tune.restOp, this._paper) * a;
+    this._thMat.opacity = inkPresence(this.tune.restOp, this._paper) * a;
   }
 
   /** COMMITTED filter → the other metagraphs' sheets take the COLORED dim (identity hue at the
@@ -281,6 +434,8 @@ export class Ribbons {
   }
 
   dispose(): void {
+    this._thGeo.dispose();
+    this._thMat.dispose();
     this._geo.dispose();
     this._mat.dispose();
     this._rows.length = 0;

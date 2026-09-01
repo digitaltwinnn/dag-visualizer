@@ -203,6 +203,10 @@ export interface FocusRow {
 export interface FocusShared {
   /** Share of the boost a GROUP member gets, vs. the primary subject's full 1. */
   groupShare: number;
+  /** How far a COMMITTED network's own snapshots are held ABOVE the trail's resting weight —
+   *  see snapBright. A multiplier on `rest`, not an additive boost, so it can never collide with
+   *  the focused row's `boost`. */
+  snapHold: number;
 }
 
 export const FOCUS_TUNE_DEFAULTS: Readonly<Record<View3D, Readonly<FocusRow>>> = {
@@ -231,7 +235,13 @@ export const FOCUS_TUNE_DEFAULTS: Readonly<Record<View3D, Readonly<FocusRow>>> =
   ledger: { dim: 0.67, hide: 0, elem: 0, back: 0.55, boost: 0.7, grow: 0.24 }, // dim 0.5 → 0.67 (user export, 2026-08-30): a deeper coloured dim on the other lanes, paired with the DAG core never dimming here at all (Globe._applyDim's ledger rule)
 };
 
-export const FOCUS_SHARED_DEFAULTS: Readonly<FocusShared> = { groupShare: GROUP_FOCUS };
+// Measured, not guessed (2026-09-01): the bar rests at 0.12 and the ledger's boost is 0.7, so a
+// focused row's band sits at 0.82 while its own network's bands down the trail sat at 0.12 — a 7×
+// gap that read as "the selection is dimmed" (user, twice). 3.75 puts the trail at ~0.45, clearly
+// legible and still comfortably behind the focused row. The lane tiles rest at 0.10 and land at
+// ~0.38 from the same number, which is why this is ONE knob rather than a per-surface constant.
+export const SNAP_HOLD = 3.75;
+export const FOCUS_SHARED_DEFAULTS: Readonly<FocusShared> = { groupShare: GROUP_FOCUS, snapHold: SNAP_HOLD };
 
 export const FOCUS_TUNE: Record<View3D, FocusRow> = {
   hyper: { ...FOCUS_TUNE_DEFAULTS.hyper },
@@ -258,6 +268,7 @@ export const FOCUS_ROW_SCHEMA: TuneSchema<FocusRow> = {
 
 export const FOCUS_SHARED_SCHEMA: TuneSchema<FocusShared> = {
   groupShare: { min: 0, max: 1, label: "group share" },
+  snapHold: { min: 1, max: 8, step: 0.05, label: "committed hold ×" },
 };
 
 // Per-node dim: the record's own eased dim (the DAG core eases ONE value for the whole core — the
@@ -342,15 +353,42 @@ export function nodeEmissive(
 export const snapFocusOf = (primary: boolean, group: boolean, offFilter: boolean): number =>
   offFilter ? 0 : focusWeightOf(primary, group);
 
+// ⚠️ A COMMITTED NETWORK IS HELD UP THE WHOLE TRAIL, NOT JUST ON THE FOCUSED ROW (user, 2026-09-01:
+// with a metagraph selected "the related segment in the trail bytebar keeps the color but can you
+// also remove the dim effect? Same applies to the metagraph lane").
+//
+// The first pass at this read the complaint as the `back` step-back — `back` pushes everything
+// behind the FOCUSED ROW, the ledger follows the live row so `anyFocus` is true almost always, and
+// the member's bands were therefore taking it on every row but one. That was real, and exempting
+// them was right, and it changed nothing anyone could see: measured, it moved a trail band from
+// 0.066 to 0.12 while the focused row's band sat at 0.82. The gap the eye was reading was never
+// `back` — it was that a member's bands rest at the trail's own resting weight, which is tuned for
+// an UNFILTERED, neutral trail where no band is anybody's subject.
+//
+// Under a commit they are precisely somebody's subject: the whole point of naming a network in this
+// chamber is to trace it BACK THROUGH TIME, and a trail you cannot follow is a commit that did
+// nothing. So a member's rest is HELD up by `snapHold`, and the ordering falls out:
+//
+//     focused row 0.82  >  committed member 0.45  >  unfiltered trail 0.066  >  off-filter 0.04
+//
+// ⚠️ It is a MULTIPLIER ON REST, taken in the else-of the boost — never an additive term. Added to
+// the focused row's own boost it would push past opacity 1 and clip, which would flatten the very
+// distinction that makes the focused row lead. And it is the ONE exception to "a commit adds no
+// light" (see hubMatchBoost below): that rule is about member NODES, whose commit is answered by
+// each view's own furniture — and the ledger's furniture answer IS this, the coloured dim made
+// legible. `offFilter` and `onFilter` are NOT complements: under "all" both are false and every
+// band simply rests.
 export function snapBright(
   base: number,
   offFilter: boolean,
   focus = 0,
   anyFocus = false,
+  onFilter = false,
 ): number {
   const row = FOCUS_TUNE.ledger;
   let v = base * (offFilter ? 1 - row.dim : 1);
   if (focus > 0) v += row.boost * focus;
+  else if (onFilter) v *= FOCUS_SHARED.snapHold;
   else if (anyFocus) v *= row.back;
   return v;
 }

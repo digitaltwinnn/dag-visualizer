@@ -158,8 +158,24 @@ height").
 **Ribbons carry the anchor.** One tapering sheet per anchoring lane, from that metagraph's lane tiles
 down to **its own band** — the literal statement of which bytes came from where. Both edges are eased
 identically so adjacent ribbons can't cross, and a **hidden lane draws no ribbon** (its old-position
-sheet would overlap the committed lane's field). Only the lead row and the hot row get a sheet; older
-ticks keep a hairline strut.
+sheet would overlap the committed lane's field). Only FOUR rows get a sheet — lead, hot, hover
+preview, grace — because N networks × every row is a wall of glass.
+
+⚠️ **That cap answers the UNFILTERED chamber, and it used to be inherited by the filtered one.** This
+paragraph claimed for months that "older ticks keep a hairline strut"; there was no such strut — it had
+been retired and the sentence outlived it — so under a commit the two readings that run the length of
+the trail (the lane's tiles above, its bands below) had nothing joining them, and the user asked why
+"the trail when filtered doesn't show any relation between global and meta snapshot" (2026-09-01).
+**THREADS** (`Ribbons.setThreads`) are the honest version of that sentence: under a commit, one
+hairline per trail row that actually anchored the committed network, on the rows the sheets don't
+cover. Commit a network and there is at most ONE line per row — a twelfth of the load the cap protects
+against — so the cap does not apply. Three rules hold it: only under a commit (unfiltered draws
+nothing and the chamber is byte-identical); only where the anchor exists, so a tick that network
+missed draws no line and **the gap is the fact** (rule 10, the byte bar's own zero rule); and it
+follows the **sheets' own eased sweep**, never a straight segment — the ribbon geometry falls, sweeps
+and lands vertically precisely so nothing slices diagonally across the chamber, and sharing `sweep()`
+is what stops a thread drifting off the ribbon it stands in for. Geometry is event-time, alpha is
+per-frame (`setThreadFades`, on the same rewind ramp the bands and tiles answer).
 
 **Composition.** Every storey surface is the same composed unit — glass plane, optional edge label, its
 own tray — instantiated per position. What it deliberately does not own is the snapshots: tiles, bars
@@ -246,7 +262,18 @@ order is the design.
 SELECTED row takes the `ledger` row's full focus `boost`; a HOVERED row takes the same boost at
 the group tier, **without demoting the selected row**, because the hover previews what a click would pin;
 while any focus exists every other row steps back by `back`; and an off-filter network drops by `dim`,
-the same knob its node chips in the trays answer to. `dimTiers.test.ts`
+the same knob its node chips in the trays answer to. **A COMMITTED member is HELD above the trail's
+resting weight** by `snapHold` and never steps back — the ledger follows the live row, so `anyFocus`
+is true almost always, and a member's bands and tiles were sitting at the resting weight of an
+UNFILTERED neutral trail on every row but one (measured: 0.12 against a focused row's 0.82). The point
+of naming a network here is to trace it back through time, and a trail you cannot follow is a commit
+that did nothing. It is a multiplier taken in the *else*-of the boost, never additive — added to the
+focused row's boost it would clip past 1 and flatten the row meant to lead.
+
+⚠️ **On paper the bands take an ink FLOOR** (`BarTune.ink`), exactly as the lane tiles have always
+taken `TileTune.ink`. The bands never had one, which is why an off-filter band composited at 0.165
+alpha while the tile beside it was already lifted into `[0.3, 1]` — the floor is affine, so every tier
+above it keeps its order and only the bottom of the span lifts off the glass. `dimTiers.test.ts`
 pins primary > preview > resting > stepped back, and that off-filter dims without vanishing. Exactly one
 hot row — a committed older snapshot beats the live lead, a hover doesn't steal it.
 

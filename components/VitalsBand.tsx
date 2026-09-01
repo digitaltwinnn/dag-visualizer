@@ -347,14 +347,36 @@ function HyperCells({ accent }: { accent: string }) {
     : cfg ? (TYPE_ORDER.find((t) => types[t]! > 0) ?? "unknown")
     : null;
 
+  // THE LAYER ROWS, built once: they are the detail of the TYPE card under a commit and a card of
+  // their own unfiltered (see below).
+  const layerRows = [
+    { key: "l0", label: <RoleChips codes={["L0"]} />, count: layers.l0! },
+    { key: "cl1", label: <RoleChips codes={["cL1"]} />, count: layers.cl1! },
+    { key: "dl1", label: <RoleChips codes={["dL1"]} />, count: layers.dl1! },
+  ];
+
   return (
     <>
       {singleWord != null ? (
-        <BandCard label={cfg ? "Metagraph type" : "Network type"} size="sm">
-          {/* SUBTLE on purpose (user): a characteristic is a quiet reading, not a headline —
-              the number cards keep the bold mono, a word does not. */}
-          <TypeGlyph t={singleWord} className="size-3.5" color={accent} />
-          <span className="font-mono text-caption text-foreground whitespace-nowrap">{singleWord}</span>
+        // TYPE AND LAYERS ARE ONE CARD UNDER A COMMIT (user, 2026-09-01: "the type is the 'total'
+        // and left section, while the layers are the details that confirm that type — e.g. a 'data'
+        // type has a number of L0 and dL1 layers and 0 cL1"). That is the two-segment grammar
+        // exactly: a lead that states the characteristic, and a breakdown that EVIDENCES it. Split
+        // across two cards the reader had to carry the type in their head to the card beside it;
+        // merged, the claim and its proof are one reading. Unfiltered there is no single type to
+        // lead with, so the layers keep a card of their own.
+        <BandCard
+          label={cfg ? "Metagraph type" : "Network type"}
+          lead={
+            // SUBTLE on purpose (user): a characteristic is a quiet reading, not a headline —
+            // the number cards keep the bold mono, a word does not.
+            <span className="flex items-center gap-1.5">
+              <TypeGlyph t={singleWord} className="size-3.5" color={accent} />
+              <span className="font-mono text-caption text-foreground whitespace-nowrap">{singleWord}</span>
+            </span>
+          }
+        >
+          <MicroBars accent={accent} labelW={34} rows={layerRows} />
         </BandCard>
       ) : (
       <BandCard label="Metagraphs"
@@ -380,13 +402,12 @@ function HyperCells({ accent }: { accent: string }) {
         <MicroBars accent={accent} labelW={72} dashZero={scoped}
           rows={Object.entries(counts).map(([label, n]) => ({ key: label, label, count: n }))} />
       </BandCard>
-      <BandCard label="Network layers">
-        <MicroBars accent={accent} labelW={34} rows={[
-          { key: "l0", label: <RoleChips codes={["L0"]} />, count: layers.l0! },
-          { key: "cl1", label: <RoleChips codes={["cL1"]} />, count: layers.cl1! },
-          { key: "dl1", label: <RoleChips codes={["dL1"]} />, count: layers.dl1! },
-        ]} />
-      </BandCard>
+      {/* Unfiltered only — under a commit these rows are the type card's own evidence, above. */}
+      {singleWord == null && (
+        <BandCard label="Network layers">
+          <MicroBars accent={accent} labelW={34} rows={layerRows} />
+        </BandCard>
+      )}
     </>
   );
 }

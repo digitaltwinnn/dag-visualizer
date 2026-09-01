@@ -281,6 +281,13 @@ detail-only). Three rules keep the row from going ragged, and all three answer t
   original 72px constant made every bar row intrinsically sized, which is where the dangling white
   space came from; an uncapped track is the opposite failure — a bar running the width of a 1600px
   row stops reading as a quantity.
+- **A card may merge a claim with its EVIDENCE.** Hyper's type and layers were two cards until
+  2026-09-01, when the user pointed out they are one reading: "the type is the 'total' and left
+  section, while the layers are the details that confirm that type — e.g. a 'data' type has a number
+  of L0 and dL1 layers and 0 cL1". Split, the reader had to carry the type in their head to the card
+  beside it. Merged, the lead states the characteristic and the breakdown evidences it — which is what
+  the two-segment grammar is for. It merges only under a COMMIT: unfiltered there is no single type to
+  lead with, so the layers keep a card of their own.
 - **The band's height is FIXED** (`--vitals-h`), not content height. Left to its content it measured
   81 / 72 / 62px across hyper / geo / ledger, and since the band is anchored at the BOTTOM that
   showed up as its top edge jumping on every view switch.

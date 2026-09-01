@@ -188,6 +188,11 @@ export class LedgerView implements SceneView {
   private model = new LedgerModel();
   private t: number;
   private _latest: GlobalSnapshot | null;
+  /** Scratch for `_syncThreads` — event-time only, so one array is reused rather than rebuilt. */
+  private _threadSpecs: { slot: number; spec: BarSpec | null }[] = [];
+  /** Bound once (rule 5: no per-frame closure allocation) — the trail's front/horizon ramp at a slot. */
+  private _threadFadeOf = (slot: number): number =>
+    this._rewind.fadeAtX(LEAD_X - slot * SLOT_SP + this._trailOff) * this._fades.alpha;
   /** The COMMITTED network — the only thing that may move geometry (the lane field, the gutter). */
   private _filter: string;
   /** The HOVERED network, a pure preview that overrides the committed one for DIMMING only. */
@@ -818,6 +823,9 @@ export class LedgerView implements SceneView {
     // The other metagraphs' elements take the COLORED dim (identity hue at the ledger's `elem`):
     // ribbons + bands here, tiles in the per-frame pass, chips via the dim model's emissive.
     this._ribbons.setFilter(d);
+    // The threads are keyed to the committed (or hovered-preview) network, so a change of key is a
+    // change of geometry — rule 9's pairing: a hover previews the thread a commit would draw.
+    this._syncThreads();
     this._bar.setFilter(d);
   }
 
@@ -1028,6 +1036,23 @@ export class LedgerView implements SceneView {
       // one of the ways the handoff silently died. Only the per-frame decay ends it.
       this._ribbons.clearRow(3);
     }
+    this._syncThreads();
+  }
+
+  /** The committed network's hairline threads (Ribbons.setThreads) — the sheets cover four rows,
+   *  these cover the REST of the trail so a commit can be traced back through time. Rebuilt on the
+   *  same event-time seam as the sheets, since they read the same specs. */
+  private _syncThreads(): void {
+    this._threadSpecs.length = 0;
+    for (const tr of this.model.trail) {
+      const slot = tr.slot;
+      if (slot < 0 || slot >= SLOT_N) continue;
+      // A row that already carries a SHEET says the relation in full — no thread under it.
+      if (slot === 0 || slot === this.model.selectedSlot || slot === this._hoverSlot || slot === this._graceSlot) continue;
+      if (!this._slotSnap[slot] || !this._specs[slot].measured) continue;
+      this._threadSpecs.push({ slot, spec: this._specs[slot] });
+    }
+    this._ribbons.setThreads(this._threadSpecs, this._laneZOf, this._topHalfOf);
   }
 
   /** Walks the lane tiles in the SAME order update() draws them, so instance id === pick index. */
@@ -1147,6 +1172,9 @@ export class LedgerView implements SceneView {
         this._graceSlot = -1;
       }
     }
+    // The threads' own boundary ramp — the SAME rewind fade the sheets and bands answer, so a
+    // thread leaves the chamber exactly where its band and its tile do.
+    this._ribbons.setThreadFades(this._threadFadeOf);
     this._bar.setGraceSlot(this._graceSlot);
 
     this._applyFloorAlpha();
@@ -1245,6 +1273,9 @@ export class LedgerView implements SceneView {
         // (_syncHoverTile), so the frame body is an integer compare.
         const hovTile = mi === this._hoverTile;
         const offNet = dimNet !== "all" && lane.id !== dimNet;
+        // This lane IS the committed network — it never steps back behind a focused row
+        // (dimModel · snapBright), the same rule its bands answer down on the floor.
+        const mine = dimNet !== "all" && !offNet;
         const onNet = !hot && !hov && dimNet !== "all" && lane.id === dimNet;
         // COLOUR is the chamber's own independent reading: the ACTIVE row (lead/pinned), a hover
         // preview and the COMMITTED NETWORK's own tiles carry identity hue down the whole trail
@@ -1266,7 +1297,7 @@ export class LedgerView implements SceneView {
         // (entry fade hoisted above the zero-scale branch — a held subject is not drawn at all)
         // `tileRest` is the curve's REFERENCE on paper — the tiles' own resting weight, taken
         // UNFADED so `b.fade` reads as the ratio it is rather than moving the reference itself.
-        const emph = inkPresence(snapBright(tileRest * b.fade, offNet, focus, anyFocus && !rowFocus), this._paper, tileRest);
+        const emph = inkPresence(snapBright(tileRest * b.fade, offNet, focus, anyFocus && !rowFocus, mine), this._paper, tileRest);
         // The hue floor (TileTune.ink) maps the emphasis into [ink, 1] on paper — affine, so the
         // tier ORDER above it is untouched and only the bottom of the span is lifted off the glass.
         const brightT = (this._paper ? tileInk + (1 - tileInk) * emph : emph) * edge * this._fades.alpha * entryF;
