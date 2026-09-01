@@ -302,6 +302,8 @@ export class Engine {
   // No param → stays 1 → the whole mechanism is a no-op, so the parse itself is the dev/prod gate
   // (unlike `stats`, which toggles a visible DOM panel and so needs an explicit environment check).
   private _slowmo = 1;
+  /** `?clickdebug` — log why each click resolved as it did. Dev instrument; see the parse site. */
+  private _clickDebug = false;
   // The live-tuning panel's handle (devTune.ts) — dev tooling, disposed with the engine.
   // Its dev-only DOM switch (user, 2026-08-18 — "can't we just add a switch and show it only for
   // dev?"). `?tune` still opens the panel anywhere, which is what makes it usable against a
@@ -541,6 +543,12 @@ export class Engine {
       d.style.bottom = "calc(var(--bottom-reserve, 92px) + 24px)";
       document.body.appendChild(d);
     }
+
+    // ?clickdebug — WHY a click did or did not select (the ?stats/?slowmo idiom). A discarded click
+    // is silent by construction: three separate guards can eat one, and from the outside all three
+    // look identical to "that thing isn't clickable". This prints which guard ran, so a report of
+    // "the node spheres are not clickable" can be answered by measurement instead of by guesswork.
+    this._clickDebug = /[?#&]clickdebug/.test(window.location.search + window.location.hash);
 
     const smMatch = /[?#&]slowmo=([\d.]+)/.exec(window.location.search + window.location.hash);
     const smVal = smMatch ? parseFloat(smMatch[1]) : NaN;
@@ -1319,8 +1327,23 @@ export class Engine {
       // view while a metagraph is committed (cameraRig.ledgerCommitTilt, user 2026-08-09). Keyed on
       // the FILTER rather than on the rung, so the two finer rungs inherit it by delegating here and
       // clearing the filter tweens back to frontal on its own.
+      // ⚠️ THROUGH THE LEDGER'S OWN LENS, like everything else in this chamber (user, 2026-09-01:
+      // filtering DAG left "a bloom on the trail that stays behind; on other filters it does not
+      // behave like this"). This gate read the RAW filter while `setFilter`, the hover preview and
+      // the live edge all read `ledgerLens` — where `dag` IS `all`, because every global tick is a
+      // DAG snapshot and the base ledger's story is the whole chamber.
+      //
+      // The mismatch composed two correct behaviours into a wrong picture: committing DAG tilted
+      // the camera into the three-quarter pose — which turns the global floor toward the viewer, so
+      // more of its emissive surface faces the camera and blooms — while the coloured dim, reading
+      // the lens, correctly dimmed NOTHING. Every other filter tilts and dims together, so the tilt
+      // reads as emphasis; DAG alone tilted with nothing dimmed, and that is the bloom.
+      //
+      // Frontal is also what the tilt is FOR: it exists so "the two storeys separate" when a
+      // metagraph's lane must be read against the floor. Commit the DAG and there is no lane to
+      // separate — the subject IS the floor — so the lean has no work to do.
       const f = FOCI.ledger;
-      if (!this.filter || this.filter === "all") {
+      if (ledgerLens(this.filter) === "all") {
         this.cam.focus("ledger");
         return true;
       }
@@ -1521,16 +1544,31 @@ export class Engine {
   }
 
   private _handleClick(e: MouseEvent) {
+    const drift = Math.hypot(e.clientX - this._downX, e.clientY - this._downY);
+    const say = (verdict: string, extra?: Record<string, unknown>) => {
+      if (this._clickDebug) console.log(`[clickdebug] ${verdict}`, { drift: Math.round(drift * 10) / 10, mode: this.mode, filter: this.filter, ...extra });
+    };
     // The second tap of a double tap zoomed instead — see onUp. Spent here, so it can only ever
     // eat the one click its own pair produced.
     if (this._eatClick) {
       this._eatClick = false;
+      say("EATEN — second tap of a double-tap zoom");
       return;
     }
     // A click that ends a drag (orbit/pan) is navigation, not selection — see onDown.
-    if (Math.hypot(e.clientX - this._downX, e.clientY - this._downY) > 5) return;
-    if (this._pickSuppressed()) return; // early flight only — see the note on _pickSuppressed
+    if (drift > 5) { say("DISCARDED — pointer moved >5px between press and release (read as a drag)"); return; }
+    if (this._pickSuppressed()) {
+      say("SUPPRESSED — view transition still misleading", { phase: this.transition.phase });
+      return;
+    }
     const p = this._pickAt(e);
+    // The pick's NETWORK matters as much as its kind here: "the node spheres are not clickable"
+    // could mean nothing picks, or that the ray keeps reaching PAST the committed network onto
+    // somebody else's nodes — two different bugs that look identical from the outside.
+    say(p ? `PICKED ${p.kind}` : "NO HIT — the ray met nothing pickable here", {
+      pickables: this._pickBuf.length,
+      net: p ? (p.kind === "metanode" ? p.meta?.id : p.kind === "l0" || p.kind === "l1" ? "dag" : p.kind === "meta" ? p.cfg.id : undefined) : undefined,
+    });
     // With nothing picked, resolve the drillable country under the cursor (geo only — the
     // land-sphere hit is analytic; the Globe resolves WHICH country in its rotated frame).
     let countryCc: string | null = null;

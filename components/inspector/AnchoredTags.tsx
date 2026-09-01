@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { UNLISTED_ID } from "@/src/data/unlisted";
@@ -145,11 +146,10 @@ export default function AnchoredTags({
           const isOpen = open.has(r.id);
           const isSel = r.id === focusId;
           return (
-            <div key={r.id}>
-              <button
-                type="button"
-                onClick={() => toggle(r.id)}
-                aria-expanded={isOpen}
+            // Radix owns the open state and the trigger↔panel pairing; `onOpenChange` still runs
+            // the caller's own `toggle`, which holds the open SET (several rows may be open).
+            <Collapsible key={r.id} open={isOpen} onOpenChange={() => toggle(r.id)}>
+              <CollapsibleTrigger
                 className={cn(
                   "group flex items-center gap-2 w-full text-left border-none cursor-pointer py-[3px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
                   isSel ? "bg-transparent" : "bg-transparent hover:bg-wash-hover",
@@ -188,10 +188,10 @@ export default function AnchoredTags({
                       : "text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
                   )}
                 />
-              </button>
+              </CollapsibleTrigger>
 
-              {isOpen && (
-                // Revealed stat line: this metagraph's exact detail for the tick.
+              <CollapsibleContent className="disclose-panel">
+                {/* Revealed stat line: this metagraph's exact detail for the tick. */}
                 <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 pl-[16px] pr-1.5 pb-1 pt-0.5 text-label text-muted-foreground tabular-nums">
                   <span>{r.n} snapshot{r.n === 1 ? "" : "s"}</span>
                   <span aria-hidden>·</span>
@@ -201,8 +201,8 @@ export default function AnchoredTags({
                   <span aria-hidden>·</span>
                   <span>{fmtDag(r.fee)} DAG</span>
                 </div>
-              )}
-            </div>
+              </CollapsibleContent>
+            </Collapsible>
           );
         })}
       </div>

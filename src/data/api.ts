@@ -149,6 +149,11 @@ export interface Activity {
    *  assumed, so the sentence survives a cadence change — and the VARIANCE is why it must be. */
   samples: number;
   spanHr: number;
+  /** ⚠️ HOW OLD THE NEWEST SAMPLE IS, so a rate can never be presented as a CURRENT one when the
+   *  window it was measured over has passed. A per-hour figure claims the present tense by its own
+   *  units; without this the claim is unfalsifiable from the reading alone. Null on the global
+   *  stream, which is live by construction — if IT stops, the app's own NO SIGNAL says so. */
+  staleMs?: number;
   cadenceSeries: number[];
   anchoredSeries: number[];
   blocksSeries: number[];
@@ -557,6 +562,17 @@ export class NetworkData {
   // true ~10,672 — twice the complete figure, from a quantity labelled a lower bound. Mean size ×
   // rate is better conditioned but still an estimate, and a vitals slot states facts. The honest
   // source is a historical series the app does not keep yet; until it does, the vital stands by.
+  // ⚠️ A DEAD CHAIN HAS NO RATE, AND THE BUFFER CANNOT TELL YOU SO (user, 2026-09-01: "why does
+  // BIOFI (no identified nodes) say it has 358 snapshots/hour? looks wrong"). It was right, and the
+  // cause is that this measures `(samples − 1) / span` over WHATEVER THE BUFFER HOLDS. For a live
+  // network the buffer is the recent past and the reading is current. For a stopped one it is the
+  // last snapshots it ever made — BIOFI's newest is 2026-08-16, sixteen days before this was
+  // reported — and those were produced quickly, so a short span over a full buffer extrapolated to
+  // a confident, entirely historical, present-tense rate.
+  //
+  // The buffer's own timestamps carry the answer; the fix is to REPORT the age rather than to
+  // guess a threshold here. A rate stated per HOUR is only current if something arrived within the
+  // hour, and the surface that prints the units is the one that decides — see VitalsBand's `rate`.
   private _metaActivity(id: string): Activity | null {
     const buf = this.metaSnaps.get(id) || [];
     if (buf.length < 2) return null;
@@ -572,6 +588,7 @@ export class NetworkData {
     const ticks = new Set(buf.map((r) => r.ts)); // distinct global snapshots it landed in
     const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
     return {
+      staleMs: Date.now() - t1,
       snapsPerHour: (buf.length - 1) / spanHr,
       // ⚠️ NOT THE SAME QUANTITY AS THE GLOBAL anchorsPerHour, which is Σ metagraphSnapshotCount
       // — snapshots. This is distinct TICKS LANDED IN, and for a batching network the two differ

@@ -27,6 +27,10 @@ const BANDS_PER_SLOT = METAGRAPHS.length + 1;
  *  ledger row's knobs, the same ones the node chips in the trays answer to. */
 export interface BarTune {
   rest: number; // a resting band's opacity
+  /** PAPER ONLY — the floor the emphasis span is mapped onto, exactly as the lane tiles' own
+   *  `TileTune.ink` does for them. Affine, so the tier ORDER above it is untouched and only the
+   *  bottom of the span lifts off the glass. */
+  ink: number;
   // Sub-pass input × for the selective paper halo (SceneContext.inMarkPass): a band's ink is
   // darker than the ground by design, so at the main-pass colour it feeds the mark target too
   // little to halo — geo's chips get the same lift for free from their env sheen. Raised only
@@ -40,11 +44,19 @@ export interface BarTune {
 // base was below the range any multiplicative dim can survive; the dim knob itself is untouched.
 // (`hot` retired 2026-08-11 — it was exactly the ledger
 // row's `boost`, and a snapshot is data, so it takes the node's focus knob instead.)
-export const BAR_TUNE_DEFAULTS: BarTune = { rest: 0.12, halo: 2.4 };
+// `ink` added 2026-09-01 (user: the dimmed cyan bands "got a bit lighter recently" in light mode).
+// The lane tiles have carried an ink floor since the paper pass; the BANDS never got one, which is
+// the asymmetry — measured, an off-filter band composited at 0.165 alpha on paper against a resting
+// 0.728, while the tile beside it was already being lifted into [0.3, 1]. The hold that now carries
+// a committed member up the trail widened that gap rather than causing it. 0.25 puts an off-filter
+// band near 0.37 — present as a neutral trail, still plainly behind its committed neighbour.
+export const BAR_TUNE_DEFAULTS: BarTune = { rest: 0.12, ink: 0.25, halo: 2.4 };
+
 
 /** The `?tune` knob ranges (contract: src/engine/tune.ts), colocated with the numbers they bound. */
 export const BAR_TUNE_SCHEMA: TuneSchema<BarTune> = {
   rest: { min: 0, max: 1 },
+  ink: { min: 0, max: 0.9, step: 0.01, label: "ink floor (light)" },
   halo: { min: 1, max: 6, step: 0.1, label: "halo input × (light)" },
 };
 
@@ -382,6 +394,8 @@ export class ByteBar {
     // Hoisted once per frame (the tune hoist rule, src/engine/tune.ts): the band loop below
     // reads a local, not a live-struct property per band.
     const rest = this.tune.rest;
+    // Hoisted with `rest` (the tune hoist rule): paper's floor for the emphasis span, below.
+    const barInk = this.tune.ink;
     // A focus is a SELECTED row or a hovered one. The bare lead is neither: with nothing selected
     // the chamber is simply running, and stepping the whole trail back against a row it advanced
     // onto by itself would make `back` a second `rest` rather than a focus effect.
@@ -436,7 +450,11 @@ export class ByteBar {
         // reading — the shown row, a hover preview and the committed network's own bands carry
         // identity hue all the way down the trail, everything else stays the neutral trail.
         const offNet = this._filter !== "all" && s.keys[i] !== this._filter;
-        const onNet = !hot && !hov && this._filter !== "all" && s.keys[i] === this._filter;
+        // The COMMITTED network's own band. Distinct from `onNet` below, which additionally
+        // excludes the hot/hovered row because that row is already painting its hue for another
+        // reason; membership in the filter is not conditional on which row you are looking at.
+        const mine = this._filter !== "all" && !offNet;
+        const onNet = !hot && !hov && mine;
         // The BOOST answers the SELECTION, not the front position (user, 2026-08-11): the bare
         // lead is simply where the chamber is running, already named by its place at the front edge
         // and by keeping identity hue, so lifting it automatically made `boost` a second `rest` and
@@ -455,7 +473,14 @@ export class ByteBar {
         // ground before the dissolves multiply it (inkPresence — order-preserving, dark unchanged).
         // `rest` rides along as the curve's REFERENCE: the translation is a ratio around this
         // instrument's own resting weight, or the tiers land within a few percent of each other.
-        const t = inkPresence(snapBright(rest, offNet, focus, anyFocus && !rowFocus), this._paper, rest)
+        // `mine` last: a committed band never takes the row step-back (dimModel · snapBright).
+        // The emphasis term, then PAPER'S FLOOR mapped over it — the lane tiles' own treatment
+        // (`TileTune.ink`), which the bands had never been given. Affine over [ink, 1], so every
+        // tier above it keeps its order and only the bottom of the span lifts off the glass. The
+        // geometric ramps multiply in AFTER, ungamma'd and unfloored: they are geometry, not
+        // weight, and flooring a dissolve would stop a row ever leaving the chamber.
+        const emph = inkPresence(snapBright(rest, offNet, focus, anyFocus && !rowFocus, mine), this._paper, rest);
+        const t = (this._paper ? barInk + (1 - barInk) * emph : emph)
           * fade * front * this._alpha * (this._entryFade ? this._entryFade[si] : 1);
         s.mats[i].opacity += (t - s.mats[i].opacity) * k;
         s.mats[i].color.setHex(hot || hov || onNet ? s.colors[i] : this._neutral);

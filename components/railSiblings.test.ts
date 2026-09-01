@@ -227,10 +227,17 @@ describe("siblingSet — metagraph snapshot rung", () => {
   const cur = { metaId: "ded", ordinal: 100, hash: "h", globalOrdinal: 42, ts: "T" };
   const s = base({ mode: "ledger", filter: "ded", metaSnap: cur, snap: snapPick, exactRows: rows });
 
-  it("is scoped to the SUBJECT'S OWN metagraph — the parent is (network × tick), ordinal desc", () => {
+  // ⚠️ OLDEST → NEWEST, so `›` MEANS FORWARD IN TIME. This asserted ordinal DESC until
+  // 2026-09-01, when the user named what that cost: "forward swipe goes to the parent, which is
+  // earlier on the timeline of the chain — that's inverse logic". It also put the two snapshot
+  // pagers in one rail on opposite headings, the global one already stepping oldest→newest so its
+  // `›` walks the way the bars do. The rows are consecutive links of one chain (each snapshot's
+  // `lastSnapshotHash` IS the previous one's hash, verified live), so the direction is the chain's
+  // own, not a preference: `‹` follows the parent links back, `›` follows them forward.
+  it("is scoped to the SUBJECT'S OWN metagraph, oldest first so a step goes FORWARD in time", () => {
     const set = siblingSet("metaSnap", s)!;
-    expect(set.items.map((i) => i.label)).toEqual(["101", "100"]);
-    expect(set.index).toBe(1);
+    expect(set.items.map((i) => i.label)).toEqual(["100", "101"]);
+    expect(set.index).toBe(0);
     expect(set.parentLabel).toBe("DED · Global 42");
   });
   it("excludes the tick's OTHER networks — a step must never move the coarser network rung", () => {
@@ -241,7 +248,9 @@ describe("siblingSet — metagraph snapshot rung", () => {
   });
   it("a step agrees with metaSnapSelectActions", () => {
     const set = siblingSet("metaSnap", s)!;
-    expect(set.items[0]!.actions).toEqual(
+    // The NEXT item — index 0 is now the subject itself (it is the oldest of the two), and
+    // committing the subject is a deselect, which would test the wrong builder.
+    expect(set.items[1]!.actions).toEqual(
       metaSnapSelectActions(
         { metaId: "ded", ordinal: 101, hash: "", globalOrdinal: 42, ts: "T" },
         snapPick,

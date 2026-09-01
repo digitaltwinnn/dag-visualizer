@@ -110,11 +110,17 @@ const ORD_OP = 0.55;
 const ORD_LINE_MUL = 0.26;
 /** The committed lane's plane edge-fill multiplier (its plane leads with its snapshots). */
 const LANE_FILL_BOOST = 3;
-const ORD_H = 0.78;
+/** The floor's edge-readout text height (user, 2026-09-01: "make the texts with the snapshot #
+ *  and size on the plane of the global metagraph bigger"). ⚠️ IT DOES NOT MOVE ALONE. `makeEdgeLabel`
+ *  draws a fixed-size glyph on a fixed canvas and scales the whole plane, so the digits' EXTENT is
+ *  linear in this number — and `ORD_LINE_Z0` below is defined as where those digits end, because
+ *  that is where the dotted tie starts. Raise one without the other and the tie is drawn straight
+ *  through the text it is supposed to lead away from. */
+const ORD_H = 1.02;
 /** The label's text anchor — just outside the widest bar's screen-left end, reading inward. */
 const ORD_Z = LANE_HALF_Z + 0.35;
 /** Where the text visually ends (≈ the digits' extent) — the dotted anchor line starts here. */
-const ORD_LINE_Z0 = ORD_Z - 2.1;
+const ORD_LINE_Z0 = ORD_Z - 2.75;
 /** The SIZE column at the bars' other end (user, 2026-08-18: "the other visualization of a row
  *  represents size: can we use dotted lines on the right side of the plane to show the size in
  *  kB?"). It is the exact reading of what WIDTH encodes, exactly as the ordinal column is the
@@ -188,6 +194,26 @@ export class LedgerView implements SceneView {
   private model = new LedgerModel();
   private t: number;
   private _latest: GlobalSnapshot | null;
+  /** Scratch for `_syncThreads` — event-time only, so one array is reused rather than rebuilt. */
+  private _threadSpecs: { slot: number; spec: BarSpec | null }[] = [];
+  /** Bound once (rule 5: no per-frame closure allocation) — every ramp a thread must answer.
+   *
+   *  ⚠️ THE ENTRY TERMS ARE NOT OPTIONAL (user, 2026-09-01: the hairlines "should appear like the
+   *  other objects, currently it's already there the moment the scene is still building up"). The
+   *  first cut carried only the rewind boundary and the view alpha, so a thread drew at full weight
+   *  over a chamber that had not arrived yet — the one element in the view not riding the entry.
+   *  Both terms are needed and they are different: `_entryFade[slot]` is the PER-ROW stagger each
+   *  band and tile answers, so a thread lands with the row it belongs to rather than with the view;
+   *  `_entryRib` is the ribbons' own later, steeper curve, which is what keeps the relation layer
+   *  from arriving before the things it relates. */
+  private _threadFadeOf = (slot: number): number => {
+    const entryRow = this._entryT < 1 && slot >= 0 && slot < SLOT_N ? this._entryFade[slot] : 1;
+    return this._rewind.fadeAtX(LEAD_X - slot * SLOT_SP + this._trailOff)
+      * horizonAt(LEAD_X - slot * SLOT_SP + this._trailOff)
+      * entryRow * this._entryRib * this._fades.alpha;
+  };
+  /** The ribbons' entry curve, hoisted per frame so the bound thread fade can read it. */
+  private _entryRib = 1;
   /** The COMMITTED network — the only thing that may move geometry (the lane field, the gutter). */
   private _filter: string;
   /** The HOVERED network, a pure preview that overrides the committed one for DIMMING only. */
@@ -283,6 +309,8 @@ export class LedgerView implements SceneView {
   private _rewind = new TrailRewind();
   /** Mirror of the rewind offset for the frame's read sites (updated once per update()). */
   private _trailOff = 0;
+  /** Set when a tick shifted every row a slot back; consumed by the next `_rewind.update`. */
+  private _advanced = false;
   private _slotOfOrd = (ordinal: number): number => this.model.slotOf(ordinal);
   /** The transient HOVER row (split from the committed selection, user 2026-08-07): previews at the
    *  GROUP focus tier without demoting the active row. */
@@ -387,6 +415,11 @@ export class LedgerView implements SceneView {
     this._metaTrailMesh.onBeforeRender = () => { if (inMarkPass()) tileMat.color.multiplyScalar(this.tiles.halo); };
     this._metaTrailMesh.onAfterRender = () => { if (inMarkPass()) tileMat.color.multiplyScalar(1 / this.tiles.halo); };
     this._metaTrailMesh.frustumCulled = false;
+    // ⚠️ Bounds three cannot reject with — the lane tiles are pickable AND they move (the trail
+    // slides every tick, the rewind slides it further), so three's lazily-computed-once
+    // `boundingSphere` would go stale and skip the whole mesh before any per-instance test.
+    // Same failure the node fabric hit; see NodeFabric.openBounds for the full note.
+    this._metaTrailMesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e4);
     this._metaTrailMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     for (let i = 0; i < META_TRAIL_MAX; i++) this._metaTrailMesh.setColorAt(i, _col.set(0xffffff));
     _dummy.scale.setScalar(0);
@@ -701,6 +734,9 @@ export class LedgerView implements SceneView {
       this._graceOrd = prevLead;
       this._graceT = 1;
     }
+    // The trail gained a slot — armed here (data time) and consumed by the rewind on the next
+    // frame, which is the one place trail motion is allowed to live.
+    if (prevLead != null && this.model.tickOrdinal !== prevLead) this._advanced = true;
 
     for (let s = 0; s < SLOT_N; s++) this._slotSnap[s] = null;
     if (this.model.tickOrdinal != null)
@@ -818,6 +854,9 @@ export class LedgerView implements SceneView {
     // The other metagraphs' elements take the COLORED dim (identity hue at the ledger's `elem`):
     // ribbons + bands here, tiles in the per-frame pass, chips via the dim model's emissive.
     this._ribbons.setFilter(d);
+    // The threads are keyed to the committed (or hovered-preview) network, so a change of key is a
+    // change of geometry — rule 9's pairing: a hover previews the thread a commit would draw.
+    this._syncThreads();
     this._bar.setFilter(d);
   }
 
@@ -1028,6 +1067,23 @@ export class LedgerView implements SceneView {
       // one of the ways the handoff silently died. Only the per-frame decay ends it.
       this._ribbons.clearRow(3);
     }
+    this._syncThreads();
+  }
+
+  /** The committed network's hairline threads (Ribbons.setThreads) — the sheets cover four rows,
+   *  these cover the REST of the trail so a commit can be traced back through time. Rebuilt on the
+   *  same event-time seam as the sheets, since they read the same specs. */
+  private _syncThreads(): void {
+    this._threadSpecs.length = 0;
+    for (const tr of this.model.trail) {
+      const slot = tr.slot;
+      if (slot < 0 || slot >= SLOT_N) continue;
+      // A row that already carries a SHEET says the relation in full — no thread under it.
+      if (slot === 0 || slot === this.model.selectedSlot || slot === this._hoverSlot || slot === this._graceSlot) continue;
+      if (!this._slotSnap[slot] || !this._specs[slot].measured) continue;
+      this._threadSpecs.push({ slot, spec: this._specs[slot] });
+    }
+    this._ribbons.setThreads(this._threadSpecs, this._laneZOf, this._topHalfOf);
   }
 
   /** Walks the lane tiles in the SAME order update() draws them, so instance id === pick index. */
@@ -1097,7 +1153,8 @@ export class LedgerView implements SceneView {
 
     // ── the TRAIL REWIND (objects/TrailRewind.ts): the shown snapshot owns the front; rows
     // newer than it slide past the edge and dissolve. All scalar logic lives in the adapter.
-    this._rewind.update(dt, this._slotOfOrd);
+    this._rewind.update(dt, this._slotOfOrd, this._advanced);
+    this._advanced = false;
     this._trailOff = this._rewind.offset;
     // Hoisted per frame (the tune hoist rule): the SELECTED row — the one that owns the focus — or -1.
     const pinSlot = this.model.selectedSlot;
@@ -1114,6 +1171,7 @@ export class LedgerView implements SceneView {
     // Entry ramp tail: ribbons arrive after the tiles have mostly landed (squared ease), so a
     // sheet never hangs from a tile still in the air.
     const entryRib = this._entryT >= 1 ? 1 : Math.max(0, this._entryT * 1.6 - 0.6) ** 2;
+    this._entryRib = entryRib; // the threads read it through _threadFadeOf
     // The incoming lead sheet's own ease-in (see the field note) — armed the frame its spec
     // first becomes drawable, so the crossfade has two soft sides.
     const lead0 = this._slotSnap[0];
@@ -1147,6 +1205,9 @@ export class LedgerView implements SceneView {
         this._graceSlot = -1;
       }
     }
+    // The threads' own boundary ramp — the SAME rewind fade the sheets and bands answer, so a
+    // thread leaves the chamber exactly where its band and its tile do.
+    this._ribbons.setThreadFades(this._threadFadeOf);
     this._bar.setGraceSlot(this._graceSlot);
 
     this._applyFloorAlpha();
@@ -1245,6 +1306,9 @@ export class LedgerView implements SceneView {
         // (_syncHoverTile), so the frame body is an integer compare.
         const hovTile = mi === this._hoverTile;
         const offNet = dimNet !== "all" && lane.id !== dimNet;
+        // This lane IS the committed network — it never steps back behind a focused row
+        // (dimModel · snapBright), the same rule its bands answer down on the floor.
+        const mine = dimNet !== "all" && !offNet;
         const onNet = !hot && !hov && dimNet !== "all" && lane.id === dimNet;
         // COLOUR is the chamber's own independent reading: the ACTIVE row (lead/pinned), a hover
         // preview and the COMMITTED NETWORK's own tiles carry identity hue down the whole trail
@@ -1266,7 +1330,7 @@ export class LedgerView implements SceneView {
         // (entry fade hoisted above the zero-scale branch — a held subject is not drawn at all)
         // `tileRest` is the curve's REFERENCE on paper — the tiles' own resting weight, taken
         // UNFADED so `b.fade` reads as the ratio it is rather than moving the reference itself.
-        const emph = inkPresence(snapBright(tileRest * b.fade, offNet, focus, anyFocus && !rowFocus), this._paper, tileRest);
+        const emph = inkPresence(snapBright(tileRest * b.fade, offNet, focus, anyFocus && !rowFocus, mine), this._paper, tileRest);
         // The hue floor (TileTune.ink) maps the emphasis into [ink, 1] on paper — affine, so the
         // tier ORDER above it is untouched and only the bottom of the span is lifted off the glass.
         const brightT = (this._paper ? tileInk + (1 - tileInk) * emph : emph) * edge * this._fades.alpha * entryF;

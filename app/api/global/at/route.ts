@@ -19,6 +19,13 @@ interface GlobalRec {
   ordinal: number;
   timestamp: string;
   hash: string;
+  /** ⚠️ CARRIED, NOT DROPPED. The explorer serves `lastSnapshotHash` on every global snapshot and
+   *  this route used to discard it, which is how the Global snapshot card came to show a Previous
+   *  hash in WINDOW mode and none in HISTORY mode (user, 2026-09-01: "why does only the metagraph
+   *  have a previous hash and the global snapshot not"). The two modes reach the same card by
+   *  different roads — the live buffer keeps the explorer's whole record, this road rebuilt a
+   *  three-field subset — so a field missing here reads as a fact the chain does not have. */
+  lastSnapshotHash?: string;
 }
 
 async function fetchGlobal(net: NetworkId, ordinal: number): Promise<GlobalRec> {
@@ -28,10 +35,19 @@ async function fetchGlobal(net: NetworkId, ordinal: number): Promise<GlobalRec> 
     signal: AbortSignal.timeout(6000),
   });
   if (!r.ok) throw new Error(`be ${r.status}`);
-  const j = (await r.json()) as { data?: { ordinal?: number; timestamp?: string; hash?: string } };
+  const j = (await r.json()) as {
+    data?: { ordinal?: number; timestamp?: string; hash?: string; lastSnapshotHash?: string };
+  };
   const d = j.data;
   if (!d || typeof d.ordinal !== "number" || typeof d.timestamp !== "string") throw new Error("bad shape");
-  return { ordinal: d.ordinal, timestamp: d.timestamp, hash: d.hash ?? "" };
+  return {
+    ordinal: d.ordinal,
+    timestamp: d.timestamp,
+    hash: d.hash ?? "",
+    // Absent stays ABSENT rather than becoming "": the card gates on presence, and an empty string
+    // would render an empty Previous hash row instead of omitting it.
+    ...(typeof d.lastSnapshotHash === "string" && d.lastSnapshotHash ? { lastSnapshotHash: d.lastSnapshotHash } : {}),
+  };
 }
 
 // Ordinals are immutable — each probe caches for a day, shared across searches.

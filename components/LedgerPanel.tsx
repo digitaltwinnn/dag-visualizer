@@ -17,9 +17,9 @@ import { IdentityDot, LayerWho } from "@/components/inspector/parts";
 import { useStore } from "@/src/store/store";
 import { metaSnapSelectActions, snapshotSelectActions, sameMetaSnap, followToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { DepthCaption, DisclosureChevron, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
+import { DepthCaption, DisclosureChevron, Disclosure, DisclosurePanel, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
 import { NoSignalDot } from "@/components/state/StateAtoms";
-import { buildAnchorLog, type AnchorLogRow } from "@/src/data/anchorLog";
+import { buildAnchorLog, type AnchorLogRow, type ChannelLogRow } from "@/src/data/anchorLog";
 import { SLOT_N } from "@/src/engine/domain/ledgerModel";
 import { fmtKB } from "@/src/util/format";
 
@@ -68,19 +68,24 @@ interface MetaGroup {
   id: string;
   name: string;
   hue: string;
-  rows: AnchorLogRow[];
+  rows: ChannelLogRow[];
 }
 
-function groupByMeta(rows: AnchorLogRow[]): MetaGroup[] {
+function groupByMeta(rows: readonly AnchorLogRow[]): MetaGroup[] {
   const by = new Map<string, MetaGroup>();
   for (const r of rows) {
-    let g = by.get(r.metaId);
+    // A SEAM (a tick that anchored nothing) belongs to no metagraph, so it forms no group. That is
+    // already this explorer's own rule — "affordance follows the data": such a tick keeps its row
+    // and simply doesn't disclose, because a chevron opening onto nothing is a lie about the feed.
+    if (r.metaId == null) continue;
+    const metaId = r.metaId;
+    let g = by.get(metaId);
     if (!g) {
-      const cfg = metagraphById(r.metaId);
-      g = { id: r.metaId, name: cfg?.name ?? r.metaId, hue: identityHudCss(r.metaId), rows: [] };
-      by.set(r.metaId, g);
+      const cfg = metagraphById(metaId);
+      g = { id: metaId, name: cfg?.name ?? metaId, hue: identityHudCss(metaId), rows: [] };
+      by.set(metaId, g);
     }
-    g.rows.push(r);
+    g.rows.push({ ...r, metaId });
   }
   return [...by.values()].sort((a, b) => b.rows.length - a.rows.length || a.name.localeCompare(b.name));
 }
@@ -614,7 +619,11 @@ export default function LedgerPanel() {
                             const lensedOut = outOfLens(filter, g.id);
                             const gOpen = openContrib === key && !lensedOut;
                             return (
-                              <div key={g.id}>
+                              // ⚠️ `onToggle` moves to the Disclosure ROOT but keeps its exact
+                              // body: this header DISCLOSES and PREVIEWS and commits nothing, the
+                              // boundary the long note below records. Radix only pairs the trigger
+                              // to the panel; it never decides what a click means.
+                              <Disclosure key={g.id} open={gOpen} onToggle={() => setOpenContrib(gOpen ? null : key)}>
                                 <DisclosureRow
                                   open={gOpen}
                                   // The row itself IS a committed subject when its band is the
@@ -641,7 +650,6 @@ export default function LedgerPanel() {
                                   // filter-firsts through `metaSnapSelectActions`, the byte-bar
                                   // band in the scene — where there is no disclosure, so a click
                                   // must mean something — or the top bar's own picker.
-                                  onToggle={() => setOpenContrib(gOpen ? null : key)}
                                   // …and under a COMMITTED FILTER the other networks stop being
                                   // browsable at all (user, 2026-08-10: "a click here commits and
                                   // this feels unintended because we lose the metagraph filter").
@@ -679,10 +687,9 @@ export default function LedgerPanel() {
                                     {g.rows.length}
                                   </span>
                                 </DisclosureRow>
-                                {gOpen && (
-                                  // Level 2+: INDENT ONLY — re-applying ROW_NEST here would
-                                  // compound its negative margin to +12px (the right-edge rule).
-                                  <div className="mb-1 ml-[7px] pl-2 border-l border-border">
+                                {/* Level 2+: INDENT ONLY — re-applying ROW_NEST here would
+                                    compound its negative margin to +12px (the right-edge rule). */}
+                                <DisclosurePanel className="mb-1 ml-[7px] pl-2 border-l border-border">
                                     {g.rows.map((r) => {
                                       const sel = {
                                         metaId: r.metaId,
@@ -734,9 +741,8 @@ export default function LedgerPanel() {
                                         </div>
                                       );
                                     })}
-                                  </div>
-                                )}
-                              </div>
+                                </DisclosurePanel>
+                              </Disclosure>
                             );
                           })
                         )}
@@ -744,7 +750,14 @@ export default function LedgerPanel() {
                             neutral gray, because no single identity can speak for a mixed set.
                             Same depth, same grammar, same band click as the listed rows. */}
                         {tickUnlisted > 0 && (
-                          <div>
+                          <Disclosure
+                            open={openContrib === `${d.ordinal}|${UNLISTED_ID}` && !outOfLens(filter, UNLISTED_ID)}
+                            onToggle={() => {
+                              // Disclose only, like every listed group header above it.
+                              const key = `${d.ordinal}|${UNLISTED_ID}`;
+                              setOpenContrib(openContrib === key ? null : key);
+                            }}
+                          >
                             <DisclosureRow
                               open={openContrib === `${d.ordinal}|${UNLISTED_ID}` && !outOfLens(filter, UNLISTED_ID)}
                               on={filter === UNLISTED_ID && activeSnapOrd === d.ordinal && metaSnap == null}
@@ -754,11 +767,6 @@ export default function LedgerPanel() {
                                 metaSnap.globalOrdinal === d.ordinal
                               }
                               title={`${tickUnlisted} uncataloged snapshot${tickUnlisted === 1 ? "" : "s"} anchored into ${d.ordinal.toLocaleString()}`}
-                              onToggle={() => {
-                                // Disclose only, like every listed group header above it.
-                                const key = `${d.ordinal}|${UNLISTED_ID}`;
-                                setOpenContrib(openContrib === key ? null : key);
-                              }}
                               // …and out of the lens under any other committed filter, like them
                               // too. `unlisted` is a first-class network here as everywhere: the
                               // one home makes it the common case, never a special case.
@@ -777,8 +785,7 @@ export default function LedgerPanel() {
                                 {tickUnlisted}
                               </span>
                             </DisclosureRow>
-                            {openContrib === `${d.ordinal}|${UNLISTED_ID}` && (
-                              <div className="mb-1 ml-[7px] pl-2 border-l border-border">
+                            <DisclosurePanel className="mb-1 ml-[7px] pl-2 border-l border-border">
                                 {tickEntries.map((r, i) => {
                                   const sel = {
                                     metaId: r.metaId,
@@ -834,9 +841,8 @@ export default function LedgerPanel() {
                                     </div>
                                   );
                                 })}
-                              </div>
-                            )}
-                          </div>
+                            </DisclosurePanel>
+                          </Disclosure>
                         )}
                       </div>
                     )}
