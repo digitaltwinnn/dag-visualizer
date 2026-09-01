@@ -102,14 +102,15 @@ const LOOK = [
   "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth",
   "borderStyle", "borderColor", "backdropFilter", "padding",
 ] as const;
+function copyLook(a: HTMLElement, b: HTMLElement): void {
+  const cs = getComputedStyle(a);
+  for (const prop of LOOK) {
+    const v = cs[prop as unknown as number] as unknown as string;
+    if (v) b.style.setProperty(prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`), v);
+  }
+}
 function carryLook(src: HTMLElement, clone: HTMLElement): void {
-  const pair = (a: HTMLElement, b: HTMLElement) => {
-    const cs = getComputedStyle(a);
-    for (const prop of LOOK) {
-      const v = cs[prop as unknown as number] as unknown as string;
-      if (v) b.style.setProperty(prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`), v);
-    }
-  };
+  const pair = copyLook;
   if (src.classList.contains("ig-panel") || src.classList.contains("rail-entry")) pair(src, clone);
   const from = src.querySelectorAll<HTMLElement>(".ig-panel, .rail-entry");
   const to = clone.querySelectorAll<HTMLElement>(".ig-panel, .rail-entry");
@@ -231,8 +232,65 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
   // on the shared spring: old out the throw side, new in from the other. `pending` holds the
   // visual cleanup; a new pointerdown finishes it instantly (the commit has already run, so a
   // swipe can never silently not-commit).
+  // THE PEEK — the incoming card, visible WHILE YOU PULL (user, 2026-09-01: "the new card only
+  // appears after I've moved the old card ... I expect to already see it appearing before that").
+  //
+  // ⚠️ IT IS A PLACEHOLDER, AND THAT IS THE HONEST CEILING HERE. The lane renders exactly ONE live
+  // card, whose body is built from the COMMITTED subject in the store — a sibling's body does not
+  // exist until its commit runs, which is the whole reason the accordion clones the OUTGOING card at
+  // commit time rather than pre-rendering the incoming one. So the peek is the card's own glass at
+  // the card's own size carrying the sibling's NAME (`SiblingStep.label`, the same string the plank's
+  // chevron announces), not its content. That is what the gesture actually needs: something is
+  // coming, and it is THAT one. Rendering the real body would mean building a card for an
+  // uncommitted subject — a different piece of work, deliberately not smuggled in here.
+  //
+  // Built imperatively for the same reason the drag transform is: this file's rule is that a pull
+  // touches the DOM and never React state, so a 60-120Hz gesture cannot re-render a subscribed card.
+  const peek = useRef<{ el: HTMLElement; dir: -1 | 1; prevPos: string; prevOverflow: string } | null>(null);
+  const clearPeek = () => {
+    const p = peek.current;
+    if (!p) return;
+    peek.current = null;
+    const parent = p.el.parentElement;
+    p.el.remove();
+    if (parent) { parent.style.position = p.prevPos; parent.style.overflow = p.prevOverflow; }
+  };
+  /** Build (or re-aim) the peek for the direction the pull is going. Returns it, or null at an end —
+   *  where there IS no neighbour, and the rubber band's short limit is already saying so. */
+  const showPeek = (dir: -1 | 1): HTMLElement | null => {
+    const el = wrap.current;
+    const parent = el?.parentElement;
+    if (!el || !parent || !set?.items[set.index + dir]) { clearPeek(); return null; }
+    if (peek.current?.dir === dir) return peek.current.el;
+    clearPeek();
+    const card = el.querySelector<HTMLElement>(".ig-panel") ?? el;
+    const g = document.createElement("div");
+    g.setAttribute("aria-hidden", "true");     // the live card is the only thing a reader hears
+    g.setAttribute("data-pager-ghost", "");    // and the only thing that animates — see globals.css
+    g.style.cssText =
+      `position:absolute;left:0;top:0;width:${el.offsetWidth}px;height:${el.offsetHeight}px;` +
+      `margin:0;pointer-events:none;transition:none;box-sizing:border-box;`;
+    copyLook(card, g);                         // the card's own glass, so it reads as a card arriving
+    const name = document.createElement("div");
+    name.textContent = set.items[set.index + dir].label;
+    // Muted and quiet on purpose: this is a NAME, not a headline — the real card's own title lands
+    // when it commits, and a peek that shouted would read as the card having already arrived.
+    name.style.cssText = "font: inherit; color: var(--muted-foreground); opacity: 0.75; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;";
+    g.appendChild(name);
+    const prevPos = parent.style.position;
+    const prevOverflow = parent.style.overflow;
+    parent.style.position = "relative";
+    parent.style.overflow = "hidden";          // the peek waits offstage until the pull reveals it
+    parent.appendChild(g);
+    peek.current = { el: g, dir, prevPos, prevOverflow };
+    return g;
+  };
+
   const pending = useRef<{ t: ReturnType<typeof setTimeout>; fin: () => void } | null>(null);
   useEffect(() => () => { if (pending.current) { clearTimeout(pending.current.t); pending.current.fin(); } }, []);
+  // A peek outlives its gesture if the pointer is lost (a cancel, a breakpoint swap) — clear on
+  // unmount too, or it would be left holding the slot's position/overflow overrides.
+  useEffect(() => clearPeek, []); // eslint-disable-line react-hooks/exhaustive-deps
   const settlePending = () => {
     const p = pending.current;
     if (!p) return;
@@ -343,7 +401,12 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     // Progressive rubber-band toward the limit (was a hard clamp): resistance grows with travel
     // and the limit is an asymptote, so the pull never hits a wall — the END limit is short and
     // firm (the no-wrap answer), the mid-set one longer and softer.
-    setTx(rubber(ddx * DAMP, atEnd ? END_LIMIT : DRAG_LIMIT), false);
+    const tx = rubber(ddx * DAMP, atEnd ? END_LIMIT : DRAG_LIMIT);
+    setTx(tx, false);
+    // The neighbour rides the SAME damped travel, one card-width out on the side it will arrive
+    // from — so the pair moves as one strip and the pull reveals rather than merely resists.
+    const g = showPeek(ddx < 0 ? 1 : -1);
+    if (g) g.style.transform = `translateX(${(ddx < 0 ? 1 : -1) * g.offsetWidth + tx}px)`;
   };
   const endDrag = (e: PointerEvent<HTMLDivElement>) => {
     const st = start.current;
@@ -360,12 +423,14 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
       const flick =
         Math.abs(v) >= FLICK_V && Math.abs(ddx) >= ENGAGE_PX && Math.sign(v) === Math.sign(ddx);
       if (Math.abs(ddx) >= STEP_PX || flick) {
+        clearPeek(); // the accordion takes the lane from here, with the REAL card
         commitStep(ddx < 0 ? 1 : -1);
         trail.current.length = 0;
         return; // commitStep owns the motion from here — no snap-back on top of the follow-through
       }
     }
     trail.current.length = 0;
+    clearPeek();
     setTx(0, true);
   };
   // A drag that travelled must not fire the card's click (the collapse toggle spans the head).

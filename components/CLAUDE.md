@@ -207,6 +207,18 @@ no height, and the store commits synchronously, so the slot becomes the NEW card
 frame later (the new height is unknowable until React has painted it). Both restore in `fin()` beside
 the position/overflow it already saved.
 
+**The pull SHOWS THE NEIGHBOUR** (`showPeek`, 2026-09-01 — user: "the new card only appears after
+I've moved the old card … I expect to already see it appearing before that"). A card-shaped peek
+carrying the incoming sibling's NAME rides the same damped travel, one width out on the side it will
+arrive from, so the pair moves as one strip and the pull reveals instead of merely resisting.
+⚠️ **It is a placeholder, and that is the honest ceiling.** The lane renders exactly ONE live card,
+whose body is built from the COMMITTED subject — a sibling's body does not exist until its commit
+runs, which is precisely why the accordion clones the OUTGOING card rather than pre-rendering the
+incoming one. Showing real content would mean rendering a card for an uncommitted subject; that is a
+different piece of work, not a tweak to this one. The peek is built imperatively for the same reason
+the drag transform is: a pull touches the DOM and never React state, so a 60-120Hz gesture cannot
+re-render a subscribed card. It carries `data-pager-ghost` too, so it neither animates nor is heard.
+
 **The box can carry a SIBLING PAGER** (`RailPager`): where the expanded rung has 1-N siblings under the
 same committed parent, a slim `‹ n / N ›` plank rides the card's OWN bottom edge, inside the glass, plus
 a horizontal swipe on the body. The set comes from the pure resolver `railSiblings.ts` and every step
