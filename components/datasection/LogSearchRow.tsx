@@ -13,8 +13,8 @@ import { cn } from "@/lib/utils";
 // searchable across all of it — and only three are:
 //
 //   · SNAPSHOT — ordinals are gapless, so the page is arithmetic. One request.
-//   · ANCHORED INTO — a global ordinal resolves to a timestamp for one ~320 B cached read
-//     (/api/global/at?ordinal=), and the chain is monotonic in time, so it is seekable from there.
+//   · ANCHORED INTO — a global snapshot CARRIES the list of what anchored into it, so the answer is
+//     one exact read of that snapshot's own manifest. See AnchorLogTable's seekTick.
 //   · AGE — a date is a timestamp; same seek (src/data/chainSeek).
 //
 // FEE and SIZE have no index at any layer: a control there could only ever filter the 25 rows on
@@ -22,6 +22,9 @@ import { cn } from "@/lib/utils";
 // exists when we had looked at 25 of 1.1 million. NETWORK is inert here because under a commit the
 // table IS one network. So those cells stay empty — an absent affordance tells the truth, a disabled
 // or scoped-to-page one asks the reader to notice a qualifier before believing the result.
+// ⚠️ VOCABULARY: the props still say `tick` because that is the COLUMN KEY the sort table uses, but
+// nothing a reader sees may (user, 2026-09-01: "whatever tick means to you, it's not the vocabulary
+// we use in our app"). Every placeholder, label and message here says GLOBAL SNAPSHOT.
 export default function LogSearchRow({
   columns,
   seeking,
@@ -78,14 +81,14 @@ export default function LogSearchRow({
         if (c.key === "ordinal") {
           return (
             <TableHead key={c.key} className="py-1.5">
-              {num(snapshot, onSnapshot, "snapshot", "go to #", "Go to snapshot ordinal")}
+              {num(snapshot, onSnapshot, "snapshot", "snapshot #", "Go to metagraph snapshot ordinal")}
             </TableHead>
           );
         }
         if (c.key === "tick") {
           return (
             <TableHead key={c.key} className="py-1.5">
-              {num(tick, onTick, "tick", "go to tick #", "Go to the snapshot anchored into a global ordinal")}
+              {num(tick, onTick, "tick", "global snapshot #", "Go to the snapshot anchored into a global snapshot")}
             </TableHead>
           );
         }

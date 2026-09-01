@@ -31,6 +31,10 @@ const PAGE = 25;
 
 // ONE COLUMN LIST, read by the header AND by the search row beneath it — a second literal is how the
 // two silently fall out of alignment when a column is added.
+/** How many seek-probed chain pages to retain (see loadPage). A walk spends at most ~10, so this
+ *  holds several searches' worth without letting a long session grow unbounded. */
+const PROBE_CACHE = 64;
+
 const COLUMNS: { key: AnchorLogSortKey; label: string }[] = [
   { key: "net", label: "Network" },
   { key: "ordinal", label: "Snapshot" },
@@ -93,6 +97,9 @@ export default function AnchorLogTable() {
   const [qFrom, setQFrom] = useState("");
   const [qTo, setQTo] = useState("");
   const [seeking, setSeeking] = useState(false);
+  /** Chain pages fetched by a SEEK, keyed by the `before` ordinal asked for (see loadPage). Cleared
+   *  with the walk when the network changes — another network's ordinals mean nothing here. */
+  const probes = useRef<Map<number, { ordinal: number; ts: string }[]>>(new Map());
   const [page, setPageState] = useState(1);
 
   // ── History state (refs so fetches don't churn the effect graph; `version` re-renders) ──────
@@ -130,6 +137,7 @@ export default function AnchorLogTable() {
     if (!histNet) return;
     if (hist.current.net !== histNet) {
       hist.current = { net: histNet, pages: new Map(), latest: 0 };
+      probes.current.clear();
       setPageState(1);
       setVersion((v) => v + 1);
     }
@@ -281,11 +289,25 @@ export default function AnchorLogTable() {
   /** The chain pager, as `seekOrdinalByTime` wants it — and it reuses the walk's own page cache, so
    *  a probe already visited costs nothing and a completed seek leaves its landing page warm. */
   const loadPage = async (before: number) => {
+    // The table's own page cache first — the TIP probe is `before === latest`, which is page 1 and
+    // therefore already loaded in the normal case, so the walk's first step usually costs nothing.
     const cached = hist.current.net === netAddr ? hist.current.pages.get(pageOfOrdinal(before, latest, PAGE)) : null;
     if (cached && cached.length && cached[0].ordinal === before) return cached.map((r) => ({ ordinal: r.ordinal, ts: r.ts }));
+    // …then the PROBE cache. A walk asks for pages at arbitrary ordinals (196,766, say), which do
+    // not line up with page boundaries, so they cannot live in the map above — storing a misaligned
+    // run under a page number would make the table render the wrong rows for that page. They get
+    // their own map keyed by the ordinal actually requested, which makes a second search anywhere
+    // near the first one nearly free: the interpolation converges through the same region, so the
+    // pages it wants are the pages it already pulled.
+    const hit = probes.current.get(before);
+    if (hit) return hit;
     const r = await fetch(netUrl(`/api/network/${netAddr}/snapshots?before=${before}`));
     if (!r.ok) throw new Error(`chain ${r.status}`);
     const d = (await r.json()) as { rows: { ordinal: number; ts: string }[] };
+    // Bounded, and oldest-out: a long session of searches must not grow this without limit, and the
+    // useful entries are the recent ones — a walk revisits its own neighbourhood, not the whole chain.
+    if (probes.current.size >= PROBE_CACHE) probes.current.delete(probes.current.keys().next().value as number);
+    probes.current.set(before, d.rows);
     return d.rows;
   };
 
@@ -311,8 +333,24 @@ export default function AnchorLogTable() {
     landOn(n);
   };
 
-  /** ANCHORED INTO — a global ordinal is not this chain's address, but it resolves to a TIMESTAMP
-   *  for one ~320 B cached read, and the chain is monotonic in time. So: one lookup, then the walk. */
+  /** ANCHORED INTO — ASK THE GLOBAL SNAPSHOT ITSELF FIRST (user, 2026-09-01: "why if you search a
+   *  [global snapshot] do you need a date").
+   *
+   *  The first pass here converted the ordinal to a timestamp and walked the chain, which was the
+   *  wrong instrument: a global snapshot CARRIES the list of what anchored into it. Its raw payload
+   *  is where `metagraphSnapshotCount` comes from, and `/api/snapshot/[ordinal]` already decodes it
+   *  into one row per channel with that channel's own snapshot ordinal. So the exact answer is one
+   *  request, from the authoritative source, and it can say something no walk ever could: that this
+   *  network did NOT anchor into that global snapshot. A time-walk would answer that case by landing
+   *  on whatever came next, which reads as a hit.
+   *
+   *  ⚠️ THE WALK SURVIVES AS A FALLBACK, because the payload host only serves roughly the last ~240k
+   *  global ordinals (~78 days) and 404s older ones (app/api/snapshot/ordinalWindow.ts). Beyond that
+   *  the ~320 B per-ordinal record is still served, so an older global still yields its TIMESTAMP —
+   *  and since the anchor join is timestamp EQUALITY, the first snapshot at or after it is the one
+   *  that anchored, IF any did. That "if" is why the fallback compares the landed row's stamp with
+   *  the target's: equal means it anchored there, otherwise the search says so rather than leaving a
+   *  near-miss looking like a hit. */
   const seekTick = async () => {
     const n = Number(qTick.replace(/[^\d]/g, ""));
     if (!Number.isFinite(n) || n < 1) return;
@@ -325,17 +363,39 @@ export default function AnchorLogTable() {
       return;
     }
     if (!latest) { setJumpMiss("still reading the chain"); return; }
+    const label = displayNetwork(histNet)?.ticker ?? "this network";
     setSeeking(true);
     try {
+      // 1 — the global snapshot's own manifest. Exact, and able to answer "it didn't".
+      const direct = await fetch(netUrl(`/api/snapshot/${n}`));
+      if (direct.ok) {
+        const d = (await direct.json()) as { rows?: { metaId: string; ordinal: number }[] };
+        const mine = (d.rows ?? []).filter((r) => r.metaId === histNet);
+        if (mine.length === 0) {
+          setMarked(null);
+          setJumpMiss(`${label} did not anchor into global snapshot ${n.toLocaleString()}`);
+          return;
+        }
+        // A metagraph can anchor SEVERAL snapshots into one global; land on the oldest so the page
+        // opens at the start of that run rather than in the middle of it.
+        const ordinals = mine.map((r) => r.ordinal).filter((o) => o > 0);
+        if (ordinals.length) { landOn(Math.min(...ordinals)); return; }
+        // Rows present but undecodable — fall through to the stamp route rather than claim nothing.
+      }
+      // 2 — older than the payload host serves (or undecodable): the timestamp route still answers.
       const g = await fetch(netUrl(`/api/global/at?ordinal=${n}`));
       if (!g.ok) { setJumpMiss("no such global snapshot"); return; }
       const rec = (await g.json()) as { timestamp: string };
       const ms = Date.parse(rec.timestamp);
-      if (!Number.isFinite(ms)) { setJumpMiss("that tick has no usable timestamp"); return; }
+      if (!Number.isFinite(ms)) { setJumpMiss("that global snapshot has no usable timestamp"); return; }
       const hit = await seekOrdinalByTime(ms, latest, loadPage);
-      // NULL means the walk did not prove a bracket — say so rather than paging somewhere plausible.
       if (hit == null) { setJumpMiss("could not locate it in the chain"); return; }
-      landOn(hit);
+      landOn(hit.ordinal);
+      // The join is timestamp EQUALITY, so an unequal stamp means we landed NEXT TO the answer, not
+      // on it — and that is worth saying out loud (rule 10).
+      if (Date.parse(hit.ts) !== ms) {
+        setJumpMiss(`${label} did not anchor into global snapshot ${n.toLocaleString()} — showing the next snapshot after it`);
+      }
     } catch {
       setJumpMiss("the chain read failed — try again");
     } finally {
@@ -361,7 +421,7 @@ export default function AnchorLogTable() {
     try {
       const hit = await seekOrdinalByTime(fromMs, latest, loadPage);
       if (hit == null) { setJumpMiss("could not locate that date in the chain"); return; }
-      landOn(hit);
+      landOn(hit.ordinal);
     } catch {
       setJumpMiss("the chain read failed — try again");
     } finally {

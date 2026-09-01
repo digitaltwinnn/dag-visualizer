@@ -77,6 +77,10 @@ export interface SeekRow { ordinal: number; ts: string }
  * `loadPage(before)` returns the ~25 rows at `before, before−1, …` — the caller's own paging route,
  * injected so this stays testable without a network and so the caller keeps its cache.
  *
+ * Returns the ROW, not just its ordinal, so a caller can check the stamp it actually landed on —
+ * which is what lets the "anchored into" fallback tell "this network anchored here" apart from
+ * "this is merely the next snapshot after that moment".
+ *
  * ⚠️ IT RETURNS A BRACKET IT PROVED, OR NULL — never a guess dressed as an answer. The walk stops
  * when a probe's page actually CONTAINS the boundary (an at-or-after row whose older neighbour is
  * before the target), which is the only state in which the answer is known. If `maxProbes` runs out
@@ -89,7 +93,7 @@ export async function seekOrdinalByTime(
   latest: number,
   loadPage: (before: number) => Promise<SeekRow[]>,
   maxProbes = 8,
-): Promise<number | null> {
+): Promise<SeekRow | null> {
   if (latest < 1) return null;
   const ms = (r: SeekRow) => Date.parse(r.ts);
 
@@ -104,18 +108,18 @@ export async function seekOrdinalByTime(
   if (ms(tip[tip.length - 1]) >= targetMs) {
     // The whole tip page is at or after the target — either the target predates this page, or it is
     // older than the chain. Fall through to the walk unless the chain is one page long.
-    if (latest <= tip.length) return tip[tip.length - 1].ordinal;
+    if (latest <= tip.length) return tip[tip.length - 1];
   } else {
     // The boundary is inside the tip page itself.
     const hit = [...tip].reverse().find((r) => ms(r) >= targetMs);
-    if (hit) return hit.ordinal;
-    return tip[0].ordinal; // target is after the newest snapshot — the tip is the answer
+    if (hit) return hit;
+    return tip[0]; // target is after the newest snapshot — the tip is the answer
   }
 
   const genesis = await probe(Math.min(25, latest));
   if (!genesis.length) return null;
   const oldest = genesis[genesis.length - 1];
-  if (ms(oldest) >= targetMs) return oldest.ordinal; // target predates the chain — genesis is the answer
+  if (ms(oldest) >= targetMs) return oldest; // target predates the chain — genesis is the answer
 
   let lo = { ordinal: oldest.ordinal, value: ms(oldest) };           // strictly before the target
   let hi = { ordinal: tip[tip.length - 1].ordinal, value: ms(tip[tip.length - 1]) }; // at or after it
@@ -139,7 +143,7 @@ export async function seekOrdinalByTime(
     const newest = page[0], eldest = page[page.length - 1];
     if (ms(eldest) < targetMs && ms(newest) >= targetMs) {
       const hit = [...page].reverse().find((r) => ms(r) >= targetMs);
-      if (hit) return hit.ordinal;
+      if (hit) return hit;
     }
     const keep: "lo" | "hi" = ms(newest) < targetMs ? "lo" : "hi";
     if (keep === "lo") lo = { ordinal: newest.ordinal, value: ms(newest) };
@@ -147,5 +151,11 @@ export async function seekOrdinalByTime(
     sameSide = keep === lastKept ? sameSide + 1 : 0;
     lastKept = keep;
   }
-  return hi.ordinal - lo.ordinal <= 1 ? hi.ordinal : null;
+  // The bracket closed on adjacent ordinals: `hi` is the proved answer, but the walk never held its
+  // ROW, so one last page read supplies it rather than the caller getting an ordinal it cannot check.
+  if (hi.ordinal - lo.ordinal <= 1) {
+    const page = await probe(hi.ordinal);
+    return page.find((r) => r.ordinal === hi.ordinal) ?? null;
+  }
+  return null;
 }

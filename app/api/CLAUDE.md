@@ -26,7 +26,10 @@ them — but the Next Node server can.
   is the cheap direction — the ordinal IS the address, so it is one ~320 B cached read with no search
   at all. That is what makes the raw log's "anchored into" column affordable: the alternative was
   `/api/snapshot/[ordinal]`, which decompresses ~2.5 MB to reach the same field. Both results are
-  immutable and cached for a day.
+  immutable and cached for a day. ⚠️ `?ordinal=` is the FALLBACK for the raw log's anchored-into
+  search, not its primary path: a global snapshot's own manifest already lists what anchored into it
+  (`/api/snapshot/[ordinal]`'s `rows`), so that is the exact one-request answer wherever the payload
+  host still serves the ordinal — this route covers the older ones it 404s.
 - **`/api/snapshot/[ordinal]`** reads the raw L0 global snapshot (~2.5 MB) and returns a tiny exact
   summary plus one row per anchored channel entry. **An `ordinal: 0` marks a payload the decoder
   couldn't read, which the UI must show as undecoded rather than as zero.** Cached per ordinal

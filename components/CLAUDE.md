@@ -15,12 +15,25 @@ The page is one fixed shell in **two layers at different depths** (`SectionShell
 ⚠️ **THE EMPTY CELLS ARE THE DESIGN.** Under a committed network this table pages a chain of >1M
 pages server-side, 25 rows at a time, so a control on a column IMPLIES that column is searchable
 across all of it — and only three are. SNAPSHOT is arithmetic (ordinals are gapless), one request.
-ANCHORED INTO resolves a global ordinal to a timestamp for one ~320 B cached read
-(`/api/global/at?ordinal=`) and then walks. AGE is a date, so the same walk. FEE and SIZE have no
+ANCHORED INTO asks the GLOBAL SNAPSHOT ITSELF — it carries the list of what anchored into it
+(`/api/snapshot/[ordinal]` decodes one row per channel with that channel's own snapshot ordinal), so
+the answer is ONE exact read, measured: one request, zero walk probes. It is also the only mechanism
+that can say *this network did not anchor there* — a time-walk answers that case by landing on
+whatever came next, which reads as a hit. ⚠️ The walk survives only as a FALLBACK, because the
+payload host serves roughly the last ~240k global ordinals (~78 days) and 404s older ones; past that
+the ~320 B per-ordinal record still yields a timestamp, and since the anchor join is timestamp
+EQUALITY the first snapshot at or after it is the one that anchored — *if any did*, which is why the
+fallback compares the landed row's stamp against the target and says so when they differ. AGE is a
+date, so it is always the walk. FEE and SIZE have no
 index at any layer — a control there could only filter the 25 rows on screen, and a reader who typed
 a fee and got "no match" would reasonably conclude no such snapshot exists when we looked at 25 of
 1.1 million. NETWORK is inert because under a commit the table IS one network. An absent affordance
 tells the truth; a disabled or scoped-to-page one asks the reader to notice a qualifier first.
+
+⚠️ **VOCABULARY: never "tick" in anything a reader sees.** The column key is `tick` and the code
+says tick throughout, but the app's word is GLOBAL SNAPSHOT — the first cut of this control shipped
+"go to tick #" as a placeholder and the user caught it ("whatever tick means to you, it's not the
+vocabulary we use in our app").
 
 The walk is **interpolating, not bisecting** — cadence is regular enough that false position lands in
 a handful of probes where binary search needs ~21. ⚠️ But false position **stagnates one-sided on a

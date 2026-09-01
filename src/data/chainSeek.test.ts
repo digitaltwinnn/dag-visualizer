@@ -104,13 +104,13 @@ describe("seekOrdinalByTime (the walk the Age and Anchored-into columns spend)",
     const c = chain(100_000, (n) => n * 10_000);
     const target = EPOCH + 60_000 * 10_000;
     const got = await seekOrdinalByTime(target, 100_000, c.loadPage);
-    expect(got).toBe(60_000);
+    expect(got?.ordinal).toBe(60_000);
   });
 
   it("spends only a handful of probes on a 1M-ordinal chain", async () => {
     const c = chain(1_000_000, (n) => n * 10_000);
     const got = await seekOrdinalByTime(EPOCH + 777_777 * 10_000, 1_000_000, c.loadPage);
-    expect(got).toBe(777_777);
+    expect(got?.ordinal).toBe(777_777);
     // A blind binary search over 1M is ~20; the whole point of false position is that this is far
     // fewer. Generous bound — it pins the ORDER, not a lucky number.
     expect(c.probes()).toBeLessThanOrEqual(8);
@@ -122,13 +122,13 @@ describe("seekOrdinalByTime (the walk the Age and Anchored-into columns spend)",
     const c = chain(200_000, (n) => (n < 100_000 ? n * 60_000 : 100_000 * 60_000 + (n - 100_000) * 2_000));
     const target = EPOCH + 100_000 * 60_000 + 50_000 * 2_000;
     const got = await seekOrdinalByTime(target, 200_000, c.loadPage, 24);
-    expect(got).toBe(150_000);
+    expect(got?.ordinal).toBe(150_000);
   });
 
   it("answers from the ends when the target is outside the chain's span", async () => {
     const c = chain(50_000, (n) => n * 10_000);
-    expect(await seekOrdinalByTime(EPOCH - 1e9, 50_000, c.loadPage)).toBe(1);
-    expect(await seekOrdinalByTime(EPOCH + 1e12, 50_000, c.loadPage)).toBe(50_000);
+    expect((await seekOrdinalByTime(EPOCH - 1e9, 50_000, c.loadPage))?.ordinal).toBe(1);
+    expect((await seekOrdinalByTime(EPOCH + 1e12, 50_000, c.loadPage))?.ordinal).toBe(50_000);
   });
 
   // The refusal is the point: a walk that ran out of probes has NOT searched the chain, and paging
@@ -147,7 +147,7 @@ describe("seekOrdinalByTime (the walk the Age and Anchored-into columns spend)",
   it("beats bisection on a regular chain rather than merely matching it", async () => {
     const c = chain(1_000_000, (n) => n * 10_000);
     const got = await seekOrdinalByTime(EPOCH + 123_456 * 10_000, 1_000_000, c.loadPage, 6);
-    expect(got).toBe(123_456);
+    expect(got?.ordinal).toBe(123_456);
   });
 
   it("refuses a chain with no arithmetic base", async () => {
