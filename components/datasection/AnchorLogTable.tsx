@@ -35,14 +35,29 @@ const PAGE = 25;
  *  holds several searches' worth without letting a long session grow unbounded. */
 const PROBE_CACHE = 64;
 
-const COLUMNS: { key: AnchorLogSortKey; label: string }[] = [
+/** ⚠️ TWO COLUMNS STAND DOWN ON PHONE. Six columns cannot fit a 500px viewport — measured, the
+ *  table ran 494px inside a 403px pane and took the whole log into horizontal scroll, which on a
+ *  log you SCAN is worse than showing less of each row. This table already answered the same
+ *  question the same way once (2026-08-15: the full network NAME became the TICKER because "the
+ *  name column alone pushed the log into horizontal scroll") — shrink what is shown, do not hand
+ *  the reader a sideways scroll.
+ *
+ *  FEE and SIZE are the two that go, and the choice is not arbitrary: the other four are what
+ *  IDENTIFIES a row — whose chain, which snapshot, where it anchored, when — while fee and size
+ *  are measures ABOUT it, and both are stated in full on the snapshot card one tap away. They are
+ *  also the two columns the search bar cannot answer for, having no index at any layer, so a phone
+ *  loses nothing it could have acted on. `max-[700px]` is `breakpointOf`'s own phone boundary and
+ *  the same arm every other phone gate names (CSS trap 8: it stops applying AT 700). */
+const COLUMNS: { key: AnchorLogSortKey; label: string; phone?: false }[] = [
   { key: "net", label: "Network" },
   { key: "ordinal", label: "Snapshot" },
-  { key: "fee", label: "Fee (DAG)" },
-  { key: "size", label: "Size" },
+  { key: "fee", label: "Fee (DAG)", phone: false },
+  { key: "size", label: "Size", phone: false },
   { key: "tick", label: "Anchored into" },
   { key: "age", label: "Age" },
 ];
+/** The one class both the header cell and its body cells wear, so a column can never half-hide. */
+const PHONE_HIDDEN = "max-[700px]:hidden";
 
 /** The absence mark for a SEAM's metagraph columns. Muted rather than dim, so a scan reads it as
  *  "nothing to say here" instead of as a faint value — and `aria-hidden` with an sr-only word,
@@ -608,7 +623,7 @@ export default function AnchorLogTable() {
                 <TableHead
                   key={c.key}
                   aria-sort={sort.key === c.key ? (sort.dir === 1 ? "ascending" : "descending") : "none"}
-                  className={cn(i >= 2 && "text-right")}
+                  className={cn(i >= 2 && "text-right", c.phone === false && PHONE_HIDDEN)}
                 >
                   <button
                     type="button"
@@ -737,8 +752,8 @@ export default function AnchorLogTable() {
                       <span className="inline-flex w-3.5 flex-none">{rowSel && <SelectedRowMark hue={cfg?.hue ?? "var(--core)"} />}</span>
                     </span>
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">{seam ? <Dash /> : fmtDag(r.fee)}</TableCell>
-                  <TableCell className="text-right tabular-nums text-foreground-dim">{seam ? <Dash /> : fmtKB(r.sizeInKB)}</TableCell>
+                  <TableCell className={cn("text-right tabular-nums", PHONE_HIDDEN)}>{seam ? <Dash /> : fmtDag(r.fee)}</TableCell>
+                  <TableCell className={cn("text-right tabular-nums text-foreground-dim", PHONE_HIDDEN)}>{seam ? <Dash /> : fmtKB(r.sizeInKB)}</TableCell>
                   <TableCell className="text-right font-mono tabular-nums">
                     {pending ? <span className="text-muted-foreground">…</span> : r.global.ordinal.toLocaleString()}
                   </TableCell>
