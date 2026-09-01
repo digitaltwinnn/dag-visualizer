@@ -183,6 +183,20 @@ tier. The lane's DOM shape is load-bearing too: members are selected by
 `:has()` on the per-rung WRAPPER divs, so **the selectors must be descendant, not child** — `RailPager`
 nests the box one level deeper inside its gesture wrapper.
 
+⚠️ **THE ACCORDION SLIDE HAS TWO TRAPS, both found by a user report (2026-09-01) and both invisible
+in code review.** *(1) Sanitizing the outgoing clone strips its GROUND.* The clone drops `.ig-panel` /
+`.rail-entry` so the `RailThread`'s measurement and the slab's `:has()` selectors cannot see it — but
+`.ig-panel` is what PAINTS a card (glass gradient, blur, border, radius, padding), so the card sliding
+out was bare text drifting over the scene: *"just text on transparent background moving quite quick,
+which hurts my eyes"*. `carryLook` copies the computed look across as inline style BEFORE the classes
+are dropped — the clone keeps its face and loses its identity, which is all sanitizing was ever for.
+*(2) The lane's height jumps the instant the slide starts.* The clone is absolutely positioned so holds
+no height, and the store commits synchronously, so the slot becomes the NEW card's height while an
+820ms HORIZONTAL slide is only beginning — everything below jumped (*"things jump vertically"*).
+`commitStep` pins the old height before the swap and eases to the new one on the slide's own clock, one
+frame later (the new height is unknowable until React has painted it). Both restore in `fin()` beside
+the position/overflow it already saved.
+
 **The box can carry a SIBLING PAGER** (`RailPager`): where the expanded rung has 1-N siblings under the
 same committed parent, a slim `‹ n / N ›` plank rides the card's OWN bottom edge, inside the glass, plus
 a horizontal swipe on the body. The set comes from the pure resolver `railSiblings.ts` and every step

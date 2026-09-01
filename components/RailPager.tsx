@@ -93,6 +93,29 @@ const rubber = (x: number, d: number) => Math.sign(x) * d * (1 - 1 / (Math.abs(x
 // the eye: slow in, cross mid-window, slow out (~15% covered at quarter time, measured), over a
 // slightly longer window. The CANCEL snap-back keeps the spring — a rubber band springing home
 // is exactly that gesture, and its different feel is what says "didn't commit".
+/** Copy the SANITIZED classes' visual result onto the clone as inline style, element for element.
+ *  A deep clone walks in the same order as its source, so the two `querySelectorAll` runs pair up.
+ *  Only the properties that make a card LOOK like a card — nothing that could re-enter a selector.
+ *  Read from the ORIGINAL, which is in the document and therefore has computed styles at all. */
+const LOOK = [
+  "backgroundColor", "backgroundImage", "borderRadius", "boxShadow",
+  "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth",
+  "borderStyle", "borderColor", "backdropFilter", "padding",
+] as const;
+function carryLook(src: HTMLElement, clone: HTMLElement): void {
+  const pair = (a: HTMLElement, b: HTMLElement) => {
+    const cs = getComputedStyle(a);
+    for (const prop of LOOK) {
+      const v = cs[prop as unknown as number] as unknown as string;
+      if (v) b.style.setProperty(prop.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`), v);
+    }
+  };
+  if (src.classList.contains("ig-panel") || src.classList.contains("rail-entry")) pair(src, clone);
+  const from = src.querySelectorAll<HTMLElement>(".ig-panel, .rail-entry");
+  const to = clone.querySelectorAll<HTMLElement>(".ig-panel, .rail-entry");
+  for (let i = 0; i < from.length && i < to.length; i++) pair(from[i], to[i]);
+}
+
 const SLIDE_MS = 820;
 const SLIDE_EASE = "cubic-bezier(0.45, 0.05, 0.25, 1)";
 const FLICK_V = 0.35; // px/ms at release — a throw this fast commits regardless of travel. Measured
@@ -211,6 +234,14 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     const dragged = el.style.transform; // carry the finger's displacement into the slide
     const clone = el.cloneNode(true) as HTMLElement;
     for (const n of clone.querySelectorAll("[id]")) n.removeAttribute("id");
+    // ⚠️ SANITIZING THE CLONE ALSO STRIPPED ITS GROUND. The classes below are removed so the
+    // RailThread's measurement and the slab's `:has()` selectors cannot see the outgoing card — but
+    // `.ig-panel` is what PAINTS a card (its glass gradient, blur, border, radius, padding), so the
+    // card sliding out was bare text on nothing, drifting over the scene. The user's words:
+    // "just text on transparent background moving quite quick, which hurts my eyes". Copy the look
+    // across as inline style FIRST, then drop the classes: the clone keeps its face and loses its
+    // identity, which is the whole point of sanitizing it.
+    carryLook(el, clone);
     for (const n of clone.querySelectorAll(".ig-panel, .rail-entry")) n.classList.remove("ig-panel", "rail-entry");
     clone.classList.remove("ig-panel", "rail-entry");
     clone.setAttribute("aria-hidden", "true");
@@ -218,8 +249,18 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     clone.style.transform = dragged;
     const prevPos = parent.style.position;
     const prevOverflow = parent.style.overflow;
+    const prevHeight = parent.style.height;
+    const prevTrans = parent.style.transition;
     parent.style.position = "relative";
     parent.style.overflow = "hidden"; // clip the adjacent slide to the lane
+    // ⚠️ PIN THE LANE'S HEIGHT BEFORE THE SWAP. The clone is absolutely positioned, so it holds no
+    // height, and the store commits synchronously — the moment React paints the new card the slot
+    // becomes ITS height. Two cards of different length therefore made everything below jump the
+    // instant an 820ms HORIZONTAL slide began (user: "things jump vertically"). Pinned here and
+    // eased to the new height on the slide's own clock below, the lane changes size as part of the
+    // movement instead of a step ahead of it.
+    const oldH = el.offsetHeight;
+    parent.style.height = `${oldH}px`;
     parent.appendChild(clone);
     step(dir); // the heavy subject swap runs NOW, with both cards visible and at rest
     el.style.transition = "none";
@@ -234,10 +275,22 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
       clone.remove();
       parent.style.position = prevPos;
       parent.style.overflow = prevOverflow;
+      parent.style.height = prevHeight;
+      parent.style.transition = prevTrans;
       el.style.transition = "none";
       el.style.transform = "";
     };
     pending.current = { fin, t: setTimeout(() => { pending.current = null; fin(); }, SLIDE_MS + 40) };
+    // The new card's height is only knowable after React has painted it, so the lane's ease is armed
+    // one frame later — on the slide's own clock and curve, so one movement carries both. Guarded on
+    // `pending`, because a fresh gesture may already have taken the lane by the time this runs.
+    requestAnimationFrame(() => {
+      if (pending.current?.fin !== fin) return;
+      const newH = el.offsetHeight;
+      if (!newH || newH === oldH) return;
+      parent.style.transition = `height ${SLIDE_MS}ms ${SLIDE_EASE}`;
+      parent.style.height = `${newH}px`;
+    });
   };
 
   if (!set) return <>{children}</>;
