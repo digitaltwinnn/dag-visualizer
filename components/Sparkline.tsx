@@ -2,6 +2,8 @@
 
 import { LineChart, Line, YAxis, ResponsiveContainer } from "recharts";
 
+import { cn } from "@/lib/utils";
+
 // Tiny inline trend line (Recharts) — used in the stats header. Recharts is also the
 // foundation for the larger charts to come (axes/tooltips/area/bar), so reuse it.
 // `stretch` fills the parent's width instead of the fixed box (the vitals band's rate cards —
@@ -47,7 +49,27 @@ export default function Sparkline({
   /** Cap the plotted points, bucketing by mean over the SAME window (see bucketMean). */
   maxPoints?: number;
 }) {
-  if (!data || data.length < 2) return null;
+  // ⚠️ AN EMPTY CHART SAYS SO, IT DOES NOT RENDER NOTHING (user, 2026-09-01: "what to show for
+  // vitals that show charts but don't have any data to show?"). `return null` left a card with a
+  // label, a number and a silent gap where the trend belongs, which reads as a broken chart rather
+  // than as a chart with nothing yet to draw.
+  //
+  // ⚠️ AND THE WORD IS `acquiring…`, NOT "no data". This app keeps those apart on purpose (rule 10,
+  // and the acquiring-state note in components/CLAUDE.md): "haven't looked yet" and "looked and
+  // found nothing" are different facts, and a rate with fewer than two ticks behind it is the
+  // FIRST — the window simply has not filled. "No data" would claim the second. It is also the
+  // word `TickBars` already uses two cards along, so the band speaks one language. A real zero is
+  // a READING and never reaches here: it plots as a flat line.
+  if (!data || data.length < 2) {
+    return (
+      <span
+        className={cn("flex items-center justify-center text-micro text-muted-foreground", stretch && "w-full")}
+        style={{ height, width: stretch ? undefined : width }}
+      >
+        acquiring…
+      </span>
+    );
+  }
   const series = maxPoints ? bucketMean(data, maxPoints) : data;
   const points = series.map((v, i) => ({ i, v }));
   if (stretch) {

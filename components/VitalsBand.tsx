@@ -71,6 +71,34 @@ export function compositionCounts(
   return counts;
 }
 
+/** ⚠️ A PER-HOUR RATE CLAIMS THE PRESENT TENSE BY ITS OWN UNITS, so it is only sayable while
+ *  something actually arrived within the hour it is counting (user, 2026-09-01: "why does BIOFI (no
+ *  identified nodes) say it has 358 snapshots/hour? looks wrong"). It did: BIOFI stopped producing
+ *  on 2026-08-16, and the buffer still held its final snapshots — made quickly, so a short span
+ *  over a full buffer extrapolated to a confident rate that was two weeks out of date.
+ *
+ *  The threshold is the unit, not a taste: `/hour` needs a sample inside the hour. Past that the
+ *  card states WHEN it last saw one, which is the real fact and the more useful one — a chain that
+ *  has stopped is exactly what a reader wants told, and "0/hour" would answer a question they did
+ *  not ask while hiding the date. */
+const RATE_STALE_MS = 3600_000;
+function staleFor(a: Activity | null | undefined): number | null {
+  return a && a.staleMs != null && a.staleMs > RATE_STALE_MS ? a.staleMs : null;
+}
+/** ⚠️ THE UNIT IS SPELLED OUT (user, 2026-09-01: "d = days? write it in full so people actually
+ *  understand"). The log's AGE column abbreviates because it repeats down 25 rows and its header
+ *  names the quantity; this appears ONCE, inside a sentence, where `315d` asks the reader to decode
+ *  a letter to learn the single most important thing the card is telling them — that the chain has
+ *  been silent for the better part of a year. The coarsest unit that is still true, pluralised. */
+function agoLabel(ms: number): string {
+  const unit = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  const m = Math.round(ms / 60000);
+  if (m < 60) return unit(Math.max(1, m), "minute");
+  const h = Math.round(m / 60);
+  if (h < 48) return unit(h, "hour");
+  return unit(Math.round(h / 24), "day");
+}
+
 function windowSpan(a: Activity): string {
   const mins = a.spanHr * 60;
   return mins < 1 ? `${Math.round(mins * 60)}s` : `~${Math.round(mins)} min`;
@@ -216,6 +244,11 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
   // here would re-shuffle the structural cards (type, composition, layers) every time the subject
   // changes, and a row that moves cannot be followed; the ranked cards already arrive sorted from
   // their builders. Ordering is a property of the DATA, not of this component.
+  // Same rule as the sparkline: a breakdown with no rows YET says so rather than rendering an
+  // empty block. A row whose count is 0 is a reading and still draws (its numeral, no bar).
+  if (rows.length === 0) {
+    return <span className="flex items-center self-stretch text-micro text-muted-foreground">acquiring…</span>;
+  }
   const max = Math.max(1, ...rows.map((r) => r.count));
   return (
     // `justify-evenly` over the full height rather than a fixed gap: a four-row card already
@@ -689,7 +722,24 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
   const cfg = metagraphById(filter);
   const isMeta = !!cfg && filter !== "all" && filter !== "dag";
   const basis = windowNote(activity, scoped ? "snapshots" : "global ticks");
-  const rate = (label: string, value: number | undefined, spark: number[] | undefined, note?: string) => (
+  const rate = (label: string, value: number | undefined, spark: number[] | undefined, note?: string) => {
+    // A stopped chain reports WHEN, not HOW FAST. The lead keeps the card's shape — same slot, same
+    // weight — so the row does not reflow between a live network and an idle one.
+    const stale = staleFor(activity);
+    if (stale != null) {
+      return (
+        <BandCard
+          key={label}
+          label={label}
+          lead={<span className="font-mono font-bold text-muted-foreground tabular-nums whitespace-nowrap">idle</span>}
+        >
+          <span className="flex items-center self-stretch text-micro text-muted-foreground">
+            no snapshots for {agoLabel(stale)}
+          </span>
+        </BandCard>
+      );
+    }
+    return (
     <BandCard
       label={label}
       lead={<span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap"><Odometer value={value} /></span>}
@@ -719,7 +769,8 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
       {activity && <span className="text-micro text-muted-foreground whitespace-nowrap self-end pb-1">{windowSpan(activity)}</span>}
       {note && <span className="sr-only">{note}</span>}
     </BandCard>
-  );
+    );
+  };
   // WHO anchors, HOW MUCH, HOW OFTEN, then the per-tick picture (user ordering, 2026-08-30):
   // the roster leads, the anchor rate beside it, the cadence, and the chart closes the row.
   return (
