@@ -130,6 +130,18 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
       const lx = (v: number) => (v - (sr?.left ?? 0)) / k; // a viewport X → local X
       const ly = (v: number) => (v - (sr?.top ?? 0)) / k; // a viewport Y → local Y
       const hRail = px(r.height);
+      // ⚠️ THE RULER RUNS THE FULL VIEWPORT (user, 2026-09-01: "extend the ruler on the left- and
+      // right- side all to the top and bottom of the view OR give the bottom- and top-bar less
+      // margin"). It already ran the whole rail LANE (2026-08-09), which stops below the command
+      // bar and above the vitals band — leaving an empty gutter square in all four corners. Of the
+      // two offers this is the one that keeps earlier decisions intact: pulling the bars out to
+      // meet it would put them over this gutter, which is exactly what 2026-08-30 moved them off
+      // ("the band sits on top of the rail of the side panels").
+      //
+      // Nothing is covered by the extension: the ruler lives in the 22px gutter OUTSIDE
+      // `--bar-margin`, so the length it gains runs beside the two bars rather than under them.
+      // The px top/bottom fades do the rest — the ink reaches the corners and dies there.
+      const ORIGIN_VY = 0;
       // Every rail card carries a thread marker: `.ig-panel` (the shared glass frame — the ONE
       // materialized box + the left rail's tool cards) or `.rail-entry` (the unboxed ancestor
       // entries + ghost hint lines, card-redesign 2026-08-08). The thread drops a dot at each
@@ -152,7 +164,11 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
           const eb = !c.hasAttribute("data-ghost") ? c.querySelector("[data-eyebrow]") : null;
           const er = eb?.getBoundingClientRect();
           return {
-            y: px((er ? er.top + er.height / 2 : cr.top + cr.height / 2) - r.top),
+            // ⚠️ MEASURED FROM THE SVG'S ORIGIN, WHICH IS THE VIEWPORT'S TOP, NOT THE RAIL'S.
+            // The ruler now starts above the rail (see the height note below), so a dot placed
+            // relative to `r.top` would sit `--rail-top` too high — the whole instrument would
+            // still line up with itself and be wrong against every card.
+            y: px((er ? er.top + er.height / 2 : cr.top + cr.height / 2) - ORIGIN_VY),
             // Measured, not derived from a shared step constant — a scrollbar or a future layout
             // tweak can't put the connectors out of register with the real card edges.
             inset: px(side === "right" ? r.right - cr.right : cr.left - r.left),
@@ -161,7 +177,14 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
             entry,
           };
         })
-        .filter((m) => m.y >= 6 && m.y <= hRail - 6); // only dots inside the visible rail
+        // ⚠️ THE CLIP IS THE RAIL'S BAND, EXPRESSED IN THE RULER'S SPACE. It read `0 … hRail`
+        // while both the marks and the rail shared an origin; now the marks are measured from the
+        // viewport's top and the rail starts `--rail-top` below it, so the same two numbers would
+        // silently drop every dot in the lower `--rail-top` pixels of the lane — the bottom cards
+        // losing their marks for no visible reason. The rule is unchanged (a card scrolled out of
+        // the rail gets no dot just because the ruler is longer than the content); only the frame
+        // it is stated in moved.
+        .filter((m) => m.y >= px(r.top - ORIGIN_VY) + 6 && m.y <= px(r.bottom - ORIGIN_VY) - 6);
       // Normalise: the shallowest card defines "flush", so a scrollbar (or any constant gutter)
       // offsets nothing and depth 0 always reads as depth 0.
       const base = raw.length ? Math.min(...raw.map((m) => m.inset)) : 0;
@@ -184,22 +207,63 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
       // CSS px, like every value here); `|| hRail` covers a `none`. Marks stay clipped to the rail's
       // own height above — a card scrolled out of the rail must not get a dot just because the ruler
       // is longer than the content.
+      // The lane's own extent is still what MARKS are clipped to (a card scrolled out of the rail
+      // must not get a dot just because the ruler is longer than the content) — that clip lives
+      // with the marks above and is unaffected by the ruler's new length.
       const band = parseFloat(getComputedStyle(rail).maxHeight) || hRail;
-      setG({ top: ly(r.top), left, height: Math.round(Math.max(hRail, band)), marks });
+      void band;
+      setG({ top: ly(ORIGIN_VY), left, height: Math.round(px(window.innerHeight - ORIGIN_VY)), marks });
 
     };
     const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };
     schedule();
+
+    // ⚠️ THE RAIL SLIDES, AND A SLIDE IS NOT ONE MEASUREMENT (user, 2026-09-01: the ruler's
+    // "anchor to the card" breaks when the strip opens — "cards move down, ruler stays
+    // unchanged"; present in prod, so it predates the corner-to-corner change).
+    //
+    // Opening a top-bar strip writes `--topbar-extra`, which moves the rails DOWN by that much
+    // over a 0.35s CSS transition. Neither existing observer answers that: a ResizeObserver
+    // watches SIZE and a position change has none, and while it does happen to fire once here
+    // (the rail's `max-height` shrinks), one callback lands at the START of the slide — measured,
+    // the dots stayed at 108 while their eyebrows travelled to 187, a drift of exactly the
+    // published 79px. This is the same family as the transform bug the header above records:
+    // the thing that moved fires no event of its own.
+    //
+    // So the ruler FOLLOWS the slide rather than sampling it: `--topbar-extra` is written to
+    // `documentElement.style`, which IS observable, and each write starts a per-frame re-measure
+    // lasting the rail's own transition (read from it, so re-tuning the CSS re-tunes this) plus a
+    // frame. Under reduced motion the duration is 0 and the loop is the single frame an instant
+    // jump needs. It costs nothing at rest — there is no polling, only a burst per strip toggle.
+    let follow = 0;
+    const followSlide = () => {
+      cancelAnimationFrame(follow);
+      const ms = (parseFloat(getComputedStyle(rail).transitionDuration) || 0) * 1000 + 60;
+      const until = performance.now() + ms;
+      const step = () => {
+        measure();
+        follow = performance.now() < until ? requestAnimationFrame(step) : 0;
+      };
+      follow = requestAnimationFrame(step);
+    };
+
     const ro = new ResizeObserver(schedule);
     ro.observe(rail);
     const mo = new MutationObserver(schedule);
     mo.observe(rail, { childList: true, subtree: true });
+    // The rails' own offsets ride tokens on the ROOT (`--topbar-extra`, `--bottom-reserve`), and
+    // every one of them is set through `documentElement.style` — so one attribute filter covers
+    // each thing that can move a rail without resizing it.
+    const rootMo = new MutationObserver(followSlide);
+    rootMo.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
     rail.addEventListener("scroll", schedule, { passive: true });
     window.addEventListener("resize", schedule);
     return () => {
       cancelAnimationFrame(raf);
+      cancelAnimationFrame(follow);
       ro.disconnect();
       mo.disconnect();
+      rootMo.disconnect();
       rail.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
     };

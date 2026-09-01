@@ -340,7 +340,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
             head and tail both surviving. Budgets measured at the desktop rail width. */}
         <FootRow label="Hash" value={midHash(d.hash, 34)} title={d.hash} copy={d.hash} />
         {d.lastSnapshotHash && (
-          <FootRow label="Parent hash" value={midHash(d.lastSnapshotHash, 27)} title={d.lastSnapshotHash} copy={d.lastSnapshotHash} />
+          <FootRow label="Previous hash" value={midHash(d.lastSnapshotHash, 27)} title={d.lastSnapshotHash} copy={d.lastSnapshotHash} />
         )}
       </Foot>
     </div>

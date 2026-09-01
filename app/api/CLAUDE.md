@@ -20,6 +20,12 @@ them — but the Next Node server can.
   budget.
 - **`/api/geo`** serves the validator IP→geo map live (cached 1h, 503 on failure) so the globe plots
   from one request; the client-side resolver fills any misses.
+- **`/api/global/at?ts=`** binary-searches ~23 tiny per-ordinal records to find the global carrying
+  that exact stamp (the anchor join is timestamp EQUALITY). Its one consumer is the anchor log's
+  ANCHORED INTO column resolution. ⚠️ An `?ordinal=` mode was added and then **removed** the same day
+  (2026-09-01): it existed only to let the raw log's anchored-into search fall back to a timestamp
+  walk for globals the payload host no longer serves, and that fallback was cut as a second mechanism
+  for a case two other columns already cover. Don't re-add it without a consumer.
 - **`/api/snapshot/[ordinal]`** reads the raw L0 global snapshot (~2.5 MB) and returns a tiny exact
   summary plus one row per anchored channel entry. **An `ordinal: 0` marks a payload the decoder
   couldn't read, which the UI must show as undecoded rather than as zero.** Cached per ordinal

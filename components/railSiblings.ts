@@ -270,11 +270,22 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       // a COARSER rung (metaSnapSelectActions filter-firsts), i.e. a swipe would silently
       // re-commit the network. The explorer still browses every contributor under a tick, because
       // there the network is a deliberate click of its own with its own chamber hover preview;
-      // the pager stays inside the committed story. Order mirrors the explorer's leaves: ordinal
-      // desc within the tick (anchorLog's own rule).
+      // the pager stays inside the committed story.
+      //
+      // ⚠️ OLDEST → NEWEST, so `›` MEANS FORWARD IN TIME (user, 2026-09-01: "forward swipe goes to
+      // the parent, which is earlier on the timeline of the chain — that's inverse logic"). It was
+      // ordinal-DESC, mirroring the explorer's leaves, and that put the two snapshot pagers in this
+      // same rail on OPPOSITE headings: the global one steps the window oldest→newest so `›` walks
+      // the way the bars do, while this one walked backwards down the chain. `lastSnapshotHash`
+      // makes the direction concrete rather than a matter of taste — these rows are consecutive
+      // links (verified live: within one tick each snapshot's parent IS the previous one's hash),
+      // so `‹` now follows the parent links back and `›` follows them forward.
+      //
+      // The explorer's LIST keeps its newest-first order, which is right for a list and not in
+      // conflict: a log reads back from now, a stepper advances.
       const rows = s.exactRows
         .filter((r) => r.metaId === cur.metaId)
-        .sort((a, b) => b.ordinal - a.ordinal);
+        .sort((a, b) => a.ordinal - b.ordinal);
       const meta = s.metaList.find((m) => m.id === cur.metaId);
       const who = meta?.symbol || meta?.name || `${cur.metaId.slice(0, 6)}…`;
       const items = rows.map((r, i) => {

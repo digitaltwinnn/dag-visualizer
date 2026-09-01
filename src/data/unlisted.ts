@@ -99,7 +99,9 @@ export function observedUnlistedIds(
   const seen = new Set<string>();
   const out: string[] = [];
   for (const row of unlistedLog(globalSnapshots, exactByOrdinal)) {
-    if (!seen.has(row.metaId)) {
+    // `unlistedLog` never emits a seam (it is built from exact-read channel entries, which exist
+    // only where something anchored) — the guard is the type's, not a real branch.
+    if (row.metaId && !seen.has(row.metaId)) {
       seen.add(row.metaId);
       out.push(row.metaId);
     }

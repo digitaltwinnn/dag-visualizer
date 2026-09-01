@@ -1,5 +1,6 @@
 "use client";
 
+import { ageWords } from "@/src/util/relativeAge";
 import { netUrl } from "@/src/net/current";
 import { useEffect, useState } from "react";
 
@@ -36,16 +37,16 @@ export function fmtSnapCount(n: number): string {
   return String(Math.max(0, Math.round(n)));
 }
 
-// Wall-clock reach of a window floor — days under two months, whole months beyond (the user
-// read decimals as strange; the census states reach with "~" anyway).
+// Wall-clock reach of a window floor. The TIERS moved to `ageWords` (src/util/relativeAge.ts,
+// 2026-09-01) — it is the app's one long-form span now, shared with the vitals' idle card, so a
+// reach and an idle age can never be phrased differently. What stays here is the rule that is this
+// census's alone: a sub-day window is a measurement artifact, not a fact, and reports nothing.
 export function fmtReach(floorTs: string, now = Date.now()): string | null {
   const t = Date.parse(floorTs);
   if (Number.isNaN(t)) return null;
-  const days = (now - t) / 86_400_000;
-  if (days < 1) return null; // a sub-day window would be a measurement artifact, not a fact
-  if (days < 60) return `${Math.round(days)} days`;
-  if (days < 700) return `${Math.round(days / 30.44)} months`;
-  return `${Math.round(days / 365.25)} years`;
+  const ms = now - t;
+  if (ms < 86_400_000) return null;
+  return ageWords(ms);
 }
 
 // The NODE card's Archive value, in the same stacked grammar the dossier settled on (user,

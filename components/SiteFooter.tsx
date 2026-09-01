@@ -34,14 +34,24 @@ export default function SiteFooter() {
     // canvas, and an orbit drag started along the bottom edge must still reach the scene.
     <footer
       id="sitefoot"
-      className="fixed inset-x-0 bottom-0 z-10 h-[var(--footer-h)] flex items-center justify-center pointer-events-none max-[700px]:bottom-[var(--phone-dock-h)] max-[700px]:h-[26px]"
+      className="fixed inset-x-0 bottom-0 z-10 h-[var(--footer-h)] flex items-center justify-center pointer-events-none max-[700px]:bottom-[var(--phone-dock-h)] max-[700px]:h-[22px]"
     >
       {/* The halo text-shadow is GONE (user, 2026-08-30: "it has some shadow which for text is
           not great") — it existed for bloom sweeping the bottom edge, but the vitals band now
           stands between the scene and this line in every 3D view, so the wash-out it answered
           no longer reaches here. Readability comes from real ink instead: full muted-foreground,
-          up from the /70 tint. */}
-      <nav className="flex items-center gap-2 text-micro text-muted-foreground [&_a]:pointer-events-auto">
+          up from the /70 tint.
+          …AND FROM A GROUND, since 2026-09-01 (user: "background of text — should it be
+          transparent or a subtle fill to keep it readable on the scene?"). A LOZENGE sized to the
+          links, never a full-width scrim: the failure is LOCAL — the line only washes out where a
+          bright scene element passes under it (the ledger's lit floor, a bloomed node), a few
+          hundred pixels of a very wide row — and a scrim spanning the viewport would turn quiet
+          site chrome into a second command bar directly under the vitals band. The plate is the
+          `--footer-glass`, a flat low-alpha veil rather than the band's lit `--topbar-glass`
+          surface (user, 2026-09-01 — that one was "too dominant white" in light mode; see the
+          token's own note). NO BORDER: a border would make this a card, and it is not an
+          instrument. */}
+      <nav className="flex items-center gap-2 text-micro text-muted-foreground [&_a]:pointer-events-auto rounded-full px-2.5 py-0.5 bg-[var(--footer-glass)] backdrop-blur-sm">
         <a href={GITHUB} target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
           GitHub
         </a>

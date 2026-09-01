@@ -8,6 +8,7 @@ import { compositionRows, machineKey } from "@/src/data/composition";
 import type { NodeInfo } from "@/src/data/types";
 import { identityHudCss } from "@/src/palette/identity";
 import { METATYPE_ICONS, VIEW_ICONS } from "@/components/icons";
+import { METAGRAPHS } from "@/src/net/current";
 import Sparkline from "@/components/Sparkline";
 import Odometer from "@/components/Odometer";
 import { NoSignalDot } from "@/components/state/StateAtoms";
@@ -15,6 +16,7 @@ import { isGlobalActivityScope, type Activity } from "@/src/data/api";
 import { POLL } from "@/src/engine/config";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { useSceneYield } from "@/components/RailShade";
+import { ageWords } from "@/src/util/relativeAge";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
 
@@ -36,9 +38,13 @@ import { useMemo } from "react";
 // segment is named by its legend row, every country bar by its code, every rate by its eyebrow
 // (dataviz discipline).
 
-// The four composition segments' opacity STEPS over the one accent hue (the house device: calm
-// and dim variants are the same token at low opacity, never a bespoke tone). Fixed order, fixed
-// step per label — a filter that empties a segment must not repaint the survivors.
+// The donut's segment opacity STEPS over the one accent hue (the house device: calm and dim
+// variants are the same token at low opacity, never a bespoke tone). Fixed order, fixed step per
+// label — a filter that empties a segment must not repaint the survivors.
+//
+// ⚠️ THE RING'S ALONE. `MicroBars` mirrored this ladder until 2026-09-01, which is what made two
+// cards in one row read as two hues — see the MicroBars header. Adjacent arcs of one colour need
+// separating; labelled rows separated by their own gaps do not.
 const DONUT_STEPS = [1, 0.66, 0.42, 0.24] as const;
 
 // The composition counting (moved home from the retired topbar/Vitals cluster, 2026-08-30 —
@@ -66,6 +72,20 @@ export function compositionCounts(
   return counts;
 }
 
+/** ⚠️ A PER-HOUR RATE CLAIMS THE PRESENT TENSE BY ITS OWN UNITS, so it is only sayable while
+ *  something actually arrived within the hour it is counting (user, 2026-09-01: "why does BIOFI (no
+ *  identified nodes) say it has 358 snapshots/hour? looks wrong"). It did: BIOFI stopped producing
+ *  on 2026-08-16, and the buffer still held its final snapshots — made quickly, so a short span
+ *  over a full buffer extrapolated to a confident rate that was two weeks out of date.
+ *
+ *  The threshold is the unit, not a taste: `/hour` needs a sample inside the hour. Past that the
+ *  card states WHEN it last saw one, which is the real fact and the more useful one — a chain that
+ *  has stopped is exactly what a reader wants told, and "0/hour" would answer a question they did
+ *  not ask while hiding the date. */
+const RATE_STALE_MS = 3600_000;
+function staleFor(a: Activity | null | undefined): number | null {
+  return a && a.staleMs != null && a.staleMs > RATE_STALE_MS ? a.staleMs : null;
+}
 function windowSpan(a: Activity): string {
   const mins = a.spanHr * 60;
   return mins < 1 ? `${Math.round(mins * 60)}s` : `~${Math.round(mins)} min`;
@@ -76,48 +96,191 @@ function windowNote(a: Activity | null | undefined, unit: string): string | unde
 }
 
 /** The band's one cell recipe: a quiet plate (spineless — cards carry no resting edge signal),
- *  eyebrow in the bar's own caps register, body below. Every card is `flex-1 basis-0` so the
- *  row DISTRIBUTES EVENLY across the full width (user, 2026-08-30 — a centred clump read as
+ *  eyebrow in the bar's own caps register, body below. A GROWING card is `flex-1 basis-0` so the
+ *  row distributes evenly across the full width (user, 2026-08-30 — a centred clump read as
  *  leftover; equal cards read as one designed instrument strip); a wider instrument passes its
- *  own flex via className. */
-export function BandCard({ label, children, className, mark }: { label: string; children: React.ReactNode; className?: string; mark?: React.ReactNode }) {
+ *  own flex via className, and a card whose content cannot spend width opts out with `grow`.
+ *
+ *  A band card in TWO SEGMENTS: the LEAD (the headline total this card exists to say) and the
+ *  DETAIL (its breakdown), divided by a hairline (user pick, 2026-09-01 — over spacing alone).
+ *
+ *  ⚠️ `size` IS THE ONE WIDTH VOCABULARY (user, 2026-09-01: "sometimes certain vitals cards are
+ *  huge while others are tiny; can we have an agreed small/medium/large size"). It replaced six
+ *  hand-picked flex values (1.4 / 1.5 / 1.6 / 1.8 / 2 / auto) that each encoded a guess about one
+ *  card's content. Three tiers, and a tier is a claim about WHAT THE CARD IS, not how wide it looked:
+ *
+ *    sm — states ONE reading and has no breakdown to spend width on (geo's NODES, the anchoring
+ *         roster, hyper's single-characteristic type card). Sizes to its content.
+ *    md — a reading AND its breakdown, or a rate and its sparkline. The row's default.
+ *    lg — a chart that genuinely reads better wide (the ledger's tick bars).
+ *
+ *  Every tier keeps an `auto` BASIS, never `basis-0`: a share computed with no reference to the
+ *  card's content is what clipped the rate cards' extrapolation note off the plate at tablet width.
+ *  A card asks for what it needs first, and grows from there by its tier's weight.
+ *
+ *  Either segment may stand alone: lead-only (geo's NODES), detail-only (NETWORK LAYERS, and
+ *  PulseStrip's poll cards, which pass no lead). The divider draws only when both are present. */
+export type BandCardSize = "sm" | "md" | "lg";
+
+/** The tier→flex table. `auto` basis throughout (see the note above); only the GROW weight differs,
+ *  so a tier says how eagerly a card takes leftover width, never how wide it starts. */
+/** ⚠️ THE CEILING IS WHAT MAKES A TIER A TIER. Without it every `md` card grows to fill whatever
+ *  the viewport gives it, and at 1600px three of them each held ~500px — a lead pinned left, a
+ *  capped bar block pinned right, and a void between the two (the very "huge cards" complaint the
+ *  scale exists to answer). The grow weight decides who takes leftover width; the ceiling decides
+ *  when everyone stops taking it and the row simply ends. */
+/*  ⚠️ THE CEILING MOVED OFF THE BOX AND ONTO THE CONTENT (user, 2026-09-01: "can we align the
+ *  vitals sections in the center of its designated space on the bottom bar?"). With the cap on the
+ *  BOX, a capped row stopped short of the plate and the whole group centred as one clump — so all
+ *  the leftover collected at the two ENDS and hyper's three sections began 234px into a bar they
+ *  were supposed to divide. The box now takes its share of the plate and the CONTENT is capped and
+ *  centred inside it, which is what "its designated space" means: the slack is distributed between
+ *  the sections instead of banked outside them, and every card still refuses to stretch its own
+ *  lead and breakdown apart (the ceiling's original job, unchanged).
+ *
+ *  ⚠️ THE BASIS STAYS `auto` ON BOTH HALVES. A share computed with no reference to the card's
+ *  content is what clipped the rate cards' extrapolation note off the plate at tablet width; with
+ *  an auto basis a squeezed row simply has no surplus to hand out and every box falls back to its
+ *  content width, which is exactly the pre-plate behaviour. */
+/** The tier→flex table for the BOX. An equal `1 1 0` share per section was tried and withdrawn
+ *  the same minute (user, 2026-09-01: "the 1/3rd rule can't apply based on vitals card count") —
+ *  a plate cut into N identical columns gives a one-number roster the same room as a 32-bar chart
+ *  and squeezes the chart to pay for it, and N changes per view. The tier still says how eagerly a
+ *  card takes LEFTOVER width, and `auto` basis throughout means it asks for what it needs first —
+ *  the rule that keeps a squeezed row from clipping the rate cards' extrapolation note. */
+const BAND_SIZE: Record<BandCardSize, string> = {
+  sm: "flex-initial",            // 0 1 auto — content-sized, and still shrinks when tight
+  md: "flex-auto",               // 1 1 auto
+  lg: "flex-[2_1_auto]",
+};
+
+/** …and the cap the tier puts on its CONTENT, centred in whatever share the row gave it. */
+const BAND_CAP: Record<BandCardSize, string> = {
+  sm: "max-w-[240px]",
+  md: "max-w-[360px]",
+  lg: "max-w-[560px]",
+};
+
+export function BandCard({ label, children, className, mark, lead, size = "md" }: { label: string; children?: React.ReactNode; className?: string; mark?: React.ReactNode; lead?: React.ReactNode; size?: BandCardSize }) {
   return (
     <div className={cn(
       // The plate is the COMMAND BAR's own glass (`--topbar-glass` — a gradient token, so the
       // arbitrary-property form per CSS trap 3): the band is that bar's sibling instrument, and
       // the earlier `bg-card/40` was tuned under light and sat near-invisible over the dark
       // scene's glow (user, 2026-08-30: "in dark the card needs a bit more contrast").
-      "flex flex-col gap-1 rounded-lg border border-border/60 [background:var(--topbar-glass)] backdrop-blur-sm px-3 py-1.5 min-w-0 flex-1 basis-0",
+      "flex rounded-lg border border-border/60 [background:var(--topbar-glass)] backdrop-blur-sm px-3 py-1.5 min-w-0",
+      // ⚠️ `sm` is `flex-initial` (0 1 auto), NOT `flex-none`: a content-sized card must still
+      // SHRINK when the row is tight, or its widest child — which is usually the LABEL, not the
+      // reading — pins it. "Metagraphs anchoring" held 305px of a 684px tablet row that way,
+      // starving the two rate cards beside it; shrinking, it truncates its eyebrow and yields.
+      BAND_SIZE[size],
       className,
     )}>
-      <span className="flex items-center gap-1.5 leading-none">
+    {/* THE CAPPED, CENTRED CONTENT. `mx-auto` is what puts a section in the middle of its own
+        share rather than at the left of it; `w-full` keeps it filling that share up to the cap,
+        so nothing changes at the widths where there is no surplus to centre within. */}
+    <div className={cn("flex flex-col gap-1 w-full min-w-0 mx-auto", BAND_CAP[size])}>
+      <span className="flex items-center gap-1.5 leading-none min-w-0">
         {mark}
-        <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground whitespace-nowrap leading-none">{label}</span>
+        {/* TRUNCATE, not `whitespace-nowrap`: at 760px "Metagraphs anchoring" clipped mid-glyph
+            with no ellipsis (user, 2026-09-01: "in some screen sizes it overflows"), which reads
+            as a rendering fault rather than as a shortened label. */}
+        <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground truncate leading-none">{label}</span>
       </span>
-      <div className="flex items-center gap-2 min-h-0 flex-1">{children}</div>
+      {/* ⚠️ NOT a `@container` (tried and reverted, 2026-09-01). Querying the body's own width to
+          drop parts of a cell is the tempting shape, but `container-type: inline-size` also
+          CONTAINS that width — the body stops contributing an intrinsic size, and every
+          content-sized card (`grow={false}`, and every card in the phone strip) would then be
+          measured on its eyebrow alone. The band's cells adapt by flex rules instead. */}
+      {/* `items-stretch`, so an instrument can CLAIM the card's height rather than floating in the
+          middle of it (user, 2026-09-01: "a lot of empty at the top and bottom"). Every child still
+          decides for itself: the lead centres its own content, the divider was already stretching,
+          and inside the detail the charts stretch while a note keeps its `self-end`. Since the band
+          went to a fixed --vitals-h the leftover was showing up as dead bands above and below every
+          reading — a taller instrument is also a more legible one. */}
+      <div className="flex items-stretch gap-2 min-h-0 flex-1 min-w-0">
+        {lead != null && <span className="flex items-center flex-none">{lead}</span>}
+        {lead != null && children != null && (
+          <span aria-hidden className="flex-none self-stretch w-px my-0.5 bg-border/60" />
+        )}
+        {children != null && <div className="flex items-center gap-2 flex-1 min-w-0">{children}</div>}
+      </div>
+    </div>
     </div>
   );
 }
 
+/** The longest a bar may run, whatever width the card was given (user, 2026-09-01: "the largest
+ *  vitals just have very long details (horizontal bars) which can also just be a bit shorter").
+ *  Past this the bar stops being a comparison and becomes a rule across the plate; the leftover
+ *  collects BEFORE the block, which `justify-end` then pins against the card's right edge. */
+const BAR_TRACK_MAX = 150;
+
 /** A row of labelled micro horizontal bars (the geo country / provider / layer read) — one
- *  measure, one hue, widths on the row max, every bar named (identity never colour-alone). */
-/** `steps` mirrors the donut's per-segment opacities onto the bars, in the same order.
- *  Without it a donut standing beside these rows loses its key: the ring separates its slices by
- *  opacity, and uniform bars give the reader nothing to match them against. */
-export function MicroBars({ rows, accent, labelW = 26, steps, dashZero }: { rows: { key: string; label: React.ReactNode; count: number }[]; accent: string; labelW?: number; steps?: readonly number[]; dashZero?: boolean }) {
+ *  measure, one hue, widths on the row max, every bar named (identity never colour-alone).
+ *
+ *  ⚠️ ONE WEIGHT FOR EVERY BAR, and the reason is worth keeping. These rows used to mirror the
+ *  donut's per-segment opacities (`steps`) so a ring standing beside them had a key — but only the
+ *  cards WITH a ring passed them, so `Node composition` ran bright→faint next to `Network layers`
+ *  running flat, and two cards in one row read as two different hues of one token (user,
+ *  2026-09-01). The ladder stays where it earns its keep: on the DONUT, whose slices are adjacent
+ *  arcs of a single colour and genuinely need separating. A bar row does not — every row is NAMED,
+ *  and the ring's slices are in the same order, which is how a legend works. */
+export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key: string; label: React.ReactNode; count: number }[]; accent: string; labelW?: number; dashZero?: boolean }) {
+  // ⚠️ THE CALLER'S ORDER STANDS — see `Donut` for the full reasoning. In short: a magnitude sort
+  // here would re-shuffle the structural cards (type, composition, layers) every time the subject
+  // changes, and a row that moves cannot be followed; the ranked cards already arrive sorted from
+  // their builders. Ordering is a property of the DATA, not of this component.
+  // Same rule as the sparkline: a breakdown with no rows YET says so rather than rendering an
+  // empty block. A row whose count is 0 is a reading and still draws (its numeral, no bar).
+  if (rows.length === 0) {
+    return <span className="flex items-center self-stretch text-micro text-muted-foreground">acquiring…</span>;
+  }
   const max = Math.max(1, ...rows.map((r) => r.count));
   return (
-    <div className="flex flex-col gap-[3px] w-full self-center min-w-0">
+    // `justify-evenly` over the full height rather than a fixed gap: a four-row card already
+    // filled its body, but a two-row one sat as a small block with 15px of dead space above and
+    // below. Distributed, the rows breathe into whatever height the card has and a four-row card is
+    // left within a pixel of where it was.
+    <div className="flex flex-col justify-evenly self-stretch w-full min-w-0">
       {rows.map((r) => (
+        // LEFT-ALIGNED, so the breakdown starts immediately after the card's hairline (user,
+        // 2026-09-01: "some vitals are not correctly left aligned"). Right-pinning was tried first
+        // — it lines the values up on the card's own right edge, which is tidy in isolation — but
+        // with the track capped, each card's leftover lands as a DIFFERENT gap behind its block, so
+        // three cards of identical width started their breakdowns at 101 / 91 / 101px and the row
+        // read ragged. Alignment across the row beats alignment within one card. The values still
+        // line up with EACH OTHER inside a card, because every row shares one label column and one
+        // capped track; the leftover simply collects at the right, where nothing has to line up
+        // against it.
         <span key={r.key} className="flex items-center gap-1.5 min-w-0">
           {/* NO uppercase transform: the layer codes are ONE vocabulary (L0/cL1/dL1 — case is
-              part of the code) and provider names are names; country codes arrive uppercase. */}
-          <span className="text-micro text-muted-foreground flex-none truncate leading-none" style={{ width: labelW }}>{r.label}</span>
-          <span aria-hidden className="h-[5px] rounded-full flex-none" style={{ background: accent, opacity: steps ? (steps[rows.indexOf(r)] ?? 0.2) : 0.75, width: `${Math.max(4, (r.count / max) * 72)}px` }} />
+              part of the code) and provider names are names; country codes arrive uppercase.
+              `0 1 <labelW>px` rather than a hard width: on a narrow card the label SHRINKS into
+              its ellipsis instead of pushing the bar track out of the plate. */}
+          <span className="text-micro text-muted-foreground truncate leading-none" style={{ flex: `0 1 ${labelW}px` }}>{r.label}</span>
+          {/* THE TRACK IS THE CARD'S OWN WIDTH, never a 72px constant (user, 2026-09-01) — but
+              never longer than BAR_TRACK_MAX either. The fixed track made every bar row
+              intrinsically sized, so a wide card left its slack dangling to the right of the
+              numbers; a proportional bar spends that width instead. The cap is the other end of
+              the same judgement: a bar running the width of a 1600px row stops reading as a
+              quantity.
+              A ZERO DRAWS NOTHING (rule 10, TickBars' own rule): the old 4px floor applied to a
+              0 count rendered an empty bucket as small-but-nonzero activity. The floor now
+              guards only real counts, and the numeral beside it still states the zero. */}
+          <span aria-hidden className="flex items-center flex-1 min-w-[16px] h-[5px]" style={{ maxWidth: BAR_TRACK_MAX }}>
+            <span className="h-[5px] rounded-full" style={{ background: accent, opacity: 0.75, width: r.count > 0 ? `${Math.max(2, (r.count / max) * 100)}%` : 0 }} />
+          </span>
           {/* Under a COMMITTED scope a 0 is "this network has none of these", not a measurement of
               zero — the dash says so where a numeral would read as a count (kept from the dot-legend
               design this replaced). Unscoped, every row is a real count and prints as one. */}
-          <span className="font-mono text-micro tabular-nums text-foreground">
+          {/* THE VALUES ARE A COLUMN, so they align on their DIGITS (user, 2026-09-01 — the
+              composition card's "data" row, where 164 / 10 / 11 / 17 mix widths). `flex-none` with
+              no width left each numeral its own box, left-packed against the bar, so the ones
+              column stepped in and out down the card. A right-aligned floor gives them a shared
+              column; `tabular-nums` then holds it exactly, and a wider count simply grows the
+              column rather than breaking it. */}
+          <span className="font-mono text-micro tabular-nums text-foreground flex-none text-right min-w-[26px]">
             {dashZero && r.count === 0 ? <span className="text-muted-foreground italic opacity-60">—</span> : r.count}
           </span>
         </span>
@@ -130,9 +293,22 @@ export function MicroBars({ rows, accent, labelW = 26, steps, dashZero }: { rows
  *  stepped opacities, the total in the hole. Pure SVG, no interaction; 2px surface gaps between
  *  segments (the dataviz spacer rule) via a gap subtracted from each arc. */
 /** The ring alone — the number that totals it is `DonutTotal`'s, standing outside at headline
- *  size. Segment opacities come from DONUT_STEPS in entry order; `MicroBars`' `steps` mirrors
- *  them so a ring and its rows can be read against each other. */
+ *  size. Segment opacities come from DONUT_STEPS in entry order, which is also the order the
+ *  bar rows beside it are built in — order and label are what key a slice to its row. */
 export function Donut({ counts, accent }: { counts: Record<string, number>; accent: string }) {
+  // ⚠️ ENTRY ORDER, NEVER SORTED BY SIZE — and the ring is only half the reason. Sorting was
+  // tried on 2026-09-01 and withdrawn the same minute: "it does not make sense for structural
+  // items like metagraph type and composition; it will look strange when they switch when swiping
+  // between metagraphs" (user). That is the tick bars' own rule reaching a second instrument — a
+  // slice that re-sorts as the subject changes cannot be followed from one subject to the next,
+  // and every donut in this band charts a FIXED VOCABULARY (the four metagraph types, the four
+  // composition roles) whose whole value is sitting in the same place every time. The RANKED
+  // breakdowns beside them — top countries, top providers — arrive sorted from their own
+  // builders, where sorting is the reading rather than a re-shuffle.
+  //
+  // The pairing makes it stricter still: `DONUT_STEPS[i]` keys a slice's opacity to its POSITION
+  // and the bar row beside it is identified by holding the same position, so this order and
+  // `MicroBars`' must never be decided separately.
   const entries = Object.entries(counts);
   const total = entries.reduce((s, [, n]) => s + n, 0);
   const R = 15.5, C = 2 * Math.PI * R, GAP = 2;
@@ -262,23 +438,45 @@ function HyperCells({ accent }: { accent: string }) {
     : cfg ? (TYPE_ORDER.find((t) => types[t]! > 0) ?? "unknown")
     : null;
 
+  // THE LAYER ROWS, built once: they are the detail of the TYPE card under a commit and a card of
+  // their own unfiltered (see below).
+  const layerRows = [
+    { key: "l0", label: <RoleChips codes={["L0"]} />, count: layers.l0! },
+    { key: "cl1", label: <RoleChips codes={["cL1"]} />, count: layers.cl1! },
+    { key: "dl1", label: <RoleChips codes={["dL1"]} />, count: layers.dl1! },
+  ];
+
   return (
     <>
       {singleWord != null ? (
-        <BandCard label={cfg ? "Metagraph type" : "Network type"}>
-          {/* SUBTLE on purpose (user): a characteristic is a quiet reading, not a headline —
-              the number cards keep the bold mono, a word does not. */}
-          <TypeGlyph t={singleWord} className="size-3.5" color={accent} />
-          <span className="font-mono text-caption text-foreground whitespace-nowrap">{singleWord}</span>
+        // TYPE AND LAYERS ARE ONE CARD UNDER A COMMIT (user, 2026-09-01: "the type is the 'total'
+        // and left section, while the layers are the details that confirm that type — e.g. a 'data'
+        // type has a number of L0 and dL1 layers and 0 cL1"). That is the two-segment grammar
+        // exactly: a lead that states the characteristic, and a breakdown that EVIDENCES it. Split
+        // across two cards the reader had to carry the type in their head to the card beside it;
+        // merged, the claim and its proof are one reading. Unfiltered there is no single type to
+        // lead with, so the layers keep a card of their own.
+        <BandCard
+          label={cfg ? "Metagraph type" : "Network type"}
+          lead={
+            // SUBTLE on purpose (user): a characteristic is a quiet reading, not a headline —
+            // the number cards keep the bold mono, a word does not.
+            <span className="flex items-center gap-1.5">
+              <TypeGlyph t={singleWord} className="size-3.5" color={accent} />
+              <span className="font-mono text-caption text-foreground whitespace-nowrap">{singleWord}</span>
+            </span>
+          }
+        >
+          <MicroBars accent={accent} labelW={34} rows={layerRows} />
         </BandCard>
       ) : (
-      <BandCard label="Metagraphs" className="flex-[1.4]">
+      <BandCard label="Metagraphs"
+        lead={<DonutTotal counts={types} accent={accent} total={TYPE_ORDER.reduce((n, t) => n + types[t]!, 0)} />}>
         {/* THE COMPOSITION CARD'S OWN SHAPE (user, 2026-08-30: "the same design (1 total value +
             4 subsets) — the one used for node composition looks best"): the two cards are sibling
             share-of-whole readings, so they wear one donut + dot-legend design. The type GLYPHS
             keep their home on the filtered face, where the card states a single characteristic. */}
-        <DonutTotal counts={types} accent={accent} total={TYPE_ORDER.reduce((n, t) => n + types[t]!, 0)} />
-        <MicroBars accent={accent} labelW={58} steps={DONUT_STEPS}
+        <MicroBars accent={accent} labelW={58}
           rows={TYPE_ORDER.map((t) => ({ key: t, label: t === "data + currency" ? "both" : t, count: types[t]! }))} />
       </BandCard>
       )}
@@ -286,22 +484,31 @@ function HyperCells({ accent }: { accent: string }) {
           so their sum is the fleet size — the donut's hole was already printing the very number
           the neighbouring card printed, twice on one row. The card that keeps it is the one that
           also says how it splits. */}
-      <BandCard label="Node composition" className="flex-[1.5]">
+      <BandCard label="Node composition"
+        lead={<DonutTotal counts={counts} accent={accent} total={Object.values(counts).reduce((a, b) => a + b, 0)} />}>
         {/* Geo's treatment, adopted here (user, 2026-08-31: "in hyper view, geo looks better"):
             the dot legend named each slice but said nothing about SIZE, so the ring carried the
             proportions alone and the numbers sat in a grid beside it. Bars carry both — and
             `steps` keeps them keyed to their own segment. */}
-        <DonutTotal counts={counts} accent={accent} total={Object.values(counts).reduce((a, b) => a + b, 0)} />
-        <MicroBars accent={accent} labelW={72} steps={DONUT_STEPS} dashZero={scoped}
+        <MicroBars accent={accent} labelW={72} dashZero={scoped}
           rows={Object.entries(counts).map(([label, n]) => ({ key: label, label, count: n }))} />
       </BandCard>
-      <BandCard label="Network layers">
-        <MicroBars accent={accent} labelW={34} rows={[
-          { key: "l0", label: <RoleChips codes={["L0"]} />, count: layers.l0! },
-          { key: "cl1", label: <RoleChips codes={["cL1"]} />, count: layers.cl1! },
-          { key: "dl1", label: <RoleChips codes={["dL1"]} />, count: layers.dl1! },
-        ]} />
-      </BandCard>
+      {/* Unfiltered only — under a commit these rows are the type card's own evidence, above. */}
+      {singleWord == null && (
+        <BandCard label="Network layers"
+          // ⚠️ A PROTOCOL CONSTANT, NOT A MEASUREMENT (user, 2026-09-01: "the protocol has 3
+          // layers, so we can just mention it, no count"). Every other lead in this band is a
+          // live reading, so two things keep this one honest in the same slot. It is derived from
+          // `layerRows.length` rather than typed as a literal, so the headline can never disagree
+          // with the rows that evidence it. And it is NOT an `Odometer`: that component exists to
+          // roll a number as it changes, and a value that cannot change must not wear the
+          // vocabulary of one that does — a `3` that visibly settles would claim it had just been
+          // measured. Plain text says "this is what the protocol IS", and the bars beside it say
+          // how the fleet fills it, which is exactly the lead/detail grammar.
+          lead={<span className="font-mono font-bold text-foreground tabular-nums">{layerRows.length}</span>}>
+          <MicroBars accent={accent} labelW={34} rows={layerRows} />
+        </BandCard>
+      )}
     </>
   );
 }
@@ -314,13 +521,18 @@ function GeoCells({ accent }: { accent: string }) {
   const selNodes = useStore((s) => s.selNodes);
   const countries = lb?.countries ?? [];
   const total = selNodes.length;
-  const { ispCounts, topIsps } = useMemo(() => {
+  const { ispCounts, topIsps, located } = useMemo(() => {
     const ispCounts = new Map<string, number>();
+    let located = 0;
     for (const r of selNodes) {
       const isp = "geo" in r.pick ? r.pick.geo?.isp : undefined;
       if (isp) ispCounts.set(isp, (ispCounts.get(isp) ?? 0) + 1);
+      // PLACED = the row resolved to a country, which is exactly the test the country ring below
+      // is built on. Reading the same field is the point: the two cards can then never disagree
+      // about how many nodes this view is actually able to draw.
+      if (r.cc) located++;
     }
-    return { ispCounts, topIsps: [...ispCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3) };
+    return { ispCounts, topIsps: [...ispCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3), located };
   }, [selNodes]);
   const topCountries = countries.slice(0, 3);
   const restC = countries.slice(3).reduce((s, c) => s + c.count, 0);
@@ -349,24 +561,45 @@ function GeoCells({ accent }: { accent: string }) {
 
   return (
     <>
-      <BandCard label="Nodes"><span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={total || null} /></span></BandCard>
+      {/* THE FLEET, AND WHETHER GEO CAN ACTUALLY DRAW IT (user, 2026-09-01: the lone numeral
+          "looks very boring, is there a nicer way to present the 1 number?"). A card with no
+          breakdown is the boring case by construction — the band's grammar is lead + detail — and
+          this is the one breakdown that belongs to THIS view rather than to its neighbours: a node
+          the lookup could not place sits in no country ring and no provider ring, so the split is
+          also the basis both cards beside it silently assume. Rule 10: an unplaced node is an
+          instrument state, not a rounding error, and stating it is how the fleet total and the
+          rings are allowed to differ honestly. `unplaced` reading 0 is itself a reading — the
+          fleet is fully drawn — and MicroBars renders no bar for it, only the numeral. */}
+      <BandCard label="Nodes"
+        lead={<span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={total || null} /></span>}>
+        <MicroBars accent={accent} labelW={56} rows={[
+          { key: "located", label: "located", count: located },
+          { key: "unplaced", label: "unplaced", count: Math.max(0, total - located) },
+        ]} />
+      </BandCard>
+      {/* "Top countries", not "Nodes by country" (user, 2026-09-01): the card shows the top three
+          plus an `other` remainder, so the old name promised the whole distribution and the row
+          beside it now states the fleet total anyway.
+          The hole counts COUNTRIES, the ring spreads NODES across them — two different questions,
+          which is why the centre is passed rather than left as the sum. */}
       {topCountries.length > 0 && (
-        <BandCard label="Nodes by country" className="flex-[1.6]">
-          {/* The hole counts COUNTRIES, the ring spreads NODES across them — two different
-              questions, which is why the centre is passed rather than left as the sum. */}
-          <DonutTotal counts={countryRing} accent={accent} total={countries.length} />
-          <div className="flex w-full items-center gap-2">
-            <MicroBars accent={accent} labelW={18} steps={DONUT_STEPS} rows={topCountries.map((c) => ({ key: c.cc, label: c.cc, count: c.count }))} />
+        <BandCard label="Top countries"
+          lead={<DonutTotal counts={countryRing} accent={accent} total={countries.length} />}>
+          {/* `items-stretch` + `self-stretch`: this wrapper sits between the card body and the
+              MicroBars, so without it the rows distribute inside a content-height box and the card
+              looks bunched while its neighbours breathe. */}
+          <div className="flex w-full items-stretch gap-2 min-w-0 self-stretch">
+            <MicroBars accent={accent} labelW={18} rows={topCountries.map((c) => ({ key: c.cc, label: c.cc, count: c.count }))} />
             {restC > 0 && <span className="text-micro text-muted-foreground whitespace-nowrap self-end pb-0.5">+{countries.length - topCountries.length} more · {restC}</span>}
           </div>
         </BandCard>
       )}
       {topIsps.length > 0 && (
-        <BandCard label="Top providers" className="flex-[1.8]">
-          <DonutTotal counts={ispRing} accent={accent} total={ispCounts.size} />
+        <BandCard label="Top providers"
+          lead={<DonutTotal counts={ispRing} accent={accent} total={ispCounts.size} />}>
           {/* labelW 92 → 150 (user, 2026-08-30): the card had spare width while "Hetzner
               Online GmbH" truncated — the name is the row's identity, so it gets the room. */}
-          <MicroBars accent={accent} labelW={150} steps={DONUT_STEPS} rows={topIsps.map(([isp, n]) => ({ key: isp, label: isp, count: n }))} />
+          <MicroBars accent={accent} labelW={150} rows={topIsps.map(([isp, n]) => ({ key: isp, label: isp, count: n }))} />
         </BandCard>
       )}
     </>
@@ -374,27 +607,84 @@ function GeoCells({ accent }: { accent: string }) {
 }
 
 // The declicked tick bar-chart — the LiveStrip's honesty rules verbatim, minus every
-// interaction: unfiltered each bar is the tick's TOTAL anchors in cyan on the window max;
-// filtered it is THAT network's own anchors on its OWN scale in its identity hue, empty ticks
-// as honest gaps. Only the newest bar glows. A regular bar chart, nothing more.
+// interaction: filtered, a bar is THAT network's own anchors on its OWN scale in its identity hue,
+// empty ticks as honest gaps. Only the newest bar glows.
+//
+// UNFILTERED IT IS STACKED, one segment per anchoring metagraph in that network's own identity hue
+// (user pick, 2026-09-01: every metagraph, always — not a top-N). The bar's HEIGHT is unchanged —
+// the tick's total anchors on the window max — so the chart reads exactly as it did at a glance and
+// gains WHO underneath. Three rules keep it honest:
+//
+//   · THE SEGMENTS MUST SUM TO THE BAR. `metaCounts` attributes what the anchor index could
+//     identify, which is not always the whole tick, so the shortfall is drawn as its own neutral
+//     segment rather than dropped — otherwise the coloured run would silently claim a total it does
+//     not account for. Same rule as the donuts' `other`.
+//   · A TICK WITH NO ATTRIBUTION IS NOT A TICK WITH NO ANCHORS. If the index carries nothing for a
+//     timestamp we still know the count, so the bar draws whole in the accent: "this many anchored,
+//     by whom is not known here" — never zero, which would be a different and false claim.
+//   · IDENTITY IS NEVER COLOUR-ALONE (dataviz discipline, and the band takes no pointer events so
+//     there can be no tooltip). The legend is the METAGRAPHS ANCHORING card standing immediately to
+//     the left: the same ids, the same `identityHudCss` hues, named sr-only. The two read from one
+//     source — `getAnchor(...).metaCounts` — so a colour in the chart always has a dot beside it.
+//
+// Order is the CATALOG's, never the per-tick counts: sorting by size would repaint every bar as the
+// window shifts, and a segment that changes place tick to tick cannot be followed.
+const STACK_ORDER: string[] = METAGRAPHS.map((m) => m.id);
+const STACK_SET = new Set(STACK_ORDER);
+
 type Snaps = ReturnType<typeof useSnapshotFeed>["snaps"];
+interface StackSeg { key: string; n: number; color: string }
 
 function TickBars({ accent, isMeta, filter, snaps }: { accent: string; isMeta: boolean; filter: string; snaps: Snaps }) {
   const bars = snaps.map((d) => {
     const total = typeof d.metagraphSnapshotCount === "number" ? d.metagraphSnapshotCount : 0;
-    const mine = isMeta ? getAnchor(d.timestamp)?.metaCounts?.get(filter) ?? 0 : total;
-    return { v: isMeta ? mine : total, ord: d.ordinal };
+    const mc = getAnchor(d.timestamp)?.metaCounts;
+    if (isMeta) return { v: mc?.get(filter) ?? 0, ord: d.ordinal, segs: null as StackSeg[] | null };
+    let segs: StackSeg[] | null = null;
+    if (mc && mc.size > 0 && total > 0) {
+      segs = [];
+      let named = 0;
+      for (const id of STACK_ORDER) {
+        const n = mc.get(id);
+        if (n) { segs.push({ key: id, n, color: identityHudCss(id) }); named += n; }
+      }
+      // A network anchoring that the catalog does not list still anchored — it takes its own hue
+      // after the listed ones rather than being folded into the shortfall.
+      for (const [id, n] of mc) {
+        if (n && !STACK_SET.has(id)) { segs.push({ key: id, n, color: identityHudCss(id) }); named += n; }
+      }
+      const rest = total - named;
+      if (rest > 0) segs.push({ key: "__unattributed", n: rest, color: "var(--muted-foreground)" });
+    }
+    return { v: total, ord: d.ordinal, segs };
   });
   const max = Math.max(1, ...bars.map((b) => b.v));
+  // EVERY BAR AT ZERO IS A READING, AND IT HAS TO SAY SO (user, 2026-09-01: "'anchors per
+  // snapshot' is completely empty when a metagraph does nothing; how do we show that instead of
+  // just a blank space?"). A single zero tick is an HONEST GAP — no body, never a stub, because a
+  // 2px mark would read as small-but-nonzero — and that rule is right per bar. But when the whole
+  // window is gaps the card renders 52 invisible spans and states nothing at all, which is the one
+  // outcome rule 10 cares about more than the stub it was avoiding.
+  //
+  // AND THE WORD IS `none`, NOT `acquiring`. The two are different facts (the acquiring-state
+  // rule): the sparkline beside it says acquiring because its window has not filled, while here
+  // the window IS full and the answer in it is zero. Saying acquiring would promise an arrival
+  // that the data has already ruled out for this window.
+  const allZero = bars.length > 0 && bars.every((b) => b.v === 0);
   return (
-    <div className="flex items-end justify-end gap-[2px] h-[34px] w-full self-end pb-0.5" aria-hidden>
+    // Full height, not a fixed 34px: the bars grow from a baseline, so every pixel of card height
+    // is resolution the chart can actually spend (user, 2026-09-01).
+    <div className="flex items-end justify-end gap-[2px] h-full w-full self-stretch pb-0.5" aria-hidden>
       {bars.length === 0 && <span className="text-micro text-muted-foreground self-center">acquiring…</span>}
+      {allZero && <span className="text-micro text-muted-foreground self-center">no anchors in this window</span>}
       {bars.map((b, i) => {
         const latest = i === bars.length - 1;
         return (
           <span
             key={b.ord}
-            className="flex-1 max-w-[9px] rounded-t-[2px]"
+            // `flex-col-reverse`: segments are written in catalog order and stack UP from the
+            // baseline, so the first listed network is the foot of every bar in the window.
+            className="flex-1 max-w-[9px] rounded-t-[2px] overflow-hidden flex flex-col-reverse"
             style={{
               // Zero anchors = an HONEST GAP (rule 10, the strip's own rendering carried over
               // exactly): no body at all, never a stub — a 2px tinted mark read as
@@ -402,11 +692,16 @@ function TickBars({ accent, isMeta, filter, snaps }: { accent: string; isMeta: b
               // sparse-cadence read exists to avoid. The span keeps its flex slot so the
               // window's rhythm (position = time) survives the empty ticks.
               height: b.v > 0 ? `${Math.max(8, (b.v / max) * 100)}%` : "0",
-              background: b.v > 0 ? accent : "none",
+              // A stacked bar's colour comes from its segments; an unattributed one paints whole.
+              background: b.v > 0 && !b.segs ? accent : "none",
               opacity: b.v > 0 ? (latest ? 1 : 0.55) : 0,
               boxShadow: latest && b.v > 0 ? `0 0 6px ${accent}` : undefined,
             }}
-          />
+          >
+            {b.segs?.map((sg) => (
+              <span key={sg.key} className="w-full flex-none" style={{ height: `${(sg.n / b.v) * 100}%`, background: sg.color }} />
+            ))}
+          </span>
         );
       })}
     </div>
@@ -427,28 +722,65 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
   const cfg = metagraphById(filter);
   const isMeta = !!cfg && filter !== "all" && filter !== "dag";
   const basis = windowNote(activity, scoped ? "snapshots" : "global ticks");
-  const rate = (label: string, value: number | undefined, spark: number[] | undefined, note?: string) => (
-    <BandCard label={label}>
-      <span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap"><Odometer value={value} /></span>
-      {/* stretch: the fixed 64px chart left the card's right half empty (user, 2026-08-30) */}
-      <span className="flex-1 min-w-0 self-center"><Sparkline data={spark} color="var(--primary)" height={26} stretch /></span>
+  const rate = (label: string, value: number | undefined, spark: number[] | undefined, note?: string) => {
+    // A stopped chain reports WHEN, not HOW FAST. The lead keeps the card's shape — same slot, same
+    // weight — so the row does not reflow between a live network and an idle one.
+    const stale = staleFor(activity);
+    if (stale != null) {
+      return (
+        <BandCard
+          key={label}
+          label={label}
+          lead={<span className="font-mono font-bold text-muted-foreground tabular-nums whitespace-nowrap">idle</span>}
+        >
+          <span className="flex items-center self-stretch text-micro text-muted-foreground">
+            no snapshots for {ageWords(stale)}
+          </span>
+        </BandCard>
+      );
+    }
+    return (
+    <BandCard
+      label={label}
+      lead={<span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap"><Odometer value={value} /></span>}
+    >
+      {/* stretch: the fixed 64px chart left the card's right half empty (user, 2026-08-30).
+          It also YIELDS FIRST when the row is tight, and `min-w-0` is how: a sparkline is the only
+          part of a rate card that is decoration — the numeral and its extrapolation basis are the
+          reading (rule 10) — so it contributes NOTHING to the card's intrinsic width and gives its
+          space back before the basis note can be clipped off the plate. That is also what lets the
+          tick chart, the row's headline instrument, keep its own 220px floor at tablet width. */}
+      {/* `accent`, NOT a hardcoded `var(--primary)` (user, 2026-09-01: the ledger's vitals should be
+          "metagraph color-aware — only anchors per global snapshot currently does that"). This was
+          the band's own rule already: structural cyan at rest, the identity hue under a committed
+          filter, resolved once in useVitalsScope and handed to EVERY chart as `accent`. The donut,
+          the bars and the tick chart all took it; the sparkline alone had been wired to the literal,
+          so a committed network re-tinted three of the row's four instruments and left this one
+          cyan. Not a rule-3 exception — rule 3 forbids repointing the structural TOKEN, and this
+          passes an identity hue to a chart, which is what the band has always done under a scope. */}
+      {/* `maxPoints`: the retained window is 52 ticks, and 51 segments of a noisy rate over a
+          40px-tall line read as hair rather than as a trend (user, 2026-09-01: "too dense, too many
+          points"). Bucketed to 20 by mean — the SAME window at a lower frequency, which is what
+          keeps it honest against the basis note printed two elements to the right. */}
+      <span className="flex-1 min-w-0 self-center"><Sparkline data={spark} color={accent} height={42} maxPoints={20} stretch /></span>
       {/* The extrapolation window, VISIBLE (rule 10): the basis is part of the reading, and the
           band's pointer-events-none root means a title tooltip can never fire — sr-only alone
           left sighted pointer users reading an extrapolated rate as a measured fact. */}
       {activity && <span className="text-micro text-muted-foreground whitespace-nowrap self-end pb-1">{windowSpan(activity)}</span>}
       {note && <span className="sr-only">{note}</span>}
     </BandCard>
-  );
+    );
+  };
   // WHO anchors, HOW MUCH, HOW OFTEN, then the per-tick picture (user ordering, 2026-08-30):
   // the roster leads, the anchor rate beside it, the cadence, and the chart closes the row.
   return (
     <>
-      <AnchoringNetworks snaps={snaps} />
+      <AnchoringNetworks snaps={snaps} filter={filter} />
       {scoped
         ? rate("DAG fees/hour", activity?.feesPerHour, activity?.feesSeries, basis && `$DAG this network pays to anchor. ${basis}`)
         : rate("Anchors/hour", activity?.anchorsPerHour, activity?.anchoredSeries, basis && `Metagraph snapshots anchored into the global chain. ${basis}`)}
       {rate("Snapshots/hour", activity?.snapsPerHour, activity?.cadenceSeries, basis)}
-      <BandCard label="Anchors per global snapshot" className="flex-[2] min-w-[220px]">
+      <BandCard label="Anchors per global snapshot" size="lg" className="min-w-[220px]">
         <TickBars accent={accent} isMeta={isMeta} filter={filter} snaps={snaps} />
       </BandCard>
     </>
@@ -459,7 +791,7 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
 // own id sets, never inferred) — with each network's identity dot: the app-wide identity-dot
 // language (a presence roster, not a chart series), names carried sr-only since the band takes
 // no pointer events. A committed filter is a LENS: the window-wide fact stands un-edited.
-function AnchoringNetworks({ snaps }: { snaps: Snaps }) {
+function AnchoringNetworks({ snaps, filter }: { snaps: Snaps; filter: string }) {
   const ids = new Set<string>();
   for (const d of snaps) {
     const mc = getAnchor(d.timestamp)?.metaCounts;
@@ -467,12 +799,47 @@ function AnchoringNetworks({ snaps }: { snaps: Snaps }) {
   }
   const list = [...ids];
   return (
-    <BandCard label="Metagraphs anchoring">
-      <span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={list.length || null} /></span>
+    // CONTENT-SIZED (grow=false): the roster is a fixed run of dots, so an equal share of the row
+    // left ~200px of empty plate beside five dots — the band's worst offender before 2026-09-01.
+    <BandCard
+      label="Metagraphs anchoring"
+      size="sm"
+      lead={<span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={list.length || null} /></span>}
+    >
+      {/* ⚠️ THE LENS DIMS, IT DOES NOT EDIT (user, 2026-09-01: "if we filter, should we then also
+          dim the filtered bullets?"). Yes — this roster was the one surface in the band ignoring the
+          committed filter while every chart beside it re-tinted. But the COUNT above stays the
+          honest total: five networks really did anchor in this window, and a lens is not allowed to
+          change that (the explorer draws the same line — a tick still LISTS every contributor under
+          a commit, it just makes only one of them drillable). So the number says how many anchored
+          and the dim says which one you are looking through.
+          `opacity-45` is the app's existing "present, but not your subject" step — the same one the
+          filter picker's 0-count rows and hyper's 0-node networks wear. */}
+      {/* TWO CHANNELS FOR ONE LENS: the others step back, the subject steps FORWARD (user,
+          2026-09-01). Dimming alone left the committed network the same size as the four it was
+          being distinguished from — the eye had to find the bright one among five identical marks
+          rather than being handed it. `items-center` keeps the row's baseline steady while one dot
+          grows, so nothing below it shifts. */}
       <span className="flex flex-wrap items-center gap-1 max-w-[120px]">
-        {list.slice(0, 12).map((id) => <IdentityDot key={id} hue={identityHudCss(id)} />)}
+        {list.slice(0, 12).map((id) => {
+          const on = filter !== "all" && id === filter;
+          return (
+            <span key={id} className={cn("flex", filter !== "all" && !on && "opacity-45")}>
+              <IdentityDot hue={identityHudCss(id)} className={on ? "w-3 h-3" : undefined} />
+            </span>
+          );
+        })}
       </span>
-      <span className="sr-only">{list.map((id) => metagraphById(id)?.name ?? id).join(", ")}</span>
+      {/* Identity is never colour-alone, and the lens has to reach the spoken form too, or a
+          screen reader hears five equal names where the eye sees one subject among four others. */}
+      <span className="sr-only">
+        {list
+          .map((id) => {
+            const name = metagraphById(id)?.name ?? id;
+            return filter !== "all" && id === filter ? `${name} (filtered)` : name;
+          })
+          .join(", ")}
+      </span>
     </BandCard>
   );
 }
@@ -515,11 +882,47 @@ export default function VitalsBand() {
       aria-label="View vitals"
       className={cn(
         // pointer-events-none: the band is a read-only instrument — orbit drags pass through it.
-        // --rail-margin each side — the RAILS' own outer margin token (globals.css), so the
-        // band's edges align with the rail cards and never cover the RailThread rulers that live
-        // in that margin (user, 2026-08-30: the band "sits on top of the rail of the side panels").
-        "fixed z-10 left-[var(--rail-margin)] right-[var(--rail-margin)] bottom-[calc(var(--footer-h,0px)+10px)] pointer-events-none",
-        "flex items-stretch gap-2",
+        // --bar-margin, THE COMMAND BAR'S OWN INSET (globals.css), so the two bars bracket the
+        // scene as a matched pair. At desktop it resolves to --rail-margin, which keeps the band's
+        // edges aligned with the rail cards and off the RailThread rulers living in that gutter
+        // (user, 2026-08-30: the band "sits on top of the rail of the side panels"); on TABLET the
+        // rails are edge tabs, so there is nothing to align with and the lane takes the wider inset
+        // instead (user, 2026-09-01).
+        // A FIXED HEIGHT, not content height (--vitals-h; see its token note). `items-stretch`
+        // below then makes every card in every view exactly this tall, so switching views moves
+        // nothing at this edge. The PHONE strip does not take it — that presentation is a scrolling
+        // row inside the command bar, sized by its own rules.
+        "fixed z-10 inset-x-[var(--bar-margin)] bottom-[calc(var(--footer-h,0px)+4px)] h-[var(--vitals-h)] pointer-events-none",
+        // ⚠️ THE PLATE IS THE LANE'S, NOT EACH CARD'S (user, 2026-09-01: the band "feels ununiform
+        // between screens because the amount of screen space they claim depends on the number of
+        // vitals and the size"). Measured at 1600px: hyper and geo hold 1096px of a 1548px lane
+        // while the ledger holds 1482, so switching views moved the band's own left edge 193px —
+        // the CONTENTS varied, which is honest, but so did the instrument containing them, which
+        // is not. One plate makes the lane constant by construction: only the divisions inside it
+        // move, and the leftover reads as quiet plate rather than as a row that failed to fill.
+        //
+        // It is the COMMAND BAR's plate, deliberately — same `--topbar-glass`, same `--bar-margin`,
+        // same radius — so the two bars now bracket the scene as an actual matched pair rather than
+        // as a bar and a scattering of chips (user, 2026-09-01: "the bottom bar should be the same
+        // exactly as the top bar").
+        "rounded-lg border border-border/60 [background:var(--topbar-glass)] backdrop-blur-sm",
+        // ⚠️ THE CARDS ARE FLATTENED FROM HERE, not by a prop threaded through every cell. The same
+        // `ViewCells` renders the PHONE strip, where the cards scroll and must keep their own
+        // plates — a section of a bar that scrolls away from the bar is not a section. An arbitrary
+        // variant scopes the flattening to this presentation and leaves that one untouched; it wins
+        // on specificity within the same layer, which is the in-layer escape CSS trap 1 describes.
+        // `[background:none]` (not `bg-transparent`): the card paints an arbitrary PROPERTY, so the
+        // override has to be one too or the gradient survives underneath.
+        "[&>*]:rounded-none [&>*]:border-0 [&>*]:backdrop-blur-none [&>*]:[background:none]",
+        // The section division: the app's one resting hairline, INSET by the plate's own padding
+        // like every other resting division (the card-head rule) — a full-height rule between two
+        // sections would read as a seam between two objects, which is what this change undoes.
+        "[&>*+*]:border-l [&>*+*]:border-border/60 [&>*+*]:rounded-none",
+        // CENTRED INSIDE THE PLATE. The tiers still cap, so a 3-card view leaves slack — it now
+        // collects symmetrically inside the instrument instead of around it. (The 2026-08-30 note
+        // against a centred clump was written when the cards were small and floated in a very wide
+        // bar; sections of a plate are a different object.) Below the ceilings this is a no-op.
+        "flex items-stretch justify-center gap-0 px-1.5 py-1",
         "transition-opacity duration-[180ms] ease-out motion-reduce:transition-none",
         yielding && "opacity-40 duration-300",
         !live && "saturate-[.45]",

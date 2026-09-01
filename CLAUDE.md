@@ -116,10 +116,18 @@ npm test           # vitest
 **Dev-server discipline: run ONE, shared** — Next 16 enforces it with a lockfile. Prefer the harness
 background-run facility over `nohup`/`setsid` so the process stays tracked, and kill by PID
 (`pkill -f "next dev"` exits 144 in this sandbox). Turbopack HMR picks up edits; restart only for
-config changes or stale state. **Any edit to an engine/scene CLASS needs a full page reload**, not
-HMR — not just geometry built in constructors. The engine is one long-lived imperative instance
-behind a dynamic import, so a swapped module leaves the running instance on its old methods and you
-verify the previous build believing it's the new one. Reload after every engine edit.
+config changes or stale state. **Any edit to a LONG-LIVED SINGLETON needs a full page reload**, not
+HMR — not just geometry built in constructors. A swapped module leaves the running instance on its
+OLD methods, so you verify the previous build believing it's the new one. Reload after every such
+edit.
+
+⚠️ That is the engine and every `scene/` class — and it is also **`NetworkData` (`src/data/api.ts`)**,
+which is the same shape: one instance, created once, holding the buffers. Cost real time twice on
+2026-09-01, the second time as a user-reported "bug": a new `Activity` field was added in
+`_metaActivity`, and the running singleton kept returning objects WITHOUT it, so a card that should
+have read `idle` was repainted with the old value on every poll. The symptom is the tell — a
+surface that renders correctly ONCE and is then "overwritten" on the next tick is a stale instance
+serving a fresh render, not a state bug. Reload before you debug it.
 
 ⚠️ **Turbopack's persistent cache can serve a STALE `globals.css` compile, and it survives a plain
 restart** — the chunk keeps one filename, so an old body ships under the same URL (found 2026-08-13:

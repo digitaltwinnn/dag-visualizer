@@ -9,6 +9,98 @@ the architecture map and the dev workflow; **its rules govern this file too**.
 ## Layout — the four-zone HUD over a raw data layer
 
 The page is one fixed shell in **two layers at different depths** (`SectionShell` + `store.section`).
+**The raw layer's anchor log carries a SEARCH BAR** (`datasection/LogSearchBar.tsx` +
+`src/data/chainSeek.ts`): three named criteria in a hairline box, and ONE Search button, revealed by
+a `search snapshots` toggle in a toolbar above the table.
+
+⚠️ **SEARCHING IS ASKED FOR, AND THE TRIGGER SITS WITH WHAT IT REVEALS.** Two placements were
+rejected and both lessons are load-bearing. The controls first sat PERMANENTLY under the header
+cells they answer for — a real pattern with a real virtue, context — but a standing line of
+placeholders under the header reads as a first data row whose values happen to be words, and a
+table's job is to open as data (user: "it kinda looks like the search row is actually part of the
+data, and the hint looks ugly"). The second cut put the toggle in the PAGER strip below the table
+while the inputs opened above it: "makes no sense to put search at the bottom and the inputs at the
+top". Progressive disclosure works by ADJACENCY — search belongs in a toolbar above the table, and
+the fields open directly beneath it.
+
+⚠️ **AND THE FIELDS CAME OFF THE TABLE ENTIRELY** (user: "just three named search fields … this way
+it does not fight with the table"). Seated in header cells, the TABLE's geometry was the form's
+budget and the table won every argument: two date inputs cannot render `mm/dd/yyyy` inside a ~165px
+AGE column, so they stacked; hints had to fit column widths, so they were cramped; and every column
+needed a cell even where it could answer nothing. Off the table they are just fields — the date
+range fits one line, each is named by a LABEL rather than by whatever column it sat under, and the
+AGE column went back to its natural 115px from the 232 the stacked pair forced. The bar sits in its
+own hairline box: measured, the toolbar, the fields and the table header sat at 0px from each other
+and the criteria read as more table chrome. Outline only, no fill — the fields carry `--panel-plate`
+and a plate on a plate flattens them.
+
+⚠️ **ONE BUTTON, AND ALL THREE CRITERIA VISIBLE.** A submit beside every field was rejected ("I want
+a search button"), and so was a "search by" chooser that hid two criteria to make one button
+unambiguous ("no 'search by'"). A reader wants to see everything they can search by, with one thing
+to press; `onSubmit` states the precedence, most specific first. Enter anywhere in the bar runs the
+same search — both, never one: implicit submission for everyone who knows it, a visible control for
+everyone who does not.
+
+⚠️ **THE METAGRAPH CRITERION IS ONE COMPOSITE FIELD — a chain picker joined to its ordinal — and
+under a commit the picker is a READOUT, not a choice.** Ordinals are PER CHAIN: DOR's 27,813,700 and
+DED's are unrelated snapshots of unrelated ledgers. Under "all" the log is a window over every
+network at once, so there is nothing to infer and the reader picks (user: "in all there are multiple
+networks, so it's needed") — and the window search is SCOPED by that pick, which is the whole point;
+an unscoped scan matches whichever network reached the number first. Under a committed filter the
+table IS that network's chain and pages it server-side, so `histNet` WINS over the local pick and the
+picker locks, stating the scope rather than offering a search this surface cannot run. Changing which
+chain is searched is the top bar's job — the same boundary the pager and the explorer already keep.
+
+⚠️ **THREE CRITERIA IS ITSELF THE STATEMENT** — the old row said it with empty cells. Only three axes
+are searchable across a chain of >1M pages. SNAPSHOT is arithmetic (ordinals are gapless), one
+request. ANCHORED INTO asks the GLOBAL SNAPSHOT ITSELF — it carries the list of what anchored into it
+(`/api/snapshot/[ordinal]` decodes one row per channel with that channel's own ordinal), so the
+answer is ONE exact read, measured: one request, zero walk probes. It is also the only mechanism that
+can say *this network did not anchor there* — a time-based search answers that case by landing on
+whatever came next, which reads as a hit. AGE is a date, and there is no date lookup upstream
+(verified: `startTime`/`endTime`, `timestamp`, `from`, `startDate`, `before` are all silently ignored
+and return the live tip), so it is the only criterion that walks. FEE and SIZE have no index at any
+layer — a field there could only filter the 25 rows on screen, and a reader who typed a fee and got
+"no match" would reasonably conclude no such snapshot exists when we looked at 25 of 1.1 million.
+
+**The toolbar carries the two states the first cuts had nowhere to put**, both named in every guide
+on table filtering: what is APPLIED (in words, so a folded bar can never leave the table on a search
+with nothing explaining it) and a way to CLEAR it.
+
+⚠️ **AND TWO COLUMNS STAND DOWN ON PHONE.** Six columns cannot fit a 500px viewport — measured, the
+table ran 494px inside a 403px pane and took the log into horizontal scroll, which on a log you SCAN
+is worse than showing less of each row. FEE and SIZE go: the other four IDENTIFY a row (whose chain,
+which snapshot, where it anchored, when) while those two are measures ABOUT it, stated in full on the
+snapshot card one tap away — and they are the only two the search bar cannot answer for anyway. One
+class on the header cell and its body cells, so a column can never half-hide.
+
+⚠️ **AND ANCHORED INTO HAS NO FALLBACK, DELIBERATELY.** The payload host serves only the recent band
+of global ordinals and 404s older ones. A first cut answered that by resolving the ordinal to a
+timestamp and walking for an equal stamp — a whole second mechanism, carrying its own near-miss
+caveat, for a case the reader already has two working routes to (the Snapshot field pages the entire
+chain; the date range reaches any point in it). An unserved ordinal is simply SAID, and the message
+names the route that does work (user: "keep it simple, no obsolete code to work around things").
+
+⚠️ **VOCABULARY: never "tick" in anything a reader sees.** The column key is `tick` and the code
+says tick throughout, but the app's word is GLOBAL SNAPSHOT — the first cut of this control shipped
+"go to tick #" as a placeholder and the user caught it ("whatever tick means to you, it's not the
+vocabulary we use in our app").
+
+The walk is **interpolating, not bisecting** — cadence is regular enough that false position lands in
+a handful of probes where binary search needs ~21. ⚠️ But false position **stagnates one-sided on a
+curved chain** (a network that changed cadence), so it carries the textbook guard: after the same end
+is kept twice running, that probe bisects. Measured, without the guard a synthetic chain that sped up
+midway failed to converge in 24 probes. It returns **null rather than a plausible page** when it runs
+out — a walk that did not prove a bracket has not searched the chain, and paging somewhere close
+would let the reader believe it had.
+
+Two traps already paid for: the controls must render in the table's LOADING branch too (a seek swaps
+the table into that state, and unmounting mid-seek loses what was typed), and a "clear" must fire
+from the change EVENT rather than an effect on the empty value — an effect also fires on mount, so
+every remount silently wiped the landing mark. That mark is an OUTLINE and deliberately not a wash:
+the washes are the selection language, and looking something up is not committing it (rule 2 keeps
+one write path).
+
 The scene layer is the four-zone HUD over the 3D canvas; the raw layer is the view's raw-data table —
 *the same data one level down*, not a second page. ⚠️ The store value for that layer is **`"data"`,
 not `"raw"`** — every word the user reads says RAW, so the two registers don't match and grepping for
@@ -137,6 +229,51 @@ tier. The lane's DOM shape is load-bearing too: members are selected by
 `:has()` on the per-rung WRAPPER divs, so **the selectors must be descendant, not child** — `RailPager`
 nests the box one level deeper inside its gesture wrapper.
 
+⚠️ **THE ACCORDION SLIDE HAS THREE TRAPS, both found by a user report (2026-09-01) and both invisible
+in code review.** *(1) Sanitizing the outgoing clone strips its GROUND.* The clone drops `.ig-panel` /
+`.rail-entry` so the `RailThread`'s measurement and the slab's `:has()` selectors cannot see it — but
+`.ig-panel` is what PAINTS a card (glass gradient, blur, border, radius, padding), so the card sliding
+out was bare text drifting over the scene: *"just text on transparent background moving quite quick,
+which hurts my eyes"*. `carryLook` copies the computed look across as inline style BEFORE the classes
+are dropped — the clone keeps its face and loses its identity, which is all sanitizing was ever for.
+*(2) The clone REPLAYS every animation the card carries.* `cloneNode(true)` copies class names, so
+inserting it restarts each one from frame 0 — the card materialize, the odometer's roll, the edge
+pulse (*"it tries to rotate the metagraph header (the odometer) with the same value as it moves out,
+it makes the whole card flash as well"*). And the flash was the lesser half: `cardMaterialize`
+animates TRANSFORM, and a running animation OVERRIDES inline style, so for its first 0.26s the
+animation — not the slide — owned the clone's transform. ⚠️ The kill must be a STYLESHEET rule
+(`[data-pager-ghost]` in globals.css), never an inline pass: inline style cannot reach a PSEUDO
+element, and `.edge-pulse::before` runs one, measured still pulsing on the ghost after the inline
+version shipped. The attribute also survives `clone.style.cssText = …`, which replaces the whole
+inline style and silently discarded the inline version's work on the root. *(3) The lane's height
+jumps the instant the slide starts.* The clone is absolutely positioned so holds
+no height, and the store commits synchronously, so the slot becomes the NEW card's height while an
+820ms HORIZONTAL slide is only beginning — everything below jumped (*"things jump vertically"*).
+`commitStep` pins the old height before the swap and eases to the new one on the slide's own clock, one
+frame later (the new height is unknowable until React has painted it). Both restore in `fin()` beside
+the position/overflow it already saved.
+
+**The pull SHOWS THE NEIGHBOUR** (`showPeek`, 2026-09-01 — user: "the new card only appears after
+I've moved the old card … I expect to already see it appearing before that"). A card-shaped peek
+carrying the incoming sibling's NAME rides the same damped travel, one width out on the side it will
+arrive from, so the pair moves as one strip and the pull reveals instead of merely resisting.
+⚠️ **It is a placeholder, and that is the honest ceiling.** The lane renders exactly ONE live card,
+whose body is built from the COMMITTED subject — a sibling's body does not exist until its commit
+runs, which is precisely why the accordion clones the OUTGOING card rather than pre-rendering the
+incoming one. Showing real content would mean rendering a card for an uncommitted subject; that is a
+different piece of work, not a tweak to this one. The peek is built imperatively for the same reason
+the drag transform is: a pull touches the DOM and never React state, so a 60-120Hz gesture cannot
+re-render a subscribed card. It carries `data-pager-ghost` too, so it neither animates nor is heard.
+
+Two details the first cut got wrong, both reported: it offset by the card's WIDTH alone, butting the
+two flush — a rhythm the app uses nowhere, since stacked panels breathe by `--rail-gap` and a card
+never sits tight against anything. The gap is READ from that token (and the commit slide takes it
+too, so the release continues the gesture's spacing rather than changing it). And it appeared at full
+strength the moment the drag engaged, which read as the next card having already won while the card
+under the finger — still the live one — read as discarded. Its opacity now rides the SAME progress
+the commit does, on a smoothstep, reaching full exactly at `STEP_PX`: faint through the early travel
+a cancel lives in, present only once the step is certain.
+
 **The box can carry a SIBLING PAGER** (`RailPager`): where the expanded rung has 1-N siblings under the
 same committed parent, a slim `‹ n / N ›` plank rides the card's OWN bottom edge, inside the glass, plus
 a horizontal swipe on the body. The set comes from the pure resolver `railSiblings.ts` and every step
@@ -249,22 +386,89 @@ row reads the snapshot feed ONCE and passes it down.
 The cells are per-view and ordered by the user (2026-08-30): hyper coarse→fine (METAGRAPHS with a
 by-type breakdown — `networkKind` is the type's one home, icons from `METATYPE_ICONS` on the
 filtered face — then NODES, the NODE COMPOSITION donut, NETWORK LAYERS as RoleChips micro-bars);
-geo pairs each total with its breakdown (NODES · nodes-by-country · top-providers —
-top-providers); the ledger leads with WHO (METAGRAPHS ANCHORING, exact from the anchor index, with
+geo pairs each total with its breakdown (NODES · TOP COUNTRIES · TOP PROVIDERS — the first two
+renamed/reshaped 2026-09-01: NODES gained a located/unplaced split, because a card with no breakdown
+is the boring case by construction and that split is the one breakdown belonging to THIS view rather
+than its neighbours — a node the lookup could not place sits in no country ring and no provider ring,
+so it is also the basis both cards beside it silently assume; and "nodes by country" became "top
+countries", since the card shows three plus a remainder and the old name promised the whole
+distribution); the ledger leads with WHO (METAGRAPHS ANCHORING, exact from the anchor index, with
 identity dots) then the rates (number + stretch sparkline, units spelled `/hour`) and the
-declicked tick bar-chart. **A TOTAL LIVES INSIDE ITS OWN BREAKDOWN, AND LEADS IT** (user, 2026-08-31): a bare number card
+declicked tick bar-chart, which is **STACKED per metagraph when unfiltered** (user pick,
+2026-09-01 — every metagraph, always, not a top-N). The bar's HEIGHT is unchanged, so it reads as it
+always did at a glance and gains WHO underneath. Three rules keep it honest: the segments must SUM
+to the bar, so whatever `metaCounts` could not attribute is drawn as its own neutral segment rather
+than dropped (the donuts' `other` rule); a tick with no attribution is not a tick with no anchors,
+so it paints whole in the accent — "this many anchored, by whom is not known here"; and order is the
+CATALOG's, never the per-tick counts, since sorting by size repaints every bar as the window shifts
+and a segment that moves cannot be followed. Identity is not colour-alone: the METAGRAPHS ANCHORING
+card immediately to its left is the legend, reading the same `getAnchor(...).metaCounts` and the same
+`identityHudCss` hues, named sr-only.
+
+**A TOTAL LIVES INSIDE ITS OWN BREAKDOWN, AND LEADS IT** (user, 2026-08-31): a bare number card
 beside the list that breaks that number down says the same thing twice, so `COUNTRIES` folded into
 nodes-by-country and `PROVIDERS` into top-providers, and hyper's `NODES` went entirely — the
 composition donut already totalled the same fleet. The merged shape is `DonutTotal` + `MicroBars`:
 ring, then the total at the band's own number size, then the rows. Two rules hold it honest — the
 ring must PARTITION the population, so a top-N chart carries its remainder as an `other` segment
 rather than drawing three slices as the whole; and the total is the LARGEST type in the card, never
-the smallest (it briefly sat in the 44px donut hole at 11px, which made merging a demotion). Rows
-wear the donut's own stepped opacities via `MicroBars`' `steps`, or the ring loses its key.
+the smallest (it briefly sat in the 44px donut hole at 11px, which made merging a demotion).
+
+**A card is TWO SEGMENTS: a LEAD and a DETAIL, split by a hairline** (user, 2026-09-01). The lead is
+the headline total the card exists to say; the detail is its breakdown. `BandCard` takes the lead as
+a prop and the detail as children, and draws the divider only when both are present — either may
+stand alone (geo's `NODES` is lead-only; `NETWORK LAYERS` and PulseStrip's poll cards are
+detail-only). Three rules keep the row from going ragged, and all three answer the same complaint
+("the details are right next to the total while there is a lot of white space on the right"):
+
+- **`size` is the one width vocabulary** — `sm` (one reading, no breakdown) / `md` (a reading and its
+  breakdown) / `lg` (a chart that reads better wide). It replaced six hand-picked flex values that
+  each encoded a guess about one card's content. **Every tier keeps an `auto` basis**, never
+  `basis-0`: a share computed with no reference to the card's content is what clipped the rate cards'
+  extrapolation note off the plate at tablet width. **And every tier has a CEILING** — without one an
+  `md` card grows to whatever the viewport gives it, and at 1600px three of them each held ~500px
+  with a void between lead and breakdown. Past the ceilings the row centres; below them the cards
+  still span margin to margin, so the centring is a no-op wherever width is scarce.
+- **`MicroBars`' track is proportional but CAPPED** (`BAR_TRACK_MAX`), and each row is `justify-end`,
+  so value columns line up on the card's right edge and the slack collects behind the block. The
+  original 72px constant made every bar row intrinsically sized, which is where the dangling white
+  space came from; an uncapped track is the opposite failure — a bar running the width of a 1600px
+  row stops reading as a quantity.
+- **A card may merge a claim with its EVIDENCE.** Hyper's type and layers were two cards until
+  2026-09-01, when the user pointed out they are one reading: "the type is the 'total' and left
+  section, while the layers are the details that confirm that type — e.g. a 'data' type has a number
+  of L0 and dL1 layers and 0 cL1". Split, the reader had to carry the type in their head to the card
+  beside it. Merged, the lead states the characteristic and the breakdown evidences it — which is what
+  the two-segment grammar is for. It merges only under a COMMIT: unfiltered there is no single type to
+  lead with, so the layers keep a card of their own.
+- **An instrument CLAIMS the card's height.** The body is `items-stretch`, `MicroBars` distributes
+  its rows with `justify-evenly`, and the charts fill rather than sitting at a fixed box. Once the
+  band went to a fixed `--vitals-h` the leftover showed up as dead bands above and below every
+  reading — a four-row card filled its body while a two-row one floated in the middle of one. Watch
+  for wrappers BETWEEN the body and the instrument (the country card has one): they need
+  `self-stretch` too, or the rows bunch inside a content-height box while their neighbours breathe.
+- **A sparkline is bucketed, not sliced** (`Sparkline maxPoints`). The retained window is 52 ticks
+  and 51 segments of a noisy rate read as hair. Slicing to the last N would be exact per point but
+  silently shortens the WINDOW — and the card prints that window in words two elements to the right.
+  Bucketing by mean keeps the window and lowers the frequency, which is the actual ask.
+- **The band's height is FIXED** (`--vitals-h`), not content height. Left to its content it measured
+  81 / 72 / 62px across hyper / geo / ledger, and since the band is anchored at the BOTTOM that
+  showed up as its top edge jumping on every view switch.
+
+⚠️ **THE OPACITY LADDER IS THE DONUT'S ALONE.** `MicroBars` mirrored `DONUT_STEPS` until 2026-09-01
+so a ring beside rows had a key — but only the cards WITH a ring passed them, so `Node composition`
+ran bright→faint beside `Network layers` running flat, and two cards in one row read as two different
+hues of one token (user). Adjacent arcs of a single colour genuinely need separating; labelled rows
+do not — every row is NAMED and the slices are in the same order, which is how a legend works.
+Don't reintroduce per-bar opacity.
 
 `compositionCounts` lives IN VitalsBand (its one consumer since the
 top-bar cluster retired). The band dims with the rails on `useSceneYield` and its plate is the
-command bar's own `--topbar-glass`.
+command bar's own `--topbar-glass`. **Its horizontal inset is `--bar-margin`, the COMMAND BAR's own**
+(user, 2026-09-01: "the bottom bar should be the same exactly as the top bar") — one token read by
+both, resolving to `--rail-margin` at desktop, where the band's edges must align with the rail cards
+and clear the RailThread rulers, and to a wider 16px below 1100px, where the rails are edge tabs and
+there is nothing to align with.
 
 `BottomStream` is the **one publisher**: it both mounts the band and writes `--bottom-reserve`, from
 the one policy flag `VIEW_POLICIES[mode].vitalsLane` **AND three deliberate gates** — the scene pose
@@ -423,10 +627,18 @@ its own strip height so a paged box's plank rides ON the plate — one number, t
 On the two snapshot cards the foot has one shape: **the artifact's chain identity — what it is, what it
 links to, what it proves.** They are the same `Signed[]` artifact, so they carry the same set, and the
 metagraph card's `State hash` is the one addition (renamed from `State proof` 2026-08-14 — it collided
-with the signers' `snapshot proof`, a SIGNATURE set, while this is a digest, kin to Hash/Parent),
+with the signers' `snapshot proof`, a SIGNATURE set, while this is a digest, kin to Hash/Previous),
 because only a metagraph snapshot proves an
 application state. **Counters are not chain identity**: `Height`, `Blocks` and `epochProgress` are all
 carried by the types and none of them appear.
+
+⚠️ **"PREVIOUS HASH", NOT "PARENT HASH"** (user, 2026-09-01). Upstream calls the field
+`lastSnapshotHash` and that is literally what it is: the hash of the snapshot before this one in
+the SAME chain. "Parent" borrows tree/DAG vocabulary for a link that is strictly linear — a
+snapshot has exactly one predecessor, never several — and on the metagraph card it invited the
+reading that the parent was the GLOBAL snapshot it anchored into, which is a different relation
+entirely (the head aside's `anchored to N`). All three surfaces say "Previous hash": both snapshot
+cards and the raw layer's channel pane.
 
 **The PILE is the unit of consistency: a card never re-states an ancestor's identity.** Adjacency is what
 the slab uses to say containment, so a leaf repeating its parent at equal weight is noise, not
@@ -612,6 +824,47 @@ with the pin control back in the HUD the raw layer had just marked `inert`. The 
 GLOBAL tick as the subject, which moved the box to the Global snapshot card and collapsed the card you
 were reading. Same builder as the anchor-log row, so a read and the equivalent row click can't drift.
 
+### Disclosures — one Radix primitive, one panel recipe
+
+Every collapsible body in the app is `Collapsible` + `.disclose-panel` (2026-09-01). The migration
+off `{open && …}` bought two things `{open && …}` structurally could not: an **animated** body (an
+unmounted node cannot travel, and it also popped into existence under `RailThread`'s measurement)
+and the **trigger↔panel id pairing** AT needs. The explorers share `Disclosure` / `DisclosureRow` /
+`DisclosurePanel` (`components/ExploreRows.tsx`), so a call site cannot forget the recipe.
+
+⚠️ **RADIX HOLDS THE PAIRING, NEVER THE STATE.** Every explorer row is a selection COMMIT whose
+disclosure is a consequence — a committed filter, country, cohort, composition group — so `open` is
+DERIVED from the store and `onOpenChange` runs the same builder the click always did. Rule 2's one
+write path is untouched; Radix decides nothing about what a click means.
+
+⚠️ **A PREVIEW-ONLY ROW IS NOT A TRIGGER.** Out of the committed lens a row hovers, keeps its wash
+and opens nothing, so it must not carry `aria-expanded` — which Radix's trigger always sets.
+`DisclosureRow` renders a plain `<button>` in that case (`Row = previewOnly ? "button" :
+CollapsibleTrigger`), which is what keeps the promise honest to AT as well as to the eye.
+
+⚠️ **150ms, and it is the CHEVRON's clock.** The arrow already rotates at `duration-150` and the two
+are one gesture; a panel on its own timing reads as two things happening. Changing `.disclose-panel`
+means changing every chevron with it.
+
+**Four sites deliberately do NOT migrate**, each for a structural reason rather than an oversight:
+
+- **`CardHead`'s three** — the head toggles the card BODY, which its PARENT renders as a sibling in
+  another component. A Collapsible root would have to wrap both, restructuring every rail card for
+  an `aria-controls`.
+- **`TopBar`'s two strips** — the grow-downward slot is a LAYOUT PARTICIPANT: TopBar publishes its
+  height and the rails and canvas add it to their `top`. A height animation would fight a published
+  measurement, and the strip is not hidden content but a resized bar.
+- **`SnapRow`'s signer list** (`LedgerPanel`) — the row's click COMMITS a snapshot and *may* also
+  disclose, depending on whether signers were resolvable at all ("affordance follows the data"). So
+  it is a disclosure only sometimes, over three call sites with three different panels — the
+  preview-only split again, at triple the cost and none of the clarity.
+- **`Desc`'s show-more** (`inspector/parts.tsx`) — evaluated and rejected on its own merits before
+  this sweep: Collapsible's model is hidden-when-closed, this is always-visible-but-CLAMPED.
+- **`ChannelStatePanel`'s raw-JSON well** takes the primitive but NOT `.disclose-panel`: it opens to
+  its SIBLINGS' leftover height (`flex-1`, and it is the lane's one scroller), not to its content's,
+  so a measured height animation would hand the scrolling back to the box — the double-scrollbar bug
+  the header there records fixing twice.
+
 ### shadcn primitives
 
 `components/ui/` holds the adopted primitives; compose classes with `cn()`. **`Button` is adopted only
@@ -622,7 +875,15 @@ bar's own network-chip strip (see the command bar's grow-downward slot); `cmdk` 
 `Command` were removed 2026-08-31 once nothing had imported them for some time, so don't reach for a
 palette here without deciding it afresh. `Table` + `ScrollArea` are the raw layer
 only, with `Table` adopted MINUS its scroll container so the header stays sticky while the body scrolls
-under it. The engine-anchored `Tooltip` stays custom, because a Radix tooltip can't track a raycast.
+under it. **`Tabs` is the channel pane's lane axis** (2026-09-01, swapped off `ToggleGroup`): the two
+looked and behaved alike, but a toggle group announces "three buttons, one pressed" while this is a
+tablist over three panels — AT never learned the region below belonged to the pressed chip, and there
+was no arrow-key navigation between lanes. ⚠️ **Every lane's `TabsContent` must carry the flex chain
+its plain `<div>` did** (`min-h-0 flex flex-col`): the primitive inserts a layer between the bordered
+box and the lane body, and one default `block` in the middle hands the scrolling back to the box.
+**`Calendar` (react-day-picker) is the raw log's date range** — see `components/ui/calendar.tsx` for
+why every surface it paints is restated in this app's tokens, and the two traps in its own
+composition (the doubled caption, the three-orientation chevron). The engine-anchored `Tooltip` stays custom, because a Radix tooltip can't track a raycast.
 
 ### CSS traps
 

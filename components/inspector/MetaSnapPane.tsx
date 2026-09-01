@@ -366,7 +366,7 @@ export default function MetaSnapPane({
                   after it aged out of the retained buffer — where stating the gap is the point. */}
               {hash && <FootRow label="Hash" value={midHash(hash, 34)} title={hash} copy={hash} />}
               {parent && (
-                <FootRow label="Parent hash" value={midHash(parent, 27)} title={parent} copy={parent} />
+                <FootRow label="Previous hash" value={midHash(parent, 27)} title={parent} copy={parent} />
               )}
               {stateProof && (
                 // "State HASH" (user, 2026-08-14 — "state proof" collided with the signers tab's

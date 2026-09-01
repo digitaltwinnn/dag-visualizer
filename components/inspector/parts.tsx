@@ -209,8 +209,12 @@ export const rolesOf = (n: NodeInfo) => (n.roles && n.roles.length ? n.roles : [
 // node rows): a plain small disc in the subject's identity hue — flat fill, NO glow (the geo
 // rows' old `shadow-[0_0_5px_currentColor]` halo read much brighter than the picker's dots;
 // user-unified to the picker's exact treatment).
-export function IdentityDot({ hue }: { hue: string }) {
-  return <span className="w-2 h-2 rounded-full flex-none" style={{ background: hue }} aria-hidden />;
+export function IdentityDot({ hue, className }: { hue: string; className?: string }) {
+  // `className` overrides the SIZE only — the mark, its shape and its hue source stay this
+  // component's (the shared identity dot, rule 3 + the design system's one-dot rule). The vitals
+  // roster uses it to enlarge the committed network's dot; nothing else should reach for it
+  // without a reason of the same kind.
+  return <span className={cn("w-2 h-2 rounded-full flex-none", className)} style={{ background: hue }} aria-hidden />;
 }
 
 /** The Yes/No FACT mark (user, 2026-08-16 — "yes has a checkmark, so for no add a x"): Yes

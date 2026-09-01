@@ -24,7 +24,12 @@ export default function AboutView({
   lines: string[];
   caption?: string;
 }) {
-  const [collapsed, setCollapsed] = useState(true);
+  // OPEN BY DEFAULT (user, 2026-09-01). The card states the view's point of view — "How the network
+  // is built", "Where the network runs" — which is orientation a reader wants BEFORE they start
+  // browsing, and behind a collapsed head it was only ever found by someone who already knew what
+  // it said. It stays collapsible, and the state is per-mount by design: a view switch is a change
+  // of subject, so its own orientation leads again.
+  const [collapsed, setCollapsed] = useState(false);
   return (
     <Card asChild className="sig-right block p-0 [--spine:var(--filter-accent,var(--primary))] animate-card-in motion-reduce:animate-none">
       <aside>

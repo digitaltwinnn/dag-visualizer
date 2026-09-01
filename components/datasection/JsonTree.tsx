@@ -9,6 +9,7 @@
 // instrument, not an export format.
 import { useState } from "react";
 import { ChevronRight } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 
 const MAX_STR = 120;
@@ -49,11 +50,11 @@ function Node({ k, v, depth }: { k: string | null; v: unknown; depth: number }) 
     : Object.entries(v as Record<string, unknown>);
   const summary = Array.isArray(v) ? `[${entries.length}]` : `{${entries.length}}`;
   return (
-    <div>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
+    // Radix owns the open state, the trigger↔panel aria pairing and the mount lifetime; the row
+    // keeps every class it had. `asChild` is what preserves that — without it Radix would render
+    // its own <button> around ours.
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger
         className={cn(
           "flex items-center gap-1 py-px w-full text-left cursor-pointer rounded-xs",
           "hover:bg-wash-faint focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
@@ -65,15 +66,15 @@ function Node({ k, v, depth }: { k: string | null; v: unknown; depth: number }) 
         />
         {k != null && <span className="text-foreground">{k}</span>}
         <span className="text-muted-foreground">{summary}</span>
-      </button>
-      {open && (
+      </CollapsibleTrigger>
+      <CollapsibleContent className="disclose-panel">
         <div className="ml-[5px] pl-2 border-l border-border/60">
           {entries.map(([ck, cv]) => (
             <Node key={ck} k={ck} v={cv} depth={depth + 1} />
           ))}
         </div>
-      )}
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 

@@ -17,6 +17,7 @@ import {
   FOCUS_ROW_SCHEMA,
   FOCUS_SHARED,
   FOCUS_SHARED_DEFAULTS,
+  SNAP_HOLD,
   FOCUS_SHARED_SCHEMA,
   dimTargetsFor,
   nodeDim,
@@ -234,6 +235,52 @@ describe("snapBright (the chamber's snapshots on the node vocabulary)", () => {
   it("steps the OTHERS back only when they are not themselves the focus", () => {
     expect(snapBright(0.1, false, 0, true)).toBeCloseTo(0.1 * back, 10);
     expect(snapBright(0.1, false, 1, true)).toBeCloseTo(0.1 + boost, 10);
+  });
+
+  // A COMMITTED MEMBER IS HELD UP THE WHOLE TRAIL (user, 2026-09-01). Exempting it from `back`
+  // alone was measured at 0.066 → 0.12 against a focused row of 0.82 — invisible. The hold is the
+  // term that actually answers the commit.
+  it("holds an ON-FILTER member above the trail's resting weight", () => {
+    expect(snapBright(0.1, false, 0, true, true)).toBeCloseTo(0.1 * FOCUS_SHARED.snapHold, 10);
+    expect(snapBright(0.1, false, 0, true, false)).toBeCloseTo(0.1 * back, 10);
+  });
+
+  // ⚠️ The hold is an else-of the boost, never additive: on the focused row it must not compound
+  // past opacity 1, which would clip and flatten the row that is supposed to lead.
+  it("never compounds the hold with the focused row's boost", () => {
+    const focused = snapBright(0.1, false, 1, true, true);
+    expect(focused).toBeCloseTo(0.1 + boost, 10);
+    expect(focused).toBeLessThanOrEqual(1);
+  });
+
+  // The ranking the chamber reads under a commit, in order. Numbers tune; the ORDER is the design.
+  it("ranks focused row > committed member > unfiltered trail > off-filter", () => {
+    const focusedRow = snapBright(0.1, false, 1, true, true);
+    const member = snapBright(0.1, false, 0, true, true);
+    const unfiltered = snapBright(0.1, false, 0, true, false);
+    const offFilter = snapBright(0.1, true, 0, true, false);
+    expect(focusedRow).toBeGreaterThan(member);
+    expect(member).toBeGreaterThan(unfiltered);
+    expect(unfiltered).toBeGreaterThan(offFilter);
+  });
+
+  // The live knob is seeded from the baked constant, and `?tune` edits FOCUS_SHARED in place —
+  // so the resolver must read the live struct, not the constant, or a tuned value would never land.
+  it("seeds the live hold from SNAP_HOLD and resolves through the live struct", () => {
+    expect(FOCUS_SHARED_DEFAULTS.snapHold).toBe(SNAP_HOLD);
+    const before = FOCUS_SHARED.snapHold;
+    try {
+      FOCUS_SHARED.snapHold = 2;
+      expect(snapBright(0.1, false, 0, true, true)).toBeCloseTo(0.2, 10);
+    } finally {
+      FOCUS_SHARED.snapHold = before;
+    }
+  });
+
+  // `offFilter` and `onFilter` are not complements — under "all" neither is set.
+  it("leaves the unfiltered chamber exactly as it was", () => {
+    expect(snapBright(0.1, false, 0, true, false)).toBeCloseTo(0.1 * back, 10);
+    expect(snapBright(0.1, false, 0, false, false)).toBeCloseTo(0.1, 10);
   });
 
   // The ranking the eye reads down the trail. Numbers may be tuned; the ORDER is the design.
