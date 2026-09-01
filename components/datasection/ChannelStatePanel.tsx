@@ -51,7 +51,6 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useStore } from "@/src/store/store";
 import { metaSnapDeepKey } from "@/src/data/types";
 import type { NodeRow } from "@/src/data/types";
@@ -65,6 +64,8 @@ import { fmtDag, fmtKB, midHash } from "@/src/util/format";
 import JsonTree from "@/components/datasection/JsonTree";
 import { LANE_ICONS } from "@/components/icons";
 import TablePager from "@/components/datasection/TablePager";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 /** Whether a decoded payload carries anything at all — `{}`, `[]` and `""` do NOT open a lane. */
@@ -187,11 +188,8 @@ function SchemaRow({
   );
   if (!openable) return <div className="flex items-center gap-1.5 py-0.5 pl-[18px]">{row}</div>;
   return (
-    <div className="flex flex-col gap-1">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
+    <Collapsible open={open} onOpenChange={setOpen} className="flex flex-col gap-1">
+      <CollapsibleTrigger
         className={cn(
           "flex items-center gap-1.5 w-full py-0.5 rounded-xs cursor-pointer text-left",
           "hover:bg-wash-faint focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
@@ -205,15 +203,15 @@ function SchemaRow({
           )}
         />
         {row}
-      </button>
-      {open && (
+      </CollapsibleTrigger>
+      <CollapsibleContent className="disclose-panel">
         <div className="flex flex-col gap-1 pl-[18px]">
           {kinds.map((k) => (
             <FieldChips key={k.kind} fields={k.fields ?? [k.kind]} />
           ))}
         </div>
-      )}
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -255,12 +253,21 @@ function RawSection({
     // OPEN, the section CLAIMS the lane's remaining height (min-h-0 flex-1) so the well below can
     // be the box's one scroller; folded it takes its own row back, or the chevron would float on
     // top of an empty column.
-    <div className={cn("group/copy flex flex-col gap-1 mt-1.5", open && "min-h-0 flex-1")}>
+    // ⚠️ THIS ONE TAKES NO `.disclose-panel`, and the reason is structural rather than taste. Every
+    // other disclosure in the app opens to its CONTENT's height, which is exactly what Radix
+    // measures into `--radix-collapsible-content-height`. This well opens to its SIBLINGS' leftover
+    // height instead — it is `flex-1` inside a flex column and is the lane's one scroller, a chain
+    // the header above records taking two passes to get right. A height animation would overwrite
+    // that flex height with a measured pixel value and hand the scrolling back to the box, which is
+    // the double-scrollbar bug all over again. Radix is here for the state and the trigger↔panel
+    // pairing; the travel is deliberately not animated.
+    <Collapsible
+      open={open}
+      onOpenChange={onToggle}
+      className={cn("group/copy flex flex-col gap-1 mt-1.5", open && "min-h-0 flex-1")}
+    >
       <div className="flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={open}
+        <CollapsibleTrigger
           className={cn(
             "flex w-fit items-center gap-1 py-0.5 pr-1.5 cursor-pointer rounded-xs",
             "text-micro tracking-caps uppercase text-muted-foreground",
@@ -276,9 +283,12 @@ function RawSection({
             )}
           />
           raw JSON
-        </button>
+        </CollapsibleTrigger>
         <CopyButton value={JSON.stringify(data, null, 2)} subject="raw JSON" />
       </div>
+      {/* `forceMount` + a manual `open` gate: the well must be a real flex CHILD of the column
+          above, and Radix's own hidden-when-closed wrapper would sit between them and break the
+          `flex-1` chain. Mounting it ourselves keeps the DOM shape the sizing depends on. */}
       {open && (
         // THE CODE WELL (user, 2026-08-14 — "put the raw JSON in some sort of code box, like
         // Discord"): the tree sits on the page's own ground inside a bordered rounded well, so
@@ -300,7 +310,7 @@ function RawSection({
           <JsonTree data={data} />
         </div>
       )}
-    </div>
+    </Collapsible>
   );
 }
 
@@ -533,14 +543,28 @@ export function ChannelStatePanel() {
               this snapshot carries no state, data or proofs we could decode
             </p>
           ) : (
-            <>
+            // ⚠️ TABS, NOT A TOGGLE GROUP (2026-09-01). They looked and behaved alike, but a
+            // toggle group announces "three buttons, one pressed" while this is a tablist over
+            // three panels — so AT never learned that the region below belongs to the pressed
+            // chip, and arrow-key navigation between the lanes did not exist. Radix pairs each
+            // trigger to its panel by id and gives the roles and the keyboard for free. The LOOK
+            // is unchanged: every class below is the one the toggle group wore.
+            <Tabs
+              value={active}
+              onValueChange={(v) => { if (v) setWant(v as LaneId); }}
+              // The shadcn root ships `flex flex-col gap-2`; this axis owns the pane's remaining
+              // height and its tabs sit flush on the box, so both are overridden here.
+              className="min-h-0 flex-1 gap-0"
+            >
               {/* The lane axis. Same segmented-control recipe as the command bar's presentation
                   toggle, one size down; the hairline under it is the tab underline and spans the
                   pane, because the lane below owns the pane's full width. */}
-              <ToggleGroup
-                type="single"
-                value={active}
-                onValueChange={(v) => { if (v) setWant(v as LaneId); }}
+              <TabsList
+                // `line` is the only variant that does not paint a `bg-muted` track behind the
+                // tabs — the file-cabinet look below needs a bare row. Its own active underline
+                // is killed on each trigger (`after:hidden`); this row's hairline is the one in
+                // the className, and the active tab notches THROUGH it.
+                variant="line"
                 // FILE-CABINET TABS (user, 2026-08-13 — "it's not clear the content under those
                 // tabs is related; more like a file cabinet: the tab outline AND the body"). The
                 // segmented-control chips read as free-floating buttons over an unrelated block,
@@ -551,31 +575,36 @@ export function ChannelStatePanel() {
                 // (flex-1) instead of huddling at one end. The COUNTS are gone (user: "at first
                 // I didn't realise they were counts") — each lane's own note and table state its
                 // weight one line later, where the numbers have labels.
-                className="relative flex flex-none w-full gap-1 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50"
+                className="relative flex h-auto flex-none w-full gap-1 rounded-none p-0 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50"
                 aria-label="Which part of the snapshot to read"
               >
                 {lanes.map((l) => {
                   const LaneIcon = LANE_ICONS[l.id];
                   return (
-                    <ToggleGroupItem
+                    <TabsTrigger
                       key={l.id}
                       value={l.id}
                       title={l.title}
                       className={cn(
                         "flex-1 flex items-center justify-center gap-1.5 h-7 px-2 rounded-t-md! rounded-b-none!",
-                        "text-micro tracking-caps uppercase",
+                        "text-micro tracking-caps uppercase font-normal",
                         "text-muted-foreground bg-transparent border border-transparent border-b-0",
                         "hover:text-foreground hover:bg-wash-soft",
-                        "data-[state=on]:z-[1] data-[state=on]:text-foreground",
-                        "data-[state=on]:border-border/50 data-[state=on]:bg-[var(--panel-solid)]",
+                        // The primitive's own active underline and focus ring, both replaced: the
+                        // notch IS the active cue here, and this app's focus language is a 1px
+                        // outline rather than a 3px ring.
+                        "after:hidden focus-visible:ring-0 focus-visible:border-transparent",
+                        "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
+                        "data-[state=active]:z-[1] data-[state=active]:text-foreground data-[state=active]:shadow-none",
+                        "data-[state=active]:border-border/50! data-[state=active]:bg-[var(--panel-solid)]!",
                       )}
                     >
                       <LaneIcon aria-hidden className="size-3.5 flex-none" />
                       {l.name}
-                    </ToggleGroupItem>
+                    </TabsTrigger>
                   );
                 })}
-              </ToggleGroup>
+              </TabsList>
 
               {/* ONE scroll region, and it takes the whole remaining pane — the point of the axis:
                   an opened tree grows INSIDE this box instead of pushing its sibling out of view.
@@ -592,8 +621,12 @@ export function ChannelStatePanel() {
                   (its panel-solid fill already bridges the baseline). Same border weight as the
                   tabs' own (border/50); bottom corners pick up the pane radius. */}
               <div className="min-h-0 flex-1 flex flex-col overflow-hidden border border-t-0 border-border/50 rounded-b-md px-2.5 pt-2 pb-2">
-                {active === "state" && (
-                  <div className="flex flex-col gap-2 min-h-0 flex-1">
+                {/* ⚠️ EVERY LANE'S PANEL MUST CARRY THE FLEX CHAIN THE PLAIN DIV DID. `TabsContent`
+                    inserts a layer between the bordered box and the lane body, so `min-h-0 flex
+                    flex-col` has to continue through it — the raw-JSON well below sizes against
+                    an unbroken column, and a single default `block` in the middle hands the
+                    scrolling straight back to the box. */}
+                <TabsContent value="state" className="min-h-0 flex flex-col gap-2">
                     {stateRows.length > 0 && (
                       <div className={schemaBox(state != null && raw)}>
                         <SchemaRows
@@ -603,10 +636,8 @@ export function ChannelStatePanel() {
                       </div>
                     )}
                     {state != null && <RawSection open={raw} onToggle={() => setRaw((o) => !o)} data={state} />}
-                  </div>
-                )}
-                {active === "data" && (
-                  <div className="flex flex-col gap-2 min-h-0 flex-1">
+                </TabsContent>
+                <TabsContent value="data" className="min-h-0 flex flex-col gap-2">
                     {/* The data lane's NOTE: the payload's own weight, the same fact the state
                         lane leads with (the tab's count is the record COUNT, a different number).
                         Without it this lane opened on a bare table header while its two siblings
@@ -627,10 +658,8 @@ export function ChannelStatePanel() {
                       </div>
                     )}
                     {dataTx != null && <RawSection open={raw} onToggle={() => setRaw((o) => !o)} data={dataTx} />}
-                  </div>
-                )}
-                {active === "signers" && (
-                  <div className="flex flex-col gap-3 min-h-0 flex-1 overflow-auto slim-scroll">
+                </TabsContent>
+                <TabsContent value="signers" className="min-h-0 flex flex-col gap-3 overflow-auto slim-scroll">
                     {/* dL1 FIRST, L0 AFTER (user, 2026-08-14): the production order — the data
                         blocks are signed by their dL1 producers before the L0 cluster seals the
                         snapshot around them, so the lane reads in the order the signatures were
@@ -641,10 +670,9 @@ export function ChannelStatePanel() {
                     {deep.signers.length > 0 && (
                       <SignerGroup group="proof" ids={deep.signers} metaId={deep.metaId} selNodes={selNodes} />
                     )}
-                  </div>
-                )}
+                </TabsContent>
               </div>
-            </>
+            </Tabs>
           )}
 
           {/* THE REFERENCE STRIP (redesign 2026-08-13): the snapshot's chain references — what it

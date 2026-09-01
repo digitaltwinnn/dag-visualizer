@@ -5,6 +5,7 @@
 // only the visual chrome; the parent supplies behaviour via callbacks + content via children,
 // so the two explorers can't drift on row styling.
 import { ChevronRight } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { SELECTED_ROW, SelectedRowMark, selectedRow, selectionHue } from "@/components/selection";
 import { subjectPairing } from "@/components/useSubjectPairing";
@@ -105,13 +106,49 @@ export function DisclosureChevron({ open }: { open: boolean }) {
 // their explorer row, the group cards didn't — one language, no exceptions). Callers keep their
 // own `onHoverEnter`/`onHoverLeave` for the member-id glow (`hoverCohort`); the two compose.
 // The ledger's floor/lane rows pass no group props, so the pairing stays inert there.
+/** The Collapsible ROOT a `DisclosureRow` and its panel live inside. It exists because the row and
+ *  the body it opens are SIBLINGS at every call site — the row renders the label, the caller renders
+ *  the nested list — so the pairing has to be declared one level up rather than inferred.
+ *
+ *  ⚠️ THE STATE IS ALWAYS THE STORE'S, never Radix's. Every one of these rows is a selection COMMIT
+ *  whose disclosure is a consequence (a committed filter, country, cohort or composition group), so
+ *  `open` is derived and `onToggle` runs the same builder the click always did — the write still
+ *  goes through the decision table and the one executor (rule 2). What Radix adds is the trigger↔
+ *  panel id pairing and a body that can animate, which `{open && …}` could not do at all. */
+export function Disclosure({
+  open,
+  onToggle,
+  className,
+  children,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Collapsible open={open} onOpenChange={onToggle} className={className}>
+      {children}
+    </Collapsible>
+  );
+}
+
+/** The BODY a `Disclosure` opens onto — one home for the shared panel recipe, so a call site can't
+ *  forget `.disclose-panel` and silently lose the animation. */
+export function DisclosurePanel({ className, children, ...rest }: React.ComponentProps<"div">) {
+  return (
+    <CollapsibleContent className="disclose-panel">
+      <div className={className} {...rest}>{children}</div>
+    </CollapsibleContent>
+  );
+}
+
 export function DisclosureRow({
   open,
   on,
   focused,
   holdsSel,
   title,
-  onToggle,
   previewOnly,
   onHoverEnter,
   onHoverLeave,
@@ -126,7 +163,6 @@ export function DisclosureRow({
   focused?: boolean;
   holdsSel: boolean;
   title: string;
-  onToggle: () => void;
   /** PREVIEW-ONLY: the row still HOVERS — it keeps its wash and still writes whatever channel its
    *  caller previews on the scene — but it neither opens nor commits (user, 2026-08-10). It is the
    *  row's answer to being out of the committed lens, so it drops the chevron (the affordance is
@@ -149,8 +185,13 @@ export function DisclosureRow({
     setHoverGroup ?? NO_PAIR,
     hue ?? "var(--primary)",
   );
+  // ⚠️ A PREVIEW-ONLY ROW IS NOT A TRIGGER. It is out of the committed lens: it hovers, it keeps
+  // its wash, and it opens nothing — so it must not carry `aria-expanded`, which Radix's trigger
+  // always sets. Rendering it as a plain button is what keeps that promise honest to AT as well as
+  // to the eye (the chevron is already dropped below).
+  const Row = previewOnly ? "button" : CollapsibleTrigger;
   return (
-    <button
+    <Row
       type="button"
       className={cn(
         "group relative flex items-center gap-2 w-full py-[5px] pl-2 pr-2 my-px rounded-sm border border-transparent bg-transparent text-left text-foreground-dim transition-colors duration-[140ms]",
@@ -168,10 +209,8 @@ export function DisclosureRow({
       // hue the pairing already carries re-hues the committed wash/ring; rows without one (a
       // cohort, a country) fall through to the structural cyan tokens.
       style={{ ...((on || holdsSel) ? selectionHue(hue) : undefined), ...pair.style }}
-      aria-expanded={previewOnly ? undefined : open}
       aria-disabled={previewOnly || undefined}
       title={title}
-      onClick={previewOnly ? undefined : onToggle}
       // Focus mirrors hover 1:1 (2026-08-13): the preview pairing must ride the keyboard route
       // too, or the scene↔HUD language is mouse-only. Same writers, four event props.
       onMouseEnter={() => {
@@ -202,7 +241,7 @@ export function DisclosureRow({
       ) : (
         <DisclosureChevron open={open} />
       )}
-    </button>
+    </Row>
   );
 }
 

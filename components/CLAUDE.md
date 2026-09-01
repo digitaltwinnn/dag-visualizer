@@ -809,6 +809,47 @@ with the pin control back in the HUD the raw layer had just marked `inert`. The 
 GLOBAL tick as the subject, which moved the box to the Global snapshot card and collapsed the card you
 were reading. Same builder as the anchor-log row, so a read and the equivalent row click can't drift.
 
+### Disclosures — one Radix primitive, one panel recipe
+
+Every collapsible body in the app is `Collapsible` + `.disclose-panel` (2026-09-01). The migration
+off `{open && …}` bought two things `{open && …}` structurally could not: an **animated** body (an
+unmounted node cannot travel, and it also popped into existence under `RailThread`'s measurement)
+and the **trigger↔panel id pairing** AT needs. The explorers share `Disclosure` / `DisclosureRow` /
+`DisclosurePanel` (`components/ExploreRows.tsx`), so a call site cannot forget the recipe.
+
+⚠️ **RADIX HOLDS THE PAIRING, NEVER THE STATE.** Every explorer row is a selection COMMIT whose
+disclosure is a consequence — a committed filter, country, cohort, composition group — so `open` is
+DERIVED from the store and `onOpenChange` runs the same builder the click always did. Rule 2's one
+write path is untouched; Radix decides nothing about what a click means.
+
+⚠️ **A PREVIEW-ONLY ROW IS NOT A TRIGGER.** Out of the committed lens a row hovers, keeps its wash
+and opens nothing, so it must not carry `aria-expanded` — which Radix's trigger always sets.
+`DisclosureRow` renders a plain `<button>` in that case (`Row = previewOnly ? "button" :
+CollapsibleTrigger`), which is what keeps the promise honest to AT as well as to the eye.
+
+⚠️ **150ms, and it is the CHEVRON's clock.** The arrow already rotates at `duration-150` and the two
+are one gesture; a panel on its own timing reads as two things happening. Changing `.disclose-panel`
+means changing every chevron with it.
+
+**Four sites deliberately do NOT migrate**, each for a structural reason rather than an oversight:
+
+- **`CardHead`'s three** — the head toggles the card BODY, which its PARENT renders as a sibling in
+  another component. A Collapsible root would have to wrap both, restructuring every rail card for
+  an `aria-controls`.
+- **`TopBar`'s two strips** — the grow-downward slot is a LAYOUT PARTICIPANT: TopBar publishes its
+  height and the rails and canvas add it to their `top`. A height animation would fight a published
+  measurement, and the strip is not hidden content but a resized bar.
+- **`SnapRow`'s signer list** (`LedgerPanel`) — the row's click COMMITS a snapshot and *may* also
+  disclose, depending on whether signers were resolvable at all ("affordance follows the data"). So
+  it is a disclosure only sometimes, over three call sites with three different panels — the
+  preview-only split again, at triple the cost and none of the clarity.
+- **`Desc`'s show-more** (`inspector/parts.tsx`) — evaluated and rejected on its own merits before
+  this sweep: Collapsible's model is hidden-when-closed, this is always-visible-but-CLAMPED.
+- **`ChannelStatePanel`'s raw-JSON well** takes the primitive but NOT `.disclose-panel`: it opens to
+  its SIBLINGS' leftover height (`flex-1`, and it is the lane's one scroller), not to its content's,
+  so a measured height animation would hand the scrolling back to the box — the double-scrollbar bug
+  the header there records fixing twice.
+
 ### shadcn primitives
 
 `components/ui/` holds the adopted primitives; compose classes with `cn()`. **`Button` is adopted only
@@ -819,7 +860,15 @@ bar's own network-chip strip (see the command bar's grow-downward slot); `cmdk` 
 `Command` were removed 2026-08-31 once nothing had imported them for some time, so don't reach for a
 palette here without deciding it afresh. `Table` + `ScrollArea` are the raw layer
 only, with `Table` adopted MINUS its scroll container so the header stays sticky while the body scrolls
-under it. The engine-anchored `Tooltip` stays custom, because a Radix tooltip can't track a raycast.
+under it. **`Tabs` is the channel pane's lane axis** (2026-09-01, swapped off `ToggleGroup`): the two
+looked and behaved alike, but a toggle group announces "three buttons, one pressed" while this is a
+tablist over three panels — AT never learned the region below belonged to the pressed chip, and there
+was no arrow-key navigation between lanes. ⚠️ **Every lane's `TabsContent` must carry the flex chain
+its plain `<div>` did** (`min-h-0 flex flex-col`): the primitive inserts a layer between the bordered
+box and the lane body, and one default `block` in the middle hands the scrolling back to the box.
+**`Calendar` (react-day-picker) is the raw log's date range** — see `components/ui/calendar.tsx` for
+why every surface it paints is restated in this app's tokens, and the two traps in its own
+composition (the doubled caption, the three-orientation chevron). The engine-anchored `Tooltip` stays custom, because a Radix tooltip can't track a raycast.
 
 ### CSS traps
 

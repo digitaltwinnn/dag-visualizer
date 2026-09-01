@@ -1,5 +1,6 @@
 "use client";
 
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import ExplorerShell from "@/components/ExplorerShell";
@@ -13,7 +14,7 @@ import { compositionToggleActions, filterToggleActions, nodeSelectActions } from
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useLadderFocus } from "@/components/useLadderFocus";
-import { DepthCaption, DisclosureChevron, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
+import { DepthCaption, DisclosureChevron, Disclosure, DisclosurePanel, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
 import type { NodeRow } from "@/src/data/types";
 
 // Hypergraph's single **explore** card — the architectural sibling of GeoExplore: each view's
@@ -103,9 +104,20 @@ export default function HyperExplore() {
               // washes this row.
               const pair = subjectPairing(hoverFilter, m.id, setHoverFilter, hue);
               return (
-                <div key={m.id} className={cn(open && "bg-wash-faint rounded-btn my-0.5 -mx-1.5 px-1.5")}>
-                  <button
-                    type="button"
+                // ⚠️ RADIX HOLDS THE PAIRING, NEVER THE STATE. `open` is `m.id === filter` — the
+                // committed FILTER, read from the store — because this row is a selection COMMIT
+                // whose disclosure is a consequence, not a toggle that happens to select. So the
+                // Collapsible is controlled, and `onOpenChange` runs the very same
+                // `toggleNetwork` the button's onClick did: the write still goes through the
+                // decision table and the one executor (rule 2). What is gained is the trigger↔
+                // panel id pairing and a body that animates instead of popping.
+                <Collapsible
+                  key={m.id}
+                  open={open}
+                  onOpenChange={() => toggleNetwork(m.id)}
+                  className={cn(open && "bg-wash-faint rounded-btn my-0.5 -mx-1.5 px-1.5")}
+                >
+                  <CollapsibleTrigger
                     className={cn(
                       "nb-row group flex items-center gap-2.5 text-left text-body border border-transparent bg-transparent cursor-pointer py-[5px] rounded-sm transition-[background] duration-150",
                       ROW_OUTSET,
@@ -123,9 +135,7 @@ export default function HyperExplore() {
                     )}
                     // The selection follows the subject's identity (selection.tsx · selectionHue).
                     style={{ ...(open ? selectionHue(hue) : undefined), ...pair.style }}
-                    aria-expanded={open}
                     title={`${name} · ${m.nodes.length} node${m.nodes.length === 1 ? "" : "s"}`}
-                    onClick={() => toggleNetwork(m.id)}
                     onMouseEnter={pair.onMouseEnter}
       onMouseMove={pair.onMouseMove}
                     onMouseLeave={pair.onMouseLeave}
@@ -142,10 +152,10 @@ export default function HyperExplore() {
                     ) : (
                       <DisclosureChevron open={open} />
                     )}
-                  </button>
+                  </CollapsibleTrigger>
 
-                  {open && (
-                    // Leaving the shell list clears the scene hover-glows — by mouse or keyboard.
+                  <CollapsibleContent className="disclose-panel">
+                    {/* Leaving the shell list clears the scene hover-glows — by mouse or keyboard. */}
                     <div
                       className={cn("mb-1.5 ml-[9px] py-0.5 pl-3", ROW_NEST)}
                       onMouseLeave={() => {
@@ -181,7 +191,7 @@ export default function HyperExplore() {
                             selIp != null &&
                             g.rows.some((r) => "node" in r.pick && r.pick.node?.ip === selIp);
                           return (
-                            <div key={key}>
+                            <Disclosure key={key} open={isOpen} onToggle={() => toggleComposition(g.key)}>
                               {/* The composition-group row — the metagraph card's table
                                   vocabulary (Hybrid / Data / …) with the layer-code pills.
                                   COMMITS the group (its own right-rail card + the steady 3D
@@ -193,7 +203,6 @@ export default function HyperExplore() {
                                 focused={focus === "composition"}
                                 holdsSel={holdsSel}
                                 title={`${g.label} · ${g.rows.length} node${g.rows.length > 1 ? "s" : ""}`}
-                                onToggle={() => toggleComposition(g.key)}
                                 onHoverEnter={() => setHoverCohort(g.rows.map((r) => hoverKeyOf(r.pick)).filter((k): k is string => !!k))}
                                 onHoverLeave={() => setHoverCohort(null)}
                                 groupKey={key}
@@ -209,8 +218,7 @@ export default function HyperExplore() {
                                 <span className="ml-auto flex-none tabular-nums text-body font-semibold">{g.rows.length}</span>
                               </DisclosureRow>
 
-                              {isOpen && (
-                                <div className="mb-1 ml-[7px] pl-2 border-l border-border">
+                              <DisclosurePanel className="mb-1 ml-[7px] pl-2 border-l border-border">
                                   {/* Depth caption (user, 2026-08-16, twice refined — first to the
                                       group's codes, then past them: "rather than repeating its
                                       parent, say what it DOES"): the parent row already names the
@@ -244,16 +252,15 @@ export default function HyperExplore() {
                                       />
                                     );
                                   })}
-                                </div>
-                              )}
-                            </div>
+                              </DisclosurePanel>
+                            </Disclosure>
                           );
                           })];
                         })()
                       )}
                     </div>
-                  )}
-                </div>
+                  </CollapsibleContent>
+                </Collapsible>
               );
             })}
     </ExplorerShell>

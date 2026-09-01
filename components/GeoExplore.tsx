@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import ExplorerShell from "@/components/ExplorerShell";
@@ -12,7 +13,7 @@ import { countryToggleActions, nodeSelectActions, cohortToggleActions, sameCohor
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useLadderFocus } from "@/components/useLadderFocus";
-import { DepthCaption, DisclosureChevron, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
+import { DepthCaption, DisclosureChevron, Disclosure, DisclosurePanel, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
 import type { NodeRow } from "@/src/data/types";
 import type { CohortSel } from "@/src/engine/domain/focusLadder";
 
@@ -197,9 +198,15 @@ export default function GeoExplore() {
             // the same hue.
             const pair = subjectPairing(hoverCountry, c.cc, setHoverCountry, filterAccent(filter));
             return (
-              <div key={c.cc} className={cn(open && "bg-wash-faint rounded-btn my-0.5 -mx-1.5 px-1.5")}>
-                <button
-                  type="button"
+              // Controlled by the STORE (`open` is the drilled country), so `onOpenChange` runs
+              // the same `drill` the click always did — rule 2's one write path is untouched.
+              <Collapsible
+                key={c.cc}
+                open={open}
+                onOpenChange={() => drill(c.cc)}
+                className={cn(open && "bg-wash-faint rounded-btn my-0.5 -mx-1.5 px-1.5")}
+              >
+                <CollapsibleTrigger
                   className={cn(
                     // ROW_OUTSET (not w-full): with w-full the right -mx-1.5 was ignored
                     // (overconstrained box) and the row ended 6px SHORT of the column; the calc width
@@ -222,8 +229,6 @@ export default function GeoExplore() {
                   // count bar (barHue) beside it; on "all" barHue is undefined and both the wash
                   // and the ✓ fall through to structural cyan (identity never gets invented).
                   style={{ ...(open ? selectionHue(barHue) : undefined), ...pair.style }}
-                  aria-expanded={open}
-                  onClick={() => drill(c.cc)}
                   onMouseEnter={pair.onMouseEnter}
       onMouseMove={pair.onMouseMove}
                   onMouseLeave={pair.onMouseLeave}
@@ -261,11 +266,11 @@ export default function GeoExplore() {
                 ) : (
                   <DisclosureChevron open={open} />
                 )}
-                </button>
+                </CollapsibleTrigger>
 
-                {open && (
-                  // Leaving the node list clears the globe hover-glow — by mouse or by keyboard
-                  // (onBlur bubbles like focusout; row-to-row moves re-set the channel right after).
+                <CollapsibleContent className="disclose-panel">
+                  {/* Leaving the node list clears the globe hover-glow — by mouse or by keyboard
+                      (onBlur bubbles like focusout; row-to-row moves re-set the channel right after). */}
                   <div
                     className={cn("mb-1.5 ml-[9px] py-0.5 pl-3", ROW_NEST)}
                     onMouseLeave={() => {
@@ -298,19 +303,15 @@ export default function GeoExplore() {
                         const on = sameCohort(cohort, { cc, city: ch.city, isp: ch.isp });
                         const isOpen = on;
                         return (
-                          <div key={ch.key}>
-                            {/* The cohort row: one line per city × provider — the honeycomb
+                            /* The cohort row: one line per city × provider — the honeycomb
                                 as a list row. A DISCLOSURE AND a COMMIT in one click (the
                                 country-row idiom): it opens/closes its id rows AND commits/
                                 clears the cohort zoom-level rung through the same tested
                                 table (`cohortToggleActions`) the scene click and the node's
-                                full-ancestry commit use. */}
-                            <DisclosureRow
+                                full-ancestry commit use. */
+                            <Disclosure
+                              key={ch.key}
                               open={isOpen}
-                              on={on}
-                              focused={focus === "cohort"}
-                              holdsSel={holdsSel}
-                              title={`${ch.city ?? "Unlocated"}${ch.isp ? ` · ${ch.isp}` : ""} · ${ch.rows.length} node${ch.rows.length > 1 ? "s" : ""}`}
                               onToggle={() => {
                                 if (ch.rows.length === 1) {
                                   // A single-node cohort has no further choice — expand AND
@@ -325,6 +326,13 @@ export default function GeoExplore() {
                                   commitCohort({ cc, city: ch.city, isp: ch.isp });
                                 }
                               }}
+                            >
+                            <DisclosureRow
+                              open={isOpen}
+                              on={on}
+                              focused={focus === "cohort"}
+                              holdsSel={holdsSel}
+                              title={`${ch.city ?? "Unlocated"}${ch.isp ? ` · ${ch.isp}` : ""} · ${ch.rows.length} node${ch.rows.length > 1 ? "s" : ""}`}
                               onHoverEnter={() => {
                                 setHoverCohort(ch.rows.map((r) => hoverKeyOf(r.pick)).filter((k): k is string => !!k));
                                 setHoverCountry(ch.rows[0] && "geo" in ch.rows[0].pick ? ch.rows[0].pick.geo?.cc ?? null : null);
@@ -357,8 +365,7 @@ export default function GeoExplore() {
                               <span className="ml-auto flex-none tabular-nums text-body font-semibold">{ch.rows.length}</span>
                             </DisclosureRow>
 
-                            {isOpen && (
-                              <div className="mb-1 ml-[7px] pl-2 border-l border-border">
+                            <DisclosurePanel className="mb-1 ml-[7px] pl-2 border-l border-border">
                                 {ch.rows.map((r, i) => {
                                   const nodeOn =
                                     selIp != null && r.layer === selLayer &&
@@ -374,16 +381,15 @@ export default function GeoExplore() {
                                     />
                                   );
                                 })}
-                              </div>
-                            )}
-                          </div>
+                            </DisclosurePanel>
+                            </Disclosure>
                         );
                       })}
                       </>
                     )}
                   </div>
-                )}
-              </div>
+                </CollapsibleContent>
+              </Collapsible>
             );
           })}
         </>

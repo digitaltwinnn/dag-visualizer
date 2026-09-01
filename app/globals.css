@@ -128,6 +128,36 @@
   transition: none !important;
 }
 
+/* THE ONE DISCLOSURE PANEL RECIPE — every collapsible body in the app wears `.disclose-panel`.
+   Radix's Collapsible keeps its content mounted through the close and publishes the measured
+   height as `--radix-collapsible-content-height`, which is the whole reason the migration off
+   `{open && …}` was worth doing: an unmounted body cannot animate, and it also popped into
+   existence under RailThread's measurement.
+
+   ⚠️ 150ms, because the CHEVRON is already 150ms and the two are one gesture. A panel on its own
+   clock reads as two things happening — the arrow finishing while the body is still moving. Any
+   change here changes `duration-150` on every disclosure chevron too, or they desynchronise.
+
+   ⚠️ `overflow: hidden` is load-bearing: without it the body paints at full height for the whole
+   animation and only the BOX collapses, so the content spills over whatever is beneath it. */
+.disclose-panel { overflow: hidden; }
+.disclose-panel[data-state="open"]   { animation: disclose-down 150ms ease-out; }
+.disclose-panel[data-state="closed"] { animation: disclose-up 150ms ease-in; }
+@keyframes disclose-down {
+  from { height: 0; }
+  to   { height: var(--radix-collapsible-content-height); }
+}
+@keyframes disclose-up {
+  from { height: var(--radix-collapsible-content-height); }
+  to   { height: 0; }
+}
+/* The open/closed STATE is information; only the travel is motion. Reduced motion keeps the
+   state change instant rather than removing it, which is this file's rule everywhere else. */
+@media (prefers-reduced-motion: reduce) {
+  .disclose-panel[data-state="open"],
+  .disclose-panel[data-state="closed"] { animation: none; }
+}
+
 @keyframes edge-line-fade {
   0%   { opacity: 0; }
   18%  { opacity: 0.5; }
