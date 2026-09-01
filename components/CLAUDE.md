@@ -601,10 +601,18 @@ its own strip height so a paged box's plank rides ON the plate — one number, t
 On the two snapshot cards the foot has one shape: **the artifact's chain identity — what it is, what it
 links to, what it proves.** They are the same `Signed[]` artifact, so they carry the same set, and the
 metagraph card's `State hash` is the one addition (renamed from `State proof` 2026-08-14 — it collided
-with the signers' `snapshot proof`, a SIGNATURE set, while this is a digest, kin to Hash/Parent),
+with the signers' `snapshot proof`, a SIGNATURE set, while this is a digest, kin to Hash/Previous),
 because only a metagraph snapshot proves an
 application state. **Counters are not chain identity**: `Height`, `Blocks` and `epochProgress` are all
 carried by the types and none of them appear.
+
+⚠️ **"PREVIOUS HASH", NOT "PARENT HASH"** (user, 2026-09-01). Upstream calls the field
+`lastSnapshotHash` and that is literally what it is: the hash of the snapshot before this one in
+the SAME chain. "Parent" borrows tree/DAG vocabulary for a link that is strictly linear — a
+snapshot has exactly one predecessor, never several — and on the metagraph card it invited the
+reading that the parent was the GLOBAL snapshot it anchored into, which is a different relation
+entirely (the head aside's `anchored to N`). All three surfaces say "Previous hash": both snapshot
+cards and the raw layer's channel pane.
 
 **The PILE is the unit of consistency: a card never re-states an ancestor's identity.** Adjacency is what
 the slab uses to say containment, so a leaf repeating its parent at equal weight is noise, not

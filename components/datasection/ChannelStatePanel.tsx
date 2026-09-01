@@ -713,7 +713,7 @@ export function ChannelStatePanel() {
             <div className="flex-none flex flex-col gap-1 rounded-md bg-[var(--panel-plate)] px-2.5 -mx-2.5 py-2">
               {hash && <FootRow label="Hash" value={paneHash(hash)} title={hash} copy={hash} />}
               {deep.lastSnapshotHash && (
-                <FootRow label="Parent hash" value={paneHash(deep.lastSnapshotHash)} title={deep.lastSnapshotHash} copy={deep.lastSnapshotHash} />
+                <FootRow label="Previous hash" value={paneHash(deep.lastSnapshotHash)} title={deep.lastSnapshotHash} copy={deep.lastSnapshotHash} />
               )}
               {deep.stateProof && (
                 // "State HASH", not "state proof" (user, 2026-08-14 — the SIGNERS tab says
