@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { pageOfOrdinal, estimateOrdinal, dayStartMs, dayEndMs, tsInRange, seekOrdinalByTime } from "./chainSeek";
+import { pageOfOrdinal, estimateOrdinal, dayStartMs, dayEndMs, tsInRange, seekOrdinalByTime, civilDate, civilString } from "./chainSeek";
 
 // The executable spec for the raw log's two non-arithmetic searches. The interpolation is the part
 // worth pinning: it is what turns a ~21-probe binary search into a handful, and its failure modes
@@ -80,6 +80,32 @@ describe("the date range", () => {
     expect(tsInRange("2026-09-01T12:00:00.000Z", null, null)).toBe(true);
     expect(tsInRange("2026-09-01T12:00:00.000Z", Date.parse("2026-01-01T00:00:00Z"), null)).toBe(true);
     expect(tsInRange("not a stamp", null, null)).toBe(false);
+  });
+});
+
+describe("the calendar's civil-date round trip", () => {
+  // ⚠️ THE PROPERTY THAT MATTERS is that the DAY survives, in any timezone. A UTC-midnight Date
+  // renders as the previous day for every viewer west of Greenwich, so a reader would click the
+  // 3rd and see the 2nd highlighted — searching a day they never chose.
+  it("returns the same day it was given, whatever the local offset", () => {
+    for (const day of ["2026-09-01", "2024-01-01", "2023-11-13", "2026-12-31"]) {
+      const d = civilDate(day)!;
+      expect(d).toBeInstanceOf(Date);
+      expect(civilString(d)).toBe(day);
+      expect(d.getDate()).toBe(Number(day.slice(8, 10)));
+      expect(d.getMonth()).toBe(Number(day.slice(5, 7)) - 1);
+    }
+  });
+
+  it("pads a single-digit month and day back to the input format", () => {
+    expect(civilString(new Date(2026, 0, 5))).toBe("2026-01-05");
+  });
+
+  // Same refusal as dayStartMs: an unparsed bound is nothing, never a silent 1970.
+  it("refuses anything that is not a plain YYYY-MM-DD", () => {
+    for (const bad of ["", "2026-9-1", "01/09/2026", "2026-09-01T00:00:00Z", "nonsense"]) {
+      expect(civilDate(bad)).toBeUndefined();
+    }
   });
 });
 

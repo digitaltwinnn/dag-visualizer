@@ -68,6 +68,27 @@ export function tsInRange(ts: string, fromMs: number | null, toMs: number | null
   return true;
 }
 
+/** A `YYYY-MM-DD` string as a Date at LOCAL midnight, and back.
+ *
+ *  ⚠️ THE ROUND TRIP IS LOCAL ON PURPOSE, even though every bound this app searches on is UTC
+ *  (`dayStartMs` parses `T00:00:00.000Z`). A calendar widget reads and writes `Date` objects
+ *  through the browser's own local calendar, so handing it a UTC-midnight Date renders as the
+ *  PREVIOUS day for every viewer west of Greenwich — they would click the 3rd, see the 2nd
+ *  highlighted, and search a day they did not choose. Going through the civil fields keeps the
+ *  DAY the user touched intact end to end; `dayStartMs` then interprets that day as UTC, which is
+ *  the same convention the explorer's own stamps use. */
+export function civilDate(day: string): Date | undefined {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+  if (!m) return undefined;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Number.isFinite(d.getTime()) ? d : undefined;
+}
+
+export function civilString(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 /** One row as the walk needs it: an ordinal and the stamp the explorer gave it. */
 export interface SeekRow { ordinal: number; ts: string }
 

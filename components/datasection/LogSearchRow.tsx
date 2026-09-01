@@ -1,7 +1,7 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
 import { TableHead, TableRow } from "@/components/ui/table";
+import DateRange from "@/components/datasection/DateRange";
 import { cn } from "@/lib/utils";
 
 // THE COLUMN SEARCH ROW — a control under each header cell it can actually answer for (user,
@@ -56,9 +56,14 @@ export default function LogSearchRow({
   // the table does not have, on a body that already overflows by ~66px at 25 rows. At rest a control
   // is a placeholder on a hairline, in the column's own type; the plate and the ring arrive on focus,
   // when it IS a field being used. `py-0` + `h-5` is what takes the row from 36px to ~22px.
+  // ⚠️ A CONTROL READS AT ITS COLUMN'S SIZE, NOT THE SMALLEST ONE AVAILABLE (user, 2026-09-01:
+  // "the hint in the snapshot search is quite small font, is that allowed by our design"). It is
+  // allowed — `text-micro` is in the scale — but it is the EYEBROW/FOOT tier, and this field is a
+  // preview of the column beneath it: you type an ordinal and ordinals come back, so it takes the
+  // cells' own `text-body` mono. The same argument settles the alignment below.
   const field =
     "w-full min-w-0 h-5 px-1 py-0 bg-transparent border-0 border-b border-border/50 rounded-none " +
-    "font-mono text-micro tabular-nums text-foreground placeholder:text-muted-foreground placeholder:font-sans " +
+    "font-mono text-body tabular-nums text-foreground placeholder:text-muted-foreground placeholder:font-sans " +
     "hover:border-border focus:bg-[var(--panel-plate)] focus:rounded-xs focus:border-transparent " +
     "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] " +
     "transition-colors";
@@ -68,12 +73,16 @@ export default function LogSearchRow({
   // Network/Fee/Size fallbacks is exactly why the first pass changed nothing measurable.
   const cell = "py-0.5 h-auto align-middle";
 
+  // ⚠️ …AND IT ALIGNS WITH ITS COLUMN. The Snapshot cells are left-aligned mono and Anchored-into's
+  // are right-aligned, so a single `text-right` on both put one hint on the opposite edge from every
+  // value under it (user, same). The alignment is the CELL's, passed in rather than assumed.
   const num = (
     value: string,
     onChange: (v: string) => void,
     which: "snapshot" | "tick",
     placeholder: string,
     label: string,
+    align: "text-left" | "text-right",
   ) => (
     <input
       type="text"
@@ -83,7 +92,7 @@ export default function LogSearchRow({
       aria-label={label}
       onChange={(e) => onChange(e.target.value)}
       onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onSubmit(which); } }}
-      className={cn(field, "text-right")}
+      className={cn(field, align)}
     />
   );
 
@@ -94,66 +103,36 @@ export default function LogSearchRow({
         if (c.key === "ordinal") {
           return (
             <TableHead key={c.key} className={cell}>
-              {num(snapshot, onSnapshot, "snapshot", "snapshot #", "Go to metagraph snapshot ordinal")}
+              {num(snapshot, onSnapshot, "snapshot", "snapshot #", "Go to metagraph snapshot ordinal", "text-left")}
             </TableHead>
           );
         }
         if (c.key === "tick") {
           return (
             <TableHead key={c.key} className={cell}>
-              {num(tick, onTick, "tick", "global snapshot #", "Go to the snapshot anchored into a global snapshot")}
+              {num(tick, onTick, "tick", "global snapshot #", "Go to the snapshot anchored into a global snapshot", "text-right")}
             </TableHead>
           );
         }
         if (c.key === "age") {
           return (
-            <TableHead key={c.key} className={cell}>
-              {/* A RANGE, and the FROM bound is what the seek lands on — `to` bounds which rows the
-                  walk will mark, not where it goes. Stated that way round because a chain is walked
-                  from a point, not filtered to a slice. */}
-              {/* ⚠️ THE RANGE STACKS, and the measurement is why. The ledger's raw layer is a
-                  master–detail split, so this table lives in a ~576px pane; its six data columns
-                  need ~395 of that, leaving ~165 for AGE. A `type="date"` field cannot render
-                  `mm/dd/yyyy` below ~90px even with the calendar glyph hidden, so two of them
-                  side by side need ~190 — measured, not estimated, and the first cut duly pushed
-                  the whole table 72px into horizontal scroll and cut the AGE column off screen.
-                  Shaving them to fit truncated the format itself to `mm/dd/y`, which is a control
-                  lying about what it takes. Stacked, each field gets the column's full width and
-                  the row costs one extra line in ONE column — the cheapest of the three prices. */}
-              <span className="flex flex-col items-end gap-0.5 py-0.5">
-                {/* A RANGE, and the FROM bound is what the seek lands on — `to` bounds which rows
-                    the walk will mark, not where it goes. Stated that way round because a chain is
-                    walked from a point, not filtered to a slice. */}
-                {(["from", "to"] as const).map((which) => (
-                  <span key={which} className="flex w-full items-center gap-1">
-                    <span aria-hidden className="w-6 flex-none text-right text-micro text-muted-foreground/60">
-                      {which}
-                    </span>
-                    {/* ⚠️ The native date control carries a browser calendar glyph that does not
-                        belong to this type system — `date-slim` (globals.css) mutes it to the row's
-                        own ink and only brings it up on hover, so at rest the cell reads as two
-                        quiet dates. */}
-                    <input
-                      type="date"
-                      value={which === "from" ? from : to}
-                      aria-label={which === "from" ? "From date" : "To date"}
-                      onChange={(e) => (which === "from" ? onFrom : onTo)(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onSubmit("age"); } }}
-                      className={cn(field, "date-slim min-w-0 flex-1")}
-                    />
-                    {/* The walk costs several requests, so it SAYS it is running — a control that
-                        goes quiet for a few seconds reads as broken, not as busy. Only WHILE it
-                        runs: a permanent magnifier is decoration on a row whose placeholders
-                        already say what each cell takes. It rides the FROM line, which is the
-                        bound the seek actually spends its probes on. */}
-                    <span aria-hidden className="w-3 flex-none">
-                      {which === "from" && seeking && (
-                        <Loader2 aria-label="searching the chain" className="size-3 animate-spin text-muted-foreground motion-reduce:animate-none" />
-                      )}
-                    </span>
-                  </span>
-                ))}
-              </span>
+            <TableHead key={c.key} className={cn(cell, "text-right")}>
+              {/* ⚠️ ONE CONTROL, NOT TWO FIELDS (user pick, 2026-09-01). Two native `type="date"`
+                  inputs cannot both render `mm/dd/yyyy` in this column: the ledger's raw layer is a
+                  master–detail split, so the table lives in a ~576px pane whose six data columns
+                  need ~395, leaving ~165 for AGE — against the ~190 a readable pair needs. Inline
+                  they pushed the table 72px into horizontal scroll and cut this column off screen;
+                  shaved to fit they truncated to `mm/dd/y`, a control lying about what it takes;
+                  stacked they cost a second line. A trigger states the range in words at ~110px and
+                  the picking happens in a portalled popover, where width is free. */}
+              <DateRange
+                from={from}
+                to={to}
+                seeking={seeking}
+                onFrom={onFrom}
+                onTo={onTo}
+                onSubmit={() => onSubmit("age")}
+              />
             </TableHead>
           );
         }
