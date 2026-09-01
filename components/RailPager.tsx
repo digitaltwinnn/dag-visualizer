@@ -284,6 +284,18 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
       `position:absolute;left:0;top:0;width:${el.offsetWidth}px;height:${el.offsetHeight}px;` +
       `margin:0;pointer-events:none;transition:none;box-sizing:border-box;opacity:0;`;
     copyLook(card, g);                         // the card's own glass, so it reads as a card arriving
+    // ⚠️ …BUT NOT ITS COMMITTED STATE (user, 2026-09-01: "the new card gets the fill selection
+    // entirely and the old card loses it immediately"). `copyLook` reads the LIVE card, and the
+    // live card is the committed one — so `boxShadow` brought the slab's lift, the mark of the
+    // BOX, across with the glass. The peek therefore arrived already looking like the open card
+    // while the one still under the finger read as discarded, which is the selection changing
+    // hands before the gesture has decided anything.
+    //
+    // A peek previews an UNCOMMITTED subject, and rule 9's line is the whole rule here: a preview
+    // never wears the committed language. It keeps the glass, the border and the radius — enough
+    // to read as a card arriving — and gives up the lift, which is the one property that says
+    // "this is the one that is open".
+    g.style.boxShadow = "none";
     const name = document.createElement("div");
     name.textContent = set.items[set.index + dir].label;
     // Muted and quiet on purpose: this is a NAME, not a headline — the real card's own title lands
