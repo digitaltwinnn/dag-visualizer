@@ -120,6 +120,17 @@
    the ghost kept pulsing its edge on the way out. `!important` + unlayered beats every animation
    rule above regardless of layer.
    The ROOT keeps its `transition`: that is the slide itself. Only its animation is killed. */
+/* The raw log's date range: a native `<input type="date">` brings the browser's own calendar glyph,
+   which is the one piece of chrome in this app nobody chose. Muted to the row's ink and lifted only
+   on hover, so at rest the cell reads as two quiet dates rather than two widgets. */
+.date-slim::-webkit-calendar-picker-indicator {
+  opacity: 0.35; cursor: pointer; padding: 0; margin-left: 2px;
+  filter: grayscale(1);
+  transition: opacity 0.15s ease;
+}
+.date-slim:hover::-webkit-calendar-picker-indicator,
+.date-slim:focus::-webkit-calendar-picker-indicator { opacity: 0.8; }
+
 [data-pager-ghost] { animation: none !important; }
 [data-pager-ghost] *,
 [data-pager-ghost]::before, [data-pager-ghost]::after,

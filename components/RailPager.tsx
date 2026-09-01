@@ -406,7 +406,11 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
       // Mostly-horizontal past the threshold — otherwise leave scroll/click alone.
       if (Math.abs(ddx) < ENGAGE_PX || Math.abs(ddx) < Math.abs(ddy) * 1.2) return;
       engaged.current = true;
-      e.currentTarget.setPointerCapture(st.id);
+      // ⚠️ GUARDED. `setPointerCapture` THROWS if that pointer is no longer active — a release
+      // landing between this move and this line, which a synthetic pointer reproduces every time
+      // and a real one can hit as a race. Unguarded it escapes into React's handler and kills the
+      // drag outright; captured or not, the gesture below works, so a failure here is not fatal.
+      try { e.currentTarget.setPointerCapture(st.id); } catch { /* pointer already gone */ }
     }
     const t = e.timeStamp;
     trail.current.push({ x: e.clientX, t });

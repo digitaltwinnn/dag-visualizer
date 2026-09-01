@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { TableHead, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 
@@ -51,10 +51,22 @@ export default function LogSearchRow({
   onTo: (v: string) => void;
   onSubmit: (which: "snapshot" | "tick" | "age") => void;
 }) {
+  // SPINELESS AT REST, like every card in this app. Three bordered plates sitting under the header
+  // read as a form bolted onto a data table (user, 2026-09-01: "looks ugly") — and they cost height
+  // the table does not have, on a body that already overflows by ~66px at 25 rows. At rest a control
+  // is a placeholder on a hairline, in the column's own type; the plate and the ring arrive on focus,
+  // when it IS a field being used. `py-0` + `h-5` is what takes the row from 36px to ~22px.
   const field =
-    "w-full min-w-0 rounded-xs bg-[var(--panel-plate)] border border-border/60 px-1.5 py-0.5 " +
+    "w-full min-w-0 h-5 px-1 py-0 bg-transparent border-0 border-b border-border/50 rounded-none " +
     "font-mono text-micro tabular-nums text-foreground placeholder:text-muted-foreground placeholder:font-sans " +
-    "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:border-transparent";
+    "hover:border-border focus:bg-[var(--panel-plate)] focus:rounded-xs focus:border-transparent " +
+    "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] " +
+    "transition-colors";
+
+  // ⚠️ EVERY cell carries it, the empty ones included: `TableHead`'s base is `h-9`, so a single
+  // unaltered cell holds the whole row at 36px no matter how short the controls are. Missing the
+  // Network/Fee/Size fallbacks is exactly why the first pass changed nothing measurable.
+  const cell = "py-0.5 h-auto align-middle";
 
   const num = (
     value: string,
@@ -76,53 +88,59 @@ export default function LogSearchRow({
   );
 
   return (
+    // No row-level fill and no hover: this is chrome under the header, not a data row.
     <TableRow className="border-border hover:bg-transparent">
       {columns.map((c) => {
         if (c.key === "ordinal") {
           return (
-            <TableHead key={c.key} className="py-1.5">
+            <TableHead key={c.key} className={cell}>
               {num(snapshot, onSnapshot, "snapshot", "snapshot #", "Go to metagraph snapshot ordinal")}
             </TableHead>
           );
         }
         if (c.key === "tick") {
           return (
-            <TableHead key={c.key} className="py-1.5">
+            <TableHead key={c.key} className={cell}>
               {num(tick, onTick, "tick", "global snapshot #", "Go to the snapshot anchored into a global snapshot")}
             </TableHead>
           );
         }
         if (c.key === "age") {
           return (
-            <TableHead key={c.key} className="py-1.5">
+            <TableHead key={c.key} className={cell}>
               {/* A RANGE, and the FROM bound is what the seek lands on — `to` bounds which rows the
                   walk will mark, not where it goes. Stated that way round because a chain is walked
                   from a point, not filtered to a slice. */}
               <span className="flex items-center gap-1 justify-end">
+                {/* ⚠️ The native date control carries a browser calendar glyph that does not belong to
+                    this type system — `date-slim` (globals.css) mutes it to the row's own ink and
+                    only brings it up on hover, so at rest the cell reads as two quiet dates. */}
                 <input
                   type="date" value={from} aria-label="From date"
                   onChange={(e) => onFrom(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onSubmit("age"); } }}
-                  className={cn(field, "w-[112px] flex-none")}
+                  className={cn(field, "date-slim w-[104px] flex-none")}
                 />
-                <span aria-hidden className="text-micro text-muted-foreground">–</span>
+                <span aria-hidden className="text-micro text-muted-foreground/60">–</span>
                 <input
                   type="date" value={to} aria-label="To date"
                   onChange={(e) => onTo(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onSubmit("age"); } }}
-                  className={cn(field, "w-[112px] flex-none")}
+                  className={cn(field, "date-slim w-[104px] flex-none")}
                 />
                 {/* The walk costs several requests, so it SAYS it is running — a control that goes
-                    quiet for a few seconds reads as broken, not as busy. */}
-                {seeking
-                  ? <Loader2 aria-label="searching the chain" className="size-3 flex-none animate-spin text-muted-foreground motion-reduce:animate-none" />
-                  : <Search aria-hidden className="size-3 flex-none text-muted-foreground" />}
+                    quiet for a few seconds reads as broken, not as busy. Only WHILE it runs: a
+                    permanent magnifier is decoration on a row whose placeholders already say what
+                    each cell takes, and this row's whole problem was carrying too much. */}
+                <span aria-hidden className="w-3 flex-none">
+                  {seeking && <Loader2 aria-label="searching the chain" className="size-3 animate-spin text-muted-foreground motion-reduce:animate-none" />}
+                </span>
               </span>
             </TableHead>
           );
         }
         // Fee, Size, Network — see the header: no affordance is the honest state.
-        return <TableHead key={c.key} className="py-1.5" />;
+        return <TableHead key={c.key} className={cell} />;
       })}
     </TableRow>
   );
