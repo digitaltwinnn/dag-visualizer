@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 
 import DateRange from "@/components/datasection/DateRange";
 import { cn } from "@/lib/utils";
@@ -71,6 +71,18 @@ export default function LogSearchBar({
     "hover:border-border focus:border-transparent " +
     "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] transition-colors";
 
+  // ⚠️ EVERY FIELD CARRIES A VISIBLE SUBMIT, AND ENTER STILL WORKS — both, never one (user,
+  // 2026-09-01: "'press ↵ to jump'? Why not a just search button?"). The bar's first cut relied on
+  // Enter alone and explained it in words at the end of the row, which is the tell: instructional
+  // microcopy is what a UI writes when it is missing an affordance. The guidance is consistent — a
+  // button "signals that an action is required", rescues everyone who does not know the Enter
+  // convention, and is the faster target on touch, while implicit submission stays for everyone who
+  // does. It sits to the RIGHT of its input, the position that reads as "…and then go".
+  //
+  // PER FIELD, not one for the bar: these are three different seeks with three different costs, and
+  // a single button would have to guess which one you meant from a hidden precedence rule. The date
+  // range already carried its own explicit control inside its popover, so per-field submit is also
+  // what makes the three read as one family.
   const num = (
     value: string,
     onChange: (v: string) => void,
@@ -79,18 +91,35 @@ export default function LogSearchBar({
     placeholder: string,
     width: string,
   ) => (
-    <label className={cn("flex flex-none items-center gap-1.5", width)}>
-      <span className="flex-none text-micro uppercase tracking-caps text-muted-foreground">{label}</span>
-      <input
-        type="text"
-        inputMode="numeric"
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onSubmit(which); } }}
-        className={cn(field, "text-right")}
-      />
-    </label>
+    <span className={cn("flex flex-none items-center gap-1.5", width)}>
+      <label className="flex min-w-0 flex-1 items-center gap-1.5">
+        <span className="flex-none text-micro uppercase tracking-caps text-muted-foreground">{label}</span>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={value}
+          placeholder={placeholder}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onSubmit(which); } }}
+          className={cn(field, "text-right")}
+        />
+      </label>
+      <button
+        type="button"
+        onClick={() => onSubmit(which)}
+        disabled={!value}
+        aria-label={`Search by ${label}`}
+        className={cn(
+          "inline-flex size-6 flex-none items-center justify-center rounded-xs cursor-pointer",
+          "border border-border/50 bg-[var(--panel-plate)] text-muted-foreground transition-colors",
+          "hover:text-foreground hover:border-border",
+          "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
+          "disabled:opacity-30 disabled:cursor-default disabled:hover:text-muted-foreground",
+        )}
+      >
+        <Search aria-hidden className="size-3" />
+      </button>
+    </span>
   );
 
   return (
@@ -102,8 +131,8 @@ export default function LogSearchBar({
       className="flex-none flex flex-wrap items-center gap-x-3 gap-y-1.5 pb-1.5"
       onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}
     >
-      {num(snapshot, onSnapshot, "snapshot", "snapshot", "#", "w-[190px]")}
-      {num(tick, onTick, "tick", "anchored into", "global #", "w-[210px]")}
+      {num(snapshot, onSnapshot, "snapshot", "snapshot", "#", "w-[218px]")}
+      {num(tick, onTick, "tick", "anchored into", "global #", "w-[238px]")}
       <label className="flex flex-none items-center gap-1.5">
         <span className="flex-none text-micro uppercase tracking-caps text-muted-foreground">age</span>
         <DateRange from={from} to={to} seeking={false} onFrom={onFrom} onTo={onTo} onSubmit={() => onSubmit("age")} />
@@ -113,9 +142,6 @@ export default function LogSearchBar({
       <span aria-hidden className="w-3 flex-none">
         {seeking && <Loader2 aria-label="searching the chain" className="size-3 animate-spin text-muted-foreground motion-reduce:animate-none" />}
       </span>
-      {/* The submit rule, stated once for the whole bar rather than repeated per field. The date
-          range carries its own explicit control, because picking days is not typing a value. */}
-      <span className="text-micro text-muted-foreground/70">press ↵ to jump</span>
     </div>
   );
 }
