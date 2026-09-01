@@ -444,6 +444,27 @@ file down in `src/data/unlistedId.ts`, a leaf with no imports, re-exported by `u
 only way network.ts and ledgerStory.ts can name the id without closing an import cycle back
 through it (`src/data/noImportCycles.test.ts` keeps the graph acyclic).
 
+⚠️ **AN INSTANCED MESH WHOSE INSTANCES MOVE MUST BE HANDED ITS BOUNDS** (2026-09-01), or picking
+silently dies. three's `InstancedMesh.raycast` opens `if (this.boundingSphere === null)
+this.computeBoundingSphere();` then rejects the ray against that sphere — **computed lazily, exactly
+once, from whatever the instance matrices were on the FIRST raycast this mesh ever received, and never
+invalidated.** Every pool here moves constantly (the view morph, the hyper structure flattening on a
+commit, the hub orbits, the trail sliding a slot per tick), so the sphere goes stale immediately and
+the ray is tested against where the instances USED to be; when it misses, the whole mesh returns before
+a single per-instance test runs. `frustumCulled = false` does NOT help — that governs drawing, not
+raycasting.
+
+It is a SILENT failure, and it reached a user as "in hyper, click a metagraph, then its node spheres
+don't select": the hub is a separate object and still picked, while the shared node mesh was skipped
+wholesale, so the ray carried on to whichever pool's stale sphere still covered it and landed on
+ANOTHER network's node — which is what `?clickdebug` showed, the committed filter and the picked node
+naming two different networks. The fix at every site is `NodeFabric.openBounds`: bounds three cannot
+reject with, so the early-out is a no-op and the accurate per-instance loop does the work. That loop is
+O(count), but picking is EVENT-TIME only, whereas recomputing the sphere per frame would pay O(count)
+every frame to serve the occasional click. `scene/instancedBounds.test.ts` pins it — and note its own
+lesson: it must strip COMMENTS before counting, because the notes at these sites quote three's API and
+a naive regex counted the prose, which let the test pass with the fix deliberately removed.
+
 ## The instance audit (dev only)
 
 `scene/instanceAudit.ts` + `Engine._auditPass` sweep what the frame ACTUALLY wrote into the node

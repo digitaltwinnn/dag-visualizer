@@ -1547,7 +1547,13 @@ export class Engine {
       return;
     }
     const p = this._pickAt(e);
-    say(p ? `PICKED ${p.kind}` : "NO HIT — the ray met nothing pickable here", { pickables: this._pickBuf.length });
+    // The pick's NETWORK matters as much as its kind here: "the node spheres are not clickable"
+    // could mean nothing picks, or that the ray keeps reaching PAST the committed network onto
+    // somebody else's nodes — two different bugs that look identical from the outside.
+    say(p ? `PICKED ${p.kind}` : "NO HIT — the ray met nothing pickable here", {
+      pickables: this._pickBuf.length,
+      net: p ? (p.kind === "metanode" ? p.meta?.id : p.kind === "l0" || p.kind === "l1" ? "dag" : p.kind === "meta" ? p.cfg.id : undefined) : undefined,
+    });
     // With nothing picked, resolve the drillable country under the cursor (geo only — the
     // land-sphere hit is analytic; the Globe resolves WHICH country in its rotated frame).
     let countryCc: string | null = null;

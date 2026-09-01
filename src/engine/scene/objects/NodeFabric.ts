@@ -134,6 +134,35 @@ export interface FrameCtx {
   gather: { origin: THREE.Vector3; right: THREE.Vector3; up: THREE.Vector3; quat: THREE.Quaternion; cell: number; scale: number; spread: number };
 }
 
+/**
+ * ⚠️ AN INSTANCED MESH WHOSE INSTANCES MOVE MUST BE GIVEN ITS BOUNDS, OR PICKING SILENTLY DIES.
+ *
+ * three's `InstancedMesh.raycast` opens with:
+ *
+ *     if ( this.boundingSphere === null ) this.computeBoundingSphere();
+ *     if ( raycaster.ray.intersectsSphere( sphere ) === false ) return;
+ *
+ * — computed LAZILY, exactly once, from whatever the instance matrices happened to be on the FIRST
+ * raycast, and never invalidated afterwards. Every node in this app moves constantly (the view
+ * morph, the hyper structure flattening on a commit, the hub orbits, the gather choreography), so
+ * that frozen sphere goes stale immediately and the ray is then tested against where the fleet USED
+ * to be. When it misses, the whole mesh returns before a single per-instance test runs.
+ *
+ * Found 2026-09-01 from a user report — "in hyper, click a metagraph, then its node spheres don't
+ * select" — which is this exactly: the hub is a separate object and still picks, while the shared
+ * node mesh is skipped wholesale, so the ray carries on to whichever pool's stale sphere still
+ * happens to cover it and lands on ANOTHER network's node. `?clickdebug` showed the committed
+ * filter and the picked node belonging to two different networks, which is what named it.
+ *
+ * The fix is the one the arcs' head Points already use: hand three bounds it cannot reject with, so
+ * the early-out is a no-op and the accurate per-instance loop does the work. That loop is O(count),
+ * but picking is EVENT-TIME only — a hover or a click, never the render loop — whereas recomputing
+ * the sphere every frame would pay O(count) on every frame to serve the occasional click.
+ */
+function openBounds(mesh: THREE.InstancedMesh): void {
+  mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e4);
+}
+
 export class NodeFabric {
   private nodeGroup: THREE.Group;
 
@@ -292,6 +321,7 @@ export class NodeFabric {
       mat.side = side;
       const mesh = new THREE.InstancedMesh(geo, mat, total);
       mesh.frustumCulled = false; // instances span the whole scene; base bounds would mis-cull
+      openBounds(mesh);
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       mesh.userData.picks = picks;
       joinBloom(mesh); // the chips are identity marks — see BLOOM_LAYER
@@ -354,6 +384,7 @@ export class NodeFabric {
       mat.side = side;
       const mesh = new THREE.InstancedMesh(geo, mat, total);
       mesh.frustumCulled = false;
+      openBounds(mesh);
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       mesh.userData.picks = picks;
       joinBloom(mesh); // the chips are identity marks — see BLOOM_LAYER

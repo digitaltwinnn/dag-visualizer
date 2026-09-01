@@ -407,6 +407,11 @@ export class LedgerView implements SceneView {
     this._metaTrailMesh.onBeforeRender = () => { if (inMarkPass()) tileMat.color.multiplyScalar(this.tiles.halo); };
     this._metaTrailMesh.onAfterRender = () => { if (inMarkPass()) tileMat.color.multiplyScalar(1 / this.tiles.halo); };
     this._metaTrailMesh.frustumCulled = false;
+    // ⚠️ Bounds three cannot reject with — the lane tiles are pickable AND they move (the trail
+    // slides every tick, the rewind slides it further), so three's lazily-computed-once
+    // `boundingSphere` would go stale and skip the whole mesh before any per-instance test.
+    // Same failure the node fabric hit; see NodeFabric.openBounds for the full note.
+    this._metaTrailMesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e4);
     this._metaTrailMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     for (let i = 0; i < META_TRAIL_MAX; i++) this._metaTrailMesh.setColorAt(i, _col.set(0xffffff));
     _dummy.scale.setScalar(0);
