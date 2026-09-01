@@ -811,13 +811,22 @@
 @layer components {
   .scene-canvas {
     position: fixed;
-    /* Slide the scene DOWN by the grown-bar height (the attached filter strip), the same
-       `--topbar-extra` the rails ride, so the 3D scene sits below the bar like everything else
-       instead of the strip covering its top (user, 2026-07-12). Pure POSITION shift — the
-       buffer stays 100vw×100vh, so no distortion and no engine resize; it renders a touch
-       below the viewport (the empty bottom margin leaves frame). Slides in lockstep with the
-       rails; reduced-motion kills it (below). */
-    top: var(--topbar-extra, 0px);
+    /* ⚠️ THE SCENE NO LONGER FOLLOWS THE GROWN BAR (user, 2026-09-01: the strips "push the scene
+       down; before the bar just went on top of it"). It DID follow it, from 2026-07-12 to here —
+       so this reverses that call rather than restoring an older one, and the reasoning it
+       reverses is worth keeping: sliding the canvas put the 3D "below the bar like everything
+       else instead of the strip covering its top".
+
+       What changed is which of the two costs reads worse. A strip covering the scene's top edge
+       costs a strip's height of a view that renders past the viewport anyway and has no content
+       pinned to that edge; sliding the whole scene moves EVERY object under the pointer mid-
+       gesture, and the strips are opened while reading the scene. The RAILS still slide, and must:
+       they hold interactive cards the strip would otherwise cover, and unlike the scene their top
+       edge is where their content starts.
+
+       `top: 0` is a plain value, so the transition below is now a no-op for this property — kept
+       because it also carries the boot fade. */
+    top: 0;
     left: 0;
     width: 100vw;
     height: 100vh;

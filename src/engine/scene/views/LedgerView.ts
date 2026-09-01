@@ -110,11 +110,17 @@ const ORD_OP = 0.55;
 const ORD_LINE_MUL = 0.26;
 /** The committed lane's plane edge-fill multiplier (its plane leads with its snapshots). */
 const LANE_FILL_BOOST = 3;
-const ORD_H = 0.78;
+/** The floor's edge-readout text height (user, 2026-09-01: "make the texts with the snapshot #
+ *  and size on the plane of the global metagraph bigger"). ⚠️ IT DOES NOT MOVE ALONE. `makeEdgeLabel`
+ *  draws a fixed-size glyph on a fixed canvas and scales the whole plane, so the digits' EXTENT is
+ *  linear in this number — and `ORD_LINE_Z0` below is defined as where those digits end, because
+ *  that is where the dotted tie starts. Raise one without the other and the tie is drawn straight
+ *  through the text it is supposed to lead away from. */
+const ORD_H = 1.02;
 /** The label's text anchor — just outside the widest bar's screen-left end, reading inward. */
 const ORD_Z = LANE_HALF_Z + 0.35;
 /** Where the text visually ends (≈ the digits' extent) — the dotted anchor line starts here. */
-const ORD_LINE_Z0 = ORD_Z - 2.1;
+const ORD_LINE_Z0 = ORD_Z - 2.75;
 /** The SIZE column at the bars' other end (user, 2026-08-18: "the other visualization of a row
  *  represents size: can we use dotted lines on the right side of the plane to show the size in
  *  kB?"). It is the exact reading of what WIDTH encodes, exactly as the ordinal column is the
