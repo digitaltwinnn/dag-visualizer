@@ -293,6 +293,16 @@ detail-only). Three rules keep the row from going ragged, and all three answer t
   beside it. Merged, the lead states the characteristic and the breakdown evidences it — which is what
   the two-segment grammar is for. It merges only under a COMMIT: unfiltered there is no single type to
   lead with, so the layers keep a card of their own.
+- **An instrument CLAIMS the card's height.** The body is `items-stretch`, `MicroBars` distributes
+  its rows with `justify-evenly`, and the charts fill rather than sitting at a fixed box. Once the
+  band went to a fixed `--vitals-h` the leftover showed up as dead bands above and below every
+  reading — a four-row card filled its body while a two-row one floated in the middle of one. Watch
+  for wrappers BETWEEN the body and the instrument (the country card has one): they need
+  `self-stretch` too, or the rows bunch inside a content-height box while their neighbours breathe.
+- **A sparkline is bucketed, not sliced** (`Sparkline maxPoints`). The retained window is 52 ticks
+  and 51 segments of a noisy rate read as hair. Slicing to the last N would be exact per point but
+  silently shortens the WINDOW — and the card prints that window in words two elements to the right.
+  Bucketing by mean keeps the window and lowers the frequency, which is the actual ask.
 - **The band's height is FIXED** (`--vitals-h`), not content height. Left to its content it measured
   81 / 72 / 62px across hyper / geo / ledger, and since the band is anchored at the BOTTOM that
   showed up as its top edge jumping on every view switch.

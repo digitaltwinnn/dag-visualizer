@@ -146,7 +146,13 @@ export function BandCard({ label, children, className, mark, lead, size = "md" }
           CONTAINS that width — the body stops contributing an intrinsic size, and every
           content-sized card (`grow={false}`, and every card in the phone strip) would then be
           measured on its eyebrow alone. The band's cells adapt by flex rules instead. */}
-      <div className="flex items-center gap-2 min-h-0 flex-1 min-w-0">
+      {/* `items-stretch`, so an instrument can CLAIM the card's height rather than floating in the
+          middle of it (user, 2026-09-01: "a lot of empty at the top and bottom"). Every child still
+          decides for itself: the lead centres its own content, the divider was already stretching,
+          and inside the detail the charts stretch while a note keeps its `self-end`. Since the band
+          went to a fixed --vitals-h the leftover was showing up as dead bands above and below every
+          reading — a taller instrument is also a more legible one. */}
+      <div className="flex items-stretch gap-2 min-h-0 flex-1 min-w-0">
         {lead != null && <span className="flex items-center flex-none">{lead}</span>}
         {lead != null && children != null && (
           <span aria-hidden className="flex-none self-stretch w-px my-0.5 bg-border/60" />
@@ -176,7 +182,11 @@ const BAR_TRACK_MAX = 150;
 export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key: string; label: React.ReactNode; count: number }[]; accent: string; labelW?: number; dashZero?: boolean }) {
   const max = Math.max(1, ...rows.map((r) => r.count));
   return (
-    <div className="flex flex-col gap-[3px] w-full self-center min-w-0">
+    // `justify-evenly` over the full height rather than a fixed gap: a four-row card already
+    // filled its body, but a two-row one sat as a small block with 15px of dead space above and
+    // below. Distributed, the rows breathe into whatever height the card has and a four-row card is
+    // left within a pixel of where it was.
+    <div className="flex flex-col justify-evenly self-stretch w-full min-w-0">
       {rows.map((r) => (
         // LEFT-ALIGNED, so the breakdown starts immediately after the card's hairline (user,
         // 2026-09-01: "some vitals are not correctly left aligned"). Right-pinning was tried first
@@ -496,7 +506,10 @@ function GeoCells({ accent }: { accent: string }) {
       {topCountries.length > 0 && (
         <BandCard label="Top countries"
           lead={<DonutTotal counts={countryRing} accent={accent} total={countries.length} />}>
-          <div className="flex w-full items-center gap-2 min-w-0">
+          {/* `items-stretch` + `self-stretch`: this wrapper sits between the card body and the
+              MicroBars, so without it the rows distribute inside a content-height box and the card
+              looks bunched while its neighbours breathe. */}
+          <div className="flex w-full items-stretch gap-2 min-w-0 self-stretch">
             <MicroBars accent={accent} labelW={18} rows={topCountries.map((c) => ({ key: c.cc, label: c.cc, count: c.count }))} />
             {restC > 0 && <span className="text-micro text-muted-foreground whitespace-nowrap self-end pb-0.5">+{countries.length - topCountries.length} more · {restC}</span>}
           </div>
@@ -528,7 +541,9 @@ function TickBars({ accent, isMeta, filter, snaps }: { accent: string; isMeta: b
   });
   const max = Math.max(1, ...bars.map((b) => b.v));
   return (
-    <div className="flex items-end justify-end gap-[2px] h-[34px] w-full self-end pb-0.5" aria-hidden>
+    // Full height, not a fixed 34px: the bars grow from a baseline, so every pixel of card height
+    // is resolution the chart can actually spend (user, 2026-09-01).
+    <div className="flex items-end justify-end gap-[2px] h-full w-full self-stretch pb-0.5" aria-hidden>
       {bars.length === 0 && <span className="text-micro text-muted-foreground self-center">acquiring…</span>}
       {bars.map((b, i) => {
         const latest = i === bars.length - 1;
@@ -587,7 +602,11 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
           so a committed network re-tinted three of the row's four instruments and left this one
           cyan. Not a rule-3 exception — rule 3 forbids repointing the structural TOKEN, and this
           passes an identity hue to a chart, which is what the band has always done under a scope. */}
-      <span className="flex-1 min-w-0 self-center"><Sparkline data={spark} color={accent} height={26} stretch /></span>
+      {/* `maxPoints`: the retained window is 52 ticks, and 51 segments of a noisy rate over a
+          40px-tall line read as hair rather than as a trend (user, 2026-09-01: "too dense, too many
+          points"). Bucketed to 20 by mean — the SAME window at a lower frequency, which is what
+          keeps it honest against the basis note printed two elements to the right. */}
+      <span className="flex-1 min-w-0 self-center"><Sparkline data={spark} color={accent} height={42} maxPoints={20} stretch /></span>
       {/* The extrapolation window, VISIBLE (rule 10): the basis is part of the reading, and the
           band's pointer-events-none root means a title tooltip can never fire — sr-only alone
           left sighted pointer users reading an extrapolated rate as a measured fact. */}
