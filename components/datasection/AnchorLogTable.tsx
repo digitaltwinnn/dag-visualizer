@@ -311,7 +311,18 @@ export default function AnchorLogTable() {
     return d.rows;
   };
 
+  /** ⚠️ FREEZE `latest` BEFORE COMPUTING THE PAGE. A page NUMBER only means an ordinal range
+   *  relative to some `latest`, and while the reader sits on page 1 that value advances with the
+   *  feed — `hist.current.latest` is deliberately refreshed there. So a jump computed its page from
+   *  the live value, and by the time the fetch effect ran (which subtracts against the FROZEN one) a
+   *  tick had landed and the same page number denoted a different 25 ordinals.
+   *
+   *  Caught live: searching global snapshot 3,993,563, whose manifest lists DOR 12,345,681–686, the
+   *  table fetched the page starting at 12,345,706 — exactly one page off, because DOR anchors about
+   *  25 snapshots per tick and one tick had passed. Pinning the base here makes the page number the
+   *  jump computed and the page number the effect fetches mean the same thing. */
   const landOn = (ordinal: number) => {
+    if (histNet && latest) hist.current.latest = latest;
     setPageState(pageOfOrdinal(ordinal, latest, PAGE));
     setMarked(ordinal);
   };
@@ -333,24 +344,22 @@ export default function AnchorLogTable() {
     landOn(n);
   };
 
-  /** ANCHORED INTO — ASK THE GLOBAL SNAPSHOT ITSELF FIRST (user, 2026-09-01: "why if you search a
+  /** ANCHORED INTO — ASK THE GLOBAL SNAPSHOT ITSELF (user, 2026-09-01: "why if you search a
    *  [global snapshot] do you need a date").
    *
-   *  The first pass here converted the ordinal to a timestamp and walked the chain, which was the
-   *  wrong instrument: a global snapshot CARRIES the list of what anchored into it. Its raw payload
-   *  is where `metagraphSnapshotCount` comes from, and `/api/snapshot/[ordinal]` already decodes it
-   *  into one row per channel with that channel's own snapshot ordinal. So the exact answer is one
-   *  request, from the authoritative source, and it can say something no walk ever could: that this
-   *  network did NOT anchor into that global snapshot. A time-walk would answer that case by landing
-   *  on whatever came next, which reads as a hit.
+   *  A global snapshot CARRIES the list of what anchored into it — that is where
+   *  `metagraphSnapshotCount` comes from — and `/api/snapshot/[ordinal]` already decodes it into one
+   *  row per channel with that channel's own snapshot ordinal. So this is ONE exact read from the
+   *  authoritative source, and it can say something no time-based search could: that this network
+   *  did NOT anchor into that global snapshot.
    *
-   *  ⚠️ THE WALK SURVIVES AS A FALLBACK, because the payload host only serves roughly the last ~240k
-   *  global ordinals (~78 days) and 404s older ones (app/api/snapshot/ordinalWindow.ts). Beyond that
-   *  the ~320 B per-ordinal record is still served, so an older global still yields its TIMESTAMP —
-   *  and since the anchor join is timestamp EQUALITY, the first snapshot at or after it is the one
-   *  that anchored, IF any did. That "if" is why the fallback compares the landed row's stamp with
-   *  the target's: equal means it anchored there, otherwise the search says so rather than leaving a
-   *  near-miss looking like a hit. */
+   *  ⚠️ NO FALLBACK, DELIBERATELY (user: "why walk as a fallback? keep it simple, no obsolete code
+   *  to work around things"). The payload host serves only the recent band of global ordinals and
+   *  404s older ones, and the first cut answered that by resolving the ordinal to a timestamp and
+   *  walking the chain for an equal stamp — a second mechanism, with its own near-miss caveat, for a
+   *  case the reader already has two working routes to: the Snapshot column pages the entire chain,
+   *  and the date range reaches any point in it. So an unserved ordinal is simply SAID, and the
+   *  message names the route that does work. */
   const seekTick = async () => {
     const n = Number(qTick.replace(/[^\d]/g, ""));
     if (!Number.isFinite(n) || n < 1) return;
@@ -366,36 +375,27 @@ export default function AnchorLogTable() {
     const label = displayNetwork(histNet)?.ticker ?? "this network";
     setSeeking(true);
     try {
-      // 1 — the global snapshot's own manifest. Exact, and able to answer "it didn't".
-      const direct = await fetch(netUrl(`/api/snapshot/${n}`));
-      if (direct.ok) {
-        const d = (await direct.json()) as { rows?: { metaId: string; ordinal: number }[] };
-        const mine = (d.rows ?? []).filter((r) => r.metaId === histNet);
-        if (mine.length === 0) {
-          setMarked(null);
-          setJumpMiss(`${label} did not anchor into global snapshot ${n.toLocaleString()}`);
-          return;
-        }
-        // A metagraph can anchor SEVERAL snapshots into one global; land on the oldest so the page
-        // opens at the start of that run rather than in the middle of it.
-        const ordinals = mine.map((r) => r.ordinal).filter((o) => o > 0);
-        if (ordinals.length) { landOn(Math.min(...ordinals)); return; }
-        // Rows present but undecodable — fall through to the stamp route rather than claim nothing.
+      const res = await fetch(netUrl(`/api/snapshot/${n}`));
+      if (!res.ok) {
+        setMarked(null);
+        // The bound is the upstream's, not ours, and it moves — so the copy states the CONSEQUENCE
+        // and the working alternative rather than a day count that would quietly go stale.
+        setJumpMiss(`global snapshot ${n.toLocaleString()} is no longer served — search by date instead`);
+        return;
       }
-      // 2 — older than the payload host serves (or undecodable): the timestamp route still answers.
-      const g = await fetch(netUrl(`/api/global/at?ordinal=${n}`));
-      if (!g.ok) { setJumpMiss("no such global snapshot"); return; }
-      const rec = (await g.json()) as { timestamp: string };
-      const ms = Date.parse(rec.timestamp);
-      if (!Number.isFinite(ms)) { setJumpMiss("that global snapshot has no usable timestamp"); return; }
-      const hit = await seekOrdinalByTime(ms, latest, loadPage);
-      if (hit == null) { setJumpMiss("could not locate it in the chain"); return; }
-      landOn(hit.ordinal);
-      // The join is timestamp EQUALITY, so an unequal stamp means we landed NEXT TO the answer, not
-      // on it — and that is worth saying out loud (rule 10).
-      if (Date.parse(hit.ts) !== ms) {
-        setJumpMiss(`${label} did not anchor into global snapshot ${n.toLocaleString()} — showing the next snapshot after it`);
+      const d = (await res.json()) as { rows?: { metaId: string; ordinal: number }[] };
+      const mine = (d.rows ?? []).filter((r) => r.metaId === histNet);
+      if (mine.length === 0) {
+        setMarked(null);
+        setJumpMiss(`${label} did not anchor into global snapshot ${n.toLocaleString()}`);
+        return;
       }
+      // A metagraph can anchor SEVERAL snapshots into one global; land on the oldest so the page
+      // opens at the start of that run rather than in the middle of it. An `ordinal: 0` is the
+      // route's marker for a payload it could not decode — excluded, and said if none survive.
+      const ordinals = mine.map((r) => r.ordinal).filter((o) => o > 0);
+      if (!ordinals.length) { setMarked(null); setJumpMiss("that global snapshot's payload could not be decoded"); return; }
+      landOn(Math.min(...ordinals));
     } catch {
       setJumpMiss("the chain read failed — try again");
     } finally {
@@ -421,7 +421,7 @@ export default function AnchorLogTable() {
     try {
       const hit = await seekOrdinalByTime(fromMs, latest, loadPage);
       if (hit == null) { setJumpMiss("could not locate that date in the chain"); return; }
-      landOn(hit.ordinal);
+      landOn(hit);
     } catch {
       setJumpMiss("the chain read failed — try again");
     } finally {

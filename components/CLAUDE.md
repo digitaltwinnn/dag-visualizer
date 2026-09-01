@@ -18,13 +18,18 @@ across all of it — and only three are. SNAPSHOT is arithmetic (ordinals are ga
 ANCHORED INTO asks the GLOBAL SNAPSHOT ITSELF — it carries the list of what anchored into it
 (`/api/snapshot/[ordinal]` decodes one row per channel with that channel's own snapshot ordinal), so
 the answer is ONE exact read, measured: one request, zero walk probes. It is also the only mechanism
-that can say *this network did not anchor there* — a time-walk answers that case by landing on
-whatever came next, which reads as a hit. ⚠️ The walk survives only as a FALLBACK, because the
-payload host serves roughly the last ~240k global ordinals (~78 days) and 404s older ones; past that
-the ~320 B per-ordinal record still yields a timestamp, and since the anchor join is timestamp
-EQUALITY the first snapshot at or after it is the one that anchored — *if any did*, which is why the
-fallback compares the landed row's stamp against the target and says so when they differ. AGE is a
-date, so it is always the walk. FEE and SIZE have no
+that can say *this network did not anchor there* — a time-based search answers that case by landing
+on whatever came next, which reads as a hit. AGE is a date, and there is no date lookup upstream
+(verified: `startTime`/`endTime`, `timestamp`, `from`, `startDate`, `before` are all silently
+ignored and return the live tip), so it is the only column that walks.
+
+⚠️ **AND ANCHORED INTO HAS NO FALLBACK, DELIBERATELY.** The payload host serves only the recent band
+of global ordinals and 404s older ones. A first cut answered that by resolving the ordinal to a
+timestamp and walking for an equal stamp — a whole second mechanism, carrying its own near-miss
+caveat, for a case the reader already has two working routes to (the Snapshot column pages the
+entire chain; the date range reaches any point in it). An unserved ordinal is simply SAID, and the
+message names the route that does work (user: "keep it simple, no obsolete code to work around
+things"). FEE and SIZE have no
 index at any layer — a control there could only filter the 25 rows on screen, and a reader who typed
 a fee and got "no match" would reasonably conclude no such snapshot exists when we looked at 25 of
 1.1 million. NETWORK is inert because under a commit the table IS one network. An absent affordance
