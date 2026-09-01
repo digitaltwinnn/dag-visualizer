@@ -37,6 +37,7 @@ export default function LogSearchRow({
   onFrom,
   onTo,
   onSubmit,
+  onClose,
 }: {
   /** The header's own keys, in order, so this row can never drift out of alignment with it. */
   columns: { key: string }[];
@@ -50,6 +51,8 @@ export default function LogSearchRow({
   onFrom: (v: string) => void;
   onTo: (v: string) => void;
   onSubmit: (which: "snapshot" | "tick" | "age") => void;
+  /** Escape folds the row away — the same key that dismisses every other transient surface here. */
+  onClose: () => void;
 }) {
   // SPINELESS AT REST, like every card in this app. Three bordered plates sitting under the header
   // read as a form bolted onto a data table (user, 2026-09-01: "looks ugly") — and they cost height
@@ -97,8 +100,9 @@ export default function LogSearchRow({
   );
 
   return (
-    // No row-level fill and no hover: this is chrome under the header, not a data row.
-    <TableRow className="border-border hover:bg-transparent">
+    // No row-level fill and no hover: this is chrome under the header, not a data row — which is
+    // also why it is only here once asked for (see AnchorLogTable's `searchOpen`).
+    <TableRow className="border-border hover:bg-transparent" onKeyDown={(e) => { if (e.key === "Escape") onClose(); }}>
       {columns.map((c) => {
         if (c.key === "ordinal") {
           return (

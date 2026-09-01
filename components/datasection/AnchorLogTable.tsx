@@ -2,7 +2,7 @@
 
 import { netUrl } from "@/src/net/current";
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowDown, ArrowUp, Search, X } from "lucide-react";
 import { useStore } from "@/src/store/store";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { getNetwork, metagraphById } from "@/src/data/network";
@@ -102,6 +102,15 @@ export default function AnchorLogTable() {
   // no store write, and a real selection still paints over it.
   const [marked, setMarked] = useState<number | null>(null);
   const [jumpMiss, setJumpMiss] = useState<string | null>(null);
+  // ⚠️ SEARCHING IS ASKED FOR, NOT ALWAYS ON (user, 2026-09-01: "can we make the search a more
+  // deliberate action? … it now kinda looks like the search row is actually part of the data, and
+  // the hint looks ugly"). The row was correct in WHERE it put its controls — under the columns
+  // they can answer for — and wrong in being there unasked: a permanent line of placeholders
+  // directly beneath the header reads as a first data row whose values happen to be words, and
+  // the table's job is to open as data. Behind a toggle the placeholders only ever appear to
+  // someone who just asked for them, which is also the one moment they stop being noise and
+  // start being the column key.
+  const [searchOpen, setSearchOpen] = useState(false);
   const [qSnapshot, setQSnapshot] = useState("");
   const [qTick, setQTick] = useState("");
   const [qFrom, setQFrom] = useState("");
@@ -456,9 +465,13 @@ export default function AnchorLogTable() {
     else void seekAge();
   };
 
+  /** Any criterion typed — the toggle says so while the row is folded away, or a search would be
+   *  silently in force with nothing on screen to explain the rows you are looking at. */
+  const searchSet = !!(qSnapshot || qTick || qFrom || qTo);
+
   // Built ONCE and rendered by BOTH branches below — a seek swaps the table into its loading state
   // while a page is fetched, and unmounting the controls mid-seek loses what was typed.
-  const search = (
+  const search = !searchOpen ? null : (
     <LogSearchRow
       columns={COLUMNS}
       seeking={seeking}
@@ -471,12 +484,67 @@ export default function AnchorLogTable() {
       onFrom={setQFrom}
       onTo={setQTo}
       onSubmit={onSubmit}
+      onClose={() => setSearchOpen(false)}
     />
+  );
+
+  const clearSearch = () => {
+    setQSnapshot(""); setQTick(""); setQFrom(""); setQTo("");
+    setMarked(null); setJumpMiss(null);
+  };
+
+  /** THE TABLE'S TOOLBAR — the researched home for a table search (2026-09-01). The controls stay
+   *  per-COLUMN, which is where context is tightest ("users see results change directly under the
+   *  input"), but the thing that OPENS them belongs in a toolbar ABOVE the table, and the two have
+   *  to be adjacent. A trigger down in the pager strip opening inputs up under the header was the
+   *  first attempt and the user rejected it on sight: nothing connected the two ends, and the
+   *  reveal appeared nowhere near the thing that asked for it.
+   *
+   *  It also houses the two states that version had nowhere to put — what is APPLIED, and a way to
+   *  CLEAR it. Every guide on table filtering names both; the first cut had neither, which is how
+   *  a folded row could leave the table sitting on a search with nothing on screen explaining it.
+   *
+   *  ⚠️ Rendered by BOTH branches, like the row itself: a seek swaps the table into its loading
+   *  state, and a toolbar that vanishes mid-seek takes the only way out with it. */
+  const toolbar = (
+    <div className="flex-none flex items-center justify-end gap-1.5 pb-1">
+      {searchSet && (
+        <>
+          <span className="min-w-0 truncate text-micro text-muted-foreground">
+            {[qSnapshot && `snapshot ${qSnapshot}`, qTick && `in global ${qTick}`, qFrom && `from ${qFrom}`, qTo && `to ${qTo}`]
+              .filter(Boolean)
+              .join(" · ")}
+          </span>
+          <button
+            type="button"
+            onClick={clearSearch}
+            className="inline-flex flex-none items-center gap-0.5 rounded-xs px-1 py-0.5 cursor-pointer text-micro uppercase tracking-caps text-muted-foreground hover:text-foreground hover:bg-wash-faint focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
+          >
+            <X aria-hidden className="size-3" /> clear
+          </button>
+        </>
+      )}
+      <button
+        type="button"
+        aria-expanded={searchOpen}
+        onClick={() => setSearchOpen((o) => !o)}
+        className={cn(
+          "inline-flex flex-none items-center gap-1 rounded-xs px-1 py-0.5 cursor-pointer",
+          "text-micro uppercase tracking-caps transition-colors hover:bg-wash-faint hover:text-foreground",
+          "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
+          searchOpen ? "bg-wash-faint text-foreground" : "text-muted-foreground",
+        )}
+      >
+        <Search aria-hidden className="size-3" />
+        search
+      </button>
+    </div>
   );
 
   if (rows.length === 0)
     return (
       <>
+        {toolbar}
         <p className="m-auto text-label text-muted-foreground">
           {!live ? "NO SIGNAL" : histNet ? (histErr ? "history unavailable — the explorer read failed; paging again retries" : "reading the chain…") : "Waiting for anchored metagraph snapshots…"}
         </p>
@@ -487,6 +555,7 @@ export default function AnchorLogTable() {
 
   return (
     <>
+      {toolbar}
       <ScrollArea className="flex-1 min-h-0">
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-[var(--panel-solid)] backdrop-blur-md">
