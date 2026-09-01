@@ -9,70 +9,51 @@ the architecture map and the dev workflow; **its rules govern this file too**.
 ## Layout — the four-zone HUD over a raw data layer
 
 The page is one fixed shell in **two layers at different depths** (`SectionShell` + `store.section`).
-**The raw layer's anchor log carries a COLUMN SEARCH ROW** (`datasection/LogSearchRow.tsx` +
-`src/data/chainSeek.ts`, 2026-09-01) — controls sitting under the header cells they can answer for.
+**The raw layer's anchor log carries a SEARCH BAR** (`datasection/LogSearchBar.tsx` +
+`src/data/chainSeek.ts`), revealed by a `search` button in a toolbar above the table.
 
-⚠️ **THE EMPTY CELLS ARE THE DESIGN.** Under a committed network this table pages a chain of >1M
-pages server-side, 25 rows at a time, so a control on a column IMPLIES that column is searchable
-across all of it — and only three are. SNAPSHOT is arithmetic (ordinals are gapless), one request.
-ANCHORED INTO asks the GLOBAL SNAPSHOT ITSELF — it carries the list of what anchored into it
-(`/api/snapshot/[ordinal]` decodes one row per channel with that channel's own snapshot ordinal), so
-the answer is ONE exact read, measured: one request, zero walk probes. It is also the only mechanism
+⚠️ **SEARCHING IS ASKED FOR, AND THE TRIGGER SITS WITH WHAT IT REVEALS.** Two rounds of this were
+rejected and both lessons are load-bearing. The controls first sat PERMANENTLY under the header
+cells they answer for — a real pattern with a real virtue, context — but a standing line of
+placeholders under the header reads as a first data row whose values happen to be words, and a
+table's job is to open as data (user: "it now kinda looks like the search row is actually part of
+the data, and the hint looks ugly"). The second cut put the toggle in the PAGER strip below the
+table while the inputs opened above it: "makes no sense to put search at the bottom and the inputs
+at the top". Progressive disclosure works by ADJACENCY — search belongs in a toolbar above the
+table, and the fields open directly beneath it.
+
+⚠️ **AND THE FIELDS CAME OFF THE TABLE ENTIRELY** (user: "just three named search fields … this way
+it does not fight with the table"). Seated in header cells, the TABLE's geometry was the form's
+budget and the table won every argument: two date inputs cannot render `mm/dd/yyyy` inside a ~165px
+AGE column, so they had to stack; hints had to fit column widths, so they were cramped; and every
+column needed a cell even where it could answer nothing. Off the table they are just fields — the
+date range fits one line, each control is named by a LABEL rather than by whatever column it sat
+under, and the AGE column went back to its natural 115px from the 232px the stacked pair forced.
+
+⚠️ **THREE FIELDS IS ITSELF THE STATEMENT** — the old row said it with empty cells. Under a
+committed network this table pages a chain of >1M pages server-side, and only three axes are
+searchable across it. SNAPSHOT is arithmetic (ordinals are gapless), one request. ANCHORED INTO
+asks the GLOBAL SNAPSHOT ITSELF — it carries the list of what anchored into it
+(`/api/snapshot/[ordinal]` decodes one row per channel with that channel's own ordinal), so the
+answer is ONE exact read, measured: one request, zero walk probes. It is also the only mechanism
 that can say *this network did not anchor there* — a time-based search answers that case by landing
 on whatever came next, which reads as a hit. AGE is a date, and there is no date lookup upstream
 (verified: `startTime`/`endTime`, `timestamp`, `from`, `startDate`, `before` are all silently
-ignored and return the live tip), so it is the only column that walks.
+ignored and return the live tip), so it is the only field that walks. FEE and SIZE have no index at
+any layer — a field there could only filter the 25 rows on screen, and a reader who typed a fee and
+got "no match" would reasonably conclude no such snapshot exists when we looked at 25 of 1.1
+million. NETWORK is inert because under a commit the table IS one network.
+
+**The toolbar carries the two states the first cuts had nowhere to put**, both named in every guide
+on table filtering: what is APPLIED (in words, so a folded bar can never leave the table on a search
+with nothing explaining it) and a way to CLEAR it.
 
 ⚠️ **AND ANCHORED INTO HAS NO FALLBACK, DELIBERATELY.** The payload host serves only the recent band
 of global ordinals and 404s older ones. A first cut answered that by resolving the ordinal to a
 timestamp and walking for an equal stamp — a whole second mechanism, carrying its own near-miss
-caveat, for a case the reader already has two working routes to (the Snapshot column pages the
-entire chain; the date range reaches any point in it). An unserved ordinal is simply SAID, and the
-message names the route that does work (user: "keep it simple, no obsolete code to work around
-things"). FEE and SIZE have no
-index at any layer — a control there could only filter the 25 rows on screen, and a reader who typed
-a fee and got "no match" would reasonably conclude no such snapshot exists when we looked at 25 of
-1.1 million. NETWORK is inert because under a commit the table IS one network. An absent affordance
-tells the truth; a disabled or scoped-to-page one asks the reader to notice a qualifier first.
-
-⚠️ **A TICK THAT ANCHORED NOTHING IS A ROW — the SEAM** (user, 2026-09-01: "what should we do for a
-global snapshot that had no anchors? I want this to be searchable as well, so it should appear but
-just without any network attached"). The scene has always drawn these standing at full height — a
-measured tick with no anchors is a MEASUREMENT, not a missing one — and the log now agrees, so a
-reader can tell a quiet tick from one the window simply never carried. `AnchorLogRow.metaId` is
-nullable and that is where every consumer meets it; `src/data/anchorLog.test.ts` is the rule. Four
-decisions carry it:
-
-- **WINDOW MODE ONLY**, gated in `buildAnchorLog` on the `all` lens (`dag` resolves to `all`, so the
-  base ledger keeps its seams). Under a committed network the log is THAT network's chain, and a
-  tick it never anchored into is not a quiet row in it — it is not in it. The unfiltered log is
-  also the only place the question can be asked at all.
-- **FOUR EM-DASHES, NOT FOUR ZEROS.** Network, snapshot, fee and size are facts about a METAGRAPH
-  SNAPSHOT and there is none, so a `0.00000000` in the fee column would read as "a snapshot that
-  paid nothing" when the truth is "no snapshot". The two columns belonging to the TICK — anchored
-  into, age — carry their real measured values, which is the whole point of the row.
-- **It commits the TICK ALONE**, so `metaSnapArrivalActions` takes a nullable sel and a seam click
-  clears the finer metaSnap slot rather than leaving a previous row's snapshot in it. It writes no
-  hover channel either — rule 9's "a surface hovers the subject it would COMMIT".
-- **Its landing mark and its React key are its tick.** A seam's ordinal is 0, which no seek can
-  produce and which every seam shares — keyed on it, React treated a whole page of seams as one
-  repeated child (caught by the Next.js MCP the first time a quiet network was opened).
-
-Two surfaces keep seams OUT, and both already had the rule: the explorer's per-metagraph groups
-(`groupByMeta` — "affordance follows the data": a tick with no identified anchors keeps its row and
-simply doesn't disclose) and the unlisted log, whose builder returns `ChannelLogRow` to say in its
-type that its rows always have a channel. ⚠️ Verified on **integrationnet**, where nothing anchors in
-the window: that log rendered EMPTY before this and now reads its ~188 seams.
-
-⚠️ **THE DATE RANGE STACKS, and the measurement is the reason.** This table lives in a master–detail
-pane — ~576px at tablet — whose six data columns need ~395, leaving ~165 for AGE. A `type="date"`
-cannot render `mm/dd/yyyy` below ~90px even with the calendar glyph hidden, so two side by side need
-~190: shipped inline they forced the column to 253px, pushed the table 72px into horizontal scroll
-and cut AGE off screen entirely. Shaving them to fit truncated the format itself to `mm/dd/y`, which
-is a control lying about what it takes. Stacked and labelled `from` / `to`, each field gets the
-column's full width at every tier, for one extra line in ONE column. **The remaining VERTICAL
-scrollbar is structural, not this row's**: `PAGE = 25` rows at ~31px exceed the pane at any header
-height, and the page size cannot shrink — the server route's page arithmetic depends on it.
+caveat, for a case the reader already has two working routes to (the Snapshot field pages the entire
+chain; the date range reaches any point in it). An unserved ordinal is simply SAID, and the message
+names the route that does work (user: "keep it simple, no obsolete code to work around things").
 
 ⚠️ **VOCABULARY: never "tick" in anything a reader sees.** The column key is `tick` and the code
 says tick throughout, but the app's word is GLOBAL SNAPSHOT — the first cut of this control shipped

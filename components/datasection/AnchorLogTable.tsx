@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import TablePager from "@/components/datasection/TablePager";
-import LogSearchRow from "@/components/datasection/LogSearchRow";
+import LogSearchBar from "@/components/datasection/LogSearchBar";
 import { pageOfOrdinal, seekOrdinalByTime, dayStartMs, dayEndMs, tsInRange } from "@/src/data/chainSeek";
 import { POLL } from "@/src/engine/config";
 
@@ -472,8 +472,7 @@ export default function AnchorLogTable() {
   // Built ONCE and rendered by BOTH branches below — a seek swaps the table into its loading state
   // while a page is fetched, and unmounting the controls mid-seek loses what was typed.
   const search = !searchOpen ? null : (
-    <LogSearchRow
-      columns={COLUMNS}
+    <LogSearchBar
       seeking={seeking}
       snapshot={qSnapshot}
       tick={qTick}
@@ -545,6 +544,7 @@ export default function AnchorLogTable() {
     return (
       <>
         {toolbar}
+        {search}
         <p className="m-auto text-label text-muted-foreground">
           {!live ? "NO SIGNAL" : histNet ? (histErr ? "history unavailable — the explorer read failed; paging again retries" : "reading the chain…") : "Waiting for anchored metagraph snapshots…"}
         </p>
@@ -556,6 +556,7 @@ export default function AnchorLogTable() {
   return (
     <>
       {toolbar}
+      {search}
       <ScrollArea className="flex-1 min-h-0">
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-[var(--panel-solid)] backdrop-blur-md">
@@ -581,7 +582,6 @@ export default function AnchorLogTable() {
                 </TableHead>
               ))}
             </TableRow>
-            {search}
           </TableHeader>
           <TableBody>
             {rows.map((r) => {
