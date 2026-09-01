@@ -183,14 +183,24 @@ tier. The lane's DOM shape is load-bearing too: members are selected by
 `:has()` on the per-rung WRAPPER divs, so **the selectors must be descendant, not child** — `RailPager`
 nests the box one level deeper inside its gesture wrapper.
 
-⚠️ **THE ACCORDION SLIDE HAS TWO TRAPS, both found by a user report (2026-09-01) and both invisible
+⚠️ **THE ACCORDION SLIDE HAS THREE TRAPS, both found by a user report (2026-09-01) and both invisible
 in code review.** *(1) Sanitizing the outgoing clone strips its GROUND.* The clone drops `.ig-panel` /
 `.rail-entry` so the `RailThread`'s measurement and the slab's `:has()` selectors cannot see it — but
 `.ig-panel` is what PAINTS a card (glass gradient, blur, border, radius, padding), so the card sliding
 out was bare text drifting over the scene: *"just text on transparent background moving quite quick,
 which hurts my eyes"*. `carryLook` copies the computed look across as inline style BEFORE the classes
 are dropped — the clone keeps its face and loses its identity, which is all sanitizing was ever for.
-*(2) The lane's height jumps the instant the slide starts.* The clone is absolutely positioned so holds
+*(2) The clone REPLAYS every animation the card carries.* `cloneNode(true)` copies class names, so
+inserting it restarts each one from frame 0 — the card materialize, the odometer's roll, the edge
+pulse (*"it tries to rotate the metagraph header (the odometer) with the same value as it moves out,
+it makes the whole card flash as well"*). And the flash was the lesser half: `cardMaterialize`
+animates TRANSFORM, and a running animation OVERRIDES inline style, so for its first 0.26s the
+animation — not the slide — owned the clone's transform. ⚠️ The kill must be a STYLESHEET rule
+(`[data-pager-ghost]` in globals.css), never an inline pass: inline style cannot reach a PSEUDO
+element, and `.edge-pulse::before` runs one, measured still pulsing on the ghost after the inline
+version shipped. The attribute also survives `clone.style.cssText = …`, which replaces the whole
+inline style and silently discarded the inline version's work on the root. *(3) The lane's height
+jumps the instant the slide starts.* The clone is absolutely positioned so holds
 no height, and the store commits synchronously, so the slot becomes the NEW card's height while an
 820ms HORIZONTAL slide is only beginning — everything below jumped (*"things jump vertically"*).
 `commitStep` pins the old height before the swap and eases to the new one on the slide's own clock, one

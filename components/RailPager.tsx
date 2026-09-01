@@ -116,6 +116,28 @@ function carryLook(src: HTMLElement, clone: HTMLElement): void {
   for (let i = 0; i < from.length && i < to.length; i++) pair(from[i], to[i]);
 }
 
+/** Stop the clone re-playing the card's own entrance as it LEAVES.
+ *
+ *  ⚠️ `cloneNode(true)` copies CLASS NAMES, so every CSS animation on the card restarts from frame 0
+ *  the moment the clone is inserted — the card materialize (`animate-card-in`: opacity 0→1 plus a
+ *  translate and scale), the odometer's roll (`.odometer-in` / `.odometer-out`) and the edge pulse
+ *  all replay on the way OUT. The user saw exactly that: "it tries to rotate the metagraph header
+ *  (the odometer) with the same value as it moves out, it makes the whole card flash as well".
+ *
+ *  ⚠️ And the flash was the lesser half. `cardMaterialize` animates TRANSFORM, and a running CSS
+ *  animation OVERRIDES inline style for the properties it touches — so for its first 0.26s the
+ *  animation, not the slide, owned the clone's transform. The outgoing card was being pulled two
+ *  ways before it even started moving.
+ *
+ *  ⚠️ THE KILL IS A STYLESHEET RULE, NOT INLINE STYLE (globals.css, `[data-pager-ghost]`). An
+ *  inline pass over the subtree cannot reach a PSEUDO element, and `.edge-pulse::before` runs one —
+ *  measured still animating on the ghost after the inline version shipped. The attribute also
+ *  survives `clone.style.cssText = …` below, which replaces the whole inline style and silently
+ *  discarded the inline version's work on the root. */
+function freezeMotion(clone: HTMLElement): void {
+  clone.setAttribute("data-pager-ghost", "");
+}
+
 const SLIDE_MS = 820;
 const SLIDE_EASE = "cubic-bezier(0.45, 0.05, 0.25, 1)";
 const FLICK_V = 0.35; // px/ms at release — a throw this fast commits regardless of travel. Measured
@@ -242,6 +264,7 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     // across as inline style FIRST, then drop the classes: the clone keeps its face and loses its
     // identity, which is the whole point of sanitizing it.
     carryLook(el, clone);
+    freezeMotion(clone);
     for (const n of clone.querySelectorAll(".ig-panel, .rail-entry")) n.classList.remove("ig-panel", "rail-entry");
     clone.classList.remove("ig-panel", "rail-entry");
     clone.setAttribute("aria-hidden", "true");

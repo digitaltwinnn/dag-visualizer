@@ -112,6 +112,22 @@
     transparent 0, var(--pulse-hue) 14%, var(--pulse-hue) 86%, transparent 100%);
   animation: edge-line-fade 1.2s ease both;
 }
+/* THE PAGER GHOST — the outgoing card during a RailPager slide (`RailPager.commitStep`).
+   ⚠️ A CSS RULE, NOT INLINE STYLE, and the reason is `::before`. `cloneNode(true)` copies class
+   names, so every animation on the card restarts from frame 0 when the clone is inserted: the card
+   materialize, the odometer's roll, and this file's own `.edge-pulse::before` — and a PSEUDO
+   element's animation cannot be reached by `element.style` at all, so the inline pass missed it and
+   the ghost kept pulsing its edge on the way out. `!important` + unlayered beats every animation
+   rule above regardless of layer.
+   The ROOT keeps its `transition`: that is the slide itself. Only its animation is killed. */
+[data-pager-ghost] { animation: none !important; }
+[data-pager-ghost] *,
+[data-pager-ghost]::before, [data-pager-ghost]::after,
+[data-pager-ghost] *::before, [data-pager-ghost] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
 @keyframes edge-line-fade {
   0%   { opacity: 0; }
   18%  { opacity: 0.5; }
