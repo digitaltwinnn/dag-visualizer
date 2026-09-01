@@ -114,10 +114,36 @@ export type BandCardSize = "sm" | "md" | "lg";
  *  capped bar block pinned right, and a void between the two (the very "huge cards" complaint the
  *  scale exists to answer). The grow weight decides who takes leftover width; the ceiling decides
  *  when everyone stops taking it and the row simply ends. */
+/*  ⚠️ THE CEILING MOVED OFF THE BOX AND ONTO THE CONTENT (user, 2026-09-01: "can we align the
+ *  vitals sections in the center of its designated space on the bottom bar?"). With the cap on the
+ *  BOX, a capped row stopped short of the plate and the whole group centred as one clump — so all
+ *  the leftover collected at the two ENDS and hyper's three sections began 234px into a bar they
+ *  were supposed to divide. The box now takes its share of the plate and the CONTENT is capped and
+ *  centred inside it, which is what "its designated space" means: the slack is distributed between
+ *  the sections instead of banked outside them, and every card still refuses to stretch its own
+ *  lead and breakdown apart (the ceiling's original job, unchanged).
+ *
+ *  ⚠️ THE BASIS STAYS `auto` ON BOTH HALVES. A share computed with no reference to the card's
+ *  content is what clipped the rate cards' extrapolation note off the plate at tablet width; with
+ *  an auto basis a squeezed row simply has no surplus to hand out and every box falls back to its
+ *  content width, which is exactly the pre-plate behaviour. */
+/** The tier→flex table for the BOX. An equal `1 1 0` share per section was tried and withdrawn
+ *  the same minute (user, 2026-09-01: "the 1/3rd rule can't apply based on vitals card count") —
+ *  a plate cut into N identical columns gives a one-number roster the same room as a 32-bar chart
+ *  and squeezes the chart to pay for it, and N changes per view. The tier still says how eagerly a
+ *  card takes LEFTOVER width, and `auto` basis throughout means it asks for what it needs first —
+ *  the rule that keeps a squeezed row from clipping the rate cards' extrapolation note. */
 const BAND_SIZE: Record<BandCardSize, string> = {
-  sm: "flex-initial max-w-[240px]",   // 0 1 auto — content-sized, and still shrinks when tight
-  md: "flex-auto max-w-[360px]",      // 1 1 auto
-  lg: "flex-[2_1_auto] max-w-[560px]",
+  sm: "flex-initial",            // 0 1 auto — content-sized, and still shrinks when tight
+  md: "flex-auto",               // 1 1 auto
+  lg: "flex-[2_1_auto]",
+};
+
+/** …and the cap the tier puts on its CONTENT, centred in whatever share the row gave it. */
+const BAND_CAP: Record<BandCardSize, string> = {
+  sm: "max-w-[240px]",
+  md: "max-w-[360px]",
+  lg: "max-w-[560px]",
 };
 
 export function BandCard({ label, children, className, mark, lead, size = "md" }: { label: string; children?: React.ReactNode; className?: string; mark?: React.ReactNode; lead?: React.ReactNode; size?: BandCardSize }) {
@@ -127,7 +153,7 @@ export function BandCard({ label, children, className, mark, lead, size = "md" }
       // arbitrary-property form per CSS trap 3): the band is that bar's sibling instrument, and
       // the earlier `bg-card/40` was tuned under light and sat near-invisible over the dark
       // scene's glow (user, 2026-08-30: "in dark the card needs a bit more contrast").
-      "flex flex-col gap-1 rounded-lg border border-border/60 [background:var(--topbar-glass)] backdrop-blur-sm px-3 py-1.5 min-w-0",
+      "flex rounded-lg border border-border/60 [background:var(--topbar-glass)] backdrop-blur-sm px-3 py-1.5 min-w-0",
       // ⚠️ `sm` is `flex-initial` (0 1 auto), NOT `flex-none`: a content-sized card must still
       // SHRINK when the row is tight, or its widest child — which is usually the LABEL, not the
       // reading — pins it. "Metagraphs anchoring" held 305px of a 684px tablet row that way,
@@ -135,6 +161,10 @@ export function BandCard({ label, children, className, mark, lead, size = "md" }
       BAND_SIZE[size],
       className,
     )}>
+    {/* THE CAPPED, CENTRED CONTENT. `mx-auto` is what puts a section in the middle of its own
+        share rather than at the left of it; `w-full` keeps it filling that share up to the cap,
+        so nothing changes at the widths where there is no surplus to centre within. */}
+    <div className={cn("flex flex-col gap-1 w-full min-w-0 mx-auto", BAND_CAP[size])}>
       <span className="flex items-center gap-1.5 leading-none min-w-0">
         {mark}
         {/* TRUNCATE, not `whitespace-nowrap`: at 760px "Metagraphs anchoring" clipped mid-glyph
@@ -160,6 +190,7 @@ export function BandCard({ label, children, className, mark, lead, size = "md" }
         )}
         {children != null && <div className="flex items-center gap-2 flex-1 min-w-0">{children}</div>}
       </div>
+    </div>
     </div>
   );
 }
@@ -764,13 +795,36 @@ export default function VitalsBand() {
         // nothing at this edge. The PHONE strip does not take it — that presentation is a scrolling
         // row inside the command bar, sized by its own rules.
         "fixed z-10 inset-x-[var(--bar-margin)] bottom-[calc(var(--footer-h,0px)+4px)] h-[var(--vitals-h)] pointer-events-none",
-        // CENTRED, because the tiers cap. Once every card has a ceiling the row stops reaching the
-        // rail margins on a wide screen, and a left-packed strip would read as a row that failed to
-        // fill rather than as one that chose its width. (The 2026-08-30 note against a centred clump
-        // was written when the cards were small and floated in a very wide bar; a capped row of
-        // full-size cards is a different object.) Below the ceilings this is a no-op — the cards
-        // still span margin to margin.
-        "flex items-stretch justify-center gap-2",
+        // ⚠️ THE PLATE IS THE LANE'S, NOT EACH CARD'S (user, 2026-09-01: the band "feels ununiform
+        // between screens because the amount of screen space they claim depends on the number of
+        // vitals and the size"). Measured at 1600px: hyper and geo hold 1096px of a 1548px lane
+        // while the ledger holds 1482, so switching views moved the band's own left edge 193px —
+        // the CONTENTS varied, which is honest, but so did the instrument containing them, which
+        // is not. One plate makes the lane constant by construction: only the divisions inside it
+        // move, and the leftover reads as quiet plate rather than as a row that failed to fill.
+        //
+        // It is the COMMAND BAR's plate, deliberately — same `--topbar-glass`, same `--bar-margin`,
+        // same radius — so the two bars now bracket the scene as an actual matched pair rather than
+        // as a bar and a scattering of chips (user, 2026-09-01: "the bottom bar should be the same
+        // exactly as the top bar").
+        "rounded-lg border border-border/60 [background:var(--topbar-glass)] backdrop-blur-sm",
+        // ⚠️ THE CARDS ARE FLATTENED FROM HERE, not by a prop threaded through every cell. The same
+        // `ViewCells` renders the PHONE strip, where the cards scroll and must keep their own
+        // plates — a section of a bar that scrolls away from the bar is not a section. An arbitrary
+        // variant scopes the flattening to this presentation and leaves that one untouched; it wins
+        // on specificity within the same layer, which is the in-layer escape CSS trap 1 describes.
+        // `[background:none]` (not `bg-transparent`): the card paints an arbitrary PROPERTY, so the
+        // override has to be one too or the gradient survives underneath.
+        "[&>*]:rounded-none [&>*]:border-0 [&>*]:backdrop-blur-none [&>*]:[background:none]",
+        // The section division: the app's one resting hairline, INSET by the plate's own padding
+        // like every other resting division (the card-head rule) — a full-height rule between two
+        // sections would read as a seam between two objects, which is what this change undoes.
+        "[&>*+*]:border-l [&>*+*]:border-border/60 [&>*+*]:rounded-none",
+        // CENTRED INSIDE THE PLATE. The tiers still cap, so a 3-card view leaves slack — it now
+        // collects symmetrically inside the instrument instead of around it. (The 2026-08-30 note
+        // against a centred clump was written when the cards were small and floated in a very wide
+        // bar; sections of a plate are a different object.) Below the ceilings this is a no-op.
+        "flex items-stretch justify-center gap-0 px-1.5 py-1",
         "transition-opacity duration-[180ms] ease-out motion-reduce:transition-none",
         yielding && "opacity-40 duration-300",
         !live && "saturate-[.45]",
