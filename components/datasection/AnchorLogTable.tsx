@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import TablePager from "@/components/datasection/TablePager";
-import LogSearchBar from "@/components/datasection/LogSearchBar";
+import LogSearchBar, { type SearchAxis } from "@/components/datasection/LogSearchBar";
 import { pageOfOrdinal, seekOrdinalByTime, dayStartMs, dayEndMs, tsInRange } from "@/src/data/chainSeek";
 import { POLL } from "@/src/engine/config";
 
@@ -111,6 +111,11 @@ export default function AnchorLogTable() {
   // someone who just asked for them, which is also the one moment they stop being noise and
   // start being the column key.
   const [searchOpen, setSearchOpen] = useState(false);
+  // ⚠️ THE AXIS IS THE SEARCH'S SUBJECT, and it defaults to the one that always works. SNAPSHOT
+  // needs a committed network (a metagraph ordinal counts on its own chain), so under "all" the bar
+  // would open on a field it has to refuse — it opens on ANCHORED INTO instead, which addresses the
+  // one chain everyone shares.
+  const [axis, setAxis] = useState<SearchAxis>("tick");
   const [qSnapshot, setQSnapshot] = useState("");
   const [qTick, setQTick] = useState("");
   const [qFrom, setQFrom] = useState("");
@@ -477,6 +482,10 @@ export default function AnchorLogTable() {
   // while a page is fetched, and unmounting the controls mid-seek loses what was typed.
   const search = !searchOpen ? null : (
     <LogSearchBar
+      axis={axis}
+      setAxis={setAxis}
+      // The committed network's own short name — SNAPSHOT's scope, stated rather than assumed.
+      network={histNet ? (displayNetwork(histNet)?.ticker ?? "this network") : null}
       seeking={seeking}
       snapshot={qSnapshot}
       tick={qTick}
@@ -539,7 +548,7 @@ export default function AnchorLogTable() {
         )}
       >
         <Search aria-hidden className="size-3" />
-        search
+        search fields
       </button>
     </div>
   );
