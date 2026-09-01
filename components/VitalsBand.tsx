@@ -178,10 +178,16 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
   return (
     <div className="flex flex-col gap-[3px] w-full self-center min-w-0">
       {rows.map((r) => (
-        // `justify-end`: with the track capped, a row's leftover width would otherwise pack to the
-        // START and strand the numbers mid-plate. Pinned right, the values line up on the card's
-        // own edge and the slack sits behind the block, next to the hairline.
-        <span key={r.key} className="flex items-center gap-1.5 min-w-0 justify-end">
+        // LEFT-ALIGNED, so the breakdown starts immediately after the card's hairline (user,
+        // 2026-09-01: "some vitals are not correctly left aligned"). Right-pinning was tried first
+        // — it lines the values up on the card's own right edge, which is tidy in isolation — but
+        // with the track capped, each card's leftover lands as a DIFFERENT gap behind its block, so
+        // three cards of identical width started their breakdowns at 101 / 91 / 101px and the row
+        // read ragged. Alignment across the row beats alignment within one card. The values still
+        // line up with EACH OTHER inside a card, because every row shares one label column and one
+        // capped track; the leftover simply collects at the right, where nothing has to line up
+        // against it.
+        <span key={r.key} className="flex items-center gap-1.5 min-w-0">
           {/* NO uppercase transform: the layer codes are ONE vocabulary (L0/cL1/dL1 — case is
               part of the code) and provider names are names; country codes arrive uppercase.
               `0 1 <labelW>px` rather than a hard width: on a narrow card the label SHRINKS into
@@ -202,7 +208,13 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
           {/* Under a COMMITTED scope a 0 is "this network has none of these", not a measurement of
               zero — the dash says so where a numeral would read as a count (kept from the dot-legend
               design this replaced). Unscoped, every row is a real count and prints as one. */}
-          <span className="font-mono text-micro tabular-nums text-foreground flex-none">
+          {/* THE VALUES ARE A COLUMN, so they align on their DIGITS (user, 2026-09-01 — the
+              composition card's "data" row, where 164 / 10 / 11 / 17 mix widths). `flex-none` with
+              no width left each numeral its own box, left-packed against the bar, so the ones
+              column stepped in and out down the card. A right-aligned floor gives them a shared
+              column; `tabular-nums` then holds it exactly, and a wider count simply grows the
+              column rather than breaking it. */}
+          <span className="font-mono text-micro tabular-nums text-foreground flex-none text-right min-w-[26px]">
             {dashZero && r.count === 0 ? <span className="text-muted-foreground italic opacity-60">—</span> : r.count}
           </span>
         </span>
