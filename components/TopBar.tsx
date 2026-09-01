@@ -168,13 +168,25 @@ export default function TopBar() {
         {/* LEFT zone: brand + filter. A real flex container at every width now that the grid
             is the base layout — the in-zone gaps mirror the row's own gap steps. */}
         <div className="flex items-center gap-3 max-[1260px]:gap-2.5 max-[940px]:gap-2 max-[700px]:gap-1 min-w-0">
-        {/* The HEARTBEAT — the PULSE STRIP's toggle (user, 2026-08-30: "when I click the top
-            bar heartbeat it should show a bottom section with relevant information about the
-            liveliness of the app", superseding the 2026-08-09 /about route — the mark IS the
-            liveliness cue, so it opens the liveliness instrument; /about moved to the FOOTER
-            (the wordmark is plain chrome and the strip's own about link was removed by the
-            user the same day). On phone the footer rides above the dock (user, 2026-08-31),
-            so the route holds on every tier. */}
+        {/* THE BRAND IS THE PULSE CONTROL — mark and wordmark in ONE button (user, 2026-09-01:
+            make the wordmark "behave like the heartbeat", then "maybe group them?"). They were
+            two adjacent elements doing different things: the ECG opened the pulse strip while
+            the wordmark beside it was inert chrome. Two buttons firing the same toggle would
+            have been the literal reading of the request and the wrong one — one control with a
+            mark and a label is what the rest of this bar already is.
+
+            This RE-LINKS the wordmark, reversing 2026-08-30 ("don't link it here"), but not to
+            the route that decision was about: /about still belongs to the footer, and the
+            wordmark now opens the LIVENESS instrument its own mark already stands for. The
+            wordmark still hides on phone (it does not fit — 700 is breakpointOf's own boundary,
+            CSS trap 8's same-number rule), so there the control is the mark alone, which is
+            exactly what it was before.
+
+            ⚠️ The accessible name must say what the button DOES. Visibly it reads "DAG
+            Visualizer", which names the app rather than the action, and on phone it reads
+            nothing at all — so an sr-only clause carries the verb in both cases. An `aria-label`
+            would have been the shorter fix and the wrong one: it REPLACES the visible text, and
+            a control whose spoken name omits the words printed on it is the label-mismatch trap. */}
         <button
           type="button"
           aria-expanded={strip === "pulse"}
@@ -183,28 +195,22 @@ export default function TopBar() {
           onClick={() => setStrip((cur) => (cur === "pulse" ? null : "pulse"))}
           onKeyDown={(e) => { if (e.key === "Escape") setStrip(null); }}
           className={cn(
-            "flex items-center rounded-btn -mx-1 px-1 py-0.5 bg-transparent border-0 cursor-pointer",
+            "flex items-center gap-3 max-[1260px]:gap-2.5 max-[940px]:gap-2 max-[700px]:gap-1",
+            "rounded-btn -mx-1 px-1 py-0.5 bg-transparent border-0 cursor-pointer text-left",
             "hover:bg-wash-soft transition-colors duration-150 motion-reduce:transition-none",
             strip === "pulse" && "bg-wash-soft",
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
           )}
         >
           <EcgMark />
+          {/* `select-none` stays (it is chrome, not copy); `cursor-default` goes — the whole
+              thing is a control now and must say so under the pointer. */}
+          <span className="flex items-center gap-2 font-semibold tracking-[-0.01em] text-title whitespace-nowrap select-none max-[700px]:hidden">
+            <span className={live ? "text-foreground" : "text-muted-foreground opacity-70"}>DAG</span>{" "}
+            <span className={cn("text-muted-foreground", !live && "opacity-70")}>Visualizer</span>
+          </span>
+          <span className="sr-only">— show app liveliness</span>
         </button>
-        {/* The WORDMARK — plain identity text since 2026-08-30 (user: the footer owns /about
-            now, "don't link it here"; the ECG beside it owns the pulse strip). Shown at every
-            width: the old 1439 hide was measured WITH the vitals cluster in the bar, and the
-            vitals left for the bottom band — re-measured after, the full wordmark fits down to
-            phone with zero zone overflow (the dev overflow alarm above still shouts if content
-            grows and this drifts again). */}
-        {/* Hidden on PHONE only (user, 2026-08-30: "it does not fit there" — the bar's content
-            is data-dependent, a committed network's name widens the filter face past what the
-            390px sweep measured). 700 is breakpointOf's own boundary, same arm every phone gate
-            names (CSS trap 8: max-[700px] stops applying AT 700, the wide face). */}
-        <span className="flex items-center gap-2 font-semibold tracking-[-0.01em] text-title whitespace-nowrap select-none cursor-default max-[700px]:hidden">
-          <span className={live ? "text-foreground" : "text-muted-foreground opacity-70"}>DAG</span>{" "}
-          <span className={cn("text-muted-foreground", !live && "opacity-70")}>Visualizer</span>
-        </span>
         <span className="w-px self-stretch bg-border my-1 max-[860px]:hidden" />
 
         {/* Filter (toned, de-nested) — toggles the ATTACHED filter strip below (user,
