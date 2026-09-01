@@ -537,7 +537,9 @@ export default function AnchorLogTable() {
    *  ⚠️ Rendered by BOTH branches, like the row itself: a seek swaps the table into its loading
    *  state, and a toolbar that vanishes mid-seek takes the only way out with it. */
   const toolbar = (
-    <div className="flex-none flex items-center justify-end gap-1.5 pb-1">
+    // `pb-2` — the same 8px the box below it keeps to the table, so the search block sits in an
+    // even rhythm instead of being pinched against its own trigger (user, 2026-09-01).
+    <div className="flex-none flex items-center justify-end gap-1.5 pb-2">
       {searchSet && (
         <>
           <span className="min-w-0 truncate text-micro text-muted-foreground">

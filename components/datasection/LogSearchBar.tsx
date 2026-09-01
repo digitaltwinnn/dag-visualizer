@@ -83,7 +83,7 @@ export default function LogSearchBar({
       //
       // OUTLINE ONLY, no fill: the fields inside carry `--panel-plate`, and a plate on a plate
       // would flatten them into the container. Same weight as every other resting division here.
-      className="flex-none flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-border/50 px-3 py-2 mt-0.5 mb-2"
+      className="flex-none flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-border/50 px-3 py-2 mb-2"
       onKeyDown={(e) => {
         if (e.key === "Escape") onClose();
         // Enter anywhere in the bar runs the same search the button runs — implicit submission for
