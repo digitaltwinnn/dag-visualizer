@@ -135,6 +135,26 @@ the phone flight-dim rules were in the source for a day while the served chunk p
 the "bug" was chased in the state machine first). When a rule is missing from the browser's CSSOM,
 don't debug the cascade: kill the server, `rm -rf .next/dev`, restart.
 
+⚠️ **AND IT REACHES PRODUCTION THROUGH VERCEL'S BUILD CACHE** (2026-09-01, a live incident on
+dagvisualizer.io). A deploy shipped a MIXED bundle: a fresh class scan of the current TSX glued to a
+`globals.css` compile from *before the branch began*. Both halves looked healthy on their own — the
+source was correct on master, `tsc`, the tests and a local `next build` were all clean — so nothing
+in the repo could have caught it.
+
+**LEARN THE TELL, because the symptom points somewhere else.** It was reported as "the top/bottom
+bars are displaced", which sounds like a layout bug. What had actually happened: the *utilities*
+`inset-x-[var(--bar-margin)]` and `h-[var(--vitals-h)]` shipped intact while the `:root` block
+defining those tokens did not, so both collapsed to `0` and the fixed bars lost their inset. So:
+
+> **utilities present + their `:root` tokens missing = a stale stylesheet, not a layout mistake.**
+
+Confirm it in one line — `getComputedStyle(document.documentElement).getPropertyValue("--bar-margin")`
+returning `""` is the whole diagnosis — then compare the served chunk against the source rather than
+reading the cascade. The fix is a redeploy with the build cache cleared (Vercel → Redeploy, "Use
+existing Build Cache" UNCHECKED); the commit itself needs no change. `components/DevCssCanary.tsx`
+now checks these tokens in EVERY environment for this reason: the failure is a build artifact, so
+checking only in dev checks the one place it cannot come from.
+
 `next build` and `next dev` don't conflict (dev outputs to `.next/dev`), so the production check can
 run alongside the dev server. Do it at phase boundaries: the build should be clean;
 `/api/metagraphs` is `ƒ` (Dynamic — it reads `?net=`) and must answer with
