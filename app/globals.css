@@ -138,18 +138,33 @@
    clock reads as two things happening — the arrow finishing while the body is still moving. Any
    change here changes `duration-150` on every disclosure chevron too, or they desynchronise.
 
-   ⚠️ `overflow: hidden` is load-bearing: without it the body paints at full height for the whole
-   animation and only the BOX collapses, so the content spills over whatever is beneath it. */
-.disclose-panel { overflow: hidden; }
+   ⚠️ CLIPPING IS THE ANIMATION'S, NOT THE PANEL'S. A height reveal needs `overflow: hidden` or the
+   body paints at full height while only the BOX collapses, spilling over whatever is beneath it —
+   but a panel that clips AT REST shaves its own content, and the explorer rows overhang on purpose
+   (user, 2026-09-01: the "2nd and 3rd row selections get cut-off at the right side — a hard
+   vertical line rather than a corner edge"). `ROW_OUTSET` runs a nested row 6px PAST its container
+   on each side so every depth ends on one edge, and what a clip removes there is precisely the
+   row's rounded right corner, which is why it read as a hard line rather than as missing width.
+
+   CSS cannot clip one axis and leave the other — `overflow-y: hidden` with `overflow-x: visible`
+   computes the visible one to `auto` — so the clip is scoped in TIME instead. `overflow` is a
+   discrete animatable property: naming it in both keyframes holds it hidden for exactly the
+   animation's duration and returns the panel to `visible` the moment it ends. Rest is unclipped,
+   the reveal is clipped, and nothing has to know about anyone's outset.
+
+   ⚠️ Widening the clip box instead (a negative margin plus equal padding) was tried first and is
+   the wrong shape: these panels NEST — a composition group inside a network row — so every level
+   added its own 6px and the outer one clipped the inner one's expansion, putting the innermost
+   rows right back on the boundary. */
 .disclose-panel[data-state="open"]   { animation: disclose-down 150ms ease-out; }
 .disclose-panel[data-state="closed"] { animation: disclose-up 150ms ease-in; }
 @keyframes disclose-down {
-  from { height: 0; }
-  to   { height: var(--radix-collapsible-content-height); }
+  from { height: 0; overflow: hidden; }
+  to   { height: var(--radix-collapsible-content-height); overflow: hidden; }
 }
 @keyframes disclose-up {
-  from { height: var(--radix-collapsible-content-height); }
-  to   { height: 0; }
+  from { height: var(--radix-collapsible-content-height); overflow: hidden; }
+  to   { height: 0; overflow: hidden; }
 }
 /* The open/closed STATE is information; only the travel is motion. Reduced motion keeps the
    state change instant rather than removing it, which is this file's rule everywhere else. */
