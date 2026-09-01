@@ -1327,8 +1327,23 @@ export class Engine {
       // view while a metagraph is committed (cameraRig.ledgerCommitTilt, user 2026-08-09). Keyed on
       // the FILTER rather than on the rung, so the two finer rungs inherit it by delegating here and
       // clearing the filter tweens back to frontal on its own.
+      // ⚠️ THROUGH THE LEDGER'S OWN LENS, like everything else in this chamber (user, 2026-09-01:
+      // filtering DAG left "a bloom on the trail that stays behind; on other filters it does not
+      // behave like this"). This gate read the RAW filter while `setFilter`, the hover preview and
+      // the live edge all read `ledgerLens` — where `dag` IS `all`, because every global tick is a
+      // DAG snapshot and the base ledger's story is the whole chamber.
+      //
+      // The mismatch composed two correct behaviours into a wrong picture: committing DAG tilted
+      // the camera into the three-quarter pose — which turns the global floor toward the viewer, so
+      // more of its emissive surface faces the camera and blooms — while the coloured dim, reading
+      // the lens, correctly dimmed NOTHING. Every other filter tilts and dims together, so the tilt
+      // reads as emphasis; DAG alone tilted with nothing dimmed, and that is the bloom.
+      //
+      // Frontal is also what the tilt is FOR: it exists so "the two storeys separate" when a
+      // metagraph's lane must be read against the floor. Commit the DAG and there is no lane to
+      // separate — the subject IS the floor — so the lean has no work to do.
       const f = FOCI.ledger;
-      if (!this.filter || this.filter === "all") {
+      if (ledgerLens(this.filter) === "all") {
         this.cam.focus("ledger");
         return true;
       }
