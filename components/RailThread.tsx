@@ -217,16 +217,53 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
     };
     const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };
     schedule();
+
+    // ⚠️ THE RAIL SLIDES, AND A SLIDE IS NOT ONE MEASUREMENT (user, 2026-09-01: the ruler's
+    // "anchor to the card" breaks when the strip opens — "cards move down, ruler stays
+    // unchanged"; present in prod, so it predates the corner-to-corner change).
+    //
+    // Opening a top-bar strip writes `--topbar-extra`, which moves the rails DOWN by that much
+    // over a 0.35s CSS transition. Neither existing observer answers that: a ResizeObserver
+    // watches SIZE and a position change has none, and while it does happen to fire once here
+    // (the rail's `max-height` shrinks), one callback lands at the START of the slide — measured,
+    // the dots stayed at 108 while their eyebrows travelled to 187, a drift of exactly the
+    // published 79px. This is the same family as the transform bug the header above records:
+    // the thing that moved fires no event of its own.
+    //
+    // So the ruler FOLLOWS the slide rather than sampling it: `--topbar-extra` is written to
+    // `documentElement.style`, which IS observable, and each write starts a per-frame re-measure
+    // lasting the rail's own transition (read from it, so re-tuning the CSS re-tunes this) plus a
+    // frame. Under reduced motion the duration is 0 and the loop is the single frame an instant
+    // jump needs. It costs nothing at rest — there is no polling, only a burst per strip toggle.
+    let follow = 0;
+    const followSlide = () => {
+      cancelAnimationFrame(follow);
+      const ms = (parseFloat(getComputedStyle(rail).transitionDuration) || 0) * 1000 + 60;
+      const until = performance.now() + ms;
+      const step = () => {
+        measure();
+        follow = performance.now() < until ? requestAnimationFrame(step) : 0;
+      };
+      follow = requestAnimationFrame(step);
+    };
+
     const ro = new ResizeObserver(schedule);
     ro.observe(rail);
     const mo = new MutationObserver(schedule);
     mo.observe(rail, { childList: true, subtree: true });
+    // The rails' own offsets ride tokens on the ROOT (`--topbar-extra`, `--bottom-reserve`), and
+    // every one of them is set through `documentElement.style` — so one attribute filter covers
+    // each thing that can move a rail without resizing it.
+    const rootMo = new MutationObserver(followSlide);
+    rootMo.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
     rail.addEventListener("scroll", schedule, { passive: true });
     window.addEventListener("resize", schedule);
     return () => {
       cancelAnimationFrame(raf);
+      cancelAnimationFrame(follow);
       ro.disconnect();
       mo.disconnect();
+      rootMo.disconnect();
       rail.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
     };
