@@ -131,8 +131,14 @@ export default function AnchorLogTable() {
   // "all" the log is a window over every network at once, so there is nothing to infer and the
   // reader picks (user: "in all there are multiple networks, so it's needed").
   const [searchMeta, setSearchMeta] = useState<string | null>(null);
+  // ⚠️ UNDER A COMMIT THE PICKER IS A READOUT, NOT A CHOICE. This table IS the committed network's
+  // chain — it pages that chain server-side — so an ordinal typed here can only ever count on it,
+  // and offering a different network would promise a search this surface cannot run. `histNet`
+  // therefore WINS over the local pick; under "all" there is no chain and the pick is the scope.
+  // Changing which network is searched is the top bar's job, which is the same boundary the pager
+  // and the explorer already keep.
   const metaList = useStore((st) => st.metaList);
-  const searchNet = searchMeta ?? (histNet || null);
+  const searchNet = histNet || searchMeta;
   const [qSnapshot, setQSnapshot] = useState("");
   const [qTick, setQTick] = useState("");
   const [qFrom, setQFrom] = useState("");
@@ -389,8 +395,17 @@ export default function AnchorLogTable() {
     if (!Number.isFinite(n) || n < 1) return;
     setJumpMiss(null);
     if (!histNet) {
-      const idx = allRows.findIndex((r) => r.ordinal === n);
-      if (idx < 0) { setMarked(null); setJumpMiss("not in the retained window — pick a network to page all time"); return; }
+      // ⚠️ SCOPED TO THE CHOSEN CHAIN. Ordinals are per-chain, so an unscoped scan of the window
+      // matches whichever network happened to reach that number first — the exact ambiguity the
+      // picker exists to remove, and the reason the field refuses to run without one.
+      if (!searchNet) { setJumpMiss("pick which metagraph's chain this number counts on"); return; }
+      const idx = allRows.findIndex((r) => r.metaId === searchNet && r.ordinal === n);
+      if (idx < 0) {
+        setMarked(null);
+        const who = displayNetwork(searchNet)?.ticker ?? "that network";
+        setJumpMiss(`${who} ${n.toLocaleString()} is not in the retained window — commit it in the top bar to page all time`);
+        return;
+      }
       setPageState(Math.floor(idx / PAGE) + 1);
       setMarked(n);
       return;
@@ -519,6 +534,7 @@ export default function AnchorLogTable() {
       networks={searchNets}
       metaId={searchNet}
       setMetaId={setSearchMeta}
+      metaLocked={!!histNet}
       seeking={seeking}
       snapshot={qSnapshot}
       tick={qTick}

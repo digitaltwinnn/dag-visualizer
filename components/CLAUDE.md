@@ -10,43 +10,69 @@ the architecture map and the dev workflow; **its rules govern this file too**.
 
 The page is one fixed shell in **two layers at different depths** (`SectionShell` + `store.section`).
 **The raw layer's anchor log carries a SEARCH BAR** (`datasection/LogSearchBar.tsx` +
-`src/data/chainSeek.ts`), revealed by a `search` button in a toolbar above the table.
+`src/data/chainSeek.ts`): three named criteria in a hairline box, and ONE Search button, revealed by
+a `search snapshots` toggle in a toolbar above the table.
 
-⚠️ **SEARCHING IS ASKED FOR, AND THE TRIGGER SITS WITH WHAT IT REVEALS.** Two rounds of this were
+⚠️ **SEARCHING IS ASKED FOR, AND THE TRIGGER SITS WITH WHAT IT REVEALS.** Two placements were
 rejected and both lessons are load-bearing. The controls first sat PERMANENTLY under the header
 cells they answer for — a real pattern with a real virtue, context — but a standing line of
 placeholders under the header reads as a first data row whose values happen to be words, and a
-table's job is to open as data (user: "it now kinda looks like the search row is actually part of
-the data, and the hint looks ugly"). The second cut put the toggle in the PAGER strip below the
-table while the inputs opened above it: "makes no sense to put search at the bottom and the inputs
-at the top". Progressive disclosure works by ADJACENCY — search belongs in a toolbar above the
-table, and the fields open directly beneath it.
+table's job is to open as data (user: "it kinda looks like the search row is actually part of the
+data, and the hint looks ugly"). The second cut put the toggle in the PAGER strip below the table
+while the inputs opened above it: "makes no sense to put search at the bottom and the inputs at the
+top". Progressive disclosure works by ADJACENCY — search belongs in a toolbar above the table, and
+the fields open directly beneath it.
 
 ⚠️ **AND THE FIELDS CAME OFF THE TABLE ENTIRELY** (user: "just three named search fields … this way
 it does not fight with the table"). Seated in header cells, the TABLE's geometry was the form's
 budget and the table won every argument: two date inputs cannot render `mm/dd/yyyy` inside a ~165px
-AGE column, so they had to stack; hints had to fit column widths, so they were cramped; and every
-column needed a cell even where it could answer nothing. Off the table they are just fields — the
-date range fits one line, each control is named by a LABEL rather than by whatever column it sat
-under, and the AGE column went back to its natural 115px from the 232px the stacked pair forced.
+AGE column, so they stacked; hints had to fit column widths, so they were cramped; and every column
+needed a cell even where it could answer nothing. Off the table they are just fields — the date
+range fits one line, each is named by a LABEL rather than by whatever column it sat under, and the
+AGE column went back to its natural 115px from the 232 the stacked pair forced. The bar sits in its
+own hairline box: measured, the toolbar, the fields and the table header sat at 0px from each other
+and the criteria read as more table chrome. Outline only, no fill — the fields carry `--panel-plate`
+and a plate on a plate flattens them.
 
-⚠️ **THREE FIELDS IS ITSELF THE STATEMENT** — the old row said it with empty cells. Under a
-committed network this table pages a chain of >1M pages server-side, and only three axes are
-searchable across it. SNAPSHOT is arithmetic (ordinals are gapless), one request. ANCHORED INTO
-asks the GLOBAL SNAPSHOT ITSELF — it carries the list of what anchored into it
+⚠️ **ONE BUTTON, AND ALL THREE CRITERIA VISIBLE.** A submit beside every field was rejected ("I want
+a search button"), and so was a "search by" chooser that hid two criteria to make one button
+unambiguous ("no 'search by'"). A reader wants to see everything they can search by, with one thing
+to press; `onSubmit` states the precedence, most specific first. Enter anywhere in the bar runs the
+same search — both, never one: implicit submission for everyone who knows it, a visible control for
+everyone who does not.
+
+⚠️ **THE METAGRAPH CRITERION IS ONE COMPOSITE FIELD — a chain picker joined to its ordinal — and
+under a commit the picker is a READOUT, not a choice.** Ordinals are PER CHAIN: DOR's 27,813,700 and
+DED's are unrelated snapshots of unrelated ledgers. Under "all" the log is a window over every
+network at once, so there is nothing to infer and the reader picks (user: "in all there are multiple
+networks, so it's needed") — and the window search is SCOPED by that pick, which is the whole point;
+an unscoped scan matches whichever network reached the number first. Under a committed filter the
+table IS that network's chain and pages it server-side, so `histNet` WINS over the local pick and the
+picker locks, stating the scope rather than offering a search this surface cannot run. Changing which
+chain is searched is the top bar's job — the same boundary the pager and the explorer already keep.
+
+⚠️ **THREE CRITERIA IS ITSELF THE STATEMENT** — the old row said it with empty cells. Only three axes
+are searchable across a chain of >1M pages. SNAPSHOT is arithmetic (ordinals are gapless), one
+request. ANCHORED INTO asks the GLOBAL SNAPSHOT ITSELF — it carries the list of what anchored into it
 (`/api/snapshot/[ordinal]` decodes one row per channel with that channel's own ordinal), so the
-answer is ONE exact read, measured: one request, zero walk probes. It is also the only mechanism
-that can say *this network did not anchor there* — a time-based search answers that case by landing
-on whatever came next, which reads as a hit. AGE is a date, and there is no date lookup upstream
-(verified: `startTime`/`endTime`, `timestamp`, `from`, `startDate`, `before` are all silently
-ignored and return the live tip), so it is the only field that walks. FEE and SIZE have no index at
-any layer — a field there could only filter the 25 rows on screen, and a reader who typed a fee and
-got "no match" would reasonably conclude no such snapshot exists when we looked at 25 of 1.1
-million. NETWORK is inert because under a commit the table IS one network.
+answer is ONE exact read, measured: one request, zero walk probes. It is also the only mechanism that
+can say *this network did not anchor there* — a time-based search answers that case by landing on
+whatever came next, which reads as a hit. AGE is a date, and there is no date lookup upstream
+(verified: `startTime`/`endTime`, `timestamp`, `from`, `startDate`, `before` are all silently ignored
+and return the live tip), so it is the only criterion that walks. FEE and SIZE have no index at any
+layer — a field there could only filter the 25 rows on screen, and a reader who typed a fee and got
+"no match" would reasonably conclude no such snapshot exists when we looked at 25 of 1.1 million.
 
 **The toolbar carries the two states the first cuts had nowhere to put**, both named in every guide
 on table filtering: what is APPLIED (in words, so a folded bar can never leave the table on a search
 with nothing explaining it) and a way to CLEAR it.
+
+⚠️ **AND TWO COLUMNS STAND DOWN ON PHONE.** Six columns cannot fit a 500px viewport — measured, the
+table ran 494px inside a 403px pane and took the log into horizontal scroll, which on a log you SCAN
+is worse than showing less of each row. FEE and SIZE go: the other four IDENTIFY a row (whose chain,
+which snapshot, where it anchored, when) while those two are measures ABOUT it, stated in full on the
+snapshot card one tap away — and they are the only two the search bar cannot answer for anyway. One
+class on the header cell and its body cells, so a column can never half-hide.
 
 ⚠️ **AND ANCHORED INTO HAS NO FALLBACK, DELIBERATELY.** The payload host serves only the recent band
 of global ordinals and 404s older ones. A first cut answered that by resolving the ordinal to a

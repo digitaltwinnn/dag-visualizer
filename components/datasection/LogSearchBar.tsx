@@ -32,6 +32,7 @@ export default function LogSearchBar({
   networks,
   metaId,
   setMetaId,
+  metaLocked,
   seeking,
   snapshot,
   tick,
@@ -48,6 +49,9 @@ export default function LogSearchBar({
   networks: { id: string; label: string }[];
   metaId: string | null;
   setMetaId: (id: string) => void;
+  /** True while a network is committed: the table IS that chain, so the picker states it rather
+   *  than offering a choice this surface could not run (see AnchorLogTable's `searchNet`). */
+  metaLocked: boolean;
   seeking: boolean;
   snapshot: string;
   tick: string;
@@ -104,10 +108,11 @@ export default function LogSearchBar({
             metagraph coloured bullet with the selected snapshot number in the field"). The two
             halves are JOINED — squared inner corners, no gap — because they are one criterion, and
             a gap between them would read as two. */}
-        <Select value={metaId ?? undefined} onValueChange={setMetaId}>
+        <Select value={metaId ?? undefined} onValueChange={setMetaId} disabled={metaLocked}>
           <SelectTrigger
             size="sm"
             aria-label="Which metagraph's chain"
+            title={metaLocked ? "The log is paging this network's chain — change it in the top bar's filter" : "Which metagraph's chain the number counts on"}
             // ⚠️ `h-6!` — CSS trap 4. The primitive sizes itself with `data-[size=sm]:h-8`, an
             // attribute selector at (0,2,0) that beats a plain `h-6` at (0,1,0), so the picker sat
             // 32px tall beside 24px inputs. The important modifier is the documented escape.
