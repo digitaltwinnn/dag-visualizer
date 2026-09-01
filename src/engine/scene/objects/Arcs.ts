@@ -29,38 +29,57 @@ interface FlashRec {
  * the bright end of the trail's vertex ramp.
  *
  * The trail is where the packet HAS BEEN: a path drawn on the wall, so it takes `glowBlend`'s ink
- * on paper like every other piece of furniture, and wave 8 judged it right ("fine ink trails"). The
- * head is the packet ITSELF — a travelling light — and a light that fades into the wall the moment
- * the ground turns pale is not a light. So it stays ADDITIVE on both grounds, deliberately NOT
- * asking `glowBlend`.
+ * on paper like every other piece of furniture, and wave 8 judged it right ("fine ink trails").
  *
- * ⚠️ That is not the additive-is-a-no-op trap, because the scene's light ground is SILVER, not the
- * HUD's paper. `--scene-ground`'s own token comment states the reason it exists: "a deeper grey
- * than the page so ink pops, MARKS CAN EXCEED THE GROUND, and a calm bloom is physically possible
- * again" (design fork C). Measured, the silver sits ~184/255 against the page's ~240 — some 70
- * bytes of headroom that a mark lying on `--background` genuinely does not have. The head spends
- * exactly that headroom, and nothing else in the scene competes for it.
+ * ⚠️ AND SO, IN THE END, DOES THE HEAD — corrected 2026-09-01, after the user reported the light
+ * ground twice: first that the arcs were "hardly visible", then that the heads were "still too
+ * light/bright". Both are the same mistake made at two strengths, and the record of the wrong
+ * reasoning is kept here because it is a persuasive wrong reasoning.
  *
- * The ground still decides the head's WEIGHT, because a spark needs different things on each. On
- * black the hue IS the light and a small hot dot reads immediately. On silver the same dot reads as
- * a pale smudge — the eye has no dark surround to measure it against — so paper takes a bigger
- * point, a whiter core and a saturated coloured skirt around it: the hue is what separates a spark
- * from a specular highlight on a grey wall.
+ * The old argument ran: the head is the packet ITSELF, a travelling light, and a light that fades
+ * into the wall the moment the ground turns pale is not a light — so it stays ADDITIVE on both
+ * grounds. It leaned on the scene's light ground being SILVER rather than the HUD's paper
+ * (`--scene-ground` sits ~184/255 against the page's ~240, "marks can exceed the ground"), and
+ * spent that headroom on a bigger point with a whiter core.
  *
- * And the head — the head ALONE — joins BLOOM_LAYER. That is the second half of reading as a spark
- * on silver: the selective pass bleeds the ground toward the head's own hue and adds a whisper of
- * light at its core, which is a halo the additive dot cannot draw for itself. The TRAIL must stay
- * out of the layer: it is a wide soft sheet of near-identical ink, and blurred it would smear the
- * whole swarm into one coloured fog — the same reason the ledger's ribbons are excluded.
+ * What that misses is the DIRECTION additive can move. Adding light to a 0.72-L ground can only
+ * push toward white, so every knob meant to make the spark READ — more size, more white in the
+ * core, the selective bloom halo on top — moved it closer to the ground it was trying to stand
+ * against, and the compensation made the wash worse. The 70 bytes of headroom are real; they are
+ * just not enough to build a mark out of, while the ~180 bytes BELOW the silver are.
+ *
+ * So on paper the head is the DENSEST INK in the swarm, not the brightest light: normal-blended, a
+ * deepened version of its own hue, and no bigger than it needs to be. The packet still leads its
+ * trail — it is darker and more saturated than the path behind it, which is exactly the same
+ * hierarchy the dark ground states with brightness, expressed for a ground that reads by contrast
+ * downward. On black nothing changes: it is the hot white-cored spark it always was.
+ *
+ * The head — the head ALONE — joins BLOOM_LAYER, which on the dark ground bleeds a halo the
+ * additive dot cannot draw for itself. On paper the mark is dark, so it feeds that pass almost
+ * nothing and the layer costs nothing to leave it in. The TRAIL must stay out either way: it is a
+ * wide soft sheet of near-identical ink, and blurred it would smear the whole swarm into one
+ * coloured fog — the same reason the ledger's ribbons are excluded.
  */
 const HEAD_TUNE_DEFAULTS = Object.freeze({
   size: 5.5,     //  point diameter in CSS px at the resting geo distance
   sizeMin: 3,    //  px floor — a spark zoomed out must still be a spark, not a speck
   sizeMax: 26,   //  px ceiling — and zoomed in it must not become a blob
-  paperMul: 2,   //  how much bigger the head runs on silver (see the header)
+  paperMul: 1.15, //  how much bigger the head runs on silver. It was 2 while the head was a
+                  //  washed-out additive blob and the size was compensating; ink needs no such
+                  //  help, and a big dark dot reads as a bug rather than as a packet.
   core: 0.85,    //  weight of the tight hot centre over the coloured skirt
-  white: 0.45,   //  how far that centre pushes toward white on the dark ground
-  whitePaper: 0.6, // …and on silver, where a hotter core is what says "light, not ink"
+  white: 0.45,   //  how far that centre pushes toward white — DARK GROUND ONLY. On paper the head
+                 //  has no white in it at all; see paperInk.
+  paperInk: 0.92, //  how deep the paper head's ink runs, as a fraction of its own hue. This is the
+                  //  mark's whole colour there — no skirt/core summing, which under a normal blend
+                  //  would clip straight to white at the centre.
+                  //  ⚠️ NEAR 1 ON PURPOSE (user, 2026-09-01: "now a darker color than the chips;
+                  //  make the overall color lighter and closer to the chip colors"). The first ink
+                  //  pass deepened the hue to 0.42 to buy contrast, which bought it against the
+                  //  NODE CHIPS instead of against the ground — a packet arriving at a chip read as
+                  //  a different, darker network. A packet and the node it travels to are the same
+                  //  identity and must wear the same colour. The head still LEADS its trail, but
+                  //  through ALPHA (below), not through a darker tint: same hue, more of it.
   alpha: 1,      //  overall additive weight
 });
 
@@ -104,17 +123,43 @@ export class Arcs {
    *  (see HEAD_TUNE_DEFAULTS) — only its weight themes, through the uniforms below. */
   setColors(c: SceneColors): void {
     this._blend = glowBlend(c);
-    if (this.mat) { this.mat.blending = this._blend; this.mat.needsUpdate = true; }
     this._paper = isLightGround(c);
+    if (this.mat) { this.mat.blending = this._blend; this.mat.needsUpdate = true; this._stageTrail(this.mat); }
     if (this.headMat) this._stageHead(this.headMat);
   }
 
-  // The head's ground-dependent uniforms, in one place so construction and a live theme flip can
-  // never disagree about what a spark weighs on this ground.
+  /** ⚠️ SWAPPING THE BLEND IS ONLY HALF THE GROUND QUESTION (user, 2026-09-01: the arcs "are great
+   *  in dark-mode, but in light-mode hardly visible"). `glowBlend` re-pointed the trail from
+   *  additive glow to normal-blended ink — correct, and it is why the trail is DRAWN on paper — but
+   *  its WEIGHT stayed authored for the dark ground, where the mark adds light to black and a long
+   *  faint tail still reads. Composited as ink over the 0.72-L silver, that same weight is a tint
+   *  nobody can see. This is exactly the second answer `inkPresence` gives for marks whose presence
+   *  is baked into a vertex colour; the arcs bake theirs into the fragment ALPHA, so they need it
+   *  here instead. Two terms translate, both riding one 0/1 uniform so the dark path is untouched:
+   *
+   *    · the FALLOFF. `vB*vB` is an additive curve — light accumulates, so a quadratic tail still
+   *      carries. Ink does not accumulate, so on paper the tail runs LINEAR and reaches further back
+   *      at a weight the eye can find.
+   *    · the TINT. On black, `0.5 + vB` brightens toward the head because more light IS more
+   *      presence. On paper that lifts the ink toward the page and REMOVES contrast — the same
+   *      inversion the ink lane hits everywhere else — so the head end deepens the hue instead.
+   *
+   *  The HEAD is not part of this: it stays additive on both grounds and spends the silver ground's
+   *  own headroom (see HEAD_TUNE_DEFAULTS). Trail = ink, head = light, on either ground. */
+  private _stageTrail(m: THREE.ShaderMaterial): void {
+    m.uniforms.uInk.value = this._paper ? 1 : 0;
+  }
+
+  // The head's ground-dependent state, in one place so construction and a live theme flip can
+  // never disagree about what a spark weighs on this ground. The BLEND is part of that state now
+  // (2026-09-01): additive can only move toward white, so an additive head on silver had no way to
+  // be anything but pale — see the header.
   private _stageHead(m: THREE.ShaderMaterial): void {
     const t = HEAD_TUNE_DEFAULTS;
     m.uniforms.uSize.value = t.size * (this._paper ? t.paperMul : 1);
-    m.uniforms.uWhite.value = this._paper ? t.whitePaper : t.white;
+    m.uniforms.uInk.value = this._paper ? 1 : 0;
+    m.blending = this._paper ? THREE.NormalBlending : THREE.AdditiveBlending;
+    m.needsUpdate = true;
   }
 
   // Adopt the surface's facing/closeness uniforms so a comet over the FAR hemisphere fades the
@@ -186,6 +231,7 @@ export class Arcs {
         uM: { value: 0 }, // morph fade-in (geography view)
         uCamN: this._camN, // shared with the graticule/walls — see setFacing
         uClose: this._close,
+        uInk: { value: this._paper ? 1 : 0 }, // 0 = additive glow, 1 = ink on paper (_stageTrail)
       },
       vertexShader: `
         attribute float aTail; attribute vec3 aColor;
@@ -197,7 +243,7 @@ export class Arcs {
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }`,
       fragmentShader: `
-        uniform float uM; uniform vec3 uCamN; uniform float uClose;
+        uniform float uM; uniform vec3 uCamN; uniform float uClose; uniform float uInk;
         varying float vB; varying vec3 vColor; varying vec3 vDir;
         void main() {
           // FACING dim, the surface's own recipe (GeoView's graticule/walls): a comet over the
@@ -206,9 +252,15 @@ export class Arcs {
           // globe was pure noise. The arc apex rises above the surface, so the smoothstep window
           // is what keeps a comet crossing the limb from popping.
           float facing = mix(mix(0.22, 0.03, uClose), 1.0, smoothstep(-0.25, 0.12, dot(vDir, uCamN)));
-          float a = vB * vB * uM * facing;
+          // The comet falloff, themed: quadratic where the mark ADDS light, linear where it lays
+          // ink. See _stageTrail for why the two grounds cannot share one curve.
+          float a = mix(vB * vB, vB, uInk) * uM * facing;
           if (a < 0.01) discard;
-          gl_FragColor = vec4(vColor * (0.5 + vB), a);
+          // …and the tint with it: brighten toward the head on black, where more light IS more
+          // presence. On paper the hue stays close to the node chips' own (see paperInk) — the
+          // trail is a hair lighter than the head and the falloff above does the rest, because a
+          // packet must read as the SAME network as the chip it is flying to.
+          gl_FragColor = vec4(vColor * mix(0.5 + vB, 0.74 + 0.16 * vB, uInk), a);
         }`,
     });
     this.arcGroup.add(new THREE.LineSegments(geo, this.mat));
@@ -237,6 +289,7 @@ export class Arcs {
         uClose: this._close,
         uSize: { value: t.size },
         uWhite: { value: t.white },
+        uInk: { value: this._paper ? 1 : 0 }, // 0 = additive spark, 1 = ink on paper (_stageHead)
         uPx: { value: px },
       },
       vertexShader: `
@@ -255,6 +308,7 @@ export class Arcs {
         }`,
       fragmentShader: `
         uniform float uM; uniform vec3 uCamN; uniform float uClose; uniform float uWhite;
+        uniform float uInk;
         varying vec3 vColor; varying vec3 vDir;
         void main() {
           // The same FACING dim the trail and the globe surface run, so a head crossing the limb
@@ -265,10 +319,18 @@ export class Arcs {
           float f = 1.0 - d;
           float skirt = f * f;            // the coloured falloff — this is what carries the hue
           float core = pow(f, 7.0);       // the tight centre — this is what reads as hot
-          vec3 rgb = vColor * skirt + mix(vColor, vec3(1.0), uWhite) * core * ${t.core.toFixed(2)};
-          float a = (skirt * 0.75 + core) * ${t.alpha.toFixed(2)} * uM * facing;
+          // TWO MARKS, ONE SPRITE. On black the colour SUMS — a coloured skirt plus a white-hot
+          // centre, which is what additive light does and what makes the dot read as a spark.
+          // On paper that same sum would clip to white at the centre under a normal blend (skirt
+          // and core both peak at 1 there), so the ink form carries ONE deepened hue and lets the
+          // ALPHA do the falloff instead. Same sprite, opposite arithmetic, per the header.
+          vec3 glowRgb = vColor * skirt + mix(vColor, vec3(1.0), uWhite) * core * ${t.core.toFixed(2)};
+          vec3 inkRgb = vColor * ${t.paperInk.toFixed(2)};
+          float glowA = (skirt * 0.75 + core) * ${t.alpha.toFixed(2)};
+          float inkA = clamp(skirt * 0.55 + core * 0.9, 0.0, 1.0);
+          float a = mix(glowA, inkA, uInk) * uM * facing;
           if (a < 0.004) discard;
-          gl_FragColor = vec4(rgb, a);
+          gl_FragColor = vec4(mix(glowRgb, inkRgb, uInk), a);
         }`,
     });
     this._stageHead(this.headMat);
