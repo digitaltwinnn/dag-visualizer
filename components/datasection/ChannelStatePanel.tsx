@@ -93,8 +93,19 @@ const LANE_HEAD = "text-micro uppercase tracking-caps text-muted-foreground font
  *  it and the schema keeps its natural height — capped at a share of the box so a wide-open schema
  *  can never squeeze the well away; with the tree folded there is no well, so the schema takes the
  *  scroll itself. */
+/*  ⚠️ FOLDED, THE SCHEMA TAKES THE SCROLL BUT NOT THE SPACE (user, 2026-09-01: "the raw JSON when
+ *  collapsed drops to the bottom of the section instead of where it is when opened"). It was
+ *  `flex-1`, which made it CLAIM the lane's whole height whether or not it had rows to fill —
+ *  so the `raw JSON` control sat just under the schema while open and slammed to the bottom of
+ *  the pane the moment it closed. A control that moves when you use it is the defect; the empty
+ *  column the old note worried about is not.
+ *
+ *  The default `flex: 0 1 auto` gives both behaviours from one value: a short schema sizes to its
+ *  content and the control sits directly beneath it, while a long one shrinks into whatever room
+ *  is left and scrolls INSIDE (`min-h-0` is what permits that shrink) — still one scrollbar, still
+ *  the chain the note above describes. */
 const schemaBox = (rawOpen: boolean): string =>
-  rawOpen ? "flex-none max-h-[45%] overflow-auto slim-scroll" : "min-h-0 flex-1 overflow-auto slim-scroll";
+  rawOpen ? "flex-none max-h-[45%] overflow-auto slim-scroll" : "min-h-0 overflow-auto slim-scroll";
 
 /** A lane's TABLE — two columns, identical markup in every lane, so the three lanes read as three
  *  views of one pane rather than three designs.
@@ -264,7 +275,12 @@ function RawSection({
     <Collapsible
       open={open}
       onOpenChange={onToggle}
-      className={cn("group/copy flex flex-col gap-1 mt-1.5", open && "min-h-0 flex-1")}
+      // ⚠️ FOLDED IT IS `flex-none`, so the CONTROL is the one thing in the column that never
+      // shrinks. Now that the schema sizes to its content rather than claiming the lane (see
+      // `schemaBox`), the two compete for a squeezed pane — and a default `flex-shrink: 1` here
+      // would let a tall schema compress the `raw JSON` row itself. The schema is the part with
+      // somewhere to go: it has its own scroller.
+      className={cn("group/copy flex flex-col gap-1 mt-1.5", open ? "min-h-0 flex-1" : "flex-none")}
     >
       <div className="flex items-center justify-between gap-2">
         <CollapsibleTrigger
