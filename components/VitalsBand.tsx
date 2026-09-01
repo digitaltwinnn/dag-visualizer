@@ -427,7 +427,17 @@ function HyperCells({ accent }: { accent: string }) {
       </BandCard>
       {/* Unfiltered only — under a commit these rows are the type card's own evidence, above. */}
       {singleWord == null && (
-        <BandCard label="Network layers">
+        <BandCard label="Network layers"
+          // ⚠️ A PROTOCOL CONSTANT, NOT A MEASUREMENT (user, 2026-09-01: "the protocol has 3
+          // layers, so we can just mention it, no count"). Every other lead in this band is a
+          // live reading, so two things keep this one honest in the same slot. It is derived from
+          // `layerRows.length` rather than typed as a literal, so the headline can never disagree
+          // with the rows that evidence it. And it is NOT an `Odometer`: that component exists to
+          // roll a number as it changes, and a value that cannot change must not wear the
+          // vocabulary of one that does — a `3` that visibly settles would claim it had just been
+          // measured. Plain text says "this is what the protocol IS", and the bars beside it say
+          // how the fleet fills it, which is exactly the lead/detail grammar.
+          lead={<span className="font-mono font-bold text-foreground tabular-nums">{layerRows.length}</span>}>
           <MicroBars accent={accent} labelW={34} rows={layerRows} />
         </BandCard>
       )}
