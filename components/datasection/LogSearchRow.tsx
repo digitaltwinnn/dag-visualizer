@@ -111,30 +111,48 @@ export default function LogSearchRow({
               {/* A RANGE, and the FROM bound is what the seek lands on — `to` bounds which rows the
                   walk will mark, not where it goes. Stated that way round because a chain is walked
                   from a point, not filtered to a slice. */}
-              <span className="flex items-center gap-1 justify-end">
-                {/* ⚠️ The native date control carries a browser calendar glyph that does not belong to
-                    this type system — `date-slim` (globals.css) mutes it to the row's own ink and
-                    only brings it up on hover, so at rest the cell reads as two quiet dates. */}
-                <input
-                  type="date" value={from} aria-label="From date"
-                  onChange={(e) => onFrom(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onSubmit("age"); } }}
-                  className={cn(field, "date-slim w-[104px] flex-none")}
-                />
-                <span aria-hidden className="text-micro text-muted-foreground/60">–</span>
-                <input
-                  type="date" value={to} aria-label="To date"
-                  onChange={(e) => onTo(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onSubmit("age"); } }}
-                  className={cn(field, "date-slim w-[104px] flex-none")}
-                />
-                {/* The walk costs several requests, so it SAYS it is running — a control that goes
-                    quiet for a few seconds reads as broken, not as busy. Only WHILE it runs: a
-                    permanent magnifier is decoration on a row whose placeholders already say what
-                    each cell takes, and this row's whole problem was carrying too much. */}
-                <span aria-hidden className="w-3 flex-none">
-                  {seeking && <Loader2 aria-label="searching the chain" className="size-3 animate-spin text-muted-foreground motion-reduce:animate-none" />}
-                </span>
+              {/* ⚠️ THE RANGE STACKS, and the measurement is why. The ledger's raw layer is a
+                  master–detail split, so this table lives in a ~576px pane; its six data columns
+                  need ~395 of that, leaving ~165 for AGE. A `type="date"` field cannot render
+                  `mm/dd/yyyy` below ~90px even with the calendar glyph hidden, so two of them
+                  side by side need ~190 — measured, not estimated, and the first cut duly pushed
+                  the whole table 72px into horizontal scroll and cut the AGE column off screen.
+                  Shaving them to fit truncated the format itself to `mm/dd/y`, which is a control
+                  lying about what it takes. Stacked, each field gets the column's full width and
+                  the row costs one extra line in ONE column — the cheapest of the three prices. */}
+              <span className="flex flex-col items-end gap-0.5 py-0.5">
+                {/* A RANGE, and the FROM bound is what the seek lands on — `to` bounds which rows
+                    the walk will mark, not where it goes. Stated that way round because a chain is
+                    walked from a point, not filtered to a slice. */}
+                {(["from", "to"] as const).map((which) => (
+                  <span key={which} className="flex w-full items-center gap-1">
+                    <span aria-hidden className="w-6 flex-none text-right text-micro text-muted-foreground/60">
+                      {which}
+                    </span>
+                    {/* ⚠️ The native date control carries a browser calendar glyph that does not
+                        belong to this type system — `date-slim` (globals.css) mutes it to the row's
+                        own ink and only brings it up on hover, so at rest the cell reads as two
+                        quiet dates. */}
+                    <input
+                      type="date"
+                      value={which === "from" ? from : to}
+                      aria-label={which === "from" ? "From date" : "To date"}
+                      onChange={(e) => (which === "from" ? onFrom : onTo)(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onSubmit("age"); } }}
+                      className={cn(field, "date-slim min-w-0 flex-1")}
+                    />
+                    {/* The walk costs several requests, so it SAYS it is running — a control that
+                        goes quiet for a few seconds reads as broken, not as busy. Only WHILE it
+                        runs: a permanent magnifier is decoration on a row whose placeholders
+                        already say what each cell takes. It rides the FROM line, which is the
+                        bound the seek actually spends its probes on. */}
+                    <span aria-hidden className="w-3 flex-none">
+                      {which === "from" && seeking && (
+                        <Loader2 aria-label="searching the chain" className="size-3 animate-spin text-muted-foreground motion-reduce:animate-none" />
+                      )}
+                    </span>
+                  </span>
+                ))}
               </span>
             </TableHead>
           );

@@ -30,6 +30,52 @@ describe("buildAnchorLog", () => {
     expect(buildAnchorLog(snaps, globals, "dag").map((x) => x.ordinal)).toEqual([12, 11, 90, 10]);
     expect(buildAnchorLog(snaps, globals, "nope")).toEqual([]);
   });
+
+  // SEAMS (user, 2026-09-01: "what should we do for a global snapshot that had no anchors? I want
+  // this to be searchable as well, so it should appear but just without any network attached").
+  // The scene has always drawn these standing at full height — a measured tick with no anchors is a
+  // MEASUREMENT, not a missing one — and the log now agrees, so a reader can tell a quiet tick from
+  // one the window never carried.
+  describe("seams — a global tick that anchored nothing", () => {
+    const withQuiet = [...globals, g(3, "2026-08-01T10:00:30Z")];
+
+    it("appears as a row carrying the tick, with no metagraph and no metagraph ordinal", () => {
+      const rows = buildAnchorLog(snaps, withQuiet, "all");
+      const seam = rows.filter((x) => x.metaId === null);
+      expect(seam).toHaveLength(1);
+      expect(seam[0].global.ordinal).toBe(3);
+      expect(seam[0].ts).toBe("2026-08-01T10:00:30Z");
+      // Zeroes, and the TABLE renders them as em-dashes: fee and size are what a metagraph snapshot
+      // paid and occupied, and there is no metagraph snapshot here.
+      expect(seam[0].ordinal).toBe(0);
+      expect(seam[0].fee).toBe(0);
+      expect(seam[0].sizeInKB).toBe(0);
+    });
+
+    it("sorts into the chronology by its own tick, not appended at the end", () => {
+      const rows = buildAnchorLog(snaps, withQuiet, "all");
+      expect(rows[0].metaId).toBeNull(); // 10:00:30 is the newest tick in the window
+      expect(rows.map((x) => x.global.ordinal)).toEqual([3, 2, 2, 1, 1]);
+    });
+
+    // ⚠️ THE BOUNDARY THAT MATTERS. A committed metagraph's log is that metagraph's own chain, and
+    // a tick it never anchored into is not a quiet row in that chain — it is not in it at all.
+    it("is WINDOW MODE only: a committed network's log carries none", () => {
+      expect(buildAnchorLog(snaps, withQuiet, "ded").every((x) => x.metaId === "ded")).toBe(true);
+      expect(buildAnchorLog(snaps, withQuiet, "dor").some((x) => x.metaId === null)).toBe(false);
+    });
+
+    // The base ledger IS the whole log (ledgerLens), so the quiet tick is one of its own snapshots.
+    it("survives the DAG lens, which reads as all", () => {
+      expect(buildAnchorLog(snaps, withQuiet, "dag").filter((x) => x.metaId === null)).toHaveLength(1);
+    });
+
+    it("sorts to one end of the NETWORK axis rather than scattering", () => {
+      const rows = sortAnchorLog(buildAnchorLog(snaps, withQuiet, "all"), "net", 1, (id) => id.toUpperCase());
+      expect(rows[0].metaId).toBeNull(); // "" sorts first ascending
+      expect(sortAnchorLog(rows, "net", -1, (id) => id.toUpperCase())[4].metaId).toBeNull();
+    });
+  });
 });
 
 describe("snapsAtTick", () => {

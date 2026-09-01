@@ -44,6 +44,16 @@ const COLUMNS: { key: AnchorLogSortKey; label: string }[] = [
   { key: "age", label: "Age" },
 ];
 
+/** The absence mark for a SEAM's metagraph columns. Muted rather than dim, so a scan reads it as
+ *  "nothing to say here" instead of as a faint value — and `aria-hidden` with an sr-only word,
+ *  because a screen reader announcing "em dash" four times per seam row says nothing at all. */
+const Dash = () => (
+  <>
+    <span aria-hidden className="text-muted-foreground/60">—</span>
+    <span className="sr-only">none</span>
+  </>
+);
+
 // The ledger data table (spec 2026-08-01): the per-metagraph ANCHOR LOG — one row per anchored
 // metagraph snapshot, finer-grained than the strip's per-tick bars. SORTABLE like the roster
 // (2026-08-13 — one raw-table idiom), resting on its chronological construction (newest first =
@@ -273,7 +283,12 @@ export default function AnchorLogTable() {
     armed.current = false;
     applyClickActions(
       metaSnapArrivalActions(
-        { metaId: windowFirst.metaId, ordinal: windowFirst.ordinal, hash: windowFirst.hash, globalOrdinal: windowFirst.global.ordinal, ts: windowFirst.ts },
+        // A SEAM first row commits the TICK alone — there is no metagraph snapshot to open the
+        // channel pane on, and inventing one would be the fabricated state rule 10 forbids. The
+        // pane's own empty branch is the honest answer, and the tick is still the subject.
+        windowFirst.metaId == null
+          ? null
+          : { metaId: windowFirst.metaId, ordinal: windowFirst.ordinal, hash: windowFirst.hash, globalOrdinal: windowFirst.global.ordinal, ts: windowFirst.ts },
         { kind: "snapshot", title: `Global snapshot #${windowFirst.global.ordinal}`, data: windowFirst.global },
       ),
     );
@@ -321,6 +336,12 @@ export default function AnchorLogTable() {
    *  table fetched the page starting at 12,345,706 — exactly one page off, because DOR anchors about
    *  25 snapshots per tick and one tick had passed. Pinning the base here makes the page number the
    *  jump computed and the page number the effect fetches mean the same thing. */
+  /** What the landing OUTLINE keys on for a given row. The mark is one number matched against both
+   *  `r.ordinal` and `r.global.ordinal`, and a SEAM has no metagraph ordinal — its `0` matches
+   *  nothing, since every seek rejects an ordinal below 1. So a seam is marked by its TICK, which is
+   *  the only number it has and the very thing that was searched for. */
+  const markOf = (row: AnchorLogRow) => (row.metaId == null ? row.global.ordinal : row.ordinal);
+
   const landOn = (ordinal: number) => {
     if (histNet && latest) hist.current.latest = latest;
     setPageState(pageOfOrdinal(ordinal, latest, PAGE));
@@ -368,7 +389,7 @@ export default function AnchorLogTable() {
       const idx = allRows.findIndex((r) => r.global.ordinal === n);
       if (idx < 0) { setMarked(null); setJumpMiss("not in the retained window — pick a network to page all time"); return; }
       setPageState(Math.floor(idx / PAGE) + 1);
-      setMarked(allRows[idx].ordinal);
+      setMarked(markOf(allRows[idx]));
       return;
     }
     if (!latest) { setJumpMiss("still reading the chain"); return; }
@@ -413,7 +434,7 @@ export default function AnchorLogTable() {
       const idx = allRows.findIndex((r) => tsInRange(r.ts, fromMs, toMs));
       if (idx < 0) { setMarked(null); setJumpMiss("nothing in that range inside the window"); return; }
       setPageState(Math.floor(idx / PAGE) + 1);
-      setMarked(allRows[idx].ordinal);
+      setMarked(markOf(allRows[idx]));
       return;
     }
     if (!latest) { setJumpMiss("still reading the chain"); return; }
@@ -499,11 +520,27 @@ export default function AnchorLogTable() {
               // TWO selection strengths (user, 2026-08-07): the CLICKED metagraph snapshot wears
               // the full wash + ✓; its tick-mates keep a fainter wash. (Washes, not box-shadow —
               // it doesn't paint on a collapsed table row.)
-              const rowSel = metaSnap?.metaId === r.metaId && metaSnap?.ordinal === r.ordinal;
+              // ⚠️ A SEAM is a global tick that anchored NOTHING (buildAnchorLog). It is a real
+              // measured row — the scene draws it standing at full height for exactly that reason —
+              // but it has no metagraph and no metagraph snapshot, so it cannot carry the metagraph
+              // selection, the hover channel keyed on one, or the ✓ that marks it.
+              const seam = r.metaId == null;
+              const rowSel = !seam && metaSnap?.metaId === r.metaId && metaSnap?.ordinal === r.ordinal;
               const tickMate = !rowSel && !r.pending && snap?.data.ordinal === r.global.ordinal;
               const pending = !!r.pending;
               const commit = () => {
                 if (pending) return; // half a (snapshot, tick) pair must not commit
+                if (seam || r.metaId == null) {
+                  // Nothing anchored here, so the only subject is the TICK — commit it alone rather
+                  // than inventing a metagraph snapshot the row does not have (rule 10).
+                  applyClickActions(
+                    metaSnapArrivalActions(
+                      null,
+                      { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot },
+                    ),
+                  );
+                  return;
+                }
                 applyClickActions(
                   metaSnapSelectActions(
                     { metaId: r.metaId, ordinal: r.ordinal, hash: r.hash, globalOrdinal: r.global.ordinal, ts: r.ts },
@@ -514,7 +551,11 @@ export default function AnchorLogTable() {
               };
               return (
                 <TableRow
-                  key={`${r.metaId}:${r.ordinal}`}
+                  // ⚠️ A SEAM has no metaId and no ordinal, so every seam would key `null:0` —
+                  // React then treats a whole page of them as one repeated child and reuses the
+                  // wrong DOM (caught by the Next.js MCP the first time a quiet network was
+                  // opened). Its identity is its TICK, which is unique by construction.
+                  key={r.metaId == null ? `tick:${r.global.ordinal}` : `${r.metaId}:${r.ordinal}`}
                   className={cn(
                     "text-body hover:bg-wash-faint",
                     pending ? "cursor-default" : "cursor-pointer",
@@ -535,9 +576,11 @@ export default function AnchorLogTable() {
                   title={pending ? "resolving the anchoring tick…" : undefined}
                   // The selection follows the subject's identity (selectionHue).
                   style={rowSel ? selectionHue(cfg?.hue ?? "var(--core)") : undefined}
-                  onMouseEnter={() => setHoverMetaSnap(metaSnapHoverKey(r.metaId, r.ordinal))}
+                  // A seam has no metagraph snapshot to preview, so it writes no hover channel —
+                  // the pairing rule is that a surface hovers the subject it would COMMIT.
+                  onMouseEnter={() => setHoverMetaSnap(r.metaId ? metaSnapHoverKey(r.metaId, r.ordinal) : null)}
                   onMouseLeave={() => setHoverMetaSnap(null)}
-                  onFocus={() => setHoverMetaSnap(metaSnapHoverKey(r.metaId, r.ordinal))}
+                  onFocus={() => setHoverMetaSnap(r.metaId ? metaSnapHoverKey(r.metaId, r.ordinal) : null)}
                   onBlur={() => setHoverMetaSnap(null)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
@@ -548,6 +591,16 @@ export default function AnchorLogTable() {
                   onClick={commit}
                 >
                   <TableCell>
+                    {seam ? (
+                      // ⚠️ FOUR EM-DASHES, NOT FOUR ZEROS. Network, snapshot, fee and size are all
+                      // facts about a METAGRAPH SNAPSHOT, and this tick has none — so a `0.00000000`
+                      // in the fee column would read as "a snapshot that paid nothing" when the
+                      // truth is "no snapshot". The em-dash is the absence; the two columns that
+                      // belong to the TICK itself (anchored into, age) carry their real measured
+                      // values, because the tick is real and that is the whole point of the row.
+                      // No identity dot either: a dot is an identity claim, and there is none here.
+                      <span className="italic text-muted-foreground">no anchors</span>
+                    ) : (
                     <span className="flex items-center gap-2">
                       <IdentityDot hue={cfg?.hue ?? "var(--core)"} />
                       {cfg && !cfg.virtual ? (
@@ -560,19 +613,20 @@ export default function AnchorLogTable() {
                         <span title={cfg.name}>{cfg.ticker}</span>
                       ) : (
                         // An uncataloged channel: the core tone + its address, honestly unnamed.
-                        <span className="italic text-muted-foreground">unlisted · {r.metaId.slice(0, 10)}…</span>
+                        <span className="italic text-muted-foreground">unlisted · {r.metaId?.slice(0, 10)}…</span>
                       )}
                     </span>
+                    )}
                   </TableCell>
                   <TableCell className="font-mono tabular-nums text-foreground-dim">
                     {/* The ✓ slot is ALWAYS reserved so the column never shifts on select. */}
                     <span className="inline-flex items-center gap-1.5">
-                      {r.ordinal.toLocaleString()}
+                      {seam ? <Dash /> : r.ordinal.toLocaleString()}
                       <span className="inline-flex w-3.5 flex-none">{rowSel && <SelectedRowMark hue={cfg?.hue ?? "var(--core)"} />}</span>
                     </span>
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">{fmtDag(r.fee)}</TableCell>
-                  <TableCell className="text-right tabular-nums text-foreground-dim">{fmtKB(r.sizeInKB)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{seam ? <Dash /> : fmtDag(r.fee)}</TableCell>
+                  <TableCell className="text-right tabular-nums text-foreground-dim">{seam ? <Dash /> : fmtKB(r.sizeInKB)}</TableCell>
                   <TableCell className="text-right font-mono tabular-nums">
                     {pending ? <span className="text-muted-foreground">…</span> : r.global.ordinal.toLocaleString()}
                   </TableCell>

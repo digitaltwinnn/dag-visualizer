@@ -263,9 +263,15 @@ export function metaSnapSelectActions(
  *  network. It still pins the tick (`follow: false`), because the pane's deep read is gated on
  *  not-following (an auto-advancing card must never turn the gesture route into a poll), and
  *  the arrival IS the deliberate gesture the read is waiting for. The caller guards the other
- *  half of the rule — an existing selection is never overridden. */
+ *  half of the rule — an existing selection is never overridden.
+ *
+ *  ⚠️ `sel` may be NULL, and that is a real arrival, not a no-op: a SEAM row is a global tick that
+ *  anchored nothing, so the tick IS the whole subject and the finer metaSnap slot must be CLEARED
+ *  rather than left holding a previous row's snapshot. Committing the coarse rung alone and
+ *  dropping the finer one is the same shape `snapshotSelectActions` already takes when a pinned
+ *  tick changes underneath a metaSnap. */
 export function metaSnapArrivalActions(
-  sel: MetaSnapSel,
+  sel: MetaSnapSel | null,
   global: Extract<PickDescriptor, { kind: "snapshot" }>,
 ): ClickAction[] {
   return [

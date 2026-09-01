@@ -66,7 +66,9 @@ export function followLatest() {
   if (filter === UNLISTED_ID && latest) {
     // Same live card chain: the newest unlisted row (the one-home log source, newest first).
     const row = unlistedLog([latest], useStore.getState().snapshotExact)[0];
-    if (row && (metaSnap?.metaId !== row.metaId || metaSnap.ordinal !== row.ordinal)) {
+    // Same guard as above: an unlisted row always names its channel, so `row.metaId` is present —
+    // the check is what keeps a follow from ever advancing onto a subject that has no network.
+    if (row?.metaId && (metaSnap?.metaId !== row.metaId || metaSnap.ordinal !== row.ordinal)) {
       advanceMetaSnap({ metaId: row.metaId, ordinal: row.ordinal, hash: "", globalOrdinal: latest.ordinal, ts: latest.timestamp });
     }
     return;

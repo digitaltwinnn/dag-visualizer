@@ -19,7 +19,7 @@ import { metaSnapSelectActions, snapshotSelectActions, sameMetaSnap, followToggl
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { DepthCaption, DisclosureChevron, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
 import { NoSignalDot } from "@/components/state/StateAtoms";
-import { buildAnchorLog, type AnchorLogRow } from "@/src/data/anchorLog";
+import { buildAnchorLog, type AnchorLogRow, type ChannelLogRow } from "@/src/data/anchorLog";
 import { SLOT_N } from "@/src/engine/domain/ledgerModel";
 import { fmtKB } from "@/src/util/format";
 
@@ -68,19 +68,24 @@ interface MetaGroup {
   id: string;
   name: string;
   hue: string;
-  rows: AnchorLogRow[];
+  rows: ChannelLogRow[];
 }
 
-function groupByMeta(rows: AnchorLogRow[]): MetaGroup[] {
+function groupByMeta(rows: readonly AnchorLogRow[]): MetaGroup[] {
   const by = new Map<string, MetaGroup>();
   for (const r of rows) {
-    let g = by.get(r.metaId);
+    // A SEAM (a tick that anchored nothing) belongs to no metagraph, so it forms no group. That is
+    // already this explorer's own rule — "affordance follows the data": such a tick keeps its row
+    // and simply doesn't disclose, because a chevron opening onto nothing is a lie about the feed.
+    if (r.metaId == null) continue;
+    const metaId = r.metaId;
+    let g = by.get(metaId);
     if (!g) {
-      const cfg = metagraphById(r.metaId);
-      g = { id: r.metaId, name: cfg?.name ?? r.metaId, hue: identityHudCss(r.metaId), rows: [] };
-      by.set(r.metaId, g);
+      const cfg = metagraphById(metaId);
+      g = { id: metaId, name: cfg?.name ?? metaId, hue: identityHudCss(metaId), rows: [] };
+      by.set(metaId, g);
     }
-    g.rows.push(r);
+    g.rows.push({ ...r, metaId });
   }
   return [...by.values()].sort((a, b) => b.rows.length - a.rows.length || a.name.localeCompare(b.name));
 }
