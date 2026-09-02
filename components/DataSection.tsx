@@ -40,6 +40,9 @@ export default function DataSection() {
             className={
               "w-[36%] max-w-[520px] flex-none min-w-0 flex flex-col border-l border-border/50 pl-5 " +
               "max-[700px]:w-auto max-[700px]:max-w-none max-[700px]:h-[44%] max-[700px]:border-l-0 " +
+              // pr-2: the phone pane SCROLLS (document mode), and without it the value column's
+              // right edge sat against the scrollbar (user, 2026-09-02).
+              "max-[700px]:pr-2 " +
               "max-[700px]:border-t max-[700px]:pl-0 max-[700px]:pt-3 max-[700px]:overflow-y-auto slim-scroll"
             }
           >

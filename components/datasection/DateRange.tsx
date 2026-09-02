@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { DateRange as RDPRange } from "react-day-picker";
-import { CalendarDays, Loader2, X } from "lucide-react";
+import { CalendarDays, X } from "lucide-react";
 
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -40,14 +40,12 @@ const fmtFull = (day: string) => {
 export default function DateRange({
   from,
   to,
-  seeking,
   onFrom,
   onTo,
   onSubmit,
 }: {
   from: string;
   to: string;
-  seeking: boolean;
   onFrom: (v: string) => void;
   onTo: (v: string) => void;
   onSubmit: () => void;
@@ -66,13 +64,11 @@ export default function DateRange({
   const clear = () => { onFrom(""); onTo(""); };
 
   return (
-    <span className="inline-flex items-center gap-1">
-      {/* The walk costs several requests, so it SAYS it is running — a control that goes quiet for
-          a few seconds reads as broken, not as busy. Only WHILE it runs: a permanent magnifier is
-          decoration on a row whose controls already say what each takes. */}
-      <span aria-hidden className="w-3 flex-none">
-        {seeking && <Loader2 aria-label="searching the chain" className="size-3 animate-spin text-muted-foreground motion-reduce:animate-none" />}
-      </span>
+    // The spinner slot this span used to lead with is CULLED (2026-09-02): it was the AGE
+    // column's in-flight signal, and since the bar became this control's one home the SEARCH
+    // button carries the spinner — the dead w-3 slot only pushed this trigger 16px off the
+    // shared left edge the phone rows align on.
+    <span className="inline-flex min-w-0 items-center max-[700px]:flex-1">
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
           // SPINELESS AT REST, like every control in this row and every card in this app: a
@@ -83,7 +79,8 @@ export default function DateRange({
           // right; in the search bar it stands beside two boxed inputs, so it takes their box and
           // their 24px height. One recipe, three controls, one line.
           className={cn(
-            "flex h-6 min-w-0 items-center gap-1.5 rounded-xs border border-border/50 bg-[var(--panel-plate)] px-1.5 py-0",
+            // pointer-coarse — the whole bar rises to 40px together on touch (LogSearchBar's note).
+            "flex h-6 pointer-coarse:h-10 min-w-0 max-[700px]:flex-1 items-center gap-1.5 rounded-xs border border-border/50 bg-[var(--panel-plate)] px-1.5 py-0",
             "text-body font-sans transition-colors hover:border-border",
             "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
             "data-[state=open]:border-transparent",

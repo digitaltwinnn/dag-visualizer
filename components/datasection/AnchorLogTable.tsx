@@ -575,7 +575,12 @@ export default function AnchorLogTable() {
   const toolbar = (
     // `pb-2` — the same 8px the box below it keeps to the table, so the search block sits in an
     // even rhythm instead of being pinched against its own trigger (user, 2026-09-01).
-    <div className="flex-none flex items-center justify-end gap-1.5 pb-2">
+    // ⚠️ Phone clears the layer's × (user, 2026-09-02: "the close button overlaps with the
+    // 'search snapshots' button"): this row right-aligns into the pane's top-right corner, which
+    // is exactly where SectionShell's absolute close sits — and the phone pane's slimmer padding
+    // (pr-4, was the pr-10 tablet gutter) plus the ×'s 44px touch box put the two on top of each
+    // other. The reserve is the ×'s own touch width.
+    <div className="flex-none flex items-center justify-end gap-1.5 pb-2 max-[700px]:pr-10">
       {searchSet && (
         <>
           <span className="min-w-0 truncate text-micro text-muted-foreground">

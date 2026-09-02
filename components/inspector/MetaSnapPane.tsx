@@ -8,6 +8,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Button } from "@/components/ui/button";
 import CardHead, { RailPane } from "@/components/CardHead";
+import { DEEP_GIVE_UP_MS } from "@/components/RawSnapshotBridge";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { Fact, FactGroup, Foot, FootRow, LayerWho } from "@/components/inspector/parts";
 import { useSnapRecord } from "@/components/useArchive";
@@ -107,7 +108,7 @@ export default function MetaSnapPane({
   useEffect(() => {
     setDecodeGaveUp(false);
     if (!sel || !deepAsked || deep) return;
-    const t = setTimeout(() => setDecodeGaveUp(true), 12000);
+    const t = setTimeout(() => setDecodeGaveUp(true), DEEP_GIVE_UP_MS);
     return () => clearTimeout(t);
   }, [sel, deepAsked, deep]);
 

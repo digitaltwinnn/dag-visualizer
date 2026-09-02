@@ -2,6 +2,7 @@
 
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { fmtCount } from "@/src/util/format";
 
 // The raw layer's ONE table pager (user, 2026-08-14 — "add a bottom row with pagination", the
 // anchor log and the signer groups alike): a quiet flex-none strip under a table, range left,
@@ -37,7 +38,7 @@ export default function TablePager({
   return (
     <div className="flex-none flex items-center justify-between gap-2 pt-1.5">
       <span className="min-w-0 truncate text-micro tracking-caps uppercase tabular-nums text-muted-foreground">
-        {from}–{to} of {total.toLocaleString()}
+        {from}–{to} of {fmtCount(total)}
         {suffix ? ` ${suffix}` : ""}
         {note ? <span className="normal-case tracking-normal"> — {note}</span> : null}
       </span>
@@ -52,7 +53,7 @@ export default function TablePager({
           <ChevronLeft aria-hidden className="size-3.5" />
         </button>
         <span className={cn("text-micro tabular-nums text-muted-foreground")}>
-          {page} / {pages.toLocaleString()}
+          {page} / {fmtCount(pages)}
         </span>
         <button type="button" className={btn} aria-label="Next page" disabled={page >= pages} onClick={() => onPage(page + 1)}>
           <ChevronRight aria-hidden className="size-3.5" />

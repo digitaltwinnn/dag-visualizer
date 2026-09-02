@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 import CardHead from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
 import { ABOUT_ICON } from "@/components/icons";
-import { breakpointOf } from "@/src/data/breakpoint";
 
 // The left-rail "About this view" orientation card, shown at the top of the rail in every view.
 // A BOXED glass card in both states (user, 2026-08-13): the entry tier it wore while collapsed
@@ -19,11 +18,17 @@ export default function AboutView({
   eyebrow,
   lines,
   caption = "",
+  defaultCollapsed = false,
 }: {
   title: string;
   eyebrow: string;
   lines: string[];
   caption?: string;
+  /** Phone starts collapsed — see the note on the state below. Passed by ExploreRail's phone
+   *  branch rather than read off `window` here: this component also SSRs in the desktop rail
+   *  (CSS-hidden on phone, but hydrated), and a window read at first render made server and
+   *  client disagree about which chevron to draw — a real hydration error, caught live. */
+  defaultCollapsed?: boolean;
 }) {
   // OPEN BY DEFAULT (user, 2026-09-01). The card states the view's point of view — "How the network
   // is built", "Where the network runs" — which is orientation a reader wants BEFORE they start
@@ -35,14 +40,10 @@ export default function AboutView({
   // viewport, and measured at 390×844 the open About filled ALL of it — the browse list the sheet
   // was opened for started below the fold. On a rail the prose leads and the list is still right
   // there; in a short sheet leading is displacing. The head stays, one tap opens it — the same
-  // per-mount rule, phone just starts from the other side. `breakpointOf` is the one home for the
-  // tier (never a local threshold), read in a lazy initializer rather than through useBreakpoint:
-  // the hook's effect lands a frame after mount, which here would paint the prose and then yank
-  // it. Safe on SSR because the guard short-circuits to the desktop answer, and the phone instance
-  // only ever mounts client-side (the dock's sheet is a Radix portal, mounted on open).
-  const [collapsed, setCollapsed] = useState(
-    () => typeof window !== "undefined" && breakpointOf(window.innerWidth) === "phone",
-  );
+  // per-mount rule, phone just starts from the other side. The tier arrives as a PROP: the phone
+  // sheet's AboutView mounts client-only and after `useBreakpoint` has resolved (Radix portals
+  // the sheet content on open), so the initializer is stable for the one instance that takes it.
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
   return (
     <Card asChild className="sig-right block p-0 [--spine:var(--filter-accent,var(--primary))] animate-card-in motion-reduce:animate-none">
       <aside>

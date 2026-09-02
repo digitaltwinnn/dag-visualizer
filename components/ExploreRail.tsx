@@ -39,7 +39,7 @@ export default function ExploreRail() {
   // hosts. `id` maps to the component to render; the manifest owns presence/order.
   const manifest = exploreCards({ mode });
   const renderCard: Record<string, ReactNode> = {
-    about: <AboutView {...ABOUT[mode]} />,
+    about: <AboutView {...ABOUT[mode]} defaultCollapsed={bp === "phone"} />,
     tool: mode === "hyper" ? <HyperExplore /> : mode === "geo" ? <GeoExplore /> : mode === "ledger" ? <LedgerPanel /> : null,
   };
   const content = (
