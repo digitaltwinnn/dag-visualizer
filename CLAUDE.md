@@ -151,9 +151,16 @@ defining those tokens did not, so both collapsed to `0` and the fixed bars lost 
 Confirm it in one line — `getComputedStyle(document.documentElement).getPropertyValue("--bar-margin")`
 returning `""` is the whole diagnosis — then compare the served chunk against the source rather than
 reading the cascade. The fix is a redeploy with the build cache cleared (Vercel → Redeploy, "Use
-existing Build Cache" UNCHECKED); the commit itself needs no change. `components/DevCssCanary.tsx`
-now checks these tokens in EVERY environment for this reason: the failure is a build artifact, so
-checking only in dev checks the one place it cannot come from.
+existing Build Cache" UNCHECKED); the commit itself needs no change.
+
+⚠️ **AND THERE IS DELIBERATELY NO RUNTIME CHECK FOR IT.** One was built and dropped (2026-09-02): a
+canary that parsed the served stylesheet and asserted that every token a shipped utility references
+is also defined by it. It worked — measured, it flagged exactly the three tokens that went missing
+and nothing on a healthy build — but it was the wrong answer to this problem. It PREVENTS nothing,
+and it ALERTS nobody: `console.error` reaches no monitoring, so a bad deploy is still found the way
+this one was, by someone looking at the page. Against a remedy that is one redeploy, that is
+machinery for its own sake. **The tell above is the whole fix** — it is what turned "the bars are
+displaced" into a five-minute diagnosis, and it costs nothing to keep.
 
 `next build` and `next dev` don't conflict (dev outputs to `.next/dev`), so the production check can
 run alongside the dev server. Do it at phase boundaries: the build should be clean;
