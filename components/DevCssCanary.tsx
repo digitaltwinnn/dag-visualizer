@@ -14,41 +14,91 @@ import { useEffect } from "react";
 // of this (the dev check is behind the env guard, and the component returns null always).
 const CONTRACT_SELECTORS = [".edge-spine", ".subject-paired", ".rail-ladder", ".slim-scroll", ".edge-pulse"];
 
-// ⚠️ AND THE TOKENS, WHICH RUN IN PRODUCTION TOO — because that is where this last shipped.
-// 2026-09-01: a Vercel build served a MIXED bundle — a fresh class scan of the current TSX glued to
-// a `globals.css` compile from before the branch began. Every contract selector above was present,
-// so the check above passed; what was missing were the `:root` CUSTOM PROPERTIES. The utilities
-// referencing them survived and quietly collapsed to 0, so the command bar and the vitals band lost
-// their inset and sat flush against the viewport edge. Reported as "the top/bottom bars are
-// displaced", which is a layout complaint, not a stylesheet one — the tell is only obvious once you
-// know it: THE UTILITIES ARE THERE AND THEIR TOKENS ARE NOT.
+// ⚠️ AND A GENERIC STALE-STYLESHEET CHECK, WHICH RUNS IN PRODUCTION TOO.
 //
-// Dev-only was exactly the wrong scope for this. The failure is a BUILD artifact, so checking only
-// in dev checks the one environment where it cannot originate from a stale deployed chunk. Five
-// `getPropertyValue` calls once per load is cheap enough to run everywhere; the SELECTOR walk above
-// stays in dev, being a pass over every rule in a 115KB sheet.
+// 2026-09-01: a Vercel build served dagvisualizer.io a MIXED bundle — a fresh class scan of the
+// current TSX glued to a `globals.css` compile from before the branch began. Every contract
+// selector above was present, so the check above passed; what was missing were the `:root` CUSTOM
+// PROPERTIES. The utilities referencing them shipped intact and quietly collapsed to 0, so the
+// command bar and the vitals band lost their inset and sat flush to the viewport edge. Reported as
+// "the top/bottom bars are displaced" — a layout complaint, not a stylesheet one.
 //
-// An empty string is the failure — NOT a falsy value. `--footer-h` is legitimately `0px` on phone,
-// and a truthiness test would report that as broken.
-const CONTRACT_TOKENS = ["--bar-margin", "--vitals-h", "--rail-margin", "--rail-top", "--panel-pad-x"];
+// ⚠️ A LIST OF TOKENS IS NOT A CHECK FOR STALENESS. The first cut here named five tokens by hand,
+// and the flaw is fatal for the purpose: it detects the incident that has already happened. A later
+// stale bundle that drops different tokens stays silent, and the list rots as tokens come and go.
+// Measured against the real bundles, that list would have caught only two of the three tokens that
+// actually went missing — `--footer-glass` was not on it.
+//
+// The INVARIANT is what to assert instead: every token a shipped utility depends on must be defined
+// by the shipped token block. Both halves come from one compile, so if they disagree the stylesheet
+// is stale — whatever changed. That needs no list and cannot rot.
+//
+// ⚠️ EXCLUSIONS ARE RUNTIME-SCOPED TOKENS, and they were MEASURED, not guessed. Parsing both real
+// bundles: the healthy one references 120 tokens with no fallback and leaves 8 undefined on :root,
+// every one of them set per-element at runtime; the stale one leaves 10 — those same 8 plus exactly
+// the three that had gone missing. So the exclusions are `--radix-*` (Radix writes them onto the
+// elements it positions), `--tw-*` (Tailwind's own engine vars) and two element-scoped names.
+//
+// A reference WITH a fallback is skipped by construction: `var(--topbar-extra, 0px)` is designed to
+// be absent, so only `var(--x)` closed immediately is a claim that `--x` exists.
+//
+// This one runs in EVERY environment. The failure is a BUILD artifact, so checking only in dev
+// checks the one place it cannot come from. It is diagnostic rather than functional, so it waits for
+// an idle callback — in dev it is nearly a no-op anyway (dev's CSSOM carries a fraction of the
+// compiled utilities), which is honest: production is where it earns its keep.
+const RUNTIME_SCOPED = /^--(radix|tw)-/;
+const RUNTIME_NAMED = new Set(["--gap", "--x"]);
 
 export default function DevCssCanary() {
   useEffect(() => {
-    // The token check runs in EVERY environment (see CONTRACT_TOKENS). Its remedy differs by
-    // where it fires: in dev the stale compile is Turbopack's own cache, in a deployment it is the
-    // build cache that produced the bundle.
-    const tokens = () => {
-      const cs = getComputedStyle(document.documentElement);
-      const gone = CONTRACT_TOKENS.filter((t) => cs.getPropertyValue(t).trim() === "");
+    // ⚠️ IT READS THE STYLESHEET TEXT, NOT THE CSSOM — and that is not a style preference, it is
+    // the only thing that works. Measured against a real production bundle: the file carries 1370
+    // `var(` occurrences and `document.styleSheets` exposes NINETEEN of them (181 top-level rules
+    // for a 116KB sheet). A CSSOM walk therefore inspects almost nothing and passes silently, which
+    // is strictly worse than the hand-written list it replaced, because it LOOKS generic. The
+    // stylesheet is same-origin and already in the HTTP cache, so re-reading it is a cache hit.
+    const staleCheck = async () => {
+      // ⚠️ REFERENCED vs DEFINED, both read from the SAME TEXT — not "resolves on :root". A token
+      // may legitimately be defined on an element selector (`--card-pad` on a card, `--pulse-hue` on
+      // a subject mark) and be absent from :root by design; testing resolution flagged four of those
+      // on a healthy bundle. What staleness actually means is that the two halves came from
+      // DIFFERENT compiles, so the question is whether the file that references a token also
+      // defines it anywhere at all.
+      const REF = /var\(\s*(--[\w-]+)\s*\)/g;
+      const DEF = /(--[\w-]+)\s*:/g;
+      const hrefs = [...document.styleSheets].map((s) => s.href).filter((h): h is string => !!h);
+      const wanted = new Set<string>();
+      const defined = new Set<string>();
+      for (const href of hrefs) {
+        let css: string;
+        try {
+          const res = await fetch(href, { cache: "force-cache" });
+          if (!res.ok) continue;
+          css = await res.text();
+        } catch { continue; }
+        let m: RegExpExecArray | null;
+        REF.lastIndex = 0;
+        while ((m = REF.exec(css))) {
+          const t = m[1];
+          if (!RUNTIME_SCOPED.test(t) && !RUNTIME_NAMED.has(t)) wanted.add(t);
+        }
+        DEF.lastIndex = 0;
+        while ((m = DEF.exec(css))) defined.add(m[1]);
+      }
+      if (!wanted.size) return; // nothing readable — say nothing rather than cry wolf
+      const gone = [...wanted].filter((t) => !defined.has(t));
       if (!gone.length) return;
       console.error(
-        `[CSS canary] ${gone.join(", ")} resolve to nothing on :root — the served globals.css is ` +
-          "STALE (its utilities shipped, its tokens did not, so they collapse to 0 and the fixed " +
-          "bars lose their inset). Do not debug the layout. In dev: kill the server, " +
-          "`rm -rf .next/dev`, restart. In a deployment: redeploy with the build cache cleared.",
+        `[CSS canary] ${gone.join(", ")} are used by shipped utilities but defined nowhere in the ` +
+          "same stylesheet — the served globals.css is STALE. " +
+          "Its utilities shipped and its tokens did not, so they collapse to 0 and fixed elements " +
+          "lose their inset. Do not debug the layout. In dev: kill the " +
+          "server, `rm -rf .next/dev`, restart. In a deployment: redeploy with the build cache cleared.",
       );
     };
-    const tokenTimer = setTimeout(tokens, 3000);
+    const idle = (cb: () => void) =>
+      typeof requestIdleCallback === "function" ? requestIdleCallback(cb, { timeout: 8000 }) : setTimeout(cb, 3000);
+    const tokenTimer = idle(() => void staleCheck()) as unknown as ReturnType<typeof setTimeout>;
 
     if (process.env.NODE_ENV === "production") return () => clearTimeout(tokenTimer);
     // After hydration settles — stylesheets are all attached by then.
