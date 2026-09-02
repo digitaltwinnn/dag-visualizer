@@ -532,6 +532,13 @@
      the phone bar-half sheet offset (RailDock) AND the LiveStrip's phone bottom offset. (Was
      16-responsive-shell.css `:root`, re-homed here when that file was retired in Task 9.) */
   --phone-dock-h: 56px;
+  /* The footer row's OWN height on phone, where `--footer-h` deliberately zeroes (the row is
+     overlay chrome that reserves nothing — see its note below). Two consumers must still agree
+     on the number: SiteFooter's explicit phone height, and the raw data layer's bottom inset —
+     the one surface the floating row genuinely collides with, since a data pane's bottom rows
+     are content where the scene's bottom edge is not (2026-09-02, measured: the lozenge sat on
+     the channel pane's hash foot). */
+  --footer-phone-h: 22px;
   /* The ONE resting dim for rail instrument furniture (lines/ruler/spine at rest) — consumed by
      the desktop RailThreads' dim group AND the tablet/phone sheet's `.ig-sheet-edge` channel, so
      rest vs signal contrast is consistent everywhere. Brightness belongs to the signals (pulses)

@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import CardHead from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
 import { ABOUT_ICON } from "@/components/icons";
+import { breakpointOf } from "@/src/data/breakpoint";
 
 // The left-rail "About this view" orientation card, shown at the top of the rail in every view.
 // A BOXED glass card in both states (user, 2026-08-13): the entry tier it wore while collapsed
@@ -29,7 +30,19 @@ export default function AboutView({
   // browsing, and behind a collapsed head it was only ever found by someone who already knew what
   // it said. It stays collapsible, and the state is per-mount by design: a view switch is a change
   // of subject, so its own orientation leads again.
-  const [collapsed, setCollapsed] = useState(false);
+  //
+  // ⚠️ EXCEPT ON PHONE, WHERE IT OPENS COLLAPSED (user, 2026-09-02). The phone sheet is ~60% of the
+  // viewport, and measured at 390×844 the open About filled ALL of it — the browse list the sheet
+  // was opened for started below the fold. On a rail the prose leads and the list is still right
+  // there; in a short sheet leading is displacing. The head stays, one tap opens it — the same
+  // per-mount rule, phone just starts from the other side. `breakpointOf` is the one home for the
+  // tier (never a local threshold), read in a lazy initializer rather than through useBreakpoint:
+  // the hook's effect lands a frame after mount, which here would paint the prose and then yank
+  // it. Safe on SSR because the guard short-circuits to the desktop answer, and the phone instance
+  // only ever mounts client-side (the dock's sheet is a Radix portal, mounted on open).
+  const [collapsed, setCollapsed] = useState(
+    () => typeof window !== "undefined" && breakpointOf(window.innerWidth) === "phone",
+  );
   return (
     <Card asChild className="sig-right block p-0 [--spine:var(--filter-accent,var(--primary))] animate-card-in motion-reduce:animate-none">
       <aside>

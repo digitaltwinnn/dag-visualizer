@@ -48,12 +48,17 @@ const PROBE_CACHE = 64;
  *  also the two columns the search bar cannot answer for, having no index at any layer, so a phone
  *  loses nothing it could have acted on. `max-[700px]` is `breakpointOf`'s own phone boundary and
  *  the same arm every other phone gate names (CSS trap 8: it stops applying AT 700). */
-const COLUMNS: { key: AnchorLogSortKey; label: string; phone?: false }[] = [
+const COLUMNS: { key: AnchorLogSortKey; label: string; phone?: false; phoneLabel?: string }[] = [
   { key: "net", label: "Network" },
   { key: "ordinal", label: "Snapshot" },
   { key: "fee", label: "Fee (DAG)", phone: false },
   { key: "size", label: "Size", phone: false },
-  { key: "tick", label: "Anchored into" },
+  // `phoneLabel` — the same axis under its shorter name where the wide one alone kept the four
+  // surviving columns in sideways scroll (2026-09-02: measured 366px of columns in a 309px pane,
+  // and this header was the widest at 118px). "Global" is not an abbreviation but the axis's own
+  // name — the search bar labels the very same criterion `global` — so nothing is invented for
+  // the narrow tier; aria-sort and the full title stay on the th either way.
+  { key: "tick", label: "Anchored into", phoneLabel: "Global" },
   { key: "age", label: "Age" },
 ];
 /** The one class both the header cell and its body cells wear, so a column can never half-hide. */
@@ -649,7 +654,14 @@ export default function AnchorLogTable() {
                     )}
                     onClick={() => setSort((s) => ({ key: c.key, dir: s.key === c.key ? ((s.dir * -1) as 1 | -1) : 1 }))}
                   >
-                    {c.label}
+                    {c.phoneLabel ? (
+                      <>
+                        <span className="max-[700px]:hidden">{c.label}</span>
+                        <span className="min-[700px]:hidden">{c.phoneLabel}</span>
+                      </>
+                    ) : (
+                      c.label
+                    )}
                     {sort.key === c.key &&
                       (sort.dir === 1 ? <ArrowUp className="size-3" aria-hidden /> : <ArrowDown className="size-3" aria-hidden />)}
                   </button>
@@ -773,7 +785,13 @@ export default function AnchorLogTable() {
                   <TableCell className="text-right font-mono tabular-nums">
                     {pending ? <span className="text-muted-foreground">…</span> : r.global.ordinal.toLocaleString()}
                   </TableCell>
-                  <TableCell className="text-right text-muted-foreground">{relativeAge(now - Date.parse(r.ts))}</TableCell>
+                  <TableCell className="text-right text-muted-foreground">
+                    {/* Phone drops the " ago" (the bare register — relativeAge's own note): the
+                        AGE header names the quantity, and the suffix's width was the last thing
+                        holding this table in sideways scroll. */}
+                    <span className="max-[700px]:hidden">{relativeAge(now - Date.parse(r.ts))}</span>
+                    <span className="min-[700px]:hidden">{relativeAge(now - Date.parse(r.ts), true)}</span>
+                  </TableCell>
                 </TableRow>
               );
             })}

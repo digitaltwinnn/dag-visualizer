@@ -34,7 +34,7 @@ export default function SiteFooter() {
     // canvas, and an orbit drag started along the bottom edge must still reach the scene.
     <footer
       id="sitefoot"
-      className="fixed inset-x-0 bottom-0 z-10 h-[var(--footer-h)] flex items-center justify-center pointer-events-none max-[700px]:bottom-[var(--phone-dock-h)] max-[700px]:h-[22px]"
+      className="fixed inset-x-0 bottom-0 z-10 h-[var(--footer-h)] flex items-center justify-center pointer-events-none max-[700px]:bottom-[var(--phone-dock-h)] max-[700px]:h-[var(--footer-phone-h)]"
     >
       {/* The halo text-shadow is GONE (user, 2026-08-30: "it has some shadow which for text is
           not great") — it existed for bloom sweeping the bottom edge, but the vitals band now
@@ -51,7 +51,16 @@ export default function SiteFooter() {
           surface (user, 2026-09-01 — that one was "too dominant white" in light mode; see the
           token's own note). NO BORDER: a border would make this a card, and it is not an
           instrument. */}
-      <nav className="flex items-center gap-2 text-micro text-muted-foreground [&_a]:pointer-events-auto rounded-full px-2.5 py-0.5 bg-[var(--footer-glass)] backdrop-blur-sm">
+      <nav className="flex items-center gap-2 text-micro text-muted-foreground [&_a]:pointer-events-auto rounded-full px-2.5 py-0.5 bg-[var(--footer-glass)] backdrop-blur-sm max-[700px]:[&_a]:pt-[26px] max-[700px]:[&_a]:-mt-[26px] max-[700px]:[&_a]:pb-1.5 max-[700px]:[&_a]:-mb-1.5 max-[700px]:[&_a]:px-1.5 max-[700px]:[&_a]:-mx-1.5">
+        {/* ⚠️ On phone every anchor wears padding CANCELLED by an equal negative margin (the
+            utility pairs above): the row keeps its 22px visual height while each link's HIT BOX
+            grows to ~43px — measured 11px tall before, a quarter of the 44px touch floor, and on
+            phone this row rides above the dock as live chrome, not decoration. The expansion is
+            ASYMMETRIC on purpose: upward 26px into inert canvas, downward only to the dock's own
+            top edge — measured, a symmetric pad reached 14px INTO the dock and this nav's
+            stacking order let the links win those taps off the dock's buttons (the z the dock
+            carries lives inside the shell's own stacking context, so it never competes here).
+            Desktop is untouched: a pointer needs no floor. */}
         <a href={GITHUB} target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
           GitHub
         </a>

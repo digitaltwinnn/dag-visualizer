@@ -197,6 +197,9 @@ export default function TopBar() {
           className={cn(
             "flex items-center gap-3 max-[1260px]:gap-2.5 max-[940px]:gap-2 max-[700px]:gap-1",
             "rounded-btn -mx-1 px-1 py-0.5 bg-transparent border-0 cursor-pointer text-left",
+            // The same pointer-keyed 44px touch floor as the filter button beside it (its note
+            // has the rationale) — the ECG mark alone measured 42×28 on phone.
+            "pointer-coarse:min-h-11 pointer-coarse:min-w-11",
             "hover:bg-wash-soft transition-colors duration-150 motion-reduce:transition-none",
             strip === "pulse" && "bg-wash-soft",
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",

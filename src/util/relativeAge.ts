@@ -4,14 +4,18 @@
 // (the moment.js/GitHub convention) — the user read "2.8y" as strange and a compound
 // "2y 9mo" doesn't fit the cell, so the months tier carries the sub-year range instead.
 const DAY = 86_400_000;
-export function relativeAge(ageMs: number): string {
+/** `bare` drops the " ago" suffix — for the anchor log's phone tier only (2026-09-02), where the
+ *  AGE header already names the quantity and the suffix's ~26px is what stood between the four
+ *  surviving columns and sideways scroll. An option HERE rather than a `.replace()` at the call
+ *  site, per this module's own rule: two registers, one home, never a third ad-hoc formatter. */
+export function relativeAge(ageMs: number, bare = false): string {
   if (Number.isNaN(ageMs) || ageMs < 0) return "";
-  if (ageMs < 60_000) return `${Math.max(1, Math.round(ageMs / 1000))}s ago`;
-  if (ageMs < 3_600_000) return `${Math.round(ageMs / 60_000)}m ago`;
-  if (ageMs < 24 * 3_600_000) return `${Math.round(ageMs / 3_600_000)}h ago`;
-  if (ageMs < 30 * DAY) return `${Math.round(ageMs / DAY)}d ago`;
-  if (ageMs < 345 * DAY) return `${Math.max(1, Math.round(ageMs / (30.44 * DAY)))}mo ago`;
-  return `${Math.max(1, Math.round(ageMs / (365.25 * DAY)))}y ago`;
+  if (ageMs < 60_000) return `${Math.max(1, Math.round(ageMs / 1000))}s${bare ? "" : " ago"}`;
+  if (ageMs < 3_600_000) return `${Math.round(ageMs / 60_000)}m${bare ? "" : " ago"}`;
+  if (ageMs < 24 * 3_600_000) return `${Math.round(ageMs / 3_600_000)}h${bare ? "" : " ago"}`;
+  if (ageMs < 30 * DAY) return `${Math.round(ageMs / DAY)}d${bare ? "" : " ago"}`;
+  if (ageMs < 345 * DAY) return `${Math.max(1, Math.round(ageMs / (30.44 * DAY)))}mo${bare ? "" : " ago"}`;
+  return `${Math.max(1, Math.round(ageMs / (365.25 * DAY)))}y${bare ? "" : " ago"}`;
 }
 
 /** THE SAME AGE, SPELLED OUT — the app's ONE long-form span (user, 2026-09-01: "there must be some

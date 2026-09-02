@@ -21,6 +21,9 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // labels condense below 1650px (measured, see the span note).
 const SEG = cn(
   "group flex items-center gap-1.5 h-9 py-1.5 px-2.5 rounded-btn!",
+  // The 44px touch floor, keyed on the POINTER like the filter button's (its note has the
+  // rationale): measured 36×36 on phone, under the floor on both axes.
+  "pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:justify-center",
   "text-muted-foreground bg-transparent border-0",
   "hover:text-foreground hover:bg-wash-soft",
   // The on-state keys on aria-pressed — the state the buttons actually stamp. (The earlier

@@ -27,7 +27,7 @@ import {
 import { LIGHT_TUNE, LIGHT_TUNE_DEFAULTS, LIGHT_TUNE_SCHEMA } from "./sceneColors";
 import { setSceneLaneLight } from "../palette/identity";
 import type { View3D } from "./domain/viewTransition";
-import { CAM_ZOOM, RAILS_HIDDEN_DOLLY } from "./domain/cameraRig";
+import { CAM_ZOOM, RAILS_HIDDEN_DOLLY, REST_ASPECT } from "./domain/cameraRig";
 import {
   renderGroup, restoreTuned, savePersisted, setPersist, tuningPersisted, exportAll, dump,
   type TuneGroup,
@@ -268,6 +268,8 @@ export async function mountDevTune(targets: DevTuneTargets): Promise<DevTuneHand
       `//      · railsLean  ×${RAILS_HIDDEN_DOLLY} at MOST, and only while the rails are hidden. Exempt on the same\n` +
       `//        poses dollyBack is, and RAMPED by how close the pose orbits vs its view's resting one —\n` +
       `//        so at a deep rung its factor is near 1 and there is little to divide back out.\n` +
+      `//      · aspectFit  ×√(${REST_ASPECT.toFixed(2)}/aspect) below the rest aspect (portrait) — identity on a\n` +
+      `//        desktop viewport, so a desktop tuning session has nothing to divide back out.\n` +
       `//    hubFraming/hyperNodeFraming compose from the SUBJECT's own radial basis, so raw numbers\n` +
       `//    there describe one subject only — read them as a delta, not as constants.`,
     );
