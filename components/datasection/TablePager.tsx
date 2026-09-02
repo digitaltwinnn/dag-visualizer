@@ -15,8 +15,7 @@ export default function TablePager({
   from,
   to,
   total,
-  suffix,
-  note,
+  scope,
   onPage,
 }: {
   page: number; // 1-based
@@ -24,13 +23,15 @@ export default function TablePager({
   from: number; // 1-based row range of the current slice
   to: number;
   total: number;
-  /** Qualifies the total ("in window") — the honest scope of a windowed count. */
-  suffix?: string;
-  /** One muted sentence after the range (the "pick a network to page all time" hint). */
-  note?: string;
+  /** The honest scope of a windowed count, as ONE dotted-underlined word after the total whose
+   *  `title` carries the explanation (user, 2026-09-02: the spelled-out "in window — pick a
+   *  network…" line was "too long text" standing under the table on every render — the scope is
+   *  a qualifier read once, not a sentence read 25 times). The dotted underline is the standard
+   *  there-is-more affordance at the strip's own weight. */
+  scope?: { word: string; title: string };
   onPage: (p: number) => void;
 }) {
-  if (pages <= 1 && !note) return null;
+  if (pages <= 1 && !scope) return null;
   const btn =
     "inline-flex items-center justify-center size-5 rounded-xs cursor-pointer text-muted-foreground " +
     "hover:text-foreground hover:bg-wash-faint disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent " +
@@ -39,8 +40,14 @@ export default function TablePager({
     <div className="flex-none flex items-center justify-between gap-2 pt-1.5">
       <span className="min-w-0 truncate text-micro tracking-caps uppercase tabular-nums text-muted-foreground">
         {from}–{to} of {fmtCount(total)}
-        {suffix ? ` ${suffix}` : ""}
-        {note ? <span className="normal-case tracking-normal"> — {note}</span> : null}
+        {scope ? (
+          <>
+            {" · "}
+            <span className="underline decoration-dotted decoration-border underline-offset-2 cursor-help" title={scope.title}>
+              {scope.word}
+            </span>
+          </>
+        ) : null}
       </span>
       <span className="inline-flex items-center gap-1">
         {/* First/last jumps (user, 2026-08-14 — "I want to see the genesis block; now I have to
