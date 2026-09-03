@@ -510,12 +510,12 @@ export default function RailDock({
   // the two sections — the app's inset-hairline idiom — and the chevron sits at the END of the
   // tray (bottom on edge tabs, trailing on the phone dock half), subtly dimmer than the icons'
   // active states. The WHOLE tray stays one ≥44px tap target.
-  // The rule renders in EVERY bar half, tray or not (user, 2026-09-03: the tray-less Vitals
-  // section had "no hairline next to the chevron while the others do") — it divides the
-  // section's IDENTITY from its open control, and a section with no card legend still has both.
-  // The tablet edge tab keeps the tray gate: there the rule sits between two stacked groups,
-  // and with no tray above it it would underline nothing.
-  const trayRule = (signals || isBarHalf) && (
+  // Bar halves render NO rule at all (user, 2026-09-03, second round: with the trays standing
+  // down at thirds the hairline only separated a label from its own chevron — "I think we can
+  // remove the hairline"; the first round made it structural for consistency, and the consistent
+  // answer that survived review is none). The tablet edge tab keeps its tray-gated rule: there
+  // it divides two stacked GROUPS, which is a real division.
+  const trayRule = signals && !isBarHalf && (
     <span
       className={cn("flex-none bg-border", isBarHalf ? "w-px h-4" : "h-px w-4")}
       aria-hidden="true"
