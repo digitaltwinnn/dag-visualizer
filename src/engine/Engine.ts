@@ -39,7 +39,7 @@ import { metaSnapDeepKey, metaSnapHoverKey } from "@/src/data/types";
 import { snapsAtTick } from "@/src/data/anchorLog";
 // The tap RECOGNIZER stays here — it is input plumbing. The step it triggers is the
 // CameraDirector's (see its header).
-import { type Tap, DOUBLE_TAP_SLOP, isDoubleTap } from "./domain/tapZoom";
+import { type Tap, DOUBLE_TAP_SLOP, LONG_PRESS_MS, LONG_PRESS_LINGER_MS, isDoubleTap } from "./domain/tapZoom";
 import { auditInstances, findingKey, type InstanceFinding } from "./scene/instanceAudit";
 import { CalloutSync, type CalloutState } from "./CalloutSync";
 import { DevTunePanel } from "./DevTunePanel";
@@ -202,6 +202,20 @@ export class Engine {
     this._ptrDown++;
     // A stale eat-flag would swallow the NEXT real click, so every gesture starts clean.
     this._eatClick = false;
+    // ── Long-press = touch's hover (domain/tapZoom's LONG_PRESS_MS — its note has the design).
+    // Armed only for a SOLO touch; a second finger, travel past the fingertip slop (checked in
+    // _handleMove, where the moves arrive) or the release disarms it. On fire it runs the one
+    // hover path at the press point — `buttons: 0` so _handleMove's mid-drag gate lets a held
+    // finger through this one deliberate route.
+    this._lpCancel();
+    if (e.pointerType !== "mouse" && this._ptrDown === 1) {
+      this._lpTimer = setTimeout(() => {
+        this._lpTimer = undefined;
+        if (this._ptrDown !== 1 || this.transition.active()) return;
+        this._lpFired = true;
+        this._handleMove({ clientX: this._downX, clientY: this._downY, buttons: 0 } as MouseEvent);
+      }, LONG_PRESS_MS);
+    }
     if (this._ptrDown > 1) {
       // Two fingers down is a pinch, not a tap pair: drop any half-recognized pair, and drop a
       // running step too — pinch dollies the same axis, and the two would fight for 0.4s. A
@@ -209,6 +223,7 @@ export class Engine {
       // free, because the step measures against the live `controls.target` every frame.
       this._lastTap = null;
       this.cam.cancelZoom();
+      this._lpCancel(); // two fingers is a pinch — never a press
     }
   };
   private _downX = 0;
@@ -220,14 +235,35 @@ export class Engine {
   private _ptrDown = 0; //             pointers currently down, for the multi-touch invalidation
   private _lastTap: Tap | null = null; // the unpaired tap waiting for its partner
   private _eatClick = false; //        set when a pair fires; `_handleClick` spends it
+  private _lpTimer: ReturnType<typeof setTimeout> | undefined; // the armed long-press
+  private _lpFired = false; //         a preview is standing (eat the release click, then linger)
+  private _lpLinger: ReturnType<typeof setTimeout> | undefined; // the post-release read window
+  private _lpCancel = () => {
+    if (this._lpTimer !== undefined) clearTimeout(this._lpTimer);
+    this._lpTimer = undefined;
+  };
   private onCancelTap = () => {
     this._ptrDown = 0;
     this._lastTap = null;
+    this._lpCancel();
+    this._lpFired = false;
   };
   private onUp = (e: PointerEvent) => {
     const solo = this._ptrDown === 1; // a pinch's two ups are not two taps
     this._ptrDown = Math.max(0, this._ptrDown - 1);
+    this._lpCancel();
     if (e.pointerType === "mouse") return;
+    if (this._lpFired) {
+      // The press previewed; the release must neither COMMIT (hovers preview, never commit —
+      // rule 9) nor start a tap pair. The preview outlives the finger by the read window — the
+      // fingertip covered the tooltip while pressed — then clears like a mouse-leave.
+      this._lpFired = false;
+      this._eatClick = true;
+      this._lastTap = null;
+      if (this._lpLinger !== undefined) clearTimeout(this._lpLinger);
+      this._lpLinger = setTimeout(() => this._clearHover(), LONG_PRESS_LINGER_MS);
+      return;
+    }
     // A tap is a touch that didn't travel — same fingertip tolerance the pair itself gets.
     if (!solo || Math.hypot(e.clientX - this._downX, e.clientY - this._downY) > DOUBLE_TAP_SLOP) {
       this._lastTap = null;
@@ -298,6 +334,8 @@ export class Engine {
     // a rotation (aspect roughly inverts) always does. Skipped mid-transition — the boundary
     // re-derives the pose itself, and tweenTo is a no-op under holdCamera anyway.
     if (this._resizeReframeT !== undefined) clearTimeout(this._resizeReframeT);
+    this._lpCancel();
+    if (this._lpLinger !== undefined) clearTimeout(this._lpLinger);
     this._resizeReframeT = setTimeout(() => {
       this._resizeReframeT = undefined;
       const aspect = this.ctx.camera.aspect;
@@ -1520,6 +1558,10 @@ export class Engine {
   }
 
   private _handleMove(e: MouseEvent) {
+    // Travel past the fingertip slop is an orbit, not a press — disarm the pending long-press.
+    if (this._lpTimer !== undefined && Math.hypot(e.clientX - this._downX, e.clientY - this._downY) > DOUBLE_TAP_SLOP) {
+      this._lpCancel();
+    }
     // Mid-drag (orbiting): no hover picking — raycasting the planes every move would flicker the
     // layer highlight across the stack while the user is just navigating.
     if (e.buttons !== 0) return;
@@ -2029,6 +2071,8 @@ export class Engine {
     this.canvas.removeEventListener("pointercancel", this.onCancelTap);
     window.removeEventListener("resize", this.onResize);
     if (this._resizeReframeT !== undefined) clearTimeout(this._resizeReframeT);
+    this._lpCancel();
+    if (this._lpLinger !== undefined) clearTimeout(this._lpLinger);
     this.ctx.controls.removeEventListener("start", this._onControlsStart);
     this.ctx.controls.removeEventListener("end", this._onControlsEnd);
     window.removeEventListener("pointerup", this._onPointerRelease);
