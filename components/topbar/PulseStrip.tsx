@@ -29,7 +29,13 @@ export default function PulseStrip() {
   const now = useNowTick(1000);
   const rows = pollHealthRows();
   return (
-    <div className="flex items-stretch gap-2 mx-2 px-2 pb-2 pt-1.5 border-t border-border/60 overflow-x-auto slim-scroll">
+    // ⚠️ TOUCH SNAPS TO A CARD (user, 2026-09-03: "lock them onto a card, don't allow positions
+    // that show only half cards"). Native CSS scroll-snap: mandatory on coarse pointers only —
+    // momentum scrolling stays the platform's own (which is the smoothness), each fling rests
+    // with a card's left edge on the strip's own padding (scroll-px matches px). A fine
+    // pointer's wheel is left free: mandatory snap under a trackpad reads as the strip grabbing
+    // the scroll.
+    <div className="flex items-stretch gap-2 mx-2 px-2 pb-2 pt-1.5 border-t border-border/60 overflow-x-auto slim-scroll pointer-coarse:snap-x pointer-coarse:snap-mandatory scroll-px-2 pointer-coarse:[&>*]:snap-start">
       {rows.length === 0 && (
         <span className="text-label text-muted-foreground self-center px-1">acquiring — no polls have completed yet</span>
       )}
