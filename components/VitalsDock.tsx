@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity } from "lucide-react";
+import { ChartColumn } from "lucide-react";
 import RailDock from "@/components/RailDock";
 import { VitalsSheetBody } from "@/components/VitalsBand";
 import { useBreakpoint } from "@/components/useBreakpoint";
@@ -36,7 +36,9 @@ export default function VitalsDock() {
       trigger="bottom-bar-half"
       sheetSide="bottom"
       barGeom="w-1/3 left-1/3"
-      barIcon={<Activity size={18} strokeWidth={1.75} aria-hidden="true" />}
+      // A CHARTS glyph, not Activity's ECG zigzag (user, 2026-09-03: it read as the top bar's
+      // heartbeat dropdown — but this section holds the vitals' charts and metrics).
+      barIcon={<ChartColumn size={18} strokeWidth={1.75} aria-hidden="true" />}
       open={phoneDock === "vitals"}
       sheetPx={phoneSheetPx}
       onSheetPx={setPhoneSheetPx}

@@ -604,6 +604,17 @@ export default function Inspector() {
   // its subjectKey changes while the sheet is closed, and bumps `updateKey` per event → RailDock
   // replays the travelling edge pulse. Opening clears all highlights (`onOpenChange`).
   const { actives, updateKey, onOpenChange: onTrayOpenChange } = useTrayActives(manifest);
+  // ⚠️ ON PHONE THE STORE IS THE OPENNESS TRUTH, and it must be SYNCED, not only heard through
+  // RailDock's onOpenChange (user, 2026-09-03: "if I click a node in geo the cue does not
+  // show"). A controlled Radix sheet fires onOpenChange only for interactions it mediates — when
+  // the OTHER dock section opens, this sheet's `open` prop flips false externally and no
+  // callback runs, so the tracker still believed the sheet was open and swallowed every later
+  // pick as "seen". Tablet keeps the callback wiring alone: its sheet state is RailDock's own,
+  // and every close there is user-driven through Radix.
+  useEffect(() => {
+    if (bp === "phone") onTrayOpenChange(phoneDock === "details");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bp, phoneDock]);
 
   // Icon per hosted card comes from the manifest; hue is the tray's own presentation: the node's
   // metagraph hue (or core cyan), everything else the filter accent.
