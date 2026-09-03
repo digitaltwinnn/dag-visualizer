@@ -194,6 +194,27 @@ export default function RailDock({
   // effect in the content's own mount commit — still before that commit paints.
   const [fitEl, setFitEl] = useState<HTMLDivElement | null>(null);
   const [fitPx, setFitPx] = useState<number | null>(null);
+  // THE ENTRY IS A GROW, NOT A SLIDE (user, 2026-09-03, three rounds: the translateY slide read
+  // as coming from the screen bottom through the dock's translucent glass; the rise-and-fade
+  // that replaced it read as appearing at the TOP, because the whole box materialized at its
+  // final height and the top edge is what the eye catches). What "appears from the dock" means
+  // mechanically: the bottom edge stays pinned at the dock's top and the HEIGHT grows 0 → fit,
+  // riding the sheet's own height transition. 'grow' holds a slower 550ms clock (the navigation
+  // tempo) so the entry never borrows the 380ms drag-snap physics; a drag started mid-entry
+  // wins instantly (`dragging` forces transition-none below).
+  //
+  // ⚠️ 'pre' IS ARMED ON THE OPEN FLIP, NOT IN THE CONTENT'S COMMIT. The content mounts a commit
+  // LATER than the `open` that reveals it (the portal trap, again), so a zero set from the
+  // content's own effect arrives after the CSS default has painted — measured, the sheet painted
+  // at 506px and the "grow" ran backwards. Armed on the flip, the zero is already in the style
+  // prop of the content's FIRST render; the fit effect then paints one zero frame (double-rAF)
+  // before releasing 'grow', so the transition has a real starting edge. (A direct DOM write in
+  // the ref callback was tried between the two: an inline arrow ref refires every render and
+  // clobbers React's own style writes — state is the only clean owner of this height.)
+  const [entry, setEntry] = useState<null | "pre" | "grow">(null);
+  useLayoutEffect(() => {
+    if (isBarHalf && open) setEntry("pre");
+  }, [open, isBarHalf]);
   useLayoutEffect(() => {
     if (!isBarHalf || !open || !fitEl) {
       setFitPx(null);
@@ -208,12 +229,24 @@ export default function RailDock({
       setFitPx(Math.min(def, Math.max(170, fitEl.offsetHeight + CHROME)));
     };
     apply();
+    // Release the grow only after a zero frame has PAINTED (double-rAF) — releasing in this same
+    // commit would flush zero and target into one paint window and the transition would never
+    // run. The slower clock holds through the entry, then hands back to the snap tempo.
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => { raf2 = requestAnimationFrame(() => setEntry("grow")); });
+    const settle = setTimeout(() => setEntry(null), 750);
     const ro = new ResizeObserver(apply);
     ro.observe(fitEl);
-    return () => ro.disconnect();
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      clearTimeout(settle);
+      setEntry(null);
+    };
   }, [open, isBarHalf, fitEl]);
-  // Drag beats fit; fit beats the CSS default. One derived height for the style below.
-  const heightPx = isBarHalf ? (sheetPx ?? fitPx) : null;
+  // Drag beats fit; fit beats the CSS default; the entry's zero beats both until released.
+  const heightPx = isBarHalf ? (entry === "pre" ? 0 : sheetPx ?? fitPx) : null;
   const handleOpenChangeRef = useRef(handleOpenChange);
   handleOpenChangeRef.current = handleOpenChange;
 
@@ -603,9 +636,16 @@ export default function RailDock({
             isBarHalf
               ? cn(
                   "!bottom-[var(--phone-dock-h)]",
+                  // The slide keyframe never plays on the bar half — the entry is the height
+                  // grow above ('!': the animate utility is a (0,2,0) variant, the documented
+                  // escape). Reduced motion collapses the grow too (transition-none).
+                  "!animate-none",
                   dragging
                     ? "!transition-none"
-                    : "transition-[height,opacity] duration-[380ms] ease-[var(--ease-spring)] motion-reduce:!transition-none",
+                    : cn(
+                        "transition-[height,opacity] ease-[var(--ease-spring)] motion-reduce:!transition-none",
+                        entry === "grow" ? "duration-[550ms]" : "duration-[380ms]",
+                      ),
                 )
               : undefined
           }

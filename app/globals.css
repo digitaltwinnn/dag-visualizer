@@ -1223,12 +1223,13 @@
    content on close). Reduced motion is handled at the call site (`motion-reduce:animate-none`). */
 @keyframes sheetInLeft   { from { transform: translateX(-100%); } to { transform: none; } }
 @keyframes sheetInRight  { from { transform: translateX(100%); }  to { transform: none; } }
-/* ⚠️ A RISE-AND-FADE, not a full-height slide (user, 2026-09-03, two rounds: "it just [comes]
-   up very quickly", then "it should appear from the dock while currently it comes from the
-   bottom of the screen"). The 100% slide passed BEHIND the dock bar — z-ordered under it, but
-   the dock's glass is translucent, so the sheet showed through it travelling up from the
-   viewport edge. A fixed 28px rise + fade is the cardMaterialize idiom at sheet scale: the
-   sheet condenses in place just above the dock, and never extends below its own resting edge. */
+/* ⚠️ EFFECTIVELY RETIRED (2026-09-03, after three review rounds): every bottom sheet is a phone
+   bar-half, and RailDock suppresses this keyframe there (`!animate-none`) because the entry is
+   a HEIGHT GROW out of the dock riding the sheet's own transition — a translateY slide showed
+   through the dock's translucent glass ("comes from the bottom of the screen") and a
+   rise-and-fade materialized the box at its final height ("now it actually comes from the
+   top?"). The keyframe stays defined so sheet.tsx's bottom arm keeps compiling; a future
+   non-bar-half bottom sheet must decide its entry afresh. */
 @keyframes sheetInBottom { from { transform: translateY(28px); opacity: 0; }  to { transform: none; opacity: 1; } }
 /* Card MATERIALIZE (card-redesign 2026-08-08): the facts rail's box tier mounting — a rung
    becoming THE materialized card (RailPane's entry→box swap remounts the Card subtree, replaying
@@ -1238,9 +1239,7 @@
 @theme inline {
   --animate-sheet-in-left:   sheetInLeft   0.28s cubic-bezier(0.22, 1, 0.36, 1);
   --animate-sheet-in-right:  sheetInRight  0.28s cubic-bezier(0.22, 1, 0.36, 1);
-  /* 0.30 → 0.55s across two review rounds (user, 2026-09-03) — the navigation clock (the depth
-     change is 0.55s): this is the user's gesture resolving, not the instrument speaking. The
-     side sheets keep 0.28s; the bottom keyframes are the rise-and-fade above. */
+  /* Suppressed on every current bottom sheet — see the keyframe's note above. */
   --animate-sheet-in-bottom: sheetInBottom 0.55s cubic-bezier(0.22, 1, 0.36, 1);
   --animate-card-in:         cardMaterialize 0.26s cubic-bezier(0.22, 1, 0.36, 1);
 }
