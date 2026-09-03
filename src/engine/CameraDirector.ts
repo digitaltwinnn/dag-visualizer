@@ -87,13 +87,16 @@ export class CameraDirector {
     this._updateTapZoom(dt);
   }
 
-  focus(name: FocusName) {
+  focus(name: FocusName, structureMoves = false) {
     const f = FOCI[name];
-    this.tweenTo(f.pos, f.target);
+    this.tweenTo(f.pos, f.target, true, structureMoves);
   }
 
 
-  tweenTo(toPos: Vec, toTgt: Vec, dolly = true) {
+  /** `structureMoves` — the commit is answered by the STRUCTURE as well as the camera (geo's
+   *  rungs: the globe spins to face the subject while the camera holds one fixed/shape-keyed
+   *  pose). It changes exactly one decision, the nudge's dim — see the gate below. */
+  tweenTo(toPos: Vec, toTgt: Vec, dolly = true, structureMoves = false) {
     // OUT-phase camera hold (spec A#6): the state commit stands; the boundary's
     // _applyDestLayout re-derives this pose from it, so dropping the tween loses nothing.
     if (this.h.transition.holdCamera()) return;
@@ -134,16 +137,23 @@ export class CameraDirector {
     // from a card is a request to LOOK at what was committed, so the cards step back out of the
     // way exactly as they do under a direct drag. NOT during a view transition: that choreography
     // is already the 3.9s answer to the user's gesture, and a 1.4s dim inside it reads as a blink.
-    // And NOT for a nudge: the dim exists so the scene can be SEEN changing, and here it doesn't.
-    if (!tw.nudge && !this.h.transition.active() && !this.h.flyingNow()) this.h.setFlying(true);
+    // And NOT for a nudge — UNLESS the structure moves (user, 2026-09-02: "click a provider and
+    // swipe it: the camera moves but the HUD does not fade"). The no-dim-on-nudge rule reasons
+    // "the dim exists so the scene can be SEEN changing, and here it doesn't" — which is exactly
+    // backwards on geo's rungs, where "view emphasis moves the structure, not the camera" means a
+    // same-pose commit still spins the GLOBE to the new subject: cohortFraming and nodeFraming
+    // are ONE fixed pose by design, so every sibling swipe is a nudge over a real structural
+    // move. `structureMoves` is the resolver saying so; the dim rides the nudge's own window and
+    // clears with it at the tween's end, like any flight's.
+    if ((!tw.nudge || structureMoves) && !this.h.transition.active() && !this.h.flyingNow()) this.h.setFlying(true);
   }
 
 
-  focusGeo(R: number) {
+  focusGeo(R: number, structureMoves = false) {
     // Look head-on at the FRONT of the globe (target pushed forward in +Z, toward where the
     // focused country/selection is aimed) so it sits centred in the view rather than low.
     geoFraming(R, this.out);
-    this.tweenTo(this.out.pos, this.out.target);
+    this.tweenTo(this.out.pos, this.out.target, true, structureMoves);
   }
 
   focusFilter(filter: string) {

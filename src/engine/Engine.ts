@@ -1241,7 +1241,9 @@ export class Engine {
       if (!this.globe.focusCohort()) return false;
       this.ctx.controls.autoRotate = false;
       cohortFraming(this.cam.out);
-      this.cam.tweenTo(this.cam.out.pos, this.cam.out.target, false); // dolly-exempt, like nodeFraming
+      // dolly-exempt like nodeFraming; structureMoves because the globe spins to the cohort while
+      // this pose is fixed — a sibling swipe is a nudge over a real move (the dim gate's note).
+      this.cam.tweenTo(this.cam.out.pos, this.cam.out.target, false, true);
       return true;
     },
     geoCountry: () => {
@@ -1252,7 +1254,9 @@ export class Engine {
       const shape = this.globe.focusCountryShape(this.country);
       if (shape) {
         countryFraming(shape.latAngle, shape.angularRadius, this.cam.out);
-        this.cam.tweenTo(this.cam.out.pos, this.cam.out.target);
+        // structureMoves: the pose is shape-keyed, so two similar countries can same-pose while
+        // the globe spins half the world between them.
+        this.cam.tweenTo(this.cam.out.pos, this.cam.out.target, true, true);
         return true;
       }
       // Degraded mode while the countries topology loads: the node-mean concentration framing
@@ -1260,7 +1264,7 @@ export class Engine {
       // the network rung; matches the pre-ladder behaviour).
       const R = this.globe.focusDensest(true);
       if (R == null) return false;
-      this.cam.focusGeo(R);
+      this.cam.focusGeo(R, true); // structureMoves: densest-cluster spin under a radius-keyed pose
       return true;
     },
     geoNetwork: () => {
@@ -1268,8 +1272,8 @@ export class Engine {
       if (R == null) return false;
       // Three zoom LEVELS (user design): metagraph = a WIDE network pose (rotated to the
       // densest cluster, held clearly farther out than the country pose so the country drill
-      // still reads as a zoom).
-      this.cam.focus("geoNetwork");
+      // still reads as a zoom). structureMoves: one fixed pose over the spin-to-densest.
+      this.cam.focus("geoNetwork", true);
       return true;
     },
     geoOverview: () => {
@@ -1390,7 +1394,8 @@ export class Engine {
     // The one geo node pose (cameraRig.nodeFraming — latitude-independent via Globe.focusNode's
     // NODE_RAISE contract). Dolly-exempt: its numbers are absolute (see CAM_ZOOM's note).
     nodeFraming(this.cam.out);
-    this.cam.tweenTo(this.cam.out.pos, this.cam.out.target, false);
+    // structureMoves: one fixed pose over a globe spin, like the cohort rung (the dim gate's note).
+    this.cam.tweenTo(this.cam.out.pos, this.cam.out.target, false, true);
   }
 
   // Compute the per-country leaderboard for the active filter and push it to the store

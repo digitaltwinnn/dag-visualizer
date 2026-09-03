@@ -323,7 +323,7 @@ function RawSection({
         // whatever its siblings above it don't. So the chain is measured instead: the box no
         // longer scrolls (overflow-hidden, a flex column), the schema block keeps its natural
         // height, and the well takes the rest — one bar, and it belongs to the tree.
-        <div className="min-h-[7rem] flex-1 overflow-auto slim-scroll rounded-md border border-border/50 bg-[var(--background)] px-2.5 py-2 max-[700px]:flex-none max-[700px]:max-h-[45vh]">
+        <div className="min-h-[7rem] flex-1 overflow-auto slim-scroll rounded-md border border-border/50 bg-[var(--background)] px-2.5 py-2 max-[700px]:flex-none max-[700px]:max-h-none">
           <JsonTree data={data} />
         </div>
       )}
@@ -502,8 +502,10 @@ export function ChannelStatePanel() {
     // box (DataSection's 44%) whose head + facts + tabs leave no leftover: the well got ~0 and
     // the signers scrolled inside a sliver. The wrapper already scrolls vertically there, so the
     // phone arms flip every flex-1/overflow link to NATURAL height and let the wrapper scroll the
-    // whole pane as one document; only the JSON well keeps an internal scroll (vh-capped), since
-    // an opened tree can be arbitrarily long. All the arms are max-[700px], one decision.
+    // whole pane as one document — the JSON well included (its first cut kept a 45vh internal
+    // scroll, which past a screenful put a bar INSIDE the scrolling pane: two scrollbars, user
+    // 2026-09-03; uncapped, a huge tree is just a long document, and the well's only remaining
+    // scroll is sideways, for wide lines the pane cannot offer). All arms are max-[700px].
     <div className="flex flex-col gap-3 min-h-0 h-full max-[700px]:h-auto max-[700px]:min-h-fit">
       {/* The pane's subject head — same grammar as a card head: eyebrow + identity + ordinal. */}
       <div className="flex flex-col gap-1 flex-none">
