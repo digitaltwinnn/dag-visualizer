@@ -531,7 +531,13 @@
   /* Height of the phone persistent bottom dock bar — the single source of truth referenced by
      the phone bar-half sheet offset (RailDock) AND the LiveStrip's phone bottom offset. (Was
      16-responsive-shell.css `:root`, re-homed here when that file was retired in Task 9.) */
-  --phone-dock-h: 56px;
+  --phone-dock-h: calc(56px + env(safe-area-inset-bottom, 0px));
+  /* The BAR half of that height — what the dock's content centres in; the inset below it is
+     the home indicator's band (viewport-fit=cover, layout.tsx). One token pair so every
+     consumer of --phone-dock-h (the sheets' offset, the footer's ride-above, the raw layer's
+     bottom) clears the indicator automatically; on flat-bottomed devices the env() is 0 and
+     both collapse to the shipped 56px. */
+  --phone-dock-bar-h: 56px;
   /* The footer row's OWN height on phone, where `--footer-h` deliberately zeroes (the row is
      overlay chrome that reserves nothing — see its note below). Two consumers must still agree
      on the number: SiteFooter's explicit phone height, and the raw data layer's bottom inset —

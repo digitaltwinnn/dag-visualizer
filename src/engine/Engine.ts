@@ -288,7 +288,27 @@ export class Engine {
     this._dragEndT = undefined;
     useStore.getState().setSceneDragging(false);
   };
-  private onResize = () => this.ctx.resize?.();
+  private onResize = () => {
+    this.ctx.resize?.();
+    // RE-FRAME ON A MATERIAL ASPECT CHANGE (2026-09-03, closing the portrait-fit gap): the
+    // aspectFit lever composes the live aspect into every pose, but resize alone only writes the
+    // projection — so rotating a phone held the landscape framing until the next commit. A
+    // debounced, thresholded re-resolve runs the ladder walk again at the new aspect: the 4%
+    // gate means a desktop window nudge (same-pose → the commit NUDGE's bob) never fires, while
+    // a rotation (aspect roughly inverts) always does. Skipped mid-transition — the boundary
+    // re-derives the pose itself, and tweenTo is a no-op under holdCamera anyway.
+    if (this._resizeReframeT !== undefined) clearTimeout(this._resizeReframeT);
+    this._resizeReframeT = setTimeout(() => {
+      this._resizeReframeT = undefined;
+      const aspect = this.ctx.camera.aspect;
+      if (Math.abs(aspect - this._framedAspect) / this._framedAspect < 0.04) return;
+      this._framedAspect = aspect;
+      if (VIEW_POLICIES[this.mode].canvas && !this.transition.active()) this._resolveFocus();
+    }, 250);
+  };
+  private _resizeReframeT: ReturnType<typeof setTimeout> | undefined;
+  /** The aspect the current pose was resolved at — seeds from the boot camera, updated per re-frame. */
+  private _framedAspect = typeof window !== "undefined" ? window.innerWidth / Math.max(1, window.innerHeight) : 16 / 9;
   // FPS/ms monitor — dev only, or in prod via `?stats`/`#stats` for ad-hoc checks, so
   // it never shows for real users. Click the panel to cycle FPS → ms → MB.
   private stats?: Stats;
@@ -2008,6 +2028,7 @@ export class Engine {
     this.canvas.removeEventListener("pointerup", this.onUp);
     this.canvas.removeEventListener("pointercancel", this.onCancelTap);
     window.removeEventListener("resize", this.onResize);
+    if (this._resizeReframeT !== undefined) clearTimeout(this._resizeReframeT);
     this.ctx.controls.removeEventListener("start", this._onControlsStart);
     this.ctx.controls.removeEventListener("end", this._onControlsEnd);
     window.removeEventListener("pointerup", this._onPointerRelease);

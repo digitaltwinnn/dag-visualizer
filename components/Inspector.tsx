@@ -702,9 +702,9 @@ export default function Inspector() {
       // Thirds with the Vitals section — see ExploreRail's matching arm.
       barGeom={VIEW_POLICIES[mode].vitalsLane ? "w-1/3 right-0" : undefined}
       sheetSide="bottom"
-      // No tray at thirds — see ExploreRail's matching arm. `updateKey` stays: the top-edge
-      // pulse is the update channel that still fits.
-      signals={VIEW_POLICIES[mode].vitalsLane ? undefined : tray}
+      // Compact tray at thirds — see ExploreRail's matching arm.
+      signals={tray}
+      trayCompact={VIEW_POLICIES[mode].vitalsLane}
       updateKey={updateKey}
       open={phoneDock === "details"}
       sheetPx={phoneSheetPx}

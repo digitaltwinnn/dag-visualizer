@@ -105,6 +105,7 @@ export default function RailDock({
   updateKey,
   barGeom,
   barIcon,
+  trayCompact,
   onOpenChange,
   sheetSide,
   trigger = "edge-tab",
@@ -130,6 +131,11 @@ export default function RailDock({
   barGeom?: string;
   /** The bar half's own leading mark — defaults to the side-keyed Explore/Details pair. */
   barIcon?: ReactNode;
+  /** Thirds-width bar halves: the icon legend cannot fit (measured 166px in a 130px section),
+   *  but the `active` cue it carried should not vanish with it — compact renders ONE small dot
+   *  (the first active's hue) while any hosted card holds an unseen update, and nothing at
+   *  rest. Fixed width by construction, so the overflow the full tray caused cannot return. */
+  trayCompact?: boolean;
   open?: boolean;
   // Bottom-sheet drag (phone): the caller-held height override in px (null = the default 60vh)
   // + its setter. Store-backed by BOTH phone docks (`store.phoneSheetPx`) so switching halves
@@ -482,7 +488,16 @@ export default function RailDock({
   // cards change — fewer icons = empty slots), sized 3 × 14px icons + 2 gaps. Renders whenever
   // the caller provides a tray at all (even momentarily empty), keeping the frame stable.
   // aria-hidden — the trigger keeps its accessible label.
-  const tray = signals && (
+  const firstActive = signals?.find((t) => t.active);
+  const tray = signals && trayCompact ? (
+    firstActive ? (
+      <span
+        aria-hidden="true"
+        className="size-1.5 flex-none rounded-full animate-dot-beat motion-reduce:animate-none"
+        style={{ background: firstActive.hue ?? "var(--primary)" }}
+      />
+    ) : null
+  ) : signals && (
     <span
       className={cn(
         "flex items-center pointer-events-none flex-none",
@@ -538,7 +553,10 @@ export default function RailDock({
           value={open ? "open" : ""}
           onValueChange={(v) => handleOpenChange(v === "open")}
           className={cn(
-            "fixed z-[42] bottom-0 h-[var(--phone-dock-h)] hidden max-[700px]:flex rounded-none",
+            // pb env: --phone-dock-h carries the safe-area inset (globals.css) so the BAR grows
+            // under a home indicator; the padding keeps the tappable content in the 56px band
+            // above it rather than centring into the indicator's strip. Zero on flat bottoms.
+            "fixed z-[42] bottom-0 h-[var(--phone-dock-h)] pb-[env(safe-area-inset-bottom,0px)] hidden max-[700px]:flex rounded-none",
             barGeom ?? (side === "left" ? "w-1/2 left-0" : "w-1/2 right-0"),
             // The raw data layer is presented: the dock belongs to the scene shell (RailDock
             // renders inside it), which has receded and dimmed behind the layer — so the bar

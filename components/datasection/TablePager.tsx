@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fmtCount } from "@/src/util/format";
@@ -31,21 +32,33 @@ export default function TablePager({
   scope?: { word: string; title: string };
   onPage: (p: number) => void;
 }) {
+  // The scope term's explanation must be REACHABLE ON TOUCH (2026-09-03, the phone review's
+  // tooltip item): a `title` needs a hover, which a phone does not have — so the term is a
+  // BUTTON that toggles the same sentence as a micro line under the strip. Desktop keeps the
+  // hover tooltip and gains the click as a second route; the line dismisses on re-tap.
+  const [explain, setExplain] = useState(false);
   if (pages <= 1 && !scope) return null;
   const btn =
     "inline-flex items-center justify-center size-5 rounded-xs cursor-pointer text-muted-foreground " +
     "hover:text-foreground hover:bg-wash-faint disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent " +
     "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]";
   return (
-    <div className="flex-none flex items-center justify-between gap-2 pt-1.5">
+    <div className="flex-none pt-1.5">
+      <div className="flex items-center justify-between gap-2">
       <span className="min-w-0 truncate text-micro tracking-caps uppercase tabular-nums text-muted-foreground">
         {from}–{to} of {fmtCount(total)}
         {scope ? (
           <>
             {" · "}
-            <span className="underline decoration-dotted decoration-border underline-offset-2 cursor-help" title={scope.title}>
+            <button
+              type="button"
+              aria-expanded={explain}
+              onClick={() => setExplain((e) => !e)}
+              className="underline decoration-dotted decoration-border underline-offset-2 cursor-help uppercase tracking-caps text-micro text-muted-foreground hover:text-foreground p-0 bg-transparent border-0"
+              title={scope.title}
+            >
               {scope.word}
-            </span>
+            </button>
           </>
         ) : null}
       </span>
@@ -69,6 +82,10 @@ export default function TablePager({
           <ChevronsRight aria-hidden className="size-3.5" />
         </button>
       </span>
+      </div>
+      {explain && scope && (
+        <p className="m-0 pt-1 text-micro text-muted-foreground max-w-[52ch]">{scope.title}</p>
+      )}
     </div>
   );
 }

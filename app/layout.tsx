@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Analytics } from "@vercel/analytics/next";
 import { SITE_ORIGIN } from "@/src/data/site";
@@ -20,6 +20,23 @@ const title = "DAG Visualizer — live 3D map of the Constellation Network";
 const description =
   "Interactive 3D visualizer of the Constellation Network: explore the $DAG hypergraph, " +
   "metagraphs, the node world map, and live global snapshot settlement in real time.";
+
+// The browser-chrome pass (2026-09-03, the phone review's real-device items):
+//  · themeColor — the address bar / task-switcher chrome takes the app ground per scheme
+//    (the oklch tokens' own hex mirrors, from globals.css's inline notes) instead of default
+//    white over a black instrument.
+//  · viewportFit cover — without it env(safe-area-inset-*) is 0 on notched iPhones and the
+//    home indicator overlays the dock; WITH it the page extends under the notch, so the dock's
+//    own height token carries the bottom inset (globals.css --phone-dock-h).
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#05060e" },
+    { media: "(prefers-color-scheme: light)", color: "#ebedf3" },
+  ],
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(base),

@@ -123,12 +123,11 @@ export default function ExploreRail() {
       // Thirds whenever the Vitals section is present (VitalsDock gates on the same flag, so the
       // bar's geometry and the middle section's presence cannot disagree).
       barGeom={VIEW_POLICIES[mode].vitalsLane ? "w-1/3 left-0" : undefined}
-      // No tray at thirds (user, 2026-09-03: "details icon overflows into vitals") — measured,
-      // icon+label+tray+rule+chevron ran 166px in a 130px third and justify-center spilled the
-      // excess into the neighbour. The legend is the tray's only job here (the update cue rides
-      // the half's top-edge pulse either way), and a legend that overlaps the next section's
-      // name legends nothing.
-      signals={VIEW_POLICIES[mode].vitalsLane ? undefined : tray}
+      // At thirds the tray COMPACTS instead of standing down (2026-09-03, two rounds): the icon
+      // legend measured 166px in a 130px section and spilled into the neighbour, but dropping it
+      // also dropped the persistent unseen-update cue — trayCompact keeps that as one dot.
+      signals={tray}
+      trayCompact={VIEW_POLICIES[mode].vitalsLane}
       sheetSide="bottom"
       open={phoneDock === "explore"}
       sheetPx={phoneSheetPx}
