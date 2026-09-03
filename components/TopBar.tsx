@@ -7,7 +7,6 @@ import { useStore } from "@/src/store/store";
 import { displayNetwork } from "@/src/data/unlisted";
 import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { VitalsStripRow } from "@/components/VitalsBand";
 import FilterPicker from "@/components/topbar/FilterPicker";
 import PulseStrip from "@/components/topbar/PulseStrip";
 import EcgMark from "@/components/topbar/EcgMark";
@@ -15,7 +14,6 @@ import PresentationToggle from "@/components/topbar/PresentationToggle";
 import ThemeToggle from "@/components/topbar/ThemeToggle";
 import NetworkSwitch, { NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
 import { useBreakpoint } from "@/components/useBreakpoint";
-import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import type { Mode } from "@/src/store/store";
 
 const VIEWS = [
@@ -391,18 +389,11 @@ export default function TopBar() {
                 desktop cluster; the hairline is the phone vitals row's own border-t device. */}
             {bp === "phone" && (
               <div className="flex items-center justify-center gap-2 mx-2 px-2 pb-2 pt-1.5 border-t border-border/60">
-                {/* The band's own cards, horizontally scrollable (user pick, 2026-08-30 — one
-                    vitals design on every tier; the bare-number cluster is retired). Gated on
-                    the band's own policy flag so a flat view's row carries controls alone. */}
-                {/* Mounted only while the strip is OPEN: collapsed, the row is invisible
-                    but a mounted VitalsStripRow still runs the snapshot-feed subscriptions
-                    and per-render tallies — refolding the window every poll on the lowest-
-                    powered tier for pixels no one can see. */}
-                {open && VIEW_POLICIES[mode].vitalsLane && <VitalsStripRow />}
-                {/* The phone home of the network switch (its bar slot is desktop/tablet-only):
-                    the strip row is the one place the bar grows, and it has the width the
-                    right zone doesn't. */}
-                <span className="w-px self-stretch bg-border my-1" />
+                {/* The vitals LEFT this row for the dock's third section (user, 2026-09-03 —
+                    VitalsDock: riding the strip put view vitals under whichever dropdown
+                    opened, the pulse strip included). What stays is what belongs to the strip:
+                    the phone homes of the network switch and theme toggle — the strip row is
+                    the one place the bar grows, and it has the width the right zone doesn't. */}
                 <NetworkSwitch />
                 <ThemeToggle />
               </div>

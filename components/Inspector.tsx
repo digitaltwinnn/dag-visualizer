@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
 import { useStore } from "@/src/store/store";
+import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { displayNetwork } from "@/src/data/unlisted";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { filterAccent } from "@/src/data/network";
@@ -698,6 +699,8 @@ export default function Inspector() {
       label="Details"
       style={accent}
       trigger="bottom-bar-half"
+      // Thirds with the Vitals section — see ExploreRail's matching arm.
+      barGeom={VIEW_POLICIES[mode].vitalsLane ? "w-1/3 right-0" : undefined}
       sheetSide="bottom"
       signals={tray}
       updateKey={updateKey}

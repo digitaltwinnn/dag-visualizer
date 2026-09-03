@@ -937,23 +937,26 @@ export default function VitalsBand() {
   );
 }
 
-/** The PHONE home of the vitals (user pick, 2026-08-30 — option 1): the SAME cards, riding the
- *  filter strip's second row as a horizontal scroll instead of a fixed band — the strip is
- *  already where phone vitals live and growing downward is its one mechanism, so no new surface
- *  or vertical space is claimed. Cards go content-sized (`flex-none basis-auto` overrides the
- *  band's even distribution at higher specificity) with a floor so the stretch sparklines have
- *  real width to measure. TopBar gates the row on `vitalsLane` AND on the strip being open. */
-export function VitalsStripRow() {
+/** The PHONE home of the vitals (user, 2026-09-03 — the dock's third section): the SAME cards,
+ *  stacked full-width in the Vitals sheet. This replaces the filter strip's second row
+ *  (2026-08-30's option 1), which rode the top bar's grow-downward slot and so appeared under
+ *  WHICHEVER strip opened — including the pulse strip, where a row of view vitals had nothing to
+ *  do with what was asked for ("it feels confusing as it's not related to the actual dropdown").
+ *  The dock parallels the desktop band: vitals live on the bottom edge on every tier. Vertical
+ *  because the sheet has height to spend and a stacked read beats a sideways thumb-scroll; the
+ *  width ceilings the band's `size` tiers carry are overridden — in a column every card takes
+ *  the sheet's width, and the ceilings exist for a 1600px row, not a 360px column. */
+export function VitalsSheetBody() {
   const { mode, live, filter, accent } = useVitalsScope();
   return (
     <div
       className={cn(
-        "flex items-stretch gap-2 overflow-x-auto slim-scroll pb-1 min-w-0 flex-1",
-        "[&>*]:flex-none [&>*]:basis-auto [&>*]:min-w-[150px]",
+        "flex flex-col items-stretch gap-2 min-w-0",
+        "[&>*]:w-full [&>*]:max-w-none [&>*]:flex-none [&>*]:basis-auto",
         !live && "saturate-[.45]",
       )}
     >
-      {!live && <span className="self-center flex-none min-w-0!"><NoSignalDot /></span>}
+      {!live && <span className="self-center flex-none"><NoSignalDot /></span>}
       <ViewCells mode={mode} accent={accent} filter={filter} />
     </div>
   );

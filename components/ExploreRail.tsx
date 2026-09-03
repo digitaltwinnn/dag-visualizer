@@ -2,6 +2,7 @@
 
 import { Fragment, type CSSProperties, type ReactNode } from "react";
 import { useStore } from "@/src/store/store";
+import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { filterAccent } from "@/src/data/network";
 import GeoExplore from "@/components/GeoExplore";
 import HyperExplore from "@/components/HyperExplore";
@@ -113,6 +114,9 @@ export default function ExploreRail() {
       label="Explore"
       style={accent}
       trigger="bottom-bar-half"
+      // Thirds whenever the Vitals section is present (VitalsDock gates on the same flag, so the
+      // bar's geometry and the middle section's presence cannot disagree).
+      barGeom={VIEW_POLICIES[mode].vitalsLane ? "w-1/3 left-0" : undefined}
       sheetSide="bottom"
       signals={tray}
       open={phoneDock === "explore"}

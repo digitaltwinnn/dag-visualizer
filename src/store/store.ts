@@ -146,14 +146,14 @@ interface AppState {
   // (Inspector), or null when both are closed. Phone has no room to stack two bottom sheets
   // (unlike tablet's two independent side sheets), so this is the single source of truth both
   // docks read `open` from: a dock is open iff `phoneDock === its own id`, and opening one
-  // (`setPhoneDock("explore" | "details")`) automatically closes the other by flipping its
+  // (`setPhoneDock("explore" | "details" | "vitals")`) automatically closes the others by flipping its
   // `open` to false — the two components never need to know about each other. Never set by a
   // scene pick (`setInspect`/`setSnap`) — only by the user tapping a button or dismissing a
   // sheet: tapping the ACTIVE bar half again (toggle), tapping the grabber (`.sheet-grabber`,
   // now a real tap-to-collapse button — see RailDock), or Escape → `setPhoneDock(null)`.
   // (Outside-tap does NOT dismiss it — `onInteractOutside` is `preventDefault`-blocked so the
   // scene/other dock stays interactive underneath.) Unused on tablet/desktop.
-  phoneDock: "explore" | "details" | null;
+  phoneDock: "explore" | "details" | "vitals" | null;
   // Which of the two shell LAYERS is presented (spec 2026-08-01): "scene" = the 3D shell + HUD,
   // "data" = the per-view raw-data table that surfaces out of the scene's depth over it. Written
   // by the command bar's RAW switch (and Escape); SectionShell owns the GSAP timeline that
@@ -263,7 +263,7 @@ interface AppState {
    *  the route fell back to another entry (an undecodable row asks with ordinal 0). */
   setMetaSnapDeep: (d: ChannelSnapDeep, key?: string) => void;
   setDeepWanted: (key: string | null) => void;
-  setPhoneDock: (dock: "explore" | "details" | null) => void;
+  setPhoneDock: (dock: "explore" | "details" | "vitals" | null) => void;
   setSection: (section: "scene" | "data") => void;
   setRailsHidden: (hidden: boolean) => void;
   setSceneDragging: (dragging: boolean) => void;

@@ -103,6 +103,8 @@ export default function RailDock({
   children,
   signals,
   updateKey,
+  barGeom,
+  barIcon,
   onOpenChange,
   sheetSide,
   trigger = "edge-tab",
@@ -121,6 +123,13 @@ export default function RailDock({
   onOpenChange?: (open: boolean) => void;
   sheetSide?: "left" | "right" | "bottom";
   trigger?: "edge-tab" | "bottom-bar-half";
+  /** Bar-half positioning override (width + x classes). The default is the two-half layout keyed
+   *  on `side`; the three-section dock (Explore | Vitals | Details, 2026-09-03) passes thirds —
+   *  geometry is the CALLERS' one shared decision, so RailDock never tracks how many sections
+   *  the bar currently holds. */
+  barGeom?: string;
+  /** The bar half's own leading mark — defaults to the side-keyed Explore/Details pair. */
+  barIcon?: ReactNode;
   open?: boolean;
   // Bottom-sheet drag (phone): the caller-held height override in px (null = the default 60vh)
   // + its setter. Store-backed by BOTH phone docks (`store.phoneSheetPx`) so switching halves
@@ -448,8 +457,8 @@ export default function RailDock({
           value={open ? "open" : ""}
           onValueChange={(v) => handleOpenChange(v === "open")}
           className={cn(
-            "fixed z-[42] bottom-0 w-1/2 h-[var(--phone-dock-h)] hidden max-[700px]:flex rounded-none",
-            side === "left" ? "left-0" : "right-0",
+            "fixed z-[42] bottom-0 h-[var(--phone-dock-h)] hidden max-[700px]:flex rounded-none",
+            barGeom ?? (side === "left" ? "w-1/2 left-0" : "w-1/2 right-0"),
             // The raw data layer is presented: the dock belongs to the scene shell (RailDock
             // renders inside it), which has receded and dimmed behind the layer — so the bar
             // would sit under the raw table pointing at a hidden rail.
@@ -475,7 +484,7 @@ export default function RailDock({
               "data-[state=on]:shadow-[inset_0_2px_0_var(--sel-border)] data-[state=on]:[&>svg]:text-[var(--primary)]",
             )}
           >
-            {side === "left" ? <EXPLORE_ICON size={18} strokeWidth={1.75} aria-hidden="true" /> : <ListTree size={18} strokeWidth={1.75} aria-hidden="true" />}
+            {barIcon ?? (side === "left" ? <EXPLORE_ICON size={18} strokeWidth={1.75} aria-hidden="true" /> : <ListTree size={18} strokeWidth={1.75} aria-hidden="true" />)}
             <span>{label}</span>
             {/* [icons legend] | [open control]: the tray, then the hairline, then the trailing
                 open/collapse chevron (up = opens a sheet above; down while open = collapses). */}
