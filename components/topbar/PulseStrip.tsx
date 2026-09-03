@@ -34,8 +34,11 @@ export default function PulseStrip() {
     // momentum scrolling stays the platform's own (which is the smoothness), each fling rests
     // with a card's left edge on the strip's own padding (scroll-px matches px). A fine
     // pointer's wheel is left free: mandatory snap under a trackpad reads as the strip grabbing
-    // the scroll.
-    <div className="flex items-stretch gap-2 mx-2 px-2 pb-2 pt-1.5 border-t border-border/60 overflow-x-auto slim-scroll pointer-coarse:snap-x pointer-coarse:snap-mandatory scroll-px-2 pointer-coarse:[&>*]:snap-start">
+    // the scroll. And on PHONE each card is HALF the strip (minus half the gap), so exactly two
+    // cards tile the view and no rest position shows a fraction of a third (user, 2026-09-03:
+    // "sometimes I see 2⅓ cards") — content-sized cards can never promise that, since their
+    // widths are the feeds' own words.
+    <div className="flex items-stretch gap-2 mx-2 px-2 pb-2 pt-1.5 border-t border-border/60 overflow-x-auto slim-scroll pointer-coarse:snap-x pointer-coarse:snap-mandatory scroll-px-2 pointer-coarse:[&>*]:snap-start max-[700px]:[&>*]:basis-[calc(50%-4px)] max-[700px]:[&>*]:grow-0 max-[700px]:[&>*]:shrink-0 max-[700px]:[&>*]:min-w-0">
       {rows.length === 0 && (
         <span className="text-label text-muted-foreground self-center px-1">acquiring — no polls have completed yet</span>
       )}

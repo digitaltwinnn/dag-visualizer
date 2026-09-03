@@ -226,7 +226,7 @@ const BAR_TRACK_MAX = 150;
  *  2026-09-01). The ladder stays where it earns its keep: on the DONUT, whose slices are adjacent
  *  arcs of a single colour and genuinely need separating. A bar row does not — every row is NAMED,
  *  and the ring's slices are in the same order, which is how a legend works. */
-export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key: string; label: React.ReactNode; count: number }[]; accent: string; labelW?: number; dashZero?: boolean }) {
+export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key: string; label: React.ReactNode; count: number; hue?: string }[]; accent: string; labelW?: number; dashZero?: boolean }) {
   // ⚠️ THE CALLER'S ORDER STANDS — see `Donut` for the full reasoning. In short: a magnitude sort
   // here would re-shuffle the structural cards (type, composition, layers) every time the subject
   // changes, and a row that moves cannot be followed; the ranked cards already arrive sorted from
@@ -274,7 +274,11 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
               column, the ceiling's void lands mid-card, and a track that fills the middle is
               what keeps label → bar → value one continuous read (user, 2026-09-03). */}
           <span aria-hidden className="flex items-center flex-1 min-w-[16px] h-[5px]" style={{ maxWidth: `var(--bar-track-max, ${BAR_TRACK_MAX}px)` }}>
-            <span className="h-[5px] rounded-full" style={{ background: accent, opacity: 0.75, width: r.count > 0 ? `${Math.max(2, (r.count / max) * 100)}%` : 0 }} />
+            {/* `hue` — a row that cannot claim the accent: the "unknown"/"unplaced" buckets take
+                the same neutral the tick chart's unattributed segment wears (user, 2026-09-03 —
+                a bucket meaning "nothing to read a type/place from" in the accent reads as one
+                more member of the vocabulary). */}
+            <span className="h-[5px] rounded-full" style={{ background: r.hue ?? accent, opacity: 0.75, width: r.count > 0 ? `${Math.max(2, (r.count / max) * 100)}%` : 0 }} />
           </span>
           {/* Under a COMMITTED scope a 0 is "this network has none of these", not a measurement of
               zero — the dash says so where a numeral would read as a count (kept from the dot-legend
@@ -300,7 +304,7 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
 /** The ring alone — the number that totals it is `DonutTotal`'s, standing outside at headline
  *  size. Segment opacities come from DONUT_STEPS in entry order, which is also the order the
  *  bar rows beside it are built in — order and label are what key a slice to its row. */
-export function Donut({ counts, accent }: { counts: Record<string, number>; accent: string }) {
+export function Donut({ counts, accent, hues }: { counts: Record<string, number>; accent: string; hues?: Record<string, string> }) {
   // ⚠️ ENTRY ORDER, NEVER SORTED BY SIZE — and the ring is only half the reason. Sorting was
   // tried on 2026-09-01 and withdrawn the same minute: "it does not make sense for structural
   // items like metagraph type and composition; it will look strange when they switch when swiping
@@ -332,7 +336,7 @@ export function Donut({ counts, accent }: { counts: Record<string, number>; acce
               key={label}
               cx="22" cy="22" r={R}
               fill="none"
-              stroke={accent}
+              stroke={hues?.[label] ?? accent}
               strokeOpacity={DONUT_STEPS[i] ?? 0.2}
               strokeWidth="6"
               strokeDasharray={`${len} ${C - len}`}
@@ -353,10 +357,10 @@ export function Donut({ counts, accent }: { counts: Record<string, number>; acce
  *  cards it replaced showed that same figure at headline size, so folding them in shrank the very
  *  number the card exists to lead with, below even its own breakdown values. The hole is now
  *  empty on purpose: the ring carries the shape, the numeral carries the reading. */
-export function DonutTotal({ counts, accent, total, className }: { counts: Record<string, number>; accent: string; total: number | null; className?: string }) {
+export function DonutTotal({ counts, accent, total, className, hues }: { counts: Record<string, number>; accent: string; total: number | null; className?: string; hues?: Record<string, string> }) {
   return (
     <span className={cn("flex items-center gap-2 flex-none", className)}>
-      <Donut counts={counts} accent={accent} />
+      <Donut counts={counts} accent={accent} hues={hues} />
       <span className="font-mono font-bold text-foreground tabular-nums leading-none">
         <Odometer int value={total || null} />
       </span>
@@ -476,13 +480,17 @@ function HyperCells({ accent }: { accent: string }) {
         </BandCard>
       ) : (
       <BandCard label="Metagraphs"
-        lead={<DonutTotal counts={types} accent={accent} total={TYPE_ORDER.reduce((n, t) => n + types[t]!, 0)} />}>
+        lead={<DonutTotal counts={types} accent={accent} hues={{ unknown: "var(--muted-foreground)" }} total={TYPE_ORDER.reduce((n, t) => n + types[t]!, 0)} />}>
         {/* THE COMPOSITION CARD'S OWN SHAPE (user, 2026-08-30: "the same design (1 total value +
             4 subsets) — the one used for node composition looks best"): the two cards are sibling
             share-of-whole readings, so they wear one donut + dot-legend design. The type GLYPHS
             keep their home on the filtered face, where the card states a single characteristic. */}
+        {/* "unknown" stays the WORD (user asked about "inactive", 2026-09-03 — but the bucket is
+            "zero LOCATABLE machines to read roles from", not zero activity: BIOFI sits here while
+            anchoring hundreds of snapshots an hour, so "inactive" would fabricate an activity
+            claim, rule 10). It takes the neutral instead: not one more type in the vocabulary. */}
         <MicroBars accent={accent} labelW={58}
-          rows={TYPE_ORDER.map((t) => ({ key: t, label: t === "data + currency" ? "both" : t, count: types[t]! }))} />
+          rows={TYPE_ORDER.map((t) => ({ key: t, label: t === "data + currency" ? "both" : t, count: types[t]!, hue: t === "unknown" ? "var(--muted-foreground)" : undefined }))} />
       </BandCard>
       )}
       {/* NO SEPARATE "NODES" CARD (user, 2026-08-31). The composition counts PARTITION the fleet,
@@ -577,9 +585,12 @@ function GeoCells({ accent }: { accent: string }) {
           fleet is fully drawn — and MicroBars renders no bar for it, only the numeral. */}
       <BandCard label="Nodes"
         lead={<span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={total || null} /></span>}>
+        {/* "unplaced" takes the neutral, like hyper's "unknown" type bucket: a node the lookup
+            could not place claims no location, so its bar should not wear the accent the located
+            split does (user, 2026-09-03). */}
         <MicroBars accent={accent} labelW={56} rows={[
           { key: "located", label: "located", count: located },
-          { key: "unplaced", label: "unplaced", count: Math.max(0, total - located) },
+          { key: "unplaced", label: "unplaced", count: Math.max(0, total - located), hue: "var(--muted-foreground)" },
         ]} />
       </BandCard>
       {/* "Top countries", not "Nodes by country" (user, 2026-09-01): the card shows the top three

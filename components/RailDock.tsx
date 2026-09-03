@@ -215,6 +215,31 @@ export default function RailDock({
   useLayoutEffect(() => {
     if (isBarHalf && open) setEntry("pre");
   }, [open, isBarHalf]);
+  // THE EXIT MIRRORS THE ENTRY (user, 2026-09-03: "appears nicely but disappears immediately"):
+  // the sheet shrinks back into the dock, then unmounts. It has to be a LAGGED unmount rather
+  // than a close-side animation, because a close can arrive from outside this component's own
+  // handler — the other dock section opening (the store's mutual exclusion), the tap-outside
+  // recognizer, Escape — and Radix unmounts a controlled sheet the moment `open` is false.
+  // While `exiting`, the sheet stays mounted at height 0 (the same transition the grow rides,
+  // downhill) and the real unmount follows on the transition's own clock. A reopen mid-exit
+  // cancels the timer and grows from wherever the shrink had reached. Section-to-section
+  // switches read as an exchange: the old sheet sinks into the dock as the new one rises.
+  // ⚠️ `exiting` is derived DURING RENDER (the getDerivedStateFromProps pattern), not in an
+  // effect: an effect runs a commit after the close, and by then Radix has already unmounted
+  // the content — measured, the "shrink" was a fresh remount sitting at zero. Flipped in the
+  // same render, the Sheet's `open || exiting` never goes false until the shrink has run.
+  const [exiting, setExiting] = useState(false);
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (isBarHalf && !open) setExiting(true);
+    if (open) setExiting(false);
+  }
+  useEffect(() => {
+    if (!exiting) return;
+    const t = setTimeout(() => setExiting(false), 420);
+    return () => clearTimeout(t);
+  }, [exiting]);
   useLayoutEffect(() => {
     if (!isBarHalf || !open || !fitEl) {
       setFitPx(null);
@@ -245,8 +270,8 @@ export default function RailDock({
       setEntry(null);
     };
   }, [open, isBarHalf, fitEl]);
-  // Drag beats fit; fit beats the CSS default; the entry's zero beats both until released.
-  const heightPx = isBarHalf ? (entry === "pre" ? 0 : sheetPx ?? fitPx) : null;
+  // Drag beats fit; fit beats the CSS default; the entry's and the exit's zeros beat both.
+  const heightPx = isBarHalf ? (entry === "pre" || exiting ? 0 : sheetPx ?? fitPx) : null;
   const handleOpenChangeRef = useRef(handleOpenChange);
   handleOpenChangeRef.current = handleOpenChange;
 
@@ -609,7 +634,7 @@ export default function RailDock({
           two bar-half docks are mutually exclusive via the CONTROLLED `open` prop (driven by
           `store.phoneDock` from the caller), not by anything in here — RailDock itself still just
           renders whatever `open` it's given. */}
-      <Sheet open={open && shellVisible} onOpenChange={handleOpenChange} modal={false}>
+      <Sheet open={(open || exiting) && shellVisible} onOpenChange={handleOpenChange} modal={false}>
         <SheetContent
           ref={setSheetEl}
           side={sheetSide ?? side}
@@ -643,8 +668,17 @@ export default function RailDock({
                   dragging
                     ? "!transition-none"
                     : cn(
-                        "transition-[height,opacity] ease-[var(--ease-spring)] motion-reduce:!transition-none",
-                        entry === "grow" ? "duration-[550ms]" : "duration-[380ms]",
+                        "motion-reduce:!transition-none",
+                        // The exit takes a plain decel ease, not the spring: a spring front-loads
+                        // its travel (measured, 280→29 in 120ms of a 380ms clock), which is the
+                        // "disappears immediately" the exit exists to fix. Exits run a touch
+                        // quicker than the 550ms entry, per standard motion practice.
+                        exiting
+                          ? "transition-[height,opacity] duration-[420ms] ease-out"
+                          : cn(
+                              "transition-[height,opacity] ease-[var(--ease-spring)]",
+                              entry === "grow" ? "duration-[550ms]" : "duration-[380ms]",
+                            ),
                       ),
                 )
               : undefined
