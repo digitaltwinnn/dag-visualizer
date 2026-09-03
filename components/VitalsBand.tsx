@@ -690,7 +690,11 @@ function TickBars({ accent, isMeta, filter, snaps }: { accent: string; isMeta: b
   return (
     // Full height, not a fixed 34px: the bars grow from a baseline, so every pixel of card height
     // is resolution the chart can actually spend (user, 2026-09-01).
-    <div className="flex items-end justify-end gap-[2px] h-full w-full self-stretch pb-0.5" aria-hidden>
+    // min-h: the chart CLAIMS whatever height its card gives it — the band's fixed --vitals-h
+    // on desktop, but the phone Vitals sheet's cards are content-height, where h-full of nothing
+    // rendered the card empty (user, 2026-09-03). The floor is the instrument's own intrinsic
+    // height; inside the band's taller box it is inert.
+    <div className="flex items-end justify-end gap-[2px] h-full min-h-12 w-full self-stretch pb-0.5" aria-hidden>
       {bars.length === 0 && <span className="text-micro text-muted-foreground self-center">acquiring…</span>}
       {allZero && <span className="text-micro text-muted-foreground self-center">no anchors in this window</span>}
       {bars.map((b, i) => {
