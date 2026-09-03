@@ -235,7 +235,10 @@ export default function TopBar() {
             // 2026-08-15 — the button used to run UNDER the switch and read as unclickable):
             // trimmed paddings/gaps, and `min-w-0` + the label's truncate below so a long
             // ticker ellipsizes inside its own column instead of overlapping the neighbour.
-            "min-w-0 max-[700px]:px-1 max-[700px]:py-1.5 max-[700px]:gap-[4px]",
+            // …but never below the touch floor's WIDTH either (user, 2026-09-03: the "All" face
+            // measured 35px). The coarse floor beats the shrink for short faces; long tickers
+            // still truncate — 44px is a floor, not a width.
+            "min-w-0 pointer-coarse:min-w-11 max-[700px]:px-1 max-[700px]:py-1.5 max-[700px]:gap-[4px]",
           )}
         >
           {/* The "FILTER" text label on wide bars; on the condensed breakpoints (≤940px) it

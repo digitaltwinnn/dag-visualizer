@@ -342,7 +342,7 @@ function SignerList({
   );
 }
 
-export default function LedgerPanel() {
+export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: boolean } = {}) {
   const filter = useStore((s) => s.filter);
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
@@ -415,6 +415,7 @@ export default function LedgerPanel() {
 
   return (
     <ExplorerShell
+      defaultCollapsed={defaultCollapsed}
       id="ledger-view"
       title="Snapshots"
       // No ordering clause (user, 2026-08-12): the list shows its own order. See the hint-shape

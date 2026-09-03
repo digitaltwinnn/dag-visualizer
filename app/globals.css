@@ -1232,7 +1232,11 @@
 @theme inline {
   --animate-sheet-in-left:   sheetInLeft   0.28s cubic-bezier(0.22, 1, 0.36, 1);
   --animate-sheet-in-right:  sheetInRight  0.28s cubic-bezier(0.22, 1, 0.36, 1);
-  --animate-sheet-in-bottom: sheetInBottom 0.30s cubic-bezier(0.22, 1, 0.36, 1);
+  /* 0.30 → 0.50s (user, 2026-09-03: "it just [comes] up very quickly") — the bottom sheet is
+     60vh of travel, and the app's own doctrine puts navigation on the slower clock (the depth
+     change is 0.55s): this is the user's gesture resolving, not the instrument speaking. The
+     side sheets keep 0.28s — their travel is a fraction of the width. */
+  --animate-sheet-in-bottom: sheetInBottom 0.50s cubic-bezier(0.22, 1, 0.36, 1);
   --animate-card-in:         cardMaterialize 0.26s cubic-bezier(0.22, 1, 0.36, 1);
 }
 

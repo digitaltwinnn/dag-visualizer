@@ -268,7 +268,12 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
               A ZERO DRAWS NOTHING (rule 10, TickBars' own rule): the old 4px floor applied to a
               0 count rendered an empty bucket as small-but-nonzero activity. The floor now
               guards only real counts, and the numeral beside it still states the zero. */}
-          <span aria-hidden className="flex items-center flex-1 min-w-[16px] h-[5px]" style={{ maxWidth: BAR_TRACK_MAX }}>
+          {/* The cap is a VAR so a surface can re-declare it: `--bar-track-max` defaults to the
+              band's 150px ceiling (a bar spanning a 1600px row stops reading as a quantity), and
+              the phone vitals SHEET sets it to none — there the cards are a 370px full-width
+              column, the ceiling's void lands mid-card, and a track that fills the middle is
+              what keeps label → bar → value one continuous read (user, 2026-09-03). */}
+          <span aria-hidden className="flex items-center flex-1 min-w-[16px] h-[5px]" style={{ maxWidth: `var(--bar-track-max, ${BAR_TRACK_MAX}px)` }}>
             <span className="h-[5px] rounded-full" style={{ background: accent, opacity: 0.75, width: r.count > 0 ? `${Math.max(2, (r.count / max) * 100)}%` : 0 }} />
           </span>
           {/* Under a COMMITTED scope a 0 is "this network has none of these", not a measurement of
@@ -953,6 +958,8 @@ export function VitalsSheetBody() {
       className={cn(
         "flex flex-col items-stretch gap-2 min-w-0",
         "[&>*]:w-full [&>*]:max-w-none [&>*]:flex-none [&>*]:basis-auto",
+        // The bar tracks fill the column's middle — see MicroBars' `--bar-track-max` note.
+        "[--bar-track-max:none]",
         !live && "saturate-[.45]",
       )}
     >

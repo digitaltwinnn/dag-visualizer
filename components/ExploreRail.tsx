@@ -41,7 +41,13 @@ export default function ExploreRail() {
   const manifest = exploreCards({ mode });
   const renderCard: Record<string, ReactNode> = {
     about: <AboutView {...ABOUT[mode]} defaultCollapsed={bp === "phone"} />,
-    tool: mode === "hyper" ? <HyperExplore /> : mode === "geo" ? <GeoExplore /> : mode === "ledger" ? <LedgerPanel /> : null,
+    // Phone opens BOTH cards collapsed (user, 2026-09-03): the sheet becomes a compact chooser
+    // that the live content-fit sizes down, and one tap opens the list and grows the sheet.
+    tool:
+      mode === "hyper" ? <HyperExplore defaultCollapsed={bp === "phone"} />
+      : mode === "geo" ? <GeoExplore defaultCollapsed={bp === "phone"} />
+      : mode === "ledger" ? <LedgerPanel defaultCollapsed={bp === "phone"} />
+      : null,
   };
   const content = (
     <>

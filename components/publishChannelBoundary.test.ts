@@ -111,15 +111,19 @@ describe("sceneCover is measured by the dock and sided by the caller", () => {
     // against a null node and publishes 0 forever — measured with both sheets up at offsetWidth
     // 300/320 and the store still reading 0. The node has to ARRIVE, which is what a callback ref
     // held as state does and a `useRef` cannot.
-    const el = /const\s*\[\s*(\w+)\s*,\s*\w+\s*\]\s*=\s*useState<HTMLDivElement \| null>/.exec(dock);
-    expect(el, "the sheet node must arrive through useState (a callback ref), not useRef").not.toBeNull();
+    // Several nodes now arrive through this pattern (the content-fit measurement adopted it for
+    // the same trap, 2026-09-03), so collect EVERY callback-ref name and require the cover
+    // effect to key on one of them — the first-match form silently pinned whichever declaration
+    // happened to come first in the file.
+    const els = [...dock.matchAll(/const\s*\[\s*(\w+)\s*,\s*\w+\s*\]\s*=\s*useState<HTMLDivElement \| null>/g)].map((m) => m[1]);
+    expect(els.length, "the sheet node must arrive through useState (a callback ref), not useRef").toBeGreaterThan(0);
 
     const at = dock.indexOf("offsetWidth");
     expect(at, "no offsetWidth measurement found in RailDock").toBeGreaterThan(0);
     const deps = /\}\s*,\s*\[([^\]]*)\]\s*\)/.exec(dock.slice(at))?.[1] ?? "";
     expect(
-      deps.includes(el![1]),
-      `the cover effect must re-run when the node lands — deps are [${deps}], missing ${el![1]}`,
+      els.some((name) => deps.includes(name)),
+      `the cover effect must re-run when the node lands — deps are [${deps}], none of [${els.join(", ")}] present`,
     ).toBe(true);
   });
 });
