@@ -65,19 +65,49 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
   const [visible, setVisible] = useState(false);
   const stageReady = useStore((s) => s.docStageReady);
   const exitT = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const rafs = useRef<number[]>([]);
+  const renderRef = useRef(render);
+  renderRef.current = render;
   useEffect(() => {
-    if (page) {
+    const clearPending = () => {
       if (exitT.current) { clearTimeout(exitT.current); exitT.current = null; }
+      for (const r of rafs.current) cancelAnimationFrame(r);
+      rafs.current.length = 0;
+    };
+    // DOUBLE rAF before the rise: a single one fires before the mounted-hidden state has ever
+    // been painted (rAF callbacks run ahead of that frame's style/paint), so the class flip
+    // coalesced and the rise snapped — measured opacity 1 at 150ms.
+    const rise = () => {
+      rafs.current.push(
+        requestAnimationFrame(() => {
+          rafs.current.push(requestAnimationFrame(() => setVisible(true)));
+        }),
+      );
+    };
+    clearPending();
+    if (page) {
+      // A DOC→DOC SWITCH ROLLS LIKE EVERYTHING ELSE (user, 2026-09-04 — "between about and
+      // design it still pops; why is it not behaving consistently?"): the standing document
+      // rolls out on the same clock, then the next one rolls in — the one transition grammar,
+      // every path.
+      if (renderRef.current != null && renderRef.current !== page) {
+        setVisible(false);
+        exitT.current = setTimeout(() => {
+          exitT.current = null;
+          setRender(page);
+          // The container survives the swap, so the old document's scroll would too.
+          box.current?.scrollTo(0, 0);
+          rise();
+        }, ROLL_MS);
+        return clearPending;
+      }
       setRender(page);
       // Hold the entrance until the ENGINE says the stage is bare (docStageReady — true by
       // default, false only while a live scene's gather is playing under this document).
-      if (!stageReady) return;
-      // DOUBLE rAF: a single one fires before the mounted-hidden state has ever been painted
-      // (rAF callbacks run ahead of that frame's style/paint), so the class flip coalesced and
-      // the rise snapped — measured opacity 1 at 150ms.
-      let raf2 = 0;
-      const raf1 = requestAnimationFrame(() => { raf2 = requestAnimationFrame(() => setVisible(true)); });
-      return () => { cancelAnimationFrame(raf1); if (raf2) cancelAnimationFrame(raf2); };
+      if (!stageReady) return clearPending;
+      rise();
+      return clearPending;
     }
     setVisible(false);
     exitT.current = setTimeout(() => {
@@ -86,7 +116,7 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
       // The roll-out finished — release the engine's held stage (the entry begins now).
       useStore.getState().setDocClosing(false);
     }, ROLL_MS);
-    return () => { if (exitT.current) { clearTimeout(exitT.current); exitT.current = null; } };
+    return clearPending;
   }, [page, stageReady]);
 
   // Unmount safety: a torn-down layer must never leave the engine holding the flat stage.
@@ -113,6 +143,7 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
     // bare stage IS the ground, and the panels' glass sits straight on it. pointer-events gate
     // off during the exit fade so a leaving document can't eat the scene's first clicks.
     <div
+      ref={box}
       className={cn(
         "fixed inset-0 z-[8] overflow-y-auto overscroll-contain",
         // The HUD's text entrance at document scale: a rise + fade on the NAV clock — never a
