@@ -35,12 +35,10 @@ export default function FooterViewLinks() {
           </NetLink>
         </span>
       ))}
-      {/* The group's trailing separator rides inside the phone-hidden span (one separator
-          species row-wide — the mid-dot; the external links' brand marks carry that group's
-          distinction). */}
-      <span aria-hidden className="opacity-70 text-muted-foreground">
-        ·
-      </span>
+      {/* The group's trailing BETWEEN-GROUPS hairline rides inside the phone-hidden span, so
+          the collapse takes its divider with it (short + self-centred — never self-stretch,
+          which ran through the tucked strip). */}
+      <span aria-hidden className="w-px h-3.5 self-center bg-muted-foreground/35" />
     </span>
   );
 }

@@ -140,7 +140,7 @@ export default function SiteFooter() {
         <DocToggle page="design" href="/design">
           Design
         </DocToggle>
-        <span aria-hidden className="opacity-70 text-muted-foreground">·</span>
+        <span aria-hidden className="w-px h-3.5 self-center bg-muted-foreground/35" />
         <a
           href={GITHUB}
           target="_blank"
@@ -150,7 +150,7 @@ export default function SiteFooter() {
           <GithubMark />
           Source code
         </a>
-        <span aria-hidden className="opacity-70 text-muted-foreground">·</span>
+        <span aria-hidden className="w-px h-3.5 self-center bg-muted-foreground/35" />
         {/* The repo and the official site stay clearly TWO things — one is this project's, the
             other is the network's (the affiliation boundary /about states in words) — told apart
             by each link's own brand mark (the one-separator rule above). The Constellation link

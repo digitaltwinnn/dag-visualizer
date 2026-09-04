@@ -130,13 +130,19 @@ export default function Blueprint() {
     // headings overlapped the grids AND the new ticker legend). The bottom edge
     // clears the footer strip plus a breather (user, same day: "the staking text almost
     // touches the bottom bar").
-    <figure id="blueprint" className="fixed inset-x-0 top-[38vh] bottom-[calc(var(--footer-h,0px)+16px)] z-[6] flex flex-col items-center justify-center gap-9 pointer-events-none px-6">
+    // overflow-y-auto + my-auto (not justify-center): when the columns wrap on a narrow
+    // viewport the content grows past the box, and flex-centering makes the overflowing top
+    // unreachable — it poked the headings up into the staging band (user, 2026-09-04). The
+    // inner wrapper's my-auto centres it whenever it fits and scrolls honestly when it doesn't;
+    // pointer-events on for the scroll (the flat view has nothing pickable behind).
+    <figure id="blueprint" className="fixed inset-x-0 top-[38vh] bottom-[calc(var(--footer-h,0px)+16px)] z-[6] flex flex-col items-center overflow-y-auto overscroll-contain px-6">
+      <div className="my-auto flex flex-col items-center gap-8 py-2">
       <span className="text-label tracking-caps uppercase [color:color-mix(in_oklch,var(--primary)_80%,#fff)] opacity-[0.85]">
         preview · in development
       </span>
-      <div className="flex flex-wrap items-start justify-center gap-x-14 gap-y-9 max-w-[1160px]">
+      <div className="flex flex-wrap items-start justify-center gap-x-10 gap-y-8 max-w-[1160px]">
         {SOON_FEATURES.map((f) => (
-          <figcaption key={f.name} className="flex flex-col items-center gap-3 text-center max-w-[300px]">
+          <figcaption key={f.name} className="flex flex-col items-center gap-3 text-center max-w-[270px]">
             <span className="flex items-center gap-2 text-title font-semibold text-foreground">
               <f.icon aria-hidden className="size-4 text-primary flex-none" />
               {f.name}
@@ -145,6 +151,7 @@ export default function Blueprint() {
             <span className="text-label text-muted-foreground leading-relaxed">{f.caption}</span>
           </figcaption>
         ))}
+      </div>
       </div>
     </figure>
   );

@@ -526,7 +526,7 @@ export class Globe implements GeoViewHost {
   // opacity rides the grids' presence envelope (gatherWeight of the lead × the fleet's
   // bare-stage weight), so the legend forms with the grids and dissolves with them — the doc
   // overlay's bare stage included.
-  private _gatherLabels: { mesh: THREE.Mesh; uMid: number; gs: number }[] = [];
+  private _gatherLabels: { mesh: THREE.Mesh; uMid: number; vMin: number; gs: number }[] = [];
   private _gatherLabelGroup: THREE.Group | null = null;
   private _gatherLabelQ = new THREE.Quaternion();
   private _gatherLabelM = new THREE.Matrix4();
@@ -544,6 +544,11 @@ export class Globe implements GeoViewHost {
       disposeTextLabel(l.mesh);
     }
     this._gatherLabels.length = 0;
+    // NEUTRAL label ink, not the identity hue (user, 2026-09-04: "colour-coded text is too
+    // strong — we already have the coloured chips right underneath"): the chips ARE the colour,
+    // the ticker just names them. labelInk is the one home for text-on-ground (the country
+    // labels' own answer).
+    const ink = `#${labelInk(this._colorsRef).toString(16).padStart(6, "0")}`;
     for (const g of this._gatherGroups) {
       const ss = slots.get(g.id);
       if (!ss || ss.length === 0) continue;
@@ -554,14 +559,15 @@ export class Globe implements GeoViewHost {
       if (!ticker) continue;
       let uMin = Infinity;
       let uMax = -Infinity;
+      let vMin = Infinity;
       for (const s of ss) {
         if (s.u < uMin) uMin = s.u;
         if (s.u > uMax) uMax = s.u;
+        if (s.v < vMin) vMin = s.v;
       }
-      const hue = (this.sceneColors && this.sceneColors[g.id]) ?? this.geoColor;
-      const mesh = makeTextLabel(`#${hue.toString(16).padStart(6, "0")}`, ticker, GATHER_CELL * 2, 600);
+      const mesh = makeTextLabel(ink, ticker, GATHER_CELL * 1.4, 500);
       grp.add(mesh);
-      this._gatherLabels.push({ mesh, uMid: (uMin + uMax) / 2, gs: ss[0]!.gs });
+      this._gatherLabels.push({ mesh, uMid: (uMin + uMax) / 2, vMin, gs: ss[0]!.gs });
     }
   }
 
@@ -580,10 +586,13 @@ export class Globe implements GeoViewHost {
     this._gatherLabelQ.setFromRotationMatrix(this._gatherLabelM);
     const fit = g.cell / GATHER_CELL; // the band's shrink factor — labels shrink with the pitch
     for (const l of this._gatherLabels) {
+      // BELOW each block, not above (user, 2026-09-04: above sat behind the command bar and
+      // its hanging view caption): the band's top edge runs under the bar, the space beneath
+      // the blocks is the scene's own.
       l.mesh.position
         .copy(g.origin)
         .addScaledVector(g.right, l.uMid * g.cell + l.gs * g.spread)
-        .addScaledVector(g.up, 1.4 * g.cell);
+        .addScaledVector(g.up, (l.vMin - 1.3) * g.cell);
       l.mesh.quaternion.copy(this._gatherLabelQ);
       l.mesh.scale.setScalar(fit);
       (l.mesh.material as THREE.MeshBasicMaterial).opacity = lw;
