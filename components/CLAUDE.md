@@ -552,9 +552,9 @@ rails-lean with no visible way back.
   arrival); the 150ms disclosure clock deliberately is not (its header says why).
 - **THE NO-POP RULE** (user, 2026-09-04): a view-scoped HUD surface never pops on navigation —
   chrome persists, content leaves on a quick out-beat and arrives on the app's one roll
-  grammar. `components/RollSwap.tsx` is the structural home (DocLayer's render/visible
-  machinery generalized; its header carries the contract — render from the KEY, never live
-  state) and it wraps the explore rail's card stack (opacity-only: RailThread measures there,
+  grammar. `components/RollSwap.tsx` is the structural home (a keyed remount speaking
+  tw-animate-css's animate-in/out — the vocabulary the shadcn primitives already use; its
+  header carries the contract — render from the KEY, never live state) and it wraps the explore rail's card stack (opacity-only: RailThread measures there,
   the BootFade transform warning) and both vitals presentations (their `[&>*]` cell rules ride
   the wrapper, or it becomes their subject). A new view inherits the behaviour by construction.
 - **The canvas's display box is CSS-owned** (`setSize(..., false)` + a 2px viewport overdraw in
