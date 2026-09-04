@@ -25,7 +25,6 @@
 // ⚠️ NO DONATE LINK. The user asked for one and the project carries no donation destination — an
 // invented address is a fabricated fact of the worst kind (rule 10). Add the entry here the moment
 // a real one exists.
-import { TriangleAlert } from "lucide-react";
 import NetLink from "@/components/NetLink";
 import FooterViewLinks from "@/components/FooterViewLinks";
 import { useStore } from "@/src/store/store";
@@ -172,15 +171,15 @@ export default function SiteFooter() {
           )}
           Constellation
         </a>
-        {/* THE DISCLAIMER RETURNS AS A STATEMENT, NOT A LINK (user, 2026-09-04 — "a small
-            disclaimer now that it has some space, visually distinct"): the ADVISORY register —
-            amber --warn-soft caps-micro with the TriangleAlert, the exact head /about's own
-            disclosure panel wears — so it cannot be mistaken for a fifth destination (the
-            2026-09-04 removal's lesson). Non-interactive: the full disclosure is one click away
-            behind About. Stands down below 860px (row width) — the About page carries it there. */}
+        {/* THE DISCLAIMER IS A STATEMENT, NOT A LINK (user, 2026-09-04, two rounds): caps-micro
+            behind its own hairline so it can't read as a fifth destination; non-interactive —
+            the full disclosure is one click away behind About. The amber advisory register was
+            tried and pulled the same day (it sat wrong on the light veil) along with its
+            triangle mark; the ink is now a softened primary at the user's call — an accepted
+            bend of "cyan is for affordances", softened and un-underlined so it stays a
+            statement. Stands down below 860px; the About page carries it there. */}
         <span aria-hidden className="w-px h-3.5 self-center bg-muted-foreground/35 max-[860px]:hidden" />
-        <span className="flex items-center gap-1.5 text-micro tracking-caps uppercase text-warn-soft/80 select-none max-[860px]:hidden">
-          <TriangleAlert aria-hidden className="size-3 opacity-85 flex-none" />
+        <span className="text-micro tracking-caps uppercase text-primary/70 select-none max-[860px]:hidden">
           unofficial community project
         </span>
       </nav>
