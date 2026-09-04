@@ -47,7 +47,19 @@ const DOC_COMPONENTS: Record<DocPage, ReturnType<typeof dynamic>> = {
 
 // The one doc column (both documents read it): max-w-3xl is the document reading measure;
 // /design's specimen grids wrap rather than widening past it. pt clears the fixed command bar.
-const DOC_COLUMN = "relative mx-auto max-w-3xl px-6 pt-[68px] pb-24";
+//
+// THE COLUMN IS A SHEET (user, 2026-09-04 — "a slight fill and shadow make it look like a
+// doc?"): a faint veil fill, hairline side edges and a soft ambient shadow lift the reading
+// column off the stage while the margins keep the LIVE scene ground (the continuity the user
+// wants). The fill is `--footer-glass` — the app's one VEIL token (cool white at low alpha in
+// light, a dark veil in dark), picked after a --background mix at 62% read "too brown" over
+// the stage's warm gradient (user, same day; the second brown strike after the full-viewport
+// wash) — with a 2px backdrop blur to calm the stage's grid behind prose. min-h-full so a
+// short document still reads as one sheet to the fold, not a scrap ending mid-viewport.
+const DOC_COLUMN =
+  "relative mx-auto max-w-3xl min-h-full px-8 pt-[68px] pb-24 " +
+  "bg-[var(--footer-glass)] backdrop-blur-[2px] " +
+  "border-x border-border shadow-[0_0_50px_rgba(0,0,0,0.14)]";
 
 // The roll's one JS home is the choreography's own DOC_ROLL (domain/viewTransition — the fleet's
 // stage fade reads the same constant, so text and nodes move as one); --tempo-nav is its CSS pair.
