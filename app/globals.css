@@ -544,7 +544,7 @@
      the one surface the floating row genuinely collides with, since a data pane's bottom rows
      are content where the scene's bottom edge is not (2026-09-02, measured: the lozenge sat on
      the channel pane's hash foot). */
-  --footer-phone-h: 22px;
+  --footer-phone-h: 26px; /* 22 → 26 with the 2026-09-04 footer redesign (label-size ink) */
   /* The ONE resting dim for rail instrument furniture (lines/ruler/spine at rest) — consumed by
      the desktop RailThreads' dim group AND the tablet/phone sheet's `.ig-sheet-edge` channel, so
      rest vs signal contrast is consistent everywhere. Brightness belongs to the signals (pulses)
@@ -767,7 +767,9 @@
                               ONE home (review, 2026-08-31): #leftcol/#rightcol and the vitals
                               band's edges all read it, so the band stays aligned with the rail
                               cards through any margin retune. */
-  --footer-h: 22px;        /* the site footer's band along the very bottom edge (SiteFooter.tsx,
+  --footer-h: 28px;        /* the site footer's band along the very bottom edge (SiteFooter.tsx,
+                              22 → 28 on 2026-09-04 (user: "text is tiny … hard to even spot"):
+                              the row stepped up to text-label ink and needed the breathing.
                               2026-08-18). 26px → 22px (user, 2026-09-01: "a bit less margin at the
                               top of the footer"): the band held an 11px line with 18px of air
                               above it and 7px below, so the gap read as a margin rather than as a

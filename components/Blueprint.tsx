@@ -123,12 +123,14 @@ export default function Blueprint() {
   const mode = useStore((s) => s.mode);
   if (mode !== "soon") return null;
   return (
-    // top-[24vh], not inset-0 (user, 2026-09-04: the eyebrow "fights with the nodes at the
+    // top-[38vh], not inset-0 (user, 2026-09-04: the eyebrow "fights with the nodes at the
     // top"): the parked fleet grids hold the viewport's top band on every flat view, so the
-    // gallery centres in the space BELOW them rather than the full height. The bottom edge
+    // gallery centres in the space BELOW them rather than the full height (38vh, raised from
+    // 24 — the band's projected bottom sits near ~38% at common aspects, and the first cut's
+    // headings overlapped the grids AND the new ticker legend). The bottom edge
     // clears the footer strip plus a breather (user, same day: "the staking text almost
     // touches the bottom bar").
-    <figure id="blueprint" className="fixed inset-x-0 top-[24vh] bottom-[calc(var(--footer-h,0px)+16px)] z-[6] flex flex-col items-center justify-center gap-9 pointer-events-none px-6">
+    <figure id="blueprint" className="fixed inset-x-0 top-[38vh] bottom-[calc(var(--footer-h,0px)+16px)] z-[6] flex flex-col items-center justify-center gap-9 pointer-events-none px-6">
       <span className="text-label tracking-caps uppercase [color:color-mix(in_oklch,var(--primary)_80%,#fff)] opacity-[0.85]">
         preview · in development
       </span>

@@ -298,7 +298,10 @@ export default function TopBar() {
           onValueChange={(v) => { if (v) setMode(v as Mode); }}
           className="flex gap-0.5 max-[700px]:gap-0"
         >
-          {(bp === "phone" ? VIEWS.filter((v) => !v.soon) : VIEWS).map((v) => {
+          {/* Phone shows ALL views since the soon consolidation (user, 2026-09-04): the three
+              dead placeholders it used to drop are one dimmed entry now, and four icon buttons
+              fit the phone switch. */}
+          {VIEWS.map((v) => {
             const Icon = VIEW_ICONS[v.id as Mode];
             return (
             <ToggleGroupItem
@@ -368,8 +371,8 @@ export default function TopBar() {
 
         {/* Pages — the doc overlay's quiet bar home (InfoMenu: About/Design as a circled-i
             popover). One rank below the view switch on purpose — they are views, but not at the
-            views' level of importance (user, 2026-09-04). Phone reaches the docs via the
-            footer's own row instead. */}
+            views' level of importance (user, 2026-09-04). On phone it rides the filter strip's
+            second row with the other shared controls (plus the footer row, always visible). */}
         <div className="contents max-[700px]:hidden">
           <InfoMenu />
         </div>
@@ -414,6 +417,10 @@ export default function TopBar() {
                 desktop cluster; the hairline is the phone vitals row's own border-t device. */}
             {bp === "phone" && (
               <div className="flex items-center justify-center gap-2 mx-2 px-2 pb-2 pt-1.5 border-t border-border/60">
+                {/* The docs' phone home rides the strip row with the other shared controls
+                    (user, 2026-09-04 — "phone is also missing the about/design top bar
+                    element"); the footer row remains the always-visible route. */}
+                <InfoMenu />
                 {/* The vitals LEFT this row for the dock's third section (user, 2026-09-03 —
                     VitalsDock: riding the strip put view vitals under whichever dropdown
                     opened, the pulse strip included). What stays is what belongs to the strip:

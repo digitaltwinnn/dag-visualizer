@@ -15,8 +15,8 @@ import { cn } from "@/lib/utils";
 // circled-i popover in the right control zone, the NetworkSwitch/ThemeToggle idiom, one rank
 // below the views exactly as their importance is. Rows are the same store toggles the footer's
 // DocToggles are (real hrefs keep middle-click/new-tab honest; a plain click flips the overlay
-// in place, and clicking the open page's row closes it). Phone declines it — the footer's
-// About · Design row is the doc home there, and the bar has no width to spare.
+// in place, and clicking the open page's row closes it). On phone it rides the filter strip's
+// second row beside NetworkSwitch/ThemeToggle (user, 2026-09-04).
 export default function InfoMenu() {
   const doc = useStore((s) => s.docPage);
   const setDocPage = useStore((s) => s.setDocPage);

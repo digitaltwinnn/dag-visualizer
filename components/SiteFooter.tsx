@@ -110,7 +110,7 @@ export default function SiteFooter() {
           separates the two rows now that they touch. */}
       <nav
         className={cn(
-          "flex-1 flex items-center justify-center gap-2 text-micro text-muted-foreground [&_a]:pointer-events-auto bg-[var(--footer-glass)] backdrop-blur-sm",
+          "flex-1 flex items-center justify-center gap-2.5 text-label text-foreground-dim [&_a]:pointer-events-auto bg-[var(--footer-glass)] backdrop-blur-sm",
           "max-[700px]:[&_a]:pt-[26px] max-[700px]:[&_a]:-mt-[26px] max-[700px]:[&_a]:pb-1.5 max-[700px]:[&_a]:-mb-1.5 max-[700px]:[&_a]:px-1.5 max-[700px]:[&_a]:-mx-1.5",
           "pt-[min(10px,var(--bottom-reserve,0px))] max-[700px]:pt-0",
         )}
@@ -136,11 +136,11 @@ export default function SiteFooter() {
         <DocToggle page="about" href="/about">
           About
         </DocToggle>
-        <span aria-hidden className="opacity-40">·</span>
+        <span aria-hidden className="opacity-70 text-muted-foreground">·</span>
         <DocToggle page="design" href="/design">
           Design
         </DocToggle>
-        <span aria-hidden className="opacity-40">·</span>
+        <span aria-hidden className="opacity-70 text-muted-foreground">·</span>
         <a
           href={GITHUB}
           target="_blank"
@@ -150,7 +150,7 @@ export default function SiteFooter() {
           <GithubMark />
           Source code
         </a>
-        <span aria-hidden className="opacity-40">·</span>
+        <span aria-hidden className="opacity-70 text-muted-foreground">·</span>
         {/* The repo and the official site stay clearly TWO things — one is this project's, the
             other is the network's (the affiliation boundary /about states in words) — told apart
             by each link's own brand mark (the one-separator rule above). The Constellation link

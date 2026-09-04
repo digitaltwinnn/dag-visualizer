@@ -181,6 +181,11 @@ export class NodeFabric {
   // only write path that actually holds.
   fleetTarget = 1;
   private _fleetW = 1;
+  /** The eased bare-stage weight — the gather-legend labels ride it so they dissolve with the
+   *  fleet they name. */
+  get fleetW(): number {
+    return this._fleetW;
+  }
 
   tickFleetFade(dt: number): void {
     if (this._fleetW === this.fleetTarget) return;

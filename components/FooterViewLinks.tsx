@@ -17,7 +17,7 @@ export default function FooterViewLinks() {
       {ROUTED_VIEWS.map((v, i) => (
         <span key={v.id} className="flex items-center gap-2">
           {i > 0 && (
-            <span aria-hidden className="opacity-40">
+            <span aria-hidden className="opacity-70 text-muted-foreground">
               ·
             </span>
           )}
@@ -38,7 +38,7 @@ export default function FooterViewLinks() {
       {/* The group's trailing separator rides inside the phone-hidden span (one separator
           species row-wide — the mid-dot; the external links' brand marks carry that group's
           distinction). */}
-      <span aria-hidden className="opacity-40">
+      <span aria-hidden className="opacity-70 text-muted-foreground">
         ·
       </span>
     </span>
