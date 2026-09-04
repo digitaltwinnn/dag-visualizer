@@ -548,7 +548,15 @@ rails-lean with no visible way back.
   compile trap besides. `motion-reduce:!transition-none` needs its `!` against an
   equal-specificity single class (trap 4's family).
 - **The tempo family is tokenized** — `--tempo-beat` / `--tempo-signal` / `--tempo-roll` in
-  globals.css `:root`; the 150ms disclosure clock deliberately is not (its header says why).
+  globals.css `:root` (+ the doc overlay's `--tempo-doc-sheet`/`--tempo-doc-rise` two-beat
+  arrival); the 150ms disclosure clock deliberately is not (its header says why).
+- **THE NO-POP RULE** (user, 2026-09-04): a view-scoped HUD surface never pops on navigation —
+  chrome persists, content leaves on a quick out-beat and arrives on the app's one roll
+  grammar. `components/RollSwap.tsx` is the structural home (DocLayer's render/visible
+  machinery generalized; its header carries the contract — render from the KEY, never live
+  state) and it wraps the explore rail's card stack (opacity-only: RailThread measures there,
+  the BootFade transform warning) and both vitals presentations (their `[&>*]` cell rules ride
+  the wrapper, or it becomes their subject). A new view inherits the behaviour by construction.
 - **The canvas's display box is CSS-owned** (`setSize(..., false)` + a 2px viewport overdraw in
   `.scene-canvas`) — integer inline sizing left fractional-DPR background slivers at the edges.
 

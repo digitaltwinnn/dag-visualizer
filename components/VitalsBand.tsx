@@ -1,6 +1,7 @@
 "use client";
 
-import { useStore } from "@/src/store/store";
+import { useStore, type Mode } from "@/src/store/store";
+import RollSwap from "@/components/RollSwap";
 import { metagraphById, filterAccent, getAnchor } from "@/src/data/network";
 import { displayNetwork } from "@/src/data/unlisted";
 import { metaType, rolesOf, IdentityDot, RoleChips } from "@/components/inspector/parts";
@@ -960,23 +961,11 @@ export default function VitalsBand() {
         // exactly as the top bar").
         "rounded-lg border border-border/60 [background:var(--topbar-glass)] backdrop-blur-sm",
         "[clip-path:inset(0_max(0px,calc(var(--cover-r)-var(--bar-margin)))_0_max(0px,calc(var(--cover-l)-var(--bar-margin))))]",
-        // ⚠️ THE CARDS ARE FLATTENED FROM HERE, not by a prop threaded through every cell. The same
-        // `ViewCells` renders the PHONE strip, where the cards scroll and must keep their own
-        // plates — a section of a bar that scrolls away from the bar is not a section. An arbitrary
-        // variant scopes the flattening to this presentation and leaves that one untouched; it wins
-        // on specificity within the same layer, which is the in-layer escape CSS trap 1 describes.
-        // `[background:none]` (not `bg-transparent`): the card paints an arbitrary PROPERTY, so the
-        // override has to be one too or the gradient survives underneath.
-        "[&>*]:rounded-none [&>*]:border-0 [&>*]:backdrop-blur-none [&>*]:[background:none]",
-        // The section division: the app's one resting hairline, INSET by the plate's own padding
-        // like every other resting division (the card-head rule) — a full-height rule between two
-        // sections would read as a seam between two objects, which is what this change undoes.
-        "[&>*+*]:border-l [&>*+*]:border-border/60 [&>*+*]:rounded-none",
-        // CENTRED INSIDE THE PLATE. The tiers still cap, so a 3-card view leaves slack — it now
-        // collects symmetrically inside the instrument instead of around it. (The 2026-08-30 note
-        // against a centred clump was written when the cards were small and floated in a very wide
-        // bar; sections of a plate are a different object.) Below the ceilings this is a no-op.
-        "flex items-stretch justify-center gap-0 px-1.5 py-1",
+        // ⚠️ The cell-targeting rules (card flattening, section dividers) moved ONTO the
+        // RollSwap wrapper below (2026-09-04, the no-pop swap): they are `[&>*]` selectors, and
+        // the wrapper between this section and the cells would otherwise be their new subject.
+        // Their rationale lives at the wrapper. Layout stays here; the wrapper centres WITHIN it.
+        "flex items-stretch px-1.5 py-1",
         // ⚠️ ONE transition statement, as an arbitrary PROPERTY. Utility pairs here silently
         // eat each other: twMerge groups every `transition-*` class, so the old
         // `transition-[left,right]` line was DROPPED by the later `transition-opacity` (found
@@ -994,7 +983,19 @@ export default function VitalsBand() {
       )}
     >
       {!live && <span className="self-center"><NoSignalDot /></span>}
-      <ViewCells mode={mode} accent={accent} filter={filter} />
+      {/* The no-pop swap (RollSwap): the PLATE persists, the cells roll — and the wrapper takes
+          over the row's cell-targeting rules (flatten, dividers, stretch), which is why the
+          section above no longer carries them: an element between a `[&>*]` and its subjects
+          silently retargets it at the wrapper. */}
+      <RollSwap
+        swapKey={mode as Mode}
+        render={(m) => <ViewCells mode={m} accent={accent} filter={filter} />}
+        className={cn(
+          "flex-1 min-w-0 flex items-stretch justify-center gap-0",
+          "[&>*]:rounded-none [&>*]:border-0 [&>*]:backdrop-blur-none [&>*]:[background:none]",
+          "[&>*+*]:border-l [&>*+*]:border-border/60 [&>*+*]:rounded-none",
+        )}
+      />
       {/* NO filter-scope hairline (user, 2026-08-30 — removed): unlike the old bar cluster's
           bare numbers, the band's own charts already wear the identity accent under a filter,
           so the scope is stated by the vitals themselves. */}
@@ -1016,15 +1017,23 @@ export function VitalsSheetBody() {
   return (
     <div
       className={cn(
-        "flex flex-col items-stretch gap-2 min-w-0",
-        "[&>*]:w-full [&>*]:max-w-none [&>*]:flex-none [&>*]:basis-auto",
+        "flex flex-col items-stretch min-w-0",
         // The bar tracks fill the column's middle — see MicroBars' `--bar-track-max` note.
         "[--bar-track-max:none]",
         !live && "saturate-[.45]",
       )}
     >
-      {!live && <span className="self-center flex-none"><NoSignalDot /></span>}
-      <ViewCells mode={mode} accent={accent} filter={filter} />
+      {!live && <span className="self-center flex-none mb-2"><NoSignalDot /></span>}
+      {/* The no-pop swap — the cell-targeting `[&>*]` rules ride the wrapper for the same
+          retargeting reason the band's do (see the desktop section above). */}
+      <RollSwap
+        swapKey={mode as Mode}
+        render={(m) => <ViewCells mode={m} accent={accent} filter={filter} />}
+        className={cn(
+          "flex flex-col items-stretch gap-2 min-w-0",
+          "[&>*]:w-full [&>*]:max-w-none [&>*]:flex-none [&>*]:basis-auto",
+        )}
+      />
     </div>
   );
 }
