@@ -197,12 +197,16 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
         // already carries opacity + transform. The transform lives on THIS fixed container,
         // whose box is inset-0 — its own fixed child (the scrim) re-anchors to it, same box, so
         // nothing shifts (trap 2 stays satisfied for everything outside).
-        // The rise breathes on its own token; the fall keeps the nav clock, whose DOC_ROLL
-        // twin also times the unmount + the engine's stage release (user, 2026-09-04 —
-        // "doc arrival is a bit too fast"; the exit boundary must not move with it).
+        // TWO-BEAT ARRIVAL (user, 2026-09-04 — "first show the 'page' and then roll in the
+        // text"): this container now carries only the SHEET's fade (opacity, no transform —
+        // the roll moved onto the text wrapper below, which is where a text roll belongs),
+        // on the short --tempo-doc-sheet beat; the fall keeps the nav clock, whose DOC_ROLL
+        // twin also times the unmount + the engine's stage release (the exit boundary must
+        // not move). With no transform here the fixed × strip and scrim anchor to the same
+        // inset-0 box as before — trap 2 stays satisfied.
         "transition ease-out motion-reduce:transition-none",
-        visible ? "duration-(--tempo-doc-rise)" : "duration-(--tempo-nav)",
-        !visible && "opacity-0 translate-y-4 pointer-events-none",
+        visible ? "duration-(--tempo-doc-sheet)" : "duration-(--tempo-nav)",
+        !visible && "opacity-0 pointer-events-none",
       )}
       role="region"
       aria-label={DOC_PAGES[render].label}
@@ -220,7 +224,20 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
         }}
       />
       <div className={DOC_COLUMN}>
-        <Doc />
+        {/* The text's own roll — the arrival's SECOND beat: it waits out the sheet's fade
+            (delay = --tempo-doc-sheet), then rises on --tempo-doc-rise. The exit drops the
+            delay and rides the nav clock so sheet and text leave as one gesture. */}
+        <div
+          className={cn(
+            "transition ease-out motion-reduce:transition-none",
+            visible
+              ? "duration-(--tempo-doc-rise) delay-(--tempo-doc-sheet)"
+              : "duration-(--tempo-nav) delay-0",
+            !visible && "opacity-0 translate-y-4",
+          )}
+        >
+          <Doc />
+        </div>
       </div>
       {/* The layer's own dismiss — the RAW layer's rule verbatim (its header comment carries
           the reasoning): the view switch is far away while the layer covers the view it would

@@ -812,6 +812,12 @@
      The fleet's stage fade also keeps DOC_ROLL, at the user's own call ("the node fade is
      even faster but that's ok — it's gone before the doc is readable"). */
   --tempo-doc-rise: 0.85s;
+  /* The arrival's FIRST beat (user, 2026-09-04: "first show the page, then roll in the text"):
+     the sheet — veil, edges, shadow — fades up alone on this clock, and the text's own rise
+     DELAYS by exactly it, so the document reads as a page arriving and then being written.
+     Exit stays one gesture on --tempo-nav: leaving is the user's decision resolving, not a
+     performance. */
+  --tempo-doc-sheet: 0.45s;
 
   /* ── Instrument-thread ruler spec (the ONE shared source) ─────────────────────
      Both rails' SVG threads (RailThread.tsx) and the bar-chart axis read identically:
