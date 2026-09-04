@@ -25,6 +25,7 @@
 // ⚠️ NO DONATE LINK. The user asked for one and the project carries no donation destination — an
 // invented address is a fabricated fact of the worst kind (rule 10). Add the entry here the moment
 // a real one exists.
+import { TriangleAlert } from "lucide-react";
 import NetLink from "@/components/NetLink";
 import FooterViewLinks from "@/components/FooterViewLinks";
 import { useStore } from "@/src/store/store";
@@ -171,11 +172,17 @@ export default function SiteFooter() {
           )}
           Constellation
         </a>
-        {/* The "Unofficial community project" entry is GONE (user, 2026-09-04): styled like its
-            nav neighbours it read as a fourth destination, which is inconsistent for a statement
-            — and the disclosure it pointed at is /about's own job (#unofficial), one click away
-            behind the About link. Don't re-add it as a link; if it ever returns it returns as
-            plain non-link text. */}
+        {/* THE DISCLAIMER RETURNS AS A STATEMENT, NOT A LINK (user, 2026-09-04 — "a small
+            disclaimer now that it has some space, visually distinct"): the ADVISORY register —
+            amber --warn-soft caps-micro with the TriangleAlert, the exact head /about's own
+            disclosure panel wears — so it cannot be mistaken for a fifth destination (the
+            2026-09-04 removal's lesson). Non-interactive: the full disclosure is one click away
+            behind About. Stands down below 860px (row width) — the About page carries it there. */}
+        <span aria-hidden className="w-px h-3.5 self-center bg-muted-foreground/35 max-[860px]:hidden" />
+        <span className="flex items-center gap-1.5 text-micro tracking-caps uppercase text-warn-soft/80 select-none max-[860px]:hidden">
+          <TriangleAlert aria-hidden className="size-3 opacity-85 flex-none" />
+          unofficial community project
+        </span>
       </nav>
     </footer>
   );
