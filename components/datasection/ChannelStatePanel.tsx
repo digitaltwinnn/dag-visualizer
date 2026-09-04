@@ -53,6 +53,7 @@ import { ChevronRight } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DEEP_GIVE_UP_MS } from "@/components/RawSnapshotBridge";
 import { useStore } from "@/src/store/store";
+import { usePointerCoarse } from "@/components/usePointerCoarse";
 import { metaSnapDeepKey } from "@/src/data/types";
 import type { NodeRow } from "@/src/data/types";
 import { getNetwork, metagraphById, resolveSigner, shortHash, SIGNER_GROUPS, SIGNER_UNKNOWN } from "@/src/data/network";
@@ -418,6 +419,7 @@ function SignerGroup({
 }
 
 export function ChannelStatePanel() {
+  const coarse = usePointerCoarse(); // the invitation names the gesture — Tap on touch
   const sel = useStore((s) => s.metaSnap);
   const deep = useStore((s) => (sel ? s.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal)] : undefined));
   const following = useStore((s) => s.following);
@@ -530,7 +532,7 @@ export function ChannelStatePanel() {
           {/* One verb family with the card: compressed → decompress → decompressing
               (user, 2026-08-13). */}
           {following
-            ? "Click this snapshot's row in the anchor log to decompress its payload. It is a ~2.5 MB fetch, so it runs only when you ask."
+            ? `${coarse ? "Tap" : "Click"} this snapshot's row in the anchor log to decompress its payload. It is a ~2.5 MB fetch, so it runs only when you ask.`
             : gaveUp
               ? "decompression failed. Reselect the row to retry: old snapshots are served by only some of the chain\u2019s nodes, so another attempt can land."
               : "decompressing…"}

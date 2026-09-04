@@ -18,6 +18,7 @@ import { RailShade } from "@/components/RailShade";
 import RailDock from "@/components/RailDock";
 import RailPager from "@/components/RailPager";
 import { useBreakpoint } from "@/components/useBreakpoint";
+import { usePointerCoarse } from "@/components/usePointerCoarse";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { detailsCards, ladderSlotIds, ladderLevelOfSlot, type RailCard } from "@/components/railCards";
 import { useLadderFocus } from "@/components/useLadderFocus";
@@ -353,8 +354,9 @@ export default function Inspector() {
   // stays ALWAYS-mounted below (via <ContextCard/>, which self-nulls on "all") so its EdgePulse
   // survives the dossier ⇄ nothing swap; the manifest only decides its tray-icon presence.
   const selNodes = useStore((s) => s.selNodes);
+  const coarse = usePointerCoarse();
   const manifest = detailsCards({
-    mode, filter, inspect, snap, country, cohort, composition, metaSnap,
+    mode, filter, inspect, snap, country, cohort, composition, metaSnap, coarse,
     selNodesCount: selNodes.length,
     filterLabel: displayNetwork(filter)?.ticker ?? null, // one lookup — catalog + the unlisted pseudo-network
   });
