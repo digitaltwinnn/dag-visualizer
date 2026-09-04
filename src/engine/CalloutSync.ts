@@ -328,11 +328,15 @@ export class CalloutSync {
     if (st.boxedCard === "context") return false;
     if (st.boxedCard === "node" && this._ledgerNodeAnchor(st, v)) return true;
     if (st.boxedCard === "snap" && st.snap) {
+      // A snapshot's label waits until its row is FIXED on the plane (LedgerView.calloutSettled
+      // — the chamber's own clocks; the tray-node paths stay exempt, chips don't ride the trail).
+      if (!this.h.ledger.calloutSettled()) return false;
       this._ledgerBarAnchor(v);
       this.h.ledger.group.localToWorld(v); // render-state OK
       return true;
     }
     if (st.metaSnap) {
+      if (!this.h.ledger.calloutSettled()) return false;
       // THE committed snapshot's tile (user, 2026-08-15), rewind offsets included; the lane
       // lead stays as the fallback while the tile is off-trail (aged out of the window or not
       // drawn this frame).
@@ -340,6 +344,7 @@ export class CalloutSync {
         if (!this.h.ledger.calloutAnchor(st.metaSnap.metaId, v) && !this.h.ledger.calloutAnchor(UNLISTED_ID, v)) return false;
       }
     } else if (st.snap) {
+      if (!this.h.ledger.calloutSettled()) return false;
       this._ledgerBarAnchor(v);
     } else if (this._ledgerNodeAnchor(st, v)) return true;
     else return false;

@@ -650,6 +650,18 @@ export class LedgerView implements SceneView {
   /** The committed FILTER's band on the shown global row (the selected row owns the front, so
    *  this is the lead-or-pinned slot) — the byte bar's own segment for the network, so the
    *  global callout can point at it under a filter (user, 2026-08-16). Chamber-local. */
+  /** THE LABEL'S QUIET GATE (user, 2026-09-04 — "before the global snapshot is fixed on the
+   *  plane already its callout is shown"): the chamber's own motion runs on its own clocks —
+   *  the rewind's ~2s glide, a just-measured bar's ~0.4s grow-in — invisible to the
+   *  view-transition and camera-flight gates the callout already holds. True when the trail is
+   *  at rest AND the selected/lead row is at its final geometry. Consulted by CalloutSync's
+   *  SNAPSHOT anchors only — tray chips don't ride the trail. */
+  calloutSettled(): boolean {
+    if (!this._rewind.settled) return false;
+    const slot = this.model.selectedSlot >= 0 ? this.model.selectedSlot : 0;
+    return this._bar.rowStill(slot);
+  }
+
   bandAnchor(key: string, out: THREE.Vector3): boolean {
     const slot = this.model.selectedSlot >= 0 ? this.model.selectedSlot : 0;
     return this._bar.bandAnchor(slot, key, out);
