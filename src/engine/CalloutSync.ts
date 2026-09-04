@@ -50,6 +50,8 @@ export interface CalloutHost {
   mode: Mode;
   filter: string;
   transitionActive(): boolean;
+  /** Is the camera mid-flight to a subject? The callout waits out the whole arrival. */
+  flyingNow(): boolean;
   calloutAllowed(): boolean;
   /** The focused metagraph's hyper group, or null (unlisted/unknown — an honest absence). */
   dofMeta(): { group: THREE.Object3D } | null;
@@ -106,7 +108,13 @@ export class CalloutSync {
     const el = document.getElementById("callout");
     if (!el) return;
     let on =
-      this.h.calloutAllowed() && !this.h.transitionActive() && breakpointOf(window.innerWidth) !== "phone";
+      this.h.calloutAllowed() &&
+      !this.h.transitionActive() &&
+      // …and not while the camera is still FLYING to the subject (user, 2026-09-04: the label
+      // appeared "a bit too quickly" — it points at a settled scene, so it waits for the whole
+      // arrival, the commit flight included; the view transition above is the other half).
+      !this.h.flyingNow() &&
+      breakpointOf(window.innerWidth) !== "phone";
     if (on) {
       const v = this._calloutV;
       on =

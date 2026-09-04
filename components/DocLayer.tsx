@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import { X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { DOC_ROLL } from "@/src/engine/domain/viewTransition";
@@ -180,6 +182,21 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
       <div className={DOC_COLUMN}>
         <Doc />
       </div>
+      {/* The layer's own dismiss — the RAW layer's rule verbatim (its header comment carries the
+          reasoning): the view switch is far away while the layer covers the view it would
+          return to, Escape is invisible, and a control ON the surface you want to leave needs
+          no hunting. Same ghost ×, same corner, same coarse-pointer re-anchor; `fixed` inside
+          the transformed layer, so it rides the roll as part of the document. */}
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        aria-label={`Close ${DOC_PAGES[render].label}`}
+        title={`Close ${DOC_PAGES[render].label}`}
+        className="fixed top-4 right-3 z-20 text-muted-foreground hover:text-foreground pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:top-1.5 pointer-coarse:right-0.5"
+        onClick={() => setDocPage(null)}
+      >
+        <X aria-hidden />
+      </Button>
     </div>
   );
 }

@@ -495,6 +495,7 @@ export class Engine {
       get mode() { return engineSelf.mode; },
       get filter() { return engineSelf.filter; },
       transitionActive: () => this.transition.active(),
+      flyingNow: () => useStore.getState().cameraFlying,
       calloutAllowed: () => this._policy.callout,
       dofMeta: () => this._dofMeta,
     });

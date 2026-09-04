@@ -1713,8 +1713,12 @@ export class Globe implements GeoViewHost {
     const flashDecay = Math.max(0, 1 - dt * 5); // ~0.2s glow tail after a hit
 
     // Travelling packets: step the sim (a hard no-op when the gate is off — the ledger "red dots"
-    // fix), then write its buffers only while the gate is on (geo view, past the morph midpoint).
-    const arcEnabled = this.simArcs && m > 0.5;
+    // fix), then write its buffers only while the gate is on (geo view, past the morph midpoint,
+    // AND the choreography settled — user, 2026-09-04: morph is boundary-snapped, so `m > 0.5`
+    // alone started the packets the moment the furniture began building, between nodes that were
+    // still in flight; a packet travels between PLACED nodes, so it waits for the very end of
+    // the view-in animation).
+    const arcEnabled = this.simArcs && m > 0.5 && !this.transition?.active();
     const { retargeted } = this.arcSim.step(dt, arcEnabled);
     if (arcEnabled && this.arcs.hasArcs) this.arcs.writeFrame(this.arcSim, retargeted);
 

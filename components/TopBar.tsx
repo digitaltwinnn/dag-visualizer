@@ -16,6 +16,7 @@ import InfoMenu from "@/components/topbar/InfoMenu";
 import NetworkSwitch, { NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { VIEWS } from "@/components/views";
+import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import type { Mode } from "@/src/store/store";
 
 // Collapsed filter face: a small identity dot + the network name in neutral text (no filled
@@ -39,6 +40,10 @@ export default function TopBar() {
   // closes the doc and lands in the view), theme and network stay — they are the overlay's
   // chrome as much as the app's.
   const doc = useStore((s) => s.docPage);
+  // The presentation pair is VIEW-SCOPED (SCENE⇄HUD and RAW act on the 3D view under the bar),
+  // so it stands down wherever there is no such view: a doc overlay, or the flat "soon" view
+  // (gated on the policy's own canvas flag, convention 7 — never a mode list).
+  const viewControls = doc == null && VIEW_POLICIES[mode].canvas;
 
   // The bar's ONE grow-downward slot, two tenants (2026-08-30 — the PULSE strip joined the
   // filter strip): `strip` names which row is open, null = closed. One slot makes them mutually
@@ -341,18 +346,20 @@ export default function TopBar() {
             the vitals still ride the filter strip below as a second row, unchanged. */}
         <div className="flex items-center gap-3 max-[1260px]:gap-2.5 max-[940px]:gap-2 max-[700px]:gap-1.5 justify-self-end">
 
-        {/* PRESENTATION — the bar's trailing group: the SCENE⇄HUD chrome toggle + the RAW
-            layer toggle, adjacent as one pair (user, 2026-08-30 — re-split along the store's
-            own axes; the 2026-08-08 one-axis control flattened two independent axes into three
-            states). It sits in the COMMAND bar (this zone's scope is the whole instrument)
-            rather than the live lane. */}
-        <span className={cn("w-px self-stretch bg-border my-1 max-[860px]:hidden", doc && "hidden")} />
-        <div className={cn("contents", doc && "hidden")}>
+        {/* PRESENTATION — the SCENE⇄HUD chrome toggle + the RAW layer toggle, adjacent as one
+            pair (user, 2026-08-30 — re-split along the store's own axes). THE ZONE'S TWO
+            HAIRLINES BRACKET THIS PAIR (user, 2026-09-04 — "RAW applies to the specific 3D
+            views, while dark/light, docs and network are fully shared; make that visually
+            clear"): the dividers now say the SCOPE split — the bracketed island is view-scoped
+            and vanishes with the view (docs, the flat soon view), while the shared trio
+            (theme · pages · network) runs unbroken to the bar's edge on every surface. */}
+        <span className={cn("w-px self-stretch bg-border my-1 max-[860px]:hidden", !viewControls && "hidden")} />
+        <div className={cn("contents", !viewControls && "hidden")}>
           <PresentationToggle />
         </div>
+        <span className={cn("w-px self-stretch bg-border my-1 max-[860px]:hidden", !viewControls && "hidden")} />
 
-        {/* Theme — the "how it looks" control, riding beside presentation with no divider of
-            its own (it reads as part of that group, not a fourth zone). On PHONE it rides the
+        {/* Theme — the "how it looks" control, the shared trio's lead. On PHONE it rides the
             filter strip's second row instead, same as NetworkSwitch below — otherwise it would
             render twice (bar + open strip) at once. */}
         <div className="contents max-[700px]:hidden">
@@ -367,13 +374,12 @@ export default function TopBar() {
           <InfoMenu />
         </div>
 
-        {/* Network switch — the RIGHT edge of the bar, one past the presentation toggle: the
-            network acts on everything INCLUDING presentation, so the edge escalates in scope
-            and the bar reads as a valley — brand (what this app is) and network (which chain)
-            at the outer edges, the most specific controls in the middle. On PHONE it rides
-            the filter strip's second row instead (see the strip below) — in this zone it
-            starved the filter face's word out of the bar (measured at 360-390, 2026-08-21). */}
-        <span className="w-px self-stretch bg-border my-1 max-[860px]:hidden" />
+        {/* Network switch — the RIGHT edge of the bar: the network acts on everything, so the
+            edge escalates in scope and the bar reads as a valley — brand and network at the
+            outer edges, the most specific controls in the middle. No divider of its own since
+            the scope regrouping above: it rides the shared trio, whose unbroken run IS the
+            statement that these apply everywhere. On PHONE it rides the filter strip's second
+            row instead (measured at 360-390, 2026-08-21). */}
         <div className="contents max-[700px]:hidden">
           <NetworkSwitch />
         </div>
