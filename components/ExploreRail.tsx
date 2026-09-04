@@ -13,6 +13,7 @@ import RailThread from "@/components/RailThread";
 import { RailShade } from "@/components/RailShade";
 import RailDock, { type TabSignal } from "@/components/RailDock";
 import { exploreCards } from "@/components/railCards";
+import HeightEase from "@/components/HeightEase";
 import { useBreakpoint } from "@/components/useBreakpoint";
 
 // Per-view About copy: ONE home, components/aboutCopy.ts — shared with /about (2026-08-13).
@@ -47,17 +48,28 @@ export default function ExploreRail() {
   // (three different explorers, none on "soon"), so it swaps keyed with the house card
   // materialize — no out-beat, so the slot is never held blank.
   const manifest = exploreCards({ mode });
+  // Each card rides its own HeightEase (user, 2026-09-04, second round: "the explorer card
+  // still jumps … snaps into its new height"): the wrapper sits OUTSIDE the keyed remount —
+  // inside it, it would remount with the card and snap — so the slot's height eases from the
+  // old card's to the new one's while the arriving card materializes within it. flex-none on
+  // the wrapper is the cards' own rule (the rail scrolls; a card never compresses).
   const renderCard: Record<string, ReactNode> = {
-    about: <AboutView {...ABOUT[mode]} defaultCollapsed={bp === "phone"} />,
+    about: (
+      <HeightEase className="flex-none">
+        <AboutView {...ABOUT[mode]} defaultCollapsed={bp === "phone"} />
+      </HeightEase>
+    ),
     // Phone opens BOTH cards collapsed (user, 2026-09-03): the sheet becomes a compact chooser
     // that the live content-fit sizes down, and one tap opens the list and grows the sheet.
     tool: (
-      <div key={`tool-${mode}`} className="flex-none animate-card-in motion-reduce:animate-none">
-        {mode === "hyper" ? <HyperExplore defaultCollapsed={bp === "phone"} />
-        : mode === "geo" ? <GeoExplore defaultCollapsed={bp === "phone"} />
-        : mode === "ledger" ? <LedgerPanel defaultCollapsed={bp === "phone"} />
-        : null}
-      </div>
+      <HeightEase className="flex-none">
+        <div key={`tool-${mode}`} className="animate-card-in motion-reduce:animate-none">
+          {mode === "hyper" ? <HyperExplore defaultCollapsed={bp === "phone"} />
+          : mode === "geo" ? <GeoExplore defaultCollapsed={bp === "phone"} />
+          : mode === "ledger" ? <LedgerPanel defaultCollapsed={bp === "phone"} />
+          : null}
+        </div>
+      </HeightEase>
     ),
   };
   const content = (

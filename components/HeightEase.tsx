@@ -30,7 +30,7 @@ import { useLayoutEffect, useRef, type ReactNode } from "react";
 // styles clear, and the box follows its content natively until the churn goes quiet.
 const RAPID_MS = 200;
 
-export default function HeightEase({ children }: { children: ReactNode }) {
+export default function HeightEase({ children, className }: { children: ReactNode; className?: string }) {
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const anim = useRef<Animation | null>(null);
@@ -85,7 +85,7 @@ export default function HeightEase({ children }: { children: ReactNode }) {
     };
   }, []);
   return (
-    <div ref={outer}>
+    <div ref={outer} className={className}>
       <div ref={inner}>{children}</div>
     </div>
   );
