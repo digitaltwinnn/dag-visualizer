@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
+import { DUR_OUT, FURN_IN } from "@/src/engine/domain/viewTransition";
 import type { DocPage } from "@/components/views";
 
 // THE DOC OVERLAY (2026-09-04, user: "keep the background AND don't reboot the whole scene").
@@ -13,13 +14,15 @@ import type { DocPage } from "@/components/views";
 // Opening and closing is a store write (`docPage`), published to the address bar by RouteSync;
 // no navigation, no engine teardown.
 //
-// THE FADE IS THE DOC'S OWN TRANSITION (user, 2026-09-04 — "the view out transition will be
-// quiet, perhaps fade out the doc itself … tied and controlled together"): the scene side of a
-// doc open/close is the gather/entry choreography, and the layer itself fades on the shared
-// `--tempo-nav` clock (globals.css — the depth transition's own 0.55s), so a document arriving,
-// a document leaving and a depth change all move on the one navigation tempo. The unmount waits
-// for the fade (NAV_MS mirrors the token — the same CSS↔JS pairing the disclosure clock keeps);
-// reduced motion snaps the opacity and the early unmount is invisible.
+// THE FADE RIDES THE CHOREOGRAPHY'S OWN CLOCKS (user, 2026-09-04 — "make the pages fade exactly
+// along the scene out transition"): the fade-IN runs DUR_OUT, the gather phase the scene is
+// playing under it, so the document is fully there the moment the furniture has left; the
+// fade-OUT runs FURN_IN, the entering view's furniture build, so the document dissolves exactly
+// while the scene stands back up (the node flights run longer — DUR_IN — but they arrive into an
+// already-standing view by design, and a doc ghost hanging over 3s of flights would read as a
+// stuck layer). Both numbers are imported from domain/viewTransition — one home, so retuning the
+// choreography retunes the fade with it. The unmount waits for the fade; reduced motion snaps
+// the opacity and the early unmount is invisible.
 //
 // SEO is unchanged by the overlay move: the /about route server-renders AppShell with
 // `doc="about"`, which reaches this component as `initial` — the prose is in that route's HTML
@@ -37,7 +40,7 @@ const DesignDoc = dynamic(() => import("@/components/docs/DesignDoc"));
 // /design's specimen grids wrap rather than widening past it. pt clears the fixed command bar.
 const DOC_COLUMN = "relative mx-auto max-w-3xl px-6 pt-[68px] pb-24";
 
-const NAV_MS = 550; // = --tempo-nav
+const NAV_MS = FURN_IN * 1000; // the exit fade's clock = the entering view's furniture build
 
 export default function DocLayer({ initial }: { initial: DocPage | null }) {
   const stored = useStore((s) => s.docPage);
@@ -59,8 +62,13 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
     if (page) {
       if (exitT.current) { clearTimeout(exitT.current); exitT.current = null; }
       setRender(page);
-      const raf = requestAnimationFrame(() => setVisible(true));
-      return () => cancelAnimationFrame(raf);
+      // DOUBLE rAF: a single one fires before the mounted-hidden state has ever been painted
+      // (rAF callbacks run ahead of that frame's style/paint), so the class flip coalesced and
+      // the fade-in snapped — measured opacity 1 at 150ms. Two frames guarantee the browser
+      // resolves opacity-0 once before the transition target lands.
+      let raf2 = 0;
+      const raf = requestAnimationFrame(() => { raf2 = requestAnimationFrame(() => setVisible(true)); });
+      return () => { cancelAnimationFrame(raf); if (raf2) cancelAnimationFrame(raf2); };
     }
     setVisible(false);
     exitT.current = setTimeout(() => { exitT.current = null; setRender(null); }, NAV_MS);
@@ -90,9 +98,13 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
     <div
       className={cn(
         "fixed inset-0 z-[8] overflow-y-auto overscroll-contain",
-        "transition-opacity duration-(--tempo-nav) ease-out motion-reduce:transition-none",
+        "transition-opacity ease-out motion-reduce:transition-none",
         !visible && "opacity-0 pointer-events-none",
       )}
+      // The two directions ride two different scene clocks (see the header): arriving = the
+      // gather (DUR_OUT), leaving = the furniture build (FURN_IN). Inline, because the numbers
+      // are the domain's, not CSS tokens.
+      style={{ transitionDuration: `${visible ? DUR_OUT : FURN_IN}s` }}
       role="region"
       aria-label={render === "about" ? "About" : "Design"}
     >

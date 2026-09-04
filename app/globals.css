@@ -799,8 +799,9 @@
   --tempo-roll: 0.4s;
   /* The NAVIGATION clock — the user's own gesture resolving, slower than any signal: 0.55s is
      the scene↔raw depth transition's GSAP duration (SectionShell.tsx — the JS half of this
-     pairing, like the disclosure clock's chevron), and the doc overlay's fade rides it so
-     opening/closing a document and changing depth read as one vocabulary. */
+     pairing, like the disclosure clock's chevron). The DOC overlay's fade deliberately does NOT
+     read it: it rides the view choreography's own DUR_OUT/FURN_IN (domain/viewTransition), the
+     clocks of the scene it crosses with. */
   --tempo-nav: 0.55s;
 
   /* ── Instrument-thread ruler spec (the ONE shared source) ─────────────────────
