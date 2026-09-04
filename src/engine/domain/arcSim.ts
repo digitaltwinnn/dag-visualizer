@@ -165,4 +165,19 @@ export class ArcSim {
     }
     return { retargeted };
   }
+
+  /** THE SETTLE-EDGE LAUNCH (user, 2026-09-04: packets "should start to move from their nodes
+   *  when the scene is ready"): park every agent AT a node in the resting pause state, with a
+   *  staggered departure timer — so when the view-in choreography completes and the gate opens,
+   *  the swarm departs from real placed nodes over a natural spread instead of appearing
+   *  mid-hop (rebuild's random `t` is the steady-state seed, right for a running scene and
+   *  wrong for an entrance). The pause branch above then routes each onward exactly as after
+   *  any arrival. */
+  relaunch(): void {
+    for (const ag of this.agents) {
+      ag.state = "pause";
+      ag.t = 0;
+      ag.pause = 0.2 + Math.random() * 1.6;
+    }
+  }
 }

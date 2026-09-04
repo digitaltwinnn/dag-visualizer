@@ -177,6 +177,7 @@ export class Globe implements GeoViewHost {
   // View-derived sim gates, set by the Engine from VIEW_POLICIES (see setSimFlags). arcs replaces
   // the old `!this.ledger` gate on the travelling packets; globeSpin gates the idle group spin.
   private simArcs = true;
+  private _arcsWereEnabled = false; // the settle edge's memory (see the arc gate in update)
   private simSpin = true;
   countryFilter: string | null = null; // the drilled country (a LENS: border/framing only, no node filter)
   l0Count = 0;
@@ -1719,6 +1720,12 @@ export class Globe implements GeoViewHost {
     // still in flight; a packet travels between PLACED nodes, so it waits for the very end of
     // the view-in animation).
     const arcEnabled = this.simArcs && m > 0.5 && !this.transition?.active();
+    // The settle EDGE relaunches the swarm from the nodes (ArcSim.relaunch — its note has the
+    // reasoning), and the meshes stay hidden while gated or stale buffers render as frozen
+    // trails over nodes still in flight.
+    if (arcEnabled && !this._arcsWereEnabled) this.arcSim.relaunch();
+    this._arcsWereEnabled = arcEnabled;
+    this.arcs.setVisible(arcEnabled && this.arcs.hasArcs);
     const { retargeted } = this.arcSim.step(dt, arcEnabled);
     if (arcEnabled && this.arcs.hasArcs) this.arcs.writeFrame(this.arcSim, retargeted);
 
