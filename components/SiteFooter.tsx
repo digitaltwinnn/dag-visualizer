@@ -25,9 +25,24 @@
 // invented address is a fabricated fact of the worst kind (rule 10). Add the entry here the moment
 // a real one exists.
 import NetLink from "@/components/NetLink";
+import { ROUTED_VIEWS } from "@/components/views";
+import { metagraphById } from "@/src/data/network";
 import { cn } from "@/lib/utils";
 
 const GITHUB = "https://github.com/digitaltwinnn/dag-visualizer";
+const CONSTELLATION = "https://constellationnetwork.io";
+
+// The GitHub BRAND mark, inline (2026-09-04): lucide dropped its brand icons, and the house
+// rule is monochrome SVG on currentColor, never emoji — the same reasoning that keeps the ECG
+// mark and identity dots bespoke. The octocat sets the external repo link apart from the
+// internal doc links beside it (user: "make a visual distinction … gh icon").
+function GithubMark() {
+  return (
+    <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden className="flex-none">
+      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
+    </svg>
+  );
+}
 
 // `overDoc` (2026-09-04): the same chrome row on the doc pages (/about, /design), so the site
 // band is identical everywhere. There it rides a scrolling document instead of the canvas: no
@@ -35,34 +50,35 @@ const GITHUB = "https://github.com/digitaltwinnn/dag-visualizer";
 // reserve no band — a document reserves its own bottom padding instead), just the safe-area
 // inset on notched phones. The doc pages pad their content bottom clear of it.
 export default function SiteFooter({ overDoc = false }: { overDoc?: boolean }) {
+  // The DAG core's one-home config: the official site URL and the $DAG brand mark the
+  // Constellation link below wears (same record the dossier avatar reads).
+  const dag = metagraphById("dag");
   return (
-    // pointer-events-none on the band, auto on the links: the strip spans the full width over the
-    // canvas, and an orbit drag started along the bottom edge must still reach the scene.
+    // pointer-events-none on the band, auto on the links: an orbit drag started along the bottom
+    // edge must still reach the scene. FULL-WIDTH STRIP since 2026-09-04 (user: the centred
+    // lozenge read as "a tiny element at the centre" under the full-span vitals band): the row
+    // spans the same --bar-margin insets as the two bars, its veil (--footer-glass) is the whole
+    // strip's ground, and in the app it sits flush under the vitals band as that instrument's
+    // underline — the lit plate above, the flat veil below, told apart by the transparency
+    // difference the two glass tokens already carry. No border, no radius: a veil, not a card.
     <footer
       id="sitefoot"
       className={cn(
-        "fixed inset-x-0 bottom-0 z-10 flex items-center justify-center pointer-events-none",
+        "fixed inset-x-[var(--bar-margin)] bottom-0 z-10 flex items-stretch pointer-events-none",
         overDoc
           ? "h-[var(--footer-phone-h)] max-[700px]:bottom-[env(safe-area-inset-bottom)]"
           : "h-[var(--footer-h)] max-[700px]:bottom-[var(--phone-dock-h)] max-[700px]:h-[var(--footer-phone-h)]",
       )}
     >
-      {/* The halo text-shadow is GONE (user, 2026-08-30: "it has some shadow which for text is
-          not great") — it existed for bloom sweeping the bottom edge, but the vitals band now
-          stands between the scene and this line in every 3D view, so the wash-out it answered
-          no longer reaches here. Readability comes from real ink instead: full muted-foreground,
-          up from the /70 tint.
-          …AND FROM A GROUND, since 2026-09-01 (user: "background of text — should it be
-          transparent or a subtle fill to keep it readable on the scene?"). A LOZENGE sized to the
-          links, never a full-width scrim: the failure is LOCAL — the line only washes out where a
-          bright scene element passes under it (the ledger's lit floor, a bloomed node), a few
-          hundred pixels of a very wide row — and a scrim spanning the viewport would turn quiet
-          site chrome into a second command bar directly under the vitals band. The plate is the
-          `--footer-glass`, a flat low-alpha veil rather than the band's lit `--topbar-glass`
-          surface (user, 2026-09-01 — that one was "too dominant white" in light mode; see the
-          token's own note). NO BORDER: a border would make this a card, and it is not an
-          instrument. */}
-      <nav className="flex items-center gap-2 text-micro text-muted-foreground [&_a]:pointer-events-auto rounded-full px-2.5 py-0.5 bg-[var(--footer-glass)] backdrop-blur-sm max-[700px]:[&_a]:pt-[26px] max-[700px]:[&_a]:-mt-[26px] max-[700px]:[&_a]:pb-1.5 max-[700px]:[&_a]:-mb-1.5 max-[700px]:[&_a]:px-1.5 max-[700px]:[&_a]:-mx-1.5">
+      {/* Readability history, still load-bearing: no text-shadow halo (user, 2026-08-30 — the
+          vitals band now stands between the scene and this line), ink at full muted-foreground,
+          and a real GROUND under the words. That ground was a link-sized lozenge from 2026-09-01
+          until 2026-09-04, when the row went full-width under the full-span vitals band (user:
+          the centred pill read as a stray element; the strip is now the band's underline). The
+          plate stays `--footer-glass` — a flat low-alpha veil, deliberately NOT the band's lit
+          `--topbar-glass` (too dominant white in light mode), and that fill difference is what
+          separates the two rows now that they touch. */}
+      <nav className="flex-1 flex items-center justify-center gap-2 text-micro text-muted-foreground [&_a]:pointer-events-auto bg-[var(--footer-glass)] backdrop-blur-sm max-[700px]:[&_a]:pt-[26px] max-[700px]:[&_a]:-mt-[26px] max-[700px]:[&_a]:pb-1.5 max-[700px]:[&_a]:-mb-1.5 max-[700px]:[&_a]:px-1.5 max-[700px]:[&_a]:-mx-1.5">
         {/* ⚠️ On phone every anchor wears padding CANCELLED by an equal negative margin (the
             utility pairs above): the row keeps its 22px visual height while each link's HIT BOX
             grows to ~43px — measured 11px tall before, a quarter of the 44px touch floor, and on
@@ -72,10 +88,30 @@ export default function SiteFooter({ overDoc = false }: { overDoc?: boolean }) {
             stacking order let the links win those taps off the dock's buttons (the z the dock
             carries lives inside the shell's own stacking context, so it never competes here).
             Desktop is untouched: a pointer needs no floor. */}
-        <a href={GITHUB} target="_blank" rel="noopener noreferrer" className="hover:text-foreground transition-colors">
-          GitHub
-        </a>
-        <span aria-hidden className="opacity-40">·</span>
+        {/* THE ROW IS THREE GROUPS, DIVIDED (user, 2026-09-04): app navigation (doc pages only
+            — the app IS those destinations and its command bar owns view switching), the
+            off-scene doc pages, then the external world. Hairline dividers (the command bar's
+            own device) separate the groups; the mid-dot separates within one. On phone the view
+            links stand down (the row would overflow 390px) — the header's icon switch still
+            carries them there. */}
+        {overDoc && (
+          <>
+            <NetLink href="/" className="hover:text-foreground transition-colors">
+              Home
+            </NetLink>
+            <span className="flex items-center gap-2 max-[700px]:hidden">
+              {ROUTED_VIEWS.map((v) => (
+                <span key={v.id} className="flex items-center gap-2">
+                  <span aria-hidden className="opacity-40">·</span>
+                  <NetLink href={`/${v.slug}`} className="hover:text-foreground transition-colors">
+                    {v.name}
+                  </NetLink>
+                </span>
+              ))}
+            </span>
+            <span aria-hidden className="w-px self-stretch bg-border mx-0.5" />
+          </>
+        )}
         <NetLink href="/about" className="hover:text-foreground transition-colors">
           About
         </NetLink>
@@ -83,12 +119,44 @@ export default function SiteFooter({ overDoc = false }: { overDoc?: boolean }) {
         <NetLink href="/design" className="hover:text-foreground transition-colors">
           Design
         </NetLink>
-        <span aria-hidden className="opacity-40">·</span>
-        {/* The disclaimer is a STATEMENT, not navigation — it reads at rest and links to the
-            section that states it in full. Same words as /about#unofficial leads with. */}
-        <NetLink href="/about#unofficial" className="hover:text-foreground transition-colors">
-          Unofficial community project
-        </NetLink>
+        <span aria-hidden className="w-px self-stretch bg-border mx-0.5" />
+        {/* OUR side of the external world: the repo. "Source code", not "GitHub" (user,
+            2026-09-04 — the usual OSS-footer form): the octocat glyph already says where, the
+            words say what it is. The glyph is also the row's one brand mark for OUR things. */}
+        <a
+          href={GITHUB}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 hover:text-foreground transition-colors"
+        >
+          <GithubMark />
+          Source code
+        </a>
+        {/* A hairline BETWEEN the repo and the official site (user, 2026-09-04): one is this
+            project's, the other is the network's — the divider is the affiliation boundary the
+            /about disclosure states in words. The link wears the official $DAG mark from the
+            app's own catalog config (metagraphById("dag") — the same one-home record the
+            dossier avatar and this href's siteUrl read), identifying, not claiming. */}
+        <span aria-hidden className="w-px self-stretch bg-border mx-0.5" />
+        <a
+          href={dag?.siteUrl ?? CONSTELLATION}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 hover:text-foreground transition-colors"
+        >
+          {dag?.iconUrl && (
+            // A 12px brand dot: plain <img>, round like every brand icon (the dossier avatar's
+            // own rule) — Radix Avatar's load machinery is a client concern this static row
+            // doesn't need.
+            <img src={dag.iconUrl} alt="" width={12} height={12} className="rounded-full flex-none" />
+          )}
+          Constellation
+        </a>
+        {/* The "Unofficial community project" entry is GONE (user, 2026-09-04): styled like its
+            nav neighbours it read as a fourth destination, which is inconsistent for a statement
+            — and the disclosure it pointed at is /about's own job (#unofficial), one click away
+            behind the About link. Don't re-add it as a link; if it ever returns it returns as
+            plain non-link text. */}
       </nav>
     </footer>
   );

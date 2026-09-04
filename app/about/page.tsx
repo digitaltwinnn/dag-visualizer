@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { TriangleAlert, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import NetLink from "@/components/NetLink";
+import DocBackdrop, { DOC_COLUMN } from "@/components/DocBackdrop";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import { VIEW_ICONS } from "@/components/icons";
@@ -98,41 +99,15 @@ export default function AboutPage() {
   // instead of relying on page scroll. Same fix on /design.
   return (
     <main className="relative h-screen overflow-y-auto bg-background text-foreground">
-      {/* The world behind the glass. The app's real backdrop is a live 3D scene; a document can't
-          have one, and faking a canvas here would be decoration pretending to be data. Instead:
-          one wide, very faint structural-cyan wash at the top, so the page reads as the same
-          material without claiming to show anything. Fixed, so it doesn't scroll with the prose. */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-x-0 top-0 h-[520px] opacity-70"
-        style={{
-          background:
-            "radial-gradient(120% 100% at 50% -30%, color-mix(in oklch, var(--primary) 16%, transparent), transparent 70%)",
-        }}
-      />
+      {/* The shared doc backdrop: cyan wash, header scrim, and the subtle side margins that
+          ground the narrow prose column (components/DocBackdrop.tsx). */}
+      <DocBackdrop />
+      {/* The shared doc-page header — the command bar's own glass, grammar and full-span box,
+          with the view switch as links (components/SiteHeader.tsx). Fixed, so the column below
+          pads clear of it. */}
+      <SiteHeader />
 
-      {/* The sticky header's SCRIM. Without it the prose scrolls visibly around and above the bar
-          — glass blurs what is behind the panel but nothing covers the strip above it, so a
-          half-clipped line of body text rides along the top edge. Fixed and full-bleed (rather
-          than a pseudo on the header, which is inside the max-width column and would need a
-          100vw trick that risks a horizontal scrollbar), at a z between the prose and the bar.
-          Tinted with a trace of primary rather than flat --background so it doesn't stamp a dark
-          block over the wash above. */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-x-0 top-0 z-[5] h-32"
-        style={{
-          background:
-            "linear-gradient(to bottom, color-mix(in oklch, var(--primary) 5%, var(--background)) 0%, " +
-            "color-mix(in oklch, var(--primary) 4%, var(--background)) 47%, transparent 100%)",
-        }}
-      />
-
-      <div className="relative mx-auto max-w-3xl px-6 pt-[14px] pb-24">
-        {/* The shared doc-page header — the command bar's own glass and grammar, with the view
-            switch as links (components/SiteHeader.tsx). */}
-        <SiteHeader />
-
+      <div className={DOC_COLUMN}>
         <article className="pt-14">
           <Eyebrow>About</Eyebrow>
           <h1 className="mt-3 text-3xl font-semibold tracking-[-0.01em] leading-tight">

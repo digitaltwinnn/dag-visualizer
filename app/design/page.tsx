@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { cn } from "@/lib/utils";
 import { METAGRAPHS } from "@/src/net/current";
 import { identityMap } from "@/src/palette/identity";
+import DocBackdrop, { DOC_COLUMN } from "@/components/DocBackdrop";
 import SiteHeader from "@/components/SiteHeader";
 import SiteFooter from "@/components/SiteFooter";
 import CardHeadDemo from "./CardHeadDemo";
@@ -102,29 +103,14 @@ export default function DesignPage() {
     // (globals.css), which would CLIP this tall document page — so it scrolls in its own
     // viewport instead of relying on page scroll. Same fix on /about.
     <main className="relative h-screen overflow-y-auto bg-background text-foreground">
-      {/* The same fixed cyan wash and header scrim /about wears — one material, two documents. */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-x-0 top-0 h-[520px] opacity-70"
-        style={{
-          background:
-            "radial-gradient(120% 100% at 50% -30%, color-mix(in oklch, var(--primary) 16%, transparent), transparent 70%)",
-        }}
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-x-0 top-0 z-[5] h-32"
-        style={{
-          background:
-            "linear-gradient(to bottom, color-mix(in oklch, var(--primary) 5%, var(--background)) 0%, " +
-            "color-mix(in oklch, var(--primary) 4%, var(--background)) 47%, transparent 100%)",
-        }}
-      />
+      {/* The same backdrop and full-span fixed header /about wears — one material, two documents
+          (components/DocBackdrop.tsx + SiteHeader.tsx). */}
+      <DocBackdrop />
+      <SiteHeader />
 
-      {/* Wider column than /about's prose measure: the swatch and specimen grids read better
-          with room, and the explanatory paragraphs cap their own measure at max-w-2xl. */}
-      <div className="relative mx-auto max-w-5xl px-6 pt-[14px] pb-24">
-        <SiteHeader />
+      {/* The SAME column as /about (DOC_COLUMN — one home, user 2026-09-04): the specimen grids
+          wrap to the document measure rather than widening this page past its sibling. */}
+      <div className={DOC_COLUMN}>
 
         <article className="pt-14">
           <p className="text-micro tracking-caps uppercase text-muted-foreground">Design</p>

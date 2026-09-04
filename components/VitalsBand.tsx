@@ -932,7 +932,12 @@ export default function VitalsBand() {
         // below then makes every card in every view exactly this tall, so switching views moves
         // nothing at this edge. The PHONE strip does not take it — that presentation is a scrolling
         // row inside the command bar, sized by its own rules.
-        "fixed z-10 inset-x-[var(--bar-margin)] bottom-[calc(var(--footer-h,0px)+4px)] h-[var(--vitals-h)] pointer-events-none",
+        // FLUSH onto the footer strip (user, 2026-09-04 — "the space between the two is just
+        // noise"): the band's bottom edge sits directly on the footer's top edge, so the two
+        // read as one instrument in two rows — the lit plate above, the flat veil underline
+        // below, distinguished by the transparency difference the two glass tokens already
+        // carry. The old +4px air gap is gone.
+        "fixed z-10 inset-x-[var(--bar-margin)] bottom-[var(--footer-h,0px)] h-[var(--vitals-h)] pointer-events-none",
         // ⚠️ THE PLATE IS THE LANE'S, NOT EACH CARD'S (user, 2026-09-01: the band "feels ununiform
         // between screens because the amount of screen space they claim depends on the number of
         // vitals and the size"). Measured at 1600px: hyper and geo hold 1096px of a 1548px lane

@@ -743,7 +743,8 @@
      ledger, and since it is anchored at the BOTTOM the difference showed up as its top edge
      jumping on every view switch. Sized to the tallest cell — four MicroBars rows plus the eyebrow
      and the plate's padding — with a couple of pixels of headroom, and it must stay under
-     --bottom-reserve minus the band's 4px offset or the rails would paint into it. */
+     --bottom-reserve minus --footer-h or the rails would paint into it (the band sits FLUSH on
+     the footer strip since 2026-09-04 — the old 4px air gap read as noise). */
   --vitals-h: 84px;
   --bottom-reserve: 92px;  /* vertical space the bottom VITALS BAND reserves (BottomStream's own
                               RESERVE). The static default matches the BOOT view: the store boots

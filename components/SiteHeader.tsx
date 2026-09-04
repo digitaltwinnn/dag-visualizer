@@ -25,7 +25,11 @@ import { VIEW_ICONS } from "@/components/icons";
 // chrome, not an instrument, and it works without a feed. The pages still import no ENGINE.
 export default function SiteHeader() {
   return (
-    <header className="sticky top-[14px] z-10">
+    // FIXED and full-span, exactly the command bar's box (user, 2026-09-04 — "topbar should
+    // always span the view"): top-[14px] + the shared --bar-margin insets, so the bar is the
+    // same width on `/`, /about and /design regardless of each document's own prose measure.
+    // The doc pages pad their columns clear of it (it is out of flow now).
+    <header className="fixed top-[14px] inset-x-[var(--bar-margin)] z-40">
       <div
         className={cn(
           "flex items-center gap-2 py-2 px-3.5 pointer-events-auto",
