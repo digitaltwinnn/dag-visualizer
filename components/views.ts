@@ -77,19 +77,29 @@ export function viewTitle(name: string): string {
 }
 
 // ── The DOC OVERLAY's half of the vocabulary (2026-09-04) ────────────────────────────────────
-// /about and /design render inside the app as the DocLayer overlay; these are their URL and
-// title mappings, read by RouteSync exactly as the view mappings above are.
-export type DocPage = "about" | "design";
+// Docs render inside the app as the DocLayer overlay; DOC_PAGES is their ONE registry — slug,
+// title — and everything else derives (the DocPage type, the path/title maps, docForPath), so
+// adding a doc page is: one entry here, its component in components/docs/ + DocLayer's map, a
+// thin route file passing `doc`, and a footer DocToggle if it should be reachable there. The
+// engine's bare stage, both transition signals and the roll grammar follow automatically.
+export const DOC_PAGES = {
+  about: { label: "About", title: "About — DAG Visualizer" },
+  design: { label: "Design", title: "Design — DAG Visualizer" },
+} as const;
 
-export const DOC_PATHS: Record<DocPage, string> = { about: "/about", design: "/design" };
+export type DocPage = keyof typeof DOC_PAGES;
 
-export const DOC_TITLES: Record<DocPage, string> = {
-  about: "About — DAG Visualizer",
-  design: "Design — DAG Visualizer",
-};
+export const DOC_PATHS = Object.fromEntries(Object.keys(DOC_PAGES).map((k) => [k, `/${k}`])) as Record<
+  DocPage,
+  string
+>;
 
-/** The doc page a pathname names, or null. */
+export const DOC_TITLES = Object.fromEntries(
+  (Object.keys(DOC_PAGES) as DocPage[]).map((k) => [k, DOC_PAGES[k].title]),
+) as Record<DocPage, string>;
+
+/** The doc page a pathname names, or null — derived from the registry, never a second list. */
 export function docForPath(pathname: string): DocPage | null {
   const seg = pathname.replace(/^\/+|\/+$/g, "");
-  return seg === "about" || seg === "design" ? seg : null;
+  return seg in DOC_PAGES ? (seg as DocPage) : null;
 }

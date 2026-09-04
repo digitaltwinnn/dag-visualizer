@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { DOC_ROLL } from "@/src/engine/domain/viewTransition";
-import type { DocPage } from "@/components/views";
+import { DOC_PAGES, type DocPage } from "@/components/views";
 
 // THE DOC OVERLAY (2026-09-04, user: "keep the background AND don't reboot the whole scene").
 // /about and /design render as a scrollable document layer on the scene's BARE STAGE — while a
@@ -34,8 +34,13 @@ import type { DocPage } from "@/components/views";
 // The `initial` → store ADOPTION is the NetLink mount pattern: SSR and the first client render
 // draw from the prop (hydration sees no mismatch), one effect seeds the store and flips
 // `adopted`, and from then on the store owns it.
-const AboutDoc = dynamic(() => import("@/components/docs/AboutDoc"));
-const DesignDoc = dynamic(() => import("@/components/docs/DesignDoc"));
+// The doc components, keyed by the registry's own DocPage — the one place a new doc's component
+// is wired (each stays its own dynamic() call so the chunks split; a computed import path would
+// defeat the bundler's static analysis). DOC_PAGES in views.ts carries everything else.
+const DOC_COMPONENTS: Record<DocPage, ReturnType<typeof dynamic>> = {
+  about: dynamic(() => import("@/components/docs/AboutDoc")),
+  design: dynamic(() => import("@/components/docs/DesignDoc")),
+};
 
 // The one doc column (both documents read it): max-w-3xl is the document reading measure;
 // /design's specimen grids wrap rather than widening past it. pt clears the fixed command bar.
@@ -134,7 +139,7 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
   }, [page, setDocPage]);
 
   if (!render) return null;
-  const Doc = render === "about" ? AboutDoc : DesignDoc;
+  const Doc = DOC_COMPONENTS[render];
   return (
     // The scroll viewport: html/body are overflow:hidden for the fixed-canvas app, so the
     // document scrolls in its own fixed box. z-[8]: over the canvas and the (stood-down) HUD,
@@ -158,7 +163,7 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
         !visible && "opacity-0 translate-y-4 pointer-events-none",
       )}
       role="region"
-      aria-label={render === "about" ? "About" : "Design"}
+      aria-label={DOC_PAGES[render].label}
     >
       {/* The bar's scrim: without it a half-clipped line of prose rides the strip between the
           viewport top and the bar's own glass while scrolling. Fixed, z above the flowing text,

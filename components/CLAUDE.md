@@ -488,6 +488,19 @@ rails-lean with no visible way back.
 
 ### Boot entrance, routes & the doc overlay (2026-09-04)
 
+**Adding a view is registry-driven — consistency is the default, not a checklist.**
+- A **3D view**: `Mode` union → a `viewPolicy` row (convention 7: inert until it opts in) → a
+  `focusLadder` row → a `SceneView` (rule 6's contract) → a `VIEWS` entry in
+  `components/views.ts` (name + slug + desc). The bar button, the route (`app/[view]` +
+  sitemap read `ROUTED_VIEWS`), the footer link, the gather/entry choreography, boot staging
+  and the URL bridge all follow from those homes.
+- A **placeholder view**: `Mode` union + a FLAT policy row + a slugless `VIEWS` entry.
+- A **doc page**: one `DOC_PAGES` entry (everything derives: type, paths, titles, docForPath),
+  its component in `components/docs/` + one line in DocLayer's `DOC_COMPONENTS` map, a thin
+  route file passing `doc`, a footer `DocToggle`. The engine's bare stage, both transition
+  signals and the roll grammar follow automatically; the store's `docPage` union is the one
+  deliberate duplicate, and tsc flags it the moment the registries disagree.
+
 - **The HUD arrives staged** (`useBootStage` + `BootFade`, wired in `AppShell`): command bar when
   the engine is up (or failed — chrome is controls), rails/dock/footer on first data, vitals band
   on live; latched, paced `STEP_MS` apart, force-completed by an 8s timeout so chrome never hides
