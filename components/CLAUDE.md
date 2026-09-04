@@ -536,7 +536,17 @@ rails-lean with no visible way back.
   In-app it tucks `min(10px, --bottom-reserve)` under the vitals band (the corner-notch fix) and
   the band sits flush on it. The brand waveform's one `d` is `components/brand.tsx`.
 - **The vitals band does NOT inset by the tablet sheets** (user reversal, same day it shipped):
-  the sheets overlay both bars alike; `sceneCover` stays published for the callout.
+  the sheets overlay both bars alike; `sceneCover` stays published for the callout — and the
+  band **CLIPS its paint by those covers** (user, 2026-09-04: "flickering when the explore and
+  bottom bar overlap" — the sheet's glass is translucent, so a band still painting under it
+  bled through as shimmer on every tick and a double-exposure under the yield dim; the
+  clip-path rides the covers with CSS max() so desktop/phone's 0 cover is identity).
+  ⚠️ Its transition is ONE `[transition:…]` arbitrary property on purpose: two `transition-*`
+  utilities in one `cn()` are a twMerge group, so the later silently DROPS the earlier (the old
+  `transition-[left,right]` died this way under `transition-opacity`, found by reading the
+  computed style), and the comma'd `transition-[a,b]` arbitrary-VALUE form is the DocLayer
+  compile trap besides. `motion-reduce:!transition-none` needs its `!` against an
+  equal-specificity single class (trap 4's family).
 - **The tempo family is tokenized** — `--tempo-beat` / `--tempo-signal` / `--tempo-roll` in
   globals.css `:root`; the 150ms disclosure clock deliberately is not (its header says why).
 - **The canvas's display box is CSS-owned** (`setSize(..., false)` + a 2px viewport overdraw in

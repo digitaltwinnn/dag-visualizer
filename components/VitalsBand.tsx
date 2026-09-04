@@ -908,10 +908,26 @@ export default function VitalsBand() {
   // — the same one read the RailShade dims on, at the recipe's own tempos (away 0.3s, the return
   // faster: it answers a gesture already finished).
   const yielding = useSceneYield();
+  // THE BAND NEVER PAINTS UNDER AN OPEN SHEET (user, 2026-09-04 — "sometimes I see flickering
+  // when the explore and bottom bar overlap"). The overlay decision above stands: the sheets
+  // cover the band. But the sheet's glass is translucent, so a band that kept PAINTING under
+  // it bled through — a steady shimmer as its numbers tick beneath the frost, and a full
+  // double-exposure whenever the yield dim drops the sheet to 0.4 (screenshot-caught: the
+  // band's METAGRAPHS rows interleaved with the explore card's). The paint is clipped by the
+  // sheets' own published covers instead — the same `sceneCover` channel the callout reads —
+  // with the --bar-margin arithmetic left to CSS max(), and the clip rides the band's own
+  // 300ms edge transition so it tracks the sheet's slide. Desktop and phone publish 0 cover,
+  // so the inset collapses to identity there.
+  const coverL = useStore((s) => s.sceneCoverL);
+  const coverR = useStore((s) => s.sceneCoverR);
   return (
     <section
       id="vitalsband"
       aria-label="View vitals"
+      style={{
+        ["--cover-l" as string]: `${coverL}px`,
+        ["--cover-r" as string]: `${coverR}px`,
+      }}
       className={cn(
         // pointer-events-none: the band is a read-only instrument — orbit drags pass through it.
         // --bar-margin, THE COMMAND BAR'S OWN INSET (globals.css), so the two bars bracket the
@@ -943,7 +959,7 @@ export default function VitalsBand() {
         // as a bar and a scattering of chips (user, 2026-09-01: "the bottom bar should be the same
         // exactly as the top bar").
         "rounded-lg border border-border/60 [background:var(--topbar-glass)] backdrop-blur-sm",
-        "transition-[left,right] duration-300 motion-reduce:transition-none",
+        "[clip-path:inset(0_max(0px,calc(var(--cover-r)-var(--bar-margin)))_0_max(0px,calc(var(--cover-l)-var(--bar-margin))))]",
         // ⚠️ THE CARDS ARE FLATTENED FROM HERE, not by a prop threaded through every cell. The same
         // `ViewCells` renders the PHONE strip, where the cards scroll and must keep their own
         // plates — a section of a bar that scrolls away from the bar is not a section. An arbitrary
@@ -961,7 +977,18 @@ export default function VitalsBand() {
         // against a centred clump was written when the cards were small and floated in a very wide
         // bar; sections of a plate are a different object.) Below the ceilings this is a no-op.
         "flex items-stretch justify-center gap-0 px-1.5 py-1",
-        "transition-opacity duration-[180ms] ease-out motion-reduce:transition-none",
+        // ⚠️ ONE transition statement, as an arbitrary PROPERTY. Utility pairs here silently
+        // eat each other: twMerge groups every `transition-*` class, so the old
+        // `transition-[left,right]` line was DROPPED by the later `transition-opacity` (found
+        // 2026-09-04 while wiring the clip — computed transition-property read "opacity"
+        // alone), and the comma'd arbitrary-value form is the DocLayer trap that never
+        // compiles. The shorthand carries each property's own tempo: the yield dim's 180ms
+        // return, and 300ms for the edges + clip so they track the sheet's slide; the
+        // yielding arm's duration-300 overrides all of them to the away tempo while the hand
+        // is on the camera. motion-reduce carries `!` — a variant loses to an equal-weight
+        // single class on stylesheet order alone (CSS trap 4).
+        "[transition:opacity_180ms_ease-out,left_300ms_ease-out,right_300ms_ease-out,clip-path_300ms_ease-out]",
+        "motion-reduce:!transition-none",
         yielding && "opacity-40 duration-300",
         !live && "saturate-[.45]",
       )}
