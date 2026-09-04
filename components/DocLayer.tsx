@@ -2,8 +2,6 @@
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { X } from "lucide-react";
-import { PulseEdge } from "@/components/EdgePulse";
-import { usePulseWindow } from "@/components/RailDock";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
@@ -142,12 +140,6 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [page, setDocPage]);
 
-  // The doc's RAIL SPINES (user, 2026-09-04: "the docs should have the rails and the view
-  // transition highlight"): two slim instrument edges flanking the column — the sheets' own
-  // spine idiom — replaying the travelling switch pulse whenever a document arrives, exactly
-  // as the RailThreads answer a view switch. Keyed on `render`, so About→Design pulses too.
-  const pulse = usePulseWindow(render);
-
   if (!render) return null;
   const Doc = DOC_COMPONENTS[render];
   return (
@@ -187,26 +179,14 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
             "color-mix(in oklch, var(--background) 70%, transparent) 55%, transparent 100%)",
         }}
       />
-      {/* THE DOC'S RAILS SIT AT THE VIEW'S OWN EDGES (user, 2026-09-04, corrected from a
-          column-flanking first cut: "the rails should just sit at the edge of the view like any
-          other view … I want to see the hairlines"): the sheets' .ig-sheet-edge recipe IS the
-          house view-edge ruler — spine, tick comb, end fades, resting dim — its fixed pseudos
-          anchoring to this transformed layer's box (viewport-sized), so the rulers ride the
-          doc's roll. The travelling switch pulse replays on every document arrival. */}
-      {(["left", "right"] as const).map((side) => (
-        <span
-          key={side}
-          aria-hidden
-          data-side={side}
-          className={cn(
-            "ig-sheet-edge pointer-events-none fixed inset-y-[10px] w-[3px] z-[1] max-[700px]:hidden",
-            side === "left" ? "left-0" : "right-0",
-          )}
-          style={{ ["--spine" as string]: "var(--primary)" }}
-        >
-          {pulse.live && <PulseEdge pulseKey={pulse.pulse} rail={side} />}
-        </span>
-      ))}
+      {/* ⚠️ DOC RAILS: WANTED, NOT YET BUILT RIGHT (user, 2026-09-04). Two cuts were removed
+          the same day: column-flanking spans (rails belong at the VIEW edges), then a reuse of
+          .ig-sheet-edge (its tick comb is oriented for a SHEET's geometry — it pointed the
+          wrong way here, "a guess and/or duplication"). The real build: extract the vertical
+          ruler into ONE shared primitive that RailThread, the sheet edges and this layer all
+          consume — a scoped task of its own, since RailThread hard-requires the rail columns
+          this state unmounts. Until then the docs stand without edge rulers rather than with
+          wrong ones. */}
       <div className={DOC_COLUMN}>
         <Doc />
       </div>
