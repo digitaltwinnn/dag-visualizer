@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
-import { DUR_OUT, is3D } from "@/src/engine/domain/viewTransition";
 import type { DocPage } from "@/components/views";
 
 // THE DOC OVERLAY (2026-09-04, user: "keep the background AND don't reboot the whole scene").
@@ -14,17 +13,17 @@ import type { DocPage } from "@/components/views";
 // Opening and closing is a store write (`docPage`), published to the address bar by RouteSync;
 // no navigation, no engine teardown.
 //
-// THE ENTRANCE IS SEQUENCED, AND TEXT NEVER LONG-FADES (user, 2026-09-04, two observations in
-// one design: "with text the fade feels a bit uneasy" — anti-aliased prose crawling through a
-// 0.9s opacity ramp shimmers — and "I expect it to animate out and only then the page to
-// appear"). So the two halves stop crossing: opening from a LIVE 3D view first lets the gather
-// run to completion (a DUR_OUT delay read from domain/viewTransition — the one home, so
-// retuning the choreography retunes the wait), and only then does the document enter — with the
-// HUD's own text entrance, the short 0.4s rise (--tempo-roll, the title/odometer idiom): a
-// quick lift + fade that is over before the eye can catch text mid-blend. Where no gather runs
-// (a cold flat boot, a doc→doc switch) the rise plays immediately. The exit is the same short
-// roll — the doc leaves fast and the scene's furniture build (1s) reads as following it.
-// Reduced motion snaps everything; the unmount waits for the roll.
+// THE TWO TRANSITIONS ARE SEQUENCED BY SIGNALS, AND TEXT NEVER LONG-FADES (user, 2026-09-04,
+// across three observations). Opening from a live 3D view: the gather plays IN FULL (the fleet
+// flies to the parked grids like any view exit) and the document holds until the ENGINE's
+// boundary signal (`store.docStageReady` — written frame-aligned with the choreography, so
+// ?slowmo and low FPS stretch the wait correctly; a wall-clock delay here measurably desynced),
+// then enters with the HUD's own text entrance: the short --tempo-roll rise, a quick lift+fade
+// that is over before the eye can catch anti-aliased prose mid-blend (the long opacity crawl
+// "felt uneasy"). Closing is the mirror: the roll-out IS the doc's OUT phase — `docClosing`
+// holds the engine's flat stage until this component's exit completes (it clears the flag), and
+// only then does the destination view's entry begin, fleet revealed at the grids for the
+// flight. Reduced motion snaps everything; the unmount waits for the roll.
 //
 // SEO is unchanged by the overlay move: the /about route server-renders AppShell with
 // `doc="about"`, which reaches this component as `initial` — the prose is in that route's HTML
@@ -61,35 +60,34 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
   // is in the HTML regardless of its starting opacity.
   const [render, setRender] = useState<DocPage | null>(initial);
   const [visible, setVisible] = useState(false);
+  const stageReady = useStore((s) => s.docStageReady);
   const exitT = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const firstRun = useRef(true);
   useEffect(() => {
-    // A COLD SEEDED LOAD is the one case with no live scene to wait for: the very first effect
-    // run already carries a page (the route's `initial`). Every later open happened in a running
-    // app, where a 3D mode means the gather is playing.
-    const cold = firstRun.current && page != null;
-    firstRun.current = false;
     if (page) {
       if (exitT.current) { clearTimeout(exitT.current); exitT.current = null; }
       setRender(page);
-      // THE SEQUENCE: an in-app open from a live 3D view waits out the gather (DUR_OUT) before
-      // the rise; a cold boot (the engine never raised the scene) and a doc->doc switch start
-      // at once.
-      const wasLive = !cold && render == null && is3D(useStore.getState().mode);
-      // DOUBLE rAF after the delay: a single one fires before the mounted-hidden state has ever
-      // been painted (rAF callbacks run ahead of that frame's style/paint), so the class flip
-      // coalesced and the rise snapped — measured opacity 1 at 150ms.
-      let raf1 = 0;
+      // Hold the entrance until the ENGINE says the stage is bare (docStageReady — true by
+      // default, false only while a live scene's gather is playing under this document).
+      if (!stageReady) return;
+      // DOUBLE rAF: a single one fires before the mounted-hidden state has ever been painted
+      // (rAF callbacks run ahead of that frame's style/paint), so the class flip coalesced and
+      // the rise snapped — measured opacity 1 at 150ms.
       let raf2 = 0;
-      const t = setTimeout(() => {
-        raf1 = requestAnimationFrame(() => { raf2 = requestAnimationFrame(() => setVisible(true)); });
-      }, wasLive ? DUR_OUT * 1000 : 0);
-      return () => { clearTimeout(t); if (raf1) cancelAnimationFrame(raf1); if (raf2) cancelAnimationFrame(raf2); };
+      const raf1 = requestAnimationFrame(() => { raf2 = requestAnimationFrame(() => setVisible(true)); });
+      return () => { cancelAnimationFrame(raf1); if (raf2) cancelAnimationFrame(raf2); };
     }
     setVisible(false);
-    exitT.current = setTimeout(() => { exitT.current = null; setRender(null); }, ROLL_MS);
+    exitT.current = setTimeout(() => {
+      exitT.current = null;
+      setRender(null);
+      // The roll-out finished — release the engine's held stage (the entry begins now).
+      useStore.getState().setDocClosing(false);
+    }, ROLL_MS);
     return () => { if (exitT.current) { clearTimeout(exitT.current); exitT.current = null; } };
-  }, [page]);
+  }, [page, stageReady]);
+
+  // Unmount safety: a torn-down layer must never leave the engine holding the flat stage.
+  useEffect(() => () => useStore.getState().setDocClosing(false), []);
 
   // Escape closes the document — the RAW layer's own gesture, and like there it is one of
   // several routes back (the footer toggles, the bar's view switch, browser back).

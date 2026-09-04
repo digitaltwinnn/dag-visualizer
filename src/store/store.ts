@@ -145,6 +145,18 @@ interface AppState {
   // never a Mode — a document is over the network, not a view of it. While set, the HUD's
   // scene furniture stands down (DocGate) and RouteSync publishes /about | /design.
   docPage: "about" | "design" | null;
+  // The doc overlay's STAGE-READY signal, written by the Engine (the one clock that knows the
+  // choreography's real boundary — frame-driven, so ?slowmo and low FPS stretch it correctly,
+  // where a wall-clock wait in the HUD desynced). DEFAULT TRUE so a document never waits on a
+  // scene that isn't there (cold flat boots, WebGL-unavailable); the Engine sets it false only
+  // when a doc opens OVER a live 3D view, and true again the frame the gather completes —
+  // DocLayer holds its entrance on it.
+  docStageReady: boolean;
+  // The CLOSE side's beat (user, 2026-09-04): the doc's roll-out is its own OUT phase, so the
+  // engine holds the flat stage until it finishes — `docClosing` is true from the close gesture
+  // until DocLayer's exit animation completes (it clears this), and only then does the engine
+  // begin the destination view's entry, with the fleet back at the parked grids for the flight.
+  docClosing: boolean;
   // Shared network filter ("all" | "dag" | <metagraph id>) — one unified core model, no
   // separate L0/L1 filters (the DAG is just another metagraph-shaped core).
   filter: string;
@@ -240,6 +252,8 @@ interface AppState {
   setActivity: (activity: Activity | null) => void;
   setMode: (mode: Mode) => void;
   setDocPage: (docPage: "about" | "design" | null) => void;
+  setDocStageReady: (ready: boolean) => void;
+  setDocClosing: (closing: boolean) => void;
   setFilter: (filter: string) => void;
   setMetaList: (list: MetaInfo[]) => void;
   setInspect: (pick: PickDescriptor | null) => void;
@@ -309,6 +323,8 @@ export const useStore = create<AppState>((set) => ({
   activity: null,
   mode: "hyper",
   docPage: null,
+  docStageReady: true,
+  docClosing: false,
   filter: "all",
   metaList: [],
   inspect: null,
@@ -357,8 +373,13 @@ export const useStore = create<AppState>((set) => ({
   setActivity: (activity) => set({ activity }),
   // A view switch CLOSES any open doc overlay: the switch is a statement of where you want to
   // be, and the two publish to one address bar (RouteSync derives the path from doc ?? mode).
-  setMode: (mode) => set({ mode, docPage: null }),
-  setDocPage: (docPage) => set({ docPage }),
+  // Closing (either route) arms `docClosing` — the doc's exit animation is its OUT phase, and
+  // the engine waits on it before entering the destination view.
+  setMode: (mode) => set((s) => ({ mode, docPage: null, docClosing: s.docPage != null || s.docClosing })),
+  setDocPage: (docPage) =>
+    set((s) => ({ docPage, docClosing: docPage == null ? s.docPage != null || s.docClosing : false })),
+  setDocStageReady: (docStageReady) => set({ docStageReady }),
+  setDocClosing: (docClosing) => set({ docClosing }),
   // Committing a network IS a user gesture (user, 2026-08-14 — changing the filter or paging
   // the dossier left the snapshot card as the box): it bumps the recency stack like every
   // other selection, so the facts rail focuses the metagraph card. "all" clears the entry.
