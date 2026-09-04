@@ -661,10 +661,7 @@ export class Engine {
         // use").
         const eff = st.docPage || st.docClosing ? ("soon" as Mode) : st.mode;
         const prevEff = prev.docPage || prev.docClosing ? ("soon" as Mode) : prev.mode;
-        if (eff !== prevEff) {
-          if (!(st.docPage || st.docClosing)) this.globe.setFleetVisible(true);
-          this.setMode(eff);
-        }
+        if (eff !== prevEff) this.setMode(eff);
         // The bare stage ARMS rather than hides (user, 2026-09-04: "shouldn't their nodes still
         // move to the gathering section at the top like they always do?"): the gather is the OUT
         // phase's job whatever the destination, and hiding the fleet is the DOC "view"'s own
@@ -679,6 +676,11 @@ export class Engine {
             if (is3D(prevEff)) st.setDocStageReady(false);
           } else {
             this._docHideArmed = false;
+            // The reveal starts AT THE CLOSE GESTURE, not at the stage change (user, 2026-09-04):
+            // the fleet's DOC_ROLL fade-in runs concurrently with the doc's own roll-out — both
+            // on the one clock — so the grids stand fully lit the moment the document is gone,
+            // ready for the entry flight that begins then.
+            this.globe.setFleetVisible(true);
           }
         }
         // The engine learns of a theme flip the one allowed way (spec §3). The CSS has already
