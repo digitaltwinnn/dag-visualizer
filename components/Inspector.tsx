@@ -441,6 +441,13 @@ export default function Inspector() {
     following ? (snap ? "live" : "") : snap?.data.ordinal ?? "",
     following ? (metaSnap ? "live" : "") : metaSnap ? `${metaSnap.metaId}:${metaSnap.ordinal}` : "",
   ].join("§");
+  // Arms HeightEase's growIn for slots that JOIN the lane after boot (false on the first
+  // render pass, true on every later one — a mounting slot's wrapper then eases from 0
+  // instead of shoving the pile in one frame).
+  const laneBooted = useRef(false);
+  useEffect(() => {
+    laneBooted.current = true;
+  }, []);
   const lastSelection = useRef(selectionKey);
   const lastMode = useRef(mode);
   const modeEnteredAt = useRef(0);
@@ -595,7 +602,7 @@ export default function Inspector() {
                 follow-don't-fight heuristic that keeps it off the pager's own slides). The
                 slab selectors are descendant, not child, so the extra level is free — the
                 RailPager precedent. */}
-            <HeightEase>{wrapped}</HeightEase>
+            <HeightEase growIn={laneBooted.current}>{wrapped}</HeightEase>
           </div>
         );
       })}

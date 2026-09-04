@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { filterAccent } from "@/src/data/network";
@@ -25,6 +25,12 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // card, just the About card.
 export default function ExploreRail() {
   const bp = useBreakpoint();
+  // growIn arming — the Inspector's laneBooted pattern: the tool slot unmounts entirely on
+  // the placeholder view and rejoins on a 3D one; rejoining grows from 0 instead of snapping.
+  const booted = useRef(false);
+  useEffect(() => {
+    booted.current = true;
+  }, []);
   const mode = useStore((s) => s.mode);
   const filter = useStore((s) => s.filter);
   const phoneDock = useStore((s) => s.phoneDock);
@@ -55,15 +61,20 @@ export default function ExploreRail() {
   // the wrapper is the cards' own rule (the rail scrolls; a card never compresses).
   const renderCard: Record<string, ReactNode> = {
     about: (
-      <HeightEase className="flex-none">
+      <HeightEase className="flex-none" growIn={booted.current}>
         <AboutView {...ABOUT[mode]} defaultCollapsed={bp === "phone"} />
       </HeightEase>
     ),
     // Phone opens BOTH cards collapsed (user, 2026-09-03): the sheet becomes a compact chooser
     // that the live content-fit sizes down, and one tap opens the list and grows the sheet.
     tool: (
-      <HeightEase className="flex-none">
-        <div key={`tool-${mode}`} className="animate-card-in motion-reduce:animate-none">
+      <HeightEase className="flex-none" growIn={booted.current}>
+        {/* ⚠️ TRANSFORM-FREE arrival (user, 2026-09-04: About collapsed + a tall explorer
+            still "jumps a bit" at the top — animate-card-in's materialize runs
+            translateY(5px) scale(0.985), and 0.985 of a 700px expanded list pulls the TOP
+            edge visibly). The keyed card fades on the roll clock; the height ease and the
+            head's title roll carry the rest of the arrival. */}
+        <div key={`tool-${mode}`} className="animate-in fade-in duration-(--tempo-roll) ease-(--ease-roll) motion-reduce:animate-none">
           {mode === "hyper" ? <HyperExplore defaultCollapsed={bp === "phone"} />
           : mode === "geo" ? <GeoExplore defaultCollapsed={bp === "phone"} />
           : mode === "ledger" ? <LedgerPanel defaultCollapsed={bp === "phone"} />

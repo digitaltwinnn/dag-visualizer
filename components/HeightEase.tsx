@@ -8,63 +8,114 @@ import { useLayoutEffect, useRef, type ReactNode } from "react";
 // grows or shrinks the node card in one frame). CSS cannot ease this: the block's height is
 // `auto` before and after, and an auto→auto content change fires no transition
 // (`interpolate-size` only bridges auto↔length). So the inner content is measured
-// (ResizeObserver) and the outer box animates between the readings via WAAPI, on the roll
-// clock's own tokens (read from the live CSSOM — WAAPI can't consume var()). Layout below the
-// block follows the animated height each frame, which is the point: the whole pile eases.
+// (ResizeObserver) and the box animates between the readings via WAAPI, on the roll clock's
+// own tokens (read from the live CSSOM — WAAPI can't consume var()). Layout below follows the
+// animated height each frame, which is the point: the whole pile eases.
 //
-// The first measurement never animates (mount is BootFade's moment), reduced motion jumps,
-// and a change mid-ease retargets from the current animated height. `overflow-clip` during
-// the ease keeps arriving content from painting past the box, with a clip margin so nearby
-// bleeds (a card's own padding) survive; at rest the style is cleared entirely.
+// ⚠️ THE CARD'S OWN BOX RIDES THE EASE (user, second round: "it actually looks like the top
+// part of the card is moving, instead of the bottom expanding/shrinking" — the first cut
+// animated only this wrapper, so a keyed-in card rendered at its natural height instantly and
+// the visible BORDER still snapped; only empty slot space eased). During the ease the inner
+// column and the first panel inside (`.ig-panel`/`.rail-entry` — the outermost card) are
+// stretched to 100% of the animated box with their own overflow clipped, so the border and
+// the content window move with the ease; every style is cleared at rest. While OUR animation
+// runs, the observer's events are self-driven echoes and are ignored — the clear at the end
+// lets one fresh measurement through, which also self-heals a content change that landed
+// mid-ease (a corrective settle to the true height).
 //
-// IT WRAPS EVERY LADDER RUNG (user, 2026-09-04, "yes" to the whole pile): expand, collapse,
-// ghost↔populated and fact redistribution all ease, and the pile follows continuously. The
-// slab's "nothing animates" note is amended to GEOMETRY (seams, corners, washes — still
-// static); heights ease. Reduced motion still snaps everything, so that guarantee holds.
+// IT WRAPS EVERY LADDER RUNG and both explore cards: expand, collapse, ghost↔populated and
+// fact redistribution all ease. The slab's "nothing animates" note is amended to GEOMETRY
+// (seams, corners, washes — still static); heights ease. Reduced motion snaps everything, so
+// that guarantee holds.
+//
+// The first measurement never animates (mount is BootFade's moment) — unless `growIn` says
+// this box arrived AFTER its host lane booted: a slot joining the ladder mid-session (the
+// snapshot slots arriving with the ledger, composition with hyper) snapped its full height
+// into the pile and shoved every card below in one frame, so a growIn mount eases from 0.
+// The leaving side stays a snap — animating an unmount needs exit-hold machinery (the
+// accordion-clone lessons), not a casual add.
 //
 // ⚠️ FOLLOW, DON'T FIGHT: the pile already has animators — the pager pins and eases heights
 // through a sibling slide, Radix disclosures run .disclose-panel inside card bodies. Their
-// tell is CADENCE: an inner animator resizes the content EVERY FRAME, while the snap this
-// component exists for is one discrete change after quiet. Successive measurements closer
-// than RAPID_MS are treated as someone else's animation — the running ease (if any) cancels,
-// styles clear, and the box follows its content natively until the churn goes quiet.
+// tell is a SUSTAINED STREAK: an inner animator resizes the content every frame for its whole
+// run, so only the third rapid event in a row stands this component down (adopt, follow
+// natively until quiet). A SINGLE rapid follower is the second half of a discrete change (an
+// explorer mounts its shell, its rows land a few frames later) and RETARGETS instead — the
+// stand-down there cancelled the just-started ease into a snap (measured).
 const RAPID_MS = 200;
+const STREAK_STANDDOWN = 2; // rapid events in a row before another animator is assumed
 
-export default function HeightEase({ children, className }: { children: ReactNode; className?: string }) {
+export default function HeightEase({
+  children,
+  className,
+  growIn = false,
+}: { children: ReactNode; className?: string; growIn?: boolean }) {
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const anim = useRef<Animation | null>(null);
+  const stretched = useRef<HTMLElement[]>([]);
   const last = useRef(-1);
   const lastAt = useRef(0);
+  const streak = useRef(0);
+  const growInRef = useRef(growIn);
+  growInRef.current = growIn;
   useLayoutEffect(() => {
     const o = outer.current!;
     const i = inner.current!;
+    const clearStyles = () => {
+      o.style.overflow = "";
+      o.style.overflowClipMargin = "";
+      i.style.height = "";
+      for (const el of stretched.current) {
+        el.style.height = "";
+        el.style.overflow = "";
+      }
+      stretched.current = [];
+    };
     const ro = new ResizeObserver(() => {
+      // Self-driven echo: our own animation resizes `inner` every frame. The clear at the
+      // end lets the next real measurement through.
+      if (anim.current) return;
       const h = i.offsetHeight;
-      if (last.current < 0 || h === last.current) {
+      if (h === last.current) return;
+      const first = last.current < 0;
+      if (first && (!growInRef.current || h === 0)) {
         last.current = h;
         return;
       }
       const now = performance.now();
-      const rapid = now - lastAt.current < RAPID_MS;
+      const rapid = !first && now - lastAt.current < RAPID_MS;
       lastAt.current = now;
-      if (rapid) {
-        // An inner animator owns this change — adopt and stand down (cancel clears styles).
-        anim.current?.cancel();
+      streak.current = rapid ? streak.current + 1 : 0;
+      if (rapid && streak.current >= STREAK_STANDDOWN) {
+        // A sustained stream — an inner animator owns this box: adopt and follow natively.
         last.current = h;
         return;
       }
-      // Retarget from wherever the box currently IS — mid-ease that is the animated height,
-      // not the stale `last` target.
-      const from = anim.current ? o.getBoundingClientRect().height : last.current;
+      const from = first ? 0 : last.current;
       last.current = h;
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
       const root = getComputedStyle(document.documentElement);
       const ms = (parseFloat(root.getPropertyValue("--tempo-roll")) || 0.65) * 1000;
       const ease = root.getPropertyValue("--ease-roll").trim() || "ease-out";
-      anim.current?.cancel();
+      // Stretch the WHOLE chain so the CARD's border tracks the eased box: inner, every
+      // intermediate wrapper (a keyed swap div, the pager's gesture wrapper — percentage
+      // heights resolve against `auto` as content height, so ONE unstretched link parks the
+      // panel at its natural size while the box eases around it; measured as a frozen panel
+      // bottom under a moving outer), and the outermost panel itself, which also clips its
+      // own overflowing content (an element's overflow clips descendants, never its own
+      // border or shadow).
       o.style.overflow = "clip";
       o.style.overflowClipMargin = "18px";
+      i.style.height = "100%";
+      const panel = i.querySelector<HTMLElement>(".ig-panel, .rail-entry");
+      if (panel) {
+        const chain: HTMLElement[] = [];
+        for (let el: HTMLElement | null = panel; el && el !== i; el = el.parentElement) chain.push(el);
+        for (const el of chain) el.style.height = "100%";
+        panel.style.overflow = "clip";
+        stretched.current = chain;
+      }
       const a = o.animate([{ height: `${from}px` }, { height: `${h}px` }], {
         duration: ms,
         easing: ease,
@@ -73,8 +124,7 @@ export default function HeightEase({ children, className }: { children: ReactNod
       a.onfinish = a.oncancel = () => {
         if (anim.current === a) {
           anim.current = null;
-          o.style.overflow = "";
-          o.style.overflowClipMargin = "";
+          clearStyles();
         }
       };
     });
