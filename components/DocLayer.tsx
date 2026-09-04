@@ -82,7 +82,15 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
   // flips it through the double-rAF like any in-app open. Crawlers are unaffected — the prose
   // is in the HTML regardless of its starting opacity.
   const [render, setRender] = useState<DocPage | null>(initial);
-  const [visible, setVisible] = useState(false);
+  // The appearance PHASE, tw-animate style (2026-09-04, the RollSwap rework reaching back —
+  // user: "do you also need to rework the docs views?"): "hold" = mounted hidden, waiting for
+  // the engine's stage (no animation); "in" = the two-beat entrance plays; "out" = the roll-out
+  // plays, held by fill-mode-forwards until the ROLL_MS timeout unmounts. Animations carry
+  // their own from-state, which deletes the old `visible` flag AND the double-rAF paint dance
+  // it needed (a transition only runs from a painted state; an animation just runs). The
+  // SEQUENCING JS below is untouched — stageReady, docClosing and the doc→doc timeout are the
+  // engine handshake, not animation bookkeeping.
+  const [phase, setPhase] = useState<"hold" | "in" | "out">("hold");
   // The document that has RISEN — the doc rails' pulse subject (see their mount below): it
   // changes exactly when a document arrives on screen, so the rails play the view-switch pulse
   // at that moment and not during a roll-out.
@@ -90,29 +98,15 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
   const stageReady = useStore((s) => s.docStageReady);
   const exitT = useRef<ReturnType<typeof setTimeout> | null>(null);
   const box = useRef<HTMLDivElement>(null);
-  const rafs = useRef<number[]>([]);
   const renderRef = useRef(render);
   renderRef.current = render;
   useEffect(() => {
     const clearPending = () => {
       if (exitT.current) { clearTimeout(exitT.current); exitT.current = null; }
-      for (const r of rafs.current) cancelAnimationFrame(r);
-      rafs.current.length = 0;
     };
-    // DOUBLE rAF before the rise: a single one fires before the mounted-hidden state has ever
-    // been painted (rAF callbacks run ahead of that frame's style/paint), so the class flip
-    // coalesced and the rise snapped — measured opacity 1 at 150ms.
     const rise = (p: DocPage) => {
-      rafs.current.push(
-        requestAnimationFrame(() => {
-          rafs.current.push(
-            requestAnimationFrame(() => {
-              setVisible(true);
-              setArrived(p);
-            }),
-          );
-        }),
-      );
+      setPhase("in");
+      setArrived(p);
     };
     clearPending();
     if (page) {
@@ -121,7 +115,7 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
       // rolls out on the same clock, then the next one rolls in — the one transition grammar,
       // every path.
       if (renderRef.current != null && renderRef.current !== page) {
-        setVisible(false);
+        setPhase("out");
         exitT.current = setTimeout(() => {
           exitT.current = null;
           setRender(page);
@@ -138,11 +132,12 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
       rise(page);
       return clearPending;
     }
-    setVisible(false);
+    setPhase("out");
     exitT.current = setTimeout(() => {
       exitT.current = null;
       setRender(null);
       setArrived(null);
+      setPhase("hold");
       // The roll-out finished — release the engine's held stage (the entry begins now).
       useStore.getState().setDocClosing(false);
     }, ROLL_MS);
@@ -189,24 +184,19 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
       ref={box}
       className={cn(
         "fixed inset-0 z-[8] overflow-y-auto overscroll-contain slim-scroll",
-        // The HUD's text entrance at document scale: a rise + fade on the NAV clock — never a
-        // long opacity crawl over prose. ⚠️ the stock `transition` utility, NOT
-        // `transition-[opacity,transform]`: the arbitrary property list never compiled, so the
-        // transform SNAPPED both ways — measured as a 12px page jump on exit and an entrance
-        // with no visible roll (two user reports, one cause). The stock utility's default list
-        // already carries opacity + transform. The transform lives on THIS fixed container,
-        // whose box is inset-0 — its own fixed child (the scrim) re-anchors to it, same box, so
-        // nothing shifts (trap 2 stays satisfied for everything outside).
         // TWO-BEAT ARRIVAL (user, 2026-09-04 — "first show the 'page' and then roll in the
-        // text"): this container now carries only the SHEET's fade (opacity, no transform —
-        // the roll moved onto the text wrapper below, which is where a text roll belongs),
-        // on the short --tempo-doc-sheet beat; the fall keeps the nav clock, whose DOC_ROLL
-        // twin also times the unmount + the engine's stage release (the exit boundary must
-        // not move). With no transform here the fixed × strip and scrim anchor to the same
-        // inset-0 box as before — trap 2 stays satisfied.
-        "transition ease-out motion-reduce:transition-none",
-        visible ? "duration-(--tempo-doc-sheet)" : "duration-(--tempo-nav)",
-        !visible && "opacity-0 pointer-events-none",
+        // text"), spoken in tw-animate (the house vocabulary; see the phase note above): this
+        // container carries only the SHEET's fade — no transform, so the fixed × strip and
+        // scrim keep anchoring to the same inset-0 box (trap 2) — on the short
+        // --tempo-doc-sheet beat; the exit keeps the nav clock, whose DOC_ROLL twin also
+        // times the unmount + the engine's stage release (the exit boundary must not move).
+        // Reduced motion drops the animations and the extra opacity-0 keeps the exit a SNAP
+        // (fill-forwards with no animation would hold the sheet visible through the timeout).
+        phase === "hold" && "opacity-0 pointer-events-none",
+        phase === "in" &&
+          "animate-in fade-in duration-(--tempo-doc-sheet) motion-reduce:animate-none",
+        phase === "out" &&
+          "animate-out fade-out duration-(--tempo-nav) ease-out fill-mode-forwards pointer-events-none motion-reduce:animate-none motion-reduce:opacity-0",
       )}
       role="region"
       aria-label={DOC_PAGES[render].label}
@@ -224,8 +214,10 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
         }}
       />
       <div className={DOC_COLUMN}>
-        {/* The text's own roll — the arrival's SECOND beat: it waits out the sheet's fade
-            (delay = --tempo-doc-sheet), then rises on --tempo-doc-rise. The exit drops the
+        {/* The text's own roll — the arrival's SECOND beat: fill-mode-both holds frame 0
+            (hidden) through the [animation-delay:--tempo-doc-sheet] wait, then the rise runs
+            on --tempo-doc-rise. The delay is an arbitrary property on purpose — Tailwind's
+            delay-* feeds transitions, not tw-animate's animation-delay. The exit drops the
             delay and rides the nav clock so sheet and text leave as one gesture.
             ⚠️ The entrance curve is NOT ease-out (user, 2026-09-04: doubling the duration
             "looks just as fast" — ease-out lands most of the change in the first half-second
@@ -234,11 +226,11 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
             ease-out, where front-loading is exactly right. */}
         <div
           className={cn(
-            "transition motion-reduce:transition-none",
-            visible
-              ? "duration-(--tempo-doc-rise) delay-(--tempo-doc-sheet) ease-[cubic-bezier(.45,.05,.25,1)]"
-              : "duration-(--tempo-nav) delay-0 ease-out",
-            !visible && "opacity-0 translate-y-8",
+            phase === "hold" && "opacity-0",
+            phase === "in" &&
+              "animate-in fade-in slide-in-from-bottom-8 duration-(--tempo-doc-rise) ease-[cubic-bezier(.45,.05,.25,1)] fill-mode-both [animation-delay:var(--tempo-doc-sheet)] motion-reduce:animate-none",
+            phase === "out" &&
+              "animate-out fade-out slide-out-to-bottom-8 duration-(--tempo-nav) ease-out fill-mode-forwards motion-reduce:animate-none motion-reduce:opacity-0",
           )}
         >
           <Doc />
