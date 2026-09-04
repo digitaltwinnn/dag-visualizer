@@ -46,10 +46,16 @@ export default function FooterViewLinks({ overDoc }: { overDoc: boolean }) {
           </NetLink>
         </span>
       ))}
-      {/* In-app the group's trailing divider rides inside the phone-hidden span; on docs the
-          divider stays with the caller, where it must survive the group's collapse to keep
-          separating Home from the doc links. */}
-      {!overDoc && <span aria-hidden className="w-px self-stretch bg-border mx-0.5" />}
+      {/* In-app the group's trailing separator rides inside the phone-hidden span; on docs the
+          separator stays with the caller, where it must survive the group's collapse to keep
+          separating Home from the doc links. ONE separator species row-wide (user, 2026-09-04
+          — the full-height hairline "cuts the whole section in half"): the mid-dot; the brand
+          marks on the external links are what set that group apart. */}
+      {!overDoc && (
+        <span aria-hidden className="opacity-40">
+          ·
+        </span>
+      )}
     </span>
   );
 }

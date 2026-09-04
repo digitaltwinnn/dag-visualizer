@@ -102,20 +102,23 @@ export default function SiteFooter({ overDoc = false }: { overDoc?: boolean }) {
             stacking order let the links win those taps off the dock's buttons (the z the dock
             carries lives inside the shell's own stacking context, so it never competes here).
             Desktop is untouched: a pointer needs no floor. */}
-        {/* THE ROW IS THREE GROUPS, DIVIDED (user, 2026-09-04): app navigation, the off-scene
-            doc pages, then the external world. Hairline dividers (the command bar's own device)
-            separate the groups; the mid-dot separates within one. The view links appear
-            EVERYWHERE (FooterViewLinks — store-driven in-app so the engine survives, plain
-            anchors on docs); Home is doc-only, because inside the app "Home" and the default
-            view would be two names for the same click. Phone drops the view group in both
-            worlds — the header's icons and the app's own bar carry the views there. */}
+        {/* THE ROW IS THREE GROUPS, ONE SEPARATOR (user, 2026-09-04, two rounds): app
+            navigation, the off-scene doc pages, then the external world. Group hairlines were
+            tried and pulled the same day — with the tuck they ran the strip's full height and
+            "cut the whole section in half" — so the mid-dot is the row's ONE separator species,
+            and what sets the external group apart is its brand marks, not a divider. The view
+            links appear EVERYWHERE (FooterViewLinks — store-driven in-app so the engine
+            survives, plain anchors on docs); Home is doc-only, because inside the app "Home"
+            and the default view would be two names for the same click. Phone drops the view
+            group in both worlds — the header's icons and the app's own bar carry the views
+            there. */}
         {overDoc ? (
           <>
             <NetLink href="/" className="hover:text-foreground transition-colors">
               Home
             </NetLink>
             <FooterViewLinks overDoc />
-            <span aria-hidden className="w-px self-stretch bg-border mx-0.5" />
+            <span aria-hidden className="opacity-40">·</span>
           </>
         ) : (
           <FooterViewLinks overDoc={false} />
@@ -127,7 +130,7 @@ export default function SiteFooter({ overDoc = false }: { overDoc?: boolean }) {
         <NetLink href="/design" className="hover:text-foreground transition-colors">
           Design
         </NetLink>
-        <span aria-hidden className="w-px self-stretch bg-border mx-0.5" />
+        <span aria-hidden className="opacity-40">·</span>
         {/* OUR side of the external world: the repo. "Source code", not "GitHub" (user,
             2026-09-04 — the usual OSS-footer form): the octocat glyph already says where, the
             words say what it is. The glyph is also the row's one brand mark for OUR things. */}
@@ -140,12 +143,13 @@ export default function SiteFooter({ overDoc = false }: { overDoc?: boolean }) {
           <GithubMark />
           Source code
         </a>
-        {/* A hairline BETWEEN the repo and the official site (user, 2026-09-04): one is this
-            project's, the other is the network's — the divider is the affiliation boundary the
-            /about disclosure states in words. The link wears the official $DAG mark from the
-            app's own catalog config (metagraphById("dag") — the same one-home record the
+        {/* The repo and the official site stay clearly TWO things — one is this project's, the
+            other is the network's (the affiliation boundary /about states in words) — but the
+            boundary is carried by each link's own brand mark now, not by a heavier divider (the
+            one-separator rule above). The Constellation link wears the official $DAG mark from
+            the app's own catalog config (metagraphById("dag") — the same one-home record the
             dossier avatar and this href's siteUrl read), identifying, not claiming. */}
-        <span aria-hidden className="w-px self-stretch bg-border mx-0.5" />
+        <span aria-hidden className="opacity-40">·</span>
         <a
           href={dag?.siteUrl ?? CONSTELLATION}
           target="_blank"
