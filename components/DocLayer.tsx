@@ -160,7 +160,7 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
     <div
       ref={box}
       className={cn(
-        "fixed inset-0 z-[8] overflow-y-auto overscroll-contain",
+        "fixed inset-0 z-[8] overflow-y-auto overscroll-contain slim-scroll",
         // The HUD's text entrance at document scale: a rise + fade on the NAV clock — never a
         // long opacity crawl over prose. ⚠️ the stock `transition` utility, NOT
         // `transition-[opacity,transform]`: the arbitrary property list never compiled, so the
@@ -187,17 +187,23 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
             "color-mix(in oklch, var(--background) 70%, transparent) 55%, transparent 100%)",
         }}
       />
+      {/* THE DOC'S RAILS SIT AT THE VIEW'S OWN EDGES (user, 2026-09-04, corrected from a
+          column-flanking first cut: "the rails should just sit at the edge of the view like any
+          other view … I want to see the hairlines"): the sheets' .ig-sheet-edge recipe IS the
+          house view-edge ruler — spine, tick comb, end fades, resting dim — its fixed pseudos
+          anchoring to this transformed layer's box (viewport-sized), so the rulers ride the
+          doc's roll. The travelling switch pulse replays on every document arrival. */}
       {(["left", "right"] as const).map((side) => (
         <span
           key={side}
           aria-hidden
+          data-side={side}
           className={cn(
-            "pointer-events-none fixed top-[76px] bottom-[44px] w-[3px] z-[1] max-[860px]:hidden",
-            side === "left" ? "left-[calc(50%-24rem-18px)]" : "right-[calc(50%-24rem-18px)]",
+            "ig-sheet-edge pointer-events-none fixed inset-y-[10px] w-[3px] z-[1] max-[700px]:hidden",
+            side === "left" ? "left-0" : "right-0",
           )}
           style={{ ["--spine" as string]: "var(--primary)" }}
         >
-          <span className="absolute inset-y-0 left-1/2 w-px bg-border/70" />
           {pulse.live && <PulseEdge pulseKey={pulse.pulse} rail={side} />}
         </span>
       ))}
