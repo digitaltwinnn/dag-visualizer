@@ -14,16 +14,8 @@ import PresentationToggle from "@/components/topbar/PresentationToggle";
 import ThemeToggle from "@/components/topbar/ThemeToggle";
 import NetworkSwitch, { NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
 import { useBreakpoint } from "@/components/useBreakpoint";
+import { VIEWS } from "@/components/views";
 import type { Mode } from "@/src/store/store";
-
-const VIEWS = [
-  { id: "hyper", name: "Hypergraph" },
-  { id: "geo", name: "Geography" },
-  { id: "ledger", name: "Snapshots" },
-  { id: "status", name: "Network", soon: true },
-  { id: "transactions", name: "Transactions", soon: true },
-  { id: "staking", name: "Staking", soon: true },
-] as const;
 
 // Collapsed filter face: a small identity dot + the network name in neutral text (no filled
 // chip). All → a neutral cyan dot. Identity is the ONLY colour the filter carries.
@@ -287,7 +279,7 @@ export default function TopBar() {
           onValueChange={(v) => { if (v) setMode(v as Mode); }}
           className="flex gap-0.5 max-[700px]:gap-0"
         >
-          {(bp === "phone" ? VIEWS.filter((v) => !("soon" in v && v.soon)) : VIEWS).map((v) => {
+          {(bp === "phone" ? VIEWS.filter((v) => !v.soon) : VIEWS).map((v) => {
             const Icon = VIEW_ICONS[v.id as Mode];
             return (
             <ToggleGroupItem
@@ -319,7 +311,7 @@ export default function TopBar() {
                 // condensed and the full face change on one line. Tablet ≥860 and desktop keep six.
                 // (Raised from 820 on 2026-08-21 when ThemeToggle landed beside PresentationToggle:
                 // measured 32px overflow at 820px; 860px is clean with slack, breakeven ~853px.)
-                "soon" in v && v.soon && "opacity-45 max-[860px]:hidden",
+                v.soon && "opacity-45 max-[860px]:hidden",
               )}
             >
               <Icon aria-hidden className="size-4 group-data-[state=on]:text-primary" />
