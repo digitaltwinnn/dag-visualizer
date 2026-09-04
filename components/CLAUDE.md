@@ -496,9 +496,18 @@ rails-lean with no visible way back.
 - **`AppShell` is the app** — `/` and `app/[view]` both render it; `RouteSync` is the URL↔mode
   bridge (seed on mount, shallow pushState on switch, popstate back), `components/views.ts` the
   one view-vocabulary home (TopBar's VIEWS lives there now).
-- **The doc pages (/about, /design) wear shared chrome**: `SiteHeader` (the command bar's glass +
-  the view switch as links + ThemeToggle/ThemeController) and `SiteFooter overDoc`; the brand
-  waveform's one `d` is `components/brand.tsx` (EcgMark animates it, BrandMark stills it).
+- **The doc pages (/about, /design) wear shared chrome**: `SiteHeader` (the command bar's glass,
+  its 3-zone grid and label breakpoint — the switch as centred links — + ThemeToggle/Controller,
+  fixed and full-span on `--bar-margin`) and `SiteFooter overDoc`; `DocBackdrop` owns the wash,
+  scrim, side margins and the one `DOC_COLUMN`; the brand waveform's one `d` is
+  `components/brand.tsx` (EcgMark animates it, BrandMark stills it).
+- **The footer is a full-width strip, one row everywhere**: view links (`FooterViewLinks` —
+  store-driven in-app so the engine survives, plain anchors on docs, phone drops them) | About ·
+  Design | Source code · Constellation, hairline-divided, the last divider the affiliation
+  boundary. In-app it tucks `min(10px, --bottom-reserve)` under the vitals band so the band's
+  rounded corners sit on its veil (the notch fix); the band sits flush on it (no air gap). The
+  canvas's display box is CSS-owned (`setSize(..., false)`) or a fractional-DPR viewport shows a
+  background sliver under the scene — light mode made it visible.
 - **The tempo family is tokenized** — `--tempo-beat` / `--tempo-signal` / `--tempo-roll` in
   globals.css `:root`; the 150ms disclosure clock deliberately is not (its header says why).
 

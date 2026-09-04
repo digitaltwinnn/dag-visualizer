@@ -25,7 +25,7 @@
 // invented address is a fabricated fact of the worst kind (rule 10). Add the entry here the moment
 // a real one exists.
 import NetLink from "@/components/NetLink";
-import { ROUTED_VIEWS } from "@/components/views";
+import FooterViewLinks from "@/components/FooterViewLinks";
 import { metagraphById } from "@/src/data/network";
 import { cn } from "@/lib/utils";
 
@@ -67,7 +67,15 @@ export default function SiteFooter({ overDoc = false }: { overDoc?: boolean }) {
         "fixed inset-x-[var(--bar-margin)] bottom-0 z-10 flex items-stretch pointer-events-none",
         overDoc
           ? "h-[var(--footer-phone-h)] max-[700px]:bottom-[env(safe-area-inset-bottom)]"
-          : "h-[var(--footer-h)] max-[700px]:bottom-[var(--phone-dock-h)] max-[700px]:h-[var(--footer-phone-h)]",
+          : // The +min(10px, --bottom-reserve) TUCK (user, 2026-09-04): the vitals band's rounded
+            // bottom corners left notches of bare scene where they met this strip's square top.
+            // The strip now reaches ~10px up BEHIND the band (later in the DOM at the same z, so
+            // the band paints over it) and its veil fills the corner curves — seamless join. The
+            // min() ties the tuck to the band actually reserving the lane: raw pose, rails-hidden
+            // and phone all zero --bottom-reserve, and a taller veil with no band above it would
+            // just be a mystery band. The nav pads the same amount so the links stay centred in
+            // the visible row.
+            "h-[calc(var(--footer-h)+min(10px,var(--bottom-reserve,0px)))] max-[700px]:bottom-[var(--phone-dock-h)] max-[700px]:h-[var(--footer-phone-h)]",
       )}
     >
       {/* Readability history, still load-bearing: no text-shadow halo (user, 2026-08-30 — the
@@ -78,7 +86,13 @@ export default function SiteFooter({ overDoc = false }: { overDoc?: boolean }) {
           plate stays `--footer-glass` — a flat low-alpha veil, deliberately NOT the band's lit
           `--topbar-glass` (too dominant white in light mode), and that fill difference is what
           separates the two rows now that they touch. */}
-      <nav className="flex-1 flex items-center justify-center gap-2 text-micro text-muted-foreground [&_a]:pointer-events-auto bg-[var(--footer-glass)] backdrop-blur-sm max-[700px]:[&_a]:pt-[26px] max-[700px]:[&_a]:-mt-[26px] max-[700px]:[&_a]:pb-1.5 max-[700px]:[&_a]:-mb-1.5 max-[700px]:[&_a]:px-1.5 max-[700px]:[&_a]:-mx-1.5">
+      <nav
+        className={cn(
+          "flex-1 flex items-center justify-center gap-2 text-micro text-muted-foreground [&_a]:pointer-events-auto bg-[var(--footer-glass)] backdrop-blur-sm",
+          "max-[700px]:[&_a]:pt-[26px] max-[700px]:[&_a]:-mt-[26px] max-[700px]:[&_a]:pb-1.5 max-[700px]:[&_a]:-mb-1.5 max-[700px]:[&_a]:px-1.5 max-[700px]:[&_a]:-mx-1.5",
+          !overDoc && "pt-[min(10px,var(--bottom-reserve,0px))] max-[700px]:pt-0",
+        )}
+      >
         {/* ⚠️ On phone every anchor wears padding CANCELLED by an equal negative margin (the
             utility pairs above): the row keeps its 22px visual height while each link's HIT BOX
             grows to ~43px — measured 11px tall before, a quarter of the 44px touch floor, and on
@@ -88,29 +102,23 @@ export default function SiteFooter({ overDoc = false }: { overDoc?: boolean }) {
             stacking order let the links win those taps off the dock's buttons (the z the dock
             carries lives inside the shell's own stacking context, so it never competes here).
             Desktop is untouched: a pointer needs no floor. */}
-        {/* THE ROW IS THREE GROUPS, DIVIDED (user, 2026-09-04): app navigation (doc pages only
-            — the app IS those destinations and its command bar owns view switching), the
-            off-scene doc pages, then the external world. Hairline dividers (the command bar's
-            own device) separate the groups; the mid-dot separates within one. On phone the view
-            links stand down (the row would overflow 390px) — the header's icon switch still
-            carries them there. */}
-        {overDoc && (
+        {/* THE ROW IS THREE GROUPS, DIVIDED (user, 2026-09-04): app navigation, the off-scene
+            doc pages, then the external world. Hairline dividers (the command bar's own device)
+            separate the groups; the mid-dot separates within one. The view links appear
+            EVERYWHERE (FooterViewLinks — store-driven in-app so the engine survives, plain
+            anchors on docs); Home is doc-only, because inside the app "Home" and the default
+            view would be two names for the same click. Phone drops the view group in both
+            worlds — the header's icons and the app's own bar carry the views there. */}
+        {overDoc ? (
           <>
             <NetLink href="/" className="hover:text-foreground transition-colors">
               Home
             </NetLink>
-            <span className="flex items-center gap-2 max-[700px]:hidden">
-              {ROUTED_VIEWS.map((v) => (
-                <span key={v.id} className="flex items-center gap-2">
-                  <span aria-hidden className="opacity-40">·</span>
-                  <NetLink href={`/${v.slug}`} className="hover:text-foreground transition-colors">
-                    {v.name}
-                  </NetLink>
-                </span>
-              ))}
-            </span>
+            <FooterViewLinks overDoc />
             <span aria-hidden className="w-px self-stretch bg-border mx-0.5" />
           </>
+        ) : (
+          <FooterViewLinks overDoc={false} />
         )}
         <NetLink href="/about" className="hover:text-foreground transition-colors">
           About

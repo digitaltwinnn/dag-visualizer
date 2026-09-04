@@ -32,33 +32,41 @@ export default function SiteHeader() {
     <header className="fixed top-[14px] inset-x-[var(--bar-margin)] z-40">
       <div
         className={cn(
-          "flex items-center gap-2 py-2 px-3.5 pointer-events-auto",
-          "border border-border rounded-lg backdrop-blur-md",
+          "pointer-events-auto border border-border rounded-lg backdrop-blur-md",
           "[background:var(--topbar-glass)]",
           "shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_30px_rgba(0,0,0,0.35)]",
+          // THE APP BAR'S OWN 3-ZONE GRID (user, 2026-09-04 — "keep placeholders so scene
+          // navigation stays in place?"): no dead placeholder controls (a filter face with no
+          // scene is decoration pretending to be an instrument) — the grid is what centres the
+          // switch in the app, not the weight of the side controls, so adopting it puts the
+          // switch in the SAME central position here with lighter zones. Labels drop at the
+          // app's own max-[1299px] threshold, so at any width the two bars render the switch
+          // identically.
+          "grid grid-cols-[1fr_auto_1fr] items-center gap-3 py-2 px-3.5",
         )}
       >
-        <NetLink
-          href="/"
-          title="Open the visualizer"
-          className={cn(
-            "flex items-center gap-3 no-underline rounded-btn -mx-1 px-1 py-0.5",
-            "pointer-coarse:min-h-11",
-            "hover:bg-wash-soft transition-colors duration-150 motion-reduce:transition-none",
-            "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
-          )}
-        >
-          <BrandMark />
-          <span className="font-semibold tracking-[-0.01em] text-title whitespace-nowrap select-none max-[480px]:hidden">
-            <span className="text-foreground">DAG</span>{" "}
-            <span className="text-muted-foreground">Visualizer</span>
-          </span>
-        </NetLink>
-        <span className="flex-1" />
-        {/* The view switch, as navigation: same icons, same order, same resting grammar as the
-            command bar's radiogroup — but links, because from a document a view is a destination.
-            Labels drop on narrow widths exactly as the bar's do; the icons alone still carry the
-            three marks (each keeps its title + accessible name). */}
+        <div className="flex items-center min-w-0">
+          <NetLink
+            href="/"
+            title="Open the visualizer"
+            className={cn(
+              "flex items-center gap-3 no-underline rounded-btn -mx-1 px-1 py-0.5",
+              "pointer-coarse:min-h-11",
+              "hover:bg-wash-soft transition-colors duration-150 motion-reduce:transition-none",
+              "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
+            )}
+          >
+            <BrandMark />
+            <span className="font-semibold tracking-[-0.01em] text-title whitespace-nowrap select-none max-[480px]:hidden">
+              <span className="text-foreground">DAG</span>{" "}
+              <span className="text-muted-foreground">Visualizer</span>
+            </span>
+          </NetLink>
+        </div>
+        {/* The view switch, as navigation: same icons, same order, same centred position and
+            label breakpoint as the command bar's radiogroup — but links, because from a document
+            a view is a destination. Below 1300 the labels go sr-only (the icons still carry the
+            three marks, each with its title + accessible name). */}
         <nav aria-label="Visualizer views" className="flex items-center gap-0.5">
           {ROUTED_VIEWS.map((v) => {
             const Icon = VIEW_ICONS[v.id];
@@ -71,18 +79,19 @@ export default function SiteHeader() {
                   "flex items-center gap-1.5 h-9 py-1.5 px-2.5 rounded-btn no-underline",
                   "text-muted-foreground hover:text-foreground hover:bg-wash-soft",
                   "transition-colors duration-150 motion-reduce:transition-none",
-                  "pointer-coarse:min-h-11 pointer-coarse:min-w-11 max-[640px]:justify-center",
+                  "pointer-coarse:min-h-11 pointer-coarse:min-w-11 max-[1299px]:justify-center",
                   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
                 )}
               >
                 <Icon aria-hidden className="size-4 flex-none" />
-                <span className="text-label max-[640px]:sr-only">{v.name}</span>
+                <span className="text-label max-[1299px]:sr-only">{v.name}</span>
               </NetLink>
             );
           })}
         </nav>
-        <span className="w-px self-stretch bg-border my-1" />
-        <ThemeToggle />
+        <div className="flex items-center justify-self-end">
+          <ThemeToggle />
+        </div>
       </div>
       <ThemeController />
     </header>
