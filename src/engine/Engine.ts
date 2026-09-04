@@ -631,8 +631,8 @@ export class Engine {
     // — same policy row, same choreography, same parked fleet — while `store.mode` keeps naming
     // the view the reader returns to. Placeholder entries preserve every selection by design
     // (the flat-views rule in components/CLAUDE.md), so an about/close round trip clears
-    // nothing. "status" is arbitrary among the three flat rows: they share PLACEHOLDER_POLICY.
-    this.mode = s.docPage || s.docClosing ? "status" : s.mode;
+    // nothing. "soon" is the app's one flat placeholder row.
+    this.mode = s.docPage || s.docClosing ? "soon" : s.mode;
     this.filter = s.filter;
     this.cohortSel = s.cohort;
     // A cold doc boot arms the bare-stage hide; the frame loop applies it (no OUT phase runs).
@@ -658,8 +658,8 @@ export class Engine {
         // destination view's entry begin, with the fleet revealed AT THE GRIDS for the flight
         // (user, 2026-09-04: "location stays, it will be visible again for the next view to
         // use").
-        const eff = st.docPage || st.docClosing ? ("status" as Mode) : st.mode;
-        const prevEff = prev.docPage || prev.docClosing ? ("status" as Mode) : prev.mode;
+        const eff = st.docPage || st.docClosing ? ("soon" as Mode) : st.mode;
+        const prevEff = prev.docPage || prev.docClosing ? ("soon" as Mode) : prev.mode;
         if (eff !== prevEff) {
           if (!(st.docPage || st.docClosing)) this.globe.setFleetVisible(true);
           this.setMode(eff);

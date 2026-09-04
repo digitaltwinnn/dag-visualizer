@@ -8,9 +8,10 @@ import type { CohortSel, CompositionSel, FocusLevel } from "@/src/engine/domain/
 import type { ThemePref, Theme } from "@/src/theme/resolve";
 
 // The active view. `hyper`/`geo`/`ledger` all drive the 3D scene (every switch among them runs
-// the gather choreography); `status`/`transactions`/`staking` are flat scaffolded placeholders
-// (the canvas is hidden).
-export type Mode = "hyper" | "geo" | "ledger" | "status" | "transactions" | "staking";
+// the gather choreography); `soon` is THE one flat placeholder view (consolidated 2026-09-04 —
+// three separate soon modes said the same nothing three times; the Blueprint gallery inside it
+// still previews each coming feature).
+export type Mode = "hyper" | "geo" | "ledger" | "soon";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
 export type SelSlot = "network" | "node" | "snap" | "metaSnap" | "country" | "cohort" | "composition";

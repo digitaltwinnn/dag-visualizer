@@ -494,7 +494,14 @@ rails-lean with no visible way back.
   `components/views.ts` (name + slug + desc). The bar button, the route (`app/[view]` +
   sitemap read `ROUTED_VIEWS`), the footer link, the gather/entry choreography, boot staging
   and the URL bridge all follow from those homes.
-- A **placeholder view**: `Mode` union + a FLAT policy row + a slugless `VIEWS` entry.
+- **The placeholder is ONE view** ("soon", consolidated 2026-09-04 — three modes said the same
+  nothing three times): one dimmed "Coming soon" bar entry, one FLAT policy row, and the
+  Blueprint GALLERY inside it previews every coming feature (each keeping the mark it wore as a
+  bar button). A future placeholder is a gallery entry, not a Mode.
+- **The doc pages' bar home is the InfoMenu** (`topbar/InfoMenu.tsx`) — a circled-i popover in
+  the right control zone, one rank below the view switch on purpose ("views, but not at the same
+  level of importance"); rows are the footer DocToggles' own store toggles, `DOC_ICONS` in
+  icons.tsx their marks. Phone reaches the docs via the footer row instead.
 - A **doc page**: one `DOC_PAGES` entry (everything derives: type, paths, titles, docForPath),
   its component in `components/docs/` + one line in DocLayer's `DOC_COMPONENTS` map, a thin
   route file passing `doc`, a footer `DocToggle`. The engine's bare stage, both transition

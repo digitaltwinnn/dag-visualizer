@@ -48,9 +48,9 @@ export const VIEWS: readonly ViewDef[] = [
       "Live snapshot anchoring in 3D: watch each metagraph seal its ledger and anchor it into " +
       "the Constellation Network's global snapshots as they happen.",
   },
-  { id: "status", name: "Network", soon: true },
-  { id: "transactions", name: "Transactions", soon: true },
-  { id: "staking", name: "Staking", soon: true },
+  // ONE consolidated entry (user, 2026-09-04): three dimmed dead buttons spent bar width saying
+  // the same nothing — the generic soon view's Blueprint gallery names what is coming instead.
+  { id: "soon", name: "Coming soon", soon: true },
 ];
 
 /** The routed subset, in switch order — the pages under app/[view] and the sitemap read this. */

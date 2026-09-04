@@ -265,7 +265,7 @@ describe("retargeting", () => {
 describe("is3D", () => {
   it("narrows the three scene views and rejects the flat placeholders", () => {
     expect(["hyper", "geo", "ledger"].every(is3D)).toBe(true);
-    expect(["status", "transactions", "staking"].some(is3D)).toBe(false);
+    expect(is3D("soon")).toBe(false);
   });
 });
 

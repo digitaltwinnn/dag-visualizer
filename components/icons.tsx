@@ -3,9 +3,8 @@ import {
   Globe,
   Layers,
   Layers2,
-  Radar,
-  ArrowLeftRight,
-  HandCoins,
+  CircleDashed,
+  SwatchBook,
   Info,
   Telescope,
   Box,
@@ -26,6 +25,7 @@ import {
 } from "lucide-react";
 import type { NetworkId } from "@/src/engine/config";
 import type { Mode } from "@/src/store/store";
+import type { DocPage } from "@/components/views";
 import type { PickDescriptor } from "@/src/data/types";
 
 // ONE source of truth for the interface's VOCABULARY glyphs — each view kind → its lucide icon.
@@ -38,11 +38,10 @@ export const VIEW_ICONS: Record<Mode, LucideIcon> = {
   hyper: Orbit,
   geo: Globe,
   ledger: Layers,
-  // Radar (not Activity — user refinement): instrument character for the Network status view;
-  // Activity's ECG zigzag also echoed the brand EcgMark sitting two regions left in the same bar.
-  status: Radar,
-  transactions: ArrowLeftRight,
-  staking: HandCoins,
+  // The one consolidated placeholder view: a dashed circle — not yet formed, the same dashed
+  // grammar the Blueprint wireframes speak. The coming features' own marks (Radar,
+  // ArrowLeftRight, HandCoins) moved into the Blueprint gallery that previews them.
+  soon: CircleDashed,
 };
 
 // The view explainer ("About") card's own mark (user-confirmed): it is not a view SUBJECT, so it
@@ -50,6 +49,15 @@ export const VIEW_ICONS: Record<Mode, LucideIcon> = {
 // the open book reads as noise; the circled i is the universal "about" mark and stays crisp).
 // Used in the left dock tray and anywhere the About card kind needs an icon.
 export const ABOUT_ICON: LucideIcon = Info;
+
+/** The DOC PAGES' marks (the bar's InfoMenu + anywhere a doc page needs a glyph): About wears
+ *  the ABOUT card's own circled-i — one concept, one mark — and Design the swatch book (the
+ *  token-reference metaphor; deliberately not Palette, whose paint-dab reads artist rather than
+ *  system). */
+export const DOC_ICONS: Record<DocPage, LucideIcon> = {
+  about: Info,
+  design: SwatchBook,
+};
 
 // The left-rail TOOL cards' ONE mark (GeoExplore, LedgerPanel — user decision: the SAME standard
 // icon in every view; an earlier per-view icon split read as neither exploring nor

@@ -12,6 +12,7 @@ import PulseStrip from "@/components/topbar/PulseStrip";
 import EcgMark from "@/components/topbar/EcgMark";
 import PresentationToggle from "@/components/topbar/PresentationToggle";
 import ThemeToggle from "@/components/topbar/ThemeToggle";
+import InfoMenu from "@/components/topbar/InfoMenu";
 import NetworkSwitch, { NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { VIEWS } from "@/components/views";
@@ -356,6 +357,14 @@ export default function TopBar() {
             render twice (bar + open strip) at once. */}
         <div className="contents max-[700px]:hidden">
           <ThemeToggle />
+        </div>
+
+        {/* Pages — the doc overlay's quiet bar home (InfoMenu: About/Design as a circled-i
+            popover). One rank below the view switch on purpose — they are views, but not at the
+            views' level of importance (user, 2026-09-04). Phone reaches the docs via the
+            footer's own row instead. */}
+        <div className="contents max-[700px]:hidden">
+          <InfoMenu />
         </div>
 
         {/* Network switch — the RIGHT edge of the bar, one past the presentation toggle: the

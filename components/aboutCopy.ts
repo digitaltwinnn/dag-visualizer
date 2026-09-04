@@ -281,22 +281,13 @@ export const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string
       "How often a network anchors differs, and so do the size and the kind of information it anchors. Those differences are what make each network unique.",
     ],
   },
-  status: {
-    title: "How healthy the network is",
+  soon: {
+    title: "What is coming next",
     eyebrow: "About",
     caption: "SOON",
-    lines: ["Stay tuned."],
-  },
-  transactions: {
-    title: "What transactions happen",
-    eyebrow: "About",
-    caption: "SOON",
-    lines: ["Stay tuned."],
-  },
-  staking: {
-    title: "Who delegates to nodes",
-    eyebrow: "About",
-    caption: "SOON",
-    lines: ["Stay tuned."],
+    lines: [
+      "Three more views are on the way: network health, transactions between addresses, and delegated staking.",
+      "Each preview on this page sketches what its view will become. Nothing here shows live data yet.",
+    ],
   },
 };
