@@ -287,7 +287,6 @@ export const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string
     caption: "SOON",
     lines: [
       "Three more views are on the way: network health, transactions between addresses, and delegated staking.",
-      "Each preview on this page sketches what its view will become. Nothing here shows live data yet.",
     ],
   },
 };
