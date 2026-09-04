@@ -319,9 +319,12 @@ The request rides one store channel, `focusRung: { level } | null` (an OBJECT, s
 rung is a fresh reference the Engine's `!==` bridge sees), and `Engine._resolveFocus(from?)` starts its
 existing ladder walk at that named rung instead of the finest. No second camera path.
 
-**View entry is scene-first**: arriving in a view starts the ladder collapsed, held through the
-transition's ancestry re-derive by a grace window, with both live-advancing ordinals guarded in the
-selection key so heartbeats never materialize a card. Conversely **the heartbeat is felt on closed
+**Expanded state survives a view switch** (user, 2026-09-04 — reversing 2026-08-08's scene-first
+collapse: with rung heights easing, the collapse-and-reopen cycle WAS the "card size jumps between
+views"): a switch is arrival machinery, not a selection moment, so the +/− overrides hold through
+the mode change and its grace window, and only a post-window selection change resets them to the
+only-the-focus-rung-open default. Both live-advancing ordinals stay guarded in the selection key so
+heartbeats never materialize a card. Conversely **the heartbeat is felt on closed
 cards**: both snapshot asides carry the beating dot and are the same tap-to-follow toggle, but **only
 one of them owns the clock.** The global aside ticks a `live · Xs` counter (the shown snapshot's age,
 never overstating); the metagraph aside says **`anchored to N`** whenever the card above already shows

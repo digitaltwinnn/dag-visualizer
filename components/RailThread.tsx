@@ -279,7 +279,13 @@ export default function RailThread({
     const ro = new ResizeObserver(schedule);
     ro.observe(rail);
     const mo = new MutationObserver(schedule);
-    mo.observe(rail, { childList: true, subtree: true });
+    // `attributes: style` joined childList for HeightEase (2026-09-04): a rung's height ease
+    // writes inline style twice (pin, clear) and WAAPI itself mutates nothing — in a rail at
+    // max-height the box never resizes, so without these two signals the dots measured at the
+    // swap frame and stayed there while the cards eased away underneath (the "thing that
+    // moved fires no event" family this file keeps records of). During the ease itself the
+    // rail's own ResizeObserver covers the content-height case frame by frame.
+    mo.observe(rail, { childList: true, subtree: true, attributes: true, attributeFilter: ["style"] });
     // The rails' own offsets ride tokens on the ROOT (`--topbar-extra`, `--bottom-reserve`), and
     // every one of them is set through `documentElement.style` — so one attribute filter covers
     // each thing that can move a rail without resizing it.

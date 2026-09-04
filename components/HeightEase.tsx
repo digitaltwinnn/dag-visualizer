@@ -17,21 +17,40 @@ import { useLayoutEffect, useRef, type ReactNode } from "react";
 // the ease keeps arriving content from painting past the box, with a clip margin so nearby
 // bleeds (a card's own padding) survive; at rest the style is cleared entirely.
 //
-// ⚠️ Wrap the CONTENT that changes, not a card or a slab member: the ladder's own geometry
-// (seams, corners, the box) deliberately does not animate, and a collapse must stay a snap —
-// mounting this INSIDE a `!collapsed` gate keeps it that way (the wrapper unmounts with the
-// body it measures).
+// IT WRAPS EVERY LADDER RUNG (user, 2026-09-04, "yes" to the whole pile): expand, collapse,
+// ghost↔populated and fact redistribution all ease, and the pile follows continuously. The
+// slab's "nothing animates" note is amended to GEOMETRY (seams, corners, washes — still
+// static); heights ease. Reduced motion still snaps everything, so that guarantee holds.
+//
+// ⚠️ FOLLOW, DON'T FIGHT: the pile already has animators — the pager pins and eases heights
+// through a sibling slide, Radix disclosures run .disclose-panel inside card bodies. Their
+// tell is CADENCE: an inner animator resizes the content EVERY FRAME, while the snap this
+// component exists for is one discrete change after quiet. Successive measurements closer
+// than RAPID_MS are treated as someone else's animation — the running ease (if any) cancels,
+// styles clear, and the box follows its content natively until the churn goes quiet.
+const RAPID_MS = 200;
+
 export default function HeightEase({ children }: { children: ReactNode }) {
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const anim = useRef<Animation | null>(null);
   const last = useRef(-1);
+  const lastAt = useRef(0);
   useLayoutEffect(() => {
     const o = outer.current!;
     const i = inner.current!;
     const ro = new ResizeObserver(() => {
       const h = i.offsetHeight;
       if (last.current < 0 || h === last.current) {
+        last.current = h;
+        return;
+      }
+      const now = performance.now();
+      const rapid = now - lastAt.current < RAPID_MS;
+      lastAt.current = now;
+      if (rapid) {
+        // An inner animator owns this change — adopt and stand down (cancel clears styles).
+        anim.current?.cancel();
         last.current = h;
         return;
       }
