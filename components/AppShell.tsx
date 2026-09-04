@@ -71,7 +71,12 @@ export default function AppShell({ doc }: { doc?: DocPage }) {
           </BootFade>
         }
       >
-        <Blueprint />
+        <DocGate>
+          {/* The gallery is scene furniture — a doc overlay stands it down like the rails
+              (user, 2026-09-04: opening a doc from the soon view left the gallery showing
+              through the bare stage). */}
+          <Blueprint />
+        </DocGate>
         <BootOverlay />
         {/* The subject callout lives INSIDE the shell (user, 2026-08-16 — it painted over the
             rail cards): its z-[5] must compete in the SAME stacking context as the rails' z-10,

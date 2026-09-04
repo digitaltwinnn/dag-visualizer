@@ -44,13 +44,19 @@ export default function RouteSync() {
 
   useEffect(() => {
     let fromPop = false;
+    // The last VIEW path this bridge published (or landed on) — the fallback when the store's
+    // current surface has no path of its own: closing a doc while the routeless "soon" view is
+    // behind it must not leave the doc's URL standing (a reload would reopen the document).
+    let lastViewPath = pathForMode(useStore.getState().mode) ?? "/";
 
     const unsub = useStore.subscribe((state, prev) => {
       if (state.mode === prev.mode && state.docPage === prev.docPage) return;
       const view = VIEWS.find((v) => v.id === state.mode);
       document.title = state.docPage ? DOC_TITLES[state.docPage] : view ? viewTitle(view.name) : document.title;
       if (fromPop) return;
-      const path = state.docPage ? DOC_PATHS[state.docPage] : pathForMode(state.mode);
+      const modePath = pathForMode(state.mode);
+      if (modePath) lastViewPath = modePath;
+      const path = state.docPage ? DOC_PATHS[state.docPage] : (modePath ?? lastViewPath);
       if (path && path !== location.pathname) {
         history.pushState(null, "", path + location.search);
       }
