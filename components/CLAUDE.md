@@ -524,6 +524,12 @@ rails-lean with no visible way back.
   the reserve, which also folds the footer tuck). TopBar hides its scene-action controls
   (filter, presentation) while a doc is open; `setMode` closes any open doc by design. The
   /design specimen's generic hue is allowlisted in `noHardcodedColors.test.ts`.
+  **The doc's edge rulers are `RailThread standalone`** — the SAME component, deriving its x
+  from `--rail-margin` instead of measuring the (unmounted) rail columns, rendering ruler +
+  identity spine with no card marks; DocLayer keys its `signal` prop on the RISEN document so
+  the travelling switch-pulse plays on each arrival. Two wrong cuts preceded it the same day
+  (column-flanking spans; an `.ig-sheet-edge` reuse whose comb pointed the wrong way) — the
+  rails belong at the VIEW edges, drawn by the one existing instrument, never re-built.
 - **The footer is a full-width strip, one row, one separator species (the mid-dot)**: view links
   (`FooterViewLinks`, store-committed) · About · Design (store toggles via `DocToggle`) ·
   Source code (octocat) · Constellation (the $DAG mark + siteUrl via `metagraphById("dag")`).

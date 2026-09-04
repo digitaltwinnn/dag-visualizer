@@ -77,7 +77,21 @@ type Mark = { y: number; inset: number; focus: boolean; ghost: boolean; entry: b
 // SVG box shrink back to `W` (the funnel needed a REACH_PAD widening on the lane side, because
 // the top/bottom fade MASK clips to the element box and ink outside it draws at alpha 0).
 
-export default function RailThread({ side = "right" }: { side?: Side }) {
+// STANDALONE MODE (2026-09-04): the doc overlay wants this same instrument at the view's edges
+// (user: "the rails should just sit at the edge of the view like any other view … this should be
+// an existing component, not a guess and/or duplication") — but DocGate unmounts the rail columns
+// this component normally measures. `standalone` renders the ruler + identity spine + pulse with
+// NO card marks (there are no cards), deriving its x from the same facts the rails' own CSS uses:
+// `--rail-margin` places the column, and the thread sits in the gutter outside it (right → at the
+// rail's right edge; left → W to the left of its left edge — the mirror of the measured branch).
+// It mounts OUTSIDE the shell, so viewport units are its local units and no `k` rescale applies.
+// `signal` folds an extra subject into the pulse key so a host can play the view-switch pulse on
+// its own arrivals (DocLayer keys it on the risen document).
+export default function RailThread({
+  side = "right",
+  standalone = false,
+  signal = "",
+}: { side?: Side; standalone?: boolean; signal?: string }) {
   const filter = useStore((s) => s.filter);
   const mode = useStore((s) => s.mode);
   // The accent may be a hex (a committed metagraph) OR a var() (all → --primary, unlisted →
@@ -95,12 +109,27 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
   // on the identity spine (the recipe is HTML/CSS, so it rides a fixed wrapper rather than the
   // SVG). ONE combined subject key: a simultaneous mode+filter change is a single key change →
   // one pulse (and the hook's PULSE_MS debounce keeps rapid back-to-back changes calm).
-  const pulseKey = useEdgePulse(`${mode}|${filter}`);
+  const pulseKey = useEdgePulse(`${mode}|${filter}|${signal}`);
 
   const { W } = GEOM[side];
   const railId = side === "right" ? "rightcol" : "leftcol";
 
   useEffect(() => {
+    // Standalone: no rail to measure, no marks to place — the geometry is the tokens' own.
+    // `--rail-margin` is a plain px token (globals.css :root), so parseFloat is exact.
+    if (standalone) {
+      const measure = () => {
+        const margin =
+          parseFloat(
+            getComputedStyle(document.documentElement).getPropertyValue("--rail-margin"),
+          ) || 26;
+        const left = side === "right" ? window.innerWidth - margin : margin - W;
+        setG({ top: 0, left, height: window.innerHeight, marks: [] });
+      };
+      measure();
+      window.addEventListener("resize", measure);
+      return () => window.removeEventListener("resize", measure);
+    }
     const rail = document.getElementById(railId);
     if (!rail) return;
     let raf = 0;
@@ -267,7 +296,7 @@ export default function RailThread({ side = "right" }: { side?: Side }) {
       rail.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
     };
-  }, [railId, side, W]);
+  }, [railId, side, W, standalone]);
 
   if (!g || g.height <= 0) return null;
   const H = g.height;

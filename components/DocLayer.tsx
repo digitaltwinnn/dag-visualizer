@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { DOC_ROLL } from "@/src/engine/domain/viewTransition";
 import { DOC_PAGES, type DocPage } from "@/components/views";
+import RailThread from "@/components/RailThread";
 
 // THE DOC OVERLAY (2026-09-04, user: "keep the background AND don't reboot the whole scene").
 // /about and /design render as a scrollable document layer on the scene's BARE STAGE — while a
@@ -70,6 +71,10 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
   // is in the HTML regardless of its starting opacity.
   const [render, setRender] = useState<DocPage | null>(initial);
   const [visible, setVisible] = useState(false);
+  // The document that has RISEN — the doc rails' pulse subject (see their mount below): it
+  // changes exactly when a document arrives on screen, so the rails play the view-switch pulse
+  // at that moment and not during a roll-out.
+  const [arrived, setArrived] = useState<DocPage | null>(null);
   const stageReady = useStore((s) => s.docStageReady);
   const exitT = useRef<ReturnType<typeof setTimeout> | null>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -85,10 +90,15 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
     // DOUBLE rAF before the rise: a single one fires before the mounted-hidden state has ever
     // been painted (rAF callbacks run ahead of that frame's style/paint), so the class flip
     // coalesced and the rise snapped — measured opacity 1 at 150ms.
-    const rise = () => {
+    const rise = (p: DocPage) => {
       rafs.current.push(
         requestAnimationFrame(() => {
-          rafs.current.push(requestAnimationFrame(() => setVisible(true)));
+          rafs.current.push(
+            requestAnimationFrame(() => {
+              setVisible(true);
+              setArrived(p);
+            }),
+          );
         }),
       );
     };
@@ -105,7 +115,7 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
           setRender(page);
           // The container survives the swap, so the old document's scroll would too.
           box.current?.scrollTo(0, 0);
-          rise();
+          rise(page);
         }, ROLL_MS);
         return clearPending;
       }
@@ -113,13 +123,14 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
       // Hold the entrance until the ENGINE says the stage is bare (docStageReady — true by
       // default, false only while a live scene's gather is playing under this document).
       if (!stageReady) return clearPending;
-      rise();
+      rise(page);
       return clearPending;
     }
     setVisible(false);
     exitT.current = setTimeout(() => {
       exitT.current = null;
       setRender(null);
+      setArrived(null);
       // The roll-out finished — release the engine's held stage (the entry begins now).
       useStore.getState().setDocClosing(false);
     }, ROLL_MS);
@@ -143,13 +154,26 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
   if (!render) return null;
   const Doc = DOC_COMPONENTS[render];
   return (
-    // The scroll viewport: html/body are overflow:hidden for the fixed-canvas app, so the
-    // document scrolls in its own fixed box. z-[8]: over the canvas and the (stood-down) HUD,
-    // under the footer strip (z-10) and the command bar (z-40), both of which stay live chrome.
-    // NO VEIL of its own (user, 2026-09-04 — the background-mix read "brownish"): the engine's
-    // bare stage IS the ground, and the panels' glass sits straight on it. pointer-events gate
-    // off during the exit fade so a leaving document can't eat the scene's first clicks.
-    <div
+    <>
+      {/* THE DOC'S RAILS ARE THE APP'S OWN RULERS (user, 2026-09-04 — "the rails should just
+          sit at the edge of the view like any other view … an existing component, not a guess
+          and/or duplication"): the SAME RailThread the desktop rails carry, in standalone mode
+          (no rail columns to measure while DocGate has them down, so no card marks — ruler +
+          identity spine only, at the exact x the measured branch computes). Mounted OUTSIDE the
+          rolling container: the rails are view furniture, not document text, so they hold the
+          edges through a doc→doc roll exactly as the desktop threads hold through a view
+          switch — and they swap in the same frame DocGate swaps the desktop ones out, so the
+          instrument reads as never leaving. `signal` keys the travelling switch-pulse to each
+          document's ARRIVAL (the risen page), the effect the rails play on every view change. */}
+      <RailThread side="left" standalone signal={arrived ?? ""} />
+      <RailThread side="right" standalone signal={arrived ?? ""} />
+      {/* The scroll viewport: html/body are overflow:hidden for the fixed-canvas app, so the
+          document scrolls in its own fixed box. z-[8]: over the canvas and the (stood-down) HUD,
+          under the footer strip (z-10) and the command bar (z-40), both of which stay live chrome.
+          NO VEIL of its own (user, 2026-09-04 — the background-mix read "brownish"): the engine's
+          bare stage IS the ground, and the panels' glass sits straight on it. pointer-events gate
+          off during the exit fade so a leaving document can't eat the scene's first clicks. */}
+      <div
       ref={box}
       className={cn(
         "fixed inset-0 z-[8] overflow-y-auto overscroll-contain slim-scroll",
@@ -179,14 +203,6 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
             "color-mix(in oklch, var(--background) 70%, transparent) 55%, transparent 100%)",
         }}
       />
-      {/* ⚠️ DOC RAILS: WANTED, NOT YET BUILT RIGHT (user, 2026-09-04). Two cuts were removed
-          the same day: column-flanking spans (rails belong at the VIEW edges), then a reuse of
-          .ig-sheet-edge (its tick comb is oriented for a SHEET's geometry — it pointed the
-          wrong way here, "a guess and/or duplication"). The real build: extract the vertical
-          ruler into ONE shared primitive that RailThread, the sheet edges and this layer all
-          consume — a scoped task of its own, since RailThread hard-requires the rail columns
-          this state unmounts. Until then the docs stand without edge rulers rather than with
-          wrong ones. */}
       <div className={DOC_COLUMN}>
         <Doc />
       </div>
@@ -204,7 +220,8 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
         onClick={() => setDocPage(null)}
       >
         <X aria-hidden />
-      </Button>
-    </div>
+        </Button>
+      </div>
+    </>
   );
 }
