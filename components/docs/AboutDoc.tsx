@@ -80,19 +80,27 @@ export default function AboutDoc() {
         what is actually happening right now: real nodes, real locations, real activity.
       </p>
 
-      {/* The honesty rule, stated as the product's one promise. It earns a panel because it is
-          the claim everything else on the page rests on. */}
+      {/* The live-data promise, stated POSITIVELY (user, 2026-09-04: "nothing is made up"
+          answers an assumption no reader arrived with — just say we use live data) — and merged
+          with the old "Where the data comes from" section, which this panel replaces. It earns
+          a panel because it is the claim everything else on the page rests on. */}
       <Panel className="mt-6 py-4 px-5">
-        <Eyebrow>The one rule</Eyebrow>
+        <Eyebrow>Live data</Eyebrow>
         <p className="mt-2 text-base text-foreground leading-relaxed">
-          What you see is what the network is actually doing, right now. Every number comes
-          straight from the network itself — nothing is estimated, and nothing is made up to
-          look complete.
+          Everything on screen is live. The visualizer reads the Constellation Network&apos;s own
+          public endpoints — the global snapshot stream, each metagraph&apos;s cluster, each
+          node&apos;s status — and draws what comes back, as it comes in.
         </p>
         <p className="mt-2 text-label text-muted-foreground leading-relaxed">
-          When some information can&apos;t be reached for a moment, the screen simply says so —
+          Node locations come from their public internet addresses, so they are accurate to a
+          city and a hosting provider, not to a street. There is no database behind this site:
+          the page keeps a short memory of recent snapshots while it is open, and forgets it
+          when you close the tab.
+        </p>
+        <p className="mt-2 text-label text-muted-foreground leading-relaxed">
+          When something can&apos;t be reached for a moment, the screen simply says so —
           you&apos;ll see a small label like <span className="font-mono">NO SIGNAL</span> instead
-          of a number we don&apos;t really have.
+          of a number.
         </p>
         {/* ⚠️ THE ARCS ARE THE ONE EXCEPTION AND THE PAGE MUST SAY SO (2026-08-12). The geo blurb
             below used to promise "live traffic travelling between them" — `domain/arcSim.ts` is a
@@ -160,20 +168,6 @@ export default function AboutDoc() {
           the privilege. Metagraphs snapshot independently of each other and faster than the
           global layer, so a single global tick can carry anywhere from one to a hundred of
           them.
-        </p>
-      </Section>
-
-      <Section id="data" title="Where the data comes from">
-        <p>
-          Everything on screen is read from Constellation&apos;s own public endpoints: the
-          global snapshot stream, each metagraph&apos;s cluster info, and each node&apos;s
-          status. Node locations come from geolocating their public IP addresses, so
-          they are accurate to a city and a hosting provider, not to a street.
-        </p>
-        <p>
-          There is no database behind this site and no account to create. The page holds a
-          rolling window of recent snapshots in memory while it is open, and forgets it when
-          you close the tab.
         </p>
       </Section>
 
