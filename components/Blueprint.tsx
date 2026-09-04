@@ -130,13 +130,14 @@ export default function Blueprint() {
     // headings overlapped the grids AND the new ticker legend). The bottom edge
     // clears the footer strip plus a breather (user, same day: "the staking text almost
     // touches the bottom bar").
-    // overflow-y-auto + my-auto (not justify-center): when the columns wrap on a narrow
-    // viewport the content grows past the box, and flex-centering makes the overflowing top
-    // unreachable — it poked the headings up into the staging band (user, 2026-09-04). The
-    // inner wrapper's my-auto centres it whenever it fits and scrolls honestly when it doesn't;
-    // pointer-events on for the scroll (the flat view has nothing pickable behind).
+    // overflow-y-auto + a TOP-ANCHORED wrapper (mb-auto): when the columns wrap on a narrow
+    // viewport the content grows past the box, and flex-centering made the overflowing top
+    // unreachable — and even when it fit, centring left "a huge gap from the top" (user,
+    // 2026-09-04): 38vh IS the band's bottom, so the eyebrow belongs snug under it, not
+    // floated mid-void. Scrolls honestly when it doesn't fit; pointer-events on for the
+    // scroll (the flat view has nothing pickable behind).
     <figure id="blueprint" className="fixed inset-x-0 top-[38vh] bottom-[calc(var(--footer-h,0px)+16px)] z-[6] flex flex-col items-center overflow-y-auto overscroll-contain px-6">
-      <div className="my-auto flex flex-col items-center gap-8 py-2">
+      <div className="mb-auto flex flex-col items-center gap-8 py-2">
       <span className="text-label tracking-caps uppercase [color:color-mix(in_oklch,var(--primary)_80%,#fff)] opacity-[0.85]">
         preview · in development
       </span>
