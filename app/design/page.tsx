@@ -240,7 +240,10 @@ export default function DesignPage() {
           <Section title={<>Command marks — <code className="font-mono text-[0.85em]">EcgMark</code> + <code className="font-mono text-[0.85em]">Odometer</code></>}>
             <Note>
               The command bar is spineless — its identity cue is the ECG heartbeat (the one cyan
-              pulse; the whole HUD&apos;s tempo family beats at 1.5s). Numbers that tick (vitals, the
+              pulse; the whole HUD&apos;s tempo family beats on{" "}
+              <code className="font-mono">--tempo-beat</code>, transient signals on{" "}
+              <code className="font-mono">--tempo-signal</code> — globals.css&apos;s tempo tokens).
+              Numbers that tick (vitals, the
               snapshot ordinal) roll on the <code className="font-mono">Odometer</code> rather than
               snapping. Both shown live below via the real components.
             </Note>

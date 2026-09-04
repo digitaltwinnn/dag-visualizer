@@ -110,7 +110,7 @@
   content: ""; position: absolute; inset: 0; opacity: 0;
   background: linear-gradient(to bottom,
     transparent 0, var(--pulse-hue) 14%, var(--pulse-hue) 86%, transparent 100%);
-  animation: edge-line-fade 1.2s ease both;
+  animation: edge-line-fade var(--tempo-signal) ease both;
 }
 /* THE PAGER GHOST — the outgoing card during a RailPager slide (`RailPager.commitStep`).
    ⚠️ A CSS RULE, NOT INLINE STYLE, and the reason is `::before`. `cloneNode(true)` copies class
@@ -188,7 +188,7 @@
   background: linear-gradient(to bottom,
     transparent 0, var(--pulse-hue) 30%, var(--pulse-hue) 70%, transparent 100%);
   filter: drop-shadow(0 0 6px var(--pulse-hue));
-  animation: edge-pulse-sweep 1.2s ease;
+  animation: edge-pulse-sweep var(--tempo-signal) ease;
 }
 @keyframes edge-pulse-sweep {
   0%   { top: calc(-1 * var(--pulse-len, 64px)); opacity: 0; }
@@ -782,6 +782,21 @@
   --rail-fade: 28px;       /* height of a clipped rail's bottom fade — AND its scroll runway
                               (globals `.rail-clip` + RailScroll's measure read this one token) */
 
+  /* ── The tempo family — the HUD's three shared clocks (2026-09-04) ───────────
+     One home for the rhythms the design grammar names, so retuning the app's pulse is one edit:
+       --tempo-beat   · the 1.5s heartbeat every steady "alive" mark shares (ECG scan, filter
+                        dot, boot core breathe, the state atoms' twinkle/standby);
+       --tempo-signal · the ~1.2s transient-signal clock (the edge pulse's sweep + fade — the
+                        title roll-in it syncs with keeps its own 0.4s roll INSIDE this window);
+       --tempo-roll   · the 0.4s odometer/title roll.
+     The 150ms disclosure clock is deliberately NOT a token: it is the chevron's `duration-150`
+     in JSX (see .disclose-panel's header) — a CSS-side token would claim a single home the JSX
+     half wouldn't read, which is worse than the documented pairing. Engine/GSAP clocks (0.55s
+     depth, ~3.9s choreography) are frame-driven and live in their own modules. */
+  --tempo-beat: 1.5s;
+  --tempo-signal: 1.2s;
+  --tempo-roll: 0.4s;
+
   /* ── Instrument-thread ruler spec (the ONE shared source) ─────────────────────
      Both rails' SVG threads (RailThread.tsx) and the bar-chart axis read identically:
      a neutral base line with ruler hairlines — short marks, every 4th longer + brighter.
@@ -1045,7 +1060,7 @@
   /* Uppercase-caps tracking — the merged 0.12/0.13/0.14em eyebrow/label cluster. */
   --tracking-caps: 0.13em;
 
-  --animate-breathe: breathe 1.5s ease-in-out infinite;
+  --animate-breathe: breathe var(--tempo-beat) ease-in-out infinite;
 }
 
 /* On the phone the footer RIDES ABOVE the dock as overlay chrome (SiteFooter.tsx, 2026-08-31 —
@@ -1070,12 +1085,12 @@
 @layer components {
   .odometer { position: relative; display: inline-grid; overflow: hidden; line-height: 1.1; }
   .odometer > span { grid-area: 1 / 1; }
-  .odometer-in  { animation: odo-in  0.4s ease-out; }
-  .odometer-out { animation: odo-out 0.4s ease-out forwards; }
+  .odometer-in  { animation: odo-in  var(--tempo-roll) ease-out; }
+  .odometer-out { animation: odo-out var(--tempo-roll) ease-out forwards; }
   /* A whole-value "roll" for TEXT card-headers (node id, metagraph name) — the same upward roll
      the Odometer uses for numeric values, so every card's header transitions in one language on a
      new subject. Triggered by a changing React `key` (the element re-mounts and plays it). */
-  .roll-in { display: inline-block; animation: odo-in 0.4s ease-out; }
+  .roll-in { display: inline-block; animation: odo-in var(--tempo-roll) ease-out; }
 }
 @media (prefers-reduced-motion: reduce) {
   .odometer-in, .odometer-out, .roll-in { animation: none; }
@@ -1091,7 +1106,7 @@
   .ecg-scan {
     stroke-dasharray: 16 84;
     filter: drop-shadow(0 0 4px color-mix(in oklch, var(--primary) 85%, transparent));
-    animation: ecg-scan 1.5s linear infinite;
+    animation: ecg-scan var(--tempo-beat) linear infinite;
   }
 }
 @keyframes ecg-scan {
@@ -1109,7 +1124,7 @@
   50%      { transform: scale(1.28); opacity: 1; }
 }
 @theme inline {
-  --animate-dot-beat: dot-beat 1.5s ease-in-out infinite;
+  --animate-dot-beat: dot-beat var(--tempo-beat) ease-in-out infinite;
 }
 
 /* ── State atoms (components/state/StateAtoms.tsx + BootOverlay.tsx) — ACQUIRING twinkle, NO
@@ -1127,7 +1142,7 @@
 @keyframes st-standby-node { 0%, 100% { opacity: 0.58; transform: scale(1); } 50% { opacity: 1; transform: scale(1.09); } }
 @keyframes st-standby-halo { 0% { transform: scale(1); opacity: 0.52; } 100% { transform: scale(3.6); opacity: 0; } }
 @theme inline {
-  --animate-st-twinkle: st-twinkle 1.5s ease-in-out infinite;
+  --animate-st-twinkle: st-twinkle var(--tempo-beat) ease-in-out infinite;
   /* Same fade, two durations: the ACQUIRING value resolve-in (0.35s) vs the boot overlay's own
      entrance (0.4s) — kept as separate theme vars over one shared keyframe. */
   --animate-resolve-in: st-fade-in 0.35s ease both;
@@ -1140,7 +1155,7 @@
      by remounting via `key`) vs the boot overlay's continuous ping while reaching the network. */
   --animate-st-sonar: st-sonar 1.4s ease-out 1 forwards;
   --animate-boot-ping: st-sonar 1.6s ease-out infinite;
-  --animate-st-standby-node: st-standby-node 1.5s ease-in-out infinite;
+  --animate-st-standby-node: st-standby-node var(--tempo-beat) ease-in-out infinite;
   --animate-st-standby-halo: st-standby-halo 1.6s ease-out infinite;
   /* The boot core's armillary shells — the hoops the hypergraph's Global L0 core actually wears,
      prefigured while the feed is still connecting, so the overlay reads as the thing it becomes
