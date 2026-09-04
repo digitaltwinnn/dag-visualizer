@@ -226,14 +226,19 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
       <div className={DOC_COLUMN}>
         {/* The text's own roll — the arrival's SECOND beat: it waits out the sheet's fade
             (delay = --tempo-doc-sheet), then rises on --tempo-doc-rise. The exit drops the
-            delay and rides the nav clock so sheet and text leave as one gesture. */}
+            delay and rides the nav clock so sheet and text leave as one gesture.
+            ⚠️ The entrance curve is NOT ease-out (user, 2026-09-04: doubling the duration
+            "looks just as fast" — ease-out lands most of the change in the first half-second
+            whatever the total, and 16px of travel hid the rest). A restrained-start bezier
+            plus 32px of travel keeps the motion VISIBLE through the window; the exit keeps
+            ease-out, where front-loading is exactly right. */}
         <div
           className={cn(
-            "transition ease-out motion-reduce:transition-none",
+            "transition motion-reduce:transition-none",
             visible
-              ? "duration-(--tempo-doc-rise) delay-(--tempo-doc-sheet)"
-              : "duration-(--tempo-nav) delay-0",
-            !visible && "opacity-0 translate-y-4",
+              ? "duration-(--tempo-doc-rise) delay-(--tempo-doc-sheet) ease-[cubic-bezier(.45,.05,.25,1)]"
+              : "duration-(--tempo-nav) delay-0 ease-out",
+            !visible && "opacity-0 translate-y-8",
           )}
         >
           <Doc />
