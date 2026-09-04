@@ -27,8 +27,7 @@ import type { DocPage } from "@/components/views";
 // SEO is unchanged by the overlay move: the /about route server-renders AppShell with
 // `doc="about"`, which reaches this component as `initial` — the prose is in that route's HTML
 // (client components server-render; the dynamic imports below default to SSR and only split the
-// chunks). A cold doc load shows the document immediately, with no entrance fade — it is
-// content, not an instrument.
+// chunks). A cold doc load fades in like any other appearance — one entrance, every path.
 //
 // The `initial` → store ADOPTION is the NetLink mount pattern: SSR and the first client render
 // draw from the prop (hydration sees no mismatch), one effect seeds the store and flips
@@ -53,10 +52,13 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
   const page = adopted ? stored : initial;
 
   // The fade machinery: `render` is what stays MOUNTED (held through the exit fade), `visible`
-  // drives the opacity. Opening mounts hidden and flips visible a frame later; closing flips
-  // hidden and unmounts on the nav clock. A cold doc load (initial set) starts visible.
+  // drives the opacity. EVERY appearance fades in on the gather clock — the cold doc load
+  // included (user, 2026-09-04: "fade in should work the same way"; it previously showed
+  // instantly): `visible` boots false even when the route seeded a page, and the mount effect
+  // flips it through the double-rAF like any in-app open. Crawlers are unaffected — the prose
+  // is in the HTML regardless of its starting opacity.
   const [render, setRender] = useState<DocPage | null>(initial);
-  const [visible, setVisible] = useState(initial != null);
+  const [visible, setVisible] = useState(false);
   const exitT = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (page) {
