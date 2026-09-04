@@ -97,17 +97,20 @@ export default function DesignDoc() {
           <h1 className="mt-3 text-3xl font-semibold tracking-[-0.01em] leading-tight">
             Instrument-Glass
           </h1>
+          {/* HUMAN VOICE (user, 2026-09-04 — the about-page rule reaches here too: "for humans to
+              read, not a technical brief"). The technical claims the old intro made still hold and
+              live where developers look: app/globals.css is the one token source, the swatches read
+              it live, and the specimens below render through the real components — which is exactly
+              what the second sentence promises the reader in plain words. */}
           <p className="mt-5 text-base text-foreground-dim leading-relaxed max-w-2xl">
-            The design system&apos;s tokens — the colour lanes and the type scale, read live from{" "}
-            <code className="font-mono">app/globals.css</code> and the palette generator, so every
-            value here is correct by construction.
+            This page shows the visual language the visualizer is built from — its colours, its
+            type, and the small signature elements you&apos;ll recognise from every corner of the
+            app.
           </p>
           <p className="mt-3 text-label text-muted-foreground leading-relaxed max-w-2xl">
-            The tokens are the durable, drift-proof part; below them are the app&apos;s signature
-            design elements — the card states and the signal language — shown via the REAL
-            components (not rebuilds), so they can&apos;t drift either. It is not a full component
-            gallery; component behaviour is verified against the running app, and{" "}
-            <code className="font-mono">app/globals.css</code> is the authoritative token source.
+            Nothing on it is a mock-up: everything here is drawn by the same styles and components
+            the app itself uses, so what you see on this page is always exactly what the app looks
+            like right now.
           </p>
 
           <Section title="Structural lane">
