@@ -13,9 +13,7 @@ import RailThread from "@/components/RailThread";
 import { RailShade } from "@/components/RailShade";
 import RailDock, { type TabSignal } from "@/components/RailDock";
 import { exploreCards } from "@/components/railCards";
-import RollSwap from "@/components/RollSwap";
 import { useBreakpoint } from "@/components/useBreakpoint";
-import type { Mode } from "@/src/store/store";
 
 // Per-view About copy: ONE home, components/aboutCopy.ts — shared with /about (2026-08-13).
 // Left control rail: the **explore/interact** zone. The global network filter lives in the
@@ -40,46 +38,41 @@ export default function ExploreRail() {
   // ONE source of truth for the hosted card set (railCards.ts): both the rail content AND the dock
   // tray are derived from the same manifest, so they can't disagree about which cards this view
   // hosts. `id` maps to the component to render; the manifest owns presence/order.
-  // BUILT FOR A GIVEN MODE, not the live one (RollSwap's contract): during a view switch the
-  // out-beat renders the OLD view's cards from its own key.
-  const contentFor = (m: Mode) => {
-    const manifest = exploreCards({ mode: m });
-    const renderCard: Record<string, ReactNode> = {
-      about: <AboutView {...ABOUT[m]} defaultCollapsed={bp === "phone"} />,
-      // Phone opens BOTH cards collapsed (user, 2026-09-03): the sheet becomes a compact chooser
-      // that the live content-fit sizes down, and one tap opens the list and grows the sheet.
-      tool:
-        m === "hyper" ? <HyperExplore defaultCollapsed={bp === "phone"} />
-        : m === "geo" ? <GeoExplore defaultCollapsed={bp === "phone"} />
-        : m === "ledger" ? <LedgerPanel defaultCollapsed={bp === "phone"} />
-        : null,
-    };
-    return (
-      <>
-        {manifest
-          .filter((c) => c.present)
-          .map((c) => (
-            <Fragment key={c.id}>{renderCard[c.id]}</Fragment>
-          ))}
-      </>
-    );
+  //
+  // THE NO-POP RULE READS PER CARD HERE, NOT PER STACK (user, 2026-09-04, second round: a
+  // stack-level RollSwap made "things that always exist disappear and re-appear" — the About
+  // card is one persistent instance across every view). The doc grammar at card scale instead:
+  // the About card's FRAME persists (React keeps the instance — no key), its title rolls and
+  // its body eases per view (AboutView's own keyed body); the TOOL is genuinely view-scoped
+  // (three different explorers, none on "soon"), so it swaps keyed with the house card
+  // materialize — no out-beat, so the slot is never held blank.
+  const manifest = exploreCards({ mode });
+  const renderCard: Record<string, ReactNode> = {
+    about: <AboutView {...ABOUT[mode]} defaultCollapsed={bp === "phone"} />,
+    // Phone opens BOTH cards collapsed (user, 2026-09-03): the sheet becomes a compact chooser
+    // that the live content-fit sizes down, and one tap opens the list and grows the sheet.
+    tool: (
+      <div key={`tool-${mode}`} className="flex-none animate-card-in motion-reduce:animate-none">
+        {mode === "hyper" ? <HyperExplore defaultCollapsed={bp === "phone"} />
+        : mode === "geo" ? <GeoExplore defaultCollapsed={bp === "phone"} />
+        : mode === "ledger" ? <LedgerPanel defaultCollapsed={bp === "phone"} />
+        : null}
+      </div>
+    ),
   };
-  // The no-pop swap (RollSwap — its header carries the rule): every host below shares this one
-  // wrapper, which replicates the hosts' own column-and-gap so the cards keep their rhythm one
-  // level down. `travel={false}` — the rail is RailThread's measured surface (see RollSwap's
-  // BootFade note); the arriving cards' own materialize + title rolls carry the motion.
   const content = (
-    <RollSwap
-      swapKey={mode}
-      render={contentFor}
-      travel={false}
-      className="flex flex-col gap-[var(--rail-gap)] flex-none min-h-0"
-    />
+    <>
+      {manifest
+        .filter((c) => c.present)
+        .map((c) => (
+          <Fragment key={c.id}>{renderCard[c.id]}</Fragment>
+        ))}
+    </>
   );
   // The dock's icon TRAY (tablet edge tab + phone dock half): the legend of what this sheet hosts,
   // straight from the manifest. The left cards are static tools (constant subjectKeys, no live
   // updates), so no `active` highlights / `updateKey` here — the tray stays a quiet legend.
-  const tray: TabSignal[] = exploreCards({ mode })
+  const tray: TabSignal[] = manifest
     .filter((c) => c.present)
     .map((c) => ({ id: c.id, icon: c.icon }));
   if (bp === "desktop") {

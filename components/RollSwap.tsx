@@ -24,13 +24,14 @@ import { cn } from "@/lib/utils";
 // the new view's content in the old view's clothes. A key change mid-swap restarts the out-beat
 // toward the LATEST key; intermediate keys are skipped, which is what a fast view-cycler wants.
 // The FIRST mount plays no entrance (the swap-count gate below) — boot staging is BootFade's
-// job, and two entrances would double-animate every card.
-//
-// `travel` (default true) adds the 8px rise. ⚠️ The LEFT RAIL passes travel={false} — BootFade's
-// own warning governs here too: RailThread measures card rects and a transform moves them with
-// no observer event to re-measure on, so the rail's swap is opacity-only and the motion comes
-// from the arriving cards' own materialize + title rolls. Reduced motion drops both animations
+// job, and two entrances would double-animate every card. Reduced motion drops both animations
 // (the 200ms sequencing hold survives, as it does on the doc — a hold is timing, not motion).
+//
+// ⚠️ THIS IS THE WHOLE-SET SWAP, for a surface whose content is fully view-scoped (the vitals
+// cells). A surface with a PERSISTENT resident reads the rule per card instead (user,
+// 2026-09-04: the rail's stack-level swap made "things that always exist disappear and
+// re-appear") — the explore rail keeps its About instance and keys only its body and its tool
+// card; see ExploreRail. `travel` (default true) adds the 8px rise.
 export const SWAP_OUT_MS = 200; // ⚠️ paired with the duration-[200ms] utility below — one file, keep together
 
 export default function RollSwap<K extends string>({

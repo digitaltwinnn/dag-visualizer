@@ -51,13 +51,24 @@ export default function AboutView({
           panel
           icon={ABOUT_ICON}
           title={title}
+          titleKey={title}
           eyebrow={eyebrow}
           caption={caption || undefined}
           collapsed={collapsed}
           onToggle={() => setCollapsed((c) => !c)}
         />
         {!collapsed && (
-          <div className="flex flex-col gap-2.5 px-4 pt-3 pb-3.5 overflow-y-auto">
+          // THE CARD STAYS, THE CONTENT EASES (user, 2026-09-04 — the doc grammar at card
+          // scale): this one instance survives every view switch, so the body is keyed on the
+          // view's own title and eases in with the title's roll. The 8px travel is inside the
+          // card — a descendant transform moves no card rect, so RailThread's measurement is
+          // untouched. On BOOT this rides inside the card's own materialize (one entrance
+          // visually — the body's fade finishes a beat after the frame's, which reads as the
+          // materialize completing, not as a second animation).
+          <div
+            key={title}
+            className="flex flex-col gap-2.5 px-4 pt-3 pb-3.5 overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-(--tempo-roll) ease-[cubic-bezier(.45,.05,.25,1)] motion-reduce:animate-none"
+          >
             {lines.map((l, i) => (
               <p
                 key={i}
