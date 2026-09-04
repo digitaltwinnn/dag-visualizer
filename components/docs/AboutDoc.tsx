@@ -1,7 +1,6 @@
 "use client";
 import { TriangleAlert, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useStore } from "@/src/store/store";
 import { VIEW_ICONS } from "@/components/icons";
 import { ABOUT } from "@/components/aboutCopy";
 
@@ -68,26 +67,6 @@ function Section({ id, title, children }: { id: string; title: string; children:
   );
 }
 
-// The overlay's way back into the scene: a real link (middle-click keeps working) whose plain
-// click closes the doc layer instead of navigating — a navigation would reboot the engine that
-// is literally rendering behind this text.
-function CloseIntoScene({ className, children }: { className?: string; children: React.ReactNode }) {
-  const setDocPage = useStore((s) => s.setDocPage);
-  return (
-    <a
-      href="/"
-      className={className}
-      onClick={(e) => {
-        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
-        e.preventDefault();
-        setDocPage(null);
-      }}
-    >
-      {children}
-    </a>
-  );
-}
-
 export default function AboutDoc() {
   return (
     <article className="pt-14">
@@ -106,13 +85,14 @@ export default function AboutDoc() {
       <Panel className="mt-6 py-4 px-5">
         <Eyebrow>The one rule</Eyebrow>
         <p className="mt-2 text-base text-foreground leading-relaxed">
-          Every number on screen, and every shape that carries one, is read from live data.
-          Nothing is estimated, and nothing is filled in with a plausible-looking placeholder.
+          What you see is what the network is actually doing, right now. Every number comes
+          straight from the network itself — nothing is estimated, and nothing is made up to
+          look complete.
         </p>
         <p className="mt-2 text-label text-muted-foreground leading-relaxed">
-          When a feed is unavailable, the instrument says so, with <span className="font-mono">NO SIGNAL</span>,{" "}
-          <span className="font-mono">acquiring</span> or <span className="font-mono">standby</span>, instead of
-          showing a number it does not have.
+          When some information can&apos;t be reached for a moment, the screen simply says so —
+          you&apos;ll see a small label like <span className="font-mono">NO SIGNAL</span> instead
+          of a number we don&apos;t really have.
         </p>
         {/* ⚠️ THE ARCS ARE THE ONE EXCEPTION AND THE PAGE MUST SAY SO (2026-08-12). The geo blurb
             below used to promise "live traffic travelling between them" — `domain/arcSim.ts` is a
@@ -124,9 +104,9 @@ export default function AboutDoc() {
             the one thing on screen that carries no reading. Both halves had to move; fixing only
             the blurb would have left the false sentence sitting in the louder type. */}
         <p className="mt-2 text-label text-muted-foreground leading-relaxed">
-          The one thing carrying no reading is the motion: the packets travelling between nodes
-          on the globe are a stand-in for nodes talking to each other, not a measured feed. The
-          nodes they travel between are real.
+          One honest exception: the little packets you can watch travelling across the globe are
+          an illustration of computers talking to each other, not measured traffic. The places
+          they travel between are real.
         </p>
       </Panel>
 
@@ -236,10 +216,9 @@ export default function AboutDoc() {
         </Panel>
       </section>
 
-      <footer className="mt-14 pt-6 border-t border-border flex flex-wrap items-center gap-x-5 gap-y-2">
-        <CloseIntoScene className="text-primary no-underline hover:underline underline-offset-2">
-          Open the visualizer →
-        </CloseIntoScene>
+      {/* No "Open the visualizer" link here (user, 2026-09-04): the command bar above and the
+          site footer below already navigate — a document should end, not re-advertise the app. */}
+      <footer className="mt-14 pt-6 border-t border-border">
         <span className="text-label text-muted-foreground">
           Built entirely from Constellation&apos;s public data. No account, nothing to sign up for.
         </span>
