@@ -1,5 +1,6 @@
 import SceneCanvas from "@/components/SceneCanvas";
 import Blueprint from "@/components/Blueprint";
+import BootFade from "@/components/BootFade";
 import BootOverlay from "@/components/BootOverlay";
 import DataBridge from "@/components/DataBridge";
 import ThemeController from "@/components/ThemeController";
@@ -40,11 +41,27 @@ import SiteFooter from "@/components/SiteFooter";
 export default function AppShell() {
   return (
     <main>
-      <TopBar />
+      {/* The staged entrance (useBootStage): command bar on `frame`, rails/dock/footer on
+          `data`, vitals band on `live` — the HUD arrives in the data's own order while the
+          BootOverlay hands the scene off. Each BootFade is a plain wrapper div (trap-2 safe)
+          that also `inert`s its zone while hidden. */}
+      <BootFade at="frame">
+        <TopBar />
+      </BootFade>
       {/* Site chrome, pinned to the real viewport like the bar — the second route to /about and
           the home of the project's own links (user, 2026-08-18). */}
-      <SiteFooter />
-      <SectionShell scene={<SceneCanvas />} raw={<DataSection />} strip={<BottomStream />}>
+      <BootFade at="data">
+        <SiteFooter />
+      </BootFade>
+      <SectionShell
+        scene={<SceneCanvas />}
+        raw={<DataSection />}
+        strip={
+          <BootFade at="live">
+            <BottomStream />
+          </BootFade>
+        }
+      >
         <Blueprint />
         <BootOverlay />
         {/* The subject callout lives INSIDE the shell (user, 2026-08-16 — it painted over the
@@ -55,9 +72,13 @@ export default function AppShell() {
             depth transition the shell scales, but the callout has already hidden itself (it only
             renders in the scene pose). */}
         <SceneCallout />
-        <ExploreRail />
-        <VitalsDock />
-        <Inspector />
+        <BootFade at="data">
+          <ExploreRail />
+          {/* The phone dock's middle section rides with the rails, not the band: the dock bar is
+              one control split in thirds, and a missing middle would read as a broken bar. */}
+          <VitalsDock />
+          <Inspector />
+        </BootFade>
         <PhoneDockSweep />
         <RailScroll />
       </SectionShell>
