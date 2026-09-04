@@ -21,6 +21,10 @@ export default function InfoMenu() {
   const doc = useStore((s) => s.docPage);
   const setDocPage = useStore((s) => s.setDocPage);
   const [open, setOpen] = useState(false);
+  // The trigger wears the OPEN page's own mark (the ThemeToggle idiom — FACE[pref]): About's
+  // circled-i doubles as the resting face, Design shows the swatch book, and the accent tint
+  // says "currently doing something" either way.
+  const Face = doc ? DOC_ICONS[doc] : Info;
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -35,7 +39,7 @@ export default function InfoMenu() {
             doc != null && "text-primary",
           )}
         >
-          <Info aria-hidden className="size-4" />
+          <Face aria-hidden className="size-4" />
           <ChevronDown aria-hidden className="size-3.5 opacity-70" />
         </button>
       </PopoverTrigger>
