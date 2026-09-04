@@ -526,7 +526,7 @@ export class Globe implements GeoViewHost {
   // opacity rides the grids' presence envelope (gatherWeight of the lead × the fleet's
   // bare-stage weight), so the legend forms with the grids and dissolves with them — the doc
   // overlay's bare stage included.
-  private _gatherLabels: { mesh: THREE.Mesh; uMid: number; vMin: number; gs: number }[] = [];
+  private _gatherLabels: { mesh: THREE.Mesh; uMid: number; gs: number }[] = [];
   private _gatherLabelGroup: THREE.Group | null = null;
   private _gatherLabelQ = new THREE.Quaternion();
   private _gatherLabelM = new THREE.Matrix4();
@@ -559,15 +559,13 @@ export class Globe implements GeoViewHost {
       if (!ticker) continue;
       let uMin = Infinity;
       let uMax = -Infinity;
-      let vMin = Infinity;
       for (const s of ss) {
         if (s.u < uMin) uMin = s.u;
         if (s.u > uMax) uMax = s.u;
-        if (s.v < vMin) vMin = s.v;
       }
       const mesh = makeTextLabel(ink, ticker, GATHER_CELL * 1.4, 500);
       grp.add(mesh);
-      this._gatherLabels.push({ mesh, uMid: (uMin + uMax) / 2, vMin, gs: ss[0]!.gs });
+      this._gatherLabels.push({ mesh, uMid: (uMin + uMax) / 2, gs: ss[0]!.gs });
     }
   }
 
@@ -586,13 +584,14 @@ export class Globe implements GeoViewHost {
     this._gatherLabelQ.setFromRotationMatrix(this._gatherLabelM);
     const fit = g.cell / GATHER_CELL; // the band's shrink factor — labels shrink with the pitch
     for (const l of this._gatherLabels) {
-      // BELOW each block, not above (user, 2026-09-04: above sat behind the command bar and
-      // its hanging view caption): the band's top edge runs under the bar, the space beneath
-      // the blocks is the scene's own.
+      // At the TOP, at ONE height (user, 2026-09-04, round 2: the per-group bottom placement
+      // sat "at various heights" since blocks differ in depth). The band's top edge is v=0 for
+      // every block, so +1.0 cells is uniform; the smaller 1.4-cell ink keeps it clear of the
+      // bar that the first, larger cut collided with.
       l.mesh.position
         .copy(g.origin)
         .addScaledVector(g.right, l.uMid * g.cell + l.gs * g.spread)
-        .addScaledVector(g.up, (l.vMin - 1.3) * g.cell);
+        .addScaledVector(g.up, 1.0 * g.cell);
       l.mesh.quaternion.copy(this._gatherLabelQ);
       l.mesh.scale.setScalar(fit);
       (l.mesh.material as THREE.MeshBasicMaterial).opacity = lw;

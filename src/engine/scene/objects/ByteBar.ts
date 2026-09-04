@@ -392,6 +392,11 @@ export class ByteBar {
   rowStill(slot: number): boolean {
     const s = this._slots[slot];
     if (!s) return false;
+    // The VIEW-ENTRY DROP is motion too (user, 2026-09-04 — "the card appears before the
+    // snapshot landed on the plane"): the drop is the scene's CLOSING beat, playing AFTER the
+    // transition settles, so the transition gate can't see it. While its ramp still fades this
+    // slot, the row is literally mid-landing. LedgerView parks the ramp at null when settled.
+    if (this._entryFade && (this._entryFade[slot] ?? 0) < 0.999) return false;
     return s.forming || (s.grow >= 1 && s.rise >= 1);
   }
 
