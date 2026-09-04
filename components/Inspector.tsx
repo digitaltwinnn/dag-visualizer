@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
 import { useStore } from "@/src/store/store";
+import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { displayNetwork } from "@/src/data/unlisted";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { filterAccent } from "@/src/data/network";
@@ -17,6 +18,7 @@ import { RailShade } from "@/components/RailShade";
 import RailDock from "@/components/RailDock";
 import RailPager from "@/components/RailPager";
 import { useBreakpoint } from "@/components/useBreakpoint";
+import { usePointerCoarse } from "@/components/usePointerCoarse";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { detailsCards, ladderSlotIds, ladderLevelOfSlot, type RailCard } from "@/components/railCards";
 import { useLadderFocus } from "@/components/useLadderFocus";
@@ -352,8 +354,9 @@ export default function Inspector() {
   // stays ALWAYS-mounted below (via <ContextCard/>, which self-nulls on "all") so its EdgePulse
   // survives the dossier ⇄ nothing swap; the manifest only decides its tray-icon presence.
   const selNodes = useStore((s) => s.selNodes);
+  const coarse = usePointerCoarse();
   const manifest = detailsCards({
-    mode, filter, inspect, snap, country, cohort, composition, metaSnap,
+    mode, filter, inspect, snap, country, cohort, composition, metaSnap, coarse,
     selNodesCount: selNodes.length,
     filterLabel: displayNetwork(filter)?.ticker ?? null, // one lookup — catalog + the unlisted pseudo-network
   });
@@ -603,6 +606,17 @@ export default function Inspector() {
   // its subjectKey changes while the sheet is closed, and bumps `updateKey` per event → RailDock
   // replays the travelling edge pulse. Opening clears all highlights (`onOpenChange`).
   const { actives, updateKey, onOpenChange: onTrayOpenChange } = useTrayActives(manifest);
+  // ⚠️ ON PHONE THE STORE IS THE OPENNESS TRUTH, and it must be SYNCED, not only heard through
+  // RailDock's onOpenChange (user, 2026-09-03: "if I click a node in geo the cue does not
+  // show"). A controlled Radix sheet fires onOpenChange only for interactions it mediates — when
+  // the OTHER dock section opens, this sheet's `open` prop flips false externally and no
+  // callback runs, so the tracker still believed the sheet was open and swallowed every later
+  // pick as "seen". Tablet keeps the callback wiring alone: its sheet state is RailDock's own,
+  // and every close there is user-driven through Radix.
+  useEffect(() => {
+    if (bp === "phone") onTrayOpenChange(phoneDock === "details");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bp, phoneDock]);
 
   // Icon per hosted card comes from the manifest; hue is the tray's own presentation: the node's
   // metagraph hue (or core cyan), everything else the filter accent.
@@ -698,8 +712,12 @@ export default function Inspector() {
       label="Details"
       style={accent}
       trigger="bottom-bar-half"
+      // Thirds with the Vitals section — see ExploreRail's matching arm.
+      barGeom={VIEW_POLICIES[mode].vitalsLane ? "w-1/3 right-0" : undefined}
       sheetSide="bottom"
+      // Compact tray at thirds — see ExploreRail's matching arm.
       signals={tray}
+      trayCompact={VIEW_POLICIES[mode].vitalsLane}
       updateKey={updateKey}
       open={phoneDock === "details"}
       sheetPx={phoneSheetPx}

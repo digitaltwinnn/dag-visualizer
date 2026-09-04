@@ -18,18 +18,32 @@ export default function AboutView({
   eyebrow,
   lines,
   caption = "",
+  defaultCollapsed = false,
 }: {
   title: string;
   eyebrow: string;
   lines: string[];
   caption?: string;
+  /** Phone starts collapsed — see the note on the state below. Passed by ExploreRail's phone
+   *  branch rather than read off `window` here: this component also SSRs in the desktop rail
+   *  (CSS-hidden on phone, but hydrated), and a window read at first render made server and
+   *  client disagree about which chevron to draw — a real hydration error, caught live. */
+  defaultCollapsed?: boolean;
 }) {
   // OPEN BY DEFAULT (user, 2026-09-01). The card states the view's point of view — "How the network
   // is built", "Where the network runs" — which is orientation a reader wants BEFORE they start
   // browsing, and behind a collapsed head it was only ever found by someone who already knew what
   // it said. It stays collapsible, and the state is per-mount by design: a view switch is a change
   // of subject, so its own orientation leads again.
-  const [collapsed, setCollapsed] = useState(false);
+  //
+  // ⚠️ EXCEPT ON PHONE, WHERE IT OPENS COLLAPSED (user, 2026-09-02). The phone sheet is ~60% of the
+  // viewport, and measured at 390×844 the open About filled ALL of it — the browse list the sheet
+  // was opened for started below the fold. On a rail the prose leads and the list is still right
+  // there; in a short sheet leading is displacing. The head stays, one tap opens it — the same
+  // per-mount rule, phone just starts from the other side. The tier arrives as a PROP: the phone
+  // sheet's AboutView mounts client-only and after `useBreakpoint` has resolved (Radix portals
+  // the sheet content on open), so the initializer is stable for the one instance that takes it.
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
   return (
     <Card asChild className="sig-right block p-0 [--spine:var(--filter-accent,var(--primary))] animate-card-in motion-reduce:animate-none">
       <aside>

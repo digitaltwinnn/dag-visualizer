@@ -7,6 +7,7 @@ import TopBar from "@/components/TopBar";
 import BottomStream from "@/components/BottomStream";
 import ExploreRail from "@/components/ExploreRail";
 import Inspector from "@/components/Inspector";
+import VitalsDock from "@/components/VitalsDock";
 import PhoneDockSweep from "@/components/PhoneDockSweep";
 import RailScroll from "@/components/RailScroll";
 import FollowController from "@/components/FollowController";
@@ -50,6 +51,7 @@ export default function Home() {
             renders in the scene pose). */}
         <SceneCallout />
         <ExploreRail />
+        <VitalsDock />
         <Inspector />
         <PhoneDockSweep />
         <RailScroll />

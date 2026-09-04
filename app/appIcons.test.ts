@@ -54,6 +54,24 @@ describe("app icons", () => {
     }
   });
 
+  it("the PWA/apple icons exist and DECODE as real PNGs (manifest.ts + the iOS touch icon)", async () => {
+    // Same philosophy as the svg assertion above: these are build artifacts that fail silently —
+    // a manifest pointing at a broken PNG installs with a blank tile and nothing errors. All four
+    // are generated from app/icon.svg (2026-09-03, the manifest's own header has the pipeline).
+    const files = [
+      join(APP, "apple-icon.png"),
+      join(process.cwd(), "public", "icon-192.png"),
+      join(process.cwd(), "public", "icon-512.png"),
+      join(process.cwd(), "public", "icon-maskable-512.png"),
+    ];
+    for (const f of files) {
+      expect(existsSync(f), `${f} is missing`).toBe(true);
+      const meta = await sharp(readFileSync(f)).metadata();
+      expect(meta.format, f).toBe("png");
+      expect(meta.width ?? 0, f).toBeGreaterThanOrEqual(180);
+    }
+  });
+
   it("the .ico is baked FROM the svg, so the two cannot drift into different marks", () => {
     // scripts/bake-favicon.ts is the one home; this only asserts the source it needs is present.
     expect(existsSync(join(process.cwd(), "scripts", "bake-favicon.ts"))).toBe(true);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -103,6 +103,9 @@ export default function RailDock({
   children,
   signals,
   updateKey,
+  barGeom,
+  barIcon,
+  trayCompact,
   onOpenChange,
   sheetSide,
   trigger = "edge-tab",
@@ -121,6 +124,18 @@ export default function RailDock({
   onOpenChange?: (open: boolean) => void;
   sheetSide?: "left" | "right" | "bottom";
   trigger?: "edge-tab" | "bottom-bar-half";
+  /** Bar-half positioning override (width + x classes). The default is the two-half layout keyed
+   *  on `side`; the three-section dock (Explore | Vitals | Details, 2026-09-03) passes thirds —
+   *  geometry is the CALLERS' one shared decision, so RailDock never tracks how many sections
+   *  the bar currently holds. */
+  barGeom?: string;
+  /** The bar half's own leading mark — defaults to the side-keyed Explore/Details pair. */
+  barIcon?: ReactNode;
+  /** Thirds-width bar halves: the icon legend cannot fit (measured 166px in a 130px section),
+   *  but the `active` cue it carried should not vanish with it — compact renders ONE small dot
+   *  (the first active's hue) while any hosted card holds an unseen update, and nothing at
+   *  rest. Fixed width by construction, so the overflow the full tray caused cannot return. */
+  trayCompact?: boolean;
   open?: boolean;
   // Bottom-sheet drag (phone): the caller-held height override in px (null = the default 60vh)
   // + its setter. Store-backed by BOTH phone docks (`store.phoneSheetPx`) so switching halves
@@ -167,26 +182,102 @@ export default function RailDock({
     setOpen(next);
     onOpenChange?.(next);
   };
-  // OPEN-TIME FIT (user, 2026-08-16, from the collapse discussion): a phone sheet that opens
-  // onto short content (two collapsed ghosts) sizes to the content instead of 60vh of empty
-  // glass — measured ONCE at open, then held for that open's whole session (never resizing
-  // while up: no motion the user didn't ask for; a drag or the store's default still wins).
-  // `phoneSheetPx` resets on full close, so every open re-fits.
-  const fitRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!isBarHalf || !open || sheetPx != null) return;
-    const raf = requestAnimationFrame(() => {
-      const content = fitRef.current;
-      if (!content) return;
-      const CHROME = 96; // sheet head + grabber + paddings
-      const fit = content.offsetHeight + CHROME;
-      const def = Math.round(window.innerHeight * 0.6);
-      if (fit < def - 12) onSheetPx?.(Math.max(170, fit));
-    });
-    return () => cancelAnimationFrame(raf);
-    // Open-edge only — content growing later must not resize the sheet mid-session.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // LIVE CONTENT FIT (user, 2026-09-03: "determine and grow the size of the section based on
+  // its contents" — superseding 2026-08-16's one-shot open fit, whose no-resizing-while-up rule
+  // assumed content only changes when data does; with the phone explorers opening collapsed,
+  // content now changes exactly when the USER expands a card, and a sheet that holds 60vh of
+  // glass over a two-head chooser — or clips the card just opened — answers their gesture with
+  // nothing). The fit is LOCAL state, never the store: `sheetPx` (the store) now means the
+  // DRAG-chosen height alone, and a drag wins over the fit until the sheet fully closes
+  // (`phoneSheetPx` resets there, so every open re-fits). Height changes ride the sheet's own
+  // 380ms spring transition below, so growth eases; the FIRST measure lands in a layout effect
+  // before paint, so opening never plays a 60vh→fit settle. Ceiling at the 60vh default —
+  // taller content scrolls, exactly as before.
+  // ⚠️ A CALLBACK REF AS STATE, not a ref — the same portal trap the canvas-cover publisher
+  // below records: the sheet's content mounts a commit LATER than the `open` that reveals it,
+  // so an effect keyed on `open` alone runs against null and fits nothing (measured: the sheet
+  // held its 60vh default over a two-head chooser). The node arriving AS state re-runs the
+  // effect in the content's own mount commit — still before that commit paints.
+  const [fitEl, setFitEl] = useState<HTMLDivElement | null>(null);
+  const [fitPx, setFitPx] = useState<number | null>(null);
+  // THE ENTRY IS A GROW, NOT A SLIDE (user, 2026-09-03, three rounds: the translateY slide read
+  // as coming from the screen bottom through the dock's translucent glass; the rise-and-fade
+  // that replaced it read as appearing at the TOP, because the whole box materialized at its
+  // final height and the top edge is what the eye catches). What "appears from the dock" means
+  // mechanically: the bottom edge stays pinned at the dock's top and the HEIGHT grows 0 → fit,
+  // riding the sheet's own height transition. 'grow' holds a slower 550ms clock (the navigation
+  // tempo) so the entry never borrows the 380ms drag-snap physics; a drag started mid-entry
+  // wins instantly (`dragging` forces transition-none below).
+  //
+  // ⚠️ 'pre' IS ARMED ON THE OPEN FLIP, NOT IN THE CONTENT'S COMMIT. The content mounts a commit
+  // LATER than the `open` that reveals it (the portal trap, again), so a zero set from the
+  // content's own effect arrives after the CSS default has painted — measured, the sheet painted
+  // at 506px and the "grow" ran backwards. Armed on the flip, the zero is already in the style
+  // prop of the content's FIRST render; the fit effect then paints one zero frame (double-rAF)
+  // before releasing 'grow', so the transition has a real starting edge. (A direct DOM write in
+  // the ref callback was tried between the two: an inline arrow ref refires every render and
+  // clobbers React's own style writes — state is the only clean owner of this height.)
+  const [entry, setEntry] = useState<null | "pre" | "grow">(null);
+  useLayoutEffect(() => {
+    if (isBarHalf && open) setEntry("pre");
   }, [open, isBarHalf]);
+  // THE EXIT MIRRORS THE ENTRY (user, 2026-09-03: "appears nicely but disappears immediately"):
+  // the sheet shrinks back into the dock, then unmounts. It has to be a LAGGED unmount rather
+  // than a close-side animation, because a close can arrive from outside this component's own
+  // handler — the other dock section opening (the store's mutual exclusion), the tap-outside
+  // recognizer, Escape — and Radix unmounts a controlled sheet the moment `open` is false.
+  // While `exiting`, the sheet stays mounted at height 0 (the same transition the grow rides,
+  // downhill) and the real unmount follows on the transition's own clock. A reopen mid-exit
+  // cancels the timer and grows from wherever the shrink had reached. Section-to-section
+  // switches read as an exchange: the old sheet sinks into the dock as the new one rises.
+  // ⚠️ `exiting` is derived DURING RENDER (the getDerivedStateFromProps pattern), not in an
+  // effect: an effect runs a commit after the close, and by then Radix has already unmounted
+  // the content — measured, the "shrink" was a fresh remount sitting at zero. Flipped in the
+  // same render, the Sheet's `open || exiting` never goes false until the shrink has run.
+  const [exiting, setExiting] = useState(false);
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (isBarHalf && !open) setExiting(true);
+    if (open) setExiting(false);
+  }
+  useEffect(() => {
+    if (!exiting) return;
+    const t = setTimeout(() => setExiting(false), 420);
+    return () => clearTimeout(t);
+  }, [exiting]);
+  useLayoutEffect(() => {
+    if (!isBarHalf || !open || !fitEl) {
+      setFitPx(null);
+      return;
+    }
+    // Measured, not guessed (2026-09-03): the bar-half sheet has NO header row — its chrome is
+    // the grabber band + paddings, 45px live (the old 96 was the labelled/×'d tablet sheet's
+    // number, and its excess showed up as a band of dead glass under the last card).
+    const CHROME = 46;
+    const apply = () => {
+      const def = Math.round(window.innerHeight * 0.6);
+      setFitPx(Math.min(def, Math.max(170, fitEl.offsetHeight + CHROME)));
+    };
+    apply();
+    // Release the grow only after a zero frame has PAINTED (double-rAF) — releasing in this same
+    // commit would flush zero and target into one paint window and the transition would never
+    // run. The slower clock holds through the entry, then hands back to the snap tempo.
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => { raf2 = requestAnimationFrame(() => setEntry("grow")); });
+    const settle = setTimeout(() => setEntry(null), 750);
+    const ro = new ResizeObserver(apply);
+    ro.observe(fitEl);
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+      clearTimeout(settle);
+      setEntry(null);
+    };
+  }, [open, isBarHalf, fitEl]);
+  // Drag beats fit; fit beats the CSS default; the entry's and the exit's zeros beat both.
+  const heightPx = isBarHalf ? (entry === "pre" || exiting ? 0 : sheetPx ?? fitPx) : null;
   const handleOpenChangeRef = useRef(handleOpenChange);
   handleOpenChangeRef.current = handleOpenChange;
 
@@ -397,7 +488,16 @@ export default function RailDock({
   // cards change — fewer icons = empty slots), sized 3 × 14px icons + 2 gaps. Renders whenever
   // the caller provides a tray at all (even momentarily empty), keeping the frame stable.
   // aria-hidden — the trigger keeps its accessible label.
-  const tray = signals && (
+  const firstActive = signals?.find((t) => t.active);
+  const tray = signals && trayCompact ? (
+    firstActive ? (
+      <span
+        aria-hidden="true"
+        className="size-1.5 flex-none rounded-full animate-dot-beat motion-reduce:animate-none"
+        style={{ background: firstActive.hue ?? "var(--primary)" }}
+      />
+    ) : null
+  ) : signals && (
     <span
       className={cn(
         "flex items-center pointer-events-none flex-none",
@@ -425,7 +525,12 @@ export default function RailDock({
   // the two sections — the app's inset-hairline idiom — and the chevron sits at the END of the
   // tray (bottom on edge tabs, trailing on the phone dock half), subtly dimmer than the icons'
   // active states. The WHOLE tray stays one ≥44px tap target.
-  const trayRule = signals && (
+  // Bar halves render NO rule at all (user, 2026-09-03, second round: with the trays standing
+  // down at thirds the hairline only separated a label from its own chevron — "I think we can
+  // remove the hairline"; the first round made it structural for consistency, and the consistent
+  // answer that survived review is none). The tablet edge tab keeps its tray-gated rule: there
+  // it divides two stacked GROUPS, which is a real division.
+  const trayRule = signals && !isBarHalf && (
     <span
       className={cn("flex-none bg-border", isBarHalf ? "w-px h-4" : "h-px w-4")}
       aria-hidden="true"
@@ -448,8 +553,11 @@ export default function RailDock({
           value={open ? "open" : ""}
           onValueChange={(v) => handleOpenChange(v === "open")}
           className={cn(
-            "fixed z-[42] bottom-0 w-1/2 h-[var(--phone-dock-h)] hidden max-[700px]:flex rounded-none",
-            side === "left" ? "left-0" : "right-0",
+            // pb env: --phone-dock-h carries the safe-area inset (globals.css) so the BAR grows
+            // under a home indicator; the padding keeps the tappable content in the 56px band
+            // above it rather than centring into the indicator's strip. Zero on flat bottoms.
+            "fixed z-[42] bottom-0 h-[var(--phone-dock-h)] pb-[env(safe-area-inset-bottom,0px)] hidden max-[700px]:flex rounded-none",
+            barGeom ?? (side === "left" ? "w-1/2 left-0" : "w-1/2 right-0"),
             // The raw data layer is presented: the dock belongs to the scene shell (RailDock
             // renders inside it), which has receded and dimmed behind the layer — so the bar
             // would sit under the raw table pointing at a hidden rail.
@@ -475,7 +583,7 @@ export default function RailDock({
               "data-[state=on]:shadow-[inset_0_2px_0_var(--sel-border)] data-[state=on]:[&>svg]:text-[var(--primary)]",
             )}
           >
-            {side === "left" ? <EXPLORE_ICON size={18} strokeWidth={1.75} aria-hidden="true" /> : <ListTree size={18} strokeWidth={1.75} aria-hidden="true" />}
+            {barIcon ?? (side === "left" ? <EXPLORE_ICON size={18} strokeWidth={1.75} aria-hidden="true" /> : <ListTree size={18} strokeWidth={1.75} aria-hidden="true" />)}
             <span>{label}</span>
             {/* [icons legend] | [open control]: the tray, then the hairline, then the trailing
                 open/collapse chevron (up = opens a sheet above; down while open = collapses). */}
@@ -544,14 +652,14 @@ export default function RailDock({
           two bar-half docks are mutually exclusive via the CONTROLLED `open` prop (driven by
           `store.phoneDock` from the caller), not by anything in here — RailDock itself still just
           renders whatever `open` it's given. */}
-      <Sheet open={open && shellVisible} onOpenChange={handleOpenChange} modal={false}>
+      <Sheet open={(open || exiting) && shellVisible} onOpenChange={handleOpenChange} modal={false}>
         <SheetContent
           ref={setSheetEl}
           side={sheetSide ?? side}
           // Drag-chosen height override (phone bottom sheet): inline height + unlocked max-height
           // (the CSS caps at 72vh, below the expanded snap). Cleared back to the 60vh default when
           // `sheetPx` is null.
-          style={isBarHalf && sheetPx != null ? { ...style, height: sheetPx, maxHeight: "none" } : style}
+          style={heightPx != null ? { ...style, height: heightPx, maxHeight: "none" } : style}
           overlay={false}
           // The HUD's step-back while the camera moves (`useSceneYield`). Both tiers yield to the
           // user's own hand; only the PHONE half also yields to a commit flight (see the call site
@@ -571,9 +679,25 @@ export default function RailDock({
             isBarHalf
               ? cn(
                   "!bottom-[var(--phone-dock-h)]",
+                  // The slide keyframe never plays on the bar half — the entry is the height
+                  // grow above ('!': the animate utility is a (0,2,0) variant, the documented
+                  // escape). Reduced motion collapses the grow too (transition-none).
+                  "!animate-none",
                   dragging
                     ? "!transition-none"
-                    : "transition-[height,opacity] duration-[380ms] ease-[var(--ease-spring)] motion-reduce:!transition-none",
+                    : cn(
+                        "motion-reduce:!transition-none",
+                        // The exit takes a plain decel ease, not the spring: a spring front-loads
+                        // its travel (measured, 280→29 in 120ms of a 380ms clock), which is the
+                        // "disappears immediately" the exit exists to fix. Exits run a touch
+                        // quicker than the 550ms entry, per standard motion practice.
+                        exiting
+                          ? "transition-[height,opacity] duration-[420ms] ease-out"
+                          : cn(
+                              "transition-[height,opacity] ease-[var(--ease-spring)]",
+                              entry === "grow" ? "duration-[550ms]" : "duration-[380ms]",
+                            ),
+                      ),
                 )
               : undefined
           }
@@ -650,7 +774,7 @@ export default function RailDock({
                 nothing: hosted cards rendered flush (user, 2026-08-30 — "zero gap between the
                 cards", tablet/phone only, desktop's #leftcol has no such wrapper). The gaps are
                 part of the content height, so the fit measurement stays honest. */}
-            <div ref={fitRef} className="flex flex-col gap-[var(--rail-gap)]">{children}</div>
+            <div ref={setFitEl} className="flex flex-col gap-[var(--rail-gap)]">{children}</div>
           </div>
         </SheetContent>
       </Sheet>

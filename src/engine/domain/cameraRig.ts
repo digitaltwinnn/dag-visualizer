@@ -131,6 +131,39 @@ export function railsLean(pos: THREE.Vector3, target: THREE.Vector3, restDist: n
   outPos.subVectors(pos, target).multiplyScalar(1 - (1 - RAILS_HIDDEN_DOLLY) * k).add(target);
 }
 
+// ---- the PORTRAIT fit (2026-09-02) ----------------------------------------------------------
+// The third global lever, same species as the two above: scale (pos − target) about the target.
+// Every FOCI pose and framing was tuned at desktop aspect (the design sessions measured at
+// 1600×950), and the camera's FOV is VERTICAL — so a portrait phone keeps the tuned pose's full
+// height and loses width linearly with aspect. Measured at 390×844: the ledger chamber ran off
+// BOTH side edges while ~37% of the viewport height sat empty above and below it; hyper the same
+// shape. The fit dollies the pose OUT until the width comes back, spending the height portrait
+// has to spare.
+//
+// ⚠️ PARTIAL COMPENSATION, BY SQUARE ROOT, ON PURPOSE. Full width-compensation is
+// restAspect/aspect ≈ 3.6× at phone aspect — but poses don't USE the full desktop width (the
+// subject sits inside the rail-free centre band), so restoring all of it would shrink the scene
+// to a third of its height for margin it never had. `√ratio` (≈1.9× at 390×844, ≈1.4× at tablet
+// portrait) splits the deficit between the two axes: the subject gives up some height to buy
+// back most of its width. Verified live at 390×844 across all three 3D views.
+//
+// Clamped to ≥ 1 — the lever only ever WIDENS. A wide viewport (ratio < 1) already fits the
+// tuned height exactly, and dollying IN would crop it. So on desktop this is the identity, by
+// construction rather than by gate.
+//
+// It rides `tweenTo`'s one `dolly` flag like both siblings: same scaling form, same reasoning —
+// on a composed look-at (nodeFraming, cohortFraming) there is no honest radial to move along.
+// The aspect is a PARAMETER (the caller reads it off the live camera): this module stays pure,
+// and the lever re-resolves with whatever aspect the next pose application sees. A device
+// ROTATION alone does not re-frame — resize only writes the projection — and that is accepted:
+// the next commit, view switch or rails toggle re-resolves, and holding the old framing for a
+// beat beats re-tweening the camera under a gesture the user didn't make.
+export const REST_ASPECT = 1600 / 950;
+export function aspectFit(pos: THREE.Vector3, target: THREE.Vector3, aspect: number, outPos: THREE.Vector3): void {
+  const k = Math.sqrt(Math.max(1, REST_ASPECT / Math.max(0.1, aspect)));
+  outPos.subVectors(pos, target).multiplyScalar(k).add(target);
+}
+
 // ---- the geo NODE pose ----------------------------------------------------------------------
 // The lean raise Globe.focusNode applies when aiming a node to the front: with the UNCAPPED
 // lean, every node arrives at the SAME residual elevation (latitude-independent — a tilt cap

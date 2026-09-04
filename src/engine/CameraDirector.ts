@@ -4,7 +4,7 @@ import type { HyperView } from "./scene/views/HyperView";
 import type { Mode } from "@/src/store/store";
 import type { CameraFraming } from "./domain/cameraRig";
 import {
-  FOCI, type FocusName, dollyBack, geoFraming, hubFraming, railsLean,
+  FOCI, type FocusName, aspectFit, dollyBack, geoFraming, hubFraming, railsLean,
   isSamePose, nudgeMix, restOrbit, NUDGE_DUR, easeInOutQuad,
 } from "./domain/cameraRig";
 import { HYPER_TILT_FOCUS } from "./domain/hyperLayout";
@@ -87,13 +87,16 @@ export class CameraDirector {
     this._updateTapZoom(dt);
   }
 
-  focus(name: FocusName) {
+  focus(name: FocusName, structureMoves = false) {
     const f = FOCI[name];
-    this.tweenTo(f.pos, f.target);
+    this.tweenTo(f.pos, f.target, true, structureMoves);
   }
 
 
-  tweenTo(toPos: Vec, toTgt: Vec, dolly = true) {
+  /** `structureMoves` — the commit is answered by the STRUCTURE as well as the camera (geo's
+   *  rungs: the globe spins to face the subject while the camera holds one fixed/shape-keyed
+   *  pose). It changes exactly one decision, the nudge's dim — see the gate below. */
+  tweenTo(toPos: Vec, toTgt: Vec, dolly = true, structureMoves = false) {
     // OUT-phase camera hold (spec A#6): the state commit stands; the boundary's
     // _applyDestLayout re-derives this pose from it, so dropping the tween loses nothing.
     if (this.h.transition.holdCamera()) return;
@@ -114,6 +117,12 @@ export class CameraDirector {
     // note next to CAM_ZOOM). And it RAMPS with how close the pose already sits to the view's
     // resting orbit, which is what `restOrbit` measures — see railsLean's own note.
     if (dolly && this.h.railsHidden()) railsLean(tw.toPos, tw.toTgt, is3D(this.h.mode) ? restOrbit(this.h.mode) : 0, tw.toPos);
+    // The PORTRAIT fit (2026-09-02): a vertical FOV loses width as the viewport narrows, so on a
+    // portrait aspect every destination dollies out until the tuned width comes back — see
+    // aspectFit's own note for the √ law. Identity at desktop aspect, so nothing above 1 changes.
+    // Same `dolly` gate, same reason as both siblings; the live camera's aspect is the parameter
+    // so the domain stays pure. In place (outPos===pos safe, like railsLean).
+    if (dolly) aspectFit(tw.toPos, tw.toTgt, this.h.ctx.camera.aspect, tw.toPos);
     // THE COMMIT NUDGE (user, 2026-08-13): "we always animate the position but a 'nudge' is allowed
     // which means the new pos will be same as old pos". Every rung answers a click, including the
     // ones whose pose is their parent's — hyper's node and composition rungs resolve to the network
@@ -128,16 +137,23 @@ export class CameraDirector {
     // from a card is a request to LOOK at what was committed, so the cards step back out of the
     // way exactly as they do under a direct drag. NOT during a view transition: that choreography
     // is already the 3.9s answer to the user's gesture, and a 1.4s dim inside it reads as a blink.
-    // And NOT for a nudge: the dim exists so the scene can be SEEN changing, and here it doesn't.
-    if (!tw.nudge && !this.h.transition.active() && !this.h.flyingNow()) this.h.setFlying(true);
+    // And NOT for a nudge — UNLESS the structure moves (user, 2026-09-02: "click a provider and
+    // swipe it: the camera moves but the HUD does not fade"). The no-dim-on-nudge rule reasons
+    // "the dim exists so the scene can be SEEN changing, and here it doesn't" — which is exactly
+    // backwards on geo's rungs, where "view emphasis moves the structure, not the camera" means a
+    // same-pose commit still spins the GLOBE to the new subject: cohortFraming and nodeFraming
+    // are ONE fixed pose by design, so every sibling swipe is a nudge over a real structural
+    // move. `structureMoves` is the resolver saying so; the dim rides the nudge's own window and
+    // clears with it at the tween's end, like any flight's.
+    if ((!tw.nudge || structureMoves) && !this.h.transition.active() && !this.h.flyingNow()) this.h.setFlying(true);
   }
 
 
-  focusGeo(R: number) {
+  focusGeo(R: number, structureMoves = false) {
     // Look head-on at the FRONT of the globe (target pushed forward in +Z, toward where the
     // focused country/selection is aimed) so it sits centred in the view rather than low.
     geoFraming(R, this.out);
-    this.tweenTo(this.out.pos, this.out.target);
+    this.tweenTo(this.out.pos, this.out.target, true, structureMoves);
   }
 
   focusFilter(filter: string) {

@@ -7,7 +7,6 @@ import { useStore } from "@/src/store/store";
 import { displayNetwork } from "@/src/data/unlisted";
 import { cn } from "@/lib/utils";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { VitalsStripRow } from "@/components/VitalsBand";
 import FilterPicker from "@/components/topbar/FilterPicker";
 import PulseStrip from "@/components/topbar/PulseStrip";
 import EcgMark from "@/components/topbar/EcgMark";
@@ -15,7 +14,6 @@ import PresentationToggle from "@/components/topbar/PresentationToggle";
 import ThemeToggle from "@/components/topbar/ThemeToggle";
 import NetworkSwitch, { NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
 import { useBreakpoint } from "@/components/useBreakpoint";
-import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import type { Mode } from "@/src/store/store";
 
 const VIEWS = [
@@ -197,6 +195,9 @@ export default function TopBar() {
           className={cn(
             "flex items-center gap-3 max-[1260px]:gap-2.5 max-[940px]:gap-2 max-[700px]:gap-1",
             "rounded-btn -mx-1 px-1 py-0.5 bg-transparent border-0 cursor-pointer text-left",
+            // The same pointer-keyed 44px touch floor as the filter button beside it (its note
+            // has the rationale) — the ECG mark alone measured 42×28 on phone.
+            "pointer-coarse:min-h-11 pointer-coarse:min-w-11",
             "hover:bg-wash-soft transition-colors duration-150 motion-reduce:transition-none",
             strip === "pulse" && "bg-wash-soft",
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
@@ -234,7 +235,10 @@ export default function TopBar() {
             // 2026-08-15 — the button used to run UNDER the switch and read as unclickable):
             // trimmed paddings/gaps, and `min-w-0` + the label's truncate below so a long
             // ticker ellipsizes inside its own column instead of overlapping the neighbour.
-            "min-w-0 max-[700px]:px-1 max-[700px]:py-1.5 max-[700px]:gap-[4px]",
+            // …but never below the touch floor's WIDTH either (user, 2026-09-03: the "All" face
+            // measured 35px). The coarse floor beats the shrink for short faces; long tickers
+            // still truncate — 44px is a floor, not a width.
+            "min-w-0 pointer-coarse:min-w-11 max-[700px]:px-1 max-[700px]:py-1.5 max-[700px]:gap-[4px]",
           )}
         >
           {/* The "FILTER" text label on wide bars; on the condensed breakpoints (≤940px) it
@@ -388,18 +392,11 @@ export default function TopBar() {
                 desktop cluster; the hairline is the phone vitals row's own border-t device. */}
             {bp === "phone" && (
               <div className="flex items-center justify-center gap-2 mx-2 px-2 pb-2 pt-1.5 border-t border-border/60">
-                {/* The band's own cards, horizontally scrollable (user pick, 2026-08-30 — one
-                    vitals design on every tier; the bare-number cluster is retired). Gated on
-                    the band's own policy flag so a flat view's row carries controls alone. */}
-                {/* Mounted only while the strip is OPEN: collapsed, the row is invisible
-                    but a mounted VitalsStripRow still runs the snapshot-feed subscriptions
-                    and per-render tallies — refolding the window every poll on the lowest-
-                    powered tier for pixels no one can see. */}
-                {open && VIEW_POLICIES[mode].vitalsLane && <VitalsStripRow />}
-                {/* The phone home of the network switch (its bar slot is desktop/tablet-only):
-                    the strip row is the one place the bar grows, and it has the width the
-                    right zone doesn't. */}
-                <span className="w-px self-stretch bg-border my-1" />
+                {/* The vitals LEFT this row for the dock's third section (user, 2026-09-03 —
+                    VitalsDock: riding the strip put view vitals under whichever dropdown
+                    opened, the pulse strip included). What stays is what belongs to the strip:
+                    the phone homes of the network switch and theme toggle — the strip row is
+                    the one place the bar grows, and it has the width the right zone doesn't. */}
                 <NetworkSwitch />
                 <ThemeToggle />
               </div>

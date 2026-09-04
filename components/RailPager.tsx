@@ -61,6 +61,7 @@ import {
   type ReactNode,
 } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { siblingSet, type SiblingState } from "@/components/railSiblings";
@@ -544,10 +545,14 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
           title={set.parentLabel}
           className="pointer-events-auto absolute bottom-1 inset-x-[19px] flex h-5 items-center gap-1"
         >
+          {/* An edge chevron is INVISIBLE, not merely disabled (user, 2026-09-03: "don't show
+              the ‹ or › because it doesn't do anything") — a dimmed arrow still promises a
+              direction that isn't there. `invisible` rather than unmounting keeps the slot, so
+              the counter and its siblings never shift when an edge is reached. */}
           <Button
             variant="ghost"
             size="icon-xs"
-            className="size-5"
+            className={cn("size-5", !prev && "invisible")}
             disabled={!prev}
             onClick={() => commitStep(-1)}
             aria-label={prev ? `Previous: ${prev.label}` : "Previous"}
@@ -564,7 +569,7 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
           <Button
             variant="ghost"
             size="icon-xs"
-            className="size-5"
+            className={cn("size-5", !next && "invisible")}
             disabled={!next}
             onClick={() => commitStep(1)}
             aria-label={next ? `Next: ${next.label}` : "Next"}

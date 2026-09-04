@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import VitalsBand from "@/components/VitalsBand";
 import { useStore } from "@/src/store/store";
 import { useBreakpoint } from "@/components/useBreakpoint";
@@ -23,8 +23,13 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 //    arbitrarily deep, so a live instrument doesn't describe the surface it would float over —
 //    and the raw layer (the phone pane especially) needs the space back.
 //  - RAILS HIDDEN hides the band too (user, 2026-08-30): presentation mode shows just the 3D.
-//  - PHONE never mounts it (the dock + sheet own that edge; the filter strip's second row
-//    renders the same cards as a horizontal scroll instead — VitalsStripRow).
+//  - PHONE never mounts it (the dock + sheet own that edge; the Vitals dock section hosts the
+//    same cards there — VitalsSheetBody).
+//  - SHORT VIEWPORTS yield it too (2026-09-03, the landscape-phone look): a phone held sideways
+//    lands in the tablet tier at ~390px of height, where the bar + caption + band + footer left
+//    the scene 184px — under half the viewport. Below 500px of height the band stands down and
+//    the scene takes the 92px back; the vitals stay one rotation away. 500 clears every
+//    landscape phone and touches no tablet (the shortest, an iPad mini landscape, is 744).
 const RESERVE = 92; // 10px gap above the footer + the band's ~66px height + 16px clearance above it
 
 export default function BottomStream() {
@@ -32,7 +37,16 @@ export default function BottomStream() {
   const section = useStore((s) => s.section);
   const railsHidden = useStore((s) => s.railsHidden);
   const bp = useBreakpoint();
-  const lane = VIEW_POLICIES[mode].vitalsLane && section === "scene" && !railsHidden && bp !== "phone";
+  // matchMedia, not a resize listener — flips exactly at the boundary, like useBreakpoint's own.
+  const [short, setShort] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-height: 500px)");
+    const apply = () => setShort(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+  const lane = VIEW_POLICIES[mode].vitalsLane && section === "scene" && !railsHidden && bp !== "phone" && !short;
   useEffect(() => {
     document.documentElement.style.setProperty("--bottom-reserve", lane ? `${RESERVE}px` : "0px");
     return () => document.documentElement.style.setProperty("--bottom-reserve", "0px");

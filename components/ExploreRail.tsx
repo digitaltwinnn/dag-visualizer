@@ -2,6 +2,7 @@
 
 import { Fragment, type CSSProperties, type ReactNode } from "react";
 import { useStore } from "@/src/store/store";
+import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { filterAccent } from "@/src/data/network";
 import GeoExplore from "@/components/GeoExplore";
 import HyperExplore from "@/components/HyperExplore";
@@ -39,8 +40,14 @@ export default function ExploreRail() {
   // hosts. `id` maps to the component to render; the manifest owns presence/order.
   const manifest = exploreCards({ mode });
   const renderCard: Record<string, ReactNode> = {
-    about: <AboutView {...ABOUT[mode]} />,
-    tool: mode === "hyper" ? <HyperExplore /> : mode === "geo" ? <GeoExplore /> : mode === "ledger" ? <LedgerPanel /> : null,
+    about: <AboutView {...ABOUT[mode]} defaultCollapsed={bp === "phone"} />,
+    // Phone opens BOTH cards collapsed (user, 2026-09-03): the sheet becomes a compact chooser
+    // that the live content-fit sizes down, and one tap opens the list and grows the sheet.
+    tool:
+      mode === "hyper" ? <HyperExplore defaultCollapsed={bp === "phone"} />
+      : mode === "geo" ? <GeoExplore defaultCollapsed={bp === "phone"} />
+      : mode === "ledger" ? <LedgerPanel defaultCollapsed={bp === "phone"} />
+      : null,
   };
   const content = (
     <>
@@ -113,8 +120,15 @@ export default function ExploreRail() {
       label="Explore"
       style={accent}
       trigger="bottom-bar-half"
-      sheetSide="bottom"
+      // Thirds whenever the Vitals section is present (VitalsDock gates on the same flag, so the
+      // bar's geometry and the middle section's presence cannot disagree).
+      barGeom={VIEW_POLICIES[mode].vitalsLane ? "w-1/3 left-0" : undefined}
+      // At thirds the tray COMPACTS instead of standing down (2026-09-03, two rounds): the icon
+      // legend measured 166px in a 130px section and spilled into the neighbour, but dropping it
+      // also dropped the persistent unseen-update cue — trayCompact keeps that as one dot.
       signals={tray}
+      trayCompact={VIEW_POLICIES[mode].vitalsLane}
+      sheetSide="bottom"
       open={phoneDock === "explore"}
       sheetPx={phoneSheetPx}
       onSheetPx={setPhoneSheetPx}
