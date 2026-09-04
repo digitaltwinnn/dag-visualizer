@@ -486,6 +486,22 @@ writer, and it clears its own state when the viewport drops below 1100px — bel
 CSS-hidden and SCENE has no meaning, so a stuck `true` would strand the band and the camera's
 rails-lean with no visible way back.
 
+### Boot entrance, routes & the doc pages' chrome (2026-09-04)
+
+- **The HUD arrives staged** (`useBootStage` + `BootFade`, wired in `AppShell`): command bar when
+  the engine is up (or failed — chrome is controls), rails/dock/footer on first data, vitals band
+  on live; latched, paced `STEP_MS` apart, force-completed by an 8s timeout so chrome never hides
+  behind a dead feed. `BootFade` is a plain opacity wrapper (trap-2 safe, `inert` while hidden) —
+  never add a transform there, RailThread measures rects mid-fade.
+- **`AppShell` is the app** — `/` and `app/[view]` both render it; `RouteSync` is the URL↔mode
+  bridge (seed on mount, shallow pushState on switch, popstate back), `components/views.ts` the
+  one view-vocabulary home (TopBar's VIEWS lives there now).
+- **The doc pages (/about, /design) wear shared chrome**: `SiteHeader` (the command bar's glass +
+  the view switch as links + ThemeToggle/ThemeController) and `SiteFooter overDoc`; the brand
+  waveform's one `d` is `components/brand.tsx` (EcgMark animates it, BrandMark stills it).
+- **The tempo family is tokenized** — `--tempo-beat` / `--tempo-signal` / `--tempo-roll` in
+  globals.css `:root`; the 150ms disclosure clock deliberately is not (its header says why).
+
 ### Responsive shell
 
 Only the rails restructure; everything else holds the four-zone shape. Desktop (≥1100px) has both rails

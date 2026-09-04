@@ -14,7 +14,10 @@ Present tense only. Git carries the history; `.superpowers/sdd/progress.md` carr
 
 An interactive 3D visualizer of the Constellation Network ($DAG). Next.js (App Router) + React +
 TypeScript + Zustand for the page and panels, driving a **vanilla Three.js engine** (not
-react-three-fiber) on one persistent canvas. The active view is `mode` in the store.
+react-three-fiber) on one persistent canvas. The active view is `mode` in the store — and the three
+3D views are also real URLs (`/hypergraph` / `/geography` / `/snapshots`): `components/views.ts` is
+the one view-vocabulary home and `components/RouteSync.tsx` the URL↔mode bridge (shallow pushState,
+so a switch never reboots the engine; analytics see per-view routes).
 
 Three views drive the 3D scene:
 
@@ -164,8 +167,12 @@ google-chrome-stable --headless=new --no-sandbox \
 
 Gotchas worth knowing before you burn time on them:
 
-- **There are no URL deep links into views**, and a one-shot can't click. Temporarily seed the store
-  default in `src/store/store.ts`, screenshot, revert.
+- **The three 3D views ARE URL deep links** (2026-09-04): `/hypergraph`, `/geography`, `/snapshots`
+  boot straight into their view (`components/RouteSync.tsx` seeds the store from the pathname), so a
+  one-shot screenshot of a view needs no store edit. In-app switches publish those paths by shallow
+  pushState — never a navigation, the engine must survive. Only the placeholder views (routeless by
+  decision) still need the old trick: temporarily seed the store default in `src/store/store.ts`,
+  screenshot, revert.
 - **`--virtual-time-budget` runs very few frames**, so a fresh boot gets caught mid-intro. Use
   **`?slowmo=N`** (a dev flag like `?stats`, clamped to `[0.1, 20]`, values <1 speeding things UP) to
   inspect mid-flight states.
