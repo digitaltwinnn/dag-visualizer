@@ -125,8 +125,10 @@ export default function Blueprint() {
   return (
     // top-[24vh], not inset-0 (user, 2026-09-04: the eyebrow "fights with the nodes at the
     // top"): the parked fleet grids hold the viewport's top band on every flat view, so the
-    // gallery centres in the space BELOW them rather than the full height.
-    <figure id="blueprint" className="fixed inset-x-0 top-[24vh] bottom-0 z-[6] flex flex-col items-center justify-center gap-9 pointer-events-none px-6">
+    // gallery centres in the space BELOW them rather than the full height. The bottom edge
+    // clears the footer strip plus a breather (user, same day: "the staking text almost
+    // touches the bottom bar").
+    <figure id="blueprint" className="fixed inset-x-0 top-[24vh] bottom-[calc(var(--footer-h,0px)+16px)] z-[6] flex flex-col items-center justify-center gap-9 pointer-events-none px-6">
       <span className="text-label tracking-caps uppercase [color:color-mix(in_oklch,var(--primary)_80%,#fff)] opacity-[0.85]">
         preview · in development
       </span>
