@@ -86,13 +86,19 @@ const RATE_STALE_MS = 3600_000;
 function staleFor(a: Activity | null | undefined): number | null {
   return a && a.staleMs != null && a.staleMs > RATE_STALE_MS ? a.staleMs : null;
 }
+/** The visible face of the extrapolation basis — "last ~6 min", not a bare "~6 min" (user,
+ *  2026-09-04: "what does ~6 min mean?" — the app's own designer had to ask, because the full
+ *  sentence below is sr-only and the sighted fragment carried no label). "last" is the one word
+ *  that makes it self-explanatory: a rate over the LAST N minutes is the live window the app
+ *  holds (the rolling snapshot buffer — boot backfill + live ticks, capped at POLL.maxSnapshots),
+ *  measured first-to-last timestamp rather than assumed (api.getActivity's note). */
 function windowSpan(a: Activity): string {
   const mins = a.spanHr * 60;
-  return mins < 1 ? `${Math.round(mins * 60)}s` : `~${Math.round(mins)} min`;
+  return mins < 1 ? `last ${Math.round(mins * 60)}s` : `last ~${Math.round(mins)} min`;
 }
 function windowNote(a: Activity | null | undefined, unit: string): string | undefined {
   if (!a) return undefined;
-  return `Rate extrapolated from ${a.samples} ${unit} over ${windowSpan(a)}.`;
+  return `Rate extrapolated from ${a.samples} ${unit} over the ${windowSpan(a)} — the live window of snapshots the app holds.`;
 }
 
 /** The band's one cell recipe: a quiet plate (spineless — cards carry no resting edge signal),
