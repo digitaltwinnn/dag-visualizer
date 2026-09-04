@@ -25,16 +25,27 @@
 // invented address is a fabricated fact of the worst kind (rule 10). Add the entry here the moment
 // a real one exists.
 import NetLink from "@/components/NetLink";
+import { cn } from "@/lib/utils";
 
 const GITHUB = "https://github.com/digitaltwinnn/dag-visualizer";
 
-export default function SiteFooter() {
+// `overDoc` (2026-09-04): the same chrome row on the doc pages (/about, /design), so the site
+// band is identical everywhere. There it rides a scrolling document instead of the canvas: no
+// phone-dock offset (no dock exists), no zeroed `--footer-h` (that zero exists so app consumers
+// reserve no band — a document reserves its own bottom padding instead), just the safe-area
+// inset on notched phones. The doc pages pad their content bottom clear of it.
+export default function SiteFooter({ overDoc = false }: { overDoc?: boolean }) {
   return (
     // pointer-events-none on the band, auto on the links: the strip spans the full width over the
     // canvas, and an orbit drag started along the bottom edge must still reach the scene.
     <footer
       id="sitefoot"
-      className="fixed inset-x-0 bottom-0 z-10 h-[var(--footer-h)] flex items-center justify-center pointer-events-none max-[700px]:bottom-[var(--phone-dock-h)] max-[700px]:h-[var(--footer-phone-h)]"
+      className={cn(
+        "fixed inset-x-0 bottom-0 z-10 flex items-center justify-center pointer-events-none",
+        overDoc
+          ? "h-[var(--footer-phone-h)] max-[700px]:bottom-[env(safe-area-inset-bottom)]"
+          : "h-[var(--footer-h)] max-[700px]:bottom-[var(--phone-dock-h)] max-[700px]:h-[var(--footer-phone-h)]",
+      )}
     >
       {/* The halo text-shadow is GONE (user, 2026-08-30: "it has some shadow which for text is
           not great") — it existed for bloom sweeping the bottom edge, but the vitals band now

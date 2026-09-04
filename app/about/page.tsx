@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
-import { Globe, Layers, Orbit, TriangleAlert, type LucideIcon } from "lucide-react";
+import { TriangleAlert, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import NetLink from "@/components/NetLink";
+import SiteHeader from "@/components/SiteHeader";
+import SiteFooter from "@/components/SiteFooter";
+import { VIEW_ICONS } from "@/components/icons";
 import { ABOUT } from "@/components/aboutCopy";
 
 // A plain-HTML, crawlable ABOUT page — deliberately GENERIC and non-technical (user, 2026-07-10):
@@ -29,27 +32,10 @@ export const metadata: Metadata = {
   alternates: { canonical: "/about" },
 };
 
-// The brand mark, STATIC: the same waveform `components/topbar/EcgMark.tsx` draws, without the
-// store subscription or the sweeping beat. Keep the path in sync with that component — it is the
-// brand's one shape, and there is no var() to share between an SVG `d` and a component.
-const BEAT = "M0 12 H10 L13 12 L15 4 L18 20 L21 9 L24 12 H34";
-
-function BrandMark() {
-  return (
-    <span className="text-primary flex-none" aria-hidden>
-      <svg width="34" height="24" viewBox="0 0 34 24" fill="none">
-        <path
-          d={BEAT}
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          opacity="0.9"
-        />
-      </svg>
-    </span>
-  );
-}
+// The brand mark and the page header are SHARED chrome now (components/brand.tsx +
+// components/SiteHeader.tsx, 2026-09-04) — the command bar's material and grammar on every doc
+// page, with the view switch as real links into the routed views. Nothing brand-shaped is
+// hand-copied here any more.
 
 // The house eyebrow: a bare role word in caps micro, the same register every card head uses.
 function Eyebrow({ children }: { children: React.ReactNode }) {
@@ -74,11 +60,9 @@ function Panel({ className, children }: { className?: string; children: React.Re
 }
 
 // A view's card in the "what you can explore" grid. The icon is the view's REAL mark from the
-// app's own vocabulary (components/icons.tsx → VIEW_ICONS), so the three cards here and the three
-// buttons in the command bar can't disagree. Imported as the lucide symbols directly rather than
-// through VIEW_ICONS, whose `Record<Mode, …>` key type would drag the store's `Mode` into a page
-// that deliberately imports no store. (aboutCopy's own `import type { Mode }` erases at compile,
-// so this page stays store-free at runtime.)
+// app's own vocabulary (components/icons.tsx → VIEW_ICONS), so the three cards here, the header's
+// view links and the command bar's buttons can't disagree. (icons.tsx's Mode import is type-only,
+// so reading VIEW_ICONS drags no store value into the page at runtime.)
 function ViewCard({ icon: Icon, name, about }: { icon: LucideIcon; name: string; about: { title: string; lines: string[] } }) {
   return (
     <Panel className="p-4">
@@ -144,31 +128,10 @@ export default function AboutPage() {
         }}
       />
 
-      <div className="relative mx-auto max-w-3xl px-6 pb-24">
-        {/* A slim echo of the command bar: same glass, same rounding, same brand cluster, so
-            arriving here reads as one level of the same product rather than a different site.
-            It is a HEADER, not an instrument — no live figures, no controls but the way back. */}
-        <header className="sticky top-3 z-10 pt-3">
-          <Panel className="flex items-center gap-2 py-2 px-3.5">
-            <BrandMark />
-            <span className="font-semibold tracking-[-0.01em] text-title whitespace-nowrap">
-              <span className="text-foreground">DAG</span> <span className="text-muted-foreground">Visualizer</span>
-            </span>
-            <span className="flex-1" />
-            {/* A plain <a>: the visualizer boots a WebGL engine on a fresh document, and there is
-                no client router on this page to preserve. */}
-            <NetLink
-              href="/"
-              className={cn(
-                "text-label text-primary no-underline rounded-btn py-1.5 px-2.5 whitespace-nowrap",
-                "hover:bg-wash-soft transition-colors duration-150 motion-reduce:transition-none",
-                "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
-              )}
-            >
-              Open the visualizer →
-            </NetLink>
-          </Panel>
-        </header>
+      <div className="relative mx-auto max-w-3xl px-6 pt-[14px] pb-24">
+        {/* The shared doc-page header — the command bar's own glass and grammar, with the view
+            switch as links (components/SiteHeader.tsx). */}
+        <SiteHeader />
 
         <article className="pt-14">
           <Eyebrow>About</Eyebrow>
@@ -225,9 +188,9 @@ export default function AboutPage() {
                 strip makes in-app. Single column: three paragraphs per view read as prose, not
                 as grid tiles. */}
             <div className="grid gap-3">
-              <ViewCard icon={Orbit} name="Hypergraph" about={ABOUT.hyper} />
-              <ViewCard icon={Globe} name="Geography" about={ABOUT.geo} />
-              <ViewCard icon={Layers} name="Snapshots" about={ABOUT.ledger} />
+              <ViewCard icon={VIEW_ICONS.hyper} name="Hypergraph" about={ABOUT.hyper} />
+              <ViewCard icon={VIEW_ICONS.geo} name="Geography" about={ABOUT.geo} />
+              <ViewCard icon={VIEW_ICONS.ledger} name="Snapshots" about={ABOUT.ledger} />
             </div>
             {/* The card-adaptation principle, stated for the reader (user, 2026-08-15) — the same
                 text CLAUDE.md and the README carry in their own registers. */}
@@ -329,6 +292,9 @@ export default function AboutPage() {
           </footer>
         </article>
       </div>
+      {/* The same site-chrome band the app wears along its bottom edge (GitHub · About · Design ·
+          the disclosure) — over a document it skips the app's phone-dock offset. */}
+      <SiteFooter overDoc />
     </main>
   );
 }
