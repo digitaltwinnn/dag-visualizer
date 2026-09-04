@@ -898,6 +898,14 @@ function ViewCells({ mode, accent, filter }: { mode: string; accent: string; fil
  *  this component reads the mode only to pick which view's cells to lay out. */
 export default function VitalsBand() {
   const { mode, live, filter, accent } = useVitalsScope();
+  // ⚠️ THE BAND INSETS BY THE OPEN SHEETS' MEASURED COVER (2026-09-04, the tablet pass): on
+  // tablet the edge sheets overlay a full-width band, and the covered cards showed through the
+  // seam as orphaned fragments — a value column with its labels under the glass. `sceneCover` is
+  // the same measured channel the callout's placement reads (RailDock publishes it per side), so
+  // the band and the callout can never disagree about how much width the sheets hold. Zero on
+  // desktop and phone by construction.
+  const coverL = useStore((s) => s.sceneCoverL);
+  const coverR = useStore((s) => s.sceneCoverR);
   // The band steps back with the rails while the user's hand is on the camera (user, 2026-08-30)
   // — the same one read the RailShade dims on, at the recipe's own tempos (away 0.3s, the return
   // faster: it answers a gesture already finished).
@@ -906,6 +914,12 @@ export default function VitalsBand() {
     <section
       id="vitalsband"
       aria-label="View vitals"
+      // The cover inset composes ONTO --bar-margin (left/right override the inset-x arms when a
+      // sheet holds width; the transition above eases the reflow on the sheet's own tempo).
+      style={{
+        left: coverL > 0 ? `calc(var(--bar-margin) + ${coverL}px)` : undefined,
+        right: coverR > 0 ? `calc(var(--bar-margin) + ${coverR}px)` : undefined,
+      }}
       className={cn(
         // pointer-events-none: the band is a read-only instrument — orbit drags pass through it.
         // --bar-margin, THE COMMAND BAR'S OWN INSET (globals.css), so the two bars bracket the
@@ -932,6 +946,7 @@ export default function VitalsBand() {
         // as a bar and a scattering of chips (user, 2026-09-01: "the bottom bar should be the same
         // exactly as the top bar").
         "rounded-lg border border-border/60 [background:var(--topbar-glass)] backdrop-blur-sm",
+        "transition-[left,right] duration-300 motion-reduce:transition-none",
         // ⚠️ THE CARDS ARE FLATTENED FROM HERE, not by a prop threaded through every cell. The same
         // `ViewCells` renders the PHONE strip, where the cards scroll and must keep their own
         // plates — a section of a bar that scrolls away from the bar is not a section. An arbitrary
