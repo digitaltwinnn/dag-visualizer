@@ -34,6 +34,20 @@ import { cn } from "@/lib/utils";
 // card; see ExploreRail. `travel` (default true) adds the 8px rise.
 export const SWAP_OUT_MS = 200; // ⚠️ paired with the duration-[200ms] utility below — one file, keep together
 
+// THE ARRIVAL EASE — the same rule for content that LANDS inside a persistent frame (an async
+// read resolving into rows, a live list gaining an entry, a reveal replacing an acquiring
+// state): put it on the element that MOUNTS when the content arrives — a keyed row, a landed
+// branch — and the entrance plays once, never on updates (user, 2026-09-04: "other elements
+// inside others that can benefit from easing … the list of anchored snapshots growing/
+// shrinking, the data in the metagraph snapshot card when revealed").
+export const CONTENT_EASE =
+  "animate-in fade-in duration-(--tempo-roll) ease-[cubic-bezier(.45,.05,.25,1)] motion-reduce:animate-none";
+
+// THE LIVE-BAR EASE — a width stated by live data never snaps between readings (the odometer's
+// principle applied to geometry). For style-width elements that PERSIST across polls; an
+// element that remounts per reading has nothing to transition and doesn't take this.
+export const BAR_EASE = "transition-[width] duration-500 ease-out motion-reduce:transition-none";
+
 export default function RollSwap<K extends string>({
   swapKey,
   render,

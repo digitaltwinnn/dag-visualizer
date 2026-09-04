@@ -5,7 +5,8 @@ import { pollStatusOf, type PollStatus } from "@/src/data/pollStatus";
 import { relativeAge } from "@/src/util/relativeAge";
 import { BandCard } from "@/components/VitalsBand";
 import { useNowTick } from "@/components/useNowTick";
-
+import { cn } from "@/lib/utils";
+import { BAR_EASE } from "@/components/RollSwap";
 // THE PULSE STRIP — the heartbeat's own row (user, 2026-08-30: clicking the ECG "should show a
 // bottom section (like the filter) with relevant information about the liveliness of the app —
 // when did it last poll successfully? which polls do we have?"). The filter strip's exact
@@ -66,9 +67,9 @@ export default function PulseStrip() {
                   thousands stays a visible mark; the numbers carry the measurement. */}
               <span className="flex items-center gap-1.5 whitespace-nowrap">
                 <span aria-hidden className="flex h-[3px] w-12 flex-none rounded-full overflow-hidden bg-border/60">
-                  <span style={{ width: `${(r.ok / Math.max(1, r.ok + r.err)) * 100}%`, background: "var(--success)" }} className="opacity-70" />
+                  <span style={{ width: `${(r.ok / Math.max(1, r.ok + r.err)) * 100}%`, background: "var(--success)" }} className={cn("opacity-70", BAR_EASE)} />
                   {r.err > 0 && (
-                    <span style={{ width: `${(r.err / Math.max(1, r.ok + r.err)) * 100}%`, background: "var(--destructive)" }} className="opacity-80 min-w-[3px]" />
+                    <span style={{ width: `${(r.err / Math.max(1, r.ok + r.err)) * 100}%`, background: "var(--destructive)" }} className={cn("opacity-80 min-w-[3px]", BAR_EASE)} />
                   )}
                 </span>
                 <span className="text-micro tabular-nums text-muted-foreground">

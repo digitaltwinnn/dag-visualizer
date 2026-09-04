@@ -1,7 +1,7 @@
 "use client";
 
 import { useStore, type Mode } from "@/src/store/store";
-import RollSwap from "@/components/RollSwap";
+import RollSwap, { BAR_EASE } from "@/components/RollSwap";
 import { metagraphById, filterAccent, getAnchor } from "@/src/data/network";
 import { displayNetwork } from "@/src/data/unlisted";
 import { metaType, rolesOf, IdentityDot, RoleChips } from "@/components/inspector/parts";
@@ -285,7 +285,9 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
                 the same neutral the tick chart's unattributed segment wears (user, 2026-09-03 —
                 a bucket meaning "nothing to read a type/place from" in the accent reads as one
                 more member of the vocabulary). */}
-            <span className="h-[5px] rounded-full" style={{ background: r.hue ?? accent, opacity: 0.75, width: r.count > 0 ? `${Math.max(2, (r.count / max) * 100)}%` : 0 }} />
+            {/* BAR_EASE: the rows persist across polls (stable keys), so a share that moves
+                between readings eases instead of snapping — the odometer's principle. */}
+            <span className={cn("h-[5px] rounded-full", BAR_EASE)} style={{ background: r.hue ?? accent, opacity: 0.75, width: r.count > 0 ? `${Math.max(2, (r.count / max) * 100)}%` : 0 }} />
           </span>
           {/* Under a COMMITTED scope a 0 is "this network has none of these", not a measurement of
               zero — the dash says so where a numeral would read as a count (kept from the dot-legend
