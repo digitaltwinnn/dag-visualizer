@@ -281,7 +281,7 @@ export class Globe implements GeoViewHost {
    *  the flag the frame loop folds in is the only write path that holds. The Engine's doc fold
    *  drives this; picking is already off there (`pickSources: []`). */
   setFleetVisible(v: boolean): void {
-    this.fabric.hidden = !v;
+    this.fabric.fleetTarget = v ? 1 : 0;
   }
   private arcs: Arcs;
   private arcSim = new ArcSim();
@@ -1677,6 +1677,8 @@ export class Globe implements GeoViewHost {
   }
 
   update(dt: number): void {
+    // The doc overlay's fleet fade eases here — once per frame, before the pools write.
+    this.fabric.tickFleetFade(dt);
     // Advance the arrival beat (see beginEntry) — parked at 1 in steady state.
     if (!this._glowEntryHold && this._glowEntryT < 1) this._glowEntryT = Math.min(1, this._glowEntryT + dt / 0.7);
     this.clock += dt;

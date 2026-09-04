@@ -29,6 +29,10 @@ export const DUR_OUT = 0.9; //         teardown + gather, incl. the stagger spre
 // because the destination view is complete long before the last node lands.
 export const DUR_IN = 3.0; //          node placement (phase length), incl. the stagger spread
 export const FURN_IN = 1.0; //         the to-view's furniture build, inside the IN phase
+// THE DOC OVERLAY'S ROLL (2026-09-04): one clock for the document's text rolling in/out
+// (DocLayer) AND the parked fleet's stage fade (NodeFabric.tickFleetFade), so the two read as
+// one moment of the same transition. Paired with the CSS side as --tempo-nav (globals.css).
+export const DOC_ROLL = 0.55;
 export const STAGGER_SPREAD = 0.25; // window over which node flights START (rank-ordered)
 
 // A node's flight lasts the phase minus the spread, so the LAST starter still lands in-phase.

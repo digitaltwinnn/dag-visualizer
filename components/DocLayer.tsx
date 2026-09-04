@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
+import { DOC_ROLL } from "@/src/engine/domain/viewTransition";
 import type { DocPage } from "@/components/views";
 
 // THE DOC OVERLAY (2026-09-04, user: "keep the background AND don't reboot the whole scene").
@@ -40,9 +41,9 @@ const DesignDoc = dynamic(() => import("@/components/docs/DesignDoc"));
 // /design's specimen grids wrap rather than widening past it. pt clears the fixed command bar.
 const DOC_COLUMN = "relative mx-auto max-w-3xl px-6 pt-[68px] pb-24";
 
-const ROLL_MS = 550; // the doc's roll = --tempo-nav (the CSS half of the pairing): at document
-// scale the 0.4s title roll read "too quick" (user) — a page is navigation, so it moves on the
-// navigation clock.
+// The roll's one JS home is the choreography's own DOC_ROLL (domain/viewTransition — the fleet's
+// stage fade reads the same constant, so text and nodes move as one); --tempo-nav is its CSS pair.
+const ROLL_MS = DOC_ROLL * 1000;
 
 export default function DocLayer({ initial }: { initial: DocPage | null }) {
   const stored = useStore((s) => s.docPage);
