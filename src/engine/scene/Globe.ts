@@ -272,6 +272,17 @@ export class Globe implements GeoViewHost {
       ["metanodes/hex", this.fabric.metaHex],
     ];
   }
+
+  /** The DOC OVERLAY's bare-stage switch (2026-09-04, user: hide "all 3d elements except the
+   *  background related elements"): the flat placeholder policy already hides every view group,
+   *  but the shared node pool renders wherever it is parked — which put the fleet grids behind
+   *  the document's headline. Sets the FABRIC's own per-frame flag: a one-shot `.visible` write
+   *  is overwritten by the cross-fade gating every frame, and the meshes are built lazily, so
+   *  the flag the frame loop folds in is the only write path that holds. The Engine's doc fold
+   *  drives this; picking is already off there (`pickSources: []`). */
+  setFleetVisible(v: boolean): void {
+    this.fabric.hidden = !v;
+  }
   private arcs: Arcs;
   private arcSim = new ArcSim();
 

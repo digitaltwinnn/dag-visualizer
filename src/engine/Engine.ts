@@ -632,6 +632,8 @@ export class Engine {
     this.mode = s.docPage ? "status" : s.mode;
     this.filter = s.filter;
     this.cohortSel = s.cohort;
+    // A cold doc boot starts on the bare stage (the subscription below only sees CHANGES).
+    if (s.docPage) this.globe.setFleetVisible(false);
     // Booting straight into geo (deep link / persisted view): seed morph=1 so the boot layout
     // is the globe from the first frame.
     if (this.mode === "geo") this.morph = 1;
@@ -648,10 +650,13 @@ export class Engine {
         // The engine's EFFECTIVE view folds the doc overlay in (see the constructor seed): a doc
         // opening runs the same transition a switch to a "soon" view runs — geometry gathers to
         // the parked grids, the canvas keeps rendering the bare backdrop — and closing re-enters
-        // the store's view through the same choreography.
+        // the store's view through the same choreography. The doc stage is BARER than a soon
+        // view's: the parked fleet hides too (user, 2026-09-04 — only background-related
+        // elements may stay), which is the one thing the flat policy's show{} gates don't reach.
         const eff = st.docPage ? ("status" as Mode) : st.mode;
         const prevEff = prev.docPage ? ("status" as Mode) : prev.mode;
         if (eff !== prevEff) this.setMode(eff);
+        if ((st.docPage != null) !== (prev.docPage != null)) this.globe.setFleetVisible(st.docPage == null);
         // The engine learns of a theme flip the one allowed way (spec §3). The CSS has already
         // flipped on this same click — `data-theme` / `color-scheme` are stamped by
         // ThemeController before it writes the store — so the tokens re-read below resolve to the

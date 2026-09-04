@@ -166,6 +166,14 @@ function openBounds(mesh: THREE.InstancedMesh): void {
 export class NodeFabric {
   private nodeGroup: THREE.Group;
 
+  // THE BARE STAGE (2026-09-04): while a doc overlay is open the scene shows background only,
+  // and the parked fleet is the one geometry the flat policy's show{} gates don't reach. The
+  // per-frame visibility writes below fold this in — a one-shot `.visible` write from outside
+  // is overwritten by the cross-fade gating every frame, and the meshes are built lazily, so a
+  // flag the frame loop reads is the only write path that actually holds. Globe.setFleetVisible
+  // is the one setter (the Engine's doc fold drives it).
+  hidden = false;
+
   // Validators (the DAG core) — two InstancedMeshes sharing one colour + glow buffer.
   instSphere: THREE.InstancedMesh | null = null;
   instHex: THREE.InstancedMesh | null = null;
@@ -566,8 +574,8 @@ export class NodeFabric {
     const trOn = !!(ctx.transition && ctx.transition.active());
     this.instSphere.instanceMatrix.needsUpdate = true;
     this.instHex.instanceMatrix.needsUpdate = true;
-    this.instSphere.visible = (w < 0.999 && !c.ledger) || trOn; // transitions crossfade per node
-    this.instHex.visible = w > 0.001 || c.ledger || trOn; //       (both meshes live mid-flight)
+    this.instSphere.visible = !this.hidden && ((w < 0.999 && !c.ledger) || trOn); // transitions crossfade per node
+    this.instHex.visible = !this.hidden && (w > 0.001 || c.ledger || trOn); //       (both meshes live mid-flight)
     return this.pickablesFor(w, c.ledger);
   }
 
@@ -792,8 +800,8 @@ export class NodeFabric {
     const trOnM = !!(ctx.transition && ctx.transition.active());
     this.metaSphere.instanceMatrix.needsUpdate = true;
     this.metaHex.instanceMatrix.needsUpdate = true;
-    this.metaSphere.visible = (w < 0.999 && !c.ledger) || trOnM;
-    this.metaHex.visible = w > 0.001 || c.ledger || trOnM;
+    this.metaSphere.visible = !this.hidden && ((w < 0.999 && !c.ledger) || trOnM);
+    this.metaHex.visible = !this.hidden && (w > 0.001 || c.ledger || trOnM);
     this.metaAESphere.needsUpdate = true;
     this.metaAEHex.needsUpdate = true;
     (this.metaSphere.geometry.getAttribute("aBase") as THREE.InstancedBufferAttribute).needsUpdate = true;

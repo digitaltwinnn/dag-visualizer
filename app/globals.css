@@ -797,6 +797,11 @@
   --tempo-beat: 1.5s;
   --tempo-signal: 1.2s;
   --tempo-roll: 0.4s;
+  /* The NAVIGATION clock — the user's own gesture resolving, slower than any signal: 0.55s is
+     the scene↔raw depth transition's GSAP duration (SectionShell.tsx — the JS half of this
+     pairing, like the disclosure clock's chevron), and the doc overlay's fade rides it so
+     opening/closing a document and changing depth read as one vocabulary. */
+  --tempo-nav: 0.55s;
 
   /* ── Instrument-thread ruler spec (the ONE shared source) ─────────────────────
      Both rails' SVG threads (RailThread.tsx) and the bar-chart axis read identically:

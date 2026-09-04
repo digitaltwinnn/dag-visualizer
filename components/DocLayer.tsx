@@ -1,30 +1,43 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import type { DocPage } from "@/components/views";
 
 // THE DOC OVERLAY (2026-09-04, user: "keep the background AND don't reboot the whole scene").
-// /about and /design render as a scrollable document layer over the LIVE scene — the app's own
-// command bar above it, the app's own footer below it, the scene's ground as the backdrop the
-// old standalone pages could only fake with a wash. Opening and closing is a store write
-// (`docPage`), published to the address bar by RouteSync; no navigation, no engine teardown.
+// /about and /design render as a scrollable document layer on the scene's BARE STAGE — while a
+// doc is open the engine runs its flat placeholder state with the parked fleet hidden too
+// (Engine's doc fold), so what shows behind the text is background only: the paper cyclorama in
+// light, the flat ground in dark. The app's own command bar above, the app's own footer below.
+// Opening and closing is a store write (`docPage`), published to the address bar by RouteSync;
+// no navigation, no engine teardown.
 //
-// SEO is unchanged by the move: the /about route server-renders AppShell with `doc="about"`,
-// which reaches this component as `initial` — the prose is in that route's HTML exactly as
-// before (client components server-render; the dynamic imports below default to SSR and only
-// code-split the chunks so the app routes don't carry the documents' weight).
+// THE FADE IS THE DOC'S OWN TRANSITION (user, 2026-09-04 — "the view out transition will be
+// quiet, perhaps fade out the doc itself … tied and controlled together"): the scene side of a
+// doc open/close is the gather/entry choreography, and the layer itself fades on the shared
+// `--tempo-nav` clock (globals.css — the depth transition's own 0.55s), so a document arriving,
+// a document leaving and a depth change all move on the one navigation tempo. The unmount waits
+// for the fade (NAV_MS mirrors the token — the same CSS↔JS pairing the disclosure clock keeps);
+// reduced motion snaps the opacity and the early unmount is invisible.
+//
+// SEO is unchanged by the overlay move: the /about route server-renders AppShell with
+// `doc="about"`, which reaches this component as `initial` — the prose is in that route's HTML
+// (client components server-render; the dynamic imports below default to SSR and only split the
+// chunks). A cold doc load shows the document immediately, with no entrance fade — it is
+// content, not an instrument.
 //
 // The `initial` → store ADOPTION is the NetLink mount pattern: SSR and the first client render
 // draw from the prop (hydration sees no mismatch), one effect seeds the store and flips
-// `adopted`, and from then on the store owns it — so the footer's toggles and Escape work the
-// moment the page is interactive, and closing can't fight the prop.
+// `adopted`, and from then on the store owns it.
 const AboutDoc = dynamic(() => import("@/components/docs/AboutDoc"));
 const DesignDoc = dynamic(() => import("@/components/docs/DesignDoc"));
 
 // The one doc column (both documents read it): max-w-3xl is the document reading measure;
 // /design's specimen grids wrap rather than widening past it. pt clears the fixed command bar.
 const DOC_COLUMN = "relative mx-auto max-w-3xl px-6 pt-[68px] pb-24";
+
+const NAV_MS = 550; // = --tempo-nav
 
 export default function DocLayer({ initial }: { initial: DocPage | null }) {
   const stored = useStore((s) => s.docPage);
@@ -35,6 +48,24 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
     setAdopted(true);
   }, [initial]);
   const page = adopted ? stored : initial;
+
+  // The fade machinery: `render` is what stays MOUNTED (held through the exit fade), `visible`
+  // drives the opacity. Opening mounts hidden and flips visible a frame later; closing flips
+  // hidden and unmounts on the nav clock. A cold doc load (initial set) starts visible.
+  const [render, setRender] = useState<DocPage | null>(initial);
+  const [visible, setVisible] = useState(initial != null);
+  const exitT = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (page) {
+      if (exitT.current) { clearTimeout(exitT.current); exitT.current = null; }
+      setRender(page);
+      const raf = requestAnimationFrame(() => setVisible(true));
+      return () => cancelAnimationFrame(raf);
+    }
+    setVisible(false);
+    exitT.current = setTimeout(() => { exitT.current = null; setRender(null); }, NAV_MS);
+    return () => { if (exitT.current) { clearTimeout(exitT.current); exitT.current = null; } };
+  }, [page]);
 
   // Escape closes the document — the RAW layer's own gesture, and like there it is one of
   // several routes back (the footer toggles, the bar's view switch, browser back).
@@ -47,21 +78,23 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [page, setDocPage]);
 
-  if (!page) return null;
-  const Doc = page === "about" ? AboutDoc : DesignDoc;
+  if (!render) return null;
+  const Doc = render === "about" ? AboutDoc : DesignDoc;
   return (
     // The scroll viewport: html/body are overflow:hidden for the fixed-canvas app, so the
     // document scrolls in its own fixed box. z-[8]: over the canvas and the (stood-down) HUD,
     // under the footer strip (z-10) and the command bar (z-40), both of which stay live chrome.
-    // NO VEIL of its own (user, 2026-09-04 — the background-mix read "brownish"): while a doc is
-    // open the ENGINE is in its flat placeholder state (Engine's effective-view fold), so what
-    // shows behind the text is the scene's own bare backdrop — the paper cyclorama in light, the
-    // flat ground in dark — and the panels' glass sits straight on it, exactly the "soon" pages'
-    // arrangement.
+    // NO VEIL of its own (user, 2026-09-04 — the background-mix read "brownish"): the engine's
+    // bare stage IS the ground, and the panels' glass sits straight on it. pointer-events gate
+    // off during the exit fade so a leaving document can't eat the scene's first clicks.
     <div
-      className="fixed inset-0 z-[8] overflow-y-auto overscroll-contain"
+      className={cn(
+        "fixed inset-0 z-[8] overflow-y-auto overscroll-contain",
+        "transition-opacity duration-(--tempo-nav) ease-out motion-reduce:transition-none",
+        !visible && "opacity-0 pointer-events-none",
+      )}
       role="region"
-      aria-label={page === "about" ? "About" : "Design"}
+      aria-label={render === "about" ? "About" : "Design"}
     >
       {/* The bar's scrim: without it a half-clipped line of prose rides the strip between the
           viewport top and the bar's own glass while scrolling. Fixed, z above the flowing text,
