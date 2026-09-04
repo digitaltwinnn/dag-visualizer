@@ -126,14 +126,15 @@ export default function AboutDoc() {
           <ViewCard icon={VIEW_ICONS.ledger} name="Snapshots" about={ABOUT.ledger} />
         </div>
         {/* The card-adaptation principle, stated for the reader (user, 2026-08-15) — the same
-            text CLAUDE.md and the README carry in their own registers. */}
+            text CLAUDE.md and the README carry in their own registers, given the human-voice
+            pass 2026-09-04 (the "ancestor card"/"routine facts" phrasing was the technical
+            register leaking through). */}
         <p>
-          Everything you select gets a card, and the cards <strong>tell the story rather than
-          recite a record</strong>: the same subject is presented as the current scene sees it.
-          Select a node while a snapshot is pinned and its card leads with the relation —
-          signed, and by which layer — while routine facts step back; facts an ancestor card
-          already states aren&apos;t repeated below it; and the label floating in the scene
-          follows whichever card you expand, exactly as the camera does.
+          Whatever you select gets its own card — and the cards <strong>adapt to what
+          you&apos;re looking at</strong> rather than reciting a fixed record. Select a node
+          while a snapshot is pinned and its card leads with how the two are related; a fact
+          already stated by the card above it isn&apos;t repeated below; and the label floating
+          in the scene follows whichever card you open, just as the camera does.
         </p>
       </Section>
 

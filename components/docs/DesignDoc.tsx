@@ -79,6 +79,11 @@ function Section({ title, children }: { title: React.ReactNode; children: React.
 }
 
 // A section's explanatory paragraph: the house label register, muted, measure-capped.
+// HUMAN VOICE THROUGHOUT (user, 2026-09-04 — "yes to all" on extending the about-page rule):
+// notes speak to a reader, never cite rules or file paths at them. The developer-facing
+// authority is unchanged and lives where developers look — components/CLAUDE.md for the
+// prohibitions, app/globals.css for the tokens, the section demos' own headers for the code
+// names the titles used to carry.
 function Note({ children }: { children: React.ReactNode }) {
   return <p className="text-label text-muted-foreground leading-relaxed max-w-2xl">{children}</p>;
 }
@@ -113,12 +118,12 @@ export default function DesignDoc() {
             like right now.
           </p>
 
-          <Section title="Structural lane">
+          <Section title="Structural colours">
             <Note>
-              Structural cyan (<code className="font-mono">--primary</code>) is the SOLE
-              accent/affordance signal; warn/ready use <code className="font-mono">--destructive</code>/
-              <code className="font-mono">--success</code>; the DAG core is{" "}
-              <code className="font-mono">--core</code>. These are never repointed at an identity hue.
+              A small set of colours does all the structural work. Cyan is the app&apos;s one
+              accent — anything glowing cyan is live or clickable. Red warns, green says ready,
+              and the deep blue belongs to the DAG core itself. These jobs are theirs alone: a
+              metagraph&apos;s own colour never takes them over.
             </Note>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {STRUCTURAL.map((t) => (
@@ -131,13 +136,11 @@ export default function DesignDoc() {
             </div>
           </Section>
 
-          <Section title="HUD type scale">
+          <Section title="Type scale">
             <Note>
-              Four steps every HUD text site snaps to (globals.css <code className="font-mono">@theme</code>{" "}
-              <code className="font-mono">--text-*</code>). Tokens first — an arbitrary{" "}
-              <code className="font-mono">text-[..px]</code> is only acceptable for a true one-off (e.g. a
-              control glyph), documented inline. <code className="font-mono">text-micro</code> is for
-              uppercase eyebrows/tags/axis + glyphs, never readable body copy.
+              Four text sizes cover the whole interface — tiny uppercase tags, small labels,
+              body rows, and card titles. Every piece of text snaps to one of them, which is a
+              large part of why the panels read as one calm instrument rather than a collage.
             </Note>
             <div className="flex flex-col gap-3">
               {TYPE_SCALE.map((t) => (
@@ -152,11 +155,10 @@ export default function DesignDoc() {
             </div>
             {/* Two typefaces, split by PURPOSE — no web font (native stacks: instant, no FOUT). */}
             <Note>
-              Two typefaces, split by role: a proportional SANS for everything you read (titles,
-              descriptions, labels), and a MONOSPACE for machine data — node id hashes, counts, layer
-              codes, $DAG amounts, snapshot ordinals. Mono + <code className="font-mono">tabular-nums</code>{" "}
-              keeps digits fixed-width so they align in columns and roll cleanly on the Odometer, and
-              makes a hash scannable character-by-character.
+              Two typefaces, split by role: a proportional sans for everything you read — titles,
+              descriptions, labels — and a monospace for machine data: hashes, counts, codes,
+              $DAG amounts, snapshot numbers. Fixed-width digits line up in columns, roll
+              cleanly on the odometer, and make a hash scannable character by character.
             </Note>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 max-w-2xl">
               <div className="ig-panel p-3">
@@ -170,12 +172,13 @@ export default function DesignDoc() {
             </div>
           </Section>
 
-          <Section title="Identity lane — generated hues">
+          <Section title="Identity colours">
             <Note>
-              Identity hues are deterministic per metagraph (<code className="font-mono">src/palette/</code>):
-              brand hue (baked) &gt; config colour &gt; hash fallback, snapped into non-colliding zones.
-              They appear ONLY on subject marks (dots, threads, chips), matched by metagraph id
-              everywhere — never on structural chrome.
+              Every metagraph gets its own colour, and it is the same everywhere, every time —
+              on its dot, its thread, its chips. A project&apos;s real brand colour wins where one
+              exists; otherwise a hue is derived from its identity and spaced so no two
+              neighbours collide. Identity colours mark subjects only — the app&apos;s own chrome
+              never wears them.
             </Note>
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
               {identity.map((m) => (
@@ -194,27 +197,21 @@ export default function DesignDoc() {
             Signature elements — the bespoke design language
           </h2>
 
-          <Section title={<>Object marks — <code className="font-mono text-[0.85em]">components/icons.tsx</code></>}>
+          <Section title="Object marks">
             <Note>
-              ONE icon system: monochrome <code className="font-mono">lucide-react</code> glyphs via{" "}
-              <code className="font-mono">currentColor</code> (so the accent/identity tint inherits),
-              never emoji. Each SUBJECT kind has a mark (<code className="font-mono">iconForPick</code>),
-              each VIEW its switch icon (<code className="font-mono">VIEW_ICONS</code>), shared by the
-              card heads, the view switch, and the dock trays — read here from the real map, so it
-              can&apos;t drift.
+              Every kind of thing on screen — a node, a country, a snapshot, a view — has one
+              mark, drawn in a single monochrome style that takes on whatever colour its
+              surroundings give it. Wherever you meet the same kind of thing, you meet the same
+              mark. The legend below is read from the app&apos;s own icon map.
             </Note>
             <IconLegend />
           </Section>
 
-          <Section title={<>Command marks — <code className="font-mono text-[0.85em]">EcgMark</code> + <code className="font-mono text-[0.85em]">Odometer</code></>}>
+          <Section title="The heartbeat and the odometer">
             <Note>
-              The command bar is spineless — its identity cue is the ECG heartbeat (the one cyan
-              pulse; the whole HUD&apos;s tempo family beats on{" "}
-              <code className="font-mono">--tempo-beat</code>, transient signals on{" "}
-              <code className="font-mono">--tempo-signal</code> — globals.css&apos;s tempo tokens).
-              Numbers that tick (vitals, the
-              snapshot ordinal) roll on the <code className="font-mono">Odometer</code> rather than
-              snapping. Both shown live below via the real components.
+              The little ECG trace in the top-left corner is the app&apos;s pulse — it beats while
+              the data flows. And numbers that change while you watch roll over like an odometer
+              instead of snapping, so you can see them move. Both run live below.
             </Note>
             <div className="ig-panel p-4 flex flex-wrap items-center gap-8">
               <span className="flex items-center gap-2 text-body">
@@ -226,39 +223,31 @@ export default function DesignDoc() {
             </div>
           </Section>
 
-          <Section title={<>Card states — <code className="font-mono text-[0.85em]">Card</code> + <code className="font-mono text-[0.85em]">CardHead</code></>}>
+          <Section title="Card states">
             <Note>
-              Every rail card is the design-system <code className="font-mono">Card</code> (the{" "}
-              <code className="font-mono">.ig-panel</code> glass recipe) led by the one shared{" "}
-              <code className="font-mono">CardHead</code> (eyebrow / title / inset hairline / body).
-              Cards are SPINELESS AT REST — the resting identity cue lives in the rail thread, not a
-              per-card edge. The states, left → right: the GHOST hint (a slot with nothing selected),
-              the ACTIVE card, COLLAPSED (the whole head is the disclosure toggle → eyebrow + title),
-              and — for right-rail facts cards — CLOSED via the × (clears the subject, back to the
-              ghost). Left-rail tool cards collapse but don&apos;t close. All rendered with the real
-              components, so nothing drifts.
+              Every card in the side rails is the same glass panel with the same header: a small
+              tag, a title, a hairline, then the facts. Left to right below: an empty slot
+              quietly showing what could live there, a full card, a collapsed one (the whole
+              header is the toggle), and a closed one — the × clears the selection and returns
+              the slot to its hint.
             </Note>
             <CardHeadDemo />
           </Section>
 
-          <Section title={<>Node status — <code className="font-mono text-[0.85em]">nodeStatus.ts</code> + the status pills</>}>
+          <Section title="Node status pills">
             <Note>
-              Node health resolves to four buckets, each with its own colour (a LITERAL palette in{" "}
-              <code className="font-mono">nodeStatus.ts</code>, separate from the structural tokens):
-              ready green, in-progress amber, down red, unknown grey. Everything renders as ONE quiet
-              pill language — shown here via the real <code className="font-mono">StatusMark</code>{" "}
-              (the same pill the node card wears; the dossier rolls several up with{" "}
-              <code className="font-mono">StatusBreakdown</code>).
+              A node&apos;s health lands in one of four buckets — ready in green, in progress in
+              amber, down in red, unknown in grey — and always appears as the same quiet pill,
+              whether it describes a single node or rolls a whole fleet up into one line.
             </Note>
             <StatusDemo />
           </Section>
 
-          <Section title={<>State atoms — <code className="font-mono text-[0.85em]">state/StateAtoms.tsx</code></>}>
+          <Section title="When data is missing">
             <Note>
-              Empty/loading states built from the app&apos;s own marks so an absent feed reads as part
-              of the instrument, never a spinner. Every animation is guarded with{" "}
-              <code className="font-mono">motion-reduce</code> at its call site. Shown live via the
-              real atoms.
+              When something hasn&apos;t arrived yet — or can&apos;t be reached at all — the screen says
+              so with one of these small instrument states, never a generic spinner and never a
+              made-up number. These are the four you&apos;ll meet.
             </Note>
             <div className="ig-panel p-4 flex flex-wrap items-center gap-8 text-label text-muted-foreground">
               <span className="flex items-center gap-2"><NodeStars /> acquiring</span>
@@ -268,24 +257,20 @@ export default function DesignDoc() {
             </div>
           </Section>
 
-          <Section title={<>Micro-instruments — <code className="font-mono text-[0.85em]">VitalsBand</code></>}>
+          <Section title="Micro-instruments">
             <Note>
-              The bottom vitals band&apos;s chart vocabulary (2026-08-30): shares of one whole take a{" "}
-              <code className="font-mono">Donut</code> (stepped opacities of the ONE accent hue — the
-              identity hue only under a committed filter), magnitudes take{" "}
-              <code className="font-mono">MicroBars</code>. Non-interactive by rule — the band takes
-              no pointer events. Rendered from the real components.
+              The little charts in the bottom band follow two rules: shares of a whole become a
+              donut, sizes become bars — and every slice and bar is named, so colour is never
+              the only clue to what you&apos;re reading.
             </Note>
             <MicroInstrumentsDemo />
           </Section>
 
-          <Section title={<>Selection language — <code className="font-mono text-[0.85em]">SELECTED_ROW</code> + <code className="font-mono text-[0.85em]">SelectedRowMark</code></>}>
+          <Section title="Selection">
             <Note>
-              ONE committed-selection treatment for every list row (the filter chips, the explorer&apos;s
-              selected node + drilled country): the <code className="font-mono">--sel-bg</code> wash + a
-              1px inset <code className="font-mono">--sel-border</code> ring (as one box-shadow, so it
-              composes over the hover washes) + the reserved trailing{" "}
-              <code className="font-mono">Check</code> mark. Mirrors the view switch&apos;s on-state.
+              Anything you have committed to — a filter, a chosen node, a drilled country —
+              wears the same treatment: a soft wash, a thin ring, and a check mark at the end of
+              the row. One look, everywhere, so you always know what is selected.
             </Note>
             <div className="ig-panel p-2 max-w-[320px] flex flex-col gap-0.5">
               <div className="relative flex items-center gap-2 rounded-sm px-2 py-1.5 pr-7 text-body text-foreground-dim">
@@ -300,15 +285,13 @@ export default function DesignDoc() {
             </div>
           </Section>
 
-          <Section title={<>Scene-anchored labels — <code className="font-mono text-[0.85em]">SCENE_GLASS</code> + the subject callout</>}>
+          <Section title="Scene labels">
             <Note>
-              The hover tooltip and the subject callout are ONE species — HUD glass tied to a scene
-              subject — sharing the <code className="font-mono">SCENE_GLASS</code> container. The callout
-              carries the CardHead register at tooltip scale: eyebrow ink, title + hued ticker aside, the
-              head hairline, <code className="font-mono">RoleChips</code>, and the{" "}
-              <code className="font-mono">.edge-spine</code> — a corner-wrapping identity hairline under a
-              fixed-length fade, so short panels spend their fade in the corner curves. The cyan dashed
-              leader ties it to the anchor ring; identity never tints the frame.
+              When you hover or select something in the 3D scene, a small glass label stands
+              beside it and points at it with a dashed leader. It speaks the cards&apos; own
+              grammar at tooltip scale — the tag, the title, the coloured ticker, a hairline of
+              the subject&apos;s colour along its edge. The example below is deliberately made up:
+              this page teaches the shape, not today&apos;s data.
             </Note>
             <div className="relative h-[190px]">
               {/* Static specimen at the anchor-wrapper geometry the live callout uses. */}
@@ -339,31 +322,25 @@ export default function DesignDoc() {
             </div>
           </Section>
 
-          <Section title={<>Signal language — <code className="font-mono text-[0.85em]">EdgePulse.tsx</code> + the edge recipes</>}>
+          <Section title="Edge signals">
             <Note>
-              <strong>Thread = resting identity cue; card edge = purely transient signal channel.</strong>{" "}
-              The edge lights ONLY as a signal, always on the SCENE-FACING edge, in a strict hierarchy:
-              grey pointer-hover whisper &lt; identity-hued hover pairing (<code className="font-mono">.subject-paired</code>)
-              &lt; the subject-change PULSE (<code className="font-mono">useEdgePulse</code> — a bright
-              gradient-tipped segment sweeps the edge, ~1.2s, synced with the title roll-in). Driven
-              here by the real <code className="font-mono">PulseEdge</code>; reduced motion → one static
-              blink.
+              A card&apos;s inner edge only lights up when something is happening, and the three
+              signals keep a strict order of loudness: a faint grey shimmer under your pointer,
+              a coloured glow when a card and its object in the scene are paired, and —
+              brightest of all — a travelling pulse when the card&apos;s subject changes. All three
+              run live below; with reduced motion on, the pulse becomes a single quiet blink.
             </Note>
             <CardSignalsDemo />
           </Section>
 
-          <Section title={<>Instrument ruler — <code className="font-mono text-[0.85em]">--thread-*</code> / <code className="font-mono text-[0.85em]">--axis-hairlines</code></>}>
+          <Section title="The instrument ruler">
             <Note>
-              One ruler spec threads the whole HUD: a neutral baseline with combed hairline ticks
-              (minor every <code className="font-mono">--thread-tick-pitch</code>, a taller/brighter
-              major every 4th). It appears as the two rails&apos; <code className="font-mono">RailThread</code>{" "}
-              (a mirrored fixed SVG in the 26px margin, with an identity-hued spine + a node-dot at each
-              card&apos;s middle — the RESTING identity cue the spineless cards defer to), the
-              tablet/phone sheet edges (<code className="font-mono">.ig-sheet-edge</code> /{" "}
-              <code className="font-mono">.ig-sheet-topruler</code>), and the bar-chart axis. The strip
-              below renders the live <code className="font-mono">--axis-hairlines</code> recipe (reads
-              the same tokens, so it can&apos;t drift). The 3D ledger station dials bend this same ruler
-              into a hexagon — not shown (same spec, different medium).
+              The thin ruled line with its comb of ticks — every fourth one a touch taller — is
+              the interface&apos;s signature instrument. You&apos;ll find it running down both edges of
+              the screen (with a coloured spine and a dot for every open card), along the panel
+              edges on smaller screens, under the bar charts, and even bent into a hexagon
+              around the dials of the 3D snapshot chamber. One ruler, drawn wherever the
+              interface needs an edge.
             </Note>
             <div className="ig-panel p-4 max-w-2xl">
               <div className="h-3 w-full" style={{ background: "var(--axis-hairlines)" }} aria-hidden />
@@ -376,13 +353,9 @@ export default function DesignDoc() {
             </div>
           </Section>
 
-          <footer className="mt-14 pt-6 border-t border-border flex flex-wrap items-center gap-x-5 gap-y-2">
-            <span className="text-label text-muted-foreground">
-              Internal reference — the tokens live in{" "}
-              <code className="font-mono">app/globals.css</code>; behaviour is verified against the
-              running app.
-            </span>
-          </footer>
+          {/* No article footer — /about's own rule (2026-09-04): the site footer below the
+              overlay is the page's real foot. The retired line's claims live in this file's
+              header comment. */}
         </article>
   );
 }
