@@ -40,7 +40,9 @@ const DesignDoc = dynamic(() => import("@/components/docs/DesignDoc"));
 // /design's specimen grids wrap rather than widening past it. pt clears the fixed command bar.
 const DOC_COLUMN = "relative mx-auto max-w-3xl px-6 pt-[68px] pb-24";
 
-const ROLL_MS = 400; // the entrance/exit roll = --tempo-roll (the CSS half of the pairing)
+const ROLL_MS = 550; // the doc's roll = --tempo-nav (the CSS half of the pairing): at document
+// scale the 0.4s title roll read "too quick" (user) — a page is navigation, so it moves on the
+// navigation clock.
 
 export default function DocLayer({ initial }: { initial: DocPage | null }) {
   const stored = useStore((s) => s.docPage);
@@ -112,12 +114,16 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
     <div
       className={cn(
         "fixed inset-0 z-[8] overflow-y-auto overscroll-contain",
-        // The HUD's text entrance at document scale: a short rise + fade on the roll clock —
-        // never a long opacity crawl over prose. The transform lives on THIS fixed container,
+        // The HUD's text entrance at document scale: a rise + fade on the NAV clock — never a
+        // long opacity crawl over prose. ⚠️ the stock `transition` utility, NOT
+        // `transition-[opacity,transform]`: the arbitrary property list never compiled, so the
+        // transform SNAPPED both ways — measured as a 12px page jump on exit and an entrance
+        // with no visible roll (two user reports, one cause). The stock utility's default list
+        // already carries opacity + transform. The transform lives on THIS fixed container,
         // whose box is inset-0 — its own fixed child (the scrim) re-anchors to it, same box, so
         // nothing shifts (trap 2 stays satisfied for everything outside).
-        "transition-[opacity,transform] duration-(--tempo-roll) ease-out motion-reduce:transition-none",
-        !visible && "opacity-0 translate-y-3 pointer-events-none",
+        "transition duration-(--tempo-nav) ease-out motion-reduce:transition-none",
+        !visible && "opacity-0 translate-y-4 pointer-events-none",
       )}
       role="region"
       aria-label={render === "about" ? "About" : "Design"}
