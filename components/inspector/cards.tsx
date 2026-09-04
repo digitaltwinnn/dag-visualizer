@@ -19,6 +19,7 @@ import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms
 import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
+import HeightEase from "@/components/HeightEase";
 import { useArchive, archiveFactState, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
 import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
 import { useNowTick } from "@/components/useNowTick";
@@ -753,6 +754,12 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // so the glow lights the card's rounded edge.
   return (
     <>
+      {/* The fact block EASES between its shapes (HeightEase — its header carries the rule):
+          the pile rule redistributes these facts as ancestor rungs come and go, and a view
+          switch snapped the card's height in one frame. The Foot stays OUTSIDE the wrapper —
+          its bleed must never meet the ease's transient clip, and Node id survives every
+          redistribution anyway. */}
+      <HeightEase>
       <FactGroup>
         {/* ALIAS — the operator's informal self-registered handle (see the note above). The row
             is ALWAYS stated (user, 2026-08-16: "if it's missing just say so, don't hide the
@@ -915,6 +922,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           </Fact>
         )}
       </FactGroup>
+      </HeightEase>
       {/* The look-up column: this node's own reference, and nothing else — the unique reference
           LAST, where references sit, which falls out of the grammar rather than being a rule of
           its own. Truncated display, full hash on hover. */}
