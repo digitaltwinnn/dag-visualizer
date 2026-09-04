@@ -53,10 +53,13 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
     // The scroll viewport: html/body are overflow:hidden for the fixed-canvas app, so the
     // document scrolls in its own fixed box. z-[8]: over the canvas and the (stood-down) HUD,
     // under the footer strip (z-10) and the command bar (z-40), both of which stay live chrome.
-    // The container's translucent ground is the readability veil — the scene stays visible
-    // through it ("text background etc transparent"), the panels keep their own glass.
+    // NO VEIL of its own (user, 2026-09-04 — the background-mix read "brownish"): while a doc is
+    // open the ENGINE is in its flat placeholder state (Engine's effective-view fold), so what
+    // shows behind the text is the scene's own bare backdrop — the paper cyclorama in light, the
+    // flat ground in dark — and the panels' glass sits straight on it, exactly the "soon" pages'
+    // arrangement.
     <div
-      className="fixed inset-0 z-[8] overflow-y-auto overscroll-contain bg-[color-mix(in_oklch,var(--background)_62%,transparent)]"
+      className="fixed inset-0 z-[8] overflow-y-auto overscroll-contain"
       role="region"
       aria-label={page === "about" ? "About" : "Design"}
     >

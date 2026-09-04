@@ -622,7 +622,14 @@ export class Engine {
     const s = useStore.getState();
     // Seed the rails-lean mirror (an HMR/StrictMode remount can boot with the flag already on).
     this.railsHidden = s.railsHidden;
-    this.mode = s.mode;
+    // THE DOC OVERLAY IS A FLAT VIEW TO THE ENGINE (user, 2026-09-04 — "treat it as a 'soon'
+    // page": the exact scene BACKDROP with the geometry gathered away, not the live scene
+    // fighting the prose). While `docPage` is set the engine's effective view is a placeholder
+    // — same policy row, same choreography, same parked fleet — while `store.mode` keeps naming
+    // the view the reader returns to. Placeholder entries preserve every selection by design
+    // (the flat-views rule in components/CLAUDE.md), so an about/close round trip clears
+    // nothing. "status" is arbitrary among the three flat rows: they share PLACEHOLDER_POLICY.
+    this.mode = s.docPage ? "status" : s.mode;
     this.filter = s.filter;
     this.cohortSel = s.cohort;
     // Booting straight into geo (deep link / persisted view): seed morph=1 so the boot layout
@@ -638,7 +645,13 @@ export class Engine {
     else this.transition.stageInstant();
     this.unsub.push(
       useStore.subscribe((st, prev) => {
-        if (st.mode !== prev.mode) this.setMode(st.mode);
+        // The engine's EFFECTIVE view folds the doc overlay in (see the constructor seed): a doc
+        // opening runs the same transition a switch to a "soon" view runs — geometry gathers to
+        // the parked grids, the canvas keeps rendering the bare backdrop — and closing re-enters
+        // the store's view through the same choreography.
+        const eff = st.docPage ? ("status" as Mode) : st.mode;
+        const prevEff = prev.docPage ? ("status" as Mode) : prev.mode;
+        if (eff !== prevEff) this.setMode(eff);
         // The engine learns of a theme flip the one allowed way (spec §3). The CSS has already
         // flipped on this same click — `data-theme` / `color-scheme` are stamped by
         // ThemeController before it writes the store — so the tokens re-read below resolve to the
