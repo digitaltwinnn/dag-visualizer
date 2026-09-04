@@ -872,8 +872,17 @@
        because it also carries the boot fade. */
     top: 0;
     left: 0;
-    width: 100vw;
-    height: 100vh;
+    /* +2px OVERDRAW past the viewport's bottom/right (user, 2026-09-04 — a ~1px light hairline
+       at the very bottom of scene pages, in light mode, at some DPR/zoom settings): the window's
+       last device-pixel row is fractional at non-integer DPRs, and whether the canvas's own
+       rasterization covers it is a browser rounding call — where it doesn't, the body's
+       `--background` shows through as a hairline against the dark scene (doc pages paint the
+       same colour there, which is why only scene pages showed it). Overdrawing clips offscreen,
+       so every fractional edge row is scene pixels at any rounding; the resulting ~0.2% stretch
+       of the integer-sized buffer is invisible and pick math reads the live rect anyway.
+       Pairs with SceneContext's setSize(..., false) — CSS owns this box. */
+    width: calc(100vw + 2px);
+    height: calc(100vh + 2px);
     display: block;
     opacity: 0;                 /* fade in on the boot handoff */
     transition: opacity 0.6s ease, top 0.25s ease-out;
