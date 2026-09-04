@@ -32,6 +32,12 @@ export default function TopBar() {
   const filter = useStore((s) => s.filter);
   const mode = useStore((s) => s.mode);
   const setMode = useStore((s) => s.setMode);
+  // The DOC OVERLAY strips the bar's SCENE-ACTION controls (user, 2026-09-04 — "strip more of
+  // the HUD"): while /about or /design covers the scene, the filter and the presentation pair
+  // act on something the reader can't see, so they hide; brand/pulse, the view switch (which
+  // closes the doc and lands in the view), theme and network stay — they are the overlay's
+  // chrome as much as the app's.
+  const doc = useStore((s) => s.docPage);
 
   // The bar's ONE grow-downward slot, two tenants (2026-08-30 — the PULSE strip joined the
   // filter strip): `strip` names which row is open, null = closed. One slot makes them mutually
@@ -45,6 +51,12 @@ export default function TopBar() {
   useEffect(() => {
     if (bp === "phone") setStrip(null);
   }, [bp]);
+
+  // A doc overlay opening closes whichever strip is grown — the strip previews the scene the
+  // overlay is about to cover.
+  useEffect(() => {
+    if (doc) setStrip(null);
+  }, [doc]);
 
   // Consume the NetworkSwitch's one-shot view handoff (see its header): a network switch is a
   // hard reload, and the view you were on survives it. Runs once on mount, BEFORE the engine's
@@ -204,7 +216,7 @@ export default function TopBar() {
           </span>
           <span className="sr-only">— show app liveliness</span>
         </button>
-        <span className="w-px self-stretch bg-border my-1 max-[860px]:hidden" />
+        <span className={cn("w-px self-stretch bg-border my-1 max-[860px]:hidden", doc && "hidden")} />
 
         {/* Filter (toned, de-nested) — toggles the ATTACHED filter strip below (user,
             2026-07-12: reversed the 2026-07-04 detached-popover decision; the strip lives on
@@ -219,6 +231,7 @@ export default function TopBar() {
             "flex items-center gap-[7px] bg-transparent border-0 cursor-pointer py-1.5 px-2 rounded-btn",
             "hover:bg-wash-soft",
             strip === "filter" && "bg-wash-soft",
+            doc && "hidden",
             // The 44px tap minimum keys on the POINTER, not the width (user, 2026-08-14 —
       // resizing a desktop window smaller made the bar GROW): a coarse pointer is a
       // touch device wherever the window edge sits; a fine pointer never needs it.
@@ -332,8 +345,10 @@ export default function TopBar() {
             own axes; the 2026-08-08 one-axis control flattened two independent axes into three
             states). It sits in the COMMAND bar (this zone's scope is the whole instrument)
             rather than the live lane. */}
-        <span className="w-px self-stretch bg-border my-1 max-[860px]:hidden" />
-        <PresentationToggle />
+        <span className={cn("w-px self-stretch bg-border my-1 max-[860px]:hidden", doc && "hidden")} />
+        <div className={cn("contents", doc && "hidden")}>
+          <PresentationToggle />
+        </div>
 
         {/* Theme — the "how it looks" control, riding beside presentation with no divider of
             its own (it reads as part of that group, not a fourth zone). On PHONE it rides the

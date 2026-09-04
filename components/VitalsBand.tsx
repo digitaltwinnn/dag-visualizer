@@ -898,14 +898,12 @@ function ViewCells({ mode, accent, filter }: { mode: string; accent: string; fil
  *  this component reads the mode only to pick which view's cells to lay out. */
 export default function VitalsBand() {
   const { mode, live, filter, accent } = useVitalsScope();
-  // ⚠️ THE BAND INSETS BY THE OPEN SHEETS' MEASURED COVER (2026-09-04, the tablet pass): on
-  // tablet the edge sheets overlay a full-width band, and the covered cards showed through the
-  // seam as orphaned fragments — a value column with its labels under the glass. `sceneCover` is
-  // the same measured channel the callout's placement reads (RailDock publishes it per side), so
-  // the band and the callout can never disagree about how much width the sheets hold. Zero on
-  // desktop and phone by construction.
-  const coverL = useStore((s) => s.sceneCoverL);
-  const coverR = useStore((s) => s.sceneCoverR);
+  // The band does NOT inset by the tablet sheets any more (user, 2026-09-04 — "the bottom bar
+  // should behave the same as the top bar; the collapsible card panels go over the bar instead
+  // of pushing it smaller"). The 2026-09-04 tablet pass had it reflowing by the sheets' measured
+  // sceneCover; reversed the same day: the sheets OVERLAY both bars now, and a partially covered
+  // read-only card is the same accepted cost the command bar already pays. `sceneCover` itself
+  // stays published — the callout's placement still reads it.
   // The band steps back with the rails while the user's hand is on the camera (user, 2026-08-30)
   // — the same one read the RailShade dims on, at the recipe's own tempos (away 0.3s, the return
   // faster: it answers a gesture already finished).
@@ -914,12 +912,6 @@ export default function VitalsBand() {
     <section
       id="vitalsband"
       aria-label="View vitals"
-      // The cover inset composes ONTO --bar-margin (left/right override the inset-x arms when a
-      // sheet holds width; the transition above eases the reflow on the sheet's own tempo).
-      style={{
-        left: coverL > 0 ? `calc(var(--bar-margin) + ${coverL}px)` : undefined,
-        right: coverR > 0 ? `calc(var(--bar-margin) + ${coverR}px)` : undefined,
-      }}
       className={cn(
         // pointer-events-none: the band is a read-only instrument — orbit drags pass through it.
         // --bar-margin, THE COMMAND BAR'S OWN INSET (globals.css), so the two bars bracket the

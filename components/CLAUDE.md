@@ -486,30 +486,35 @@ writer, and it clears its own state when the viewport drops below 1100px — bel
 CSS-hidden and SCENE has no meaning, so a stuck `true` would strand the band and the camera's
 rails-lean with no visible way back.
 
-### Boot entrance, routes & the doc pages' chrome (2026-09-04)
+### Boot entrance, routes & the doc overlay (2026-09-04)
 
 - **The HUD arrives staged** (`useBootStage` + `BootFade`, wired in `AppShell`): command bar when
   the engine is up (or failed — chrome is controls), rails/dock/footer on first data, vitals band
   on live; latched, paced `STEP_MS` apart, force-completed by an 8s timeout so chrome never hides
   behind a dead feed. `BootFade` is a plain opacity wrapper (trap-2 safe, `inert` while hidden) —
   never add a transform there, RailThread measures rects mid-fade.
-- **`AppShell` is the app** — `/` and `app/[view]` both render it; `RouteSync` is the URL↔mode
-  bridge (seed on mount, shallow pushState on switch, popstate back), `components/views.ts` the
-  one view-vocabulary home (TopBar's VIEWS lives there now).
-- **The doc pages (/about, /design) wear shared chrome**: `SiteHeader` (the command bar's glass,
-  its 3-zone grid and label breakpoint — the switch as centred links — + ThemeToggle/Controller,
-  fixed and full-span on `--bar-margin`) and `SiteFooter overDoc`; `DocBackdrop` owns the wash,
-  scrim, side margins and the one `DOC_COLUMN`; the brand waveform's one `d` is
-  `components/brand.tsx` (EcgMark animates it, BrandMark stills it).
-- **The footer is a full-width strip, one row everywhere**: view links (`FooterViewLinks` —
-  store-driven in-app so the engine survives, plain anchors on docs, phone drops them) | About ·
-  Design | Source code · Constellation, hairline-divided, the last divider the affiliation
-  boundary. In-app it tucks `min(10px, --bottom-reserve)` under the vitals band so the band's
-  rounded corners sit on its veil (the notch fix); the band sits flush on it (no air gap). The
-  canvas's display box is CSS-owned (`setSize(..., false)`) or a fractional-DPR viewport shows a
-  background sliver under the scene — light mode made it visible.
+- **`AppShell` is the app** — `/`, `app/[view]` AND the doc routes all render it; `RouteSync` is
+  the URL↔state bridge (seed mode on mount, shallow pushState for `docPage ?? mode`, popstate
+  back), `components/views.ts` the one view/doc vocabulary home (TopBar's VIEWS lives there).
+- **/about and /design are the DOC OVERLAY, not pages** (user: footer navigation must not reboot
+  the engine, and the live scene is the backdrop): `store.docPage` + `DocLayer` (scrollable
+  veil over the scene, Escape closes; content in `components/docs/`, dynamic-imported so the
+  chunks split; the routes pass `doc` so /about's prose still server-renders for crawlers) +
+  `DocGate` (rails/dock/band/callout/sweep UNMOUNT while open — BottomStream's cleanup zeroes
+  the reserve, which also folds the footer tuck). TopBar hides its scene-action controls
+  (filter, presentation) while a doc is open; `setMode` closes any open doc by design. The
+  /design specimen's generic hue is allowlisted in `noHardcodedColors.test.ts`.
+- **The footer is a full-width strip, one row, one separator species (the mid-dot)**: view links
+  (`FooterViewLinks`, store-committed) · About · Design (store toggles via `DocToggle`) ·
+  Source code (octocat) · Constellation (the $DAG mark + siteUrl via `metagraphById("dag")`).
+  In-app it tucks `min(10px, --bottom-reserve)` under the vitals band (the corner-notch fix) and
+  the band sits flush on it. The brand waveform's one `d` is `components/brand.tsx`.
+- **The vitals band does NOT inset by the tablet sheets** (user reversal, same day it shipped):
+  the sheets overlay both bars alike; `sceneCover` stays published for the callout.
 - **The tempo family is tokenized** — `--tempo-beat` / `--tempo-signal` / `--tempo-roll` in
   globals.css `:root`; the 150ms disclosure clock deliberately is not (its header says why).
+- **The canvas's display box is CSS-owned** (`setSize(..., false)` + a 2px viewport overdraw in
+  `.scene-canvas`) — integer inline sizing left fractional-DPR background slivers at the edges.
 
 ### Responsive shell
 

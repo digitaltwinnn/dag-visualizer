@@ -139,6 +139,12 @@ interface AppState {
   // Active view. The scene is one persistent canvas; the engine morphs between hyper
   // and geo and hides it for the flat views, all driven by this.
   mode: Mode;
+  // The DOC OVERLAY (2026-09-04): /about and /design render INSIDE the app as a scrollable
+  // document layer over the live scene (DocLayer), instead of separate static pages that
+  // rebooted the WebGL engine on every footer navigation. A presentation axis like `section`,
+  // never a Mode — a document is over the network, not a view of it. While set, the HUD's
+  // scene furniture stands down (DocGate) and RouteSync publishes /about | /design.
+  docPage: "about" | "design" | null;
   // Shared network filter ("all" | "dag" | <metagraph id>) — one unified core model, no
   // separate L0/L1 filters (the DAG is just another metagraph-shaped core).
   filter: string;
@@ -233,6 +239,7 @@ interface AppState {
   setLatestSnapshot: (snap: GlobalSnapshot | null) => void;
   setActivity: (activity: Activity | null) => void;
   setMode: (mode: Mode) => void;
+  setDocPage: (docPage: "about" | "design" | null) => void;
   setFilter: (filter: string) => void;
   setMetaList: (list: MetaInfo[]) => void;
   setInspect: (pick: PickDescriptor | null) => void;
@@ -301,6 +308,7 @@ export const useStore = create<AppState>((set) => ({
   latestSnapshot: null,
   activity: null,
   mode: "hyper",
+  docPage: null,
   filter: "all",
   metaList: [],
   inspect: null,
@@ -347,7 +355,10 @@ export const useStore = create<AppState>((set) => ({
   setMetagraphs: (metagraphs) => set({ metagraphs }),
   setLatestSnapshot: (latestSnapshot) => set({ latestSnapshot }),
   setActivity: (activity) => set({ activity }),
-  setMode: (mode) => set({ mode }),
+  // A view switch CLOSES any open doc overlay: the switch is a statement of where you want to
+  // be, and the two publish to one address bar (RouteSync derives the path from doc ?? mode).
+  setMode: (mode) => set({ mode, docPage: null }),
+  setDocPage: (docPage) => set({ docPage }),
   // Committing a network IS a user gesture (user, 2026-08-14 — changing the filter or paging
   // the dossier left the snapshot card as the box): it bumps the recency stack like every
   // other selection, so the facts rail focuses the metagraph card. "all" clears the entry.

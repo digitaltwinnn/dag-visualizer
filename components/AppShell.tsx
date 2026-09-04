@@ -3,6 +3,8 @@ import Blueprint from "@/components/Blueprint";
 import BootFade from "@/components/BootFade";
 import BootOverlay from "@/components/BootOverlay";
 import DataBridge from "@/components/DataBridge";
+import DocGate from "@/components/DocGate";
+import DocLayer from "@/components/DocLayer";
 import ThemeController from "@/components/ThemeController";
 import TopBar from "@/components/TopBar";
 import BottomStream from "@/components/BottomStream";
@@ -21,10 +23,13 @@ import DevCssCanary from "@/components/DevCssCanary";
 import SectionShell from "@/components/SectionShell";
 import DataSection from "@/components/DataSection";
 import SiteFooter from "@/components/SiteFooter";
+import type { DocPage } from "@/components/views";
 
-// THE app — one shell, rendered identically by `/` and by every routed view page (app/[view]).
-// The routes differ only in metadata; which view is showing is store state, seeded and published
-// by RouteSync, so a view switch never re-renders this tree and never touches the WebGL engine.
+// THE app — one shell, rendered identically by `/`, every routed view page (app/[view]) AND the
+// two doc routes (/about, /design pass `doc`, which opens the DocLayer overlay over the live
+// scene). The routes differ only in metadata and that seed; which surface is showing is store
+// state, seeded and published by RouteSync/DocLayer, so neither a view switch nor opening a
+// document ever re-renders this tree or touches the WebGL engine.
 //
 // Single-page shell in TWO LAYERS (spec 2026-08-01): SectionShell carries the fixed scene shell
 // (the canvas in its own `scene` slot, since it recedes rather than hides, + the HUD as children)
@@ -37,19 +42,21 @@ import SiteFooter from "@/components/SiteFooter";
 // The always-on EXPERIMENTAL banner that used to pin above the bar is GONE (user, 2026-08-09).
 // A permanent ribbon spends the scene's top 28px restating one sentence that never changes — the
 // instrument should not carry its own disclaimer as furniture. The disclosure moved to /about,
-// which now covers it properly, and the command bar's brand mark is the route there.
-export default function AppShell() {
+// which now covers it properly.
+export default function AppShell({ doc }: { doc?: DocPage }) {
   return (
     <main>
       {/* The staged entrance (useBootStage): command bar on `frame`, rails/dock/footer on
           `data`, vitals band on `live` — the HUD arrives in the data's own order while the
           BootOverlay hands the scene off. Each BootFade is a plain wrapper div (trap-2 safe)
-          that also `inert`s its zone while hidden. */}
+          that also `inert`s its zone while hidden. The DOC overlay is deliberately outside the
+          staging: it is content, not an instrument, and shows immediately while the scene forms
+          behind it. */}
       <BootFade at="frame">
         <TopBar />
       </BootFade>
-      {/* Site chrome, pinned to the real viewport like the bar — the second route to /about and
-          the home of the project's own links (user, 2026-08-18). */}
+      {/* Site chrome, pinned to the real viewport like the bar — the doc overlay's chrome too
+          (its toggles live here), so it stays OUTSIDE DocGate. */}
       <BootFade at="data">
         <SiteFooter />
       </BootFade>
@@ -58,7 +65,9 @@ export default function AppShell() {
         raw={<DataSection />}
         strip={
           <BootFade at="live">
-            <BottomStream />
+            <DocGate>
+              <BottomStream />
+            </DocGate>
           </BootFade>
         }
       >
@@ -71,17 +80,26 @@ export default function AppShell() {
             Engine's canvas-rect coordinates resolve the same fixed box the rails use; during the
             depth transition the shell scales, but the callout has already hidden itself (it only
             renders in the scene pose). */}
-        <SceneCallout />
+        <DocGate>
+          <SceneCallout />
+        </DocGate>
         <BootFade at="data">
-          <ExploreRail />
-          {/* The phone dock's middle section rides with the rails, not the band: the dock bar is
-              one control split in thirds, and a missing middle would read as a broken bar. */}
-          <VitalsDock />
-          <Inspector />
+          <DocGate>
+            <ExploreRail />
+            {/* The phone dock's middle section rides with the rails, not the band: the dock bar
+                is one control split in thirds, and a missing middle would read as a broken bar. */}
+            <VitalsDock />
+            <Inspector />
+          </DocGate>
         </BootFade>
-        <PhoneDockSweep />
+        <DocGate>
+          <PhoneDockSweep />
+        </DocGate>
         <RailScroll />
       </SectionShell>
+      {/* The doc overlay — over the canvas and the stood-down HUD, under the bar and footer.
+          `doc` is the route's server-rendered seed, so /about's prose is in its HTML. */}
+      <DocLayer initial={doc ?? null} />
       <DataBridge />
       <FollowController />
       <RawSnapshotBridge />

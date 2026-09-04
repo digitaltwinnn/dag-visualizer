@@ -1,32 +1,35 @@
+"use client";
 // THE SITE FOOTER (user, 2026-08-18 — "navigation to About is difficult to find behind the logo").
 // The brand mark in the command bar was the app's ONLY route to /about, and a wordmark is a weak
-// affordance for "there is a page here". This is the second route, and the one the project's own
-// off-instrument pages live behind.
+// affordance for "there is a page here". This row is the durable second route — and since the doc
+// overlay landed (2026-09-04) it is ONE footer for every surface: the doc pages render inside the
+// app, so the `overDoc` variant retired with the standalone pages.
 //
-// It is SITE chrome, not view chrome — one row, the same in every view and both depth poses — so it
-// mounts OUTSIDE SectionShell beside TopBar (CSS trap 2: a transformed ancestor would re-anchor its
-// fixed box, and the shell also `inert`s whichever layer is away). Its band is the static
+// It is SITE chrome, not view chrome — one row, the same in every view, both depth poses and
+// under the doc overlay (it is the overlay's chrome: its About/Design toggles live here) — so it
+// mounts OUTSIDE SectionShell beside TopBar (CSS trap 2: a transformed ancestor would re-anchor
+// its fixed box, and the shell also `inert`s whichever layer is away). Its band is the static
 // `--footer-h` token, which everything above it adds to its own bottom inset exactly as the rails
-// add `--topbar-extra` at the top; `--bottom-reserve` keeps its meaning as the lane's own band above
-// the footer.
+// add `--topbar-extra` at the top; `--bottom-reserve` keeps its meaning as the lane's own band
+// above the footer.
 //
 // On the PHONE the dock owns bottom:0, so the row rides directly ABOVE it (user, 2026-08-31 —
-// "keep footer link visible in phone": with the wordmark unlinked and the strip's about link
-// removed, this row had become the app's ONLY route to /about, and hiding it left phone with
-// none). It is overlay chrome there, like the dock itself: `--footer-h` still zeroes on the
-// phone boundary so no consumer reserves a band for it — the row takes its 26px height
-// explicitly, and an open sheet (higher z) covers it exactly as it covers the scene.
+// "keep footer link visible in phone"). It is overlay chrome there, like the dock itself:
+// `--footer-h` still zeroes on the phone boundary so no consumer reserves a band for it. While a
+// DOC overlay is open the dock is stood down (DocGate), so the row drops to the safe-area bottom.
 //
-// The links are plain anchors, not next/link: /about and /design are ordinary documents, and a
-// client-side route change would tear down and rebuild the WebGL engine (the same reason TopBar's
-// brand link is an <a>).
+// About/Design are STORE TOGGLES now, not navigations — a navigation would reboot the engine the
+// overlay deliberately keeps alive; the hrefs stay real so middle-click/new-tab work. The view
+// links commit the same way (FooterViewLinks).
 //
 // ⚠️ NO DONATE LINK. The user asked for one and the project carries no donation destination — an
 // invented address is a fabricated fact of the worst kind (rule 10). Add the entry here the moment
 // a real one exists.
 import NetLink from "@/components/NetLink";
 import FooterViewLinks from "@/components/FooterViewLinks";
+import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
+import type { DocPage } from "@/components/views";
 import { cn } from "@/lib/utils";
 
 const GITHUB = "https://github.com/digitaltwinnn/dag-visualizer";
@@ -44,15 +47,32 @@ function GithubMark() {
   );
 }
 
-// `overDoc` (2026-09-04): the same chrome row on the doc pages (/about, /design), so the site
-// band is identical everywhere. There it rides a scrolling document instead of the canvas: no
-// phone-dock offset (no dock exists), no zeroed `--footer-h` (that zero exists so app consumers
-// reserve no band — a document reserves its own bottom padding instead), just the safe-area
-// inset on notched phones. The doc pages pad their content bottom clear of it.
-export default function SiteFooter({ overDoc = false }: { overDoc?: boolean }) {
+// A doc-page toggle: a real link whose plain click flips the overlay in place (clicking the open
+// page's own entry closes it — back to the scene).
+function DocToggle({ page, href, children }: { page: DocPage; href: string; children: React.ReactNode }) {
+  const doc = useStore((s) => s.docPage);
+  const setDocPage = useStore((s) => s.setDocPage);
+  return (
+    <NetLink
+      href={href}
+      aria-current={doc === page ? "page" : undefined}
+      className={cn("hover:text-foreground transition-colors", doc === page && "text-foreground")}
+      onClick={(e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+        e.preventDefault();
+        setDocPage(doc === page ? null : page);
+      }}
+    >
+      {children}
+    </NetLink>
+  );
+}
+
+export default function SiteFooter() {
   // The DAG core's one-home config: the official site URL and the $DAG brand mark the
   // Constellation link below wears (same record the dossier avatar reads).
   const dag = metagraphById("dag");
+  const doc = useStore((s) => s.docPage);
   return (
     // pointer-events-none on the band, auto on the links: an orbit drag started along the bottom
     // edge must still reach the scene. FULL-WIDTH STRIP since 2026-09-04 (user: the centred
@@ -65,17 +85,19 @@ export default function SiteFooter({ overDoc = false }: { overDoc?: boolean }) {
       id="sitefoot"
       className={cn(
         "fixed inset-x-[var(--bar-margin)] bottom-0 z-10 flex items-stretch pointer-events-none",
-        overDoc
-          ? "h-[var(--footer-phone-h)] max-[700px]:bottom-[env(safe-area-inset-bottom)]"
-          : // The +min(10px, --bottom-reserve) TUCK (user, 2026-09-04): the vitals band's rounded
-            // bottom corners left notches of bare scene where they met this strip's square top.
-            // The strip now reaches ~10px up BEHIND the band (later in the DOM at the same z, so
-            // the band paints over it) and its veil fills the corner curves — seamless join. The
-            // min() ties the tuck to the band actually reserving the lane: raw pose, rails-hidden
-            // and phone all zero --bottom-reserve, and a taller veil with no band above it would
-            // just be a mystery band. The nav pads the same amount so the links stay centred in
-            // the visible row.
-            "h-[calc(var(--footer-h)+min(10px,var(--bottom-reserve,0px)))] max-[700px]:bottom-[var(--phone-dock-h)] max-[700px]:h-[var(--footer-phone-h)]",
+        // The +min(10px, --bottom-reserve) TUCK (user, 2026-09-04): the vitals band's rounded
+        // bottom corners left notches of bare scene where they met this strip's square top.
+        // The strip reaches ~10px up BEHIND the band (later in the DOM at the same z, so the
+        // band paints over it) and its veil fills the corner curves — seamless join. The min()
+        // ties the tuck to the band actually reserving the lane: raw pose, rails-hidden, phone
+        // and the doc overlay (DocGate unmounts BottomStream, whose cleanup zeroes the reserve)
+        // all fold it away.
+        "h-[calc(var(--footer-h)+min(10px,var(--bottom-reserve,0px)))]",
+        // Phone: above the dock normally; at the safe-area bottom while a doc overlay has the
+        // dock stood down.
+        doc == null
+          ? "max-[700px]:bottom-[var(--phone-dock-h)] max-[700px]:h-[var(--footer-phone-h)]"
+          : "max-[700px]:bottom-[env(safe-area-inset-bottom)] max-[700px]:h-[var(--footer-phone-h)]",
       )}
     >
       {/* Readability history, still load-bearing: no text-shadow halo (user, 2026-08-30 — the
@@ -90,7 +112,7 @@ export default function SiteFooter({ overDoc = false }: { overDoc?: boolean }) {
         className={cn(
           "flex-1 flex items-center justify-center gap-2 text-micro text-muted-foreground [&_a]:pointer-events-auto bg-[var(--footer-glass)] backdrop-blur-sm",
           "max-[700px]:[&_a]:pt-[26px] max-[700px]:[&_a]:-mt-[26px] max-[700px]:[&_a]:pb-1.5 max-[700px]:[&_a]:-mb-1.5 max-[700px]:[&_a]:px-1.5 max-[700px]:[&_a]:-mx-1.5",
-          !overDoc && "pt-[min(10px,var(--bottom-reserve,0px))] max-[700px]:pt-0",
+          "pt-[min(10px,var(--bottom-reserve,0px))] max-[700px]:pt-0",
         )}
       >
         {/* ⚠️ On phone every anchor wears padding CANCELLED by an equal negative margin (the
@@ -106,34 +128,19 @@ export default function SiteFooter({ overDoc = false }: { overDoc?: boolean }) {
             navigation, the off-scene doc pages, then the external world. Group hairlines were
             tried and pulled the same day — with the tuck they ran the strip's full height and
             "cut the whole section in half" — so the mid-dot is the row's ONE separator species,
-            and what sets the external group apart is its brand marks, not a divider. The view
-            links appear EVERYWHERE (FooterViewLinks — store-driven in-app so the engine
-            survives, plain anchors on docs); Home is doc-only, because inside the app "Home"
-            and the default view would be two names for the same click. Phone drops the view
-            group in both worlds — the header's icons and the app's own bar carry the views
-            there. */}
-        {overDoc ? (
-          <>
-            <NetLink href="/" className="hover:text-foreground transition-colors">
-              Home
-            </NetLink>
-            <FooterViewLinks overDoc />
-            <span aria-hidden className="opacity-40">·</span>
-          </>
-        ) : (
-          <FooterViewLinks overDoc={false} />
-        )}
-        <NetLink href="/about" className="hover:text-foreground transition-colors">
+            and what sets the external group apart is its brand marks, not a divider. Home
+            retired with the standalone pages: closing the doc is what every view link and the
+            brand already do. Phone drops the view group (the header's… the BAR's own switch
+            carries the views there). */}
+        <FooterViewLinks />
+        <DocToggle page="about" href="/about">
           About
-        </NetLink>
+        </DocToggle>
         <span aria-hidden className="opacity-40">·</span>
-        <NetLink href="/design" className="hover:text-foreground transition-colors">
+        <DocToggle page="design" href="/design">
           Design
-        </NetLink>
+        </DocToggle>
         <span aria-hidden className="opacity-40">·</span>
-        {/* OUR side of the external world: the repo. "Source code", not "GitHub" (user,
-            2026-09-04 — the usual OSS-footer form): the octocat glyph already says where, the
-            words say what it is. The glyph is also the row's one brand mark for OUR things. */}
         <a
           href={GITHUB}
           target="_blank"
@@ -143,13 +150,13 @@ export default function SiteFooter({ overDoc = false }: { overDoc?: boolean }) {
           <GithubMark />
           Source code
         </a>
-        {/* The repo and the official site stay clearly TWO things — one is this project's, the
-            other is the network's (the affiliation boundary /about states in words) — but the
-            boundary is carried by each link's own brand mark now, not by a heavier divider (the
-            one-separator rule above). The Constellation link wears the official $DAG mark from
-            the app's own catalog config (metagraphById("dag") — the same one-home record the
-            dossier avatar and this href's siteUrl read), identifying, not claiming. */}
         <span aria-hidden className="opacity-40">·</span>
+        {/* The repo and the official site stay clearly TWO things — one is this project's, the
+            other is the network's (the affiliation boundary /about states in words) — told apart
+            by each link's own brand mark (the one-separator rule above). The Constellation link
+            wears the official $DAG mark from the app's own catalog config (metagraphById("dag")
+            — the same one-home record the dossier avatar and this href's siteUrl read),
+            identifying, not claiming. */}
         <a
           href={dag?.siteUrl ?? CONSTELLATION}
           target="_blank"

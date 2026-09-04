@@ -3,27 +3,20 @@ import { useStore } from "@/src/store/store";
 import NetLink from "@/components/NetLink";
 import { ROUTED_VIEWS } from "@/components/views";
 
-// THE FOOTER'S VIEW LINKS, everywhere (user, 2026-09-04 — "shouldn't a footer be a consistent
-// anchor?"): the same three destinations in the same group on the app and the doc pages. The
-// difference is the mechanism, and it is the whole reason this is a client island:
-//  · on a DOC page (`overDoc`) they are plain anchors into the routed views — entering the
-//    visualizer boots the engine on a fresh document, nothing to preserve;
-//  · IN-APP a plain anchor would be a full navigation, tearing down and rebooting the WebGL
-//    engine for a switch the command bar does as a store write — so a plain left-click commits
-//    through setMode instead (RouteSync publishes the URL exactly as it does for the switch),
-//    while the real href keeps middle-click / new-tab / copy-link honest.
-// Hidden on phone in both worlds (the row would overflow 390px; the header's icon switch and
-// the app's own bar carry the views there) — the group hides as ONE span, its separators and
-// its trailing divider included, so no dangling mid-dot survives the collapse.
-export default function FooterViewLinks({ overDoc }: { overDoc: boolean }) {
+// THE FOOTER'S VIEW LINKS (user, 2026-09-04 — "shouldn't a footer be a consistent anchor?"):
+// the same three destinations on every surface. A plain left-click COMMITS through the store —
+// a real navigation would tear down and reboot the WebGL engine for a switch the command bar
+// does as a store write, and setMode also closes any open doc overlay, so from /about a view
+// link lands straight in the scene. The real href keeps middle-click / new-tab / copy-link
+// honest. Hidden on phone (the row would overflow 390px; the bar's own switch carries the views
+// there) — the group hides as ONE span, separators included, so no dangling mid-dot survives.
+export default function FooterViewLinks() {
   const setMode = useStore((s) => s.setMode);
   return (
     <span className="flex items-center gap-2 max-[700px]:hidden">
       {ROUTED_VIEWS.map((v, i) => (
         <span key={v.id} className="flex items-center gap-2">
-          {/* On docs every item leads with a mid-dot (Home stands before the group); in-app the
-              group leads the row, so the first item carries none. */}
-          {(overDoc || i > 0) && (
+          {i > 0 && (
             <span aria-hidden className="opacity-40">
               ·
             </span>
@@ -31,31 +24,23 @@ export default function FooterViewLinks({ overDoc }: { overDoc: boolean }) {
           <NetLink
             href={`/${v.slug}`}
             className="hover:text-foreground transition-colors"
-            onClick={
-              overDoc
-                ? undefined
-                : (e) => {
-                    // Modified clicks keep native anchor behaviour (new tab etc.).
-                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
-                    e.preventDefault();
-                    setMode(v.id);
-                  }
-            }
+            onClick={(e) => {
+              // Modified clicks keep native anchor behaviour (new tab etc.).
+              if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+              e.preventDefault();
+              setMode(v.id);
+            }}
           >
             {v.name}
           </NetLink>
         </span>
       ))}
-      {/* In-app the group's trailing separator rides inside the phone-hidden span; on docs the
-          separator stays with the caller, where it must survive the group's collapse to keep
-          separating Home from the doc links. ONE separator species row-wide (user, 2026-09-04
-          — the full-height hairline "cuts the whole section in half"): the mid-dot; the brand
-          marks on the external links are what set that group apart. */}
-      {!overDoc && (
-        <span aria-hidden className="opacity-40">
-          ·
-        </span>
-      )}
+      {/* The group's trailing separator rides inside the phone-hidden span (one separator
+          species row-wide — the mid-dot; the external links' brand marks carry that group's
+          distinction). */}
+      <span aria-hidden className="opacity-40">
+        ·
+      </span>
     </span>
   );
 }

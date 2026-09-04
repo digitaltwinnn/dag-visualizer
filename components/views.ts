@@ -2,9 +2,9 @@ import type { Mode } from "@/src/store/store";
 
 // ONE home for the interface's VIEW VOCABULARY: id, user-facing name, and — for the three live
 // 3D views — the URL slug and the search-facing copy their route serves. Consumed by the top-bar
-// view switch (TopBar), the URL↔mode bridge (RouteSync), the routed pages (app/[view]) and the
-// doc pages' shared header (SiteHeader), so a view's name, slug and mark can never disagree
-// between the command bar, the address bar and the marketing pages.
+// view switch (TopBar), the URL↔state bridge (RouteSync), the routed pages (app/[view]) and the
+// footer's view links (FooterViewLinks), so a view's name, slug and mark can never disagree
+// between the command bar, the address bar and the footer.
 //
 // The placeholder views deliberately carry NO slug (user decision, 2026-09-04): a shareable link
 // to `preview · in development` isn't worth a route, and with `dynamicParams = false` a pushState
@@ -74,4 +74,22 @@ export function pathForMode(mode: Mode): string | null {
 /** The document title a view carries once the app is past first load (RouteSync + route metadata). */
 export function viewTitle(name: string): string {
   return `${name} — DAG Visualizer`;
+}
+
+// ── The DOC OVERLAY's half of the vocabulary (2026-09-04) ────────────────────────────────────
+// /about and /design render inside the app as the DocLayer overlay; these are their URL and
+// title mappings, read by RouteSync exactly as the view mappings above are.
+export type DocPage = "about" | "design";
+
+export const DOC_PATHS: Record<DocPage, string> = { about: "/about", design: "/design" };
+
+export const DOC_TITLES: Record<DocPage, string> = {
+  about: "About — DAG Visualizer",
+  design: "Design — DAG Visualizer",
+};
+
+/** The doc page a pathname names, or null. */
+export function docForPath(pathname: string): DocPage | null {
+  const seg = pathname.replace(/^\/+|\/+$/g, "");
+  return seg === "about" || seg === "design" ? seg : null;
 }
