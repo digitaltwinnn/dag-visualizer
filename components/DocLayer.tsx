@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { X } from "lucide-react";
+import { PulseEdge } from "@/components/EdgePulse";
+import { usePulseWindow } from "@/components/RailDock";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
@@ -140,6 +142,12 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [page, setDocPage]);
 
+  // The doc's RAIL SPINES (user, 2026-09-04: "the docs should have the rails and the view
+  // transition highlight"): two slim instrument edges flanking the column — the sheets' own
+  // spine idiom — replaying the travelling switch pulse whenever a document arrives, exactly
+  // as the RailThreads answer a view switch. Keyed on `render`, so About→Design pulses too.
+  const pulse = usePulseWindow(render);
+
   if (!render) return null;
   const Doc = DOC_COMPONENTS[render];
   return (
@@ -179,6 +187,20 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
             "color-mix(in oklch, var(--background) 70%, transparent) 55%, transparent 100%)",
         }}
       />
+      {(["left", "right"] as const).map((side) => (
+        <span
+          key={side}
+          aria-hidden
+          className={cn(
+            "pointer-events-none fixed top-[76px] bottom-[44px] w-[3px] z-[1] max-[860px]:hidden",
+            side === "left" ? "left-[calc(50%-24rem-18px)]" : "right-[calc(50%-24rem-18px)]",
+          )}
+          style={{ ["--spine" as string]: "var(--primary)" }}
+        >
+          <span className="absolute inset-y-0 left-1/2 w-px bg-border/70" />
+          {pulse.live && <PulseEdge pulseKey={pulse.pulse} rail={side} />}
+        </span>
+      ))}
       <div className={DOC_COLUMN}>
         <Doc />
       </div>

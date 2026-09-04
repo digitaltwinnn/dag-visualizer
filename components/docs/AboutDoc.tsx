@@ -87,9 +87,9 @@ export default function AboutDoc() {
       <Panel className="mt-6 py-4 px-5">
         <Eyebrow>Live data</Eyebrow>
         <p className="mt-2 text-base text-foreground leading-relaxed">
-          Everything on screen is live. The visualizer reads the Constellation Network&apos;s own
-          public endpoints — the global snapshot stream, each metagraph&apos;s cluster, each
-          node&apos;s status — and draws what comes back, as it comes in.
+          Every number on screen is live — read straight from the Constellation Network&apos;s
+          own public endpoints, the global snapshot stream, each metagraph&apos;s cluster and
+          each node&apos;s status, and drawn as it comes in.
         </p>
         <p className="mt-2 text-label text-muted-foreground leading-relaxed">
           Node locations come from their public internet addresses, so they are accurate to a
@@ -102,20 +102,11 @@ export default function AboutDoc() {
           you&apos;ll see a small label like <span className="font-mono">NO SIGNAL</span> instead
           of a number.
         </p>
-        {/* ⚠️ THE ARCS ARE THE ONE EXCEPTION AND THE PAGE MUST SAY SO (2026-08-12). The geo blurb
-            below used to promise "live traffic travelling between them" — `domain/arcSim.ts` is a
-            pure simulation: real node endpoints, invented motion, targets picked at random. On the
-            one page that promised "Nothing is simulated", that was the sharpest possible false
-            claim — and stating the exception underneath an unchanged promise would only have put
-            the contradiction inside one panel. So the promise is now scoped to what it is actually
-            true of, READINGS (a number, and the geometry that encodes one), and the exception names
-            the one thing on screen that carries no reading. Both halves had to move; fixing only
-            the blurb would have left the false sentence sitting in the louder type. */}
-        <p className="mt-2 text-label text-muted-foreground leading-relaxed">
-          One honest exception: the little packets you can watch travelling across the globe are
-          an illustration of computers talking to each other, not measured traffic. The places
-          they travel between are real.
-        </p>
+        {/* The arcs-exception PARAGRAPH was cut (user, 2026-09-04: "it emphasises the wrong
+            thing") — but its 2026-08-12 honesty constraint still binds: the arcs are simulated
+            motion, so the promise above stays scoped to NUMBERS ("every number is live"), which
+            is that fix's own resolution. Don't widen the claim back to "everything" without
+            restoring an exception. */}
       </Panel>
 
       <Section id="explore" title="What you can explore">
@@ -146,28 +137,23 @@ export default function AboutDoc() {
         </p>
       </Section>
 
-      <Section id="constellation" title="What is the Constellation Network?">
+      {/* The two explainer sections retired (user, 2026-09-04: "better to refer to their own
+          documentation") — one orientation sentence keeps the vocabulary the visualizer uses,
+          the official docs carry the full story. */}
+      <Section id="constellation" title="New to Constellation?">
         <p>
-          Constellation is a distributed network whose native token is <strong>$DAG</strong>.
-          Instead of one single chain of blocks, it is organised as a <em>hypergraph</em>: a
-          base network (the Global L0) that many independent networks plug into. Validator
-          nodes run all over the world and cooperate to agree on the network&apos;s state.
-        </p>
-      </Section>
-
-      <Section id="metagraph" title="What is a metagraph?">
-        <p>
-          A metagraph is an application network built on Constellation. Each one runs its own
-          nodes and produces its own ledger, and periodically <em>anchors</em> that ledger into
-          the global network. You can think of metagraphs as independent economies that all
-          come together on the same base layer.
-        </p>
-        <p>
-          Anchoring is what the Snapshots view shows: a metagraph publishes a snapshot of its
-          state, that snapshot is carried into a global snapshot, and it pays a fee in $DAG for
-          the privilege. Metagraphs snapshot independently of each other and faster than the
-          global layer, so a single global tick can carry anywhere from one to a hundred of
-          them.
+          Constellation is a distributed network whose native token is <strong>$DAG</strong>;
+          the independent application networks that plug into it are called{" "}
+          <em>metagraphs</em> — the same names you&apos;ll see all over this visualizer. For the
+          full story, straight from the source, see the official documentation at{" "}
+          <a
+            href="https://docs.constellationnetwork.io"
+            className="text-primary underline underline-offset-2"
+            rel="noopener"
+          >
+            docs.constellationnetwork.io
+          </a>
+          .
         </p>
       </Section>
 
@@ -210,13 +196,8 @@ export default function AboutDoc() {
         </Panel>
       </section>
 
-      {/* No "Open the visualizer" link here (user, 2026-09-04): the command bar above and the
-          site footer below already navigate — a document should end, not re-advertise the app. */}
-      <footer className="mt-14 pt-6 border-t border-border">
-        <span className="text-label text-muted-foreground">
-          Built entirely from Constellation&apos;s public data. No account, nothing to sign up for.
-        </span>
-      </footer>
+      {/* No article footer at all (user, 2026-09-04, two rounds): the site footer below the
+          overlay is the page's real foot — a second one inside the document was furniture. */}
     </article>
   );
 }
