@@ -65,12 +65,22 @@ export default function LogSearchBar({
   /** Escape folds the bar away — the same key that dismisses every other transient surface here. */
   onClose: () => void;
 }) {
+  // ⚠️ TOUCH RAISES EVERY CONTROL IN THE BAR TOGETHER (user, 2026-09-02: "the search snapshot
+  // field height is too small"). 24px was tuned for a pointer; on a coarse pointer all five
+  // controls — three fields, the calendar trigger, the button — take 40px through the same
+  // pointer-coarse idiom the top bar uses, so the row can never mix heights again (the exact
+  // mistake the 2026-09-01 "standardize" round fixed once at h-6).
   const field =
-    "min-w-0 h-6 px-1.5 py-0 bg-[var(--panel-plate)] border border-border/50 rounded-xs " +
+    "min-w-0 h-6 pointer-coarse:h-10 px-1.5 py-0 bg-[var(--panel-plate)] border border-border/50 rounded-xs " +
     "font-mono text-body tabular-nums text-foreground " +
     "hover:border-border focus:border-transparent " +
     "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] transition-colors";
-  const label = "flex-none text-micro uppercase tracking-caps text-muted-foreground";
+  // ⚠️ AND PHONE ALIGNS THE CRITERIA AS LABELLED ROWS (same user note: "the search fields need
+  // some alignment"). Free-wrapped, the three labels' different widths gave every field a
+  // different left edge — a ragged form. Each criterion goes full-width, the label takes one
+  // fixed column and the field fills the rest, so the fields share one edge the way Fact values
+  // share theirs. Desktop keeps the one-line flow untouched.
+  const label = "flex-none text-micro uppercase tracking-caps text-muted-foreground max-[700px]:w-24";
 
   // What the one button would actually do — so it can refuse a press it has nothing to answer
   // with, rather than accepting it and reporting a miss.
@@ -96,7 +106,7 @@ export default function LogSearchBar({
       }}
     >
       {/* ── METAGRAPH SNAPSHOT — the chain, then its ordinal, as one control ─────────────────── */}
-      <span className="flex flex-none items-center gap-1.5">
+      <span className="flex flex-none items-center gap-1.5 max-[700px]:w-full">
         {/* ⚠️ THE NOUN IS SAID ONCE, BY THE TOGGLE (user, 2026-09-01: "remove 'snapshot' from the
             filter texts? say 'search snapshots' instead?"). "SEARCH SNAPSHOTS" opens the bar, so
             repeating "snapshot" in all three labels only crowded them — each field names the axis
@@ -116,7 +126,7 @@ export default function LogSearchBar({
             // ⚠️ `h-6!` — CSS trap 4. The primitive sizes itself with `data-[size=sm]:h-8`, an
             // attribute selector at (0,2,0) that beats a plain `h-6` at (0,1,0), so the picker sat
             // 32px tall beside 24px inputs. The important modifier is the documented escape.
-            className="h-6! w-[116px] flex-none rounded-l-xs rounded-r-none border-r-0 border-border/50 bg-[var(--panel-plate)] px-1.5 py-0! text-micro uppercase tracking-caps focus-visible:ring-0 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
+            className="h-6! pointer-coarse:h-10! w-[116px] flex-none rounded-l-xs rounded-r-none border-r-0 border-border/50 bg-[var(--panel-plate)] px-1.5 py-0! text-micro uppercase tracking-caps focus-visible:ring-0 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
           >
             <SelectValue placeholder="network" />
           </SelectTrigger>
@@ -141,12 +151,12 @@ export default function LogSearchBar({
           value={snapshot}
           aria-label="Metagraph snapshot ordinal"
           onChange={(e) => onSnapshot(e.target.value)}
-          className={cn(field, "w-[124px] rounded-l-none text-right")}
+          className={cn(field, "w-[124px] max-[700px]:w-auto max-[700px]:flex-1 rounded-l-none text-right")}
         />
       </span>
 
       {/* ── GLOBAL SNAPSHOT — no hint inside the box; the label is the hint ──────────────────── */}
-      <span className="flex flex-none items-center gap-1.5">
+      <span className="flex flex-none items-center gap-1.5 max-[700px]:w-full">
         <span className={label}>global</span>
         <input
           type="text"
@@ -154,14 +164,14 @@ export default function LogSearchBar({
           value={tick}
           aria-label="Global snapshot ordinal"
           onChange={(e) => onTick(e.target.value)}
-          className={cn(field, "w-[124px] text-right")}
+          className={cn(field, "w-[124px] max-[700px]:w-auto max-[700px]:flex-1 text-right")}
         />
       </span>
 
       {/* ── DATE RANGE — the calendar ───────────────────────────────────────────────────────── */}
-      <span className="flex flex-none items-center gap-1.5">
+      <span className="flex flex-none items-center gap-1.5 max-[700px]:w-full">
         <span className={label}>date</span>
-        <DateRange from={from} to={to} seeking={false} onFrom={onFrom} onTo={onTo} onSubmit={onSubmit} />
+        <DateRange from={from} to={to} onFrom={onFrom} onTo={onTo} onSubmit={onSubmit} />
       </span>
 
       <button
@@ -174,7 +184,7 @@ export default function LogSearchBar({
           // the far end of whatever line it lands on, so the criteria read left-to-right and the
           // action sits where an action sits — and on a narrow pane, where the row wraps, it still
           // ends its own line rather than floating mid-row.
-          "ml-auto inline-flex flex-none items-center gap-1 h-6 px-2.5 rounded-xs cursor-pointer",
+          "ml-auto inline-flex flex-none items-center gap-1 h-6 pointer-coarse:h-10 px-2.5 pointer-coarse:px-4 rounded-xs cursor-pointer",
           "text-micro uppercase tracking-caps transition-colors",
           "border border-[var(--primary)]/40 bg-[var(--wash-soft)] text-[var(--primary)]",
           "hover:bg-[var(--wash-hover)] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",

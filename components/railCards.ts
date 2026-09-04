@@ -128,6 +128,10 @@ export interface RailCard {
 // old pickHintText rule, preserved verbatim).
 export interface RailManifestState {
   mode: Mode;
+  /** Coarse pointer (usePointerCoarse — `(pointer: coarse)`, the same key the touch floors
+   *  ride): the hints say the gesture the reader's device actually has — Tap, not Click.
+   *  Optional so every fine-pointer caller and test reads unchanged. */
+  coarse?: boolean;
   filter: string;
   inspect: PickDescriptor | null;
   snap: Extract<PickDescriptor, { kind: "snapshot" }> | null;
@@ -210,6 +214,9 @@ export function exploreCards(s: Pick<RailManifestState, "mode">): RailCard[] {
 //    surface the reader reads (the About cards, the explorer hints, the empty states). Comments and
 //    docs like this one are dev-facing and keep their dashes.
 const IN_3D = (m: Mode) => m === "hyper" || m === "geo" || m === "ledger";
+// The pointer's own verb (2026-09-04): "Click" taught a mouse to a thumb. One helper so no hint
+// can pick its own word.
+const CLICK = (s: RailManifestState) => (s.coarse ? "Tap" : "Click");
 function contextHint(s: RailManifestState): string | null {
   if (!IN_3D(s.mode)) return null;
   // No noun at all: the slot label reads "Metagraph" while the app's broader word is "network", and
@@ -219,7 +226,7 @@ function contextHint(s: RailManifestState): string | null {
 function nodeHint(s: RailManifestState): string | null {
   // NB the hypergraph's HUBS commit the filter (the metagraph slot) — only nodes fill this one,
   // so the hint no longer offers a hub click it can't honour.
-  if (s.mode === "hyper") return "Click one on a layer ring around a network.";
+  if (s.mode === "hyper") return `${CLICK(s)} one on a layer ring around a network.`;
   if (s.mode === "geo") {
     if (s.selNodesCount === 0) {
       if (!s.filterLabel) return null; // boot — the data simply hasn't landed yet
@@ -228,12 +235,16 @@ function nodeHint(s: RailManifestState): string | null {
     // No "…on the globe" here: the COUNTRY ghost one slot up already ends that way, and two
     // ghosts in one rail sharing a trailing clause is the refrain rule 2 exists to prevent
     // (the tail test catches it). The stack is only ever on the globe anyway.
-    return "Click one in a stack.";
+    // ⚠️ The long-press advertisement rides the NODE ghost, on touch only, in geo alone (one
+    // mention — every 3D object previews the same way, and a refrain across three node hints
+    // would be the shared-tail defect at sheet scale). It exists because long-press is the one
+    // gesture with no visible affordance: nothing in the scene says a still press previews.
+    return s.coarse ? "Tap one in a stack — or press and hold to preview it." : "Click one in a stack.";
   }
   // Nodes are pickable in the chamber too (user, 2026-07-12 — the standing chips are a real pick
   // target), so the slot announces it. "in a container under a floor" was stale jargon from the
   // retired per-role split (src/data/ledgerLayers.ts) — the house word is TRAY, and there are many.
-  if (s.mode === "ledger") return "Click one in any of the trays.";
+  if (s.mode === "ledger") return `${CLICK(s)} one in any of the trays.`;
   return null;
 }
 function snapHint(s: RailManifestState): string | null {
@@ -242,12 +253,12 @@ function snapHint(s: RailManifestState): string | null {
   // so the slot invites — and exists — only there. The strip earns its clause (it is a second
   // route in a different ZONE, not the explorer refrain) and the parallel is real: the same
   // subject is a bar in both places.
-  return s.mode === "ledger" ? "Click a bar on the floor, or in the strip below." : null;
+  return s.mode === "ledger" ? `${CLICK(s)} a bar on the floor, or in the strip below.` : null;
 }
 // Country/cohort are geo-only focus-ladder rungs (the drill + the city×provider commit) — their
 // ghosts only ever invite in geo, same allow-list idiom as every other slot.
 function countryHint(s: RailManifestState): string | null {
-  return s.mode === "geo" ? "Click the land on the globe." : null;
+  return s.mode === "geo" ? `${CLICK(s)} the land on the globe.` : null;
 }
 function cohortHint(s: RailManifestState): string | null {
   // Explorer-only rung: no 3D cohort exists to click, so naming the row IS the route.
@@ -262,7 +273,7 @@ function compositionHint(s: RailManifestState): string | null {
 // STOREY does the work here: the line above it aims at a bar ON the floor, so "a plane above the
 // floor" separates the two subjects and teaches the chamber's two-storey shape in passing.
 function metaSnapHint(s: RailManifestState): string | null {
-  return s.mode === "ledger" ? "Click a tile on a plane above the floor." : null;
+  return s.mode === "ledger" ? `${CLICK(s)} a tile on a plane above the floor.` : null;
 }
 
 // RIGHT rail (Details): FIXED slots in a stable order — the Context dossier, then country,

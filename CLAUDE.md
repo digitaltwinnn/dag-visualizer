@@ -329,10 +329,12 @@ its claim is paper-only, so its one `intensity` already is its paper number.
    isn't. A node commit is answered in **every** 3D view, gated on the canvas allow-list (convention 7),
    never a list of modes.
 
-⚠️ **The two global camera levers share one exemption, and one of them RAMPS** (user, 2026-08-13).
-`dollyBack` and `railsLean` both scale `(pos − target)` about the target, so a pose whose target is a
-composed look-at rather than the subject — `nodeFraming`, `cohortFraming` — is exempt from BOTH; the
-exemption belongs to the POSE, and `_tweenTo`'s one `dolly` flag gates both levers. And the
+⚠️ **The three global camera levers share one exemption, and one of them RAMPS** (user, 2026-08-13;
+the third lever 2026-09-02). `dollyBack`, `railsLean` and `aspectFit` (the portrait fit — √ of the
+width deficit on narrow aspects, identity at desktop; a resize crossing a 4% aspect gate re-resolves
+the pose) all scale `(pos − target)` about the target, so a pose whose target is a composed look-at
+rather than the subject — `nodeFraming`, `cohortFraming` — is exempt from ALL THREE; the exemption
+belongs to the POSE, and `_tweenTo`'s one `dolly` flag gates every lever. And the
 rails-hidden lean fades out as the pose closes in on its subject: hiding the rails frees **horizontal**
 width while the FOV is **vertical**, so the radial dolly buys width by spending vertical fit — free at
 a resting pose, whose subject runs wide, and a crop at a deep rung, whose subject (a co-located stack,

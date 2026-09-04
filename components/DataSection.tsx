@@ -15,7 +15,14 @@ export default function DataSection() {
     // right): its recorded reason is the <1100px sideways scroll, where the sticky header slid
     // under the close mark (2026-08-02) — at desktop the tables fit and nothing runs beneath
     // the ×, so both pads match and the pane takes the width.
-    <div className="h-full flex flex-col pl-6 pr-6 max-[1099px]:pr-10 py-3">
+    // …and the ×-gutter narrows again on PHONE (2026-09-02): its 40px bought clearance for a
+    // sticky header sliding sideways under the close mark, and the phone tables no longer scroll
+    // sideways at all (the log and the roster both stand their measure columns down) — and BOTH
+    // pads drop to 16px there: measured, the anchor log's four surviving columns need 324px and
+    // the 24px pads left them 309 (DOR's ordinals are 10 digits; nothing else left to stand
+    // down). The × overlaps only the toolbar row's free right end. Both arms below name the same
+    // 700/1099 the shell's tiers use.
+    <div className="h-full flex flex-col pl-6 pr-6 max-[1099px]:pr-10 max-[700px]:pr-4 max-[700px]:pl-4 py-3">
       {mode === "ledger" ? (
         // MASTER–DETAIL (item 9, 2026-08-06): the anchor log is the index on the left; the right
         // pane renders the SELECTED metagraph snapshot's contents (the deep read + the JSON tree),
@@ -33,6 +40,9 @@ export default function DataSection() {
             className={
               "w-[36%] max-w-[520px] flex-none min-w-0 flex flex-col border-l border-border/50 pl-5 " +
               "max-[700px]:w-auto max-[700px]:max-w-none max-[700px]:h-[44%] max-[700px]:border-l-0 " +
+              // pr-2: the phone pane SCROLLS (document mode), and without it the value column's
+              // right edge sat against the scrollbar (user, 2026-09-02).
+              "max-[700px]:pr-2 " +
               "max-[700px]:border-t max-[700px]:pl-0 max-[700px]:pt-3 max-[700px]:overflow-y-auto slim-scroll"
             }
           >

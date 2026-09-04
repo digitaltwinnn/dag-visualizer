@@ -474,8 +474,11 @@ there is nothing to align with.
 the one policy flag `VIEW_POLICIES[mode].vitalsLane` **AND three deliberate gates** — the scene pose
 (user, 2026-08-15: the raw layer pages history the lane wouldn't describe, and needs the space), the
 rails (user, 2026-08-30: presentation mode shows just the 3D, so rails-hidden hides the band too), and
-the phone (the dock + sheet own that edge; the filter strip's second row renders the SAME cards
-as a horizontal scroll instead — `VitalsStripRow`, one vitals design on every tier). Presence and
+the phone (the dock + sheet own that edge; the dock's own VITALS section hosts the SAME cards as
+a full-width stack — `VitalsDock` + `VitalsSheetBody`, since 2026-09-03; the filter strip's
+second row was their first phone home and was retired the same day, because riding the top bar's
+one grow-downward slot surfaced them under WHICHEVER strip opened, the pulse strip included).
+Presence and
 reserved space can't drift once hydrated; the token's static default in `globals.css` is the band's
 own reserve (**`92px`**), matching the BOOT state (hyper's lane is on, SSR assumes desktop) so the
 rails keep clear of the band before the effect runs. The SCENE⇄HUD toggle is the one `railsHidden`
@@ -487,9 +490,17 @@ rails-lean with no visible way back.
 
 Only the rails restructure; everything else holds the four-zone shape. Desktop (≥1100px) has both rails
 inline with their `RailThread` siblings; tablet (700–1099px) collapses them to edge tabs opening
-**non-modal** sheets (both can be open, orbit still works behind them); phone (<700px) has a persistent
-split bottom bar and ONE sheet at a time, with grabber drag-resize and flick-dismiss. Dismissing a
-sheet only collapses it — it does not clear the selection.
+**non-modal** sheets (both can be open, orbit still works behind them — and the vitals band INSETS
+by their measured `sceneCover`, or the covered cards show through the seam as fragments); phone
+(<700px) has a persistent bottom bar — Explore | Vitals | Details thirds where the view has a
+vitals lane, halves elsewhere (`barGeom`; the icon trays compact to one unseen-update dot at
+thirds) — and ONE sheet at a time, with grabber drag-resize and flick-dismiss. The sheet GROWS out
+of the dock (a height transition from a zero armed on the open flip — the content mounts a commit
+later, the portal trap), fits its content live (drag wins until close), and shrinks back on a
+render-phase-derived exit. Dismissing a sheet only collapses it — it does not clear the selection.
+On phone both Explore cards open COLLAPSED (a compact chooser that grows), and the teaching copy
+says the pointer's own word (`usePointerCoarse` — Tap/Click, one home; geo's node ghost alone
+advertises the long-press preview).
 
 **No auto-open, ever** (global): a pick never opens a sheet or dock. The dock's icon tray announces it;
 the user always taps the trigger.

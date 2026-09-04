@@ -24,7 +24,7 @@ import type { CohortSel } from "@/src/engine/domain/focusLadder";
 // clicking it drills the globe into that country AND expands its nodes inline — master on
 // top, detail nested beneath, then a node row opens its card on the right facts rail.
 // The footprint's headline figures live in the top-bar vitals; this card is purely the accordion.
-export default function GeoExplore() {
+export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: boolean } = {}) {
   const lb = useStore((s) => s.leaderboard);
   const country = useStore((s) => s.country);
   const cohort = useStore((s) => s.cohort); // read-only — the selection WRITE still goes through applyClickActions
@@ -145,6 +145,7 @@ export default function GeoExplore() {
     // shell's REFERENCE look, so this render is byte-identical to the pre-extraction JSX modulo
     // the chrome that moved into ExplorerShell.
     <ExplorerShell
+      defaultCollapsed={defaultCollapsed}
       id="geoexplore"
       title="Nodes by country"
       hint={

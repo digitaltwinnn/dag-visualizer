@@ -51,7 +51,9 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { DEEP_GIVE_UP_MS } from "@/components/RawSnapshotBridge";
 import { useStore } from "@/src/store/store";
+import { usePointerCoarse } from "@/components/usePointerCoarse";
 import { metaSnapDeepKey } from "@/src/data/types";
 import type { NodeRow } from "@/src/data/types";
 import { getNetwork, metagraphById, resolveSigner, shortHash, SIGNER_GROUPS, SIGNER_UNKNOWN } from "@/src/data/network";
@@ -280,7 +282,7 @@ function RawSection({
       // `schemaBox`), the two compete for a squeezed pane — and a default `flex-shrink: 1` here
       // would let a tall schema compress the `raw JSON` row itself. The schema is the part with
       // somewhere to go: it has its own scroller.
-      className={cn("group/copy flex flex-col gap-1 mt-1.5", open ? "min-h-0 flex-1" : "flex-none")}
+      className={cn("group/copy flex flex-col gap-1 mt-1.5", open ? "min-h-0 flex-1 max-[700px]:flex-none" : "flex-none")}
     >
       <div className="flex items-center justify-between gap-2">
         <CollapsibleTrigger
@@ -322,7 +324,7 @@ function RawSection({
         // whatever its siblings above it don't. So the chain is measured instead: the box no
         // longer scrolls (overflow-hidden, a flex column), the schema block keeps its natural
         // height, and the well takes the rest — one bar, and it belongs to the tree.
-        <div className="min-h-[7rem] flex-1 overflow-auto slim-scroll rounded-md border border-border/50 bg-[var(--background)] px-2.5 py-2">
+        <div className="min-h-[7rem] flex-1 overflow-auto slim-scroll rounded-md border border-border/50 bg-[var(--background)] px-2.5 py-2 max-[700px]:flex-none max-[700px]:max-h-none">
           <JsonTree data={data} />
         </div>
       )}
@@ -417,6 +419,7 @@ function SignerGroup({
 }
 
 export function ChannelStatePanel() {
+  const coarse = usePointerCoarse(); // the invitation names the gesture — Tap on touch
   const sel = useStore((s) => s.metaSnap);
   const deep = useStore((s) => (sel ? s.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal)] : undefined));
   const following = useStore((s) => s.following);
@@ -429,7 +432,7 @@ export function ChannelStatePanel() {
   useEffect(() => {
     setGaveUp(false);
     if (!sel || following || deep) return;
-    const t = setTimeout(() => setGaveUp(true), 12000);
+    const t = setTimeout(() => setGaveUp(true), DEEP_GIVE_UP_MS);
     return () => clearTimeout(t);
   }, [sel, following, deep]);
 
@@ -494,7 +497,18 @@ export function ChannelStatePanel() {
   const hash = sel.hash || (net ? snapsAtTick(net.metaSnaps, sel.metaId, sel.ts).find((r) => r.ordinal === sel.ordinal)?.hash : "") || "";
 
   return (
-    <div className="flex flex-col gap-3 min-h-0 h-full">
+    // ⚠️ ON PHONE THE PANE IS A DOCUMENT, NOT A FRAME (user, 2026-09-02: "raw json can't be seen
+    // because no scroll appears while in signers there is a scroll but its within tiny section").
+    // The desktop chain below hands the lane's LEFTOVER height to one scroller — measured and
+    // hard-won (see the well's own history) — but on phone the stacked wrapper is a fixed-share
+    // box (DataSection's 44%) whose head + facts + tabs leave no leftover: the well got ~0 and
+    // the signers scrolled inside a sliver. The wrapper already scrolls vertically there, so the
+    // phone arms flip every flex-1/overflow link to NATURAL height and let the wrapper scroll the
+    // whole pane as one document — the JSON well included (its first cut kept a 45vh internal
+    // scroll, which past a screenful put a bar INSIDE the scrolling pane: two scrollbars, user
+    // 2026-09-03; uncapped, a huge tree is just a long document, and the well's only remaining
+    // scroll is sideways, for wide lines the pane cannot offer). All arms are max-[700px].
+    <div className="flex flex-col gap-3 min-h-0 h-full max-[700px]:h-auto max-[700px]:min-h-fit">
       {/* The pane's subject head — same grammar as a card head: eyebrow + identity + ordinal. */}
       <div className="flex flex-col gap-1 flex-none">
         <span className="text-micro tracking-caps uppercase text-muted-foreground">Metagraph snapshot</span>
@@ -518,7 +532,7 @@ export function ChannelStatePanel() {
           {/* One verb family with the card: compressed → decompress → decompressing
               (user, 2026-08-13). */}
           {following
-            ? "Click this snapshot's row in the anchor log to decompress its payload. It is a ~2.5 MB fetch, so it runs only when you ask."
+            ? `${coarse ? "Tap" : "Click"} this snapshot's row in the anchor log to decompress its payload. It is a ~2.5 MB fetch, so it runs only when you ask.`
             : gaveUp
               ? "decompression failed. Reselect the row to retry: old snapshots are served by only some of the chain\u2019s nodes, so another attempt can land."
               : "decompressing…"}
@@ -570,7 +584,7 @@ export function ChannelStatePanel() {
               onValueChange={(v) => { if (v) setWant(v as LaneId); }}
               // The shadcn root ships `flex flex-col gap-2`; this axis owns the pane's remaining
               // height and its tabs sit flush on the box, so both are overridden here.
-              className="min-h-0 flex-1 gap-0"
+              className="min-h-0 flex-1 gap-0 max-[700px]:flex-none"
             >
               {/* The lane axis. Same segmented-control recipe as the command bar's presentation
                   toggle, one size down; the hairline under it is the tab underline and spans the
@@ -636,7 +650,7 @@ export function ChannelStatePanel() {
                   from the content"), so the active tab visibly opens INTO the bounded panel
                   (its panel-solid fill already bridges the baseline). Same border weight as the
                   tabs' own (border/50); bottom corners pick up the pane radius. */}
-              <div className="min-h-0 flex-1 flex flex-col overflow-hidden border border-t-0 border-border/50 rounded-b-md px-2.5 pt-2 pb-2">
+              <div className="min-h-0 flex-1 flex flex-col overflow-hidden border border-t-0 border-border/50 rounded-b-md px-2.5 pt-2 pb-2 max-[700px]:flex-none max-[700px]:overflow-visible">
                 {/* ⚠️ EVERY LANE'S PANEL MUST CARRY THE FLEX CHAIN THE PLAIN DIV DID. `TabsContent`
                     inserts a layer between the bordered box and the lane body, so `min-h-0 flex
                     flex-col` has to continue through it — the raw-JSON well below sizes against
@@ -675,7 +689,7 @@ export function ChannelStatePanel() {
                     )}
                     {dataTx != null && <RawSection open={raw} onToggle={() => setRaw((o) => !o)} data={dataTx} />}
                 </TabsContent>
-                <TabsContent value="signers" className="min-h-0 flex flex-col gap-3 overflow-auto slim-scroll">
+                <TabsContent value="signers" className="min-h-0 flex flex-col gap-3 overflow-auto slim-scroll max-[700px]:overflow-visible">
                     {/* dL1 FIRST, L0 AFTER (user, 2026-08-14): the production order — the data
                         blocks are signed by their dL1 producers before the L0 cluster seals the
                         snapshot around them, so the lane reads in the order the signatures were
@@ -710,7 +724,13 @@ export function ChannelStatePanel() {
             // the pane ends on one right edge, and the hash values sat 10px short of it because
             // the padding was carried INSIDE the content box; same arithmetic as the rail Foot's
             // full-bleed, at the pane's scale).
-            <div className="flex-none flex flex-col gap-1 rounded-md bg-[var(--panel-plate)] px-2.5 -mx-2.5 py-2">
+            // ⚠️ The value-edge bleed (-mx) stands down on phone (user, 2026-09-02: "the hash section
+            // has a horizontal scrollbar"): the stacked wrapper's overflow-y-auto forces its
+            // x-axis from visible to auto, so the 10px the plate reaches past the pane became a
+            // horizontal scroll axis. Un-bled, the plate's inner padding matches the tab box's
+            // own inset, so the values still share an edge — the tab box's, which is the pane's
+            // visible frame on that tier.
+            <div className="flex-none flex flex-col gap-1 rounded-md bg-[var(--panel-plate)] px-2.5 -mx-2.5 py-2 max-[700px]:mx-0">
               {hash && <FootRow label="Hash" value={paneHash(hash)} title={hash} copy={hash} />}
               {deep.lastSnapshotHash && (
                 <FootRow label="Previous hash" value={paneHash(deep.lastSnapshotHash)} title={deep.lastSnapshotHash} copy={deep.lastSnapshotHash} />

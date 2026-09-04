@@ -86,13 +86,19 @@ const RATE_STALE_MS = 3600_000;
 function staleFor(a: Activity | null | undefined): number | null {
   return a && a.staleMs != null && a.staleMs > RATE_STALE_MS ? a.staleMs : null;
 }
+/** The visible face of the extrapolation basis — "last ~6 min", not a bare "~6 min" (user,
+ *  2026-09-04: "what does ~6 min mean?" — the app's own designer had to ask, because the full
+ *  sentence below is sr-only and the sighted fragment carried no label). "last" is the one word
+ *  that makes it self-explanatory: a rate over the LAST N minutes is the live window the app
+ *  holds (the rolling snapshot buffer — boot backfill + live ticks, capped at POLL.maxSnapshots),
+ *  measured first-to-last timestamp rather than assumed (api.getActivity's note). */
 function windowSpan(a: Activity): string {
   const mins = a.spanHr * 60;
-  return mins < 1 ? `${Math.round(mins * 60)}s` : `~${Math.round(mins)} min`;
+  return mins < 1 ? `last ${Math.round(mins * 60)}s` : `last ~${Math.round(mins)} min`;
 }
 function windowNote(a: Activity | null | undefined, unit: string): string | undefined {
   if (!a) return undefined;
-  return `Rate extrapolated from ${a.samples} ${unit} over ${windowSpan(a)}.`;
+  return `Rate extrapolated from ${a.samples} ${unit} over the ${windowSpan(a)} — the live window of snapshots the app holds.`;
 }
 
 /** The band's one cell recipe: a quiet plate (spineless — cards carry no resting edge signal),
@@ -226,7 +232,7 @@ const BAR_TRACK_MAX = 150;
  *  2026-09-01). The ladder stays where it earns its keep: on the DONUT, whose slices are adjacent
  *  arcs of a single colour and genuinely need separating. A bar row does not — every row is NAMED,
  *  and the ring's slices are in the same order, which is how a legend works. */
-export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key: string; label: React.ReactNode; count: number }[]; accent: string; labelW?: number; dashZero?: boolean }) {
+export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key: string; label: React.ReactNode; count: number; hue?: string }[]; accent: string; labelW?: number; dashZero?: boolean }) {
   // ⚠️ THE CALLER'S ORDER STANDS — see `Donut` for the full reasoning. In short: a magnitude sort
   // here would re-shuffle the structural cards (type, composition, layers) every time the subject
   // changes, and a row that moves cannot be followed; the ranked cards already arrive sorted from
@@ -268,8 +274,17 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
               A ZERO DRAWS NOTHING (rule 10, TickBars' own rule): the old 4px floor applied to a
               0 count rendered an empty bucket as small-but-nonzero activity. The floor now
               guards only real counts, and the numeral beside it still states the zero. */}
-          <span aria-hidden className="flex items-center flex-1 min-w-[16px] h-[5px]" style={{ maxWidth: BAR_TRACK_MAX }}>
-            <span className="h-[5px] rounded-full" style={{ background: accent, opacity: 0.75, width: r.count > 0 ? `${Math.max(2, (r.count / max) * 100)}%` : 0 }} />
+          {/* The cap is a VAR so a surface can re-declare it: `--bar-track-max` defaults to the
+              band's 150px ceiling (a bar spanning a 1600px row stops reading as a quantity), and
+              the phone vitals SHEET sets it to none — there the cards are a 370px full-width
+              column, the ceiling's void lands mid-card, and a track that fills the middle is
+              what keeps label → bar → value one continuous read (user, 2026-09-03). */}
+          <span aria-hidden className="flex items-center flex-1 min-w-[16px] h-[5px]" style={{ maxWidth: `var(--bar-track-max, ${BAR_TRACK_MAX}px)` }}>
+            {/* `hue` — a row that cannot claim the accent: the "unknown"/"unplaced" buckets take
+                the same neutral the tick chart's unattributed segment wears (user, 2026-09-03 —
+                a bucket meaning "nothing to read a type/place from" in the accent reads as one
+                more member of the vocabulary). */}
+            <span className="h-[5px] rounded-full" style={{ background: r.hue ?? accent, opacity: 0.75, width: r.count > 0 ? `${Math.max(2, (r.count / max) * 100)}%` : 0 }} />
           </span>
           {/* Under a COMMITTED scope a 0 is "this network has none of these", not a measurement of
               zero — the dash says so where a numeral would read as a count (kept from the dot-legend
@@ -295,7 +310,7 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
 /** The ring alone — the number that totals it is `DonutTotal`'s, standing outside at headline
  *  size. Segment opacities come from DONUT_STEPS in entry order, which is also the order the
  *  bar rows beside it are built in — order and label are what key a slice to its row. */
-export function Donut({ counts, accent }: { counts: Record<string, number>; accent: string }) {
+export function Donut({ counts, accent, hues }: { counts: Record<string, number>; accent: string; hues?: Record<string, string> }) {
   // ⚠️ ENTRY ORDER, NEVER SORTED BY SIZE — and the ring is only half the reason. Sorting was
   // tried on 2026-09-01 and withdrawn the same minute: "it does not make sense for structural
   // items like metagraph type and composition; it will look strange when they switch when swiping
@@ -327,7 +342,7 @@ export function Donut({ counts, accent }: { counts: Record<string, number>; acce
               key={label}
               cx="22" cy="22" r={R}
               fill="none"
-              stroke={accent}
+              stroke={hues?.[label] ?? accent}
               strokeOpacity={DONUT_STEPS[i] ?? 0.2}
               strokeWidth="6"
               strokeDasharray={`${len} ${C - len}`}
@@ -348,10 +363,10 @@ export function Donut({ counts, accent }: { counts: Record<string, number>; acce
  *  cards it replaced showed that same figure at headline size, so folding them in shrank the very
  *  number the card exists to lead with, below even its own breakdown values. The hole is now
  *  empty on purpose: the ring carries the shape, the numeral carries the reading. */
-export function DonutTotal({ counts, accent, total, className }: { counts: Record<string, number>; accent: string; total: number | null; className?: string }) {
+export function DonutTotal({ counts, accent, total, className, hues }: { counts: Record<string, number>; accent: string; total: number | null; className?: string; hues?: Record<string, string> }) {
   return (
     <span className={cn("flex items-center gap-2 flex-none", className)}>
-      <Donut counts={counts} accent={accent} />
+      <Donut counts={counts} accent={accent} hues={hues} />
       <span className="font-mono font-bold text-foreground tabular-nums leading-none">
         <Odometer int value={total || null} />
       </span>
@@ -471,13 +486,17 @@ function HyperCells({ accent }: { accent: string }) {
         </BandCard>
       ) : (
       <BandCard label="Metagraphs"
-        lead={<DonutTotal counts={types} accent={accent} total={TYPE_ORDER.reduce((n, t) => n + types[t]!, 0)} />}>
+        lead={<DonutTotal counts={types} accent={accent} hues={{ unknown: "var(--muted-foreground)" }} total={TYPE_ORDER.reduce((n, t) => n + types[t]!, 0)} />}>
         {/* THE COMPOSITION CARD'S OWN SHAPE (user, 2026-08-30: "the same design (1 total value +
             4 subsets) — the one used for node composition looks best"): the two cards are sibling
             share-of-whole readings, so they wear one donut + dot-legend design. The type GLYPHS
             keep their home on the filtered face, where the card states a single characteristic. */}
+        {/* "unknown" stays the WORD (user asked about "inactive", 2026-09-03 — but the bucket is
+            "zero LOCATABLE machines to read roles from", not zero activity: BIOFI sits here while
+            anchoring hundreds of snapshots an hour, so "inactive" would fabricate an activity
+            claim, rule 10). It takes the neutral instead: not one more type in the vocabulary. */}
         <MicroBars accent={accent} labelW={58}
-          rows={TYPE_ORDER.map((t) => ({ key: t, label: t === "data + currency" ? "both" : t, count: types[t]! }))} />
+          rows={TYPE_ORDER.map((t) => ({ key: t, label: t === "data + currency" ? "both" : t, count: types[t]!, hue: t === "unknown" ? "var(--muted-foreground)" : undefined }))} />
       </BandCard>
       )}
       {/* NO SEPARATE "NODES" CARD (user, 2026-08-31). The composition counts PARTITION the fleet,
@@ -572,9 +591,12 @@ function GeoCells({ accent }: { accent: string }) {
           fleet is fully drawn — and MicroBars renders no bar for it, only the numeral. */}
       <BandCard label="Nodes"
         lead={<span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={total || null} /></span>}>
+        {/* "unplaced" takes the neutral, like hyper's "unknown" type bucket: a node the lookup
+            could not place claims no location, so its bar should not wear the accent the located
+            split does (user, 2026-09-03). */}
         <MicroBars accent={accent} labelW={56} rows={[
           { key: "located", label: "located", count: located },
-          { key: "unplaced", label: "unplaced", count: Math.max(0, total - located) },
+          { key: "unplaced", label: "unplaced", count: Math.max(0, total - located), hue: "var(--muted-foreground)" },
         ]} />
       </BandCard>
       {/* "Top countries", not "Nodes by country" (user, 2026-09-01): the card shows the top three
@@ -674,7 +696,11 @@ function TickBars({ accent, isMeta, filter, snaps }: { accent: string; isMeta: b
   return (
     // Full height, not a fixed 34px: the bars grow from a baseline, so every pixel of card height
     // is resolution the chart can actually spend (user, 2026-09-01).
-    <div className="flex items-end justify-end gap-[2px] h-full w-full self-stretch pb-0.5" aria-hidden>
+    // min-h: the chart CLAIMS whatever height its card gives it — the band's fixed --vitals-h
+    // on desktop, but the phone Vitals sheet's cards are content-height, where h-full of nothing
+    // rendered the card empty (user, 2026-09-03). The floor is the instrument's own intrinsic
+    // height; inside the band's taller box it is inert.
+    <div className="flex items-end justify-end gap-[2px] h-full min-h-12 w-full self-stretch pb-0.5" aria-hidden>
       {bars.length === 0 && <span className="text-micro text-muted-foreground self-center">acquiring…</span>}
       {allZero && <span className="text-micro text-muted-foreground self-center">no anchors in this window</span>}
       {bars.map((b, i) => {
@@ -872,6 +898,14 @@ function ViewCells({ mode, accent, filter }: { mode: string; accent: string; fil
  *  this component reads the mode only to pick which view's cells to lay out. */
 export default function VitalsBand() {
   const { mode, live, filter, accent } = useVitalsScope();
+  // ⚠️ THE BAND INSETS BY THE OPEN SHEETS' MEASURED COVER (2026-09-04, the tablet pass): on
+  // tablet the edge sheets overlay a full-width band, and the covered cards showed through the
+  // seam as orphaned fragments — a value column with its labels under the glass. `sceneCover` is
+  // the same measured channel the callout's placement reads (RailDock publishes it per side), so
+  // the band and the callout can never disagree about how much width the sheets hold. Zero on
+  // desktop and phone by construction.
+  const coverL = useStore((s) => s.sceneCoverL);
+  const coverR = useStore((s) => s.sceneCoverR);
   // The band steps back with the rails while the user's hand is on the camera (user, 2026-08-30)
   // — the same one read the RailShade dims on, at the recipe's own tempos (away 0.3s, the return
   // faster: it answers a gesture already finished).
@@ -880,6 +914,12 @@ export default function VitalsBand() {
     <section
       id="vitalsband"
       aria-label="View vitals"
+      // The cover inset composes ONTO --bar-margin (left/right override the inset-x arms when a
+      // sheet holds width; the transition above eases the reflow on the sheet's own tempo).
+      style={{
+        left: coverL > 0 ? `calc(var(--bar-margin) + ${coverL}px)` : undefined,
+        right: coverR > 0 ? `calc(var(--bar-margin) + ${coverR}px)` : undefined,
+      }}
       className={cn(
         // pointer-events-none: the band is a read-only instrument — orbit drags pass through it.
         // --bar-margin, THE COMMAND BAR'S OWN INSET (globals.css), so the two bars bracket the
@@ -906,6 +946,7 @@ export default function VitalsBand() {
         // as a bar and a scattering of chips (user, 2026-09-01: "the bottom bar should be the same
         // exactly as the top bar").
         "rounded-lg border border-border/60 [background:var(--topbar-glass)] backdrop-blur-sm",
+        "transition-[left,right] duration-300 motion-reduce:transition-none",
         // ⚠️ THE CARDS ARE FLATTENED FROM HERE, not by a prop threaded through every cell. The same
         // `ViewCells` renders the PHONE strip, where the cards scroll and must keep their own
         // plates — a section of a bar that scrolls away from the bar is not a section. An arbitrary
@@ -937,23 +978,28 @@ export default function VitalsBand() {
   );
 }
 
-/** The PHONE home of the vitals (user pick, 2026-08-30 — option 1): the SAME cards, riding the
- *  filter strip's second row as a horizontal scroll instead of a fixed band — the strip is
- *  already where phone vitals live and growing downward is its one mechanism, so no new surface
- *  or vertical space is claimed. Cards go content-sized (`flex-none basis-auto` overrides the
- *  band's even distribution at higher specificity) with a floor so the stretch sparklines have
- *  real width to measure. TopBar gates the row on `vitalsLane` AND on the strip being open. */
-export function VitalsStripRow() {
+/** The PHONE home of the vitals (user, 2026-09-03 — the dock's third section): the SAME cards,
+ *  stacked full-width in the Vitals sheet. This replaces the filter strip's second row
+ *  (2026-08-30's option 1), which rode the top bar's grow-downward slot and so appeared under
+ *  WHICHEVER strip opened — including the pulse strip, where a row of view vitals had nothing to
+ *  do with what was asked for ("it feels confusing as it's not related to the actual dropdown").
+ *  The dock parallels the desktop band: vitals live on the bottom edge on every tier. Vertical
+ *  because the sheet has height to spend and a stacked read beats a sideways thumb-scroll; the
+ *  width ceilings the band's `size` tiers carry are overridden — in a column every card takes
+ *  the sheet's width, and the ceilings exist for a 1600px row, not a 360px column. */
+export function VitalsSheetBody() {
   const { mode, live, filter, accent } = useVitalsScope();
   return (
     <div
       className={cn(
-        "flex items-stretch gap-2 overflow-x-auto slim-scroll pb-1 min-w-0 flex-1",
-        "[&>*]:flex-none [&>*]:basis-auto [&>*]:min-w-[150px]",
+        "flex flex-col items-stretch gap-2 min-w-0",
+        "[&>*]:w-full [&>*]:max-w-none [&>*]:flex-none [&>*]:basis-auto",
+        // The bar tracks fill the column's middle — see MicroBars' `--bar-track-max` note.
+        "[--bar-track-max:none]",
         !live && "saturate-[.45]",
       )}
     >
-      {!live && <span className="self-center flex-none min-w-0!"><NoSignalDot /></span>}
+      {!live && <span className="self-center flex-none"><NoSignalDot /></span>}
       <ViewCells mode={mode} accent={accent} filter={filter} />
     </div>
   );

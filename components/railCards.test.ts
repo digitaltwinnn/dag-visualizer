@@ -295,4 +295,29 @@ describe("ghost hints — the copy rule", () => {
       for (const { hint } of hintsIn(mode)) expect(hint).not.toMatch(/in the explorer\.?$/);
     }
   });
+
+  // ── The pointer's own verb (2026-09-04) ──────────────────────────────────────────────────────
+  const coarseHintsIn = (mode: (typeof VIEWS)[number]) =>
+    detailsCards({ ...details({ mode }), coarse: true }).filter((c) => !c.present && c.hint).map((c) => ({ id: c.id, hint: c.hint! }));
+
+  it.each(VIEWS)("%s: a coarse pointer is never told to Click — the hints say Tap", (mode) => {
+    for (const { id, hint } of coarseHintsIn(mode)) {
+      expect(hint, `${mode}/${id}`).not.toMatch(/\bclick\b/i);
+    }
+    // …and the default (fine/unspecified) hints never say Tap, so the two registers can't blur.
+    for (const { id, hint } of hintsIn(mode)) {
+      expect(hint, `${mode}/${id}`).not.toMatch(/\btap\b/i);
+    }
+  });
+
+  it("EXACTLY ONE hint advertises the long-press preview, on touch, in geo", () => {
+    // The advertisement exists because long-press has no visible affordance (railCards' node-hint
+    // note); ONE mention is the rule — a refrain across slots would be the shared-tail defect.
+    const mentions = VIEWS.flatMap((mode) => coarseHintsIn(mode).filter(({ hint }) => /press and hold/i.test(hint)).map(({ id }) => `${mode}/${id}`));
+    expect(mentions).toEqual(["geo/node"]);
+    // Never on a fine pointer, whose preview is the resting hover itself.
+    for (const mode of VIEWS) {
+      for (const { hint } of hintsIn(mode)) expect(hint).not.toMatch(/press and hold/i);
+    }
+  });
 });

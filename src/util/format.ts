@@ -44,3 +44,16 @@ export function midHash(v: string, max = 46): string {
   const tail = Math.floor((max - 1) * 0.4);
   return `${v.slice(0, max - 1 - tail)}…${v.slice(-tail)}`;
 }
+
+// A COUNT AT MAGNITUDE SCALE → "~27.9M" (user, 2026-09-02: "1–25 of 27,851,696" and "1 /
+// 1,114,068" on one pager row — "can we use a more readable format?"). Best practice splits the
+// row's numbers by what they are: the visible row range and the CURRENT page stay exact (one
+// names what is on screen, the other is an address you type back), while a chain-scale TOTAL is
+// a magnitude — the chain grows every few seconds, so its "exact" length is stale the moment it
+// renders, and eight digits of it are noise a reader has to count. Compact only from 10,000 up:
+// below that the locale string is perfectly readable, and the windowed counts ("347 in window")
+// keep their exactness, which is real. The tilde marks the rounding honestly (rule 10).
+export const fmtCount = (n: number): string =>
+  n < 10_000
+    ? n.toLocaleString()
+    : `~${new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(n)}`;

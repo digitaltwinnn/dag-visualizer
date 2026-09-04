@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
-import { FOCI, hubFraming, geoFraming, ledgerCommitTilt, LEDGER_TILT_YAW, LEDGER_TILT_PITCH, LEDGER_TILT_DOLLY, easeInOutQuad, CAM_ZOOM, dollyBack, RAILS_HIDDEN_DOLLY, railsLean, restOrbit, restPitch, nodeFraming, cohortFraming, isSamePose, nudgeMix, NUDGE_AMP, NUDGE_DUR, NUDGE_SAME, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE } from "./cameraRig";
+import { FOCI, hubFraming, geoFraming, REST_ASPECT, aspectFit, ledgerCommitTilt, LEDGER_TILT_YAW, LEDGER_TILT_PITCH, LEDGER_TILT_DOLLY, easeInOutQuad, CAM_ZOOM, dollyBack, RAILS_HIDDEN_DOLLY, railsLean, restOrbit, restPitch, nodeFraming, cohortFraming, isSamePose, nudgeMix, NUDGE_AMP, NUDGE_DUR, NUDGE_SAME, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE } from "./cameraRig";
 
 // NO Snapshots framing is pinned here, because the view HAS none: it owns one pose, `FOCI.ledger`,
 // with one state-keyed variation — `ledgerCommitTilt`, the commit ORBIT, pinned below. Five framings
@@ -184,6 +184,40 @@ describe("railsLean (the rails-hidden camera lean, 2026-08-08; ramped 2026-08-13
     railsLean(pos, target, 14, expected);
     railsLean(pos, target, 14, pos); // in place
     expect(pos.distanceTo(expected)).toBeLessThan(1e-12);
+  });
+});
+
+
+describe("aspectFit (the portrait fit, 2026-09-02)", () => {
+  it("is the IDENTITY at rest aspect and wider — the lever only ever widens", () => {
+    const pos = new THREE.Vector3(0, 0, 12);
+    const target = new THREE.Vector3(0, 0, 2);
+    const out = new THREE.Vector3();
+    aspectFit(pos, target, REST_ASPECT, out);
+    expect(out.z).toBeCloseTo(12, 9);
+    aspectFit(pos, target, 2.4, out); // ultrawide: never dollies IN (would crop the tuned height)
+    expect(out.z).toBeCloseTo(12, 9);
+    expect(pos.z).toBe(12); // inputs untouched
+    expect(target.z).toBe(2);
+  });
+  it("dollies OUT by the square root of the width deficit on a portrait aspect", () => {
+    // Partial compensation is the design: full restAspect/aspect would restore margin the
+    // desktop pose never used — see the lever's own note.
+    const pos = new THREE.Vector3(0, 0, 12);
+    const target = new THREE.Vector3(0, 0, 2);
+    const out = new THREE.Vector3();
+    const aspect = 390 / 844;
+    aspectFit(pos, target, aspect, out);
+    expect(out.z).toBeCloseTo(2 + 10 * Math.sqrt(REST_ASPECT / aspect), 9);
+  });
+  it("scales about the TARGET, and is outPos===pos safe like its two sibling levers", () => {
+    const pos = new THREE.Vector3(3, 4, 12);
+    const target = new THREE.Vector3(3, 4, 2);
+    aspectFit(pos, target, 0.5, pos); // in place
+    const k = Math.sqrt(REST_ASPECT / 0.5);
+    expect(pos.x).toBeCloseTo(3, 9); // radial through the target: x/y offsets stay zero
+    expect(pos.y).toBeCloseTo(4, 9);
+    expect(pos.z).toBeCloseTo(2 + 10 * k, 9);
   });
 });
 

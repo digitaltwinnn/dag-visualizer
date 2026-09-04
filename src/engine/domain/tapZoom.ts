@@ -86,3 +86,16 @@ export function tapZoomAround(
   }
   out.subVectors(pos, target).multiplyScalar(to / d).add(target);
 }
+
+// ── Long-press (2026-09-03) ────────────────────────────────────────────────────────────────────
+// TOUCH'S HOVER: a phone has no pointer that rests over an object, so the whole preview tier —
+// the tooltip, the dim previews, the scene↔HUD hover pairing — was silently absent there. A still
+// press of this duration runs the SAME hover pick a resting mouse runs (the Engine calls its one
+// _handleMove path with the press point), so previews come from one code path on both input
+// kinds; rule 9's channels are untouched. The threshold sits under the platform context-menu
+// delay (~500ms) so the preview wins the race, and comfortably above a deliberate tap.
+// Stillness reuses DOUBLE_TAP_SLOP — one fingertip tolerance for every touch gesture here.
+export const LONG_PRESS_MS = 420;
+/** How long a fired preview outlives the finger: the fingertip covers the tooltip while pressed,
+ *  so the reading happens AFTER release — this is the read window, cleared like a mouse-leave. */
+export const LONG_PRESS_LINGER_MS = 2500;

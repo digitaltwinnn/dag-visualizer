@@ -48,12 +48,17 @@ const PROBE_CACHE = 64;
  *  also the two columns the search bar cannot answer for, having no index at any layer, so a phone
  *  loses nothing it could have acted on. `max-[700px]` is `breakpointOf`'s own phone boundary and
  *  the same arm every other phone gate names (CSS trap 8: it stops applying AT 700). */
-const COLUMNS: { key: AnchorLogSortKey; label: string; phone?: false }[] = [
+const COLUMNS: { key: AnchorLogSortKey; label: string; phone?: false; phoneLabel?: string }[] = [
   { key: "net", label: "Network" },
   { key: "ordinal", label: "Snapshot" },
   { key: "fee", label: "Fee (DAG)", phone: false },
   { key: "size", label: "Size", phone: false },
-  { key: "tick", label: "Anchored into" },
+  // `phoneLabel` — the same axis under its shorter name where the wide one alone kept the four
+  // surviving columns in sideways scroll (2026-09-02: measured 366px of columns in a 309px pane,
+  // and this header was the widest at 118px). "Global" is not an abbreviation but the axis's own
+  // name — the search bar labels the very same criterion `global` — so nothing is invented for
+  // the narrow tier; aria-sort and the full title stay on the th either way.
+  { key: "tick", label: "Anchored into", phoneLabel: "Global" },
   { key: "age", label: "Age" },
 ];
 /** The one class both the header cell and its body cells wear, so a column can never half-hide. */
@@ -570,7 +575,12 @@ export default function AnchorLogTable() {
   const toolbar = (
     // `pb-2` — the same 8px the box below it keeps to the table, so the search block sits in an
     // even rhythm instead of being pinched against its own trigger (user, 2026-09-01).
-    <div className="flex-none flex items-center justify-end gap-1.5 pb-2">
+    // ⚠️ Phone clears the layer's × (user, 2026-09-02: "the close button overlaps with the
+    // 'search snapshots' button"): this row right-aligns into the pane's top-right corner, which
+    // is exactly where SectionShell's absolute close sits — and the phone pane's slimmer padding
+    // (pr-4, was the pr-10 tablet gutter) plus the ×'s 44px touch box put the two on top of each
+    // other. The reserve is the ×'s own touch width.
+    <div className="flex-none flex items-center justify-end gap-1.5 pb-2 max-[700px]:pr-10">
       {searchSet && (
         <>
           <span className="min-w-0 truncate text-micro text-muted-foreground">
@@ -649,7 +659,14 @@ export default function AnchorLogTable() {
                     )}
                     onClick={() => setSort((s) => ({ key: c.key, dir: s.key === c.key ? ((s.dir * -1) as 1 | -1) : 1 }))}
                   >
-                    {c.label}
+                    {c.phoneLabel ? (
+                      <>
+                        <span className="max-[700px]:hidden">{c.label}</span>
+                        <span className="min-[700px]:hidden">{c.phoneLabel}</span>
+                      </>
+                    ) : (
+                      c.label
+                    )}
                     {sort.key === c.key &&
                       (sort.dir === 1 ? <ArrowUp className="size-3" aria-hidden /> : <ArrowDown className="size-3" aria-hidden />)}
                   </button>
@@ -773,7 +790,13 @@ export default function AnchorLogTable() {
                   <TableCell className="text-right font-mono tabular-nums">
                     {pending ? <span className="text-muted-foreground">…</span> : r.global.ordinal.toLocaleString()}
                   </TableCell>
-                  <TableCell className="text-right text-muted-foreground">{relativeAge(now - Date.parse(r.ts))}</TableCell>
+                  <TableCell className="text-right text-muted-foreground">
+                    {/* Phone drops the " ago" (the bare register — relativeAge's own note): the
+                        AGE header names the quantity, and the suffix's width was the last thing
+                        holding this table in sideways scroll. */}
+                    <span className="max-[700px]:hidden">{relativeAge(now - Date.parse(r.ts))}</span>
+                    <span className="min-[700px]:hidden">{relativeAge(now - Date.parse(r.ts), true)}</span>
+                  </TableCell>
                 </TableRow>
               );
             })}
@@ -791,10 +814,16 @@ export default function AnchorLogTable() {
         from={from}
         to={to}
         total={total}
-        // The windowed lenses state their scope and the way further back (user, 2026-08-14):
-        // no merged cross-network history feed exists, so "all"/unlisted page the window only.
-        suffix={histNet ? undefined : "in window"}
-        note={histNet ? undefined : "pick a network to explore all the way back to genesis"}
+        // The windowed lenses state their scope and the way further back (user, 2026-08-14) —
+        // since 2026-09-02 as one underlined word with the explanation behind it, because the
+        // spelled-out line ran too long. The title says what the count actually is: the window
+        // is a span of TIME, and networks snapshot at their own rates, so 262 here is not a
+        // fraction of anything — a fast chain fills the window with hundreds while a slow one
+        // contributes three, and neither number is proportional to its chain.
+        scope={histNet ? undefined : {
+          word: "window",
+          title: "The recently retained span, held by time rather than by count — each network snapshots at its own rate, so these counts are not proportional to any chain's length. Pick a network in the top-bar filter to page its whole chain, back to genesis.",
+        }}
         onPage={setPageState}
       />
     </>

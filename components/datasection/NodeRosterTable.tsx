@@ -21,24 +21,34 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 // A row click = the explorer row click (nodeSelectActions: filter→ancestry→inspect; re-click
 // deselects); it commits silently — flip the RAW switch back to see the card/camera. Row hover
 // glows the node's 3D shells (hoverNodeId, outward-only — the cohort-row convention).
-const COLS: Record<"hyper" | "geo", { key: RosterSortKey; label: string }[]> = {
+// ⚠️ PHONE STANDS COLUMNS DOWN, BY THE ANCHOR LOG'S OWN RULE (2026-09-02; the log's COLUMNS
+// note has the full argument): measured, this table ran 1017px inside a 390px viewport — three
+// of seven columns visible, the rest behind a sideways scroll, which on a roster you SCAN is
+// worse than showing less of each row. What stays is what IDENTIFIES a node under the view's
+// own lens — geo: where it is and which node (country, network, id — city measured 125px and is
+// the country's qualifier, stated on the node card one tap away); hyper: what it is in the
+// architecture (network, id, layer). Provider, co-location and the off-lens locations are facts
+// ABOUT the node, stated in full on the same card. `phone` is per-view because the lens is:
+// geo's layer is hyper's identity column and vice versa.
+const PHONE_HIDDEN = "max-[700px]:hidden"; // one class on head + body cells, so a column can never half-hide
+const COLS: Record<"hyper" | "geo", { key: RosterSortKey; label: string; phone?: false }[]> = {
   geo: [
     { key: "country", label: "Country" },
-    { key: "city", label: "City" },
-    { key: "isp", label: "Provider" },
+    { key: "city", label: "City", phone: false },
+    { key: "isp", label: "Provider", phone: false },
     { key: "net", label: "Network" },
     { key: "id", label: "Node" },
-    { key: "layer", label: "Layer" },
-    { key: "colo", label: "Co-located" },
+    { key: "layer", label: "Layer", phone: false },
+    { key: "colo", label: "Co-located", phone: false },
   ],
   hyper: [
     { key: "net", label: "Network" },
     { key: "id", label: "Node" },
     { key: "layer", label: "Layer" },
-    { key: "isp", label: "Provider" },
-    { key: "country", label: "Country" },
-    { key: "city", label: "City" },
-    { key: "colo", label: "Co-located" },
+    { key: "isp", label: "Provider", phone: false },
+    { key: "country", label: "Country", phone: false },
+    { key: "city", label: "City", phone: false },
+    { key: "colo", label: "Co-located", phone: false },
   ],
 };
 
@@ -65,10 +75,20 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
     switch (key) {
       case "net": {
         const cfg = r.netId ? metagraphById(r.netId) : null;
+        // Phone wears the TICKER, the log's own network-column treatment: measured, the full
+        // names held this column at 133px where the tick log's ticker column runs 76 — and the
+        // identity dot plus ticker is the same two-part identity every row and card wears.
         return (
           <span className="flex items-center gap-2">
             {r.netId && <IdentityDot hue={filterAccent(r.netId)} />}
-            {cfg?.name ?? r.netId ?? "—"}
+            {cfg ? (
+              <>
+                <span className="max-[700px]:hidden">{cfg.name}</span>
+                <span className="min-[700px]:hidden">{cfg.ticker || cfg.name}</span>
+              </>
+            ) : (
+              r.netId ?? "—"
+            )}
           </span>
         );
       }
@@ -77,19 +97,33 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
         // id is `whitespace-nowrap` in a table cell, so it blew the NODE column — and with it the
         // table — past the raw layer's width. The id is a reference, not a reading column; the
         // full hash stays one hover away.
+        // Phone tightens the short form once more (8…6 → 6…4): still a recognizable handle —
+        // the full id stays on the hover title and the node card — and the 29px it frees is what
+        // keeps the four surviving columns out of sideways scroll.
         return (
           <span className="font-mono tabular-nums text-foreground-dim" title={r.node.id ?? undefined}>
-            {r.node.id ? shortHash(r.node.id) : r.node.label}
+            {r.node.id ? (
+              <>
+                <span className="max-[700px]:hidden">{shortHash(r.node.id)}</span>
+                <span className="min-[700px]:hidden">{`${r.node.id.slice(0, 6)}…${r.node.id.slice(-4)}`}</span>
+              </>
+            ) : (
+              r.node.label
+            )}
           </span>
         );
       case "layer": {
         // The shared composition vocabulary (the node card's subtitle idiom): the make-up word
         // plus its layer codes as pills — never a raw role array.
         const comp = compositionRows([{ roles: r.node.roles, layer: r.node.layer }])[0];
+        // The chips stand down on phone (the word stays): the make-up word is the summary this
+        // column exists to say, the codes are its detail — and at 150px the pair was the widest
+        // cell in hyper's phone roster. Never the inverse: codes without the word would be the
+        // raw role array this column's convention exists to prevent.
         return comp ? (
           <span className="flex items-center gap-2">
             {comp.label}
-            <RoleChips codes={comp.codes} />
+            <span className="max-[700px]:hidden"><RoleChips codes={comp.codes} /></span>
           </span>
         ) : (
           "—"
@@ -117,6 +151,7 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
             {COLS[mode].map((c) => (
               <TableHead
                 key={c.key}
+                className={cn(c.phone === false && PHONE_HIDDEN)}
                 aria-sort={sort.key === c.key ? (sort.dir === 1 ? "ascending" : "descending") : "none"}
               >
                 <button
@@ -169,7 +204,7 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
                 onClick={commit}
               >
                 {COLS[mode].map((c) => (
-                  <TableCell key={c.key}>{cell(r, c.key)}</TableCell>
+                  <TableCell key={c.key} className={cn(c.phone === false && PHONE_HIDDEN)}>{cell(r, c.key)}</TableCell>
                 ))}
                 <TableCell className="w-7">{selected && <SelectedRowMark hue={r.netId ? filterAccent(r.netId) : undefined} />}</TableCell>
               </TableRow>

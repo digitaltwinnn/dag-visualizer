@@ -168,7 +168,10 @@ export default function SectionShell({
         className={
           "ig-panel fixed z-9 overflow-hidden left-4 right-4 min-[1100px]:left-[26px] min-[1100px]:right-[26px] " +
           "top-[calc(var(--rail-top)+var(--topbar-extra,0px))] bottom-[calc(var(--bottom-reserve,0px)+var(--footer-h,0px))] " +
-          "max-[700px]:bottom-[calc(var(--phone-dock-h,56px)+var(--bottom-reserve,0px))]"
+          // Phone adds the FOOTER ROW's own height: the row floats over the scene's bottom edge by
+          // design (--footer-h zeroes on phone), but this layer is a DATA pane — measured, the
+          // lozenge sat on the channel pane's hash rows. One token, shared with SiteFooter.
+          "max-[700px]:bottom-[calc(var(--phone-dock-h,56px)+var(--bottom-reserve,0px)+var(--footer-phone-h,22px))]"
         }
         style={{ visibility: "hidden", willChange: "transform, opacity" }}
       >
@@ -184,7 +187,10 @@ export default function SectionShell({
           size="icon-xs"
           aria-label="Close the raw data layer"
           title="Close the raw data layer"
-          className="absolute top-4 right-3 z-20 text-muted-foreground hover:text-foreground"
+          // The coarse-pointer arms grow the 24px ghost to the 44px touch floor AND re-anchor it
+          // (top-4→1.5, right-3→0.5) so the × GLYPH stays where the fine-pointer one sits — grown
+          // in place, the box's centre drifted 10px down-left onto the table header's AGE cell.
+          className="absolute top-4 right-3 z-20 text-muted-foreground hover:text-foreground pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:top-1.5 pointer-coarse:right-0.5"
           onClick={() => useStore.getState().setSection("scene")}
         >
           <X aria-hidden />

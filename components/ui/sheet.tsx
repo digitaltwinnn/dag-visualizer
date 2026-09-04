@@ -59,7 +59,9 @@ const SHEET_SIDE: Record<"left" | "right" | "bottom", string> = {
     "top-0 right-0 bottom-0 w-[min(320px,90vw)] rounded-l-[var(--radius)] " +
     "ig-sheet-edge data-[state=open]:animate-sheet-in-right",
   bottom:
-    "left-0 right-0 bottom-0 h-[60vh] max-h-[72vh] rounded-t-[var(--radius)] " +
+    // dvh, not vh (2026-09-03): on iOS Safari `vh` measures the LARGEST viewport, so with the
+    // toolbar up a 60vh sheet ran taller than the visible page; dvh tracks the live viewport.
+    "left-0 right-0 bottom-0 h-[60dvh] max-h-[72dvh] rounded-t-[var(--radius)] " +
     "ig-sheet-topruler data-[state=open]:animate-sheet-in-bottom",
 }
 

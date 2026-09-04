@@ -60,12 +60,18 @@ describe("responsive tier arms name the boundary itself", () => {
     // visible on phone as overlay chrome, since it is the app's one /about route). Two homes
     // for one boundary, so they are pinned together — this is the pair that was off by one and
     // left --footer-h reserving 26px the layout wasn't using. The component arm must name the
-    // SAME 700 the media query does, and its phone height must be explicit, because the token
-    // it normally sizes by is 0 on that tier.
+    // SAME 700 the media query does, and its phone height must NOT ride the zeroed token: it
+    // rides `--footer-phone-h`, the dedicated phone-height token (2026-09-02 — it was a px
+    // literal until the raw data layer needed the same number for its bottom inset, the one
+    // surface the floating row genuinely collides with). Both consumers are pinned here so the
+    // row and the pane's clearance can never disagree.
     const css = readFileSync(join("app", "globals.css"), "utf8");
     expect(css).toMatch(/@media not \(min-width: 700px\) \{\s*:root \{ --footer-h: 0px; \}/);
+    expect(css).toMatch(/--footer-phone-h: \d+px/);
     const foot = readFileSync(join("components", "SiteFooter.tsx"), "utf8");
     expect(foot).toContain("max-[700px]:bottom-[var(--phone-dock-h)]");
-    expect(foot).toMatch(/max-\[700px\]:h-\[\d+px\]/);
+    expect(foot).toContain("max-[700px]:h-[var(--footer-phone-h)]");
+    const shell = readFileSync(join("components", "SectionShell.tsx"), "utf8");
+    expect(shell).toContain("var(--footer-phone-h,22px)");
   });
 });

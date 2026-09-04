@@ -37,6 +37,7 @@ export default function ExplorerShell({
   title,
   hint,
   onLeave,
+  defaultCollapsed = false,
   children,
 }: {
   id: string;
@@ -58,9 +59,15 @@ export default function ExplorerShell({
   // Container-level hover cleanup — see the file comment. Optional: most explorers' committed
   // rows stay rendered after a click (no self-unmount hazard), so most callers omit it.
   onLeave?: () => void;
+  /** Phone starts the explorer collapsed (user, 2026-09-03) — with About collapsed too, the
+   *  Explore sheet opens as a compact two-head chooser and the live content-fit sizes it down;
+   *  one tap opens the browse list and the sheet grows with it. Same per-mount rule and same
+   *  prop-not-window-read reasoning as AboutView's `defaultCollapsed` (its note has the
+   *  hydration lesson). */
+  defaultCollapsed?: boolean;
   children: ReactNode;
 }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
   return (
     <Card
       asChild

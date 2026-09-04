@@ -531,7 +531,20 @@
   /* Height of the phone persistent bottom dock bar — the single source of truth referenced by
      the phone bar-half sheet offset (RailDock) AND the LiveStrip's phone bottom offset. (Was
      16-responsive-shell.css `:root`, re-homed here when that file was retired in Task 9.) */
-  --phone-dock-h: 56px;
+  --phone-dock-h: calc(56px + env(safe-area-inset-bottom, 0px));
+  /* The BAR half of that height — what the dock's content centres in; the inset below it is
+     the home indicator's band (viewport-fit=cover, layout.tsx). One token pair so every
+     consumer of --phone-dock-h (the sheets' offset, the footer's ride-above, the raw layer's
+     bottom) clears the indicator automatically; on flat-bottomed devices the env() is 0 and
+     both collapse to the shipped 56px. */
+  --phone-dock-bar-h: 56px;
+  /* The footer row's OWN height on phone, where `--footer-h` deliberately zeroes (the row is
+     overlay chrome that reserves nothing — see its note below). Two consumers must still agree
+     on the number: SiteFooter's explicit phone height, and the raw data layer's bottom inset —
+     the one surface the floating row genuinely collides with, since a data pane's bottom rows
+     are content where the scene's bottom edge is not (2026-09-02, measured: the lozenge sat on
+     the channel pane's hash foot). */
+  --footer-phone-h: 22px;
   /* The ONE resting dim for rail instrument furniture (lines/ruler/spine at rest) — consumed by
      the desktop RailThreads' dim group AND the tablet/phone sheet's `.ig-sheet-edge` channel, so
      rest vs signal contrast is consistent everywhere. Brightness belongs to the signals (pulses)
@@ -1216,7 +1229,14 @@
    content on close). Reduced motion is handled at the call site (`motion-reduce:animate-none`). */
 @keyframes sheetInLeft   { from { transform: translateX(-100%); } to { transform: none; } }
 @keyframes sheetInRight  { from { transform: translateX(100%); }  to { transform: none; } }
-@keyframes sheetInBottom { from { transform: translateY(100%); }  to { transform: none; } }
+/* ⚠️ EFFECTIVELY RETIRED (2026-09-03, after three review rounds): every bottom sheet is a phone
+   bar-half, and RailDock suppresses this keyframe there (`!animate-none`) because the entry is
+   a HEIGHT GROW out of the dock riding the sheet's own transition — a translateY slide showed
+   through the dock's translucent glass ("comes from the bottom of the screen") and a
+   rise-and-fade materialized the box at its final height ("now it actually comes from the
+   top?"). The keyframe stays defined so sheet.tsx's bottom arm keeps compiling; a future
+   non-bar-half bottom sheet must decide its entry afresh. */
+@keyframes sheetInBottom { from { transform: translateY(28px); opacity: 0; }  to { transform: none; opacity: 1; } }
 /* Card MATERIALIZE (card-redesign 2026-08-08): the facts rail's box tier mounting — a rung
    becoming THE materialized card (RailPane's entry→box swap remounts the Card subtree, replaying
    this once). Subtle rise+fade on the navigation clock's fast end; reduced motion is guarded at
@@ -1225,7 +1245,8 @@
 @theme inline {
   --animate-sheet-in-left:   sheetInLeft   0.28s cubic-bezier(0.22, 1, 0.36, 1);
   --animate-sheet-in-right:  sheetInRight  0.28s cubic-bezier(0.22, 1, 0.36, 1);
-  --animate-sheet-in-bottom: sheetInBottom 0.30s cubic-bezier(0.22, 1, 0.36, 1);
+  /* Suppressed on every current bottom sheet — see the keyframe's note above. */
+  --animate-sheet-in-bottom: sheetInBottom 0.55s cubic-bezier(0.22, 1, 0.36, 1);
   --animate-card-in:         cardMaterialize 0.26s cubic-bezier(0.22, 1, 0.36, 1);
 }
 

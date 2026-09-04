@@ -3,6 +3,8 @@ import * as THREE from "three";
 import {
   DOUBLE_TAP_MS,
   DOUBLE_TAP_SLOP,
+  LONG_PRESS_MS,
+  LONG_PRESS_LINGER_MS,
   isDoubleTap,
   TAP_ZOOM_STEP,
   TAP_ZOOM_DUR,
@@ -149,5 +151,17 @@ describe("tapZoomAround", () => {
     tapZoomAround(pos, tgt, 0, 1000, out);
     tapZoomAround(out, tgt, 0, 1000, out);
     expect(out.z).toBeCloseTo(100 * TAP_ZOOM_STEP * TAP_ZOOM_STEP);
+  });
+});
+
+describe("long-press (touch's hover, 2026-09-03)", () => {
+  it("fires under the platform context-menu delay and lingers long enough to read", () => {
+    // The DIRECTIONS are the spec, not the numbers: the press must win the ~500ms context-menu
+    // race or the browser's menu eats the gesture, and it must be far above a tap so deliberate
+    // taps never preview. The linger exists because the fingertip covers the tooltip while
+    // pressed — reading happens after release.
+    expect(LONG_PRESS_MS).toBeLessThan(500);
+    expect(LONG_PRESS_MS).toBeGreaterThan(250);
+    expect(LONG_PRESS_LINGER_MS).toBeGreaterThan(LONG_PRESS_MS);
   });
 });

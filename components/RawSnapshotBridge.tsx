@@ -18,6 +18,9 @@ import { metaSnapDeepKey } from "@/src/data/types";
 const inflight = new Set<number>();
 const deepInflight = new Set<string>();
 
+/** See the note inside the component: measured slow-path latency (12.8–14.1s) + margin. */
+export const DEEP_GIVE_UP_MS = 20_000;
+
 // The byte bar needs a MEASURED width for every tick in the trail, and only the live tick is read
 // as it happens. A cold page load therefore starts with a trail of unmeasured seams, so the bridge
 // backfills the previous few ordinals ONCE, in the background, paced so it never bursts the route
@@ -142,6 +145,17 @@ export default function RawSnapshotBridge() {
     },
     [],
   );
+
+  // HOW LONG THE PANES WAIT BEFORE CALLING THE DEEP READ FAILED. Sized by the MEASURED latency
+  // of the read's own slow path, never a pleasing constant (the tick-handoff grace's lesson, in
+  // src/data/CLAUDE.md): a history ordinal goes LB (fast 404) → the archival-node walk
+  // (fetchGlobal: 8s LB timeout, 4s per probe, then a multi-MB download), measured 2026-09-02 at
+  // 12.8–14.1s on SUCCESSFUL reads — and the old 12s timer sat just under that, so every history
+  // row flashed "decompression failed" a second before its content landed, which the user read
+  // as failing all the time. 20s covers the measured band with download variance; the give-up is
+  // COPY, not an abort — a read landing later still replaces it. Exported so the two panes that
+  // render the word cannot drift from each other or from this rationale.
+  // (module scope below; both consumers import it)
 
   // The deeper read: only ever for the ONE selected metagraph snapshot, never a poll.
   useEffect(() => {

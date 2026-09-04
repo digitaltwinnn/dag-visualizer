@@ -27,7 +27,7 @@ import type { NodeRow } from "@/src/data/types";
 // rung with its own right-rail card, geo's provider-cohort idiom bent onto architecture — one
 // click commits AND expands it, so the disclosure state IS the committed composition (single-open
 // by construction). The terminal subject is still a node.
-export default function HyperExplore() {
+export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: boolean } = {}) {
   const metaList = useStore((s) => s.metaList);
   const filter = useStore((s) => s.filter);
   const selNodes = useStore((s) => s.selNodes);
@@ -86,6 +86,7 @@ export default function HyperExplore() {
     // is the architectural sibling of GeoExplore and shares its chrome exactly (both migrated
     // onto ExplorerShell together, pixel-neutral).
     <ExplorerShell
+      defaultCollapsed={defaultCollapsed}
       id="hyperexplore"
       title="Nodes by network"
       // No ordering clause (user, 2026-08-12): a sorted list states its own order, so "biggest
