@@ -228,7 +228,7 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
           className={cn(
             phase === "hold" && "opacity-0",
             phase === "in" &&
-              "animate-in fade-in slide-in-from-bottom-8 duration-(--tempo-doc-rise) ease-[cubic-bezier(.45,.05,.25,1)] fill-mode-both [animation-delay:var(--tempo-doc-sheet)] motion-reduce:animate-none",
+              "animate-in fade-in slide-in-from-bottom-8 duration-(--tempo-doc-rise) ease-(--ease-roll) fill-mode-both [animation-delay:var(--tempo-doc-sheet)] motion-reduce:animate-none",
             phase === "out" &&
               "animate-out fade-out slide-out-to-bottom-8 duration-(--tempo-nav) ease-out fill-mode-forwards motion-reduce:animate-none motion-reduce:opacity-0",
           )}

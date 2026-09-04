@@ -67,7 +67,7 @@ export default function AboutView({
           // materialize completing, not as a second animation).
           <div
             key={title}
-            className="flex flex-col gap-2.5 px-4 pt-3 pb-3.5 overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-(--tempo-roll) ease-[cubic-bezier(.45,.05,.25,1)] motion-reduce:animate-none"
+            className="flex flex-col gap-2.5 px-4 pt-3 pb-3.5 overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-(--tempo-roll) ease-(--ease-roll) motion-reduce:animate-none"
           >
             {lines.map((l, i) => (
               <p

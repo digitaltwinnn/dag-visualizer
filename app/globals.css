@@ -791,14 +791,22 @@
                         dot, boot core breathe, the state atoms' twinkle/standby);
        --tempo-signal · the ~1.2s transient-signal clock (the edge pulse's sweep + fade — the
                         title roll-in it syncs with keeps its own 0.4s roll INSIDE this window);
-       --tempo-roll   · the 0.4s odometer/title roll.
+       --tempo-roll   · the odometer/title/content roll (0.65s since 2026-09-04 — 0.4 read
+                        "too fast" on the About card and across the app; --ease-roll is its
+                        curve, see below).
      The 150ms disclosure clock is deliberately NOT a token: it is the chevron's `duration-150`
      in JSX (see .disclose-panel's header) — a CSS-side token would claim a single home the JSX
      half wouldn't read, which is worse than the documented pairing. Engine/GSAP clocks (0.55s
      depth, ~3.9s choreography) are frame-driven and live in their own modules. */
   --tempo-beat: 1.5s;
   --tempo-signal: 1.2s;
-  --tempo-roll: 0.4s;
+  --tempo-roll: 0.65s;
+  /* The roll grammar's ONE entrance curve (2026-09-04, the doc-rise lesson generalized):
+     ease-out lands most of its change in the first half-second whatever the duration, so a
+     slower roll on ease-out "looks just as fast" — this restrained-start bezier keeps the
+     motion visible through the window. Entrances only; exits keep ease-out, where
+     front-loading is exactly right. */
+  --ease-roll: cubic-bezier(0.45, 0.05, 0.25, 1);
   /* The NAVIGATION clock — the user's own gesture resolving, slower than any signal: 0.55s is
      the scene↔raw depth transition's GSAP duration (SectionShell.tsx — the JS half of this
      pairing, like the disclosure clock's chevron). The DOC overlay's fade deliberately does NOT
@@ -1116,12 +1124,12 @@
 @layer components {
   .odometer { position: relative; display: inline-grid; overflow: hidden; line-height: 1.1; }
   .odometer > span { grid-area: 1 / 1; }
-  .odometer-in  { animation: odo-in  var(--tempo-roll) ease-out; }
+  .odometer-in  { animation: odo-in  var(--tempo-roll) var(--ease-roll); }
   .odometer-out { animation: odo-out var(--tempo-roll) ease-out forwards; }
   /* A whole-value "roll" for TEXT card-headers (node id, metagraph name) — the same upward roll
      the Odometer uses for numeric values, so every card's header transitions in one language on a
      new subject. Triggered by a changing React `key` (the element re-mounts and plays it). */
-  .roll-in { display: inline-block; animation: odo-in var(--tempo-roll) ease-out; }
+  .roll-in { display: inline-block; animation: odo-in var(--tempo-roll) var(--ease-roll); }
 }
 @media (prefers-reduced-motion: reduce) {
   .odometer-in, .odometer-out, .roll-in { animation: none; }

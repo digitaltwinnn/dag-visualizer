@@ -41,7 +41,7 @@ export const SWAP_OUT_MS = 200; // ⚠️ paired with the duration-[200ms] utili
 // inside others that can benefit from easing … the list of anchored snapshots growing/
 // shrinking, the data in the metagraph snapshot card when revealed").
 export const CONTENT_EASE =
-  "animate-in fade-in duration-(--tempo-roll) ease-[cubic-bezier(.45,.05,.25,1)] motion-reduce:animate-none";
+  "animate-in fade-in duration-(--tempo-roll) ease-(--ease-roll) motion-reduce:animate-none";
 
 // THE LIVE-BAR EASE — a width stated by live data never snaps between readings (the odometer's
 // principle applied to geometry). For style-width elements that PERSIST across polls; an
@@ -84,7 +84,7 @@ export default function RollSwap<K extends string>({
       className={cn(
         leaving
           ? "animate-out fade-out duration-[200ms] ease-out fill-mode-forwards"
-          : swaps.current > 0 && "animate-in fade-in duration-(--tempo-roll) ease-[cubic-bezier(.45,.05,.25,1)]",
+          : swaps.current > 0 && "animate-in fade-in duration-(--tempo-roll) ease-(--ease-roll)",
         !leaving && travel && swaps.current > 0 && "slide-in-from-bottom-2",
         "motion-reduce:animate-none",
         className,
