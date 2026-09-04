@@ -197,7 +197,11 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
         // already carries opacity + transform. The transform lives on THIS fixed container,
         // whose box is inset-0 — its own fixed child (the scrim) re-anchors to it, same box, so
         // nothing shifts (trap 2 stays satisfied for everything outside).
-        "transition duration-(--tempo-nav) ease-out motion-reduce:transition-none",
+        // The rise breathes on its own token; the fall keeps the nav clock, whose DOC_ROLL
+        // twin also times the unmount + the engine's stage release (user, 2026-09-04 —
+        // "doc arrival is a bit too fast"; the exit boundary must not move with it).
+        "transition ease-out motion-reduce:transition-none",
+        visible ? "duration-(--tempo-doc-rise)" : "duration-(--tempo-nav)",
         !visible && "opacity-0 translate-y-4 pointer-events-none",
       )}
       role="region"

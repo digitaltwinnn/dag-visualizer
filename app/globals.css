@@ -805,6 +805,13 @@
      read it: it rides the view choreography's own DUR_OUT/FURN_IN (domain/viewTransition), the
      clocks of the scene it crosses with. */
   --tempo-nav: 0.55s;
+  /* The doc overlay's ARRIVAL alone (user, 2026-09-04: "doc arrival is a bit too fast"): the
+     document's rise takes a longer breath than the nav clock, while its roll-OUT keeps
+     --tempo-nav — the exit is sequenced against the engine's held stage on DOC_ROLL
+     (domain/viewTransition), so only the entrance may stretch without moving that boundary.
+     The fleet's stage fade also keeps DOC_ROLL, at the user's own call ("the node fade is
+     even faster but that's ok — it's gone before the doc is readable"). */
+  --tempo-doc-rise: 0.85s;
 
   /* ── Instrument-thread ruler spec (the ONE shared source) ─────────────────────
      Both rails' SVG threads (RailThread.tsx) and the bar-chart axis read identically:

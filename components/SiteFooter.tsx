@@ -177,9 +177,11 @@ export default function SiteFooter() {
             tried and pulled the same day (it sat wrong on the light veil) along with its
             triangle mark; the ink is now a softened primary at the user's call — an accepted
             bend of "cyan is for affordances", softened and un-underlined so it stays a
-            statement. Stands down below 860px; the About page carries it there. */}
+            statement — at 85% ink since 2026-09-04 (the /70 read "too light" on the light
+            veil; the softening is the caps-micro size and the missing underline, not the
+            alpha). Stands down below 860px; the About page carries it there. */}
         <span aria-hidden className="w-px h-3.5 self-center bg-muted-foreground/35 max-[860px]:hidden" />
-        <span className="text-micro tracking-caps uppercase text-primary/70 select-none max-[860px]:hidden">
+        <span className="text-micro tracking-caps uppercase text-primary/85 select-none max-[860px]:hidden">
           unofficial community project
         </span>
       </nav>
