@@ -5,7 +5,8 @@ import { pollStatusOf, type PollStatus } from "@/src/data/pollStatus";
 import { relativeAge } from "@/src/util/relativeAge";
 import { BandCard } from "@/components/VitalsBand";
 import { useNowTick } from "@/components/useNowTick";
-
+import { cn } from "@/lib/utils";
+import { BAR_EASE } from "@/components/RollSwap";
 // THE PULSE STRIP — the heartbeat's own row (user, 2026-08-30: clicking the ECG "should show a
 // bottom section (like the filter) with relevant information about the liveliness of the app —
 // when did it last poll successfully? which polls do we have?"). The filter strip's exact
@@ -58,8 +59,22 @@ export default function PulseStrip() {
                 </span>
                 <span className="text-micro text-muted-foreground">{everyWord(r.everyMs)}</span>
               </span>
-              <span className="text-micro text-muted-foreground whitespace-nowrap">
-                {r.target} · {r.ok.toLocaleString()} ok{r.err > 0 ? ` · ${r.err.toLocaleString()} err` : ""}
+              <span className="text-micro text-muted-foreground truncate">{r.target}</span>
+              {/* The ok/err record as a GLANCE instrument (user, 2026-09-04 — the "219 ok ·
+                  14 err" prose was hard to read): a hairline ratio bar in the two status
+                  tones, exact counts beside it (identity is never colour-alone — each count
+                  keeps its word). The err segment floors at 3px so one failure among
+                  thousands stays a visible mark; the numbers carry the measurement. */}
+              <span className="flex items-center gap-1.5 whitespace-nowrap">
+                <span aria-hidden className="flex h-[3px] w-12 flex-none rounded-full overflow-hidden bg-border/60">
+                  <span style={{ width: `${(r.ok / Math.max(1, r.ok + r.err)) * 100}%`, background: "var(--success)" }} className={cn("opacity-70", BAR_EASE)} />
+                  {r.err > 0 && (
+                    <span style={{ width: `${(r.err / Math.max(1, r.ok + r.err)) * 100}%`, background: "var(--destructive)" }} className={cn("opacity-80 min-w-[3px]", BAR_EASE)} />
+                  )}
+                </span>
+                <span className="text-micro tabular-nums text-muted-foreground">
+                  {r.ok.toLocaleString()} ok{r.err > 0 ? ` · ${r.err.toLocaleString()} err` : ""}
+                </span>
               </span>
             </span>
           </BandCard>

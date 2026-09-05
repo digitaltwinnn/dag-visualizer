@@ -650,6 +650,28 @@ export class LedgerView implements SceneView {
   /** The committed FILTER's band on the shown global row (the selected row owns the front, so
    *  this is the lead-or-pinned slot) — the byte bar's own segment for the network, so the
    *  global callout can point at it under a filter (user, 2026-08-16). Chamber-local. */
+  /** THE LABEL'S QUIET GATE (user, 2026-09-04 — "before the global snapshot is fixed on the
+   *  plane already its callout is shown"): the chamber's own motion runs on its own clocks —
+   *  the rewind's ~2s glide, a just-measured bar's ~0.4s grow-in — invisible to the
+   *  view-transition and camera-flight gates the callout already holds. True when the trail is
+   *  at rest AND the selected/lead row is at its final geometry. Consulted by CalloutSync's
+   *  SNAPSHOT anchors only — tray chips don't ride the trail. */
+  calloutSettled(following: boolean): boolean {
+    // FOLLOW MODE SKIPS THE REWIND GATE (review find, 2026-09-05): a follow handoff IS a
+    // glide by design — jump +SLOT_SP, then ~3s of damped ease — on every anchored tick, so
+    // gating it blinked the committed label off for ~3s per tick for the life of the commit.
+    // The anchor is recorded live each frame (rewind offsets included), so the label rides
+    // the slide; the ARRIVAL cases this gate exists for — a fresh pin's multi-slot glide, the
+    // view-entry drop — keep it, because a pin is never `following`.
+    if (!following && !this._rewind.settled) return false;
+    // The slot-0 fallback belongs to FOLLOW alone (the followed tip IS the lead). A pinned
+    // subject aged out of the window has no row of its own — gating it on the lead's regrow
+    // was an unrelated hide (review find #2); with no slot there is nothing to wait on.
+    const slot = this.model.selectedSlot >= 0 ? this.model.selectedSlot : following ? 0 : -1;
+    if (slot < 0) return true;
+    return this._bar.rowStill(slot);
+  }
+
   bandAnchor(key: string, out: THREE.Vector3): boolean {
     const slot = this.model.selectedSlot >= 0 ? this.model.selectedSlot : 0;
     return this._bar.bandAnchor(slot, key, out);

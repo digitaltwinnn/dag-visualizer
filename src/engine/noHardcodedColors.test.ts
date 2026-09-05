@@ -35,6 +35,11 @@ const ENGINE_ALLOWED = new Set<number>([
 // Components-layer allowlist:
 const COMPONENTS_ALLOWED = new Set<number>([
   // RailThread/TopBar/scrim literals became themed tokens — light/dark spec §1.
+  // The /design callout SPECIMEN's made-up identity hue (docs/DesignDoc.tsx): deliberately
+  // GENERIC content (user, 2026-08-16 — the page teaches the grammar, not today's data), so the
+  // hue must NOT be any real network's token or the palette generator's output. It moved into
+  // components/ scope when the doc pages became the in-app DocLayer overlay (2026-09-04).
+  0xc9824f,
 ]);
 
 // Parse any colour-literal token to {r,g,b}, or null if it isn't one.

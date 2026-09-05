@@ -372,7 +372,16 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     step(dir); // the heavy subject swap runs NOW, with both cards visible and at rest
     el.style.transition = "none";
     const gap = slideGap();
-    el.style.transform = `translateX(${dir * (w + gap)}px)`; // the new card waits just offstage
+    // ⚠️ THE INCOMING CARD STARTS WHERE THE PEEK STOOD AT RELEASE, not at full offstage (user,
+    // 2026-09-04 — "once it's locked it snaps back to the edge outside of view before it
+    // animates in"). During the drag the peek rides at dir·(w+gap) + tx; seeding the real card
+    // at dir·(w+gap) alone discarded the damped travel the finger had already bought, so the
+    // arriving card visibly jumped BACK by |tx| in the frame the peek was swapped for it. The
+    // release offset is parsed from the dragged transform this function already carries — a
+    // chevron/keyboard commit has none and still starts fully offstage, which is that path's
+    // designed slide.
+    const txNow = parseFloat(/translateX\((-?[\d.]+)px\)/.exec(dragged)?.[1] ?? "0") || 0;
+    el.style.transform = `translateX(${dir * (w + gap) + txNow}px)`; // continue the peek's travel
     void el.offsetWidth; // flush, so both start their slide together
     el.style.transition = `transform ${SLIDE_MS}ms ${SLIDE_EASE}`;
     el.style.transform = "";

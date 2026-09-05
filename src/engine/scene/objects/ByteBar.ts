@@ -386,6 +386,20 @@ export class ByteBar {
     return false;
   }
 
+  /** Is this slot's row at its FINAL geometry — fully grown and risen? A forming seed counts
+   *  as still (it lies flush in the glass and animates nothing). The callout's quiet gate reads
+   *  this so a label never points at a bar mid-rise (user, 2026-09-04). */
+  rowStill(slot: number): boolean {
+    const s = this._slots[slot];
+    if (!s) return false;
+    // The VIEW-ENTRY DROP is motion too (user, 2026-09-04 — "the card appears before the
+    // snapshot landed on the plane"): the drop is the scene's CLOSING beat, playing AFTER the
+    // transition settles, so the transition gate can't see it. While its ramp still fades this
+    // slot, the row is literally mid-landing. LedgerView parks the ramp at null when settled.
+    if (this._entryFade && (this._entryFade[slot] ?? 0) < 0.999) return false;
+    return s.forming || (s.grow >= 1 && s.rise >= 1);
+  }
+
   update(dt: number): void {
     // dimModel.emphasisK: the ONE emphasis-easing rate, shared with the node fabric and the lane
     // tiles. It replaces the local rate this bar used to ease its opacity at (slightly faster now);

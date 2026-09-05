@@ -110,7 +110,7 @@
   content: ""; position: absolute; inset: 0; opacity: 0;
   background: linear-gradient(to bottom,
     transparent 0, var(--pulse-hue) 14%, var(--pulse-hue) 86%, transparent 100%);
-  animation: edge-line-fade 1.2s ease both;
+  animation: edge-line-fade var(--tempo-signal) ease both;
 }
 /* THE PAGER GHOST — the outgoing card during a RailPager slide (`RailPager.commitStep`).
    ⚠️ A CSS RULE, NOT INLINE STYLE, and the reason is `::before`. `cloneNode(true)` copies class
@@ -188,7 +188,7 @@
   background: linear-gradient(to bottom,
     transparent 0, var(--pulse-hue) 30%, var(--pulse-hue) 70%, transparent 100%);
   filter: drop-shadow(0 0 6px var(--pulse-hue));
-  animation: edge-pulse-sweep 1.2s ease;
+  animation: edge-pulse-sweep var(--tempo-signal) ease;
 }
 @keyframes edge-pulse-sweep {
   0%   { top: calc(-1 * var(--pulse-len, 64px)); opacity: 0; }
@@ -326,6 +326,43 @@
 #callout[data-flip] .co-leader { transform: scaleX(-1); }
 #callout[data-drop] .co-leader { transform: scaleY(-1); }
 #callout[data-flip][data-drop] .co-leader { transform: scale(-1, -1); }
+
+/* THE ENTRANCE CHOREOGRAPHY (user, 2026-09-05 — "the dotted line is already drawn before the
+   animation"): panel rolls in → the leader DRAWS from the panel corner toward the anchor →
+   the anchor ring lands as the line arrives; hyper's multi-legs fade on the draw window.
+   Mechanism: `.co-draw` is the MASK's ink line (SceneCallout), spanning the leader's own
+   geometry from the PANEL end with `pathLength=1`, so easing its dash offset 1→0 reveals the
+   dashed leader progressively without the dash pattern crawling. The clock is the panel's own,
+   but the draw starts at 60% of the rise, not its end (user, 2026-09-05 — "make it appear a
+   bit quicker"): the roll's ease has spent most of its motion by then, so the line leaves a
+   visibly settling panel without the dead beat a full-rise wait read as. The wrapper is keyed
+   by subject, so a subject change replays the whole sequence. Unlayered on purpose — the pause
+   gate must beat `.roll-in`'s layered animation shorthand (CSS trap 1). */
+#callout { --co-draw-at: calc(var(--tempo-roll-lag) + 0.6 * var(--tempo-doc-rise)); }
+#callout .co-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: co-draw var(--tempo-roll) var(--ease-roll) var(--co-draw-at) forwards;
+}
+#callout .co-tip {
+  opacity: 0;
+  animation: co-fade 0.2s ease-out calc(var(--co-draw-at) + var(--tempo-roll)) forwards;
+}
+#callout .co-multi {
+  opacity: 0;
+  animation: co-fade var(--tempo-roll) var(--ease-roll) var(--co-draw-at) forwards;
+}
+/* Paused until the Engine actually SHOWS the callout (`data-on`): a commit answered by a camera
+   flight keeps the wrapper hidden for the whole arrival, and an entrance that played invisibly
+   would present a finished callout on reveal — the exact complaint the draw exists to fix. The
+   delay phases pause too, so the clock starts at first visibility. */
+#callout:not([data-on="1"]) :is(.roll-in, .co-draw, .co-tip, .co-multi) { animation-play-state: paused; }
+@keyframes co-draw { to { stroke-dashoffset: 0; } }
+@keyframes co-fade { to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  #callout .co-draw { animation: none; stroke-dashoffset: 0; }
+  #callout .co-tip, #callout .co-multi { animation: none; opacity: 1; }
+}
 #callout[data-flip] .edge-spine {
   border-left-color: transparent;
   border-right-color: var(--spine, var(--primary));
@@ -544,7 +581,7 @@
      the one surface the floating row genuinely collides with, since a data pane's bottom rows
      are content where the scene's bottom edge is not (2026-09-02, measured: the lozenge sat on
      the channel pane's hash foot). */
-  --footer-phone-h: 22px;
+  --footer-phone-h: 26px; /* 22 → 26 with the 2026-09-04 footer redesign (label-size ink) */
   /* The ONE resting dim for rail instrument furniture (lines/ruler/spine at rest) — consumed by
      the desktop RailThreads' dim group AND the tablet/phone sheet's `.ig-sheet-edge` channel, so
      rest vs signal contrast is consistent everywhere. Brightness belongs to the signals (pulses)
@@ -743,7 +780,8 @@
      ledger, and since it is anchored at the BOTTOM the difference showed up as its top edge
      jumping on every view switch. Sized to the tallest cell — four MicroBars rows plus the eyebrow
      and the plate's padding — with a couple of pixels of headroom, and it must stay under
-     --bottom-reserve minus the band's 4px offset or the rails would paint into it. */
+     --bottom-reserve minus --footer-h or the rails would paint into it (the band sits FLUSH on
+     the footer strip since 2026-09-04 — the old 4px air gap read as noise). */
   --vitals-h: 84px;
   --bottom-reserve: 92px;  /* vertical space the bottom VITALS BAND reserves (BottomStream's own
                               RESERVE). The static default matches the BOOT view: the store boots
@@ -766,7 +804,9 @@
                               ONE home (review, 2026-08-31): #leftcol/#rightcol and the vitals
                               band's edges all read it, so the band stays aligned with the rail
                               cards through any margin retune. */
-  --footer-h: 22px;        /* the site footer's band along the very bottom edge (SiteFooter.tsx,
+  --footer-h: 28px;        /* the site footer's band along the very bottom edge (SiteFooter.tsx,
+                              22 → 28 on 2026-09-04 (user: "text is tiny … hard to even spot"):
+                              the row stepped up to text-label ink and needed the breathing.
                               2026-08-18). 26px → 22px (user, 2026-09-01: "a bit less margin at the
                               top of the footer"): the band held an 11px line with 18px of air
                               above it and 7px below, so the gap read as a margin rather than as a
@@ -781,6 +821,54 @@
                               and the footer hides — one token, so every consumer follows. */
   --rail-fade: 28px;       /* height of a clipped rail's bottom fade — AND its scroll runway
                               (globals `.rail-clip` + RailScroll's measure read this one token) */
+
+  /* ── The tempo family — the HUD's three shared clocks (2026-09-04) ───────────
+     One home for the rhythms the design grammar names, so retuning the app's pulse is one edit:
+       --tempo-beat   · the 1.5s heartbeat every steady "alive" mark shares (ECG scan, filter
+                        dot, boot core breathe, the state atoms' twinkle/standby);
+       --tempo-signal · the ~1.2s transient-signal clock (the edge pulse's sweep + fade — the
+                        title roll-in it syncs with keeps its own 0.4s roll INSIDE this window);
+       --tempo-roll   · the odometer/title/content roll (0.65s since 2026-09-04 — 0.4 read
+                        "too fast" on the About card and across the app; --ease-roll is its
+                        curve, see below).
+     The 150ms disclosure clock is deliberately NOT a token: it is the chevron's `duration-150`
+     in JSX (see .disclose-panel's header) — a CSS-side token would claim a single home the JSX
+     half wouldn't read, which is worse than the documented pairing. Engine/GSAP clocks (0.55s
+     depth, ~3.9s choreography) are frame-driven and live in their own modules. */
+  --tempo-beat: 1.5s;
+  --tempo-signal: 1.2s;
+  --tempo-roll: 0.65s;
+  /* The roll grammar's ONE entrance curve (2026-09-04, the doc-rise lesson generalized):
+     ease-out lands most of its change in the first half-second whatever the duration, so a
+     slower roll on ease-out "looks just as fast" — this restrained-start bezier keeps the
+     motion visible through the window. Entrances only; exits keep ease-out, where
+     front-loading is exactly right. */
+  --ease-roll: cubic-bezier(0.45, 0.05, 0.25, 1);
+  /* The card-scale second beat (user, 2026-09-05: "load the text in the card slower" — the
+     doc overlay's page-then-text grammar scaled down): arriving card CONTENT delays by this
+     lag while the height ease establishes the box, then fades in on --tempo-doc-rise — the
+     app's one text-arrival clock, doc and card alike ("slower", user's second round).
+     Needs fill-mode-both at the call site or the content is visible through its own delay. */
+  --tempo-roll-lag: 0.2s;
+  /* The NAVIGATION clock — the user's own gesture resolving, slower than any signal: 0.55s is
+     the scene↔raw depth transition's GSAP duration (SectionShell.tsx — the JS half of this
+     pairing, like the disclosure clock's chevron). The DOC overlay's fade deliberately does NOT
+     read it: it rides the view choreography's own DUR_OUT/FURN_IN (domain/viewTransition), the
+     clocks of the scene it crosses with. */
+  --tempo-nav: 0.55s;
+  /* The doc overlay's ARRIVAL alone (user, 2026-09-04: "doc arrival is a bit too fast"): the
+     document's rise takes a longer breath than the nav clock, while its roll-OUT keeps
+     --tempo-nav — the exit is sequenced against the engine's held stage on DOC_ROLL
+     (domain/viewTransition), so only the entrance may stretch without moving that boundary.
+     The fleet's stage fade also keeps DOC_ROLL, at the user's own call ("the node fade is
+     even faster but that's ok — it's gone before the doc is readable"). */
+  --tempo-doc-rise: 1.15s;
+  /* The arrival's FIRST beat (user, 2026-09-04: "first show the page, then roll in the text"):
+     the sheet — veil, edges, shadow — fades up alone on this clock, and the text's own rise
+     DELAYS by exactly it, so the document reads as a page arriving and then being written.
+     Exit stays one gesture on --tempo-nav: leaving is the user's decision resolving, not a
+     performance. */
+  --tempo-doc-sheet: 0.45s;
 
   /* ── Instrument-thread ruler spec (the ONE shared source) ─────────────────────
      Both rails' SVG threads (RailThread.tsx) and the bar-chart axis read identically:
@@ -856,8 +944,17 @@
        because it also carries the boot fade. */
     top: 0;
     left: 0;
-    width: 100vw;
-    height: 100vh;
+    /* +2px OVERDRAW past the viewport's bottom/right (user, 2026-09-04 — a ~1px light hairline
+       at the very bottom of scene pages, in light mode, at some DPR/zoom settings): the window's
+       last device-pixel row is fractional at non-integer DPRs, and whether the canvas's own
+       rasterization covers it is a browser rounding call — where it doesn't, the body's
+       `--background` shows through as a hairline against the dark scene (doc pages paint the
+       same colour there, which is why only scene pages showed it). Overdrawing clips offscreen,
+       so every fractional edge row is scene pixels at any rounding; the resulting ~0.2% stretch
+       of the integer-sized buffer is invisible and pick math reads the live rect anyway.
+       Pairs with SceneContext's setSize(..., false) — CSS owns this box. */
+    width: calc(100vw + 2px);
+    height: calc(100vh + 2px);
     display: block;
     opacity: 0;                 /* fade in on the boot handoff */
     transition: opacity 0.6s ease, top 0.25s ease-out;
@@ -1045,7 +1142,7 @@
   /* Uppercase-caps tracking — the merged 0.12/0.13/0.14em eyebrow/label cluster. */
   --tracking-caps: 0.13em;
 
-  --animate-breathe: breathe 1.5s ease-in-out infinite;
+  --animate-breathe: breathe var(--tempo-beat) ease-in-out infinite;
 }
 
 /* On the phone the footer RIDES ABOVE the dock as overlay chrome (SiteFooter.tsx, 2026-08-31 —
@@ -1070,12 +1167,17 @@
 @layer components {
   .odometer { position: relative; display: inline-grid; overflow: hidden; line-height: 1.1; }
   .odometer > span { grid-area: 1 / 1; }
-  .odometer-in  { animation: odo-in  0.4s ease-out; }
-  .odometer-out { animation: odo-out 0.4s ease-out forwards; }
+  .odometer-in  { animation: odo-in  var(--tempo-roll) var(--ease-roll); }
+  .odometer-out { animation: odo-out var(--tempo-roll) ease-out forwards; }
   /* A whole-value "roll" for TEXT card-headers (node id, metagraph name) — the same upward roll
      the Odometer uses for numeric values, so every card's header transitions in one language on a
      new subject. Triggered by a changing React `key` (the element re-mounts and plays it). */
-  .roll-in { display: inline-block; animation: odo-in 0.4s ease-out; }
+  /* The TITLE roll parted ways with the digit roll (user, 2026-09-05: "the roll of the header
+     text is also too fast" — beside body text arriving on --tempo-doc-rise, a 0.65s title
+     popped): headers ride the text-arrival clock and its lag, `both` holding them hidden
+     through the delay so title and body land as one beat. The odometer keeps --tempo-roll —
+     digits are a live instrument, not arriving text. */
+  .roll-in { display: inline-block; animation: odo-in var(--tempo-doc-rise) var(--ease-roll) var(--tempo-roll-lag) both; }
 }
 @media (prefers-reduced-motion: reduce) {
   .odometer-in, .odometer-out, .roll-in { animation: none; }
@@ -1091,7 +1193,7 @@
   .ecg-scan {
     stroke-dasharray: 16 84;
     filter: drop-shadow(0 0 4px color-mix(in oklch, var(--primary) 85%, transparent));
-    animation: ecg-scan 1.5s linear infinite;
+    animation: ecg-scan var(--tempo-beat) linear infinite;
   }
 }
 @keyframes ecg-scan {
@@ -1109,7 +1211,7 @@
   50%      { transform: scale(1.28); opacity: 1; }
 }
 @theme inline {
-  --animate-dot-beat: dot-beat 1.5s ease-in-out infinite;
+  --animate-dot-beat: dot-beat var(--tempo-beat) ease-in-out infinite;
 }
 
 /* ── State atoms (components/state/StateAtoms.tsx + BootOverlay.tsx) — ACQUIRING twinkle, NO
@@ -1127,7 +1229,7 @@
 @keyframes st-standby-node { 0%, 100% { opacity: 0.58; transform: scale(1); } 50% { opacity: 1; transform: scale(1.09); } }
 @keyframes st-standby-halo { 0% { transform: scale(1); opacity: 0.52; } 100% { transform: scale(3.6); opacity: 0; } }
 @theme inline {
-  --animate-st-twinkle: st-twinkle 1.5s ease-in-out infinite;
+  --animate-st-twinkle: st-twinkle var(--tempo-beat) ease-in-out infinite;
   /* Same fade, two durations: the ACQUIRING value resolve-in (0.35s) vs the boot overlay's own
      entrance (0.4s) — kept as separate theme vars over one shared keyframe. */
   --animate-resolve-in: st-fade-in 0.35s ease both;
@@ -1140,7 +1242,7 @@
      by remounting via `key`) vs the boot overlay's continuous ping while reaching the network. */
   --animate-st-sonar: st-sonar 1.4s ease-out 1 forwards;
   --animate-boot-ping: st-sonar 1.6s ease-out infinite;
-  --animate-st-standby-node: st-standby-node 1.5s ease-in-out infinite;
+  --animate-st-standby-node: st-standby-node var(--tempo-beat) ease-in-out infinite;
   --animate-st-standby-halo: st-standby-halo 1.6s ease-out infinite;
   /* The boot core's armillary shells — the hoops the hypergraph's Global L0 core actually wears,
      prefigured while the feed is still connecting, so the overlay reads as the thing it becomes

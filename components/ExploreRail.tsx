@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { filterAccent } from "@/src/data/network";
@@ -13,6 +13,7 @@ import RailThread from "@/components/RailThread";
 import { RailShade } from "@/components/RailShade";
 import RailDock, { type TabSignal } from "@/components/RailDock";
 import { exploreCards } from "@/components/railCards";
+import HeightEase from "@/components/HeightEase";
 import { useBreakpoint } from "@/components/useBreakpoint";
 
 // Per-view About copy: ONE home, components/aboutCopy.ts — shared with /about (2026-08-13).
@@ -24,6 +25,12 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // card, just the About card.
 export default function ExploreRail() {
   const bp = useBreakpoint();
+  // growIn arming — the Inspector's laneBooted pattern: the tool slot unmounts entirely on
+  // the placeholder view and rejoins on a 3D one; rejoining grows from 0 instead of snapping.
+  const booted = useRef(false);
+  useEffect(() => {
+    booted.current = true;
+  }, []);
   const mode = useStore((s) => s.mode);
   const filter = useStore((s) => s.filter);
   const phoneDock = useStore((s) => s.phoneDock);
@@ -38,16 +45,43 @@ export default function ExploreRail() {
   // ONE source of truth for the hosted card set (railCards.ts): both the rail content AND the dock
   // tray are derived from the same manifest, so they can't disagree about which cards this view
   // hosts. `id` maps to the component to render; the manifest owns presence/order.
+  //
+  // THE NO-POP RULE READS PER CARD HERE, NOT PER STACK (user, 2026-09-04, second round: a
+  // stack-level RollSwap made "things that always exist disappear and re-appear" — the About
+  // card is one persistent instance across every view). The doc grammar at card scale instead:
+  // the About card's FRAME persists (React keeps the instance — no key), its title rolls and
+  // its body eases per view (AboutView's own keyed body); the TOOL is genuinely view-scoped
+  // (three different explorers, none on "soon"), so it swaps keyed with the house card
+  // materialize — no out-beat, so the slot is never held blank.
   const manifest = exploreCards({ mode });
+  // Each card rides its own HeightEase (user, 2026-09-04, second round: "the explorer card
+  // still jumps … snaps into its new height"): the wrapper sits OUTSIDE the keyed remount —
+  // inside it, it would remount with the card and snap — so the slot's height eases from the
+  // old card's to the new one's while the arriving card materializes within it. flex-none on
+  // the wrapper is the cards' own rule (the rail scrolls; a card never compresses).
   const renderCard: Record<string, ReactNode> = {
-    about: <AboutView {...ABOUT[mode]} defaultCollapsed={bp === "phone"} />,
+    about: (
+      <HeightEase className="flex-none" growIn={booted.current}>
+        <AboutView {...ABOUT[mode]} defaultCollapsed={bp === "phone"} />
+      </HeightEase>
+    ),
     // Phone opens BOTH cards collapsed (user, 2026-09-03): the sheet becomes a compact chooser
     // that the live content-fit sizes down, and one tap opens the list and grows the sheet.
-    tool:
-      mode === "hyper" ? <HyperExplore defaultCollapsed={bp === "phone"} />
-      : mode === "geo" ? <GeoExplore defaultCollapsed={bp === "phone"} />
-      : mode === "ledger" ? <LedgerPanel defaultCollapsed={bp === "phone"} />
-      : null,
+    tool: (
+      <HeightEase className="flex-none" growIn={booted.current}>
+        {/* ⚠️ TRANSFORM-FREE arrival (user, 2026-09-04: About collapsed + a tall explorer
+            still "jumps a bit" at the top — animate-card-in's materialize runs
+            translateY(5px) scale(0.985), and 0.985 of a 700px expanded list pulls the TOP
+            edge visibly). The keyed card fades on the roll clock; the height ease and the
+            head's title roll carry the rest of the arrival. */}
+        <div key={`tool-${mode}`} className="animate-in fade-in duration-(--tempo-doc-rise) ease-(--ease-roll) delay-(--tempo-roll-lag) fill-mode-both motion-reduce:animate-none">
+          {mode === "hyper" ? <HyperExplore defaultCollapsed={bp === "phone"} />
+          : mode === "geo" ? <GeoExplore defaultCollapsed={bp === "phone"} />
+          : mode === "ledger" ? <LedgerPanel defaultCollapsed={bp === "phone"} />
+          : null}
+        </div>
+      </HeightEase>
+    ),
   };
   const content = (
     <>

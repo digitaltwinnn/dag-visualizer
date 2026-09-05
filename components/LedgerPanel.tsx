@@ -18,6 +18,7 @@ import { useStore } from "@/src/store/store";
 import { metaSnapSelectActions, snapshotSelectActions, sameMetaSnap, followToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { DepthCaption, DisclosureChevron, Disclosure, DisclosurePanel, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
+import { CONTENT_EASE } from "@/components/RollSwap";
 import { NoSignalDot } from "@/components/state/StateAtoms";
 import { buildAnchorLog, type AnchorLogRow, type ChannelLogRow } from "@/src/data/anchorLog";
 import { SLOT_N } from "@/src/engine/domain/ledgerModel";
@@ -562,8 +563,11 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
                 } as const;
                 // The filter releases if ITS network isn't in this tick's story (ledgerStory).
                 const tickHasFilter = tickInStory(filter, getAnchor(d.timestamp), snapshotExact[d.ordinal]);
+                // New ticks arrive at the top as the window advances — each row eases in once
+                // on mount (the no-pop arrival ease; keys are ordinals, so live re-renders
+                // never replay it).
                 return (
-                  <div key={d.ordinal}>
+                  <div key={d.ordinal} className={CONTENT_EASE}>
                     {/* The tick row SELECTS (pin / live re-follow — the same tested table the
                         strip's bars run) AND discloses its contributors in the same click. */}
                     <SnapRow

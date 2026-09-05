@@ -1,12 +1,12 @@
 "use client";
 import { useStore } from "@/src/store/store";
+import { BEAT, FLAT } from "@/components/brand";
 
 // The brand mark = a live ECG monitor. While the feed is up, a bright pulse SWEEPS along the trace
 // on a steady ~1.5s beat (the filter bullet pulses on the same beat); when the feed is down it
 // flattens to a grey flatline (NO SIGNAL). The beat is a continuous heartbeat rhythm, not a per-tick
 // flash — it always reads as "alive". Reduced-motion: a static lit trace.
-const BEAT = "M0 12 H10 L13 12 L15 4 L18 20 L21 9 L24 12 H34"; // spike
-const FLAT = "M0 12 H34";
+// The waveform itself lives in components/brand.tsx — one `d`, shared with the static BrandMark.
 
 export default function EcgMark() {
   const live = useStore((s) => s.live);

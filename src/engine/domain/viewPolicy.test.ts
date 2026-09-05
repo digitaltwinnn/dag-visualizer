@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import type { Mode } from "@/src/store/store";
 import { VIEW_POLICIES } from "./viewPolicy";
 
-const MODES: Mode[] = ["hyper", "geo", "ledger", "status", "transactions", "staking"];
+const MODES: Mode[] = ["hyper", "geo", "ledger", "soon"];
 const CANVAS_MODES: Mode[] = ["hyper", "geo", "ledger"];
-const FLAT_MODES: Mode[] = ["status", "transactions", "staking"];
+const FLAT_MODES: Mode[] = ["soon"];
 
 describe("VIEW_POLICIES", () => {
   it("defines exactly the six modes", () => {

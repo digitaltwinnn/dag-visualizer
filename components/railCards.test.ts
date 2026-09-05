@@ -40,7 +40,7 @@ describe("exploreCards — LEFT rail (Explore)", () => {
   it("ledger hosts About + the snapshots-browser tool", () => {
     expect(presentKinds(exploreCards({ mode: "ledger" }))).toEqual(["about", "tool"]);
   });
-  it.each(["status", "transactions", "staking"] as const)("placeholder %s hosts About only", (mode) => {
+  it.each(["soon"] as const)("placeholder %s hosts About only", (mode) => {
     expect(presentKinds(exploreCards({ mode }))).toEqual(["about"]);
   });
   it("left cards carry stable (non-updating) subjectKeys", () => {
@@ -103,7 +103,7 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
   // canvas is a wireframe captioned `preview · in development` that deliberately shows no numbers;
   // a live populated card beside it reads as data FROM it. The selection itself is untouched, so
   // this only asserts the view stops speaking for it.
-  it.each(["status", "transactions", "staking"] as const)("placeholder %s hosts NO details cards", (mode) => {
+  it.each(["soon"] as const)("placeholder %s hosts NO details cards", (mode) => {
     expect(detailsCards(details({ mode }))).toEqual([]);
     // …including when every subject a 3D view could commit is still selected.
     const held = details({ mode, filter: "dor", inspect: nodePick, snap: snapPick, country: "US" });
@@ -172,9 +172,7 @@ describe("ladderSlotIds — the descent-spine lane (display order = reversed run
     expect(ladderSlotIds("ledger")).toEqual(["context", "snap", "metaSnap", "node"]);
   });
   it("flat views have no ladder", () => {
-    expect(ladderSlotIds("status")).toEqual([]);
-    expect(ladderSlotIds("transactions")).toEqual([]);
-    expect(ladderSlotIds("staking")).toEqual([]);
+    expect(ladderSlotIds("soon")).toEqual([]);
   });
   it("every ladder slot id exists in the details manifest (the lane can't invent a slot)", () => {
     const ids = detailsCards(details({ mode: "geo" })).map((c) => c.id);
@@ -252,7 +250,7 @@ describe("focusSlotId — the focus rung both rails read", () => {
   });
 
   it("flat views have no focus rung", () => {
-    expect(focusSlotId(details({ mode: "status", filter: "dag", inspect: nodePick }))).toBeNull();
+    expect(focusSlotId(details({ mode: "soon", filter: "dag", inspect: nodePick }))).toBeNull();
   });
 });
 

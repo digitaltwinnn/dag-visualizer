@@ -201,7 +201,13 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     canvas, antialias: false, stencil: false, powerPreference: "high-performance",
   });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  // updateStyle=false: `.scene-canvas` (globals.css) owns the display box at 100vw/100vh. three's
+  // default writes INTEGER inline px, which beats the class — and at a fractional-DPR viewport
+  // (e.g. 606.29 CSS px tall) that left a sub-pixel sliver of page background visible below the
+  // canvas: invisible on the dark ground, a light hairline under the scene in light mode (user,
+  // 2026-09-04 — "1 pixel more than the scene at the bottom"). The buffer stays integer-sized;
+  // CSS stretches it by <1px, which no pick math notices (NDC is derived from the live rect).
+  renderer.setSize(window.innerWidth, window.innerHeight, false);
   // Tone mapping — ACESFilmicToneMapping. (Applies via the OutputPass; an EffectComposer bypasses
   // the renderer's direct-to-screen output, so without OutputPass this would be a no-op.) Switched
   // from NeutralToneMapping (user, on-device): Khronos Neutral does a min-channel `color -= offset`
@@ -369,7 +375,8 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   function resize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    // updateStyle=false — same reason as construction: CSS owns the canvas box.
+    renderer.setSize(window.innerWidth, window.innerHeight, false);
     composer.setSize(window.innerWidth, window.innerHeight);
     if (sel) {
       sel.composer.setSize(

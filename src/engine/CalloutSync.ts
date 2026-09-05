@@ -33,6 +33,8 @@ export interface CalloutState {
   inspect: PickDescriptor | null;
   snap: Extract<PickDescriptor, { kind: "snapshot" }> | null;
   metaSnap: MetaSnapSel | null;
+  /** Live-follow flag — the settle gate skips the rewind term for it (LedgerView.calloutSettled). */
+  following: boolean;
   boxedCard: string | null;
   country: string | null;
   cohort: CohortSel | null;
@@ -50,6 +52,8 @@ export interface CalloutHost {
   mode: Mode;
   filter: string;
   transitionActive(): boolean;
+  /** Is the camera mid-flight to a subject? The callout waits out the whole arrival. */
+  flyingNow(): boolean;
   calloutAllowed(): boolean;
   /** The focused metagraph's hyper group, or null (unlisted/unknown — an honest absence). */
   dofMeta(): { group: THREE.Object3D } | null;
@@ -106,7 +110,13 @@ export class CalloutSync {
     const el = document.getElementById("callout");
     if (!el) return;
     let on =
-      this.h.calloutAllowed() && !this.h.transitionActive() && breakpointOf(window.innerWidth) !== "phone";
+      this.h.calloutAllowed() &&
+      !this.h.transitionActive() &&
+      // …and not while the camera is still FLYING to the subject (user, 2026-09-04: the label
+      // appeared "a bit too quickly" — it points at a settled scene, so it waits for the whole
+      // arrival, the commit flight included; the view transition above is the other half).
+      !this.h.flyingNow() &&
+      breakpointOf(window.innerWidth) !== "phone";
     if (on) {
       const v = this._calloutV;
       on =
@@ -320,11 +330,15 @@ export class CalloutSync {
     if (st.boxedCard === "context") return false;
     if (st.boxedCard === "node" && this._ledgerNodeAnchor(st, v)) return true;
     if (st.boxedCard === "snap" && st.snap) {
+      // A snapshot's label waits until its row is FIXED on the plane (LedgerView.calloutSettled
+      // — the chamber's own clocks; the tray-node paths stay exempt, chips don't ride the trail).
+      if (!this.h.ledger.calloutSettled(st.following)) return false;
       this._ledgerBarAnchor(v);
       this.h.ledger.group.localToWorld(v); // render-state OK
       return true;
     }
     if (st.metaSnap) {
+      if (!this.h.ledger.calloutSettled(st.following)) return false;
       // THE committed snapshot's tile (user, 2026-08-15), rewind offsets included; the lane
       // lead stays as the fallback while the tile is off-trail (aged out of the window or not
       // drawn this frame).
@@ -332,6 +346,7 @@ export class CalloutSync {
         if (!this.h.ledger.calloutAnchor(st.metaSnap.metaId, v) && !this.h.ledger.calloutAnchor(UNLISTED_ID, v)) return false;
       }
     } else if (st.snap) {
+      if (!this.h.ledger.calloutSettled(st.following)) return false;
       this._ledgerBarAnchor(v);
     } else if (this._ledgerNodeAnchor(st, v)) return true;
     else return false;

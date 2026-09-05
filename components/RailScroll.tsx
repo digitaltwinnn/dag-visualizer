@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useStore } from "@/src/store/store";
 
 // Grab-and-drag scrolling on the rails. Tablets already pan natively (CSS `touch-action: pan-y`
 // + momentum); this adds the same feel for a MOUSE — press on a rail's non-interactive area and
@@ -18,6 +19,19 @@ import { useEffect } from "react";
 // `#rightcol` being added/removed and (re)attaching the per-rail setup each time the live element
 // changes identity, instead of resolving it once.
 export default function RailScroll() {
+  // A VIEW SWITCH RETURNS THE RAILS TO THEIR TOP (user, 2026-09-04: with an expanded explorer
+  // section the rail is SCROLLED, and on the switch "the top part of the card is moving,
+  // instead of the bottom expanding/shrinking" — the browser clamps/anchors scrollTop against
+  // the easing, shrinking content, so the whole card slid instead of its bottom edge). Scrolled
+  // to 0 the ease reads bottom-anchored again, and an unscrolled rail makes this a no-op. Smooth,
+  // so the return is one gesture with the height ease; reduced motion jumps.
+  const mode = useStore((s) => s.mode);
+  useEffect(() => {
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    for (const id of ["leftcol", "rightcol"]) {
+      document.getElementById(id)?.scrollTo({ top: 0, behavior: reduce ? "auto" : "smooth" });
+    }
+  }, [mode]);
   useEffect(() => {
     // id -> the element it's currently attached to + its cleanup. Tracked by ELEMENT IDENTITY
     // (not just id presence) so a same-id swap — old node removed and a new one added, which

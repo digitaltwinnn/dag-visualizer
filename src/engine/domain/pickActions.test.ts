@@ -122,7 +122,7 @@ describe("clickActions — node clicks (the ordering contracts)", () => {
 
 describe("clickActions — flat/placeholder + non-geo safety (the table gates itself)", () => {
   it("an empty click does nothing in ANY non-geo view, even with a (contract-violating) countryCc", () => {
-    for (const mode of ["hyper", "ledger", "status", "transactions", "staking"] as const) {
+    for (const mode of ["hyper", "ledger", "soon"] as const) {
       expect(clickActions({ mode, pick: null, countryCc: "DE", current: state() })).toEqual([]);
     }
   });

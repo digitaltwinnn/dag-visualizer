@@ -14,7 +14,10 @@ Present tense only. Git carries the history; `.superpowers/sdd/progress.md` carr
 
 An interactive 3D visualizer of the Constellation Network ($DAG). Next.js (App Router) + React +
 TypeScript + Zustand for the page and panels, driving a **vanilla Three.js engine** (not
-react-three-fiber) on one persistent canvas. The active view is `mode` in the store.
+react-three-fiber) on one persistent canvas. The active view is `mode` in the store — and the three
+3D views are also real URLs (`/hypergraph` / `/geography` / `/snapshots`): `components/views.ts` is
+the one view-vocabulary home and `components/RouteSync.tsx` the URL↔mode bridge (shallow pushState,
+so a switch never reboots the engine; analytics see per-view routes).
 
 Three views drive the 3D scene:
 
@@ -28,9 +31,10 @@ Three views drive the 3D scene:
   per metagraph above it. The gap between planes is the point — metagraphs are unrelated and only
   come together on the global plane.
 
-`status`, `transactions` and `staking` are scaffolded placeholders: the canvas fades out and
-`Blueprint.tsx` draws a wireframe labelled `preview · in development`, with no numbers, so it never
-reads as live data.
+The placeholder is ONE consolidated `soon` Mode (2026-09-04; the old `status`/`transactions`/
+`staking` modes said the same nothing three times): the canvas fades out and `Blueprint.tsx` draws a
+wireframe GALLERY of the coming features, with no numbers, so it never reads as live data. The two
+doc pages (/about, /design) are an overlay over the same bare stage, not Modes.
 
 **The three 3D views are complementary projections of the same network: hyper = who/what, geo =
 where, ledger = when.** Activity metrics belong to ledger, structure to hyper.
@@ -164,8 +168,12 @@ google-chrome-stable --headless=new --no-sandbox \
 
 Gotchas worth knowing before you burn time on them:
 
-- **There are no URL deep links into views**, and a one-shot can't click. Temporarily seed the store
-  default in `src/store/store.ts`, screenshot, revert.
+- **The three 3D views ARE URL deep links** (2026-09-04): `/hypergraph`, `/geography`, `/snapshots`
+  boot straight into their view (`components/RouteSync.tsx` seeds the store from the pathname), so a
+  one-shot screenshot of a view needs no store edit. In-app switches publish those paths by shallow
+  pushState — never a navigation, the engine must survive. Only the placeholder views (routeless by
+  decision) still need the old trick: temporarily seed the store default in `src/store/store.ts`,
+  screenshot, revert.
 - **`--virtual-time-budget` runs very few frames**, so a fresh boot gets caught mid-intro. Use
   **`?slowmo=N`** (a dev flag like `?stats`, clamped to `[0.1, 20]`, values <1 speeding things UP) to
   inspect mid-flight states.
@@ -201,7 +209,7 @@ nodes.
 
 | Path | Responsibility |
 |---|---|
-| `app/` | Next App Router. `globals.css` is **the one stylesheet**; `design/page.tsx` is the token reference; `about/page.tsx` is the project's own page — Instrument-Glass like the HUD, and the home of the **experimental disclosure** that used to be an always-on banner (retired 2026-08-09: a permanent banner over a live instrument reads as an alarm; the footer links here — the wordmark is plain unlinked chrome and the ECG opens the pulse strip, both 2026-08-30. On phone the footer rides ABOVE the dock — user decision 2026-08-31, keeping /about reachable on every tier — with `--footer-h` still zeroed there, since the row is overlay chrome that reserves nothing). `--warn-soft` is its amber (shared with the raw layer's JSON booleans and the pulse strip's STALE dot). `api/*` are the server-side data routes. |
+| `app/` | Next App Router. `globals.css` is **the one stylesheet**; `[view]/` serves the three routed 3D views; `/about` and `/design` are the **DOC OVERLAY** (2026-09-04) — they render AppShell with a scrollable document layer over the live scene (`components/DocLayer.tsx`; content in `components/docs/`, opened/closed by store `docPage` with no engine reboot; /about still server-renders its prose for crawlers and carries the **experimental disclosure** that used to be an always-on banner, retired 2026-08-09: a permanent banner over a live instrument reads as an alarm). The footer's About/Design entries toggle the overlay. `--warn-soft` is /about's amber (shared with the raw layer's JSON booleans and the pulse strip's STALE dot). `api/*` are the server-side data routes. |
 | `components/` | React panels, each reading/writing the store. `SceneCanvas` mounts the engine (dynamic-imported so Three never enters the server bundle). |
 | `components/ui/` | The adopted shadcn/Radix primitives. |
 | `src/store/store.ts` | The Zustand store — mode, filter, selection, hover channels, `section`, phone UI state. |

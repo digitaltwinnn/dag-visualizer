@@ -29,11 +29,19 @@ const ROWS: { id: ThemePref; name: string }[] = [
 
 export default function ThemeToggle() {
   const pref = useStore((s) => s.themePref);
+  // THE FACE SHOWS THE RESOLVED MODE, ALWAYS (user, 2026-09-04: "once System is selected,
+  // shouldn't the icon just show whether it's light or dark?" — Monitor names the POLICY, not
+  // the state, and the bar is a readout). Under System the trigger wears what System resolves
+  // to right now — `store.theme`, written by ThemeController on adoption and on every OS flip,
+  // booting a stable "dark" on server and client alike so hydration sees no mismatch and the
+  // face corrects itself the way the pref icon always did. Monitor survives on the System ROW
+  // in the menu, where the policy is the subject.
+  const resolved = useStore((s) => s.theme);
   // Controlled open so picking a row CLOSES the menu (user, 2026-08-30): unlike the network
   // menu's rows — navigations, where the reload dismisses everything — a theme pick applies in
   // place, and a menu that lingers after a set-and-forget choice reads as unfinished.
   const [open, setOpen] = useState(false);
-  const Icon = FACE[pref];
+  const Icon = FACE[pref === "system" ? resolved : pref];
   // What System currently resolves to — read once per render, never subscribed: the popover
   // only renders on the client (content mounts on open), and ThemeController stays the app's
   // one matchMedia LISTENER.
@@ -46,7 +54,7 @@ export default function ThemeToggle() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={`Theme: ${ROWS.find((r) => r.id === pref)!.name}`}
+          aria-label={`Theme: ${ROWS.find((r) => r.id === pref)!.name}${pref === "system" ? ` (${resolved})` : ""}`}
           className={cn(
             "group flex flex-none items-center gap-1 h-9 py-1.5 px-2.5 rounded-btn! pointer-coarse:min-h-11",
             "bg-transparent border-0 text-muted-foreground hover:text-foreground hover:bg-wash-soft",

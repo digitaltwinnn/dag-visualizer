@@ -11,6 +11,7 @@ import { identityHudCss } from "@/src/palette/identity";
 import { fmtDag, fmtKB } from "@/src/util/format";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { useMinHold } from "@/components/useMinHold";
+import { CONTENT_EASE } from "@/components/RollSwap";
 
 // The anchored block on the snapshot card: a ranked share-of-total breakdown of the metagraph
 // snapshots this global tick anchored — `dot · ticker · share-bar · count`, sorted desc, ALL of
@@ -141,7 +142,12 @@ export default function AnchoredTags({
     <div className="mt-1">
       {header}
 
-      <div className="flex flex-col gap-y-1">
+      {/* The list EASES IN on every reveal (the no-pop rule's arrival ease): following live,
+          each tick swaps this block to "resolving" and back, and the rows popped with slightly
+          different members every ~4s — the container mounts fresh at each acquiring→rows flip,
+          so the mount entrance is exactly per-reveal. Bar widths carry no transition: the
+          remount means there is never an old width to ease from. */}
+      <div className={cn("flex flex-col gap-y-1", CONTENT_EASE)}>
         {rows.map((r) => {
           const isOpen = open.has(r.id);
           const isSel = r.id === focusId;

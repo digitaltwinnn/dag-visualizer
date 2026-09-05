@@ -104,7 +104,7 @@ export interface ViewPolicy {
 // read at a glance — bump them here directly for more/less overall glow).
 const BLOOM_CALM = { strength: 0.40, radius: 0.35, threshold: 0.13 };
 
-// A flat placeholder view (status / transactions / staking): the canvas is hidden and the view
+// THE flat placeholder view ("soon" — one consolidated mode): the canvas is hidden and the view
 // is fully inert. Shared so the three rows stay identical by construction.
 const FLAT: ViewPolicy = {
   canvas: false,
@@ -192,7 +192,5 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     bloom: BLOOM_CALM, // the reference look the design likes — unchanged
     chipEnv: 0.5, // low, not zero — coplanar trays wash at full sheen, go bland at none (field note)
   },
-  status: FLAT,
-  transactions: FLAT,
-  staking: FLAT,
+  soon: FLAT,
 };

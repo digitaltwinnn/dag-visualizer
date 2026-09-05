@@ -34,10 +34,17 @@ export class TrailRewind {
   private _pinnedOrd: number | null = null;
   private _slotPrev = -1;
   private _ordPrev: number | null = null;
+  private _target = 0; // the glide's destination this frame — `settled` compares against it
 
   /** The current +X offset the whole trail wears. */
   get offset(): number {
     return this._off;
+  }
+
+  /** Is the trail at rest (the glide arrived)? The callout's quiet gate reads this — a label
+   *  must not point at a row still sliding to its slot. */
+  get settled(): boolean {
+    return Math.abs(this._target - this._off) < 0.01;
   }
 
   /** The COMMITTED (clicked) or FOLLOWED snapshot — the only thing the rewind tracks. */
@@ -72,6 +79,7 @@ export class TrailRewind {
     // ⚠️ `else`, NEVER both: on an advance WITH a held row the jump above has already accounted for
     // that same slot, and adding this on top would step the trail two slots for one tick.
     else if (advanced) this._off += SLOT_SP;
+    this._target = target;
     this._slotPrev = slot;
     this._ordPrev = this._pinnedOrd;
     // 2.0, down from 3.2: with the glide above this is now the trail's VISIBLE per-tick motion

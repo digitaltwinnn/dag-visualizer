@@ -23,6 +23,7 @@ import { PAYLOAD_LANES } from "@/src/data/payloadKinds";
 import { fmtDag, fmtKB, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { useMinHold } from "@/components/useMinHold";
+import { CONTENT_EASE } from "@/components/RollSwap";
 import { useNowTick } from "@/components/useNowTick";
 import { identityHudCss } from "@/src/palette/identity";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
@@ -215,7 +216,10 @@ export default function MetaSnapPane({
             <Separator className="my-2" />
             <FactGroup>
               {row ? (
-                <>
+                // The landed facts EASE IN (the no-pop arrival ease) — this branch mounts when
+                // the exact read resolves out of "reading…". The inner column re-states
+                // FactGroup's own gap so the wrapper is rhythm-invisible.
+                <div className={cn("flex flex-col gap-1", CONTENT_EASE)}>
                   {/* Fee leads, size rides under it — the global card's own two-line value, so
                       the pair reads identically on both storeys of the chain. */}
                   <Fact label="Fees paid">
@@ -244,7 +248,7 @@ export default function MetaSnapPane({
                       {(deep?.signers ?? row.signers)?.length ?? 0} <LayerWho who={SIGNER_GROUPS.proof.who} />
                     </span>
                   </Fact>
-                </>
+                </div>
               ) : !row && exact ? (
                 // The tick's exact read landed and is immutable, and this snapshot's row is not
                 // in it (aged past the buffer's join, or never anchored here) — a terminal fact,
@@ -485,7 +489,7 @@ function PayloadBlock({
         // + proofs), the heartbeat of a quiet network. It leads the payload block so the two
         // `none` sections below become confirmation rather than a puzzle; "idle" is the app's
         // existing word for a tick that moves nothing (CLAUDE.md, the height counter).
-        <p className="mb-2 text-label text-muted-foreground">
+        <p className={cn("mb-2 text-label text-muted-foreground", CONTENT_EASE)}>
           An idle snapshot: it anchored only its envelope and proofs.
         </p>
       )}
@@ -549,16 +553,18 @@ function PayloadSection({
         // MEASURED empty — the deep read landed and this section carries nothing. A reading,
         // not a state, so it takes the section rows' own register; the italic-muted treatment
         // is `pending`'s (unread / reading…), and "unread and none are different facts".
-        <p className="pl-2 text-label text-foreground-dim">none</p>
+        <p className={cn("pl-2 text-label text-foreground-dim", CONTENT_EASE)}>none</p>
       )}
+      {/* The shape rows ease in as the read lands (the no-pop arrival ease) — keyed, so they
+          play once and never on a re-render. */}
       {rows.map((r) => (
-        <div key={r.name} className="flex items-start justify-between gap-2.5 pl-2" title={r.name}>
+        <div key={r.name} className={cn("flex items-start justify-between gap-2.5 pl-2", CONTENT_EASE)} title={r.name}>
           <span className="min-w-0 truncate text-label text-foreground-dim">{r.name}</span>
           <span className="shrink-0 text-label text-foreground-dim tabular-nums">{r.count.toLocaleString()}</span>
         </div>
       ))}
       {signers && (
-        <div className="flex items-start justify-between gap-2.5 pl-2" title={signers.title}>
+        <div className={cn("flex items-start justify-between gap-2.5 pl-2", CONTENT_EASE)} title={signers.title}>
           <span className="min-w-0 truncate text-label text-muted-foreground">{signers.label}</span>
           <span className="shrink-0 text-label text-foreground-dim tabular-nums">
             <span className="inline-flex items-center gap-1">{signers.count} <LayerWho who={signers.who} /></span>

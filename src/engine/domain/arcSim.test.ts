@@ -361,3 +361,23 @@ describe("ArcSim.step — pause -> retarget (js/globe.js:1000-1009 verbatim)", (
     expect(result.retargeted).toBe(true);
   });
 });
+
+describe("relaunch (the settle-edge launch)", () => {
+  it("parks every agent at a node (paused, t=0, staggered departure) and step resumes travel", () => {
+    const sim = new ArcSim();
+    const pts = Array.from({ length: 8 }, (_, i) => ({
+      dir: new THREE.Vector3(Math.sin(i), Math.cos(i), 0.5).normalize(),
+      node: { index: i },
+    })) as never;
+    sim.rebuild(pts);
+    sim.relaunch();
+    for (const ag of sim.agents) {
+      expect(ag.state).toBe("pause");
+      expect(ag.t).toBe(0);
+      expect(ag.pause).toBeGreaterThan(0);
+    }
+    // long enough that every stagger expires: everyone has departed a node
+    sim.step(5, true);
+    expect(sim.agents.some((a) => a.state === "travel")).toBe(true);
+  });
+});

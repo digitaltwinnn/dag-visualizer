@@ -17,6 +17,7 @@ import RailThread from "@/components/RailThread";
 import { RailShade } from "@/components/RailShade";
 import RailDock from "@/components/RailDock";
 import RailPager from "@/components/RailPager";
+import HeightEase from "@/components/HeightEase";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { usePointerCoarse } from "@/components/usePointerCoarse";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
@@ -440,6 +441,13 @@ export default function Inspector() {
     following ? (snap ? "live" : "") : snap?.data.ordinal ?? "",
     following ? (metaSnap ? "live" : "") : metaSnap ? `${metaSnap.metaId}:${metaSnap.ordinal}` : "",
   ].join("§");
+  // Arms HeightEase's growIn for slots that JOIN the lane after boot (false on the first
+  // render pass, true on every later one — a mounting slot's wrapper then eases from 0
+  // instead of shoving the pile in one frame).
+  const laneBooted = useRef(false);
+  useEffect(() => {
+    laneBooted.current = true;
+  }, []);
   const lastSelection = useRef(selectionKey);
   const lastMode = useRef(mode);
   const modeEnteredAt = useRef(0);
@@ -451,20 +459,36 @@ export default function Inspector() {
     // Read the live overrides rather than closing over them: `railCollapse` changes on every
     // +/− too, and this effect must fire on a SELECTION change only.
     const staleNulls = Object.fromEntries(Object.keys(useStore.getState().railCollapse).map((id) => [id, null]));
-    // VIEW ENTRY IS SCENE-FIRST (user, 2026-08-08): arriving in a view starts the whole ladder
-    // COLLAPSED — carried selections rest as entries, no materialized box — so the destination
-    // scene leads and the rail stays calm through the switch choreography. The collapse covers
-    // EVERY ladder id (rungs can arrive late) and HOLDS through the transition window: the
-    // boundary's own ancestry re-derive (`viewEntryActions`) and the ledger's live-follow
-    // entry are selection changes, but they're ARRIVAL machinery, not user gestures — only a
-    // selection change after the grace window materializes the focus rung. A manual entry
-    // click materializes immediately at any time (it writes its own override, no reset here).
+    // EXPANDED STATE SURVIVES A VIEW SWITCH (user, 2026-09-04 — reversing 2026-08-08's
+    // scene-first entry, which collapsed the whole ladder on arrival: with every rung's height
+    // now EASING, the collapse-and-reopen cycle was the "node card size jumps between views"
+    // itself). A switch is ARRIVAL machinery, not a new selection moment — so through the mode
+    // change and its grace window the overrides are left exactly as they stand: the boundary's
+    // ancestry re-derive (`viewEntryActions`) and the ledger's live-follow entry are selection
+    // changes, but dropping the +/− state for them would re-collapse what the user had open.
+    // Only a selection change AFTER the window is a user gesture, and that still resets to the
+    // auto only-the-focus-rung-is-open default exactly as before.
+    // ⚠️ The freeze is EXPLICIT, not an absence of writes (found live, first cut): the
+    // boundary's re-derive lands its commits one after another, and with no overrides the
+    // auto default follows the FOCUS — which tracks the last arrival commit, so the box
+    // drifted onto the provider mid-choreography while the node card the user had open fell
+    // back to an entry. Snapshotting the departure state into explicit overrides at the mode
+    // flip pins what is open and closed; the arrival can then shuffle focus freely under an
+    // unchanged pile, and the first post-window selection drops the snapshot like any other
+    // override set.
     const ENTRY_GRACE_MS = 4200; // ≥ the ~3.9s 3D↔3D choreography
-    if (modeChanged) modeEnteredAt.current = Date.now();
-    if (modeChanged || Date.now() - modeEnteredAt.current < ENTRY_GRACE_MS) {
-      setRailCollapseMany({ ...staleNulls, ...Object.fromEntries(ladderIds.map((id) => [id, true])) });
+    if (modeChanged) {
+      modeEnteredAt.current = Date.now();
+      // Open = "is a PRESENT box right now" — a not-yet-present slot's autoCollapsed is
+      // false (ghosts aren't collapsed), so a bare effCollapsed snapshot pinned the arriving
+      // ancestor slots OPEN and the re-derive materialized three boxes at once (measured).
+      setRailCollapseMany({
+        ...staleNulls,
+        ...Object.fromEntries(ladderIds.map((id) => [id, !(presentOf(id) && !effCollapsed(id))])),
+      });
       return;
     }
+    if (Date.now() - modeEnteredAt.current < ENTRY_GRACE_MS) return;
     if (Object.keys(staleNulls).length) setRailCollapseMany(staleNulls);
   }, [selectionKey, setRailCollapseMany]); // eslint-disable-line react-hooks/exhaustive-deps -- mode/ladderIds ride selectionKey (mode is a component of it)
 
@@ -574,7 +598,11 @@ export default function Inspector() {
           // applies `opacity-[var(--entry-dim,1)]` and RELEASES it on hover (the materialize
           // preview) — a wrapper opacity would clamp the hover lift from outside.
           <div key={id} data-depth={depth} data-tier={tier} data-focus={focused ? "" : undefined} style={{ ["--entry-dim" as string]: entryDim(id) } as CSSProperties}>
-            {wrapped}
+            {/* Every rung's height EASES (HeightEase — its header carries the rule and the
+                follow-don't-fight heuristic that keeps it off the pager's own slides). The
+                slab selectors are descendant, not child, so the extra level is free — the
+                RailPager precedent. */}
+            <HeightEase growIn={laneBooted.current}>{wrapped}</HeightEase>
           </div>
         );
       })}

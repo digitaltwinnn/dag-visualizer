@@ -8,9 +8,10 @@ import type { CohortSel, CompositionSel, FocusLevel } from "@/src/engine/domain/
 import type { ThemePref, Theme } from "@/src/theme/resolve";
 
 // The active view. `hyper`/`geo`/`ledger` all drive the 3D scene (every switch among them runs
-// the gather choreography); `status`/`transactions`/`staking` are flat scaffolded placeholders
-// (the canvas is hidden).
-export type Mode = "hyper" | "geo" | "ledger" | "status" | "transactions" | "staking";
+// the gather choreography); `soon` is THE one flat placeholder view (consolidated 2026-09-04 —
+// three separate soon modes said the same nothing three times; the Blueprint gallery inside it
+// still previews each coming feature).
+export type Mode = "hyper" | "geo" | "ledger" | "soon";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
 export type SelSlot = "network" | "node" | "snap" | "metaSnap" | "country" | "cohort" | "composition";
@@ -139,6 +140,24 @@ interface AppState {
   // Active view. The scene is one persistent canvas; the engine morphs between hyper
   // and geo and hides it for the flat views, all driven by this.
   mode: Mode;
+  // The DOC OVERLAY (2026-09-04): /about and /design render INSIDE the app as a scrollable
+  // document layer over the live scene (DocLayer), instead of separate static pages that
+  // rebooted the WebGL engine on every footer navigation. A presentation axis like `section`,
+  // never a Mode — a document is over the network, not a view of it. While set, the HUD's
+  // scene furniture stands down (DocGate) and RouteSync publishes /about | /design.
+  docPage: "about" | "design" | null;
+  // The doc overlay's STAGE-READY signal, written by the Engine (the one clock that knows the
+  // choreography's real boundary — frame-driven, so ?slowmo and low FPS stretch it correctly,
+  // where a wall-clock wait in the HUD desynced). DEFAULT TRUE so a document never waits on a
+  // scene that isn't there (cold flat boots, WebGL-unavailable); the Engine sets it false only
+  // when a doc opens OVER a live 3D view, and true again the frame the gather completes —
+  // DocLayer holds its entrance on it.
+  docStageReady: boolean;
+  // The CLOSE side's beat (user, 2026-09-04): the doc's roll-out is its own OUT phase, so the
+  // engine holds the flat stage until it finishes — `docClosing` is true from the close gesture
+  // until DocLayer's exit animation completes (it clears this), and only then does the engine
+  // begin the destination view's entry, with the fleet back at the parked grids for the flight.
+  docClosing: boolean;
   // Shared network filter ("all" | "dag" | <metagraph id>) — one unified core model, no
   // separate L0/L1 filters (the DAG is just another metagraph-shaped core).
   filter: string;
@@ -233,6 +252,9 @@ interface AppState {
   setLatestSnapshot: (snap: GlobalSnapshot | null) => void;
   setActivity: (activity: Activity | null) => void;
   setMode: (mode: Mode) => void;
+  setDocPage: (docPage: "about" | "design" | null) => void;
+  setDocStageReady: (ready: boolean) => void;
+  setDocClosing: (closing: boolean) => void;
   setFilter: (filter: string) => void;
   setMetaList: (list: MetaInfo[]) => void;
   setInspect: (pick: PickDescriptor | null) => void;
@@ -301,6 +323,9 @@ export const useStore = create<AppState>((set) => ({
   latestSnapshot: null,
   activity: null,
   mode: "hyper",
+  docPage: null,
+  docStageReady: true,
+  docClosing: false,
   filter: "all",
   metaList: [],
   inspect: null,
@@ -347,7 +372,23 @@ export const useStore = create<AppState>((set) => ({
   setMetagraphs: (metagraphs) => set({ metagraphs }),
   setLatestSnapshot: (latestSnapshot) => set({ latestSnapshot }),
   setActivity: (activity) => set({ activity }),
-  setMode: (mode) => set({ mode }),
+  // A view switch CLOSES any open doc overlay: the switch is a statement of where you want to
+  // be, and the two publish to one address bar (RouteSync derives the path from doc ?? mode).
+  // Closing (either route) arms `docClosing` — the doc's exit animation is its OUT phase, and
+  // the engine waits on it before entering the destination view.
+  setMode: (mode) => set((s) => ({ mode, docPage: null, docClosing: s.docPage != null || s.docClosing })),
+  // Opening a doc also SURFACES THE SCENE POSE: the overlay sits at z-8, under the raw layer's
+  // z-9 — a doc opened from the RAW pose rendered beneath the still-interactive table, with the
+  // RAW toggle that could exit it hidden by the doc's own control gating (review find,
+  // 2026-09-05). The doc covers the SCENE by design, so the pose comes home with it.
+  setDocPage: (docPage) =>
+    set((s) => ({
+      docPage,
+      section: docPage != null ? "scene" : s.section,
+      docClosing: docPage == null ? s.docPage != null || s.docClosing : false,
+    })),
+  setDocStageReady: (docStageReady) => set({ docStageReady }),
+  setDocClosing: (docClosing) => set({ docClosing }),
   // Committing a network IS a user gesture (user, 2026-08-14 — changing the filter or paging
   // the dossier left the snapshot card as the box): it bumps the recency stack like every
   // other selection, so the facts rail focuses the metagraph card. "all" clears the entry.
