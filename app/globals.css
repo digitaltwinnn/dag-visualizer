@@ -807,6 +807,12 @@
      motion visible through the window. Entrances only; exits keep ease-out, where
      front-loading is exactly right. */
   --ease-roll: cubic-bezier(0.45, 0.05, 0.25, 1);
+  /* The card-scale second beat (user, 2026-09-05: "load the text in the card slower" — the
+     doc overlay's page-then-text grammar scaled down): arriving card CONTENT delays by this
+     lag while the height ease establishes the box, then fades in on --tempo-doc-rise — the
+     app's one text-arrival clock, doc and card alike ("slower", user's second round).
+     Needs fill-mode-both at the call site or the content is visible through its own delay. */
+  --tempo-roll-lag: 0.2s;
   /* The NAVIGATION clock — the user's own gesture resolving, slower than any signal: 0.55s is
      the scene↔raw depth transition's GSAP duration (SectionShell.tsx — the JS half of this
      pairing, like the disclosure clock's chevron). The DOC overlay's fade deliberately does NOT

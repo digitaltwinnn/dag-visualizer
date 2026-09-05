@@ -74,7 +74,7 @@ export default function ExploreRail() {
             translateY(5px) scale(0.985), and 0.985 of a 700px expanded list pulls the TOP
             edge visibly). The keyed card fades on the roll clock; the height ease and the
             head's title roll carry the rest of the arrival. */}
-        <div key={`tool-${mode}`} className="animate-in fade-in duration-(--tempo-roll) ease-(--ease-roll) motion-reduce:animate-none">
+        <div key={`tool-${mode}`} className="animate-in fade-in duration-(--tempo-doc-rise) ease-(--ease-roll) delay-(--tempo-roll-lag) fill-mode-both motion-reduce:animate-none">
           {mode === "hyper" ? <HyperExplore defaultCollapsed={bp === "phone"} />
           : mode === "geo" ? <GeoExplore defaultCollapsed={bp === "phone"} />
           : mode === "ledger" ? <LedgerPanel defaultCollapsed={bp === "phone"} />
