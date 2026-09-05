@@ -2,7 +2,7 @@
 import { describe, it, expect } from "vitest";
 import {
   gatherSlots, gatherExtent, gatherBand, gatherSpread, gatherRows,
-  GATHER_GUTTER, GATHER_GUTTER_MAX,
+  GATHER_GUTTER, GATHER_GUTTER_MAX, GATHER_LEGEND_PX,
   type GatherExtent,
 } from "./gatherLayout";
 
@@ -283,10 +283,12 @@ describe("gatherBand", () => {
   const halfWidthPx = (b: { halfWidthFrac: number }, viewW: number) => (viewW / 2) * b.halfWidthFrac;
 
   it("puts the band's top edge on the rail cards' own top, at any viewport height", () => {
-    // --rail-top is 90px, and the canvas rides --topbar-extra exactly as the rails do, so the
+    // --rail-top is 90px plus GATHER_LEGEND_PX (the ticker row's reserve, 2026-09-04 — the
+    // legend stands above the band, and at the bare rail-top it collided with the bar's
+    // hanging view caption), and the canvas rides --topbar-extra exactly as the rails do, so the
     // cards' top is 90 canvas-local px whatever the filter strip is doing.
-    expect(topPx(band(1600, 950, false), 950)).toBeCloseTo(90, 6);
-    expect(topPx(band(390, 780, false), 780)).toBeCloseTo(90, 6);
+    expect(topPx(band(1600, 950, false), 950)).toBeCloseTo(90 + GATHER_LEGEND_PX, 6);
+    expect(topPx(band(390, 780, false), 780)).toBeCloseTo(90 + GATHER_LEGEND_PX, 6);
   });
 
   it("spans wider with the rails hidden than with them showing", () => {

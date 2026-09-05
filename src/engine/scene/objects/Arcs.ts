@@ -99,6 +99,14 @@ export class Arcs {
   private _camN: { value: THREE.Vector3 } = { value: new THREE.Vector3(0, 0, 1) };
   private _close: { value: number } = { value: 0 };
   hasArcs = false;
+
+  /** The gate's VISIBILITY half (user, 2026-09-04): while the view-in choreography runs, the
+   *  sim is frozen and `writeFrame` skipped — but the meshes kept rendering their STALE buffers,
+   *  so frozen trails hung mid-air over nodes still in flight. Hidden until the caller's gate
+   *  opens. */
+  setVisible(v: boolean): void {
+    if (this.arcGroup) this.arcGroup.visible = v;
+  }
   // The travelling packets are additive GLOW on the dark ground and normal-blended INK on paper —
   // additive over a 0.965-L background saturates to white and draws nothing. Held as a field
   // because the material is rebuilt on every filter change (see rebuildFrom), so the blend mode has

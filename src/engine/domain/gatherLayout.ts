@@ -152,14 +152,21 @@ export interface GatherBand {
  * returning a fresh one — the same arrangement, and the same reason, as cameraRig's framing
  * functions. Returns `out` so a call still reads as an expression.
  */
+/** The LEGEND ROW's reserve (2026-09-04): the staged blocks' ticker labels stand one cell above
+ *  the band, and at the old top — the rail cards' own edge — they collided with the bar's
+ *  hanging view caption (measured: the caption's zone reaches ~84px while block tops sat at
+ *  ~91). The band starts this much lower so the legend owns a clear strip. */
+export const GATHER_LEGEND_PX = 22;
+
 export function gatherBand(viewW: number, viewH: number, railsHidden: boolean, out: GatherBand): GatherBand {
   const railed = !railsHidden && viewW >= RAILS_TIER;
   const reach = railed ? RAIL_GUTTER + Math.max(LEFT_RAIL_W, RIGHT_RAIL_W) : 0;
   const halfWidthPx = Math.max(1, viewW / 2 - reach - BAND_MARGIN);
+  const top = RAIL_TOP + GATHER_LEGEND_PX;
   // A point `f` half-heights above centre lands at `viewH/2 * (1 - f)` pixels from the top.
-  out.topFrac = 1 - (2 * RAIL_TOP) / viewH;
+  out.topFrac = 1 - (2 * top) / viewH;
   out.halfWidthFrac = halfWidthPx / (viewW / 2);
-  out.heightFrac = Math.max(0, viewH - RAIL_TOP - BOTTOM_RESERVE - BAND_MARGIN) / (viewH / 2);
+  out.heightFrac = Math.max(0, viewH - top - BOTTOM_RESERVE - BAND_MARGIN) / (viewH / 2);
   return out;
 }
 

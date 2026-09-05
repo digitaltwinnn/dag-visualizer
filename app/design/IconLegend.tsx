@@ -18,9 +18,7 @@ const VIEWS: { label: string; Icon: LucideIcon }[] = [
   { label: "Hypergraph", Icon: VIEW_ICONS.hyper },
   { label: "Geography", Icon: VIEW_ICONS.geo },
   { label: "Snapshots", Icon: VIEW_ICONS.ledger },
-  { label: "Network", Icon: VIEW_ICONS.status },
-  { label: "Transactions", Icon: VIEW_ICONS.transactions },
-  { label: "Staking", Icon: VIEW_ICONS.staking },
+  { label: "Coming soon", Icon: VIEW_ICONS.soon },
 ];
 const RAIL: { label: string; Icon: LucideIcon }[] = [
   { label: "About", Icon: ABOUT_ICON },

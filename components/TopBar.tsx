@@ -12,18 +12,12 @@ import PulseStrip from "@/components/topbar/PulseStrip";
 import EcgMark from "@/components/topbar/EcgMark";
 import PresentationToggle from "@/components/topbar/PresentationToggle";
 import ThemeToggle from "@/components/topbar/ThemeToggle";
+import InfoMenu from "@/components/topbar/InfoMenu";
 import NetworkSwitch, { NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
 import { useBreakpoint } from "@/components/useBreakpoint";
+import { DOC_PAGES, VIEWS } from "@/components/views";
+import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import type { Mode } from "@/src/store/store";
-
-const VIEWS = [
-  { id: "hyper", name: "Hypergraph" },
-  { id: "geo", name: "Geography" },
-  { id: "ledger", name: "Snapshots" },
-  { id: "status", name: "Network", soon: true },
-  { id: "transactions", name: "Transactions", soon: true },
-  { id: "staking", name: "Staking", soon: true },
-] as const;
 
 // Collapsed filter face: a small identity dot + the network name in neutral text (no filled
 // chip). All → a neutral cyan dot. Identity is the ONLY colour the filter carries.
@@ -40,6 +34,16 @@ export default function TopBar() {
   const filter = useStore((s) => s.filter);
   const mode = useStore((s) => s.mode);
   const setMode = useStore((s) => s.setMode);
+  // The DOC OVERLAY strips the bar's SCENE-ACTION controls (user, 2026-09-04 — "strip more of
+  // the HUD"): while /about or /design covers the scene, the filter and the presentation pair
+  // act on something the reader can't see, so they hide; brand/pulse, the view switch (which
+  // closes the doc and lands in the view), theme and network stay — they are the overlay's
+  // chrome as much as the app's.
+  const doc = useStore((s) => s.docPage);
+  // The presentation pair is VIEW-SCOPED (SCENE⇄HUD and RAW act on the 3D view under the bar),
+  // so it stands down wherever there is no such view: a doc overlay, or the flat "soon" view
+  // (gated on the policy's own canvas flag, convention 7 — never a mode list).
+  const viewControls = doc == null && VIEW_POLICIES[mode].canvas;
 
   // The bar's ONE grow-downward slot, two tenants (2026-08-30 — the PULSE strip joined the
   // filter strip): `strip` names which row is open, null = closed. One slot makes them mutually
@@ -53,6 +57,12 @@ export default function TopBar() {
   useEffect(() => {
     if (bp === "phone") setStrip(null);
   }, [bp]);
+
+  // A doc overlay opening closes whichever strip is grown — the strip previews the scene the
+  // overlay is about to cover.
+  useEffect(() => {
+    if (doc) setStrip(null);
+  }, [doc]);
 
   // Consume the NetworkSwitch's one-shot view handoff (see its header): a network switch is a
   // hard reload, and the view you were on survives it. Runs once on mount, BEFORE the engine's
@@ -212,7 +222,7 @@ export default function TopBar() {
           </span>
           <span className="sr-only">— show app liveliness</span>
         </button>
-        <span className="w-px self-stretch bg-border my-1 max-[860px]:hidden" />
+        <span className={cn("w-px self-stretch bg-border my-1 max-[860px]:hidden", doc && "hidden")} />
 
         {/* Filter (toned, de-nested) — toggles the ATTACHED filter strip below (user,
             2026-07-12: reversed the 2026-07-04 detached-popover decision; the strip lives on
@@ -227,6 +237,7 @@ export default function TopBar() {
             "flex items-center gap-[7px] bg-transparent border-0 cursor-pointer py-1.5 px-2 rounded-btn",
             "hover:bg-wash-soft",
             strip === "filter" && "bg-wash-soft",
+            doc && "hidden",
             // The 44px tap minimum keys on the POINTER, not the width (user, 2026-08-14 —
       // resizing a desktop window smaller made the bar GROW): a coarse pointer is a
       // touch device wherever the window edge sits; a fine pointer never needs it.
@@ -287,7 +298,10 @@ export default function TopBar() {
           onValueChange={(v) => { if (v) setMode(v as Mode); }}
           className="flex gap-0.5 max-[700px]:gap-0"
         >
-          {(bp === "phone" ? VIEWS.filter((v) => !("soon" in v && v.soon)) : VIEWS).map((v) => {
+          {/* Phone shows ALL views since the soon consolidation (user, 2026-09-04): the three
+              dead placeholders it used to drop are one dimmed entry now, and four icon buttons
+              fit the phone switch. */}
+          {VIEWS.map((v) => {
             const Icon = VIEW_ICONS[v.id as Mode];
             return (
             <ToggleGroupItem
@@ -319,7 +333,10 @@ export default function TopBar() {
                 // condensed and the full face change on one line. Tablet ≥860 and desktop keep six.
                 // (Raised from 820 on 2026-08-21 when ThemeToggle landed beside PresentationToggle:
                 // measured 32px overflow at 820px; 860px is clean with slack, breakeven ~853px.)
-                "soon" in v && v.soon && "opacity-45 max-[860px]:hidden",
+                // The dimmed soon entry STAYS at every width (review find, 2026-09-05: the phone comment
+                // promised all four views but this class still hid it below 860 — and below 700 it has
+                // no other route at all: no slug, and the footer's view links stand down on phone).
+                v.soon && "opacity-45",
               )}
             >
               <Icon aria-hidden className="size-4 group-data-[state=on]:text-primary" />
@@ -335,29 +352,40 @@ export default function TopBar() {
             the vitals still ride the filter strip below as a second row, unchanged. */}
         <div className="flex items-center gap-3 max-[1260px]:gap-2.5 max-[940px]:gap-2 max-[700px]:gap-1.5 justify-self-end">
 
-        {/* PRESENTATION — the bar's trailing group: the SCENE⇄HUD chrome toggle + the RAW
-            layer toggle, adjacent as one pair (user, 2026-08-30 — re-split along the store's
-            own axes; the 2026-08-08 one-axis control flattened two independent axes into three
-            states). It sits in the COMMAND bar (this zone's scope is the whole instrument)
-            rather than the live lane. */}
-        <span className="w-px self-stretch bg-border my-1 max-[860px]:hidden" />
-        <PresentationToggle />
+        {/* PRESENTATION — the SCENE⇄HUD chrome toggle + the RAW layer toggle, adjacent as one
+            pair (user, 2026-08-30 — re-split along the store's own axes). THE ZONE'S TWO
+            HAIRLINES BRACKET THIS PAIR (user, 2026-09-04 — "RAW applies to the specific 3D
+            views, while dark/light, docs and network are fully shared; make that visually
+            clear"): the dividers now say the SCOPE split — the bracketed island is view-scoped
+            and vanishes with the view (docs, the flat soon view), while the shared trio
+            (theme · pages · network) runs unbroken to the bar's edge on every surface. */}
+        <span className={cn("w-px self-stretch bg-border my-1 max-[860px]:hidden", !viewControls && "hidden")} />
+        <div className={cn("contents", !viewControls && "hidden")}>
+          <PresentationToggle />
+        </div>
+        <span className={cn("w-px self-stretch bg-border my-1 max-[860px]:hidden", !viewControls && "hidden")} />
 
-        {/* Theme — the "how it looks" control, riding beside presentation with no divider of
-            its own (it reads as part of that group, not a fourth zone). On PHONE it rides the
+        {/* Theme — the "how it looks" control, the shared trio's lead. On PHONE it rides the
             filter strip's second row instead, same as NetworkSwitch below — otherwise it would
             render twice (bar + open strip) at once. */}
         <div className="contents max-[700px]:hidden">
           <ThemeToggle />
         </div>
 
-        {/* Network switch — the RIGHT edge of the bar, one past the presentation toggle: the
-            network acts on everything INCLUDING presentation, so the edge escalates in scope
-            and the bar reads as a valley — brand (what this app is) and network (which chain)
-            at the outer edges, the most specific controls in the middle. On PHONE it rides
-            the filter strip's second row instead (see the strip below) — in this zone it
-            starved the filter face's word out of the bar (measured at 360-390, 2026-08-21). */}
-        <span className="w-px self-stretch bg-border my-1 max-[860px]:hidden" />
+        {/* Pages — the doc overlay's quiet bar home (InfoMenu: About/Design as a circled-i
+            popover). One rank below the view switch on purpose — they are views, but not at the
+            views' level of importance (user, 2026-09-04). On phone it rides the filter strip's
+            second row with the other shared controls (plus the footer row, always visible). */}
+        <div className="contents max-[700px]:hidden">
+          <InfoMenu />
+        </div>
+
+        {/* Network switch — the RIGHT edge of the bar: the network acts on everything, so the
+            edge escalates in scope and the bar reads as a valley — brand and network at the
+            outer edges, the most specific controls in the middle. No divider of its own since
+            the scope regrouping above: it rides the shared trio, whose unbroken run IS the
+            statement that these apply everywhere. On PHONE it rides the filter strip's second
+            row instead (measured at 360-390, 2026-08-21). */}
         <div className="contents max-[700px]:hidden">
           <NetworkSwitch />
         </div>
@@ -392,6 +420,10 @@ export default function TopBar() {
                 desktop cluster; the hairline is the phone vitals row's own border-t device. */}
             {bp === "phone" && (
               <div className="flex items-center justify-center gap-2 mx-2 px-2 pb-2 pt-1.5 border-t border-border/60">
+                {/* The docs' phone home rides the strip row with the other shared controls
+                    (user, 2026-09-04 — "phone is also missing the about/design top bar
+                    element"); the footer row remains the always-visible route. */}
+                <InfoMenu />
                 {/* The vitals LEFT this row for the dock's third section (user, 2026-09-03 —
                     VitalsDock: riding the strip put view vitals under whichever dropdown
                     opened, the pulse strip included). What stays is what belongs to the strip:
@@ -417,9 +449,11 @@ export default function TopBar() {
           eyebrow language + keyed roll-in on view change (the HUD grammar). Decorative echo of
           the radiogroup's own accessible state, so aria-hidden; non-interactive (the wrapper's
           pointer-events-none passes scene clicks through the caption strip). */}
+      {/* While a DOC covers the scene the caption says the DOC (review find, 2026-09-05: it
+          kept naming the hidden view underneath — an honest label names what is on screen). */}
       <div className="hidden max-[1299px]:flex justify-end pr-2.5 mt-1.5" aria-hidden>
-        <span key={mode} className="roll-in text-micro tracking-caps uppercase text-muted-foreground leading-none">
-          {VIEWS.find((v) => v.id === mode)?.name}
+        <span key={doc ?? mode} className="roll-in text-micro tracking-caps uppercase text-muted-foreground leading-none">
+          {doc ? DOC_PAGES[doc].label : VIEWS.find((v) => v.id === mode)?.name}
         </span>
       </div>
       </div>

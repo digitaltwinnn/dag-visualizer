@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ViewTransition, is3D, DUR_OUT, DUR_IN, FURN_IN, STAGGER_SPREAD } from "./viewTransition";
+import { ViewTransition, is3D, DUR_OUT, DUR_IN, FURN_IN, STAGGER_SPREAD, DOC_ROLL } from "./viewTransition";
 
 const settled = (v: "hyper" | "geo" | "ledger" = "hyper") => {
   const tr = new ViewTransition();
@@ -8,6 +8,14 @@ const settled = (v: "hyper" | "geo" | "ledger" = "hyper") => {
 };
 
 describe("phase sequencing", () => {
+  // The doc overlay's roll (DocLayer's text + NodeFabric's fleet fade share it): pinned by
+  // RELATION, not number — it must fit inside the entering view's furniture build, or a leaving
+  // document would still be rolling while the scene stands fully lit behind it.
+  it("DOC_ROLL fits inside the furniture build", () => {
+    expect(DOC_ROLL).toBeGreaterThan(0);
+    expect(DOC_ROLL).toBeLessThanOrEqual(FURN_IN);
+  });
+
   it("is idle after settle: inactive, current view's furniture full, weight 0", () => {
     const tr = settled("geo");
     expect(tr.active()).toBe(false);
@@ -257,7 +265,7 @@ describe("retargeting", () => {
 describe("is3D", () => {
   it("narrows the three scene views and rejects the flat placeholders", () => {
     expect(["hyper", "geo", "ledger"].every(is3D)).toBe(true);
-    expect(["status", "transactions", "staking"].some(is3D)).toBe(false);
+    expect(is3D("soon")).toBe(false);
   });
 });
 

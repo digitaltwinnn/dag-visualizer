@@ -209,7 +209,9 @@ opens around it. Its border is NOT handed to a seam the way an entry↔entry joi
 curves in at each corner, so it never draws the full-width division the inset-seam rule exists to
 prevent; it reads as the box cut into the pile. **The stack carries DEPTH, the thread carries STATE**;
 adjacency is what reads as containment, which is why the snapshot chain runs coarse→fine above. Ghosts
-stay outside the slab. Nothing in the block animates, so reduced motion is a no-op.
+stay outside the slab. The block's GEOMETRY never animates (seams, corners, washes) — but since
+2026-09-04 every rung's HEIGHT eases (`HeightEase` on the Inspector rung wrappers; the no-pop bullet
+below carries the rules). Reduced motion snaps, so the no-op guarantee holds there.
 
 ⚠️ **The lift shadow is not the box's distinguisher and can't be** — squaring the box mid-pile was tried
 (2026-08-09) and left it with no geometry at all: square corners, both borders handed to seams, and a
@@ -319,9 +321,12 @@ The request rides one store channel, `focusRung: { level } | null` (an OBJECT, s
 rung is a fresh reference the Engine's `!==` bridge sees), and `Engine._resolveFocus(from?)` starts its
 existing ladder walk at that named rung instead of the finest. No second camera path.
 
-**View entry is scene-first**: arriving in a view starts the ladder collapsed, held through the
-transition's ancestry re-derive by a grace window, with both live-advancing ordinals guarded in the
-selection key so heartbeats never materialize a card. Conversely **the heartbeat is felt on closed
+**Expanded state survives a view switch** (user, 2026-09-04 — reversing 2026-08-08's scene-first
+collapse: with rung heights easing, the collapse-and-reopen cycle WAS the "card size jumps between
+views"): a switch is arrival machinery, not a selection moment, so the +/− overrides hold through
+the mode change and its grace window, and only a post-window selection change resets them to the
+only-the-focus-rung-open default. Both live-advancing ordinals stay guarded in the selection key so
+heartbeats never materialize a card. Conversely **the heartbeat is felt on closed
 cards**: both snapshot asides carry the beating dot and are the same tap-to-follow toggle, but **only
 one of them owns the clock.** The global aside ticks a `live · Xs` counter (the shown snapshot's age,
 never overstating); the metagraph aside says **`anchored to N`** whenever the card above already shows
@@ -486,12 +491,96 @@ writer, and it clears its own state when the viewport drops below 1100px — bel
 CSS-hidden and SCENE has no meaning, so a stuck `true` would strand the band and the camera's
 rails-lean with no visible way back.
 
+### Boot entrance, routes & the doc overlay (2026-09-04)
+
+**Adding a view is registry-driven — consistency is the default, not a checklist.**
+- A **3D view**: `Mode` union → a `viewPolicy` row (convention 7: inert until it opts in) → a
+  `focusLadder` row → a `SceneView` (rule 6's contract) → a `VIEWS` entry in
+  `components/views.ts` (name + slug + desc). The bar button, the route (`app/[view]` +
+  sitemap read `ROUTED_VIEWS`), the footer link, the gather/entry choreography, boot staging
+  and the URL bridge all follow from those homes.
+- **The placeholder is ONE view** ("soon", consolidated 2026-09-04 — three modes said the same
+  nothing three times): one dimmed "Coming soon" bar entry, one FLAT policy row, and the
+  Blueprint GALLERY inside it previews every coming feature (each keeping the mark it wore as a
+  bar button). A future placeholder is a gallery entry, not a Mode.
+- **The doc pages' bar home is the InfoMenu** (`topbar/InfoMenu.tsx`) — a circled-i popover in
+  the right control zone, one rank below the view switch on purpose ("views, but not at the same
+  level of importance"); rows are the footer DocToggles' own store toggles, `DOC_ICONS` in
+  icons.tsx their marks. Phone reaches the docs via the footer row instead.
+- A **doc page**: one `DOC_PAGES` entry (everything derives: type, paths, titles, docForPath),
+  its component in `components/docs/` + one line in DocLayer's `DOC_COMPONENTS` map, a thin
+  route file passing `doc`, a footer `DocToggle`. The engine's bare stage, both transition
+  signals and the roll grammar follow automatically; the store's `docPage` union is the one
+  deliberate duplicate, and tsc flags it the moment the registries disagree.
+
+- **The HUD arrives staged** (`useBootStage` + `BootFade`, wired in `AppShell`): command bar when
+  the engine is up (or failed — chrome is controls), rails/dock/footer on first data, vitals band
+  on live; latched, paced `STEP_MS` apart, force-completed by an 8s timeout so chrome never hides
+  behind a dead feed. `BootFade` is a plain opacity wrapper (trap-2 safe, `inert` while hidden) —
+  never add a transform there, RailThread measures rects mid-fade.
+- **`AppShell` is the app** — `/`, `app/[view]` AND the doc routes all render it; `RouteSync` is
+  the URL↔state bridge (seed mode on mount, shallow pushState for `docPage ?? mode`, popstate
+  back), `components/views.ts` the one view/doc vocabulary home (TopBar's VIEWS lives there).
+- **/about and /design are the DOC OVERLAY, not pages** (user: footer navigation must not reboot
+  the engine, and the live scene is the backdrop): `store.docPage` + `DocLayer` (scrollable
+  veil over the scene, Escape closes; content in `components/docs/`, dynamic-imported so the
+  chunks split; the routes pass `doc` so /about's prose still server-renders for crawlers) +
+  `DocGate` (rails/dock/band/callout/sweep UNMOUNT while open — BottomStream's cleanup zeroes
+  the reserve, which also folds the footer tuck). TopBar hides its scene-action controls
+  (filter, presentation) while a doc is open; `setMode` closes any open doc by design. The
+  /design specimen's generic hue is allowlisted in `noHardcodedColors.test.ts`.
+  **The doc's edge rulers are `RailThread standalone`** — the SAME component, deriving its x
+  from `--rail-margin` instead of measuring the (unmounted) rail columns, rendering ruler +
+  identity spine with no card marks; DocLayer keys its `signal` prop on the RISEN document so
+  the travelling switch-pulse plays on each arrival. Two wrong cuts preceded it the same day
+  (column-flanking spans; an `.ig-sheet-edge` reuse whose comb pointed the wrong way) — the
+  rails belong at the VIEW edges, drawn by the one existing instrument, never re-built.
+- **The footer is a full-width strip, one row, one separator species (the mid-dot)**: view links
+  (`FooterViewLinks`, store-committed) · About · Design (store toggles via `DocToggle`) ·
+  Source code (octocat) · Constellation (the $DAG mark + siteUrl via `metagraphById("dag")`).
+  In-app it tucks `min(10px, --bottom-reserve)` under the vitals band (the corner-notch fix) and
+  the band sits flush on it. The brand waveform's one `d` is `components/brand.tsx`.
+- **The vitals band does NOT inset by the tablet sheets** (user reversal, same day it shipped):
+  the sheets overlay both bars alike; `sceneCover` stays published for the callout — and the
+  band **CLIPS its paint by those covers** (user, 2026-09-04: "flickering when the explore and
+  bottom bar overlap" — the sheet's glass is translucent, so a band still painting under it
+  bled through as shimmer on every tick and a double-exposure under the yield dim; the
+  clip-path rides the covers with CSS max() so desktop/phone's 0 cover is identity).
+  ⚠️ Its transition is ONE `[transition:…]` arbitrary property on purpose: two `transition-*`
+  utilities in one `cn()` are a twMerge group, so the later silently DROPS the earlier (the old
+  `transition-[left,right]` died this way under `transition-opacity`, found by reading the
+  computed style), and the comma'd `transition-[a,b]` arbitrary-VALUE form is the DocLayer
+  compile trap besides. `motion-reduce:!transition-none` needs its `!` against an
+  equal-specificity single class (trap 4's family).
+- **The tempo family is tokenized** — `--tempo-beat` / `--tempo-signal` / `--tempo-roll` (0.65s,
+  with `--ease-roll` its one ENTRANCE curve — exits keep ease-out) in globals.css `:root`, plus the
+  text-arrival pair `--tempo-doc-sheet`/`--tempo-doc-rise` and the card lag `--tempo-roll-lag`;
+  the 150ms disclosure clock deliberately is not (its header says why). Titles (`.roll-in`) ride
+  the text clock; the odometer keeps `--tempo-roll` — digits are an instrument, not arriving text.
+- **THE NO-POP RULE** (user, 2026-09-04, several rounds): a view-scoped HUD surface never pops on
+  navigation, and **the swap unit is what CHANGES, not the zone**. Fully view-scoped content (the
+  vitals cells, both presentations) takes `components/RollSwap.tsx` — out-beat then keyed arrival
+  in tw-animate's own vocabulary; render from the KEY, never live state; the vitals' `[&>*]` cell
+  rules ride the wrapper or it becomes their subject. A surface with a PERSISTENT resident reads
+  the rule per card: the explore rail keeps its ONE About instance (title rolls, body keyed on the
+  view's title, animating only when the title actually changed — never on a manual expand) and
+  keys only the view-scoped tool card, transform-free (a materialize's scale visibly pulls a tall
+  card's top edge). HEIGHTS ease everywhere via `components/HeightEase.tsx` (every Inspector rung +
+  both explore cards): measured content, WAAPI on the roll tokens, the whole chain down to the
+  panel stretched so the CARD BORDER rides the ease (one `auto` link parks a percentage height), a
+  one-frame re-measure standing down for foreign animators (the pager's pinned slides,
+  disclosures), `growIn` easing lane-joining slots from 0 once the host lane booted. In-card
+  arrivals take `CONTENT_EASE`, live bar widths `BAR_EASE` (both exported beside RollSwap; persist
+  vs remount decides which). Reduced motion snaps all of it.
+- **The canvas's display box is CSS-owned** (`setSize(..., false)` + a 2px viewport overdraw in
+  `.scene-canvas`) — integer inline sizing left fractional-DPR background slivers at the edges.
+
 ### Responsive shell
 
 Only the rails restructure; everything else holds the four-zone shape. Desktop (≥1100px) has both rails
 inline with their `RailThread` siblings; tablet (700–1099px) collapses them to edge tabs opening
-**non-modal** sheets (both can be open, orbit still works behind them — and the vitals band INSETS
-by their measured `sceneCover`, or the covered cards show through the seam as fragments); phone
+**non-modal** sheets (both can be open, orbit still works behind them — the sheets OVERLAY the
+vitals band, which CLIPS its paint by their published `sceneCover`, see the band bullet); phone
 (<700px) has a persistent bottom bar — Explore | Vitals | Details thirds where the view has a
 vitals lane, halves elsewhere (`barGeom`; the icon trays compact to one unseen-update dot at
 thirds) — and ONE sheet at a time, with grabber drag-resize and flick-dismiss. The sheet GROWS out
@@ -1005,6 +1094,12 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
 - **It is a label, not a control**: `pointer-events-none`, no ×, dismissal is the selection's own.
   Content mirrors the cards' grammar rung for rung (eyebrow ink, bare ordinals, aside rules,
   RoleChips, the ticking age on the global tick).
+- **The entrance is a sequence: panel rolls in, THEN the leader draws panel→anchor, THEN the ring
+  lands** (user, 2026-09-05 — the tie was fully drawn while the panel was still arriving). An
+  SVG-mask ink line (`.co-draw`) eases its normalized dash offset so the dashes reveal without
+  crawling; the wrapper is keyed by subject so the choreography replays as one unit, and it's
+  PAUSED until the Engine's `data-on` — after a commit flight it plays at reveal, not invisibly
+  mid-flight. Clock is the panel's own (lag + rise, then --tempo-roll); reduced motion snaps it.
 - **The phone declines it** (user, 2026-08-18). Co-location is the whole promise — the panel stands
   beside its subject and points at it — and a phone has no width to stand beside anything: the panel
   is a third of the viewport, so it lands ON the subject or over the dock, and the flip rule has no

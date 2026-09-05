@@ -1,9 +1,9 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { ArrowLeftRight, HandCoins, Radar, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
-import type { Mode } from "@/src/store/store";
 
 // Structural blueprint chrome expressed as Tailwind-on-tokens. Stroke/fill come through
 // class-based `[stroke:…]` utilities (CSS declarations, so `var()`/`color-mix()` resolve —
@@ -16,13 +16,16 @@ const BP_ARROWHEAD = "fill-none [stroke:color-mix(in_oklch,var(--primary)_55%,tr
 const BP_VALIDATOR = "fill-none [stroke:color-mix(in_oklch,var(--primary)_45%,var(--border))] [stroke-width:1.5]";
 const BP_STAKER = "[fill:color-mix(in_oklch,var(--primary)_45%,transparent)] stroke-none";
 const BP_DELEGATE = "[stroke:var(--border)] [stroke-width:1]";
-const BP_SVG = "w-[min(46vw,420px)] h-auto overflow-visible";
+const BP_SVG = "w-[min(26vw,280px)] h-auto overflow-visible";
 
-// The center schematic BLUEPRINT for the not-yet-built ("SOON") views. A faint, abstract wireframe
-// of what each view will become — explicitly labelled `preview · in development` so it never reads
-// as live data (no numbers, no real values). Structural chrome only (blueprint = chrome, not
-// identity); accent/flow lines in cyan. Renders on the empty scene (SceneCanvas fades out for flat
-// views). Not shown for the three 3D views.
+// The schematic BLUEPRINT GALLERY for the one consolidated "Coming soon" view (2026-09-04 —
+// three separate placeholder modes said the same nothing three times; the ONE view now previews
+// every coming feature side by side). Faint, abstract wireframes — explicitly labelled
+// `preview · in development` so nothing reads as live data (no numbers, no real values).
+// Structural chrome only (blueprint = chrome, not identity); accent/flow lines in cyan. Renders
+// on the empty scene (the canvas hides for the flat view). Not shown for the three 3D views.
+// Each feature keeps the mark it wore as a bar button (Radar / ArrowLeftRight / HandCoins), so
+// the vocabulary survives the consolidation.
 
 // Network → a health GRID of node cells (a couple dashed = waiting, one hollow = offline —
 // schematic states, not counts).
@@ -95,29 +98,62 @@ function StakingSchematic() {
   );
 }
 
-const SCHEMATIC: Partial<Record<Mode, ReactNode>> = {
-  status: <NetworkSchematic />,
-  transactions: <TransactionsSchematic />,
-  staking: <StakingSchematic />,
-};
-
-const CAPTION: Partial<Record<Mode, string>> = {
-  status: "Network health: node uptime, node states and version spread across the network.",
-  transactions: "Transactions: $DAG and metagraph currencies moving between addresses, plus lookup and economics.",
-  staking: "Delegated staking: who is staked to which nodes, total delegated, and rewards flowing back.",
-};
+const SOON_FEATURES: { name: string; icon: LucideIcon; art: ReactNode; caption: string }[] = [
+  {
+    name: "Network",
+    icon: Radar,
+    art: <NetworkSchematic />,
+    caption: "Network health: node uptime, node states and version spread across the network.",
+  },
+  {
+    name: "Transactions",
+    icon: ArrowLeftRight,
+    art: <TransactionsSchematic />,
+    caption: "$DAG and metagraph currencies moving between addresses, plus lookup and economics.",
+  },
+  {
+    name: "Staking",
+    icon: HandCoins,
+    art: <StakingSchematic />,
+    caption: "Who is staked to which nodes, total delegated, and rewards flowing back.",
+  },
+];
 
 export default function Blueprint() {
-  const mode = useStore((s) => s.mode) as Mode;
-  const art = SCHEMATIC[mode];
-  if (!art) return null; // 3D views + any placeholder without art yet
+  const mode = useStore((s) => s.mode);
+  if (mode !== "soon") return null;
   return (
-    <figure id="blueprint" className="fixed inset-0 z-[6] flex flex-col items-center justify-center gap-[22px] pointer-events-none px-6">
-      <div className="opacity-50">{art}</div>
-      <figcaption className="flex flex-col items-center gap-2 text-center max-w-[360px]">
-        <span className="text-label tracking-caps uppercase [color:color-mix(in_oklch,var(--primary)_80%,#fff)] opacity-[0.85]">preview · in development</span>
-        <span className="text-body text-muted-foreground">{CAPTION[mode]}</span>
-      </figcaption>
+    // top-[38vh], not inset-0 (user, 2026-09-04: the eyebrow "fights with the nodes at the
+    // top"): the parked fleet grids hold the viewport's top band on every flat view, so the
+    // gallery centres in the space BELOW them rather than the full height (38vh, raised from
+    // 24 — the band's projected bottom sits near ~38% at common aspects, and the first cut's
+    // headings overlapped the grids AND the new ticker legend). The bottom edge
+    // clears the footer strip plus a breather (user, same day: "the staking text almost
+    // touches the bottom bar").
+    // overflow-y-auto + a TOP-ANCHORED wrapper (mb-auto): when the columns wrap on a narrow
+    // viewport the content grows past the box, and flex-centering made the overflowing top
+    // unreachable — and even when it fit, centring left "a huge gap from the top" (user,
+    // 2026-09-04): 38vh IS the band's bottom, so the eyebrow belongs snug under it, not
+    // floated mid-void. Scrolls honestly when it doesn't fit; pointer-events on for the
+    // scroll (the flat view has nothing pickable behind).
+    <figure id="blueprint" className="fixed inset-x-0 top-[38vh] bottom-[calc(var(--footer-h,0px)+16px)] z-[6] flex flex-col items-center overflow-y-auto overscroll-contain px-6">
+      <div className="mb-auto flex flex-col items-center gap-8 py-2">
+      <span className="text-label tracking-caps uppercase [color:color-mix(in_oklch,var(--primary)_80%,#fff)] opacity-[0.85]">
+        preview · in development
+      </span>
+      <div className="flex flex-wrap items-start justify-center gap-x-10 gap-y-8 max-w-[1160px]">
+        {SOON_FEATURES.map((f) => (
+          <figcaption key={f.name} className="flex flex-col items-center gap-3 text-center max-w-[270px]">
+            <span className="flex items-center gap-2 text-title font-semibold text-foreground">
+              <f.icon aria-hidden className="size-4 text-primary flex-none" />
+              {f.name}
+            </span>
+            <div className="opacity-50">{f.art}</div>
+            <span className="text-label text-muted-foreground leading-relaxed">{f.caption}</span>
+          </figcaption>
+        ))}
+      </div>
+      </div>
     </figure>
   );
 }

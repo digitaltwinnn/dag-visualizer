@@ -1,6 +1,7 @@
 "use client";
 
-import { useStore } from "@/src/store/store";
+import { useStore, type Mode } from "@/src/store/store";
+import RollSwap, { BAR_EASE } from "@/components/RollSwap";
 import { metagraphById, filterAccent, getAnchor } from "@/src/data/network";
 import { displayNetwork } from "@/src/data/unlisted";
 import { metaType, rolesOf, IdentityDot, RoleChips } from "@/components/inspector/parts";
@@ -284,7 +285,9 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
                 the same neutral the tick chart's unattributed segment wears (user, 2026-09-03 —
                 a bucket meaning "nothing to read a type/place from" in the accent reads as one
                 more member of the vocabulary). */}
-            <span className="h-[5px] rounded-full" style={{ background: r.hue ?? accent, opacity: 0.75, width: r.count > 0 ? `${Math.max(2, (r.count / max) * 100)}%` : 0 }} />
+            {/* BAR_EASE: the rows persist across polls (stable keys), so a share that moves
+                between readings eases instead of snapping — the odometer's principle. */}
+            <span className={cn("h-[5px] rounded-full", BAR_EASE)} style={{ background: r.hue ?? accent, opacity: 0.75, width: r.count > 0 ? `${Math.max(2, (r.count / max) * 100)}%` : 0 }} />
           </span>
           {/* Under a COMMITTED scope a 0 is "this network has none of these", not a measurement of
               zero — the dash says so where a numeral would read as a count (kept from the dot-legend
@@ -898,27 +901,35 @@ function ViewCells({ mode, accent, filter }: { mode: string; accent: string; fil
  *  this component reads the mode only to pick which view's cells to lay out. */
 export default function VitalsBand() {
   const { mode, live, filter, accent } = useVitalsScope();
-  // ⚠️ THE BAND INSETS BY THE OPEN SHEETS' MEASURED COVER (2026-09-04, the tablet pass): on
-  // tablet the edge sheets overlay a full-width band, and the covered cards showed through the
-  // seam as orphaned fragments — a value column with its labels under the glass. `sceneCover` is
-  // the same measured channel the callout's placement reads (RailDock publishes it per side), so
-  // the band and the callout can never disagree about how much width the sheets hold. Zero on
-  // desktop and phone by construction.
-  const coverL = useStore((s) => s.sceneCoverL);
-  const coverR = useStore((s) => s.sceneCoverR);
+  // The band does NOT inset by the tablet sheets any more (user, 2026-09-04 — "the bottom bar
+  // should behave the same as the top bar; the collapsible card panels go over the bar instead
+  // of pushing it smaller"). The 2026-09-04 tablet pass had it reflowing by the sheets' measured
+  // sceneCover; reversed the same day: the sheets OVERLAY both bars now, and a partially covered
+  // read-only card is the same accepted cost the command bar already pays. `sceneCover` itself
+  // stays published — the callout's placement still reads it.
   // The band steps back with the rails while the user's hand is on the camera (user, 2026-08-30)
   // — the same one read the RailShade dims on, at the recipe's own tempos (away 0.3s, the return
   // faster: it answers a gesture already finished).
   const yielding = useSceneYield();
+  // THE BAND NEVER PAINTS UNDER AN OPEN SHEET (user, 2026-09-04 — "sometimes I see flickering
+  // when the explore and bottom bar overlap"). The overlay decision above stands: the sheets
+  // cover the band. But the sheet's glass is translucent, so a band that kept PAINTING under
+  // it bled through — a steady shimmer as its numbers tick beneath the frost, and a full
+  // double-exposure whenever the yield dim drops the sheet to 0.4 (screenshot-caught: the
+  // band's METAGRAPHS rows interleaved with the explore card's). The paint is clipped by the
+  // sheets' own published covers instead — the same `sceneCover` channel the callout reads —
+  // with the --bar-margin arithmetic left to CSS max(), and the clip rides the band's own
+  // 300ms edge transition so it tracks the sheet's slide. Desktop and phone publish 0 cover,
+  // so the inset collapses to identity there.
+  const coverL = useStore((s) => s.sceneCoverL);
+  const coverR = useStore((s) => s.sceneCoverR);
   return (
     <section
       id="vitalsband"
       aria-label="View vitals"
-      // The cover inset composes ONTO --bar-margin (left/right override the inset-x arms when a
-      // sheet holds width; the transition above eases the reflow on the sheet's own tempo).
       style={{
-        left: coverL > 0 ? `calc(var(--bar-margin) + ${coverL}px)` : undefined,
-        right: coverR > 0 ? `calc(var(--bar-margin) + ${coverR}px)` : undefined,
+        ["--cover-l" as string]: `${coverL}px`,
+        ["--cover-r" as string]: `${coverR}px`,
       }}
       className={cn(
         // pointer-events-none: the band is a read-only instrument — orbit drags pass through it.
@@ -932,7 +943,12 @@ export default function VitalsBand() {
         // below then makes every card in every view exactly this tall, so switching views moves
         // nothing at this edge. The PHONE strip does not take it — that presentation is a scrolling
         // row inside the command bar, sized by its own rules.
-        "fixed z-10 inset-x-[var(--bar-margin)] bottom-[calc(var(--footer-h,0px)+4px)] h-[var(--vitals-h)] pointer-events-none",
+        // FLUSH onto the footer strip (user, 2026-09-04 — "the space between the two is just
+        // noise"): the band's bottom edge sits directly on the footer's top edge, so the two
+        // read as one instrument in two rows — the lit plate above, the flat veil underline
+        // below, distinguished by the transparency difference the two glass tokens already
+        // carry. The old +4px air gap is gone.
+        "fixed z-10 inset-x-[var(--bar-margin)] bottom-[var(--footer-h,0px)] h-[var(--vitals-h)] pointer-events-none",
         // ⚠️ THE PLATE IS THE LANE'S, NOT EACH CARD'S (user, 2026-09-01: the band "feels ununiform
         // between screens because the amount of screen space they claim depends on the number of
         // vitals and the size"). Measured at 1600px: hyper and geo hold 1096px of a 1548px lane
@@ -946,31 +962,42 @@ export default function VitalsBand() {
         // as a bar and a scattering of chips (user, 2026-09-01: "the bottom bar should be the same
         // exactly as the top bar").
         "rounded-lg border border-border/60 [background:var(--topbar-glass)] backdrop-blur-sm",
-        "transition-[left,right] duration-300 motion-reduce:transition-none",
-        // ⚠️ THE CARDS ARE FLATTENED FROM HERE, not by a prop threaded through every cell. The same
-        // `ViewCells` renders the PHONE strip, where the cards scroll and must keep their own
-        // plates — a section of a bar that scrolls away from the bar is not a section. An arbitrary
-        // variant scopes the flattening to this presentation and leaves that one untouched; it wins
-        // on specificity within the same layer, which is the in-layer escape CSS trap 1 describes.
-        // `[background:none]` (not `bg-transparent`): the card paints an arbitrary PROPERTY, so the
-        // override has to be one too or the gradient survives underneath.
-        "[&>*]:rounded-none [&>*]:border-0 [&>*]:backdrop-blur-none [&>*]:[background:none]",
-        // The section division: the app's one resting hairline, INSET by the plate's own padding
-        // like every other resting division (the card-head rule) — a full-height rule between two
-        // sections would read as a seam between two objects, which is what this change undoes.
-        "[&>*+*]:border-l [&>*+*]:border-border/60 [&>*+*]:rounded-none",
-        // CENTRED INSIDE THE PLATE. The tiers still cap, so a 3-card view leaves slack — it now
-        // collects symmetrically inside the instrument instead of around it. (The 2026-08-30 note
-        // against a centred clump was written when the cards were small and floated in a very wide
-        // bar; sections of a plate are a different object.) Below the ceilings this is a no-op.
-        "flex items-stretch justify-center gap-0 px-1.5 py-1",
-        "transition-opacity duration-[180ms] ease-out motion-reduce:transition-none",
+        "[clip-path:inset(0_max(0px,calc(var(--cover-r)-var(--bar-margin)))_0_max(0px,calc(var(--cover-l)-var(--bar-margin))))]",
+        // ⚠️ The cell-targeting rules (card flattening, section dividers) moved ONTO the
+        // RollSwap wrapper below (2026-09-04, the no-pop swap): they are `[&>*]` selectors, and
+        // the wrapper between this section and the cells would otherwise be their new subject.
+        // Their rationale lives at the wrapper. Layout stays here; the wrapper centres WITHIN it.
+        "flex items-stretch px-1.5 py-1",
+        // ⚠️ ONE transition statement, as an arbitrary PROPERTY. Utility pairs here silently
+        // eat each other: twMerge groups every `transition-*` class, so the old
+        // `transition-[left,right]` line was DROPPED by the later `transition-opacity` (found
+        // 2026-09-04 while wiring the clip — computed transition-property read "opacity"
+        // alone), and the comma'd arbitrary-value form is the DocLayer trap that never
+        // compiles. The shorthand carries each property's own tempo: the yield dim's 180ms
+        // return, and 300ms for the edges + clip so they track the sheet's slide; the
+        // yielding arm's duration-300 overrides all of them to the away tempo while the hand
+        // is on the camera. motion-reduce carries `!` — a variant loses to an equal-weight
+        // single class on stylesheet order alone (CSS trap 4).
+        "[transition:opacity_180ms_ease-out,left_300ms_ease-out,right_300ms_ease-out,clip-path_300ms_ease-out]",
+        "motion-reduce:!transition-none",
         yielding && "opacity-40 duration-300",
         !live && "saturate-[.45]",
       )}
     >
       {!live && <span className="self-center"><NoSignalDot /></span>}
-      <ViewCells mode={mode} accent={accent} filter={filter} />
+      {/* The no-pop swap (RollSwap): the PLATE persists, the cells roll — and the wrapper takes
+          over the row's cell-targeting rules (flatten, dividers, stretch), which is why the
+          section above no longer carries them: an element between a `[&>*]` and its subjects
+          silently retargets it at the wrapper. */}
+      <RollSwap
+        swapKey={mode as Mode}
+        render={(m) => <ViewCells mode={m} accent={accent} filter={filter} />}
+        className={cn(
+          "flex-1 min-w-0 flex items-stretch justify-center gap-0",
+          "[&>*]:rounded-none [&>*]:border-0 [&>*]:backdrop-blur-none [&>*]:[background:none]",
+          "[&>*+*]:border-l [&>*+*]:border-border/60 [&>*+*]:rounded-none",
+        )}
+      />
       {/* NO filter-scope hairline (user, 2026-08-30 — removed): unlike the old bar cluster's
           bare numbers, the band's own charts already wear the identity accent under a filter,
           so the scope is stated by the vitals themselves. */}
@@ -992,15 +1019,23 @@ export function VitalsSheetBody() {
   return (
     <div
       className={cn(
-        "flex flex-col items-stretch gap-2 min-w-0",
-        "[&>*]:w-full [&>*]:max-w-none [&>*]:flex-none [&>*]:basis-auto",
+        "flex flex-col items-stretch min-w-0",
         // The bar tracks fill the column's middle — see MicroBars' `--bar-track-max` note.
         "[--bar-track-max:none]",
         !live && "saturate-[.45]",
       )}
     >
-      {!live && <span className="self-center flex-none"><NoSignalDot /></span>}
-      <ViewCells mode={mode} accent={accent} filter={filter} />
+      {!live && <span className="self-center flex-none mb-2"><NoSignalDot /></span>}
+      {/* The no-pop swap — the cell-targeting `[&>*]` rules ride the wrapper for the same
+          retargeting reason the band's do (see the desktop section above). */}
+      <RollSwap
+        swapKey={mode as Mode}
+        render={(m) => <ViewCells mode={m} accent={accent} filter={filter} />}
+        className={cn(
+          "flex flex-col items-stretch gap-2 min-w-0",
+          "[&>*]:w-full [&>*]:max-w-none [&>*]:flex-none [&>*]:basis-auto",
+        )}
+      />
     </div>
   );
 }

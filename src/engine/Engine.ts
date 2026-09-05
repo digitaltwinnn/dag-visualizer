@@ -163,6 +163,9 @@ export class Engine {
   private _gatherU2 = new THREE.Vector3(); // scratch: staging-plane up (world)
   private _gatherBand: GatherBand = { topFrac: 0, halfWidthFrac: 0, heightFrac: 0 }; // scratch: the measured band
   private _pendingBoundary: Mode | null = null; // destination whose layout applies at the boundary
+  // The DOC overlay's deferred bare-stage hide: armed by the doc fold, applied by the frame loop
+  // the first frame the transition is past its OUT phase (see the tick site).
+  private _docHideArmed = false;
   // Set when a 3D→3D retarget reverses straight back to its origin mid-OUT (no boundary will
   // fire, so the held camera never replays a mid-flight commit) — re-resolve focus once the
   // transition settles. See _integrateInputs' completion-edge check below.
@@ -492,6 +495,7 @@ export class Engine {
       get mode() { return engineSelf.mode; },
       get filter() { return engineSelf.filter; },
       transitionActive: () => this.transition.active(),
+      flyingNow: () => useStore.getState().cameraFlying,
       calloutAllowed: () => this._policy.callout,
       dofMeta: () => this._dofMeta,
     });
@@ -622,9 +626,18 @@ export class Engine {
     const s = useStore.getState();
     // Seed the rails-lean mirror (an HMR/StrictMode remount can boot with the flag already on).
     this.railsHidden = s.railsHidden;
-    this.mode = s.mode;
+    // THE DOC OVERLAY IS A FLAT VIEW TO THE ENGINE (user, 2026-09-04 — "treat it as a 'soon'
+    // page": the exact scene BACKDROP with the geometry gathered away, not the live scene
+    // fighting the prose). While `docPage` is set the engine's effective view is a placeholder
+    // — same policy row, same choreography, same parked fleet — while `store.mode` keeps naming
+    // the view the reader returns to. Placeholder entries preserve every selection by design
+    // (the flat-views rule in components/CLAUDE.md), so an about/close round trip clears
+    // nothing. "soon" is the app's one flat placeholder row.
+    this.mode = s.docPage || s.docClosing ? "soon" : s.mode;
     this.filter = s.filter;
     this.cohortSel = s.cohort;
+    // A cold doc boot arms the bare-stage hide; the frame loop applies it (no OUT phase runs).
+    this._docHideArmed = s.docPage != null;
     // Booting straight into geo (deep link / persisted view): seed morph=1 so the boot layout
     // is the globe from the first frame.
     if (this.mode === "geo") this.morph = 1;
@@ -638,7 +651,38 @@ export class Engine {
     else this.transition.stageInstant();
     this.unsub.push(
       useStore.subscribe((st, prev) => {
-        if (st.mode !== prev.mode) this.setMode(st.mode);
+        // The engine's EFFECTIVE view folds the doc overlay in (see the constructor seed): a doc
+        // opening runs the same transition a switch to a "soon" view runs — the gather plays in
+        // full, the fleet flies to the parked grids, the canvas keeps rendering the bare
+        // backdrop — and the doc's own roll-out is its OUT phase on the way back: `docClosing`
+        // holds the flat stage until DocLayer's exit animation completes, and only then does the
+        // destination view's entry begin, with the fleet revealed AT THE GRIDS for the flight
+        // (user, 2026-09-04: "location stays, it will be visible again for the next view to
+        // use").
+        const eff = st.docPage || st.docClosing ? ("soon" as Mode) : st.mode;
+        const prevEff = prev.docPage || prev.docClosing ? ("soon" as Mode) : prev.mode;
+        if (eff !== prevEff) this.setMode(eff);
+        // The bare stage ARMS rather than hides (user, 2026-09-04: "shouldn't their nodes still
+        // move to the gathering section at the top like they always do?"): the gather is the OUT
+        // phase's job whatever the destination, and hiding the fleet is the DOC "view"'s own
+        // entry behaviour — so it lands at the OUT→IN boundary in the frame loop, never at the
+        // click.
+        if ((st.docPage != null) !== (prev.docPage != null)) {
+          if (st.docPage) {
+            this._docHideArmed = true;
+            // Only a doc opening OVER A LIVE 3D VIEW makes the document wait — the gather is
+            // then playing and the entrance holds until its boundary. Flat origins (a soon
+            // view, a cold boot, a reopen mid-close) leave the default-true signal alone.
+            if (is3D(prevEff)) st.setDocStageReady(false);
+          } else {
+            this._docHideArmed = false;
+            // The reveal starts AT THE CLOSE GESTURE, not at the stage change (user, 2026-09-04):
+            // the fleet's DOC_ROLL fade-in runs concurrently with the doc's own roll-out — both
+            // on the one clock — so the grids stand fully lit the moment the document is gone,
+            // ready for the entry flight that begins then.
+            this.globe.setFleetVisible(true);
+          }
+        }
         // The engine learns of a theme flip the one allowed way (spec §3). The CSS has already
         // flipped on this same click — `data-theme` / `color-scheme` are stamped by
         // ThemeController before it writes the store — so the tokens re-read below resolve to the
@@ -1785,6 +1829,20 @@ export class Engine {
       this._pendingBoundary = null;
       this._applyBoundary(dest);
     }
+    // The DOC overlay's bare-stage hide fires here, FRAME-ALIGNED with the choreography (armed
+    // by the doc fold): while the OUT phase runs the fleet must stay visible — the nodes flying
+    // to the parked grids IS the exit animation, whatever the destination — and the first frame
+    // past it (the boundary; or no transition at all: a cold flat boot, a doc opened from an
+    // already-flat view) the gathered fleet blinks off as the document rises. Never a wall-clock
+    // timer: at low FPS the dt clamp stretches the choreography, and a timer would hide the
+    // fleet mid-flight.
+    if (this._docHideArmed && this.transition.phase !== "out") {
+      this._docHideArmed = false;
+      this.globe.setFleetVisible(false);
+      // The same boundary frame releases the document's entrance (store.docStageReady) — the
+      // fleet blinking off and the prose rising are one moment, on the choreography's own clock.
+      useStore.getState().setDocStageReady(true);
+    }
     // Reversal-gap completion edge: a 3D→3D retarget that flipped straight back to its origin
     // mid-OUT never fires a boundary, so a commit landing mid-flight only updated the store —
     // the camera was held (transition.holdCamera()) and never replayed. Re-derive it once the
@@ -2043,13 +2101,13 @@ export class Engine {
   // literal. `CalloutSync` copies nothing out of it and holds it only for the duration of `sync`,
   // so one buffer is safe; nothing may retain the reference across frames.
   private _calloutState: CalloutState = {
-    inspect: null, snap: null, metaSnap: null, boxedCard: null,
+    inspect: null, snap: null, metaSnap: null, following: false, boxedCard: null,
     country: null, cohort: null, sceneCoverL: 0, sceneCoverR: 0,
   };
   private _syncCallout(): void {
     const st = useStore.getState();
     const c = this._calloutState;
-    c.inspect = st.inspect; c.snap = st.snap; c.metaSnap = st.metaSnap;
+    c.inspect = st.inspect; c.snap = st.snap; c.metaSnap = st.metaSnap; c.following = st.following;
     c.boxedCard = st.boxedCard; c.country = st.country; c.cohort = st.cohort;
     c.sceneCoverL = st.sceneCoverL; c.sceneCoverR = st.sceneCoverR;
     this.callout.sync(c);

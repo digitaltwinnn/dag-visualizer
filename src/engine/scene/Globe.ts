@@ -177,6 +177,7 @@ export class Globe implements GeoViewHost {
   // View-derived sim gates, set by the Engine from VIEW_POLICIES (see setSimFlags). arcs replaces
   // the old `!this.ledger` gate on the travelling packets; globeSpin gates the idle group spin.
   private simArcs = true;
+  private _arcsWereEnabled = false; // the settle edge's memory (see the arc gate in update)
   private simSpin = true;
   countryFilter: string | null = null; // the drilled country (a LENS: border/framing only, no node filter)
   l0Count = 0;
@@ -271,6 +272,17 @@ export class Globe implements GeoViewHost {
       ["metanodes/sphere", this.fabric.metaSphere],
       ["metanodes/hex", this.fabric.metaHex],
     ];
+  }
+
+  /** The DOC OVERLAY's bare-stage switch (2026-09-04, user: hide "all 3d elements except the
+   *  background related elements"): the flat placeholder policy already hides every view group,
+   *  but the shared node pool renders wherever it is parked — which put the fleet grids behind
+   *  the document's headline. Sets the FABRIC's own per-frame flag: a one-shot `.visible` write
+   *  is overwritten by the cross-fade gating every frame, and the meshes are built lazily, so
+   *  the flag the frame loop folds in is the only write path that holds. The Engine's doc fold
+   *  drives this; picking is already off there (`pickSources: []`). */
+  setFleetVisible(v: boolean): void {
+    this.fabric.fleetTarget = v ? 1 : 0;
   }
   private arcs: Arcs;
   private arcSim = new ArcSim();
@@ -506,6 +518,86 @@ export class Globe implements GeoViewHost {
   // Reads BOTH record arrays as they currently stand, so it's safe to call from either setNodes or
   // setMetagraphs — whichever rebuilt, the other array's slots are recomputed too (harmless: the
   // layout is a pure function of the current counts).
+  // ── The gather LEGEND (user, 2026-09-04: "the top gathering section acts as a nice
+  // colour-coded legend — add the ticker at the top of each metagraph['s block]") ─────────
+  // One furniture TextLabel per staged network block, in the network's own scene hue, placed
+  // just above the block's top edge on the same camera-anchored basis the chips ride. Built
+  // event-time with the slots; positioned per frame beside the fabric's own gather writes;
+  // opacity rides the grids' presence envelope (gatherWeight of the lead × the fleet's
+  // bare-stage weight), so the legend forms with the grids and dissolves with them — the doc
+  // overlay's bare stage included.
+  private _gatherLabels: { mesh: THREE.Mesh; uMid: number; gs: number }[] = [];
+  private _gatherLabelGroup: THREE.Group | null = null;
+  private _gatherLabelQ = new THREE.Quaternion();
+  private _gatherLabelM = new THREE.Matrix4();
+  private _gatherLabelN = new THREE.Vector3();
+
+  private _rebuildGatherLabels(slots: Map<string, GatherSlot[]>): void {
+    if (!this._gatherLabelGroup) {
+      this._gatherLabelGroup = new THREE.Group();
+      this._gatherLabelGroup.visible = false;
+      this.group.add(this._gatherLabelGroup);
+    }
+    const grp = this._gatherLabelGroup;
+    for (const l of this._gatherLabels) {
+      grp.remove(l.mesh);
+      disposeTextLabel(l.mesh);
+    }
+    this._gatherLabels.length = 0;
+    // NEUTRAL label ink, not the identity hue (user, 2026-09-04: "colour-coded text is too
+    // strong — we already have the coloured chips right underneath"): the chips ARE the colour,
+    // the ticker just names them. labelInk is the one home for text-on-ground (the country
+    // labels' own answer).
+    const ink = `#${labelInk(this._colorsRef).toString(16).padStart(6, "0")}`;
+    for (const g of this._gatherGroups) {
+      const ss = slots.get(g.id);
+      if (!ss || ss.length === 0) continue;
+      // The ticker from the config catalog (the hubs' own source); the DAG is the one
+      // core-shaped constant. A network the catalog can't name gets no label — rule 10's
+      // honest absence, and unlisted machines never stage anyway.
+      const ticker = g.id === "dag" ? "DAG" : METAGRAPHS.find((c) => c.id === g.id)?.ticker;
+      if (!ticker) continue;
+      let uMin = Infinity;
+      let uMax = -Infinity;
+      for (const s of ss) {
+        if (s.u < uMin) uMin = s.u;
+        if (s.u > uMax) uMax = s.u;
+      }
+      const mesh = makeTextLabel(ink, ticker, GATHER_CELL * 1.4, 500);
+      grp.add(mesh);
+      this._gatherLabels.push({ mesh, uMid: (uMin + uMax) / 2, gs: ss[0]!.gs });
+    }
+  }
+
+  /** Per-frame legend placement — the same basis the chips' _applyGather reads, so label and
+   *  block can never drift; called from update() after the frame ctx is current. */
+  private _placeGatherLabels(): void {
+    const grp = this._gatherLabelGroup;
+    if (!grp) return;
+    const tr = this.transition;
+    const lw = (tr && tr.phase !== "idle" ? tr.gatherWeight(0, 1) : 0) * this.fabric.fleetW;
+    grp.visible = lw > 0.01 && this._gatherLabels.length > 0;
+    if (!grp.visible) return;
+    const g = this._ctx.gather;
+    this._gatherLabelN.crossVectors(g.right, g.up).normalize();
+    this._gatherLabelM.makeBasis(g.right, g.up, this._gatherLabelN);
+    this._gatherLabelQ.setFromRotationMatrix(this._gatherLabelM);
+    const fit = g.cell / GATHER_CELL; // the band's shrink factor — labels shrink with the pitch
+    for (const l of this._gatherLabels) {
+      // At the TOP, at ONE height (user, 2026-09-04, round 2: the per-group bottom placement
+      // sat "at various heights" since blocks differ in depth). The band's top edge is v=0 for
+      // every block, so +1.0 cells is uniform; the smaller 1.4-cell ink keeps it clear of the
+      // bar that the first, larger cut collided with.
+      l.mesh.position
+        .copy(g.origin)
+        .addScaledVector(g.right, l.uMid * g.cell + l.gs * g.spread)
+        .addScaledVector(g.up, 1.0 * g.cell);
+      l.mesh.quaternion.copy(this._gatherLabelQ);
+      l.mesh.scale.setScalar(fit);
+      (l.mesh.material as THREE.MeshBasicMaterial).opacity = lw;
+    }
+  }
+
   private _assignGatherSlots(): void {
     // Group by MACHINE, not shell instance: a hybrid validator/metagraph machine holds a record
     // PER LAYER it runs (e.g. an l0 record + a cl1 twin), but only one — the geoPrimary — renders
@@ -572,6 +664,7 @@ export class Globe implements GeoViewHost {
       let i = 0;
       for (const arr of byMachine.values()) { const s = ss[i++]; if (s) apply(arr, s); }
     }
+    this._rebuildGatherLabels(slots);
   }
 
   // -------------------------------------------------- metagraph nodes
@@ -609,6 +702,9 @@ export class Globe implements GeoViewHost {
   setSceneColors(map: Record<string, number>): void {
     this.sceneColors = map;
     this._retintNetworks();
+    // The gather legend's canvas ink can't be re-pointed — re-run the slot pass, whose tail
+    // rebuilds the labels in the fresh hues (event-time, and a no-op before any nodes exist).
+    this._assignGatherSlots();
   }
 
   private _retintNetworks(): void {
@@ -1666,6 +1762,9 @@ export class Globe implements GeoViewHost {
   }
 
   update(dt: number): void {
+    // The doc overlay's fleet fade eases here — once per frame, before the pools write.
+    this.fabric.tickFleetFade(dt);
+    this._placeGatherLabels();
     // Advance the arrival beat (see beginEntry) — parked at 1 in steady state.
     if (!this._glowEntryHold && this._glowEntryT < 1) this._glowEntryT = Math.min(1, this._glowEntryT + dt / 0.7);
     this.clock += dt;
@@ -1700,8 +1799,18 @@ export class Globe implements GeoViewHost {
     const flashDecay = Math.max(0, 1 - dt * 5); // ~0.2s glow tail after a hit
 
     // Travelling packets: step the sim (a hard no-op when the gate is off — the ledger "red dots"
-    // fix), then write its buffers only while the gate is on (geo view, past the morph midpoint).
-    const arcEnabled = this.simArcs && m > 0.5;
+    // fix), then write its buffers only while the gate is on (geo view, past the morph midpoint,
+    // AND the choreography settled — user, 2026-09-04: morph is boundary-snapped, so `m > 0.5`
+    // alone started the packets the moment the furniture began building, between nodes that were
+    // still in flight; a packet travels between PLACED nodes, so it waits for the very end of
+    // the view-in animation).
+    const arcEnabled = this.simArcs && m > 0.5 && !this.transition?.active();
+    // The settle EDGE relaunches the swarm from the nodes (ArcSim.relaunch — its note has the
+    // reasoning), and the meshes stay hidden while gated or stale buffers render as frozen
+    // trails over nodes still in flight.
+    if (arcEnabled && !this._arcsWereEnabled) this.arcSim.relaunch();
+    this._arcsWereEnabled = arcEnabled;
+    this.arcs.setVisible(arcEnabled && this.arcs.hasArcs);
     const { retargeted } = this.arcSim.step(dt, arcEnabled);
     if (arcEnabled && this.arcs.hasArcs) this.arcs.writeFrame(this.arcSim, retargeted);
 

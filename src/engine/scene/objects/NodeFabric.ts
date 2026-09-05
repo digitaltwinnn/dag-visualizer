@@ -13,6 +13,7 @@
 // `pickablesFor` returns a REUSED array (the plan's allocation fix).
 
 import * as THREE from "three";
+import { DOC_ROLL } from "../../domain/viewTransition";
 import { LEDGER } from "../../domain/ledgerLayout";
 import { HEX_H } from "../../domain/geoLayout";
 import { discFall, lerp, smooth } from "../../domain/nodeLayout";
@@ -165,6 +166,41 @@ function openBounds(mesh: THREE.InstancedMesh): void {
 
 export class NodeFabric {
   private nodeGroup: THREE.Group;
+
+  // THE BARE STAGE (2026-09-04): while a doc overlay is open the scene shows background only,
+  // and the parked fleet is the one geometry the flat policy's show{} gates don't reach. The
+  // fleet FADES between the two states rather than blinking (user: "nicely fade out instead of
+  // popping"), on the same DOC_ROLL clock the document's text rolls on — the two read as one
+  // moment. `fleetTarget` is the requested end state (Globe.setFleetVisible, driven by the
+  // Engine's doc fold at the choreography's boundaries); `tickFleetFade` eases the weight per
+  // frame and rides it on the four MATERIALS' opacity (multiplied over each one's captured base
+  // — the hex chips are translucent by construction), flipping `transparent` only while below
+  // 1 so the resting fleet keeps its opaque pipeline. The per-frame visibility writes below
+  // fold the weight in — a one-shot `.visible` write from outside is overwritten by the
+  // cross-fade gating every frame, and the meshes are built lazily, so per-frame state is the
+  // only write path that actually holds.
+  fleetTarget = 1;
+  private _fleetW = 1;
+  /** The eased bare-stage weight — the gather-legend labels ride it so they dissolve with the
+   *  fleet they name. */
+  get fleetW(): number {
+    return this._fleetW;
+  }
+
+  tickFleetFade(dt: number): void {
+    if (this._fleetW === this.fleetTarget) return;
+    const step = dt / DOC_ROLL;
+    const d = this.fleetTarget - this._fleetW;
+    const w = this._fleetW + Math.max(-step, Math.min(step, d));
+    this._fleetW = Math.abs(w - this.fleetTarget) < 1e-3 ? this.fleetTarget : w;
+    for (const m of [this.instSphere, this.instHex, this.metaSphere, this.metaHex]) {
+      if (!m) continue;
+      const mat = m.material as THREE.MeshStandardMaterial;
+      const base = (mat.userData.baseOpacity ??= mat.opacity);
+      mat.opacity = base * this._fleetW;
+      mat.transparent = base < 1 || this._fleetW < 1;
+    }
+  }
 
   // Validators (the DAG core) — two InstancedMeshes sharing one colour + glow buffer.
   instSphere: THREE.InstancedMesh | null = null;
@@ -566,8 +602,8 @@ export class NodeFabric {
     const trOn = !!(ctx.transition && ctx.transition.active());
     this.instSphere.instanceMatrix.needsUpdate = true;
     this.instHex.instanceMatrix.needsUpdate = true;
-    this.instSphere.visible = (w < 0.999 && !c.ledger) || trOn; // transitions crossfade per node
-    this.instHex.visible = w > 0.001 || c.ledger || trOn; //       (both meshes live mid-flight)
+    this.instSphere.visible = this._fleetW > 0.002 && ((w < 0.999 && !c.ledger) || trOn); // transitions crossfade per node
+    this.instHex.visible = this._fleetW > 0.002 && (w > 0.001 || c.ledger || trOn); //       (both meshes live mid-flight)
     return this.pickablesFor(w, c.ledger);
   }
 
@@ -792,8 +828,8 @@ export class NodeFabric {
     const trOnM = !!(ctx.transition && ctx.transition.active());
     this.metaSphere.instanceMatrix.needsUpdate = true;
     this.metaHex.instanceMatrix.needsUpdate = true;
-    this.metaSphere.visible = (w < 0.999 && !c.ledger) || trOnM;
-    this.metaHex.visible = w > 0.001 || c.ledger || trOnM;
+    this.metaSphere.visible = this._fleetW > 0.002 && ((w < 0.999 && !c.ledger) || trOnM);
+    this.metaHex.visible = this._fleetW > 0.002 && (w > 0.001 || c.ledger || trOnM);
     this.metaAESphere.needsUpdate = true;
     this.metaAEHex.needsUpdate = true;
     (this.metaSphere.geometry.getAttribute("aBase") as THREE.InstancedBufferAttribute).needsUpdate = true;
