@@ -326,6 +326,40 @@
 #callout[data-flip] .co-leader { transform: scaleX(-1); }
 #callout[data-drop] .co-leader { transform: scaleY(-1); }
 #callout[data-flip][data-drop] .co-leader { transform: scale(-1, -1); }
+
+/* THE ENTRANCE CHOREOGRAPHY (user, 2026-09-05 — "the dotted line is already drawn before the
+   animation"): panel rolls in → the leader DRAWS from the panel corner toward the anchor →
+   the anchor ring lands as the line arrives; hyper's multi-legs fade on the draw window.
+   Mechanism: `.co-draw` is the MASK's ink line (SceneCallout), spanning the leader's own
+   geometry from the PANEL end with `pathLength=1`, so easing its dash offset 1→0 reveals the
+   dashed leader progressively without the dash pattern crawling. The clock is the panel's own:
+   the roll-in ends at lag + rise, the draw takes --tempo-roll from there. The wrapper is keyed
+   by subject, so a subject change replays the whole sequence. Unlayered on purpose — the pause
+   gate must beat `.roll-in`'s layered animation shorthand (CSS trap 1). */
+#callout .co-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: co-draw var(--tempo-roll) var(--ease-roll) calc(var(--tempo-roll-lag) + var(--tempo-doc-rise)) forwards;
+}
+#callout .co-tip {
+  opacity: 0;
+  animation: co-fade 0.2s ease-out calc(var(--tempo-roll-lag) + var(--tempo-doc-rise) + var(--tempo-roll)) forwards;
+}
+#callout .co-multi {
+  opacity: 0;
+  animation: co-fade var(--tempo-roll) var(--ease-roll) calc(var(--tempo-roll-lag) + var(--tempo-doc-rise)) forwards;
+}
+/* Paused until the Engine actually SHOWS the callout (`data-on`): a commit answered by a camera
+   flight keeps the wrapper hidden for the whole arrival, and an entrance that played invisibly
+   would present a finished callout on reveal — the exact complaint the draw exists to fix. The
+   delay phases pause too, so the clock starts at first visibility. */
+#callout:not([data-on="1"]) :is(.roll-in, .co-draw, .co-tip, .co-multi) { animation-play-state: paused; }
+@keyframes co-draw { to { stroke-dashoffset: 0; } }
+@keyframes co-fade { to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  #callout .co-draw { animation: none; stroke-dashoffset: 0; }
+  #callout .co-tip, #callout .co-multi { animation: none; opacity: 1; }
+}
 #callout[data-flip] .edge-spine {
   border-left-color: transparent;
   border-right-color: var(--spine, var(--primary));

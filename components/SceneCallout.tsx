@@ -369,23 +369,48 @@ export default function SceneCallout() {
   return (
     <div
       id="callout"
+      // Keyed by SUBJECT (user, 2026-09-05 — the leader was already drawn while the panel was
+      // still rolling in): a subject change remounts the whole wrapper, so the entrance
+      // choreography below (panel roll → leader draw → ring landing) replays as one unit, and
+      // CalloutSync's documented assumptions hold by construction — fresh `data-on="0"`, and a
+      // fresh element for its multi-leg ref cache. The animations are PAUSED until the Engine
+      // flips `data-on` (globals.css), so after a camera flight the entrance plays when the
+      // callout actually appears instead of finishing invisibly mid-flight.
+      key={m.key}
       data-on="0"
       aria-hidden
       className="fixed left-0 top-0 z-[5] pointer-events-none opacity-0 data-[on=1]:opacity-100 transition-opacity duration-200 motion-reduce:transition-none"
     >
       {/* Anchor ring at the projected point (the wrapper's origin) — the subject mark at the
-          scene end of the tie. */}
+          scene end of the tie. `.co-tip` lands it when the drawing leader arrives. */}
       <span
-        className="absolute -translate-x-1/2 -translate-y-1/2 w-[9px] h-[9px] rounded-full border-[1.5px]"
+        className="co-tip absolute -translate-x-1/2 -translate-y-1/2 w-[9px] h-[9px] rounded-full border-[1.5px]"
         style={{ borderColor: m.ring }}
       />
       {/* Dashed leader from the anchor to the panel's near corner — the ordinal-label language,
           in the SAME ink: the chamber's in-scene anchor lines are structural cyan, and cyan is
           the design's one accent/affordance signal (user, 2026-08-15 — round 2; the neutral grey
           read as chrome, the border token before it was too weak). Moderate opacity, not full —
-          it is a tie, not a signal. Identity stays on the anchor RING. */}
+          it is a tie, not a signal. Identity stays on the anchor RING.
+          It DRAWS panel→anchor once the panel's roll-in lands (user, 2026-09-05): the mask's
+          `.co-draw` ink line runs the same span from the PANEL corner with `pathLength=1`, and
+          globals.css animates its dash offset — revealing the dashes progressively without the
+          dash pattern itself crawling. White stroke is mask luminance, not a palette hue. */}
       <svg className="co-leader absolute left-0 top-0 overflow-visible" width="1" height="1" aria-hidden>
+        <mask id="co-draw-mask" maskUnits="userSpaceOnUse" x={-20} y={-CALLOUT_OFF_Y - 40} width={CALLOUT_OFF_X + 60} height={CALLOUT_OFF_Y + 60}>
+          <line
+            className="co-draw"
+            x1={CALLOUT_OFF_X}
+            y1={-(CALLOUT_OFF_Y - CALLOUT_LEG_INSET)}
+            x2={6}
+            y2={-6}
+            pathLength={1}
+            stroke="white"
+            strokeWidth="3"
+          />
+        </mask>
         <line
+          mask="url(#co-draw-mask)"
           x1={6}
           y1={-6}
           x2={CALLOUT_OFF_X}
@@ -400,7 +425,10 @@ export default function SceneCallout() {
           — up to two extra dashed legs from the anchor to the non-primary shells, written per
           frame by CalloutSync's multi-leader (the Tooltip discipline: position never renders
           React). Same leader ink; each leg ends in a smaller identity ring. Hidden until the
-          Engine reveals a leg, and only the hyper node anchor ever does. */}
+          Engine reveals a leg, and only the hyper node anchor ever does. The svg fades in on
+          the primary leader's draw window (globals.css) — legs fan from the same panel corner,
+          so they arrive with the tie rather than pre-drawn (their per-frame geometry can't
+          ride the mask draw itself). */}
       <svg className="co-multi absolute left-0 top-0 overflow-visible" width="1" height="1" aria-hidden>
         {[0, 1].map((i) => (
           <g key={i} className="co-mleg" visibility="hidden">

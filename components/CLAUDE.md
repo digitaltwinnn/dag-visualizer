@@ -1094,6 +1094,12 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
 - **It is a label, not a control**: `pointer-events-none`, no ×, dismissal is the selection's own.
   Content mirrors the cards' grammar rung for rung (eyebrow ink, bare ordinals, aside rules,
   RoleChips, the ticking age on the global tick).
+- **The entrance is a sequence: panel rolls in, THEN the leader draws panel→anchor, THEN the ring
+  lands** (user, 2026-09-05 — the tie was fully drawn while the panel was still arriving). An
+  SVG-mask ink line (`.co-draw`) eases its normalized dash offset so the dashes reveal without
+  crawling; the wrapper is keyed by subject so the choreography replays as one unit, and it's
+  PAUSED until the Engine's `data-on` — after a commit flight it plays at reveal, not invisibly
+  mid-flight. Clock is the panel's own (lag + rise, then --tempo-roll); reduced motion snaps it.
 - **The phone declines it** (user, 2026-08-18). Co-location is the whole promise — the panel stands
   beside its subject and points at it — and a phone has no width to stand beside anything: the panel
   is a third of the viewport, so it lands ON the subject or over the dock, and the flip rule has no
