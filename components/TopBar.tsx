@@ -15,7 +15,7 @@ import ThemeToggle from "@/components/topbar/ThemeToggle";
 import InfoMenu from "@/components/topbar/InfoMenu";
 import NetworkSwitch, { NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
 import { useBreakpoint } from "@/components/useBreakpoint";
-import { VIEWS } from "@/components/views";
+import { DOC_PAGES, VIEWS } from "@/components/views";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import type { Mode } from "@/src/store/store";
 
@@ -449,9 +449,11 @@ export default function TopBar() {
           eyebrow language + keyed roll-in on view change (the HUD grammar). Decorative echo of
           the radiogroup's own accessible state, so aria-hidden; non-interactive (the wrapper's
           pointer-events-none passes scene clicks through the caption strip). */}
+      {/* While a DOC covers the scene the caption says the DOC (review find, 2026-09-05: it
+          kept naming the hidden view underneath — an honest label names what is on screen). */}
       <div className="hidden max-[1299px]:flex justify-end pr-2.5 mt-1.5" aria-hidden>
-        <span key={mode} className="roll-in text-micro tracking-caps uppercase text-muted-foreground leading-none">
-          {VIEWS.find((v) => v.id === mode)?.name}
+        <span key={doc ?? mode} className="roll-in text-micro tracking-caps uppercase text-muted-foreground leading-none">
+          {doc ? DOC_PAGES[doc].label : VIEWS.find((v) => v.id === mode)?.name}
         </span>
       </div>
       </div>

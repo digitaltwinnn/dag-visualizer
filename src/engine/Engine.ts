@@ -2101,13 +2101,13 @@ export class Engine {
   // literal. `CalloutSync` copies nothing out of it and holds it only for the duration of `sync`,
   // so one buffer is safe; nothing may retain the reference across frames.
   private _calloutState: CalloutState = {
-    inspect: null, snap: null, metaSnap: null, boxedCard: null,
+    inspect: null, snap: null, metaSnap: null, following: false, boxedCard: null,
     country: null, cohort: null, sceneCoverL: 0, sceneCoverR: 0,
   };
   private _syncCallout(): void {
     const st = useStore.getState();
     const c = this._calloutState;
-    c.inspect = st.inspect; c.snap = st.snap; c.metaSnap = st.metaSnap;
+    c.inspect = st.inspect; c.snap = st.snap; c.metaSnap = st.metaSnap; c.following = st.following;
     c.boxedCard = st.boxedCard; c.country = st.country; c.cohort = st.cohort;
     c.sceneCoverL = st.sceneCoverL; c.sceneCoverR = st.sceneCoverR;
     this.callout.sync(c);
