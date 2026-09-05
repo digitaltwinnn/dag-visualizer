@@ -332,22 +332,25 @@
    the anchor ring lands as the line arrives; hyper's multi-legs fade on the draw window.
    Mechanism: `.co-draw` is the MASK's ink line (SceneCallout), spanning the leader's own
    geometry from the PANEL end with `pathLength=1`, so easing its dash offset 1→0 reveals the
-   dashed leader progressively without the dash pattern crawling. The clock is the panel's own:
-   the roll-in ends at lag + rise, the draw takes --tempo-roll from there. The wrapper is keyed
+   dashed leader progressively without the dash pattern crawling. The clock is the panel's own,
+   but the draw starts at 60% of the rise, not its end (user, 2026-09-05 — "make it appear a
+   bit quicker"): the roll's ease has spent most of its motion by then, so the line leaves a
+   visibly settling panel without the dead beat a full-rise wait read as. The wrapper is keyed
    by subject, so a subject change replays the whole sequence. Unlayered on purpose — the pause
    gate must beat `.roll-in`'s layered animation shorthand (CSS trap 1). */
+#callout { --co-draw-at: calc(var(--tempo-roll-lag) + 0.6 * var(--tempo-doc-rise)); }
 #callout .co-draw {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: co-draw var(--tempo-roll) var(--ease-roll) calc(var(--tempo-roll-lag) + var(--tempo-doc-rise)) forwards;
+  animation: co-draw var(--tempo-roll) var(--ease-roll) var(--co-draw-at) forwards;
 }
 #callout .co-tip {
   opacity: 0;
-  animation: co-fade 0.2s ease-out calc(var(--tempo-roll-lag) + var(--tempo-doc-rise) + var(--tempo-roll)) forwards;
+  animation: co-fade 0.2s ease-out calc(var(--co-draw-at) + var(--tempo-roll)) forwards;
 }
 #callout .co-multi {
   opacity: 0;
-  animation: co-fade var(--tempo-roll) var(--ease-roll) calc(var(--tempo-roll-lag) + var(--tempo-doc-rise)) forwards;
+  animation: co-fade var(--tempo-roll) var(--ease-roll) var(--co-draw-at) forwards;
 }
 /* Paused until the Engine actually SHOWS the callout (`data-on`): a commit answered by a camera
    flight keeps the wrapper hidden for the whole arrival, and an entrance that played invisibly
