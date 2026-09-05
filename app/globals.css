@@ -1135,7 +1135,12 @@
   /* A whole-value "roll" for TEXT card-headers (node id, metagraph name) — the same upward roll
      the Odometer uses for numeric values, so every card's header transitions in one language on a
      new subject. Triggered by a changing React `key` (the element re-mounts and plays it). */
-  .roll-in { display: inline-block; animation: odo-in var(--tempo-roll) var(--ease-roll); }
+  /* The TITLE roll parted ways with the digit roll (user, 2026-09-05: "the roll of the header
+     text is also too fast" — beside body text arriving on --tempo-doc-rise, a 0.65s title
+     popped): headers ride the text-arrival clock and its lag, `both` holding them hidden
+     through the delay so title and body land as one beat. The odometer keeps --tempo-roll —
+     digits are a live instrument, not arriving text. */
+  .roll-in { display: inline-block; animation: odo-in var(--tempo-doc-rise) var(--ease-roll) var(--tempo-roll-lag) both; }
 }
 @media (prefers-reduced-motion: reduce) {
   .odometer-in, .odometer-out, .roll-in { animation: none; }
