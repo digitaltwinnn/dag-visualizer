@@ -333,7 +333,10 @@ export default function TopBar() {
                 // condensed and the full face change on one line. Tablet ≥860 and desktop keep six.
                 // (Raised from 820 on 2026-08-21 when ThemeToggle landed beside PresentationToggle:
                 // measured 32px overflow at 820px; 860px is clean with slack, breakeven ~853px.)
-                v.soon && "opacity-45 max-[860px]:hidden",
+                // The dimmed soon entry STAYS at every width (review find, 2026-09-05: the phone comment
+                // promised all four views but this class still hid it below 860 — and below 700 it has
+                // no other route at all: no slug, and the footer's view links stand down on phone).
+                v.soon && "opacity-45",
               )}
             >
               <Icon aria-hidden className="size-4 group-data-[state=on]:text-primary" />

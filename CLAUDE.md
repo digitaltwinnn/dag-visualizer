@@ -31,9 +31,10 @@ Three views drive the 3D scene:
   per metagraph above it. The gap between planes is the point — metagraphs are unrelated and only
   come together on the global plane.
 
-`status`, `transactions` and `staking` are scaffolded placeholders: the canvas fades out and
-`Blueprint.tsx` draws a wireframe labelled `preview · in development`, with no numbers, so it never
-reads as live data.
+The placeholder is ONE consolidated `soon` Mode (2026-09-04; the old `status`/`transactions`/
+`staking` modes said the same nothing three times): the canvas fades out and `Blueprint.tsx` draws a
+wireframe GALLERY of the coming features, with no numbers, so it never reads as live data. The two
+doc pages (/about, /design) are an overlay over the same bare stage, not Modes.
 
 **The three 3D views are complementary projections of the same network: hyper = who/what, geo =
 where, ledger = when.** Activity metrics belong to ledger, structure to hyper.

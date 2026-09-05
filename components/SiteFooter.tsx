@@ -29,7 +29,7 @@ import NetLink from "@/components/NetLink";
 import FooterViewLinks from "@/components/FooterViewLinks";
 import { useStore } from "@/src/store/store";
 import { metagraphById } from "@/src/data/network";
-import type { DocPage } from "@/components/views";
+import { DOC_PATHS, type DocPage } from "@/components/views";
 import { cn } from "@/lib/utils";
 
 const GITHUB = "https://github.com/digitaltwinnn/dag-visualizer";
@@ -133,11 +133,11 @@ export default function SiteFooter() {
             brand already do. Phone drops the view group (the header's… the BAR's own switch
             carries the views there). */}
         <FooterViewLinks />
-        <DocToggle page="about" href="/about">
+        <DocToggle page="about" href={DOC_PATHS.about}>
           About
         </DocToggle>
         <span aria-hidden className="opacity-70 text-muted-foreground">·</span>
-        <DocToggle page="design" href="/design">
+        <DocToggle page="design" href={DOC_PATHS.design}>
           Design
         </DocToggle>
         <span aria-hidden className="w-px h-3.5 self-center bg-muted-foreground/35" />

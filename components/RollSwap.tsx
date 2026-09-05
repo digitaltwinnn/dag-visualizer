@@ -67,7 +67,13 @@ export default function RollSwap<K extends string>({
   shownRef.current = shown;
   const swaps = useRef(0);
   useEffect(() => {
-    if (swapKey === shownRef.current) return;
+    if (swapKey === shownRef.current) {
+      // A key that returns to the standing content mid-out-beat (fast double-switch) must
+      // also CANCEL the out — the cleanup cleared the timer, but `leaving` stayed true and
+      // fill-mode-forwards held the content invisible for good (review find, 2026-09-05).
+      setLeaving(false);
+      return;
+    }
     setLeaving(true);
     const t = setTimeout(() => {
       swaps.current += 1;

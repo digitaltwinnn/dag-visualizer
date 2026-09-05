@@ -44,10 +44,14 @@ export default function RouteSync() {
 
   useEffect(() => {
     let fromPop = false;
-    // The last VIEW path this bridge published (or landed on) — the fallback when the store's
-    // current surface has no path of its own: closing a doc while the routeless "soon" view is
-    // behind it must not leave the doc's URL standing (a reload would reopen the document).
-    let lastViewPath = pathForMode(useStore.getState().mode) ?? "/";
+    // The last VIEW path this bridge published (or landed on) — the fallback ONLY for the case
+    // it exists for: closing a doc while the routeless "soon" view is behind it must not leave
+    // the doc's URL standing (a reload would reopen the document). Seeded from the REAL
+    // location and updated on popstate too (review find, 2026-09-05: seeded from the store and
+    // skipped on back-steps, it pushed a wrong or stale view path — "/" → soon wrote
+    // /hypergraph; back to /hypergraph then soon wrote /geography). Entering "soon" from a
+    // clean view URL now leaves the address bar untouched, as the publish note promises.
+    let lastViewPath = modeForPath(location.pathname) ? location.pathname : (pathForMode(useStore.getState().mode) ?? "/");
 
     const unsub = useStore.subscribe((state, prev) => {
       if (state.mode === prev.mode && state.docPage === prev.docPage) return;
@@ -56,7 +60,9 @@ export default function RouteSync() {
       if (fromPop) return;
       const modePath = pathForMode(state.mode);
       if (modePath) lastViewPath = modePath;
-      const path = state.docPage ? DOC_PATHS[state.docPage] : (modePath ?? lastViewPath);
+      const path = state.docPage
+        ? DOC_PATHS[state.docPage]
+        : (modePath ?? (docForPath(location.pathname) ? lastViewPath : null));
       if (path && path !== location.pathname) {
         history.pushState(null, "", path + location.search);
       }
@@ -64,6 +70,9 @@ export default function RouteSync() {
 
     const onPop = () => {
       const doc = docForPath(location.pathname);
+      // A back/forward step onto a view URL is as real a landing as a click — the fallback
+      // must follow it or a later routeless entry publishes a stale path.
+      if (!doc && modeForPath(location.pathname)) lastViewPath = location.pathname;
       fromPop = true;
       if (doc) {
         useStore.getState().setDocPage(doc);

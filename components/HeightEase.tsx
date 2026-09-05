@@ -37,13 +37,15 @@ import { useLayoutEffect, useRef, type ReactNode } from "react";
 //
 // ⚠️ FOLLOW, DON'T FIGHT: the pile already has animators — the pager pins and eases heights
 // through a sibling slide, Radix disclosures run .disclose-panel inside card bodies. Their
-// tell is a SUSTAINED STREAK: an inner animator resizes the content every frame for its whole
-// run, so only the third rapid event in a row stands this component down (adopt, follow
-// natively until quiet). A SINGLE rapid follower is the second half of a discrete change (an
-// explorer mounts its shell, its rows land a few frames later) and RETARGETS instead — the
-// stand-down there cancelled the just-started ease into a snap (measured).
-const RAPID_MS = 200;
-const STREAK_STANDDOWN = 2; // rapid events in a row before another animator is assumed
+// tell is that the content is STILL MOVING one frame later — so every would-be ease first
+// waits ONE rAF and re-measures: still changing → a foreign animator owns this box, adopt
+// silently and let it play (nothing was stretched, so the pager's pinned height is never
+// touched); stable → the change was a discrete snap, ease it. (Review find, 2026-09-05: the
+// earlier rapid-streak heuristic sat BEHIND the own-animation echo guard and could never
+// accumulate, so the first frame of a pager slide got captured into a 0.65s ease whose
+// cleanup then wiped the pager's pin mid-slide.) The cost is one frame of latency on a real
+// snap — invisible, and it also absorbs the mount-shell-then-rows double pass into a single
+// correctly-targeted ease.
 
 export default function HeightEase({
   children,
@@ -53,10 +55,9 @@ export default function HeightEase({
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const anim = useRef<Animation | null>(null);
+  const confirm = useRef(0);
   const stretched = useRef<HTMLElement[]>([]);
   const last = useRef(-1);
-  const lastAt = useRef(0);
-  const streak = useRef(0);
   const growInRef = useRef(growIn);
   growInRef.current = growIn;
   useLayoutEffect(() => {
@@ -83,18 +84,19 @@ export default function HeightEase({
         last.current = h;
         return;
       }
-      const now = performance.now();
-      const rapid = !first && now - lastAt.current < RAPID_MS;
-      lastAt.current = now;
-      streak.current = rapid ? streak.current + 1 : 0;
-      if (rapid && streak.current >= STREAK_STANDDOWN) {
-        // A sustained stream — an inner animator owns this box: adopt and follow natively.
-        last.current = h;
-        return;
-      }
       const from = first ? 0 : last.current;
       last.current = h;
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      // The one-frame confirmation (see the follow-don't-fight note above): a foreign
+      // animator shows up as the height still moving next frame.
+      cancelAnimationFrame(confirm.current);
+      confirm.current = requestAnimationFrame(() => {
+        confirm.current = 0;
+        const h2 = i.offsetHeight;
+        if (h2 !== h) {
+          last.current = h2;
+          return;
+        }
       const root = getComputedStyle(document.documentElement);
       const ms = (parseFloat(root.getPropertyValue("--tempo-roll")) || 0.65) * 1000;
       const ease = root.getPropertyValue("--ease-roll").trim() || "ease-out";
@@ -127,10 +129,12 @@ export default function HeightEase({
           clearStyles();
         }
       };
+      });
     });
     ro.observe(i);
     return () => {
       ro.disconnect();
+      cancelAnimationFrame(confirm.current);
       anim.current?.cancel();
     };
   }, []);

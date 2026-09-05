@@ -377,8 +377,16 @@ export const useStore = create<AppState>((set) => ({
   // Closing (either route) arms `docClosing` — the doc's exit animation is its OUT phase, and
   // the engine waits on it before entering the destination view.
   setMode: (mode) => set((s) => ({ mode, docPage: null, docClosing: s.docPage != null || s.docClosing })),
+  // Opening a doc also SURFACES THE SCENE POSE: the overlay sits at z-8, under the raw layer's
+  // z-9 — a doc opened from the RAW pose rendered beneath the still-interactive table, with the
+  // RAW toggle that could exit it hidden by the doc's own control gating (review find,
+  // 2026-09-05). The doc covers the SCENE by design, so the pose comes home with it.
   setDocPage: (docPage) =>
-    set((s) => ({ docPage, docClosing: docPage == null ? s.docPage != null || s.docClosing : false })),
+    set((s) => ({
+      docPage,
+      section: docPage != null ? "scene" : s.section,
+      docClosing: docPage == null ? s.docPage != null || s.docClosing : false,
+    })),
   setDocStageReady: (docStageReady) => set({ docStageReady }),
   setDocClosing: (docClosing) => set({ docClosing }),
   // Committing a network IS a user gesture (user, 2026-08-14 — changing the filter or paging

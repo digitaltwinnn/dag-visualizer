@@ -100,6 +100,8 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
   const box = useRef<HTMLDivElement>(null);
   const renderRef = useRef(render);
   renderRef.current = render;
+  const phaseRef = useRef(phase);
+  phaseRef.current = phase;
   useEffect(() => {
     const clearPending = () => {
       if (exitT.current) { clearTimeout(exitT.current); exitT.current = null; }
@@ -115,6 +117,14 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
       // rolls out on the same clock, then the next one rolls in — the one transition grammar,
       // every path.
       if (renderRef.current != null && renderRef.current !== page) {
+        // From "hold" the standing document has never been SHOWN — swap it silently and keep
+        // holding (review find, 2026-09-05: playing "out" here dropped the hold's opacity-0
+        // and tw-animate's exit ran from base opacity 1, flashing a never-seen page).
+        if (phaseRef.current === "hold") {
+          setRender(page);
+          box.current?.scrollTo(0, 0);
+          return clearPending;
+        }
         setPhase("out");
         exitT.current = setTimeout(() => {
           exitT.current = null;
@@ -130,6 +140,15 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
       // default, false only while a live scene's gather is playing under this document).
       if (!stageReady) return clearPending;
       rise(page);
+      return clearPending;
+    }
+    // Same rule on CLOSE: from "hold" there is nothing on screen to roll out — unmount now
+    // and release the engine's stage immediately (the gather it was holding for keeps
+    // playing; the destination entry follows it as on any switch).
+    if (phaseRef.current === "hold") {
+      setRender(null);
+      setArrived(null);
+      useStore.getState().setDocClosing(false);
       return clearPending;
     }
     setPhase("out");
@@ -160,6 +179,14 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
 
   if (!render) return null;
   const Doc = DOC_COMPONENTS[render];
+  // The sheet's phase, shared by the scroller and its viewport-anchored siblings (scrim, ×) so
+  // the three fade as one surface.
+  const sheetPhaseCls = cn(
+    phase === "hold" && "opacity-0 pointer-events-none",
+    phase === "in" && "animate-in fade-in duration-(--tempo-doc-sheet) motion-reduce:animate-none",
+    phase === "out" &&
+      "animate-out fade-out duration-(--tempo-nav) ease-out fill-mode-forwards pointer-events-none motion-reduce:animate-none motion-reduce:opacity-0",
+  );
   return (
     <>
       {/* THE DOC'S RAILS ARE THE APP'S OWN RULERS (user, 2026-09-04 — "the rails should just
@@ -186,33 +213,21 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
         "fixed inset-0 z-[8] overflow-y-auto overscroll-contain slim-scroll",
         // TWO-BEAT ARRIVAL (user, 2026-09-04 — "first show the 'page' and then roll in the
         // text"), spoken in tw-animate (the house vocabulary; see the phase note above): this
-        // container carries only the SHEET's fade — no transform, so the fixed × strip and
-        // scrim keep anchoring to the same inset-0 box (trap 2) — on the short
-        // --tempo-doc-sheet beat; the exit keeps the nav clock, whose DOC_ROLL twin also
-        // times the unmount + the engine's stage release (the exit boundary must not move).
+        // container carries the SHEET's fade on the short --tempo-doc-sheet beat; the exit
+        // keeps the nav clock, whose DOC_ROLL twin also times the unmount + the engine's
+        // stage release (the exit boundary must not move).
+        // ⚠️ tw-animate's enter/exit keyframes DO carry transform (verified in the shipped
+        // css), so while an animation runs — and through the whole fill-forwards out phase —
+        // this scroller is a containing block for fixed descendants (trap 2). The scrim and
+        // the × strip therefore live OUTSIDE it, as siblings sharing its phase classes; from
+        // a scrolled document they used to jump away with the exit (review find, 2026-09-05).
         // Reduced motion drops the animations and the extra opacity-0 keeps the exit a SNAP
         // (fill-forwards with no animation would hold the sheet visible through the timeout).
-        phase === "hold" && "opacity-0 pointer-events-none",
-        phase === "in" &&
-          "animate-in fade-in duration-(--tempo-doc-sheet) motion-reduce:animate-none",
-        phase === "out" &&
-          "animate-out fade-out duration-(--tempo-nav) ease-out fill-mode-forwards pointer-events-none motion-reduce:animate-none motion-reduce:opacity-0",
+        sheetPhaseCls,
       )}
       role="region"
       aria-label={DOC_PAGES[render].label}
     >
-      {/* The bar's scrim: without it a half-clipped line of prose rides the strip between the
-          viewport top and the bar's own glass while scrolling. Fixed, z above the flowing text,
-          under the bar. */}
-      <div
-        aria-hidden
-        className="pointer-events-none fixed inset-x-0 top-0 z-[1] h-24"
-        style={{
-          background:
-            "linear-gradient(to bottom, color-mix(in oklch, var(--background) 85%, transparent) 0%, " +
-            "color-mix(in oklch, var(--background) 70%, transparent) 55%, transparent 100%)",
-        }}
-      />
       <div className={DOC_COLUMN}>
         {/* The text's own roll — the arrival's SECOND beat: fill-mode-both holds frame 0
             (hidden) through the [animation-delay:--tempo-doc-sheet] wait, then the rise runs
@@ -236,14 +251,26 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
           <Doc />
         </div>
       </div>
+      </div>
+      {/* The bar's scrim — a SIBLING of the scroller (see the trap-2 note above): fixed to the
+          real viewport, fading on the sheet's own phase classes, above the container (z-[9])
+          and under the footer/bar. */}
+      <div
+        aria-hidden
+        className={cn("pointer-events-none fixed inset-x-0 top-0 z-[9] h-24", sheetPhaseCls)}
+        style={{
+          background:
+            "linear-gradient(to bottom, color-mix(in oklch, var(--background) 85%, transparent) 0%, " +
+            "color-mix(in oklch, var(--background) 70%, transparent) 55%, transparent 100%)",
+        }}
+      />
       {/* The layer's own dismiss — the RAW layer's rule verbatim (its header comment carries
           the reasoning): the view switch is far away while the layer covers the view it would
           return to, Escape is invisible, and a control ON the surface you want to leave needs
           no hunting. ON THE SHEET, not the viewport (user, 2026-09-04 — "top right of the doc"):
-          the fixed strip re-centres the column's own measure and the × sits at its top-right,
-          below the command bar's band, pinned there through scrolling. `fixed` inside the
-          transformed layer, so it rides the roll as part of the document. */}
-      <div className="fixed inset-x-0 top-0 z-20 pointer-events-none">
+          the strip re-centres the column's own measure and the × pins at its top-right through
+          scrolling — a viewport-anchored SIBLING of the scroller, phased with the sheet. */}
+      <div className={cn("fixed inset-x-0 top-0 z-[9] pointer-events-none", sheetPhaseCls)}>
         <div className="relative mx-auto max-w-3xl">
           <Button
             variant="ghost"
@@ -256,7 +283,6 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
             <X aria-hidden />
           </Button>
         </div>
-      </div>
       </div>
     </>
   );

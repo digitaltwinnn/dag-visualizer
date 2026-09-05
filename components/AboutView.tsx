@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import CardHead from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
@@ -44,6 +44,16 @@ export default function AboutView({
   // sheet's AboutView mounts client-only and after `useBreakpoint` has resolved (Radix portals
   // the sheet content on open), so the initializer is stable for the one instance that takes it.
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
+  // The body's arrival animation belongs to a VIEW SWITCH (the title changing), never to the
+  // user's own expand gesture — mounted by the disclosure it played anyway (a mount runs its
+  // animation regardless of key) and blanked the body 0.2s against the 150ms chevron clock
+  // (review find, 2026-09-05). Render-time compare: true exactly for the render whose title
+  // changed, which is the render that remounts the keyed div.
+  const prevTitle = useRef(title);
+  const switched = prevTitle.current !== title;
+  useEffect(() => {
+    prevTitle.current = title;
+  });
   return (
     <Card asChild className="sig-right block p-0 [--spine:var(--filter-accent,var(--primary))] animate-card-in motion-reduce:animate-none">
       <aside>
@@ -67,7 +77,11 @@ export default function AboutView({
           // materialize completing, not as a second animation).
           <div
             key={title}
-            className="flex flex-col gap-2.5 px-4 pt-3 pb-3.5 overflow-y-auto animate-in fade-in slide-in-from-bottom-2 duration-(--tempo-doc-rise) ease-(--ease-roll) delay-(--tempo-roll-lag) fill-mode-both motion-reduce:animate-none"
+            className={cn(
+              "flex flex-col gap-2.5 px-4 pt-3 pb-3.5 overflow-y-auto",
+              switched &&
+                "animate-in fade-in slide-in-from-bottom-2 duration-(--tempo-doc-rise) ease-(--ease-roll) delay-(--tempo-roll-lag) fill-mode-both motion-reduce:animate-none",
+            )}
           >
             {lines.map((l, i) => (
               <p

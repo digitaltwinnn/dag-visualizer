@@ -209,7 +209,9 @@ opens around it. Its border is NOT handed to a seam the way an entry↔entry joi
 curves in at each corner, so it never draws the full-width division the inset-seam rule exists to
 prevent; it reads as the box cut into the pile. **The stack carries DEPTH, the thread carries STATE**;
 adjacency is what reads as containment, which is why the snapshot chain runs coarse→fine above. Ghosts
-stay outside the slab. Nothing in the block animates, so reduced motion is a no-op.
+stay outside the slab. The block's GEOMETRY never animates (seams, corners, washes) — but since
+2026-09-04 every rung's HEIGHT eases (`HeightEase` on the Inspector rung wrappers; the no-pop bullet
+below carries the rules). Reduced motion snaps, so the no-op guarantee holds there.
 
 ⚠️ **The lift shadow is not the box's distinguisher and can't be** — squaring the box mid-pile was tried
 (2026-08-09) and left it with no geometry at all: square corners, both borders handed to seams, and a
@@ -550,16 +552,26 @@ rails-lean with no visible way back.
   computed style), and the comma'd `transition-[a,b]` arbitrary-VALUE form is the DocLayer
   compile trap besides. `motion-reduce:!transition-none` needs its `!` against an
   equal-specificity single class (trap 4's family).
-- **The tempo family is tokenized** — `--tempo-beat` / `--tempo-signal` / `--tempo-roll` in
-  globals.css `:root` (+ the doc overlay's `--tempo-doc-sheet`/`--tempo-doc-rise` two-beat
-  arrival); the 150ms disclosure clock deliberately is not (its header says why).
-- **THE NO-POP RULE** (user, 2026-09-04): a view-scoped HUD surface never pops on navigation —
-  chrome persists, content leaves on a quick out-beat and arrives on the app's one roll
-  grammar. `components/RollSwap.tsx` is the structural home (a keyed remount speaking
-  tw-animate-css's animate-in/out — the vocabulary the shadcn primitives already use; its
-  header carries the contract — render from the KEY, never live state) and it wraps the explore rail's card stack (opacity-only: RailThread measures there,
-  the BootFade transform warning) and both vitals presentations (their `[&>*]` cell rules ride
-  the wrapper, or it becomes their subject). A new view inherits the behaviour by construction.
+- **The tempo family is tokenized** — `--tempo-beat` / `--tempo-signal` / `--tempo-roll` (0.65s,
+  with `--ease-roll` its one ENTRANCE curve — exits keep ease-out) in globals.css `:root`, plus the
+  text-arrival pair `--tempo-doc-sheet`/`--tempo-doc-rise` and the card lag `--tempo-roll-lag`;
+  the 150ms disclosure clock deliberately is not (its header says why). Titles (`.roll-in`) ride
+  the text clock; the odometer keeps `--tempo-roll` — digits are an instrument, not arriving text.
+- **THE NO-POP RULE** (user, 2026-09-04, several rounds): a view-scoped HUD surface never pops on
+  navigation, and **the swap unit is what CHANGES, not the zone**. Fully view-scoped content (the
+  vitals cells, both presentations) takes `components/RollSwap.tsx` — out-beat then keyed arrival
+  in tw-animate's own vocabulary; render from the KEY, never live state; the vitals' `[&>*]` cell
+  rules ride the wrapper or it becomes their subject. A surface with a PERSISTENT resident reads
+  the rule per card: the explore rail keeps its ONE About instance (title rolls, body keyed on the
+  view's title, animating only when the title actually changed — never on a manual expand) and
+  keys only the view-scoped tool card, transform-free (a materialize's scale visibly pulls a tall
+  card's top edge). HEIGHTS ease everywhere via `components/HeightEase.tsx` (every Inspector rung +
+  both explore cards): measured content, WAAPI on the roll tokens, the whole chain down to the
+  panel stretched so the CARD BORDER rides the ease (one `auto` link parks a percentage height), a
+  one-frame re-measure standing down for foreign animators (the pager's pinned slides,
+  disclosures), `growIn` easing lane-joining slots from 0 once the host lane booted. In-card
+  arrivals take `CONTENT_EASE`, live bar widths `BAR_EASE` (both exported beside RollSwap; persist
+  vs remount decides which). Reduced motion snaps all of it.
 - **The canvas's display box is CSS-owned** (`setSize(..., false)` + a 2px viewport overdraw in
   `.scene-canvas`) — integer inline sizing left fractional-DPR background slivers at the edges.
 
@@ -567,8 +579,8 @@ rails-lean with no visible way back.
 
 Only the rails restructure; everything else holds the four-zone shape. Desktop (≥1100px) has both rails
 inline with their `RailThread` siblings; tablet (700–1099px) collapses them to edge tabs opening
-**non-modal** sheets (both can be open, orbit still works behind them — and the vitals band INSETS
-by their measured `sceneCover`, or the covered cards show through the seam as fragments); phone
+**non-modal** sheets (both can be open, orbit still works behind them — the sheets OVERLAY the
+vitals band, which CLIPS its paint by their published `sceneCover`, see the band bullet); phone
 (<700px) has a persistent bottom bar — Explore | Vitals | Details thirds where the view has a
 vitals lane, halves elsewhere (`barGeom`; the icon trays compact to one unseen-update dot at
 thirds) — and ONE sheet at a time, with grabber drag-resize and flick-dismiss. The sheet GROWS out
