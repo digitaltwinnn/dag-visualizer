@@ -16,14 +16,17 @@ per-metagraph byte rate vital that deliberately stands by today (`src/data/api.t
 
 - **Four metric families**: anchoring activity, snapshot cadence/health, economics, fleet structure.
 - **Three horizons**, tiered: last 24 h (fine), week–month (hourly), months–years (daily, forever).
-- **15-minute sampler cadence** — chosen for considerate upstream traffic. Bucket resolution is
-  independent of run cadence (records are bucketed by their own timestamps), so cadence is a
-  freshness knob, never an accuracy one. The sampler's upstream traffic ≈ 1–3 % of ONE open
-  browser tab of the app.
+- **5-minute buckets, 15-minute sampler cadence** (revised 2026-09-06 from 15-min buckets).
+  Bucket resolution is independent of run cadence (records are bucketed by their own
+  timestamps), so the finer buckets cost ~0.7 MB and zero extra commands or upstream traffic,
+  and buy stall localization for the health family; cadence stays the considerate-traffic
+  knob — the sampler's upstream traffic ≈ 1–3 % of ONE open browser tab of the app. Known
+  trade, accepted: a slow metagraph's fine-tier series reads as a spiky comb of zeros; the
+  hourly tier is the smooth reading.
 - **Vercel Cron drives it** (account upgraded to Pro during the brainstorm). QStash was the $0
   alternative and remains a drop-in swap; not used.
 - **Budget target**: everything inside the Upstash free tier (256 MB, 500 K commands/month).
-  Sized: ~5 MB steady + ~1 MB/year, ~30 K commands/month (~6 %), ~0.7 GB of 10 GB bandwidth.
+  Sized: ~6 MB steady + ~1 MB/year, ~30 K commands/month (~6 %), ~0.7 GB of 10 GB bandwidth.
 - **Mainnet only scheduled** at launch; the key schema carries `{net}` so integrationnet/testnet
   are one cron entry away, costing nothing until scheduled.
 
@@ -61,12 +64,12 @@ height/subHeight/epochProgress (counters that answer no trend question — the c
 - `nodes` total, `nodes:{id}` per network (12 incl. DAG), `layer:{l0|cl1|dl1}` totals
 - per-country `cc:{XX}` — **daily tier only** (cardinality control)
 
-≈ 40 fields per fine bucket, ~56 hourly, ~90 daily.
+≈ 40 fields per fine bucket (288 buckets/day at 5 min), ~56 hourly, ~90 daily.
 
 ## Redis layout
 
 ```
-t:{net}:15m:{yyyy-mm-dd}   hash, field "{hh:mm}|{series}" → value   TTL 3 d
+t:{net}:5m:{yyyy-mm-dd}    hash, field "{hh:mm}|{series}" → value   TTL 3 d
 t:{net}:1h:{yyyy-mm}       hash, field "{dd-hh}|{series}"          TTL 120 d
 t:{net}:1d:{yyyy}          hash, field "{mm-dd}|{series}"          no TTL
 t:{net}:cursor             hash: last global ordinal + per-meta last ordinals + schema `v`
