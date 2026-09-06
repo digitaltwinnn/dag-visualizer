@@ -52,7 +52,10 @@ async function fleetCounts(net: ReturnType<typeof netOf>): Promise<FleetCounts |
 }
 
 export async function GET(req: Request) {
-  if (req.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
+  // ⚠️ `!process.env.CRON_SECRET` is load-bearing: without it, an unset secret turns the
+  // template literal into the literal string "Bearer undefined" and authenticates anyone
+  // who sends exactly that — concretely reachable on a preview deploy sharing prod Redis.
+  if (!process.env.CRON_SECRET || req.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const net = netOf(req);

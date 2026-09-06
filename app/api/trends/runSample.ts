@@ -1,7 +1,15 @@
 // One sampler run: cursor → grow-until-cursor fetches → bucket → merge-write one key per
 // tier → advance cursor. Dependency-injected so the whole contract is unit-tested; the
 // route provides the real deps. Command budget per run: 1 lock + 1 hgetall (cursor) +
-// ≤1 hmget/hset pair per touched tier key + ≤3 expire + 1 cursor hset + 1 del ≈ 12.
+// 1 hmget per touched tier key (reads, pre-transaction) + 1 applyWrites MULTI/EXEC
+// (every touched key's HSET + EXPIRE, plus the cursor HSET) + 1 del ≈ 8.
+//
+// The write phase is ALL-OR-NOTHING (data + cursor together): the hmgets read prior values
+// first (race-free — the lock excludes every other run), the merged maps are computed in
+// memory, and only then does ONE applyWrites transaction commit everything. A run that
+// dies mid-write-phase leaves the store exactly as it was — no key half-updated, no cursor
+// advanced past data that didn't land — so the NEXT run's hmget reads are still consistent
+// with what actually got merged, and nothing double-counts.
 import { TTL_S, cursorKeyOf, lockKeyOf, slotOf, fieldOf, type Tier } from "./keys";
 import { mergeVals } from "./merge";
 import {
@@ -9,7 +17,7 @@ import {
   type FleetCounts, type GlobalRec, type IncMap, type MetaRec,
 } from "./bucketing";
 import { listSince } from "./fetchSince";
-import type { TrendsStore } from "./store";
+import type { TrendsStore, TrendsWrite } from "./store";
 
 export interface SampleDeps {
   net: string;
@@ -83,8 +91,11 @@ export async function runSample(deps: SampleDeps): Promise<SampleResult> {
       if (fleet) bucketFleet(inc, net, deps.now(), fleet);
     }
 
-    // Merge-write: one hmget + hset per touched tier key.
+    // Compute every touched key's merged map first (hmget reads stay per-key, as before —
+    // the lock makes read-then-transact race-free); the cursor advance rides along as one
+    // more write in the SAME transaction, so data and cursor commit together or not at all.
     let wroteFields = 0;
+    const writes: TrendsWrite[] = [];
     for (const [key, fields] of inc) {
       const names = [...fields.keys()];
       const prev = await store.hmget(key, names);
@@ -93,13 +104,12 @@ export async function runSample(deps: SampleDeps): Promise<SampleResult> {
         const p = prev[i] == null ? undefined : Number(prev[i]);
         out[f] = mergeVals(f.split("|")[1], p, fields.get(f)!);
       });
-      await store.hset(key, out);
-      const ttl = TTL_S[tierOfKey(key)];
-      if (ttl != null) await store.expire(key, ttl);
+      writes.push({ key, map: out, ttlS: TTL_S[tierOfKey(key)] });
       wroteFields += names.length;
     }
 
-    if (Object.keys(cursorNext).length > 1) await store.hset(cursorKeyOf(net), cursorNext);
+    if (Object.keys(cursorNext).length > 1) writes.push({ key: cursorKeyOf(net), map: cursorNext, ttlS: null });
+    if (writes.length) await store.applyWrites(writes);
     return { wroteFields, gap: g.gap, metaErrors };
   } finally {
     await store.releaseLock(lockKeyOf(net));

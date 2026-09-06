@@ -1,13 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { runSample, type SampleDeps } from "./runSample";
-import type { TrendsStore } from "./store";
+import type { TrendsStore, TrendsWrite } from "./store";
 
 // In-memory TrendsStore — hash semantics only, enough for the orchestration contract.
-function memStore(): TrendsStore & { data: Map<string, Map<string, string>>; ttls: Map<string, number>; locked: boolean } {
+// `applyWrites` mirrors Upstash's real MULTI/EXEC all-or-nothing semantics: when
+// `failApply` is set it throws WITHOUT mutating `data`/`ttls`, so a test can assert that a
+// transaction failure persists nothing (data + cursor together, per the store's contract).
+function memStore(): TrendsStore & { data: Map<string, Map<string, string>>; ttls: Map<string, number>; locked: boolean; failApply: boolean } {
   const data = new Map<string, Map<string, string>>();
   const ttls = new Map<string, number>();
   const s = {
-    data, ttls, locked: false,
+    data, ttls, locked: false, failApply: false,
     async hgetall(key: string) {
       const h = data.get(key);
       return h ? Object.fromEntries(h) : null;
@@ -24,6 +27,15 @@ function memStore(): TrendsStore & { data: Map<string, Map<string, string>>; ttl
     async expire(key: string, ttl: number) { ttls.set(key, ttl); },
     async acquireLock() { if (s.locked) return false; s.locked = true; return true; },
     async releaseLock() { s.locked = false; },
+    async applyWrites(writes: TrendsWrite[]) {
+      if (s.failApply) throw new Error("transaction failed");
+      for (const w of writes) {
+        let h = data.get(w.key);
+        if (!h) { h = new Map(); data.set(w.key, h); }
+        for (const [f, v] of Object.entries(w.map)) h.set(f, String(v));
+        if (w.ttlS != null) ttls.set(w.key, w.ttlS);
+      }
+    },
   };
   return s;
 }
@@ -106,5 +118,20 @@ describe("runSample", () => {
     const store = memStore();
     await runSample(deps(store, { fleet: async () => null }));
     expect(store.data.get("t:mainnet:1h:2026-09")?.get("06-14|f.nodes")).toBeUndefined();
+  });
+  it("a failed transaction persists nothing — data and cursor together, lock still released", async () => {
+    const store = memStore();
+    store.failApply = true;
+    await expect(runSample(deps(store))).rejects.toThrow();
+    expect(store.data.get("t:mainnet:5m:2026-09-06")).toBeUndefined();
+    expect(store.data.get("t:mainnet:cursor")).toBeUndefined();
+    expect(store.locked).toBe(false);
+  });
+  it("a rejected global fetch propagates, writes nothing, and releases the lock", async () => {
+    const store = memStore();
+    const d = deps(store, { pageGlobals: async () => { throw new Error("503"); } });
+    await expect(runSample(d)).rejects.toThrow();
+    expect(store.data.get("t:mainnet:cursor")).toBeUndefined();
+    expect(store.locked).toBe(false);
   });
 });
