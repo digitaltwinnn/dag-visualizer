@@ -14,7 +14,7 @@ export const maxDuration = 15;
 export async function GET(req: Request) {
   const net = netOf(req);
   const w = new URL(req.url).searchParams.get("window") ?? "24h";
-  if (!(w in WINDOWS)) {
+  if (!Object.prototype.hasOwnProperty.call(WINDOWS, w)) {
     return NextResponse.json({ error: `window must be one of ${Object.keys(WINDOWS).join(", ")}` }, { status: 400 });
   }
   const window = w as WindowId;
