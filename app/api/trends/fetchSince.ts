@@ -20,5 +20,13 @@ export async function listSince<T extends { ordinal: number }>(
     }
     limit = Math.min(CAP, limit * 3);
   }
-  return { recs: list.filter((r) => r.ordinal > sinceOrdinal).reverse(), gap: false };
+  // A short page (list.length < limit) is only PROOF of reaching the chain start when the
+  // oldest record it returned actually lands at/before the cursor. Upstream can also hand
+  // back a short page because it clamped the limit or pruned history behind the cursor (cron
+  // paused for weeks, then resumed) — in that case the loop still exits here, but the batch
+  // provably never reached sinceOrdinal, so reporting `gap: false` would fabricate a bridge
+  // over a real hole (rule 10). Recompute from what actually came back, not from why the loop
+  // stopped.
+  const gap = sinceOrdinal >= 0 && list.length > 0 && list[list.length - 1].ordinal > sinceOrdinal + 1;
+  return { recs: list.filter((r) => r.ordinal > sinceOrdinal).reverse(), gap };
 }

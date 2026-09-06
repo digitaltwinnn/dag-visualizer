@@ -30,16 +30,30 @@ async function getJson(url: string, ms = 7000): Promise<unknown> {
 // failure: an absent gauge is an honest gap (rule 10), a zeroed fleet is a fabrication.
 async function fleetCounts(net: ReturnType<typeof netOf>): Promise<FleetCounts | null> {
   try {
-    const [{ metagraphs }, geo] = await Promise.all([getLive(net), getLiveGeo(net)]);
-    const dagIps = Object.keys(geo);
+    const [{ metagraphs, geo: metaGeo }, dagGeo] = await Promise.all([getLive(net), getLiveGeo(net)]);
+    const dagIps = Object.keys(dagGeo);
     const perNet: Record<string, number> = { dag: dagIps.length };
     const layers: Record<string, number> = {};
+    // Country counts cover the WHOLE fleet — validators (dagGeo) and metagraph machines
+    // (metaGeo, already returned by getLive()) folded into one per-country tally. An IP can
+    // appear in both maps (a hybrid node is also geolocated by the metagraph directory scan),
+    // so count each IP once: validators first, metagraph geo only for IPs not already seen.
     const countries: Record<string, number> = {};
+    const seenIps = new Set<string>();
     for (const ip of dagIps) {
-      const cc = geo[ip]?.cc;
+      seenIps.add(ip);
+      const cc = dagGeo[ip]?.cc;
+      if (cc) countries[cc] = (countries[cc] || 0) + 1;
+    }
+    for (const ip of Object.keys(metaGeo)) {
+      if (seenIps.has(ip)) continue;
+      seenIps.add(ip);
+      const cc = metaGeo[ip]?.cc;
       if (cc) countries[cc] = (countries[cc] || 0) + 1;
     }
     let total = dagIps.length;
+    // f.layer.* counts metagraph-layer roles only — per-layer validator attribution isn't
+    // derivable from the geo map (it carries no role/layer field for validator IPs).
     for (const m of metagraphs) {
       perNet[m.id] = m.nodes.length;
       total += m.nodes.length;

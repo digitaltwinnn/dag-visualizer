@@ -46,6 +46,11 @@ function wrap(r: Redis): TrendsStore {
       return (await r.set(key, "1", { nx: true, ex: ttlS })) === "OK";
     },
     async releaseLock(key) {
+      // Unconditional DEL (not compare-and-delete) — safe only because the sampler's
+      // maxDuration (60s) stays well under this lock's TTL (300s, see acquireLock's caller):
+      // a run can never still be alive when its own lock would have expired and been
+      // re-acquired by a later run, so there's nothing to steal. Bump maxDuration past the
+      // TTL and this DEL can delete a NEWER run's lock out from under it.
       await r.del(key);
     },
     async applyWrites(writes) {

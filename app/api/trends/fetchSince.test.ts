@@ -41,4 +41,20 @@ describe("listSince", () => {
     expect(recs).toEqual([]);
     expect(gap).toBe(false);
   });
+  it("a short page that never reached the cursor is a real gap, not a reached start", async () => {
+    // Upstream clamps/prunes: a page shorter than the requested limit, but its oldest record
+    // is still well past sinceOrdinal + 1 — the loop's short-page break must not read this as
+    // "reached the chain start".
+    const calls: number[] = [];
+    const shortPager = async (limit: number) => {
+      calls.push(limit);
+      // Pretend upstream only ever has 40 records, starting at ordinal 461 (oldest) through 500.
+      const all = Array.from({ length: 40 }, (_, i) => ({ ordinal: 500 - i }));
+      return all.slice(0, limit);
+    };
+    const { recs, gap } = await listSince(shortPager, 100);
+    expect(calls).toEqual([60]); // 40 < 60 → short page → loop breaks on the first call
+    expect(recs.map((r) => r.ordinal)).toEqual(Array.from({ length: 40 }, (_, i) => 461 + i));
+    expect(gap).toBe(true);
+  });
 });

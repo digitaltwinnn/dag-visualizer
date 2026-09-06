@@ -27,4 +27,3 @@ next-env.d.ts
 
 # Visual brainstorming companion
 .superpowers/
-.env*
