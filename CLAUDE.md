@@ -365,13 +365,17 @@ not through `_tweenTo`, which would compose `dollyBack` and `railsLean` in a sec
 
 ## Deploying (Vercel)
 
-Target host is Vercel; any Node host works. No env vars or secrets required.
+Target host is Vercel; any Node host works. The trends backend needs `CRON_SECRET` and the Upstash
+Redis tokens as env vars — the rest of the app needs none.
 
-Enabled now, all on the free Hobby plan: a clean `next build` with the route caching above; **security
-headers** in `next.config.mjs` (a moderate CSP — inline script/style for the Next runtime, `img https:`
-for logos, `connect https:` since the Constellation host set is open, plus telemetry; dev adds
-`unsafe-eval`/`ws:`/`http:`), added for reputation-scanner posture after a scanner NRD-isolated the
-fresh domain; and Speed Insights + Analytics in the layout, both no-op off Vercel.
+Enabled now, on the **Pro plan** (upgraded 2026-09-06 for the trends cron): a clean `next build` with
+the route caching above; **security headers** in `next.config.mjs` (a moderate CSP — inline
+script/style for the Next runtime, `img https:` for logos, `connect https:` since the Constellation
+host set is open, plus telemetry; dev adds `unsafe-eval`/`ws:`/`http:`), added for reputation-scanner
+posture after a scanner NRD-isolated the fresh domain; Speed Insights + Analytics in the layout, both
+no-op off Vercel; and a 15-minute Vercel Cron (`vercel.json`) hitting `/api/trends/sample`, which
+merge-writes into Upstash Redis (the Vercel-native marketplace integration) holding the trends
+timeseries — see `app/api/CLAUDE.md`.
 
 ⚠️ Web Vitals do NOT capture the WebGL frame rate — use the engine's stats.js for that (dev-only, or in
 prod via `?stats`, so it never shows for real users).
@@ -379,10 +383,12 @@ prod via `?stats`, so it never shows for real users).
 ⚠️ **`app/opengraph-image.tsx` must stay ASCII + styled `<div>`s only**: a non-Latin glyph makes Satori
 fetch a font at render time, which fails and breaks the image.
 
-**When adoption grows → upgrade to Pro** for Skew Protection (the app is a long-lived open tab and a
-deploy can break chunk loading in open tabs), a cron pre-warm for `/api/metagraphs`, WAF/rate-limiting
-on `/api/*`, and a licensed geo provider. Not applicable: Image Optimization (no `<img>`),
-KV/Postgres/Blob (no persistence), Edge Config / env vars (no secrets).
+**Pro is active but its other levers are still unused** — Skew Protection (the app is a long-lived
+open tab and a deploy can break chunk loading in open tabs), a cron pre-warm for `/api/metagraphs`,
+WAF/rate-limiting on `/api/*`, and a licensed geo provider all remain future upgrades, not things the
+plan bump was for. KV is no longer not-applicable: Upstash Redis holds the trends timeseries (above).
+Still not applicable: Image Optimization (no `<img>`), Postgres/Blob (nothing else persists), Edge
+Config (no other secrets need it).
 
 ## Where the rest of this lives
 

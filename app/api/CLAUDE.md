@@ -20,6 +20,15 @@ them — but the Next Node server can.
   budget.
 - **`/api/geo`** serves the validator IP→geo map live (cached 1h, 503 on failure) so the globe plots
   from one request; the client-side resolver fills any misses.
+- **`/api/trends`** serves tiered timeseries windows (`?window=24h|7d|30d|1y`) assembled
+  from Upstash Redis; **`/api/trends/sample`** is the Vercel-Cron sampler (15 min,
+  `CRON_SECRET` auth) that pages the explorer stream since a Redis cursor and
+  merge-writes 5m/1h/1d hash tiers. Spec:
+  `docs/superpowers/specs/2026-09-05-trends-timeseries-design.md` — the key/field grammar,
+  command budget, honesty rules (null = not measured, 0 = measured none; `g.ticks` is the
+  coverage marker) and the Upstash usage contract (single region, eviction OFF, read-only
+  token on the read route) live there. The pure modules beside the routes are the
+  specification-by-test (keys/merge/bucketing/fetchSince/runSample/assemble).
 - **`/api/global/at?ts=`** binary-searches ~23 tiny per-ordinal records to find the global carrying
   that exact stamp (the anchor join is timestamp EQUALITY). Its one consumer is the anchor log's
   ANCHORED INTO column resolution. ⚠️ An `?ordinal=` mode was added and then **removed** the same day
