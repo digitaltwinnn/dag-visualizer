@@ -29,6 +29,10 @@ them — but the Next Node server can.
   coverage marker) and the Upstash usage contract (single region, eviction OFF, read-only
   token on the read route) live there. The pure modules beside the routes are the
   specification-by-test (keys/merge/bucketing/fetchSince/runSample/assemble).
+  **`scripts/rebuild-trends.ts` is the recovery tool** (wipe + real-record backfill via the
+  explorer's `meta.next` cursor paging; always wipes first — merge-based writes double-count
+  otherwise; fleet gauges aren't backfillable). The `/trends` doc page is the read route's
+  first consumer (90d window, daily tier).
 - **`/api/global/at?ts=`** binary-searches ~23 tiny per-ordinal records to find the global carrying
   that exact stamp (the anchor join is timestamp EQUALITY). Its one consumer is the anchor log's
   ANCHORED INTO column resolution. ⚠️ An `?ordinal=` mode was added and then **removed** the same day

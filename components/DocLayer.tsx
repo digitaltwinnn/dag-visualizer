@@ -43,6 +43,7 @@ import RailThread from "@/components/RailThread";
 const DOC_COMPONENTS: Record<DocPage, ReturnType<typeof dynamic>> = {
   about: dynamic(() => import("@/components/docs/AboutDoc")),
   design: dynamic(() => import("@/components/docs/DesignDoc")),
+  trends: dynamic(() => import("@/components/docs/TrendsDoc")),
 };
 
 // The one doc column (both documents read it): max-w-3xl is the document reading measure;
