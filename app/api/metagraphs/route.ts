@@ -17,7 +17,8 @@ export const revalidate = 300; // re-fetch at most every 5 minutes (was 10 — u
 // a DOR restart left its signers reading "unknown node" for most of a cycle; halving the cadence
 // halves that stale window, and the geolocation batch rate stays well inside ip-api's free tier)
 // The live fan-out can run long if a cluster LB is slow; give it headroom over the
-// Hobby 10s default (the per-fetch timeout below keeps the realistic case well under).
+// Hobby 10s default (the per-fetch timeout in ./live's getJson keeps the realistic case
+// well under).
 export const maxDuration = 60;
 
 function withHues(list: Metagraph[], net: NetworkId): Metagraph[] {

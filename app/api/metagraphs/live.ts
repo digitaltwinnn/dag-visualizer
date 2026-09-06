@@ -3,8 +3,6 @@ import { NETWORKS, type NetworkId } from "@/src/engine/config";
 import { geolocate } from "@/src/server/ipGeolocate";
 import type { GeoMap } from "@/src/data/types";
 
-// The live fan-out can run long if a cluster LB is slow; give it headroom over the
-// Hobby 10s default (the per-fetch timeout below keeps the realistic case well under).
 const revalidate = 300; // re-fetch at most every 5 minutes (was 10 — user, 2026-08-14:
 // a DOR restart left its signers reading "unknown node" for most of a cycle; halving the cadence
 // halves that stale window, and the geolocation batch rate stays well inside ip-api's free tier)
