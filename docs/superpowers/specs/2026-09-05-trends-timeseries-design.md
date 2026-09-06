@@ -141,6 +141,25 @@ end-of-scope acceptance check.
 
 ## Out of scope (explicitly)
 
-- UI consumers (the byte-rate vital, trend surfaces/sparklines) — next phase.
+- UI consumers beyond the /trends doc page (vitals wiring, in-view trend surfaces) — next phase.
 - Scheduling integrationnet/testnet.
-- Backfilling history; migrating `/api/metagraphs` off `unstable_cache`.
+- Migrating `/api/metagraphs` off `unstable_cache`.
+
+## Revision 2026-09-06 — rebuild tool, 90d window, /trends doc page (Alexander)
+
+The original "no backfill" line is REVISED: it barred *fabrication*, and a backfill from the
+explorer's own records is real measured history. `scripts/rebuild-trends.ts` is the recovery
+tool ("useful when there is a bug"): it always wipes `t:{net}:*` first (merge-based writes
+would double-count otherwise), walks the explorer's `meta.next` cursor paging (probed live —
+`?limit=&next=`; `offset` is ignored) for the global chain and every catalog metagraph over
+`--days` (default 90), feeds the SAME bucketing/merge modules the sampler uses, prunes 5m-tier
+fields older than that tier's own retention, writes chunked `applyWrites` transactions, and
+leaves the cursor at the newest backfilled ordinals so the cron resumes seamlessly. FLEET
+gauges are not backfillable — no historical fleet record exists upstream — so f.* series begin
+at the first live sampler run; the doc page says so.
+
+Additions: a `90d` read window (daily tier, 91 points) and the `/trends` DOC OVERLAY page
+(`components/docs/TrendsDoc.tsx` + `TrendChart.tsx` — hand-rolled SVG small multiples in the
+app's token system; null buckets draw as GAPS, floors stay labelled). /about's "no database
+behind this site" claim was amended — the trends store is a database, and the copy now says
+exactly what it holds.
