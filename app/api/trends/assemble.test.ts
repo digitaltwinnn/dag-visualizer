@@ -9,6 +9,8 @@ describe("assemble", () => {
     expect(WINDOWS["30d"].tier).toBe("1h");
     expect(WINDOWS["90d"].tier).toBe("1d");
     expect(WINDOWS["90d"].ms).toBe(90 * 86400000);
+    expect(WINDOWS["180d"].tier).toBe("1d");
+    expect(WINDOWS["180d"].ms).toBe(180 * 86400000);
     expect(WINDOWS["1y"].tier).toBe("1d");
   });
   it("null for uncovered buckets, 0 for covered-but-absent counters, null for absent gauges", () => {

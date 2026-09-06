@@ -6,9 +6,8 @@ import { METAGRAPHS } from "@/src/net/current";
 import { netUrl } from "@/src/net/current";
 import { displayNetwork } from "@/src/data/unlisted";
 
-// THE TRENDS DOCUMENT (user, 2026-09-06: "a simple doc page with a 3-month chart for each
-// metric") — the first UI consumer of the trends backend: one daily-resolution chart per
-// stored metric over the /api/trends 90d window. It rides the doc-overlay recipe like About
+// THE TRENDS DOCUMENT (user, 2026-09-06: a chart per metric; widened to six months the same day) — the first UI consumer of the trends backend: one daily-resolution chart per
+// stored metric over the /api/trends 180d window. It rides the doc-overlay recipe like About
 // and Design (registry entry in views.ts, thin route, footer + info-menu toggles follow).
 //
 // HONESTY (rule 10, the trends store's own contract rendered): a null bucket draws as a GAP,
@@ -59,7 +58,7 @@ export default function TrendsDoc() {
 
   useEffect(() => {
     let dead = false;
-    fetch(netUrl("/api/trends?window=90d"))
+    fetch(netUrl("/api/trends?window=180d"))
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((data: TrendsPayload) => { if (!dead) setFetched({ state: "ready", data }); })
       .catch(() => { if (!dead) setFetched({ state: "error" }); });
@@ -83,7 +82,7 @@ export default function TrendsDoc() {
     <article className="pt-14">
       <p className="text-micro tracking-caps uppercase text-muted-foreground">Trends</p>
       <h1 className="mt-3 text-3xl font-semibold tracking-[-0.01em] leading-tight">
-        Three months of the network, measured daily
+        Six months of the network, measured daily
       </h1>
       <p className="mt-5 text-base text-foreground-dim leading-relaxed">
         Every reading below is summed from the chain&apos;s own records — each global snapshot and

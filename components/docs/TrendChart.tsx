@@ -133,7 +133,7 @@ export default function TrendChart({
             preserveAspectRatio="none"
             className="absolute inset-0 w-full h-full"
             role="img"
-            aria-label={`${name} — daily over the last 90 days`}
+            aria-label={`${name} — daily, ${buckets.length}-day window`}
           >
             {/* Recessive grid: three hairlines, no frame. */}
             {[0.25, 0.5, 0.75].map((f) => (

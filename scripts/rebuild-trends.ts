@@ -2,7 +2,7 @@
 // 2026-09-06: "this 'initial load' could be useful in the future as well when there is a bug").
 // Run manually, like every scripts/ tool:
 //
-//   npx tsx scripts/rebuild-trends.ts --net=mainnet --days=90
+//   npx tsx scripts/rebuild-trends.ts --net=mainnet --days=180
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --wipe-only
 //
 // A rebuild ALWAYS wipes `t:{net}:*` first: the store's write path is merge-based (add-series
@@ -54,8 +54,8 @@ function parseArgs(): Args {
     else if (arg.startsWith("--days=")) a.days = Number(arg.slice(7));
     else { console.error(`unknown arg ${arg}`); process.exit(1); }
   }
-  if (!["mainnet", "integrationnet", "testnet"].includes(a.net) || !(a.days > 0 && a.days <= 120)) {
-    console.error("usage: --net=mainnet|integrationnet|testnet --days=1..120 [--wipe-only]");
+  if (!["mainnet", "integrationnet", "testnet"].includes(a.net) || !(a.days > 0 && a.days <= 400)) {
+    console.error("usage: --net=mainnet|integrationnet|testnet --days=1..400 [--wipe-only]");
     process.exit(1);
   }
   return a;
