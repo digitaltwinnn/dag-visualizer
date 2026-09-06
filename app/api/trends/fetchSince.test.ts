@@ -1,0 +1,44 @@
+import { describe, it, expect } from "vitest";
+import { listSince } from "./fetchSince";
+
+// A fake chain served newest-first, the explorer's shape.
+const chain = (n: number) => Array.from({ length: n }, (_, i) => ({ ordinal: n - i }));
+const pager = (all: { ordinal: number }[], calls: number[]) => async (limit: number) => {
+  calls.push(limit);
+  return all.slice(0, limit);
+};
+
+describe("listSince", () => {
+  it("returns only records past the cursor, oldest first", async () => {
+    const { recs, gap } = await listSince(pager(chain(50), []), 45);
+    expect(recs.map((r) => r.ordinal)).toEqual([46, 47, 48, 49, 50]);
+    expect(gap).toBe(false);
+  });
+  it("grows 60 → 180 → 540 until the batch reaches the cursor", async () => {
+    const calls: number[] = [];
+    const { recs, gap } = await listSince(pager(chain(500), calls), 100);
+    expect(calls).toEqual([60, 180, 540]);
+    expect(recs[0].ordinal).toBe(101);
+    expect(recs.length).toBe(400);
+    expect(gap).toBe(false);
+  });
+  it("caps at 600 and reports the accepted gap", async () => {
+    const calls: number[] = [];
+    const { recs, gap } = await listSince(pager(chain(2000), calls), 100);
+    expect(calls).toEqual([60, 180, 540, 600]);
+    expect(gap).toBe(true);
+    expect(recs.length).toBe(600); // what it could get, still bucketed honestly
+  });
+  it("a cold cursor (-1) takes one page and reports no gap", async () => {
+    const calls: number[] = [];
+    const { recs, gap } = await listSince(pager(chain(500), calls), -1);
+    expect(calls).toEqual([60]);
+    expect(recs.length).toBe(60);
+    expect(gap).toBe(false);
+  });
+  it("an empty page is empty, not a gap", async () => {
+    const { recs, gap } = await listSince(async () => [], 100);
+    expect(recs).toEqual([]);
+    expect(gap).toBe(false);
+  });
+});
