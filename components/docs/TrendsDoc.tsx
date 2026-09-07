@@ -146,6 +146,21 @@ export default function TrendsDoc() {
         const line: TrendLine = { label: suffix, points, hue: net?.hue };
         return <TrendChart key={m.id} name={net?.name ?? m.id!} unit={unit} buckets={cBuckets} stepMs={stepMs} format={fmt} lines={[line]} />;
       });
+  /** Per-network GAUGE panels (fleet): untrimmed — a point sample is complete the moment it
+   *  is taken — and null where never sampled (gauges are not zero-filled). */
+  const netGaugePanels = (unit: string) =>
+    METAGRAPHS.filter((m) => m.id)
+      .map((m) => {
+        const points = S(p, `f.nodes.${m.id}`);
+        const last = points.reduce<number | null>((acc, v) => (v != null ? v : acc), null);
+        return { m, points, last };
+      })
+      .sort((a, b) => (b.last ?? -1) - (a.last ?? -1))
+      .map(({ m, points }) => {
+        const net = displayNetwork(m.id);
+        const line: TrendLine = { label: "nodes", points, hue: net?.hue };
+        return <TrendChart key={m.id} name={net?.name ?? m.id!} unit={unit} buckets={buckets} stepMs={stepMs} lines={[line]} />;
+      });
   const secs = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}s`;
   const mb = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 1 })} MB`;
 
@@ -320,8 +335,8 @@ export default function TrendsDoc() {
             <div className="flex items-center justify-between gap-3 flex-wrap pt-4">
               <TabsList aria-label="Metagraph sections">
                 <TabsTrigger value="snapshots" className={innerTrigger}>Snapshots</TabsTrigger>
-                <TabsTrigger value="fees" className={innerTrigger}>Fees</TabsTrigger>
-                <TabsTrigger value="data" className={innerTrigger}>Data</TabsTrigger>
+                <TabsTrigger value="economics" className={innerTrigger}>Economics</TabsTrigger>
+                <TabsTrigger value="fleet" className={innerTrigger}>Fleet</TabsTrigger>
               </TabsList>
               {zoomPicker}
             </div>
@@ -334,22 +349,36 @@ export default function TrendsDoc() {
             {netPanels("snaps", per)}
           </Section>
           </TabsContent>
-          <TabsContent value="fees">
+          <TabsContent value="economics">
           <Section
             id="net-fees"
             title="Fees paid"
-            lead="What each network paid the base ledger to anchor — exact, from its own snapshot records (these are the terms the network-wide floor sums)."
+            lead="What each network paid the base ledger to anchor — exact, from its own snapshot records (these are the terms the Hypergraph tab's floor sums)."
           >
             {netPanels("fee", `DAG${per}`, 1e-8, dag)}
           </Section>
-          </TabsContent>
-          <TabsContent value="data">
+
           <Section
             id="net-data"
             title="Data anchored"
             lead="How much state each network sealed into the base ledger — exact, from its own snapshot records."
           >
             {netPanels("kb", per, 1 / 1024, mb)}
+          </Section>
+          </TabsContent>
+          <TabsContent value="fleet">
+          <Section
+            id="net-fleet"
+            title="Fleet"
+            lead="Each network's own node count, sampled live every hour — no historical fleet record exists upstream, so these begin the day measuring started and fill forward."
+          >
+            {stepMs < 3600000 ? (
+              <p className="text-label text-muted-foreground">
+                The fleet is an hourly instrument — pick 7D or wider to see it.
+              </p>
+            ) : (
+              netGaugePanels("nodes")
+            )}
           </Section>
           </TabsContent>
           </Tabs>
