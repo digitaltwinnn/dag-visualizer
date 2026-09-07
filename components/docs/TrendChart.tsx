@@ -109,7 +109,20 @@ export default function TrendChart({
   }
 
   const hue0 = lines[0]?.hue ?? "var(--primary)";
-  const last = lines[0]?.points.reduce<number | null>((acc, v) => (v != null ? v : acc), null);
+  // The head's right-hand readout is the NEWEST MEASURED BUCKET — stamped with its own
+  // date/time (user, 2026-09-07: "what does the number mean? total? average?" — an unlabeled
+  // number is ambiguous, and a reading is only honest while you can see the span it covers).
+  let lastIdx = -1;
+  for (let i = (lines[0]?.points.length ?? 0) - 1; i >= 0; i--) {
+    if (lines[0].points[i] != null) { lastIdx = i; break; }
+  }
+  const last = lastIdx >= 0 ? lines[0].points[lastIdx] : null;
+  const lastStamp =
+    lastIdx >= 0
+      ? stepMs >= 86400000
+        ? new Date(buckets[lastIdx]).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" })
+        : new Date(buckets[lastIdx]).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" }) + " UTC"
+      : null;
 
   return (
     <div className={cn("min-w-0", className)}>
@@ -131,7 +144,10 @@ export default function TrendChart({
           </span>
         )}
         {lines.length === 1 && last != null && (
-          <span className="ml-auto text-label text-foreground-dim tabular-nums">{format(last)}</span>
+          <span className="ml-auto inline-flex items-baseline gap-1.5">
+            <span className="text-micro text-muted-foreground">{lastStamp}</span>
+            <span className="text-label text-foreground-dim tabular-nums">{format(last)}</span>
+          </span>
         )}
       </div>
       {!measured ? (
