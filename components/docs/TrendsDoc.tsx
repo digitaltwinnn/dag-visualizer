@@ -72,7 +72,7 @@ const scale = (points: (number | null)[], k: number): (number | null)[] =>
 
 function Section({ id, title, lead, children }: { id: string; title: string; lead: string; children: React.ReactNode }) {
   return (
-    <section id={id} className="mt-12 scroll-mt-24">
+    <section id={id} className="mt-8 scroll-mt-24">
       <h2 className="text-lg font-semibold text-foreground">{title}</h2>
       <div className="mt-3 border-t border-border" />
       <p className="mt-3 text-label text-muted-foreground leading-relaxed">{lead}</p>
@@ -149,6 +149,35 @@ export default function TrendsDoc() {
   const secs = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}s`;
   const mb = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 1 })} MB`;
 
+  // The zoom — a filter over every chart at once; it rides each inner section row so it is
+  // always beside the control it composes with.
+  const zoomPicker = (
+    <div role="group" aria-label="Time window" className="inline-flex items-center rounded-lg bg-muted p-[3px]">
+      {ZOOMS.map((z) => (
+        <button
+          key={z.id}
+          type="button"
+          aria-pressed={zoom === z.id}
+          onClick={() => setZoom(z.id)}
+          className={
+            zoom === z.id
+              ? "h-7 px-3 rounded-md text-label tracking-caps uppercase text-foreground bg-[var(--panel-solid)] shadow-sm"
+              : "h-7 px-3 rounded-md text-label tracking-caps uppercase text-muted-foreground hover:text-foreground"
+          }
+        >
+          {z.label}
+        </button>
+      ))}
+    </div>
+  );
+  // SECTIONS AS SUB-TABS (user, 2026-09-07): one section at a time inside each drawer. The
+  // hierarchy carries the design: the outer pair is the file-cabinet (primary), the inner
+  // switcher the segmented-pill register the zoom already wears (secondary) — two drawer
+  // levels would read as furniture. Continuity lives under Hypergraph on its own: the base
+  // ledger's steadiness is a hypergraph concern, and it deliberately doesn't blend with
+  // anchoring (the user's own earlier split).
+  const innerTrigger = "text-label tracking-caps uppercase px-3 data-[state=active]:bg-[var(--panel-solid)]!";
+
   return (
     <article className="pt-14">
       <p className="text-micro tracking-caps uppercase text-muted-foreground">Trends</p>
@@ -210,28 +239,20 @@ export default function TrendsDoc() {
           {/* The drawer's own outline — the tab row's baseline hairline is its top edge (the
               channel pane's rule), so the active tab's panel-solid fill bridges into it. */}
           <div className="border border-t-0 border-border/50 rounded-b-md px-5 pb-8">
-            {/* The zoom — a filter over every chart at once, INSIDE the drawer it filters. */}
-            <div role="group" aria-label="Time window" className="flex justify-end pt-4">
-              <div className="inline-flex items-center rounded-lg bg-muted p-[3px]">
-                {ZOOMS.map((z) => (
-                  <button
-                    key={z.id}
-                    type="button"
-                    aria-pressed={zoom === z.id}
-                    onClick={() => setZoom(z.id)}
-                    className={
-                      zoom === z.id
-                        ? "h-7 px-3 rounded-md text-label tracking-caps uppercase text-foreground bg-[var(--panel-solid)] shadow-sm"
-                        : "h-7 px-3 rounded-md text-label tracking-caps uppercase text-muted-foreground hover:text-foreground"
-                    }
-                  >
-                    {z.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+
 
           <TabsContent value="hypergraph">
+          <Tabs defaultValue="snapshots" className="gap-0">
+            <div className="flex items-center justify-between gap-3 flex-wrap pt-4">
+              <TabsList aria-label="Hypergraph sections">
+                <TabsTrigger value="snapshots" className={innerTrigger}>Snapshots</TabsTrigger>
+                <TabsTrigger value="continuity" className={innerTrigger}>Continuity</TabsTrigger>
+                <TabsTrigger value="economics" className={innerTrigger}>Economics</TabsTrigger>
+                <TabsTrigger value="fleet" className={innerTrigger}>Fleet</TabsTrigger>
+              </TabsList>
+              {zoomPicker}
+            </div>
+          <TabsContent value="snapshots">
           <Section
             id="ledger"
             title="The base ledger"
@@ -241,7 +262,8 @@ export default function TrendsDoc() {
             <TrendChart name="Snapshots anchored" unit={per} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "anchored", points: trim(S(p, "g.anchors")) }]} />
             <TrendChart name="Blocks" unit={per} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "blocks", points: trim(S(p, "g.blocks")) }]} />
           </Section>
-
+          </TabsContent>
+          <TabsContent value="continuity">
           <Section
             id="continuity"
             title="Continuity"
@@ -250,7 +272,8 @@ export default function TrendsDoc() {
             <TrendChart name="Mean gap" unit="seconds" buckets={cBuckets} stepMs={stepMs} format={secs} lines={[{ label: "mean", points: trim(meanGap(p)) }]} />
             <TrendChart name="Longest pause" unit={`seconds · the ${stepMs >= 86400000 ? "day" : "bucket"}'s single widest gap`} buckets={cBuckets} stepMs={stepMs} format={secs} lines={[{ label: "max", points: trim(S(p, "g.gapMax")) }]} />
           </Section>
-
+          </TabsContent>
+          <TabsContent value="economics">
           <Section
             id="economics"
             title="Economics"
@@ -259,7 +282,8 @@ export default function TrendsDoc() {
             <TrendChart name="Fees paid" unit={`DAG${per} · floor`} buckets={cBuckets} stepMs={stepMs} format={dag} lines={[{ label: "fees", points: trim(scale(S(p, "g.feeFloor"), 1e-8)) }]} />
             <TrendChart name="Data anchored" unit={`${per} · floor`} buckets={cBuckets} stepMs={stepMs} format={mb} lines={[{ label: "data", points: trim(scale(S(p, "g.kbFloor"), 1 / 1024)) }]} />
           </Section>
-
+          </TabsContent>
+          <TabsContent value="fleet">
           <Section
             id="fleet"
             title="Fleet"
@@ -288,8 +312,20 @@ export default function TrendsDoc() {
             )}
           </Section>
           </TabsContent>
+          </Tabs>
+          </TabsContent>
 
           <TabsContent value="metagraphs">
+          <Tabs defaultValue="snapshots" className="gap-0">
+            <div className="flex items-center justify-between gap-3 flex-wrap pt-4">
+              <TabsList aria-label="Metagraph sections">
+                <TabsTrigger value="snapshots" className={innerTrigger}>Snapshots</TabsTrigger>
+                <TabsTrigger value="fees" className={innerTrigger}>Fees</TabsTrigger>
+                <TabsTrigger value="data" className={innerTrigger}>Data</TabsTrigger>
+              </TabsList>
+              {zoomPicker}
+            </div>
+          <TabsContent value="snapshots">
           <Section
             id="networks"
             title="Snapshots"
@@ -297,7 +333,8 @@ export default function TrendsDoc() {
           >
             {netPanels("snaps", per)}
           </Section>
-
+          </TabsContent>
+          <TabsContent value="fees">
           <Section
             id="net-fees"
             title="Fees paid"
@@ -305,7 +342,8 @@ export default function TrendsDoc() {
           >
             {netPanels("fee", `DAG${per}`, 1e-8, dag)}
           </Section>
-
+          </TabsContent>
+          <TabsContent value="data">
           <Section
             id="net-data"
             title="Data anchored"
@@ -313,6 +351,8 @@ export default function TrendsDoc() {
           >
             {netPanels("kb", per, 1 / 1024, mb)}
           </Section>
+          </TabsContent>
+          </Tabs>
           </TabsContent>
           </div>
         </Tabs>
