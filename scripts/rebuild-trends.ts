@@ -4,7 +4,15 @@
 //
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --days=180
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --extend-to=2026-01-01
+//   npx tsx scripts/rebuild-trends.ts --net=mainnet --recompute-from=2026-09-06
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --wipe-only
+//
+// --recompute-from REPAIRS RECENT DAYS (2026-09-07, found live the day it was needed): a
+// sampler catch-up that runs past the pager's 600-record cap ACCEPTS a gap — honest, but the
+// affected day then carries a measured-looking floor that reads as a crash. This mode
+// recomputes every day from the given date through YESTERDAY (UTC) completely from the tip —
+// all chains, daily tier overwritten whole, today's partial day and the cron cursor untouched.
+// Locally-driven stores need it after manual sampling; a production cron never should.
 //
 // --extend-to EXTENDS HISTORY BACKWARD WITHOUT WIPING (user, 2026-09-07: "without removing/
 // duplicating data"): everything strictly older than the store's oldest covered day is a
@@ -57,9 +65,9 @@ function loadEnvLocal(): void {
   }
 }
 
-interface Args { net: "mainnet" | "integrationnet" | "testnet"; days: number; wipeOnly: boolean; extendToMs: number | null }
+interface Args { net: "mainnet" | "integrationnet" | "testnet"; days: number; wipeOnly: boolean; extendToMs: number | null; recomputeFromMs: number | null }
 function parseArgs(): Args {
-  const a: Args = { net: "mainnet", days: 90, wipeOnly: false, extendToMs: null };
+  const a: Args = { net: "mainnet", days: 90, wipeOnly: false, extendToMs: null, recomputeFromMs: null };
   for (const arg of process.argv.slice(2)) {
     if (arg === "--wipe-only") a.wipeOnly = true;
     else if (arg.startsWith("--net=")) a.net = arg.slice(6) as Args["net"];
@@ -68,6 +76,11 @@ function parseArgs(): Args {
       const m = arg.slice(12).match(/^(\d{4})-(\d{2})-(\d{2})$/);
       if (m) a.extendToMs = Date.UTC(+m[1], +m[2] - 1, +m[3]);
       else { console.error("--extend-to wants YYYY-MM-DD (UTC)"); process.exit(1); }
+    }
+    else if (arg.startsWith("--recompute-from=")) {
+      const m = arg.slice(17).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (m) a.recomputeFromMs = Date.UTC(+m[1], +m[2] - 1, +m[3]);
+      else { console.error("--recompute-from wants YYYY-MM-DD (UTC)"); process.exit(1); }
     }
     else { console.error(`unknown arg ${arg}`); process.exit(1); }
   }
@@ -170,7 +183,7 @@ async function walkChain<T extends { timestamp: string }>(
 
 async function main(): Promise<void> {
   loadEnvLocal();
-  const { net, days, wipeOnly, extendToMs } = parseArgs();
+  const { net, days, wipeOnly, extendToMs, recomputeFromMs } = parseArgs();
 
   // Deferred imports: store.ts reads env at construction, so env must be loaded first.
   const { Redis } = await import("@upstash/redis");
@@ -189,6 +202,55 @@ async function main(): Promise<void> {
   });
 
   const be0 = NETWORKS[net].be;
+
+  // ---- RECOMPUTE mode: repair recent days whole (see the header) ----
+  if (recomputeFromMs != null) {
+    const todayStartMs = Math.floor(Date.now() / 86400000) * 86400000;
+    if (recomputeFromMs >= todayStartMs) { console.error("recompute-from must be before today (UTC)"); process.exit(1); }
+    console.log(`recomputing ${new Date(recomputeFromMs).toISOString().slice(0, 10)} → yesterday, whole days, from the tip …`);
+    const inc: IncMap = new Map();
+    const tierOf = (key: string): Tier => key.split(":")[2] as Tier;
+    /** Whole days only: today's still-filling partial stays out (the charts trim it anyway). */
+    const whole = <T extends { timestamp: string }>(recs: T[]): T[] =>
+      recs.filter((r) => Date.parse(r.timestamp) < todayStartMs);
+
+    const globals: GlobalRec[] = [];
+    await walkChain<GlobalRec & { timestamp: string }>(`${be0}/global-snapshots`, recomputeFromMs, (recs) => {
+      for (const r of whole(recs)) globals.push({ ordinal: r.ordinal, timestamp: r.timestamp, metagraphSnapshotCount: r.metagraphSnapshotCount, blocks: r.blocks });
+    }, "global");
+    globals.sort((a, b) => a.ordinal - b.ordinal);
+    {
+      let dayStart = 0;
+      let prevTs: number | null = null;
+      for (let i = 1; i <= globals.length; i++) {
+        const boundary = i === globals.length ||
+          new Date(Date.parse(globals[i].timestamp)).getUTCDate() !== new Date(Date.parse(globals[dayStart].timestamp)).getUTCDate();
+        if (!boundary) continue;
+        const chunk = globals.slice(dayStart, i);
+        bucketGlobals(inc, net, chunk, prevTs);
+        prevTs = Date.parse(chunk[chunk.length - 1].timestamp);
+        dayStart = i;
+      }
+    }
+    for (const id of CATALOG[net].map((m) => m.id).filter((v): v is string => !!v)) {
+      await walkChain<MetaRec & { timestamp: string }>(`${be0}/currency/${id}/snapshots`, recomputeFromMs, (recs) => {
+        bucketMetas(inc, net, id, whole(recs).map((r) => ({ ordinal: r.ordinal, timestamp: r.timestamp, fee: r.fee, sizeInKB: r.sizeInKB })));
+      }, id.slice(0, 10));
+    }
+    console.log("writing (daily tier) …");
+    const store = writeStore();
+    let fields = 0;
+    for (const [key, map] of inc) {
+      if (tierOf(key) !== "1d") continue;
+      const entries = [...map.entries()];
+      for (let i = 0; i < entries.length; i += 400) {
+        await store.applyWrites([{ key, map: Object.fromEntries(entries.slice(i, i + 400)), ttlS: null }]);
+      }
+      fields += entries.length;
+    }
+    console.log(`  ${fields} daily fields recomputed; cursor untouched.`);
+    return;
+  }
 
   // ---- EXTEND mode: backward-only, wipeless (see the header) ----
   if (extendToMs != null) {

@@ -22,12 +22,19 @@ describe("listSince", () => {
     expect(recs.length).toBe(400);
     expect(gap).toBe(false);
   });
-  it("caps at 600 and reports the accepted gap", async () => {
+  it("keeps growing to the 30K self-heal depth for a long outage", async () => {
     const calls: number[] = [];
-    const { recs, gap } = await listSince(pager(chain(2000), calls), 100);
-    expect(calls).toEqual([60, 180, 540, 600]);
+    const { recs, gap } = await listSince(pager(chain(20000), calls), 100);
+    expect(calls).toEqual([60, 180, 540, 1620, 4860, 14580, 20000 > 14580 ? 30000 : 0].filter((v) => v));
+    expect(recs.length).toBe(19900);
+    expect(gap).toBe(false);
+  });
+  it("caps at 30,000 and reports the accepted gap", async () => {
+    const calls: number[] = [];
+    const { recs, gap } = await listSince(pager(chain(40000), calls), 100);
+    expect(calls[calls.length - 1]).toBe(30000);
     expect(gap).toBe(true);
-    expect(recs.length).toBe(600); // what it could get, still bucketed honestly
+    expect(recs.length).toBe(30000); // what it could get, still bucketed honestly
   });
   it("a cold cursor (-1) takes one page and reports no gap", async () => {
     const calls: number[] = [];

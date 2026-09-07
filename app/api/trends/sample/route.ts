@@ -13,7 +13,9 @@ import type { FleetCounts, GlobalRec, MetaRec } from "../bucketing";
 // automatically once the env var exists.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// 300 s (was 60): pays for the pager's 30K-record self-heal depth after downtime — a normal
+// 15-min run still finishes in seconds; only a catch-up after an outage goes deep.
+export const maxDuration = 300;
 
 async function getJson(url: string, ms = 7000): Promise<unknown> {
   const r = await fetch(url, {

@@ -3,11 +3,18 @@
 // back to the cursor, capped. Past the cap the gap is ACCEPTED and stays a gap in the
 // series (rule 10: an honest hole beats a fabricated bridge). A COLD cursor (-1) takes one
 // page — history before the feature's deploy simply doesn't exist (no backfill, per spec).
+//
+// THE CAP IS THE SELF-HEAL DEPTH (raised 600 → 30,000, 2026-09-07): it decides how much
+// downtime a deploy gap or outage recovers from without leaving a hole. The explorer serves
+// 10K-record pages (probed live), and the busiest chain (DOR, ~29K records/day) sets the
+// clock — 30K covers ~a day of DOR downtime and weeks of everything else; the sampler's
+// maxDuration rose to 300 s to pay for the worst case. Beyond the cap the gap is accepted,
+// and scripts/rebuild-trends.ts --recompute-from repairs the affected days whole.
 export async function listSince<T extends { ordinal: number }>(
   page: (limit: number) => Promise<T[]>,
   sinceOrdinal: number,
 ): Promise<{ recs: T[]; gap: boolean }> {
-  const CAP = 600;
+  const CAP = 30000;
   let limit = 60;
   let list: T[] = [];
   for (;;) {
