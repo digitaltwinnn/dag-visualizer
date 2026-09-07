@@ -1,55 +1,33 @@
 "use client";
-import { useRef, useState } from "react";
-import { cn } from "@/lib/utils";
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 // THE TRENDS DOC'S ONE CHART PRIMITIVE — a small-multiple line chart over the /api/trends
-// daily buckets (2026-09-06). Hand-rolled SVG like every chart in this app (the vitals band's
-// Sparkline/TickBars precedent — recharts stays unused), so it speaks the token system natively.
+// buckets, on RECHARTS (user, 2026-09-07: "why hand-roll charts if we have a neat library?" —
+// and the vitals band's Sparkline had already established the recharts idiom, so the library
+// was in the bundle all along; this file's first cut claimed otherwise and hand-rolled).
+// Recharts lays out at pixel size, which retires the hand-rolled version's stretch hacks
+// (non-scaling strokes, HTML-overlay dots); every colour it draws is a CSS token string, so
+// the design system holds.
 //
-// The honesty rules are the store's, rendered: a null bucket is a GAP in the line (not a zero,
-// not an interpolation — the path breaks), an isolated measured point between gaps still shows
-// (a dot, since no segment can reach it), and a series with nothing measured in the window says
-// so in words instead of drawing an empty plot. Identity: the hue prop carries a network's own
-// colour, but the NAME beside the chart is what identifies it — colour is never the only
-// channel (the dataviz rule the vitals band already follows).
-//
-// Geometry: the plot is one SVG stretched to the panel (preserveAspectRatio="none" +
-// non-scaling strokes), while every piece of TEXT is an HTML overlay — SVG text under a
-// non-uniform stretch would distort, and HTML text wears the type tokens for free. The hover
-// layer is a crosshair + readout chip (pointer events on the wrapper, nearest-bucket snap);
-// charts without hover read as pictures, and this page is an instrument.
+// The honesty rules are the store's, rendered: a null bucket is a GAP in the line
+// (`connectNulls={false}` — never a zero, never an interpolation), an isolated measured point
+// between gaps still shows (a dot, since no segment can reach it), a series with nothing
+// measured says so in words instead of drawing an empty plot, and the head's right-hand
+// readout is the newest measured bucket stamped with its own date — a reading is only honest
+// while you can see the span it covers. Identity: the hue prop carries a network's own colour,
+// but the NAME beside the chart is what identifies it — colour is never the only channel.
 
 export interface TrendLine {
   label: string;
   points: (number | null)[];
-  /** Dashed = the secondary reading of a pair (cadence max vs mean) — a second channel beside
-   *  colour, so the pair survives grayscale. */
+  /** Dashed = the secondary reading of a pair — a second channel beside colour, so the pair
+   *  survives grayscale. */
   dash?: boolean;
   hue?: string;
 }
 
-const W = 600;
-const H = 120;
-const PAD_Y = 6; // keeps the 2px stroke's extremes inside the box
-
-/** Line path + the isolated points no segment can reach (rendered as HTML dots — an SVG
- *  circle under this chart's non-uniform stretch would squash into an ellipse). */
-function pathOf(points: (number | null)[], max: number): { d: string; dots: { i: number; v: number }[] } {
-  const n = points.length;
-  const x = (i: number) => (i / Math.max(1, n - 1)) * W;
-  const y = (v: number) => H - PAD_Y - (v / max) * (H - 2 * PAD_Y);
-  let d = "";
-  const dots: { i: number; v: number }[] = [];
-  for (let i = 0; i < n; i++) {
-    const v = points[i];
-    if (v == null) continue;
-    const prev = i > 0 ? points[i - 1] : null;
-    const next = i < n - 1 ? points[i + 1] : null;
-    if (prev == null && next == null) dots.push({ i, v });
-    else d += `${prev == null ? "M" : "L"}${x(i).toFixed(1)} ${y(v).toFixed(1)}`;
-  }
-  return { d, dots };
-}
+const PLOT_H = 120;
+const AXIS_H = 18;
 
 export default function TrendChart({
   name,
@@ -61,76 +39,74 @@ export default function TrendChart({
   className,
 }: {
   name: string;
-  /** The unit word the readout appends (" /day", " s", " DAG"…) — the label carries it once. */
+  /** The unit word the head carries once (" /day", " seconds", " total"…). */
   unit?: string;
   lines: TrendLine[];
   /** Bucket START instants (epoch ms UTC), oldest → newest — the API's own axis. */
   buckets: number[];
   /** The bucket width (the payload's own stepMs) — drives axis-mark granularity and the
-   *  hover stamp's precision. Daily by default. */
+   *  stamps' precision. Daily by default. */
   stepMs?: number;
   format?: (v: number) => string;
   className?: string;
 }) {
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const [hover, setHover] = useState<number | null>(null);
-
   const n = buckets.length;
   const measured = lines.some((l) => l.points.some((v) => v != null));
   const max = Math.max(1e-9, ...lines.flatMap((l) => l.points.filter((v): v is number => v != null))) * 1.05;
 
-  const onMove = (e: React.PointerEvent) => {
-    const r = wrapRef.current?.getBoundingClientRect();
-    if (!r || n < 2) return;
-    setHover(Math.min(n - 1, Math.max(0, Math.round(((e.clientX - r.left) / r.width) * (n - 1)))));
-  };
+  const rows = buckets.map((ts, i) => {
+    const row: Record<string, number | null> = { ts };
+    for (const l of lines) row[l.label] = l.points[i];
+    return row;
+  });
 
-  // Axis marks, at the granularity the window can carry: months for a long daily window,
-  // days for a week or a month of hours, six-hour marks inside a day. Right-edge marks are
-  // skipped — a label there would clip against the plot's overflow.
+  // Axis marks at the granularity the window can carry: months for a long daily window, days
+  // for a week, weekly (Mondays) for a month of hours, six-hour marks inside a day.
   const spanMs = n > 1 ? buckets[n - 1] - buckets[0] : 0;
-  const marks: { frac: number; label: string }[] = [];
+  const ticks: number[] = [];
   for (let i = 1; i < n; i++) {
     const d = new Date(buckets[i]);
     const prev = new Date(buckets[i - 1]);
-    const frac = i / (n - 1);
-    if (frac > 0.93) continue;
     if (spanMs > 45 * 86400000) {
-      if (prev.getUTCMonth() !== d.getUTCMonth())
-        marks.push({ frac, label: d.toLocaleDateString(undefined, { month: "short", timeZone: "UTC" }) });
+      if (prev.getUTCMonth() !== d.getUTCMonth()) ticks.push(buckets[i]);
     } else if (spanMs > 2 * 86400000) {
-      // a week of days marks daily; a month of days marks weekly (Mondays)
-      if (prev.getUTCDate() !== d.getUTCDate() && (spanMs <= 9 * 86400000 || d.getUTCDay() === 1))
-        marks.push({ frac, label: d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" }) });
-    } else {
-      if (d.getUTCHours() % 6 === 0 && d.getUTCMinutes() === 0 && !(prev.getUTCHours() === d.getUTCHours() && prev.getUTCDate() === d.getUTCDate()))
-        marks.push({ frac, label: `${String(d.getUTCHours()).padStart(2, "0")}:00` });
+      if (prev.getUTCDate() !== d.getUTCDate() && (spanMs <= 9 * 86400000 || d.getUTCDay() === 1)) ticks.push(buckets[i]);
+    } else if (d.getUTCHours() % 6 === 0 && d.getUTCMinutes() === 0 && !(prev.getUTCHours() === d.getUTCHours() && prev.getUTCDate() === d.getUTCDate())) {
+      ticks.push(buckets[i]);
     }
   }
+  const tickLabel = (ts: number): string => {
+    const d = new Date(ts);
+    if (spanMs > 45 * 86400000) return d.toLocaleDateString(undefined, { month: "short", timeZone: "UTC" });
+    if (spanMs > 2 * 86400000) return d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+    return `${String(d.getUTCHours()).padStart(2, "0")}:00`;
+  };
+  const stampOf = (ts: number): string =>
+    stepMs < 86400000
+      ? new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" }) + " UTC"
+      : new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
 
   const hue0 = lines[0]?.hue ?? "var(--primary)";
-  // The head's right-hand readout is the NEWEST MEASURED BUCKET — stamped with its own
-  // date/time (user, 2026-09-07: "what does the number mean? total? average?" — an unlabeled
-  // number is ambiguous, and a reading is only honest while you can see the span it covers).
+  // The head's right-hand readout: the NEWEST MEASURED BUCKET, stamped with its own date —
+  // an unlabeled number reads as anything (a total, an average), and it is neither.
   let lastIdx = -1;
   for (let i = (lines[0]?.points.length ?? 0) - 1; i >= 0; i--) {
     if (lines[0].points[i] != null) { lastIdx = i; break; }
   }
   const last = lastIdx >= 0 ? lines[0].points[lastIdx] : null;
-  const lastStamp =
-    lastIdx >= 0
-      ? stepMs >= 86400000
-        ? new Date(buckets[lastIdx]).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" })
-        : new Date(buckets[lastIdx]).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" }) + " UTC"
-      : null;
+
+  /** An isolated measured point (both neighbours null) gets a dot — no segment can reach it. */
+  const isolated = (l: TrendLine, i: number): boolean =>
+    l.points[i] != null && (i === 0 || l.points[i - 1] == null) && (i === n - 1 || l.points[i + 1] == null);
 
   return (
-    <div className={cn("min-w-0", className)}>
+    <div className={className ? `min-w-0 ${className}` : "min-w-0"}>
       <div className="flex items-baseline gap-2 mb-1">
         <span className="inline-block w-2 h-2 rounded-full flex-none" style={{ background: hue0 }} aria-hidden />
         <span className="text-label font-semibold text-foreground truncate">{name}</span>
         {unit && <span className="text-micro text-muted-foreground">{unit}</span>}
-        {/* The pair legend — only when there IS a pair (one series needs no legend, its name is the title). */}
+        {/* The pair legend — only when there IS a pair (one series needs no legend, its name is
+            the title). */}
         {lines.length > 1 && (
           <span className="ml-auto inline-flex items-center gap-2 text-micro text-muted-foreground">
             {lines.map((l) => (
@@ -145,96 +121,83 @@ export default function TrendChart({
         )}
         {lines.length === 1 && last != null && (
           <span className="ml-auto inline-flex items-baseline gap-1.5">
-            <span className="text-micro text-muted-foreground">{lastStamp}</span>
+            <span className="text-micro text-muted-foreground">{stampOf(buckets[lastIdx])}</span>
             <span className="text-label text-foreground-dim tabular-nums">{format(last)}</span>
           </span>
         )}
       </div>
       {!measured ? (
-        <div className="h-[120px] grid place-items-center rounded-md border border-border border-dashed">
+        <div className="h-[138px] grid place-items-center rounded-md border border-border border-dashed">
           <span className="text-label text-muted-foreground">no measurements in this window</span>
         </div>
       ) : (
         <div
-          ref={wrapRef}
-          className="relative h-[120px] rounded-md overflow-hidden bg-[var(--panel-plate)]"
-          onPointerMove={onMove}
-          onPointerLeave={() => setHover(null)}
+          className="relative rounded-md bg-[var(--panel-plate)]"
+          role="img"
+          aria-label={`${name} — ${stepMs >= 86400000 ? "daily" : stepMs >= 3600000 ? "hourly" : "5-minute"} buckets, ${n} of them`}
         >
-          <svg
-            viewBox={`0 0 ${W} ${H}`}
-            preserveAspectRatio="none"
-            className="absolute inset-0 w-full h-full"
-            role="img"
-            aria-label={`${name} — ${stepMs >= 86400000 ? "daily" : stepMs >= 3600000 ? "hourly" : "5-minute"} buckets, ${buckets.length} of them`}
-          >
-            {/* Recessive grid: three hairlines, no frame. */}
-            {[0.25, 0.5, 0.75].map((f) => (
-              <line key={f} x1="0" x2={W} y1={H * f} y2={H * f} stroke="var(--border)" strokeWidth="1" vectorEffect="non-scaling-stroke" opacity="0.5" />
-            ))}
-            {lines.map((l) => {
-              const { d } = pathOf(l.points, max);
-              const hue = l.hue ?? hue0;
-              return (
-                <g key={l.label}>
-                  {d && (
-                    <path d={d} fill="none" stroke={hue} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeDasharray={l.dash ? "4 4" : undefined} strokeLinejoin="round" />
-                  )}
-                </g>
-              );
-            })}
-          </svg>
-          {/* Isolated measured points — HTML dots, so they stay round however the plot
-              stretches. */}
-          {lines.flatMap((l) =>
-            pathOf(l.points, max).dots.map((pt) => (
-              <span
-                key={`${l.label}|${pt.i}`}
-                aria-hidden
-                className="absolute w-[5px] h-[5px] rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-                style={{
-                  background: l.hue ?? hue0,
-                  left: `${(pt.i / Math.max(1, n - 1)) * 100}%`,
-                  top: `${((H - PAD_Y - (pt.v / max) * (H - 2 * PAD_Y)) / H) * 100}%`,
+          <ResponsiveContainer width="100%" height={PLOT_H + AXIS_H}>
+            <LineChart data={rows} margin={{ top: 6, right: 2, bottom: 0, left: 2 }}>
+              <CartesianGrid
+                vertical={false}
+                stroke="var(--border)"
+                strokeOpacity={0.5}
+                horizontalCoordinatesGenerator={({ height }) => [height * 0.25, height * 0.5, height * 0.75]}
+              />
+              <XAxis
+                dataKey="ts"
+                type="number"
+                domain={["dataMin", "dataMax"]}
+                ticks={ticks}
+                tickFormatter={tickLabel}
+                axisLine={false}
+                tickLine={false}
+                height={AXIS_H}
+                tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+              />
+              <YAxis hide domain={[0, max]} />
+              <Tooltip
+                isAnimationActive={false}
+                cursor={{ stroke: "var(--primary)", strokeOpacity: 0.4 }}
+                content={({ active, payload, label }) => {
+                  if (!active || !payload?.length) return null;
+                  return (
+                    <div className="rounded border border-border bg-[var(--panel)] px-1.5 py-0.5 text-micro text-foreground whitespace-nowrap tabular-nums">
+                      <span className="text-muted-foreground">{stampOf(Number(label))}{" · "}</span>
+                      {lines.map((l, li) => {
+                        const v = payload.find((e) => e.dataKey === l.label)?.value;
+                        return (
+                          <span key={l.label}>
+                            {li > 0 && <span className="text-muted-foreground"> · </span>}
+                            {lines.length > 1 && <span className="text-muted-foreground">{l.label} </span>}
+                            {v != null ? format(Number(v)) : "—"}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  );
                 }}
               />
-            )),
-          )}
-          {/* Crosshair + readout — nearest bucket, clamped chip, no pointer events of its own. */}
-          {hover != null && (
-            <>
-              <div
-                aria-hidden
-                className="absolute top-0 bottom-0 w-px bg-[var(--primary)] opacity-40 pointer-events-none"
-                style={{ left: `${(hover / Math.max(1, n - 1)) * 100}%` }}
-              />
-              <div
-                className="absolute top-1 pointer-events-none rounded border border-border bg-[var(--panel)] px-1.5 py-0.5 text-micro text-foreground whitespace-nowrap tabular-nums"
-                style={hover / (n - 1) < 0.5 ? { left: `calc(${(hover / (n - 1)) * 100}% + 6px)` } : { right: `calc(${100 - (hover / (n - 1)) * 100}% + 6px)` }}
-              >
-                <span className="text-muted-foreground">
-                  {stepMs < 86400000
-                    ? new Date(buckets[hover]).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" }) + " UTC"
-                    : new Date(buckets[hover]).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" })}
-                  {" · "}
-                </span>
-                {lines.map((l, li) => (
-                  <span key={l.label}>
-                    {li > 0 && <span className="text-muted-foreground"> · </span>}
-                    {lines.length > 1 && <span className="text-muted-foreground">{l.label} </span>}
-                    {l.points[hover] != null ? format(l.points[hover]!) : "—"}
-                  </span>
-                ))}
-              </div>
-            </>
-          )}
-          {/* Axis marks ride the plot's bottom edge. */}
-          {marks.map((m) => (
-            <span key={m.frac} aria-hidden className="absolute bottom-0.5 text-micro text-muted-foreground pointer-events-none" style={{ left: `calc(${m.frac * 100}% + 3px)` }}>
-              {m.label}
-            </span>
-          ))}
-          {/* Y max label — the scale's one number; the baseline is 0 by construction. */}
+              {lines.map((l) => (
+                <Line
+                  key={l.label}
+                  dataKey={l.label}
+                  type="linear"
+                  stroke={l.hue ?? hue0}
+                  strokeWidth={2}
+                  strokeDasharray={l.dash ? "4 4" : undefined}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                  dot={(props: { key?: React.Key | null; index?: number; cx?: number; cy?: number }) => {
+                    const { key, index, cx, cy } = props;
+                    if (index == null || cx == null || cy == null || !isolated(l, index)) return <g key={key ?? undefined} />;
+                    return <circle key={key ?? undefined} cx={cx} cy={cy} r={2.5} fill={l.hue ?? hue0} />;
+                  }}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+          {/* The y scale's one number — the baseline is 0 by construction. */}
           <span aria-hidden className="absolute top-0.5 left-1.5 text-micro text-muted-foreground pointer-events-none tabular-nums">
             {format(max / 1.05)}
           </span>

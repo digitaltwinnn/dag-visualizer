@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TrendChart, { type TrendLine } from "@/components/docs/TrendChart";
 import { METAGRAPHS, netUrl } from "@/src/net/current";
 import { displayNetwork } from "@/src/data/unlisted";
+import { cn } from "@/lib/utils";
 
 // THE TRENDS DOCUMENT (user, 2026-09-06; widened twice since) — the first UI consumer of the
 // trends backend: one daily-resolution chart per stored metric over the /api/trends 1y window,
@@ -175,40 +176,60 @@ export default function TrendsDoc() {
       )}
 
       {p && (
-        <Tabs defaultValue="hypergraph" className="mt-4">
+        <Tabs defaultValue="hypergraph" className="mt-6 gap-0">
           {/* TWO TABS (user, 2026-09-07): the hypergraph's own readings vs the per-metagraph
-              ones — the same split every 3D view draws. Segmented-control recipe (the command
-              bar's presentation toggle), not the channel pane's file-cabinet: a document has no
-              boxed body for a tab to fuse with. */}
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <TabsList aria-label="Which side of the network">
-              <TabsTrigger value="hypergraph" className="text-label tracking-caps uppercase px-4">
-                Hypergraph
+              ones — the same split every 3D view draws. FILE-CABINET recipe (the channel pane's,
+              verbatim — user, same day: "they look like pills and the body has no outline; same
+              design issue before on metagraph details"): the active tab is an outlined
+              rounded-top drawer label whose fill notches THROUGH the row's baseline hairline
+              into the outlined body below, so label and contents read as one drawer. */}
+          <TabsList
+            variant="line"
+            className="relative flex h-auto flex-none w-full gap-1 rounded-none p-0 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50"
+            aria-label="Which side of the network"
+          >
+            {(["hypergraph", "metagraphs"] as const).map((id) => (
+              <TabsTrigger
+                key={id}
+                value={id}
+                className={cn(
+                  "flex-1 flex items-center justify-center gap-1.5 h-8 px-2 rounded-t-md! rounded-b-none!",
+                  "text-label tracking-caps uppercase font-normal",
+                  "text-muted-foreground bg-transparent border border-transparent border-b-0",
+                  "hover:text-foreground hover:bg-wash-soft",
+                  "after:hidden focus-visible:ring-0 focus-visible:border-transparent",
+                  "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
+                  "data-[state=active]:z-[1] data-[state=active]:text-foreground data-[state=active]:shadow-none",
+                  "data-[state=active]:border-border/50! data-[state=active]:bg-[var(--panel-solid)]!",
+                )}
+              >
+                {id === "hypergraph" ? "Hypergraph" : "Metagraphs"}
               </TabsTrigger>
-              <TabsTrigger value="metagraphs" className="text-label tracking-caps uppercase px-4">
-                Metagraphs
-              </TabsTrigger>
-            </TabsList>
-            {/* The zoom — a filter over every chart at once (the dataviz time-range rule:
-                one control row, above the charts), styled as the same quiet pill row. */}
-            <div role="group" aria-label="Time window" className="inline-flex items-center rounded-lg bg-muted p-[3px]">
-              {ZOOMS.map((z) => (
-                <button
-                  key={z.id}
-                  type="button"
-                  aria-pressed={zoom === z.id}
-                  onClick={() => setZoom(z.id)}
-                  className={
-                    zoom === z.id
-                      ? "h-7 px-3 rounded-md text-label tracking-caps uppercase text-foreground bg-[var(--panel-solid)] shadow-sm"
-                      : "h-7 px-3 rounded-md text-label tracking-caps uppercase text-muted-foreground hover:text-foreground"
-                  }
-                >
-                  {z.label}
-                </button>
-              ))}
+            ))}
+          </TabsList>
+          {/* The drawer's own outline — the tab row's baseline hairline is its top edge (the
+              channel pane's rule), so the active tab's panel-solid fill bridges into it. */}
+          <div className="border border-t-0 border-border/50 rounded-b-md px-5 pb-8">
+            {/* The zoom — a filter over every chart at once, INSIDE the drawer it filters. */}
+            <div role="group" aria-label="Time window" className="flex justify-end pt-4">
+              <div className="inline-flex items-center rounded-lg bg-muted p-[3px]">
+                {ZOOMS.map((z) => (
+                  <button
+                    key={z.id}
+                    type="button"
+                    aria-pressed={zoom === z.id}
+                    onClick={() => setZoom(z.id)}
+                    className={
+                      zoom === z.id
+                        ? "h-7 px-3 rounded-md text-label tracking-caps uppercase text-foreground bg-[var(--panel-solid)] shadow-sm"
+                        : "h-7 px-3 rounded-md text-label tracking-caps uppercase text-muted-foreground hover:text-foreground"
+                    }
+                  >
+                    {z.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
           <TabsContent value="hypergraph">
           <Section
@@ -293,6 +314,7 @@ export default function TrendsDoc() {
             {netPanels("kb", per, 1 / 1024, mb)}
           </Section>
           </TabsContent>
+          </div>
         </Tabs>
       )}
     </article>
