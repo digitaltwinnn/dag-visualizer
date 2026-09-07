@@ -58,15 +58,29 @@ export default function TrendsDoc() {
 
   useEffect(() => {
     let dead = false;
-    fetch(netUrl("/api/trends?window=180d"))
+    fetch(netUrl("/api/trends?window=1y"))
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((data: TrendsPayload) => { if (!dead) setFetched({ state: "ready", data }); })
       .catch(() => { if (!dead) setFetched({ state: "error" }); });
     return () => { dead = true; };
   }, []);
 
-  const p = fetched.state === "ready" ? fetched.data : undefined;
+  const raw = fetched.state === "ready" ? fetched.data : undefined;
+  // LEADING TRIM: the 1y window reaches further back than measuring does, and months of
+  // leading null days would draw as a long empty runway. Uncovered days at the START are
+  // dropped (coverage = g.ticks measured), so the axis begins where history begins and the
+  // page widens by itself as the store grows. Interior gaps still draw as gaps — only the
+  // unmeasured PREFIX goes.
+  const firstCovered = raw ? Math.max(0, raw.series["g.ticks"]?.findIndex((v) => v != null) ?? 0) : 0;
+  const p = raw
+    ? {
+        ...raw,
+        buckets: raw.buckets.slice(firstCovered),
+        series: Object.fromEntries(Object.entries(raw.series).map(([k, v]) => [k, v.slice(firstCovered)])),
+      }
+    : undefined;
   const buckets = p?.buckets ?? [];
+  const spanMonths = buckets.length > 1 ? Math.max(1, Math.round((buckets[buckets.length - 1] - buckets[0]) / 2592000000)) : null;
   // COUNTER charts drop the window's partial edge days (the first bucket starts mid-day at the
   // window cutoff, the last IS today, still filling) — a partial sum charted as a day reads as
   // a crash, the classic last-bucket lie. GAUGE charts keep them: a point sample is complete
@@ -82,7 +96,7 @@ export default function TrendsDoc() {
     <article className="pt-14">
       <p className="text-micro tracking-caps uppercase text-muted-foreground">Trends</p>
       <h1 className="mt-3 text-3xl font-semibold tracking-[-0.01em] leading-tight">
-        Six months of the network, measured daily
+        {spanMonths ? `${spanMonths} months of the network, measured daily` : "The network, measured daily"}
       </h1>
       <p className="mt-5 text-base text-foreground-dim leading-relaxed">
         Every reading below is summed from the chain&apos;s own records — each global snapshot and
