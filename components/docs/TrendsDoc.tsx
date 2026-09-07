@@ -286,7 +286,7 @@ export default function TrendsDoc() {
               <TabsList aria-label="Hypergraph sections">
                 <TabsTrigger value="snapshots" className={innerTrigger}>Snapshots</TabsTrigger>
                 <TabsTrigger value="economics" className={innerTrigger}>Economics</TabsTrigger>
-                <TabsTrigger value="fleet" className={innerTrigger}>Fleet</TabsTrigger>
+                <TabsTrigger value="fleet" className={innerTrigger}>Nodes</TabsTrigger>
                 <TabsTrigger value="continuity" className={innerTrigger}>Continuity</TabsTrigger>
               </TabsList>
               {zoomPicker}
@@ -325,14 +325,14 @@ export default function TrendsDoc() {
           <TabsContent value="fleet">
           <Section
             id="fleet"
-            title="Fleet"
+            title="Nodes"
             lead="Node counts are sampled live, hourly — there is no historical record of the fleet to read back, so these series begin the day measuring started and fill forward."
           >
             {stepMs < 3600000 ? (
               /* The gauges are HOURLY instruments — at the 5-minute zoom there is nothing they
                  could honestly show, and "no measurements" would wrongly read as an outage. */
               <p className="text-label text-muted-foreground">
-                The fleet is an hourly instrument — pick 7D or wider to see it.
+                Node counts are an hourly instrument — pick 7D or wider to see them.
               </p>
             ) : (
               <>
@@ -360,7 +360,7 @@ export default function TrendsDoc() {
               <TabsList aria-label="Metagraph sections">
                 <TabsTrigger value="snapshots" className={innerTrigger}>Snapshots</TabsTrigger>
                 <TabsTrigger value="economics" className={innerTrigger}>Economics</TabsTrigger>
-                <TabsTrigger value="fleet" className={innerTrigger}>Fleet</TabsTrigger>
+                <TabsTrigger value="fleet" className={innerTrigger}>Nodes</TabsTrigger>
                 <TabsTrigger value="continuity" className={innerTrigger}>Continuity</TabsTrigger>
               </TabsList>
               {zoomPicker}
@@ -394,12 +394,12 @@ export default function TrendsDoc() {
           <TabsContent value="fleet">
           <Section
             id="net-fleet"
-            title="Fleet"
+            title="Nodes"
             lead="Each network's own node count, sampled live every hour — no historical fleet record exists upstream, so these begin the day measuring started and fill forward."
           >
             {stepMs < 3600000 ? (
               <p className="text-label text-muted-foreground">
-                The fleet is an hourly instrument — pick 7D or wider to see it.
+                Node counts are an hourly instrument — pick 7D or wider to see them.
               </p>
             ) : (
               netGaugePanels("nodes")
