@@ -54,6 +54,7 @@ export default function TrendChart({
   unit,
   lines,
   buckets,
+  stepMs = 86400000,
   format = (v) => v.toLocaleString(undefined, { maximumFractionDigits: 1 }),
   className,
 }: {
@@ -63,6 +64,9 @@ export default function TrendChart({
   lines: TrendLine[];
   /** Bucket START instants (epoch ms UTC), oldest → newest — the API's own axis. */
   buckets: number[];
+  /** The bucket width (the payload's own stepMs) — drives axis-mark granularity and the
+   *  hover stamp's precision. Daily by default. */
+  stepMs?: number;
   format?: (v: number) => string;
   className?: string;
 }) {
@@ -79,15 +83,26 @@ export default function TrendChart({
     setHover(Math.min(n - 1, Math.max(0, Math.round(((e.clientX - r.left) / r.width) * (n - 1)))));
   };
 
-  // Month tick marks: the first bucket of each new UTC month, as fractions of the axis.
-  const months: { frac: number; label: string }[] = [];
+  // Axis marks, at the granularity the window can carry: months for a long daily window,
+  // days for a week or a month of hours, six-hour marks inside a day. Right-edge marks are
+  // skipped — a label there would clip against the plot's overflow.
+  const spanMs = n > 1 ? buckets[n - 1] - buckets[0] : 0;
+  const marks: { frac: number; label: string }[] = [];
   for (let i = 1; i < n; i++) {
     const d = new Date(buckets[i]);
+    const prev = new Date(buckets[i - 1]);
     const frac = i / (n - 1);
-    // A label at the right edge would clip against the plot's overflow — skip it; the next
-    // month gets its mark on the next visit.
-    if (frac <= 0.93 && (d.getUTCDate() === 1 || new Date(buckets[i - 1]).getUTCMonth() !== d.getUTCMonth())) {
-      months.push({ frac, label: d.toLocaleDateString(undefined, { month: "short", timeZone: "UTC" }) });
+    if (frac > 0.93) continue;
+    if (spanMs > 45 * 86400000) {
+      if (prev.getUTCMonth() !== d.getUTCMonth())
+        marks.push({ frac, label: d.toLocaleDateString(undefined, { month: "short", timeZone: "UTC" }) });
+    } else if (spanMs > 2 * 86400000) {
+      const every = spanMs > 9 * 86400000 ? 7 : 1; // a month of days marks weekly
+      if (prev.getUTCDate() !== d.getUTCDate() && (spanMs <= 9 * 86400000 || d.getUTCDay() === 1) && every)
+        marks.push({ frac, label: d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" }) });
+    } else {
+      if (d.getUTCHours() % 6 === 0 && d.getUTCMinutes() === 0 && !(prev.getUTCHours() === d.getUTCHours() && prev.getUTCDate() === d.getUTCDate()))
+        marks.push({ frac, label: `${String(d.getUTCHours()).padStart(2, "0")}:00` });
     }
   }
 
@@ -133,7 +148,7 @@ export default function TrendChart({
             preserveAspectRatio="none"
             className="absolute inset-0 w-full h-full"
             role="img"
-            aria-label={`${name} — daily, ${buckets.length}-day window`}
+            aria-label={`${name} — ${stepMs >= 86400000 ? "daily" : stepMs >= 3600000 ? "hourly" : "5-minute"} buckets, ${buckets.length} of them`}
           >
             {/* Recessive grid: three hairlines, no frame. */}
             {[0.25, 0.5, 0.75].map((f) => (
@@ -167,7 +182,9 @@ export default function TrendChart({
                 style={hover / (n - 1) < 0.5 ? { left: `calc(${(hover / (n - 1)) * 100}% + 6px)` } : { right: `calc(${100 - (hover / (n - 1)) * 100}% + 6px)` }}
               >
                 <span className="text-muted-foreground">
-                  {new Date(buckets[hover]).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" })}
+                  {stepMs < 86400000
+                    ? new Date(buckets[hover]).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" }) + " UTC"
+                    : new Date(buckets[hover]).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" })}
                   {" · "}
                 </span>
                 {lines.map((l, li) => (
@@ -180,8 +197,8 @@ export default function TrendChart({
               </div>
             </>
           )}
-          {/* Month marks ride the plot's bottom edge. */}
-          {months.map((m) => (
+          {/* Axis marks ride the plot's bottom edge. */}
+          {marks.map((m) => (
             <span key={m.frac} aria-hidden className="absolute bottom-0.5 text-micro text-muted-foreground pointer-events-none" style={{ left: `calc(${m.frac * 100}% + 3px)` }}>
               {m.label}
             </span>

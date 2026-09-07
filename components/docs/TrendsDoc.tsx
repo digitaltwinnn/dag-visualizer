@@ -26,11 +26,36 @@ import { displayNetwork } from "@/src/data/unlisted";
 
 interface TrendsPayload {
   v: 1;
+  stepMs: number;
   buckets: number[];
   series: Record<string, (number | null)[]>;
 }
 
 type Fetched = { state: "loading" } | { state: "error" } | { state: "ready"; data: TrendsPayload };
+
+// THE ZOOM (user, 2026-09-07: "can we zoom in?") — the window picker is the tiers made
+// visible: 24H reads the 5-minute buckets (48 h retention), 7D and 30D the hourly tier, ALL
+// the daily tier. Same charts, same honesty rules, finer buckets. "ALL" is the 1y window with
+// the unmeasured prefix trimmed, so it says exactly as much as has been measured.
+const ZOOMS = [
+  { id: "24h", label: "24H" },
+  { id: "7d", label: "7D" },
+  { id: "30d", label: "30D" },
+  { id: "1y", label: "All" },
+] as const;
+type ZoomId = (typeof ZOOMS)[number]["id"];
+
+/** The h1's span phrase, from the measured buckets themselves. */
+function spanPhrase(buckets: number[], stepMs: number): string {
+  if (buckets.length < 2) return "The network";
+  const spanMs = buckets[buckets.length - 1] - buckets[0];
+  const grain = stepMs >= 86400000 ? "measured daily" : stepMs >= 3600000 ? "measured hourly" : "measured every five minutes";
+  const months = Math.round(spanMs / 2592000000);
+  if (months >= 2) return `${months} months of the network, ${grain}`;
+  const days = Math.round(spanMs / 86400000);
+  if (days >= 2) return `${days} days of the network, ${grain}`;
+  return `24 hours of the network, ${grain}`;
+}
 
 const S = (p: TrendsPayload | undefined, name: string): (number | null)[] =>
   p?.series[name] ?? [];
@@ -60,15 +85,18 @@ function Section({ id, title, lead, children }: { id: string; title: string; lea
 
 export default function TrendsDoc() {
   const [fetched, setFetched] = useState<Fetched>({ state: "loading" });
+  const [zoom, setZoom] = useState<ZoomId>("1y");
 
+  // Refetch per zoom; the PREVIOUS payload stays on screen until the new one lands (the CDN
+  // answers in ~no time, and swapping through a loading flash would blank every chart).
   useEffect(() => {
     let dead = false;
-    fetch(netUrl("/api/trends?window=1y"))
+    fetch(netUrl(`/api/trends?window=${zoom}`))
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((data: TrendsPayload) => { if (!dead) setFetched({ state: "ready", data }); })
       .catch(() => { if (!dead) setFetched({ state: "error" }); });
     return () => { dead = true; };
-  }, []);
+  }, [zoom]);
 
   const raw = fetched.state === "ready" ? fetched.data : undefined;
   // LEADING TRIM: the 1y window reaches further back than measuring does, and months of
@@ -85,14 +113,20 @@ export default function TrendsDoc() {
       }
     : undefined;
   const buckets = p?.buckets ?? [];
-  const spanMonths = buckets.length > 1 ? Math.max(1, Math.round((buckets[buckets.length - 1] - buckets[0]) / 2592000000)) : null;
-  // COUNTER charts drop the window's partial edge days (the first bucket starts mid-day at the
-  // window cutoff, the last IS today, still filling) — a partial sum charted as a day reads as
-  // a crash, the classic last-bucket lie. GAUGE charts keep them: a point sample is complete
-  // the moment it is taken, and trimming today would hide the fleet's only readings.
-  const cBuckets = buckets.slice(1, -1);
-  const trim = (points: (number | null)[]): (number | null)[] => points.slice(1, -1);
+  const stepMs = p?.stepMs ?? 86400000;
+  // COUNTER charts drop partial edge buckets — a partial sum charted whole reads as a crash,
+  // the classic last-bucket lie. Daily windows lose both edges (the cutoff day starts mid-day,
+  // the last IS today, still filling); sub-daily windows lose only the newest bucket (stored
+  // fine buckets are complete once written — only the current slot is still filling). GAUGE
+  // charts keep everything: a point sample is complete the moment it is taken, and trimming
+  // today would hide the fleet's only readings.
+  const lead = stepMs >= 86400000 ? 1 : 0;
+  const cBuckets = buckets.slice(lead, -1);
+  const trim = (points: (number | null)[]): (number | null)[] => points.slice(lead, -1);
 
+  // The unit word follows the tier — an hourly bucket labelled "/day" would misstate every
+  // reading by a factor of 24.
+  const per = stepMs >= 86400000 ? "/day" : stepMs >= 3600000 ? "/hour" : "/5 min";
   const dag = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: v < 10 ? 2 : 0 })}`;
   /** The Metagraphs tab's panel list: one chart per catalog network for one stored metric,
    *  ranked by the LAST measured day, busiest first (per-section — each ranking is its own
@@ -109,7 +143,7 @@ export default function TrendsDoc() {
       .map(({ m, points }) => {
         const net = displayNetwork(m.id);
         const line: TrendLine = { label: suffix, points, hue: net?.hue };
-        return <TrendChart key={m.id} name={net?.name ?? m.id!} unit={unit} buckets={cBuckets} format={fmt} lines={[line]} />;
+        return <TrendChart key={m.id} name={net?.name ?? m.id!} unit={unit} buckets={cBuckets} stepMs={stepMs} format={fmt} lines={[line]} />;
       });
   const secs = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}s`;
   const mb = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 1 })} MB`;
@@ -118,12 +152,12 @@ export default function TrendsDoc() {
     <article className="pt-14">
       <p className="text-micro tracking-caps uppercase text-muted-foreground">Trends</p>
       <h1 className="mt-3 text-3xl font-semibold tracking-[-0.01em] leading-tight">
-        {spanMonths ? `${spanMonths} months of the network, measured daily` : "The network, measured daily"}
+        {buckets.length > 1 ? spanPhrase(buckets, stepMs) : "The network, measured"}
       </h1>
       <p className="mt-5 text-base text-foreground-dim leading-relaxed">
         Every reading below is summed from the chain&apos;s own records — each global snapshot and
-        each metagraph snapshot, bucketed by the day it happened. A break in a line is a period
-        nothing measured, never a zero; a zero is a day that really anchored nothing.
+        each metagraph snapshot, bucketed by when it happened. A break in a line is a period
+        nothing measured, never a zero; a zero is a stretch that really anchored nothing.
       </p>
 
       {fetched.state === "loading" && (
@@ -146,33 +180,54 @@ export default function TrendsDoc() {
               ones — the same split every 3D view draws. Segmented-control recipe (the command
               bar's presentation toggle), not the channel pane's file-cabinet: a document has no
               boxed body for a tab to fuse with. */}
-          <TabsList aria-label="Which side of the network">
-            <TabsTrigger value="hypergraph" className="text-label tracking-caps uppercase px-4">
-              Hypergraph
-            </TabsTrigger>
-            <TabsTrigger value="metagraphs" className="text-label tracking-caps uppercase px-4">
-              Metagraphs
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <TabsList aria-label="Which side of the network">
+              <TabsTrigger value="hypergraph" className="text-label tracking-caps uppercase px-4">
+                Hypergraph
+              </TabsTrigger>
+              <TabsTrigger value="metagraphs" className="text-label tracking-caps uppercase px-4">
+                Metagraphs
+              </TabsTrigger>
+            </TabsList>
+            {/* The zoom — a filter over every chart at once (the dataviz time-range rule:
+                one control row, above the charts), styled as the same quiet pill row. */}
+            <div role="group" aria-label="Time window" className="inline-flex items-center rounded-lg bg-muted p-[3px]">
+              {ZOOMS.map((z) => (
+                <button
+                  key={z.id}
+                  type="button"
+                  aria-pressed={zoom === z.id}
+                  onClick={() => setZoom(z.id)}
+                  className={
+                    zoom === z.id
+                      ? "h-7 px-3 rounded-md text-label tracking-caps uppercase text-foreground bg-[var(--panel-solid)] shadow-sm"
+                      : "h-7 px-3 rounded-md text-label tracking-caps uppercase text-muted-foreground hover:text-foreground"
+                  }
+                >
+                  {z.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <TabsContent value="hypergraph">
           <Section
             id="ledger"
             title="The base ledger"
-            lead="One subject, three readings: how many global snapshots the day produced, how many metagraph snapshots they anchored, and the day's blocks."
+            lead="One subject, three readings: how many global snapshots were produced, how many metagraph snapshots they anchored, and the blocks that came with them."
           >
-            <TrendChart name="Global snapshots" unit="/day" buckets={cBuckets} lines={[{ label: "ticks", points: trim(S(p, "g.ticks")) }]} />
-            <TrendChart name="Snapshots anchored" unit="/day" buckets={cBuckets} lines={[{ label: "anchored", points: trim(S(p, "g.anchors")) }]} />
-            <TrendChart name="Blocks" unit="/day" buckets={cBuckets} lines={[{ label: "blocks", points: trim(S(p, "g.blocks")) }]} />
+            <TrendChart name="Global snapshots" unit={per} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "ticks", points: trim(S(p, "g.ticks")) }]} />
+            <TrendChart name="Snapshots anchored" unit={per} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "anchored", points: trim(S(p, "g.anchors")) }]} />
+            <TrendChart name="Blocks" unit={per} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "blocks", points: trim(S(p, "g.blocks")) }]} />
           </Section>
 
           <Section
             id="continuity"
             title="Continuity"
-            lead="How steadily the ledger ticked: the average spacing between snapshots and each day's single longest pause — a tall spike is a stall, however brief."
+            lead="How steadily the ledger ticked: the average spacing between snapshots and each bucket's single longest pause — a tall spike is a stall, however brief."
           >
-            <TrendChart name="Mean gap" unit="seconds" buckets={cBuckets} format={secs} lines={[{ label: "mean", points: trim(meanGap(p)) }]} />
-            <TrendChart name="Longest pause" unit="seconds · the day's single widest gap" buckets={cBuckets} format={secs} lines={[{ label: "max", points: trim(S(p, "g.gapMax")) }]} />
+            <TrendChart name="Mean gap" unit="seconds" buckets={cBuckets} stepMs={stepMs} format={secs} lines={[{ label: "mean", points: trim(meanGap(p)) }]} />
+            <TrendChart name="Longest pause" unit={`seconds · the ${stepMs >= 86400000 ? "day" : "bucket"}'s single widest gap`} buckets={cBuckets} stepMs={stepMs} format={secs} lines={[{ label: "max", points: trim(S(p, "g.gapMax")) }]} />
           </Section>
 
           <Section
@@ -180,8 +235,8 @@ export default function TrendsDoc() {
             title="Economics"
             lead="What anchoring paid and carried, summed over the publicly listed metagraphs — a floor, exactly as the cards state it: unlisted channels pay too."
           >
-            <TrendChart name="Fees paid" unit="DAG/day · floor" buckets={cBuckets} format={dag} lines={[{ label: "fees", points: trim(scale(S(p, "g.feeFloor"), 1e-8)) }]} />
-            <TrendChart name="Data anchored" unit="/day · floor" buckets={cBuckets} format={mb} lines={[{ label: "data", points: trim(scale(S(p, "g.kbFloor"), 1 / 1024)) }]} />
+            <TrendChart name="Fees paid" unit={`DAG${per} · floor`} buckets={cBuckets} stepMs={stepMs} format={dag} lines={[{ label: "fees", points: trim(scale(S(p, "g.feeFloor"), 1e-8)) }]} />
+            <TrendChart name="Data anchored" unit={`${per} · floor`} buckets={cBuckets} stepMs={stepMs} format={mb} lines={[{ label: "data", points: trim(scale(S(p, "g.kbFloor"), 1 / 1024)) }]} />
           </Section>
 
           <Section
@@ -189,11 +244,12 @@ export default function TrendsDoc() {
             title="Fleet"
             lead="Node counts are sampled live, hourly — there is no historical record of the fleet to read back, so these series begin the day measuring started and fill forward."
           >
-            <TrendChart name="Nodes" unit="total" buckets={buckets} lines={[{ label: "nodes", points: S(p, "f.nodes") }]} />
+            <TrendChart name="Nodes" unit="total" buckets={buckets} stepMs={stepMs} lines={[{ label: "nodes", points: S(p, "f.nodes") }]} />
             <TrendChart
               name="Metagraph layers"
               unit="layer-roles"
               buckets={buckets}
+              stepMs={stepMs}
               lines={[
                 { label: "L0", points: S(p, "f.layer.l0") },
                 { label: "dL1", points: S(p, "f.layer.dl1"), dash: true },
@@ -208,7 +264,7 @@ export default function TrendsDoc() {
             title="Snapshots"
             lead="Each network's own daily snapshot count — its cadence is its choice, so every panel carries its own scale, busiest today first."
           >
-            {netPanels("snaps", "/day")}
+            {netPanels("snaps", per)}
           </Section>
 
           <Section
@@ -216,7 +272,7 @@ export default function TrendsDoc() {
             title="Fees paid"
             lead="What each network paid the base ledger to anchor, day by day — exact, from its own snapshot records (these are the terms the network-wide floor sums)."
           >
-            {netPanels("fee", "DAG/day", 1e-8, dag)}
+            {netPanels("fee", `DAG${per}`, 1e-8, dag)}
           </Section>
 
           <Section
@@ -224,7 +280,7 @@ export default function TrendsDoc() {
             title="Data anchored"
             lead="How much state each network sealed into the base ledger, day by day — exact, from its own snapshot records."
           >
-            {netPanels("kb", "/day", 1 / 1024, mb)}
+            {netPanels("kb", per, 1 / 1024, mb)}
           </Section>
           </TabsContent>
         </Tabs>
