@@ -8,7 +8,7 @@ can understand how it works and why it's powerful.
 
 ## Features
 
-- Live data from the public Constellation block-explorer API (no backend / API key needed).
+- Live data from the public Constellation block-explorer API — no API key, and no backend for the 3D views.
 - **Views** using ThreeJs to drive the 3D scene
 - A per-view "About" card explains what each view shows
 - Hover any element for a tooltip; **click** for an inspector with real on-chain values and other details alongside **live
@@ -16,6 +16,10 @@ can understand how it works and why it's powerful.
 - A bottom **vitals band** carries each view's own instruments — donut, micro-bars,
   sparklines and the snapshot bar-chart — and the top-bar heartbeat opens a **pulse strip**
   showing every data feed's last successful poll.
+- A **/trends** page charts the network's measured history — daily since Jan 1 2026, with
+  hourly and 5-minute zoom — summed from the chain's own records into an Upstash Redis
+  timeseries by a 15-minute cron (the 3D views need no backend at all; only this history
+  does).
 
 ## Design language
 
@@ -72,9 +76,14 @@ The `/api/metagraphs` and `/api/geo` routes run server-side (the
 Node server reaches the no-CORS metagraph cluster endpoints a browser can't); the
 block-explorer API is polled directly from the browser. No CDN dependencies.
 
-`/api/metagraphs` caches its live fetch for 10 min (`unstable_cache`) with a `maxDuration`
-budget and a concurrent cluster fan-out, falling back to the bundled `data/*.json` if the
-upstreams are down. Real-user metrics come from **Vercel Speed Insights + Analytics**, and
+`/api/metagraphs` caches its live fetch for 5 min (`unstable_cache`) with a `maxDuration`
+budget and a concurrent cluster fan-out, answering an honest 503 if the upstreams are down
+(the client keeps its last good pull). The **trends backend** additionally needs the Upstash
+Redis marketplace integration and a `CRON_SECRET` env var: a 15-minute **Vercel Cron** samples
+the chain into tiered timeseries. Crons fire on the **production** deployment only — a PR
+preview renders the /trends charts read-only from the shared store and cannot write to it
+(the sampler fails closed without its secret). Real-user metrics come from **Vercel Speed
+Insights + Analytics**, and
 a social card is generated at `app/opengraph-image.tsx`. See `CLAUDE.md` →
 *Deploying (Vercel)* for the full checklist (incl. the Pro-only extras to enable as
 traffic grows).
@@ -90,6 +99,9 @@ Browser ──poll──> Constellation block explorer API   (snapshots / cluste
    │
    └── Next routes (server-side): /api/metagraphs (live cluster fetch + geo, ISR)
                                   /api/geo (validator geo seed)
+                                  /api/trends (tiered history out of Upstash Redis)
+
+Vercel Cron ──15 min──> /api/trends/sample ──> Upstash Redis (5m/1h/1d buckets) ──> /trends
 ```
 
 ## Architecture rules

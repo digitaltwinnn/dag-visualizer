@@ -377,6 +377,15 @@ no-op off Vercel; and a 15-minute Vercel Cron (`vercel.json`) hitting `/api/tren
 merge-writes into Upstash Redis (the Vercel-native marketplace integration) holding the trends
 timeseries — see `app/api/CLAUDE.md`.
 
+⚠️ **Crons fire on the PRODUCTION deployment only — a PR preview is not production.** The preview
+deploys the trends routes against the SAME Upstash store (the marketplace env vars span all three
+scopes), so its /trends page shows real history — but `CRON_SECRET` is deliberately absent from the
+Preview scope and the sampler FAILS CLOSED without it, so a public preview holds no credential that
+can write. Don't "fix" a preview's 401 by adding the secret there. Deploys and downtime self-heal:
+the cursor lives in Redis, and the next production run catches up to 30K records per chain (~a day
+of the busiest chain) with no hole; beyond that the gap is accepted and
+`scripts/rebuild-trends.ts --recompute-from` repairs the affected days.
+
 ⚠️ Web Vitals do NOT capture the WebGL frame rate — use the engine's stats.js for that (dev-only, or in
 prod via `?stats`, so it never shows for real users).
 
