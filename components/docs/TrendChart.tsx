@@ -32,6 +32,8 @@ const W = 600;
 const H = 120;
 const PAD_Y = 6; // keeps the 2px stroke's extremes inside the box
 
+/** Line path + the isolated points no segment can reach (rendered as HTML dots — an SVG
+ *  circle under this chart's non-uniform stretch would squash into an ellipse). */
 function pathOf(points: (number | null)[], max: number): { d: string; dots: { i: number; v: number }[] } {
   const n = points.length;
   const x = (i: number) => (i / Math.max(1, n - 1)) * W;
@@ -155,20 +157,33 @@ export default function TrendChart({
               <line key={f} x1="0" x2={W} y1={H * f} y2={H * f} stroke="var(--border)" strokeWidth="1" vectorEffect="non-scaling-stroke" opacity="0.5" />
             ))}
             {lines.map((l) => {
-              const { d, dots } = pathOf(l.points, max);
+              const { d } = pathOf(l.points, max);
               const hue = l.hue ?? hue0;
               return (
                 <g key={l.label}>
                   {d && (
                     <path d={d} fill="none" stroke={hue} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeDasharray={l.dash ? "4 4" : undefined} strokeLinejoin="round" />
                   )}
-                  {dots.map((p) => (
-                    <circle key={p.i} cx={(p.i / Math.max(1, n - 1)) * W} cy={H - PAD_Y - (p.v / max) * (H - 2 * PAD_Y)} r="2.5" fill={hue} />
-                  ))}
                 </g>
               );
             })}
           </svg>
+          {/* Isolated measured points — HTML dots, so they stay round however the plot
+              stretches. */}
+          {lines.flatMap((l) =>
+            pathOf(l.points, max).dots.map((pt) => (
+              <span
+                key={`${l.label}|${pt.i}`}
+                aria-hidden
+                className="absolute w-[5px] h-[5px] rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+                style={{
+                  background: l.hue ?? hue0,
+                  left: `${(pt.i / Math.max(1, n - 1)) * 100}%`,
+                  top: `${((H - PAD_Y - (pt.v / max) * (H - 2 * PAD_Y)) / H) * 100}%`,
+                }}
+              />
+            )),
+          )}
           {/* Crosshair + readout — nearest bucket, clamped chip, no pointer events of its own. */}
           {hover != null && (
             <>

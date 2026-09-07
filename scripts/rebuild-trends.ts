@@ -250,18 +250,24 @@ async function main(): Promise<void> {
         bucketMetas(inc, net, id, whole(recs).map((r) => ({ ordinal: r.ordinal, timestamp: r.timestamp, fee: r.fee, sizeInKB: r.sizeInKB })));
       }, id.slice(0, 10));
     }
-    console.log("writing (daily tier) …");
+    // Repair every tier the affected days live in (review find: a capped catch-up also
+    // leaves partial HOURLY buckets at the gap boundary, which the 7D/30D zooms kept
+    // showing after a daily-only repair). 5m keys only within that tier's own 48 h
+    // retention — older ones would just expire unread.
+    console.log("writing (all tiers within retention) …");
     const store = writeStore();
+    const fresh5m = slotOf(net, "5m", Date.now() - TTL_S["5m"]! * 1000).key;
     let fields = 0;
     for (const [key, map] of inc) {
-      if (tierOf(key) !== "1d") continue;
+      const tier = tierOf(key);
+      if (tier === "5m" && key < fresh5m) continue;
       const entries = [...map.entries()];
       for (let i = 0; i < entries.length; i += 400) {
-        await store.applyWrites([{ key, map: Object.fromEntries(entries.slice(i, i + 400)), ttlS: null }]);
+        await store.applyWrites([{ key, map: Object.fromEntries(entries.slice(i, i + 400)), ttlS: TTL_S[tier] }]);
       }
       fields += entries.length;
     }
-    console.log(`  ${fields} daily fields recomputed; cursor untouched.`);
+    console.log(`  ${fields} fields recomputed across the tiers; cursor untouched.`);
     return;
   }
 
@@ -270,15 +276,24 @@ async function main(): Promise<void> {
     const inc: IncMap = new Map();
     const tierOf = (key: string): Tier => key.split(":")[2] as Tier;
 
-    // The store's oldest covered day is the overwrite boundary.
-    const yearKey = `t:${net}:1d:${new Date(extendToMs).getUTCFullYear()}`;
-    const dayHash = (await redis.hgetall<Record<string, string>>(yearKey)) ?? {};
-    const covered = Object.keys(dayHash).filter((f) => f.endsWith("|g.ticks")).map((f) => f.slice(0, 5)).sort();
-    if (!covered.length) { console.error("extend: the store is empty — run a plain rebuild instead"); process.exit(1); }
-    const d0 = covered[0]; // "MM-DD" — recomputed completely and overwritten
-    const year = new Date(extendToMs).getUTCFullYear();
-    const d1StartMs = Date.UTC(year, +d0.slice(0, 2) - 1, +d0.slice(3)) + 86400000;
-    console.log(`extending ${new Date(extendToMs).toISOString().slice(0, 10)} → ${year}-${d0} (boundary day recomputed whole; daily tier only)`);
+    // The store's oldest covered day is the overwrite boundary — scanned across every year
+    // hash from the extend target to now, so an extension may cross year boundaries.
+    let oldest: { year: number; d: string } | null = null;
+    for (let y = new Date(extendToMs).getUTCFullYear(); y <= new Date().getUTCFullYear(); y++) {
+      const dayHash = (await redis.hgetall<Record<string, string>>(`t:${net}:1d:${y}`)) ?? {};
+      const covered = Object.keys(dayHash).filter((f) => f.endsWith("|g.ticks")).map((f) => f.slice(0, 5)).sort();
+      if (covered.length) { oldest = { year: y, d: covered[0] }; break; }
+    }
+    if (!oldest) {
+      console.error("extend: no covered days found in the daily tier — extending needs existing history (run a plain --days rebuild first, or check --net)");
+      process.exit(1);
+    }
+    const d1StartMs = Date.UTC(oldest.year, +oldest.d.slice(0, 2) - 1, +oldest.d.slice(3)) + 86400000;
+    if (extendToMs >= d1StartMs) {
+      console.error(`extend: the store already reaches ${oldest.year}-${oldest.d} — nothing to extend to ${new Date(extendToMs).toISOString().slice(0, 10)}`);
+      process.exit(1);
+    }
+    console.log(`extending ${new Date(extendToMs).toISOString().slice(0, 10)} → ${oldest.year}-${oldest.d} (boundary day recomputed whole; daily tier only)`);
 
     await probeCursorShape(`${be0}/global-snapshots`, "created_at,ordinal");
     const anyMeta = CATALOG[net].find((m) => m.id)?.id;
@@ -290,10 +305,9 @@ async function main(): Promise<void> {
 
     // Globals: seek the boundary, walk down to extend-to, day-chunk with a clean gap chain.
     const gBoundary = await seekBoundary(
-      async (o) => {
-        try { return ((await getPage<never>(`${be0}/global-snapshots/${o}`)) as unknown as { data?: { ordinal: number; timestamp: string } }).data ?? null; }
-        catch { return null; }
-      },
+      // No catch: getPage already retried — a persistent probe failure ABORTS the run (writes
+      // happen last, so nothing is half-written) instead of reading as "born at the boundary".
+      async (o) => ((await getPage<never>(`${be0}/global-snapshots/${o}`)) as unknown as { data?: { ordinal: number; timestamp: string } }).data ?? null,
       Number(cur.g ?? 0) || 1,
       d1StartMs,
     );
@@ -323,10 +337,7 @@ async function main(): Promise<void> {
       const tip = Number(cur[`m.${id}`] ?? 0);
       if (!tip) { console.log(`  ${id.slice(0, 10)}: no cursor — skipped (chain unseen by the store)`); continue; }
       const bnd = await seekBoundary(
-        async (o) => {
-          try { return ((await getPage<never>(`${be0}/currency/${id}/snapshots/${o}`)) as unknown as { data?: { ordinal: number; timestamp: string; hash?: string } }).data ?? null; }
-          catch { return null; }
-        },
+        async (o) => ((await getPage<never>(`${be0}/currency/${id}/snapshots/${o}`)) as unknown as { data?: { ordinal: number; timestamp: string; hash?: string } }).data ?? null,
         tip,
         d1StartMs,
       );
@@ -373,7 +384,10 @@ async function main(): Promise<void> {
 
   const be = NETWORKS[net].be;
   const now = Date.now();
-  const cutoffMs = now - days * 86400000;
+  // Snapped DOWN to UTC midnight: the oldest rebuilt day is then COMPLETE, so the /trends
+  // page never has to hide it as a partial (review find — the old mid-day cutoff left a
+  // half-day first bucket forever).
+  const cutoffMs = Math.floor((now - days * 86400000) / 86400000) * 86400000;
   const fresh5mFloor = now - TTL_S["5m"]! * 1000; // 5m fields older than the tier's retention are pruned
 
   const inc: IncMap = new Map();
@@ -417,6 +431,14 @@ async function main(): Promise<void> {
           if (!(id in newestMetaOrd)) newestMetaOrd[id] = recs[0].ordinal; // first page is the newest
           bucketMetas(inc, net, id, recs.map((r) => ({ ordinal: r.ordinal, timestamp: r.timestamp, fee: r.fee, sizeInKB: r.sizeInKB })));
         }, id.slice(0, 10));
+      // A DORMANT chain (nothing inside the window) still gets a cursor — parked at its TIP,
+      // or the cron's cold cursor would page its ancient records into pre-window buckets as
+      // unlabeled partials (review find). An entirely empty chain stays unset.
+      if (!(id in newestMetaOrd)) {
+        const tipPage = await getPage<{ ordinal: number }>(`${be}/currency/${id}/snapshots?limit=1`);
+        const tip = tipPage.data?.[0]?.ordinal;
+        if (tip != null) newestMetaOrd[id] = tip;
+      }
     }));
     prune5m();
   }

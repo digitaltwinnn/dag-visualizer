@@ -126,6 +126,7 @@ export default function TrendsDoc() {
   // The unit word follows the tier — an hourly bucket labelled "/day" would misstate every
   // reading by a factor of 24.
   const per = stepMs >= 86400000 ? "/day" : stepMs >= 3600000 ? "/hour" : "/5 min";
+  const bucketWord = stepMs >= 86400000 ? "daily" : stepMs >= 3600000 ? "hourly" : "five-minute";
   const dag = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: v < 10 ? 2 : 0 })}`;
   /** The Metagraphs tab's panel list: one chart per catalog network for one stored metric,
    *  ranked by the LAST measured day, busiest first (per-section — each ranking is its own
@@ -243,17 +244,27 @@ export default function TrendsDoc() {
             title="Fleet"
             lead="Node counts are sampled live, hourly — there is no historical record of the fleet to read back, so these series begin the day measuring started and fill forward."
           >
-            <TrendChart name="Nodes" unit="total" buckets={buckets} stepMs={stepMs} lines={[{ label: "nodes", points: S(p, "f.nodes") }]} />
-            <TrendChart
-              name="Metagraph layers"
-              unit="layer-roles"
-              buckets={buckets}
-              stepMs={stepMs}
-              lines={[
-                { label: "L0", points: S(p, "f.layer.l0") },
-                { label: "dL1", points: S(p, "f.layer.dl1"), dash: true },
-              ]}
-            />
+            {stepMs < 3600000 ? (
+              /* The gauges are HOURLY instruments — at the 5-minute zoom there is nothing they
+                 could honestly show, and "no measurements" would wrongly read as an outage. */
+              <p className="text-label text-muted-foreground">
+                The fleet is an hourly instrument — pick 7D or wider to see it.
+              </p>
+            ) : (
+              <>
+                <TrendChart name="Nodes" unit="total" buckets={buckets} stepMs={stepMs} lines={[{ label: "nodes", points: S(p, "f.nodes") }]} />
+                <TrendChart
+                  name="Metagraph layers"
+                  unit="layer-roles"
+                  buckets={buckets}
+                  stepMs={stepMs}
+                  lines={[
+                    { label: "L0", points: S(p, "f.layer.l0") },
+                    { label: "dL1", points: S(p, "f.layer.dl1"), dash: true },
+                  ]}
+                />
+              </>
+            )}
           </Section>
           </TabsContent>
 
@@ -261,7 +272,7 @@ export default function TrendsDoc() {
           <Section
             id="networks"
             title="Snapshots"
-            lead="Each network's own daily snapshot count — its cadence is its choice, so every panel carries its own scale, busiest today first."
+            lead={`Each network's own ${bucketWord} snapshot count — its cadence is its choice, so every panel carries its own scale, busiest first.`}
           >
             {netPanels("snaps", per)}
           </Section>
@@ -269,7 +280,7 @@ export default function TrendsDoc() {
           <Section
             id="net-fees"
             title="Fees paid"
-            lead="What each network paid the base ledger to anchor, day by day — exact, from its own snapshot records (these are the terms the network-wide floor sums)."
+            lead="What each network paid the base ledger to anchor — exact, from its own snapshot records (these are the terms the network-wide floor sums)."
           >
             {netPanels("fee", `DAG${per}`, 1e-8, dag)}
           </Section>
@@ -277,7 +288,7 @@ export default function TrendsDoc() {
           <Section
             id="net-data"
             title="Data anchored"
-            lead="How much state each network sealed into the base ledger, day by day — exact, from its own snapshot records."
+            lead="How much state each network sealed into the base ledger — exact, from its own snapshot records."
           >
             {netPanels("kb", per, 1 / 1024, mb)}
           </Section>
