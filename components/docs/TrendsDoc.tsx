@@ -6,9 +6,10 @@ import { METAGRAPHS } from "@/src/net/current";
 import { netUrl } from "@/src/net/current";
 import { displayNetwork } from "@/src/data/unlisted";
 
-// THE TRENDS DOCUMENT (user, 2026-09-06: a chart per metric; widened to six months the same day) — the first UI consumer of the trends backend: one daily-resolution chart per
-// stored metric over the /api/trends 180d window. It rides the doc-overlay recipe like About
-// and Design (registry entry in views.ts, thin route, footer + info-menu toggles follow).
+// THE TRENDS DOCUMENT (user, 2026-09-06; widened twice since) — the first UI consumer of the
+// trends backend: one daily-resolution chart per stored metric over the /api/trends 1y window,
+// leading-trimmed to where measuring began. It rides the doc-overlay recipe like About and
+// Design (registry entry in views.ts, thin route, footer + info-menu toggles follow).
 //
 // HONESTY (rule 10, the trends store's own contract rendered): a null bucket draws as a GAP,
 // never a zero — the copy says so once, up front. The fees/bytes charts carry the FLOOR label
@@ -18,8 +19,9 @@ import { displayNetwork } from "@/src/data/unlisted";
 //
 // Charts are SMALL MULTIPLES per network rather than one many-hued plot (the dataviz rule the
 // vitals band follows: identity is never colour-alone, and eleven series in one frame is a
-// legend puzzle, not a reading). Catalog order, like the tick bars — a chart that reorders by
-// size cannot be followed across visits.
+// legend puzzle, not a reading), stacked in ONE COLUMN so the shared time axis aligns across
+// metrics, and ranked busiest-first (see the networks section for why that departs from the
+// vitals' catalog-order rule).
 
 interface TrendsPayload {
   v: 1;
@@ -48,7 +50,9 @@ function Section({ id, title, lead, children }: { id: string; title: string; lea
       <h2 className="text-lg font-semibold text-foreground">{title}</h2>
       <div className="mt-3 border-t border-border" />
       <p className="mt-3 text-label text-muted-foreground leading-relaxed">{lead}</p>
-      <div className="mt-4 grid gap-x-8 gap-y-6 sm:grid-cols-2">{children}</div>
+      {/* ONE COLUMN (user, 2026-09-07): every chart shares the same time axis, so
+          stacking aligns the days vertically and a dip can be followed across metrics. */}
+      <div className="mt-4 grid gap-y-7">{children}</div>
     </section>
   );
 }
@@ -121,12 +125,22 @@ export default function TrendsDoc() {
       {p && (
         <>
           <Section
-            id="anchoring"
-            title="Anchoring"
-            lead="What the base ledger settles: how many metagraph snapshots each day's global snapshots anchored, and the day's blocks."
+            id="ledger"
+            title="The base ledger"
+            lead="One subject, three readings: how many global snapshots the day produced, how many metagraph snapshots they anchored, and the day's blocks."
           >
+            <TrendChart name="Global snapshots" unit="/day" buckets={cBuckets} lines={[{ label: "ticks", points: trim(S(p, "g.ticks")) }]} />
             <TrendChart name="Snapshots anchored" unit="/day" buckets={cBuckets} lines={[{ label: "anchored", points: trim(S(p, "g.anchors")) }]} />
             <TrendChart name="Blocks" unit="/day" buckets={cBuckets} lines={[{ label: "blocks", points: trim(S(p, "g.blocks")) }]} />
+          </Section>
+
+          <Section
+            id="continuity"
+            title="Continuity"
+            lead="How steadily the ledger ticked: the average spacing between snapshots and each day's single longest pause — a tall spike is a stall, however brief."
+          >
+            <TrendChart name="Mean gap" unit="seconds" buckets={cBuckets} format={secs} lines={[{ label: "mean", points: trim(meanGap(p)) }]} />
+            <TrendChart name="Longest pause" unit="seconds · the day's single widest gap" buckets={cBuckets} format={secs} lines={[{ label: "max", points: trim(S(p, "g.gapMax")) }]} />
           </Section>
 
           <Section
@@ -134,11 +148,22 @@ export default function TrendsDoc() {
             title="Snapshots by metagraph"
             lead="Each network's own daily snapshot count — its cadence is its choice, so every panel carries its own scale."
           >
-            {METAGRAPHS.filter((m) => m.id).map((m) => {
-              const net = displayNetwork(m.id);
-              const line: TrendLine = { label: "snapshots", points: trim(S(p, `m.${m.id}.snaps`)), hue: net?.hue };
-              return <TrendChart key={m.id} name={net?.name ?? m.id!} unit="/day" buckets={cBuckets} lines={[line]} />;
-            })}
+            {/* Ordered by the LAST measured day's count, busiest first (user, 2026-09-07). The
+                vitals' catalog-order rule guards live charts that would reshuffle under the
+                reader as ticks land; a document laid out once per visit can rank honestly, and
+                here the ranking IS a reading. Dormant chains sink to the bottom. */}
+            {METAGRAPHS.filter((m) => m.id)
+              .map((m) => {
+                const points = trim(S(p, `m.${m.id}.snaps`));
+                const last = points.reduce<number | null>((acc, v) => (v != null ? v : acc), null);
+                return { m, points, last };
+              })
+              .sort((a, b) => (b.last ?? -1) - (a.last ?? -1))
+              .map(({ m, points }) => {
+                const net = displayNetwork(m.id);
+                const line: TrendLine = { label: "snapshots", points, hue: net?.hue };
+                return <TrendChart key={m.id} name={net?.name ?? m.id!} unit="/day" buckets={cBuckets} lines={[line]} />;
+              })}
           </Section>
 
           <Section
@@ -148,16 +173,6 @@ export default function TrendsDoc() {
           >
             <TrendChart name="Fees paid" unit="DAG/day · floor" buckets={cBuckets} format={dag} lines={[{ label: "fees", points: trim(scale(S(p, "g.feeFloor"), 1e-8)) }]} />
             <TrendChart name="Data anchored" unit="/day · floor" buckets={cBuckets} format={mb} lines={[{ label: "data", points: trim(scale(S(p, "g.kbFloor"), 1 / 1024)) }]} />
-          </Section>
-
-          <Section
-            id="cadence"
-            title="Base-ledger cadence"
-            lead="The global snapshot rhythm: how many ticks a day, how far apart on average, and the day's single longest pause."
-          >
-            <TrendChart name="Global snapshots" unit="/day" buckets={cBuckets} lines={[{ label: "ticks", points: trim(S(p, "g.ticks")) }]} />
-            <TrendChart name="Mean gap" unit="seconds" buckets={cBuckets} format={secs} lines={[{ label: "mean", points: trim(meanGap(p)) }]} />
-            <TrendChart name="Longest pause" unit="seconds · the day's single widest gap" buckets={cBuckets} format={secs} lines={[{ label: "max", points: trim(S(p, "g.gapMax")) }]} />
           </Section>
 
           <Section
