@@ -47,11 +47,11 @@ function deps(store: TrendsStore, over: Partial<SampleDeps> = {}): SampleDeps {
     net: "mainnet",
     metaIds: ["abc"],
     store,
-    pageGlobals: async () => [
+    pageGlobals: async () => ({ data: [
       { ordinal: 102, timestamp: iso(14, 0, 36), metagraphSnapshotCount: 2 },
       { ordinal: 101, timestamp: iso(14, 0, 8), metagraphSnapshotCount: 3 },
-    ],
-    pageMeta: async () => [{ ordinal: 9, timestamp: iso(14, 0, 8), fee: 500, sizeInKB: 10 }],
+    ] }),
+    pageMeta: async () => ({ data: [{ ordinal: 9, timestamp: iso(14, 0, 8), fee: 500, sizeInKB: 10 }] }),
     fleet: async () => ({ total: 5, perNet: { dag: 5 }, layers: { l0: 5 }, countries: { DE: 5 } }),
     now: () => Date.UTC(2026, 8, 6, 14, 10),
     ...over,
@@ -81,11 +81,11 @@ describe("runSample", () => {
     const store = memStore();
     await runSample(deps(store));
     await runSample(deps(store, {
-      pageGlobals: async () => [
+      pageGlobals: async () => ({ data: [
         { ordinal: 103, timestamp: iso(14, 1, 4), metagraphSnapshotCount: 4 },
         { ordinal: 102, timestamp: iso(14, 0, 36), metagraphSnapshotCount: 2 }, // pre-cursor, filtered
-      ],
-      pageMeta: async () => [],
+      ] }),
+      pageMeta: async () => ({ data: [] }),
     }));
     const day = store.data.get("t:mainnet:5m:2026-09-06")!;
     expect(day.get("14:00|g.ticks")).toBe("3");     // 2 + 1
@@ -97,7 +97,7 @@ describe("runSample", () => {
     let fleetCalls = 0;
     const d = deps(store, { fleet: async () => { fleetCalls++; return { total: 5, perNet: {}, layers: {}, countries: {} }; } });
     await runSample(d);
-    await runSample({ ...d, pageGlobals: async () => [], pageMeta: async () => [] });
+    await runSample({ ...d, pageGlobals: async () => ({ data: [] }), pageMeta: async () => ({ data: [] }) });
     expect(fleetCalls).toBe(1);
     expect(store.data.get("t:mainnet:1h:2026-09")!.get("06-14|f.nodes")).toBe("5");
   });

@@ -6,6 +6,7 @@ import { getLiveGeo } from "@/app/api/geo/live";
 import { runSample } from "../runSample";
 import { writeStore } from "../store";
 import type { FleetCounts, GlobalRec, MetaRec } from "../bucketing";
+import type { ChainPage } from "../fetchSince";
 
 // The trends SAMPLER — Vercel Cron hits this every 15 min (vercel.json). It pages the tiny
 // explorer list records since the Redis cursor (never the ~2.5 MB raw snapshot routes) and
@@ -81,10 +82,17 @@ export async function GET(req: Request) {
       net,
       metaIds: CATALOG[net].map((m) => m.id).filter((id): id is string => !!id),
       store: writeStore(),
-      pageGlobals: async (limit) =>
-        (((await getJson(`${be}/global-snapshots?limit=${limit}`)) as { data?: GlobalRec[] }).data ?? []),
-      pageMeta: async (id, limit) =>
-        (((await getJson(`${be}/currency/${id}/snapshots?limit=${limit}`)) as { data?: MetaRec[] }).data ?? []),
+      // Catch-up pages ride the explorer's own `meta.next` cursor — one request can't go
+      // past ~10K records (probed live: the global list returns EMPTY above 10K and the
+      // busiest currency chain 504s there), so depth comes from walking, not from limit.
+      pageGlobals: async (limit, next) => {
+        const j = (await getJson(`${be}/global-snapshots?limit=${limit}${next ? `&next=${encodeURIComponent(next)}` : ""}`)) as { data?: GlobalRec[]; meta?: { next?: string } };
+        return { data: j.data ?? [], next: j.meta?.next } satisfies ChainPage<GlobalRec>;
+      },
+      pageMeta: async (id, limit, next) => {
+        const j = (await getJson(`${be}/currency/${id}/snapshots?limit=${limit}${next ? `&next=${encodeURIComponent(next)}` : ""}`)) as { data?: MetaRec[]; meta?: { next?: string } };
+        return { data: j.data ?? [], next: j.meta?.next } satisfies ChainPage<MetaRec>;
+      },
       fleet: () => fleetCounts(net),
       now: () => Date.now(),
     });

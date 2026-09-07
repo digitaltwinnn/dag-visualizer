@@ -144,7 +144,7 @@ interface AppState {
   // document layer over the live scene (DocLayer), instead of separate static pages that
   // rebooted the WebGL engine on every footer navigation. A presentation axis like `section`,
   // never a Mode — a document is over the network, not a view of it. While set, the HUD's
-  // scene furniture stands down (DocGate) and RouteSync publishes /about | /design.
+  // scene furniture stands down (DocGate) and RouteSync publishes the doc page's own path.
   docPage: "about" | "design" | "trends" | null;
   // The doc overlay's STAGE-READY signal, written by the Engine (the one clock that knows the
   // choreography's real boundary — frame-driven, so ?slowmo and low FPS stretch it correctly,

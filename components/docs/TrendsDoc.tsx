@@ -3,8 +3,7 @@ import { useEffect, useState } from "react";
 import { Panel } from "@/components/docs/AboutDoc";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TrendChart, { type TrendLine } from "@/components/docs/TrendChart";
-import { METAGRAPHS } from "@/src/net/current";
-import { netUrl } from "@/src/net/current";
+import { METAGRAPHS, netUrl } from "@/src/net/current";
 import { displayNetwork } from "@/src/data/unlisted";
 
 // THE TRENDS DOCUMENT (user, 2026-09-06; widened twice since) — the first UI consumer of the

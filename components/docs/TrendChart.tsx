@@ -97,8 +97,8 @@ export default function TrendChart({
       if (prev.getUTCMonth() !== d.getUTCMonth())
         marks.push({ frac, label: d.toLocaleDateString(undefined, { month: "short", timeZone: "UTC" }) });
     } else if (spanMs > 2 * 86400000) {
-      const every = spanMs > 9 * 86400000 ? 7 : 1; // a month of days marks weekly
-      if (prev.getUTCDate() !== d.getUTCDate() && (spanMs <= 9 * 86400000 || d.getUTCDay() === 1) && every)
+      // a week of days marks daily; a month of days marks weekly (Mondays)
+      if (prev.getUTCDate() !== d.getUTCDate() && (spanMs <= 9 * 86400000 || d.getUTCDay() === 1))
         marks.push({ frac, label: d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" }) });
     } else {
       if (d.getUTCHours() % 6 === 0 && d.getUTCMinutes() === 0 && !(prev.getUTCHours() === d.getUTCHours() && prev.getUTCDate() === d.getUTCDate()))

@@ -43,8 +43,9 @@
 //  - Global records are day-chunked through bucketGlobals so the gap chain threads across chunks
 //    while the 5m coverage zero-fill stays bounded: 5m-tier fields older than the tier's own 48 h
 //    retention are pruned as we go instead of being written and left to expire.
-//  - The store starts empty (wiped), and this is the only writer while it runs, so the final
-//    write pass needs no read-merge: chunked applyWrites transactions carry the folded IncMap.
+//  - The script holds the SAMPLER'S OWN LOCK for its whole run (cron runs skip meanwhile and
+//    self-heal after), so the store has exactly one writer and the write passes need no
+//    read-merge: chunked applyWrites transactions carry the folded IncMap.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -188,7 +189,7 @@ async function main(): Promise<void> {
   // Deferred imports: store.ts reads env at construction, so env must be loaded first.
   const { Redis } = await import("@upstash/redis");
   const { NETWORKS, CATALOG } = await import("../src/engine/config");
-  const { TTL_S, slotOf, cursorKeyOf } = await import("../app/api/trends/keys");
+  const { TTL_S, slotOf, cursorKeyOf, lockKeyOf } = await import("../app/api/trends/keys");
   const { bucketGlobals, bucketMetas } = await import("../app/api/trends/bucketing");
   const { writeStore } = await import("../app/api/trends/store");
   type IncMap = import("../app/api/trends/bucketing").IncMap;
@@ -200,6 +201,18 @@ async function main(): Promise<void> {
     url: process.env.UPSTASH_KV_REST_API_URL!,
     token: process.env.UPSTASH_KV_REST_API_TOKEN!,
   });
+
+  // ⚠️ THE PRODUCTION CRON IS A CONCURRENT WRITER (review find, 2026-09-07 — this script
+  // used to claim sole-writer status it never enforced). Take the sampler's own lock for the
+  // whole run: cron runs skip while it's held (honest gaps, self-healed afterward), and the
+  // wipe below must never delete the lock key it is standing on. TTL 6 h outlives the longest
+  // walk; released in finally.
+  const lockStore = (await import("../app/api/trends/store")).writeStore();
+  if (!(await lockStore.acquireLock(lockKeyOf(net), 21600))) {
+    console.error("the sampler lock is held (a cron run or another rebuild is writing) — try again shortly");
+    process.exit(1);
+  }
+  try {
 
   const be0 = NETWORKS[net].be;
 
@@ -349,9 +362,10 @@ async function main(): Promise<void> {
   do {
     const [c, keys] = await redis.scan(cursor, { match: `t:${net}:*`, count: 200 });
     cursor = String(c);
-    if (keys.length) {
-      await redis.del(...(keys as string[]));
-      wiped += keys.length;
+    const doomed = (keys as string[]).filter((k) => k !== lockKeyOf(net)); // never the lock we hold
+    if (doomed.length) {
+      await redis.del(...doomed);
+      wiped += doomed.length;
     }
   } while (cursor !== "0");
   console.log(`  wiped ${wiped} keys`);
@@ -427,6 +441,10 @@ async function main(): Promise<void> {
   await store.applyWrites([{ key: cursorKeyOf(net), map: cursorMap, ttlS: null }]);
   console.log(`  ${fields} fields across ${inc.size} keys; cursor g=${newestG?.ordinal ?? "—"} (+${Object.keys(newestMetaOrd).length} metagraph cursors)`);
   console.log("done — the 15-min cron resumes from here.");
+
+  } finally {
+    await lockStore.releaseLock(lockKeyOf(net));
+  }
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

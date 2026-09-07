@@ -16,15 +16,15 @@ import {
   bucketGlobals, bucketMetas, bucketFleet,
   type FleetCounts, type GlobalRec, type IncMap, type MetaRec,
 } from "./bucketing";
-import { listSince } from "./fetchSince";
+import { listSince, type ChainPage } from "./fetchSince";
 import type { TrendsStore, TrendsWrite } from "./store";
 
 export interface SampleDeps {
   net: string;
   metaIds: string[];
   store: TrendsStore;
-  pageGlobals(limit: number): Promise<GlobalRec[]>;
-  pageMeta(id: string, limit: number): Promise<MetaRec[]>;
+  pageGlobals(limit: number, next?: string): Promise<ChainPage<GlobalRec>>;
+  pageMeta(id: string, limit: number, next?: string): Promise<ChainPage<MetaRec>>;
   /** Fleet counts, or null when the loaders failed — null writes NOTHING (an absent gauge
    *  is an honest gap; a zeroed fleet would be a fabricated reading). */
   fleet(): Promise<FleetCounts | null>;
@@ -42,7 +42,10 @@ const tierOfKey = (key: string): Tier => key.split(":")[2] as Tier;
 
 export async function runSample(deps: SampleDeps): Promise<SampleResult> {
   const { net, store } = deps;
-  if (!(await store.acquireLock(lockKeyOf(net), 300))) {
+  // Lock TTL 900 s — WELL above the route's maxDuration (300 s), per the releaseLock
+  // invariant in store.ts: an unconditional DEL is only safe while no run can outlive its
+  // own lock.
+  if (!(await store.acquireLock(lockKeyOf(net), 900))) {
     return { skipped: "locked", wroteFields: 0, gap: false, metaErrors: [] };
   }
   try {
@@ -68,7 +71,7 @@ export async function runSample(deps: SampleDeps): Promise<SampleResult> {
     const settled = await Promise.allSettled(
       deps.metaIds.map(async (id) => {
         const since = cur[`m.${id}`] != null ? Number(cur[`m.${id}`]) : -1;
-        const r = await listSince((limit) => deps.pageMeta(id, limit), since);
+        const r = await listSince((limit, next) => deps.pageMeta(id, limit, next), since);
         return { id, r };
       }),
     );
