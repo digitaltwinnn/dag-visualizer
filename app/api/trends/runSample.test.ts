@@ -72,6 +72,7 @@ describe("runSample", () => {
     const cursor = store.data.get("t:mainnet:cursor")!;
     expect(cursor.get("g")).toBe("102");
     expect(cursor.get("m.abc")).toBe("9");
+    expect(cursor.get("mTs.abc")).toBe(String(Date.UTC(2026, 8, 6, 14, 0, 8)));
     expect(cursor.get("v")).toBe("1");
     expect(store.ttls.get("t:mainnet:5m:2026-09-06")).toBe(259200);
     expect(store.ttls.has("t:mainnet:1d:2026")).toBe(false); // forever tier: no TTL

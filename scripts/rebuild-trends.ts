@@ -5,7 +5,15 @@
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --days=180
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --extend-to=2026-01-01
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --recompute-from=2026-09-06
+//   npx tsx scripts/rebuild-trends.ts --net=mainnet --backfill-gaps=2026-01-01
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --wipe-only
+//
+// --backfill-gaps writes the per-network CONTINUITY series (m.{id}.gapSum/gapMax) for
+// history: the ordinary backfills never kept record timestamps, so measuring gaps
+// retroactively means re-walking each chain — but ONLY the timestamps are collected, only
+// the two gap fields are written (complete-day recomputations, HSET overwrite), TODAY is
+// excluded (the live sampler's accruing bucket must not be double-counted), and every other
+// field is untouched. Runs under the sampler lock like everything else here.
 //
 // --recompute-from REPAIRS RECENT DAYS (2026-09-07, found live the day it was needed): a
 // sampler catch-up that runs past the pager's 600-record cap ACCEPTS a gap — honest, but the
@@ -66,9 +74,9 @@ function loadEnvLocal(): void {
   }
 }
 
-interface Args { net: "mainnet" | "integrationnet" | "testnet"; days: number; wipeOnly: boolean; extendToMs: number | null; recomputeFromMs: number | null }
+interface Args { net: "mainnet" | "integrationnet" | "testnet"; days: number; wipeOnly: boolean; extendToMs: number | null; recomputeFromMs: number | null; gapsFromMs: number | null }
 function parseArgs(): Args {
-  const a: Args = { net: "mainnet", days: 90, wipeOnly: false, extendToMs: null, recomputeFromMs: null };
+  const a: Args = { net: "mainnet", days: 90, wipeOnly: false, extendToMs: null, recomputeFromMs: null, gapsFromMs: null };
   for (const arg of process.argv.slice(2)) {
     if (arg === "--wipe-only") a.wipeOnly = true;
     else if (arg.startsWith("--net=")) a.net = arg.slice(6) as Args["net"];
@@ -82,6 +90,11 @@ function parseArgs(): Args {
       const m = arg.slice(17).match(/^(\d{4})-(\d{2})-(\d{2})$/);
       if (m) a.recomputeFromMs = Date.UTC(+m[1], +m[2] - 1, +m[3]);
       else { console.error("--recompute-from wants YYYY-MM-DD (UTC)"); process.exit(1); }
+    }
+    else if (arg.startsWith("--backfill-gaps=")) {
+      const m = arg.slice(16).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (m) a.gapsFromMs = Date.UTC(+m[1], +m[2] - 1, +m[3]);
+      else { console.error("--backfill-gaps wants YYYY-MM-DD (UTC)"); process.exit(1); }
     }
     else { console.error(`unknown arg ${arg}`); process.exit(1); }
   }
@@ -184,13 +197,17 @@ async function walkChain<T extends { timestamp: string }>(
 
 async function main(): Promise<void> {
   loadEnvLocal();
-  const { net, days, wipeOnly, extendToMs, recomputeFromMs } = parseArgs();
+  const { net, days, wipeOnly, extendToMs, recomputeFromMs, gapsFromMs } = parseArgs();
 
   // Deferred imports: store.ts reads env at construction, so env must be loaded first.
   const { Redis } = await import("@upstash/redis");
   const { NETWORKS, CATALOG } = await import("../src/engine/config");
   const { TTL_S, slotOf, cursorKeyOf, lockKeyOf } = await import("../app/api/trends/keys");
-  const { bucketGlobals, bucketMetas } = await import("../app/api/trends/bucketing");
+  const { bucketGlobals, bucketMetas, addInc } = await import("../app/api/trends/bucketing");
+  const addIncGap = (inc: import("../app/api/trends/bucketing").IncMap, n: string, tsMs: number, id: string, gap: number) => {
+    addInc(inc, n, tsMs, `m.${id}.gapSum`, gap);
+    addInc(inc, n, tsMs, `m.${id}.gapMax`, gap);
+  };
   const { writeStore } = await import("../app/api/trends/store");
   type IncMap = import("../app/api/trends/bucketing").IncMap;
   type GlobalRec = import("../app/api/trends/bucketing").GlobalRec;
@@ -215,6 +232,45 @@ async function main(): Promise<void> {
   try {
 
   const be0 = NETWORKS[net].be;
+
+  // ---- GAPS BACKFILL mode: per-network continuity history (see the header) ----
+  if (gapsFromMs != null) {
+    const todayStartMs = Math.floor(Date.now() / 86400000) * 86400000;
+    console.log(`backfilling per-network gap stats ${new Date(gapsFromMs).toISOString().slice(0, 10)} → yesterday …`);
+    const inc: IncMap = new Map();
+    const tierOf = (key: string): Tier => key.split(":")[2] as Tier;
+    for (const id of CATALOG[net].map((m) => m.id).filter((v): v is string => !!v)) {
+      // Timestamps only — the walk's records are otherwise discarded, and the two gap
+      // fields are the only thing this mode may write.
+      const stamps: number[] = [];
+      await walkChain<{ timestamp: string }>(`${NETWORKS[net].be}/currency/${id}/snapshots`, gapsFromMs, (recs) => {
+        for (const r of recs) {
+          const t = Date.parse(r.timestamp);
+          if (t < todayStartMs) stamps.push(t);
+        }
+      }, id.slice(0, 10));
+      stamps.sort((a, b) => a - b);
+      for (let i = 1; i < stamps.length; i++) {
+        const gap = Math.max(0, Math.round((stamps[i] - stamps[i - 1]) / 1000));
+        addIncGap(inc, net, stamps[i], id, gap);
+      }
+    }
+    console.log("writing (gap fields, all tiers within retention) …");
+    const store = writeStore();
+    const fresh5m = slotOf(net, "5m", Date.now() - TTL_S["5m"]! * 1000).key;
+    let fields = 0;
+    for (const [key, map] of inc) {
+      const tier = tierOf(key);
+      if (tier === "5m" && key < fresh5m) continue;
+      const entries = [...map.entries()];
+      for (let i = 0; i < entries.length; i += 400) {
+        await store.applyWrites([{ key, map: Object.fromEntries(entries.slice(i, i + 400)), ttlS: TTL_S[tier] }]);
+      }
+      fields += entries.length;
+    }
+    console.log(`  ${fields} gap fields; every other field and the cursor untouched.`);
+    return;
+  }
 
   // ---- RECOMPUTE mode: repair recent days whole (see the header) ----
   if (recomputeFromMs != null) {

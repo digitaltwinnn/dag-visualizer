@@ -161,6 +161,30 @@ export default function TrendsDoc() {
         const line: TrendLine = { label: "nodes", points, hue: net?.hue };
         return <TrendChart key={m.id} name={net?.name ?? m.id!} unit={unit} buckets={buckets} stepMs={stepMs} lines={[line]} />;
       });
+  /** Per-network CONTINUITY panels: real measured gap stats (m.{id}.gapSum/gapMax — sampled
+   *  from 2026-09-07 on; the sampler always held the record timestamps, it just discarded
+   *  them). Mean = gapSum/snaps per bucket; a day÷snaps approximation was rejected — for a
+   *  batching network (DOR: dozens of snapshots in one tick, then idle) it reads as spacing
+   *  that never existed. Ranked by the latest reading, most-stalled first. */
+  const netGapPanels = (kind: "mean" | "max") =>
+    METAGRAPHS.filter((m) => m.id)
+      .map((m) => {
+        const sum = S(p, `m.${m.id}.gapSum`);
+        const snaps = S(p, `m.${m.id}.snaps`);
+        const gmax = S(p, `m.${m.id}.gapMax`);
+        const points =
+          kind === "mean"
+            ? sum.map((v, i) => (v != null && snaps[i] != null && snaps[i]! > 0 ? v / snaps[i]! : null))
+            : gmax;
+        const last = points.reduce<number | null>((acc, v) => (v != null ? v : acc), null);
+        return { m, points, last };
+      })
+      .sort((a, b) => (b.last ?? -1) - (a.last ?? -1))
+      .map(({ m, points }) => {
+        const net = displayNetwork(m.id);
+        const line: TrendLine = { label: kind, points: trim(points), hue: net?.hue };
+        return <TrendChart key={m.id} name={net?.name ?? m.id!} unit="seconds" buckets={cBuckets} stepMs={stepMs} format={secs} lines={[line]} />;
+      });
   const secs = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}s`;
   const mb = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 1 })} MB`;
 
@@ -261,9 +285,9 @@ export default function TrendsDoc() {
             <div className="flex items-center justify-between gap-3 flex-wrap pt-4">
               <TabsList aria-label="Hypergraph sections">
                 <TabsTrigger value="snapshots" className={innerTrigger}>Snapshots</TabsTrigger>
-                <TabsTrigger value="continuity" className={innerTrigger}>Continuity</TabsTrigger>
                 <TabsTrigger value="economics" className={innerTrigger}>Economics</TabsTrigger>
                 <TabsTrigger value="fleet" className={innerTrigger}>Fleet</TabsTrigger>
+                <TabsTrigger value="continuity" className={innerTrigger}>Continuity</TabsTrigger>
               </TabsList>
               {zoomPicker}
             </div>
@@ -337,6 +361,7 @@ export default function TrendsDoc() {
                 <TabsTrigger value="snapshots" className={innerTrigger}>Snapshots</TabsTrigger>
                 <TabsTrigger value="economics" className={innerTrigger}>Economics</TabsTrigger>
                 <TabsTrigger value="fleet" className={innerTrigger}>Fleet</TabsTrigger>
+                <TabsTrigger value="continuity" className={innerTrigger}>Continuity</TabsTrigger>
               </TabsList>
               {zoomPicker}
             </div>
@@ -379,6 +404,23 @@ export default function TrendsDoc() {
             ) : (
               netGaugePanels("nodes")
             )}
+          </Section>
+          </TabsContent>
+          <TabsContent value="continuity">
+          <Section
+            id="net-continuity"
+            title="Continuity"
+            lead="How steadily each network sealed its own snapshots — the average spacing and the single longest pause per bucket. Measuring began 7 Sep 2026; earlier history shows as unmeasured."
+          >
+            {netGapPanels("mean")}
+          </Section>
+
+          <Section
+            id="net-pause"
+            title="Longest pause"
+            lead="Each network's single widest gap per bucket — a tall spike is that network stalling, however briefly."
+          >
+            {netGapPanels("max")}
           </Section>
           </TabsContent>
           </Tabs>

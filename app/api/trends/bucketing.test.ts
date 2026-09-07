@@ -71,6 +71,28 @@ describe("bucketMetas", () => {
     expect(get(inc, day, "14:00|m.abc.kb")).toBe(15);
     expect(get(inc, "t:mainnet:1h:2026-09", "06-14|m.abc.snaps")).toBe(2);
   });
+  it("computes per-network gap stats only when a chain is opted in", () => {
+    const inc: IncMap = new Map();
+    const prev = Date.UTC(2026, 8, 6, 13, 59, 30);
+    bucketMetas(inc, "mainnet", "abc", [
+      { ordinal: 9, timestamp: ts(14, 0, 0), fee: 0, sizeInKB: 0 },
+      { ordinal: 10, timestamp: ts(14, 0, 45), fee: 0, sizeInKB: 0 },
+    ], prev);
+    const day = "t:mainnet:5m:2026-09-06";
+    expect(get(inc, day, "14:00|m.abc.gapSum")).toBe(75); // 30 (prev→9) + 45 (9→10)
+    expect(get(inc, day, "14:00|m.abc.gapMax")).toBe(45);
+    // no opt-in → no gap series, no invented values
+    const inc2: IncMap = new Map();
+    bucketMetas(inc2, "mainnet", "abc", [{ ordinal: 9, timestamp: ts(14, 0), fee: 0, sizeInKB: 0 }]);
+    expect(get(inc2, day, "14:00|m.abc.gapSum")).toBeUndefined();
+    // null opens a fresh chain: the first record contributes no gap
+    const inc3: IncMap = new Map();
+    bucketMetas(inc3, "mainnet", "abc", [
+      { ordinal: 9, timestamp: ts(14, 0, 0), fee: 0, sizeInKB: 0 },
+      { ordinal: 10, timestamp: ts(14, 0, 20), fee: 0, sizeInKB: 0 },
+    ], null);
+    expect(get(inc3, day, "14:00|m.abc.gapSum")).toBe(20);
+  });
   it("also feeds the global floors", () => {
     const inc: IncMap = new Map();
     bucketMetas(inc, "mainnet", "abc", [{ ordinal: 9, timestamp: ts(14, 2), fee: 400000, sizeInKB: 12.5 }]);

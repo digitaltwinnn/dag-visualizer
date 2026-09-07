@@ -6,7 +6,7 @@ export type MergeOp = "add" | "max" | "set";
 
 export function opOf(series: string): MergeOp {
   if (series.startsWith("f.")) return "set";
-  if (series === "g.gapMax") return "max";
+  if (series.endsWith("gapMax")) return "max"; // g.gapMax and every m.{id}.gapMax
   return "add";
 }
 

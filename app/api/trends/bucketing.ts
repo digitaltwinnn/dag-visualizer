@@ -53,8 +53,14 @@ export function bucketGlobals(inc: IncMap, net: string, recs: GlobalRec[], prevT
   }
 }
 
-/** One metagraph's snapshots: exact per-net sums plus the tracked-total floors. */
-export function bucketMetas(inc: IncMap, net: string, id: string, recs: MetaRec[]): void {
+/** One metagraph's snapshots: exact per-net sums plus the tracked-total floors.
+ *
+ *  `gapChain` opts INTO per-network gap stats (m.{id}.gapSum / m.{id}.gapMax — the metagraph
+ *  Continuity reading, 2026-09-07): pass the previous run's newest record timestamp (null to
+ *  open a fresh chain, e.g. after an accepted gap). Omit it entirely when record order isn't
+ *  guaranteed oldest→newest — the rebuild script's page streams — and no gap is invented. */
+export function bucketMetas(inc: IncMap, net: string, id: string, recs: MetaRec[], gapChain?: number | null): void {
+  let prev = gapChain === undefined ? undefined : gapChain;
   for (const r of recs) {
     const t = Date.parse(r.timestamp);
     addInc(inc, net, t, `m.${id}.snaps`, 1);
@@ -62,6 +68,14 @@ export function bucketMetas(inc: IncMap, net: string, id: string, recs: MetaRec[
     addInc(inc, net, t, `m.${id}.kb`, r.sizeInKB || 0);
     addInc(inc, net, t, "g.feeFloor", r.fee || 0);
     addInc(inc, net, t, "g.kbFloor", r.sizeInKB || 0);
+    if (prev !== undefined) {
+      if (prev != null) {
+        const gap = Math.max(0, Math.round((t - prev) / 1000));
+        addInc(inc, net, t, `m.${id}.gapSum`, gap);
+        addInc(inc, net, t, `m.${id}.gapMax`, gap);
+      }
+      prev = t;
+    }
   }
 }
 

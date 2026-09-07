@@ -80,8 +80,12 @@ export async function runSample(deps: SampleDeps): Promise<SampleResult> {
       if (s.status === "rejected") { metaErrors.push(deps.metaIds[i]); continue; }
       const { id, r } = s.value;
       if (r.recs.length) {
-        bucketMetas(inc, net, id, r.recs);
+        // The per-chain gap chain rides its own timestamp cursor; an accepted gap breaks the
+        // chain (null) exactly as the global spine's does.
+        const prevTs = cur[`mTs.${id}`] != null ? Number(cur[`mTs.${id}`]) : null;
+        bucketMetas(inc, net, id, r.recs, r.gap ? null : prevTs);
         cursorNext[`m.${id}`] = r.recs[r.recs.length - 1].ordinal;
+        cursorNext[`mTs.${id}`] = Date.parse(r.recs[r.recs.length - 1].timestamp);
       }
     }
 
