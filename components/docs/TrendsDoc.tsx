@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Panel } from "@/components/docs/AboutDoc";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TrendChart, { type TrendLine } from "@/components/docs/TrendChart";
 import { METAGRAPHS } from "@/src/net/current";
 import { netUrl } from "@/src/net/current";
@@ -93,6 +94,23 @@ export default function TrendsDoc() {
   const trim = (points: (number | null)[]): (number | null)[] => points.slice(1, -1);
 
   const dag = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: v < 10 ? 2 : 0 })}`;
+  /** The Metagraphs tab's panel list: one chart per catalog network for one stored metric,
+   *  ranked by the LAST measured day, busiest first (per-section — each ranking is its own
+   *  reading). The vitals' catalog-order rule guards live charts that reshuffle under the
+   *  reader; a document laid out once per visit can rank honestly. */
+  const netPanels = (suffix: string, unit: string, k = 1, fmt?: (v: number) => string) =>
+    METAGRAPHS.filter((m) => m.id)
+      .map((m) => {
+        const points = trim(scale(S(p, `m.${m.id}.${suffix}`), k));
+        const last = points.reduce<number | null>((acc, v) => (v != null ? v : acc), null);
+        return { m, points, last };
+      })
+      .sort((a, b) => (b.last ?? -1) - (a.last ?? -1))
+      .map(({ m, points }) => {
+        const net = displayNetwork(m.id);
+        const line: TrendLine = { label: suffix, points, hue: net?.hue };
+        return <TrendChart key={m.id} name={net?.name ?? m.id!} unit={unit} buckets={cBuckets} format={fmt} lines={[line]} />;
+      });
   const secs = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}s`;
   const mb = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 1 })} MB`;
 
@@ -123,7 +141,21 @@ export default function TrendsDoc() {
       )}
 
       {p && (
-        <>
+        <Tabs defaultValue="hypergraph" className="mt-4">
+          {/* TWO TABS (user, 2026-09-07): the hypergraph's own readings vs the per-metagraph
+              ones — the same split every 3D view draws. Segmented-control recipe (the command
+              bar's presentation toggle), not the channel pane's file-cabinet: a document has no
+              boxed body for a tab to fuse with. */}
+          <TabsList aria-label="Which side of the network">
+            <TabsTrigger value="hypergraph" className="text-label tracking-caps uppercase px-4">
+              Hypergraph
+            </TabsTrigger>
+            <TabsTrigger value="metagraphs" className="text-label tracking-caps uppercase px-4">
+              Metagraphs
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="hypergraph">
           <Section
             id="ledger"
             title="The base ledger"
@@ -144,29 +176,6 @@ export default function TrendsDoc() {
           </Section>
 
           <Section
-            id="networks"
-            title="Snapshots by metagraph"
-            lead="Each network's own daily snapshot count — its cadence is its choice, so every panel carries its own scale."
-          >
-            {/* Ordered by the LAST measured day's count, busiest first (user, 2026-09-07). The
-                vitals' catalog-order rule guards live charts that would reshuffle under the
-                reader as ticks land; a document laid out once per visit can rank honestly, and
-                here the ranking IS a reading. Dormant chains sink to the bottom. */}
-            {METAGRAPHS.filter((m) => m.id)
-              .map((m) => {
-                const points = trim(S(p, `m.${m.id}.snaps`));
-                const last = points.reduce<number | null>((acc, v) => (v != null ? v : acc), null);
-                return { m, points, last };
-              })
-              .sort((a, b) => (b.last ?? -1) - (a.last ?? -1))
-              .map(({ m, points }) => {
-                const net = displayNetwork(m.id);
-                const line: TrendLine = { label: "snapshots", points, hue: net?.hue };
-                return <TrendChart key={m.id} name={net?.name ?? m.id!} unit="/day" buckets={cBuckets} lines={[line]} />;
-              })}
-          </Section>
-
-          <Section
             id="economics"
             title="Economics"
             lead="What anchoring paid and carried, summed over the publicly listed metagraphs — a floor, exactly as the cards state it: unlisted channels pay too."
@@ -182,8 +191,8 @@ export default function TrendsDoc() {
           >
             <TrendChart name="Nodes" unit="total" buckets={buckets} lines={[{ label: "nodes", points: S(p, "f.nodes") }]} />
             <TrendChart
-              name="Layers"
-              unit="node-roles"
+              name="Metagraph layers"
+              unit="layer-roles"
               buckets={buckets}
               lines={[
                 { label: "L0", points: S(p, "f.layer.l0") },
@@ -191,7 +200,34 @@ export default function TrendsDoc() {
               ]}
             />
           </Section>
-        </>
+          </TabsContent>
+
+          <TabsContent value="metagraphs">
+          <Section
+            id="networks"
+            title="Snapshots"
+            lead="Each network's own daily snapshot count — its cadence is its choice, so every panel carries its own scale, busiest today first."
+          >
+            {netPanels("snaps", "/day")}
+          </Section>
+
+          <Section
+            id="net-fees"
+            title="Fees paid"
+            lead="What each network paid the base ledger to anchor, day by day — exact, from its own snapshot records (these are the terms the network-wide floor sums)."
+          >
+            {netPanels("fee", "DAG/day", 1e-8, dag)}
+          </Section>
+
+          <Section
+            id="net-data"
+            title="Data anchored"
+            lead="How much state each network sealed into the base ledger, day by day — exact, from its own snapshot records."
+          >
+            {netPanels("kb", "/day", 1 / 1024, mb)}
+          </Section>
+          </TabsContent>
+        </Tabs>
       )}
     </article>
   );
