@@ -700,8 +700,7 @@ function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: b
     <div className="flex items-end justify-end gap-[2px] h-full min-h-12 w-full self-stretch pb-0.5" aria-hidden>
       {(bars.length === 0 || !anyMeasured) && <span className="text-micro text-muted-foreground self-center">acquiring…</span>}
       {allZero && <span className="text-micro text-muted-foreground self-center">no anchors in this window</span>}
-      {bars.map((b, i) => {
-        const latest = i === bars.length - 1;
+      {bars.map((b) => {
         if (b.v == null) {
           // Unmeasured — the neutral stub (see the header). It keeps its flex slot so the
           // window's rhythm (position = time) survives the hole.
@@ -717,8 +716,10 @@ function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: b
               height: b.v > 0 ? `${Math.max(8, (b.v / max) * 100)}%` : "0",
               // A stacked bar's colour comes from its segments; a scoped one paints whole.
               background: b.v > 0 && !b.segs ? accent : "none",
-              opacity: b.v > 0 ? (latest ? 1 : 0.55) : 0,
-              boxShadow: latest && b.v > 0 ? `0 0 6px ${accent}` : undefined,
+              // ONE weight for every bar (user, 2026-09-08): the tick chart's glowing head
+              // meant "the newest live tick"; here the last bar is just the newest COMPLETE
+              // bucket — nothing an emphasis would be ABOUT.
+              opacity: b.v > 0 ? 0.7 : 0,
             }}
           >
             {b.segs?.map((sg) => (
