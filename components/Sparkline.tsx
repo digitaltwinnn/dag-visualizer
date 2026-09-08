@@ -18,17 +18,25 @@ import { cn } from "@/lib/utils";
  *
  *  Mean rather than max: a max-bucket preserves peaks but inflates the shape, and this chart has no
  *  axis to correct the impression with. The headline numeral beside it carries the real rate; the
- *  line carries shape alone, so its job is to be READ, not measured. */
-function bucketMean(data: number[], max: number): number[] {
+ *  line carries shape alone, so its job is to be READ, not measured.
+ *
+ *  A null is NOT MEASURED (the trends store's contract): it never enters a bucket's mean, and a
+ *  bucket with nothing measured stays null — the line breaks there rather than fabricating a
+ *  level (rule 10; the /trends charts' own connectNulls:false, one instrument down). */
+function bucketMean(data: (number | null)[], max: number): (number | null)[] {
   if (data.length <= max) return data;
-  const out: number[] = [];
+  const out: (number | null)[] = [];
   const size = data.length / max;
   for (let i = 0; i < max; i++) {
     const from = Math.floor(i * size);
     const to = Math.max(from + 1, Math.floor((i + 1) * size));
     let sum = 0;
-    for (let j = from; j < to; j++) sum += data[j];
-    out.push(sum / (to - from));
+    let n = 0;
+    for (let j = from; j < to; j++) {
+      const v = data[j];
+      if (v != null) { sum += v; n++; }
+    }
+    out.push(n > 0 ? sum / n : null);
   }
   return out;
 }
@@ -41,7 +49,7 @@ export default function Sparkline({
   stretch = false,
   maxPoints,
 }: {
-  data: number[] | undefined;
+  data: (number | null)[] | undefined;
   color: string;
   width?: number;
   height?: number;
@@ -60,7 +68,9 @@ export default function Sparkline({
   // FIRST — the window simply has not filled. "No data" would claim the second. It is also the
   // word `TickBars` already uses two cards along, so the band speaks one language. A real zero is
   // a READING and never reaches here: it plots as a flat line.
-  if (!data || data.length < 2) {
+  // A null-riddled series is judged by what it can DRAW: fewer than two measured points is
+  // the same "window has not filled" fact whatever the array's length.
+  if (!data || data.filter((v) => v != null).length < 2) {
     return (
       <span
         className={cn("flex items-center justify-center text-micro text-muted-foreground", stretch && "w-full")}
@@ -77,7 +87,9 @@ export default function Sparkline({
       <ResponsiveContainer width="100%" height={height}>
         <LineChart data={points} margin={{ top: 3, right: 1, bottom: 3, left: 1 }}>
           <YAxis hide domain={["dataMin", "dataMax"]} />
-          <Line type="monotone" dataKey="v" stroke={color} strokeWidth={1.5} dot={false} isAnimationActive={false} />
+          {/* connectNulls false stated, not defaulted: the break IS the reading (a gap is
+              "not measured", and bridging it would draw a level nobody measured). */}
+          <Line type="monotone" dataKey="v" stroke={color} strokeWidth={1.5} dot={false} isAnimationActive={false} connectNulls={false} />
         </LineChart>
       </ResponsiveContainer>
     );
@@ -93,6 +105,7 @@ export default function Sparkline({
         strokeWidth={1.5}
         dot={false}
         isAnimationActive={false}
+        connectNulls={false}
       />
     </LineChart>
   );

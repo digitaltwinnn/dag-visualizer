@@ -16,6 +16,7 @@ import { NoSignalDot } from "@/components/state/StateAtoms";
 import { isGlobalActivityScope, type Activity } from "@/src/data/api";
 import { POLL } from "@/src/engine/config";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
+import useTrendsWindow from "@/components/useTrendsWindow";
 import { useSceneYield } from "@/components/RailShade";
 import { ageWords } from "@/src/util/relativeAge";
 import { cn } from "@/lib/utils";
@@ -168,7 +169,7 @@ const BAND_CAP: Record<BandCardSize, string> = {
   lg: "max-w-[560px]",
 };
 
-export function BandCard({ label, children, className, mark, lead, size = "md" }: { label: string; children?: React.ReactNode; className?: string; mark?: React.ReactNode; lead?: React.ReactNode; size?: BandCardSize }) {
+export function BandCard({ label, children, className, mark, lead, size = "md", aside }: { label: string; children?: React.ReactNode; className?: string; mark?: React.ReactNode; lead?: React.ReactNode; size?: BandCardSize; aside?: React.ReactNode }) {
   return (
     <div className={cn(
       // The plate is the COMMAND BAR's own glass (`--topbar-glass` — a gradient token, so the
@@ -193,6 +194,11 @@ export function BandCard({ label, children, className, mark, lead, size = "md" }
             with no ellipsis (user, 2026-09-01: "in some screen sizes it overflows"), which reads
             as a rendering fault rather than as a shortened label. */}
         <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground truncate leading-none">{label}</span>
+        {/* The eyebrow's right-aligned companion — CardHead's aside pattern reaching the band
+            (user, 2026-09-08: the rate cards' window words moved here from beside the chart, so
+            the line spends the whole body). Muted, natural case (a window is words, not a
+            label), flex-none so the LABEL is what truncates when the card is tight. */}
+        {aside != null && <span className="ml-auto flex-none text-micro text-muted-foreground whitespace-nowrap leading-none">{aside}</span>}
       </span>
       {/* ⚠️ NOT a `@container` (tried and reverted, 2026-09-01). Querying the body's own width to
           drop parts of a cell is the tempting shape, but `container-type: inline-size` also
@@ -747,11 +753,43 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
   // retained window is the old strip's own choice: a fixed slice left the wide card's right
   // side empty (user, 2026-08-30 — "a lot of room available to the right").
   const { snaps } = useSnapshotFeed(POLL.maxSnapshots);
+  // THE LINE IS MEASURED, THE NUMBER IS LIVE (2026-09-08 — the trends store's first HUD
+  // surface). The sparklines used to plot per-hour extrapolations over the live buffer's
+  // ~45 min, with a basis note apologizing for the reach; the store holds the same
+  // quantities MEASURED, 24 hours deep, so the line now carries real history while the lead
+  // numeral stays the live rate — the band is a live instrument, and the freshest fact wins
+  // the headline. A null bucket (a sampling hole) breaks the line — Sparkline's own rule.
+  const trends = useTrendsWindow("24h");
   const scoped = !isGlobalActivityScope(filter);
   const cfg = metagraphById(filter);
   const isMeta = !!cfg && filter !== "all" && filter !== "dag";
   const basis = windowNote(activity, scoped ? "snapshots" : "global ticks");
-  const rate = (label: string, value: number | undefined, spark: number[] | undefined, note?: string) => {
+  /** A measured series by field name — and an ABSENT name is still a reading. `assemble` only
+   *  emits names that appeared in the window's hashes, so a catalog chain that anchored
+   *  nothing in 24h has no `m.{id}.snaps` at all; its honest series is 0 wherever the sampler
+   *  covered the bucket (`g.ticks`, the coverage marker) and a gap where it didn't. */
+  const measured = (name: string): (number | null)[] | undefined => {
+    if (!trends) return undefined;
+    return trends.series[name] ?? trends.series["g.ticks"]?.map((v) => (v != null ? 0 : null));
+  };
+  interface SparkSpec { data: (number | null)[] | undefined; span: string; sr: string }
+  /** The measured line where the store carries this scope (the catalog chains and the global
+   *  chain), else the live buffer's extrapolated shape — the unlisted networks are sampled by
+   *  nothing, and an "acquiring…" that never resolves is the fabricated promise rule 10
+   *  forbids. */
+  const sparkOf = (name: string | null, live: number[] | undefined): SparkSpec =>
+    name != null
+      ? {
+          data: measured(name),
+          span: "last 24 hours",
+          sr: "The line is measured history — the last 24 hours from the chain's own records, in 5-minute buckets averaged for drawing.",
+        }
+      : {
+          data: live,
+          span: activity ? windowSpan(activity) : "",
+          sr: "",
+        };
+  const rate = (label: string, value: number | undefined, spark: SparkSpec, note?: string) => {
     // A stopped chain reports WHEN, not HOW FAST. The lead keeps the card's shape — same slot, same
     // weight — so the row does not reflow between a live network and an idle one.
     const stale = staleFor(activity);
@@ -771,6 +809,7 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
     return (
     <BandCard
       label={label}
+      aside={spark.span || undefined}
       lead={<span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap"><Odometer value={value} /></span>}
     >
       {/* stretch: the fixed 64px chart left the card's right half empty (user, 2026-08-30).
@@ -787,15 +826,15 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
           so a committed network re-tinted three of the row's four instruments and left this one
           cyan. Not a rule-3 exception — rule 3 forbids repointing the structural TOKEN, and this
           passes an identity hue to a chart, which is what the band has always done under a scope. */}
-      {/* `maxPoints`: the retained window is 52 ticks, and 51 segments of a noisy rate over a
-          40px-tall line read as hair rather than as a trend (user, 2026-09-01: "too dense, too many
-          points"). Bucketed to 20 by mean — the SAME window at a lower frequency, which is what
-          keeps it honest against the basis note printed two elements to the right. */}
-      <span className="flex-1 min-w-0 self-center"><Sparkline data={spark} color={accent} height={42} maxPoints={20} stretch /></span>
-      {/* The extrapolation window, VISIBLE (rule 10): the basis is part of the reading, and the
-          band's pointer-events-none root means a title tooltip can never fire — sr-only alone
-          left sighted pointer users reading an extrapolated rate as a measured fact. */}
-      {activity && <span className="text-micro text-muted-foreground whitespace-nowrap self-end pb-1">{windowSpan(activity)}</span>}
+      {/* `maxPoints`: a 24h window is 288 five-minute buckets, and that many segments over a
+          40px-tall line read as hair rather than as a trend (the "too dense" rule, user,
+          2026-09-01). Bucketed to 20 by mean — the SAME window at a lower frequency, which is
+          what keeps it honest against the window printed two elements to the right. */}
+      {/* The window words live in the eyebrow's aside (user, 2026-09-08, after one round with
+          them captioned under the line): the header carries the reading's window, so the body
+          is the chart's alone — full width AND full height. */}
+      <span className="flex-1 min-w-0 self-center"><Sparkline data={spark.data} color={accent} height={42} maxPoints={20} stretch /></span>
+      {spark.sr && <span className="sr-only">{spark.sr}</span>}
       {note && <span className="sr-only">{note}</span>}
     </BandCard>
     );
@@ -806,10 +845,14 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
     <>
       <AnchoringNetworks snaps={snaps} filter={filter} />
       {scoped
-        ? rate("DAG fees/hour", activity?.feesPerHour, activity?.feesSeries, basis && `$DAG this network pays to anchor. ${basis}`)
-        : rate("Anchors/hour", activity?.anchorsPerHour, activity?.anchoredSeries, basis && `Metagraph snapshots anchored into the global chain. ${basis}`)}
-      {rate("Snapshots/hour", activity?.snapsPerHour, activity?.cadenceSeries, basis)}
-      <BandCard label="Anchors per global snapshot" size="lg" className="min-w-[220px]">
+        ? rate("DAG fees/hour", activity?.feesPerHour, sparkOf(cfg ? `m.${cfg.id}.fee` : null, activity?.feesSeries), basis && `$DAG this network pays to anchor. ${basis}`)
+        : rate("Anchors/hour", activity?.anchorsPerHour, sparkOf("g.anchors", activity?.anchoredSeries), basis && `Metagraph snapshots anchored into the global chain. ${basis}`)}
+      {rate("Snapshots/hour", activity?.snapsPerHour, sparkOf(scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries), basis)}
+      {/* Its window in the eyebrow aside like the rate cards' (2026-09-08 — once two cards
+          stated their window, the third's silence read as unbounded). This one is the LIVE
+          per-tick instrument: the store's 5m floor cannot say "per global snapshot", so the
+          card keeps the retained window and says so. */}
+      <BandCard label="Anchors per global snapshot" size="lg" className="min-w-[220px]" aside={activity ? windowSpan(activity) : undefined}>
         <TickBars accent={accent} isMeta={isMeta} filter={filter} snaps={snaps} />
       </BandCard>
     </>

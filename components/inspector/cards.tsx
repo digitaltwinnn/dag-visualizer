@@ -14,6 +14,7 @@ import { metaSnapDeepKey } from "@/src/data/types";
 import AnchoredTags from "./AnchoredTags";
 import Odometer from "@/components/Odometer";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
 import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS } from "@/components/icons";
@@ -559,6 +560,24 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           <Separator className="my-2" />
           <MetaSiteRow site={site} />
         </>
+      )}
+      {/* THE TRENDS INVITATION — a CONTROL, not a fact (the value-slot rule): this network's
+          measured history lives on the Trends page, and this button is the dossier's one route
+          to it (2026-09-08, the trends-in-HUD round). It opens the DOC OVERLAY — a store
+          toggle, never a navigation, so the engine survives — and TrendsDoc reads the
+          committed filter at mount to open on the right tab. Catalog networks only: the
+          sampler reads the catalog, so the unlisted set has no measured series to invite
+          anyone into. */}
+      {cfg.id !== UNLISTED_ID && (
+        <Button
+          variant="link"
+          size="xs"
+          className="mt-1 px-0"
+          title="Measured history for this network — snapshots, fees and data, daily since January."
+          onClick={() => useStore.getState().setDocPage("trends")}
+        >
+          Show the trends
+        </Button>
       )}
       {/* FOOT — the network's own chain references (user, 2026-08-13/14): a metagraph's id IS
           its state-channel address, plus the owner and staking addresses its records publish.

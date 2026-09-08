@@ -4,6 +4,8 @@ import { Panel } from "@/components/docs/AboutDoc";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TrendChart, { type TrendLine } from "@/components/docs/TrendChart";
 import { METAGRAPHS, netUrl } from "@/src/net/current";
+import { useStore } from "@/src/store/store";
+import { metagraphById } from "@/src/data/network";
 import { displayNetwork } from "@/src/data/unlisted";
 import { cn } from "@/lib/utils";
 
@@ -86,6 +88,14 @@ function Section({ id, title, lead, children }: { id: string; title: string; lea
 export default function TrendsDoc() {
   const [fetched, setFetched] = useState<Fetched>({ state: "loading" });
   const [zoom, setZoom] = useState<ZoomId>("1y");
+  // Opened from a committed metagraph's dossier ("Show the trends", 2026-09-08), the page
+  // opens on that side of the network. Read ONCE at mount (the doc remounts per open): the
+  // Tabs stay uncontrolled, so browsing the tabs afterwards owes the filter nothing. The DAG
+  // core's history is the Hypergraph tab — only a catalog metagraph flips the default.
+  const [initialTab] = useState<"hypergraph" | "metagraphs">(() => {
+    const f = useStore.getState().filter;
+    return f !== "dag" && metagraphById(f) ? "metagraphs" : "hypergraph";
+  });
 
   // Refetch per zoom; the PREVIOUS payload stays on screen until the new one lands (the CDN
   // answers in ~no time, and swapping through a loading flash would blank every chart).
@@ -244,7 +254,7 @@ export default function TrendsDoc() {
       )}
 
       {p && (
-        <Tabs defaultValue="hypergraph" className="mt-6 gap-0">
+        <Tabs defaultValue={initialTab} className="mt-6 gap-0">
           {/* TWO TABS (user, 2026-09-07): the hypergraph's own readings vs the per-metagraph
               ones — the same split every 3D view draws. FILE-CABINET recipe (the channel pane's,
               verbatim — user, same day: "they look like pills and the body has no outline; same
