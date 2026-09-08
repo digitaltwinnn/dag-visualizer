@@ -840,13 +840,14 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
     return (
     <BandCard
       label={label}
-      // THE RIM IS THE BAND'S ONE WINDOW STATEMENT (user, 2026-09-08: the per-card asides
-      // repeated it four times — "ensure it's consistent and no duplication" — and beside the
-      // label they misread as one claim: "SNAPSHOTS/HOUR since Jan"). The label describes the
-      // LEAD (the live rate); the picked window lives on the rim, stated once. A card keeps a
-      // visible aside ONLY when its window is NOT the rim's — the live-fallback line — where
-      // silence would let the rim's claim cover a chart it doesn't describe.
-      aside={spark.offRim ? spark.span || undefined : undefined}
+      // THE LABEL NAMES THE QUANTITY, THE ASIDE QUALIFIES THE NUMBER (user, 2026-09-08 —
+      // second round: "ANCHORS/HOUR" over a year-long line put the lead's unit on the whole
+      // card). The eyebrow says WHAT is counted; the aside says what the numeral is — a live
+      // per-hour rate — and the RANGE stays the rim's, stated once (same user round: the
+      // per-card window asides had repeated it four times). The one exception stands: the
+      // live-fallback line states its own window, because it is NOT the rim's, and silence
+      // would let the rim's claim cover a chart it doesn't describe.
+      aside={spark.offRim ? spark.span || undefined : "live · /hour"}
       lead={<span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap"><Odometer value={value} /></span>}
     >
       {/* stretch: the fixed 64px chart left the card's right half empty (user, 2026-08-30).
@@ -883,9 +884,9 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
     <>
       <AnchoringNetworks windowed={windowed} snaps={snaps} filter={filter} />
       {scoped
-        ? rate("DAG fees/hour", activity?.feesPerHour, sparkOf(cfg ? `m.${cfg.id}.fee` : null, activity?.feesSeries), basis && `$DAG this network pays to anchor. ${basis}`)
-        : rate("Anchors/hour", activity?.anchorsPerHour, sparkOf("g.anchors", activity?.anchoredSeries), basis && `Metagraph snapshots anchored into the global chain. ${basis}`)}
-      {rate("Snapshots/hour", activity?.snapsPerHour, sparkOf(scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries), basis)}
+        ? rate("DAG fees", activity?.feesPerHour, sparkOf(cfg ? `m.${cfg.id}.fee` : null, activity?.feesSeries), basis && `$DAG this network pays to anchor, per hour. ${basis}`)
+        : rate("Anchors", activity?.anchorsPerHour, sparkOf("g.anchors", activity?.anchoredSeries), basis && `Metagraph snapshots anchored into the global chain, per hour. ${basis}`)}
+      {rate("Snapshots", activity?.snapsPerHour, sparkOf(scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries), basis)}
       <BandCard label="Anchors by metagraph" size="lg" className="min-w-[220px]">
         <StackBars accent={accent} isMeta={isMeta} filter={cfg?.id ?? filter} data={barData} />
       </BandCard>
