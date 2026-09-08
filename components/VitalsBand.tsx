@@ -840,15 +840,22 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
     return (
     <BandCard
       label={label}
-      // THE LABEL NAMES THE QUANTITY, THE ASIDE QUALIFIES THE NUMBER (user, 2026-09-08 —
-      // second round: "ANCHORS/HOUR" over a year-long line put the lead's unit on the whole
-      // card). The eyebrow says WHAT is counted; the aside says what the numeral is — a live
-      // per-hour rate — and the RANGE stays the rim's, stated once (same user round: the
-      // per-card window asides had repeated it four times). The one exception stands: the
-      // live-fallback line states its own window, because it is NOT the rim's, and silence
-      // would let the rim's claim cover a chart it doesn't describe.
-      aside={spark.offRim ? spark.span || undefined : "live · /hour"}
-      lead={<span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap"><Odometer value={value} /></span>}
+      // THE LABEL NAMES THE QUANTITY, THE NUMERAL CARRIES ITS OWN UNIT (user, 2026-09-08,
+      // two rounds: "ANCHORS/HOUR" over a year-long line put the lead's unit on the whole
+      // card, and an aside saying "live · /hour" was hard to read and repeated on every
+      // window — it described the numeral, not the card). The unit rides UNDER the number
+      // as a muted underline (the idle card's own stacked-lead grammar), so it qualifies
+      // exactly the thing it belongs to; the header carries no aside and the rim alone
+      // speaks for the charts' range. The one exception stands: the live-fallback line
+      // states its own window, because it is NOT the rim's, and silence would let the
+      // rim's claim cover a chart it doesn't describe.
+      aside={spark.offRim ? spark.span || undefined : undefined}
+      lead={
+        <span className="flex flex-col items-start">
+          <span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap"><Odometer value={value} /></span>
+          <span className="text-label text-muted-foreground leading-none">/hour</span>
+        </span>
+      }
     >
       {/* stretch: the fixed 64px chart left the card's right half empty (user, 2026-08-30).
           It also YIELDS FIRST when the row is tight, and `min-w-0` is how: a sparkline is the only
