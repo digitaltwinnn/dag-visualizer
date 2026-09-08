@@ -1005,10 +1005,51 @@ function ViewCells({ mode, accent, filter }: { mode: string; accent: string; fil
 const WINDOW_CHOICES = [["24h", "24H"], ["30d", "30D"], ["1y", "1Y"]] as const;
 const TrendsMark = DOC_ICONS.trends;
 
-function TrendsRim({ yielding }: { yielding: boolean }) {
+/** The rim's segments, shared by both presentations (2026-09-08): the desktop band's floating
+ *  pill and the phone Vitals sheet's control row render ONE group, so a window added or a
+ *  route renamed reaches both in the same edit — the ViewCells rule, applied to the control.
+ *  `grow` is the phone form: equal thumb-width segments across the sheet's column. */
+function RimSegments({ grow = false }: { grow?: boolean }) {
   const zoom = useStore((s) => s.vitalsWindow);
   const setZoom = useStore((s) => s.setVitalsWindow);
   const setDocPage = useStore((s) => s.setDocPage);
+  return (
+    <>
+      {WINDOW_CHOICES.map(([id, label]) => (
+        <button
+          key={id}
+          type="button"
+          aria-pressed={zoom === id}
+          onClick={() => setZoom(id)}
+          className={cn(
+            "px-2 flex items-center text-micro tracking-[0.1em] uppercase leading-none",
+            grow && "flex-1 justify-center",
+            // The pressed segment wears the /trends zoom picker's active fill (user: the
+            // text-only state was hardly visible) — the rim is the band's ONE window
+            // statement, so its selection has to read at a glance.
+            zoom === id ? "font-bold text-foreground bg-[var(--panel-solid)]" : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {label}
+        </button>
+      ))}
+      <button
+        type="button"
+        onClick={() => setDocPage("trends")}
+        title="The measured history behind these vitals — open the Trends page."
+        className={cn(
+          "flex items-center gap-1 px-2 text-micro tracking-[0.1em] uppercase leading-none text-muted-foreground hover:text-foreground",
+          grow && "flex-1 justify-center",
+        )}
+      >
+        <TrendsMark aria-hidden className="size-3" />
+        Trends
+      </button>
+    </>
+  );
+}
+
+function TrendsRim({ yielding }: { yielding: boolean }) {
   return (
     <div
       role="group"
@@ -1029,32 +1070,7 @@ function TrendsRim({ yielding }: { yielding: boolean }) {
         yielding && "opacity-40",
       )}
     >
-      {WINDOW_CHOICES.map(([id, label]) => (
-        <button
-          key={id}
-          type="button"
-          aria-pressed={zoom === id}
-          onClick={() => setZoom(id)}
-          className={cn(
-            "px-2 flex items-center text-micro tracking-[0.1em] uppercase leading-none",
-            // The pressed segment wears the /trends zoom picker's active fill (user: the
-            // text-only state was hardly visible) — the rim is the band's ONE window
-            // statement, so its selection has to read at a glance.
-            zoom === id ? "font-bold text-foreground bg-[var(--panel-solid)]" : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          {label}
-        </button>
-      ))}
-      <button
-        type="button"
-        onClick={() => setDocPage("trends")}
-        title="The measured history behind these vitals — open the Trends page."
-        className="flex items-center gap-1 px-2 text-micro tracking-[0.1em] uppercase leading-none text-muted-foreground hover:text-foreground"
-      >
-        <TrendsMark aria-hidden className="size-3" />
-        Trends
-      </button>
+      <RimSegments />
     </div>
   );
 }
@@ -1191,6 +1207,18 @@ export function VitalsSheetBody() {
       )}
     >
       {!live && <span className="self-center flex-none mb-2"><NoSignalDot /></span>}
+      {/* The rim, in the sheet's own register (2026-09-08): an in-flow full-width pill of
+          equal thumb-height segments above the cards — the sheet is interactive (unlike the
+          band), so it simply sits in the column. Same policy gate as the desktop pill. */}
+      {VIEW_POLICIES[mode].vitalsWindows && (
+        <div
+          role="group"
+          aria-label="Vitals history window"
+          className="flex items-stretch h-9 mb-2 flex-none rounded-full border border-border/60 overflow-hidden [background:var(--topbar-glass)]"
+        >
+          <RimSegments grow />
+        </div>
+      )}
       {/* The no-pop swap — the cell-targeting `[&>*]` rules ride the wrapper for the same
           retargeting reason the band's do (see the desktop section above). */}
       <RollSwap
