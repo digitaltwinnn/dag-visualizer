@@ -156,14 +156,16 @@ async function seekBoundary(
 // ---- explorer paging (the probed `meta.next` cursor walk) ------------------------------------
 interface Page<T> { data?: T[]; meta?: { next?: string } }
 async function getPage<T>(url: string): Promise<Page<T>> {
+  // Backoff reaches ~1.5 min cumulative: a multi-hour walk must survive a transient DNS or
+  // network blip (one killed a 3-hour gaps walk at 83%, 2026-09-08 — EAI_AGAIN).
   for (let attempt = 0; ; attempt++) {
     try {
-      const r = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(15000) });
+      const r = await fetch(url, { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(20000) });
       if (!r.ok) throw new Error(`${r.status}`);
       return (await r.json()) as Page<T>;
     } catch (e) {
-      if (attempt >= 3) throw e;
-      await new Promise((res) => setTimeout(res, 1000 * (attempt + 1)));
+      if (attempt >= 6) throw e;
+      await new Promise((res) => setTimeout(res, Math.min(30000, 1000 * 2 ** attempt)));
     }
   }
 }
@@ -237,11 +239,15 @@ async function main(): Promise<void> {
   if (gapsFromMs != null) {
     const todayStartMs = Math.floor(Date.now() / 86400000) * 86400000;
     console.log(`backfilling per-network gap stats ${new Date(gapsFromMs).toISOString().slice(0, 10)} → yesterday …`);
-    const inc: IncMap = new Map();
     const tierOf = (key: string): Tier => key.split(":")[2] as Tier;
+    const store = writeStore();
+    const fresh5m = slotOf(net, "5m", Date.now() - TTL_S["5m"]! * 1000).key;
+    let fields = 0;
     for (const id of CATALOG[net].map((m) => m.id).filter((v): v is string => !!v)) {
       // Timestamps only — the walk's records are otherwise discarded, and the two gap
-      // fields are the only thing this mode may write.
+      // fields are the only thing this mode may write. Each chain WRITES as soon as its
+      // walk ends (complete-day HSET recomputations are idempotent), so a crash mid-run
+      // loses one chain's walk, not the whole night's (learned at 83% of DOR, 2026-09-08).
       const stamps: number[] = [];
       await walkChain<{ timestamp: string }>(`${NETWORKS[net].be}/currency/${id}/snapshots`, gapsFromMs, (recs) => {
         for (const r of recs) {
@@ -250,23 +256,20 @@ async function main(): Promise<void> {
         }
       }, id.slice(0, 10));
       stamps.sort((a, b) => a - b);
+      const inc: IncMap = new Map();
       for (let i = 1; i < stamps.length; i++) {
         const gap = Math.max(0, Math.round((stamps[i] - stamps[i - 1]) / 1000));
         addIncGap(inc, net, stamps[i], id, gap);
       }
-    }
-    console.log("writing (gap fields, all tiers within retention) …");
-    const store = writeStore();
-    const fresh5m = slotOf(net, "5m", Date.now() - TTL_S["5m"]! * 1000).key;
-    let fields = 0;
-    for (const [key, map] of inc) {
-      const tier = tierOf(key);
-      if (tier === "5m" && key < fresh5m) continue;
-      const entries = [...map.entries()];
-      for (let i = 0; i < entries.length; i += 400) {
-        await store.applyWrites([{ key, map: Object.fromEntries(entries.slice(i, i + 400)), ttlS: TTL_S[tier] }]);
+      for (const [key, map] of inc) {
+        const tier = tierOf(key);
+        if (tier === "5m" && key < fresh5m) continue;
+        const entries = [...map.entries()];
+        for (let i = 0; i < entries.length; i += 400) {
+          await store.applyWrites([{ key, map: Object.fromEntries(entries.slice(i, i + 400)), ttlS: TTL_S[tier] }]);
+        }
+        fields += entries.length;
       }
-      fields += entries.length;
     }
     console.log(`  ${fields} gap fields; every other field and the cursor untouched.`);
     return;
