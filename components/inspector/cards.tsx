@@ -14,10 +14,9 @@ import { metaSnapDeepKey } from "@/src/data/types";
 import AnchoredTags from "./AnchoredTags";
 import Odometer from "@/components/Odometer";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
-import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS } from "@/components/icons";
+import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS, DOC_ICONS } from "@/components/icons";
 import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
 import { useArchive, archiveFactState, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
@@ -29,6 +28,8 @@ import { compositionGroups, compositionRows, nodeCompositionLabel, parseComposit
 import { pickNetId, followToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
+
+const TrendsMark = DOC_ICONS.trends;
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
 
@@ -561,23 +562,29 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           <MetaSiteRow site={site} />
         </>
       )}
-      {/* THE TRENDS INVITATION — a CONTROL, not a fact (the value-slot rule): this network's
-          measured history lives on the Trends page, and this button is the dossier's one route
-          to it (2026-09-08, the trends-in-HUD round). It opens the DOC OVERLAY — a store
-          toggle, never a navigation, so the engine survives — and TrendsDoc reads the
-          committed filter at mount to open on the right tab. Catalog networks only: the
-          sampler reads the catalog, so the unlisted set has no measured series to invite
-          anyone into. */}
+      {/* THE TRENDS ROW — the Site row's own shape (user, 2026-09-08: the first cut, a bare
+          link button, "feels undesigned"): a reference-cluster Fact whose value is the route,
+          wearing the Trends page's own mark. A control in a value slot is the Site row's
+          established exception — the row names a destination and the value is how you get
+          there. It opens the DOC OVERLAY (a store toggle, never a navigation, so the engine
+          survives), and TrendsDoc reads the committed filter at mount to open on the
+          Metagraphs tab. Catalog networks only: nothing samples the unlisted set, so there is
+          no history to route to. */}
       {cfg.id !== UNLISTED_ID && (
-        <Button
-          variant="link"
-          size="xs"
-          className="mt-1 px-0"
-          title="Measured history for this network — snapshots, fees and data, daily since January."
-          onClick={() => useStore.getState().setDocPage("trends")}
-        >
-          Show the trends
-        </Button>
+        <>
+          {!site && <Separator className="my-2" />}
+          <Fact label="Trends">
+            <button
+              type="button"
+              onClick={() => useStore.getState().setDocPage("trends")}
+              title="Measured history for this network — snapshots, fees and data, on the Trends page."
+              className="inline-flex items-center gap-1.5 text-primary/75 hover:text-primary"
+            >
+              measured history
+              <TrendsMark aria-hidden className="size-3.5" />
+            </button>
+          </Fact>
+        </>
       )}
       {/* FOOT — the network's own chain references (user, 2026-08-13/14): a metagraph's id IS
           its state-channel address, plus the owner and staking addresses its records publish.

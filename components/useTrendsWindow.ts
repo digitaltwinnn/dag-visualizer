@@ -66,12 +66,33 @@ function fresh(url: string): TrendsWindowData | null {
   return slot && Date.now() - slot.at < POLL.trendsMs ? slot.data : null;
 }
 
+/** The newest `ms` of a window — how the 7d fetch serves a 24h chart: one request, the
+ *  store's own hourly sums, no client-side re-bucketing (which would have to invent a rule
+ *  for hours that are part-null). */
+export function sliceWindow(data: TrendsWindowData, ms: number): TrendsWindowData {
+  const cut = Date.now() - ms;
+  let from = data.buckets.findIndex((t) => t + data.stepMs > cut);
+  if (from < 0) from = data.buckets.length;
+  if (from === 0) return data;
+  return {
+    buckets: data.buckets.slice(from),
+    stepMs: data.stepMs,
+    series: Object.fromEntries(Object.entries(data.series).map(([k, v]) => [k, v.slice(from)])),
+  };
+}
+
 /** The measured window, or null while nothing has landed (first flight, or a failed fetch —
- *  the next tick or mount asks again; a consumer shows its own acquiring state meanwhile). */
-export default function useTrendsWindow(window: "24h" | "7d" | "30d"): TrendsWindowData | null {
-  const url = netUrl(`/api/trends?window=${window}`);
-  const [data, setData] = useState<TrendsWindowData | null>(() => cache.get(url)?.data ?? null);
+ *  the next tick or mount asks again; a consumer shows its own acquiring state meanwhile).
+ *  A null `window` skips the fetch entirely — for consumers whose need is conditional (the
+ *  idle cards' 30d reach), since a hook cannot be called conditionally. */
+export default function useTrendsWindow(window: "24h" | "7d" | "30d" | "90d" | null): TrendsWindowData | null {
+  const url = window ? netUrl(`/api/trends?window=${window}`) : null;
+  const [data, setData] = useState<TrendsWindowData | null>(() => (url ? (cache.get(url)?.data ?? null) : null));
   useEffect(() => {
+    if (!url) {
+      setData(null);
+      return;
+    }
     touchPoll("api-trends"); // present in the pulse strip from first mount, as "acquiring"
     let dead = false;
     const pull = () => {

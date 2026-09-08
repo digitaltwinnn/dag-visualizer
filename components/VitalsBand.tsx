@@ -16,7 +16,9 @@ import { NoSignalDot } from "@/components/state/StateAtoms";
 import { isGlobalActivityScope, type Activity } from "@/src/data/api";
 import { POLL } from "@/src/engine/config";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
-import useTrendsWindow from "@/components/useTrendsWindow";
+import useTrendsWindow, { sliceWindow, type TrendsWindowData } from "@/components/useTrendsWindow";
+import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
+import { DOC_ICONS } from "@/components/icons";
 import { useSceneYield } from "@/components/RailShade";
 import { ageWords } from "@/src/util/relativeAge";
 import { cn } from "@/lib/utils";
@@ -637,104 +639,90 @@ function GeoCells({ accent }: { accent: string }) {
   );
 }
 
-// The declicked tick bar-chart — the LiveStrip's honesty rules verbatim, minus every
-// interaction: filtered, a bar is THAT network's own anchors on its OWN scale in its identity hue,
-// empty ticks as honest gaps. Only the newest bar glows.
+// The wide card is the STORE's chart (2026-09-08, user: "an overview who anchored the most over
+// time" — replacing the declicked per-tick bar-chart, whose subject the store structurally
+// cannot carry: its finest tier is a 5-minute bucket and a tick is ~28s, so keeping the label
+// while changing the resolution would have changed the meaning silently. The card changed
+// SUBJECT instead: one bar per store bucket over the rim's picked window). TickBars' honesty
+// rules carry over where they apply:
 //
-// UNFILTERED IT IS STACKED, one segment per anchoring metagraph in that network's own identity hue
-// (user pick, 2026-09-01: every metagraph, always — not a top-N). The bar's HEIGHT is unchanged —
-// the tick's total anchors on the window max — so the chart reads exactly as it did at a glance and
-// gains WHO underneath. Three rules keep it honest:
+//   · THE SEGMENTS MUST SUM TO THE BAR. The store samples the catalog, so the shortfall
+//     against g.anchors is the UNLISTED networks' anchoring — drawn as its own neutral
+//     segment rather than dropped (the donuts' `other` rule).
+//   · ORDER IS THE CATALOG'S, never per-bucket size: a segment that changes place bucket to
+//     bucket cannot be followed.
+//   · A MEASURED ZERO DRAWS NOTHING — an honest gap, never a stub.
+//   · IDENTITY IS NEVER COLOUR-ALONE: the METAGRAPHS ANCHORING card to the left is the
+//     legend, ranked over the SAME window (its own header says why).
 //
-//   · THE SEGMENTS MUST SUM TO THE BAR. `metaCounts` attributes what the anchor index could
-//     identify, which is not always the whole tick, so the shortfall is drawn as its own neutral
-//     segment rather than dropped — otherwise the coloured run would silently claim a total it does
-//     not account for. Same rule as the donuts' `other`.
-//   · A TICK WITH NO ATTRIBUTION IS NOT A TICK WITH NO ANCHORS. If the index carries nothing for a
-//     timestamp we still know the count, so the bar draws whole in the accent: "this many anchored,
-//     by whom is not known here" — never zero, which would be a different and false claim.
-//   · IDENTITY IS NEVER COLOUR-ALONE (dataviz discipline, and the band takes no pointer events so
-//     there can be no tooltip). The legend is the METAGRAPHS ANCHORING card standing immediately to
-//     the left: the same ids, the same `identityHudCss` hues, named sr-only. The two read from one
-//     source — `getAnchor(...).metaCounts` — so a colour in the chart always has a dot beside it.
+// And one rule is NEW here, because the live buffers never had the state: an UNMEASURED
+// bucket (null — a sampling hole) is not a zero. It draws a 2px NEUTRAL baseline stub — the
+// muted "nothing to read here" vocabulary — never the accent: an accent stub is exactly the
+// small-but-nonzero fabrication the zero rule exists to avoid, but drawing nothing would
+// claim "no anchors" about an hour nobody measured.
 //
-// Order is the CATALOG's, never the per-tick counts: sorting by size would repaint every bar as the
-// window shifts, and a segment that changes place tick to tick cannot be followed.
+// Filtered, a bar is that network's own anchors per bucket on its OWN scale in its identity
+// hue — the tick chart's scoped rule, at the store's resolution.
 const STACK_ORDER: string[] = METAGRAPHS.map((m) => m.id);
-const STACK_SET = new Set(STACK_ORDER);
 
 type Snaps = ReturnType<typeof useSnapshotFeed>["snaps"];
 interface StackSeg { key: string; n: number; color: string }
 
-function TickBars({ accent, isMeta, filter, snaps }: { accent: string; isMeta: boolean; filter: string; snaps: Snaps }) {
-  const bars = snaps.map((d) => {
-    const total = typeof d.metagraphSnapshotCount === "number" ? d.metagraphSnapshotCount : 0;
-    const mc = getAnchor(d.timestamp)?.metaCounts;
-    if (isMeta) return { v: mc?.get(filter) ?? 0, ord: d.ordinal, segs: null as StackSeg[] | null };
+function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: boolean; filter: string; data: TrendsWindowData | null }) {
+  if (!data) {
+    return <span className="flex items-center justify-center w-full self-center text-micro text-muted-foreground" aria-hidden>acquiring…</span>;
+  }
+  const anchors = data.series["g.anchors"] ?? [];
+  const ticks = data.series["g.ticks"] ?? [];
+  const bars = data.buckets.map((ts, i) => {
+    const covered = ticks[i] != null;
+    if (isMeta) {
+      return { v: covered ? (data.series[`m.${filter}.snaps`]?.[i] ?? 0) : null, ts, segs: null as StackSeg[] | null };
+    }
+    const total = covered ? (anchors[i] ?? 0) : null;
     let segs: StackSeg[] | null = null;
-    if (mc && mc.size > 0 && total > 0) {
+    if (total != null && total > 0) {
       segs = [];
       let named = 0;
       for (const id of STACK_ORDER) {
-        const n = mc.get(id);
+        const n = data.series[`m.${id}.snaps`]?.[i];
         if (n) { segs.push({ key: id, n, color: identityHudCss(id) }); named += n; }
       }
-      // A network anchoring that the catalog does not list still anchored — it takes its own hue
-      // after the listed ones rather than being folded into the shortfall.
-      for (const [id, n] of mc) {
-        if (n && !STACK_SET.has(id)) { segs.push({ key: id, n, color: identityHudCss(id) }); named += n; }
-      }
       const rest = total - named;
-      if (rest > 0) segs.push({ key: "__unattributed", n: rest, color: "var(--muted-foreground)" });
+      if (rest > 0) segs.push({ key: "__unlisted", n: rest, color: "var(--muted-foreground)" });
     }
-    return { v: total, ord: d.ordinal, segs };
+    return { v: total, ts, segs };
   });
-  const max = Math.max(1, ...bars.map((b) => b.v));
-  // EVERY BAR AT ZERO IS A READING, AND IT HAS TO SAY SO (user, 2026-09-01: "'anchors per
-  // snapshot' is completely empty when a metagraph does nothing; how do we show that instead of
-  // just a blank space?"). A single zero tick is an HONEST GAP — no body, never a stub, because a
-  // 2px mark would read as small-but-nonzero — and that rule is right per bar. But when the whole
-  // window is gaps the card renders 52 invisible spans and states nothing at all, which is the one
-  // outcome rule 10 cares about more than the stub it was avoiding.
-  //
-  // AND THE WORD IS `none`, NOT `acquiring`. The two are different facts (the acquiring-state
-  // rule): the sparkline beside it says acquiring because its window has not filled, while here
-  // the window IS full and the answer in it is zero. Saying acquiring would promise an arrival
-  // that the data has already ruled out for this window.
-  const allZero = bars.length > 0 && bars.every((b) => b.v === 0);
+  const max = Math.max(1, ...bars.map((b) => b.v ?? 0));
+  const anyMeasured = bars.some((b) => b.v != null);
+  const allZero = anyMeasured && bars.every((b) => b.v === 0 || b.v == null);
   return (
-    // Full height, not a fixed 34px: the bars grow from a baseline, so every pixel of card height
-    // is resolution the chart can actually spend (user, 2026-09-01).
-    // min-h: the chart CLAIMS whatever height its card gives it — the band's fixed --vitals-h
-    // on desktop, but the phone Vitals sheet's cards are content-height, where h-full of nothing
-    // rendered the card empty (user, 2026-09-03). The floor is the instrument's own intrinsic
-    // height; inside the band's taller box it is inert.
     <div className="flex items-end justify-end gap-[2px] h-full min-h-12 w-full self-stretch pb-0.5" aria-hidden>
-      {bars.length === 0 && <span className="text-micro text-muted-foreground self-center">acquiring…</span>}
+      {(bars.length === 0 || !anyMeasured) && <span className="text-micro text-muted-foreground self-center">acquiring…</span>}
       {allZero && <span className="text-micro text-muted-foreground self-center">no anchors in this window</span>}
       {bars.map((b, i) => {
         const latest = i === bars.length - 1;
+        if (b.v == null) {
+          // Unmeasured — the neutral stub (see the header). It keeps its flex slot so the
+          // window's rhythm (position = time) survives the hole.
+          return <span key={b.ts} className="flex-1 max-w-[14px] h-[2px] rounded-t-[2px]" style={{ background: "var(--border)", opacity: 0.6 }} />;
+        }
         return (
           <span
-            key={b.ord}
+            key={b.ts}
             // `flex-col-reverse`: segments are written in catalog order and stack UP from the
             // baseline, so the first listed network is the foot of every bar in the window.
-            className="flex-1 max-w-[9px] rounded-t-[2px] overflow-hidden flex flex-col-reverse"
+            className="flex-1 max-w-[14px] rounded-t-[2px] overflow-hidden flex flex-col-reverse"
             style={{
-              // Zero anchors = an HONEST GAP (rule 10, the strip's own rendering carried over
-              // exactly): no body at all, never a stub — a 2px tinted mark read as
-              // small-but-nonzero activity, precisely the fabricated quantity the filtered
-              // sparse-cadence read exists to avoid. The span keeps its flex slot so the
-              // window's rhythm (position = time) survives the empty ticks.
               height: b.v > 0 ? `${Math.max(8, (b.v / max) * 100)}%` : "0",
-              // A stacked bar's colour comes from its segments; an unattributed one paints whole.
+              // A stacked bar's colour comes from its segments; a scoped one paints whole.
               background: b.v > 0 && !b.segs ? accent : "none",
               opacity: b.v > 0 ? (latest ? 1 : 0.55) : 0,
               boxShadow: latest && b.v > 0 ? `0 0 6px ${accent}` : undefined,
             }}
           >
             {b.segs?.map((sg) => (
-              <span key={sg.key} className="w-full flex-none" style={{ height: `${(sg.n / b.v) * 100}%`, background: sg.color }} />
+              <span key={sg.key} className="w-full flex-none" style={{ height: `${(sg.n / b.v!) * 100}%`, background: sg.color }} />
             ))}
           </span>
         );
@@ -748,29 +736,38 @@ function TickBars({ accent, isMeta, filter, snaps }: { accent: string; isMeta: b
 // the network's DAG fees show instead), and the tick chart as one wide card.
 function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
   const activity = useStore((s) => s.activity);
-  // ONE feed subscription for the whole row (review, 2026-08-31 — TickBars and
-  // AnchoringNetworks each kept their own duplicate window state and listeners). The FULL
-  // retained window is the old strip's own choice: a fixed slice left the wide card's right
-  // side empty (user, 2026-08-30 — "a lot of room available to the right").
+  // ONE feed subscription for the whole row (review, 2026-08-31) — the roster's live
+  // fallback still reads it while the store hasn't answered.
   const { snaps } = useSnapshotFeed(POLL.maxSnapshots);
-  // THE LINE IS MEASURED, THE NUMBER IS LIVE (2026-09-08 — the trends store's first HUD
-  // surface). The sparklines used to plot per-hour extrapolations over the live buffer's
-  // ~45 min, with a basis note apologizing for the reach; the store holds the same
-  // quantities MEASURED, 24 hours deep, so the line now carries real history while the lead
-  // numeral stays the live rate — the band is a live instrument, and the freshest fact wins
-  // the headline. A null bucket (a sampling hole) breaks the line — Sparkline's own rule.
-  const trends = useTrendsWindow("24h");
+  // THE LINES AND BARS ARE MEASURED, THE NUMBERS ARE LIVE (2026-09-08 — the trends store's
+  // first HUD surface, then the rim round the same day). The charts plot the store's series
+  // over the rim's picked window; the lead numerals stay the live rates — the band is a live
+  // instrument, and the freshest fact wins the headline. Two fetches cover every window:
+  // the 7d payload is the HOURLY tier (its newest-24h slice = exact per-hour sums), the 90d
+  // payload the DAILY tier (7d/30d slices = exact per-day sums). No client re-bucketing —
+  // a client sum over part-null buckets would have to invent a floor rule the store already
+  // solved.
+  const zoom = useStore((s) => s.vitalsWindow);
+  const t7 = useTrendsWindow("7d");
+  const t90 = useTrendsWindow(zoom !== "24h" ? "90d" : null);
+  const windowed = useMemo<TrendsWindowData | null>(() => {
+    if (zoom === "24h") return t7 ? sliceWindow(t7, 24 * 3_600_000) : null;
+    if (zoom === "7d") return t90 ? sliceWindow(t90, 7 * 86_400_000) : null;
+    return t90 ? sliceWindow(t90, 30 * 86_400_000) : null;
+  }, [zoom, t7, t90]);
+  const span = zoom === "24h" ? "last 24 hours" : zoom === "7d" ? "last 7 days" : "last 30 days";
+  const stepWord = windowed?.stepMs === 3_600_000 ? "hour by hour" : "day by day";
   const scoped = !isGlobalActivityScope(filter);
   const cfg = metagraphById(filter);
   const isMeta = !!cfg && filter !== "all" && filter !== "dag";
   const basis = windowNote(activity, scoped ? "snapshots" : "global ticks");
   /** A measured series by field name — and an ABSENT name is still a reading. `assemble` only
    *  emits names that appeared in the window's hashes, so a catalog chain that anchored
-   *  nothing in 24h has no `m.{id}.snaps` at all; its honest series is 0 wherever the sampler
-   *  covered the bucket (`g.ticks`, the coverage marker) and a gap where it didn't. */
+   *  nothing in the window has no `m.{id}.snaps` at all; its honest series is 0 wherever the
+   *  sampler covered the bucket (`g.ticks`, the coverage marker) and a gap where it didn't. */
   const measured = (name: string): (number | null)[] | undefined => {
-    if (!trends) return undefined;
-    return trends.series[name] ?? trends.series["g.ticks"]?.map((v) => (v != null ? 0 : null));
+    if (!windowed) return undefined;
+    return windowed.series[name] ?? windowed.series["g.ticks"]?.map((v) => (v != null ? 0 : null));
   };
   interface SparkSpec { data: (number | null)[] | undefined; span: string; sr: string }
   /** The measured line where the store carries this scope (the catalog chains and the global
@@ -781,8 +778,8 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
     name != null
       ? {
           data: measured(name),
-          span: "last 24 hours",
-          sr: "The line is measured history — the last 24 hours from the chain's own records, in 5-minute buckets averaged for drawing.",
+          span,
+          sr: `The line is measured history — the ${span} from the chain's own records, ${stepWord}.`,
         }
       : {
           data: live,
@@ -790,19 +787,34 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
           sr: "",
         };
   const rate = (label: string, value: number | undefined, spark: SparkSpec, note?: string) => {
-    // A stopped chain reports WHEN, not HOW FAST. The lead keeps the card's shape — same slot, same
-    // weight — so the row does not reflow between a live network and an idle one.
+    // A STOPPED CHAIN REPORTS WHEN, NOT HOW FAST — and now also SHOWS it (user, 2026-09-08:
+    // the idle-card idea). The lead states idle and how long, in the Fees-paid stacked
+    // grammar; the measured line still draws, because a chain that stopped inside the picked
+    // window shows exactly WHERE it stopped — zoom out and the stop is the story. The live
+    // fallback line has nothing to show for an idle chain (its buffer is the silence), so
+    // that branch keeps the words alone.
     const stale = staleFor(activity);
     if (stale != null) {
       return (
         <BandCard
           key={label}
           label={label}
-          lead={<span className="font-mono font-bold text-muted-foreground tabular-nums whitespace-nowrap">idle</span>}
+          aside={spark.data != null ? spark.span : undefined}
+          lead={
+            <span className="flex flex-col items-start">
+              <span className="font-mono font-bold text-muted-foreground tabular-nums whitespace-nowrap">idle</span>
+              <span className="text-label text-muted-foreground whitespace-nowrap">{ageWords(stale)}</span>
+            </span>
+          }
         >
-          <span className="flex items-center self-stretch text-micro text-muted-foreground">
-            no snapshots for {ageWords(stale)}
-          </span>
+          {spark.data != null ? (
+            <span className="flex-1 min-w-0 self-center"><Sparkline data={spark.data} color={accent} height={42} maxPoints={20} stretch /></span>
+          ) : (
+            <span className="flex items-center self-stretch text-micro text-muted-foreground">
+              no snapshots for {ageWords(stale)}
+            </span>
+          )}
+          <span className="sr-only">No snapshots for {ageWords(stale)}. {spark.sr}</span>
         </BandCard>
       );
     }
@@ -817,7 +829,7 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
           part of a rate card that is decoration — the numeral and its extrapolation basis are the
           reading (rule 10) — so it contributes NOTHING to the card's intrinsic width and gives its
           space back before the basis note can be clipped off the plate. That is also what lets the
-          tick chart, the row's headline instrument, keep its own 220px floor at tablet width. */}
+          stacked chart, the row's headline instrument, keep its own 220px floor at tablet width. */}
       {/* `accent`, NOT a hardcoded `var(--primary)` (user, 2026-09-01: the ledger's vitals should be
           "metagraph color-aware — only anchors per global snapshot currently does that"). This was
           the band's own rule already: structural cyan at rest, the identity hue under a committed
@@ -826,10 +838,11 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
           so a committed network re-tinted three of the row's four instruments and left this one
           cyan. Not a rule-3 exception — rule 3 forbids repointing the structural TOKEN, and this
           passes an identity hue to a chart, which is what the band has always done under a scope. */}
-      {/* `maxPoints`: a 24h window is 288 five-minute buckets, and that many segments over a
-          40px-tall line read as hair rather than as a trend (the "too dense" rule, user,
-          2026-09-01). Bucketed to 20 by mean — the SAME window at a lower frequency, which is
-          what keeps it honest against the window printed two elements to the right. */}
+      {/* `maxPoints`: even the widest window (30 daily buckets) stays under a readable ceiling,
+          and the 7d hourly window's 168 segments over a 40px-tall line read as hair rather than
+          as a trend (the "too dense" rule, user, 2026-09-01). Bucketed to 20 by mean — the SAME
+          window at a lower frequency, which is what keeps it honest against the window printed
+          in the card's own header. */}
       {/* The window words live in the eyebrow's aside (user, 2026-09-08, after one round with
           them captioned under the line): the header carries the reading's window, so the body
           is the chart's alone — full width AND full height. */}
@@ -839,43 +852,62 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
     </BandCard>
     );
   };
-  // WHO anchors, HOW MUCH, HOW OFTEN, then the per-tick picture (user ordering, 2026-08-30):
+  // WHO anchors, HOW MUCH, HOW OFTEN, then the attribution picture (user ordering, 2026-08-30):
   // the roster leads, the anchor rate beside it, the cadence, and the chart closes the row.
   return (
     <>
-      <AnchoringNetworks snaps={snaps} filter={filter} />
+      <AnchoringNetworks windowed={windowed} span={span} snaps={snaps} filter={filter} />
       {scoped
         ? rate("DAG fees/hour", activity?.feesPerHour, sparkOf(cfg ? `m.${cfg.id}.fee` : null, activity?.feesSeries), basis && `$DAG this network pays to anchor. ${basis}`)
         : rate("Anchors/hour", activity?.anchorsPerHour, sparkOf("g.anchors", activity?.anchoredSeries), basis && `Metagraph snapshots anchored into the global chain. ${basis}`)}
       {rate("Snapshots/hour", activity?.snapsPerHour, sparkOf(scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries), basis)}
-      {/* Its window in the eyebrow aside like the rate cards' (2026-09-08 — once two cards
-          stated their window, the third's silence read as unbounded). This one is the LIVE
-          per-tick instrument: the store's 5m floor cannot say "per global snapshot", so the
-          card keeps the retained window and says so. */}
-      <BandCard label="Anchors per global snapshot" size="lg" className="min-w-[220px]" aside={activity ? windowSpan(activity) : undefined}>
-        <TickBars accent={accent} isMeta={isMeta} filter={filter} snaps={snaps} />
+      <BandCard label="Anchors by metagraph" size="lg" className="min-w-[220px]" aside={span}>
+        <StackBars accent={accent} isMeta={isMeta} filter={cfg?.id ?? filter} data={windowed} />
       </BandCard>
     </>
   );
 }
 
-// The distinct metagraphs seen anchoring across the retained window — EXACT (the anchor index's
-// own id sets, never inferred) — with each network's identity dot: the app-wide identity-dot
-// language (a presence roster, not a chart series), names carried sr-only since the band takes
-// no pointer events. A committed filter is a LENS: the window-wide fact stands un-edited.
-function AnchoringNetworks({ snaps, filter }: { snaps: Snaps; filter: string }) {
-  const ids = new Set<string>();
-  for (const d of snaps) {
-    const mc = getAnchor(d.timestamp)?.metaCounts;
-    if (mc) for (const id of mc.keys()) ids.add(id);
+// The distinct metagraphs seen anchoring — RANKED, OVER THE SAME WINDOW AS THE CHART IT
+// LEGENDS (2026-09-08). This card is the stacked chart's legend (identity is never
+// colour-alone, and the band takes no pointer events so there can be no tooltip), so the two
+// must read one window or a hue in the chart could have no dot beside it. Ranked
+// busiest-first — "who anchored the most" is the card's question now — which is the ranked-
+// breakdown exemption to the fixed-order rule (top countries' own precedent: sorting IS the
+// reading where the builder ranks). The unlisted remainder has no dot anywhere, honestly: the
+// chart's neutral segment is its whole identity, because the store samples the catalog.
+// While the store hasn't answered, the LIVE window's exact id set stands in (the anchor
+// index), with no window words — the honest silence. A committed filter stays a LENS: the
+// count is the window's whole truth, the dim says which network you are looking through.
+function AnchoringNetworks({ windowed, span, snaps, filter }: { windowed: TrendsWindowData | null; span: string; snaps: Snaps; filter: string }) {
+  let list: string[];
+  let aside: string | undefined;
+  if (windowed) {
+    const totals = new Map<string, number>();
+    for (const [name, series] of Object.entries(windowed.series)) {
+      const m = /^m\.(.+)\.snaps$/.exec(name);
+      if (!m) continue;
+      const sum = series.reduce<number>((a, v) => a + (v ?? 0), 0);
+      if (sum > 0) totals.set(m[1], sum);
+    }
+    list = [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+    aside = span;
+  } else {
+    const ids = new Set<string>();
+    for (const d of snaps) {
+      const mc = getAnchor(d.timestamp)?.metaCounts;
+      if (mc) for (const id of mc.keys()) ids.add(id);
+    }
+    list = [...ids];
+    aside = undefined;
   }
-  const list = [...ids];
   return (
     // CONTENT-SIZED (grow=false): the roster is a fixed run of dots, so an equal share of the row
     // left ~200px of empty plate beside five dots — the band's worst offender before 2026-09-01.
     <BandCard
       label="Metagraphs anchoring"
       size="sm"
+      aside={aside}
       lead={<span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={list.length || null} /></span>}
     >
       {/* ⚠️ THE LENS DIMS, IT DOES NOT EDIT (user, 2026-09-01: "if we filter, should we then also
@@ -940,6 +972,65 @@ function ViewCells({ mode, accent, filter }: { mode: string; accent: string; fil
   );
 }
 
+/** The TRENDS RIM — the band's one interactive strip (user, 2026-09-08: "some sort of separate
+ *  control bar that sets the range + links to the separate trends page"). A small tab riding
+ *  the band's TOP edge in the file-cabinet vocabulary the Trends page itself uses: the window
+ *  pills set `store.vitalsWindow` (which every windowed ledger cell reads), the divider, then
+ *  the route to the page where the elaborate versions live. It is a fixed SIBLING of the band,
+ *  not a child — the band's clip-path would amputate anything protruding past its border box,
+ *  and the band's `pointer-events-none` charter stays intact: the cards below remain
+ *  read-only, and this strip is the one deliberate exception, OUTSIDE the plate.
+ *  Gated per view by `viewPolicy.vitalsWindows` (convention 7): only the ledger's cells read
+ *  the store, and a picker over live-fleet cells would be a control wired to nothing. */
+const WINDOW_CHOICES = [["24h", "24H"], ["7d", "7D"], ["30d", "30D"]] as const;
+const TrendsMark = DOC_ICONS.trends;
+
+function TrendsRim({ yielding }: { yielding: boolean }) {
+  const zoom = useStore((s) => s.vitalsWindow);
+  const setZoom = useStore((s) => s.setVitalsWindow);
+  const setDocPage = useStore((s) => s.setDocPage);
+  return (
+    <div
+      role="group"
+      aria-label="Vitals history window"
+      style={{ right: "calc(var(--bar-margin) + 10px)", bottom: "calc(var(--footer-h, 0px) + var(--vitals-h) - 1px)" }}
+      className={cn(
+        // The band plate's own glass and hairline, rounded top only — the drawer-label read.
+        // -1px bottom overlap seats the tab ON the band's top border rather than beside it.
+        "fixed z-10 flex items-center h-[22px] px-1 rounded-t-md border border-b-0 border-border/60",
+        "[background:var(--topbar-glass)] backdrop-blur-sm",
+        "transition-opacity duration-300 motion-reduce:!transition-none",
+        yielding && "opacity-40",
+      )}
+    >
+      {WINDOW_CHOICES.map(([id, label]) => (
+        <button
+          key={id}
+          type="button"
+          aria-pressed={zoom === id}
+          onClick={() => setZoom(id)}
+          className={cn(
+            "px-1.5 h-full text-micro tracking-[0.1em] uppercase leading-none",
+            zoom === id ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {label}
+        </button>
+      ))}
+      <span aria-hidden className="w-px self-stretch my-1 bg-border/60 mx-0.5" />
+      <button
+        type="button"
+        onClick={() => setDocPage("trends")}
+        title="The measured history behind these vitals — open the Trends page."
+        className="flex items-center gap-1 px-1.5 h-full text-micro tracking-[0.1em] uppercase leading-none text-muted-foreground hover:text-foreground"
+      >
+        <TrendsMark aria-hidden className="size-3" />
+        Trends
+      </button>
+    </div>
+  );
+}
+
 /** The band. Mounted by BottomStream (per viewPolicy.vitalsLane + scene pose + rails visible);
  *  this component reads the mode only to pick which view's cells to lay out. */
 export default function VitalsBand() {
@@ -967,7 +1058,9 @@ export default function VitalsBand() {
   const coverL = useStore((s) => s.sceneCoverL);
   const coverR = useStore((s) => s.sceneCoverR);
   return (
-    <section
+    <>
+      {VIEW_POLICIES[mode].vitalsWindows && <TrendsRim yielding={yielding} />}
+      <section
       id="vitalsband"
       aria-label="View vitals"
       style={{
@@ -1045,6 +1138,7 @@ export default function VitalsBand() {
           bare numbers, the band's own charts already wear the identity accent under a filter,
           so the scope is stated by the vitals themselves. */}
     </section>
+    </>
   );
 }
 
