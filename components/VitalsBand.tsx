@@ -789,7 +789,7 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
     if (!windowed) return undefined;
     return windowed.series[name] ?? windowed.series["g.ticks"]?.map((v) => (v != null ? 0 : null));
   };
-  interface SparkSpec { data: (number | null)[] | undefined; span: string; sr: string }
+  interface SparkSpec { data: (number | null)[] | undefined; span: string; sr: string; offRim: boolean }
   /** The measured line where the store carries this scope (the catalog chains and the global
    *  chain), else the live buffer's extrapolated shape — the unlisted networks are sampled by
    *  nothing, and an "acquiring…" that never resolves is the fabricated promise rule 10
@@ -800,11 +800,13 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
           data: measured(name),
           span,
           sr: `The line is measured history — the ${span} from the chain's own records, ${stepWord}.`,
+          offRim: false,
         }
       : {
           data: live,
           span: activity ? windowSpan(activity) : "",
           sr: "",
+          offRim: true, // the live buffer's window is NOT the rim's — this card must say so
         };
   const rate = (label: string, value: number | undefined, spark: SparkSpec, note?: string) => {
     // A STOPPED CHAIN REPORTS WHEN, NOT HOW FAST — and now also SHOWS it (user, 2026-09-08:
@@ -819,7 +821,7 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
         <BandCard
           key={label}
           label={label}
-          aside={spark.data != null ? spark.span : undefined}
+          aside={spark.offRim && spark.data != null ? spark.span : undefined}
           lead={
             <span className="flex flex-col items-start">
               <span className="font-mono font-bold text-muted-foreground tabular-nums whitespace-nowrap">idle</span>
@@ -841,7 +843,13 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
     return (
     <BandCard
       label={label}
-      aside={spark.span || undefined}
+      // THE RIM IS THE BAND'S ONE WINDOW STATEMENT (user, 2026-09-08: the per-card asides
+      // repeated it four times — "ensure it's consistent and no duplication" — and beside the
+      // label they misread as one claim: "SNAPSHOTS/HOUR since Jan"). The label describes the
+      // LEAD (the live rate); the picked window lives on the rim, stated once. A card keeps a
+      // visible aside ONLY when its window is NOT the rim's — the live-fallback line — where
+      // silence would let the rim's claim cover a chart it doesn't describe.
+      aside={spark.offRim ? spark.span || undefined : undefined}
       lead={<span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap"><Odometer value={value} /></span>}
     >
       {/* stretch: the fixed 64px chart left the card's right half empty (user, 2026-08-30).
@@ -876,12 +884,12 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
   // the roster leads, the anchor rate beside it, the cadence, and the chart closes the row.
   return (
     <>
-      <AnchoringNetworks windowed={windowed} span={span} snaps={snaps} filter={filter} />
+      <AnchoringNetworks windowed={windowed} snaps={snaps} filter={filter} />
       {scoped
         ? rate("DAG fees/hour", activity?.feesPerHour, sparkOf(cfg ? `m.${cfg.id}.fee` : null, activity?.feesSeries), basis && `$DAG this network pays to anchor. ${basis}`)
         : rate("Anchors/hour", activity?.anchorsPerHour, sparkOf("g.anchors", activity?.anchoredSeries), basis && `Metagraph snapshots anchored into the global chain. ${basis}`)}
       {rate("Snapshots/hour", activity?.snapsPerHour, sparkOf(scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries), basis)}
-      <BandCard label="Anchors by metagraph" size="lg" className="min-w-[220px]" aside={span}>
+      <BandCard label="Anchors by metagraph" size="lg" className="min-w-[220px]">
         <StackBars accent={accent} isMeta={isMeta} filter={cfg?.id ?? filter} data={barData.data} forming={barData.forming} />
       </BandCard>
     </>
@@ -899,9 +907,8 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
 // While the store hasn't answered, the LIVE window's exact id set stands in (the anchor
 // index), with no window words — the honest silence. A committed filter stays a LENS: the
 // count is the window's whole truth, the dim says which network you are looking through.
-function AnchoringNetworks({ windowed, span, snaps, filter }: { windowed: TrendsWindowData | null; span: string; snaps: Snaps; filter: string }) {
+function AnchoringNetworks({ windowed, snaps, filter }: { windowed: TrendsWindowData | null; snaps: Snaps; filter: string }) {
   let list: string[];
-  let aside: string | undefined;
   if (windowed) {
     const totals = new Map<string, number>();
     for (const [name, series] of Object.entries(windowed.series)) {
@@ -911,7 +918,6 @@ function AnchoringNetworks({ windowed, span, snaps, filter }: { windowed: Trends
       if (sum > 0) totals.set(m[1], sum);
     }
     list = [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
-    aside = span;
   } else {
     const ids = new Set<string>();
     for (const d of snaps) {
@@ -919,7 +925,6 @@ function AnchoringNetworks({ windowed, span, snaps, filter }: { windowed: Trends
       if (mc) for (const id of mc.keys()) ids.add(id);
     }
     list = [...ids];
-    aside = undefined;
   }
   return (
     // CONTENT-SIZED (grow=false): the roster is a fixed run of dots, so an equal share of the row
@@ -927,7 +932,6 @@ function AnchoringNetworks({ windowed, span, snaps, filter }: { windowed: Trends
     <BandCard
       label="Metagraphs anchoring"
       size="sm"
-      aside={aside}
       lead={<span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={list.length || null} /></span>}
     >
       {/* ⚠️ THE LENS DIMS, IT DOES NOT EDIT (user, 2026-09-01: "if we filter, should we then also
@@ -1030,8 +1034,11 @@ function TrendsRim({ yielding }: { yielding: boolean }) {
           aria-pressed={zoom === id}
           onClick={() => setZoom(id)}
           className={cn(
-            "px-1.5 h-full text-micro tracking-[0.1em] uppercase leading-none",
-            zoom === id ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+            "px-1.5 h-[18px] my-auto rounded-sm text-micro tracking-[0.1em] uppercase leading-none",
+            // The pressed pill wears the /trends zoom picker's own active register (user,
+            // 2026-09-08: "highlight is hardly visible") — the rim is now the band's ONE
+            // window statement, so its selection has to read at a glance.
+            zoom === id ? "text-foreground bg-[var(--panel-solid)] shadow-sm" : "text-muted-foreground hover:text-foreground",
           )}
         >
           {label}
