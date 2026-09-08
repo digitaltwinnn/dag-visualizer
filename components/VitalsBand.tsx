@@ -1017,11 +1017,13 @@ function TrendsRim({ yielding }: { yielding: boolean }) {
     <div
       role="group"
       aria-label="Vitals history window"
-      style={{ right: "calc(var(--bar-margin) + 10px)", bottom: "calc(var(--footer-h, 0px) + var(--vitals-h) - 1px)" }}
+      style={{ right: "var(--bar-margin)", bottom: "calc(var(--footer-h, 0px) + var(--vitals-h) + 6px)" }}
       className={cn(
-        // The band plate's own glass and hairline, rounded top only — the drawer-label read.
-        // -1px bottom overlap seats the tab ON the band's top border rather than beside it.
-        "fixed z-10 flex items-center h-[22px] px-1 rounded-t-md border border-b-0 border-border/60",
+        // A floating PILL above the band's right corner (user, 2026-09-08 — the drawer-tab
+        // cut read "flat at the bottom and not properly right aligned"): rounded on all
+        // corners, its right edge flush with the band's own, a 6px air gap below so it
+        // reads as the band's satellite control rather than a growth on its border.
+        "fixed z-10 flex items-center h-[24px] px-1 rounded-full border border-border/60",
         "[background:var(--topbar-glass)] backdrop-blur-sm",
         "transition-opacity duration-300 motion-reduce:!transition-none",
         yielding && "opacity-40",
@@ -1034,7 +1036,7 @@ function TrendsRim({ yielding }: { yielding: boolean }) {
           aria-pressed={zoom === id}
           onClick={() => setZoom(id)}
           className={cn(
-            "px-1.5 h-[18px] my-auto rounded-sm text-micro tracking-[0.1em] uppercase leading-none",
+            "px-1.5 h-[18px] my-auto rounded-full text-micro tracking-[0.1em] uppercase leading-none",
             // The pressed pill wears the /trends zoom picker's own active register (user,
             // 2026-09-08: "highlight is hardly visible") — the rim is now the band's ONE
             // window statement, so its selection has to read at a glance.
