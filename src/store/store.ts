@@ -144,8 +144,8 @@ interface AppState {
   // document layer over the live scene (DocLayer), instead of separate static pages that
   // rebooted the WebGL engine on every footer navigation. A presentation axis like `section`,
   // never a Mode — a document is over the network, not a view of it. While set, the HUD's
-  // scene furniture stands down (DocGate) and RouteSync publishes /about | /design.
-  docPage: "about" | "design" | null;
+  // scene furniture stands down (DocGate) and RouteSync publishes the doc page's own path.
+  docPage: "about" | "design" | "trends" | null;
   // The doc overlay's STAGE-READY signal, written by the Engine (the one clock that knows the
   // choreography's real boundary — frame-driven, so ?slowmo and low FPS stretch it correctly,
   // where a wall-clock wait in the HUD desynced). DEFAULT TRUE so a document never waits on a
@@ -252,7 +252,7 @@ interface AppState {
   setLatestSnapshot: (snap: GlobalSnapshot | null) => void;
   setActivity: (activity: Activity | null) => void;
   setMode: (mode: Mode) => void;
-  setDocPage: (docPage: "about" | "design" | null) => void;
+  setDocPage: (docPage: "about" | "design" | "trends" | null) => void;
   setDocStageReady: (ready: boolean) => void;
   setDocClosing: (closing: boolean) => void;
   setFilter: (filter: string) => void;
