@@ -812,7 +812,10 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
       return {
         data,
         value: meanOf(data, feeScale ? 1e-8 : 1),
-        unit,
+        // "avg" is part of the unit line on purpose (user, 2026-09-08: "is that the average
+        // across the whole year or the latest?" — the mean-ness was sr-only, invisible to the
+        // eye asking). The fallback keeps its bare "/hour": its lead is a current rate.
+        unit: `avg ${unit}`,
         span,
         sr: `Measured from the chain's own records over the ${span}, ${stepWord}; the rate is the window's mean.`,
         offRim: false,
