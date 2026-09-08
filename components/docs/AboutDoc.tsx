@@ -93,9 +93,10 @@ export default function AboutDoc() {
         </p>
         <p className="mt-2 text-label text-muted-foreground leading-relaxed">
           Node locations come from their public internet addresses, so they are accurate to a
-          city and a hosting provider, not to a street. There is no database behind this site:
-          the page keeps a short memory of recent snapshots while it is open, and forgets it
-          when you close the tab.
+          city and a hosting provider, not to a street. The only thing stored behind this site
+          is the network&apos;s own public history — daily activity totals summed from the chain
+          for the Trends page. Nothing about you: the page keeps a short memory of recent
+          snapshots while it is open, and forgets it when you close the tab.
         </p>
         <p className="mt-2 text-label text-muted-foreground leading-relaxed">
           When something can&apos;t be reached for a moment, the screen simply says so —

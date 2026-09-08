@@ -30,7 +30,7 @@ export default function InfoMenu() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={doc ? `Pages: ${DOC_PAGES[doc].label} open` : "Pages: About and Design"}
+          aria-label={doc ? `Pages: ${DOC_PAGES[doc].label} open` : `Pages: ${Object.values(DOC_PAGES).map((d) => d.label).join(" and ")}`}
           className={cn(
             "group flex flex-none items-center gap-1 h-9 py-1.5 px-2.5 rounded-btn! pointer-coarse:min-h-11",
             "bg-transparent border-0 text-muted-foreground hover:text-foreground hover:bg-wash-soft",

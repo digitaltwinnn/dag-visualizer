@@ -85,6 +85,7 @@ export function viewTitle(name: string): string {
 export const DOC_PAGES = {
   about: { label: "About", title: "About — DAG Visualizer" },
   design: { label: "Design", title: "Design — DAG Visualizer" },
+  trends: { label: "Trends", title: "Trends — DAG Visualizer" },
 } as const;
 
 export type DocPage = keyof typeof DOC_PAGES;

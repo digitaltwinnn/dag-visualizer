@@ -140,6 +140,10 @@ export default function SiteFooter() {
         <DocToggle page="design" href={DOC_PATHS.design}>
           Design
         </DocToggle>
+        <span aria-hidden className="opacity-70 text-muted-foreground">·</span>
+        <DocToggle page="trends" href={DOC_PATHS.trends}>
+          Trends
+        </DocToggle>
         <span aria-hidden className="w-px h-3.5 self-center bg-muted-foreground/35" />
         <a
           href={GITHUB}

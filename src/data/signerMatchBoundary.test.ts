@@ -19,7 +19,9 @@ import { join } from "node:path";
 // So: a prefix comparison lives in the home, or it is EXEMPT here with a reason.
 const ROOTS = ["components", "src", "app"];
 const HOME = "src/data/network.ts";
-const EXEMPT: Record<string, string> = {};
+const EXEMPT: Record<string, string> = {
+  "app/api/trends/merge.ts": "series prefix matching (f./g.) for merge-op routing, domain-specific not signer-matching",
+};
 
 const walk = (dir: string): string[] =>
   readdirSync(dir).flatMap((name) => {

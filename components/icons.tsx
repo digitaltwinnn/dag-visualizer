@@ -21,6 +21,7 @@ import {
   BadgeCheck,
   GitMerge,
   FlaskConical,
+  ChartLine,
   type LucideIcon,
 } from "lucide-react";
 import type { NetworkId } from "@/src/engine/config";
@@ -57,6 +58,8 @@ export const ABOUT_ICON: LucideIcon = Info;
 export const DOC_ICONS: Record<DocPage, LucideIcon> = {
   about: Info,
   design: SwatchBook,
+  // Trends wears the line chart — the page IS timeseries charts, so the mark says exactly that.
+  trends: ChartLine,
 };
 
 // The left-rail TOOL cards' ONE mark (GeoExplore, LedgerPanel — user decision: the SAME standard
