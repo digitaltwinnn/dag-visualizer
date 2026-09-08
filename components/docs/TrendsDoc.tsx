@@ -225,7 +225,10 @@ export default function TrendsDoc() {
   // levels would read as furniture. Continuity lives under Hypergraph on its own: the base
   // ledger's steadiness is a hypergraph concern, and it deliberately doesn't blend with
   // anchoring (the user's own earlier split).
-  const innerTrigger = "text-label tracking-caps uppercase px-3 data-[state=active]:bg-[var(--panel-solid)]!";
+  // flex-none + a fixed h-8: the primitive's triggers are flex-1 at a %-height, which is what
+  // spread them wide and broke when the list WRAPS on phone (the h-auto rows below) — as
+  // compact pills they pack left and wrap cleanly (user, 2026-09-08: the tabs overflowed).
+  const innerTrigger = "flex-none h-8 text-label tracking-caps uppercase px-3 data-[state=active]:bg-[var(--panel-solid)]!";
 
   return (
     <article className="pt-14">
@@ -293,7 +296,7 @@ export default function TrendsDoc() {
           <TabsContent value="hypergraph">
           <Tabs defaultValue="snapshots" className="gap-0">
             <div className="flex items-center justify-between gap-3 flex-wrap pt-4">
-              <TabsList aria-label="Hypergraph sections">
+              <TabsList aria-label="Hypergraph sections" className="flex-wrap h-auto! justify-start gap-1">
                 <TabsTrigger value="snapshots" className={innerTrigger}>Snapshots</TabsTrigger>
                 <TabsTrigger value="economics" className={innerTrigger}>Economics</TabsTrigger>
                 <TabsTrigger value="fleet" className={innerTrigger}>Nodes</TabsTrigger>
@@ -367,7 +370,7 @@ export default function TrendsDoc() {
           <TabsContent value="metagraphs">
           <Tabs defaultValue="snapshots" className="gap-0">
             <div className="flex items-center justify-between gap-3 flex-wrap pt-4">
-              <TabsList aria-label="Metagraph sections">
+              <TabsList aria-label="Metagraph sections" className="flex-wrap h-auto! justify-start gap-1">
                 <TabsTrigger value="snapshots" className={innerTrigger}>Snapshots</TabsTrigger>
                 <TabsTrigger value="economics" className={innerTrigger}>Economics</TabsTrigger>
                 <TabsTrigger value="fleet" className={innerTrigger}>Nodes</TabsTrigger>
