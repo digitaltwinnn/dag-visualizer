@@ -188,7 +188,7 @@ interface AppState {
   // The vitals band's measured-window pick (2026-09-08 — the ledger band's trends rim): which
   // reach of the trends store the windowed cells chart. Session-only UI state like `section`;
   // both presentations of the cells read it, the rim (desktop band's top edge) writes it.
-  vitalsWindow: "24h" | "7d" | "30d";
+  vitalsWindow: "24h" | "30d" | "1y";
   // TRUE while the user is DIRECTLY manipulating the scene (OrbitControls' `start`→`end`, which
   // fire on real pointer/touch/wheel input only — Engine tweens and programmatic camera moves
   // never set this). The rails dim while it holds, so direct manipulation pushes the HUD back
@@ -292,7 +292,7 @@ interface AppState {
   setPhoneDock: (dock: "explore" | "details" | "vitals" | null) => void;
   setSection: (section: "scene" | "data") => void;
   setRailsHidden: (hidden: boolean) => void;
-  setVitalsWindow: (w: "24h" | "7d" | "30d") => void;
+  setVitalsWindow: (w: "24h" | "30d" | "1y") => void;
   setSceneDragging: (dragging: boolean) => void;
   setCameraFlying: (flying: boolean) => void;
   setPhoneSheetPx: (px: number | null) => void;

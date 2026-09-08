@@ -16,7 +16,7 @@ import { NoSignalDot } from "@/components/state/StateAtoms";
 import { isGlobalActivityScope, type Activity } from "@/src/data/api";
 import { POLL } from "@/src/engine/config";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
-import useTrendsWindow, { sliceWindow, type TrendsWindowData } from "@/components/useTrendsWindow";
+import useTrendsWindow, { sliceWindow, leadingTrim, monthlySum, type TrendsWindowData } from "@/components/useTrendsWindow";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { DOC_ICONS } from "@/components/icons";
 import { useSceneYield } from "@/components/RailShade";
@@ -668,7 +668,7 @@ const STACK_ORDER: string[] = METAGRAPHS.map((m) => m.id);
 type Snaps = ReturnType<typeof useSnapshotFeed>["snaps"];
 interface StackSeg { key: string; n: number; color: string }
 
-function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: boolean; filter: string; data: TrendsWindowData | null }) {
+function StackBars({ accent, isMeta, filter, data, forming }: { accent: string; isMeta: boolean; filter: string; data: TrendsWindowData | null; forming?: boolean }) {
   if (!data) {
     return <span className="flex items-center justify-center w-full self-center text-micro text-muted-foreground" aria-hidden>acquiring…</span>;
   }
@@ -702,23 +702,27 @@ function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: b
       {allZero && <span className="text-micro text-muted-foreground self-center">no anchors in this window</span>}
       {bars.map((b, i) => {
         const latest = i === bars.length - 1;
+        // The FORMING bucket (the 1Y view's current month): a partial sum drawn at full ink
+        // would chart as a collapse, so it stands at reduced presence with no glow — the
+        // chamber's forming-block vocabulary, a bar still being poured.
+        const isForming = latest && !!forming;
         if (b.v == null) {
           // Unmeasured — the neutral stub (see the header). It keeps its flex slot so the
           // window's rhythm (position = time) survives the hole.
-          return <span key={b.ts} className="flex-1 max-w-[14px] h-[2px] rounded-t-[2px]" style={{ background: "var(--border)", opacity: 0.6 }} />;
+          return <span key={b.ts} className="flex-1 max-w-[22px] h-[2px] rounded-t-[2px]" style={{ background: "var(--border)", opacity: 0.6 }} />;
         }
         return (
           <span
             key={b.ts}
             // `flex-col-reverse`: segments are written in catalog order and stack UP from the
             // baseline, so the first listed network is the foot of every bar in the window.
-            className="flex-1 max-w-[14px] rounded-t-[2px] overflow-hidden flex flex-col-reverse"
+            className="flex-1 max-w-[22px] rounded-t-[2px] overflow-hidden flex flex-col-reverse"
             style={{
               height: b.v > 0 ? `${Math.max(8, (b.v / max) * 100)}%` : "0",
               // A stacked bar's colour comes from its segments; a scoped one paints whole.
               background: b.v > 0 && !b.segs ? accent : "none",
-              opacity: b.v > 0 ? (latest ? 1 : 0.55) : 0,
-              boxShadow: latest && b.v > 0 ? `0 0 6px ${accent}` : undefined,
+              opacity: b.v > 0 ? (isForming ? 0.35 : latest ? 1 : 0.55) : 0,
+              boxShadow: latest && !isForming && b.v > 0 ? `0 0 6px ${accent}` : undefined,
             }}
           >
             {b.segs?.map((sg) => (
@@ -749,13 +753,29 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
   // solved.
   const zoom = useStore((s) => s.vitalsWindow);
   const t7 = useTrendsWindow("7d");
-  const t90 = useTrendsWindow(zoom !== "24h" ? "90d" : null);
+  const t90 = useTrendsWindow(zoom === "30d" ? "90d" : null);
+  const t1y = useTrendsWindow(zoom === "1y" ? "1y" : null);
   const windowed = useMemo<TrendsWindowData | null>(() => {
     if (zoom === "24h") return t7 ? sliceWindow(t7, 24 * 3_600_000) : null;
-    if (zoom === "7d") return t90 ? sliceWindow(t90, 7 * 86_400_000) : null;
-    return t90 ? sliceWindow(t90, 30 * 86_400_000) : null;
-  }, [zoom, t7, t90]);
-  const span = zoom === "24h" ? "last 24 hours" : zoom === "7d" ? "last 7 days" : "last 30 days";
+    if (zoom === "30d") return t90 ? sliceWindow(t90, 30 * 86_400_000) : null;
+    // 1y: the whole daily window, leading-trimmed to where measuring began — so the span
+    // the aside claims below is derived from the DATA, never asserted.
+    return t1y ? leadingTrim(t1y) : null;
+  }, [zoom, t7, t90, t1y]);
+  // The BARS at 1Y are calendar months (the lines stay daily — a 20-point mean over the
+  // trimmed year); elsewhere bars and lines share the windowed buckets exactly.
+  const barData = useMemo(() => {
+    if (!windowed) return { data: null as TrendsWindowData | null, forming: false };
+    if (zoom !== "1y") return { data: windowed, forming: false };
+    const m = monthlySum(windowed);
+    return { data: m.data, forming: m.formingLast };
+  }, [zoom, windowed]);
+  const span =
+    zoom === "24h" ? "last 24 hours"
+    : zoom === "30d" ? "last 30 days"
+    : windowed?.buckets.length
+      ? `since ${new Date(windowed.buckets[0]).toLocaleString("en", { month: "short", timeZone: "UTC" })}`
+      : "past year";
   const stepWord = windowed?.stepMs === 3_600_000 ? "hour by hour" : "day by day";
   const scoped = !isGlobalActivityScope(filter);
   const cfg = metagraphById(filter);
@@ -862,7 +882,7 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
         : rate("Anchors/hour", activity?.anchorsPerHour, sparkOf("g.anchors", activity?.anchoredSeries), basis && `Metagraph snapshots anchored into the global chain. ${basis}`)}
       {rate("Snapshots/hour", activity?.snapsPerHour, sparkOf(scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries), basis)}
       <BandCard label="Anchors by metagraph" size="lg" className="min-w-[220px]" aside={span}>
-        <StackBars accent={accent} isMeta={isMeta} filter={cfg?.id ?? filter} data={windowed} />
+        <StackBars accent={accent} isMeta={isMeta} filter={cfg?.id ?? filter} data={barData.data} forming={barData.forming} />
       </BandCard>
     </>
   );
@@ -982,7 +1002,7 @@ function ViewCells({ mode, accent, filter }: { mode: string; accent: string; fil
  *  read-only, and this strip is the one deliberate exception, OUTSIDE the plate.
  *  Gated per view by `viewPolicy.vitalsWindows` (convention 7): only the ledger's cells read
  *  the store, and a picker over live-fleet cells would be a control wired to nothing. */
-const WINDOW_CHOICES = [["24h", "24H"], ["7d", "7D"], ["30d", "30D"]] as const;
+const WINDOW_CHOICES = [["24h", "24H"], ["30d", "30D"], ["1y", "1Y"]] as const;
 const TrendsMark = DOC_ICONS.trends;
 
 function TrendsRim({ yielding }: { yielding: boolean }) {

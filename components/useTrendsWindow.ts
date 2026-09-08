@@ -81,11 +81,61 @@ export function sliceWindow(data: TrendsWindowData, ms: number): TrendsWindowDat
   };
 }
 
+/** Drop the leading UNMEASURED stretch — the /trends page's own leading-trim rule reaching
+ *  the band: a 1y window opens months before measuring began (the store's history starts
+ *  2026-01-01), and a runway of dead buckets would chart as a long hole nobody dug. Coverage
+ *  = `g.ticks` measured, the store's one marker. Widens on its own as the cron accumulates. */
+export function leadingTrim(data: TrendsWindowData): TrendsWindowData {
+  const ticks = data.series["g.ticks"];
+  if (!ticks) return data;
+  const from = ticks.findIndex((v) => v != null);
+  if (from <= 0) return data;
+  return {
+    buckets: data.buckets.slice(from),
+    stepMs: data.stepMs,
+    series: Object.fromEntries(Object.entries(data.series).map(([k, v]) => [k, v.slice(from)])),
+  };
+}
+
+/** Calendar-month aggregation of a DAILY window — the 1Y bars. Counters SUM per month (the
+ *  store's own merge op for them); a month with no measured day stays null. `formingLast` is
+ *  true when the newest bucket is the CURRENT month — a partial sum, which a chart must mark
+ *  as FORMING rather than draw at full claim (a part-month bar at full ink charts as a
+ *  collapse). `stepMs` is nominal (months vary); consumers key bars on the bucket instants. */
+export function monthlySum(data: TrendsWindowData): { data: TrendsWindowData; formingLast: boolean } {
+  const starts: number[] = [];
+  const idx: number[] = []; // source bucket → month ordinal
+  let cur = "";
+  for (const ts of data.buckets) {
+    const d = new Date(ts);
+    const key = `${d.getUTCFullYear()}-${d.getUTCMonth()}`;
+    if (key !== cur) {
+      cur = key;
+      starts.push(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+    }
+    idx.push(starts.length - 1);
+  }
+  const series: Record<string, (number | null)[]> = {};
+  for (const [name, src] of Object.entries(data.series)) {
+    const out: (number | null)[] = new Array(starts.length).fill(null);
+    src.forEach((v, i) => {
+      if (v == null) return;
+      const m = idx[i];
+      out[m] = (out[m] ?? 0) + v;
+    });
+    series[name] = out;
+  }
+  const now = new Date();
+  const formingLast =
+    starts.length > 0 && starts[starts.length - 1] === Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+  return { data: { buckets: starts, stepMs: 2_592_000_000, series }, formingLast };
+}
+
 /** The measured window, or null while nothing has landed (first flight, or a failed fetch —
  *  the next tick or mount asks again; a consumer shows its own acquiring state meanwhile).
  *  A null `window` skips the fetch entirely — for consumers whose need is conditional (the
  *  idle cards' 30d reach), since a hook cannot be called conditionally. */
-export default function useTrendsWindow(window: "24h" | "7d" | "30d" | "90d" | null): TrendsWindowData | null {
+export default function useTrendsWindow(window: "24h" | "7d" | "30d" | "90d" | "1y" | null): TrendsWindowData | null {
   const url = window ? netUrl(`/api/trends?window=${window}`) : null;
   const [data, setData] = useState<TrendsWindowData | null>(() => (url ? (cache.get(url)?.data ?? null) : null));
   useEffect(() => {
