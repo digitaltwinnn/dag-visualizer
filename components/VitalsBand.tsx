@@ -12,7 +12,7 @@ import { METATYPE_ICONS, VIEW_ICONS } from "@/components/icons";
 import { METAGRAPHS } from "@/src/net/current";
 import Sparkline from "@/components/Sparkline";
 import Odometer from "@/components/Odometer";
-import { NoSignalDot } from "@/components/state/StateAtoms";
+import { NoSignalDot, NodeStars } from "@/components/state/StateAtoms";
 import { isGlobalActivityScope, type Activity } from "@/src/data/api";
 import { POLL } from "@/src/engine/config";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
@@ -881,7 +881,13 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
       aside={spark.offRim ? spark.span || undefined : undefined}
       lead={
         <span className="flex flex-col items-start">
-          <span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap"><Odometer value={spark.value} /></span>
+          {/* NodeStars while the window's mean is still in flight (user, 2026-09-08: the
+              dash "doesn't say it's working on it") — the acquiring rule's slot form: a
+              real number is arriving into this slot, and the stars hold its width; the
+              label and unit line already name what is coming. */}
+          <span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap">
+            {spark.value != null ? <Odometer value={spark.value} /> : <NodeStars count={3} />}
+          </span>
           <span className="text-label text-muted-foreground leading-none">{spark.unit}</span>
         </span>
       }
@@ -1047,10 +1053,9 @@ const TrendsMark = DOC_ICONS.trends;
  *  pill and the phone Vitals sheet's control row render ONE group, so a window added or a
  *  route renamed reaches both in the same edit — the ViewCells rule, applied to the control.
  *  `grow` is the phone form: equal thumb-width segments across the sheet's column. */
-function RimSegments({ grow = false }: { grow?: boolean }) {
+function WindowSegments({ grow = false }: { grow?: boolean }) {
   const zoom = useStore((s) => s.vitalsWindow);
   const setZoom = useStore((s) => s.setVitalsWindow);
-  const setDocPage = useStore((s) => s.setDocPage);
   return (
     <>
       {WINDOW_CHOICES.map(([id, label]) => (
@@ -1073,47 +1078,55 @@ function RimSegments({ grow = false }: { grow?: boolean }) {
           {label}
         </button>
       ))}
-      <button
-        type="button"
-        onClick={() => setDocPage("trends")}
-        title="The measured history behind these vitals — open the Trends page."
-        className={cn(
-          "flex items-center gap-1 px-2 text-micro tracking-[0.1em] uppercase leading-none text-muted-foreground hover:text-foreground hover:bg-wash-hover",
-          grow && "flex-1 justify-center",
-        )}
-      >
-        <TrendsMark aria-hidden className="size-3" />
-        Trends
-      </button>
     </>
+  );
+}
+
+/** The Trends route as a LINK, outside the range group (user, 2026-09-08: "should not be part
+ *  of the button-group, it should show as a link") — the site row's own link register: primary
+ *  ink, normal case, the page's mark. A destination is a link; only the range is a control. */
+function TrendsLink({ className }: { className?: string }) {
+  const setDocPage = useStore((s) => s.setDocPage);
+  return (
+    <button
+      type="button"
+      onClick={() => setDocPage("trends")}
+      title="The measured history behind these vitals — open the Trends page."
+      className={cn("inline-flex items-center gap-1.5 text-label text-primary/75 hover:text-primary whitespace-nowrap", className)}
+    >
+      <TrendsMark aria-hidden className="size-3.5" />
+      Trends
+    </button>
   );
 }
 
 function TrendsRim({ yielding }: { yielding: boolean }) {
   return (
     <div
-      role="group"
-      aria-label="Vitals history window"
       style={{ right: "var(--bar-margin)", bottom: "calc(var(--footer-h, 0px) + var(--vitals-h) + 6px)" }}
       className={cn(
-        // A floating PILL above the band's right corner (user, 2026-09-08 — the drawer-tab
-        // cut read "flat at the bottom and not properly right aligned"): rounded on all
-        // corners, its right edge flush with the band's own, a 6px air gap below so it
-        // reads as the band's satellite control rather than a growth on its border.
-        // ONE pill outside, a flush SEGMENTED GROUP inside (user, 2026-09-08): the container
-        // is the only rounded shape — overflow-hidden clips a pressed end-segment's fill into
-        // the pill's own curve — and the buttons are full-height segments with no divider,
-        // the TRENDS route simply the last segment.
-        // The hairline is PRIMARY-TINTED, not the cards' neutral (user, 2026-09-08): cyan
-        // is the app's one affordance signal, so a cyan-edged pill among neutral-edged
-        // plates reads as the thing you touch — the same distinction on both presentations.
-        "fixed z-10 flex items-stretch h-[24px] rounded-full border border-primary/25 overflow-hidden",
-        "[background:var(--topbar-glass)] backdrop-blur-sm",
+        "fixed z-10 flex items-center gap-3",
         "transition-opacity duration-300 motion-reduce:!transition-none",
         yielding && "opacity-40",
       )}
     >
-      <RimSegments />
+      <TrendsLink />
+      <div
+        role="group"
+        aria-label="Vitals history window"
+        className={cn(
+          // The RANGE alone is the pill (user, 2026-09-08 — the Trends route left the group
+          // for the link beside it): a floating segmented control above the band's right
+          // corner, container-only rounding, overflow-hidden clipping a pressed end-segment's
+          // fill into the curve. The hairline is PRIMARY-TINTED, not the cards' neutral: cyan
+          // is the app's one affordance signal, so a cyan-edged pill among neutral-edged
+          // plates reads as the thing you touch.
+          "flex items-stretch h-[24px] rounded-full border border-primary/25 overflow-hidden",
+          "[background:var(--topbar-glass)] backdrop-blur-sm",
+        )}
+      >
+        <WindowSegments />
+      </div>
     </div>
   );
 }
@@ -1254,12 +1267,15 @@ export function VitalsSheetBody() {
           equal thumb-height segments above the cards — the sheet is interactive (unlike the
           band), so it simply sits in the column. Same policy gate as the desktop pill. */}
       {VIEW_POLICIES[mode].vitalsWindows && (
-        <div
-          role="group"
-          aria-label="Vitals history window"
-          className="flex items-stretch h-9 mb-2 flex-none rounded-full border border-primary/25 overflow-hidden [background:var(--topbar-glass)]"
-        >
-          <RimSegments grow />
+        <div className="flex items-center gap-3 mb-2 flex-none">
+          <div
+            role="group"
+            aria-label="Vitals history window"
+            className="flex flex-1 items-stretch h-9 rounded-full border border-primary/25 overflow-hidden [background:var(--topbar-glass)]"
+          >
+            <WindowSegments grow />
+          </div>
+          <TrendsLink />
         </div>
       )}
       {/* The no-pop swap — the cell-targeting `[&>*]` rules ride the wrapper for the same
