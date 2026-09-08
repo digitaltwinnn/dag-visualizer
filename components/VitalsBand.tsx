@@ -786,26 +786,48 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
     if (!windowed) return undefined;
     return windowed.series[name] ?? windowed.series["g.ticks"]?.map((v) => (v != null ? 0 : null));
   };
-  interface SparkSpec { data: (number | null)[] | undefined; span: string; sr: string; offRim: boolean }
+  interface SparkSpec { data: (number | null)[] | undefined; value: number | undefined; unit: string; span: string; sr: string; offRim: boolean }
+  // THE LEAD FOLLOWS THE RIM TOO (user, 2026-09-08, the third round of the same stumble —
+  // "should a 1Y selection say /hour?"): a live per-hour numeral beside a year-long line kept
+  // inviting the two to be read together, whatever the words said. The numeral is now the
+  // WINDOW'S MEASURED MEAN in the window's own tier unit — /hour on the hourly tier, /day on
+  // the daily — so every element of the card describes the one window the rim states. It is
+  // also a measurement where the old lead was an extrapolation (rule 10 smiles). The live
+  // per-hour rate lost from the lead survives where live already lives: the fallback card,
+  // whose whole surface IS the live window.
+  const unit = windowed?.stepMs === 3_600_000 ? "/hour" : "/day";
+  const meanOf = (data: (number | null)[] | undefined, scale = 1): number | undefined => {
+    const vals = (data ?? []).filter((v): v is number => v != null);
+    if (!vals.length) return undefined;
+    const m = (vals.reduce((a, b) => a + b, 0) / vals.length) * scale;
+    return m >= 100 ? Math.round(m) : Math.round(m * 10) / 10;
+  };
   /** The measured line where the store carries this scope (the catalog chains and the global
    *  chain), else the live buffer's extrapolated shape — the unlisted networks are sampled by
    *  nothing, and an "acquiring…" that never resolves is the fabricated promise rule 10
-   *  forbids. */
-  const sparkOf = (name: string | null, live: number[] | undefined): SparkSpec =>
-    name != null
-      ? {
-          data: measured(name),
-          span,
-          sr: `The line is measured history — the ${span} from the chain's own records, ${stepWord}.`,
-          offRim: false,
-        }
-      : {
-          data: live,
-          span: activity ? windowSpan(activity) : "",
-          sr: "",
-          offRim: true, // the live buffer's window is NOT the rim's — this card must say so
-        };
-  const rate = (label: string, value: number | undefined, spark: SparkSpec, note?: string) => {
+   *  forbids. `feeScale` turns the store's datum fee into $DAG (1e8 datum per DAG). */
+  const sparkOf = (name: string | null, live: number[] | undefined, liveValue: number | undefined, feeScale = false): SparkSpec => {
+    if (name != null) {
+      const data = measured(name);
+      return {
+        data,
+        value: meanOf(data, feeScale ? 1e-8 : 1),
+        unit,
+        span,
+        sr: `Measured from the chain's own records over the ${span}, ${stepWord}; the rate is the window's mean.`,
+        offRim: false,
+      };
+    }
+    return {
+      data: live,
+      value: liveValue,
+      unit: "/hour",
+      span: activity ? windowSpan(activity) : "",
+      sr: basis ?? "",
+      offRim: true, // the live buffer's window is NOT the rim's — this card must say so
+    };
+  };
+  const rate = (label: string, spark: SparkSpec, note?: string) => {
     // A STOPPED CHAIN REPORTS WHEN, NOT HOW FAST — and now also SHOWS it (user, 2026-09-08:
     // the idle-card idea). The lead states idle and how long, in the Fees-paid stacked
     // grammar; the measured line still draws, because a chain that stopped inside the picked
@@ -852,8 +874,8 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
       aside={spark.offRim ? spark.span || undefined : undefined}
       lead={
         <span className="flex flex-col items-start">
-          <span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap"><Odometer value={value} /></span>
-          <span className="text-label text-muted-foreground leading-none">/hour</span>
+          <span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap"><Odometer value={spark.value} /></span>
+          <span className="text-label text-muted-foreground leading-none">{spark.unit}</span>
         </span>
       }
     >
@@ -891,9 +913,9 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
     <>
       <AnchoringNetworks windowed={windowed} snaps={snaps} filter={filter} />
       {scoped
-        ? rate("DAG fees", activity?.feesPerHour, sparkOf(cfg ? `m.${cfg.id}.fee` : null, activity?.feesSeries), basis && `$DAG this network pays to anchor, per hour. ${basis}`)
-        : rate("Anchors", activity?.anchorsPerHour, sparkOf("g.anchors", activity?.anchoredSeries), basis && `Metagraph snapshots anchored into the global chain, per hour. ${basis}`)}
-      {rate("Snapshots", activity?.snapsPerHour, sparkOf(scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries), basis)}
+        ? rate("DAG fees", sparkOf(cfg ? `m.${cfg.id}.fee` : null, activity?.feesSeries, activity?.feesPerHour, true), "$DAG this network pays to anchor.")
+        : rate("Anchors", sparkOf("g.anchors", activity?.anchoredSeries, activity?.anchorsPerHour), "Metagraph snapshots anchored into the global chain.")}
+      {rate("Snapshots", sparkOf(scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries, activity?.snapsPerHour))}
       <BandCard label="Anchors by metagraph" size="lg" className="min-w-[220px]">
         <StackBars accent={accent} isMeta={isMeta} filter={cfg?.id ?? filter} data={barData} />
       </BandCard>
