@@ -98,11 +98,12 @@ export function leadingTrim(data: TrendsWindowData): TrendsWindowData {
 }
 
 /** Calendar-month aggregation of a DAILY window — the 1Y bars. Counters SUM per month (the
- *  store's own merge op for them); a month with no measured day stays null. `formingLast` is
- *  true when the newest bucket is the CURRENT month — a partial sum, which a chart must mark
- *  as FORMING rather than draw at full claim (a part-month bar at full ink charts as a
- *  collapse). `stepMs` is nominal (months vary); consumers key bars on the bucket instants. */
-export function monthlySum(data: TrendsWindowData): { data: TrendsWindowData; formingLast: boolean } {
+ *  store's own merge op for them); a month with no measured day stays null. THE CURRENT
+ *  MONTH IS TRIMMED — the /trends counter charts' own partial-edge rule: a part-month sum
+ *  charts as a collapse, and a "forming" dim was tried first and read as a downtrend anyway
+ *  (user, 2026-09-08) — the honest move is to not draw a sum that isn't one yet. `stepMs`
+ *  is nominal (months vary); consumers key bars on the bucket instants. */
+export function monthlySum(data: TrendsWindowData): TrendsWindowData {
   const starts: number[] = [];
   const idx: number[] = []; // source bucket → month ordinal
   let cur = "";
@@ -126,9 +127,13 @@ export function monthlySum(data: TrendsWindowData): { data: TrendsWindowData; fo
     series[name] = out;
   }
   const now = new Date();
-  const formingLast =
-    starts.length > 0 && starts[starts.length - 1] === Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
-  return { data: { buckets: starts, stepMs: 2_592_000_000, series }, formingLast };
+  const forming = starts.length > 0 && starts[starts.length - 1] === Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
+  const keep = forming ? starts.length - 1 : starts.length;
+  return {
+    buckets: starts.slice(0, keep),
+    stepMs: 2_592_000_000,
+    series: Object.fromEntries(Object.entries(series).map(([k, v]) => [k, v.slice(0, keep)])),
+  };
 }
 
 /** The measured window, or null while nothing has landed (first flight, or a failed fetch —
