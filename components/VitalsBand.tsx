@@ -1023,7 +1023,11 @@ function TrendsRim({ yielding }: { yielding: boolean }) {
         // cut read "flat at the bottom and not properly right aligned"): rounded on all
         // corners, its right edge flush with the band's own, a 6px air gap below so it
         // reads as the band's satellite control rather than a growth on its border.
-        "fixed z-10 flex items-center h-[24px] px-1 rounded-full border border-border/60",
+        // ONE pill outside, a flush SEGMENTED GROUP inside (user, 2026-09-08): the container
+        // is the only rounded shape — overflow-hidden clips a pressed end-segment's fill into
+        // the pill's own curve — and the buttons are full-height segments with no divider,
+        // the TRENDS route simply the last segment.
+        "fixed z-10 flex items-stretch h-[24px] rounded-full border border-border/60 overflow-hidden",
         "[background:var(--topbar-glass)] backdrop-blur-sm",
         "transition-opacity duration-300 motion-reduce:!transition-none",
         yielding && "opacity-40",
@@ -1036,22 +1040,21 @@ function TrendsRim({ yielding }: { yielding: boolean }) {
           aria-pressed={zoom === id}
           onClick={() => setZoom(id)}
           className={cn(
-            "px-1.5 h-[18px] my-auto rounded-full text-micro tracking-[0.1em] uppercase leading-none",
-            // The pressed pill wears the /trends zoom picker's own active register (user,
-            // 2026-09-08: "highlight is hardly visible") — the rim is now the band's ONE
-            // window statement, so its selection has to read at a glance.
-            zoom === id ? "text-foreground bg-[var(--panel-solid)] shadow-sm" : "text-muted-foreground hover:text-foreground",
+            "px-2 flex items-center text-micro tracking-[0.1em] uppercase leading-none",
+            // The pressed segment wears the /trends zoom picker's active fill (user: the
+            // text-only state was hardly visible) — the rim is the band's ONE window
+            // statement, so its selection has to read at a glance.
+            zoom === id ? "text-foreground bg-[var(--panel-solid)]" : "text-muted-foreground hover:text-foreground",
           )}
         >
           {label}
         </button>
       ))}
-      <span aria-hidden className="w-px self-stretch my-1 bg-border/60 mx-0.5" />
       <button
         type="button"
         onClick={() => setDocPage("trends")}
         title="The measured history behind these vitals — open the Trends page."
-        className="flex items-center gap-1 px-1.5 h-full text-micro tracking-[0.1em] uppercase leading-none text-muted-foreground hover:text-foreground"
+        className="flex items-center gap-1 px-2 text-micro tracking-[0.1em] uppercase leading-none text-muted-foreground hover:text-foreground"
       >
         <TrendsMark aria-hidden className="size-3" />
         Trends
