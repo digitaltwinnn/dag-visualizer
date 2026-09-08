@@ -19,6 +19,7 @@ import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import useTrendsWindow, { sliceWindow, leadingTrim, monthlySum, type TrendsWindowData } from "@/components/useTrendsWindow";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { DOC_ICONS } from "@/components/icons";
+import { SELECTED_ROW } from "@/components/selection";
 import { useSceneYield } from "@/components/RailShade";
 import { ageWords } from "@/src/util/relativeAge";
 import { cn } from "@/lib/utils";
@@ -1024,10 +1025,12 @@ function RimSegments({ grow = false }: { grow?: boolean }) {
           className={cn(
             "px-2 flex items-center text-micro tracking-[0.1em] uppercase leading-none",
             grow && "flex-1 justify-center",
-            // The pressed segment wears the /trends zoom picker's active fill (user: the
-            // text-only state was hardly visible) — the rim is the band's ONE window
-            // statement, so its selection has to read at a glance.
-            zoom === id ? "font-bold text-foreground bg-[var(--panel-solid)]" : "text-muted-foreground hover:text-foreground",
+            // The pressed segment wears SELECTED_ROW — the app's ONE committed-selection
+            // language (wash + inset ring), which is what a picked window IS. That is also
+            // what says CONTROL, not card (user, 2026-09-08: stacked in the phone sheet the
+            // pill read as one more card): cards are spineless and never wash; a segment
+            // carrying the selection wash can only be an instrument you set.
+            zoom === id ? cn("font-bold", SELECTED_ROW) : "text-muted-foreground hover:text-foreground hover:bg-wash-hover",
           )}
         >
           {label}
@@ -1038,7 +1041,7 @@ function RimSegments({ grow = false }: { grow?: boolean }) {
         onClick={() => setDocPage("trends")}
         title="The measured history behind these vitals — open the Trends page."
         className={cn(
-          "flex items-center gap-1 px-2 text-micro tracking-[0.1em] uppercase leading-none text-muted-foreground hover:text-foreground",
+          "flex items-center gap-1 px-2 text-micro tracking-[0.1em] uppercase leading-none text-muted-foreground hover:text-foreground hover:bg-wash-hover",
           grow && "flex-1 justify-center",
         )}
       >
@@ -1064,7 +1067,10 @@ function TrendsRim({ yielding }: { yielding: boolean }) {
         // is the only rounded shape — overflow-hidden clips a pressed end-segment's fill into
         // the pill's own curve — and the buttons are full-height segments with no divider,
         // the TRENDS route simply the last segment.
-        "fixed z-10 flex items-stretch h-[24px] rounded-full border border-border/60 overflow-hidden",
+        // The hairline is PRIMARY-TINTED, not the cards' neutral (user, 2026-09-08): cyan
+        // is the app's one affordance signal, so a cyan-edged pill among neutral-edged
+        // plates reads as the thing you touch — the same distinction on both presentations.
+        "fixed z-10 flex items-stretch h-[24px] rounded-full border border-primary/25 overflow-hidden",
         "[background:var(--topbar-glass)] backdrop-blur-sm",
         "transition-opacity duration-300 motion-reduce:!transition-none",
         yielding && "opacity-40",
@@ -1214,7 +1220,7 @@ export function VitalsSheetBody() {
         <div
           role="group"
           aria-label="Vitals history window"
-          className="flex items-stretch h-9 mb-2 flex-none rounded-full border border-border/60 overflow-hidden [background:var(--topbar-glass)]"
+          className="flex items-stretch h-9 mb-2 flex-none rounded-full border border-primary/25 overflow-hidden [background:var(--topbar-glass)]"
         >
           <RimSegments grow />
         </div>
