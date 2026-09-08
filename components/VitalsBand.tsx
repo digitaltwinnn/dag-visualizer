@@ -795,11 +795,15 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
   // also a measurement where the old lead was an extrapolation (rule 10 smiles). The live
   // per-hour rate lost from the lead survives where live already lives: the fallback card,
   // whose whole surface IS the live window.
-  const unit = windowed?.stepMs === 3_600_000 ? "/hour" : "/day";
+  // ONE unit whatever the window (user, 2026-09-08, closing the round: "it's not the actual
+  // bucket that matters — show a consistent value derived from the appropriate bucket"): the
+  // mean is stated PER DAY on every window, so flipping the rim compares like with like —
+  // 24H answers "the last day", 30D and 1Y answer "a typical day of that stretch". The tier
+  // only decides what the mean is computed FROM (hourly sums × 24, daily sums × 1).
   const meanOf = (data: (number | null)[] | undefined, scale = 1): number | undefined => {
     const vals = (data ?? []).filter((v): v is number => v != null);
-    if (!vals.length) return undefined;
-    const m = (vals.reduce((a, b) => a + b, 0) / vals.length) * scale;
+    if (!vals.length || !windowed) return undefined;
+    const m = (vals.reduce((a, b) => a + b, 0) / vals.length) * (86_400_000 / windowed.stepMs) * scale;
     return m >= 100 ? Math.round(m) : Math.round(m * 10) / 10;
   };
   /** The measured line where the store carries this scope (the catalog chains and the global
@@ -815,9 +819,9 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
         // "avg" is part of the unit line on purpose (user, 2026-09-08: "is that the average
         // across the whole year or the latest?" — the mean-ness was sr-only, invisible to the
         // eye asking). The fallback keeps its bare "/hour": its lead is a current rate.
-        unit: `avg ${unit}`,
+        unit: "avg /day",
         span,
-        sr: `Measured from the chain's own records over the ${span}, ${stepWord}; the rate is the window's mean.`,
+        sr: `Measured from the chain's own records (${span}, ${stepWord}); the rate is the window's mean, stated per day.`,
         offRim: false,
       };
     }
