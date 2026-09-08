@@ -1039,7 +1039,7 @@ function TrendsRim({ yielding }: { yielding: boolean }) {
             // The pressed segment wears the /trends zoom picker's active fill (user: the
             // text-only state was hardly visible) — the rim is the band's ONE window
             // statement, so its selection has to read at a glance.
-            zoom === id ? "text-foreground bg-[var(--panel-solid)]" : "text-muted-foreground hover:text-foreground",
+            zoom === id ? "font-bold text-foreground bg-[var(--panel-solid)]" : "text-muted-foreground hover:text-foreground",
           )}
         >
           {label}
