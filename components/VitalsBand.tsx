@@ -1065,7 +1065,11 @@ function WindowSegments({ grow = false }: { grow?: boolean }) {
           aria-pressed={zoom === id}
           onClick={() => setZoom(id)}
           className={cn(
-            "px-2 flex items-center text-micro tracking-[0.1em] uppercase leading-none",
+            // rounded-full per segment INSIDE the padded pill (user, 2026-09-08: the flush
+            // clipped segments left the container's cyan hairline with "missing parts on the
+            // rounded corners" — SELECTED_ROW's square inset ring was being cut against the
+            // curve; a segment that carries its own curve keeps its ring whole).
+            "px-2 flex items-center rounded-full text-micro tracking-[0.1em] uppercase leading-none",
             grow && "flex-1 justify-center",
             // The pressed segment wears SELECTED_ROW — the app's ONE committed-selection
             // language (wash + inset ring), which is what a picked window IS. That is also
@@ -1092,7 +1096,11 @@ function TrendsLink({ className }: { className?: string }) {
       type="button"
       onClick={() => setDocPage("trends")}
       title="The measured history behind these vitals — open the Trends page."
-      className={cn("inline-flex items-center gap-1.5 text-label text-primary/75 hover:text-primary whitespace-nowrap", className)}
+      // RIDES THE SAME PILL as the range group but stays a LINK (user, 2026-09-08, second
+      // round: "keep it on the same rounded pill still but just with some transparency while
+      // the button-group stays as-is"): transparent ground, primary ink, normal case — the
+      // colour split is the separation, no divider.
+      className={cn("inline-flex items-center gap-1.5 rounded-full px-2 text-label text-primary/75 hover:text-primary whitespace-nowrap bg-transparent", className)}
     >
       <TrendsMark aria-hidden className="size-3.5" />
       Trends
@@ -1105,28 +1113,24 @@ function TrendsRim({ yielding }: { yielding: boolean }) {
     <div
       style={{ right: "var(--bar-margin)", bottom: "calc(var(--footer-h, 0px) + var(--vitals-h) + 6px)" }}
       className={cn(
-        "fixed z-10 flex items-center gap-3",
+        // ONE PILL for range + route (user, 2026-09-08, after a fully-split round): the range
+        // group keeps its control segments, the Trends LINK rides the same pill on a
+        // transparent ground — the ink split is the separation. Padded rather than clipped
+        // (p-0.5, no overflow-hidden): flush segments under the old clip cut SELECTED_ROW's
+        // square ring against the curve, which read as "missing parts" of the cyan hairline.
+        // That hairline is PRIMARY-TINTED, not the cards' neutral: cyan is the app's one
+        // affordance signal, so a cyan-edged pill among neutral-edged plates reads as the
+        // thing you touch.
+        "fixed z-10 flex items-stretch h-[26px] p-0.5 gap-0.5 rounded-full border border-primary/25",
+        "[background:var(--topbar-glass)] backdrop-blur-sm",
         "transition-opacity duration-300 motion-reduce:!transition-none",
         yielding && "opacity-40",
       )}
+      role="group"
+      aria-label="Vitals history window"
     >
+      <WindowSegments />
       <TrendsLink />
-      <div
-        role="group"
-        aria-label="Vitals history window"
-        className={cn(
-          // The RANGE alone is the pill (user, 2026-09-08 — the Trends route left the group
-          // for the link beside it): a floating segmented control above the band's right
-          // corner, container-only rounding, overflow-hidden clipping a pressed end-segment's
-          // fill into the curve. The hairline is PRIMARY-TINTED, not the cards' neutral: cyan
-          // is the app's one affordance signal, so a cyan-edged pill among neutral-edged
-          // plates reads as the thing you touch.
-          "flex items-stretch h-[24px] rounded-full border border-primary/25 overflow-hidden",
-          "[background:var(--topbar-glass)] backdrop-blur-sm",
-        )}
-      >
-        <WindowSegments />
-      </div>
     </div>
   );
 }
@@ -1267,15 +1271,13 @@ export function VitalsSheetBody() {
           equal thumb-height segments above the cards — the sheet is interactive (unlike the
           band), so it simply sits in the column. Same policy gate as the desktop pill. */}
       {VIEW_POLICIES[mode].vitalsWindows && (
-        <div className="flex items-center gap-3 mb-2 flex-none">
-          <div
-            role="group"
-            aria-label="Vitals history window"
-            className="flex flex-1 items-stretch h-9 rounded-full border border-primary/25 overflow-hidden [background:var(--topbar-glass)]"
-          >
-            <WindowSegments grow />
-          </div>
-          <TrendsLink />
+        <div
+          role="group"
+          aria-label="Vitals history window"
+          className="flex items-stretch h-10 p-0.5 gap-0.5 mb-2 flex-none rounded-full border border-primary/25 [background:var(--topbar-glass)]"
+        >
+          <WindowSegments grow />
+          <TrendsLink className="flex-1 justify-center" />
         </div>
       )}
       {/* The no-pop swap — the cell-targeting `[&>*]` rules ride the wrapper for the same
