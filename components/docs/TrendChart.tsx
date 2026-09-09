@@ -213,16 +213,17 @@ export default function TrendChart({
         {lines.length === 1 && last != null && (
           // The readout NAMES ITS RELATION to the window (user, 2026-09-09, third round of
           // this head: a number and a time still read as two facts — the words now say what
-          // the number IS, "newest full day/hour/5 min", and the exact stamp lives on hover.
-          // "Full" because partial edges are trimmed; "newest" not "latest" — an outage can
-          // put the newest MEASURED bucket behind the clock, and the title says which).
+          // the number IS, "latest full day/hour/5 min", and the exact stamp lives on hover.
+          // "Full" because partial edges are trimmed. ("Newest" was tried for one round on a
+          // staleness nuance too thin to carry — user: "'newest' not 'latest'?" — the hover
+          // stamp and the gray band are what actually say when the reading lags the clock.)
           <span
             className="ml-auto inline-flex items-baseline gap-1 whitespace-nowrap"
             title={`The newest complete measured ${stepMs >= 86400000 ? "day" : stepMs >= 3600000 ? "hour" : "five-minute bucket"} (${stampOf(buckets[lastIdx])})`}
           >
             <span className="text-label text-foreground-dim tabular-nums">{format(last)}</span>
             <span className="text-micro text-muted-foreground">
-              · newest full {stepMs >= 86400000 ? "day" : stepMs >= 3600000 ? "hour" : "5 min"}
+              · latest full {stepMs >= 86400000 ? "day" : stepMs >= 3600000 ? "hour" : "5 min"}
             </span>
           </span>
         )}
