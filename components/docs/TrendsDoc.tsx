@@ -406,7 +406,18 @@ export default function TrendsDoc() {
       )}
 
       {p && (
-        <Tabs defaultValue={initialTab} className="mt-6 gap-0">
+        <Tabs
+          defaultValue={initialTab}
+          // A NETWORK-STAMPED RANGE LOSES ITS STAMP ON THE HYPERGRAPH TAB (user, 2026-09-09:
+          // "drop the biofi filter but keep the date range") — the dates are tab-agnostic,
+          // but the stamp means "the chart this was drawn on", and above global charts it
+          // would caption charts it does not describe. Dropped is dropped: switching back
+          // does not resurrect it (drag again on a network's chart to re-stamp).
+          onValueChange={(v) => {
+            if (v === "hypergraph") setRange((r) => (r?.metaId ? { fromMs: r.fromMs, toMs: r.toMs, metaId: null } : r));
+          }}
+          className="mt-6 gap-0"
+        >
           {/* TWO TABS (user, 2026-09-07): the hypergraph's own readings vs the per-metagraph
               ones — the same split every 3D view draws. FILE-CABINET recipe (the channel pane's,
               verbatim — user, same day: "they look like pills and the body has no outline; same
