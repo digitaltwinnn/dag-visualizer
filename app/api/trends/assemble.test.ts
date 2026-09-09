@@ -12,6 +12,10 @@ describe("assemble", () => {
     expect(WINDOWS["180d"].tier).toBe("1d");
     expect(WINDOWS["180d"].ms).toBe(180 * 86400000);
     expect(WINDOWS["1y"].tier).toBe("1d");
+    // "all" spans far past the store's own birth — the honest span is the consumer's leading
+    // trim, so the table only promises daily tier and room (≥ the global chain's 2022 genesis).
+    expect(WINDOWS["all"].tier).toBe("1d");
+    expect(WINDOWS["all"].ms).toBeGreaterThan(4 * 365 * 86400000);
   });
   it("null for uncovered buckets, 0 for covered-but-absent counters, null for absent gauges", () => {
     const p = assemble("mainnet", "24h", now, {

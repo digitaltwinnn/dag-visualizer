@@ -6,7 +6,7 @@
 import { fieldOf, slotsInWindow, stepMsOf, type Tier } from "./keys";
 import { opOf } from "./merge";
 
-export type WindowId = "24h" | "7d" | "30d" | "90d" | "180d" | "1y";
+export type WindowId = "24h" | "7d" | "30d" | "90d" | "180d" | "1y" | "all";
 export const WINDOWS: Record<WindowId, { tier: Tier; ms: number }> = {
   "24h": { tier: "5m", ms: 86400000 },
   "7d": { tier: "1h", ms: 604800000 },
@@ -17,6 +17,13 @@ export const WINDOWS: Record<WindowId, { tier: Tier; ms: number }> = {
   "90d": { tier: "1d", ms: 7776000000 },
   "180d": { tier: "1d", ms: 15552000000 },
   "1y": { tier: "1d", ms: 31536000000 },
+  // "all" = everything the store can hold (user, 2026-09-09 — the backfill reaches past a
+  // year, and both zoom rims want an everything view). Six years of daily slots: covers the
+  // global chain's own 2022 genesis with room to grow, and the cost of the unmeasured years
+  // is a run of nulls that gzips to almost nothing (missing year hashes read back empty) —
+  // consumers leading-trim to where measuring began, so the honest span is derived, not
+  // asserted here.
+  all: { tier: "1d", ms: 189216000000 },
 };
 
 export interface TrendsPayload {

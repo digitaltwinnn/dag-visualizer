@@ -60,22 +60,25 @@ export default function PulseStrip() {
                 <span className="text-micro text-muted-foreground">{everyWord(r.everyMs)}</span>
               </span>
               <span className="text-micro text-muted-foreground truncate">{r.target}</span>
-              {/* The ok/err record as a GLANCE instrument (user, 2026-09-04 — the "219 ok ·
-                  14 err" prose was hard to read): a hairline ratio bar in the two status
-                  tones, exact counts beside it (identity is never colour-alone — each count
-                  keeps its word). The err segment floors at 3px so one failure among
-                  thousands stays a visible mark; the numbers carry the measurement. */}
-              <span className="flex items-center gap-1.5 whitespace-nowrap">
-                <span aria-hidden className="flex h-[3px] w-12 flex-none rounded-full overflow-hidden bg-border/60">
-                  <span style={{ width: `${(r.ok / Math.max(1, r.ok + r.err)) * 100}%`, background: "var(--success)" }} className={cn("opacity-70", BAR_EASE)} />
-                  {r.err > 0 && (
+              {/* The ok/err record shows ONLY when there is something to weigh (user,
+                  2026-09-09, second round: the all-ok "N polls, all ok" line said what the
+                  green dot and the ticking last-success already say — chrome restating
+                  health). With failures it is a GLANCE instrument (2026-09-04): a hairline
+                  ratio bar in the two status tones, exact counts beside it (identity is
+                  never colour-alone — each count keeps its word, and "failed" is the human
+                  word for the red share). The err segment floors at 3px so one failure
+                  among thousands stays a visible mark. */}
+              {r.err > 0 && (
+                <span className="flex items-center gap-1.5 whitespace-nowrap">
+                  <span aria-hidden className="flex h-[3px] w-12 flex-none rounded-full overflow-hidden bg-border/60">
+                    <span style={{ width: `${(r.ok / Math.max(1, r.ok + r.err)) * 100}%`, background: "var(--success)" }} className={cn("opacity-70", BAR_EASE)} />
                     <span style={{ width: `${(r.err / Math.max(1, r.ok + r.err)) * 100}%`, background: "var(--destructive)" }} className={cn("opacity-80 min-w-[3px]", BAR_EASE)} />
-                  )}
+                  </span>
+                  <span className="text-micro tabular-nums text-muted-foreground">
+                    {r.ok.toLocaleString()} ok · {r.err.toLocaleString()} failed
+                  </span>
                 </span>
-                <span className="text-micro tabular-nums text-muted-foreground">
-                  {r.ok.toLocaleString()} ok{r.err > 0 ? ` · ${r.err.toLocaleString()} err` : ""}
-                </span>
-              </span>
+              )}
             </span>
           </BandCard>
         );

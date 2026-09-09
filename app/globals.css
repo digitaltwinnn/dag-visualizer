@@ -663,8 +663,13 @@
   /* The advisory amber — NOT --destructive (amber ≠ red): a distinct "work-in-progress /
      advisory" accent. Its home is /about's unofficial-project notice (the always-on experimental
      banner it was made for was retired 2026-08-09; the token stays because the advisory REGISTER
-     is still a real one, distinct from an error). */
-  --warn-soft: light-dark(#8a6a00, #ffd166);
+     is still a real one, distinct from an error); also the pulse strip's STALE dot, the raw
+     layer's JSON booleans, and the trends charts' not-sampled bands. BOTH grounds are real
+     ORANGE (user, 2026-09-09, two rounds: light's #8a6a00 read "dull and hardly orange", then
+     dark's #ffd166 amber-yellow went brown inside a translucent fill) — light an amber-700
+     ink dark enough to carry text on paper, dark a luminous orange that stays orange when
+     alpha pulls it toward the ground. */
+  --warn-soft: light-dark(oklch(0.55 0.17 55), oklch(0.78 0.16 60));
 
   --border: light-dark(rgba(30, 60, 140, 0.38), rgba(90, 140, 255, 0.22));        /* panel/hairline border (was the --panel-border alias) */
   --input: var(--border);

@@ -61,7 +61,7 @@ function fresh(url: string): TrendsWindowData | null {
 
 /** The measured window plus the failure signal. A null `window` skips the fetch entirely —
  *  for consumers whose need is conditional, since a hook cannot be called conditionally. */
-export default function useTrendsWindow(window: "24h" | "7d" | "30d" | "90d" | "1y" | null): TrendsWindowState {
+export default function useTrendsWindow(window: "24h" | "7d" | "30d" | "90d" | "1y" | "all" | null): TrendsWindowState {
   const url = window ? netUrl(`/api/trends?window=${window}`) : null;
   const [state, setState] = useState<TrendsWindowState>(() => ({
     data: url ? (cache.get(url)?.data ?? null) : null,

@@ -358,13 +358,20 @@ export function LayerWho({ who }: { who: string }) {
   );
 }
 
-export function RoleChips({ codes }: { codes: string[] }) {
+export function RoleChips({ codes, compact }: { codes: string[]; compact?: boolean }) {
   return (
     <span className="inline-flex items-center gap-1">
       {codes.map((c) => (
         <span
           key={c}
-          className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-[2px] text-micro leading-none text-muted-foreground"
+          // `compact` — the vitals band's fixed-height rows (user, 2026-09-09: three full-height
+          // pills consumed the card's whole 48px column and the rows read as one fused block;
+          // 2px less pill is what buys justify-evenly its air). Same pill, same vocabulary —
+          // only the vertical padding narrows; every roomier surface keeps the full form.
+          className={cn(
+            "inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] text-micro leading-none text-muted-foreground",
+            compact ? "py-px" : "py-[2px]",
+          )}
         >
           {c}
         </span>

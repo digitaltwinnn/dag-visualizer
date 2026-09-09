@@ -469,9 +469,9 @@ function HyperCells({ accent }: { accent: string }) {
   // THE LAYER ROWS, built once: they are the detail of the TYPE card under a commit and a card of
   // their own unfiltered (see below).
   const layerRows = [
-    { key: "l0", label: <RoleChips codes={["L0"]} />, count: layers.l0! },
-    { key: "cl1", label: <RoleChips codes={["cL1"]} />, count: layers.cl1! },
-    { key: "dl1", label: <RoleChips codes={["dL1"]} />, count: layers.dl1! },
+    { key: "l0", label: <RoleChips compact codes={["L0"]} />, count: layers.l0! },
+    { key: "cl1", label: <RoleChips compact codes={["cL1"]} />, count: layers.cl1! },
+    { key: "dl1", label: <RoleChips compact codes={["dL1"]} />, count: layers.dl1! },
   ];
 
   return (
@@ -713,39 +713,64 @@ function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: b
   if (bars.length === 0 || !anyMeasured) {
     // Message ONLY — rendering the null stubs beside it squeezed the words into the same
     // flex row (review); an entirely-unmeasured window has nothing honest to draw.
-    return <span className="flex items-center justify-center w-full self-center text-micro text-muted-foreground" aria-hidden>acquiring…</span>;
+    // NOT "acquiring…" (user, 2026-09-09, watching the backfill's cron lock-out): the payload
+    // DID arrive — the window simply holds no samples, a real outage that can stand for
+    // hours. "Acquiring" is the fetch-in-flight word above and quietly promises resolution;
+    // a measured silence states itself.
+    return <span className="flex items-center justify-center w-full self-center text-micro text-muted-foreground" aria-hidden>not sampled in this window</span>;
   }
+  // MONTHLY BARS CARRY A MONTH AXIS (user, 2026-09-09: "a subtle legend at 1Y — jan. feb."):
+  // the 1Y window is the one where position-in-window stops being readable as "when" (a bar
+  // is a whole calendar month, not a rolling bucket), so each slot names its month below.
+  // Detected off monthlySum's own nominal stepMs — no new prop to drift. Every OTHER month,
+  // anchored at the newest so the right edge always reads (the /trends right-edge skip rule);
+  // twelve full labels at text-micro collide in the card's ~16px slots. The label row mirrors
+  // the bar row's slot geometry exactly (flex-1 / max-w / gap), so labels sit under their bars.
+  const monthly = data.stepMs === 2_592_000_000;
   return (
-    <div className="flex items-end justify-end gap-[2px] h-full min-h-12 w-full self-stretch pb-0.5" aria-hidden>
-      {allZero && <span className="text-micro text-muted-foreground self-center">no anchors in this window</span>}
-      {bars.map((b) => {
-        if (b.v == null) {
-          // Unmeasured — the neutral stub (see the header). It keeps its flex slot so the
-          // window's rhythm (position = time) survives the hole.
-          return <span key={b.ts} className="flex-1 max-w-[22px] h-[2px] rounded-t-[2px]" style={{ background: "var(--border)", opacity: 0.6 }} />;
-        }
-        return (
-          <span
-            key={b.ts}
-            // `flex-col-reverse`: segments are written in catalog order and stack UP from the
-            // baseline, so the first listed network is the foot of every bar in the window.
-            className="flex-1 max-w-[22px] rounded-t-[2px] overflow-hidden flex flex-col-reverse"
-            style={{
-              height: b.v > 0 ? `${Math.max(8, (b.v / max) * 100)}%` : "0",
-              // A stacked bar's colour comes from its segments; a scoped one paints whole.
-              background: b.v > 0 && !b.segs ? accent : "none",
-              // ONE weight for every bar (user, 2026-09-08): the tick chart's glowing head
-              // meant "the newest live tick"; here the last bar is just the newest COMPLETE
-              // bucket — nothing an emphasis would be ABOUT.
-              opacity: b.v > 0 ? 0.7 : 0,
-            }}
-          >
-            {b.segs?.map((sg) => (
-              <span key={sg.key} className="w-full flex-none" style={{ height: `${(sg.n / b.v!) * 100}%`, background: sg.color }} />
-            ))}
-          </span>
-        );
-      })}
+    <div className="flex flex-col h-full min-h-12 w-full self-stretch" aria-hidden>
+      <div className="flex items-end justify-end gap-[2px] flex-1 min-h-0 pb-0.5">
+        {allZero && <span className="text-micro text-muted-foreground self-center">no anchors in this window</span>}
+        {bars.map((b) => {
+          if (b.v == null) {
+            // Unmeasured — the neutral stub (see the header). It keeps its flex slot so the
+            // window's rhythm (position = time) survives the hole.
+            return <span key={b.ts} className="flex-1 max-w-[22px] h-[2px] rounded-t-[2px]" style={{ background: "var(--border)", opacity: 0.6 }} />;
+          }
+          return (
+            <span
+              key={b.ts}
+              // `flex-col-reverse`: segments are written in catalog order and stack UP from the
+              // baseline, so the first listed network is the foot of every bar in the window.
+              className="flex-1 max-w-[22px] rounded-t-[2px] overflow-hidden flex flex-col-reverse"
+              style={{
+                height: b.v > 0 ? `${Math.max(8, (b.v / max) * 100)}%` : "0",
+                // A stacked bar's colour comes from its segments; a scoped one paints whole.
+                background: b.v > 0 && !b.segs ? accent : "none",
+                // ONE weight for every bar (user, 2026-09-08): the tick chart's glowing head
+                // meant "the newest live tick"; here the last bar is just the newest COMPLETE
+                // bucket — nothing an emphasis would be ABOUT.
+                opacity: b.v > 0 ? 0.7 : 0,
+              }}
+            >
+              {b.segs?.map((sg) => (
+                <span key={sg.key} className="w-full flex-none" style={{ height: `${(sg.n / b.v!) * 100}%`, background: sg.color }} />
+              ))}
+            </span>
+          );
+        })}
+      </div>
+      {monthly && (
+        <div className="flex justify-end gap-[2px] leading-none">
+          {bars.map((b, i) => (
+            <span key={b.ts} className="flex-1 max-w-[22px] text-center text-micro text-muted-foreground/70 lowercase whitespace-nowrap">
+              {(bars.length - 1 - i) % 2 === 0
+                ? new Date(b.ts).toLocaleString("en", { month: "short", timeZone: "UTC" })
+                : null}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -769,38 +794,55 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
   const zoom = useStore((s) => s.vitalsWindow);
   // Each window fetches only while picked (review: the unconditional 7d fetch kept
   // re-downloading the largest payload to discard it whenever the rim sat on 30D/1Y).
+  // 1H rides the 24h payload — the store's finest tier (5m), sliced to the newest hour.
+  const t24 = useTrendsWindow(zoom === "1h" ? "24h" : null);
   const t7 = useTrendsWindow(zoom === "24h" ? "7d" : null);
-  const t90 = useTrendsWindow(zoom === "30d" ? "90d" : null);
+  // 7D and 30D both ride the 90d DAILY payload (one fetch, the store's own sums — the
+  // no-client-rebucketing rule): the rim's 7D is seven daily readings; the hour-by-hour
+  // 7D lives on /trends, whose line charts have the room for 168 points.
+  const t90 = useTrendsWindow(zoom === "30d" || zoom === "7d" ? "90d" : null);
   const t1y = useTrendsWindow(zoom === "1y" ? "1y" : null);
+  const tAll = useTrendsWindow(zoom === "all" ? "all" : null);
   const windowed = useMemo<TrendsWindowData | null>(() => {
     // trimNewestPartial FIRST (the payload's own clock drops the still-filling bucket —
-    // the CDN finding), then the window cut; 1y adds the leading trim so the span the
+    // the CDN finding), then the window cut; 1y/all add the leading trim so the span the
     // aside claims below is derived from the DATA, never asserted.
+    if (zoom === "1h") return t24.data ? sliceWindow(trimNewestPartial(t24.data), 3_600_000) : null;
     if (zoom === "24h") return t7.data ? sliceWindow(trimNewestPartial(t7.data), 24 * 3_600_000) : null;
+    if (zoom === "7d") return t90.data ? sliceWindow(trimNewestPartial(t90.data), 7 * 86_400_000) : null;
     if (zoom === "30d") return t90.data ? sliceWindow(trimNewestPartial(t90.data), 30 * 86_400_000) : null;
-    return t1y.data ? leadingTrim(trimNewestPartial(t1y.data)) : null;
-  }, [zoom, t7.data, t90.data, t1y.data]);
+    if (zoom === "1y") return t1y.data ? leadingTrim(trimNewestPartial(t1y.data)) : null;
+    return tAll.data ? leadingTrim(trimNewestPartial(tAll.data)) : null;
+  }, [zoom, t24.data, t7.data, t90.data, t1y.data, tAll.data]);
   // NO outage fallback to the live buffers — considered after the review and declined
   // (user, 2026-09-09: "keep the code simple, no complex fallback logic"). A store outage
   // leaves the measured cards on their acquiring state while the hook retries; the pulse
   // strip's api-trends row is where the outage itself is stated.
-  // The BARS at 1Y are calendar months, the still-forming current month trimmed (the
+  // The BARS at 1Y/ALL are calendar months, the still-forming current month trimmed (the
   // /trends counters' partial-edge rule); the lines stay daily — a 20-point mean over the
-  // trimmed year. Elsewhere bars and lines share the windowed buckets exactly.
+  // trimmed span. Elsewhere bars and lines share the windowed buckets exactly.
   // barData feeds the stacked chart AND the roster that legends it (review: ranking the
   // roster over the untrimmed daily window while the chart drew trimmed months broke the
   // card pair's own same-window rule for the first weeks of every month).
+  const monthlyZoom = zoom === "1y" || zoom === "all";
   const barData = useMemo(
-    () => (windowed ? (zoom === "1y" ? monthlySum(windowed) : windowed) : null),
-    [zoom, windowed],
+    () => (windowed ? (monthlyZoom ? monthlySum(windowed) : windowed) : null),
+    [monthlyZoom, windowed],
   );
   const span =
-    zoom === "24h" ? "last 24 hours"
+    zoom === "1h" ? "last hour"
+    : zoom === "24h" ? "last 24 hours"
+    : zoom === "7d" ? "last 7 days"
     : zoom === "30d" ? "last 30 days"
     : windowed?.buckets.length
-      ? `since ${new Date(windowed.buckets[0]).toLocaleString("en", { month: "short", timeZone: "UTC" })}`
-      : "past year";
-  const stepWord = windowed?.stepMs === 3_600_000 ? "hour by hour" : "day by day";
+      // Month + full year (the range row's own 2026-09-09 ruling): post-backfill the deep
+      // windows open in a PREVIOUS year, and a bare month claims the wrong one.
+      ? `since ${new Date(windowed.buckets[0]).toLocaleString("en", { month: "short", timeZone: "UTC" })} ${new Date(windowed.buckets[0]).getUTCFullYear()}`
+      : zoom === "all" ? "all measured history" : "past year";
+  const stepWord =
+    windowed?.stepMs === 300_000 ? "in five-minute buckets"
+    : windowed?.stepMs === 3_600_000 ? "hour by hour"
+    : "day by day";
   const scoped = !isGlobalActivityScope(filter);
   const cfg = metagraphById(filter);
   const isMeta = !!cfg && filter !== "all" && filter !== "dag";
@@ -845,8 +887,10 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
         value: meanOf(data, feeScale ? 1e-8 : 1),
         // "avg" is part of the unit line on purpose (user, 2026-09-08: "is that the average
         // across the whole year or the latest?" — the mean-ness was sr-only, invisible to the
-        // eye asking). The fallback keeps its bare "/hour": its lead is a current rate.
-        unit: "avg /day",
+        // eye asking). The fallback keeps its bare "per hour": its lead is a current rate.
+        // Prose units, not the "/day" glyph — the trends page's own 2026-09-09 ruling, one
+        // vocabulary across both surfaces.
+        unit: "avg per day",
         span,
         sr: `Measured from the chain's own records (${span}, ${stepWord}); the rate is the window's mean, stated per day.`,
         offRim: false,
@@ -855,13 +899,38 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
     return {
       data: live,
       value: liveValue,
-      unit: "/hour",
+      unit: "per hour",
       span: activity ? windowSpan(activity) : "",
       sr: basis ?? "",
       offRim: true, // the live buffer's window is NOT the rim's — this card must say so
     };
   };
   const rate = (label: string, spark: SparkSpec, note?: string) => {
+    // THE 1Y LINE CARRIES ITS ENDPOINTS (user, 2026-09-09, closing the month-axis round: "for
+    // a year I can't see if it's the last 12 months or until current year"): at 1Y the window's
+    // edges are the ambiguity — months repeat across the year boundary — so the line gets a
+    // start/end range row WITH years, while the wide chart's per-bar ticks carry the months
+    // between. Shorter windows stay axis-free (position-in-window still reads as "when", and
+    // the rim states the range). Rim-windowed cards only — the live-fallback line states its
+    // own window in words already.
+    // The year written OUT ("sep 2026", not "sep '26" — user, 2026-09-09: the apostrophe form
+    // read as a day-of-month; and month+day was considered and declined, because a trailing
+    // year starts and ends on almost the same date, which would read as a two-day window).
+    const monthYear = (ts: number): string =>
+      `${new Date(ts).toLocaleString("en", { month: "short", timeZone: "UTC" }).toLowerCase()} ${new Date(ts).getUTCFullYear()}`;
+    const rangeRow =
+      !spark.offRim && (zoom === "1y" || zoom === "all") && windowed && windowed.buckets.length > 1 ? (
+        <span aria-hidden className="flex justify-between leading-none text-micro text-muted-foreground/70">
+          <span>{monthYear(windowed.buckets[0])}</span>
+          <span>{monthYear(windowed.buckets[windowed.buckets.length - 1])}</span>
+        </span>
+      ) : null;
+    const line = (
+      <span className={cn("flex-1 min-w-0 self-center", rangeRow && "flex flex-col justify-center gap-0.5")}>
+        <Sparkline data={spark.data} color={accent} height={rangeRow ? 32 : 42} maxPoints={20} stretch />
+        {rangeRow}
+      </span>
+    );
     // A STOPPED CHAIN REPORTS WHEN, NOT HOW FAST — and now also SHOWS it (user, 2026-09-08:
     // the idle-card idea). The lead states idle and how long, in the Fees-paid stacked
     // grammar; the measured line still draws, because a chain that stopped inside the picked
@@ -883,7 +952,7 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
           }
         >
           {spark.data != null ? (
-            <span className="flex-1 min-w-0 self-center"><Sparkline data={spark.data} color={accent} height={42} maxPoints={20} stretch /></span>
+            line
           ) : (
             <span className="flex items-center self-stretch text-micro text-muted-foreground">
               no snapshots for {ageWords(stale)}
@@ -940,8 +1009,9 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
           in the card's own header. */}
       {/* The window words live in the eyebrow's aside (user, 2026-09-08, after one round with
           them captioned under the line): the header carries the reading's window, so the body
-          is the chart's alone — full width AND full height. */}
-      <span className="flex-1 min-w-0 self-center"><Sparkline data={spark.data} color={accent} height={42} maxPoints={20} stretch /></span>
+          is the chart's alone — full width AND full height (the 1Y range row above is chart
+          furniture, not a window statement, so it does not reopen that round). */}
+      {line}
       {spark.sr && <span className="sr-only">{spark.sr}</span>}
       {note && <span className="sr-only">{note}</span>}
     </BandCard>
@@ -1026,7 +1096,7 @@ function AnchoringNetworks({ windowed, snaps, filter }: { windowed: TrendsWindow
           const on = filter !== "all" && id === filter;
           return (
             <span key={id} className={cn("flex", filter !== "all" && !on && "opacity-45")}>
-              <IdentityDot hue={identityHudCss(id)} className={on ? "w-3 h-3" : undefined} />
+              <IdentityDot hue={identityHudCss(id)} className={on ? "w-3.5 h-3.5" : undefined} />
             </span>
           );
         })}
@@ -1079,7 +1149,7 @@ function ViewCells({ mode, accent, filter }: { mode: string; accent: string; fil
  *  read-only, and this strip is the one deliberate exception, OUTSIDE the plate.
  *  Gated per view by `viewPolicy.vitalsWindows` (convention 7): only the ledger's cells read
  *  the store, and a picker over live-fleet cells would be a control wired to nothing. */
-const WINDOW_CHOICES = [["24h", "24H"], ["30d", "30D"], ["1y", "1Y"]] as const;
+const WINDOW_CHOICES = [["1h", "1H"], ["24h", "24H"], ["7d", "7D"], ["30d", "30D"], ["1y", "1Y"], ["all", "All"]] as const;
 const TrendsMark = DOC_ICONS.trends;
 
 /** The rim's segments, shared by both presentations (2026-09-08): the desktop band's floating

@@ -16,7 +16,7 @@ import type { Anchor, ClusterNode, DagCore, GlobalSnapshot } from "@/src/data/ty
 export interface PollHealth {
   id: string;
   label: string;
-  target: string;      // where it goes, in words ("block explorer", "L0/L1 load balancers", "app API")
+  target: string;      // where it goes, in words ("block explorer", "L0/L1 load balancers"; app-served feeds name the REAL upstream with the hop in parens)
   everyMs: number | null; // the feed's own cadence; null = on demand
   lastOkAt: number | null;
   lastErrAt: number | null;
@@ -31,11 +31,13 @@ const FEEDS = {
   global: { label: "Global snapshots", target: "block explorer", everyMs: POLL.pollMs },
   metasnaps: { label: "Metagraph snapshots", target: "block explorer", everyMs: POLL.pollMs },
   clusters: { label: "DAG nodes", target: "L0 + L1 load balancers", everyMs: POLL.clusterMs },
-  "api-metagraphs": { label: "Metagraph directory", target: "app API", everyMs: POLL.metaRefreshMs },
-  "api-geo": { label: "Validator geo map", target: "app API", everyMs: null },
+  // "app API" said only the HOP, not the source (user, 2026-09-09: "that's only from where it
+  // does the real calls") — an app-served feed names the real upstream, the hop in parens.
+  "api-metagraphs": { label: "Metagraph directory", target: "cluster info (via app)", everyMs: POLL.metaRefreshMs },
+  "api-geo": { label: "Validator geo map", target: "IP geolocation (via app)", everyMs: null },
   // everyMs null on purpose: the feed polls POLL.trendsMs only WHILE a consumer is mounted
   // (the ledger band's cards) — a fixed cadence here would derive STALE in every other view.
-  "api-trends": { label: "Trends history", target: "app API", everyMs: null },
+  "api-trends": { label: "Trends history", target: "trends store (via app)", everyMs: null },
 } as const;
 export type FeedId = keyof typeof FEEDS;
 const POLL_HEALTH = new Map<string, PollHealth>();
