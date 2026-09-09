@@ -98,7 +98,7 @@ export default function TrendChart({
       }
     : {};
   const measured = lines.some((l) => l.points.some((v) => v != null));
-  const max = Math.max(1e-9, ...lines.flatMap((l) => l.points.filter((v): v is number => v != null))) * 1.05;
+  const max = Math.max(1e-9, ...lines.flatMap((l) => l.points.filter((v): v is number => v != null))) * 1.12;
 
   const rows = buckets.map((ts, i) => {
     const row: Record<string, number | null> = { ts };
@@ -178,7 +178,7 @@ export default function TrendChart({
   const stalls = sampled ? bandRuns((i) => sampled[i] === 0, 0) : [];
 
   return (
-    <div className={className ? `min-w-0 ${className}` : "min-w-0"}>
+    <div className={className ? `min-w-0 select-none ${className}` : "min-w-0 select-none"}>
       <div className="flex items-baseline gap-2 mb-1">
         <span className="inline-block w-2 h-2 rounded-full flex-none" style={{ background: hue0 }} aria-hidden />
         <span className="text-label font-semibold text-foreground truncate">{name}</span>
@@ -242,7 +242,7 @@ export default function TrendChart({
           aria-label={`${name} — ${stepMs >= 86400000 ? "daily" : stepMs >= 3600000 ? "hourly" : "5-minute"} buckets, ${n} of them`}
         >
           <ResponsiveContainer width="100%" height={PLOT_H + AXIS_H}>
-            <LineChart data={rows} margin={{ top: 6, right: 2, bottom: 0, left: 2 }} {...dragProps}>
+            <LineChart data={rows} margin={{ top: 10, right: 2, bottom: 4, left: 2 }} {...dragProps}>
               {/* The drag preview — the committed cut happens on the PAGE at release. */}
               {drag && (
                 <ReferenceArea
@@ -344,8 +344,8 @@ export default function TrendChart({
             </LineChart>
           </ResponsiveContainer>
           {/* The y scale's one number — the baseline is 0 by construction. */}
-          <span aria-hidden className="absolute top-0.5 left-1.5 text-micro text-muted-foreground pointer-events-none tabular-nums">
-            {format(max / 1.05)}
+          <span aria-hidden className="absolute top-1 left-1.5 text-micro text-muted-foreground pointer-events-none tabular-nums">
+            {format(max / 1.12)}
           </span>
         </div>
       )}
