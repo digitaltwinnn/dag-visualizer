@@ -77,7 +77,11 @@ export default function TrendChart({
   const [drag, setDrag] = useState<{ a: number; b: number } | null>(null);
   const dragProps = onRange
     ? {
-        onMouseDown: (e: { activeLabel?: string | number }) => {
+        onMouseDown: (e: { activeLabel?: string | number }, ev?: { preventDefault?: () => void }) => {
+          // preventDefault kills the NATIVE selection at its source: select-none only covers
+          // the chart, and a drag that crossed its edge started selecting the page text
+          // beyond it (user, 2026-09-09, round 2 of the selectable-chart bug).
+          ev?.preventDefault?.();
           const ts = Number(e?.activeLabel);
           if (Number.isFinite(ts)) setDrag({ a: ts, b: ts });
         },
