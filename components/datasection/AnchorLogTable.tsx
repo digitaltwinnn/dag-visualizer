@@ -533,7 +533,12 @@ export default function AnchorLogTable() {
     setLogSeek(null);
   }, [logSeek, setLogSeek]);
   useEffect(() => {
-    if (pendingSeek.current && histNet && latest && qFrom && !seeking) {
+    // `hist.current.net === lens` is the LOAD-BEARING guard (found live, 2026-09-09: the
+    // handoff committed BioFi while the walk cache still held DOR's, and line 184's fallback
+    // handed DOR's 28M tip to BioFi's pager — the tip probe came back empty and the seek
+    // honestly reported "could not locate"). The seek may only run once the walk IS the
+    // target chain's.
+    if (pendingSeek.current && histNet && hist.current.net === lens && latest && qFrom && !seeking) {
       pendingSeek.current = false;
       void seekAge();
     }
