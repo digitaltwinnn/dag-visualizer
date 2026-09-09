@@ -772,7 +772,6 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
   const t7 = useTrendsWindow(zoom === "24h" ? "7d" : null);
   const t90 = useTrendsWindow(zoom === "30d" ? "90d" : null);
   const t1y = useTrendsWindow(zoom === "1y" ? "1y" : null);
-  const active = zoom === "24h" ? t7 : zoom === "30d" ? t90 : t1y;
   const windowed = useMemo<TrendsWindowData | null>(() => {
     // trimNewestPartial FIRST (the payload's own clock drops the still-filling bucket —
     // the CDN finding), then the window cut; 1y adds the leading trim so the span the
@@ -781,12 +780,10 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
     if (zoom === "30d") return t90.data ? sliceWindow(trimNewestPartial(t90.data), 30 * 86_400_000) : null;
     return t1y.data ? leadingTrim(trimNewestPartial(t1y.data)) : null;
   }, [zoom, t7.data, t90.data, t1y.data]);
-  // THE GIVE-UP PATH (review: measured cards promised a number forever through a store
-  // outage — the acquiring rule requires every acquiring state to have one). When the fetch
-  // has FAILED and nothing cached answers, the cards fall back to the live buffers the
-  // pre-store band drew — real numbers with their own honestly-different window — and the
-  // next 5-minute tick still retries the store.
-  const storeOut = windowed == null && active.error;
+  // NO outage fallback to the live buffers — considered after the review and declined
+  // (user, 2026-09-09: "keep the code simple, no complex fallback logic"). A store outage
+  // leaves the measured cards on their acquiring state while the hook retries; the pulse
+  // strip's api-trends row is where the outage itself is stated.
   // The BARS at 1Y are calendar months, the still-forming current month trimmed (the
   // /trends counters' partial-edge rule); the lines stay daily — a 20-point mean over the
   // trimmed year. Elsewhere bars and lines share the windowed buckets exactly.
@@ -841,7 +838,7 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
    *  nothing, and an "acquiring…" that never resolves is the fabricated promise rule 10
    *  forbids. `feeScale` turns the store's datum fee into $DAG (1e8 datum per DAG). */
   const sparkOf = (name: string | null, live: number[] | undefined, liveValue: number | undefined, feeScale = false): SparkSpec => {
-    if (name != null && !storeOut) {
+    if (name != null) {
       const data = measured(name);
       return {
         data,
