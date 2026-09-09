@@ -333,16 +333,14 @@ export default function TrendsDoc() {
         {buckets.length > 1 ? spanPhrase(buckets, stepMs) : "The network, measured"}
       </h1>
       {/* HUMAN VOICE (user, 2026-09-09 — the /about rule reaches every doc page: say what
-          the reader can DO, not what the pixels are). The honesty vocabulary survives inside
-          the how-to: amber = the chain's own silence, gray = our not-measuring. */}
+          the reader can DO, in their own gestures — "click", not "opens"). The amber/gray
+          vocabulary left the intro at user call; the continuity section's own lead still
+          carries it where those bands actually appear. */}
       <p className="mt-5 text-base text-foreground-dim leading-relaxed">
         This is the network&apos;s history, drawn from its own records. Use it to see how busy
         each chain has been and how steadily it ran: pick a time window, or drag across any
         chart to zoom into a moment that interests you — and when something catches your eye,
-        <em> snapshot records</em> opens the actual snapshots behind it. An amber stretch
-        means the network truly went quiet there, which is usually the story worth reading; a
-        gray stretch only means this app wasn&apos;t measuring at that moment, and says
-        nothing about the chain.
+        click <em>snapshot records</em> to see the actual snapshots behind it.
       </p>
 
       {!p && !fetched.error && (
