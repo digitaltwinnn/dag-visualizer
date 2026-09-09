@@ -185,6 +185,9 @@ export const POLL = {
                            // ONE home (2026-08-31): Engine.metaTimer and the pulse strip's FEEDS
                            // row both read it, so a cadence retune can't leave the liveliness
                            // instrument deriving STALE from a stale interval (rule 10 by drift).
+  trendsMs: 5 * 60_000,    // /api/trends re-pull — matches that route's s-maxage=300. Same
+                           // one-home rule: useTrendsWindow's TTL/refresh and its FEEDS row
+                           // both read it.
 
   // Per-metagraph snapshot history (the shared data layer behind the ribbon's
   // derived DAG fee and the Snapshot DAG / ledger view).
