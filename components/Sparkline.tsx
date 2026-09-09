@@ -82,6 +82,17 @@ export default function Sparkline({
   }
   const series = maxPoints ? bucketMean(data, maxPoints) : data;
   const points = series.map((v, i) => ({ i, v }));
+  /** An isolated measured point (both neighbours null) gets a dot — no segment can reach it
+   *  (TrendChart's own device; the review found [5, null, 7] passing the guard yet painting
+   *  NOTHING under connectNulls=false + dot=false — a silently blank chart). Judged on the
+   *  DRAWN series: bucketMean can merge the only measured neighbours into isolation. */
+  const isolated = (i: number): boolean =>
+    series[i] != null && (i === 0 || series[i - 1] == null) && (i === series.length - 1 || series[i + 1] == null);
+  const dot = (props: { key?: React.Key | null; index?: number; cx?: number; cy?: number }) => {
+    const { key, index, cx, cy } = props;
+    if (index == null || cx == null || cy == null || !isolated(index)) return <g key={key ?? undefined} />;
+    return <circle key={key ?? undefined} cx={cx} cy={cy} r={1.75} fill={color} />;
+  };
   if (stretch) {
     return (
       <ResponsiveContainer width="100%" height={height}>
@@ -103,9 +114,9 @@ export default function Sparkline({
         dataKey="v"
         stroke={color}
         strokeWidth={1.5}
-        dot={false}
-        isAnimationActive={false}
+        dot={dot}
         connectNulls={false}
+        isAnimationActive={false}
       />
     </LineChart>
   );

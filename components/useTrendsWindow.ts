@@ -3,27 +3,26 @@
 import { netUrl } from "@/src/net/current";
 import { reportPoll, touchPoll } from "@/src/data/api";
 import { POLL } from "@/src/engine/config";
+import { type TrendsWindowData } from "@/src/data/trendWindow";
 import { useEffect, useState } from "react";
 
-// The trends store's window, client side (2026-09-08 — the vitals band's measured history).
-// The useArchive idiom: one module-level cache shared by every consumer, an inflight promise
-// so simultaneous mounts share one request, and — new here — a TTL matching the read route's
-// own s-maxage, because unlike the archive census this window grows every five minutes. A
-// mounted consumer refreshes on that clock; a remount inside the TTL (the band's RollSwap
-// remounts its cells on every view switch) answers from the cache with no request at all.
+// The trends store's window, client side (2026-09-08 — the vitals band's measured history;
+// TrendsDoc rides it too since the 2026-09-09 review unified the two fetch paths). The
+// useArchive idiom: one module-level cache shared by every consumer, an inflight promise so
+// simultaneous mounts share one request, and a TTL matching the read route's own s-maxage.
+// A mounted consumer refreshes on that clock; a remount inside the TTL answers from the
+// cache with no request at all.
 //
-// HONESTY (rule 10, the store's contract carried through): a null bucket is "not measured" —
-// a sampling hole, tonight's cron outage — and consumers must render it as a GAP, never a
-// zero (Sparkline breaks its line on null). The newest bucket is trimmed here because it is
-// still FILLING: a partial sum charts as a collapse, the /trends page's own trim rule.
+// The PAYLOAD IS SERVED UNTRIMMED — the honesty cuts (partial-bucket trim, leading trim,
+// monthly sums) are named transforms in src/data/trendWindow.ts that each consumer applies
+// per SERIES KIND: counters trim their partial edges, gauges keep today (the fleet charts'
+// only current reading lives in the newest bucket — a load-time trim here once hid it).
+//
+// FAILURE IS A SIGNAL, NOT A SILENCE (the review's give-up finding): `error` goes true when
+// a load attempt failed and nothing cached answers, so a consumer can fall back or state the
+// outage instead of promising a number forever. The next tick retries; success clears it.
 
-export interface TrendsWindowData {
-  /** Bucket START instants, epoch ms UTC, oldest → newest — the still-filling newest trimmed. */
-  buckets: number[];
-  stepMs: number;
-  /** null = not measured (a gap), 0 = measured none. */
-  series: Record<string, (number | null)[]>;
-}
+export type TrendsWindowState = { data: TrendsWindowData | null; error: boolean };
 
 interface CacheSlot { at: number; data: TrendsWindowData }
 const cache = new Map<string, CacheSlot>();
@@ -36,19 +35,13 @@ async function load(url: string): Promise<TrendsWindowData | null> {
       reportPoll("api-trends", false);
       return null;
     }
-    const j = (await r.json()) as {
-      buckets: number[];
-      stepMs: number;
-      series: Record<string, (number | null)[]>;
-    };
-    // Trim the still-filling newest bucket — a partial sum reads as a crash in any counter
-    // series. The bucket is partial iff "now" still falls inside it.
-    const last = j.buckets.length - 1;
-    const trim = last >= 0 && Date.now() < j.buckets[last] + j.stepMs ? last : j.buckets.length;
+    const j = (await r.json()) as { now?: number; buckets: number[]; stepMs: number; series: Record<string, (number | null)[]> };
     const data: TrendsWindowData = {
-      buckets: j.buckets.slice(0, trim),
+      buckets: j.buckets,
       stepMs: j.stepMs,
-      series: Object.fromEntries(Object.entries(j.series).map(([k, v]) => [k, v.slice(0, trim)])),
+      series: j.series,
+      // An older cached payload without the field: its receive time is the best honest bound.
+      now: j.now ?? Date.now(),
     };
     cache.set(url, { at: Date.now(), data });
     reportPoll("api-trends", true);
@@ -66,86 +59,17 @@ function fresh(url: string): TrendsWindowData | null {
   return slot && Date.now() - slot.at < POLL.trendsMs ? slot.data : null;
 }
 
-/** The newest `ms` of a window — how the 7d fetch serves a 24h chart: one request, the
- *  store's own hourly sums, no client-side re-bucketing (which would have to invent a rule
- *  for hours that are part-null). */
-export function sliceWindow(data: TrendsWindowData, ms: number): TrendsWindowData {
-  const cut = Date.now() - ms;
-  let from = data.buckets.findIndex((t) => t + data.stepMs > cut);
-  if (from < 0) from = data.buckets.length;
-  if (from === 0) return data;
-  return {
-    buckets: data.buckets.slice(from),
-    stepMs: data.stepMs,
-    series: Object.fromEntries(Object.entries(data.series).map(([k, v]) => [k, v.slice(from)])),
-  };
-}
-
-/** Drop the leading UNMEASURED stretch — the /trends page's own leading-trim rule reaching
- *  the band: a 1y window opens months before measuring began (the store's history starts
- *  2026-01-01), and a runway of dead buckets would chart as a long hole nobody dug. Coverage
- *  = `g.ticks` measured, the store's one marker. Widens on its own as the cron accumulates. */
-export function leadingTrim(data: TrendsWindowData): TrendsWindowData {
-  const ticks = data.series["g.ticks"];
-  if (!ticks) return data;
-  const from = ticks.findIndex((v) => v != null);
-  if (from <= 0) return data;
-  return {
-    buckets: data.buckets.slice(from),
-    stepMs: data.stepMs,
-    series: Object.fromEntries(Object.entries(data.series).map(([k, v]) => [k, v.slice(from)])),
-  };
-}
-
-/** Calendar-month aggregation of a DAILY window — the 1Y bars. Counters SUM per month (the
- *  store's own merge op for them); a month with no measured day stays null. THE CURRENT
- *  MONTH IS TRIMMED — the /trends counter charts' own partial-edge rule: a part-month sum
- *  charts as a collapse, and a "forming" dim was tried first and read as a downtrend anyway
- *  (user, 2026-09-08) — the honest move is to not draw a sum that isn't one yet. `stepMs`
- *  is nominal (months vary); consumers key bars on the bucket instants. */
-export function monthlySum(data: TrendsWindowData): TrendsWindowData {
-  const starts: number[] = [];
-  const idx: number[] = []; // source bucket → month ordinal
-  let cur = "";
-  for (const ts of data.buckets) {
-    const d = new Date(ts);
-    const key = `${d.getUTCFullYear()}-${d.getUTCMonth()}`;
-    if (key !== cur) {
-      cur = key;
-      starts.push(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
-    }
-    idx.push(starts.length - 1);
-  }
-  const series: Record<string, (number | null)[]> = {};
-  for (const [name, src] of Object.entries(data.series)) {
-    const out: (number | null)[] = new Array(starts.length).fill(null);
-    src.forEach((v, i) => {
-      if (v == null) return;
-      const m = idx[i];
-      out[m] = (out[m] ?? 0) + v;
-    });
-    series[name] = out;
-  }
-  const now = new Date();
-  const forming = starts.length > 0 && starts[starts.length - 1] === Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1);
-  const keep = forming ? starts.length - 1 : starts.length;
-  return {
-    buckets: starts.slice(0, keep),
-    stepMs: 2_592_000_000,
-    series: Object.fromEntries(Object.entries(series).map(([k, v]) => [k, v.slice(0, keep)])),
-  };
-}
-
-/** The measured window, or null while nothing has landed (first flight, or a failed fetch —
- *  the next tick or mount asks again; a consumer shows its own acquiring state meanwhile).
- *  A null `window` skips the fetch entirely — for consumers whose need is conditional (the
- *  idle cards' 30d reach), since a hook cannot be called conditionally. */
-export default function useTrendsWindow(window: "24h" | "7d" | "30d" | "90d" | "1y" | null): TrendsWindowData | null {
+/** The measured window plus the failure signal. A null `window` skips the fetch entirely —
+ *  for consumers whose need is conditional, since a hook cannot be called conditionally. */
+export default function useTrendsWindow(window: "24h" | "7d" | "30d" | "90d" | "1y" | null): TrendsWindowState {
   const url = window ? netUrl(`/api/trends?window=${window}`) : null;
-  const [data, setData] = useState<TrendsWindowData | null>(() => (url ? (cache.get(url)?.data ?? null) : null));
+  const [state, setState] = useState<TrendsWindowState>(() => ({
+    data: url ? (cache.get(url)?.data ?? null) : null,
+    error: false,
+  }));
   useEffect(() => {
     if (!url) {
-      setData(null);
+      setState({ data: null, error: false });
       return;
     }
     touchPoll("api-trends"); // present in the pulse strip from first mount, as "acquiring"
@@ -153,7 +77,7 @@ export default function useTrendsWindow(window: "24h" | "7d" | "30d" | "90d" | "
     const pull = () => {
       const hit = fresh(url);
       if (hit) {
-        setData(hit);
+        setState({ data: hit, error: false });
         return;
       }
       let p = inflight.get(url);
@@ -162,7 +86,10 @@ export default function useTrendsWindow(window: "24h" | "7d" | "30d" | "90d" | "
         inflight.set(url, p);
       }
       p.then((v) => {
-        if (!dead && v) setData(v);
+        if (dead) return;
+        // A failed load keeps whatever the cache last held (stale beats blank) and raises
+        // the signal; a success replaces and clears it.
+        setState((prev) => (v ? { data: v, error: false } : { data: prev.data ?? cache.get(url)?.data ?? null, error: true }));
       });
     };
     pull();
@@ -172,5 +99,5 @@ export default function useTrendsWindow(window: "24h" | "7d" | "30d" | "90d" | "
       clearInterval(t);
     };
   }, [url]);
-  return data;
+  return url ? state : { data: null, error: false };
 }

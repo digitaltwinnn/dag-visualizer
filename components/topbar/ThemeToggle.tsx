@@ -15,7 +15,7 @@ import { resolveTheme, type ThemePref } from "@/src/theme/resolve";
 // resolves light, and a click that changes nothing "feels off". A menu makes every click state
 // intent, and the System row names what it currently resolves to, so the three-state model is
 // visible instead of inferred.
-export const THEME_FACE = { system: Monitor, light: Sun, dark: Moon } as const;
+const THEME_FACE = { system: Monitor, light: Sun, dark: Moon } as const;
 const ROWS: { id: ThemePref; name: string }[] = [
   { id: "system", name: "System" },
   { id: "light", name: "Light" },

@@ -16,7 +16,8 @@ import { NoSignalDot, NodeStars } from "@/components/state/StateAtoms";
 import { isGlobalActivityScope, type Activity } from "@/src/data/api";
 import { POLL } from "@/src/engine/config";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
-import useTrendsWindow, { sliceWindow, leadingTrim, monthlySum, type TrendsWindowData } from "@/components/useTrendsWindow";
+import useTrendsWindow from "@/components/useTrendsWindow";
+import { sliceWindow, leadingTrim, monthlySum, trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { DOC_ICONS } from "@/components/icons";
 import { SELECTED_ROW } from "@/components/selection";
@@ -680,8 +681,8 @@ function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: b
     if (isMeta) {
       return { v: covered ? (data.series[`m.${filter}.snaps`]?.[i] ?? 0) : null, ts, segs: null as StackSeg[] | null };
     }
-    const total = covered ? (anchors[i] ?? 0) : null;
     let segs: StackSeg[] | null = null;
+    let total = covered ? (anchors[i] ?? 0) : null;
     if (total != null && total > 0) {
       segs = [];
       let named = 0;
@@ -689,17 +690,33 @@ function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: b
         const n = data.series[`m.${id}.snaps`]?.[i];
         if (n) { segs.push({ key: id, n, color: identityHudCss(id) }); named += n; }
       }
+      // THE REMAINDER IS "UNATTRIBUTED", NEVER "UNLISTED" (review, 2026-09-09): the store
+      // advances each chain's cursor independently, so a lagging catalog chain's anchors
+      // land here beside the genuinely-unlisted ones — the neutral says only "not
+      // attributable from the store", the tick chart's own old rule. And the bar must
+      // CONTAIN its segments: live edge skew can put named above the global total, so the
+      // bar takes the larger (a negative remainder must not silently vanish while the
+      // segments clip past 100%).
+      total = Math.max(total, named);
       const rest = total - named;
-      if (rest > 0) segs.push({ key: "__unlisted", n: rest, color: "var(--muted-foreground)" });
+      if (rest > 0) segs.push({ key: "__unattributed", n: rest, color: "var(--muted-foreground)" });
     }
     return { v: total, ts, segs };
   });
   const max = Math.max(1, ...bars.map((b) => b.v ?? 0));
   const anyMeasured = bars.some((b) => b.v != null);
-  const allZero = anyMeasured && bars.every((b) => b.v === 0 || b.v == null);
+  // "none" is a whole-window claim and may only be said over a fully-measured window
+  // (review, 2026-09-09: with 23 of 24 buckets unmeasured and one measured zero, the old
+  // test asserted "no anchors in this window" from one hour — the TickBars rule this chart
+  // inherits: the window IS full and the answer in it is zero).
+  const allZero = bars.length > 0 && bars.every((b) => b.v === 0);
+  if (bars.length === 0 || !anyMeasured) {
+    // Message ONLY — rendering the null stubs beside it squeezed the words into the same
+    // flex row (review); an entirely-unmeasured window has nothing honest to draw.
+    return <span className="flex items-center justify-center w-full self-center text-micro text-muted-foreground" aria-hidden>acquiring…</span>;
+  }
   return (
     <div className="flex items-end justify-end gap-[2px] h-full min-h-12 w-full self-stretch pb-0.5" aria-hidden>
-      {(bars.length === 0 || !anyMeasured) && <span className="text-micro text-muted-foreground self-center">acquiring…</span>}
       {allZero && <span className="text-micro text-muted-foreground self-center">no anchors in this window</span>}
       {bars.map((b) => {
         if (b.v == null) {
@@ -750,19 +767,32 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
   // a client sum over part-null buckets would have to invent a floor rule the store already
   // solved.
   const zoom = useStore((s) => s.vitalsWindow);
-  const t7 = useTrendsWindow("7d");
+  // Each window fetches only while picked (review: the unconditional 7d fetch kept
+  // re-downloading the largest payload to discard it whenever the rim sat on 30D/1Y).
+  const t7 = useTrendsWindow(zoom === "24h" ? "7d" : null);
   const t90 = useTrendsWindow(zoom === "30d" ? "90d" : null);
   const t1y = useTrendsWindow(zoom === "1y" ? "1y" : null);
+  const active = zoom === "24h" ? t7 : zoom === "30d" ? t90 : t1y;
   const windowed = useMemo<TrendsWindowData | null>(() => {
-    if (zoom === "24h") return t7 ? sliceWindow(t7, 24 * 3_600_000) : null;
-    if (zoom === "30d") return t90 ? sliceWindow(t90, 30 * 86_400_000) : null;
-    // 1y: the whole daily window, leading-trimmed to where measuring began — so the span
-    // the aside claims below is derived from the DATA, never asserted.
-    return t1y ? leadingTrim(t1y) : null;
-  }, [zoom, t7, t90, t1y]);
+    // trimNewestPartial FIRST (the payload's own clock drops the still-filling bucket —
+    // the CDN finding), then the window cut; 1y adds the leading trim so the span the
+    // aside claims below is derived from the DATA, never asserted.
+    if (zoom === "24h") return t7.data ? sliceWindow(trimNewestPartial(t7.data), 24 * 3_600_000) : null;
+    if (zoom === "30d") return t90.data ? sliceWindow(trimNewestPartial(t90.data), 30 * 86_400_000) : null;
+    return t1y.data ? leadingTrim(trimNewestPartial(t1y.data)) : null;
+  }, [zoom, t7.data, t90.data, t1y.data]);
+  // THE GIVE-UP PATH (review: measured cards promised a number forever through a store
+  // outage — the acquiring rule requires every acquiring state to have one). When the fetch
+  // has FAILED and nothing cached answers, the cards fall back to the live buffers the
+  // pre-store band drew — real numbers with their own honestly-different window — and the
+  // next 5-minute tick still retries the store.
+  const storeOut = windowed == null && active.error;
   // The BARS at 1Y are calendar months, the still-forming current month trimmed (the
   // /trends counters' partial-edge rule); the lines stay daily — a 20-point mean over the
   // trimmed year. Elsewhere bars and lines share the windowed buckets exactly.
+  // barData feeds the stacked chart AND the roster that legends it (review: ranking the
+  // roster over the untrimmed daily window while the chart drew trimmed months broke the
+  // card pair's own same-window rule for the first weeks of every month).
   const barData = useMemo(
     () => (windowed ? (zoom === "1y" ? monthlySum(windowed) : windowed) : null),
     [zoom, windowed],
@@ -811,7 +841,7 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
    *  nothing, and an "acquiring…" that never resolves is the fabricated promise rule 10
    *  forbids. `feeScale` turns the store's datum fee into $DAG (1e8 datum per DAG). */
   const sparkOf = (name: string | null, live: number[] | undefined, liveValue: number | undefined, feeScale = false): SparkSpec => {
-    if (name != null) {
+    if (name != null && !storeOut) {
       const data = measured(name);
       return {
         data,
@@ -924,13 +954,13 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
   // the roster leads, the anchor rate beside it, the cadence, and the chart closes the row.
   return (
     <>
-      <AnchoringNetworks windowed={windowed} snaps={snaps} filter={filter} />
+      <AnchoringNetworks windowed={barData} snaps={snaps} filter={filter} />
       {scoped
         ? rate("DAG fees", sparkOf(cfg ? `m.${cfg.id}.fee` : null, activity?.feesSeries, activity?.feesPerHour, true), "$DAG this network pays to anchor.")
         : rate("Anchors", sparkOf("g.anchors", activity?.anchoredSeries, activity?.anchorsPerHour), "Metagraph snapshots anchored into the global chain.")}
       {rate("Snapshots", sparkOf(scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries, activity?.snapsPerHour))}
       <BandCard label="Anchors by metagraph" size="lg" className="min-w-[220px]">
-        <StackBars accent={accent} isMeta={isMeta} filter={cfg?.id ?? filter} data={barData} />
+        <StackBars accent={accent} isMeta={isMeta} filter={filter} data={barData} />
       </BandCard>
     </>
   );
@@ -948,8 +978,10 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
 // index), with no window words — the honest silence. A committed filter stays a LENS: the
 // count is the window's whole truth, the dim says which network you are looking through.
 function AnchoringNetworks({ windowed, snaps, filter }: { windowed: TrendsWindowData | null; snaps: Snaps; filter: string }) {
-  let list: string[];
-  if (windowed) {
+  // Memoized on the payload: the ranking's input changes per 5-minute fetch while the
+  // component re-renders on every activity tick (review's efficiency pass).
+  const ranked = useMemo(() => {
+    if (!windowed) return null;
     const totals = new Map<string, number>();
     for (const [name, series] of Object.entries(windowed.series)) {
       const m = /^m\.(.+)\.snaps$/.exec(name);
@@ -957,7 +989,11 @@ function AnchoringNetworks({ windowed, snaps, filter }: { windowed: TrendsWindow
       const sum = series.reduce<number>((a, v) => a + (v ?? 0), 0);
       if (sum > 0) totals.set(m[1], sum);
     }
-    list = [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+    return [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);
+  }, [windowed]);
+  let list: string[];
+  if (ranked) {
+    list = ranked;
   } else {
     const ids = new Set<string>();
     for (const d of snaps) {
