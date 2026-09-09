@@ -377,14 +377,14 @@ export default function TrendsDoc() {
   return (
     <article className="pt-14">
       <p className="text-micro tracking-caps uppercase text-muted-foreground">Trends</p>
-      <h1 className="mt-3 text-3xl font-semibold tracking-[-0.01em] leading-tight">
+      <h1 className="mt-3 text-2xl font-semibold tracking-[-0.01em] leading-tight">
         {buckets.length > 1 ? spanPhrase(buckets, stepMs) : "The network, measured"}
       </h1>
       {/* HUMAN VOICE (user, 2026-09-09 — the /about rule reaches every doc page: say what
           the reader can DO, in their own gestures — "click", not "opens"). The amber/gray
           vocabulary left the intro at user call; the continuity section's own lead still
           carries it where those bands actually appear. */}
-      <p className="mt-5 text-base text-foreground-dim leading-relaxed">
+      <p className="mt-5 text-sm text-foreground-dim leading-relaxed">
         This is the network&apos;s history, drawn from its own records. Use it to see how busy
         each chain has been and how steadily it ran: pick a time window, or drag across any
         chart to zoom into a moment that interests you — and when something catches your eye,

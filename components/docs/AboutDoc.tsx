@@ -71,7 +71,7 @@ export default function AboutDoc() {
   return (
     <article className="pt-14">
       <Eyebrow>About</Eyebrow>
-      <h1 className="mt-3 text-3xl font-semibold tracking-[-0.01em] leading-tight">
+      <h1 className="mt-3 text-2xl font-semibold tracking-[-0.01em] leading-tight">
         A live 3D map of the Constellation Network
       </h1>
       <p className="mt-5 text-base text-foreground-dim leading-relaxed">
