@@ -11,9 +11,8 @@ import FilterPicker from "@/components/topbar/FilterPicker";
 import PulseStrip from "@/components/topbar/PulseStrip";
 import EcgMark from "@/components/topbar/EcgMark";
 import PresentationToggle from "@/components/topbar/PresentationToggle";
-import ThemeToggle from "@/components/topbar/ThemeToggle";
-import InfoMenu from "@/components/topbar/InfoMenu";
-import NetworkSwitch, { NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
+import SettingsMenu from "@/components/topbar/SettingsMenu";
+import { NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { DOC_PAGES, VIEWS } from "@/components/views";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
@@ -365,30 +364,16 @@ export default function TopBar() {
         </div>
         <span className={cn("w-px self-stretch bg-border my-1 max-[860px]:hidden", !viewControls && "hidden")} />
 
-        {/* Theme — the "how it looks" control, the shared trio's lead. On PHONE it rides the
-            filter strip's second row instead, same as NetworkSwitch below — otherwise it would
-            render twice (bar + open strip) at once. */}
-        <div className="contents max-[700px]:hidden">
-          <ThemeToggle />
-        </div>
-
-        {/* Pages — the doc overlay's quiet bar home (InfoMenu: About/Design as a circled-i
-            popover). One rank below the view switch on purpose — they are views, but not at the
-            views' level of importance (user, 2026-09-04). On phone it rides the filter strip's
-            second row with the other shared controls (plus the footer row, always visible). */}
-        <div className="contents max-[700px]:hidden">
-          <InfoMenu />
-        </div>
-
-        {/* Network switch — the RIGHT edge of the bar: the network acts on everything, so the
-            edge escalates in scope and the bar reads as a valley — brand and network at the
-            outer edges, the most specific controls in the middle. No divider of its own since
-            the scope regrouping above: it rides the shared trio, whose unbroken run IS the
-            statement that these apply everywhere. On PHONE it rides the filter strip's second
-            row instead (measured at 360-390, 2026-08-21). */}
-        <div className="contents max-[700px]:hidden">
-          <NetworkSwitch />
-        </div>
+        {/* SETTINGS — the shared trio (theme · pages · network) folded under ONE control
+            (user, 2026-09-08: "the right section gets busy with many icons; keep the
+            HUD/scene toggle and RAW, move the rest underneath a settings button"). The
+            2026-09-04 divider regrouping already said the scope split in hairlines; this says
+            it in weight — the view-scoped island, then one app-wide button at the bar's edge.
+            The network face's "never goes missing" rule survives on the trigger: the gear
+            carries the network CODE in the live accent off mainnet. One mount at EVERY width —
+            a single icon fits the phone bar, which the trio never did (the old strip-row
+            homes retired with this). */}
+        <SettingsMenu />
         </div>
       </div>
 
@@ -418,21 +403,9 @@ export default function TopBar() {
                 the bar row. Inside `stripInner`, so the published `--topbar-extra` height and
                 the rails' slide-down already account for it. Same key/value language as the
                 desktop cluster; the hairline is the phone vitals row's own border-t device. */}
-            {bp === "phone" && (
-              <div className="flex items-center justify-center gap-2 mx-2 px-2 pb-2 pt-1.5 border-t border-border/60">
-                {/* The docs' phone home rides the strip row with the other shared controls
-                    (user, 2026-09-04 — "phone is also missing the about/design top bar
-                    element"); the footer row remains the always-visible route. */}
-                <InfoMenu />
-                {/* The vitals LEFT this row for the dock's third section (user, 2026-09-03 —
-                    VitalsDock: riding the strip put view vitals under whichever dropdown
-                    opened, the pulse strip included). What stays is what belongs to the strip:
-                    the phone homes of the network switch and theme toggle — the strip row is
-                    the one place the bar grows, and it has the width the right zone doesn't. */}
-                <NetworkSwitch />
-                <ThemeToggle />
-              </div>
-            )}
+            {/* The strip's second row (the trio's phone homes) RETIRED 2026-09-08 with the
+                SettingsMenu consolidation: one gear rides the bar at every width, so the
+                strip is the filter/pulse face alone again. */}
           </div>
         </div>
       </div>

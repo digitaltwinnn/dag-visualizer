@@ -33,6 +33,9 @@ const FEEDS = {
   clusters: { label: "DAG nodes", target: "L0 + L1 load balancers", everyMs: POLL.clusterMs },
   "api-metagraphs": { label: "Metagraph directory", target: "app API", everyMs: POLL.metaRefreshMs },
   "api-geo": { label: "Validator geo map", target: "app API", everyMs: null },
+  // everyMs null on purpose: the feed polls POLL.trendsMs only WHILE a consumer is mounted
+  // (the ledger band's cards) — a fixed cadence here would derive STALE in every other view.
+  "api-trends": { label: "Trends history", target: "app API", everyMs: null },
 } as const;
 export type FeedId = keyof typeof FEEDS;
 const POLL_HEALTH = new Map<string, PollHealth>();

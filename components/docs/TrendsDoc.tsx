@@ -1,9 +1,13 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Panel } from "@/components/docs/AboutDoc";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import useTrendsWindow from "@/components/useTrendsWindow";
+import { leadingTrim } from "@/src/data/trendWindow";
 import TrendChart, { type TrendLine } from "@/components/docs/TrendChart";
-import { METAGRAPHS, netUrl } from "@/src/net/current";
+import { METAGRAPHS } from "@/src/net/current";
+import { useStore } from "@/src/store/store";
+import { metagraphById } from "@/src/data/network";
 import { displayNetwork } from "@/src/data/unlisted";
 import { cn } from "@/lib/utils";
 
@@ -25,13 +29,10 @@ import { cn } from "@/lib/utils";
 // vitals' catalog-order rule).
 
 interface TrendsPayload {
-  v: 1;
   stepMs: number;
   buckets: number[];
   series: Record<string, (number | null)[]>;
 }
-
-type Fetched = { state: "loading" } | { state: "error" } | { state: "ready"; data: TrendsPayload };
 
 // THE ZOOM (user, 2026-09-07: "can we zoom in?") — the window picker is the tiers made
 // visible: 24H reads the 5-minute buckets (48 h retention), 7D and 30D the hourly tier, ALL
@@ -84,34 +85,28 @@ function Section({ id, title, lead, children }: { id: string; title: string; lea
 }
 
 export default function TrendsDoc() {
-  const [fetched, setFetched] = useState<Fetched>({ state: "loading" });
   const [zoom, setZoom] = useState<ZoomId>("1y");
+  // ONE fetch path with the band (review, 2026-09-09 — the doc carried its own raw fetch
+  // and a second, divergent leading-trim): the hook brings the shared cache (a rim-to-doc
+  // hop re-uses the band's payload), the pulse-strip health reporting, and the 5-minute
+  // refresh. The hook keeps the previous window's payload until the new one lands, which
+  // preserves the doc's own no-loading-flash rule on zoom changes.
+  const fetched = useTrendsWindow(zoom);
+  // Opened from a committed metagraph's dossier ("Show the trends", 2026-09-08), the page
+  // opens on that side of the network. Read ONCE at mount (the doc remounts per open): the
+  // Tabs stay uncontrolled, so browsing the tabs afterwards owes the filter nothing. The DAG
+  // core's history is the Hypergraph tab — only a catalog metagraph flips the default.
+  const [initialTab] = useState<"hypergraph" | "metagraphs">(() => {
+    const f = useStore.getState().filter;
+    return f !== "dag" && metagraphById(f) ? "metagraphs" : "hypergraph";
+  });
 
-  // Refetch per zoom; the PREVIOUS payload stays on screen until the new one lands (the CDN
-  // answers in ~no time, and swapping through a loading flash would blank every chart).
-  useEffect(() => {
-    let dead = false;
-    fetch(netUrl(`/api/trends?window=${zoom}`))
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-      .then((data: TrendsPayload) => { if (!dead) setFetched({ state: "ready", data }); })
-      .catch(() => { if (!dead) setFetched({ state: "error" }); });
-    return () => { dead = true; };
-  }, [zoom]);
-
-  const raw = fetched.state === "ready" ? fetched.data : undefined;
-  // LEADING TRIM: the 1y window reaches further back than measuring does, and months of
-  // leading null days would draw as a long empty runway. Uncovered days at the START are
-  // dropped (coverage = g.ticks measured), so the axis begins where history begins and the
-  // page widens by itself as the store grows. Interior gaps still draw as gaps — only the
-  // unmeasured PREFIX goes.
-  const firstCovered = raw ? Math.max(0, raw.series["g.ticks"]?.findIndex((v) => v != null) ?? 0) : 0;
-  const p = raw
-    ? {
-        ...raw,
-        buckets: raw.buckets.slice(firstCovered),
-        series: Object.fromEntries(Object.entries(raw.series).map(([k, v]) => [k, v.slice(firstCovered)])),
-      }
-    : undefined;
+  const raw = fetched.data ?? undefined;
+  // LEADING TRIM (src/data/trendWindow — the one home since the review): the 1y window
+  // reaches further back than measuring does, and months of leading null days would draw as
+  // a long empty runway. The axis begins where history begins and the page widens by itself
+  // as the store grows; interior gaps still draw as gaps — only the unmeasured PREFIX goes.
+  const p: TrendsPayload | undefined = raw ? leadingTrim(raw) : undefined;
   const buckets = p?.buckets ?? [];
   const stepMs = p?.stepMs ?? 86400000;
   // COUNTER charts drop partial edge buckets — a partial sum charted whole reads as a crash,
@@ -161,9 +156,10 @@ export default function TrendsDoc() {
         const line: TrendLine = { label: "nodes", points, hue: net?.hue };
         return <TrendChart key={m.id} name={net?.name ?? m.id!} unit={unit} buckets={buckets} stepMs={stepMs} lines={[line]} />;
       });
-  /** Per-network CONTINUITY panels: real measured gap stats (m.{id}.gapSum/gapMax — sampled
-   *  from 2026-09-07 on; the sampler always held the record timestamps, it just discarded
-   *  them). Mean = gapSum/snaps per bucket; a day÷snaps approximation was rejected — for a
+  /** Per-network CONTINUITY panels: real measured gap stats (m.{id}.gapSum/gapMax — live
+   *  since 2026-09-07, and BACKFILLED to Jan 1 by the 2026-09-09 gaps walk: ~13M records
+   *  re-walked for their timestamps alone, since the ordinary backfills never kept them).
+   *  Mean = gapSum/snaps per bucket; a day÷snaps approximation was rejected — for a
    *  batching network (DOR: dozens of snapshots in one tick, then idle) it reads as spacing
    *  that never existed. Ranked by the latest reading, most-stalled first. */
   const netGapPanels = (kind: "mean" | "max") =>
@@ -215,7 +211,10 @@ export default function TrendsDoc() {
   // levels would read as furniture. Continuity lives under Hypergraph on its own: the base
   // ledger's steadiness is a hypergraph concern, and it deliberately doesn't blend with
   // anchoring (the user's own earlier split).
-  const innerTrigger = "text-label tracking-caps uppercase px-3 data-[state=active]:bg-[var(--panel-solid)]!";
+  // flex-none + a fixed h-8: the primitive's triggers are flex-1 at a %-height, which is what
+  // spread them wide and broke when the list WRAPS on phone (the h-auto rows below) — as
+  // compact pills they pack left and wrap cleanly (user, 2026-09-08: the tabs overflowed).
+  const innerTrigger = "flex-none h-8 text-label tracking-caps uppercase px-3 data-[state=active]:bg-[var(--panel-solid)]!";
 
   return (
     <article className="pt-14">
@@ -229,12 +228,12 @@ export default function TrendsDoc() {
         nothing measured, never a zero; a zero is a stretch that really anchored nothing.
       </p>
 
-      {fetched.state === "loading" && (
+      {!p && !fetched.error && (
         <Panel className="mt-8 py-4 px-5">
           <p className="text-label text-muted-foreground">reading the measured history…</p>
         </Panel>
       )}
-      {fetched.state === "error" && (
+      {!p && fetched.error && (
         <Panel className="mt-8 py-4 px-5">
           <p className="text-label text-muted-foreground">
             The trends store is unreachable right now. It recovers on its own — reopen this page
@@ -244,7 +243,7 @@ export default function TrendsDoc() {
       )}
 
       {p && (
-        <Tabs defaultValue="hypergraph" className="mt-6 gap-0">
+        <Tabs defaultValue={initialTab} className="mt-6 gap-0">
           {/* TWO TABS (user, 2026-09-07): the hypergraph's own readings vs the per-metagraph
               ones — the same split every 3D view draws. FILE-CABINET recipe (the channel pane's,
               verbatim — user, same day: "they look like pills and the body has no outline; same
@@ -283,7 +282,7 @@ export default function TrendsDoc() {
           <TabsContent value="hypergraph">
           <Tabs defaultValue="snapshots" className="gap-0">
             <div className="flex items-center justify-between gap-3 flex-wrap pt-4">
-              <TabsList aria-label="Hypergraph sections">
+              <TabsList aria-label="Hypergraph sections" className="flex-wrap h-auto! justify-start gap-1">
                 <TabsTrigger value="snapshots" className={innerTrigger}>Snapshots</TabsTrigger>
                 <TabsTrigger value="economics" className={innerTrigger}>Economics</TabsTrigger>
                 <TabsTrigger value="fleet" className={innerTrigger}>Nodes</TabsTrigger>
@@ -357,7 +356,7 @@ export default function TrendsDoc() {
           <TabsContent value="metagraphs">
           <Tabs defaultValue="snapshots" className="gap-0">
             <div className="flex items-center justify-between gap-3 flex-wrap pt-4">
-              <TabsList aria-label="Metagraph sections">
+              <TabsList aria-label="Metagraph sections" className="flex-wrap h-auto! justify-start gap-1">
                 <TabsTrigger value="snapshots" className={innerTrigger}>Snapshots</TabsTrigger>
                 <TabsTrigger value="economics" className={innerTrigger}>Economics</TabsTrigger>
                 <TabsTrigger value="fleet" className={innerTrigger}>Nodes</TabsTrigger>
@@ -410,7 +409,7 @@ export default function TrendsDoc() {
           <Section
             id="net-continuity"
             title="Continuity"
-            lead="How steadily each network sealed its own snapshots — the average spacing and the single longest pause per bucket. Measuring began 7 Sep 2026; earlier history shows as unmeasured."
+            lead="How steadily each network sealed its own snapshots — the average spacing between them, per bucket. A line that ends is a network that stopped; the spacing is measured from the chain's own record timestamps."
           >
             {netGapPanels("mean")}
           </Section>

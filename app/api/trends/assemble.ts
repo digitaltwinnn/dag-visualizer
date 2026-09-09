@@ -25,6 +25,9 @@ export interface TrendsPayload {
   window: WindowId;
   tier: Tier;
   stepMs: number;
+  /** Server clock at assembly — the only honest "now" a CDN-cached payload can be trimmed
+   *  against (the client's clock misjudges which bucket is still filling). */
+  now: number;
   /** Bucket START instants, epoch ms UTC, oldest → newest. */
   buckets: number[];
   series: Record<string, (number | null)[]>;
@@ -62,5 +65,5 @@ export function assemble(
     }
   });
 
-  return { v: 1, net, window, tier, stepMs: stepMsOf(tier), buckets, series };
+  return { v: 1, net, window, tier, stepMs: stepMsOf(tier), now: nowMs, buckets, series };
 }

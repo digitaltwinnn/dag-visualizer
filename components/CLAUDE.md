@@ -119,9 +119,12 @@ zone/scope it belongs to, not by what a particular view puts there** — a card 
 and its contents are view-specific examples that keep changing.
 
 **Top — the command bar.** One full-width glass bar, edges aligned with the rail columns: the ECG +
-wordmark + filter on the left, the view switch centered, presentation/theme/network on the right
-(the vitals left the bar for the bottom band, 2026-08-30; RAW last, because it acts on everything
-to its left). The bar has **one grow-downward slot with two tenants** (a which-strip enum makes
+wordmark + filter on the left, the view switch centered, and on the right the view-scoped pair
+(SCENE⇄HUD + RAW) followed by ONE settings gear (2026-09-08 — the theme/pages/network trio folded
+into `topbar/SettingsMenu.tsx`, three labeled sections of one popover; their files are rows-only
+modules now. Two states survive on the trigger by rule: the network CODE in the live accent off
+mainnet — "which chain am I looking at" never goes missing — and the doc-open primary tint. One
+mount at every width; the filter strip's second row, the trio's old phone home, retired with it). The bar has **one grow-downward slot with two tenants** (a which-strip enum makes
 them mutually exclusive by construction): the FILTER button opens the network-chip strip (hovering
 previews the dim, picking closes it), and the ECG opens the **pulse strip** — one read-only cell
 per data FEED from the poll-health registry (`src/data/api.ts` `reportPoll`/`pollHealthRows`; the
@@ -378,9 +381,10 @@ counts are shares of one fleet — the one honest home for a donut) plus its leg
 footprint numbers plus a nodes-by-country micro-bar row; the ledger shows its two rate cards (number +
 sparkline off the live buffers) beside the declicked tick bar-chart. This deliberately widens the old
 snapshots-only rule (2026-08-12): each band is the view's OWN vitals — the numbers the bar's vitals
-region used to show — so nothing generic returned. **The band takes no pointer events at all**
+region used to show — so nothing generic returned. **The band's plate takes no pointer events**
 (`pointer-events-none` — user: "no clicking etc required"): every route the old strip's clicks served
-survives in the explorer rows and the global card's pager. Colour is rule 3's: structural cyan, the
+survives in the explorer rows and the global card's pager. The ONE exception is the ledger's TRENDS
+RIM (2026-09-08), a fixed SIBLING outside the plate — see the ledger row below. Colour is rule 3's: structural cyan, the
 identity hue only under a committed filter — resolved once per band (`useVitalsScope`) and handed to
 every chart as its `accent` prop; the band wears NO filter-scope hairline (user, 2026-08-30 — the
 charts themselves state the scope). Identity is never colour-alone — every donut segment, country bar
@@ -452,10 +456,10 @@ detail-only). Three rules keep the row from going ragged, and all three answer t
   reading — a four-row card filled its body while a two-row one floated in the middle of one. Watch
   for wrappers BETWEEN the body and the instrument (the country card has one): they need
   `self-stretch` too, or the rows bunch inside a content-height box while their neighbours breathe.
-- **A sparkline is bucketed, not sliced** (`Sparkline maxPoints`). The retained window is 52 ticks
-  and 51 segments of a noisy rate read as hair. Slicing to the last N would be exact per point but
-  silently shortens the WINDOW — and the card prints that window in words two elements to the right.
-  Bucketing by mean keeps the window and lowers the frequency, which is the actual ask.
+- **A sparkline is bucketed, not sliced** (`Sparkline maxPoints`) — bucketing by mean keeps the
+  window and lowers the frequency; slicing would silently shorten the window the rim states. A
+  null bucket breaks the line (hole ≠ zero) and an isolated measured point draws a DOT
+  (TrendChart's device — under connectNulls=false a dotless isolated point paints nothing).
 - **The band's height is FIXED** (`--vitals-h`), not content height. Left to its content it measured
   81 / 72 / 62px across hyper / geo / ledger, and since the band is anchored at the BOTTOM that
   showed up as its top edge jumping on every view switch.
@@ -503,10 +507,10 @@ rails-lean with no visible way back.
   nothing three times): one dimmed "Coming soon" bar entry, one FLAT policy row, and the
   Blueprint GALLERY inside it previews every coming feature (each keeping the mark it wore as a
   bar button). A future placeholder is a gallery entry, not a Mode.
-- **The doc pages' bar home is the InfoMenu** (`topbar/InfoMenu.tsx`) — a circled-i popover in
-  the right control zone, one rank below the view switch on purpose ("views, but not at the same
-  level of importance"); rows are the footer DocToggles' own store toggles, `DOC_ICONS` in
-  icons.tsx their marks. Phone reaches the docs via the footer row instead.
+- **The doc pages' bar home is the SettingsMenu's Pages section** (2026-09-08; `InfoMenu.tsx`
+  is the rows-only module `DocRows` now) — one rank below the view switch on purpose ("views,
+  but not at the same level of importance"); rows are the footer DocToggles' own store toggles,
+  `DOC_ICONS` in icons.tsx their marks. The footer row remains the always-visible route.
 - A **doc page**: one `DOC_PAGES` entry (everything derives: type, paths, titles, docForPath),
   its component in `components/docs/` + one line in DocLayer's `DOC_COMPONENTS` map, a thin
   route file passing `doc`, a footer `DocToggle`. The engine's bare stage, both transition

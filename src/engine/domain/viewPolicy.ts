@@ -73,6 +73,12 @@ export interface ViewPolicy {
   // views stay false — numbers beside a `preview` wireframe would be the mixed signal rule 10
   // exists to prevent.
   vitalsLane: boolean;
+  // Does the vitals lane carry the TRENDS RIM (2026-09-08) — the band's one interactive strip
+  // (the measured-window picker + the route to the Trends page)? Only where every windowed
+  // cell actually reads the trends store: the ledger. A view whose cells are live-fleet reads
+  // (hyper, geo) has no measured window to pick, so a picker there would be a control wired
+  // to nothing — the fabricated-affordance cousin of rule 10.
+  vitalsWindows: boolean;
   // Does this view anchor the SUBJECT CALLOUT (user, 2026-08-15) — the HUD-layer label the Engine
   // positions over the committed subject's projected anchor each frame? Two readers: SceneCallout
   // mounts on it, the Engine's per-frame sync gates on it — one flag, so the label and its
@@ -119,6 +125,7 @@ const FLAT: ViewPolicy = {
   minPolarAngle: 0.25,
   nodeList: false,
   vitalsLane: false,
+  vitalsWindows: false,
   callout: false,
   bloom: BLOOM_CALM,
   chipEnv: 1,
@@ -146,6 +153,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // so hyper shares the overview pose with the other views and never needs the pole-crossing relax
     nodeList: true,
     vitalsLane: true,
+    vitalsWindows: false, // live-fleet cells — no measured window to pick
     callout: true, // first consumer of the subject callout (rolling out view by view)
     // Calmer than ledger: the core + dense node field piled up an additive bleed on OLED/HDR.
     bloom: { strength: 0.27, radius: 0.32, threshold: 0.14 },
@@ -165,6 +173,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minPolarAngle: 0.25,
     nodeList: true,
     vitalsLane: true,
+    vitalsWindows: false, // live-fleet cells — no measured window to pick
     callout: true, // node > cohort > country anchors; the distributed network rung has none
     // The lowest bloom of the three views: strength drives the "black halo" ring the saturated
     // node/wall hues cast on the globe, and the additive coastal walls read fuzzy under bloom.
@@ -188,6 +197,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // The Snapshots node browser (LedgerPanel's floor disclosures) reads store.selNodes.
     nodeList: true,
     vitalsLane: true,
+    vitalsWindows: true, // every windowed cell reads the trends store here — the rim is real
     callout: true, // the pinned snapshot — the lane lead tile, or the global tick's bar
     bloom: BLOOM_CALM, // the reference look the design likes — unchanged
     chipEnv: 0.5, // low, not zero — coplanar trays wash at full sheen, go bland at none (field note)
