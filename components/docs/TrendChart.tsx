@@ -211,22 +211,18 @@ export default function TrendChart({
           </span>
         )}
         {lines.length === 1 && last != null && (
-          // The readout reads as a SENTENCE tail, number first (user, 2026-09-09, two rounds:
-          // "/day" then "Sep 8 · 1,863" were fragments the reader had to assemble; and the
-          // sub-daily full date+time+UTC stamp overstated — the window is at most a day or a
-          // month deep, so the hour alone places the bucket). With the head's prose unit it
-          // composes: "Global snapshots per day … 1,863 on Sep 8". The connective is the
-          // number's description; the title carries the precise claim for whoever hovers.
-          // Full-precision stamps live on in the tooltip, where a POINT is being inspected.
+          // The readout NAMES ITS RELATION to the window (user, 2026-09-09, third round of
+          // this head: a number and a time still read as two facts — the words now say what
+          // the number IS, "newest full day/hour/5 min", and the exact stamp lives on hover.
+          // "Full" because partial edges are trimmed; "newest" not "latest" — an outage can
+          // put the newest MEASURED bucket behind the clock, and the title says which).
           <span
             className="ml-auto inline-flex items-baseline gap-1 whitespace-nowrap"
             title={`The newest complete measured ${stepMs >= 86400000 ? "day" : stepMs >= 3600000 ? "hour" : "five-minute bucket"} (${stampOf(buckets[lastIdx])})`}
           >
             <span className="text-label text-foreground-dim tabular-nums">{format(last)}</span>
             <span className="text-micro text-muted-foreground">
-              {stepMs < 86400000
-                ? `at ${String(new Date(buckets[lastIdx]).getUTCHours()).padStart(2, "0")}:${String(new Date(buckets[lastIdx]).getUTCMinutes()).padStart(2, "0")}`
-                : `on ${new Date(buckets[lastIdx]).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" })}`}
+              · newest full {stepMs >= 86400000 ? "day" : stepMs >= 3600000 ? "hour" : "5 min"}
             </span>
           </span>
         )}
@@ -343,9 +339,11 @@ export default function TrendChart({
               ))}
             </LineChart>
           </ResponsiveContainer>
-          {/* The y scale's one number — the baseline is 0 by construction. */}
+          {/* The y scale's one number, with its ROLE said (user, 2026-09-09: a bare number
+              top-left beside the head's readout top-right was two unexplained values) — it
+              is the window's peak, and the baseline is 0 by construction. */}
           <span aria-hidden className="absolute top-1 left-1.5 text-micro text-muted-foreground pointer-events-none tabular-nums">
-            {format(max / 1.12)}
+            peak {format(max / 1.12)}
           </span>
         </div>
       )}
