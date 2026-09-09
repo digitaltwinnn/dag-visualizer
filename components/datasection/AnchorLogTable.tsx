@@ -274,7 +274,13 @@ export default function AnchorLogTable() {
     allRows = sortAnchorLog([...listedRows, ...unlistedRows], sort.key, sort.dir, (metaId) => displayNetwork(metaId)?.ticker ?? metaId);
     total = allRows.length;
     pages = Math.max(1, Math.ceil(total / PAGE));
-    const p = Math.min(page, pages);
+    // A LANDED SEARCH HOLDS ITS ROW, NOT ITS PAGE NUMBER (user, 2026-09-09: "a search filter
+    // gets overwritten when a new live snapshot arrives") — the window's rows shift on every
+    // tick, so while a mark stands the shown page is re-derived from the marked row each
+    // render; paging away by hand releases the follow (the pager clears the mark). Inlined
+    // markOf (defined below) — the row's identity is its own ordinal, a seam its tick's.
+    const markIdx = marked != null ? allRows.findIndex((r) => (r.metaId == null ? r.global.ordinal : r.ordinal) === marked) : -1;
+    const p = markIdx >= 0 ? Math.floor(markIdx / PAGE) + 1 : Math.min(page, pages);
     rows = allRows.slice((p - 1) * PAGE, p * PAGE);
     from = total === 0 ? 0 : (p - 1) * PAGE + 1;
     to = Math.min(p * PAGE, total);
@@ -858,7 +864,12 @@ export default function AnchorLogTable() {
           word: "window",
           title: "The recently retained span, held by time rather than by count — each network snapshots at its own rate, so these counts are not proportional to any chain's length. Pick a network in the top-bar filter to page its whole chain, back to genesis.",
         }}
-        onPage={setPageState}
+        onPage={(n) => {
+          setPageState(n);
+          // Manual paging is the reader leaving the landing — release the row-follow, or the
+          // next live tick would snap the view straight back to the mark.
+          if (!histNet) setMarked(null);
+        }}
       />
     </>
   );
