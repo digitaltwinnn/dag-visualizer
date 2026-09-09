@@ -171,9 +171,10 @@ export default function TrendsDoc() {
         const line: TrendLine = { label: "nodes", points, hue: net?.hue };
         return <TrendChart key={m.id} name={net?.name ?? m.id!} unit={unit} buckets={buckets} stepMs={stepMs} lines={[line]} />;
       });
-  /** Per-network CONTINUITY panels: real measured gap stats (m.{id}.gapSum/gapMax — sampled
-   *  from 2026-09-07 on; the sampler always held the record timestamps, it just discarded
-   *  them). Mean = gapSum/snaps per bucket; a day÷snaps approximation was rejected — for a
+  /** Per-network CONTINUITY panels: real measured gap stats (m.{id}.gapSum/gapMax — live
+   *  since 2026-09-07, and BACKFILLED to Jan 1 by the 2026-09-09 gaps walk: ~13M records
+   *  re-walked for their timestamps alone, since the ordinary backfills never kept them).
+   *  Mean = gapSum/snaps per bucket; a day÷snaps approximation was rejected — for a
    *  batching network (DOR: dozens of snapshots in one tick, then idle) it reads as spacing
    *  that never existed. Ranked by the latest reading, most-stalled first. */
   const netGapPanels = (kind: "mean" | "max") =>
@@ -423,7 +424,7 @@ export default function TrendsDoc() {
           <Section
             id="net-continuity"
             title="Continuity"
-            lead="How steadily each network sealed its own snapshots — the average spacing and the single longest pause per bucket. Measuring began 7 Sep 2026; earlier history shows as unmeasured."
+            lead="How steadily each network sealed its own snapshots — the average spacing between them, per bucket. A line that ends is a network that stopped; the spacing is measured from the chain's own record timestamps."
           >
             {netGapPanels("mean")}
           </Section>
