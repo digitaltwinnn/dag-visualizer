@@ -78,6 +78,8 @@ function meanGap(p: TrendsPayload): (number | null)[] {
   return ticks.map((t, i) => (t != null && t > 0 && sum[i] != null ? sum[i]! / t : null));
 }
 
+const stepMsOfMain = (w: { stepMs: number } | undefined): number => w?.stepMs ?? 86400000;
+
 const scale = (points: (number | null)[], k: number): (number | null)[] =>
   points.map((v) => (v == null ? null : v * k));
 
@@ -133,6 +135,14 @@ export default function TrendsDoc() {
     return f !== "dag" && metagraphById(f) ? "metagraphs" : "hypergraph";
   });
 
+  // THE FLEET RIDES THE HOURLY TIER at fine zooms (user, 2026-09-09: "1H/24H on Nodes says
+  // no data while 7D has it") — the gauges are written hourly+daily only, so the 5m payload
+  // honestly lacks them; instead of gating, the Nodes sections fetch the 7d hourly payload
+  // and slice it to the picked span (the rim's own recipe). Small, shared-cache fetch, made
+  // only while a fine zoom stands.
+  const fleetFine = useTrendsWindow(
+    (range ? Date.now() - range.fromMs <= 24 * 3_600_000 : zoom === "1h" || zoom === "24h") ? "7d" : null,
+  );
   const raw = fetched.data ?? undefined;
   // 1H is the 24h payload's newest hour (the rim's own recipe — sliceWindow measures from
   // the payload's newest bucket, so a cached payload yields a consistent hour). A committed
@@ -154,6 +164,15 @@ export default function TrendsDoc() {
   // fine buckets are complete once written — only the current slot is still filling). GAUGE
   // charts keep everything: a point sample is complete the moment it is taken, and trimming
   // today would hide the fleet's only readings.
+  const fleetRaw =
+    stepMsOfMain(windowedRaw) < 3600000 && fleetFine.data
+      ? range
+        ? cutRange(fleetFine.data, range.fromMs, range.toMs)
+        : sliceWindow(fleetFine.data, zoom === "1h" ? 3_600_000 : 24 * 3_600_000)
+      : undefined;
+  const pF = fleetRaw ?? p;
+  const fBuckets = fleetRaw?.buckets ?? buckets;
+  const fStep = fleetRaw?.stepMs ?? stepMs;
   const lead = stepMs >= 86400000 ? 1 : 0;
   const cBuckets = buckets.slice(lead, -1);
   const trim = (points: (number | null)[]): (number | null)[] => points.slice(lead, -1);
@@ -184,10 +203,11 @@ export default function TrendsDoc() {
       });
   /** Per-network GAUGE panels (fleet): untrimmed — a point sample is complete the moment it
    *  is taken — and null where never sampled (gauges are not zero-filled). */
+  /** Per-network GAUGE panels ride the FLEET payload (hourly at fine zooms — see fleetRaw). */
   const netGaugePanels = (unit: string) =>
     METAGRAPHS.filter((m) => m.id)
       .map((m) => {
-        const points = S(p, `f.nodes.${m.id}`);
+        const points = S(pF, `f.nodes.${m.id}`);
         const last = points.reduce<number | null>((acc, v) => (v != null ? v : acc), null);
         return { m, points, last };
       })
@@ -195,7 +215,7 @@ export default function TrendsDoc() {
       .map(({ m, points }) => {
         const net = displayNetwork(m.id);
         const line: TrendLine = { label: "nodes", points, hue: net?.hue };
-        return <TrendChart key={m.id} onRange={onRange} inspect={() => inspectRange(m.id!)} name={net?.name ?? m.id!} unit={unit} buckets={buckets} stepMs={stepMs} lines={[line]} />;
+        return <TrendChart key={m.id} onRange={onRange} inspect={() => inspectRange(m.id!)} name={net?.name ?? m.id!} unit={unit} buckets={fBuckets} stepMs={fStep} lines={[line]} />;
       });
   /** Per-network CONTINUITY panels: real measured gap stats (m.{id}.gapSum/gapMax — live
    *  since 2026-09-07, and BACKFILLED to Jan 1 by the 2026-09-09 gaps walk: ~13M records
@@ -442,15 +462,13 @@ export default function TrendsDoc() {
             title="Nodes"
             lead="Node counts are sampled live, hourly — there is no historical record of the fleet to read back, so these series begin the day measuring started and fill forward."
           >
-            {stepMs < 3600000 ? (
-              /* The gauges are HOURLY instruments — at the 5-minute zoom there is nothing they
-                 could honestly show, and "no measurements" would wrongly read as an outage. */
-              <p className="text-label text-muted-foreground">
-                Node counts are an hourly instrument — pick 7D or wider to see them.
-              </p>
+            {stepMs < 3600000 && !fleetRaw ? (
+              /* The gauges are HOURLY instruments; at fine zooms their hourly payload is a
+                 separate fetch — this line only stands while it is in flight. */
+              <p className="text-label text-muted-foreground">reading the hourly samples…</p>
             ) : (
               <>
-                <TrendChart onRange={onRange} inspect={inspectHere} name="Nodes" unit="total" buckets={buckets} stepMs={stepMs} lines={[{ label: "nodes", points: S(p, "f.nodes") }]} />
+                <TrendChart onRange={onRange} inspect={inspectHere} name="Nodes" unit="total" buckets={fBuckets} stepMs={fStep} lines={[{ label: "nodes", points: S(pF, "f.nodes") }]} />
                 <TrendChart
                   onRange={onRange}
                   inspect={inspectHere}
@@ -463,12 +481,12 @@ export default function TrendsDoc() {
                   // from the section lead too — the legend's three named lines carry enough).
                   name="Network layers"
                   unit="nodes per layer"
-                  buckets={buckets}
-                  stepMs={stepMs}
+                  buckets={fBuckets}
+                  stepMs={fStep}
                   lines={[
-                    { label: "L0", points: S(p, "f.layer.l0") },
-                    { label: "cL1", points: S(p, "f.layer.cl1"), dash: "2 4" },
-                    { label: "dL1", points: S(p, "f.layer.dl1"), dash: true },
+                    { label: "L0", points: S(pF, "f.layer.l0") },
+                    { label: "cL1", points: S(pF, "f.layer.cl1"), dash: "2 4" },
+                    { label: "dL1", points: S(pF, "f.layer.dl1"), dash: true },
                   ]}
                 />
               </>
@@ -521,10 +539,8 @@ export default function TrendsDoc() {
             title="Nodes"
             lead="Each network's own node count, sampled live every hour — no historical fleet record exists upstream, so these begin the day measuring started and fill forward."
           >
-            {stepMs < 3600000 ? (
-              <p className="text-label text-muted-foreground">
-                Node counts are an hourly instrument — pick 7D or wider to see them.
-              </p>
+            {stepMs < 3600000 && !fleetRaw ? (
+              <p className="text-label text-muted-foreground">reading the hourly samples…</p>
             ) : (
               netGaugePanels("nodes")
             )}
