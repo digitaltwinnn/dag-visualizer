@@ -519,7 +519,7 @@ export default function TrendsDoc() {
                   // the hybrid-counts-per-layer nuance is deliberately unstated (user cut it
                   // from the section lead too — the legend's three named lines carry enough).
                   name="Network layers"
-                  unit="nodes per layer"
+                  unit="total nodes per layer"
                   buckets={fBuckets}
                   stepMs={fStep}
                   lines={[
