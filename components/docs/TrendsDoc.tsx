@@ -332,12 +332,17 @@ export default function TrendsDoc() {
       <h1 className="mt-3 text-3xl font-semibold tracking-[-0.01em] leading-tight">
         {buckets.length > 1 ? spanPhrase(buckets, stepMs) : "The network, measured"}
       </h1>
+      {/* HUMAN VOICE (user, 2026-09-09 — the /about rule reaches every doc page: say what
+          the reader can DO, not what the pixels are). The honesty vocabulary survives inside
+          the how-to: amber = the chain's own silence, gray = our not-measuring. */}
       <p className="mt-5 text-base text-foreground-dim leading-relaxed">
-        Every reading below is summed from the chain&apos;s own records — each global snapshot and
-        each metagraph snapshot, bucketed by when it happened. An amber band is the network
-        itself going silent while this app watched — a measured stretch that sealed nothing.
-        A gray band is a period this app did not sample, which says nothing about the chain;
-        a zero is a reading like any other.
+        This is the network&apos;s history, drawn from its own records. Use it to see how busy
+        each chain has been and how steadily it ran: pick a time window, or drag across any
+        chart to zoom into a moment that interests you — and when something catches your eye,
+        <em> snapshot records</em> opens the actual snapshots behind it. An amber stretch
+        means the network truly went quiet there, which is usually the story worth reading; a
+        gray stretch only means this app wasn&apos;t measuring at that moment, and says
+        nothing about the chain.
       </p>
 
       {!p && !fetched.error && (
