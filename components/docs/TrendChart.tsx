@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { ArrowUpRight } from "lucide-react";
 import { CartesianGrid, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 // THE TRENDS DOC'S ONE CHART PRIMITIVE — a small-multiple line chart over the /api/trends
@@ -193,9 +194,14 @@ export default function TrendChart({
             type="button"
             onClick={inspect}
             title="Open this range in the Snapshots view's raw data search"
-            className="text-micro text-primary/75 hover:text-primary whitespace-nowrap"
+            // Reads as a LINK, not a label (user, 2026-09-09): primary ink + a trailing
+            // arrow mark + hover underline — the app's "this goes somewhere" signals. Text
+            // FIRST so the flex baseline is the text's (a leading icon was what knocked the
+            // earlier cut off the head's baseline).
+            className="inline-flex items-center gap-0.5 text-micro text-primary/80 hover:text-primary hover:underline underline-offset-2 whitespace-nowrap"
           >
             snapshot records
+            <ArrowUpRight aria-hidden className="size-3" />
           </button>
         )}
         {/* The pair legend — only when there IS a pair (one series needs no legend, its name is
