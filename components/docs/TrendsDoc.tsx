@@ -13,6 +13,7 @@ import { metagraphById } from "@/src/data/network";
 import { displayNetwork } from "@/src/data/unlisted";
 import { cn } from "@/lib/utils";
 import { Table2 } from "lucide-react";
+import { SELECTED_ROW } from "@/components/selection";
 
 // THE TRENDS DOCUMENT (user, 2026-09-06; widened twice since) — the first UI consumer of the
 // trends backend: one daily-resolution chart per stored metric over the /api/trends 1y window,
@@ -287,10 +288,16 @@ export default function TrendsDoc() {
   // carrying its own × and the ladder's "records" action so the bridge is reachable from any
   // tab. Compact sizing throughout (h-6/px-2/text-micro — the h-7 pills stopped fitting one
   // line beside the section tabs once ALL and the range joined, same user note).
+  // The PRESSED register is the RIM'S (user, 2026-09-09: "styled differently in bottom bar
+  // than in the trend view — deliberate?" — no, drift: the rim adopted this picker's register
+  // in 2026-09-08's round, then evolved to SELECTED_ROW while this stayed behind; same
+  // control, one language now). The section pills above deliberately keep the tab register —
+  // a section is furniture, a window is a committed selection.
   const zoomBtn = (pressed: boolean) =>
-    pressed
-      ? "h-6 px-2 rounded-md text-micro tracking-caps uppercase text-foreground bg-[var(--panel-solid)] shadow-sm"
-      : "h-6 px-2 rounded-md text-micro tracking-caps uppercase text-muted-foreground hover:text-foreground";
+    cn(
+      "h-6 px-2 rounded-md text-micro tracking-caps uppercase",
+      pressed ? cn("font-bold text-foreground", SELECTED_ROW) : "text-muted-foreground hover:text-foreground hover:bg-wash-hover",
+    );
   const zoomPicker = (
     <div role="group" aria-label="Time window" className="inline-flex items-center rounded-lg bg-muted p-[3px]">
       {!range && ZOOMS.map((z) => (
@@ -305,7 +312,7 @@ export default function TrendsDoc() {
         </button>
       ))}
       {range && (
-        <span className="h-6 px-2 inline-flex items-center gap-1.5 rounded-md text-micro text-foreground bg-[var(--panel-solid)] shadow-sm whitespace-nowrap">
+        <span className={cn("h-6 px-2 inline-flex items-center gap-1.5 rounded-md text-micro font-bold text-foreground whitespace-nowrap", SELECTED_ROW)}>
           <span className="tabular-nums">{stampRange(range.fromMs)}–{stampRange(range.toMs)}</span>
           <button
             type="button"
