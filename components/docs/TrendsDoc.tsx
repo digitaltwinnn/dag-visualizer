@@ -103,7 +103,10 @@ export default function TrendsDoc() {
   // page: the shared-axis column means every chart cuts to it together. Picking a zoom pill
   // clears it (the pill IS a range statement); the chip row beside the pills states it, and
   // the "records" action on per-network charts hands it one rung down the ladder.
-  const [range, setRange] = useState<{ fromMs: number; toMs: number } | null>(null);
+  // `metaId` = whose chart the drag was drawn on (user, 2026-09-09: DOR committed, a range
+  // dragged on BIOFI's chart, "go to raw: no biofi in the filter" — a range must remember
+  // its network, and the standalone records button prefers it over the committed filter).
+  const [range, setRange] = useState<{ fromMs: number; toMs: number; metaId?: string | null } | null>(null);
   // ONE section selection for BOTH drawers (user, 2026-09-09: "have it once drive both
   // tabs") — the two cabinets carry the same four sections, and an uncontrolled pair reset
   // the pick on every drawer switch. The zoom/range already lives at page level; making the
@@ -216,7 +219,7 @@ export default function TrendsDoc() {
       .map(({ m, points }) => {
         const net = displayNetwork(m.id);
         const line: TrendLine = { label: suffix, points, hue: net?.hue };
-        return <TrendChart key={m.id} onRange={onRange} inspect={() => inspectRange(m.id!)} name={net?.name ?? m.id!} unit={unit} readout={dayReadout(`m.${m.id}.${suffix}`, k)} buckets={cBuckets} stepMs={stepMs} format={fmt} lines={[line]} />;
+        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} name={net?.name ?? m.id!} unit={unit} readout={dayReadout(`m.${m.id}.${suffix}`, k)} buckets={cBuckets} stepMs={stepMs} format={fmt} lines={[line]} />;
       });
   /** Per-network GAUGE panels (fleet): untrimmed — a point sample is complete the moment it
    *  is taken — and null where never sampled (gauges are not zero-filled). */
@@ -232,7 +235,7 @@ export default function TrendsDoc() {
       .map(({ m, points }) => {
         const net = displayNetwork(m.id);
         const line: TrendLine = { label: "nodes", points, hue: net?.hue };
-        return <TrendChart key={m.id} onRange={onRange} inspect={() => inspectRange(m.id!)} name={net?.name ?? m.id!} unit={unit} buckets={fBuckets} stepMs={fStep} lines={[line]} />;
+        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} name={net?.name ?? m.id!} unit={unit} buckets={fBuckets} stepMs={fStep} lines={[line]} />;
       });
   /** Per-network CONTINUITY panels: real measured gap stats (m.{id}.gapSum/gapMax — live
    *  since 2026-09-07, and BACKFILLED to Jan 1 by the 2026-09-09 gaps walk: ~13M records
@@ -260,7 +263,7 @@ export default function TrendsDoc() {
         // `sampled` = the chain's own snaps series: amber only where the SAMPLER missed;
         // a null point over a sampled bucket (a quiet stretch — nothing to space) just
         // breaks the line (user, 2026-09-09: DOR's quiet buckets wore outage amber).
-        return <TrendChart key={m.id} onRange={onRange} inspect={() => inspectRange(m.id!)} name={net?.name ?? m.id!} unit="seconds" buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, `m.${m.id}.snaps`))} lines={[line]} />;
+        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} name={net?.name ?? m.id!} unit="seconds" buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, `m.${m.id}.snaps`))} lines={[line]} />;
       });
   const secs = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}s`;
   const mb = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 1 })} MB`;
@@ -285,12 +288,14 @@ export default function TrendsDoc() {
     if (st.mode !== "ledger") st.setMode("ledger");
     st.setSection("data");
   };
-  const onRange = (fromMs: number, toMs: number) => setRange({ fromMs, toMs });
+  const onRange = (fromMs: number, toMs: number) => setRange({ fromMs, toMs, metaId: null });
+  /** The per-network charts' drag: the range carries the chart's own chain. */
+  const onRangeFor = (metaId: string) => (fromMs: number, toMs: number) => setRange({ fromMs, toMs, metaId });
   /** The global charts' door: no chain of their own, so the committed catalog filter rides
    *  along when there is one, and the unscoped log otherwise. */
   const inspectHere = () => {
     const f = useStore.getState().filter;
-    inspectRange(metagraphById(f) && f !== "dag" ? f : null);
+    inspectRange(range?.metaId ?? (metagraphById(f) && f !== "dag" ? f : null));
   };
   const stampRange = (ms: number): string =>
     new Date(ms).toLocaleString(undefined, {
@@ -329,7 +334,10 @@ export default function TrendsDoc() {
       ))}
       {range && (
         <span className={cn("h-6 px-2 inline-flex items-center gap-1.5 rounded-md text-micro font-bold text-foreground whitespace-nowrap", SELECTED_ROW)}>
-          <span className="tabular-nums">{stampRange(range.fromMs)}–{stampRange(range.toMs)}</span>
+          <span className="tabular-nums">
+            {range.metaId ? `${displayNetwork(range.metaId)?.ticker ?? ""} · ` : ""}
+            {stampRange(range.fromMs)}–{stampRange(range.toMs)}
+          </span>
           <button
             type="button"
             onClick={() => setRange(null)}
@@ -347,10 +355,7 @@ export default function TrendsDoc() {
   const rangeInspect = buckets.length ? (
     <button
       type="button"
-      onClick={() => {
-        const f = useStore.getState().filter;
-        inspectRange(metagraphById(f) && f !== "dag" ? f : null);
-      }}
+      onClick={inspectHere}
       title="Open this range in the Snapshots view's raw data search (uses the committed network's chain when one is filtered)"
       className="ml-auto inline-flex items-center gap-1.5 h-6 px-2 rounded-md text-micro tracking-caps uppercase text-[var(--primary)]/80 hover:text-[var(--primary)] hover:bg-wash-soft whitespace-nowrap"
     >
