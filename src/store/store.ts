@@ -146,6 +146,11 @@ interface AppState {
   // never a Mode — a document is over the network, not a view of it. While set, the HUD's
   // scene furniture stands down (DocGate) and RouteSync publishes the doc page's own path.
   docPage: "about" | "design" | "trends" | null;
+  // ONE-SHOT HANDOFF down the observation ladder (convention 12, 2026-09-09): a /trends chart
+  // range handed to the anchor log's search. The trends page writes it as it closes; the log
+  // consumes it on sight (prefills the date criteria, seeks when it can) and clears it — a
+  // navigation bridge, not a selection (the network commit itself rides the pickActions table).
+  logSeek: { metaId: string | null; fromMs: number; toMs: number } | null;
   // The doc overlay's STAGE-READY signal, written by the Engine (the one clock that knows the
   // choreography's real boundary — frame-driven, so ?slowmo and low FPS stretch it correctly,
   // where a wall-clock wait in the HUD desynced). DEFAULT TRUE so a document never waits on a
@@ -188,7 +193,7 @@ interface AppState {
   // The vitals band's measured-window pick (2026-09-08 — the ledger band's trends rim): which
   // reach of the trends store the windowed cells chart. Session-only UI state like `section`;
   // both presentations of the cells read it, the rim (desktop band's top edge) writes it.
-  vitalsWindow: "24h" | "30d" | "1y";
+  vitalsWindow: "1h" | "24h" | "7d" | "30d" | "1y" | "all";
   // TRUE while the user is DIRECTLY manipulating the scene (OrbitControls' `start`→`end`, which
   // fire on real pointer/touch/wheel input only — Engine tweens and programmatic camera moves
   // never set this). The rails dim while it holds, so direct manipulation pushes the HUD back
@@ -257,6 +262,7 @@ interface AppState {
   setActivity: (activity: Activity | null) => void;
   setMode: (mode: Mode) => void;
   setDocPage: (docPage: "about" | "design" | "trends" | null) => void;
+  setLogSeek: (logSeek: { metaId: string | null; fromMs: number; toMs: number } | null) => void;
   setDocStageReady: (ready: boolean) => void;
   setDocClosing: (closing: boolean) => void;
   setFilter: (filter: string) => void;
@@ -292,7 +298,7 @@ interface AppState {
   setPhoneDock: (dock: "explore" | "details" | "vitals" | null) => void;
   setSection: (section: "scene" | "data") => void;
   setRailsHidden: (hidden: boolean) => void;
-  setVitalsWindow: (w: "24h" | "30d" | "1y") => void;
+  setVitalsWindow: (w: "1h" | "24h" | "7d" | "30d" | "1y" | "all") => void;
   setSceneDragging: (dragging: boolean) => void;
   setCameraFlying: (flying: boolean) => void;
   setPhoneSheetPx: (px: number | null) => void;
@@ -329,6 +335,7 @@ export const useStore = create<AppState>((set) => ({
   activity: null,
   mode: "hyper",
   docPage: null,
+  logSeek: null,
   docStageReady: true,
   docClosing: false,
   filter: "all",
@@ -395,6 +402,7 @@ export const useStore = create<AppState>((set) => ({
     })),
   setDocStageReady: (docStageReady) => set({ docStageReady }),
   setDocClosing: (docClosing) => set({ docClosing }),
+  setLogSeek: (logSeek) => set({ logSeek }),
   // Committing a network IS a user gesture (user, 2026-08-14 — changing the filter or paging
   // the dossier left the snapshot card as the box): it bumps the recency stack like every
   // other selection, so the facts rail focuses the metagraph card. "all" clears the entry.

@@ -23,6 +23,15 @@ can understand how it works and why it's powerful.
 
 ## Design language
 
+**Three depths, one subject — the observation ladder.** Everything the site shows is the same
+network at one of three depths: the **3D scene** is the live instrument (what is happening right
+now), the **/trends page** is the measured history (what the chain's own records say happened),
+and the **raw data layer** is the record-level microscope (the snapshots themselves, back to
+genesis). Each step down is one deliberate gesture that carries its context with it — zoom a
+trends chart into a range and you can hand that exact range to the snapshot search. The depths
+complement each other on purpose: history grows coarser the further back you look, precisely
+where the record microscope stays exact.
+
 The HUD is four fixed zones over the canvas, each with **one role** that holds in every
 view, so switching views never relearns the screen:
 

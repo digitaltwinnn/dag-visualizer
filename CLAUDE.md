@@ -45,7 +45,7 @@ identity tinting inherit. **Never emoji**: they ignore CSS `color`. The view→i
 
 ## The rules
 
-Eleven invariants. Six are executable — `npm test` fails when they break.
+Twelve invariants. Six are executable — `npm test` fails when they break.
 
 ### Enforced — the test IS the specification
 
@@ -103,6 +103,15 @@ scope from the table.
 11. **Design tokens first.** The HUD type scale and structural tokens over arbitrary values. New
     `text-*`/`rounded-*`/`tracking-*` token utilities must be registered in `lib/utils.ts` — see CSS
     trap 6, which is a silent failure.
+12. **The observation ladder: live scene → measured history → individual records** (user,
+    2026-09-09). Three depths, one subject: the 3D scene is the LIVE instrument, /trends is the
+    MEASURED HISTORY (a document — prose, sections, 2D charts; charts want 2D, so it stays a doc
+    overlay, never a pseudo-scene), and the raw layer is the RECORD-level microscope. Each step
+    down is one deliberate gesture that CARRIES ITS CONTEXT (a chart range hands its network and
+    dates to the anchor log's search), and every new surface must name its rung and its bridges
+    rather than invent a fourth depth. The registers complement each other on purpose: trends
+    grows coarser with distance (tier retention) exactly where the raw layer's chain paging stays
+    exact to genesis.
 
 ## Run & test
 

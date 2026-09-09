@@ -68,6 +68,18 @@ export function leadingTrim(data: TrendsWindowData): TrendsWindowData {
   return cut(data, from);
 }
 
+/** An arbitrary [fromMs, toMs] cut — the /trends range selection (the observation ladder's
+ *  zoom, 2026-09-09): keeps every bucket that INTERSECTS the range (a bucket is [start,
+ *  start+step)), so a range drawn mid-bucket still shows the bucket it touches. An inverted
+ *  or non-overlapping range cuts to empty rather than throwing — a drag is user input. */
+export function cutRange(data: TrendsWindowData, fromMs: number, toMs: number): TrendsWindowData {
+  const from = data.buckets.findIndex((t) => t + data.stepMs > fromMs);
+  if (from < 0) return cut(data, data.buckets.length);
+  let to = data.buckets.length;
+  while (to > from && data.buckets[to - 1] > toMs) to--;
+  return cut(data, from, to);
+}
+
 /** Calendar-month aggregation of a DAILY window — the 1Y bars. Counters SUM per month; a
  *  month with no measured day stays null. BOTH partial edge months are trimmed (the review:
  *  the forming current month was, the mid-month leading edge was not — the partial-edge rule

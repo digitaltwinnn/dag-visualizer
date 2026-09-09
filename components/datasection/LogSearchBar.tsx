@@ -38,6 +38,7 @@ export default function LogSearchBar({
   tick,
   from,
   to,
+  miss,
   onSnapshot,
   onTick,
   onFrom,
@@ -57,6 +58,10 @@ export default function LogSearchBar({
   tick: string;
   from: string;
   to: string;
+  /** The last search's refusal or miss — answered HERE, beside the button that asked (user,
+   *  2026-09-09: the message used to sit by the pager, a screen away from the press, and the
+   *  search read as simply not working). */
+  miss?: string | null;
   onSnapshot: (v: string) => void;
   onTick: (v: string) => void;
   onFrom: (v: string) => void;
@@ -82,9 +87,12 @@ export default function LogSearchBar({
   // share theirs. Desktop keeps the one-line flow untouched.
   const label = "flex-none text-micro uppercase tracking-caps text-muted-foreground max-[700px]:w-24";
 
-  // What the one button would actually do — so it can refuse a press it has nothing to answer
-  // with, rather than accepting it and reporting a miss.
-  const canGo = (!!metaId && !!snapshot) || !!tick || !!from;
+  // What the one button would actually do. Any typed criterion ENABLES it — including a
+  // metagraph ordinal with no chain picked, which the handler answers with "pick which
+  // metagraph's chain…" (user, 2026-09-09: the old refusal was a silently-disabled button,
+  // which read as the search simply not working; a press that gets an ANSWER teaches, a
+  // grey button explains nothing).
+  const canGo = !!snapshot || !!tick || !!from;
 
   return (
     <div
@@ -194,6 +202,14 @@ export default function LogSearchBar({
         {seeking && <Loader2 aria-hidden className="size-3 animate-spin motion-reduce:animate-none" />}
         search
       </button>
+
+      {/* The search's answer, IN the bar (user, 2026-09-09 — see the `miss` prop note): a
+          refusal or a miss lands on its own full-width line right under the fields, in the
+          advisory tone, instead of whispering by the pager a screen below. aria-live so the
+          answer is spoken when it changes, not just painted. */}
+      {miss && (
+        <p aria-live="polite" className="w-full basis-full text-micro text-[var(--warn-soft)]">{miss}</p>
+      )}
     </div>
   );
 }

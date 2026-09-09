@@ -137,6 +137,15 @@ export default function AboutDoc() {
           already stated by the card above it isn&apos;t repeated below; and the label floating
           in the scene follows whichever card you open, just as the camera does.
         </p>
+        {/* The observation ladder, in the human register (user, 2026-09-09 — the same
+            principle CLAUDE.md carries as convention 12 and the README states in its own
+            voice; this page keeps it to one warm paragraph). */}
+        <p>
+          And everything here comes at <strong>three depths</strong>: the scene shows the
+          network <em>live</em>, the Trends page shows its <em>measured history</em>, and the
+          raw data view opens the <em>individual snapshots</em> themselves — each one step
+          deeper, and each step carries along what you were looking at.
+        </p>
       </Section>
 
       {/* The two explainer sections retired (user, 2026-09-04: "better to refer to their own
