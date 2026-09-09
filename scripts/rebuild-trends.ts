@@ -32,6 +32,12 @@
 // by binary-searching the per-ordinal endpoint, then walks only the missing span. Writes go
 // to the DAILY tier alone — the hourly tier only serves the 7d/30d windows, which never reach
 // this far back — and the cron cursor is untouched (the extension is backward-only).
+// The SAME walk also yields the per-network continuity fields (user, 2026-09-09: every
+// metric the store holds, one walk): each chain's record timestamps fold into
+// m.{id}.gapSum/gapMax exactly as --backfill-gaps does, so an extension never needs a
+// second re-walk. The span's first record opens the chain (no invented gap at extend-to),
+// and the boundary day's gap fields are recomputed whole — now INCLUDING the cross-midnight
+// gap from the day before it, which the original forward-only gaps walk could not see.
 //
 // A rebuild ALWAYS wipes `t:{net}:*` first: the store's write path is merge-based (add-series
 // accumulate), so backfilling over existing data would double-count — wipe-and-rebuild is the
@@ -402,10 +408,19 @@ async function main(): Promise<void> {
       );
       if (!bnd) { console.log(`  ${id.slice(0, 10)}: born at/after the boundary — nothing older`); continue; }
       if (!bnd.hash) { console.error(`  ${id.slice(0, 10)}: boundary record has no hash — cannot seek`); process.exit(1); }
+      const stamps: number[] = [];
       await walkChain<MetaRec & { timestamp: string }>(
         `${be0}/currency/${id}/snapshots`, extendToMs, (recs) => {
-          bucketMetas(inc, net, id, beforeBoundary(recs).map((r) => ({ ordinal: r.ordinal, timestamp: r.timestamp, fee: r.fee, sizeInKB: r.sizeInKB })));
+          const keep = beforeBoundary(recs);
+          bucketMetas(inc, net, id, keep.map((r) => ({ ordinal: r.ordinal, timestamp: r.timestamp, fee: r.fee, sizeInKB: r.sizeInKB })));
+          for (const r of keep) stamps.push(Date.parse(r.timestamp));
         }, id.slice(0, 10), craftCurrencyCursor(bnd.hash));
+      // Continuity from the same walk: pages stream newest→oldest, so gaps are folded after
+      // the sort, gaps-mode style (bucketMetas' gapChain wants oldest→newest streams).
+      stamps.sort((a, b) => a - b);
+      for (let i = 1; i < stamps.length; i++) {
+        addIncGap(inc, net, stamps[i], id, Math.max(0, Math.round((stamps[i] - stamps[i - 1]) / 1000)));
+      }
     }
 
     // Daily tier only; plain HSET overwrites the boundary day with its complete recomputation.
