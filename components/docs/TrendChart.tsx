@@ -1,7 +1,6 @@
 "use client";
 import { useState } from "react";
 import { CartesianGrid, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Table2 } from "lucide-react";
 
 // THE TRENDS DOC'S ONE CHART PRIMITIVE — a small-multiple line chart over the /api/trends
 // buckets, on RECHARTS (user, 2026-09-07: "why hand-roll charts if we have a neat library?" —
@@ -194,9 +193,8 @@ export default function TrendChart({
             type="button"
             onClick={inspect}
             title="Open this range in the Snapshots view's raw data search"
-            className="inline-flex items-center gap-1 text-micro text-primary/75 hover:text-primary whitespace-nowrap"
+            className="text-micro text-primary/75 hover:text-primary whitespace-nowrap"
           >
-            <Table2 aria-hidden className="size-3" />
             snapshot records
           </button>
         )}

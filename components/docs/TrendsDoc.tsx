@@ -249,6 +249,12 @@ export default function TrendsDoc() {
     st.setSection("data");
   };
   const onRange = (fromMs: number, toMs: number) => setRange({ fromMs, toMs });
+  /** The global charts' door: no chain of their own, so the committed catalog filter rides
+   *  along when there is one, and the unscoped log otherwise. */
+  const inspectHere = () => {
+    const f = useStore.getState().filter;
+    inspectRange(metagraphById(f) && f !== "dag" ? f : null);
+  };
   const stampRange = (ms: number): string =>
     new Date(ms).toLocaleString(undefined, {
       month: "short", day: "numeric",
@@ -267,7 +273,7 @@ export default function TrendsDoc() {
       : "h-6 px-2 rounded-md text-micro tracking-caps uppercase text-muted-foreground hover:text-foreground";
   const zoomPicker = (
     <div role="group" aria-label="Time window" className="inline-flex items-center rounded-lg bg-muted p-[3px]">
-      {ZOOMS.map((z) => (
+      {!range && ZOOMS.map((z) => (
         <button
           key={z.id}
           type="button"
@@ -402,9 +408,9 @@ export default function TrendsDoc() {
             title="The base ledger"
             lead="One subject, three readings: how many global snapshots were produced, how many metagraph snapshots they anchored, and the blocks that came with them."
           >
-            <TrendChart onRange={onRange} name="Global snapshots" unit={per} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "ticks", points: trim(S(p, "g.ticks")) }]} />
-            <TrendChart onRange={onRange} name="Snapshots anchored" unit={per} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "anchored", points: trim(S(p, "g.anchors")) }]} />
-            <TrendChart onRange={onRange} name="Blocks" unit={per} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "blocks", points: trim(S(p, "g.blocks")) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Global snapshots" unit={per} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "ticks", points: trim(S(p, "g.ticks")) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Snapshots anchored" unit={per} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "anchored", points: trim(S(p, "g.anchors")) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Blocks" unit={per} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "blocks", points: trim(S(p, "g.blocks")) }]} />
           </Section>
           </TabsContent>
           <TabsContent value="continuity">
@@ -413,8 +419,8 @@ export default function TrendsDoc() {
             title="Continuity"
             lead="How steadily the ledger ticked: the average spacing between snapshots and each bucket's single longest pause — a tall spike is a stall, however brief."
           >
-            <TrendChart onRange={onRange} name="Mean gap" unit="seconds" buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} lines={[{ label: "mean", points: trim(meanGap(p)) }]} />
-            <TrendChart onRange={onRange} name="Longest pause" unit={`seconds · the ${stepMs >= 86400000 ? "day" : "bucket"}'s single widest gap`} buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} lines={[{ label: "max", points: trim(S(p, "g.gapMax")) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Mean gap" unit="seconds" buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} lines={[{ label: "mean", points: trim(meanGap(p)) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Longest pause" unit={`seconds · the ${stepMs >= 86400000 ? "day" : "bucket"}'s single widest gap`} buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} lines={[{ label: "max", points: trim(S(p, "g.gapMax")) }]} />
           </Section>
           </TabsContent>
           <TabsContent value="economics">
@@ -423,8 +429,8 @@ export default function TrendsDoc() {
             title="Economics"
             lead="What anchoring paid and carried, summed over the publicly listed metagraphs — a floor, exactly as the cards state it: unlisted channels pay too."
           >
-            <TrendChart onRange={onRange} name="Fees paid" unit={`DAG ${per} · floor`} buckets={cBuckets} stepMs={stepMs} format={dag} lines={[{ label: "fees", points: trim(scale(S(p, "g.feeFloor"), 1e-8)) }]} />
-            <TrendChart onRange={onRange} name="Data anchored" unit={`${per} · floor`} buckets={cBuckets} stepMs={stepMs} format={mb} lines={[{ label: "data", points: trim(scale(S(p, "g.kbFloor"), 1 / 1024)) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Fees paid" unit={`DAG ${per} · floor`} buckets={cBuckets} stepMs={stepMs} format={dag} lines={[{ label: "fees", points: trim(scale(S(p, "g.feeFloor"), 1e-8)) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Data anchored" unit={`${per} · floor`} buckets={cBuckets} stepMs={stepMs} format={mb} lines={[{ label: "data", points: trim(scale(S(p, "g.kbFloor"), 1 / 1024)) }]} />
           </Section>
           </TabsContent>
           <TabsContent value="fleet">
@@ -441,9 +447,10 @@ export default function TrendsDoc() {
               </p>
             ) : (
               <>
-                <TrendChart onRange={onRange} name="Nodes" unit="total" buckets={buckets} stepMs={stepMs} lines={[{ label: "nodes", points: S(p, "f.nodes") }]} />
+                <TrendChart onRange={onRange} inspect={inspectHere} name="Nodes" unit="total" buckets={buckets} stepMs={stepMs} lines={[{ label: "nodes", points: S(p, "f.nodes") }]} />
                 <TrendChart
                   onRange={onRange}
+                  inspect={inspectHere}
                   // "Network layers" — the vitals band's own card name for this exact reading
                   // (user, 2026-09-09: "Metagraph layers · layer-roles" wasn't descriptive,
                   // and cL1 was missing from the plot; all three protocol layers now draw —
