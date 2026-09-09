@@ -42,6 +42,7 @@ export default function TrendChart({
   sampled,
   onRange,
   inspect,
+  readout,
   className,
 }: {
   name: string;
@@ -69,6 +70,12 @@ export default function TrendChart({
   /** One step down the ladder: "open these buckets as records". Rendered as a small action in
    *  the head — the page passes it only while a range is active and the chart knows its chain. */
   inspect?: () => void;
+  /** Overrides the head readout for COUNTER charts at day-denominated zooms (user,
+   *  2026-09-09: "latest full hour" atop a 7-day view answered too fine a question) — the
+   *  page hands the DAILY tier's own newest complete day, so no client re-summing invents a
+   *  floor rule. Gauges and continuity keep their bucket readout: a gauge's day is not a sum,
+   *  and a day-mean of gaps needs the weighting the store already did per bucket. */
+  readout?: { value: number; word: string };
   className?: string;
 }) {
   const n = buckets.length;
@@ -227,11 +234,11 @@ export default function TrendChart({
           // stamp and the gray band are what actually say when the reading lags the clock.)
           <span
             className="ml-auto inline-flex items-baseline gap-1 whitespace-nowrap"
-            title={`The newest complete measured ${stepMs >= 86400000 ? "day" : stepMs >= 3600000 ? "hour" : "five-minute bucket"} (${stampOf(buckets[lastIdx])})`}
+            title={readout ? "The newest complete measured day, from the daily tier" : `The newest complete measured ${stepMs >= 86400000 ? "day" : stepMs >= 3600000 ? "hour" : "five-minute bucket"} (${stampOf(buckets[lastIdx])})`}
           >
-            <span className="text-label text-foreground-dim tabular-nums">{format(last)}</span>
+            <span className="text-label text-foreground-dim tabular-nums">{format(readout ? readout.value : last)}</span>
             <span className="text-micro text-muted-foreground">
-              · latest full {stepMs >= 86400000 ? "day" : stepMs >= 3600000 ? "hour" : "5 min"}
+              · {readout ? readout.word : `latest full ${stepMs >= 86400000 ? "day" : stepMs >= 3600000 ? "hour" : "5 min"}`}
             </span>
           </span>
         )}

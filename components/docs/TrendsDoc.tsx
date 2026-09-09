@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Panel } from "@/components/docs/AboutDoc";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import useTrendsWindow from "@/components/useTrendsWindow";
-import { cutRange, leadingTrim, sliceWindow } from "@/src/data/trendWindow";
+import { cutRange, leadingTrim, sliceWindow, trimNewestPartial } from "@/src/data/trendWindow";
 import TrendChart, { type TrendLine } from "@/components/docs/TrendChart";
 import { METAGRAPHS } from "@/src/net/current";
 import { useStore } from "@/src/store/store";
@@ -144,6 +144,11 @@ export default function TrendsDoc() {
   const fleetFine = useTrendsWindow(
     (range ? Date.now() - range.fromMs <= 24 * 3_600_000 : zoom === "1h" || zoom === "24h") ? "7d" : null,
   );
+  // COUNTER READOUTS AT DAY SCALE (user, 2026-09-09: 7D's "latest full hour" answered too
+  // fine a question for a week-wide view): at the hourly zooms the counter charts' head
+  // readout rides the DAILY tier's own newest complete day — the store's exact sums, the
+  // same cached 90d payload the vitals rim already shares. No client re-summing.
+  const daily = useTrendsWindow(zoom === "7d" || zoom === "30d" ? "90d" : null);
   const raw = fetched.data ?? undefined;
   // 1H is the 24h payload's newest hour (the rim's own recipe — sliceWindow measures from
   // the payload's newest bucket, so a cached payload yields a consistent hour). A committed
@@ -185,6 +190,17 @@ export default function TrendsDoc() {
   const per = stepMs >= 86400000 ? "per day" : stepMs >= 3600000 ? "per hour" : "per 5 min";
   const bucketWord = stepMs >= 86400000 ? "daily" : stepMs >= 3600000 ? "hourly" : "five-minute";
   const dag = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: v < 10 ? 2 : 0 })}`;
+  /** The daily tier's newest COMPLETE day for a counter series (yesterday — today still
+   *  fills), scaled like the chart it captions; undefined off the hourly zooms. */
+  const dayReadout = (name: string, k = 1): { value: number; word: string } | undefined => {
+    if (!daily.data) return undefined;
+    const d = trimNewestPartial(daily.data);
+    const series = d.series[name];
+    for (let i = (series?.length ?? 0) - 1; i >= 0; i--) {
+      if (series![i] != null) return { value: series![i]! * k, word: "latest full day" };
+    }
+    return undefined;
+  };
   /** The Metagraphs tab's panel list: one chart per catalog network for one stored metric,
    *  ranked by the LAST measured day, busiest first (per-section — each ranking is its own
    *  reading). The vitals' catalog-order rule guards live charts that reshuffle under the
@@ -200,7 +216,7 @@ export default function TrendsDoc() {
       .map(({ m, points }) => {
         const net = displayNetwork(m.id);
         const line: TrendLine = { label: suffix, points, hue: net?.hue };
-        return <TrendChart key={m.id} onRange={onRange} inspect={() => inspectRange(m.id!)} name={net?.name ?? m.id!} unit={unit} buckets={cBuckets} stepMs={stepMs} format={fmt} lines={[line]} />;
+        return <TrendChart key={m.id} onRange={onRange} inspect={() => inspectRange(m.id!)} name={net?.name ?? m.id!} unit={unit} readout={dayReadout(`m.${m.id}.${suffix}`, k)} buckets={cBuckets} stepMs={stepMs} format={fmt} lines={[line]} />;
       });
   /** Per-network GAUGE panels (fleet): untrimmed — a point sample is complete the moment it
    *  is taken — and null where never sampled (gauges are not zero-filled). */
@@ -438,9 +454,9 @@ export default function TrendsDoc() {
             title="The base ledger"
             lead="One subject, three readings: how many global snapshots were produced, how many metagraph snapshots they anchored, and the blocks that came with them."
           >
-            <TrendChart onRange={onRange} inspect={inspectHere} name="Global snapshots" unit={per} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "ticks", points: trim(S(p, "g.ticks")) }]} />
-            <TrendChart onRange={onRange} inspect={inspectHere} name="Snapshots anchored" unit={per} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "anchored", points: trim(S(p, "g.anchors")) }]} />
-            <TrendChart onRange={onRange} inspect={inspectHere} name="Blocks" unit={per} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "blocks", points: trim(S(p, "g.blocks")) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Global snapshots" unit={per} readout={dayReadout("g.ticks")} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "ticks", points: trim(S(p, "g.ticks")) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Snapshots anchored" unit={per} readout={dayReadout("g.anchors")} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "anchored", points: trim(S(p, "g.anchors")) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Blocks" unit={per} readout={dayReadout("g.blocks")} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "blocks", points: trim(S(p, "g.blocks")) }]} />
           </Section>
           </TabsContent>
           <TabsContent value="continuity">
@@ -459,8 +475,8 @@ export default function TrendsDoc() {
             title="Economics"
             lead="What anchoring paid and carried, summed over the publicly listed metagraphs — a floor, exactly as the cards state it: unlisted channels pay too."
           >
-            <TrendChart onRange={onRange} inspect={inspectHere} name="Fees paid" unit={`DAG ${per} · floor`} buckets={cBuckets} stepMs={stepMs} format={dag} lines={[{ label: "fees", points: trim(scale(S(p, "g.feeFloor"), 1e-8)) }]} />
-            <TrendChart onRange={onRange} inspect={inspectHere} name="Data anchored" unit={`${per} · floor`} buckets={cBuckets} stepMs={stepMs} format={mb} lines={[{ label: "data", points: trim(scale(S(p, "g.kbFloor"), 1 / 1024)) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Fees paid" unit={`DAG ${per} · floor`} readout={dayReadout("g.feeFloor", 1e-8)} buckets={cBuckets} stepMs={stepMs} format={dag} lines={[{ label: "fees", points: trim(scale(S(p, "g.feeFloor"), 1e-8)) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Data anchored" unit={`${per} · floor`} readout={dayReadout("g.kbFloor", 1 / 1024)} buckets={cBuckets} stepMs={stepMs} format={mb} lines={[{ label: "data", points: trim(scale(S(p, "g.kbFloor"), 1 / 1024)) }]} />
           </Section>
           </TabsContent>
           <TabsContent value="fleet">
