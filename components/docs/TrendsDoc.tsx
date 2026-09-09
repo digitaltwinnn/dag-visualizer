@@ -12,6 +12,7 @@ import { filterToggleActions } from "@/src/engine/domain/pickActions";
 import { metagraphById } from "@/src/data/network";
 import { displayNetwork } from "@/src/data/unlisted";
 import { cn } from "@/lib/utils";
+import { Table2 } from "lucide-react";
 
 // THE TRENDS DOCUMENT (user, 2026-09-06; widened twice since) — the first UI consumer of the
 // trends backend: one daily-resolution chart per stored metric over the /api/trends 1y window,
@@ -100,6 +101,12 @@ export default function TrendsDoc() {
   // clears it (the pill IS a range statement); the chip row beside the pills states it, and
   // the "records" action on per-network charts hands it one rung down the ladder.
   const [range, setRange] = useState<{ fromMs: number; toMs: number } | null>(null);
+  // ONE section selection for BOTH drawers (user, 2026-09-09: "have it once drive both
+  // tabs") — the two cabinets carry the same four sections, and an uncontrolled pair reset
+  // the pick on every drawer switch. The zoom/range already lives at page level; making the
+  // inner Tabs controlled by one state is the whole fix, and only one control row is ever
+  // on screen (the inactive drawer unmounts).
+  const [sectionTab, setSectionTab] = useState("snapshots");
   // AUTO-TIER: a selected range fetches the FINEST window whose reach still covers it —
   // zoom into yesterday and the charts sharpen to 5-minute buckets by themselves; a range
   // past a tier's retention stays on the coarser tier, honestly (the h1 states the grain).
@@ -173,7 +180,7 @@ export default function TrendsDoc() {
       .map(({ m, points }) => {
         const net = displayNetwork(m.id);
         const line: TrendLine = { label: suffix, points, hue: net?.hue };
-        return <TrendChart key={m.id} onRange={onRange} inspect={range ? () => inspectRange(m.id!) : undefined} name={net?.name ?? m.id!} unit={unit} buckets={cBuckets} stepMs={stepMs} format={fmt} lines={[line]} />;
+        return <TrendChart key={m.id} onRange={onRange} inspect={() => inspectRange(m.id!)} name={net?.name ?? m.id!} unit={unit} buckets={cBuckets} stepMs={stepMs} format={fmt} lines={[line]} />;
       });
   /** Per-network GAUGE panels (fleet): untrimmed — a point sample is complete the moment it
    *  is taken — and null where never sampled (gauges are not zero-filled). */
@@ -188,7 +195,7 @@ export default function TrendsDoc() {
       .map(({ m, points }) => {
         const net = displayNetwork(m.id);
         const line: TrendLine = { label: "nodes", points, hue: net?.hue };
-        return <TrendChart key={m.id} onRange={onRange} inspect={range ? () => inspectRange(m.id!) : undefined} name={net?.name ?? m.id!} unit={unit} buckets={buckets} stepMs={stepMs} lines={[line]} />;
+        return <TrendChart key={m.id} onRange={onRange} inspect={() => inspectRange(m.id!)} name={net?.name ?? m.id!} unit={unit} buckets={buckets} stepMs={stepMs} lines={[line]} />;
       });
   /** Per-network CONTINUITY panels: real measured gap stats (m.{id}.gapSum/gapMax — live
    *  since 2026-09-07, and BACKFILLED to Jan 1 by the 2026-09-09 gaps walk: ~13M records
@@ -216,7 +223,7 @@ export default function TrendsDoc() {
         // `sampled` = the chain's own snaps series: amber only where the SAMPLER missed;
         // a null point over a sampled bucket (a quiet stretch — nothing to space) just
         // breaks the line (user, 2026-09-09: DOR's quiet buckets wore outage amber).
-        return <TrendChart key={m.id} onRange={onRange} inspect={range ? () => inspectRange(m.id!) : undefined} name={net?.name ?? m.id!} unit="seconds" buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, `m.${m.id}.snaps`))} lines={[line]} />;
+        return <TrendChart key={m.id} onRange={onRange} inspect={() => inspectRange(m.id!)} name={net?.name ?? m.id!} unit="seconds" buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, `m.${m.id}.snaps`))} lines={[line]} />;
       });
   const secs = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}s`;
   const mb = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 1 })} MB`;
@@ -227,10 +234,14 @@ export default function TrendsDoc() {
   // itself travels the one-shot store bridge the log consumes on sight. Closing the doc
   // before opening the raw layer matters: setDocPage forces section back to "scene".
   const inspectRange = (metaId: string | null) => {
-    if (!range) return;
+    // No custom range = the WINDOW you are looking at (user, 2026-09-09: "that button can
+    // always exist") — the zoom is a range statement too, so the ladder's door is always open.
+    const span =
+      range ?? (buckets.length ? { fromMs: buckets[0], toMs: buckets[buckets.length - 1] + stepMs } : null);
+    if (!span) return;
     const st = useStore.getState();
     if (metaId && st.filter !== metaId) applyClickActions(filterToggleActions(metaId, st.filter));
-    st.setLogSeek({ metaId, fromMs: range.fromMs, toMs: range.toMs });
+    st.setLogSeek({ metaId, fromMs: span.fromMs, toMs: span.toMs });
     st.setDocPage(null);
     // The anchor log is the LEDGER view's raw projection — the ladder lands on the rung
     // that can actually show records (mode navigation, not a selection).
@@ -284,7 +295,7 @@ export default function TrendsDoc() {
   );
   // THE LADDER'S BUTTON, its own control beside the group (user, 2026-09-09: "a separate
   // button and be specific") — names the destination: the Snapshots view's raw data search.
-  const rangeInspect = range ? (
+  const rangeInspect = buckets.length ? (
     <button
       type="button"
       onClick={() => {
@@ -292,8 +303,9 @@ export default function TrendsDoc() {
         inspectRange(metagraphById(f) && f !== "dag" ? f : null);
       }}
       title="Open this range in the Snapshots view's raw data search (uses the committed network's chain when one is filtered)"
-      className="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-md border border-[var(--primary)]/40 bg-[var(--wash-soft)] text-micro tracking-caps uppercase text-[var(--primary)] hover:bg-[var(--wash-hover)] whitespace-nowrap"
+      className="ml-auto inline-flex items-center gap-1.5 h-6 px-2 rounded-md text-micro tracking-caps uppercase text-[var(--primary)]/80 hover:text-[var(--primary)] hover:bg-wash-soft whitespace-nowrap"
     >
+      <Table2 aria-hidden className="size-3" />
       snapshot records
     </button>
   ) : null;
@@ -306,7 +318,7 @@ export default function TrendsDoc() {
   // flex-none + a fixed h-8: the primitive's triggers are flex-1 at a %-height, which is what
   // spread them wide and broke when the list WRAPS on phone (the h-auto rows below) — as
   // compact pills they pack left and wrap cleanly (user, 2026-09-08: the tabs overflowed).
-  const innerTrigger = "flex-none h-8 text-label tracking-caps uppercase px-3 data-[state=active]:bg-[var(--panel-solid)]!";
+  const innerTrigger = "flex-none h-6 text-micro tracking-caps uppercase px-2 data-[state=active]:bg-[var(--panel-solid)]!";
 
   return (
     <article className="pt-14">
@@ -374,7 +386,7 @@ export default function TrendsDoc() {
 
 
           <TabsContent value="hypergraph">
-          <Tabs defaultValue="snapshots" className="gap-0">
+          <Tabs value={sectionTab} onValueChange={setSectionTab} className="gap-0">
             <div className="flex items-center justify-between gap-3 flex-wrap pt-4">
               <TabsList aria-label="Hypergraph sections" className="flex-wrap h-auto! justify-start gap-1">
                 <TabsTrigger value="snapshots" className={innerTrigger}>Snapshots</TabsTrigger>
@@ -457,7 +469,7 @@ export default function TrendsDoc() {
           </TabsContent>
 
           <TabsContent value="metagraphs">
-          <Tabs defaultValue="snapshots" className="gap-0">
+          <Tabs value={sectionTab} onValueChange={setSectionTab} className="gap-0">
             <div className="flex items-center justify-between gap-3 flex-wrap pt-4">
               <TabsList aria-label="Metagraph sections" className="flex-wrap h-auto! justify-start gap-1">
                 <TabsTrigger value="snapshots" className={innerTrigger}>Snapshots</TabsTrigger>
