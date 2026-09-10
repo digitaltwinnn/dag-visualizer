@@ -129,19 +129,19 @@ describe("archiveSchedule (the dossier's by-archival partition)", () => {
     entries: new Map((entries as { ip: string }[]).map((e) => [e.ip, e])),
     since: "Nov 2023", archivalCount: entries.length, total: 5,
   }) as Parameters<typeof archiveSchedule>[0];
-  it("dynamic reach rows (no tilde), full rows flagged and leading, kept sums as hints", () => {
+  it("same-reach copies MERGE (the DED find: a genesis keeper beside day-later windows was two rows and a chain-doubling kept sum) — kept is the deepest single copy, fullCount the tag", () => {
     const s2 = archiveSchedule(census([
       { ip: "a", chain: "x", kind: "genesis", floor: 1, latest: 100, floorTs: "2025-05-10T00:00:00Z" },
-      { ip: "b", chain: "x", kind: "window", floor: 50, latest: 100, floorTs: "2026-07-10T00:00:00Z" },
+      { ip: "b", chain: "x", kind: "window", floor: 5, latest: 100, floorTs: "2025-05-10T12:00:00Z" },
       { ip: "c", chain: "x", kind: "window", floor: 40, latest: 100, floorTs: "2026-07-10T00:00:00Z" },
       { ip: "d", chain: "x", kind: "window", floor: 99, latest: 100, floorTs: "2026-09-10T00:00:00Z" },
       { ip: "e", chain: "other", kind: "genesis", floor: 1, latest: 9, floorTs: null },
     ]), "x", 22, now);
-    // the full-chain keeper LEADS, reach-labeled in the age grammar, flagged, kept = the chain
-    expect(s2!.rows[0]).toEqual({ label: "16 months", count: 1, kept: 100, full: true });
-    expect(s2!.rows).toContainEqual({ label: "2 months", count: 2, kept: 110, full: false });
-    expect(s2!.rows).toContainEqual({ label: "recent window", count: 1, kept: 1, full: false }); // sub-day floor: no age claim
-    expect(s2!.unmeasured).toBe(18); // 22 minus this chain's 4 probed
+    // genesis + the near-genesis window share "16 months": ONE row, deepest copy's kept, 1 full
+    expect(s2!.rows[0]).toEqual({ label: "16 months", count: 2, kept: 100, fullCount: 1 });
+    expect(s2!.rows).toContainEqual({ label: "2 months", count: 1, kept: 60, fullCount: 0 });
+    expect(s2!.rows).toContainEqual({ label: "recent window", count: 1, kept: 1, fullCount: 0 });
+    expect(s2!.unmeasured).toBe(18);
   });
   it("null when the census carries nothing for the chain", () => {
     expect(archiveSchedule(census([]), "x", 3, now)).toBeNull();

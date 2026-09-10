@@ -411,6 +411,58 @@ function UnlistedMemberFacts({ id, last }: { id: string; last: boolean }) {
   );
 }
 
+// THE "BY ARCHIVAL" GROUP — one renderer for every dossier (user, 2026-09-10: "missing the
+// archival breakdown for DAG / hypergraph; should behave the same"): the census's reaches as
+// merged rows (full-node + kept-snapshot tags), the honest unmeasured remainder, stars while
+// the census is in flight. The metagraph dossiers seat it as the third schedule under Online
+// nodes; the DAG dossier seats the same group standalone (its roster isn't `nodes`).
+function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> }) {
+  return (
+    <>
+      <p className="mt-2 text-micro tracking-caps uppercase text-muted-foreground">by archival</p>
+      <div className="mt-1 pl-2">
+        {sched ? (
+          <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-[7px]">
+            {sched.rows.map((row) => (
+              <Fragment key={row.label}>
+                {/* The kept-snapshot count rides the row as a tag and its hover hint; a
+                    full-chain keeper wears the full-node tag beside its reach. */}
+                <span
+                  className="inline-flex items-center gap-1.5 text-body text-foreground"
+                  title={row.kept != null ? `${fmtSnapCount(row.kept)} snapshots kept` : undefined}
+                >
+                  {cap(row.label)}
+                  {row.fullCount > 0 && (
+                    <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap">
+                      {row.fullCount === row.count ? "full node" : `${row.fullCount} full node${row.fullCount > 1 ? "s" : ""}`}
+                    </span>
+                  )}
+                  {row.kept != null && (
+                    <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap">
+                      {fmtSnapCount(row.kept)} snapshots
+                    </span>
+                  )}
+                </span>
+                <ChipStack count={row.count} color="var(--muted-foreground)" />
+                <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{row.count}</span>
+              </Fragment>
+            ))}
+            {sched.unmeasured > 0 && (
+              <Fragment key="__unmeasured">
+                <span className="text-body text-muted-foreground">Unmeasured</span>
+                <span />
+                <span className="text-body text-muted-foreground tabular-nums min-w-[1.5em] text-right">{sched.unmeasured}</span>
+              </Fragment>
+            )}
+          </div>
+        ) : (
+          <NodeStars count={4} />
+        )}
+      </div>
+    </>
+  );
+}
+
 // The metagraph context pane (top-right "context" slot): identity only — description,
 // make-up rows, website. Its live/economic counterpart is the top-bar vitals (filter-aware
 // "live activity"), so the dossier stays a stable identity card.
@@ -516,94 +568,25 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
               kept-count ride as the group's muted underline; this absorbs the old
               divider-separated "Full archive nodes" fact for fleets. */}
           {(() => {
-            const sched = archCensus ? archiveSchedule(archCensus, cfg.id, nodes.length) : null;
+            const sched = archCensus ? archiveSchedule(archCensus, cfg.id === "dag" ? "global" : cfg.id, nodes.length) : null;
             if (!sched && !archAcquiring) return null;
-            return (
-              <>
-                <p className="mt-2 text-micro tracking-caps uppercase text-muted-foreground">by archival</p>
-                <div className="mt-1 pl-2">
-                  {sched ? (
-                    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-[7px]">
-                      {sched.rows.map((row) => (
-                        <Fragment key={`${row.full}|${row.label}`}>
-                          {/* The kept-snapshot sum rides the ROW as its hover hint (user,
-                              round 2 — the "deepest …" underline retired); a full-chain
-                              keeper wears the tag beside its reach. */}
-                          <span
-                            className="inline-flex items-center gap-1.5 text-body text-foreground"
-                            title={row.kept != null ? `${fmtSnapCount(row.kept)} snapshots kept` : undefined}
-                          >
-                            {cap(row.label)}
-                            {row.full && (
-                              <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap">
-                                full node
-                              </span>
-                            )}
-                            {row.kept != null && (
-                              <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap">
-                                {fmtSnapCount(row.kept)} snapshots
-                              </span>
-                            )}
-                          </span>
-                          <ChipStack count={row.count} color="var(--muted-foreground)" />
-                          <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{row.count}</span>
-                        </Fragment>
-                      ))}
-                      {sched.unmeasured > 0 && (
-                        <Fragment key="__unmeasured">
-                          <span className="text-body text-muted-foreground">Unmeasured</span>
-                          <span />
-                          <span className="text-body text-muted-foreground tabular-nums min-w-[1.5em] text-right">{sched.unmeasured}</span>
-                        </Fragment>
-                      )}
-                    </div>
-                  ) : (
-                    <NodeStars count={4} />
-                  )}
-                </div>
-              </>
-            );
+            return <ArchivalGroup sched={sched} />;
           })()}
             </>
           )}
         </>
       )}
-      {/* Fleet-level archive summary, in the same summary block as Online nodes; the DAG
-          dossier carries no composition block, so it brings its own separator. ONE fact in
-          the Fees-paid stacked grammar (user, 2026-08-14, settled over several passes —
-          "from genesis as a separate fact, like a checkmark", then "the ~15 months as an
-          underline like fees paid"): the main line counts the machines keeping the whole
-          chain — ratio bold under the Online nodes total it counts against, checked in the
-          success hue when any exist — and the muted underline carries the fleet's deepest
-          surviving reach in the time register. */}
+      {/* The DAG dossier's archival reading — the SAME by-archival schedule the metagraph
+          dossiers carry (user, 2026-09-10: "missing the archival breakdown for DAG /
+          hypergraph; should behave the same" — this absorbs the old single "Full archive
+          nodes" fact). Its chain in the census is "global"; the unmeasured remainder counts
+          against the census's own probed universe, the global L0 fleet at probe time —
+          the DAG core's roster isn't `nodes` (that list is per-metagraph). Deep-kind rows
+          ("back to Nov 2023") keep a null kept, the holed-archive rule. */}
       {nodes.length === 0 && cfg.id === "dag" && (archSum || archAcquiring) && (
         <>
           <Separator className="my-2" />
-          {/* "Full archive nodes", not "genesis nodes" (user, 2026-08-14): the latter reads as
-              validators PRESENT at genesis — a different claim than keeping the whole chain. */}
-          <Fact
-            label={
-              <span className="inline-flex items-center gap-1">
-                Full archive nodes <RoleChips codes={["L0"]} />
-              </span>
-            }
-          >
-            {archSum ? (
-              /* No checkmark here (user, 2026-08-14 — "it just clutters the view"): the ratio
-                 already answers, and the node card's Yes keeps the check where it is the value. */
-              <span className="flex flex-col items-end" title={`${archSum.genesisTitle} ${archSum.reachTitle}`}>
-                <b className="font-bold">{archSum.genesisCount}</b>
-                <span className="text-label text-muted-foreground">{archSum.reach}</span>
-                {/* Second underline: what that reach holds in snapshots — absent for the holed
-                    global deep archives, where any count would overclaim. */}
-                {archSum.kept != null && (
-                  <span className="text-label text-muted-foreground">{fmtSnapCount(archSum.kept)} snapshots</span>
-                )}
-              </span>
-            ) : (
-              <NodeStars count={4} />
-            )}
-          </Fact>
+          <ArchivalGroup sched={archCensus ? archiveSchedule(archCensus, "global", archCensus.total) : null} />
         </>
       )}
       {unlistedMembers.map((id, i) => (

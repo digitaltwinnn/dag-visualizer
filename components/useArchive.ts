@@ -168,14 +168,17 @@ export function archiveSummary(c: ArchiveCensus, chain: string): ArchiveNetSumma
   };
 }
 
-// THE ARCHIVAL SCHEDULE (user, 2026-09-10, two rounds — the dossier's accounting form: "by
-// archival", dynamic reach ranges): one row per DISTINCT reach, labeled in the age grammar
-// without the tilde ("2 months" — user: "the ~ looks messy"), a `full` flag for the rows
-// that keep the whole chain (rendered as a tag), each row's kept-snapshot sum as its hover
-// hint, and the fleet's remainder as "unmeasured" (an absent entry means the probe read
-// nothing, never provably "keeps little"; rule 10). Deep-kind rows carry a null kept — the
-// holed global archives, where any count would overclaim.
-export interface ArchiveScheduleRow { label: string; count: number; kept: number | null; full: boolean }
+// THE ARCHIVAL SCHEDULE (user, 2026-09-10, three rounds — the dossier's accounting form:
+// "by archival", dynamic reach ranges): one row per DISTINCT reach, labeled in the age
+// grammar without the tilde, and SAME-REACH nodes MERGE whatever their kind (user, round 3:
+// DED showed two "12 months" rows — a genesis keeper beside two window nodes whose floor is
+// ONE DAY later; two rows was duplication, and the old per-row kept SUM double-counted the
+// same chain: two near-full copies read as 4.6M). A row now carries `fullCount` (how many of
+// its copies keep the whole chain — the tag) and `kept` = the DEEPEST single copy's holding,
+// a per-node fact that never sums the chain against itself. The fleet's remainder stays
+// "unmeasured" (an absent entry means the probe read nothing; rule 10); deep-kind rows keep
+// a null kept — the holed global archives, where any count would overclaim.
+export interface ArchiveScheduleRow { label: string; count: number; kept: number | null; fullCount: number }
 export function archiveSchedule(
   c: ArchiveCensus, chain: string, fleetTotal: number, now = Date.now(),
 ): { rows: ArchiveScheduleRow[]; unmeasured: number } | null {
@@ -189,17 +192,17 @@ export function archiveSchedule(
         ? `back to ${c.since}`
         : (e.floorTs && fmtReach(e.floorTs, now)) || (full ? "full chain" : "recent window");
     const kept = e.kind === "deep" ? null : full ? e.latest : e.latest - e.floor;
-    const key = `${full ? "F" : "P"}|${label}`;
-    const row = buckets.get(key);
+    const row = buckets.get(label);
     if (row) {
       row.count += 1;
-      row.kept = row.kept == null || kept == null ? null : row.kept + kept;
+      row.fullCount += full ? 1 : 0;
+      row.kept = row.kept == null || kept == null ? null : Math.max(row.kept, kept);
     } else {
-      buckets.set(key, { label, count: 1, kept, full });
+      buckets.set(label, { label, count: 1, kept, fullCount: full ? 1 : 0 });
     }
   }
-  // Full-chain rows lead — the schedule's own ranking, deepest first.
-  const rows = [...buckets.values()].sort((a, b) => Number(b.full) - Number(a.full));
+  // Deepest copies lead — full-chain rows, then by holding.
+  const rows = [...buckets.values()].sort((a, b) => b.fullCount - a.fullCount || (b.kept ?? -1) - (a.kept ?? -1));
   return { rows, unmeasured: Math.max(0, fleetTotal - entries.length) };
 }
 
