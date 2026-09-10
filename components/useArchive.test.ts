@@ -129,20 +129,19 @@ describe("archiveSchedule (the dossier's by-archival partition)", () => {
     entries: new Map((entries as { ip: string }[]).map((e) => [e.ip, e])),
     since: "Nov 2023", archivalCount: entries.length, total: 5,
   }) as Parameters<typeof archiveSchedule>[0];
-  it("full nodes LEAD as their own row, never combined with partial copies (user, round 4); window copies of one reach merge, kept = the deepest single copy", () => {
+  it("full nodes LEAD as their own row; a window node whose floor sits within the chain's FIRST DAY is graced into it (user, round 5: nodes don't join simultaneously), later joiners never (round 4)", () => {
     const s2 = archiveSchedule(census([
       { ip: "a", chain: "x", kind: "genesis", floor: 1, latest: 100, floorTs: "2025-05-10T00:00:00Z" },
       { ip: "b", chain: "x", kind: "window", floor: 5, latest: 100, floorTs: "2025-05-10T12:00:00Z" },
-      { ip: "c", chain: "x", kind: "window", floor: 40, latest: 100, floorTs: "2026-07-10T00:00:00Z" },
+      { ip: "c", chain: "x", kind: "window", floor: 40, latest: 100, floorTs: "2025-05-11T14:00:00Z" },
       { ip: "d", chain: "x", kind: "window", floor: 99, latest: 100, floorTs: "2026-09-10T00:00:00Z" },
       { ip: "e", chain: "other", kind: "genesis", floor: 1, latest: 9, floorTs: null },
     ]), "x", 22, now);
-    // The genesis keeper is its own leading row (the near-genesis window shares its reach
-    // label but never its row — the tag distinguishes them); few distinct reaches, no spans.
+    // b joined 12h after birth → graced into the full row; c at 38h stays a window row
+    // sharing the reach label but never the row — the tag distinguishes them.
     expect(s2!.rows).toEqual([
-      { label: "16 months", count: 1, kept: 100, fullCount: 1 },
-      { label: "16 months", count: 1, kept: 95, fullCount: 0 },
-      { label: "2 months", count: 1, kept: 60, fullCount: 0 },
+      { label: "16 months", count: 2, kept: 100, fullCount: 2 },
+      { label: "16 months", count: 1, kept: 60, fullCount: 0 },
       { label: "recent window", count: 1, kept: 1, fullCount: 0 },
     ]);
     expect(s2!.unmeasured).toBe(18);

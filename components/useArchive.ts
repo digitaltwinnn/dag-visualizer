@@ -168,23 +168,30 @@ export function archiveSummary(c: ArchiveCensus, chain: string): ArchiveNetSumma
   };
 }
 
-// THE ARCHIVAL SCHEDULE (user, 2026-09-10, four rounds — the dossier's accounting form:
+// THE ARCHIVAL SCHEDULE (user, 2026-09-10, five rounds — the dossier's accounting form:
 // "by archival", dynamic reach ranges, then the DAG's 152-node census turning the exact-reach
 // rows into a ~25-row histogram: "too many rows for DAG, use 3-5 rows max and do some smart
 // grouping based on the counts"). Three kinds, three treatments:
-// - FULL nodes are ALWAYS their own leading row, never combined with partial copies (user,
+// - FULL nodes are ALWAYS their own leading row, never combined with PARTIAL copies (user,
 //   round 4) — the row's count column carries how many, so the tag is the bare "full node".
-//   Kept = the chain itself (the latest ordinal); label = the chain's age.
+//   Kept = the chain itself (the latest ordinal); label = the chain's age. ⚠️ WITH A
+//   FIRST-DAY GRACE (user, round 10: "not always nodes will join simultaneously — if nodes
+//   joined within the 1st day they are still considered full"): a window node whose measured
+//   floor sits within GRACE_MS of the chain's birth — the genesis keeper's own floorTs, so
+//   grace exists only where a genesis keeper proves when the chain began — merges INTO the
+//   full row. Its floor is a measured upper bound anyway (the probe bisects at ~latest/1024
+//   resolution), so "joined day one" is as exact a claim as the census can carry.
 // - DEEP archives stay one row ("back to Nov 2023") with a null kept — the holed global
 //   archives, where any count would overclaim (rule 10).
-// - WINDOW nodes bucket by exact reach in the age grammar; when the distinct reaches
-//   overflow the remaining row budget (MAX_SCHED_ROWS total) they cluster into contiguous
-//   COUNT-BALANCED groups, labeled as a span ("3 – 6 months", "up to 18 days"). Kept is the
-//   deepest single copy in the group — a per-node fact that never sums the chain against
-//   itself (the DED double-count, round 3).
+// - WINDOW nodes past the grace bucket by exact reach in the age grammar; when the distinct
+//   reaches overflow the remaining row budget (MAX_SCHED_ROWS total) they cluster into
+//   contiguous COUNT-BALANCED groups, labeled as a span ("3 – 6 months", "up to 18 days").
+//   Kept is the deepest single copy in the group — a per-node fact that never sums the chain
+//   against itself (the DED double-count, round 3).
 // The fleet's remainder stays "unmeasured" (an absent entry means the probe read nothing).
 export interface ArchiveScheduleRow { label: string; count: number; kept: number | null; fullCount: number }
 const MAX_SCHED_ROWS = 5;
+const GRACE_MS = 86_400_000;
 
 // A merged group's label: one reach stays itself; a span reads shallow → deep, collapsing a
 // shared unit ("3 – 6 months", not "3 months – 6 months"); a group whose shallow end is the
@@ -206,18 +213,29 @@ export function archiveSchedule(
   if (!entries.length) return null;
   const rows: ArchiveScheduleRow[] = [];
   const full = entries.filter((e) => e.kind === "genesis");
+  // The first-day grace (see the header): birth is the genesis keeper's own floorTs.
+  const birthTs = full.find((e) => e.floorTs)?.floorTs;
+  const birthMs = birthTs ? Date.parse(birthTs) : NaN;
+  const graced = new Set(
+    Number.isFinite(birthMs)
+      ? entries.filter((e) => {
+          if (e.kind !== "window" || !e.floorTs) return false;
+          const t = Date.parse(e.floorTs);
+          return !Number.isNaN(t) && t - birthMs <= GRACE_MS;
+        })
+      : [],
+  );
   if (full.length) {
-    const ts = full.find((e) => e.floorTs)?.floorTs;
     rows.push({
-      label: (ts && fmtReach(ts, now)) || "full chain",
-      count: full.length,
+      label: (birthTs && fmtReach(birthTs, now)) || "full chain",
+      count: full.length + graced.size,
       kept: Math.max(...full.map((e) => e.latest)),
-      fullCount: full.length,
+      fullCount: full.length + graced.size,
     });
   }
   const deep = entries.filter((e) => e.kind === "deep");
   if (deep.length) rows.push({ label: `back to ${c.since}`, count: deep.length, kept: null, fullCount: 0 });
-  const win = entries.filter((e) => e.kind === "window");
+  const win = entries.filter((e) => e.kind === "window" && !graced.has(e));
   if (win.length) {
     // Exact-reach buckets first, deepest leading — small fleets never see a span.
     const buckets = new Map<string, { label: string; count: number; kept: number; ms: number }>();
