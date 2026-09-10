@@ -168,41 +168,104 @@ export function archiveSummary(c: ArchiveCensus, chain: string): ArchiveNetSumma
   };
 }
 
-// THE ARCHIVAL SCHEDULE (user, 2026-09-10, three rounds — the dossier's accounting form:
-// "by archival", dynamic reach ranges): one row per DISTINCT reach, labeled in the age
-// grammar without the tilde, and SAME-REACH nodes MERGE whatever their kind (user, round 3:
-// DED showed two "12 months" rows — a genesis keeper beside two window nodes whose floor is
-// ONE DAY later; two rows was duplication, and the old per-row kept SUM double-counted the
-// same chain: two near-full copies read as 4.6M). A row now carries `fullCount` (how many of
-// its copies keep the whole chain — the tag) and `kept` = the DEEPEST single copy's holding,
-// a per-node fact that never sums the chain against itself. The fleet's remainder stays
-// "unmeasured" (an absent entry means the probe read nothing; rule 10); deep-kind rows keep
-// a null kept — the holed global archives, where any count would overclaim.
+// THE ARCHIVAL SCHEDULE (user, 2026-09-10, four rounds — the dossier's accounting form:
+// "by archival", dynamic reach ranges, then the DAG's 152-node census turning the exact-reach
+// rows into a ~25-row histogram: "too many rows for DAG, use 3-5 rows max and do some smart
+// grouping based on the counts"). Three kinds, three treatments:
+// - FULL nodes are ALWAYS their own leading row, never combined with partial copies (user,
+//   round 4) — the row's count column carries how many, so the tag is the bare "full node".
+//   Kept = the chain itself (the latest ordinal); label = the chain's age.
+// - DEEP archives stay one row ("back to Nov 2023") with a null kept — the holed global
+//   archives, where any count would overclaim (rule 10).
+// - WINDOW nodes bucket by exact reach in the age grammar; when the distinct reaches
+//   overflow the remaining row budget (MAX_SCHED_ROWS total) they cluster into contiguous
+//   COUNT-BALANCED groups, labeled as a span ("3 – 6 months", "up to 18 days"). Kept is the
+//   deepest single copy in the group — a per-node fact that never sums the chain against
+//   itself (the DED double-count, round 3).
+// The fleet's remainder stays "unmeasured" (an absent entry means the probe read nothing).
 export interface ArchiveScheduleRow { label: string; count: number; kept: number | null; fullCount: number }
+const MAX_SCHED_ROWS = 5;
+
+// A merged group's label: one reach stays itself; a span reads shallow → deep, collapsing a
+// shared unit ("3 – 6 months", not "3 months – 6 months"); a group whose shallow end is the
+// sub-day "recent window" has no lower age claim, so it reads "up to <deep>".
+function spanLabel(shallow: string, deep: string): string {
+  if (shallow === deep) return deep;
+  if (shallow === "recent window") return `up to ${deep}`;
+  const s = shallow.split(" ");
+  const d = deep.split(" ");
+  if (s.length === 2 && d.length === 2 && s[1].replace(/s$/, "") === d[1].replace(/s$/, ""))
+    return `${s[0]} – ${deep}`;
+  return `${shallow} – ${deep}`;
+}
+
 export function archiveSchedule(
   c: ArchiveCensus, chain: string, fleetTotal: number, now = Date.now(),
 ): { rows: ArchiveScheduleRow[]; unmeasured: number } | null {
   const entries = [...c.entries.values()].filter((e) => e.chain === chain);
   if (!entries.length) return null;
-  const buckets = new Map<string, ArchiveScheduleRow>();
-  for (const e of entries) {
-    const full = e.kind === "genesis";
-    const label =
-      e.kind === "deep"
-        ? `back to ${c.since}`
-        : (e.floorTs && fmtReach(e.floorTs, now)) || (full ? "full chain" : "recent window");
-    const kept = e.kind === "deep" ? null : full ? e.latest : e.latest - e.floor;
-    const row = buckets.get(label);
-    if (row) {
-      row.count += 1;
-      row.fullCount += full ? 1 : 0;
-      row.kept = row.kept == null || kept == null ? null : Math.max(row.kept, kept);
+  const rows: ArchiveScheduleRow[] = [];
+  const full = entries.filter((e) => e.kind === "genesis");
+  if (full.length) {
+    const ts = full.find((e) => e.floorTs)?.floorTs;
+    rows.push({
+      label: (ts && fmtReach(ts, now)) || "full chain",
+      count: full.length,
+      kept: Math.max(...full.map((e) => e.latest)),
+      fullCount: full.length,
+    });
+  }
+  const deep = entries.filter((e) => e.kind === "deep");
+  if (deep.length) rows.push({ label: `back to ${c.since}`, count: deep.length, kept: null, fullCount: 0 });
+  const win = entries.filter((e) => e.kind === "window");
+  if (win.length) {
+    // Exact-reach buckets first, deepest leading — small fleets never see a span.
+    const buckets = new Map<string, { label: string; count: number; kept: number; ms: number }>();
+    for (const e of win) {
+      const t = e.floorTs ? Date.parse(e.floorTs) : NaN;
+      const ms = Number.isNaN(t) ? 0 : now - t;
+      const label = (e.floorTs && fmtReach(e.floorTs, now)) || "recent window";
+      const kept = e.latest - e.floor;
+      const b = buckets.get(label);
+      if (b) {
+        b.count += 1;
+        b.kept = Math.max(b.kept, kept);
+        b.ms = Math.max(b.ms, ms);
+      } else buckets.set(label, { label, count: 1, kept, ms });
+    }
+    const ordered = [...buckets.values()].sort((a, b) => b.ms - a.ms);
+    const slots = Math.max(1, MAX_SCHED_ROWS - rows.length);
+    if (ordered.length <= slots) {
+      for (const b of ordered) rows.push({ label: b.label, count: b.count, kept: b.kept, fullCount: 0 });
     } else {
-      buckets.set(label, { label, count: 1, kept, fullCount: full ? 1 : 0 });
+      // Greedy contiguous partition balancing NODE counts across the slots (the "smart
+      // grouping based on the counts"): each group fills toward an even share of what
+      // remains, always keeping one bucket per unfilled slot.
+      let i = 0;
+      let rem = win.length;
+      for (let s = 0; s < slots; s++) {
+        const start = i;
+        let gc = 0;
+        if (s === slots - 1) {
+          for (; i < ordered.length; i++) gc += ordered[i].count;
+        } else {
+          const target = rem / (slots - s);
+          do {
+            gc += ordered[i].count;
+            i += 1;
+          } while (i < ordered.length - (slots - s - 1) && gc < target);
+        }
+        rem -= gc;
+        const group = ordered.slice(start, i);
+        rows.push({
+          label: spanLabel(group[group.length - 1].label, group[0].label),
+          count: gc,
+          kept: Math.max(...group.map((b) => b.kept)),
+          fullCount: 0,
+        });
+      }
     }
   }
-  // Deepest copies lead — full-chain rows, then by holding.
-  const rows = [...buckets.values()].sort((a, b) => b.fullCount - a.fullCount || (b.kept ?? -1) - (a.kept ?? -1));
   return { rows, unmeasured: Math.max(0, fleetTotal - entries.length) };
 }
 

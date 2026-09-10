@@ -129,7 +129,7 @@ describe("archiveSchedule (the dossier's by-archival partition)", () => {
     entries: new Map((entries as { ip: string }[]).map((e) => [e.ip, e])),
     since: "Nov 2023", archivalCount: entries.length, total: 5,
   }) as Parameters<typeof archiveSchedule>[0];
-  it("same-reach copies MERGE (the DED find: a genesis keeper beside day-later windows was two rows and a chain-doubling kept sum) — kept is the deepest single copy, fullCount the tag", () => {
+  it("full nodes LEAD as their own row, never combined with partial copies (user, round 4); window copies of one reach merge, kept = the deepest single copy", () => {
     const s2 = archiveSchedule(census([
       { ip: "a", chain: "x", kind: "genesis", floor: 1, latest: 100, floorTs: "2025-05-10T00:00:00Z" },
       { ip: "b", chain: "x", kind: "window", floor: 5, latest: 100, floorTs: "2025-05-10T12:00:00Z" },
@@ -137,11 +137,41 @@ describe("archiveSchedule (the dossier's by-archival partition)", () => {
       { ip: "d", chain: "x", kind: "window", floor: 99, latest: 100, floorTs: "2026-09-10T00:00:00Z" },
       { ip: "e", chain: "other", kind: "genesis", floor: 1, latest: 9, floorTs: null },
     ]), "x", 22, now);
-    // genesis + the near-genesis window share "16 months": ONE row, deepest copy's kept, 1 full
-    expect(s2!.rows[0]).toEqual({ label: "16 months", count: 2, kept: 100, fullCount: 1 });
-    expect(s2!.rows).toContainEqual({ label: "2 months", count: 1, kept: 60, fullCount: 0 });
-    expect(s2!.rows).toContainEqual({ label: "recent window", count: 1, kept: 1, fullCount: 0 });
+    // The genesis keeper is its own leading row (the near-genesis window shares its reach
+    // label but never its row — the tag distinguishes them); few distinct reaches, no spans.
+    expect(s2!.rows).toEqual([
+      { label: "16 months", count: 1, kept: 100, fullCount: 1 },
+      { label: "16 months", count: 1, kept: 95, fullCount: 0 },
+      { label: "2 months", count: 1, kept: 60, fullCount: 0 },
+      { label: "recent window", count: 1, kept: 1, fullCount: 0 },
+    ]);
     expect(s2!.unmeasured).toBe(18);
+  });
+  it("a many-reach fleet clusters into the row budget, count-balanced, span-labeled (the DAG's 25-row histogram, round 4: '3-5 rows max, smart grouping based on the counts')", () => {
+    const day = (n: number) => new Date(now - n * 86_400_000).toISOString();
+    const win = (ip: string, days: number, kept: number) =>
+      ({ ip, chain: "g", kind: "window", floor: 1000 - kept, latest: 1000, floorTs: day(days) });
+    const s = archiveSchedule(census([
+      { ip: "dp", chain: "g", kind: "deep", floor: 766_718, latest: 1000, floorTs: null },
+      // 8 distinct reaches, 16 nodes — far more reaches than the 4 slots left after the deep row
+      win("a", 730, 900), win("b", 540, 800),
+      win("c1", 180, 500), win("c2", 180, 490), win("c3", 180, 480),
+      win("d1", 120, 400), win("d2", 120, 390),
+      win("e1", 90, 300), win("e2", 90, 290), win("e3", 90, 280),
+      win("f1", 60, 200), win("f2", 60, 190),
+      win("g1", 20, 100), win("g2", 20, 90),
+      win("h1", 0.5, 10), win("h2", 0.5, 8),
+    ]), "g", 20, now);
+    // Deep leads (no full nodes here), then four contiguous groups of ~4 nodes each; a
+    // group's kept is its deepest single copy, a shared unit collapses in the span.
+    expect(s!.rows).toEqual([
+      { label: "back to Nov 2023", count: 1, kept: null, fullCount: 0 },
+      { label: "6 months – 2 years", count: 5, kept: 900, fullCount: 0 },
+      { label: "3 – 4 months", count: 5, kept: 400, fullCount: 0 },
+      { label: "20 days – 2 months", count: 4, kept: 200, fullCount: 0 },
+      { label: "recent window", count: 2, kept: 10, fullCount: 0 },
+    ]);
+    expect(s!.unmeasured).toBe(3);
   });
   it("null when the census carries nothing for the chain", () => {
     expect(archiveSchedule(census([]), "x", 3, now)).toBeNull();

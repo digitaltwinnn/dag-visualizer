@@ -424,9 +424,10 @@ function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> })
         {sched ? (
           <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-[7px]">
             {sched.rows.map((row) => (
-              <Fragment key={row.label}>
-                {/* The kept-snapshot count rides the row as a tag and its hover hint; a
-                    full-chain keeper wears the full-node tag beside its reach. */}
+              <Fragment key={`${row.fullCount > 0 ? "full|" : ""}${row.label}`}>
+                {/* The kept-snapshot count rides the row as a tag and its hover hint. A
+                    full row wears the bare "full node" tag — no count in the words, the
+                    row's own count column already says how many (user, round 4). */}
                 <span
                   className="inline-flex items-center gap-1.5 text-body text-foreground"
                   title={row.kept != null ? `${fmtSnapCount(row.kept)} snapshots kept` : undefined}
@@ -434,7 +435,7 @@ function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> })
                   {cap(row.label)}
                   {row.fullCount > 0 && (
                     <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap">
-                      {row.fullCount === row.count ? "full node" : `${row.fullCount} full node${row.fullCount > 1 ? "s" : ""}`}
+                      full node
                     </span>
                   )}
                   {row.kept != null && (
