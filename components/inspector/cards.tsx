@@ -417,11 +417,11 @@ function UnlistedMemberFacts({ id, last }: { id: string; last: boolean }) {
 // trigger. The chevron stays ALWAYS visible (not the explorer's hover-reveal: a folded
 // group's caption is otherwise indistinguishable from a plain label, and the chevron was
 // asked for as the affordance), rotating on the shared 150ms clock.
-// Open by default (the schedules ARE the card's content); state is local and plain —
-// folding a breakdown commits nothing, so the store owns none of it — and survives
-// pager steps, since the group's identity does.
+// CLOSED by default (user, round 21) — the captions are the card's index and a breakdown
+// is opened on demand; state is local and plain — folding commits nothing, so the store
+// owns none of it — and survives pager steps, since the group's identity does.
 function ScheduleGroup({ label, children }: { label: string; children: ReactNode }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger className="group mt-2 flex w-full items-center gap-1 cursor-pointer">
