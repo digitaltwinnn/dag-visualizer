@@ -182,18 +182,21 @@ export function archiveSummary(c: ArchiveCensus, chain: string): ArchiveNetSumma
 //   grace exists only where a genesis keeper proves when the chain began — merges INTO the
 //   full row. Its floor is a measured upper bound anyway (the probe bisects at ~latest/1024
 //   resolution), so "joined day one" is as exact a claim as the census can carry.
+// - NO full node is a READING, not an omission (user, round 11 — an "incomplete" tag on
+//   the deep row alone misstated it, every partial row being incomplete too): a chain
+//   where no probed node keeps the whole history LEADS with a muted "Full archive · 0"
+//   row, rule 10's zero-is-measured-none in the schedule's own grammar.
 // - DEEP archives stay one row, labeled by their real age in the age grammar (round 7) and
-//   tagged with the SPAN they serve (latest − the era floor; round 8) plus the explicit
-//   "incomplete archive" tag (round 9 — it replaced a hover-only "with gaps" caveat): the
-//   deep archives measurably share holes (~2.4-2.8M ordinals missing on all nine, probed
-//   2026-08-14), so the span count needs the incompleteness said beside it (rule 10).
+//   tagged with the SPAN they serve (latest − the era floor; round 8): the deep archives
+//   measurably share holes (~2.4-2.8M ordinals missing on all nine, probed 2026-08-14), so
+//   the hover says the count is the span, never a promise of every snapshot (rule 10).
 // - WINDOW nodes past the grace bucket by exact reach in the age grammar; when the distinct
 //   reaches overflow the remaining row budget (MAX_SCHED_ROWS total) they cluster into
 //   contiguous COUNT-BALANCED groups, labeled as a span ("3 – 6 months", "up to 18 days").
 //   Kept is the deepest single copy in the group — a per-node fact that never sums the chain
 //   against itself (the DED double-count, round 3).
 // The fleet's remainder stays "unmeasured" (an absent entry means the probe read nothing).
-export interface ArchiveScheduleRow { label: string; count: number; kept: number | null; fullCount: number; hint?: string; incomplete?: boolean }
+export interface ArchiveScheduleRow { label: string; count: number; kept: number | null; fullCount: number; hint?: string }
 const MAX_SCHED_ROWS = 5;
 const GRACE_MS = 86_400_000;
 
@@ -248,6 +251,14 @@ export function archiveSchedule(
       kept: Math.max(...full.map((e) => e.latest)),
       fullCount: full.length + graced.size,
     });
+  } else {
+    rows.push({
+      label: "full archive",
+      count: 0,
+      kept: null,
+      fullCount: 0,
+      hint: "No probed node keeps this chain in full, back to its first snapshot.",
+    });
   }
   // The deep archives lead the partials at their real age in the age grammar, like every
   // other row (user, round 7: "instead of 'oldest' give it the right age in text") — the
@@ -260,7 +271,6 @@ export function archiveSchedule(
       count: deep.length,
       kept: Math.max(0, ...deep.map((e) => e.latest - e.floor)),
       fullCount: 0,
-      incomplete: true,
       hint: `keeps deep history back to ${c.since} — the deep archives share gaps, so the count is the span, not a promise of every snapshot`,
     });
   }

@@ -433,7 +433,7 @@ function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> })
                     "incomplete archive", on the holed deep row) — no count in the words,
                     the row's own count column already says how many (round 4). */}
                 <span
-                  className="text-body text-foreground"
+                  className={row.count === 0 ? "text-body text-muted-foreground" : "text-body text-foreground"}
                   title={row.hint ?? (row.kept != null ? `${fmtSnapCount(row.kept)} snapshots kept` : undefined)}
                 >
                   {cap(row.label)}
@@ -443,11 +443,6 @@ function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> })
                     {row.fullCount > 0 && (
                       <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap">
                         full
-                      </span>
-                    )}
-                    {row.incomplete && (
-                      <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap">
-                        incomplete
                       </span>
                     )}
                     {row.kept != null && (
@@ -463,7 +458,7 @@ function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> })
                   <span />
                 )}
                 <BarCell count={row.count} max={Math.max(...sched.rows.map((x) => x.count))} hue="var(--muted-foreground)" />
-                <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{row.count}</span>
+                <span className={`text-body tabular-nums min-w-[1.5em] text-right ${row.count === 0 ? "text-muted-foreground" : "text-foreground"}`}>{row.count}</span>
               </Fragment>
             ))}
             {sched.unmeasured > 0 && (
