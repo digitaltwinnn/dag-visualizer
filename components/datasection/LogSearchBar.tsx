@@ -190,9 +190,11 @@ export default function LogSearchBar({
           // RIGHT-ALIGNED ON THE FIELDS' OWN LINE (user, 2026-09-01: "why is search on the left,
           // can't it be on the right and same line as the input fields?"). `ml-auto` pushes it to
           // the far end of whatever line it lands on, so the criteria read left-to-right and the
-          // action sits where an action sits — and on a narrow pane, where the row wraps, it still
-          // ends its own line rather than floating mid-row.
-          "ml-auto inline-flex flex-none items-center gap-1 h-6 pointer-coarse:h-10 px-2.5 pointer-coarse:px-4 rounded-xs cursor-pointer",
+          // action sits where an action sits. On the PHONE tier, where the criteria are already
+          // full-width labelled rows, the button goes full-width too (2026-09-10) — a small
+          // control floating right on an empty line read as an afterthought, and the wide press
+          // is the touch form the rest of the bar already takes.
+          "ml-auto inline-flex flex-none items-center justify-center gap-1 h-6 pointer-coarse:h-10 px-2.5 pointer-coarse:px-4 rounded-xs cursor-pointer max-[700px]:w-full",
           "text-micro uppercase tracking-caps transition-colors",
           "border border-[var(--primary)]/40 bg-[var(--wash-soft)] text-[var(--primary)]",
           "hover:bg-[var(--wash-hover)] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
