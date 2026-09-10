@@ -358,9 +358,19 @@ async function main(): Promise<void> {
       }
     }
     for (const id of CATALOG[net].map((m) => m.id).filter((v): v is string => !!v)) {
+      // One walk, both field families: the counted series bucket per page as they stream,
+      // while the timestamps are kept aside for the gap pass — the page stream is unordered,
+      // so the per-network gaps are computed the gaps mode's way, sorted once per chain.
+      const stamps: number[] = [];
       await walkChain<MetaRec & { timestamp: string }>(`${be0}/currency/${id}/snapshots`, recomputeFromMs, (recs) => {
-        bucketMetas(inc, net, id, whole(recs).map((r) => ({ ordinal: r.ordinal, timestamp: r.timestamp, fee: r.fee, sizeInKB: r.sizeInKB, blocks: r.blocks })));
+        const w = whole(recs);
+        for (const r of w) stamps.push(Date.parse(r.timestamp));
+        bucketMetas(inc, net, id, w.map((r) => ({ ordinal: r.ordinal, timestamp: r.timestamp, fee: r.fee, sizeInKB: r.sizeInKB, blocks: r.blocks })));
       }, id.slice(0, 10));
+      stamps.sort((a, b) => a - b);
+      for (let i = 1; i < stamps.length; i++) {
+        addIncGap(inc, net, stamps[i], id, Math.max(0, Math.round((stamps[i] - stamps[i - 1]) / 1000)));
+      }
     }
     // Repair every tier the affected days live in (review find: a capped catch-up also
     // leaves partial HOURLY buckets at the gap boundary, which the 7D/30D zooms kept
