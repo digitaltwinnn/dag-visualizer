@@ -535,8 +535,13 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
                           >
                             {cap(row.label)}
                             {row.full && (
-                              <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground">
-                                full
+                              <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap">
+                                full node
+                              </span>
+                            )}
+                            {row.kept != null && (
+                              <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap">
+                                {fmtSnapCount(row.kept)} snapshots
                               </span>
                             )}
                           </span>
@@ -561,7 +566,6 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           })()}
             </>
           )}
-          <Separator className="my-2" />
         </>
       )}
       {/* Fleet-level archive summary, in the same summary block as Online nodes; the DAG
