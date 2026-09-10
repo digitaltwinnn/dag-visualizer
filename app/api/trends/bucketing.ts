@@ -10,6 +10,8 @@ export interface MetaRec { ordinal: number; timestamp: string; fee?: number; siz
 export interface FleetCounts {
   total: number;
   perNet: Record<string, number>;
+  /** Per-network per-layer role tallies — f.layer.{id}.{role} (2026-09-11). */
+  perNetLayers?: Record<string, Record<string, number>>;
   layers: Record<string, number>;
   countries: Record<string, number>;
 }
@@ -99,5 +101,7 @@ export function bucketFleet(inc: IncMap, net: string, tsMs: number, fleet: Fleet
   addInc(inc, net, tsMs, "f.nodes", fleet.total, tiers);
   for (const [id, n] of Object.entries(fleet.perNet)) addInc(inc, net, tsMs, `f.nodes.${id}`, n, tiers);
   for (const [layer, n] of Object.entries(fleet.layers)) addInc(inc, net, tsMs, `f.layer.${layer}`, n, tiers);
+  for (const [id, roles] of Object.entries(fleet.perNetLayers ?? {}))
+    for (const [layer, n] of Object.entries(roles)) addInc(inc, net, tsMs, `f.layer.${id}.${layer}`, n, tiers);
   for (const [cc, n] of Object.entries(fleet.countries)) addInc(inc, net, tsMs, `f.cc.${cc}`, n, ["1d"]);
 }

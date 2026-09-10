@@ -159,3 +159,18 @@ describe("coverage zero-fill reaches every tier", () => {
     expect(inc2.get(k2.key)?.get(fieldOf(k2.bucket, "g.ticks"))).toBeUndefined();
   });
 });
+
+// Per-network layer gauges (2026-09-11): the /trends per-network node panels draw layer
+// lines, so the fleet sample keeps each network's role tally beside its total.
+describe("bucketFleet per-network layers", () => {
+  it("writes f.layer.{id}.{role} for every network's tally", () => {
+    const inc: IncMap = new Map();
+    bucketFleet(inc, "mainnet", Date.parse("2026-09-11T10:00:00Z"), {
+      total: 5, perNet: { dag: 2, up: 3 }, layers: { l0: 3, cl1: 3 },
+      perNetLayers: { up: { l0: 3, cl1: 3 } }, countries: {},
+    });
+    const k = slotOf("mainnet", "1h", Date.parse("2026-09-11T10:00:00Z"));
+    expect(inc.get(k.key)?.get(fieldOf(k.bucket, "f.layer.up.l0"))).toBe(3);
+    expect(inc.get(k.key)?.get(fieldOf(k.bucket, "f.layer.up.cl1"))).toBe(3);
+  });
+});

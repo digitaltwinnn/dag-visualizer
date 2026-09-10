@@ -228,8 +228,17 @@ export default function TrendsDoc() {
   /** Per-network GAUGE panels (fleet): untrimmed — a point sample is complete the moment it
    *  is taken — and null where never sampled (gauges are not zero-filled). */
   /** Per-network GAUGE panels ride the FLEET payload (hourly at fine zooms — see fleetRaw). */
-  const netGaugePanels = (unit: string) =>
-    METAGRAPHS.filter((m) => m.id)
+  const netGaugePanels = (unit: string) => {
+    // The LAYER LINES (user, 2026-09-11: "metagraph nodes don't show the role") — the same
+    // three-line treatment the hypergraph tab's Network layers chart wears, per network, in
+    // its identity hue: total solid, each layer the fleet chart's own dash. Which layers a
+    // network runs comes from the LIVE roster (metaList), so the legend names the roles the
+    // moment the panel renders; the lines themselves fill forward from the day the sampler
+    // began keeping f.layer.{id}.{role} (the section's own stated rule for gauges).
+    const metaList = useStore.getState().metaList;
+    const DASH: Record<string, string | boolean> = { l0: "", cl1: "2 4", dl1: "6 4" };
+    const SHORT: Record<string, string> = { l0: "L0", cl1: "cL1", dl1: "dL1" };
+    return METAGRAPHS.filter((m) => m.id)
       .map((m) => {
         const points = S(pF, `f.nodes.${m.id}`);
         const last = points.reduce<number | null>((acc, v) => (v != null ? v : acc), null);
@@ -238,9 +247,15 @@ export default function TrendsDoc() {
       .sort((a, b) => (b.last ?? -1) - (a.last ?? -1))
       .map(({ m, points }) => {
         const net = displayNetwork(m.id);
-        const line: TrendLine = { label: "nodes", points, hue: net?.hue };
-        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} name={net?.name ?? m.id!} unit={unit} buckets={fBuckets} stepMs={fStep} lines={[line]} />;
+        const roster = metaList.find((x) => x.id === m.id);
+        const present = ["l0", "cl1", "dl1"].filter((r) => roster?.nodes.some((n) => (n.roles?.length ? n.roles : [n.layer]).includes(r)));
+        const lines: TrendLine[] = [
+          { label: "nodes", points, hue: net?.hue },
+          ...present.map((r) => ({ label: SHORT[r]!, points: S(pF, `f.layer.${m.id}.${r}`), hue: net?.hue, dash: DASH[r] || true })),
+        ];
+        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} name={net?.name ?? m.id!} unit={unit} buckets={fBuckets} stepMs={fStep} lines={lines} />;
       });
+  };
   /** Per-network CONTINUITY panels: real measured gap stats (m.{id}.gapSum/gapMax — live
    *  since 2026-09-07, and BACKFILLED to Jan 1 by the 2026-09-09 gaps walk: ~13M records
    *  re-walked for their timestamps alone, since the ordinary backfills never kept them).
@@ -317,7 +332,7 @@ export default function TrendsDoc() {
   // a section is furniture, a window is a committed selection.
   const zoomBtn = (pressed: boolean) =>
     cn(
-      "h-6 px-2 rounded-md text-micro tracking-caps uppercase",
+      "h-6 px-1.5 rounded-md text-micro tracking-caps uppercase",
       pressed ? cn("font-bold text-foreground", SELECTED_ROW) : "text-muted-foreground hover:text-foreground hover:bg-wash-hover",
     );
   const zoomPicker = (
@@ -416,9 +431,9 @@ export default function TrendsDoc() {
 
       {p && (
         <>
-        <div className="mt-6 flex items-center justify-between gap-3 flex-wrap">
+        <div className="mt-6 flex items-center justify-between gap-2 flex-wrap">
           {topicPicker}
-          <div className="flex items-center gap-3 flex-wrap justify-end">{zoomPicker}{rangeInspect}</div>
+          <div className="flex items-center gap-2 flex-wrap justify-end">{zoomPicker}{rangeInspect}</div>
         </div>
         <Tabs
           defaultValue={initialTab}
