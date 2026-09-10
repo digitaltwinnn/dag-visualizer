@@ -52,12 +52,17 @@ export default function PulseStrip() {
             className="min-w-[150px]"
             mark={<span aria-hidden className="size-1.5 rounded-full flex-none" style={{ background: DOT[status] }} />}
           >
-            <span className="flex flex-col gap-0.5 min-w-0">
-              <span className="flex items-baseline gap-2 whitespace-nowrap">
-                <span className="font-mono font-bold text-caption tabular-nums text-foreground">
-                  {r.lastOkAt != null ? relativeAge(now - r.lastOkAt) : status === "failing" ? "failing" : "—"}
+            <span className="flex flex-col gap-1 min-w-0">
+              {/* The band's STACKED-LEAD grammar (user, 2026-09-10: "just simple texts, make
+                  them prettier") — the reading bold with its qualifier as the muted underline,
+                  exactly the rate cards' numeral-and-unit form: "31s" over "ago · every 4s". */}
+              <span className="flex flex-col">
+                <span className="font-mono font-bold text-caption tabular-nums text-foreground leading-tight">
+                  {r.lastOkAt != null ? relativeAge(now - r.lastOkAt, true) : status === "failing" ? "failing" : "—"}
                 </span>
-                <span className="text-micro text-muted-foreground">{everyWord(r.everyMs)}</span>
+                <span className="text-micro text-muted-foreground leading-none whitespace-nowrap">
+                  {r.lastOkAt != null ? "ago · " : ""}{everyWord(r.everyMs)}
+                </span>
               </span>
               <span className="text-micro text-muted-foreground truncate">{r.target}</span>
               {/* The ok/err record shows ONLY when there is something to weigh (user,
