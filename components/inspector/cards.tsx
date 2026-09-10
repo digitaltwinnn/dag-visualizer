@@ -423,7 +423,12 @@ function ScheduleGroup({ label, children }: { label: string; children: ReactNode
   const [open, setOpen] = useState(false);
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger className="group mt-2 flex w-full items-center gap-1 cursor-pointer">
+      {/* No default focus ring and no text selection (user, round 22: clicking drew "an
+          ugly white selection border … separate to the chevron" — the double-click text
+          selection, which can never include the chevron): the row is one CONTROL, so it
+          selects nothing, and focus shows only for the keyboard in CopyButton's own
+          focus-visible recipe. */}
+      <CollapsibleTrigger className="group mt-2 flex w-full items-center gap-1 cursor-pointer select-none outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]">
         <span className="text-micro tracking-caps uppercase text-muted-foreground">{label}</span>
         <ChevronRight
           aria-hidden
