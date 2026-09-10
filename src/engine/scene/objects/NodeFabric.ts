@@ -259,24 +259,24 @@ export class NodeFabric {
       transparent: alpha < 1, opacity: alpha,
     });
     if (flat && _env) mat.envMapRotation.copy(ENV_ROT); // aim the lit ceiling at the resting pose
-    // The GROUND as live uniforms (for the status hollow below): a hollow interior recedes
-    // toward DARK on the emissive ground but toward the GROUND ITSELF on ink — dark ink on
-    // paper is emphasis (src/theme), so a dark interior there read HEAVIER than a ready
-    // node, and a pure-white one (the first cut) read as bright marbles, brighter than the
-    // off-white page. DIM already holds the themed recede target (colors.bg on paper), so
-    // the interior borrows it. Shared objects per material, re-synced on the theme fan-out
-    // (applyGroundEnv), so a live flip reaches compiled shaders.
+    // The GROUND flag as a live uniform (for the status hollow below): a hollow interior
+    // recedes toward DARK on the emissive ground, but on paper it is a true CUTOUT — the
+    // interior fragments DISCARD, so the page, grid and rings show THROUGH the shell and
+    // only an ink ring in the identity hue remains. Three repaints failed first (user,
+    // 2026-09-10, three rounds): dark ink on paper is emphasis, pure white is brighter
+    // than the off-white page, and even a page-coloured interior still OCCLUDES whatever
+    // sits behind it — a flat disc over grid lines reads as a white ball no matter its
+    // colour. Invisibility on a non-uniform page is only honest as absence. Re-synced on
+    // the theme fan-out (applyGroundEnv), so a live flip reaches compiled shaders.
     mat.userData.uPaper = { value: _paper ? 1 : 0 };
-    mat.userData.uHollowBg = { value: new THREE.Color().copy(DIM) };
     mat.onBeforeCompile = (shader) => {
       shader.uniforms.uPaper = mat.userData.uPaper;
-      shader.uniforms.uHollowBg = mat.userData.uHollowBg;
       shader.vertexShader = shader.vertexShader
         .replace("#include <common>", "#include <common>\nattribute vec3 aBase;\nattribute float aEmissive;\nattribute float aFill;\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;\nvarying float vFill;")
         .replace("#include <begin_vertex>", "#include <begin_vertex>\nvBase = aBase;\nvEmi = aEmissive;\nvCap = max(0.0, objectNormal.y);\nvFill = aFill;");
       shader.fragmentShader = shader.fragmentShader
-        .replace("#include <common>", "#include <common>\nuniform float uPaper;\nuniform vec3 uHollowBg;\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;\nvarying float vFill;")
-        .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb *= vBase;\ndiffuseColor.rgb = mix(diffuseColor.rgb, mix(diffuseColor.rgb * 0.3, uHollowBg, uPaper), 1.0 - vFill);")
+        .replace("#include <common>", "#include <common>\nuniform float uPaper;\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;\nvarying float vFill;")
+        .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb *= vBase;\ndiffuseColor.rgb = mix(diffuseColor.rgb, mix(diffuseColor.rgb * 0.3, vec3(0.0), uPaper), 1.0 - vFill);")
         .replace(
           "#include <emissivemap_fragment>",
           flat
@@ -293,7 +293,8 @@ export class NodeFabric {
               // the shipped look. Same mix on the spheres below.
               "#include <emissivemap_fragment>\n" +
               "float fres = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 3.0);\n" +
-              "totalEmissiveRadiance = vBase * vEmi * mix(1.4 * fres, 0.5 + 0.95 * vCap + 1.1 * fres, vFill);"
+              "if (vFill < 0.5 && uPaper > 0.5 && fres < 0.3) discard;\n" +
+              "totalEmissiveRadiance = vBase * vEmi * mix(1.4 * fres, 0.5 + 0.95 * vCap + 1.1 * fres, vFill) + vBase * ((1.0 - vFill) * uPaper * 0.85);"
             : // spheres (hyper nodes): a view-dependent FRESNEL rim so they read as glowing 3D orbs
               // instead of flat blobs (user). Coeffs keep the average near the old flat vEmi so the
               // dim/hover and bloom-threshold behaviour is unchanged. The rim is the shared
@@ -303,7 +304,8 @@ export class NodeFabric {
               // and carry no status.
               "#include <emissivemap_fragment>\n" +
               ORB_FRESNEL_GLSL +
-              `totalEmissiveRadiance = vBase * vEmi * mix(1.4 * fres, ${ORB_FRESNEL_MIX}, vFill);`,
+              "if (vFill < 0.5 && uPaper > 0.5 && fres < 0.3) discard;\n" +
+              `totalEmissiveRadiance = vBase * vEmi * mix(1.4 * fres, ${ORB_FRESNEL_MIX}, vFill) + vBase * ((1.0 - vFill) * uPaper * 0.85);`,
         );
     };
     return mat;
@@ -343,13 +345,11 @@ export class NodeFabric {
   }
 
   private _applyEnv(): void {
-    // The hollow interior's ground uniforms ride the same fan-out (see _makeNodeMaterial) —
-    // every fabric material, spheres included. DIM is already themed by setNodeDimTarget,
-    // which the Engine calls before this on a theme flip.
+    // The hollow cutout's ground uniform rides the same fan-out (see _makeNodeMaterial) —
+    // every fabric material, spheres included.
     for (const mesh of [this.instSphere, this.instHex, this.metaSphere, this.metaHex]) {
       const ud = (mesh?.material as THREE.MeshStandardMaterial | undefined)?.userData;
       if (ud?.uPaper) (ud.uPaper as { value: number }).value = _paper ? 1 : 0;
-      if (ud?.uHollowBg) (ud.uHollowBg as { value: THREE.Color }).value.copy(DIM);
     }
     for (const mesh of [this.instHex, this.metaHex]) {
       const m = mesh?.material as THREE.MeshStandardMaterial | undefined;
