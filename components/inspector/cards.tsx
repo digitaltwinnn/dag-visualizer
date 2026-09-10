@@ -419,7 +419,7 @@ function UnlistedMemberFacts({ id, last }: { id: string; last: boolean }) {
 function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> }) {
   return (
     <>
-      <p className="mt-2 text-micro tracking-caps uppercase text-muted-foreground">by archival</p>
+      <p className="mt-2 text-micro tracking-caps uppercase text-muted-foreground">by archived snapshots</p>
       <div className="mt-1 pl-2">
         {sched ? (
           <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-[7px]">
@@ -440,7 +440,7 @@ function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> })
                   )}
                   {row.kept != null && (
                     <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap">
-                      {fmtSnapCount(row.kept)} snapshots
+                      {fmtSnapCount(row.kept)}
                     </span>
                   )}
                 </span>
