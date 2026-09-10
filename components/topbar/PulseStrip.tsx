@@ -1,7 +1,7 @@
 "use client";
 
 import { pollHealthRows } from "@/src/data/api";
-import { pollStatusOf } from "@/src/data/pollStatus";
+import { pollStatusOf, type PollStatus } from "@/src/data/pollStatus";
 import { relativeAge } from "@/src/util/relativeAge";
 import { BandCard } from "@/components/VitalsBand";
 import { useNowTick } from "@/components/useNowTick";
@@ -15,6 +15,16 @@ import { BAR_EASE } from "@/components/RollSwap";
 // the status MEANING lives in src/data/pollStatus.ts (rule 10 wants it testable, not buried in
 // JSX), the plate is the vitals band's own BandCard (one band-card recipe app-wide), and the
 // age words are relativeAge, the app's one age grammar.
+
+// The status inks the READING itself (user, 2026-09-10, after the head dot retired: "tint
+// the age value") — the same derived states the dot spoke, on the value they qualify: a
+// stale age goes advisory amber, a failing one destructive; ok stays the plain foreground.
+const AGE_INK: Record<PollStatus, string> = {
+  ok: "text-foreground",
+  stale: "text-[var(--warn-soft)]",
+  failing: "text-[var(--destructive)]",
+  acquiring: "text-muted-foreground",
+};
 
 const everyWord = (ms: number | null): string =>
   ms == null ? "on demand" : ms >= 60_000 ? `every ${Math.round(ms / 60_000)} min` : `every ${Math.round(ms / 1000)}s`;
@@ -51,7 +61,7 @@ export default function PulseStrip() {
                   identity) — instead of plain words. No "ago": the ticking value under a
                   liveliness dot carries it. */}
               <span className="flex items-center gap-1.5 whitespace-nowrap">
-                <span className="font-mono font-bold text-caption tabular-nums text-foreground leading-tight">
+                <span className={cn("font-mono font-bold text-caption tabular-nums leading-tight", AGE_INK[status])}>
                   {r.lastOkAt != null ? relativeAge(now - r.lastOkAt, true) : status === "failing" ? "failing" : "—"}
                 </span>
                 <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground">
