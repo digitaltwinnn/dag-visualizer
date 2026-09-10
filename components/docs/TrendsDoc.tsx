@@ -2,8 +2,8 @@
 import { useState } from "react";
 import { Panel } from "@/components/docs/AboutDoc";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import useTrendsWindow from "@/components/useTrendsWindow";
-import { cutRange, leadingTrim, sliceWindow, trimNewestPartial } from "@/src/data/trendWindow";
+import useTrendsWindow, { useTrendsRange } from "@/components/useTrendsWindow";
+import { cutRange, leadingTrim, pickRangeTier, sliceWindow, trimNewestPartial } from "@/src/data/trendWindow";
 import TrendChart, { type TrendLine } from "@/components/docs/TrendChart";
 import { METAGRAPHS } from "@/src/net/current";
 import { useStore } from "@/src/store/store";
@@ -113,23 +113,20 @@ export default function TrendsDoc() {
   // inner Tabs controlled by one state is the whole fix, and only one control row is ever
   // on screen (the inactive drawer unmounts).
   const [sectionTab, setSectionTab] = useState("snapshots");
-  // AUTO-TIER: a selected range fetches the FINEST window whose reach still covers it —
-  // zoom into yesterday and the charts sharpen to 5-minute buckets by themselves; a range
-  // past a tier's retention stays on the coarser tier, honestly (the h1 states the grain).
-  const rangeWindow = (r: { fromMs: number; toMs: number }): "24h" | "7d" | "30d" | "90d" | "all" => {
-    const back = Date.now() - r.fromMs;
-    if (back <= 24 * 3_600_000) return "24h";
-    if (back <= 7 * 86_400_000) return "7d";
-    if (back <= 30 * 86_400_000) return "30d";
-    if (back <= 90 * 86_400_000) return "90d";
-    return "all";
-  };
+  // AUTO-TIER (map-tile edition, 2026-09-10): a selected range picks the FINEST tier whose
+  // HISTORY FLOOR its start clears (pickRangeTier — since the keep-forever flip, retention
+  // no longer prunes, but the floors record where fine grain begins to exist) and fetches
+  // the few calendar-unit tiles it touches; daily ranges keep riding the one `all` payload.
+  const rangeTier = range ? pickRangeTier(range.fromMs, range.toMs) : null;
   // ONE fetch path with the band (review, 2026-09-09 — the doc carried its own raw fetch
   // and a second, divergent leading-trim): the hook brings the shared cache (a rim-to-doc
   // hop re-uses the band's payload), the pulse-strip health reporting, and the 5-minute
   // refresh. The hook keeps the previous window's payload until the new one lands, which
   // preserves the doc's own no-loading-flash rule on zoom changes.
-  const fetched = useTrendsWindow(range ? rangeWindow(range) : zoom === "1h" ? "24h" : zoom);
+  const fetched = useTrendsWindow(range ? (rangeTier === "1d" ? "all" : null) : zoom === "1h" ? "24h" : zoom);
+  const rangeTiles = useTrendsRange(
+    range && (rangeTier === "5m" || rangeTier === "1h") ? { tier: rangeTier, fromMs: range.fromMs, toMs: range.toMs } : null,
+  );
   // Opened from a committed metagraph's dossier ("Show the trends", 2026-09-08), the page
   // opens on that side of the network. Read ONCE at mount (the doc remounts per open): the
   // Tabs stay uncontrolled, so browsing the tabs afterwards owes the filter nothing. The DAG
@@ -144,8 +141,9 @@ export default function TrendsDoc() {
   // honestly lacks them; instead of gating, the Nodes sections fetch the 7d hourly payload
   // and slice it to the picked span (the rim's own recipe). Small, shared-cache fetch, made
   // only while a fine zoom stands.
-  const fleetFine = useTrendsWindow(
-    (range ? Date.now() - range.fromMs <= 24 * 3_600_000 : zoom === "1h" || zoom === "24h") ? "7d" : null,
+  const fleetFine = useTrendsWindow(!range && (zoom === "1h" || zoom === "24h") ? "7d" : null);
+  const fleetTiles = useTrendsRange(
+    range && rangeTier === "5m" ? { tier: "1h", fromMs: range.fromMs, toMs: range.toMs } : null,
   );
   // COUNTER READOUTS AT DAY SCALE (user, 2026-09-09: 7D's "latest full hour" answered too
   // fine a question for a week-wide view): at the hourly zooms the counter charts' head
@@ -157,9 +155,15 @@ export default function TrendsDoc() {
   // the payload's newest bucket, so a cached payload yields a consistent hour). A committed
   // RANGE replaces the zoom's cut entirely.
   const windowedRaw =
-    range && raw ? cutRange(raw, range.fromMs, range.toMs)
-    : zoom === "1h" && raw ? sliceWindow(raw, 3_600_000)
-    : raw;
+    range
+      ? rangeTier === "1d"
+        ? raw && cutRange(raw, range.fromMs, range.toMs)
+        : rangeTiles.data
+          ? cutRange(rangeTiles.data, range.fromMs, range.toMs)
+          : undefined
+      : zoom === "1h" && raw
+        ? sliceWindow(raw, 3_600_000)
+        : raw;
   // LEADING TRIM (src/data/trendWindow — the one home since the review): the 1y window
   // reaches further back than measuring does, and months of leading null days would draw as
   // a long empty runway. The axis begins where history begins and the page widens by itself
@@ -174,10 +178,10 @@ export default function TrendsDoc() {
   // charts keep everything: a point sample is complete the moment it is taken, and trimming
   // today would hide the fleet's only readings.
   const fleetRaw =
-    stepMsOfMain(windowedRaw) < 3600000 && fleetFine.data
+    stepMsOfMain(windowedRaw) < 3600000
       ? range
-        ? cutRange(fleetFine.data, range.fromMs, range.toMs)
-        : sliceWindow(fleetFine.data, zoom === "1h" ? 3_600_000 : 24 * 3_600_000)
+        ? fleetTiles.data && cutRange(fleetTiles.data, range.fromMs, range.toMs)
+        : fleetFine.data && sliceWindow(fleetFine.data, zoom === "1h" ? 3_600_000 : 24 * 3_600_000)
       : undefined;
   const pF = fleetRaw ?? p;
   const fBuckets = fleetRaw?.buckets ?? buckets;

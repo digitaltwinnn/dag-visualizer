@@ -6,9 +6,14 @@
 export type Tier = "5m" | "1h" | "1d";
 export const TIERS: Tier[] = ["5m", "1h", "1d"];
 
-// TTL IS the retention mechanism (Upstash usage contract): 5m lives 3 days, 1h 120 days
-// (covers the 90-day horizon for every bucket in a month key), 1d forever.
-export const TTL_S: Record<Tier, number | null> = { "5m": 259200, "1h": 10368000, "1d": null };
+// TTL IS the retention mechanism (Upstash usage contract) — and since 2026-09-10 EVERY tier
+// keeps forever (user: the range zoom should sharpen to the finest grain that exists, and
+// full-grain storage costs ~1.5 MB/day — pocket change against the read-bandwidth axis,
+// which day-tile immutable caching protects). The finite eras remain as history's floors:
+// 5m fields exist from 2026-09-06 (the recompute that healed the pre-prod holes), hourly
+// from ~2026-05-13 (120 days before the flip) — TIER_SINCE in src/data/trendWindow.ts is
+// the client's map of those floors.
+export const TTL_S: Record<Tier, number | null> = { "5m": null, "1h": null, "1d": null };
 
 const STEP_MS: Record<Tier, number> = { "5m": 300000, "1h": 3600000, "1d": 86400000 };
 export function stepMsOf(tier: Tier): number {

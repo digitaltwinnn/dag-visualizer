@@ -20,8 +20,15 @@ them — but the Next Node server can.
   budget.
 - **`/api/geo`** serves the validator IP→geo map live (cached 1h, 503 on failure) so the globe plots
   from one request; the client-side resolver fills any misses.
-- **`/api/trends`** serves tiered timeseries windows (`?window=24h|7d|30d|1y`) assembled
-  from Upstash Redis; **`/api/trends/sample`** is the Vercel-Cron sampler (15 min,
+- **`/api/trends`** serves tiered timeseries windows (`?window=24h|7d|30d|1y|all`) assembled
+  from Upstash Redis; **`/api/trends/tile/[tier]/[unit]`** (2026-09-10) serves one calendar
+  unit of a fine tier — a day of 5m buckets (`/tile/5m/2026-09-08`) or a month of hourly ones
+  (`/tile/1h/2026-08`) — the range zoom's map-tile reads: user ranges are snowflakes, their
+  units are shared, and a COMPLETE unit is immutable history shipped with a year of s-maxage
+  (one Upstash read per CDN region ever — how keep-forever retention stays readable without
+  touching the read-bandwidth watch-item). **Every tier keeps forever since 2026-09-10**
+  (TTL_S all-null; the finite era's pending expiries were PERSISTed away one-time); history's
+  FLOORS — where fine grain begins to exist — live in `src/data/trendWindow.ts` TIER_SINCE; **`/api/trends/sample`** is the Vercel-Cron sampler (15 min,
   `CRON_SECRET` auth) that pages the explorer stream since a Redis cursor and
   merge-writes 5m/1h/1d hash tiers. Spec:
   `docs/superpowers/specs/2026-09-05-trends-timeseries-design.md` — the key/field grammar,

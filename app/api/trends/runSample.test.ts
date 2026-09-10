@@ -59,7 +59,7 @@ function deps(store: TrendsStore, over: Partial<SampleDeps> = {}): SampleDeps {
 }
 
 describe("runSample", () => {
-  it("writes buckets, advances the cursor, sets TTLs, releases the lock", async () => {
+  it("writes buckets, advances the cursor, sets NO expiry (keep-forever, 2026-09-10), releases the lock", async () => {
     const store = memStore();
     const res = await runSample(deps(store));
     expect(res.skipped).toBeUndefined();
@@ -74,7 +74,7 @@ describe("runSample", () => {
     expect(cursor.get("m.abc")).toBe("9");
     expect(cursor.get("mTs.abc")).toBe(String(Date.UTC(2026, 8, 6, 14, 0, 8)));
     expect(cursor.get("v")).toBe("1");
-    expect(store.ttls.get("t:mainnet:5m:2026-09-06")).toBe(259200);
+    expect(store.ttls.get("t:mainnet:5m:2026-09-06")).toBeUndefined();
     expect(store.ttls.has("t:mainnet:1d:2026")).toBe(false); // forever tier: no TTL
     expect(store.locked).toBe(false);
   });

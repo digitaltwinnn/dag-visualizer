@@ -247,7 +247,9 @@ async function main(): Promise<void> {
     console.log(`backfilling per-network gap stats ${new Date(gapsFromMs).toISOString().slice(0, 10)} → yesterday …`);
     const tierOf = (key: string): Tier => key.split(":")[2] as Tier;
     const store = writeStore();
-    const fresh5m = slotOf(net, "5m", Date.now() - TTL_S["5m"]! * 1000).key;
+    // A null TTL means the tier keeps forever — the empty-string floor sorts below every key,
+      // so nothing is skipped (2026-09-10, the keep-forever flip).
+      const fresh5m = TTL_S["5m"] == null ? "" : slotOf(net, "5m", Date.now() - TTL_S["5m"] * 1000).key;
     let fields = 0;
     for (const id of CATALOG[net].map((m) => m.id).filter((v): v is string => !!v)) {
       // Timestamps only — the walk's records are otherwise discarded, and the two gap
@@ -321,7 +323,9 @@ async function main(): Promise<void> {
     // retention — older ones would just expire unread.
     console.log("writing (all tiers within retention) …");
     const store = writeStore();
-    const fresh5m = slotOf(net, "5m", Date.now() - TTL_S["5m"]! * 1000).key;
+    // A null TTL means the tier keeps forever — the empty-string floor sorts below every key,
+      // so nothing is skipped (2026-09-10, the keep-forever flip).
+      const fresh5m = TTL_S["5m"] == null ? "" : slotOf(net, "5m", Date.now() - TTL_S["5m"] * 1000).key;
     let fields = 0;
     for (const [key, map] of inc) {
       const tier = tierOf(key);
@@ -462,7 +466,7 @@ async function main(): Promise<void> {
   // page never has to hide it as a partial (review find — the old mid-day cutoff left a
   // half-day first bucket forever).
   const cutoffMs = Math.floor((now - days * 86400000) / 86400000) * 86400000;
-  const fresh5mFloor = now - TTL_S["5m"]! * 1000; // 5m fields older than the tier's retention are pruned
+  const fresh5mFloor = TTL_S["5m"] == null ? -Infinity : now - TTL_S["5m"] * 1000; // 5m prune floor; -Infinity = keep-forever (2026-09-10)
 
   const inc: IncMap = new Map();
   const tierOfKey = (key: string): Tier => key.split(":")[2] as Tier;
