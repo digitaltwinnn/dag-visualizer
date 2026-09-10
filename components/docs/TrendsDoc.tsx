@@ -247,23 +247,20 @@ export default function TrendsDoc() {
    *  Mean = gapSum/snaps per bucket; a day÷snaps approximation was rejected — for a
    *  batching network (DOR: dozens of snapshots in one tick, then idle) it reads as spacing
    *  that never existed. Ranked by the latest reading, most-stalled first. */
-  const netGapPanels = (kind: "mean" | "max") =>
+  const netGapPanels = () =>
     METAGRAPHS.filter((m) => m.id)
       .map((m) => {
         const sum = S(p, `m.${m.id}.gapSum`);
         const snaps = S(p, `m.${m.id}.snaps`);
         const gmax = S(p, `m.${m.id}.gapMax`);
-        const points =
-          kind === "mean"
-            ? sum.map((v, i) => (v != null && snaps[i] != null && snaps[i]! > 0 ? v / snaps[i]! : null))
-            : gmax;
+        const points = sum.map((v, i) => (v != null && snaps[i] != null && snaps[i]! > 0 ? v / snaps[i]! : null));
         const last = points.reduce<number | null>((acc, v) => (v != null ? v : acc), null);
         return { m, points, last, gmax };
       })
       .sort((a, b) => (b.last ?? -1) - (a.last ?? -1))
       .map(({ m, points, gmax }) => {
         const net = displayNetwork(m.id);
-        const line: TrendLine = { label: kind, points: trim(points), hue: net?.hue };
+        const line: TrendLine = { label: "mean", points: trim(points), hue: net?.hue };
         // `sampled` = the chain's own snaps series: amber only where the SAMPLER missed;
         // a null point over a sampled bucket (a quiet stretch — nothing to space) just
         // breaks the line (user, 2026-09-09: DOR's quiet buckets wore outage amber).
@@ -483,7 +480,7 @@ export default function TrendsDoc() {
           <Section
             id="continuity"
             title="Continuity"
-            lead="How steadily the ledger ticked: the average spacing between snapshots and each bucket's single longest pause. A gray column is a quiet stretch — the chain sealed nothing there, but within its normal rhythm; an amber column is a silence unusually long by this chain's own history; a hatched column is a stretch this app itself was not measuring, which says nothing about the chain."
+            lead="How regularly the network produced its snapshots, and how long its pauses were. Gray marks a pause that is normal for this network; amber marks one unusually long by its own history; a striped area means this app was not watching at the time — that says nothing about the network itself."
           >
             <TrendChart onRange={onRange} inspect={inspectHere} name="Mean gap" unit="seconds" buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} gaps={trim(S(p, "g.gapMax"))} lines={[{ label: "mean", points: trim(meanGap(p)) }]} />
             <TrendChart onRange={onRange} inspect={inspectHere} name="Longest pause" unit={`seconds · the ${stepMs >= 86400000 ? "day" : "bucket"}'s single widest gap`} buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} gaps={trim(S(p, "g.gapMax"))} lines={[{ label: "max", points: trim(S(p, "g.gapMax")) }]} />
@@ -493,10 +490,10 @@ export default function TrendsDoc() {
           <Section
             id="economics"
             title="Economics"
-            lead="What anchoring paid and carried, summed over the publicly listed metagraphs — a floor, exactly as the cards state it: unlisted channels pay too."
+            lead="How much data the metagraphs anchored into the global ledger, and what they paid for it — measured from the chain's own records (counts at least this much; some channels aren't itemized)."
           >
-            <TrendChart onRange={onRange} inspect={inspectHere} name="Fees paid" unit={`DAG ${per} · floor`} readout={dayReadout("g.feeFloor", 1e-8)} buckets={cBuckets} stepMs={stepMs} format={dag} lines={[{ label: "fees", points: trim(scale(S(p, "g.feeFloor"), 1e-8)) }]} />
-            <TrendChart onRange={onRange} inspect={inspectHere} name="Data anchored" unit={`${per} · floor`} readout={dayReadout("g.kbFloor", 1 / 1024)} buckets={cBuckets} stepMs={stepMs} format={mb} lines={[{ label: "data", points: trim(scale(S(p, "g.kbFloor"), 1 / 1024)) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Fees paid" unit={`DAG ${per} · at least`} readout={dayReadout("g.feeFloor", 1e-8)} buckets={cBuckets} stepMs={stepMs} format={dag} lines={[{ label: "fees", points: trim(scale(S(p, "g.feeFloor"), 1e-8)) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Data anchored" unit={`${per} · at least`} readout={dayReadout("g.kbFloor", 1 / 1024)} buckets={cBuckets} stepMs={stepMs} format={mb} lines={[{ label: "data", points: trim(scale(S(p, "g.kbFloor"), 1 / 1024)) }]} />
           </Section>
           </TabsContent>
           <TabsContent value="fleet">
@@ -563,7 +560,7 @@ export default function TrendsDoc() {
           <Section
             id="net-fees"
             title="Fees paid"
-            lead="What each network paid the base ledger to anchor — exact, from its own snapshot records (these are the terms the Hypergraph tab's floor sums)."
+            lead="What each network paid the base ledger to anchor — exact, from its own snapshot records."
           >
             {netPanels("fee", `DAG ${per}`, 1e-8, dag)}
           </Section>
@@ -593,17 +590,9 @@ export default function TrendsDoc() {
           <Section
             id="net-continuity"
             title="Continuity"
-            lead="How steadily each network sealed its own snapshots — the average spacing between them, measured from the chain's own record timestamps. A gray column is a quiet stretch: nothing sealed, but ordinary for that network's own rhythm (some seal in bursts). An amber column is a silence that stands out against that network's own history — one that runs to the edge and never returns is a network that stopped. A hatched column is a stretch this app itself was not measuring."
+            lead="How regularly each network produced its own snapshots. Some write steadily and some in bursts, so each is judged against its own rhythm: gray marks a normal pause, amber one unusually long for that network — and an amber that runs to the edge and never comes back is a network that stopped. A striped area means this app was not watching at the time."
           >
-            {netGapPanels("mean")}
-          </Section>
-
-          <Section
-            id="net-pause"
-            title="Longest pause"
-            lead="Each network's single widest gap per bucket — a tall spike is that network stalling, however briefly."
-          >
-            {netGapPanels("max")}
+            {netGapPanels()}
           </Section>
           </TabsContent>
           </Tabs>
