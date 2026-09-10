@@ -1,7 +1,7 @@
 "use client";
 
 import { pollHealthRows } from "@/src/data/api";
-import { pollStatusOf, type PollStatus } from "@/src/data/pollStatus";
+import { pollStatusOf } from "@/src/data/pollStatus";
 import { relativeAge } from "@/src/util/relativeAge";
 import { BandCard } from "@/components/VitalsBand";
 import { useNowTick } from "@/components/useNowTick";
@@ -15,13 +15,6 @@ import { BAR_EASE } from "@/components/RollSwap";
 // the status MEANING lives in src/data/pollStatus.ts (rule 10 wants it testable, not buried in
 // JSX), the plate is the vitals band's own BandCard (one band-card recipe app-wide), and the
 // age words are relativeAge, the app's one age grammar.
-
-const DOT: Record<PollStatus, string> = {
-  ok: "var(--success)",
-  stale: "var(--warn-soft)",
-  failing: "var(--destructive)",
-  acquiring: "var(--muted-foreground)",
-};
 
 const everyWord = (ms: number | null): string =>
   ms == null ? "on demand" : ms >= 60_000 ? `every ${Math.round(ms / 60_000)} min` : `every ${Math.round(ms / 1000)}s`;
@@ -46,23 +39,22 @@ export default function PulseStrip() {
       {rows.map((r) => {
         const status = pollStatusOf(r, now);
         return (
-          <BandCard
-            key={r.id}
-            label={r.label}
-            className="min-w-[150px]"
-            mark={<span aria-hidden className="size-1.5 rounded-full flex-none" style={{ background: DOT[status] }} />}
-          >
+          // No head mark (user, 2026-09-10: "the bullet doesn't add anything and elsewhere
+          // we don't do it" — the band's cards carry bare labels). The status still reads:
+          // a failing feed says the word and shows its failed count, and a stale one wears
+          // the growing age beside its own cadence chip.
+          <BandCard key={r.id} label={r.label} className="min-w-[150px]">
             <span className="flex flex-col gap-1 min-w-0">
               {/* The band's STACKED-LEAD grammar (user, 2026-09-10, two rounds): the bare
                   bold reading, and the CADENCE as a chip in the taxonomy-chrome recipe —
                   RoleChips' own squared pill (faint wash, hairline, muted ink; chrome, not
                   identity) — instead of plain words. No "ago": the ticking value under a
                   liveliness dot carries it. */}
-              <span className="flex flex-col gap-1 items-start">
+              <span className="flex items-center gap-1.5 whitespace-nowrap">
                 <span className="font-mono font-bold text-caption tabular-nums text-foreground leading-tight">
                   {r.lastOkAt != null ? relativeAge(now - r.lastOkAt, true) : status === "failing" ? "failing" : "—"}
                 </span>
-                <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap">
+                <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground">
                   {everyWord(r.everyMs)}
                 </span>
               </span>
