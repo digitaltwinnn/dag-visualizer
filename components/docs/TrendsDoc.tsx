@@ -480,7 +480,7 @@ export default function TrendsDoc() {
           <Section
             id="continuity"
             title="Continuity"
-            lead="How regularly the network produced its snapshots, and how long its pauses were. Gray marks a pause that is normal for this network; amber marks one unusually long by its own history; a striped area means this app was not watching at the time — that says nothing about the network itself."
+            lead="How regularly the network produced its snapshots, and how long its pauses were. Gray marks a pause that is normal for this network; amber marks one unusually long by its own history; a striped area means this app was not watching at the time."
           >
             <TrendChart onRange={onRange} inspect={inspectHere} name="Mean gap" unit="seconds" buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} gaps={trim(S(p, "g.gapMax"))} lines={[{ label: "mean", points: trim(meanGap(p)) }]} />
             <TrendChart onRange={onRange} inspect={inspectHere} name="Longest pause" unit={`seconds · the ${stepMs >= 86400000 ? "day" : "bucket"}'s single widest gap`} buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} gaps={trim(S(p, "g.gapMax"))} lines={[{ label: "max", points: trim(S(p, "g.gapMax")) }]} />
@@ -490,7 +490,7 @@ export default function TrendsDoc() {
           <Section
             id="economics"
             title="Economics"
-            lead="How much data the metagraphs anchored into the global ledger, and what they paid for it — measured from the chain's own records (counts at least this much; some channels aren't itemized)."
+            lead="How much data the metagraphs anchored into the global ledger, and what they paid for it."
           >
             <TrendChart onRange={onRange} inspect={inspectHere} name="Fees paid" unit={`DAG ${per} · at least`} readout={dayReadout("g.feeFloor", 1e-8)} buckets={cBuckets} stepMs={stepMs} format={dag} lines={[{ label: "fees", points: trim(scale(S(p, "g.feeFloor"), 1e-8)) }]} />
             <TrendChart onRange={onRange} inspect={inspectHere} name="Data anchored" unit={`${per} · at least`} readout={dayReadout("g.kbFloor", 1 / 1024)} buckets={cBuckets} stepMs={stepMs} format={mb} lines={[{ label: "data", points: trim(scale(S(p, "g.kbFloor"), 1 / 1024)) }]} />
@@ -500,7 +500,7 @@ export default function TrendsDoc() {
           <Section
             id="fleet"
             title="Nodes"
-            lead="Node counts are sampled live, hourly — there is no historical record of the fleet to read back, so these series begin the day measuring started and fill forward."
+            lead="Node counts are sampled live, hourly."
           >
             {stepMs < 3600000 && !fleetRaw ? (
               /* The gauges are HOURLY instruments; at fine zooms their hourly payload is a
@@ -560,7 +560,7 @@ export default function TrendsDoc() {
           <Section
             id="net-fees"
             title="Fees paid"
-            lead="What each network paid the base ledger to anchor — exact, from its own snapshot records."
+            lead="What each network paid the base ledger to anchor."
           >
             {netPanels("fee", `DAG ${per}`, 1e-8, dag)}
           </Section>
@@ -568,7 +568,7 @@ export default function TrendsDoc() {
           <Section
             id="net-data"
             title="Data anchored"
-            lead="How much state each network sealed into the base ledger — exact, from its own snapshot records."
+            lead="How much state each network sealed into the base ledger."
           >
             {netPanels("kb", per, 1 / 1024, mb)}
           </Section>
@@ -577,7 +577,7 @@ export default function TrendsDoc() {
           <Section
             id="net-fleet"
             title="Nodes"
-            lead="Each network's own node count, sampled live every hour — no historical fleet record exists upstream, so these begin the day measuring started and fill forward."
+            lead="Each network's own node count, sampled live every hour."
           >
             {stepMs < 3600000 && !fleetRaw ? (
               <p className="text-label text-muted-foreground">reading the hourly samples…</p>
@@ -590,7 +590,7 @@ export default function TrendsDoc() {
           <Section
             id="net-continuity"
             title="Continuity"
-            lead="How regularly each network produced its own snapshots. Some write steadily and some in bursts, so each is judged against its own rhythm: gray marks a normal pause, amber one unusually long for that network — and an amber that runs to the edge and never comes back is a network that stopped. A striped area means this app was not watching at the time."
+            lead="How regularly each network produced its own snapshots. Some write steadily and some in bursts, so each is judged against its own rhythm: gray marks a normal pause, amber one unusually long for that network. A striped area means this app was not watching at the time."
           >
             {netGapPanels()}
           </Section>
