@@ -293,8 +293,8 @@ export class NodeFabric {
               // the shipped look. Same mix on the spheres below.
               "#include <emissivemap_fragment>\n" +
               "float fres = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 3.0);\n" +
-              "if (vFill < 0.5 && uPaper > 0.5 && fres < 0.3) discard;\n" +
-              "totalEmissiveRadiance = vBase * vEmi * mix(1.4 * fres, 0.5 + 0.95 * vCap + 1.1 * fres, vFill) + vBase * ((1.0 - vFill) * uPaper * 0.85);"
+              "if (vFill < 0.5 && uPaper > 0.5 && fres < 0.1) discard;\n" +
+              "totalEmissiveRadiance = vBase * vEmi * mix(1.4 * fres, 0.5 + 0.95 * vCap + 1.1 * fres, vFill) + vBase * ((1.0 - vFill) * uPaper);"
             : // spheres (hyper nodes): a view-dependent FRESNEL rim so they read as glowing 3D orbs
               // instead of flat blobs (user). Coeffs keep the average near the old flat vEmi so the
               // dim/hover and bloom-threshold behaviour is unchanged. The rim is the shared
@@ -304,8 +304,8 @@ export class NodeFabric {
               // and carry no status.
               "#include <emissivemap_fragment>\n" +
               ORB_FRESNEL_GLSL +
-              "if (vFill < 0.5 && uPaper > 0.5 && fres < 0.3) discard;\n" +
-              `totalEmissiveRadiance = vBase * vEmi * mix(1.4 * fres, ${ORB_FRESNEL_MIX}, vFill) + vBase * ((1.0 - vFill) * uPaper * 0.85);`,
+              "if (vFill < 0.5 && uPaper > 0.5 && fres < 0.1) discard;\n" +
+              `totalEmissiveRadiance = vBase * vEmi * mix(1.4 * fres, ${ORB_FRESNEL_MIX}, vFill) + vBase * ((1.0 - vFill) * uPaper);`,
         );
     };
     return mat;
