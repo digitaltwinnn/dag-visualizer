@@ -53,15 +53,17 @@ export default function PulseStrip() {
             mark={<span aria-hidden className="size-1.5 rounded-full flex-none" style={{ background: DOT[status] }} />}
           >
             <span className="flex flex-col gap-1 min-w-0">
-              {/* The band's STACKED-LEAD grammar (user, 2026-09-10: "just simple texts, make
-                  them prettier") — the reading bold with its qualifier as the muted underline,
-                  exactly the rate cards' numeral-and-unit form: "31s" over "ago · every 4s". */}
-              <span className="flex flex-col">
+              {/* The band's STACKED-LEAD grammar (user, 2026-09-10, two rounds): the bare
+                  bold reading, and the CADENCE as a chip in the taxonomy-chrome recipe —
+                  RoleChips' own squared pill (faint wash, hairline, muted ink; chrome, not
+                  identity) — instead of plain words. No "ago": the ticking value under a
+                  liveliness dot carries it. */}
+              <span className="flex flex-col gap-1 items-start">
                 <span className="font-mono font-bold text-caption tabular-nums text-foreground leading-tight">
                   {r.lastOkAt != null ? relativeAge(now - r.lastOkAt, true) : status === "failing" ? "failing" : "—"}
                 </span>
-                <span className="text-micro text-muted-foreground leading-none whitespace-nowrap">
-                  {r.lastOkAt != null ? "ago · " : ""}{everyWord(r.everyMs)}
+                <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap">
+                  {everyWord(r.everyMs)}
                 </span>
               </span>
               <span className="text-micro text-muted-foreground truncate">{r.target}</span>
