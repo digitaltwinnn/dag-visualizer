@@ -6,6 +6,7 @@
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --extend-to=2026-01-01
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --recompute-from=2026-09-06
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --backfill-gaps=2026-01-01
+//   npx tsx scripts/rebuild-trends.ts --net=mainnet --backfill-blocks=2025-07-01
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --wipe-only
 //
 // --backfill-gaps writes the per-network CONTINUITY series (m.{id}.gapSum/gapMax) for
@@ -80,9 +81,9 @@ function loadEnvLocal(): void {
   }
 }
 
-interface Args { net: "mainnet" | "integrationnet" | "testnet"; days: number; wipeOnly: boolean; extendToMs: number | null; recomputeFromMs: number | null; gapsFromMs: number | null }
+interface Args { net: "mainnet" | "integrationnet" | "testnet"; days: number; wipeOnly: boolean; extendToMs: number | null; recomputeFromMs: number | null; gapsFromMs: number | null; blocksFromMs: number | null }
 function parseArgs(): Args {
-  const a: Args = { net: "mainnet", days: 90, wipeOnly: false, extendToMs: null, recomputeFromMs: null, gapsFromMs: null };
+  const a: Args = { net: "mainnet", days: 90, wipeOnly: false, extendToMs: null, recomputeFromMs: null, gapsFromMs: null, blocksFromMs: null };
   for (const arg of process.argv.slice(2)) {
     if (arg === "--wipe-only") a.wipeOnly = true;
     else if (arg.startsWith("--net=")) a.net = arg.slice(6) as Args["net"];
@@ -96,6 +97,11 @@ function parseArgs(): Args {
       const m = arg.slice(17).match(/^(\d{4})-(\d{2})-(\d{2})$/);
       if (m) a.recomputeFromMs = Date.UTC(+m[1], +m[2] - 1, +m[3]);
       else { console.error("--recompute-from wants YYYY-MM-DD (UTC)"); process.exit(1); }
+    }
+    else if (arg.startsWith("--backfill-blocks=")) {
+      const m = /^--backfill-blocks=(\d{4})-(\d{2})-(\d{2})$/.exec(arg);
+      if (m) a.blocksFromMs = Date.UTC(+m[1], +m[2] - 1, +m[3]);
+      else { console.error("--backfill-blocks wants YYYY-MM-DD (UTC)"); process.exit(1); }
     }
     else if (arg.startsWith("--backfill-gaps=")) {
       const m = arg.slice(16).match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -205,11 +211,12 @@ async function walkChain<T extends { timestamp: string }>(
 
 async function main(): Promise<void> {
   loadEnvLocal();
-  const { net, days, wipeOnly, extendToMs, recomputeFromMs, gapsFromMs } = parseArgs();
+  const { net, days, wipeOnly, extendToMs, recomputeFromMs, gapsFromMs, blocksFromMs } = parseArgs();
 
   // Deferred imports: store.ts reads env at construction, so env must be loaded first.
   const { Redis } = await import("@upstash/redis");
   const { NETWORKS, CATALOG } = await import("../src/engine/config");
+  const { TIER_SINCE } = await import("../src/data/trendWindow");
   const { TTL_S, slotOf, cursorKeyOf, lockKeyOf } = await import("../app/api/trends/keys");
   const { bucketGlobals, bucketMetas, addInc } = await import("../app/api/trends/bucketing");
   const addIncGap = (inc: import("../app/api/trends/bucketing").IncMap, n: string, tsMs: number, id: string, gap: number) => {
@@ -242,6 +249,44 @@ async function main(): Promise<void> {
   const be0 = NETWORKS[net].be;
 
   // ---- GAPS BACKFILL mode: per-network continuity history (see the header) ----
+  // ---- BLOCKS BACKFILL: per-network sealed-block counts from the chain's own records ----
+  // (2026-09-11 — m.{id}.blocks joined bucketMetas for the cron; history needs this walk
+  // once, or every covered old bucket would read "measured zero blocks", a fabrication.)
+  if (blocksFromMs != null) {
+    const todayStartMs = Math.floor(Date.now() / 86400000) * 86400000;
+    console.log(`backfilling per-network block counts ${new Date(blocksFromMs).toISOString().slice(0, 10)} → yesterday …`);
+    const tierOf = (key: string): Tier => key.split(":")[2] as Tier;
+    const store = writeStore();
+    let fields = 0;
+    for (const id of CATALOG[net].map((m) => m.id).filter((v): v is string => !!v)) {
+      // Timestamps + block counts only — one field is all this mode may write. Each chain
+      // writes as soon as its walk ends (complete-day HSETs are idempotent), the gaps
+      // walk's crash rule.
+      const inc: IncMap = new Map();
+      await walkChain<{ timestamp: string; blocks?: unknown[] }>(`${NETWORKS[net].be}/currency/${id}/snapshots`, blocksFromMs, (recs) => {
+        for (const r of recs) {
+          const t = Date.parse(r.timestamp);
+          if (!(t < todayStartMs)) continue;
+          // Whole days only, and each tier only past its own birthdate (TIER_SINCE): the
+          // daily tier carries the deep history; fine grain is never invented backward.
+          const tiers: Tier[] = ["1d"];
+          if (t >= TIER_SINCE["1h"]) tiers.push("1h");
+          if (t >= TIER_SINCE["5m"]) tiers.push("5m");
+          addInc(inc, net, t, `m.${id}.blocks`, Array.isArray(r.blocks) ? r.blocks.length : 0, tiers);
+        }
+      }, id.slice(0, 10));
+      for (const [key, map] of inc) {
+        const entries = [...map.entries()];
+        for (let i = 0; i < entries.length; i += 400) {
+          await store.applyWrites([{ key, map: Object.fromEntries(entries.slice(i, i + 400)), ttlS: TTL_S[tierOf(key)] }]);
+        }
+        fields += entries.length;
+      }
+    }
+    console.log(`  ${fields} block fields; every other field and the cursor untouched.`);
+    return;
+  }
+
   if (gapsFromMs != null) {
     const todayStartMs = Math.floor(Date.now() / 86400000) * 86400000;
     console.log(`backfilling per-network gap stats ${new Date(gapsFromMs).toISOString().slice(0, 10)} → yesterday …`);
@@ -314,7 +359,7 @@ async function main(): Promise<void> {
     }
     for (const id of CATALOG[net].map((m) => m.id).filter((v): v is string => !!v)) {
       await walkChain<MetaRec & { timestamp: string }>(`${be0}/currency/${id}/snapshots`, recomputeFromMs, (recs) => {
-        bucketMetas(inc, net, id, whole(recs).map((r) => ({ ordinal: r.ordinal, timestamp: r.timestamp, fee: r.fee, sizeInKB: r.sizeInKB })));
+        bucketMetas(inc, net, id, whole(recs).map((r) => ({ ordinal: r.ordinal, timestamp: r.timestamp, fee: r.fee, sizeInKB: r.sizeInKB, blocks: r.blocks })));
       }, id.slice(0, 10));
     }
     // Repair every tier the affected days live in (review find: a capped catch-up also
@@ -416,7 +461,7 @@ async function main(): Promise<void> {
       await walkChain<MetaRec & { timestamp: string }>(
         `${be0}/currency/${id}/snapshots`, extendToMs, (recs) => {
           const keep = beforeBoundary(recs);
-          bucketMetas(inc, net, id, keep.map((r) => ({ ordinal: r.ordinal, timestamp: r.timestamp, fee: r.fee, sizeInKB: r.sizeInKB })));
+          bucketMetas(inc, net, id, keep.map((r) => ({ ordinal: r.ordinal, timestamp: r.timestamp, fee: r.fee, sizeInKB: r.sizeInKB, blocks: r.blocks })));
           for (const r of keep) stamps.push(Date.parse(r.timestamp));
         }, id.slice(0, 10), craftCurrencyCursor(bnd.hash));
       // Continuity from the same walk: pages stream newest→oldest, so gaps are folded after
@@ -507,7 +552,7 @@ async function main(): Promise<void> {
       await walkChain<MetaRec & { timestamp: string; lastSnapshotHash?: string }>(
         `${be}/currency/${id}/snapshots`, cutoffMs, (recs) => {
           if (!(id in newestMetaOrd)) newestMetaOrd[id] = recs[0].ordinal; // first page is the newest
-          bucketMetas(inc, net, id, recs.map((r) => ({ ordinal: r.ordinal, timestamp: r.timestamp, fee: r.fee, sizeInKB: r.sizeInKB })));
+          bucketMetas(inc, net, id, recs.map((r) => ({ ordinal: r.ordinal, timestamp: r.timestamp, fee: r.fee, sizeInKB: r.sizeInKB, blocks: r.blocks })));
         }, id.slice(0, 10));
       // A DORMANT chain (nothing inside the window) still gets a cursor — parked at its TIP,
       // or the cron's cold cursor would page its ancient records into pre-window buckets as

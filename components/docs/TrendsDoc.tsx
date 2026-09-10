@@ -566,7 +566,7 @@ export default function TrendsDoc() {
           </TabsContent>
 
           <TabsContent value="metagraphs" className="pt-5">
-          {sectionTab === "snapshots" && (
+          {sectionTab === "snapshots" && (<>
           <Section
             id="networks"
             title="Metagraph snapshots anchored to global"
@@ -574,7 +574,14 @@ export default function TrendsDoc() {
           >
             {netPanels("snaps", per)}
           </Section>
-          )}
+          <Section
+            id="net-blocks"
+            title="Blocks per metagraph"
+            lead="The blocks each network sealed inside its own snapshots — a transfer of its token rides in a block (sending USDC.dag or UP somewhere), and a data network's application records land the same way."
+          >
+            {netPanels("blocks", per)}
+          </Section>
+          </>)}
           {sectionTab === "economics" && (<>
           <Section
             id="net-fees"

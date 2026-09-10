@@ -6,7 +6,7 @@ import { TIERS, slotOf, fieldOf, type Tier } from "./keys";
 import { mergeVals } from "./merge";
 
 export interface GlobalRec { ordinal: number; timestamp: string; metagraphSnapshotCount?: number; blocks?: unknown[] }
-export interface MetaRec { ordinal: number; timestamp: string; fee?: number; sizeInKB?: number }
+export interface MetaRec { ordinal: number; timestamp: string; fee?: number; sizeInKB?: number; blocks?: unknown[] }
 export interface FleetCounts {
   total: number;
   perNet: Record<string, number>;
@@ -81,6 +81,9 @@ export function bucketMetas(inc: IncMap, net: string, id: string, recs: MetaRec[
     addInc(inc, net, t, `m.${id}.snaps`, 1);
     addInc(inc, net, t, `m.${id}.fee`, r.fee || 0);
     addInc(inc, net, t, `m.${id}.kb`, r.sizeInKB || 0);
+    // Each network's own sealed blocks (2026-09-11 — transfers of its token and a data
+    // network's application records ride in blocks; the raw cron records carry the array).
+    addInc(inc, net, t, `m.${id}.blocks`, Array.isArray(r.blocks) ? r.blocks.length : 0);
     addInc(inc, net, t, "g.feeFloor", r.fee || 0);
     addInc(inc, net, t, "g.kbFloor", r.sizeInKB || 0);
     if (prev !== undefined) {

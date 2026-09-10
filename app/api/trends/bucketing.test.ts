@@ -174,3 +174,17 @@ describe("bucketFleet per-network layers", () => {
     expect(inc.get(k.key)?.get(fieldOf(k.bucket, "f.layer.up.cl1"))).toBe(3);
   });
 });
+
+// Per-network blocks (2026-09-11): a token transfer rides in a block, so each network's
+// sealed-block count is stored beside its snaps/fee/kb.
+describe("bucketMetas blocks", () => {
+  it("counts each record's blocks array into m.{id}.blocks", () => {
+    const inc: IncMap = new Map();
+    bucketMetas(inc, "mainnet", "up", [
+      { ordinal: 1, timestamp: "2026-09-11T10:00:00Z", fee: 0, sizeInKB: 2, blocks: ["a", "b"] },
+      { ordinal: 2, timestamp: "2026-09-11T10:01:00Z", fee: 0, sizeInKB: 2 },
+    ]);
+    const k = slotOf("mainnet", "1h", Date.parse("2026-09-11T10:00:00Z"));
+    expect(inc.get(k.key)?.get(fieldOf(k.bucket, "m.up.blocks"))).toBe(2);
+  });
+});
