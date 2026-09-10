@@ -166,7 +166,8 @@ describe("archiveSchedule (the dossier's by-archival partition)", () => {
     // deepest single copy per tier.
     expect(s!.rows).toEqual([
       // Nov 2023 aged from the pinned now (2026-09-10) — the age grammar's year rounding
-      { label: "full archive", count: 0, kept: null, fullCount: 0, hint: "No probed node keeps this chain in full, back to its first snapshot." },
+      // its tag is what a full archive WOULD hold — the chain's tip at probe time
+      { label: "full archive", count: 0, kept: 1000, fullCount: 0, hint: "No probed node keeps this whole chain, back to its first snapshot." },
       { label: "3 years", count: 1, kept: 900, fullCount: 0, hint: "keeps deep history back to Nov 2023 — the deep archives share gaps, so the count is the span, not a promise of every snapshot" },
       { label: "> 1 year", count: 2, kept: 900, fullCount: 0, hint: "keeps more than a year of the chain" },
       { label: "6 months", count: 10, kept: 500, fullCount: 0, hint: "keeps up to six months of the chain" },

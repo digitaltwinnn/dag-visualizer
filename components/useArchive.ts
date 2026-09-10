@@ -252,12 +252,14 @@ export function archiveSchedule(
       fullCount: full.length + graced.size,
     });
   } else {
+    // The tag still states what a FULL archive would hold (user, round 12): the chain's
+    // tip ordinal at probe time — the whole chain's size, kept by nobody.
     rows.push({
       label: "full archive",
       count: 0,
-      kept: null,
+      kept: Math.max(...entries.map((e) => e.latest)),
       fullCount: 0,
-      hint: "No probed node keeps this chain in full, back to its first snapshot.",
+      hint: "No probed node keeps this whole chain, back to its first snapshot.",
     });
   }
   // The deep archives lead the partials at their real age in the age grammar, like every
