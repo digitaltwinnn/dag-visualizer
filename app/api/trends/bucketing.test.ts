@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { addInc, bucketGlobals, bucketMetas, bucketFleet, type IncMap } from "./bucketing";
+import { slotOf, fieldOf } from "./keys";
 
 const ts = (h: number, m: number, s = 0) => new Date(Date.UTC(2026, 8, 6, h, m, s)).toISOString();
 const get = (inc: IncMap, key: string, field: string) => inc.get(key)?.get(field);
@@ -114,5 +115,28 @@ describe("bucketFleet", () => {
     expect(get(inc, "t:mainnet:1d:2026", "09-06|f.cc.DE")).toBe(60);
     expect(get(inc, "t:mainnet:1h:2026-09", "06-14|f.cc.DE")).toBeUndefined(); // daily only
     expect(inc.get("t:mainnet:5m:2026-09-06")).toBeUndefined(); // no fine-tier gauges
+  });
+});
+
+// The Sep 8 2026 find: a real 4-hour global stall (consecutive ordinals, 10:40 → 14:47 UTC)
+// must read as MEASURED SILENCE in every tier — the hourly/daily coverage zero-fill is what
+// keeps a 7D window from painting a chain stall in the not-sampled gray.
+describe("coverage zero-fill reaches every tier", () => {
+  it("a batch bracketing hours of silence marks the empty hourly buckets with g.ticks 0", () => {
+    const inc: IncMap = new Map();
+    bucketGlobals(inc, "mainnet", [
+      { ordinal: 1, timestamp: "2026-09-08T10:40:00Z", metagraphSnapshotCount: 0, blocks: [] },
+      { ordinal: 2, timestamp: "2026-09-08T14:47:00Z", metagraphSnapshotCount: 0, blocks: [] },
+    ], null);
+    const hourKey = slotOf("mainnet", "1h", Date.parse("2026-09-08T12:00:00Z"));
+    const hourField = fieldOf(hourKey.bucket, "g.ticks");
+    expect(inc.get(hourKey.key)?.get(hourField)).toBe(0);
+    // both records share this DAY, so its bucket holds their real count — the daily
+    // zero-fill only speaks when a batch brackets a wholly-silent day
+    const dayKey = slotOf("mainnet", "1d", Date.parse("2026-09-08T12:00:00Z"));
+    expect(inc.get(dayKey.key)?.get(fieldOf(dayKey.bucket, "g.ticks"))).toBe(2);
+    // the record-bearing hours carry real counts, not zeros
+    const h1 = slotOf("mainnet", "1h", Date.parse("2026-09-08T10:40:00Z"));
+    expect(inc.get(h1.key)?.get(fieldOf(h1.bucket, "g.ticks"))).toBe(1);
   });
 });

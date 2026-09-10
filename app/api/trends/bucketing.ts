@@ -44,12 +44,20 @@ export function bucketGlobals(inc: IncMap, net: string, recs: GlobalRec[], prevT
     }
     prev = t;
   }
-  // COVERAGE (rule 10): every 5m bucket the batch spans gets a g.ticks field even when no
-  // tick landed in it, so the read side can tell "measured, empty" from "not measured".
+  // COVERAGE (rule 10): every bucket the batch spans — IN EVERY TIER — gets a g.ticks field
+  // even when no tick landed in it, so the read side can tell "measured, empty" from "not
+  // measured". The hourly/daily tiers were exempt until 2026-09-10 on the silent assumption
+  // that every hour holds ticks; the Sep 8 chain stall (consecutive ordinals 4h07m apart,
+  // 10:40→14:47 UTC) broke it, and the 7D/30D windows painted a MEASURED chain silence in
+  // the not-sampled gray instead of the stall amber. Stepping by the bucket width from an
+  // arbitrary offset covers consecutive buckets and cannot skip one (the ledger's fuzz note,
+  // same day); the final partial bucket is marked by its own record.
   if (recs.length >= 2) {
     const from = Date.parse(recs[0].timestamp);
     const to = Date.parse(recs[recs.length - 1].timestamp);
     for (let t = from; t <= to; t += 300000) addInc(inc, net, t, "g.ticks", 0, ["5m"]);
+    for (let t = from; t <= to; t += 3600000) addInc(inc, net, t, "g.ticks", 0, ["1h"]);
+    for (let t = from; t <= to; t += 86400000) addInc(inc, net, t, "g.ticks", 0, ["1d"]);
   }
 }
 
