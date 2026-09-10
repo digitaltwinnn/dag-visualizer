@@ -189,22 +189,23 @@ export function archiveSummary(c: ArchiveCensus, chain: string): ArchiveNetSumma
 //   Kept is the deepest single copy in the group — a per-node fact that never sums the chain
 //   against itself (the DED double-count, round 3).
 // The fleet's remainder stays "unmeasured" (an absent entry means the probe read nothing).
-export interface ArchiveScheduleRow { label: string; count: number; kept: number | null; fullCount: number }
+export interface ArchiveScheduleRow { label: string; count: number; kept: number | null; fullCount: number; hint?: string }
 const MAX_SCHED_ROWS = 5;
 const GRACE_MS = 86_400_000;
 
-// A merged group's label: one reach stays itself; a span reads shallow → deep, collapsing a
-// shared unit ("3 – 6 months", not "3 months – 6 months"); a group whose shallow end is the
-// sub-day "recent window" has no lower age claim, so it reads "up to <deep>".
-function spanLabel(shallow: string, deep: string): string {
-  if (shallow === deep) return deep;
-  if (shallow === "recent window") return `up to ${deep}`;
-  const s = shallow.split(" ");
-  const d = deep.split(" ");
-  if (s.length === 2 && d.length === 2 && s[1].replace(/s$/, "") === d[1].replace(/s$/, ""))
-    return `${s[0]} – ${deep}`;
-  return `${shallow} – ${deep}`;
-}
+// The fixed reach LADDER a many-reach fleet folds into (user, round 6: the DAG's span
+// labels — "5 months – 2 years" — were "too much text; break it down into 1 month,
+// 6 months, >1 year, oldest"). Each window node lands in the shallowest tier that holds
+// its reach; a tier nobody occupies draws no row. "1 year" closes the 6-months-to-a-year
+// band his four labels would strand (the DAG keeps real nodes there). The hint carries the
+// tier's exact meaning for the row's hover.
+const DAY_MS = 86_400_000;
+const REACH_TIERS = [
+  { label: "> 1 year", minMs: 365.25 * DAY_MS, hint: "keeps more than a year of the chain" },
+  { label: "1 year", minMs: 6 * 30.44 * DAY_MS, hint: "keeps up to a year of the chain" },
+  { label: "6 months", minMs: 30.44 * DAY_MS, hint: "keeps up to six months of the chain" },
+  { label: "1 month", minMs: 0, hint: "keeps up to a month of the chain" },
+];
 
 export function archiveSchedule(
   c: ArchiveCensus, chain: string, fleetTotal: number, now = Date.now(),
@@ -233,11 +234,14 @@ export function archiveSchedule(
       fullCount: full.length + graced.size,
     });
   }
+  // The deep archives are the fleet's OLDEST reach — one word, the era and its caveat in
+  // the hover ("Back to Nov 2023" spelled out was part of the round-6 text complaint).
   const deep = entries.filter((e) => e.kind === "deep");
-  if (deep.length) rows.push({ label: `back to ${c.since}`, count: deep.length, kept: null, fullCount: 0 });
+  if (deep.length)
+    rows.push({ label: "oldest", count: deep.length, kept: null, fullCount: 0, hint: `keeps deep history back to ${c.since}, with gaps` });
   const win = entries.filter((e) => e.kind === "window" && !graced.has(e));
   if (win.length) {
-    // Exact-reach buckets first, deepest leading — small fleets never see a span.
+    // Exact-reach buckets first, deepest leading — small fleets keep their exact labels.
     const buckets = new Map<string, { label: string; count: number; kept: number; ms: number }>();
     for (const e of win) {
       const t = e.floorTs ? Date.parse(e.floorTs) : NaN;
@@ -256,30 +260,18 @@ export function archiveSchedule(
     if (ordered.length <= slots) {
       for (const b of ordered) rows.push({ label: b.label, count: b.count, kept: b.kept, fullCount: 0 });
     } else {
-      // Greedy contiguous partition balancing NODE counts across the slots (the "smart
-      // grouping based on the counts"): each group fills toward an even share of what
-      // remains, always keeping one bucket per unfilled slot.
-      let i = 0;
-      let rem = win.length;
-      for (let s = 0; s < slots; s++) {
-        const start = i;
-        let gc = 0;
-        if (s === slots - 1) {
-          for (; i < ordered.length; i++) gc += ordered[i].count;
-        } else {
-          const target = rem / (slots - s);
-          do {
-            gc += ordered[i].count;
-            i += 1;
-          } while (i < ordered.length - (slots - s - 1) && gc < target);
-        }
-        rem -= gc;
-        const group = ordered.slice(start, i);
+      // Too many distinct reaches for the budget: fold into the fixed ladder — each
+      // bucket lands in the deepest tier whose floor its reach clears.
+      const tierOf = (ms: number) => REACH_TIERS.find((t) => ms >= t.minMs) ?? REACH_TIERS[REACH_TIERS.length - 1];
+      for (const tier of REACH_TIERS) {
+        const members = ordered.filter((b) => tierOf(b.ms) === tier);
+        if (!members.length) continue;
         rows.push({
-          label: spanLabel(group[group.length - 1].label, group[0].label),
-          count: gc,
-          kept: Math.max(...group.map((b) => b.kept)),
+          label: tier.label,
+          count: members.reduce((n, b) => n + b.count, 0),
+          kept: Math.max(...members.map((b) => b.kept)),
           fullCount: 0,
+          hint: tier.hint,
         });
       }
     }

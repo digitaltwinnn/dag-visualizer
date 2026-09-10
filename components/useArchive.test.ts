@@ -146,7 +146,7 @@ describe("archiveSchedule (the dossier's by-archival partition)", () => {
     ]);
     expect(s2!.unmeasured).toBe(18);
   });
-  it("a many-reach fleet clusters into the row budget, count-balanced, span-labeled (the DAG's 25-row histogram, round 4: '3-5 rows max, smart grouping based on the counts')", () => {
+  it("a many-reach fleet folds into the fixed reach ladder (round 6: the DAG's span labels were 'too much text — 1 month, 6 months, >1 year, oldest'); deep archives read 'oldest' with the era in the hint", () => {
     const day = (n: number) => new Date(now - n * 86_400_000).toISOString();
     const win = (ip: string, days: number, kept: number) =>
       ({ ip, chain: "g", kind: "window", floor: 1000 - kept, latest: 1000, floorTs: day(days) });
@@ -161,14 +161,14 @@ describe("archiveSchedule (the dossier's by-archival partition)", () => {
       win("g1", 20, 100), win("g2", 20, 90),
       win("h1", 0.5, 10), win("h2", 0.5, 8),
     ]), "g", 20, now);
-    // Deep leads (no full nodes here), then four contiguous groups of ~4 nodes each; a
-    // group's kept is its deepest single copy, a shared unit collapses in the span.
+    // A tier holds every node whose reach clears its floor but not the next tier's; an
+    // empty tier (nothing between 6 and 12 months here) draws no row. Kept is still the
+    // deepest single copy per tier.
     expect(s!.rows).toEqual([
-      { label: "back to Nov 2023", count: 1, kept: null, fullCount: 0 },
-      { label: "6 months – 2 years", count: 5, kept: 900, fullCount: 0 },
-      { label: "3 – 4 months", count: 5, kept: 400, fullCount: 0 },
-      { label: "20 days – 2 months", count: 4, kept: 200, fullCount: 0 },
-      { label: "recent window", count: 2, kept: 10, fullCount: 0 },
+      { label: "oldest", count: 1, kept: null, fullCount: 0, hint: "keeps deep history back to Nov 2023, with gaps" },
+      { label: "> 1 year", count: 2, kept: 900, fullCount: 0, hint: "keeps more than a year of the chain" },
+      { label: "6 months", count: 10, kept: 500, fullCount: 0, hint: "keeps up to six months of the chain" },
+      { label: "1 month", count: 4, kept: 100, fullCount: 0, hint: "keeps up to a month of the chain" },
     ]);
     expect(s!.unmeasured).toBe(3);
   });

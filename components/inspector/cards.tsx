@@ -432,7 +432,7 @@ function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> })
                     count column already says how many (round 4). */}
                 <span
                   className="text-body text-foreground"
-                  title={row.kept != null ? `${fmtSnapCount(row.kept)} snapshots kept` : undefined}
+                  title={row.hint ?? (row.kept != null ? `${fmtSnapCount(row.kept)} snapshots kept` : undefined)}
                 >
                   {cap(row.label)}
                 </span>
