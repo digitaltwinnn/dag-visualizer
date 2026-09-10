@@ -139,4 +139,23 @@ describe("coverage zero-fill reaches every tier", () => {
     const h1 = slotOf("mainnet", "1h", Date.parse("2026-09-08T10:40:00Z"));
     expect(inc.get(h1.key)?.get(fieldOf(h1.bucket, "g.ticks"))).toBe(1);
   });
+  it("the fill starts at the cross-run boundary: a stall straddling two runs is covered by the SECOND run's batch (Sep 10's 13.5-min stall read gray because neither batch spanned it)", () => {
+    const inc: IncMap = new Map();
+    // previous run ended at 10:22; this run's first record is 10:35 — the silent buckets
+    // between belong to THIS run's measurement
+    bucketGlobals(inc, "mainnet", [
+      { ordinal: 2, timestamp: "2026-09-10T10:35:58Z", metagraphSnapshotCount: 0, blocks: [] },
+    ], Date.parse("2026-09-10T10:22:25Z"));
+    for (const hhmm of ["10:25", "10:30"]) {
+      const k = slotOf("mainnet", "5m", Date.parse(`2026-09-10T${hhmm}:00Z`));
+      expect(inc.get(k.key)?.get(fieldOf(k.bucket, "g.ticks"))).toBe(0);
+    }
+    // and a single-record batch with NO boundary still fills nothing (cold cursor rule)
+    const inc2: IncMap = new Map();
+    bucketGlobals(inc2, "mainnet", [
+      { ordinal: 2, timestamp: "2026-09-10T10:35:58Z", metagraphSnapshotCount: 0, blocks: [] },
+    ], null);
+    const k2 = slotOf("mainnet", "5m", Date.parse("2026-09-10T10:25:00Z"));
+    expect(inc2.get(k2.key)?.get(fieldOf(k2.bucket, "g.ticks"))).toBeUndefined();
+  });
 });

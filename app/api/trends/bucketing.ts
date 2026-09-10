@@ -52,12 +52,17 @@ export function bucketGlobals(inc: IncMap, net: string, recs: GlobalRec[], prevT
   // the not-sampled gray instead of the stall amber. Stepping by the bucket width from an
   // arbitrary offset covers consecutive buckets and cannot skip one (the ledger's fuzz note,
   // same day); the final partial bucket is marked by its own record.
-  if (recs.length >= 2) {
-    const from = Date.parse(recs[0].timestamp);
+  //   And the fill starts at the CROSS-RUN BOUNDARY (prevTickTsMs, the previous run's newest
+  // tick) when it is known: a batch-only span leaves a stall that crosses a run boundary
+  // marked by NEITHER run — caught live twice the same day (Sep 10's 13.5-min stall at
+  // 10:22→10:35 straddled two cron runs and read gray; the lone unhealed Sep-9 10:55 bucket
+  // was the same blind spot, its evidence erased by repair before the mechanism was found).
+  const fillFrom = prevTickTsMs ?? (recs.length >= 2 ? Date.parse(recs[0].timestamp) : null);
+  if (fillFrom != null && recs.length >= 1) {
     const to = Date.parse(recs[recs.length - 1].timestamp);
-    for (let t = from; t <= to; t += 300000) addInc(inc, net, t, "g.ticks", 0, ["5m"]);
-    for (let t = from; t <= to; t += 3600000) addInc(inc, net, t, "g.ticks", 0, ["1h"]);
-    for (let t = from; t <= to; t += 86400000) addInc(inc, net, t, "g.ticks", 0, ["1d"]);
+    for (let t = fillFrom; t <= to; t += 300000) addInc(inc, net, t, "g.ticks", 0, ["5m"]);
+    for (let t = fillFrom; t <= to; t += 3600000) addInc(inc, net, t, "g.ticks", 0, ["1h"]);
+    for (let t = fillFrom; t <= to; t += 86400000) addInc(inc, net, t, "g.ticks", 0, ["1d"]);
   }
 }
 
