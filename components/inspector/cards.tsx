@@ -8,7 +8,6 @@ import { UNLISTED_ID, UNLISTED_HUE, observedUnlistedIds } from "@/src/data/unlis
 import { identityHudCss } from "@/src/palette/identity";
 import { fmtDag, fmtKB, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
-import { statusBreakdown } from "@/src/data/nodeStatus";
 import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
 import { metaSnapDeepKey } from "@/src/data/types";
 import AnchoredTags from "./AnchoredTags";
@@ -554,10 +553,8 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const site = mg?.siteUrl ?? cfg.siteUrl;
   // The summary row: "Online nodes" + the TOTAL (user, 2026-07-12 — it summarizes the
   // composition table above, whose counts sum to the total; a joining node is online too,
-  // just not ready yet). The pill row below appears only when something is NOT ready.
+  // just not ready yet).
   const states = nodes.map((n) => n.state);
-  const buckets = statusBreakdown(states);
-  const nonReady = buckets.progress + buckets.down + buckets.unknown > 0;
   // Hover pairing (synced 3D hub glow) lives on the OUTER pane (ContextCard's #metapane), not here.
   // The full identity header (avatar + name + ticker) lives in the card HEAD now (MetaTitle via
   // CardHead's title slot, rolled via titleKey) — the body starts at the description.
@@ -576,9 +573,10 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
               totals-below rule to the band's own later ruling ("a total lives inside its own
               breakdown and LEADS it"); the separators between the partitions retire, and the
               indent keeps two column-aligned tables from reading as ONE summing to twice the
-              fleet (the job the middle separator used to do). "by status" keeps its
-              2026-08-18 gate: all-ready is the silent default, and when something is not
-              ready the schedule shows the COMPLETE picture, ready included. */}
+              fleet (the job the middle separator used to do). "by status" ALWAYS renders now
+              (user, 2026-09-10 — it retired the 2026-08-18 all-ready-is-silent gate: with
+              the groups folded to caption rows, an omitted group reads as a missing section,
+              and an all-ready fleet opening to its one Ready row IS the reading). */}
           {/* The CONTROL TOTAL leads in the normal Fact grammar with a divider beneath it
               (user, 2026-09-10, round 2: the larger font read as just a big number — the
               DIVIDER is what says "what follows partitions this"). Shown even at 0 for a
@@ -594,13 +592,9 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           <ScheduleGroup label="by node composition">
             <CompositionRows nodes={nodes} />
           </ScheduleGroup>
-          {nonReady && (
-            <>
-              <ScheduleGroup label="by node status">
-                <StatusBreakdown states={states} />
-              </ScheduleGroup>
-            </>
-          )}
+          <ScheduleGroup label="by node status">
+            <StatusBreakdown states={states} />
+          </ScheduleGroup>
           {/* THIRD SCHEDULE — "by archival" (user, 2026-09-10): the census's own kinds as
               rows — the full-chain keepers, then one DYNAMIC row per distinct partial reach
               in the age grammar ("~2 months") — and the honest remainder as unmeasured (an
