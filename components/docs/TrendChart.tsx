@@ -106,6 +106,29 @@ export default function TrendChart({
           setDrag(null);
         },
         onMouseLeave: () => setDrag(null),
+        // TOUCH mirrors the mouse drag (user, 2026-09-10 — the zoom must work on tablet and
+        // phone). The plate's `touch-pan-y` splits the gestures: a horizontal drag selects,
+        // a vertical swipe still scrolls the document. Touchstart may fire before recharts
+        // has a coordinate, so the drag begins lazily on the first labelled event.
+        onTouchStart: (e: { activeLabel?: string | number }) => {
+          const ts = Number(e?.activeLabel);
+          if (Number.isFinite(ts)) setDrag({ a: ts, b: ts });
+        },
+        onTouchMove: (e: { activeLabel?: string | number }) => {
+          const ts = Number(e?.activeLabel);
+          if (!Number.isFinite(ts)) return;
+          setDrag((d) => (d ? { a: d.a, b: ts } : { a: ts, b: ts }));
+        },
+        onTouchEnd: () => {
+          // The closure's `drag`, like onMouseUp — committing inside a setState updater
+          // would double-fire under Strict Mode (updaters must stay pure).
+          if (drag) {
+            const lo = Math.min(drag.a, drag.b);
+            const hi = Math.max(drag.a, drag.b);
+            if (hi - lo >= stepMs) onRange(lo, hi + stepMs);
+          }
+          setDrag(null);
+        },
       }
     : {};
   const measured = lines.some((l) => l.points.some((v) => v != null));
@@ -249,12 +272,12 @@ export default function TrendChart({
         </div>
       ) : (
         <div
-          className={`relative rounded-md bg-[var(--panel-plate)] overflow-hidden${onRange ? " cursor-crosshair select-none" : ""}`}
+          className={`relative rounded-md bg-[var(--panel-plate)] overflow-hidden${onRange ? " cursor-crosshair select-none touch-pan-y" : ""}`}
           role="img"
           aria-label={`${name} — ${stepMs >= 86400000 ? "daily" : stepMs >= 3600000 ? "hourly" : "5-minute"} buckets, ${n} of them`}
         >
           <ResponsiveContainer width="100%" height={PLOT_H + AXIS_H}>
-            <LineChart data={rows} margin={{ top: 10, right: 2, bottom: 4, left: 2 }} {...dragProps}>
+            <LineChart data={rows} syncId="trends" syncMethod="value" margin={{ top: 10, right: 2, bottom: 4, left: 2 }} {...dragProps}>
               {/* The drag preview — the committed cut happens on the PAGE at release. */}
               {drag && (
                 <ReferenceArea
