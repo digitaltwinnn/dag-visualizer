@@ -373,7 +373,15 @@ export default function TrendsDoc() {
   // flex-none + a fixed h-8: the primitive's triggers are flex-1 at a %-height, which is what
   // spread them wide and broke when the list WRAPS on phone (the h-auto rows below) — as
   // compact pills they pack left and wrap cleanly (user, 2026-09-08: the tabs overflowed).
-  const innerTrigger = "flex-none h-6 text-micro tracking-caps uppercase px-2 data-[state=active]:bg-[var(--panel-solid)]!";
+  const topicPicker = (
+    <div role="group" aria-label="Topic" className="inline-flex items-center rounded-lg bg-muted p-[3px]">
+      {([["snapshots", "Snapshots"], ["economics", "Economics"], ["fleet", "Nodes"], ["continuity", "Continuity"]] as const).map(([id, label]) => (
+        <button key={id} type="button" aria-pressed={sectionTab === id} onClick={() => setSectionTab(id)} className={zoomBtn(sectionTab === id)}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <article className="pt-14">
@@ -407,6 +415,11 @@ export default function TrendsDoc() {
       )}
 
       {p && (
+        <>
+        <div className="mt-6 flex items-center justify-between gap-3 flex-wrap">
+          {topicPicker}
+          <div className="flex items-center gap-3 flex-wrap justify-end">{zoomPicker}{rangeInspect}</div>
+        </div>
         <Tabs
           defaultValue={initialTab}
           // A NETWORK-STAMPED RANGE LOSES ITS STAMP ON THE HYPERGRAPH TAB (user, 2026-09-09:
@@ -417,7 +430,7 @@ export default function TrendsDoc() {
           onValueChange={(v) => {
             if (v === "hypergraph") setRange((r) => (r?.metaId ? { fromMs: r.fromMs, toMs: r.toMs, metaId: null } : r));
           }}
-          className="mt-6 gap-0"
+          className="mt-3 gap-0"
         >
           {/* TWO TABS (user, 2026-09-07): the hypergraph's own readings vs the per-metagraph
               ones — the same split every 3D view draws. FILE-CABINET recipe (the channel pane's,
@@ -454,18 +467,8 @@ export default function TrendsDoc() {
           <div className="border border-t-0 border-border/50 rounded-b-md px-5 pb-8">
 
 
-          <TabsContent value="hypergraph">
-          <Tabs value={sectionTab} onValueChange={setSectionTab} className="gap-0">
-            <div className="flex items-center justify-between gap-3 flex-wrap pt-4">
-              <TabsList aria-label="Hypergraph sections" className="flex-wrap h-auto! justify-start gap-1">
-                <TabsTrigger value="snapshots" className={innerTrigger}>Snapshots</TabsTrigger>
-                <TabsTrigger value="economics" className={innerTrigger}>Economics</TabsTrigger>
-                <TabsTrigger value="fleet" className={innerTrigger}>Nodes</TabsTrigger>
-                <TabsTrigger value="continuity" className={innerTrigger}>Continuity</TabsTrigger>
-              </TabsList>
-              {zoomPicker}{rangeInspect}
-            </div>
-          <TabsContent value="snapshots">
+          <TabsContent value="hypergraph" className="pt-5">
+          {sectionTab === "snapshots" && (
           <Section
             id="ledger"
             title="The base ledger"
@@ -475,8 +478,8 @@ export default function TrendsDoc() {
             <TrendChart onRange={onRange} inspect={inspectHere} name="Snapshots anchored" unit={per} readout={dayReadout("g.anchors")} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "anchored", points: trim(S(p, "g.anchors")) }]} />
             <TrendChart onRange={onRange} inspect={inspectHere} name="Blocks" unit={per} readout={dayReadout("g.blocks")} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "blocks", points: trim(S(p, "g.blocks")) }]} />
           </Section>
-          </TabsContent>
-          <TabsContent value="continuity">
+          )}
+          {sectionTab === "continuity" && (
           <Section
             id="continuity"
             title="Continuity"
@@ -485,8 +488,8 @@ export default function TrendsDoc() {
             <TrendChart onRange={onRange} inspect={inspectHere} name="Mean gap" unit="seconds" buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} gaps={trim(S(p, "g.gapMax"))} lines={[{ label: "mean", points: trim(meanGap(p)) }]} />
             <TrendChart onRange={onRange} inspect={inspectHere} name="Longest pause" unit={`seconds · the ${stepMs >= 86400000 ? "day" : "bucket"}'s single widest gap`} buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} gaps={trim(S(p, "g.gapMax"))} lines={[{ label: "max", points: trim(S(p, "g.gapMax")) }]} />
           </Section>
-          </TabsContent>
-          <TabsContent value="economics">
+          )}
+          {sectionTab === "economics" && (
           <Section
             id="economics"
             title="Economics"
@@ -495,8 +498,8 @@ export default function TrendsDoc() {
             <TrendChart onRange={onRange} inspect={inspectHere} name="Fees paid" unit={`DAG ${per} · at least`} readout={dayReadout("g.feeFloor", 1e-8)} buckets={cBuckets} stepMs={stepMs} format={dag} lines={[{ label: "fees", points: trim(scale(S(p, "g.feeFloor"), 1e-8)) }]} />
             <TrendChart onRange={onRange} inspect={inspectHere} name="Data anchored" unit={`${per} · at least`} readout={dayReadout("g.kbFloor", 1 / 1024)} buckets={cBuckets} stepMs={stepMs} format={mb} lines={[{ label: "data", points: trim(scale(S(p, "g.kbFloor"), 1 / 1024)) }]} />
           </Section>
-          </TabsContent>
-          <TabsContent value="fleet">
+          )}
+          {sectionTab === "fleet" && (
           <Section
             id="fleet"
             title="Nodes"
@@ -532,31 +535,20 @@ export default function TrendsDoc() {
               </>
             )}
           </Section>
-          </TabsContent>
-          </Tabs>
+          )}
           </TabsContent>
 
-          <TabsContent value="metagraphs">
-          <Tabs value={sectionTab} onValueChange={setSectionTab} className="gap-0">
-            <div className="flex items-center justify-between gap-3 flex-wrap pt-4">
-              <TabsList aria-label="Metagraph sections" className="flex-wrap h-auto! justify-start gap-1">
-                <TabsTrigger value="snapshots" className={innerTrigger}>Snapshots</TabsTrigger>
-                <TabsTrigger value="economics" className={innerTrigger}>Economics</TabsTrigger>
-                <TabsTrigger value="fleet" className={innerTrigger}>Nodes</TabsTrigger>
-                <TabsTrigger value="continuity" className={innerTrigger}>Continuity</TabsTrigger>
-              </TabsList>
-              {zoomPicker}{rangeInspect}
-            </div>
-          <TabsContent value="snapshots">
+          <TabsContent value="metagraphs" className="pt-5">
+          {sectionTab === "snapshots" && (
           <Section
             id="networks"
             title="Snapshots"
-            lead={`Each network's own ${bucketWord} snapshot count — its cadence is its choice, so every panel carries its own scale, busiest first.`}
+            lead={`Each network's own ${bucketWord} snapshot count.`}
           >
             {netPanels("snaps", per)}
           </Section>
-          </TabsContent>
-          <TabsContent value="economics">
+          )}
+          {sectionTab === "economics" && (<>
           <Section
             id="net-fees"
             title="Fees paid"
@@ -572,8 +564,8 @@ export default function TrendsDoc() {
           >
             {netPanels("kb", per, 1 / 1024, mb)}
           </Section>
-          </TabsContent>
-          <TabsContent value="fleet">
+          </>)}
+          {sectionTab === "fleet" && (
           <Section
             id="net-fleet"
             title="Nodes"
@@ -585,8 +577,8 @@ export default function TrendsDoc() {
               netGaugePanels("nodes")
             )}
           </Section>
-          </TabsContent>
-          <TabsContent value="continuity">
+          )}
+          {sectionTab === "continuity" && (
           <Section
             id="net-continuity"
             title="Continuity"
@@ -594,11 +586,11 @@ export default function TrendsDoc() {
           >
             {netGapPanels()}
           </Section>
-          </TabsContent>
-          </Tabs>
+          )}
           </TabsContent>
           </div>
         </Tabs>
+        </>
       )}
     </article>
   );
