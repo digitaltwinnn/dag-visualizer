@@ -442,12 +442,12 @@ function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> })
                   <span className="justify-self-end inline-flex items-center gap-1">
                     {row.fullCount > 0 && (
                       <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap">
-                        full archive
+                        full
                       </span>
                     )}
                     {row.incomplete && (
                       <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap">
-                        incomplete archive
+                        incomplete
                       </span>
                     )}
                     {row.kept != null && (
@@ -468,7 +468,7 @@ function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> })
             ))}
             {sched.unmeasured > 0 && (
               <Fragment key="__unmeasured">
-                <span className="text-body text-muted-foreground">Unmeasured</span>
+                <span className="text-body text-muted-foreground" title="The probe read nothing from these nodes — what they keep is unknown.">Unknown</span>
                 <span />
                 <span />
                 <span className="text-body text-muted-foreground tabular-nums min-w-[1.5em] text-right">{sched.unmeasured}</span>
