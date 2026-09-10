@@ -23,7 +23,7 @@ import { useArchive, archiveFactState, archiveSchedule, archiveSummary, fmtSnapC
 import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
 import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
-import { cap, ChipStack, Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark } from "./parts";
+import { cap, BarCell, Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark } from "./parts";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { pickNetId, followToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -422,12 +422,14 @@ function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> })
       <p className="mt-2 text-micro tracking-caps uppercase text-muted-foreground">by archived snapshots</p>
       <div className="mt-1 pl-2">
         {sched ? (
-          <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-[7px]">
+          <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-x-2 gap-y-[7px]">
             {sched.rows.map((row) => (
               <Fragment key={`${row.fullCount > 0 ? "full|" : ""}${row.label}`}>
-                {/* The kept-snapshot count rides the row as a tag and its hover hint. A
-                    full row wears the bare "full node" tag — no count in the words, the
-                    row's own count column already says how many (user, round 4). */}
+                {/* A full row wears the bare "full node" tag with its label — no count in
+                    the words, the row's own count column already says how many (user,
+                    round 4). The kept count rides its OWN right-aligned column (user,
+                    round 8: "right aligned, not based on label length"), so the tags
+                    share one edge whatever the labels run. */}
                 <span
                   className="inline-flex items-center gap-1.5 text-body text-foreground"
                   title={row.kept != null ? `${fmtSnapCount(row.kept)} snapshots kept` : undefined}
@@ -438,19 +440,25 @@ function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> })
                       full node
                     </span>
                   )}
-                  {row.kept != null && (
-                    <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap">
-                      {fmtSnapCount(row.kept)}
-                    </span>
-                  )}
                 </span>
-                <ChipStack count={row.count} color="var(--muted-foreground)" />
+                {row.kept != null ? (
+                  <span
+                    className="justify-self-end inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap"
+                    title={`${fmtSnapCount(row.kept)} snapshots kept`}
+                  >
+                    {fmtSnapCount(row.kept)}
+                  </span>
+                ) : (
+                  <span />
+                )}
+                <BarCell count={row.count} max={Math.max(...sched.rows.map((x) => x.count))} hue="var(--muted-foreground)" />
                 <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{row.count}</span>
               </Fragment>
             ))}
             {sched.unmeasured > 0 && (
               <Fragment key="__unmeasured">
                 <span className="text-body text-muted-foreground">Unmeasured</span>
+                <span />
                 <span />
                 <span className="text-body text-muted-foreground tabular-nums min-w-[1.5em] text-right">{sched.unmeasured}</span>
               </Fragment>

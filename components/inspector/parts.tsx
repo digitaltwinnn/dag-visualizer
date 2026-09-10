@@ -3,6 +3,7 @@
 import { Fragment, useRef, useState, type ReactNode } from "react";
 import { Check, Copy, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BAR_EASE } from "@/components/RollSwap";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { NodeInfo } from "@/src/data/types";
@@ -300,13 +301,14 @@ export function StatusBreakdown({ states }: { states: (string | null | undefined
     <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-[7px]">
       {items.map((it) => (
         <Fragment key={it.label}>
-          {/* The bucket colour rides the CHIPS alone (user, 2026-08-18) — the word takes the
-              default ink, like the composition labels above it, and the count column stays
-              neutral in both tables. One colour per row, on the one element that is nothing but
-              colour; a hued label as well made the state table read as an alert list beside its
-              plain twin. Capitalized to match those labels, since a bucket word opens a row. */}
+          {/* The bucket colour rides the BAR alone (user, 2026-08-18, chips then; bars since
+              2026-09-10) — the word takes the default ink, like the composition labels above
+              it, and the count column stays neutral in both tables. One colour per row, on the
+              one element that is nothing but colour; a hued label as well made the state table
+              read as an alert list beside its plain twin. Capitalized to match those labels,
+              since a bucket word opens a row. */}
           <span className="text-body text-foreground">{cap(it.label)}</span>
-          <ChipStack count={it.count} color={it.color} />
+          <BarCell count={it.count} max={Math.max(...items.map((x) => x.count))} hue={it.color} />
           <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{it.count}</span>
         </Fragment>
       ))}
@@ -314,27 +316,24 @@ export function StatusBreakdown({ states }: { states: (string | null | undefined
   );
 }
 
-// The miniature node cloud — ONE renderer for both partition tables (extracted 2026-08-18 when
-// the status breakdown became rows). Identity-hued discs that OVERLAP like stacked avatars, each
-// ringed in the panel colour so the overlap reads. Visual scale only, capped ≤10 with no +N — the
-// authoritative number is the count column beside it. Plain overlapping dots (no image/fallback
-// content), so a bare utility span reproduces the look more directly than fighting Avatar's
-// chrome. `color` is the ONLY difference between the two tables: the filter's identity hue for a
-// make-up row, the status bucket's for a state row.
-export function ChipStack({ count, color }: { count: number; color?: string }) {
-  const hue = color ?? "var(--filter-accent, var(--foreground-dim))";
+// The miniature bar — the vitals band's micro-bar recipe (one weight, fill only, eased —
+// see MicroBars) as a dossier table cell (user, 2026-09-10: "remove the node chips and use
+// the horizontal bars we already have in many places" — the overlapping-disc ChipStack
+// retired). The track is FIXED and sits right-aligned against the count column, so its left
+// edge is constant per table and every bar grows from one origin; widths are on the table's
+// own max, the caller's business, like MicroBars' row max. A zero draws nothing (rule 10);
+// real counts keep a small visible floor.
+export function BarCell({ count, max, hue }: { count: number; max: number; hue?: string }) {
   return (
-    <span className="inline-flex justify-end items-center pl-1" aria-hidden>
-      {Array.from({ length: Math.min(count, 10) }).map((_, j) => (
-        <span
-          key={j}
-          className="w-[9px] h-[9px] rounded-full -ml-1"
-          style={{
-            background: `color-mix(in oklch, ${hue} 60%, transparent)`,
-            boxShadow: "0 0 0 1.5px var(--panel)",
-          }}
-        />
-      ))}
+    <span aria-hidden className="flex items-center justify-self-end w-14 h-[5px]">
+      <span
+        className={cn("h-[5px] rounded-full", BAR_EASE)}
+        style={{
+          background: hue ?? "var(--filter-accent, var(--foreground-dim))",
+          opacity: 0.75,
+          width: count > 0 ? `${Math.max(4, (count / Math.max(1, max)) * 100)}%` : 0,
+        }}
+      />
     </span>
   );
 }
@@ -380,22 +379,26 @@ export function RoleChips({ codes, compact }: { codes: string[]; compact?: boole
   );
 }
 
-// One composition row per make-up: role (bright) + code pills + a capped chip stack
-// (visual scale only, ≤10, no +N) + the authoritative count. (A per-row status line lived
+// One composition row per make-up: role (bright) + code pills + a micro bar (visual
+// scale on the table's max) + the authoritative count. (A per-row status line lived
 // here briefly — reverted: it read too busy; the dossier shows ONE aggregate StatusBreakdown
 // in its STATUS segment instead.)
 export function CompositionRows({ nodes }: { nodes: NodeInfo[] }) {
   const rows = compositionRows(nodes);
   // ONE grid for the whole table (not per-row grids): the label column sizes to the WIDEST
-  // label, so the code-pill column starts at one consistent x on every row (user, 2026-07-12
-  // — per-row grids let each label push its own pills around).
+  // label so labels share an edge, and the code pills RIGHT-ALIGN into their own column
+  // (user, 2026-09-10: "same right align" as the archival tags — a tag column keyed to
+  // label length ragged the rows; before that, 2026-07-12, per-row grids let each label
+  // push its own pills around).
   return (
-    <div className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-x-2 gap-y-[7px] mt-2">
+    <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-x-2 gap-y-[7px] mt-2">
       {rows.map((r, i) => (
         <Fragment key={i}>
           <span className="text-body text-foreground">{r.label}</span>
-          <RoleChips codes={r.codes} />
-          <ChipStack count={r.count} />
+          <span className="justify-self-end">
+            <RoleChips codes={r.codes} />
+          </span>
+          <BarCell count={r.count} max={Math.max(...rows.map((x) => x.count))} />
           <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{r.count}</span>
         </Fragment>
       ))}
