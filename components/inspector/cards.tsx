@@ -446,7 +446,7 @@ function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> })
                     {row.kept != null && (
                       <span
                         className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap"
-                        title={`${fmtSnapCount(row.kept)} snapshots kept`}
+                        title={row.hint ? `${fmtSnapCount(row.kept)} snapshots — ${row.hint}` : `${fmtSnapCount(row.kept)} snapshots kept`}
                       >
                         {fmtSnapCount(row.kept)}
                       </span>

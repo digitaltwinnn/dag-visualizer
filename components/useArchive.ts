@@ -181,8 +181,10 @@ export function archiveSummary(c: ArchiveCensus, chain: string): ArchiveNetSumma
 //   grace exists only where a genesis keeper proves when the chain began — merges INTO the
 //   full row. Its floor is a measured upper bound anyway (the probe bisects at ~latest/1024
 //   resolution), so "joined day one" is as exact a claim as the census can carry.
-// - DEEP archives stay one row ("back to Nov 2023") with a null kept — the holed global
-//   archives, where any count would overclaim (rule 10).
+// - DEEP archives stay one row, labeled by their real age in the age grammar (round 7) and
+//   tagged with the SPAN they serve (latest − the era floor; round 8: "incl snapshot count
+//   tag") — the holed-archive caveat rides both hovers, since the deep archives share gaps
+//   and a bare "kept" would overclaim (rule 10).
 // - WINDOW nodes past the grace bucket by exact reach in the age grammar; when the distinct
 //   reaches overflow the remaining row budget (MAX_SCHED_ROWS total) they cluster into
 //   contiguous COUNT-BALANCED groups, labeled as a span ("3 – 6 months", "up to 18 days").
@@ -200,6 +202,17 @@ const GRACE_MS = 86_400_000;
 // band his four labels would strand (the DAG keeps real nodes there). The hint carries the
 // tier's exact meaning for the row's hover.
 const DAY_MS = 86_400_000;
+
+// The census's era string ("Nov 2023") back to a timestamp, so the deep row can state its
+// age. A shape this parser doesn't know answers null and the row falls back to "oldest" —
+// never NaN math.
+const ERA_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function eraMs(since: string): number | null {
+  const m = /^([A-Za-z]{3}) (\d{4})$/.exec(since.trim());
+  if (!m) return null;
+  const mi = ERA_MONTHS.indexOf(m[1]);
+  return mi < 0 ? null : Date.UTC(Number(m[2]), mi, 1);
+}
 const REACH_TIERS = [
   { label: "> 1 year", minMs: 365.25 * DAY_MS, hint: "keeps more than a year of the chain" },
   { label: "1 year", minMs: 6 * 30.44 * DAY_MS, hint: "keeps up to a year of the chain" },
@@ -234,11 +247,20 @@ export function archiveSchedule(
       fullCount: full.length + graced.size,
     });
   }
-  // The deep archives are the fleet's OLDEST reach — one word, the era and its caveat in
-  // the hover ("Back to Nov 2023" spelled out was part of the round-6 text complaint).
+  // The deep archives lead the partials at their real age in the age grammar, like every
+  // other row (user, round 7: "instead of 'oldest' give it the right age in text") — the
+  // era month parsed and aged; the era itself and its gaps caveat stay in the hover.
   const deep = entries.filter((e) => e.kind === "deep");
-  if (deep.length)
-    rows.push({ label: "oldest", count: deep.length, kept: null, fullCount: 0, hint: `keeps deep history back to ${c.since}, with gaps` });
+  if (deep.length) {
+    const t = eraMs(c.since);
+    rows.push({
+      label: t != null ? ageWords(now - t) : "oldest",
+      count: deep.length,
+      kept: Math.max(0, ...deep.map((e) => e.latest - e.floor)),
+      fullCount: 0,
+      hint: `keeps deep history back to ${c.since}, with gaps`,
+    });
+  }
   const win = entries.filter((e) => e.kind === "window" && !graced.has(e));
   if (win.length) {
     // Exact-reach buckets first, deepest leading — small fleets keep their exact labels.

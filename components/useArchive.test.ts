@@ -146,12 +146,12 @@ describe("archiveSchedule (the dossier's by-archival partition)", () => {
     ]);
     expect(s2!.unmeasured).toBe(18);
   });
-  it("a many-reach fleet folds into the fixed reach ladder (round 6: the DAG's span labels were 'too much text — 1 month, 6 months, >1 year, oldest'); deep archives read 'oldest' with the era in the hint", () => {
+  it("a many-reach fleet folds into the fixed reach ladder (round 6: the DAG's span labels were 'too much text — 1 month, 6 months, >1 year, oldest'); deep archives state their age and served span (rounds 7-8), era + gaps in the hint", () => {
     const day = (n: number) => new Date(now - n * 86_400_000).toISOString();
     const win = (ip: string, days: number, kept: number) =>
       ({ ip, chain: "g", kind: "window", floor: 1000 - kept, latest: 1000, floorTs: day(days) });
     const s = archiveSchedule(census([
-      { ip: "dp", chain: "g", kind: "deep", floor: 766_718, latest: 1000, floorTs: null },
+      { ip: "dp", chain: "g", kind: "deep", floor: 100, latest: 1000, floorTs: null },
       // 8 distinct reaches, 16 nodes — far more reaches than the 4 slots left after the deep row
       win("a", 730, 900), win("b", 540, 800),
       win("c1", 180, 500), win("c2", 180, 490), win("c3", 180, 480),
@@ -165,7 +165,8 @@ describe("archiveSchedule (the dossier's by-archival partition)", () => {
     // empty tier (nothing between 6 and 12 months here) draws no row. Kept is still the
     // deepest single copy per tier.
     expect(s!.rows).toEqual([
-      { label: "oldest", count: 1, kept: null, fullCount: 0, hint: "keeps deep history back to Nov 2023, with gaps" },
+      // Nov 2023 aged from the pinned now (2026-09-10) — the age grammar's year rounding
+      { label: "3 years", count: 1, kept: 900, fullCount: 0, hint: "keeps deep history back to Nov 2023, with gaps" },
       { label: "> 1 year", count: 2, kept: 900, fullCount: 0, hint: "keeps more than a year of the chain" },
       { label: "6 months", count: 10, kept: 500, fullCount: 0, hint: "keeps up to six months of the chain" },
       { label: "1 month", count: 4, kept: 100, fullCount: 0, hint: "keeps up to a month of the chain" },
