@@ -433,7 +433,7 @@ function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> })
                     "incomplete archive", on the holed deep row) — no count in the words,
                     the row's own count column already says how many (round 4). */}
                 <span
-                  className={row.count === 0 ? "text-body text-muted-foreground" : "text-body text-foreground"}
+                  className="text-body text-foreground"
                   title={row.hint ?? (row.kept != null ? `${fmtSnapCount(row.kept)} snapshots kept` : undefined)}
                 >
                   {cap(row.label)}
@@ -458,15 +458,15 @@ function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> })
                   <span />
                 )}
                 <BarCell count={row.count} max={Math.max(...sched.rows.map((x) => x.count))} hue="var(--muted-foreground)" />
-                <span className={`text-body tabular-nums min-w-[1.5em] text-right ${row.count === 0 ? "text-muted-foreground" : "text-foreground"}`}>{row.count}</span>
+                <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{row.count}</span>
               </Fragment>
             ))}
             {sched.unmeasured > 0 && (
               <Fragment key="__unmeasured">
-                <span className="text-body text-muted-foreground" title="The probe read nothing from these nodes — what they keep is unknown.">Unknown</span>
+                <span className="text-body text-foreground" title="The probe read nothing from these nodes — what they keep is unknown.">Unknown</span>
                 <span />
                 <span />
-                <span className="text-body text-muted-foreground tabular-nums min-w-[1.5em] text-right">{sched.unmeasured}</span>
+                <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{sched.unmeasured}</span>
               </Fragment>
             )}
           </div>
