@@ -168,30 +168,38 @@ export function archiveSummary(c: ArchiveCensus, chain: string): ArchiveNetSumma
   };
 }
 
-// THE ARCHIVAL SCHEDULE (user, 2026-09-10 — the dossier's accounting form: "by archival",
-// full vs dynamic reach ranges): one row for the full-chain keepers, one row per DISTINCT
-// reach among the partial archives — labeled in the app's one age grammar ("~2 months"),
-// dynamic because the census's floors are — and the fleet's remainder as "unmeasured"
-// (an absent entry means the probe read nothing, never provably "keeps little"; rule 10).
-export interface ArchiveScheduleRow { label: string; count: number }
+// THE ARCHIVAL SCHEDULE (user, 2026-09-10, two rounds — the dossier's accounting form: "by
+// archival", dynamic reach ranges): one row per DISTINCT reach, labeled in the age grammar
+// without the tilde ("2 months" — user: "the ~ looks messy"), a `full` flag for the rows
+// that keep the whole chain (rendered as a tag), each row's kept-snapshot sum as its hover
+// hint, and the fleet's remainder as "unmeasured" (an absent entry means the probe read
+// nothing, never provably "keeps little"; rule 10). Deep-kind rows carry a null kept — the
+// holed global archives, where any count would overclaim.
+export interface ArchiveScheduleRow { label: string; count: number; kept: number | null; full: boolean }
 export function archiveSchedule(
   c: ArchiveCensus, chain: string, fleetTotal: number, now = Date.now(),
 ): { rows: ArchiveScheduleRow[]; unmeasured: number } | null {
   const entries = [...c.entries.values()].filter((e) => e.chain === chain);
   if (!entries.length) return null;
-  const rows: ArchiveScheduleRow[] = [];
-  const genesis = entries.filter((e) => e.kind === "genesis").length;
-  if (genesis > 0) rows.push({ label: "full chain", count: genesis });
-  const buckets = new Map<string, number>();
+  const buckets = new Map<string, ArchiveScheduleRow>();
   for (const e of entries) {
-    if (e.kind === "genesis") continue;
+    const full = e.kind === "genesis";
     const label =
       e.kind === "deep"
         ? `back to ${c.since}`
-        : (e.floorTs && fmtReach(e.floorTs, now) ? `~${fmtReach(e.floorTs, now)}` : "recent window");
-    buckets.set(label, (buckets.get(label) ?? 0) + 1);
+        : (e.floorTs && fmtReach(e.floorTs, now)) || (full ? "full chain" : "recent window");
+    const kept = e.kind === "deep" ? null : full ? e.latest : e.latest - e.floor;
+    const key = `${full ? "F" : "P"}|${label}`;
+    const row = buckets.get(key);
+    if (row) {
+      row.count += 1;
+      row.kept = row.kept == null || kept == null ? null : row.kept + kept;
+    } else {
+      buckets.set(key, { label, count: 1, kept, full });
+    }
   }
-  for (const [label, count] of buckets) rows.push({ label, count });
+  // Full-chain rows lead — the schedule's own ranking, deepest first.
+  const rows = [...buckets.values()].sort((a, b) => Number(b.full) - Number(a.full));
   return { rows, unmeasured: Math.max(0, fleetTotal - entries.length) };
 }
 

@@ -274,7 +274,7 @@ const BUCKET_WORD: Record<StatusBucket, string> = {
 };
 /** Row-leading capital for a lifecycle word — the labels beside it in the make-up table are
  *  proper nouns of a sort ("Hybrid", "Data"), so a bare lowercase state broke the column. */
-const cap = (w: string): string => w.charAt(0).toUpperCase() + w.slice(1);
+export const cap = (w: string): string => w.charAt(0).toUpperCase() + w.slice(1);
 
 export function StatusBreakdown({ states }: { states: (string | null | undefined)[] }) {
   const b = statusBreakdown(states);

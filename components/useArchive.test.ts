@@ -129,17 +129,18 @@ describe("archiveSchedule (the dossier's by-archival partition)", () => {
     entries: new Map((entries as { ip: string }[]).map((e) => [e.ip, e])),
     since: "Nov 2023", archivalCount: entries.length, total: 5,
   }) as Parameters<typeof archiveSchedule>[0];
-  it("one full-chain row, dynamic reach rows in the age grammar, and the honest remainder", () => {
+  it("dynamic reach rows (no tilde), full rows flagged and leading, kept sums as hints", () => {
     const s2 = archiveSchedule(census([
       { ip: "a", chain: "x", kind: "genesis", floor: 1, latest: 100, floorTs: "2025-05-10T00:00:00Z" },
       { ip: "b", chain: "x", kind: "window", floor: 50, latest: 100, floorTs: "2026-07-10T00:00:00Z" },
-      { ip: "c", chain: "x", kind: "window", floor: 50, latest: 100, floorTs: "2026-07-10T00:00:00Z" },
+      { ip: "c", chain: "x", kind: "window", floor: 40, latest: 100, floorTs: "2026-07-10T00:00:00Z" },
       { ip: "d", chain: "x", kind: "window", floor: 99, latest: 100, floorTs: "2026-09-10T00:00:00Z" },
       { ip: "e", chain: "other", kind: "genesis", floor: 1, latest: 9, floorTs: null },
     ]), "x", 22, now);
-    expect(s2!.rows[0]).toEqual({ label: "full chain", count: 1 });
-    expect(s2!.rows).toContainEqual({ label: "~2 months", count: 2 });
-    expect(s2!.rows).toContainEqual({ label: "recent window", count: 1 }); // sub-day floor is an artifact, no age claim
+    // the full-chain keeper LEADS, reach-labeled in the age grammar, flagged, kept = the chain
+    expect(s2!.rows[0]).toEqual({ label: "16 months", count: 1, kept: 100, full: true });
+    expect(s2!.rows).toContainEqual({ label: "2 months", count: 2, kept: 110, full: false });
+    expect(s2!.rows).toContainEqual({ label: "recent window", count: 1, kept: 1, full: false }); // sub-day floor: no age claim
     expect(s2!.unmeasured).toBe(18); // 22 minus this chain's 4 probed
   });
   it("null when the census carries nothing for the chain", () => {

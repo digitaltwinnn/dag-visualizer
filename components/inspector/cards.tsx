@@ -23,7 +23,7 @@ import { useArchive, archiveFactState, archiveSchedule, archiveSummary, fmtSnapC
 import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
 import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
-import { ChipStack, Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark } from "./parts";
+import { cap, ChipStack, Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark } from "./parts";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { pickNetId, followToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -472,7 +472,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
       {/* Keyed on the text so the expand state resets when the subject (or its description
           arriving from /api/metagraphs) changes — an expanded DOR must not leak into DED. */}
       <Desc key={blurb} text={blurb} />
-      {nodes.length > 0 && (
+      {(nodes.length > 0 || (cfg.id !== "dag" && cfg.id !== UNLISTED_ID && metagraphById(cfg.id) != null)) && (
         <>
           {/* THE SCHEDULE FORM (user, 2026-09-10: "both are breakdowns of the same total …
               look at accounting"). Accounting's double-breakdown device is the SCHEDULE: the
@@ -485,13 +485,18 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
               fleet (the job the middle separator used to do). "by status" keeps its
               2026-08-18 gate: all-ready is the silent default, and when something is not
               ready the schedule shows the COMPLETE picture, ready included. */}
-          {/* The CONTROL TOTAL leads at the band's own lead weight (user, 2026-09-10: "it's
-              not clear it's the leading element") — the one number every schedule below
-              partitions. */}
-          <div className="mt-3 flex items-baseline justify-between gap-2">
-            <span className="text-body text-muted-foreground">Online nodes</span>
-            <span className="font-mono font-bold text-title tabular-nums text-foreground">{nodes.length}</span>
+          {/* The CONTROL TOTAL leads in the normal Fact grammar with a divider beneath it
+              (user, 2026-09-10, round 2: the larger font read as just a big number — the
+              DIVIDER is what says "what follows partitions this"). Shown even at 0 for a
+              catalog metagraph (an empty fleet is a reading); the schedules below skip then. */}
+          <div className="mt-3">
+            <Fact label="Online nodes">
+              <b className="font-bold">{nodes.length}</b>
+            </Fact>
           </div>
+          <Separator className="my-2" />
+          {nodes.length > 0 && (
+            <>
           <p className="mt-2 text-micro tracking-caps uppercase text-muted-foreground">by composition</p>
           <div className="mt-1 pl-2">
             <CompositionRows nodes={nodes} />
@@ -520,8 +525,21 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
                   {sched ? (
                     <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-[7px]">
                       {sched.rows.map((row) => (
-                        <Fragment key={row.label}>
-                          <span className="text-body text-foreground">{row.label === "full chain" ? "Full chain" : row.label}</span>
+                        <Fragment key={`${row.full}|${row.label}`}>
+                          {/* The kept-snapshot sum rides the ROW as its hover hint (user,
+                              round 2 — the "deepest …" underline retired); a full-chain
+                              keeper wears the tag beside its reach. */}
+                          <span
+                            className="inline-flex items-center gap-1.5 text-body text-foreground"
+                            title={row.kept != null ? `${fmtSnapCount(row.kept)} snapshots kept` : undefined}
+                          >
+                            {cap(row.label)}
+                            {row.full && (
+                              <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground">
+                                full
+                              </span>
+                            )}
+                          </span>
                           <ChipStack count={row.count} color="var(--muted-foreground)" />
                           <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{row.count}</span>
                         </Fragment>
@@ -537,15 +555,12 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
                   ) : (
                     <NodeStars count={4} />
                   )}
-                  {archSum?.kept != null && (
-                    <p className="mt-1 text-label text-muted-foreground">
-                      deepest {archSum.reach} · {fmtSnapCount(archSum.kept)} snapshots
-                    </p>
-                  )}
                 </div>
               </>
             );
           })()}
+            </>
+          )}
           <Separator className="my-2" />
         </>
       )}
@@ -557,7 +572,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           chain — ratio bold under the Online nodes total it counts against, checked in the
           success hue when any exist — and the muted underline carries the fleet's deepest
           surviving reach in the time register. */}
-      {nodes.length === 0 && (archSum || archAcquiring) && (
+      {nodes.length === 0 && cfg.id === "dag" && (archSum || archAcquiring) && (
         <>
           <Separator className="my-2" />
           {/* "Full archive nodes", not "genesis nodes" (user, 2026-08-14): the latter reads as
