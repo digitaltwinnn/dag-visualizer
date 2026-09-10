@@ -428,8 +428,10 @@ function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> })
                 {/* EVERY tag rides the right-aligned tag column (user, rounds 8 and 11:
                     "right aligned, not based on label length", then the full-node tag
                     too), so the tags share one edge whatever the labels run. A full row's
-                    tag is the bare "full node" — no count in the words, the row's own
-                    count column already says how many (round 4). */}
+                    tag is the bare "full archive" (round 9 — was "full node": the tag
+                    qualifies the ARCHIVE, and completeness got its opposite number,
+                    "incomplete archive", on the holed deep row) — no count in the words,
+                    the row's own count column already says how many (round 4). */}
                 <span
                   className="text-body text-foreground"
                   title={row.hint ?? (row.kept != null ? `${fmtSnapCount(row.kept)} snapshots kept` : undefined)}
@@ -440,7 +442,12 @@ function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> })
                   <span className="justify-self-end inline-flex items-center gap-1">
                     {row.fullCount > 0 && (
                       <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap">
-                        full node
+                        full archive
+                      </span>
+                    )}
+                    {row.incomplete && (
+                      <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap">
+                        incomplete archive
                       </span>
                     )}
                     {row.kept != null && (
