@@ -486,38 +486,44 @@ export default function TrendsDoc() {
           {sectionTab === "snapshots" && (
           <Section
             id="ledger"
-            title="The base ledger"
+            title="Global snapshots"
             lead="One subject, three readings: how many global snapshots were produced, how many metagraph snapshots they anchored, and the blocks that came with them."
           >
             <TrendChart onRange={onRange} inspect={inspectHere} name="Global snapshots" unit={per} readout={dayReadout("g.ticks")} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "ticks", points: trim(S(p, "g.ticks")) }]} />
-            <TrendChart onRange={onRange} inspect={inspectHere} name="Snapshots anchored" unit={per} readout={dayReadout("g.anchors")} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "anchored", points: trim(S(p, "g.anchors")) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Metagraph snapshots anchored" unit={per} readout={dayReadout("g.anchors")} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "anchored", points: trim(S(p, "g.anchors")) }]} />
             <TrendChart onRange={onRange} inspect={inspectHere} name="Blocks" unit={per} readout={dayReadout("g.blocks")} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "blocks", points: trim(S(p, "g.blocks")) }]} />
           </Section>
           )}
           {sectionTab === "continuity" && (
           <Section
             id="continuity"
-            title="Continuity"
-            lead="How regularly the network produced its snapshots, and how long its pauses were. Gray marks a pause that is normal for this network; amber marks one unusually long by its own history; a striped area means this app was not watching at the time."
+            title="Global snapshot continuity"
+            lead="How regularly the global snapshots were produced, and how long the pauses were. Gray marks a pause that is normal for this network; amber marks one unusually long by its own history; a striped area means this app was not watching at the time."
           >
             <TrendChart onRange={onRange} inspect={inspectHere} name="Mean gap" unit="seconds" buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} gaps={trim(S(p, "g.gapMax"))} lines={[{ label: "mean", points: trim(meanGap(p)) }]} />
             <TrendChart onRange={onRange} inspect={inspectHere} name="Longest pause" unit={`seconds · the ${stepMs >= 86400000 ? "day" : "bucket"}'s single widest gap`} buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} gaps={trim(S(p, "g.gapMax"))} lines={[{ label: "max", points: trim(S(p, "g.gapMax")) }]} />
           </Section>
           )}
-          {sectionTab === "economics" && (
+          {sectionTab === "economics" && (<>
           <Section
             id="economics"
-            title="Economics"
-            lead="How much data the metagraphs anchored into the global ledger, and what they paid for it."
+            title="Total fees paid"
+            lead="What the metagraphs paid to anchor into the global ledger."
           >
             <TrendChart onRange={onRange} inspect={inspectHere} name="Fees paid" unit={`DAG ${per} · at least`} readout={dayReadout("g.feeFloor", 1e-8)} buckets={cBuckets} stepMs={stepMs} format={dag} lines={[{ label: "fees", points: trim(scale(S(p, "g.feeFloor"), 1e-8)) }]} />
+          </Section>
+          <Section
+            id="economics-data"
+            title="Total data anchored"
+            lead="How much data the metagraphs anchored into the global ledger."
+          >
             <TrendChart onRange={onRange} inspect={inspectHere} name="Data anchored" unit={`${per} · at least`} readout={dayReadout("g.kbFloor", 1 / 1024)} buckets={cBuckets} stepMs={stepMs} format={mb} lines={[{ label: "data", points: trim(scale(S(p, "g.kbFloor"), 1 / 1024)) }]} />
           </Section>
-          )}
+          </>)}
           {sectionTab === "fleet" && (
           <Section
             id="fleet"
-            title="Nodes"
+            title="Total nodes"
             lead="Node counts are sampled live, hourly."
           >
             {stepMs < 3600000 && !fleetRaw ? (
@@ -557,7 +563,7 @@ export default function TrendsDoc() {
           {sectionTab === "snapshots" && (
           <Section
             id="networks"
-            title="Snapshots"
+            title="Metagraph snapshots anchored to global"
             lead={`Each network's own ${bucketWord} snapshot count.`}
           >
             {netPanels("snaps", per)}
@@ -566,16 +572,16 @@ export default function TrendsDoc() {
           {sectionTab === "economics" && (<>
           <Section
             id="net-fees"
-            title="Fees paid"
-            lead="What each network paid the base ledger to anchor."
+            title="Fees paid per metagraph"
+            lead="What each network paid to anchor into the global ledger."
           >
             {netPanels("fee", `DAG ${per}`, 1e-8, dag)}
           </Section>
 
           <Section
             id="net-data"
-            title="Data anchored"
-            lead="How much state each network sealed into the base ledger."
+            title="Data anchored per metagraph"
+            lead="How much data each network anchored into the global ledger."
           >
             {netPanels("kb", per, 1 / 1024, mb)}
           </Section>
@@ -583,7 +589,7 @@ export default function TrendsDoc() {
           {sectionTab === "fleet" && (
           <Section
             id="net-fleet"
-            title="Nodes"
+            title="Nodes per metagraph"
             lead="Each network's own node count, sampled live every hour."
           >
             {stepMs < 3600000 && !fleetRaw ? (
@@ -596,7 +602,7 @@ export default function TrendsDoc() {
           {sectionTab === "continuity" && (
           <Section
             id="net-continuity"
-            title="Continuity"
+            title="Continuity per metagraph"
             lead="How regularly each network produced its own snapshots. Some write steadily and some in bursts, so each is judged against its own rhythm: gray marks a normal pause, amber one unusually long for that network. A striped area means this app was not watching at the time."
           >
             {netGapPanels()}
