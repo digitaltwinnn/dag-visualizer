@@ -36,7 +36,11 @@ them — but the Next Node server can.
   coverage marker) and the Upstash usage contract (single region, eviction OFF, read-only
   token on the read route) live there. The pure modules beside the routes are the
   specification-by-test (keys/merge/bucketing/fetchSince/runSample/assemble).
-  **`scripts/rebuild-trends.ts` is the recovery tool**, three modes: full wipe-and-rebuild
+  **`scripts/rebuild-trends.ts` is the recovery tool — and the ONLY store-repair route**
+  (user, 2026-09-10: "use existing sweep functionality … even if it replays a day"): a
+  whole-day replay through `--recompute-from` beats any surgical write, because the sweep
+  rebuilds the day from the chain's own records and is authoritative over whatever it
+  overwrites. Never hand-write store fields. Three modes: full wipe-and-rebuild
   (`--days`; always wipes first — merge-based writes double-count otherwise), wipeless backward
   extension (`--extend-to`; disjoint older records, the partial boundary day recomputed whole —
   ⚠️ the explorer's cursors are CRAFTABLE but two-dialected: global `{created_at, ordinal}`,
