@@ -7,13 +7,7 @@ import { BAR_EASE } from "@/components/RollSwap";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { NodeInfo } from "@/src/data/types";
-import {
-  nodeStatus,
-  statusBreakdown,
-  labelBreakdown,
-  BUCKET_COLOR,
-  type StatusBucket,
-} from "@/src/data/nodeStatus";
+import { nodeStatus, statusItems } from "@/src/data/nodeStatus";
 import { compositionRows } from "@/src/data/composition";
 
 // Shared building blocks for the inspector cards (the React port of ui.js _cardBody),
@@ -260,33 +254,17 @@ export function StatusMark({ state }: { state?: string | null }) {
 }
 
 // Rolled-up status for a node group (dossier): the non-zero buckets as one small TABLE, the
-// composition table's own row grammar (see the placement note inside). The amber "progress" AND
-// red "down" buckets are spelled out by their exact lifecycle state(s) — the same wording the
-// single node's own card shows (`StatusMark`; the dossier said "down" while the node card said
-// "leaving", user 2026-07-12) — instead of collapsing to the bucket word; the bucket colour
-// (BUCKET_COLOR) rides the CHIPS only, never the word or the count. It went pills → stacked inline
+// composition table's own row grammar (see the placement note inside). Row derivation lives in
+// `statusItems` (src/data/nodeStatus.ts), shared with the vitals band's Node status cell; the
+// bucket colour rides the BAR only, never the word or the count. It went pills → stacked inline
 // counts → rows over three passes; the pill form has no consumer left, so it is gone rather than
 // kept as a dead branch.
-const BUCKET_WORD: Record<StatusBucket, string> = {
-  ready: "ready",
-  progress: "in progress",
-  down: "down",
-  unknown: "unknown",
-};
 /** Row-leading capital for a lifecycle word — the labels beside it in the make-up table are
  *  proper nouns of a sort ("Hybrid", "Data"), so a bare lowercase state broke the column. */
 export const cap = (w: string): string => w.charAt(0).toUpperCase() + w.slice(1);
 
 export function StatusBreakdown({ states }: { states: (string | null | undefined)[] }) {
-  const b = statusBreakdown(states);
-  const order: StatusBucket[] = ["ready", "progress", "down", "unknown"];
-  const items = order
-    .filter((k) => b[k] > 0)
-    .flatMap((k) =>
-      k === "progress" || k === "down"
-        ? labelBreakdown(states, k).map((it) => ({ ...it, color: BUCKET_COLOR[k] }))
-        : [{ label: BUCKET_WORD[k], count: b[k], color: BUCKET_COLOR[k] }],
-    );
+  const items = statusItems(states);
   // The COMPOSITION table's grammar, applied to the second partition (user, 2026-08-18). It was
   // an inline run of coloured counts hanging under the Online-nodes total, which wrapped the
   // moment a fleet was mixed — exactly when it has something to say. The card already asks this

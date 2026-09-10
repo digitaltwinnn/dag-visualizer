@@ -10,6 +10,7 @@ import type { NodeInfo } from "@/src/data/types";
 import { identityHudCss } from "@/src/palette/identity";
 import { METATYPE_ICONS, VIEW_ICONS } from "@/components/icons";
 import { METAGRAPHS } from "@/src/net/current";
+import { statusItems } from "@/src/data/nodeStatus";
 import Sparkline from "@/components/Sparkline";
 import Odometer from "@/components/Odometer";
 import { NoSignalDot, NodeStars } from "@/components/state/StateAtoms";
@@ -423,7 +424,7 @@ function HyperCells({ accent }: { accent: string }) {
   const scoped = !!cfg || displayNetwork(filter)?.virtual === true;
   // Memoized on the DATA inputs: the band re-renders on every scene-yield flip and feed
   // publish, and these fleet folds don't change with them (review, 2026-08-31).
-  const { counts, types, layers } = useMemo(() => {
+  const { counts, types, layers, statusRows } = useMemo(() => {
     const counts = compositionCounts(metaList, filter);
 
     // Metagraphs by TYPE — the DAG core is not a metagraph (one node model: it is the
@@ -441,6 +442,10 @@ function HyperCells({ accent }: { accent: string }) {
     // rolesOf is the one fallback home (a role list, else the single primary layer).
     const layers: Record<string, number> = { l0: 0, cl1: 0, dl1: 0 };
     const layerScope = cfg ? metaList.filter((m) => m.id === cfg.id) : displayNetwork(filter)?.virtual === true ? [] : metaList;
+    // The fleet's lifecycle STATES, per node record like the dossier's own status schedule
+    // (statusItems is the one row derivation for both) — same scope as the layer read.
+    const states: (string | null | undefined)[] = [];
+    for (const m of layerScope) for (const n of m.nodes) states.push(n.state);
     for (const m of layerScope) {
       const seen = new Set<string>();
       for (const n of m.nodes) {
@@ -450,7 +455,7 @@ function HyperCells({ accent }: { accent: string }) {
         for (const r of rolesOf(n)) if (r in layers) layers[r]!++;
       }
     }
-    return { counts, types, layers };
+    return { counts, types, layers, statusRows: statusItems(states) };
   }, [metaList, filter, cfg]);
 
   // A COMMITTED SCOPE flips the card from a DISTRIBUTION to a CHARACTERISTIC (user, 2026-08-30:
@@ -524,6 +529,16 @@ function HyperCells({ accent }: { accent: string }) {
             `steps` keeps them keyed to their own segment. */}
         <MicroBars accent={accent} labelW={72} dashZero={scoped}
           rows={Object.entries(counts).map(([label, n]) => ({ key: label, label, count: n }))} />
+      </BandCard>
+      {/* NODE STATUS (user, 2026-09-10) — the fleet's liveliness at a glance, a reading the
+          band never carried: under "all" (the starting point) it is unique to this row, and
+          under a commit it mirrors the dossier's own "by node status" schedule by design (two
+          scopes, one derivation — statusItems). Detail-only like the layers card: its total
+          is the fleet, which the composition donut beside it already leads with. Colour is
+          the status lane's own bucket tokens; every row is named (never colour-alone). */}
+      <BandCard label="Node status">
+        <MicroBars accent={accent} labelW={52}
+          rows={statusRows.map((it) => ({ key: it.label, label: it.label, count: it.count, hue: it.color }))} />
       </BandCard>
       {/* Unfiltered only — under a commit these rows are the type card's own evidence, above. */}
       {singleWord == null && (
