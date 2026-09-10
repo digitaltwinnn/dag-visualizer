@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { shortHash, metagraphById, getNetwork, SIGNER_GROUPS, nodeSigned, coLocatedNetworks, filterAccent } from "@/src/data/network";
@@ -19,11 +19,11 @@ import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms
 import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
-import { useArchive, archiveFactState, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
+import { useArchive, archiveFactState, archiveSchedule, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
 import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
 import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
-import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark } from "./parts";
+import { ChipStack, Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark } from "./parts";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { pickNetId, followToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -474,42 +474,79 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
       <Desc key={blurb} text={blurb} />
       {nodes.length > 0 && (
         <>
-          {/* The snapshot card's rhythm, applied here (user, 2026-07-12): the BREAKDOWN first
-              (composition table — rows carry their own counts), then the shared Separator,
-              then ONE summary row in the snapshot card's "Fees paid" grammar — muted label
-              left, the bold total + per-state breakdown right. Totals sit BELOW their parts;
-              the old "166 nodes with 3 different compositions" header restated the table.
-              The "Composition" micro-uppercase label above this table was the LAST survivor of
-              the retired stacked label-above-block form (user, 2026-08-10) — it outlived the
-              sweep only because CompositionRows is a table rather than a Fact. Dropped: each
-              row already names its own composition, and with it gone the description above
-              reads as the card's LEAD (which is why the blurb stays in the body rather than
-              moving into the head — a paragraph in CardHead would both special-case the one
-              header standard and blow up this card's ~28px collapsed entry). */}
-          <div className="mt-3">
+          {/* THE SCHEDULE FORM (user, 2026-09-10: "both are breakdowns of the same total …
+              look at accounting"). Accounting's double-breakdown device is the SCHEDULE: the
+              control total LEADS, and each partition follows as a labeled of-which schedule
+              under one roof — the grouping, the "by …" labels and the slight inset carry the
+              relation that three divider-separated segments lost. This flips the 2026-07-12
+              totals-below rule to the band's own later ruling ("a total lives inside its own
+              breakdown and LEADS it"); the separators between the partitions retire, and the
+              indent keeps two column-aligned tables from reading as ONE summing to twice the
+              fleet (the job the middle separator used to do). "by status" keeps its
+              2026-08-18 gate: all-ready is the silent default, and when something is not
+              ready the schedule shows the COMPLETE picture, ready included. */}
+          {/* The CONTROL TOTAL leads at the band's own lead weight (user, 2026-09-10: "it's
+              not clear it's the leading element") — the one number every schedule below
+              partitions. */}
+          <div className="mt-3 flex items-baseline justify-between gap-2">
+            <span className="text-body text-muted-foreground">Online nodes</span>
+            <span className="font-mono font-bold text-title tabular-nums text-foreground">{nodes.length}</span>
+          </div>
+          <p className="mt-2 text-micro tracking-caps uppercase text-muted-foreground">by composition</p>
+          <div className="mt-1 pl-2">
             <CompositionRows nodes={nodes} />
           </div>
-          {/* The SECOND partition of the same fleet — by state, in the same row grammar (user,
-              2026-08-18). It appears only when something is NOT ready (all-ready is the silent
-              default), and then it shows the FULL breakdown including the ready count, so a mixed
-              fleet reads as one complete picture. Its Separator is not decoration: column-aligned
-              and undivided, the two tables would read as ONE whose four partitions sum to twice
-              the fleet. */}
           {nonReady && (
             <>
-              <Separator className="my-2" />
-              <StatusBreakdown states={states} />
+              <p className="mt-2 text-micro tracking-caps uppercase text-muted-foreground">by status</p>
+              <div className="mt-1 pl-2">
+                <StatusBreakdown states={states} />
+              </div>
             </>
           )}
+          {/* THIRD SCHEDULE — "by archival" (user, 2026-09-10): the census's own kinds as
+              rows — the full-chain keepers, then one DYNAMIC row per distinct partial reach
+              in the age grammar ("~2 months") — and the honest remainder as unmeasured (an
+              absent probe entry proves nothing about what a node keeps). The deepest reach +
+              kept-count ride as the group's muted underline; this absorbs the old
+              divider-separated "Full archive nodes" fact for fleets. */}
+          {(() => {
+            const sched = archCensus ? archiveSchedule(archCensus, cfg.id, nodes.length) : null;
+            if (!sched && !archAcquiring) return null;
+            return (
+              <>
+                <p className="mt-2 text-micro tracking-caps uppercase text-muted-foreground">by archival</p>
+                <div className="mt-1 pl-2">
+                  {sched ? (
+                    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-[7px]">
+                      {sched.rows.map((row) => (
+                        <Fragment key={row.label}>
+                          <span className="text-body text-foreground">{row.label === "full chain" ? "Full chain" : row.label}</span>
+                          <ChipStack count={row.count} color="var(--muted-foreground)" />
+                          <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{row.count}</span>
+                        </Fragment>
+                      ))}
+                      {sched.unmeasured > 0 && (
+                        <Fragment key="__unmeasured">
+                          <span className="text-body text-muted-foreground">Unmeasured</span>
+                          <span />
+                          <span className="text-body text-muted-foreground tabular-nums min-w-[1.5em] text-right">{sched.unmeasured}</span>
+                        </Fragment>
+                      )}
+                    </div>
+                  ) : (
+                    <NodeStars count={4} />
+                  )}
+                  {archSum?.kept != null && (
+                    <p className="mt-1 text-label text-muted-foreground">
+                      deepest {archSum.reach} · {fmtSnapCount(archSum.kept)} snapshots
+                    </p>
+                  )}
+                </div>
+              </>
+            );
+          })()}
           <Separator className="my-2" />
-          {/* Summary in the shared Fact grammar — muted label left, the bold TOTAL right,
-              column-aligned with the counts of both tables it summarizes. Totals sit BELOW their
-              parts, which is why the state table sits above this row rather than hanging under it
-              as its underline: below, it would wedge between this Fact and the archive Fact, and
-              those two read as one summary block. */}
-          <Fact label="Online nodes">
-            <b className="font-bold">{nodes.length}</b>
-          </Fact>
         </>
       )}
       {/* Fleet-level archive summary, in the same summary block as Online nodes; the DAG
@@ -520,9 +557,9 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           chain — ratio bold under the Online nodes total it counts against, checked in the
           success hue when any exist — and the muted underline carries the fleet's deepest
           surviving reach in the time register. */}
-      {(archSum || archAcquiring) && (
+      {nodes.length === 0 && (archSum || archAcquiring) && (
         <>
-          {nodes.length === 0 && <Separator className="my-2" />}
+          <Separator className="my-2" />
           {/* "Full archive nodes", not "genesis nodes" (user, 2026-08-14): the latter reads as
               validators PRESENT at genesis — a different claim than keeping the whole chain. */}
           <Fact

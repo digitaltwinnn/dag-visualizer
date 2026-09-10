@@ -168,6 +168,33 @@ export function archiveSummary(c: ArchiveCensus, chain: string): ArchiveNetSumma
   };
 }
 
+// THE ARCHIVAL SCHEDULE (user, 2026-09-10 — the dossier's accounting form: "by archival",
+// full vs dynamic reach ranges): one row for the full-chain keepers, one row per DISTINCT
+// reach among the partial archives — labeled in the app's one age grammar ("~2 months"),
+// dynamic because the census's floors are — and the fleet's remainder as "unmeasured"
+// (an absent entry means the probe read nothing, never provably "keeps little"; rule 10).
+export interface ArchiveScheduleRow { label: string; count: number }
+export function archiveSchedule(
+  c: ArchiveCensus, chain: string, fleetTotal: number, now = Date.now(),
+): { rows: ArchiveScheduleRow[]; unmeasured: number } | null {
+  const entries = [...c.entries.values()].filter((e) => e.chain === chain);
+  if (!entries.length) return null;
+  const rows: ArchiveScheduleRow[] = [];
+  const genesis = entries.filter((e) => e.kind === "genesis").length;
+  if (genesis > 0) rows.push({ label: "full chain", count: genesis });
+  const buckets = new Map<string, number>();
+  for (const e of entries) {
+    if (e.kind === "genesis") continue;
+    const label =
+      e.kind === "deep"
+        ? `back to ${c.since}`
+        : (e.floorTs && fmtReach(e.floorTs, now) ? `~${fmtReach(e.floorTs, now)}` : "recent window");
+    buckets.set(label, (buckets.get(label) ?? 0) + 1);
+  }
+  for (const [label, count] of buckets) rows.push({ label, count });
+  return { rows, unmeasured: Math.max(0, fleetTotal - entries.length) };
+}
+
 let cached: ArchiveCensus | null = null;
 let inflight: Promise<ArchiveCensus | null> | null = null;
 
