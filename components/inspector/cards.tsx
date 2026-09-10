@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { shortHash, metagraphById, getNetwork, SIGNER_GROUPS, nodeSigned, coLocatedNetworks, filterAccent } from "@/src/data/network";
@@ -12,12 +12,13 @@ import { statusBreakdown } from "@/src/data/nodeStatus";
 import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
 import { metaSnapDeepKey } from "@/src/data/types";
 import AnchoredTags from "./AnchoredTags";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import Odometer from "@/components/Odometer";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
 import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS } from "@/components/icons";
-import { ExternalLink } from "lucide-react";
+import { ChevronRight, ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
 import { useArchive, archiveFactState, archiveSchedule, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
 import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
@@ -411,6 +412,35 @@ function UnlistedMemberFacts({ id, last }: { id: string; last: boolean }) {
   );
 }
 
+// EACH SCHEDULE GROUP DISCLOSES (user, 2026-09-10: "add a dropdown chevron to each
+// breakdown") — the one Collapsible + .disclose-panel recipe, the caption row as the
+// trigger. The chevron stays ALWAYS visible (not the explorer's hover-reveal: a folded
+// group's caption is otherwise indistinguishable from a plain label, and the chevron was
+// asked for as the affordance), rotating on the shared 150ms clock.
+// Open by default (the schedules ARE the card's content); state is local and plain —
+// folding a breakdown commits nothing, so the store owns none of it — and survives
+// pager steps, since the group's identity does.
+function ScheduleGroup({ label, children }: { label: string; children: ReactNode }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      <CollapsibleTrigger className="group mt-2 flex w-full items-center gap-1 cursor-pointer">
+        <span className="text-micro tracking-caps uppercase text-muted-foreground">{label}</span>
+        <ChevronRight
+          aria-hidden
+          className={cn(
+            "size-3.5 flex-none text-muted-foreground transition-transform duration-150 motion-reduce:transition-none",
+            open && "rotate-90",
+          )}
+        />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="disclose-panel">
+        <div className="mt-1 pl-2">{children}</div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 // THE "BY ARCHIVAL" GROUP — one renderer for every dossier (user, 2026-09-10: "missing the
 // archival breakdown for DAG / hypergraph; should behave the same"): the census's reaches as
 // merged rows (full-node + kept-snapshot tags), the honest unmeasured remainder, stars while
@@ -418,10 +448,8 @@ function UnlistedMemberFacts({ id, last }: { id: string; last: boolean }) {
 // nodes; the DAG dossier seats the same group standalone (its roster isn't `nodes`).
 function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> }) {
   return (
-    <>
-      <p className="mt-2 text-micro tracking-caps uppercase text-muted-foreground">by archived snapshots</p>
-      <div className="mt-1 pl-2">
-        {sched ? (
+    <ScheduleGroup label="by archived snapshots">
+      {sched ? (
           <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-x-2 gap-y-[7px]">
             {sched.rows.map((row) => (
               <Fragment key={`${row.fullCount > 0 ? "full|" : ""}${row.label}`}>
@@ -473,8 +501,7 @@ function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> })
         ) : (
           <NodeStars count={4} />
         )}
-      </div>
-    </>
+    </ScheduleGroup>
   );
 }
 
@@ -564,16 +591,14 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           <Separator className="my-2" />
           {nodes.length > 0 && (
             <>
-          <p className="mt-2 text-micro tracking-caps uppercase text-muted-foreground">by node composition</p>
-          <div className="mt-1 pl-2">
+          <ScheduleGroup label="by node composition">
             <CompositionRows nodes={nodes} />
-          </div>
+          </ScheduleGroup>
           {nonReady && (
             <>
-              <p className="mt-2 text-micro tracking-caps uppercase text-muted-foreground">by node status</p>
-              <div className="mt-1 pl-2">
+              <ScheduleGroup label="by node status">
                 <StatusBreakdown states={states} />
-              </div>
+              </ScheduleGroup>
             </>
           )}
           {/* THIRD SCHEDULE — "by archival" (user, 2026-09-10): the census's own kinds as
