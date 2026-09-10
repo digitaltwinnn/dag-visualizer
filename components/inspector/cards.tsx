@@ -550,13 +550,13 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           <Separator className="my-2" />
           {nodes.length > 0 && (
             <>
-          <p className="mt-2 text-micro tracking-caps uppercase text-muted-foreground">by composition</p>
+          <p className="mt-2 text-micro tracking-caps uppercase text-muted-foreground">by node composition</p>
           <div className="mt-1 pl-2">
             <CompositionRows nodes={nodes} />
           </div>
           {nonReady && (
             <>
-              <p className="mt-2 text-micro tracking-caps uppercase text-muted-foreground">by status</p>
+              <p className="mt-2 text-micro tracking-caps uppercase text-muted-foreground">by node status</p>
               <div className="mt-1 pl-2">
                 <StatusBreakdown states={states} />
               </div>
