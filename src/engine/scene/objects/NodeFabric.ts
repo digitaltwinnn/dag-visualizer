@@ -272,10 +272,10 @@ export class NodeFabric {
     mat.onBeforeCompile = (shader) => {
       shader.uniforms.uPaper = mat.userData.uPaper;
       shader.vertexShader = shader.vertexShader
-        .replace("#include <common>", "#include <common>\nattribute vec3 aBase;\nattribute float aEmissive;\nattribute float aFill;\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;\nvarying float vFill;\nvarying vec3 vPos;")
-        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvBase = aBase;\nvEmi = aEmissive;\nvCap = max(0.0, objectNormal.y);\nvFill = aFill;\nvPos = position;");
+        .replace("#include <common>", "#include <common>\nattribute vec3 aBase;\nattribute float aEmissive;\nattribute float aFill;\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;\nvarying float vFill;\nvarying vec3 vPos;\nvarying float vWall;")
+        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvBase = aBase;\nvEmi = aEmissive;\nvCap = max(0.0, objectNormal.y);\nvFill = aFill;\nvPos = position;\nvWall = 1.0 - abs(objectNormal.y);");
       shader.fragmentShader = shader.fragmentShader
-        .replace("#include <common>", "#include <common>\nuniform float uPaper;\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;\nvarying float vFill;\nvarying vec3 vPos;")
+        .replace("#include <common>", "#include <common>\nuniform float uPaper;\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;\nvarying float vFill;\nvarying vec3 vPos;\nvarying float vWall;")
         .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb *= vBase;\ndiffuseColor.rgb = mix(diffuseColor.rgb, mix(diffuseColor.rgb * 0.3, vec3(0.0), uPaper), 1.0 - vFill);")
         .replace(
           "#include <emissivemap_fragment>",
@@ -294,7 +294,9 @@ export class NodeFabric {
               "#include <emissivemap_fragment>\n" +
               "float fres = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 3.0);\n" +
               "if (vFill < 0.5 && uPaper > 0.5 && length(vPos.xz) < 0.72) discard;\n" +
-              "totalEmissiveRadiance = vBase * vEmi * mix(1.4 * fres, 0.5 + 0.95 * vCap + 1.1 * fres, vFill) + vBase * ((1.0 - vFill) * uPaper);"
+              "float hollowP = (1.0 - vFill) * uPaper;\n" +
+              "diffuseColor.a *= 1.0 - 0.7 * vWall * hollowP;\n" +
+              "totalEmissiveRadiance = vBase * vEmi * mix(1.4 * fres, 0.5 + 0.95 * vCap + 1.1 * fres, vFill) + vBase * (hollowP * (1.0 - 0.75 * vWall));"
             : // spheres (hyper nodes): a view-dependent FRESNEL rim so they read as glowing 3D orbs
               // instead of flat blobs (user). Coeffs keep the average near the old flat vEmi so the
               // dim/hover and bloom-threshold behaviour is unchanged. The rim is the shared
