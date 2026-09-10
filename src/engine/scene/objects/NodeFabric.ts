@@ -259,13 +259,20 @@ export class NodeFabric {
       transparent: alpha < 1, opacity: alpha,
     });
     if (flat && _env) mat.envMapRotation.copy(ENV_ROT); // aim the lit ceiling at the resting pose
+    // The GROUND flag as a live uniform (for the status hollow below): a hollow interior
+    // recedes toward DARK on the emissive ground but toward the PAPER on ink — dark ink on
+    // paper is emphasis (src/theme), so a dark interior there read HEAVIER than a ready
+    // node, inverting the signal. One shared object per material, re-pointed on the theme
+    // fan-out (applyGroundEnv), so a live flip reaches compiled shaders.
+    mat.userData.uPaper = { value: _paper ? 1 : 0 };
     mat.onBeforeCompile = (shader) => {
+      shader.uniforms.uPaper = mat.userData.uPaper;
       shader.vertexShader = shader.vertexShader
         .replace("#include <common>", "#include <common>\nattribute vec3 aBase;\nattribute float aEmissive;\nattribute float aFill;\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;\nvarying float vFill;")
         .replace("#include <begin_vertex>", "#include <begin_vertex>\nvBase = aBase;\nvEmi = aEmissive;\nvCap = max(0.0, objectNormal.y);\nvFill = aFill;");
       shader.fragmentShader = shader.fragmentShader
-        .replace("#include <common>", "#include <common>\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;\nvarying float vFill;")
-        .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb *= vBase * mix(0.3, 1.0, vFill);")
+        .replace("#include <common>", "#include <common>\nuniform float uPaper;\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;\nvarying float vFill;")
+        .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb *= vBase;\ndiffuseColor.rgb = mix(diffuseColor.rgb, mix(diffuseColor.rgb * 0.3, vec3(1.0), uPaper), 1.0 - vFill);")
         .replace(
           "#include <emissivemap_fragment>",
           flat
@@ -332,6 +339,12 @@ export class NodeFabric {
   }
 
   private _applyEnv(): void {
+    // The hollow interior's ground uniform rides the same fan-out (see _makeNodeMaterial) —
+    // every fabric material, spheres included.
+    for (const mesh of [this.instSphere, this.instHex, this.metaSphere, this.metaHex]) {
+      const u = (mesh?.material as THREE.MeshStandardMaterial | undefined)?.userData?.uPaper as { value: number } | undefined;
+      if (u) u.value = _paper ? 1 : 0;
+    }
     for (const mesh of [this.instHex, this.metaHex]) {
       const m = mesh?.material as THREE.MeshStandardMaterial | undefined;
       if (m?.envMap) m.envMapIntensity = envIntensity();
