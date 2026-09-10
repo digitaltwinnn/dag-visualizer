@@ -483,17 +483,23 @@ export default function TrendsDoc() {
 
 
           <TabsContent value="hypergraph" className="pt-5">
-          {sectionTab === "snapshots" && (
+          {sectionTab === "snapshots" && (<>
           <Section
             id="ledger"
             title="Global snapshots"
-            lead="One subject, three readings: how many global snapshots were produced, how many metagraph snapshots they anchored, and the blocks that came with them."
+            lead="One subject, two readings: how many global snapshots were produced, and how many metagraph snapshots they anchored."
           >
             <TrendChart onRange={onRange} inspect={inspectHere} name="Global snapshots" unit={per} readout={dayReadout("g.ticks")} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "ticks", points: trim(S(p, "g.ticks")) }]} />
             <TrendChart onRange={onRange} inspect={inspectHere} name="Metagraph snapshots anchored" unit={per} readout={dayReadout("g.anchors")} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "anchored", points: trim(S(p, "g.anchors")) }]} />
+          </Section>
+          <Section
+            id="ledger-blocks"
+            title="Blocks"
+            lead="Blocks ride inside the global snapshots — each one seals whatever blocks arrived with it. Most seal none: anchoring metagraph snapshots is the usual work, so blocks are the exception, not the pulse."
+          >
             <TrendChart onRange={onRange} inspect={inspectHere} name="Blocks" unit={per} readout={dayReadout("g.blocks")} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "blocks", points: trim(S(p, "g.blocks")) }]} />
           </Section>
-          )}
+          </>)}
           {sectionTab === "continuity" && (
           <Section
             id="continuity"
