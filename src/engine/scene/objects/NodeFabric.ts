@@ -261,11 +261,11 @@ export class NodeFabric {
     if (flat && _env) mat.envMapRotation.copy(ENV_ROT); // aim the lit ceiling at the resting pose
     mat.onBeforeCompile = (shader) => {
       shader.vertexShader = shader.vertexShader
-        .replace("#include <common>", "#include <common>\nattribute vec3 aBase;\nattribute float aEmissive;\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;")
-        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvBase = aBase;\nvEmi = aEmissive;\nvCap = max(0.0, objectNormal.y);");
+        .replace("#include <common>", "#include <common>\nattribute vec3 aBase;\nattribute float aEmissive;\nattribute float aFill;\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;\nvarying float vFill;")
+        .replace("#include <begin_vertex>", "#include <begin_vertex>\nvBase = aBase;\nvEmi = aEmissive;\nvCap = max(0.0, objectNormal.y);\nvFill = aFill;");
       shader.fragmentShader = shader.fragmentShader
-        .replace("#include <common>", "#include <common>\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;")
-        .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb *= vBase;")
+        .replace("#include <common>", "#include <common>\nvarying vec3 vBase;\nvarying float vEmi;\nvarying float vCap;\nvarying float vFill;")
+        .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb *= vBase * mix(0.3, 1.0, vFill);")
         .replace(
           "#include <emissivemap_fragment>",
           flat
@@ -276,16 +276,23 @@ export class NodeFabric {
               // its bloom halo dimmed with the resting tips, and geo's hover/selection highlight
               // vanished on light (user). The tip-calming is rest-only now, on the CPU where fw
               // is known (see CHIP_PAPER_CALM below).
+              // THE STATUS HOLLOW (user, 2026-09-10): vFill = 0 keeps ONLY the fresnel rim
+              // (slightly boosted so the shell stays legible) — a measured not-ready node
+              // reads as an outlined shell in its own hue; vFill = 1 is byte-identical to
+              // the shipped look. Same mix on the spheres below.
               "#include <emissivemap_fragment>\n" +
               "float fres = pow(1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0), 3.0);\n" +
-              "totalEmissiveRadiance = vBase * vEmi * (0.5 + 0.95 * vCap + 1.1 * fres);"
+              "totalEmissiveRadiance = vBase * vEmi * mix(1.4 * fres, 0.5 + 0.95 * vCap + 1.1 * fres, vFill);"
             : // spheres (hyper nodes): a view-dependent FRESNEL rim so they read as glowing 3D orbs
               // instead of flat blobs (user). Coeffs keep the average near the old flat vEmi so the
               // dim/hover and bloom-threshold behaviour is unchanged. The rim is the shared
               // ORB_FRESNEL chunk (HyperView's core/hub orbs replay the same tail).
+              // The status hollow, sphere form (see the chip branch): rim-only at vFill 0.
+              // ORB_FRESNEL_MIX itself is untouched — HyperView's core/hub orbs share it
+              // and carry no status.
               "#include <emissivemap_fragment>\n" +
               ORB_FRESNEL_GLSL +
-              `totalEmissiveRadiance = vBase * vEmi * ${ORB_FRESNEL_MIX};`,
+              `totalEmissiveRadiance = vBase * vEmi * mix(1.4 * fres, ${ORB_FRESNEL_MIX}, vFill);`,
         );
     };
     return mat;
@@ -335,6 +342,9 @@ export class NodeFabric {
     const total = records.length;
     const baseArr = new Float32Array(total * 3);
     const emiArr = new Float32Array(total).fill(0.5);
+    // The status fill channel (records carry it; see ValidatorRecord.fill) — event-time like
+    // aBase: statuses arrive with data rebuilds, so no per-frame write path exists for it.
+    const fillArr = new Float32Array(total).fill(1);
     const picks = new Array(total);
 
     const sphereGeo = (this._sphereGeo ||= new THREE.SphereGeometry(0.5, 16, 12)).clone();
@@ -344,6 +354,7 @@ export class NodeFabric {
     const hexGeo = (this._hexGeo ||= new THREE.CylinderGeometry(1, 1, 1, 32)).clone();
     const wrap = (geo: THREE.BufferGeometry): THREE.InstancedBufferAttribute => {
       geo.setAttribute("aBase", new THREE.InstancedBufferAttribute(baseArr, 3));
+      geo.setAttribute("aFill", new THREE.InstancedBufferAttribute(fillArr, 1));
       const aE = new THREE.InstancedBufferAttribute(emiArr, 1);
       aE.setUsage(THREE.DynamicDrawUsage);
       geo.setAttribute("aEmissive", aE);
@@ -372,6 +383,7 @@ export class NodeFabric {
     for (const u of records) {
       const c = u.base;
       baseArr[u.index * 3] = c.r; baseArr[u.index * 3 + 1] = c.g; baseArr[u.index * 3 + 2] = c.b;
+      fillArr[u.index] = u.fill;
       picks[u.index] = u.pick;
     }
     (this.instSphere.geometry.getAttribute("aBase") as THREE.InstancedBufferAttribute).needsUpdate = true;
@@ -402,11 +414,13 @@ export class NodeFabric {
 
     const baseArr = new Float32Array(total * 3);
     const emiArr = new Float32Array(total).fill(0.5);
+    const fillArr = new Float32Array(total).fill(1); // status fill — see the validator build
     const picks = new Array(total);
     const sphereGeo = new THREE.SphereGeometry(0.5, 16, 12);
     const hexGeo = new THREE.CylinderGeometry(1, 1, 1, 32); // round chip (see the validator note)
     const wrap = (geo: THREE.BufferGeometry): THREE.InstancedBufferAttribute => {
       geo.setAttribute("aBase", new THREE.InstancedBufferAttribute(baseArr, 3));
+      geo.setAttribute("aFill", new THREE.InstancedBufferAttribute(fillArr, 1));
       const aE = new THREE.InstancedBufferAttribute(emiArr, 1);
       aE.setUsage(THREE.DynamicDrawUsage);
       geo.setAttribute("aEmissive", aE);
@@ -433,6 +447,7 @@ export class NodeFabric {
     records.forEach((r, i) => {
       r.index = i;
       baseArr[i * 3] = r.color.r; baseArr[i * 3 + 1] = r.color.g; baseArr[i * 3 + 2] = r.color.b;
+      fillArr[i] = r.fill;
       picks[i] = r.pick;
     });
     (this.metaSphere.geometry.getAttribute("aBase") as THREE.InstancedBufferAttribute).needsUpdate = true;

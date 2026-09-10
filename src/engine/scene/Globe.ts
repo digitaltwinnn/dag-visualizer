@@ -42,6 +42,7 @@ import { Arcs } from "./objects/Arcs";
 import { makeRadialGradientTexture } from "./objects/gradientTexture";
 import type { HyperView } from "./views/HyperView";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
+import { nodeStatus } from "@/src/data/nodeStatus";
 import type {
   CountryStat,
   DagCore,
@@ -128,6 +129,18 @@ type MetaLayout = RouteMetagraph & {
 };
 
 const geoOf = (pick: PickDescriptor): GeoInfo | undefined => ("geo" in pick ? pick.geo : undefined);
+
+// THE STATUS FILL CHANNEL (user, 2026-09-10: "a chip/sphere with only outline/edge but no
+// fill") — a node whose cluster state MEASURED as not ready (the amber/red buckets:
+// observing/waiting/syncing/joining, offline/leaving) renders as a rim-only hollow shell in
+// its own identity hue, in every presentation. UNKNOWN stays solid (rule 10: an unread state
+// is not "not ready" — BioFi's whole fleet would otherwise hollow while anchoring hundreds
+// of snapshots an hour). Status still never touches colour, size, or the dim system: fill is
+// its own channel, resolved once per record at build (statuses arrive with data rebuilds).
+const nodeFillOf = (state?: string | null): number => {
+  const b = nodeStatus(state).bucket;
+  return b === "progress" || b === "down" ? 0 : 1;
+};
 
 export class Globe implements GeoViewHost {
   surface!: THREE.Group;
@@ -441,8 +454,9 @@ export class Globe implements GeoViewHost {
         const primary = node.id == null || !seen.has(node.id);
         if (node.id != null) seen.add(node.id);
         const col = new THREE.Color(color);
-        // NB: node colour is NOT dimmed by ready state — status lives in the card/explorer, never in
-        // the 3D scene (matches the uniform-size rule); off-ready nodes render at full identity colour.
+        // NB: node colour is NOT dimmed by ready state (nor size — the uniform-size rule):
+        // status in the scene is the FILL channel alone (nodeFillOf above) — a measured
+        // not-ready node hollows to its rim, at full identity colour.
 
         const hyperPos = armillaryPos(i, n, ring.radius, ring.numRings, ring.tilt);
         // The node's ring normal — nodes orbit ALONG their shell around this axis (see update()).
@@ -465,6 +479,7 @@ export class Globe implements GeoViewHost {
         } as unknown as PickDescriptor;
         const u: ValidatorRecord = {
           index: idx, layer: role, roles: node.roles || [role], nodeId: node.id, geoPrimary: primary, ready, base: col.clone(),
+          fill: nodeFillOf(node.state),
           ledgerPos, ledgerHide,
           hyperPos, hyperDir: hyperPos.clone().normalize(), hyperRadius: hyperPos.length(), ringAxis,
           geoDir, trueDir: geoDir ? geoDir.clone() : null, geoRadius: HEX_BASE_R, noGeo: !g,
@@ -826,7 +841,7 @@ export class Globe implements GeoViewHost {
             spinAxis: new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).normalize(),
             spinSpeed: 0.3 + Math.random() * 0.5, spinPhase: Math.random() * 6.2831,
             dim: 0, dimTarget: 0,
-            pick, fw: 0,
+            pick, fill: nodeFillOf(node.state), fw: 0,
             gU: 0, gV: 0, gRank: 0, gCount: 0, gS: 0,
           });
         });
