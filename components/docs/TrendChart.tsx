@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { CartesianGrid, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
@@ -40,6 +40,7 @@ export default function TrendChart({
   stepMs = 86400000,
   format = (v) => v.toLocaleString(undefined, { maximumFractionDigits: 1 }),
   sampled,
+  gaps,
   onRange,
   inspect,
   readout,
@@ -62,6 +63,11 @@ export default function TrendChart({
    *  bucket is "no reading derivable here" — the line breaks, no amber. Omitted, the points
    *  themselves are the coverage (raw stored series carry their own nulls-as-holes). */
   sampled?: (number | null)[];
+  /** The chain's own per-bucket WIDEST GAP (seconds — the gapMax series), for scaling the
+   *  amber band to the chain's rhythm (user, 2026-09-10: a warning colour on a bursty
+   *  chain's ordinary pauses was a diagnosis the words never made). See the band comment
+   *  for the median-based threshold and its reasoning. */
+  gaps?: (number | null)[];
   /** Drag-to-select a time range (the observation ladder's zoom, convention 12): mouse-down →
    *  drag → release hands the [fromMs, toMs] up, where the PAGE cuts every chart to it — one
    *  selection drives the whole column (the shared-axis rule), so this chart never cuts
@@ -79,6 +85,9 @@ export default function TrendChart({
   className?: string;
 }) {
   const n = buckets.length;
+  // The hatch pattern's SVG id — per chart instance (useId), sanitized because url(#…)
+  // fragments dislike the ':' React ids carry.
+  const hatchId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   // The in-flight drag, as bucket instants — preview only; the committed range lives on the
   // page (one selection, every chart). Cleared on release or when the pointer leaves.
   const [drag, setDrag] = useState<{ a: number; b: number } | null>(null);
@@ -179,37 +188,58 @@ export default function TrendChart({
   const isolated = (l: TrendLine, i: number): boolean =>
     l.points[i] != null && (i === 0 || l.points[i - 1] == null) && (i === n - 1 || l.points[i + 1] == null);
 
-  // VERTICAL BANDS, TWO KINDS (user, 2026-09-09 — one long arc: first "highlight the outage
-  // between these two measurements", then three rounds of form (full tile height, no outline,
-  // a real orange on both grounds), then the meaning flipped by "switch it around"): these
-  // charts are ABOUT the network, so the warning colour belongs to the NETWORK's events —
-  // an amber band is a measured run of buckets where the chain sealed NOTHING while this app
-  // watched (sampled === 0; the continuity charts pass `sampled`, whose zeros are exactly
-  // that silence). Our own coverage caveat goes NEUTRAL instead: a gray band is a stretch
-  // nobody sampled — no claim about the chain, quiet on purpose (the HUD's unmeasured stubs
-  // wear the same achromatic tone), and rare by design since the sampler heals its own gaps.
-  // A bucket is unmeasured only when EVERY line has nothing there (a pair's one-sided null is
-  // that series' own gap), and the never-measured LEADING prefix is the instrument's
-  // birthdate — no band at all.
-  const bandRuns = (inRun: (i: number) => boolean, startAt: number): { x1: number; x2: number }[] => {
-    const out: { x1: number; x2: number }[] = [];
+  // VERTICAL BANDS, THREE KINDS (user, 2026-09-09/10, one long arc — the 09-09 rounds set
+  // the form and flipped the meaning ("switch it around"); 09-10 split the silence itself,
+  // "is amber then the correct color?"): these charts are ABOUT the network, and a colour
+  // is a claim, so each band claims exactly what is provable.
+  //   AMBER — a measured silence EXCEPTIONAL for this chain: the run's ledger-proven pause
+  //     (the resume bucket's own gapMax, else the run's span) exceeds the chain's threshold.
+  //   GRAY (plain fill) — a measured silence WITHIN the chain's normal rhythm: sealed
+  //     nothing, said quietly, because for a bursty chain that is ordinary texture.
+  //   HATCHED — a stretch this app itself did not sample: a texture, not a tone, so our own
+  //     coverage caveat can never be confused with a statement about the chain.
+  //   The threshold is MEDIAN × 5 of the window's own per-bucket widest gaps — the median,
+  //   not a high quantile, because a p95 needs ~100+ buckets and lets a big stall inside a
+  //   small zoom become its own yardstick (the tail judging the tail); the median is stable
+  //   from a dozen buckets and one monster gap cannot move it. Fewer than 12 gap samples
+  //   (or no `gaps` series) falls back to every proven silence ambering — the pre-split
+  //   vocabulary, which only ever OVER-warns.
+  //   A bucket is unmeasured only when EVERY line has nothing there (a pair's one-sided null
+  //   is that series' own gap), and the never-measured LEADING prefix is the instrument's
+  //   birthdate — no band at all.
+  const bandRunsIdx = (inRun: (i: number) => boolean, startAt: number): { s: number; e: number }[] => {
+    const out: { s: number; e: number }[] = [];
     let start = -1;
     for (let i = startAt; i < n; i++) {
       if (inRun(i)) {
         if (start < 0) start = i;
       } else if (start >= 0) {
-        out.push({ x1: buckets[Math.max(0, start - 1)], x2: buckets[i] });
+        out.push({ s: start, e: i - 1 });
         start = -1;
       }
     }
-    if (start > 0) out.push({ x1: buckets[start - 1], x2: buckets[n - 1] });
+    if (start > 0) out.push({ s: start, e: n - 1 });
     return out;
   };
+  const spanOf = (r: { s: number; e: number }): { x1: number; x2: number } => ({
+    x1: buckets[Math.max(0, r.s - 1)],
+    x2: buckets[Math.min(n - 1, r.e + 1)],
+  });
   const unmeasuredAt = (i: number): boolean =>
     sampled ? sampled[i] == null : lines.every((l) => l.points[i] == null);
   const firstMeasured = buckets.findIndex((_, i) => !unmeasuredAt(i));
-  const holes = firstMeasured >= 0 ? bandRuns(unmeasuredAt, Math.max(0, firstMeasured)) : [];
-  const stalls = sampled ? bandRuns((i) => sampled[i] === 0, 0) : [];
+  const holes = (firstMeasured >= 0 ? bandRunsIdx(unmeasuredAt, Math.max(0, firstMeasured)) : []).map(spanOf);
+  const gapSamples = gaps ? gaps.filter((v): v is number => v != null).sort((a, b) => a - b) : [];
+  const gapThreshold = gapSamples.length >= 12 ? gapSamples[Math.floor(gapSamples.length / 2)] * 5 : null;
+  const stallRuns = sampled ? bandRunsIdx((i) => sampled[i] === 0, 0) : [];
+  const stallKind = (r: { s: number; e: number }): boolean => {
+    if (gapThreshold == null) return true; // no baseline — over-warn, never under
+    const proven = gaps?.[r.e + 1];
+    const pause = proven != null ? proven : ((r.e - r.s + 1) * stepMs) / 1000;
+    return pause > gapThreshold;
+  };
+  const stalls = stallRuns.filter((r) => stallKind(r)).map(spanOf);
+  const quiets = stallRuns.filter((r) => !stallKind(r)).map(spanOf);
 
   return (
     <div className={className ? `min-w-0 select-none ${className}` : "min-w-0 select-none"}>
@@ -312,6 +342,30 @@ export default function TrendChart({
               {holes.map((h) => (
                 <ReferenceArea
                   key={`hole-${h.x1}`}
+                  x1={h.x1}
+                  x2={h.x2}
+                  shape={({ x, width }: { x?: number; width?: number }) =>
+                    x != null && width != null ? (
+                      // NOT-SAMPLED is a TEXTURE, not a tone (the band comment): diagonal
+                      // hatching says "no reading here" the way a drawing voids a region,
+                      // and can never be confused with the quiet-gray fill beside it.
+                      <g>
+                        <defs>
+                          <pattern id={`${hatchId}-${h.x1}`} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                            <line x1="0" y1="0" x2="0" y2="6" stroke="var(--muted-foreground)" strokeWidth="1.5" strokeOpacity="0.3" />
+                          </pattern>
+                        </defs>
+                        <rect x={x} y={0} width={width} height={PLOT_H + AXIS_H} fill={`url(#${hatchId}-${h.x1})`} />
+                      </g>
+                    ) : (
+                      <g />
+                    )
+                  }
+                />
+              ))}
+              {quiets.map((h) => (
+                <ReferenceArea
+                  key={`quiet-${h.x1}`}
                   x1={h.x1}
                   x2={h.x2}
                   shape={({ x, width }: { x?: number; width?: number }) =>

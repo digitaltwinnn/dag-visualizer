@@ -258,16 +258,16 @@ export default function TrendsDoc() {
             ? sum.map((v, i) => (v != null && snaps[i] != null && snaps[i]! > 0 ? v / snaps[i]! : null))
             : gmax;
         const last = points.reduce<number | null>((acc, v) => (v != null ? v : acc), null);
-        return { m, points, last };
+        return { m, points, last, gmax };
       })
       .sort((a, b) => (b.last ?? -1) - (a.last ?? -1))
-      .map(({ m, points }) => {
+      .map(({ m, points, gmax }) => {
         const net = displayNetwork(m.id);
         const line: TrendLine = { label: kind, points: trim(points), hue: net?.hue };
         // `sampled` = the chain's own snaps series: amber only where the SAMPLER missed;
         // a null point over a sampled bucket (a quiet stretch — nothing to space) just
         // breaks the line (user, 2026-09-09: DOR's quiet buckets wore outage amber).
-        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} name={net?.name ?? m.id!} unit="seconds" buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, `m.${m.id}.snaps`))} lines={[line]} />;
+        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} name={net?.name ?? m.id!} unit="seconds" buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, `m.${m.id}.snaps`))} gaps={trim(gmax)} lines={[line]} />;
       });
   const secs = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}s`;
   const mb = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 1 })} MB`;
@@ -483,10 +483,10 @@ export default function TrendsDoc() {
           <Section
             id="continuity"
             title="Continuity"
-            lead="How steadily the ledger ticked: the average spacing between snapshots and each bucket's single longest pause — a tall spike is a stall, however brief."
+            lead="How steadily the ledger ticked: the average spacing between snapshots and each bucket's single longest pause. A gray column is a quiet stretch — the chain sealed nothing there, but within its normal rhythm; an amber column is a silence unusually long by this chain's own history; a hatched column is a stretch this app itself was not measuring, which says nothing about the chain."
           >
-            <TrendChart onRange={onRange} inspect={inspectHere} name="Mean gap" unit="seconds" buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} lines={[{ label: "mean", points: trim(meanGap(p)) }]} />
-            <TrendChart onRange={onRange} inspect={inspectHere} name="Longest pause" unit={`seconds · the ${stepMs >= 86400000 ? "day" : "bucket"}'s single widest gap`} buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} lines={[{ label: "max", points: trim(S(p, "g.gapMax")) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Mean gap" unit="seconds" buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} gaps={trim(S(p, "g.gapMax"))} lines={[{ label: "mean", points: trim(meanGap(p)) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Longest pause" unit={`seconds · the ${stepMs >= 86400000 ? "day" : "bucket"}'s single widest gap`} buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} gaps={trim(S(p, "g.gapMax"))} lines={[{ label: "max", points: trim(S(p, "g.gapMax")) }]} />
           </Section>
           </TabsContent>
           <TabsContent value="economics">
@@ -593,7 +593,7 @@ export default function TrendsDoc() {
           <Section
             id="net-continuity"
             title="Continuity"
-            lead="How steadily each network sealed its own snapshots — the average spacing between them, per bucket, measured from the chain's own record timestamps. An amber stretch is the network sealing nothing while this app watched — one that runs to the edge and never returns is a network that stopped; a gray stretch is a period this app did not sample."
+            lead="How steadily each network sealed its own snapshots — the average spacing between them, measured from the chain's own record timestamps. A gray column is a quiet stretch: nothing sealed, but ordinary for that network's own rhythm (some seal in bursts). An amber column is a silence that stands out against that network's own history — one that runs to the edge and never returns is a network that stopped. A hatched column is a stretch this app itself was not measuring."
           >
             {netGapPanels("mean")}
           </Section>
