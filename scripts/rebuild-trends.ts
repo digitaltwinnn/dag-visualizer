@@ -20,7 +20,7 @@
 // sampler catch-up that runs past the pager's 600-record cap ACCEPTS a gap — honest, but the
 // affected day then carries a measured-looking floor that reads as a crash. This mode
 // recomputes every day from the given date through YESTERDAY (UTC) completely from the tip —
-// all chains, daily tier overwritten whole, today's partial day and the cron cursor untouched.
+// all chains, every tier overwritten whole, today's partial day and the cron cursor untouched.
 // Locally-driven stores need it after manual sampling; a production cron never should.
 //
 // --extend-to EXTENDS HISTORY BACKWARD WITHOUT WIPING (user, 2026-09-07: "without removing/
@@ -417,7 +417,7 @@ async function main(): Promise<void> {
       console.error(`extend: the store already reaches ${oldest.year}-${oldest.d} — nothing to extend to ${new Date(extendToMs).toISOString().slice(0, 10)}`);
       process.exit(1);
     }
-    console.log(`extending ${new Date(extendToMs).toISOString().slice(0, 10)} → ${oldest.year}-${oldest.d} (boundary day recomputed whole; daily tier only)`);
+    console.log(`extending ${new Date(extendToMs).toISOString().slice(0, 10)} → ${oldest.year}-${oldest.d} (boundary day recomputed whole; all tiers)`);
 
     await probeCursorShape(`${be0}/global-snapshots`, "created_at,ordinal");
     const anyMeta = CATALOG[net].find((m) => m.id)?.id;
@@ -482,20 +482,21 @@ async function main(): Promise<void> {
       }
     }
 
-    // Daily tier only; plain HSET overwrites the boundary day with its complete recomputation.
-    console.log("writing (daily tier) …");
+    // Every tier — the daily-only limit belonged to the finite-TTL era, when older fine
+    // keys would only have expired unread; keep-forever (2026-09-10) retired the reason.
+    // Plain HSET overwrites the boundary day with its complete recomputation.
+    console.log("writing (all tiers) …");
     const store = writeStore();
     const CHUNK = 400;
     let fields = 0;
     for (const [key, map] of inc) {
-      if (tierOf(key) !== "1d") continue;
       const entries = [...map.entries()];
       for (let i = 0; i < entries.length; i += CHUNK) {
-        await store.applyWrites([{ key, map: Object.fromEntries(entries.slice(i, i + CHUNK)), ttlS: null }]);
+        await store.applyWrites([{ key, map: Object.fromEntries(entries.slice(i, i + CHUNK)), ttlS: TTL_S[tierOf(key)] }]);
       }
       fields += entries.length;
     }
-    console.log(`  ${fields} daily fields; cursor untouched — the cron never noticed.`);
+    console.log(`  ${fields} fields across the tiers; cursor untouched — the cron never noticed.`);
     return;
   }
 
