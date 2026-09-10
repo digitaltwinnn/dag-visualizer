@@ -425,28 +425,32 @@ function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> })
           <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-x-2 gap-y-[7px]">
             {sched.rows.map((row) => (
               <Fragment key={`${row.fullCount > 0 ? "full|" : ""}${row.label}`}>
-                {/* A full row wears the bare "full node" tag with its label — no count in
-                    the words, the row's own count column already says how many (user,
-                    round 4). The kept count rides its OWN right-aligned column (user,
-                    round 8: "right aligned, not based on label length"), so the tags
-                    share one edge whatever the labels run. */}
+                {/* EVERY tag rides the right-aligned tag column (user, rounds 8 and 11:
+                    "right aligned, not based on label length", then the full-node tag
+                    too), so the tags share one edge whatever the labels run. A full row's
+                    tag is the bare "full node" — no count in the words, the row's own
+                    count column already says how many (round 4). */}
                 <span
-                  className="inline-flex items-center gap-1.5 text-body text-foreground"
+                  className="text-body text-foreground"
                   title={row.kept != null ? `${fmtSnapCount(row.kept)} snapshots kept` : undefined}
                 >
                   {cap(row.label)}
-                  {row.fullCount > 0 && (
-                    <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap">
-                      full node
-                    </span>
-                  )}
                 </span>
-                {row.kept != null ? (
-                  <span
-                    className="justify-self-end inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap"
-                    title={`${fmtSnapCount(row.kept)} snapshots kept`}
-                  >
-                    {fmtSnapCount(row.kept)}
+                {row.fullCount > 0 || row.kept != null ? (
+                  <span className="justify-self-end inline-flex items-center gap-1">
+                    {row.fullCount > 0 && (
+                      <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap">
+                        full node
+                      </span>
+                    )}
+                    {row.kept != null && (
+                      <span
+                        className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap"
+                        title={`${fmtSnapCount(row.kept)} snapshots kept`}
+                      >
+                        {fmtSnapCount(row.kept)}
+                      </span>
+                    )}
                   </span>
                 ) : (
                   <span />
