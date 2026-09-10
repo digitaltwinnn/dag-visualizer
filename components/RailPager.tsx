@@ -267,7 +267,7 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     peek.current = null;
     const parent = p.el.parentElement;
     p.el.remove();
-    if (parent) { parent.style.position = p.prevPos; parent.style.overflow = p.prevOverflow; }
+    if (parent) { parent.style.position = p.prevPos; parent.style.overflow = p.prevOverflow; parent.style.maskImage = ""; }
   };
   /** Build (or re-aim) the peek for the direction the pull is going. Returns it, or null at an end —
    *  where there IS no neighbour, and the rubber band's short limit is already saying so. */
@@ -307,10 +307,18 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     const prevOverflow = parent.style.overflow;
     parent.style.position = "relative";
     parent.style.overflow = "hidden";          // the peek waits offstage until the pull reveals it
+    parent.style.maskImage = EDGE_MASK;
     parent.appendChild(g);
     peek.current = { el: g, dir, prevPos, prevOverflow };
     return g;
   };
+
+  // THE LANE'S SOFT EDGE (user, 2026-09-10: "the card swipe has a hard edge against which it
+  // disappears — give it a fade"): whenever the lane clips a slide, it also wears a short
+  // horizontal fade mask, so a card leaving the lane dissolves over its last ~14px instead of
+  // guillotining at the clip boundary. Applied and restored exactly where the overflow clip
+  // is — the mask exists only while something is actually sliding.
+  const EDGE_MASK = "linear-gradient(to right, transparent 0, black 14px, black calc(100% - 14px), transparent 100%)";
 
   const pending = useRef<{ t: ReturnType<typeof setTimeout>; fin: () => void } | null>(null);
   useEffect(() => () => { if (pending.current) { clearTimeout(pending.current.t); pending.current.fin(); } }, []);
@@ -359,7 +367,8 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     const prevHeight = parent.style.height;
     const prevTrans = parent.style.transition;
     parent.style.position = "relative";
-    parent.style.overflow = "hidden"; // clip the adjacent slide to the lane
+    parent.style.overflow = "hidden"; // clip the adjacent slide to the lane (+ the soft edge mask)
+    parent.style.maskImage = EDGE_MASK;
     // ⚠️ PIN THE LANE'S HEIGHT BEFORE THE SWAP. The clone is absolutely positioned, so it holds no
     // height, and the store commits synchronously — the moment React paints the new card the slot
     // becomes ITS height. Two cards of different length therefore made everything below jump the
@@ -392,6 +401,7 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
       clone.remove();
       parent.style.position = prevPos;
       parent.style.overflow = prevOverflow;
+      parent.style.maskImage = "";
       parent.style.height = prevHeight;
       parent.style.transition = prevTrans;
       el.style.transition = "none";
