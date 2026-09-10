@@ -524,7 +524,7 @@ export default function TrendsDoc() {
           <Section
             id="fleet"
             title="Total nodes"
-            lead="Node counts are sampled live, hourly."
+            lead="Every node across the whole network — the DAG's own validators and every metagraph's nodes — counted live each hour. The layers split the work: L0 seals a network's own state, currency L1 (cL1) moves its token, data L1 (dL1) takes in what applications write — and one node can run several."
           >
             {stepMs < 3600000 && !fleetRaw ? (
               /* The gauges are HOURLY instruments; at fine zooms their hourly payload is a
@@ -590,7 +590,7 @@ export default function TrendsDoc() {
           <Section
             id="net-fleet"
             title="Nodes per metagraph"
-            lead="Each network's own node count, sampled live every hour."
+            lead="Each network's own node count, sampled live every hour, with a line for each layer it runs: L0 seals its state, cL1 moves its token, dL1 takes in what applications write."
           >
             {stepMs < 3600000 && !fleetRaw ? (
               <p className="text-label text-muted-foreground">reading the hourly samples…</p>
