@@ -17,7 +17,11 @@ export interface PollHealth {
   id: string;
   label: string;
   target: string;      // where it goes, in words ("block explorer", "L0/L1 load balancers"; app-served feeds name the REAL upstream with the hop in parens)
-  everyMs: number | null; // the feed's own cadence; null = on demand
+  everyMs: number | null; // the feed's own cadence; null = no fixed cadence (see `when`)
+  /** The honest trigger words for a null-cadence feed (user, 2026-09-11 — "on demand" claimed a
+   *  user gesture neither feed answers to: the geo map loads once at engine boot, and trends
+   *  re-pulls on its own clock while its charts are shown). Null on scheduled feeds. */
+  when: string | null;
   lastOkAt: number | null;
   lastErrAt: number | null;
   ok: number;
@@ -28,16 +32,19 @@ export interface PollHealth {
 // the two-homes drift class this repo keeps re-catching — change a label at the success site
 // and not its error twin and the registry silently grows two rows. Call sites pass the ID alone.
 const FEEDS = {
-  global: { label: "Global snapshots", target: "block explorer", everyMs: POLL.pollMs },
-  metasnaps: { label: "Metagraph snapshots", target: "block explorer", everyMs: POLL.pollMs },
-  clusters: { label: "DAG nodes", target: "L0 + L1 load balancers", everyMs: POLL.clusterMs },
+  global: { label: "Global snapshots", target: "block explorer", everyMs: POLL.pollMs, when: null },
+  metasnaps: { label: "Metagraph snapshots", target: "block explorer", everyMs: POLL.pollMs, when: null },
+  clusters: { label: "DAG nodes", target: "L0 + L1 load balancers", everyMs: POLL.clusterMs, when: null },
   // "app API" said only the HOP, not the source (user, 2026-09-09: "that's only from where it
   // does the real calls") — an app-served feed names the real upstream, the hop in parens.
-  "api-metagraphs": { label: "Metagraph directory", target: "cluster info (via app)", everyMs: POLL.metaRefreshMs },
-  "api-geo": { label: "Validator geo map", target: "IP geolocation (via app)", everyMs: null },
+  "api-metagraphs": { label: "Metagraph directory", target: "cluster info (via app)", everyMs: POLL.metaRefreshMs, when: null },
+  // Loaded ONCE at engine boot (Engine._loadData), then localStorage fills misses — nothing the
+  // user does re-fires it, so the chip must not say "on demand" (user, 2026-09-11).
+  "api-geo": { label: "Validator geo map", target: "IP geolocation (via app)", everyMs: null, when: "at start" },
   // everyMs null on purpose: the feed polls POLL.trendsMs only WHILE a consumer is mounted
-  // (the ledger band's cards) — a fixed cadence here would derive STALE in every other view.
-  "api-trends": { label: "Trends history", target: "trends store (via app)", everyMs: null },
+  // (the ledger band's cards, the /trends doc) — a fixed cadence here would derive STALE in
+  // every other view. The `when` words state that real behaviour.
+  "api-trends": { label: "Trends history", target: "trends store (via app)", everyMs: null, when: `${Math.round(POLL.trendsMs / 60_000)} min · in view` },
 } as const;
 export type FeedId = keyof typeof FEEDS;
 const POLL_HEALTH = new Map<string, PollHealth>();
@@ -46,7 +53,7 @@ const POLL_HEALTH = new Map<string, PollHealth>();
 export function reportPoll(id: FeedId, ok: boolean): void {
   const d = FEEDS[id];
   let r = POLL_HEALTH.get(id);
-  if (!r) { r = { id, label: d.label, target: d.target, everyMs: d.everyMs, lastOkAt: null, lastErrAt: null, ok: 0, err: 0 }; POLL_HEALTH.set(id, r); }
+  if (!r) { r = { id, label: d.label, target: d.target, everyMs: d.everyMs, when: d.when, lastOkAt: null, lastErrAt: null, ok: 0, err: 0 }; POLL_HEALTH.set(id, r); }
   if (ok) { r.lastOkAt = Date.now(); r.ok++; } else { r.lastErrAt = Date.now(); r.err++; }
 }
 /** Ensure a feed has a ROW without recording an outcome.
@@ -59,7 +66,7 @@ export function reportPoll(id: FeedId, ok: boolean): void {
 export function touchPoll(id: FeedId): void {
   const d = FEEDS[id];
   if (!POLL_HEALTH.has(id)) {
-    POLL_HEALTH.set(id, { id, label: d.label, target: d.target, everyMs: d.everyMs, lastOkAt: null, lastErrAt: null, ok: 0, err: 0 });
+    POLL_HEALTH.set(id, { id, label: d.label, target: d.target, everyMs: d.everyMs, when: d.when, lastOkAt: null, lastErrAt: null, ok: 0, err: 0 });
   }
 }
 

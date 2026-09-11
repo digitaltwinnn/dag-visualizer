@@ -1,12 +1,13 @@
 "use client";
 
-import { pollHealthRows } from "@/src/data/api";
+import { pollHealthRows, type PollHealth } from "@/src/data/api";
 import { pollStatusOf, type PollStatus } from "@/src/data/pollStatus";
 import { relativeAge } from "@/src/util/relativeAge";
 import { BandCard } from "@/components/VitalsBand";
 import { useNowTick } from "@/components/useNowTick";
 import { cn } from "@/lib/utils";
 import { BAR_EASE } from "@/components/RollSwap";
+import { Timer } from "lucide-react";
 // THE PULSE STRIP — the heartbeat's own row (user, 2026-08-30: clicking the ECG "should show a
 // bottom section (like the filter) with relevant information about the liveliness of the app —
 // when did it last poll successfully? which polls do we have?"). The filter strip's exact
@@ -26,8 +27,17 @@ const AGE_INK: Record<PollStatus, string> = {
   acquiring: "text-muted-foreground",
 };
 
-const everyWord = (ms: number | null): string =>
-  ms == null ? "on demand" : ms >= 60_000 ? `every ${Math.round(ms / 60_000)} min` : `every ${Math.round(ms / 1000)}s`;
+// The cadence chip says the DURATION, the timer glyph says "scheduled" (user, 2026-09-11 —
+// "can't we say 5 mins with an icon?"): a fixed-cadence feed wears the glyph + the bare
+// duration. A feed with no fixed cadence wears its `when` words instead — the honest trigger
+// ("at start" for the boot-loaded geo map, "5 min · in view" for trends), because "on demand"
+// claimed a user gesture neither feed answers to (same user round).
+const cadenceWord = (r: PollHealth): string =>
+  r.everyMs != null
+    ? r.everyMs >= 60_000
+      ? `${Math.round(r.everyMs / 60_000)} min`
+      : `${Math.round(r.everyMs / 1000)}s`
+    : (r.when ?? "—");
 
 export default function PulseStrip() {
   const now = useNowTick(1000);
@@ -64,8 +74,9 @@ export default function PulseStrip() {
                 <span className={cn("font-mono font-bold text-caption tabular-nums leading-tight", AGE_INK[status])}>
                   {r.lastOkAt != null ? relativeAge(now - r.lastOkAt, true) : status === "failing" ? "failing" : "—"}
                 </span>
-                <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground">
-                  {everyWord(r.everyMs)}
+                <span className="inline-flex items-center gap-1 rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground">
+                  {r.everyMs != null && <Timer aria-hidden className="size-2.5 flex-none" />}
+                  {cadenceWord(r)}
                 </span>
               </span>
               <span className="text-micro text-muted-foreground truncate">{r.target}</span>
