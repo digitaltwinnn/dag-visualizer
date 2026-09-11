@@ -455,6 +455,10 @@ export class Engine {
     }
     setNodeDimTarget(colors); // the fabrics' shared mute target follows the ground (see NodeFabric)
     this.ctx = createScene(canvas, colors);
+    // The reframe gate's baseline is the aspect the poses actually resolve against — the
+    // camera's, which createScene measures from the CANVAS BOX, not the window (the two
+    // diverge by the browser-chrome band on mobile; see SceneContext's boxOf note).
+    this._framedAspect = this.ctx.camera.aspect;
     // The shared chip studio env, handed over before any fabric builds a material — every chip
     // material born after this carries it (see NodeFabric's note for the physics).
     setNodeEnv(this.ctx.nodeEnv());

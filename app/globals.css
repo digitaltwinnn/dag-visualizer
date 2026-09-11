@@ -955,9 +955,11 @@
        rasterization covers it is a browser rounding call — where it doesn't, the body's
        `--background` shows through as a hairline against the dark scene (doc pages paint the
        same colour there, which is why only scene pages showed it). Overdrawing clips offscreen,
-       so every fractional edge row is scene pixels at any rounding; the resulting ~0.2% stretch
-       of the integer-sized buffer is invisible and pick math reads the live rect anyway.
-       Pairs with SceneContext's setSize(..., false) — CSS owns this box. */
+       so every fractional edge row is scene pixels at any rounding.
+       Pairs with SceneContext's setSize(..., false) — CSS owns this box, and since 2026-09-11
+       the engine MEASURES it (boxOf) for the buffer and the camera aspect, so the box and the
+       render agree to sub-pixel even where 100vh and innerHeight diverge (mobile browser
+       chrome — the tablet's stretched globe). */
     width: calc(100vw + 2px);
     height: calc(100vh + 2px);
     display: block;
