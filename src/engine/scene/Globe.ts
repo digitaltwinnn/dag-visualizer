@@ -168,6 +168,16 @@ export class Globe implements GeoViewHost {
   private _glowTex?: THREE.Texture; // shared radial-gradient sprite for the light pools
   private _glowDim = 1; // eased 1→~0.2 while a country is drilled, so its highlight isn't overruled
   private _glowAllDim = 1; // eased ~0.62 in "all" (overlapping per-network planes stack additively)
+  // ⚠️ THE SHELL ROTATION SURVIVES A DATA REBUILD (user, 2026-09-11: "the spheres … at some
+  // point jump to a different point in their rotation"). The per-frame hyper orbit MUTATES
+  // each record's position in place (update() below), so the accumulated rotation lives only
+  // in the records — and a rebuild recomputes positions from the static armillary layout,
+  // snapping every bead back to its slot. These two accumulators are the rotation's second
+  // home: update() advances them alongside the mutation, and both build sites bake them into
+  // fresh positions, so a rebuild lands each bead where the motion had carried it. Kept mod
+  // 2π so a long-lived tab never feeds applyAxisAngle a huge angle.
+  private _coreRingAng = 0;
+  private _metaRingAng = 0;
   morph = 0;
   // The view-transition state machine (Engine-owned, set once); null = no transition support wired
   // yet at that call site. Read each frame by _frameCtx into ctx.transition for NodeFabric's gather.
@@ -462,6 +472,9 @@ export class Globe implements GeoViewHost {
         // The node's ring normal — nodes orbit ALONG their shell around this axis (see update()).
         const _rf = armillaryFrame(i % ring.numRings, ring.numRings, ring.tilt);
         const ringAxis = ringNormal(_rf, new THREE.Vector3()); // event-time
+        // Re-apply the live shell rotation (see _coreRingAng) — a rebuild must not reset the
+        // orbit phase; hyperDir/azimuth below derive from the rotated position.
+        hyperPos.applyAxisAngle(ringAxis, this._coreRingAng);
         const g = geoMap[node.ip];
         const geoDir = g ? latLonToVec3(g.lat!, g.lon!, 1).normalize() : null;
 
@@ -814,6 +827,9 @@ export class Globe implements GeoViewHost {
           const primary = !seen.has(node.ip);
           seen.add(node.ip);
           const offset = ringFramePos(i, cnt, META_RING.radii[layer], frame);
+          // Re-apply the live shell rotation (see _metaRingAng) — a rebuild must not reset
+          // the orbit phase; hyperPos below adds the rotated offset.
+          offset.applyAxisAngle(ringAxis, this._metaRingAng);
           const dir = latLonToVec3(g.lat!, g.lon!, 1).normalize(); // real location; fanned out below
           // LEDGER: one chip per MACHINE in this metagraph's own tray (2026-08-07) — the
           // machine's primary record carries the chip, its other layer instances hide.
@@ -1844,6 +1860,9 @@ export class Globe implements GeoViewHost {
       // too fast — give the core (validators) a slower angular rate than the metagraph rings (user).
       const coreAng = dt * 0.09;
       const metaAng = dt * 0.12;
+      // The accumulators mirror the mutation (see their declaration) — a rebuild re-applies them.
+      this._coreRingAng = (this._coreRingAng + coreAng) % (Math.PI * 2);
+      this._metaRingAng = (this._metaRingAng + metaAng) % (Math.PI * 2);
       for (const r of this.nodes) { r.hyperPos.applyAxisAngle(r.ringAxis, coreAng); r.hyperDir.applyAxisAngle(r.ringAxis, coreAng); }
       for (const r of this.metaNodes) r.offset.applyAxisAngle(r.ringAxis, metaAng);
     }
