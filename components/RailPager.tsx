@@ -460,12 +460,24 @@ export default function RailPager({
   // fight the rails' touch scrolling and the sheets' drag gestures): ∧ re-boxes the coarser
   // committed rung, ∨ the finer one — the accordion's own expand, committing nothing — and where
   // nothing finer is committed, ∨ falls through to `childStep` and COMMITS the first child.
-  const up = upSlot != null && onOpenSlot ? () => onOpenSlot(upSlot) : null;
+  // Every step first arms the lane's hover-inert window (`data-stepping`, globals.css): the
+  // pile re-lays under a resting cursor and entries easing past it flashed their hover release
+  // (user, same day — the pager slide's own bug on the vertical axis). Cleared a beat after
+  // the height ease (--tempo-roll ≈ 650ms); repeated steps re-arm the timer.
+  const stepStillT = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stillLane = () => {
+    const lane = wrap.current?.closest(".rail-ladder");
+    if (!(lane instanceof HTMLElement)) return; // the sheets' flat stack has no lane — no-op
+    lane.setAttribute("data-stepping", "");
+    if (stepStillT.current) clearTimeout(stepStillT.current);
+    stepStillT.current = setTimeout(() => lane.removeAttribute("data-stepping"), 720);
+  };
+  const up = upSlot != null && onOpenSlot ? () => { stillLane(); onOpenSlot(upSlot); } : null;
   const down =
     downSlot != null && onOpenSlot
-      ? { label: "Open the finer card", run: () => onOpenSlot(downSlot) }
+      ? { label: "Open the finer card", run: () => { stillLane(); onOpenSlot(downSlot); } }
       : child
-        ? { label: `Open first: ${child.label}`, run: () => applyClickActions(child.actions) }
+        ? { label: `Open first: ${child.label}`, run: () => { stillLane(); applyClickActions(child.actions); } }
         : null;
 
   if (!set && !up && !down) return <>{children}</>;

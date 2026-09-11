@@ -415,6 +415,13 @@
    what the geometry actually depends on, so the tier is what the wrapper states.
    Members are the two committed tiers; GHOSTS stay outside the slab and keep the plain gap. */
 .rail-ladder { gap: 0; }
+/* A LADDER STEP HOLDS THE LANE HOVER-INERT (user, 2026-09-11 — "down still flashes, check
+   also mouse pointer"): the ∧/∨ step re-lays the pile under a resting cursor, and entries
+   easing past it each flashed their hover release mid-motion — the pager slide's own bug on
+   the vertical axis, cured the same way. RailPager sets `data-stepping` for the height ease's
+   window; the plank's `pointer-events-auto` utility re-enables itself inside, so rapid
+   stepping keeps working. JS-toggled attribute — a contract like the marker classes. */
+.rail-ladder[data-stepping] { pointer-events: none; }
 .rail-ladder > * + * { margin-top: var(--rail-gap); }
 
 /* Any committed rung directly following another committed rung joins the pile — the box included,
