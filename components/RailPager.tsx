@@ -61,7 +61,6 @@ import {
   type ReactNode,
 } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { childStep, siblingSet, type SiblingState } from "@/components/railSiblings";
@@ -605,16 +604,24 @@ export default function RailPager({
           title={set?.parentLabel}
           className="pointer-events-auto absolute bottom-1 inset-x-[19px] flex h-5 items-center gap-1"
         >
-          {/* An edge chevron is INVISIBLE, not merely disabled (user, 2026-09-03: "don't show
-              the ‹ or › because it doesn't do anything") — a dimmed arrow still promises a
-              direction that isn't there. `invisible` rather than unmounting keeps the slot, so
-              the counter and its siblings never shift when an edge is reached. */}
-          {set ? (
+          {/* An edge chevron is INACTIVE, not hidden — but an AXIS with nothing to navigate on
+              this card EVER is ABSENT (user, 2026-09-11, two rounds; supersedes 2026-09-03's
+              invisible rule, which predates the ladder pair). The split: a direction that ran
+              out mid-set dims (the control exists, the direction is exhausted — and a vanishing
+              chevron would re-compose the row at every edge), while a card with no sibling set
+              at all (the only record at its rung) shows no trio, and a card with no ladder step
+              at all shows no pair — permanently dead chrome is not a control.
+              The trio is CENTERED as one cluster — chevrons hugging the counter — rather than
+              spread to the card edges (user, same day: with the ladder pair aboard, an
+              edge-aligned › sat right beside ∧; the flex spacers put clear air between the two
+              axes instead). */}
+          <div className="min-w-0 flex-1" />
+          {set && (
             <>
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className={cn("size-5", !prev && "invisible")}
+                className="size-5 disabled:opacity-30"
                 disabled={!prev}
                 onClick={() => commitStep(-1)}
                 aria-label={prev ? `Previous: ${prev.label}` : "Previous"}
@@ -622,16 +629,16 @@ export default function RailPager({
               >
                 <ChevronLeft aria-hidden />
               </Button>
-              {/* An OPEN set shows NO position (user, 2026-08-09): the global chain is ongoing, so
-                  `n / N` would state a total the window doesn't have. The spacer keeps the chevrons on
-                  the card's own content edges, identical to the counted variant. */}
-              <div className="min-w-0 flex-1 truncate text-center text-micro uppercase tracking-caps text-muted-foreground tabular-nums">
+              {/* An OPEN set shows NO position (user, 2026-08-09): the global chain is ongoing,
+                  so `n / N` would state a total the window doesn't have. The min-width keeps the
+                  chevron spacing identical across the variants. */}
+              <div className="min-w-[3ch] whitespace-nowrap text-center text-micro uppercase tracking-caps text-muted-foreground tabular-nums">
                 {set.open ? "" : `${set.index + 1} / ${set.items.length}`}
               </div>
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className={cn("size-5", !next && "invisible")}
+                className="size-5 disabled:opacity-30"
                 disabled={!next}
                 onClick={() => commitStep(1)}
                 aria-label={next ? `Next: ${next.label}` : "Next"}
@@ -639,25 +646,21 @@ export default function RailPager({
               >
                 <ChevronRight aria-hidden />
               </Button>
+              <div className="min-w-0 flex-1" />
             </>
-          ) : (
-            // Ladder-only plank: the spacer holds the pair on the card's right content edge,
-            // where the counted variant's › sits.
-            <div className="min-w-0 flex-1" />
           )}
           {/* THE LADDER PAIR (user, 2026-09-11) — ∧ re-boxes the coarser committed rung, ∨ the
               finer one (the accordion's own expand — the camera and callout follow the box as
               they always do), and with nothing finer committed ∨ commits the rung's FIRST child
-              in the explorer's own order. Same chrome-less grammar, same invisible-at-the-edge
-              rule as the sibling chevrons; the hairline keeps the two axes from reading as one
-              four-way control. */}
+              in the explorer's own order. Same chrome-less grammar, same inactive-at-the-edge
+              rule; the hairline keeps the two axes from reading as one four-way control. */}
           {(up || down) && (
             <>
               {set && <div aria-hidden className="mx-0.5 h-3 w-px bg-border" />}
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className={cn("size-5", !up && "invisible")}
+                className="size-5 disabled:opacity-30"
                 disabled={!up}
                 onClick={() => up?.()}
                 aria-label="Open the coarser card"
@@ -668,7 +671,7 @@ export default function RailPager({
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className={cn("size-5", !down && "invisible")}
+                className="size-5 disabled:opacity-30"
                 disabled={!down}
                 onClick={() => down?.run()}
                 aria-label={down?.label ?? "Open the finer card"}

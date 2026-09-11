@@ -306,9 +306,14 @@ nothing, with the camera and callout following the box as always — and where n
 committed, ∨ falls through to `childStep` (railSiblings.ts, tested) and COMMITS the rung's FIRST
 child in the explorer's own order ("just pick the 1st one"). A rung with no child vocabulary
 (a node, a metagraph snapshot, the ledger's network — its finer subjects belong to the tick axis)
-answers null and the control hides by the invisible-chevron rule. One hairline divides the two
-axes so they never read as one four-way control; a plank can be ladder-only (a boxed rung with no
-siblings still shows ∧/∨ where they act).
+disables the control. The sibling trio is CENTERED as one cluster with the ladder pair at the
+right, a hairline between the axes so they never read as one four-way control — and **an
+exhausted direction is INACTIVE while an axis with nothing to ever navigate is ABSENT** (user,
+2026-09-11, two rounds; supersedes 2026-09-03's invisible rule, which predates the pair): a
+direction that ran out mid-set dims — a vanishing chevron re-composes the row at every edge,
+and the dimmed state reads as "the control exists, the direction is exhausted" — while a card
+that is the only record at its rung shows no trio at all, and one with no ladder step shows no
+pair. Permanently dead chrome is not a control.
 
 **A pager's parent scope is whatever the step must NOT change, which for the metagraph snapshot makes it
 a PAIR — this metagraph × this tick** (user, 2026-08-09). The set is the subject's own `metaId` rows of the
