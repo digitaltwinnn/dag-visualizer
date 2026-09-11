@@ -745,7 +745,12 @@ function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: b
   const weekly = data.stepMs === 86_400_000 && data.buckets.length <= 7;
   return (
     <div className="flex flex-col h-full min-h-12 w-full self-stretch" aria-hidden>
-      <div className="flex items-end justify-end gap-[2px] flex-1 min-h-0 pb-0.5">
+      {/* justify-CENTER (user, 2026-09-11: "7D takes less than half the space and is right
+          aligned"): the 22px slot cap means sparse windows — 7D's seven bars, 1Y's twelve —
+          cannot fill the row, and end-alignment parked them in a corner. Full windows shrink
+          their slots to fit, so the justification is a no-op everywhere else; time still
+          reads left-old → right-new inside the cluster. */}
+      <div className="flex items-end justify-center gap-[2px] flex-1 min-h-0 pb-0.5">
         {allZero && <span className="text-micro text-muted-foreground self-center">no anchors in this window</span>}
         {bars.map((b) => {
           if (b.v == null) {
@@ -777,7 +782,7 @@ function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: b
         })}
       </div>
       {(monthly || weekly) && (
-        <div className="flex justify-end gap-[2px] leading-none">
+        <div className="flex justify-center gap-[2px] leading-none">
           {bars.map((b, i) => (
             <span key={b.ts} className="flex-1 max-w-[22px] text-center text-micro text-muted-foreground/70 lowercase whitespace-nowrap">
               {weekly
