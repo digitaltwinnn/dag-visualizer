@@ -315,6 +315,21 @@ and the dimmed state reads as "the control exists, the direction is exhausted" �
 that is the only record at its rung shows no trio at all, and one with no ladder step shows no
 pair. Permanently dead chrome is not a control.
 
+**Ladder steps are QUIET, and the quiet is PROVENANCE, not a timer** (user, 2026-09-11, four
+rounds ending in "solve it structurally"): `store.navQuiet` records HOW the current state was
+reached — set true by `toggleCollapse` (any manual expand, the About card's own
+never-roll-on-a-manual-expand rule) and by the one executor when a caller passes `quiet` (the
+plank's first-child ∨); reset false by every ordinary commit, by `setMode`, and by the
+`advanceSnap`/`advanceMetaSnap` heartbeat writes (a new tick IS an arrival — without that
+reset a stale quiet suppressed every later live-advance roll). `CardHead.useRolledTitle`
+freezes the answer per (mount, titleKey) via `getState` — no subscription, no re-trigger by
+class change — so a card mounting seconds late off a quiet gesture still skips its roll while
+explorer clicks and the ‹ › sibling steps keep theirs. The `data-stepping` attribute is the
+separate MOTION window (lane-owned timer on the `--tempo-roll` token; the sibling slide arms
+it on its own clock): it gates only the hover TREATMENTS — entry lift, seam reach, whisper,
+copy reveals — because a latched `:hover` survives `pointer-events` changes; it deliberately
+does NOT make the lane pointer-inert (clicks would fall through `#rightcol` to the canvas).
+
 **A pager's parent scope is whatever the step must NOT change, which for the metagraph snapshot makes it
 a PAIR — this metagraph × this tick** (user, 2026-08-09). The set is the subject's own `metaId` rows of the
 pinned tick's exact read, ordinal-desc, never every contributor: `metaSnapSelectActions` filter-firsts, so
@@ -715,7 +730,12 @@ grammar everywhere: label left, value right, one line.** The stacked micro-upper
 form is retired — it cost two lines per fact and read as a form, not an instrument. Its last survivor was
 the `Composition` label over the dossier's composition table, which outlived the sweep only because that
 table isn't a `Fact`; dropped 2026-08-10, since each row already names its own composition and without it
-the description above reads as the card's lead.
+the description above reads as the card's lead. **ONE deliberate exception since 2026-09-10: the
+dossier's accounting SCHEDULES** — the `by node composition` / `by node status` / `by archived
+snapshots` caption rows are user-directed disclosure captions over partition tables (the accounting
+form: one control total, labeled partitions beneath), not fact labels — a caption that FOLDS is a
+control, which is what takes it out of this rule's reach. Don't strip them as a regression of the
+2026-08-10 sweep, and don't cite them as precedent for stacking a label over a `Fact`.
 
 Three weights, and a fact's weight is a claim about what the card is FOR:
 

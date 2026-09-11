@@ -427,6 +427,12 @@ export const useStore = create<AppState>((set) => ({
   advanceSnap: (snap) =>
     set((s) => ({
       snap,
+      // A NEW tick arriving is an ARRIVAL, never part of a quiet gesture — it lifts the
+      // navQuiet provenance so the loud default governs the next title freeze (review find,
+      // 2026-09-11: this path bypasses applyClickActions, the flag's usual reset, so a stale
+      // quiet from a manual expand suppressed every later live-advance roll). Same-ordinal
+      // re-points leave the flag alone — a poll is not an arrival.
+      navQuiet: snap && s.snap?.data.ordinal !== snap.data.ordinal ? false : s.navQuiet,
       selStack: !snap
         ? s.selStack.filter((x) => x !== "snap")
         : s.selStack.includes("snap")
@@ -437,6 +443,11 @@ export const useStore = create<AppState>((set) => ({
   advanceMetaSnap: (metaSnap) =>
     set((s) => ({
       metaSnap,
+      // Same arrival rule as advanceSnap above — identity is metaId+ordinal (sameMetaSnap's).
+      navQuiet:
+        metaSnap && !(s.metaSnap && s.metaSnap.metaId === metaSnap.metaId && s.metaSnap.ordinal === metaSnap.ordinal)
+          ? false
+          : s.navQuiet,
       selStack: !metaSnap
         ? s.selStack.filter((x) => x !== "metaSnap")
         : s.selStack.includes("metaSnap")

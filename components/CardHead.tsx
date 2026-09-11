@@ -52,12 +52,14 @@ const TITLE = "m-0 text-title font-semibold";
  *  flag is state, a card mounting seconds later off the same gesture still knows. FROZEN per
  *  (mount, titleKey): the decision is made when this span first renders for a key and never
  *  revised, or a later loud commit elsewhere would re-trigger the animation by class change
- *  on a standing element. */
+ *  on a standing element. The flag is SAMPLED at freeze time via getState, not subscribed
+ *  (review find, 2026-09-11): a key change always arrives with a re-render of this head, and
+ *  a subscription re-rendered every card head in the app on each flip for a value none of
+ *  them re-consults. */
 function useRolledTitle(titleKey: string | number | undefined, title: ReactNode): ReactNode {
-  const navQuiet = useStore((s) => s.navQuiet);
   const frozen = useRef<{ key: string | number | undefined; quiet: boolean } | null>(null);
   if (frozen.current == null || frozen.current.key !== titleKey) {
-    frozen.current = { key: titleKey, quiet: navQuiet };
+    frozen.current = { key: titleKey, quiet: useStore.getState().navQuiet };
   }
   if (titleKey == null) return title;
   return (

@@ -542,6 +542,19 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const archSum = archCensus ? archiveSummary(archCensus, cfg.id === "dag" ? "global" : cfg.id) : null;
   const archAcquiring = archSum == null && !archSettled && (cfg.id === "dag" || metagraphById(cfg.id) != null);
   const nodes = mg?.nodes || [];
+  // ONE schedule for both seats (the fleet's third group and the DAG's standalone block —
+  // review cleanup, 2026-09-11: it was computed twice, once in an inline IIFE): the DAG's
+  // chain in the census is "global" and its unmeasured remainder counts against the census's
+  // own probed universe (its roster isn't `nodes`); a metagraph counts against its live fleet.
+  // Memoized — archiveSchedule walks every census entry with date parsing, and this card
+  // re-renders on every poll and hover.
+  const archSched = useMemo(
+    () =>
+      archCensus
+        ? archiveSchedule(archCensus, cfg.id === "dag" ? "global" : cfg.id, cfg.id === "dag" ? archCensus.total : nodes.length)
+        : null,
+    [archCensus, cfg.id, nodes.length],
+  );
   // The unlisted blurb COUNTS its members (user, 2026-08-14) — built here, beside the member
   // list it describes, so the two can't drift.
   const blurb =
@@ -591,41 +604,45 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
               <b className="font-bold">{nodes.length}</b>
             </Fact>
           </div>
-          <Separator className="my-2" />
+          {/* The divider announces the partitions that follow, so at 0 nodes — where every
+              schedule skips — it stands down too (review find, 2026-09-11: a dangling rule
+              over an empty region, back-to-back with the site row's own Separator). */}
+          {nodes.length > 0 && <Separator className="my-2" />}
           {nodes.length > 0 && (
             <>
-          <ScheduleGroup label="by node composition">
-            <CompositionRows nodes={nodes} />
-          </ScheduleGroup>
-          <ScheduleGroup label="by node status">
-            <StatusBreakdown states={states} />
-          </ScheduleGroup>
-          {/* THIRD SCHEDULE — "by archival" (user, 2026-09-10): the census's own kinds as
-              rows — the full-chain keepers, then one DYNAMIC row per distinct partial reach
-              in the age grammar ("~2 months") — and the honest remainder as unmeasured (an
-              absent probe entry proves nothing about what a node keeps). The deepest reach +
-              kept-count ride as the group's muted underline; this absorbs the old
-              divider-separated "Full archive nodes" fact for fleets. */}
-          {(() => {
-            const sched = archCensus ? archiveSchedule(archCensus, cfg.id === "dag" ? "global" : cfg.id, nodes.length) : null;
-            if (!sched && !archAcquiring) return null;
-            return <ArchivalGroup sched={sched} />;
-          })()}
+              <ScheduleGroup label="by node composition">
+                <CompositionRows nodes={nodes} />
+              </ScheduleGroup>
+              <ScheduleGroup label="by node status">
+                <StatusBreakdown states={states} />
+              </ScheduleGroup>
+              {/* THIRD SCHEDULE — "by archival" (user, 2026-09-10): the census's own kinds as
+                  rows — the full-chain keepers, then one DYNAMIC row per distinct partial reach
+                  in the age grammar ("~2 months") — and the honest remainder as unmeasured (an
+                  absent probe entry proves nothing about what a node keeps). The deepest reach +
+                  kept-count ride as the group's muted underline; this absorbs the old
+                  divider-separated "Full archive nodes" fact for fleets. */}
+              {(archSched != null || archAcquiring) && <ArchivalGroup sched={archSched} />}
             </>
           )}
         </>
       )}
-      {/* The DAG dossier's archival reading — the SAME by-archival schedule the metagraph
-          dossiers carry (user, 2026-09-10: "missing the archival breakdown for DAG /
+      {/* The ZERO-FLEET archival reading — the DAG dossier always lands here (its roster
+          isn't `nodes`), and a catalog metagraph whose live fleet reads 0 keeps its census
+          data too (review find, 2026-09-11: the old fleet-gated block silently dropped a
+          probed chain's archival facts, and the acquiring stars with them, on a fleet dip).
+          The SAME by-archival schedule the metagraph dossiers carry (user, 2026-09-10: "missing the archival breakdown for DAG /
           hypergraph; should behave the same" — this absorbs the old single "Full archive
           nodes" fact). Its chain in the census is "global"; the unmeasured remainder counts
           against the census's own probed universe, the global L0 fleet at probe time —
           the DAG core's roster isn't `nodes` (that list is per-metagraph). Deep-kind rows
-          ("back to Nov 2023") keep a null kept, the holed-archive rule. */}
-      {nodes.length === 0 && cfg.id === "dag" && (archSum || archAcquiring) && (
+          ("back to Nov 2023") carry their SPAN as the kept chip — archiveSchedule's rule,
+          with the shared-gaps caveat riding the chip's own hover, since the deep archives
+          hold the reach, not every ordinal in it. */}
+      {nodes.length === 0 && ((archSched?.rows.length ?? 0) > 0 || archAcquiring) && (
         <>
           <Separator className="my-2" />
-          <ArchivalGroup sched={archCensus ? archiveSchedule(archCensus, "global", archCensus.total) : null} />
+          <ArchivalGroup sched={archSched} />
         </>
       )}
       {unlistedMembers.map((id, i) => (

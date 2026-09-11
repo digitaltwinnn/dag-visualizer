@@ -415,13 +415,16 @@
    what the geometry actually depends on, so the tier is what the wrapper states.
    Members are the two committed tiers; GHOSTS stay outside the slab and keep the plain gap. */
 .rail-ladder { gap: 0; }
-/* A LADDER STEP HOLDS THE LANE HOVER-INERT (user, 2026-09-11 — "down still flashes, check
-   also mouse pointer"): the ∧/∨ step re-lays the pile under a resting cursor, and entries
-   easing past it each flashed their hover release mid-motion — the pager slide's own bug on
-   the vertical axis, cured the same way. RailPager sets `data-stepping` for the height ease's
-   window; the plank's `pointer-events-auto` utility re-enables itself inside, so rapid
-   stepping keeps working. JS-toggled attribute — a contract like the marker classes. */
-.rail-ladder[data-stepping] { pointer-events: none; }
+/* A LADDER STEP GATES THE HOVER TREATMENTS (user, 2026-09-11, several rounds; review-hardened
+   the same day): the ∧/∨ step (and the sibling slide, which arms the same window) re-lays
+   cards under a resting cursor, and Chromium keeps — even grants freshly-mounted elements —
+   a latched `:hover` until a real hit test, which lags the re-layout. So while RailPager's
+   `data-stepping` holds, the hover EFFECTS below simply do not apply, whatever :hover claims.
+   ⚠️ Deliberately NOT `pointer-events: none` on the lane (review find: it made clicks FALL
+   THROUGH the lane to the canvas — `#rightcol` is pointer-events:none — so a click on an
+   entry right after a step could fire an accidental scene pick, and reduced-motion users got
+   a dead zone after an instant swap). Clicks stay live; only the hover visuals stand down.
+   JS-toggled attribute — a contract like the marker classes. */
 /* THE TIER SWAP SETTLES, NEVER SNAPS (user, 2026-09-11, closing the ladder-step polish:
    "focus should fade and only be fully active when the card is expanded to its final
    shape. Check also when going up."): a rung arriving as the BOX eases its presence up from

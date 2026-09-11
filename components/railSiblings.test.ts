@@ -399,4 +399,18 @@ describe("childStep — the first-child DOWN step", () => {
     expect(childStep("node", base({ inspect: deA.pick }))).toBeNull();
     expect(childStep("metaSnap", base({}))).toBeNull();
   });
+  // A filter is a LENS (the explorer's previewOnly rule): the tick's ∨ opens the committed
+  // story's own first row, never a cross-network row whose builder would filter-first and
+  // silently re-commit the network — and with no row for the story in this tick, nothing.
+  it("under a committed filter the tick's ∨ stays inside the lens", () => {
+    const rows = [
+      { metaId: "dor", ordinal: 900 },
+      { metaId: "ded", ordinal: 55 },
+    ] as unknown as SiblingState["exactRows"];
+    const s = base({ mode: "ledger", filter: "ded", snap: snapPick, exactRows: rows });
+    const step = childStep("snap", s)!;
+    expect(step.key).toBe("ded:55");
+    expect(step.actions.some((a) => a.kind === "filter")).toBe(false); // never re-commits the network
+    expect(childStep("snap", base({ mode: "ledger", filter: "paca", snap: snapPick, exactRows: rows }))).toBeNull();
+  });
 });
