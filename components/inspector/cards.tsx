@@ -779,8 +779,10 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // across networks (the Upsider pattern) carries it on its metagraph record too, which is
   // why the match runs for every node kind (user, 2026-08-16: "keep it actual"). The row is
   // ALWAYS stated, "not known" when nothing resolves. The registry's other reading, the
-  // delegated-staking OPT-IN, is its own row (user, 2026-08-16: "would that be a separate
-  // attribute?") in the service block below: Yes/No for DAG validators only — only a Global
+  // delegated-staking OPT-IN, is the ROW RIGHT UNDER IT (user, 2026-09-11: "alias and
+  // delegated staking are directly related, no?" — both are the one registry's readings, the
+  // alias IS its display name, and adjacency is this grammar's relation device; supersedes
+  // the 2026-08-16 service-block placement): Yes/No for DAG validators only — only a Global
   // L0 validator can register (measured: 31 of 147 live validators haven't).
   const isDagValidator = p.kind === "l0" || p.kind === "l1";
   const nickState = useNodeNames();
@@ -850,6 +852,35 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
             </span>
           ))}
         </Fact>
+        {/* DELEGATED STAKING — the registry's opt-in reading, DIRECTLY under the Alias it
+            shares a registry with (user, 2026-09-11 — see the note above; the adjacency IS
+            the relation statement): whether this validator registered as a candidate DAG
+            holders can delegate to. Validators only — the question doesn't apply to a
+            metagraph machine (the archive row's n/a lesson, taken one further: no row at
+            all). */}
+        {isDagValidator && (
+          <Fact label="Delegated staking">
+            {!nickState.settled ? (
+              <NodeStars count={3} />
+            ) : nickState.names ? (
+              <span
+                className="inline-flex items-center gap-1.5"
+                title={
+                  registered
+                    ? "Registered as a delegated-staking candidate in the Global L0 registry — DAG holders can delegate stake to this L0 validator."
+                    : "Whitelisted to validate but not registered as a delegated-staking candidate — separate, independent gates, which is why a live L0 validator can lack an entry."
+                }
+              >
+                <BoolMark on={registered} />
+                <b className="font-bold">{registered ? "Yes" : "No"}</b>
+              </span>
+            ) : (
+              <span className="text-muted-foreground italic" title="The delegated-staking registry could not be read — retried on the next visit.">
+                not available
+              </span>
+            )}
+          </Fact>
+        )}
         {/* STATUS — only while the SIGNED relation holds the head aside (its usual home). */}
         {signedSel && (
           <Fact label="Status">
@@ -903,35 +934,8 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           )}
         </Fact>
         {/* Reading order: place → role → host → SERVICE — what this machine serves sits with
-            the host block, above the reference foot. */}
-        {/* DELEGATED STAKING — the registry's opt-in reading (see the Nickname note): whether
-            this validator registered as a candidate DAG holders can delegate to. A service the
-            machine offers, so it sits with the host block like Full archive, and it shares that
-            row's Yes/No grammar. Validators only — the question doesn't apply to a metagraph
-            machine (the archive row's n/a lesson, taken one further: no row at all). */}
-        {isDagValidator && (
-          <Fact label="Delegated staking">
-            {!nickState.settled ? (
-              <NodeStars count={3} />
-            ) : nickState.names ? (
-              <span
-                className="inline-flex items-center gap-1.5"
-                title={
-                  registered
-                    ? "Registered as a delegated-staking candidate in the Global L0 registry — DAG holders can delegate stake to this L0 validator."
-                    : "Whitelisted to validate but not registered as a delegated-staking candidate — separate, independent gates, which is why a live L0 validator can lack an entry."
-                }
-              >
-                <BoolMark on={registered} />
-                <b className="font-bold">{registered ? "Yes" : "No"}</b>
-              </span>
-            ) : (
-              <span className="text-muted-foreground italic" title="The delegated-staking registry could not be read — retried on the next visit.">
-                not available
-              </span>
-            )}
-          </Fact>
-        )}
+            the host block, above the reference foot. (Delegated staking moved up beside its
+            registry sibling Alias, 2026-09-11 — see that pair's note.) */}
         {archState.kind === "value" && archEntry && archive && (
           /* The dossier's settled stacked grammar, machine-scoped (user, 2026-08-14 — "in the
              node card follow the same thinking; still says 'archive'"): Yes/No against the
