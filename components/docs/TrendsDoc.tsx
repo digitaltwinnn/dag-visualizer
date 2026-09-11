@@ -577,12 +577,14 @@ export default function TrendsDoc() {
           <Section
             id="net-blocks"
             title="Blocks per metagraph"
-            // The lead teaches the mechanism, not just the count (user, 2026-09-11): a block
-            // is the L1 layers' batching unit, and each layer batches its own kind — the
-            // About card's own layer phrasing (cL1 moves the token, dL1 takes in what
-            // applications write), with the both-layers case stated generally rather than
-            // pinning it to named networks.
-            lead="The blocks each network sealed inside its own snapshots. A block is where an L1 layer batches its work before the snapshot seals it, and each layer batches its own kind: a currency layer's blocks move the token (someone sending USDC.dag or UP), while a data layer's blocks hold the records its application writes. A network running both layers seals both — transfers and data side by side."
+            // ⚠️ No mechanism claim beyond what the raw page shows (user, 2026-09-11, twice):
+            // the first cut said a data layer's records ride in blocks and blocks are where
+            // "an L1 batches its work" — but a snapshot has TWO carriers (its state, and its
+            // blocks) and networks split their payload between them differently (DED: state
+            // empty, records in blocks; others the reverse), with no crisp delineation we've
+            // measured. So the lead names both carriers, keeps the one vetted example
+            // (token transfers), and closes on the honesty rule a per-network zero needs.
+            lead="The blocks each network sealed inside its own snapshots. Blocks carry transactions — a token transfer rides as one (someone sending USDC.dag or UP), and a data network can batch application records the same way — but they are one of two places a snapshot carries work: a network may just as well put its payload in the snapshot's own state, and where it draws that line is its own design. A zero here means no blocks, not no activity."
           >
             {netPanels("blocks", per)}
           </Section>
