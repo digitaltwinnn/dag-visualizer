@@ -463,25 +463,27 @@ export default function RailPager({
   // Every step first arms the lane's hover-inert window (`data-stepping`, globals.css): the
   // pile re-lays under a resting cursor and entries easing past it flashed their hover release
   // (user, same day — the pager slide's own bug on the vertical axis). Cleared a beat after
-  // the height ease (--tempo-roll ≈ 650ms); repeated steps re-arm the timer. The VALUE says
-  // what kind of step: "move" is the accordion re-boxing a rung whose subject is unchanged —
-  // the title roll-in stands down there (the About card's own never-roll-on-manual-expand
-  // rule; user: "'Falkenstein' and the 'ready' tag flash while they are still the same") —
-  // while "commit" (∨ opening a first child) is a genuinely new subject and keeps its roll.
+  // the height ease (--tempo-roll ≈ 650ms); repeated steps re-arm the timer. EVERY ladder step
+  // is a QUIET one — the title roll stands down for the accordion moves (the About card's
+  // never-roll-on-a-manual-expand rule; "'Falkenstein' and the 'ready' tag flash while they
+  // are still the same") AND for the ∨ first-child commit (user, next round: the arriving
+  // tile rolled and "in this case it shouldn't" — the gesture reads as one continuous
+  // descent, and the edge pulse still announces the new subject). Explorer clicks and the
+  // ‹ › sibling steps keep their rolls: those arrive from elsewhere, not down the pile.
   const stepStillT = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const stillLane = (kind: "move" | "commit") => {
+  const stillLane = () => {
     const lane = wrap.current?.closest(".rail-ladder");
     if (!(lane instanceof HTMLElement)) return; // the sheets' flat stack has no lane — no-op
-    lane.setAttribute("data-stepping", kind);
+    lane.setAttribute("data-stepping", "move");
     if (stepStillT.current) clearTimeout(stepStillT.current);
     stepStillT.current = setTimeout(() => lane.removeAttribute("data-stepping"), 720);
   };
-  const up = upSlot != null && onOpenSlot ? () => { stillLane("move"); onOpenSlot(upSlot); } : null;
+  const up = upSlot != null && onOpenSlot ? () => { stillLane(); onOpenSlot(upSlot); } : null;
   const down =
     downSlot != null && onOpenSlot
-      ? { label: "Open the finer card", run: () => { stillLane("move"); onOpenSlot(downSlot); } }
+      ? { label: "Open the finer card", run: () => { stillLane(); onOpenSlot(downSlot); } }
       : child
-        ? { label: `Open first: ${child.label}`, run: () => { stillLane("commit"); applyClickActions(child.actions); } }
+        ? { label: `Open first: ${child.label}`, run: () => { stillLane(); applyClickActions(child.actions); } }
         : null;
 
   if (!set && !up && !down) return <>{children}</>;

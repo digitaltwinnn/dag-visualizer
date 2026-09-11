@@ -508,12 +508,12 @@
   left: 18px;
   right: 18px;
 }
-/* A QUIET STEP DOES NOT ROLL THE TITLE (user, 2026-09-11 — "'Falkenstein' and the 'ready'
-   tag flash while they are still the same as the card data is not refreshed"): the tier swap
-   remounts the head, and a fresh element replays `.roll-in` whatever its key says. An
-   accordion re-box announces nothing new, so RailPager marks it `data-stepping="move"` and
-   the roll stands down — the About card's own never-roll-on-a-manual-expand rule. A ∨
-   child COMMIT is a genuinely new subject: it marks "commit" and keeps its roll. */
+/* A LADDER STEP DOES NOT ROLL TITLES (user, 2026-09-11, two rounds — "'Falkenstein' and the
+   'ready' tag flash while they are still the same", then the ∨ commit's arriving tile:
+   "in this case it shouldn't" either): the tier swap remounts heads, and a fresh element
+   replays `.roll-in` whatever its key says. Every plank ladder step is quiet — the settle
+   carries the tier change, the edge pulse announces a genuinely new subject. Explorer
+   clicks and the ‹ › sibling steps arrive from elsewhere and keep their rolls. */
 .rail-ladder[data-stepping="move"] .roll-in { animation: none; }
 @media (prefers-reduced-motion: reduce) {
   .rail-ladder > [data-tier="entry"] + [data-tier="entry"]::before { transition: none; }
