@@ -83,9 +83,13 @@ export { RAIL_ENTRY };
 
 // The ONE right-rail pane frame — every facts-rail pane renders through this switch:
 //   • `entry` false → the full glass panel (Card baseline supplies `.ig-panel`; RIGHT_CARD the
-//     rail overrides; `.sig-left` the scene-facing signal edge; `animate-card-in` plays the
-//     materialize moment on mount — which is exactly the entry→box swap, since RailPane changes
-//     the element structure and React remounts the subtree).
+//     rail overrides; `.sig-left` the scene-facing signal edge). NO `animate-card-in` (user,
+//     2026-09-11 — the ladder pair made re-boxing a repeated gesture and the materialize's
+//     opacity-0 start + scale pop read as a flash on every ∧/∨ step, since the entry→box swap
+//     remounts this subtree): a rung's state change is carried by the accordion's own geometry
+//     (HeightEase, the seams), and a genuinely new subject is announced by the title roll-in
+//     and the edge pulse — the same reasoning that already made the left tool card
+//     transform-free.
 //   • `entry` true → the unboxed RAIL_ENTRY above. It carries `.sig-left` too (2026-08-09): the
 //     entry is a card in the signal system's terms, so hover whisper / pairing edge / pulse all
 //     speak on it — globals.css supplies the pseudo's geometry, since the shared rules light
@@ -127,7 +131,7 @@ export function RailPane({
     );
   }
   return (
-    <Card asChild className={cn(RIGHT_CARD, "sig-left", "animate-card-in motion-reduce:animate-none", className)}>
+    <Card asChild className={cn(RIGHT_CARD, "sig-left", className)}>
       <aside id={id} style={style} onMouseEnter={onMouseEnter} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} onFocus={onFocus} onBlur={onBlur}>
         {children}
       </aside>
