@@ -497,8 +497,10 @@ export default function TrendsDoc() {
             title="Blocks"
             // Paired with the metagraph Blocks lead (user, 2026-09-11): same opening shape,
             // each side saying what ITS blocks carry — here the DAG ledger's own
-            // transactions; no batching-mechanism claim (the state/blocks correction).
-            lead="The blocks the global snapshots sealed. Here a block carries the DAG ledger's own transactions — a DAG transfer rides as one — and most snapshots seal none: anchoring metagraph snapshots is the usual work, so blocks are the exception, not the pulse."
+            // transactions; no batching-mechanism claim (the state/blocks correction), and
+            // no volume commentary either ("most seal none" cut — user: "no opinion of the
+            // volume, let charts do the work").
+            lead="The blocks the global snapshots sealed. Here a block carries the DAG ledger's own transactions — a DAG transfer rides as one."
           >
             <TrendChart onRange={onRange} inspect={inspectHere} name="Blocks" unit={per} readout={dayReadout("g.blocks")} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "blocks", points: trim(S(p, "g.blocks")) }]} />
           </Section>
