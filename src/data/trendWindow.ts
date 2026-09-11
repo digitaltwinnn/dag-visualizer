@@ -129,10 +129,13 @@ export function monthlySum(data: TrendsWindowData): TrendsWindowData {
 // predates: the tiles would come back empty and the charts would claim an outage about an
 // era that is measured perfectly well one tier up.
 export const TIER_SINCE: Record<"5m" | "1h", number> = {
-  // The 2026-09-10 recompute-from seeded permanent 5m back to the pre-prod era's start.
-  "5m": Date.UTC(2026, 8, 6),
-  // The Sep 6 backfill's hourly writes reached its 120-day retention horizon back.
-  "1h": Date.UTC(2026, 4, 10),
+  // ONE floor for both fine tiers since the 2026-09-11 clean-sheet walk (rebuild-trends
+  // --recompute-from=2025-07-01, then --extend-to): it rebuilds 5m AND hourly back to the
+  // start of the store's fine-history era. While a walk is still filling, a fine range may
+  // transiently read sparse — the walk's progressive flush closes it from the newest days
+  // backward; the floors moved ahead of the walk by decision (user, 2026-09-11).
+  "5m": Date.UTC(2025, 6, 1),
+  "1h": Date.UTC(2025, 6, 1),
 };
 
 /** The finest tier that can honestly serve [fromMs, toMs]: fine enough to have the range's

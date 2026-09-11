@@ -111,10 +111,10 @@ describe("pickRangeTier", () => {
   const d5 = TIER_SINCE["5m"];
   it("goes finest only where the tier's history floor allows", () => {
     expect(pickRangeTier(d5 + DAY, d5 + 2 * DAY)).toBe("5m");
-    // same span BEFORE the 5m floor falls back to hourly (its floor is older)
-    expect(pickRangeTier(TIER_SINCE["1h"] + DAY, TIER_SINCE["1h"] + 2 * DAY)).toBe("1h");
-    // and before every floor, daily
-    expect(pickRangeTier(Date.UTC(2025, 7, 1), Date.UTC(2025, 7, 3))).toBe("1d");
+    // both fine floors share one date since the clean-sheet walk (2026-09-11), so any range
+    // opening before it is daily-only regardless of span — there is no between-floors rung
+    expect(pickRangeTier(d5 - 3 * DAY, d5 - DAY)).toBe("1d");
+    expect(pickRangeTier(d5 - 30 * DAY, d5 - DAY)).toBe("1d");
   });
   it("widens the tier with the span", () => {
     expect(pickRangeTier(d5, d5 + 30 * DAY)).toBe("1h");
