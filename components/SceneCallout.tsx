@@ -42,10 +42,11 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { displayNetwork } from "@/src/data/unlisted";
 import { coLocatedNetworks, filterAccent, getAnchor, isAnchorSettling, metagraphById, shortHash } from "@/src/data/network";
 import { SCENE_GLASS } from "@/components/selection";
-import { RoleChips } from "@/components/inspector/parts";
+import { RoleChips, StatusMark } from "@/components/inspector/parts";
 // The lead line's codes come from the composition vocabulary's ONE home, rendered by the cards'
 // own RoleChips (user, 2026-08-15: "look at my cards — square pills").
 import { layerCodesOf } from "@/src/data/composition";
+import { nodeStatus } from "@/src/data/nodeStatus";
 import { useNowTick } from "@/components/useNowTick";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { relativeAge } from "@/src/util/relativeAge";
@@ -82,6 +83,10 @@ export interface CalloutModel {
     ident?: { text: string; hue: string };
     text?: string;
     codes?: string[];
+    /** The node's raw lifecycle state, set only when MEASURED (the scene's status fill
+     *  channel hollows a not-ready chip, so the label names the state beside it — user,
+     *  2026-09-11); `unknown` stays absent, the callout's unmeasured-means-no-line rule. */
+    status?: string;
     also?: { text: string; hue: string }[];
   };
 }
@@ -142,6 +147,13 @@ export function CalloutPanel({ m, className }: { m: CalloutModel; className?: st
           )}
           {m.lead.text && <span>{m.lead.text}</span>}
           {m.lead.codes && m.lead.codes.length > 0 && <RoleChips codes={m.lead.codes} />}
+          {/* STATUS — the cards' one status chrome (colour = bucket, text = exact stage), here
+              because the scene itself now speaks status (the fill channel hollows a not-ready
+              chip, 2026-09-10) and the label beside the shell should name what it shows (user,
+              2026-09-11). After the composition (what it runs), before the co-tenant addendum
+              (who else runs here); rendered for every MEASURED state, ready included — a status
+              readout that only spoke up for trouble would be an alarm, not a reading. */}
+          {m.lead.status && <StatusMark state={m.lead.status} />}
           {/* CO-TENANTS — the other networks running on this same machine, each as its own
               hued ticker (user, 2026-08-18). It closes the lead because the node card reads
               place → role → host → co-located, and the chips to its left are this node's own
@@ -214,6 +226,9 @@ export default function SceneCallout() {
     const coloReady = metaList.some((x) => x.isRoot) && metaList.some((x) => !x.isRoot);
     const colo = coloReady ? coLocatedNetworks(ip, netId, metaList) : [];
     const also = colo.map((c) => ({ text: displayNetwork(c.id)?.ticker ?? c.name, hue: filterAccent(c.id) }));
+    // Status: only a MEASURED state gets the mark (unknown = no line, like co-location above).
+    const state = (nodePick as { node?: { state?: string | null } }).node?.state;
+    const status = state != null && nodeStatus(state).bucket !== "unknown" ? state : undefined;
     return {
       key: `node|${id ?? `${g?.lat},${g?.lon}`}`,
       eyebrow: "Node",
@@ -222,7 +237,7 @@ export default function SceneCallout() {
       title: g?.city ?? g?.country ?? (id ? shortHash(id) : "Node"),
       aside: nnet ? { text: nnet.ticker, hue: nnet.hue } : undefined,
       ring: nnet?.hue ?? "var(--primary)",
-      lead: codes.length || also.length ? { codes, also } : undefined,
+      lead: codes.length || also.length || status ? { codes, status, also } : undefined,
     };
   };
 
