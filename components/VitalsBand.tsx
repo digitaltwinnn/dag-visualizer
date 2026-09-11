@@ -629,19 +629,15 @@ function GeoCells({ accent }: { accent: string }) {
       </BandCard>
       {/* "Top countries", not "Nodes by country" (user, 2026-09-01): the card shows the top three
           plus an `other` remainder, so the old name promised the whole distribution and the row
-          beside it now states the fleet total anyway.
+          beside it now states the fleet total anyway. No "+N more" note either (user, 2026-09-11):
+          "top" already implies there can be more, and the ring's `other` segment carries the
+          remainder honestly.
           The hole counts COUNTRIES, the ring spreads NODES across them — two different questions,
           which is why the centre is passed rather than left as the sum. */}
       {topCountries.length > 0 && (
         <BandCard label="Top countries"
           lead={<DonutTotal counts={countryRing} accent={accent} total={countries.length} />}>
-          {/* `items-stretch` + `self-stretch`: this wrapper sits between the card body and the
-              MicroBars, so without it the rows distribute inside a content-height box and the card
-              looks bunched while its neighbours breathe. */}
-          <div className="flex w-full items-stretch gap-2 min-w-0 self-stretch">
-            <MicroBars accent={accent} labelW={18} rows={topCountries.map((c) => ({ key: c.cc, label: c.cc, count: c.count }))} />
-            {restC > 0 && <span className="text-micro text-muted-foreground whitespace-nowrap self-end pb-0.5">+{countries.length - topCountries.length} more · {restC}</span>}
-          </div>
+          <MicroBars accent={accent} labelW={18} rows={topCountries.map((c) => ({ key: c.cc, label: c.cc, count: c.count }))} />
         </BandCard>
       )}
       {topIsps.length > 0 && (
