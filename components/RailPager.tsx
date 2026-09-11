@@ -476,7 +476,12 @@ export default function RailPager({
     if (!(lane instanceof HTMLElement)) return; // the sheets' flat stack has no lane — no-op
     lane.setAttribute("data-stepping", "move");
     if (stepStillT.current) clearTimeout(stepStillT.current);
-    stepStillT.current = setTimeout(() => lane.removeAttribute("data-stepping"), 720);
+    // 1600, not the height ease's 720 (user, 2026-09-11, third round — "it still has the
+    // roll effect"): a ∨ COMMIT's new cards mount ~730ms after the click (measured — store
+    // commit, engine focus, the pane's own data), which was 10ms past the old window, so
+    // their titles rolled with the suppression already lifted. The window must outlive the
+    // remounts it exists to quiet, not just the geometry.
+    stepStillT.current = setTimeout(() => lane.removeAttribute("data-stepping"), 1600);
   };
   const up = upSlot != null && onOpenSlot ? () => { stillLane(); onOpenSlot(upSlot); } : null;
   const down =
