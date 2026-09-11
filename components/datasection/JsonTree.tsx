@@ -7,10 +7,22 @@
 // Objects/arrays collapse per node (chevron rows; open to one level by default), primitives
 // render inline. Long strings truncate with the full value on hover — the tree is a reading
 // instrument, not an export format.
-import { useState } from "react";
+//
+// `cmd` is the whole-tree broadcast behind the RAW JSON header's expand/collapse-all control
+// (user, 2026-09-11): a fresh object per click, so every mounted node syncs once per press —
+// "expand" opens everything (children cascade as they mount under their opening parents),
+// "collapse" restores the DEFAULT reading state (root open one level), never a fully shut
+// root the reader would have to reopen to see anything at all.
+import { useEffect, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
+
+export interface JsonTreeCmd {
+  mode: "expand" | "collapse";
+  /** A fresh number per press — the object identity is what re-fires the sync. */
+  epoch: number;
+}
 
 const MAX_STR = 120;
 
@@ -34,9 +46,14 @@ function Val({ v }: { v: unknown }) {
   }
 }
 
-function Node({ k, v, depth }: { k: string | null; v: unknown; depth: number }) {
+function Node({ k, v, depth, cmd }: { k: string | null; v: unknown; depth: number; cmd?: JsonTreeCmd | null }) {
   const isObj = v !== null && typeof v === "object";
   const [open, setOpen] = useState(depth < 1);
+  // The broadcast sync — also fires on MOUNT, which is what cascades an expand-all down the
+  // tree: children mount as their parent opens and immediately obey the standing command.
+  useEffect(() => {
+    if (cmd) setOpen(cmd.mode === "expand" ? true : depth < 1);
+  }, [cmd, depth]);
   if (!isObj) {
     return (
       <div className="flex items-baseline gap-1.5 py-px pl-[18px]">
@@ -70,7 +87,7 @@ function Node({ k, v, depth }: { k: string | null; v: unknown; depth: number }) 
       <CollapsibleContent className="disclose-panel">
         <div className="ml-[5px] pl-2 border-l border-border/60">
           {entries.map(([ck, cv]) => (
-            <Node key={ck} k={ck} v={cv} depth={depth + 1} />
+            <Node key={ck} k={ck} v={cv} depth={depth + 1} cmd={cmd} />
           ))}
         </div>
       </CollapsibleContent>
@@ -78,10 +95,10 @@ function Node({ k, v, depth }: { k: string | null; v: unknown; depth: number }) 
   );
 }
 
-export default function JsonTree({ data }: { data: unknown }) {
+export default function JsonTree({ data, cmd }: { data: unknown; cmd?: JsonTreeCmd | null }) {
   return (
     <div className="font-mono text-label leading-relaxed">
-      <Node k={null} v={data} depth={0} />
+      <Node k={null} v={data} depth={0} cmd={cmd} />
     </div>
   );
 }
