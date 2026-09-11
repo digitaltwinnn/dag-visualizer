@@ -738,6 +738,11 @@ function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: b
   // twelve full labels at text-micro collide in the card's ~16px slots. The label row mirrors
   // the bar row's slot geometry exactly (flex-1 / max-w / gap), so labels sit under their bars.
   const monthly = data.stepMs === 2_592_000_000;
+  // A WEEK'S BARS CARRY THEIR WEEKDAYS (user, 2026-09-11 — the month axis's own reasoning one
+  // zoom down: seven identical daily bars had no identity, and "mon · tue …" is what a week's
+  // bars are actually about). Daily step + at most seven slots IS the 7D window — 30D shares
+  // the step but never the count. Every bar labels; seven three-letter micros fit the slots.
+  const weekly = data.stepMs === 86_400_000 && data.buckets.length <= 7;
   return (
     <div className="flex flex-col h-full min-h-12 w-full self-stretch" aria-hidden>
       <div className="flex items-end justify-end gap-[2px] flex-1 min-h-0 pb-0.5">
@@ -771,13 +776,15 @@ function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: b
           );
         })}
       </div>
-      {monthly && (
+      {(monthly || weekly) && (
         <div className="flex justify-end gap-[2px] leading-none">
           {bars.map((b, i) => (
             <span key={b.ts} className="flex-1 max-w-[22px] text-center text-micro text-muted-foreground/70 lowercase whitespace-nowrap">
-              {(bars.length - 1 - i) % 2 === 0
-                ? new Date(b.ts).toLocaleString("en", { month: "short", timeZone: "UTC" })
-                : null}
+              {weekly
+                ? new Date(b.ts).toLocaleString("en", { weekday: "short", timeZone: "UTC" })
+                : (bars.length - 1 - i) % 2 === 0
+                  ? new Date(b.ts).toLocaleString("en", { month: "short", timeZone: "UTC" })
+                  : null}
             </span>
           ))}
         </div>
@@ -807,14 +814,14 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
   // re-downloading the largest payload to discard it whenever the rim sat on 30D/1Y).
   // 1H rides the 24h payload — the store's finest tier (5m), sliced to the newest hour.
   const t24 = useTrendsWindow(zoom === "1h" ? "24h" : null);
-  // 24H and 7D both ride the 7d HOURLY payload (one fetch across the pair): 24H as its
-  // newest-day slice, 7D whole — 168 hourly bars, not seven daily ones (user, 2026-09-11:
-  // "the 7D range has only 7 bars which I don't think is required"; the old daily 7D shared
-  // the 90d fetch with 30D, a fetch-sharing choice rather than a data limit). 1H stays the
-  // store's honest floor: twelve 5-minute buckets IS the finest measured grain.
-  const t7 = useTrendsWindow(zoom === "24h" || zoom === "7d" ? "7d" : null);
-  // 30D rides the 90d DAILY payload (the store's own sums — the no-client-rebucketing rule).
-  const t90 = useTrendsWindow(zoom === "30d" ? "90d" : null);
+  const t7 = useTrendsWindow(zoom === "24h" ? "7d" : null);
+  // 7D and 30D both ride the 90d DAILY payload (one fetch, the store's own sums — the
+  // no-client-rebucketing rule): the rim's 7D is seven daily bars, each NAMED by its weekday
+  // in the chart (user, 2026-09-11, two rounds: first "only 7 bars", then the hourly 168 was
+  // too many and a 6-hour re-bucket would need bucketing machinery the store already solved —
+  // "does 7 make more sense; in that case say the weekdays"). The hour-by-hour 7D lives on
+  // /trends, the observation ladder's next rung down.
+  const t90 = useTrendsWindow(zoom === "30d" || zoom === "7d" ? "90d" : null);
   const t1y = useTrendsWindow(zoom === "1y" ? "1y" : null);
   const tAll = useTrendsWindow(zoom === "all" ? "all" : null);
   const windowed = useMemo<TrendsWindowData | null>(() => {
@@ -823,7 +830,7 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
     // aside claims below is derived from the DATA, never asserted.
     if (zoom === "1h") return t24.data ? sliceWindow(trimNewestPartial(t24.data), 3_600_000) : null;
     if (zoom === "24h") return t7.data ? sliceWindow(trimNewestPartial(t7.data), 24 * 3_600_000) : null;
-    if (zoom === "7d") return t7.data ? sliceWindow(trimNewestPartial(t7.data), 7 * 86_400_000) : null;
+    if (zoom === "7d") return t90.data ? sliceWindow(trimNewestPartial(t90.data), 7 * 86_400_000) : null;
     if (zoom === "30d") return t90.data ? sliceWindow(trimNewestPartial(t90.data), 30 * 86_400_000) : null;
     if (zoom === "1y") return t1y.data ? leadingTrim(trimNewestPartial(t1y.data)) : null;
     return tAll.data ? leadingTrim(trimNewestPartial(tAll.data)) : null;
