@@ -75,8 +75,13 @@ export const RIGHT_CARD = "relative block w-auto pointer-events-auto [--spine:tr
 // pointer): the dim RELEASES to full luminance AND a small brightness boost rides on top, so
 // entries resting at dim 1 (the anchor-adjacent ones — found live: the metagraph-snapshot entry
 // had nothing to release) still visibly respond. Click does the actual expand.
+// ⚠️ THE TOP PAD MATCHES THE BOX'S 18px (user, 2026-09-11: "the card header jumps down a bit …
+// when it's inactive it sits too high"): the eyebrow sat 6px from an entry's top and 18px from
+// a box's, so every expand dropped the header 12px inside the easing height. With the top edge
+// shared, the header holds still across the tier swap; the BOTTOM stays compact — an entry is
+// still a one-liner, just seated at the box's own first-content line.
 const RAIL_ENTRY =
-  "rail-entry relative block w-auto pointer-events-auto [--spine:transparent] px-[18px] py-1.5 min-h-0 flex-none rounded-md bg-[var(--panel-solid)] [backdrop-filter:blur(10px)] opacity-[var(--entry-dim,1)] hover:opacity-100 hover:brightness-[1.18] transition-[opacity,filter] duration-150 motion-reduce:transition-none";
+  "rail-entry relative block w-auto pointer-events-auto [--spine:transparent] px-[18px] pt-[18px] pb-1.5 min-h-0 flex-none rounded-md bg-[var(--panel-solid)] [backdrop-filter:blur(10px)] opacity-[var(--entry-dim,1)] hover:opacity-100 hover:brightness-[1.18] transition-[opacity,filter] duration-150 motion-reduce:transition-none";
 // Exported for the LEFT rail's entry-tier cards (AboutView — the collapsed About sheds its box
 // into the same grammar, 2026-08-08); the right rail routes through RailPane below.
 export { RAIL_ENTRY };
