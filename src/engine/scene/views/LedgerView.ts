@@ -662,8 +662,10 @@ export class LedgerView implements SceneView {
     // gating it blinked the committed label off for ~3s per tick for the life of the commit.
     // The anchor is recorded live each frame (rewind offsets included), so the label rides
     // the slide; the ARRIVAL cases this gate exists for — a fresh pin's multi-slot glide, the
-    // view-entry drop — keep it, because a pin is never `following`.
-    if (!following && !this._rewind.settled) return false;
+    // view-entry drop — keep it, because a pin is never `following`. And the pin's gate reads
+    // `nearlySettled`, not `settled` (user, 2026-09-11 — the glide's asymptotic tail held the
+    // label back for over a second after the row already read as home).
+    if (!following && !this._rewind.nearlySettled) return false;
     // The slot-0 fallback belongs to FOLLOW alone (the followed tip IS the lead). A pinned
     // subject aged out of the window has no row of its own — gating it on the lead's regrow
     // was an unrelated hide (review find #2); with no slot there is nothing to wait on.

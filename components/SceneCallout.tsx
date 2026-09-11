@@ -315,7 +315,14 @@ export default function SceneCallout() {
       if (!metaSnap) return null;
       const nnet = displayNetwork(metaSnap.metaId);
       return {
-        key: `ms|${metaSnap.metaId}|${metaSnap.ordinal}`,
+        // ⚠️ WHILE FOLLOWING, THE SUBJECT IS THE LIVE LANE, NOT THE ORDINAL (user, 2026-09-11:
+        // "it re-draws the card while the subject is the same — only the contents changed").
+        // The wrapper is keyed by subject so the entrance choreography replays as one unit —
+        // but a follow advances the ordinal every anchored tick, and keying on it replayed
+        // the whole roll-in + leader draw per heartbeat. Same guard the Inspector's
+        // selectionKey applies to both live-advancing cards. A pin keys by ordinal: that IS
+        // a new subject, and the replay is the acknowledgement.
+        key: following ? `ms|${metaSnap.metaId}|live` : `ms|${metaSnap.metaId}|${metaSnap.ordinal}`,
         eyebrow: "Metagraph snapshot",
         title: metaSnap.ordinal.toLocaleString(),
         aside: nnet ? { text: nnet.ticker, hue: nnet.hue } : undefined,
@@ -348,7 +355,9 @@ export default function SceneCallout() {
       const share = mine ? getAnchor(snap.data.timestamp)?.metaCounts?.get(filter) : undefined;
       const settling = mine != null && share == null && isAnchorSettling(snap.data.timestamp, typeof total === "number" ? total : null);
       return {
-        key: `gs|${snap.data.ordinal}`,
+        // The live-lane key rule — see msModel above (the follow advances this ordinal ~every
+        // tick; only a PIN is a new subject).
+        key: following ? "gs|live" : `gs|${snap.data.ordinal}`,
         eyebrow: "Global snapshot",
         title: snap.data.ordinal.toLocaleString(),
         aside: following ? { text: rel ? `live · ${rel}` : "live", live: true } : rel ? { text: `◷ ${rel}` } : undefined,
