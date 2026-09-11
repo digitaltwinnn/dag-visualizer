@@ -422,6 +422,22 @@
    window; the plank's `pointer-events-auto` utility re-enables itself inside, so rapid
    stepping keeps working. JS-toggled attribute — a contract like the marker classes. */
 .rail-ladder[data-stepping] { pointer-events: none; }
+/* THE TIER SWAP SETTLES, NEVER SNAPS (user, 2026-09-11, closing the ladder-step polish:
+   "focus should fade and only be fully active when the card is expanded to its final
+   shape. Check also when going up."): a rung arriving as the BOX eases its presence up from
+   the entry register on the height ease's own clock, and a rung falling back to an ENTRY
+   eases down from the box's full presence toward its distance dim. OPACITY ONLY — the
+   geometry stays the accordion's (the no-pop rule; the scale-popping materialize died the
+   same day). The `from`-only keyframes land on each element's own computed value, so the
+   entry settles onto whatever `--entry-dim` its wrapper carries and the box onto 1. */
+@keyframes tierSettleIn { from { opacity: 0.72; } }
+@keyframes tierSettleOut { from { opacity: 1; } }
+.rail-ladder [data-tier="box"] .ig-panel { animation: tierSettleIn var(--tempo-roll) var(--ease-roll); }
+.rail-ladder [data-tier="entry"] .rail-entry { animation: tierSettleOut var(--tempo-roll) var(--ease-roll); }
+@media (prefers-reduced-motion: reduce) {
+  .rail-ladder [data-tier="box"] .ig-panel,
+  .rail-ladder [data-tier="entry"] .rail-entry { animation: none; }
+}
 .rail-ladder > * + * { margin-top: var(--rail-gap); }
 
 /* Any committed rung directly following another committed rung joins the pile — the box included,
