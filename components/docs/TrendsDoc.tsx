@@ -577,7 +577,12 @@ export default function TrendsDoc() {
           <Section
             id="net-blocks"
             title="Blocks per metagraph"
-            lead="The blocks each network sealed inside its own snapshots — a transfer of its token rides in a block (sending USDC.dag or UP somewhere), and a data network's application records land the same way."
+            // The lead teaches the mechanism, not just the count (user, 2026-09-11): a block
+            // is the L1 layers' batching unit, and each layer batches its own kind — the
+            // About card's own layer phrasing (cL1 moves the token, dL1 takes in what
+            // applications write), with the both-layers case stated generally rather than
+            // pinning it to named networks.
+            lead="The blocks each network sealed inside its own snapshots. A block is where an L1 layer batches its work before the snapshot seals it, and each layer batches its own kind: a currency layer's blocks move the token (someone sending USDC.dag or UP), while a data layer's blocks hold the records its application writes. A network running both layers seals both — transfers and data side by side."
           >
             {netPanels("blocks", per)}
           </Section>
