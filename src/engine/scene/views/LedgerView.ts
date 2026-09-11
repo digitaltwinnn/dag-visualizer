@@ -657,19 +657,23 @@ export class LedgerView implements SceneView {
    *  at rest AND the selected/lead row is at its final geometry. Consulted by CalloutSync's
    *  SNAPSHOT anchors only — tray chips don't ride the trail. */
   calloutSettled(following: boolean): boolean {
-    // FOLLOW MODE SKIPS THE REWIND GATE (review find, 2026-09-05): a follow handoff IS a
-    // glide by design — jump +SLOT_SP, then ~3s of damped ease — on every anchored tick, so
-    // gating it blinked the committed label off for ~3s per tick for the life of the commit.
-    // The anchor is recorded live each frame (rewind offsets included), so the label rides
-    // the slide; the ARRIVAL cases this gate exists for — a fresh pin's multi-slot glide, the
-    // view-entry drop — keep it, because a pin is never `following`. And the pin's gate reads
-    // `nearlySettled`, not `settled` (user, 2026-09-11 — the glide's asymptotic tail held the
-    // label back for over a second after the row already read as home).
-    if (!following && !this._rewind.nearlySettled) return false;
-    // The slot-0 fallback belongs to FOLLOW alone (the followed tip IS the lead). A pinned
-    // subject aged out of the window has no row of its own — gating it on the lead's regrow
-    // was an unrelated hide (review find #2); with no slot there is nothing to wait on.
-    const slot = this.model.selectedSlot >= 0 ? this.model.selectedSlot : following ? 0 : -1;
+    // FOLLOW MODE SKIPS THE WHOLE GATE (2026-09-05 skipped the rewind term; the user caught
+    // the half left behind, 2026-09-11 — "when the new byte row is drawn it still replays"):
+    // the slot-0 rowStill term went false for the fresh bar's ~0.4s grow-in on EVERY anchored
+    // tick, so data-on flickered and the label faded out and back in per heartbeat. A follow's
+    // every-tick motion IS the steady state — the anchor is recorded live each frame (rewind
+    // offsets and the growing bar included), so the label rides all of it; the ARRIVAL cases
+    // this gate exists for — a fresh pin's multi-slot glide, the view-entry drop — keep it,
+    // because a pin is never `following` and the view entry is already hidden by the
+    // transition gate.
+    if (following) return true;
+    // The pin's gate reads `nearlySettled`, not `settled` (user, 2026-09-11 — the glide's
+    // asymptotic tail held the label back for over a second after the row already read as
+    // home).
+    if (!this._rewind.nearlySettled) return false;
+    // A pinned subject aged out of the window has no row of its own — gating it on the lead's
+    // regrow was an unrelated hide (review find #2); with no slot there is nothing to wait on.
+    const slot = this.model.selectedSlot;
     if (slot < 0) return true;
     return this._bar.rowStill(slot);
   }
