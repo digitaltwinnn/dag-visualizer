@@ -487,6 +487,24 @@
   left: 0;
   right: 0;
 }
+/* WHILE A LADDER STEP RUNS, THE HOVER TREATMENTS THEMSELVES STAND DOWN (user, 2026-09-11,
+   fourth round — "still flashes"): `pointer-events: none` above only affects FUTURE hit
+   tests, and Chromium keeps (and even grants a freshly-mounted element) a latched `:hover`
+   until the next real hit test, which lags the re-layout by hundreds of ms — measured as a
+   ~330ms brightness(1.18) flash on the collapsing card despite the inert lane. So the
+   stepping window also gates the EFFECTS: the entry's lift and the seams' full-width reach
+   don't apply while `data-stepping` holds, whatever :hover claims. Unlayered on purpose —
+   these must beat the entry's own hover utilities (CSS trap 1). */
+.rail-ladder[data-stepping] .rail-entry,
+.rail-ladder[data-stepping] .rail-entry:hover {
+  opacity: var(--entry-dim, 1);
+  filter: none;
+}
+.rail-ladder[data-stepping] > [data-tier="entry"] + [data-tier="entry"]:has(.rail-entry:hover)::before,
+.rail-ladder[data-stepping] > [data-tier="entry"]:has(.rail-entry:hover) + [data-tier="entry"]::before {
+  left: 18px;
+  right: 18px;
+}
 @media (prefers-reduced-motion: reduce) {
   .rail-ladder > [data-tier="entry"] + [data-tier="entry"]::before { transition: none; }
 }
