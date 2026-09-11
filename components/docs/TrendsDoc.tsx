@@ -578,13 +578,11 @@ export default function TrendsDoc() {
             id="net-blocks"
             title="Blocks per metagraph"
             // ⚠️ No mechanism claim beyond what the raw page shows (user, 2026-09-11, twice):
-            // the first cut said a data layer's records ride in blocks and blocks are where
-            // "an L1 batches its work" — but a snapshot has TWO carriers (its state, and its
-            // blocks) and networks split their payload between them differently (DED: state
-            // empty, records in blocks; others the reverse), with no crisp delineation we've
-            // measured. So the lead names both carriers, keeps the one vetted example
-            // (token transfers), and closes on the honesty rule a per-network zero needs.
-            lead="The blocks each network sealed inside its own snapshots. Blocks carry transactions — a token transfer rides as one (someone sending USDC.dag or UP), and a data network can batch application records the same way — but they are one of two places a snapshot carries work: a network may just as well put its payload in the snapshot's own state, and where it draws that line is its own design. A zero here means no blocks, not no activity."
+            // a snapshot has TWO carriers (its state, and its blocks) and networks split
+            // their payload between them differently (DED: state empty, records in blocks;
+            // others the reverse), with no crisp delineation we've measured. Simplified the
+            // same day — the two-carrier fact, one example each, the zero rule.
+            lead="The blocks each network sealed inside its own snapshots. A block carries transactions — a token transfer, or a batch of application records — and it is one of two places a snapshot carries work: the other is its state, and each network decides what goes where. A zero means no blocks, not no activity."
           >
             {netPanels("blocks", per)}
           </Section>
