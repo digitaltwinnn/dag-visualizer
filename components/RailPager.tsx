@@ -417,6 +417,15 @@ export default function RailPager({
     // designed slide.
     const txNow = parseFloat(/translateX\((-?[\d.]+)px\)/.exec(dragged)?.[1] ?? "0") || 0;
     el.style.transform = `translateX(${dir * (w + gap) + txNow}px)`; // continue the peek's travel
+    // ⚠️ THE SLIDE IS HOVER-INERT (user, 2026-09-11: "a quick flash focusing the card … my
+    // mouse-pointer still present on top of the cards"): the cards translate UNDER a resting
+    // pointer, so :hover flickered across the moving elements and the entry hover-release /
+    // seam treatments flashed mid-slide. The card body takes pointer-events:none for the
+    // slide's own window; the plank stays interactive (its group is pointer-events-auto, which
+    // overrides the ancestor), so rapid chevron stepping keeps working. Restored in fin(), at
+    // which point whatever sits under the pointer hovers normally — a resting state, no flash.
+    const prevPE = el.style.pointerEvents;
+    el.style.pointerEvents = "none";
     void el.offsetWidth; // flush, so both start their slide together
     el.style.transition = `transform ${SLIDE_MS}ms ${SLIDE_EASE}`;
     el.style.transform = "";
@@ -432,6 +441,7 @@ export default function RailPager({
       parent.style.transition = prevTrans;
       el.style.transition = "none";
       el.style.transform = "";
+      el.style.pointerEvents = prevPE;
     };
     pending.current = { fin, t: setTimeout(() => { pending.current = null; fin(); }, SLIDE_MS + 40) };
     // The new card's height is only knowable after React has painted it, so the lane's ease is armed
