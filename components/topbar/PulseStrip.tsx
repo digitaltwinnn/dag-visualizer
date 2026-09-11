@@ -74,8 +74,12 @@ export default function PulseStrip() {
                 <span className={cn("font-mono font-bold text-caption tabular-nums leading-tight", AGE_INK[status])}>
                   {r.lastOkAt != null ? relativeAge(now - r.lastOkAt, true) : status === "failing" ? "failing" : "—"}
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground">
-                  {r.everyMs != null && <Timer aria-hidden className="size-2.5 flex-none" />}
+                {/* A touch roomier than RoleChips' full pill (px 5→6, py 2→3) and a 12px glyph:
+                    at the compact py-px the icon-bearing chip read cramped and the glyph sat
+                    optically high beside the 10px text (user, 2026-09-11 — "padding … they look
+                    small and text icon alignment feels a bit off"). */}
+                <span className="inline-flex items-center gap-1 rounded-xs border border-border bg-wash-faint px-1.5 py-[3px] text-micro leading-none text-muted-foreground">
+                  {r.everyMs != null && <Timer aria-hidden className="size-3 flex-none" />}
                   {cadenceWord(r)}
                 </span>
               </span>

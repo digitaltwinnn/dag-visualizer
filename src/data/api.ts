@@ -38,13 +38,15 @@ const FEEDS = {
   // "app API" said only the HOP, not the source (user, 2026-09-09: "that's only from where it
   // does the real calls") — an app-served feed names the real upstream, the hop in parens.
   "api-metagraphs": { label: "Metagraph directory", target: "cluster info (via app)", everyMs: POLL.metaRefreshMs, when: null },
-  // Loaded ONCE at engine boot (Engine._loadData), then localStorage fills misses — nothing the
-  // user does re-fires it, so the chip must not say "on demand" (user, 2026-09-11).
-  "api-geo": { label: "Validator geo map", target: "IP geolocation (via app)", everyMs: null, when: "at start" },
+  // Loaded ONCE per page load (Engine._loadData at boot), then localStorage fills misses —
+  // nothing the user does re-fires it, so the chip must not say "on demand" (user, 2026-09-11;
+  // "page load" is the user's own clearer word for it, same day).
+  "api-geo": { label: "Validator geo map", target: "IP geolocation (via app)", everyMs: null, when: "page load" },
   // everyMs null on purpose: the feed polls POLL.trendsMs only WHILE a consumer is mounted
   // (the ledger band's cards, the /trends doc) — a fixed cadence here would derive STALE in
-  // every other view. The `when` words state that real behaviour.
-  "api-trends": { label: "Trends history", target: "trends store (via app)", everyMs: null, when: `${Math.round(POLL.trendsMs / 60_000)} min · in view` },
+  // every other view. The `when` words state that real behaviour ("while shown", user round 2:
+  // "in view" still read like on-demand).
+  "api-trends": { label: "Trends history", target: "trends store (via app)", everyMs: null, when: `${Math.round(POLL.trendsMs / 60_000)} min · while shown` },
 } as const;
 export type FeedId = keyof typeof FEEDS;
 const POLL_HEALTH = new Map<string, PollHealth>();
