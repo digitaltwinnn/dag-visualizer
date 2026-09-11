@@ -87,8 +87,11 @@ const hexPitchDeg = (r: number) => ((2 * r * 1.04) / (R + LAND_H)) * (180 / Math
 // thing that makes a stack of chips sit ON the globe rather than float over it, and with the sun's
 // terminator now shading the sphere underneath it the two agree instead of competing. So it stays,
 // with a weight; if it ever has to go, delete the mechanism rather than zero it again.
+// 0.55 → 0.72 (user, 2026-09-11: "make the bloom attached to the nodes/cohorts' earth surface
+// a bit stronger" in light mode) — the shade steps up from a whisper toward a seated contact
+// shadow while staying well short of the blot the OP comment above warns about.
 const POOL_SHADE = 0.34;
-const POOL_SHADE_OP = 0.55;
+const POOL_SHADE_OP = 0.72;
 
 // View-transition staging grid: THE cell pitch (world units). setGatherFit may only shrink it
 // (with the chip size, by one factor) to make the packed row of per-network squares
