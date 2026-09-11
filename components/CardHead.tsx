@@ -287,13 +287,16 @@ export default function CardHead({
   // (they share the card's top edge); the title row sits BELOW them and runs to the content
   // edge, so its aside (status pill, live dot, site link) ends flush with the ×'s glyph and the
   // body's right-aligned columns (user, 2026-07-12 — the 22px title-row clearance double-inset
-  // the aside ~40px from the card edge while everything else aligned at ~18px). Right cards are
-  // COLLAPSIBLE too (user, 2026-07-12): expanded (the BOX), the +/− rides the eyebrow line and
-  // the × floats at the corner. COLLAPSED (the unboxed ENTRY, card-redesign 2026-08-08) the
-  // chrome disappears entirely — no ×, no +/− (user: it read as clutter on a one-line entry);
-  // the WHOLE entry is one invisible stretched toggle (aria-expanded, sr-only label), so a click
-  // anywhere re-materializes it as the box. Deselection of an entry happens by stepping down
-  // from the box / clear-all, not per-entry chrome.
+  // the aside ~40px from the card edge while everything else aligned at ~18px). The BOX carries
+  // NO minimize control (user, 2026-09-11 — "hardly used"; it was the − on the eyebrow line
+  // plus a whole-head stretched toggle): the box moves by expanding another entry or by the
+  // plank's ladder pair, never by collapsing into nothing. COLLAPSED (the unboxed ENTRY,
+  // card-redesign 2026-08-08) the chrome disappears entirely — no ×, no +/− (user: it read as
+  // clutter on a one-line entry); the WHOLE entry is one invisible stretched toggle
+  // (aria-expanded, sr-only label), so a click anywhere re-materializes it as the box.
+  // Deselection of an entry happens by stepping down from the box / clear-all, not per-entry
+  // chrome. The LEFT rail's panel layout above keeps its collapse toggle — the removal is the
+  // right rail's alone.
   const entryMode = !!collapsed && !!onToggle;
   return (
     <>
@@ -321,38 +324,21 @@ export default function CardHead({
             <span className="sr-only">Expand</span>
           </button>
         )}
-        {(eyebrow || caption != null || (onToggle && !entryMode)) && (
+        {(eyebrow || caption != null) && (
           <div className={cn("flex items-start justify-between gap-2 mb-2", onClose && !entryMode && "pr-[30px]")}>
             {/* `data-eyebrow` is RailThread's read: on an unboxed ENTRY the thread runs its
                 depth-reach connector at the EYEBROW's height (user, 2026-08-08 — the entry's
                 vertical centre put the line through the title-row aside's space). */}
             {eyebrow ? <span data-eyebrow="" className={cn("block", eyebrowClass)}>{eyebrow}</span> : <span />}
-            {/* The right cluster — caption, then the +/− indicator, the SAME order and the same
-                line the panel layout puts them on. ⚠️ The caption belongs HERE and not in the
-                title row's aside (user, 2026-08-12 — "the network view collapse is broken in the
-                card"): About's collapsed entry passed `SOON` as the aside, so a title that fits
-                the expanded card's 202px lane ran straight THROUGH it in the narrower entry, and
-                since nothing bounds an unbounded inline-flex title it couldn't truncate either.
-                Level with the eyebrow the title gets the whole lane back, and the two tiers stop
-                disagreeing about where a card's status tag lives. */}
-            {(caption != null || (onToggle && !entryMode)) && (
+            {/* The right cluster — the caption, on the eyebrow's own line. ⚠️ It belongs HERE
+                and not in the title row's aside (user, 2026-08-12 — "the network view collapse
+                is broken in the card"): About's collapsed entry passed `SOON` as the aside, so
+                a title that fits the expanded card's 202px lane ran straight THROUGH it in the
+                narrower entry, and since nothing bounds an unbounded inline-flex title it
+                couldn't truncate either. */}
+            {caption != null && (
               <div className="flex items-center gap-1.5 flex-none pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
-                {caption != null && (
-                  <span className="text-micro text-muted-foreground text-right tabular-nums">{caption}</span>
-                )}
-                {onToggle && !entryMode && (
-                  // -mt aligns the glyph's centre with the ×'s (the × floats at the card corner,
-                  // outside this row's flow — measured, not eyeballed).
-                  <button
-                    type="button"
-                    aria-expanded={!collapsed}
-                    title={collapsed ? "Expand" : "Collapse"}
-                    onClick={onToggle}
-                    className="appearance-none bg-transparent border-0 p-0 -mt-[7px] -mb-1 inline-flex items-center justify-center w-5 h-[18px] leading-none text-muted-foreground group-hover:text-foreground rounded-sm focus-visible:outline-1 focus-visible:outline-ring/60 after:absolute after:inset-0 after:cursor-pointer after:content-['']"
-                  >
-                    {collapsed ? <Plus className="size-3.5" aria-hidden /> : <Minus className="size-3.5" aria-hidden />}
-                  </button>
-                )}
+                <span className="text-micro text-muted-foreground text-right tabular-nums">{caption}</span>
               </div>
             )}
           </div>

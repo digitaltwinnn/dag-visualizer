@@ -345,3 +345,117 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+
+/** The plank's DOWN step where nothing finer is committed: the FIRST child of the boxed rung,
+ *  in the explorer's own order (user, 2026-09-11 — "I do like to be able to open a finer rung,
+ *  can just pick the 1st one"). Pure like siblingSet, and every step's actions come from the
+ *  pickActions builders, so the button and the equivalent explorer click can't drift (rule 2).
+ *  Null where a rung has no first child to open — no children in the data, or no child
+ *  vocabulary at all (a node, a metagraph snapshot, the ledger's network — whose finer
+ *  subjects belong to the tick axis) — and the plank hides the control (the invisible-chevron
+ *  rule). A finer COMMITTED rung never reaches here: the caller steps the pile instead. */
+export function childStep(slot: RailCardKind, s: SiblingState): SiblingStep | null {
+  switch (slot) {
+    case "context": {
+      if (s.filter === "all") return null;
+      if (s.mode === "geo") {
+        // The geo explorer's own first row: countries count-desc.
+        const c = s.countries[0];
+        if (!c) return null;
+        return {
+          key: c.cc,
+          label: c.country,
+          actions: countryToggleActions(c.cc, { country: s.country, hasInspect: !!s.inspect, cohort: s.cohort }),
+        };
+      }
+      if (s.mode === "hyper") {
+        // Hyper's explorer leads with the composition groups, size-desc.
+        const g = compositionGroups(s.selNodes)[0];
+        if (!g) return null;
+        return {
+          key: g.key,
+          label: g.label,
+          actions: compositionToggleActions(
+            { netId: s.filter, key: g.key },
+            { composition: s.composition, hasInspect: !!s.inspect, filter: s.filter },
+          ),
+        };
+      }
+      return null;
+    }
+
+    case "country": {
+      if (!s.country) return null;
+      const g = cohortsOf(s.selNodes.filter((r) => r.cc === s.country))[0];
+      if (!g) return null;
+      return {
+        key: `${s.country}|${g.city}|${g.isp}`,
+        label: cohortLabel(g),
+        actions: cohortToggleActions(
+          { cc: s.country, city: g.city, isp: g.isp },
+          { cohort: s.cohort, hasInspect: !!s.inspect },
+        ),
+      };
+    }
+
+    case "cohort": {
+      if (!s.cohort) return null;
+      const c = s.cohort;
+      const g = cohortsOf(s.selNodes.filter((r) => r.cc === c.cc)).find((x) =>
+        sameCohort(c, { cc: c.cc, city: x.city, isp: x.isp }),
+      );
+      const r = g ? machineRows(g.rows).sort(nodeSort)[0] : undefined;
+      if (!r) return null;
+      return {
+        key: hoverKeyOf(r.pick) ?? r.label,
+        label: r.label,
+        actions: nodeSelectActions(r.pick, { mode: s.mode, currentFilter: s.filter, deselect: false }),
+      };
+    }
+
+    case "composition": {
+      if (!s.composition) return null;
+      const g = compositionGroups(s.selNodes).find((x) => x.key === s.composition!.key);
+      // The group's own row order — the same sequence the node pager steps in hyper.
+      const r = g ? machineRows(g.rows)[0] : undefined;
+      if (!r || !g) return null;
+      return {
+        key: hoverKeyOf(r.pick) ?? r.label,
+        label: r.label,
+        actions: nodeSelectActions(r.pick, {
+          mode: s.mode,
+          currentFilter: s.filter,
+          deselect: false,
+          compositionSel: { netId: s.filter, key: g.key },
+        }),
+      };
+    }
+
+    // The global tick's first child is its first exact-read channel row — the anchor log's own
+    // "commit the first row" precedent. The builder filter-firsts exactly like a row click.
+    case "snap": {
+      if (!s.snap || !s.exactRows || s.exactRows.length === 0) return null;
+      const r = s.exactRows[0];
+      const meta = s.metaList.find((m) => m.id === r.metaId);
+      const who = meta?.symbol || meta?.name || `${r.metaId.slice(0, 6)}…`;
+      const sel: MetaSnapSel = {
+        metaId: r.metaId,
+        ordinal: r.ordinal,
+        hash: "", // the exact read carries no hash; sameMetaSnap keys on metaId+ordinal
+        globalOrdinal: s.snap.data.ordinal,
+        ts: s.snap.data.timestamp,
+      };
+      return {
+        key: `${r.metaId}:${r.ordinal}`,
+        label: `${who} ${r.ordinal > 0 ? r.ordinal.toLocaleString() : "undecoded"}`,
+        actions: metaSnapSelectActions(sel, s.snap, { filter: s.filter, metaSnap: s.metaSnap }),
+      };
+    }
+
+    // A node and a metagraph snapshot are leaves; About/tool never focus.
+    default:
+      return null;
+  }
+}

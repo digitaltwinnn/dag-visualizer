@@ -592,7 +592,14 @@ export default function Inspector() {
         // (`railLadderBoundary.test.ts` asserts rung → slot, never the reverse). RailPager renders
         // children untouched when the rung has no sibling set.
         const focused = id === focusId;
-        const wrapped = boxed ? <RailPager slot={card.kind}>{body}</RailPager> : body;
+        // The plank's ladder pair steps the PILE: the boxed rung's committed neighbours in
+        // display order, opened through the accordion's own toggleCollapse (single-open makes
+        // the target the box). With no finer committed rung, RailPager's ∨ falls through to
+        // childStep and commits the first child (user, 2026-09-11).
+        const pi = presentLadderIds.indexOf(id);
+        const upSlot = pi > 0 ? presentLadderIds[pi - 1] : null;
+        const downSlot = pi >= 0 && pi < presentLadderIds.length - 1 ? presentLadderIds[pi + 1] : null;
+        const wrapped = boxed ? <RailPager slot={card.kind} upSlot={upSlot} downSlot={downSlot} onOpenSlot={toggleCollapse}>{body}</RailPager> : body;
         return (
           // The distance-dim rides a VAR, not wrapper opacity (2026-08-08): the entry itself
           // applies `opacity-[var(--entry-dim,1)]` and RELEASES it on hover (the materialize

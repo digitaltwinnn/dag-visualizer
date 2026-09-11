@@ -298,6 +298,18 @@ box unique) — it is the tier's own `boxed` condition, and `railTierBoundary.te
 can't drift. Keying it to the FOCUS rung was the same mistake `data-tier` fixed above, and it also shut
 out the two snapshot slots, which ride the lane with no focus rung at all.
 
+**The plank also carries the LADDER PAIR** (`∧ ∨`, 2026-09-11 — the user liked the sibling swipe
+and asked for the vertical axis; a vertical SWIPE was rejected together because it fights the
+rails' touch scrolling and the sheets' drag gestures, so it is buttons): ∧ re-boxes the next
+coarser COMMITTED rung and ∨ the next finer one — the accordion's own `toggleCollapse`, committing
+nothing, with the camera and callout following the box as always — and where nothing finer is
+committed, ∨ falls through to `childStep` (railSiblings.ts, tested) and COMMITS the rung's FIRST
+child in the explorer's own order ("just pick the 1st one"). A rung with no child vocabulary
+(a node, a metagraph snapshot, the ledger's network — its finer subjects belong to the tick axis)
+answers null and the control hides by the invisible-chevron rule. One hairline divides the two
+axes so they never read as one four-way control; a plank can be ladder-only (a boxed rung with no
+siblings still shows ∧/∨ where they act).
+
 **A pager's parent scope is whatever the step must NOT change, which for the metagraph snapshot makes it
 a PAIR — this metagraph × this tick** (user, 2026-08-09). The set is the subject's own `metaId` rows of the
 pinned tick's exact read, ordinal-desc, never every contributor: `metaSnapSelectActions` filter-firsts, so
@@ -828,12 +840,15 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
   plus 2px to reach the 16px `--panel-pad-x` the head rule uses. Deriving it from the tokens is what
   makes the lines actually share an edge.
 - **One close**: every dismissible card's × is CardHead's ghost close labelled "Clear selection", with
-  no per-card variants. Right cards are collapsible too — the whole head is the disclosure toggle (the
-  stretched-hit-area pattern, required for touch), with the × and the aside floating above the overlay
-  so closing and links keep working. ⚠️ **Floating above it means `pointer-events-none` on the wrapper
-  and `pointer-events-auto` on its own links/buttons** (`[&_a]:pointer-events-auto`,
-  `[&_button]:pointer-events-auto`) — a `z-index` alone leaves the whole aside eating the toggle click,
-  which is exactly how a collapsed head stopped expanding.
+  no per-card variants. A right-rail ENTRY expands on click (the whole entry is one invisible
+  stretched toggle, required for touch) — but the BOX carries **no minimize** (user, 2026-09-11:
+  "hardly used"; the − on the eyebrow line and the whole-head collapse toggle both went): the box
+  moves by expanding another entry or by the plank's ladder pair, never by collapsing into
+  nothing. The LEFT rail's explore cards keep their collapse toggle. The × and the aside float
+  above the entry overlay so closing and links keep working. ⚠️ **Floating above it means
+  `pointer-events-none` on the wrapper and `pointer-events-auto` on its own links/buttons**
+  (`[&_a]:pointer-events-auto`, `[&_button]:pointer-events-auto`) — a `z-index` alone leaves the
+  whole aside eating the toggle click, which is exactly how a collapsed head stopped expanding.
 - **The cards ARE the rail's controls — there is no rail toolbar.** The collapse-all/restore + clear-all
   pair above the pile was removed (2026-08-09): every head is already a disclosure toggle, so a
   collapse-all button restates what a click says, and its × was the coarsest card's own × — clearing

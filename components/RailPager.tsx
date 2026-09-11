@@ -60,11 +60,11 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { siblingSet, type SiblingState } from "@/components/railSiblings";
+import { childStep, siblingSet, type SiblingState } from "@/components/railSiblings";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { latestRelevant } from "@/src/data/follow";
 import { getAnchor } from "@/src/data/network";
@@ -162,7 +162,24 @@ const FLICK_MS = 90; // velocity is measured over this trailing window, never of
 // a finger that pauses before lifting reads ~0 (correctly — a pause then lift is not a flick),
 // but a genuine throw's last sample can land 2ms before pointerup and read as noise either way.
 
-export default function RailPager({ slot, children }: { slot: RailCardKind; children: ReactNode }) {
+export default function RailPager({
+  slot,
+  upSlot,
+  downSlot,
+  onOpenSlot,
+  children,
+}: {
+  slot: RailCardKind;
+  /** The next coarser COMMITTED rung in the pile (Inspector's present order) — the plank's ∧
+   *  re-boxes it through the accordion's own expand, committing nothing. Null at the top. */
+  upSlot?: string | null;
+  /** The next finer COMMITTED rung — the plank's ∨ re-boxes it. When null, ∨ falls through to
+   *  `childStep`: COMMIT the rung's first child in the explorer's own order (user, 2026-09-11). */
+  downSlot?: string | null;
+  /** Inspector's own toggleCollapse — the same routine an entry's head click runs. */
+  onOpenSlot?: (id: string) => void;
+  children: ReactNode;
+}) {
   const mode = useStore((s) => s.mode);
   const filter = useStore((s) => s.filter);
   const country = useStore((s) => s.country);
@@ -182,7 +199,7 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
   // underneath doesn't re-render with it.
   const { snaps } = useSnapshotFeed(POLL.maxSnapshots);
 
-  const set = useMemo(() => {
+  const { set, child } = useMemo(() => {
     // The two live reads railSiblings can't make itself (network singleton + the story rule), done
     // ONLY for the slot that uses them — the tick window is irrelevant to every other card.
     const liveOrd = slot === "snap" ? (latestRelevant("all")?.ordinal ?? null) : null;
@@ -206,12 +223,22 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
       selNodes,
       metaList,
       countries: leaderboard?.countries ?? [],
-      exactRows: metaSnap ? (snapshotExact[metaSnap.globalOrdinal]?.rows ?? null) : null,
+      // The metaSnap pager reads its committed pair's rows; the snap slot's DOWN step (first
+      // channel row of the boxed tick) reads its own tick's exact rows.
+      exactRows: metaSnap
+        ? (snapshotExact[metaSnap.globalOrdinal]?.rows ?? null)
+        : snap
+          ? (snapshotExact[snap.data.ordinal]?.rows ?? null)
+          : null,
       following,
       ticks,
     };
-    return siblingSet(slot, state);
-  }, [slot, mode, filter, country, cohort, composition, inspect, snap, metaSnap, selNodes, metaList, leaderboard, snapshotExact, following, snaps]);
+    return {
+      set: siblingSet(slot, state),
+      // A finer COMMITTED rung wins over a fresh commit — the pile is stepped, not re-built.
+      child: downSlot == null ? childStep(slot, state) : null,
+    };
+  }, [slot, downSlot, mode, filter, country, cohort, composition, inspect, snap, metaSnap, selNodes, metaList, leaderboard, snapshotExact, following, snaps]);
 
   // --- swipe state: ALL refs. Nothing here re-renders — the transform is written to the node. ---
   const wrap = useRef<HTMLDivElement | null>(null);
@@ -420,7 +447,19 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     });
   };
 
-  if (!set) return <>{children}</>;
+  // The ladder pair (user, 2026-09-11 — a button pair instead of a vertical swipe, which would
+  // fight the rails' touch scrolling and the sheets' drag gestures): ∧ re-boxes the coarser
+  // committed rung, ∨ the finer one — the accordion's own expand, committing nothing — and where
+  // nothing finer is committed, ∨ falls through to `childStep` and COMMITS the first child.
+  const up = upSlot != null && onOpenSlot ? () => onOpenSlot(upSlot) : null;
+  const down =
+    downSlot != null && onOpenSlot
+      ? { label: "Open the finer card", run: () => onOpenSlot(downSlot) }
+      : child
+        ? { label: `Open first: ${child.label}`, run: () => applyClickActions(child.actions) }
+        : null;
+
+  if (!set && !up && !down) return <>{children}</>;
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
@@ -430,6 +469,7 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     trail.current = [{ x: e.clientX, t: e.timeStamp }];
   };
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (!set) return; // ladder-only plank: the ∧/∨ buttons work, the sibling swipe has no set to step
     const st = start.current;
     if (!st || e.pointerId !== st.id) return;
     const ddx = e.clientX - st.x;
@@ -503,6 +543,7 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     e.stopPropagation();
   };
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (!set) return;
     if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
     const t = e.target as HTMLElement;
     if (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable) return;
@@ -510,8 +551,8 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
     commitStep(e.key === "ArrowLeft" ? -1 : 1);
   };
 
-  const prev = set.items[set.index - 1];
-  const next = set.items[set.index + 1];
+  const prev = set ? set.items[set.index - 1] : undefined;
+  const next = set ? set.items[set.index + 1] : undefined;
   return (
     <div onKeyDown={onKeyDown}>
       <div
@@ -560,42 +601,83 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
             is a sibling of the card, not a descendant, and `#rightcol` is pointer-events:none. */}
         <div
           role="group"
-          aria-label={set.open ? `Step through ${set.parentLabel}` : `Siblings in ${set.parentLabel}`}
-          title={set.parentLabel}
+          aria-label={set ? (set.open ? `Step through ${set.parentLabel}` : `Siblings in ${set.parentLabel}`) : "Card ladder"}
+          title={set?.parentLabel}
           className="pointer-events-auto absolute bottom-1 inset-x-[19px] flex h-5 items-center gap-1"
         >
           {/* An edge chevron is INVISIBLE, not merely disabled (user, 2026-09-03: "don't show
               the ‹ or › because it doesn't do anything") — a dimmed arrow still promises a
               direction that isn't there. `invisible` rather than unmounting keeps the slot, so
               the counter and its siblings never shift when an edge is reached. */}
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            className={cn("size-5", !prev && "invisible")}
-            disabled={!prev}
-            onClick={() => commitStep(-1)}
-            aria-label={prev ? `Previous: ${prev.label}` : "Previous"}
-            title={prev?.label}
-          >
-            <ChevronLeft aria-hidden />
-          </Button>
-          {/* An OPEN set shows NO position (user, 2026-08-09): the global chain is ongoing, so
-              `n / N` would state a total the window doesn't have. The spacer keeps the chevrons on
-              the card's own content edges, identical to the counted variant. */}
-          <div className="min-w-0 flex-1 truncate text-center text-micro uppercase tracking-caps text-muted-foreground tabular-nums">
-            {set.open ? "" : `${set.index + 1} / ${set.items.length}`}
-          </div>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            className={cn("size-5", !next && "invisible")}
-            disabled={!next}
-            onClick={() => commitStep(1)}
-            aria-label={next ? `Next: ${next.label}` : "Next"}
-            title={next?.label}
-          >
-            <ChevronRight aria-hidden />
-          </Button>
+          {set ? (
+            <>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className={cn("size-5", !prev && "invisible")}
+                disabled={!prev}
+                onClick={() => commitStep(-1)}
+                aria-label={prev ? `Previous: ${prev.label}` : "Previous"}
+                title={prev?.label}
+              >
+                <ChevronLeft aria-hidden />
+              </Button>
+              {/* An OPEN set shows NO position (user, 2026-08-09): the global chain is ongoing, so
+                  `n / N` would state a total the window doesn't have. The spacer keeps the chevrons on
+                  the card's own content edges, identical to the counted variant. */}
+              <div className="min-w-0 flex-1 truncate text-center text-micro uppercase tracking-caps text-muted-foreground tabular-nums">
+                {set.open ? "" : `${set.index + 1} / ${set.items.length}`}
+              </div>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className={cn("size-5", !next && "invisible")}
+                disabled={!next}
+                onClick={() => commitStep(1)}
+                aria-label={next ? `Next: ${next.label}` : "Next"}
+                title={next?.label}
+              >
+                <ChevronRight aria-hidden />
+              </Button>
+            </>
+          ) : (
+            // Ladder-only plank: the spacer holds the pair on the card's right content edge,
+            // where the counted variant's › sits.
+            <div className="min-w-0 flex-1" />
+          )}
+          {/* THE LADDER PAIR (user, 2026-09-11) — ∧ re-boxes the coarser committed rung, ∨ the
+              finer one (the accordion's own expand — the camera and callout follow the box as
+              they always do), and with nothing finer committed ∨ commits the rung's FIRST child
+              in the explorer's own order. Same chrome-less grammar, same invisible-at-the-edge
+              rule as the sibling chevrons; the hairline keeps the two axes from reading as one
+              four-way control. */}
+          {(up || down) && (
+            <>
+              {set && <div aria-hidden className="mx-0.5 h-3 w-px bg-border" />}
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className={cn("size-5", !up && "invisible")}
+                disabled={!up}
+                onClick={() => up?.()}
+                aria-label="Open the coarser card"
+                title="Open the coarser card"
+              >
+                <ChevronUp aria-hidden />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                className={cn("size-5", !down && "invisible")}
+                disabled={!down}
+                onClick={() => down?.run()}
+                aria-label={down?.label ?? "Open the finer card"}
+                title={down?.label}
+              >
+                <ChevronDown aria-hidden />
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>

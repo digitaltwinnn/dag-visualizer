@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { siblingSet, type SiblingState } from "@/components/railSiblings";
+import { childStep, siblingSet, type SiblingState } from "@/components/railSiblings";
 import {
   cohortToggleActions,
   compositionToggleActions,
@@ -339,5 +339,64 @@ describe("siblingSet — non-pager slots", () => {
   it("a single-member set is no set (nothing to step to)", () => {
     const s = base({ mode: "geo", country: "de", cohort: { cc: "de", city: "Berlin", isp: "AWS" }, inspect: deC.pick });
     expect(siblingSet("node", s)).toBeNull(); // Berlin·AWS holds one machine
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+// The plank's DOWN step where nothing finer is committed (user, 2026-09-11): the FIRST child
+// of the boxed rung, in the explorer's own order, through the same pickActions builders a
+// click uses. Leaves and rungs with no child vocabulary answer null — the control hides.
+describe("childStep — the first-child DOWN step", () => {
+  it("geo network opens the first country (the explorer's count-desc order)", () => {
+    const step = childStep("context", base({ filter: "ded" }))!;
+    expect(step.label).toBe("Germany");
+    expect(step.actions).toEqual(countryToggleActions("de", { country: null, hasInspect: false, cohort: null }));
+  });
+  it("hyper network opens the first composition group (size-desc)", () => {
+    const s = base({ mode: "hyper", filter: "ded" });
+    const g = compositionGroups(s.selNodes)[0]!;
+    const step = childStep("context", s)!;
+    expect(step.key).toBe(g.key);
+    expect(step.actions).toEqual(
+      compositionToggleActions({ netId: "ded", key: g.key }, { composition: null, hasInspect: false, filter: "ded" }),
+    );
+  });
+  it("the ledger network and 'all' have no first child to open", () => {
+    expect(childStep("context", base({ mode: "ledger", filter: "ded" }))).toBeNull();
+    expect(childStep("context", base({}))).toBeNull();
+  });
+  it("a country opens its first cohort (count-desc then city)", () => {
+    const step = childStep("country", base({ country: "de" }))!;
+    expect(step.label).toBe("Falkenstein · Hetzner"); // 2 machines beat Berlin's 1
+    expect(step.actions).toEqual(
+      cohortToggleActions({ cc: "de", city: "Falkenstein", isp: "Hetzner" }, { cohort: null, hasInspect: false }),
+    );
+  });
+  it("a cohort opens its first machine (the node pager's own order)", () => {
+    const s = base({ country: "de", cohort: { cc: "de", city: "Falkenstein", isp: "Hetzner" } });
+    const step = childStep("cohort", s)!;
+    expect(step.label).toBe(deA.label);
+    expect(step.actions).toEqual(nodeSelectActions(deA.pick, { mode: "geo", currentFilter: "all", deselect: false }));
+  });
+  it("the global tick opens its first exact-read channel row (the anchor log's first-row rule)", () => {
+    const rows = [
+      { metaId: "dor", ordinal: 900, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
+    ] as unknown as SiblingState["exactRows"];
+    const s = base({ mode: "ledger", snap: snapPick, exactRows: rows });
+    const step = childStep("snap", s)!;
+    expect(step.label).toContain("DOR");
+    expect(step.actions).toEqual(
+      metaSnapSelectActions(
+        { metaId: "dor", ordinal: 900, hash: "", globalOrdinal: 42, ts: "T" },
+        snapPick,
+        { filter: "all", metaSnap: null },
+      ),
+    );
+  });
+  it("an unread tick and the leaf rungs answer null", () => {
+    expect(childStep("snap", base({ mode: "ledger", snap: snapPick, exactRows: [] }))).toBeNull();
+    expect(childStep("node", base({ inspect: deA.pick }))).toBeNull();
+    expect(childStep("metaSnap", base({}))).toBeNull();
   });
 });
