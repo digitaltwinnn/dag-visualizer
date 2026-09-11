@@ -426,11 +426,14 @@
    "focus should fade and only be fully active when the card is expanded to its final
    shape. Check also when going up."): a rung arriving as the BOX eases its presence up from
    the entry register on the height ease's own clock, and a rung falling back to an ENTRY
-   eases down from the box's full presence toward its distance dim. OPACITY ONLY — the
-   geometry stays the accordion's (the no-pop rule; the scale-popping materialize died the
-   same day). The `from`-only keyframes land on each element's own computed value, so the
-   entry settles onto whatever `--entry-dim` its wrapper carries and the box onto 1. */
-@keyframes tierSettleIn { from { opacity: 0.72; } }
+   eases down from the box's full presence toward its distance dim. The box's OUTLINE rides
+   the same settle (user, round two: "it also suddenly has rounded outline") — the border
+   fades in from transparent and the radius grows from the entry's own --radius-md to the
+   panel's --radius, so the frame arrives WITH the emphasis instead of a beat before it.
+   No transforms — the geometry-never-animates rule keeps its spirit: nothing moves, the
+   arriving frame simply fades and rounds into place. The `from`-only keyframes land on
+   each element's own computed values. */
+@keyframes tierSettleIn { from { opacity: 0.72; border-color: transparent; border-radius: var(--radius-md); } }
 @keyframes tierSettleOut { from { opacity: 1; } }
 .rail-ladder [data-tier="box"] .ig-panel { animation: tierSettleIn var(--tempo-roll) var(--ease-roll); }
 .rail-ladder [data-tier="entry"] .rail-entry { animation: tierSettleOut var(--tempo-roll) var(--ease-roll); }
