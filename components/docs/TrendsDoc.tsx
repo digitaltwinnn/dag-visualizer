@@ -390,7 +390,10 @@ export default function TrendsDoc() {
   // compact pills they pack left and wrap cleanly (user, 2026-09-08: the tabs overflowed).
   const topicPicker = (
     <div role="group" aria-label="Topic" className="inline-flex items-center rounded-lg bg-muted p-[3px]">
-      {([["snapshots", "Snapshots"], ["economics", "Economics"], ["fleet", "Nodes"], ["continuity", "Continuity"]] as const).map(([id, label]) => (
+      {/* The topic's user-facing word is "Fees" (user, 2026-09-11: "Economics = Fees" — the
+          plainer word for what the sections show: fees paid, and the data they anchored);
+          the internal id stays `economics`, one concept two registers. */}
+      {([["snapshots", "Snapshots"], ["economics", "Fees"], ["fleet", "Nodes"], ["continuity", "Continuity"]] as const).map(([id, label]) => (
         <button key={id} type="button" aria-pressed={sectionTab === id} onClick={() => setSectionTab(id)} className={zoomBtn(sectionTab === id)}>
           {label}
         </button>
