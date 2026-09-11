@@ -241,6 +241,13 @@ interface AppState {
   // via setRailCollapse returns a slot to auto. UI state, not selection (the selection boundary
   // rule doesn't apply); session-only, like phoneDock.
   railCollapse: Record<string, boolean>;
+  // HOW the current rail state was reached (user, 2026-09-11 — "solve it structurally", ending
+  // the timer-based roll suppression): true when the latest navigation was a QUIET gesture —
+  // the plank's ladder steps and any manual expand/collapse (the About card's never-roll-on-a-
+  // manual-expand rule) — so a card mounting from it, however late its data arrives, skips the
+  // title roll-in. The one executor resets it to false on every ordinary commit; CardHead
+  // freezes the answer per mount. UI state, not selection.
+  navQuiet: boolean;
   // THE CAMERA FRAMES THE BOXED RUNG (user, 2026-08-09: "when we click the card, can we also
   // update the view camera position, we do the same when we click a row in the explorer"). The
   // rail's open plank and the camera name the same subject, so opening a rung asks the Engine to
@@ -306,6 +313,7 @@ interface AppState {
   setSceneCover: (side: "left" | "right", px: number) => void;
   setBoxedCard: (id: string | null) => void;
   setRailCollapse: (id: string, collapsed: boolean | null) => void;
+  setNavQuiet: (navQuiet: boolean) => void;
   setRailCollapseMany: (entries: Record<string, boolean | null>) => void;
   /** Ask the Engine to frame this ladder rung (see `focusRung`). One-shot; the Engine reads it
    *  on change and never clears it — the value IS the last request, not a pending queue. */
@@ -369,6 +377,7 @@ export const useStore = create<AppState>((set) => ({
   sceneDragging: false,
   cameraFlying: false,
   railCollapse: {},
+  navQuiet: false,
   focusRung: null,
   phoneSheetPx: null,
   sceneCoverL: 0,
@@ -389,7 +398,9 @@ export const useStore = create<AppState>((set) => ({
   // be, and the two publish to one address bar (RouteSync derives the path from doc ?? mode).
   // Closing (either route) arms `docClosing` — the doc's exit animation is its OUT phase, and
   // the engine waits on it before entering the destination view.
-  setMode: (mode) => set((s) => ({ mode, docPage: null, docClosing: s.docPage != null || s.docClosing })),
+  // A view switch is a LOUD navigation (the no-pop rule rolls view-scoped content on arrival),
+  // so it clears any standing quiet mark from a rail gesture.
+  setMode: (mode) => set((s) => ({ mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing })),
   // Opening a doc also SURFACES THE SCENE POSE: the overlay sits at z-8, under the raw layer's
   // z-9 — a doc opened from the RAW pose rendered beneath the still-interactive table, with the
   // RAW toggle that could exit it hidden by the doc's own control gating (review find,
@@ -500,6 +511,7 @@ export const useStore = create<AppState>((set) => ({
   setVitalsWindow: (vitalsWindow) => set({ vitalsWindow }),
   setSceneDragging: (sceneDragging) => set({ sceneDragging }),
   setCameraFlying: (cameraFlying) => set({ cameraFlying }),
+  setNavQuiet: (navQuiet) => set({ navQuiet }),
   setRailCollapse: (id, collapsed) =>
     set((s) => {
       const railCollapse = { ...s.railCollapse };

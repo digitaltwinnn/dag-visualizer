@@ -508,13 +508,13 @@
   left: 18px;
   right: 18px;
 }
-/* A LADDER STEP DOES NOT ROLL TITLES (user, 2026-09-11, two rounds — "'Falkenstein' and the
-   'ready' tag flash while they are still the same", then the ∨ commit's arriving tile:
-   "in this case it shouldn't" either): the tier swap remounts heads, and a fresh element
-   replays `.roll-in` whatever its key says. Every plank ladder step is quiet — the settle
-   carries the tier change, the edge pulse announces a genuinely new subject. Explorer
-   clicks and the ‹ › sibling steps arrive from elsewhere and keep their rolls. */
-.rail-ladder[data-stepping="move"] .roll-in { animation: none; }
+/* …and the CARD-INTERNAL hover reveals stand down in the same window (user, 2026-09-11:
+   "check the card swipes also for [the same] machinery") — the pager slide translates the
+   incoming card under a latched pointer exactly like a ladder step re-lays the pile, so the
+   whisper edge and the copy-button reveal could light mid-slide. One attribute, every
+   hover-treatment gate. */
+.rail-ladder[data-stepping] .sig-left:hover::before { opacity: 0; }
+.rail-ladder[data-stepping] .group\/copy:hover button[aria-label^="Copy"] { opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
   .rail-ladder > [data-tier="entry"] + [data-tier="entry"]::before { transition: none; }
 }

@@ -360,6 +360,12 @@ export default function RailPager({
   };
   const commitStep = (dir: -1 | 1) => {
     if (!set?.items[set.index + dir]) return;
+    // The slide shares the ladder step's hover-inert window (user, 2026-09-11: "check the
+    // card swipes also for machinery") — the incoming card translates under a latched pointer
+    // exactly like a re-laid pile, and inline pointer-events:none alone does not clear a
+    // latched :hover (the measured Chromium lag). Safe before the early return above: a
+    // no-op step arms nothing.
+    stillLane();
     const el = wrap.current;
     const parent = el?.parentElement;
     const reduced = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -463,32 +469,25 @@ export default function RailPager({
   // Every step first arms the lane's hover-inert window (`data-stepping`, globals.css): the
   // pile re-lays under a resting cursor and entries easing past it flashed their hover release
   // (user, same day — the pager slide's own bug on the vertical axis). Cleared a beat after
-  // the height ease (--tempo-roll ≈ 650ms); repeated steps re-arm the timer. EVERY ladder step
-  // is a QUIET one — the title roll stands down for the accordion moves (the About card's
-  // never-roll-on-a-manual-expand rule; "'Falkenstein' and the 'ready' tag flash while they
-  // are still the same") AND for the ∨ first-child commit (user, next round: the arriving
-  // tile rolled and "in this case it shouldn't" — the gesture reads as one continuous
-  // descent, and the edge pulse still announces the new subject). Explorer clicks and the
-  // ‹ › sibling steps keep their rolls: those arrive from elsewhere, not down the pile.
+  // the height ease (--tempo-roll ≈ 650ms); repeated steps re-arm the timer. The ROLL
+  // suppression no longer rides this window (user: "timer-based is too fragile, solve it
+  // structurally") — it is the store's `navQuiet` provenance now: toggleCollapse marks itself
+  // quiet, and the ∨ first-child commit passes `quiet` through the one executor, so a card
+  // mounting however late still knows the gesture it came from.
   const stepStillT = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stillLane = () => {
     const lane = wrap.current?.closest(".rail-ladder");
     if (!(lane instanceof HTMLElement)) return; // the sheets' flat stack has no lane — no-op
     lane.setAttribute("data-stepping", "move");
     if (stepStillT.current) clearTimeout(stepStillT.current);
-    // 1600, not the height ease's 720 (user, 2026-09-11, third round — "it still has the
-    // roll effect"): a ∨ COMMIT's new cards mount ~730ms after the click (measured — store
-    // commit, engine focus, the pane's own data), which was 10ms past the old window, so
-    // their titles rolled with the suppression already lifted. The window must outlive the
-    // remounts it exists to quiet, not just the geometry.
-    stepStillT.current = setTimeout(() => lane.removeAttribute("data-stepping"), 1600);
+    stepStillT.current = setTimeout(() => lane.removeAttribute("data-stepping"), 720);
   };
   const up = upSlot != null && onOpenSlot ? () => { stillLane(); onOpenSlot(upSlot); } : null;
   const down =
     downSlot != null && onOpenSlot
       ? { label: "Open the finer card", run: () => { stillLane(); onOpenSlot(downSlot); } }
       : child
-        ? { label: `Open first: ${child.label}`, run: () => { stillLane(); applyClickActions(child.actions); } }
+        ? { label: `Open first: ${child.label}`, run: () => { stillLane(); applyClickActions(child.actions, { quiet: true }); } }
         : null;
 
   if (!set && !up && !down) return <>{children}</>;

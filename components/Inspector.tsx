@@ -395,6 +395,12 @@ export default function Inspector() {
   // in one store update. Collapsing the open box just closes it (no box open is a legal rest).
   const presentLadderIds = ladderIds.filter(presentOf);
   const toggleCollapse = (id: string) => {
+    // A manual expand/collapse is a QUIET navigation (the About card's never-roll-on-a-manual-
+    // expand rule, structural since 2026-09-11): heads remounting from this gesture — the
+    // plank's ∧/∨ and an entry's own click alike — skip the title roll. The provenance lives
+    // in the store so a late-mounting card still knows it; the next ordinary commit resets it
+    // through the one executor.
+    useStore.getState().setNavQuiet(true);
     const next = !effCollapsed(id);
     if (!next && ladderIds.includes(id)) {
       setRailCollapseMany({

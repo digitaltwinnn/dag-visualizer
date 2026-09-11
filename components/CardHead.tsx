@@ -1,8 +1,10 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
+import { useRef } from "react";
 import { Plus, Minus, X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useStore } from "@/src/store/store";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { KIND_MARK_CLASS } from "@/components/icons";
@@ -42,6 +44,32 @@ import { KIND_MARK_CLASS } from "@/components/icons";
 const EYEBROW = "text-micro font-bold tracking-[0.1em] uppercase leading-none";
 // The ONE title standard every card head uses (panel h2 and inspector h3 alike).
 const TITLE = "m-0 text-title font-semibold";
+
+/** The title, rolled ONLY when its arrival is worth announcing. The roll's gate is the
+ *  store's `navQuiet` provenance (user, 2026-09-11 — "solve it structurally", ending a
+ *  timer-based suppression): a QUIET navigation (the plank's ∧/∨, a manual expand) remounts
+ *  heads whose subjects didn't newly arrive, so their titles must not roll — and because the
+ *  flag is state, a card mounting seconds later off the same gesture still knows. FROZEN per
+ *  (mount, titleKey): the decision is made when this span first renders for a key and never
+ *  revised, or a later loud commit elsewhere would re-trigger the animation by class change
+ *  on a standing element. */
+function useRolledTitle(titleKey: string | number | undefined, title: ReactNode): ReactNode {
+  const navQuiet = useStore((s) => s.navQuiet);
+  const frozen = useRef<{ key: string | number | undefined; quiet: boolean } | null>(null);
+  if (frozen.current == null || frozen.current.key !== titleKey) {
+    frozen.current = { key: titleKey, quiet: navQuiet };
+  }
+  if (titleKey == null) return title;
+  return (
+    // `min-w-0 max-w-full` bounds this inline-block wrapper to its parent's width so a long
+    // title inside (e.g. a provider's "City · Long Provider GmbH") can actually truncate — an
+    // unbounded inline-block shrinks to content and lets the inner `.truncate` overflow the card
+    // (surfaced once the ladder lane narrows the deeper cards, 2026-07-19).
+    <span key={titleKey} className={cn("min-w-0 max-w-full", !frozen.current.quiet && "roll-in")}>
+      {title}
+    </span>
+  );
+}
 
 // The right-rail card frame — the ONE definition of the inspector-rail Card composition. It is the
 // className you hand to `<Card asChild className={RIGHT_CARD}>`: the Card baseline already supplies
@@ -187,18 +215,7 @@ export default function CardHead({
   // and the card body's own `.no-signal` wrapper no longer sits as its ancestor).
   eyebrowMuted?: boolean;
 }) {
-  const rolled =
-    titleKey != null ? (
-      // `min-w-0 max-w-full` bounds this inline-block wrapper to its parent's width so a long
-      // title inside (e.g. a provider's "City · Long Provider GmbH") can actually truncate — an
-      // unbounded inline-block shrinks to content and lets the inner `.truncate` overflow the card
-      // (surfaced once the ladder lane narrows the deeper cards, 2026-07-19).
-      <span key={titleKey} className="roll-in min-w-0 max-w-full">
-        {title}
-      </span>
-    ) : (
-      title
-    );
+  const rolled = useRolledTitle(titleKey, title);
   const eyebrowClass = cn(EYEBROW, eyebrowMuted ? "text-muted-foreground" : "text-accent");
 
   if (panel) {
