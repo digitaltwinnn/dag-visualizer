@@ -487,7 +487,7 @@ export default function TrendsDoc() {
           <Section
             id="ledger"
             title="Global snapshots"
-            lead="One subject, two readings: how many global snapshots were produced, and how many metagraph snapshots they anchored."
+            lead="How many global snapshots were produced, and how many metagraph snapshots they anchored."
           >
             <TrendChart onRange={onRange} inspect={inspectHere} name="Global snapshots" unit={per} readout={dayReadout("g.ticks")} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "ticks", points: trim(S(p, "g.ticks")) }]} />
             <TrendChart onRange={onRange} inspect={inspectHere} name="Metagraph snapshots anchored" unit={per} readout={dayReadout("g.anchors")} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "anchored", points: trim(S(p, "g.anchors")) }]} />
