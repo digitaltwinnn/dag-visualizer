@@ -94,7 +94,14 @@ export default function SiteFooter() {
         // all fold it away.
         "h-[calc(var(--footer-h)+min(10px,var(--bottom-reserve,0px)))]",
         // Phone: above the dock normally; at the safe-area bottom while a doc overlay has the
-        // dock stood down.
+        // dock stood down. And FULL-BLEED there (user, 2026-09-12): the two bars' shared
+        // `--bar-margin` inset exists so their edges align with the rail cards and clear the
+        // RailThread rulers — neither of which exists on the phone, where this strip's
+        // neighbour is the DOCK, and the dock is full-bleed. Inset, the veil fell 16px short
+        // of the screen on each side directly above a full-width bar, which read as a broken
+        // join rather than one bottom chrome block. `max-[700px]` is the same arm the two
+        // rules below already use (CSS trap 8: one number, both arms).
+        "max-[700px]:inset-x-0",
         doc == null
           ? "max-[700px]:bottom-[var(--phone-dock-h)] max-[700px]:h-[var(--footer-phone-h)]"
           : "max-[700px]:bottom-[env(safe-area-inset-bottom)] max-[700px]:h-[var(--footer-phone-h)]",
