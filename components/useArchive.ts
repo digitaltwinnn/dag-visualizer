@@ -168,6 +168,154 @@ export function archiveSummary(c: ArchiveCensus, chain: string): ArchiveNetSumma
   };
 }
 
+// THE ARCHIVAL SCHEDULE (user, 2026-09-10, five rounds — the dossier's accounting form:
+// "by archival", dynamic reach ranges, then the DAG's 152-node census turning the exact-reach
+// rows into a ~25-row histogram: "too many rows for DAG, use 3-5 rows max and do some smart
+// grouping based on the counts"). Three kinds, three treatments:
+// - FULL nodes are ALWAYS their own leading row, never combined with PARTIAL copies (user,
+//   round 4) — the row's count column carries how many, so the tag is the bare
+//   "full archive" (round 9 — was "full node"; the tag qualifies the archive).
+//   Kept = the chain itself (the latest ordinal); label = the chain's age. ⚠️ WITH A
+//   FIRST-DAY GRACE (user, round 10: "not always nodes will join simultaneously — if nodes
+//   joined within the 1st day they are still considered full"): a window node whose measured
+//   floor sits within GRACE_MS of the chain's birth — the genesis keeper's own floorTs, so
+//   grace exists only where a genesis keeper proves when the chain began — merges INTO the
+//   full row. Its floor is a measured upper bound anyway (the probe bisects at ~latest/1024
+//   resolution), so "joined day one" is as exact a claim as the census can carry.
+// - NO full node is a READING, not an omission (user, round 11 — an "incomplete" tag on
+//   the deep row alone misstated it, every partial row being incomplete too): a chain
+//   where no probed node keeps the whole history LEADS with a muted "Full archive · 0"
+//   row, rule 10's zero-is-measured-none in the schedule's own grammar.
+// - DEEP archives stay one row, labeled by their real age in the age grammar (round 7) and
+//   tagged with the SPAN they serve (latest − the era floor; round 8): the deep archives
+//   measurably share holes (~2.4-2.8M ordinals missing on all nine, probed 2026-08-14), so
+//   the hover says the count is the span, never a promise of every snapshot (rule 10).
+// - WINDOW nodes past the grace bucket by exact reach in the age grammar; when the distinct
+//   reaches overflow the remaining row budget (MAX_SCHED_ROWS total) they cluster into
+//   contiguous COUNT-BALANCED groups, labeled as a span ("3 – 6 months", "up to 18 days").
+//   Kept is the deepest single copy in the group — a per-node fact that never sums the chain
+//   against itself (the DED double-count, round 3).
+// The fleet's remainder stays "unmeasured" (an absent entry means the probe read nothing).
+export interface ArchiveScheduleRow { label: string; count: number; kept: number | null; fullCount: number; hint?: string }
+const MAX_SCHED_ROWS = 5;
+const GRACE_MS = 86_400_000;
+
+// The fixed reach LADDER a many-reach fleet folds into (user, round 6: the DAG's span
+// labels — "5 months – 2 years" — were "too much text; break it down into 1 month,
+// 6 months, >1 year, oldest"). Each window node lands in the shallowest tier that holds
+// its reach; a tier nobody occupies draws no row. "1 year" closes the 6-months-to-a-year
+// band his four labels would strand (the DAG keeps real nodes there). The hint carries the
+// tier's exact meaning for the row's hover.
+const DAY_MS = 86_400_000;
+
+// The census's era string ("Nov 2023") back to a timestamp, so the deep row can state its
+// age. A shape this parser doesn't know answers null and the row falls back to "oldest" —
+// never NaN math.
+const ERA_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function eraMs(since: string): number | null {
+  const m = /^([A-Za-z]{3}) (\d{4})$/.exec(since.trim());
+  if (!m) return null;
+  const mi = ERA_MONTHS.indexOf(m[1]);
+  return mi < 0 ? null : Date.UTC(Number(m[2]), mi, 1);
+}
+const REACH_TIERS = [
+  { label: "> 1 year", minMs: 365.25 * DAY_MS, hint: "keeps more than a year of the chain" },
+  { label: "1 year", minMs: 6 * 30.44 * DAY_MS, hint: "keeps up to a year of the chain" },
+  { label: "6 months", minMs: 30.44 * DAY_MS, hint: "keeps up to six months of the chain" },
+  { label: "1 month", minMs: 0, hint: "keeps up to a month of the chain" },
+];
+
+export function archiveSchedule(
+  c: ArchiveCensus, chain: string, fleetTotal: number, now = Date.now(),
+): { rows: ArchiveScheduleRow[]; unmeasured: number } | null {
+  const entries = [...c.entries.values()].filter((e) => e.chain === chain);
+  if (!entries.length) return null;
+  const rows: ArchiveScheduleRow[] = [];
+  const full = entries.filter((e) => e.kind === "genesis");
+  // The first-day grace (see the header): birth is the genesis keeper's own floorTs.
+  const birthTs = full.find((e) => e.floorTs)?.floorTs;
+  const birthMs = birthTs ? Date.parse(birthTs) : NaN;
+  const graced = new Set(
+    Number.isFinite(birthMs)
+      ? entries.filter((e) => {
+          if (e.kind !== "window" || !e.floorTs) return false;
+          const t = Date.parse(e.floorTs);
+          return !Number.isNaN(t) && t - birthMs <= GRACE_MS;
+        })
+      : [],
+  );
+  if (full.length) {
+    rows.push({
+      label: (birthTs && fmtReach(birthTs, now)) || "full chain",
+      count: full.length + graced.size,
+      kept: Math.max(...full.map((e) => e.latest)),
+      fullCount: full.length + graced.size,
+    });
+  } else {
+    // The tag still states what a FULL archive would hold (user, round 12): the chain's
+    // tip ordinal at probe time — the whole chain's size, kept by nobody.
+    rows.push({
+      label: "full archive",
+      count: 0,
+      kept: Math.max(...entries.map((e) => e.latest)),
+      fullCount: 0,
+      hint: "No probed node keeps this whole chain, back to its first snapshot.",
+    });
+  }
+  // The deep archives lead the partials at their real age in the age grammar, like every
+  // other row (user, round 7: "instead of 'oldest' give it the right age in text") — the
+  // era month parsed and aged; the era itself and its gaps caveat stay in the hover.
+  const deep = entries.filter((e) => e.kind === "deep");
+  if (deep.length) {
+    const t = eraMs(c.since);
+    rows.push({
+      label: t != null ? ageWords(now - t) : "oldest",
+      count: deep.length,
+      kept: Math.max(0, ...deep.map((e) => e.latest - e.floor)),
+      fullCount: 0,
+      hint: `keeps deep history back to ${c.since} — the deep archives share gaps, so the count is the span, not a promise of every snapshot`,
+    });
+  }
+  const win = entries.filter((e) => e.kind === "window" && !graced.has(e));
+  if (win.length) {
+    // Exact-reach buckets first, deepest leading — small fleets keep their exact labels.
+    const buckets = new Map<string, { label: string; count: number; kept: number; ms: number }>();
+    for (const e of win) {
+      const t = e.floorTs ? Date.parse(e.floorTs) : NaN;
+      const ms = Number.isNaN(t) ? 0 : now - t;
+      const label = (e.floorTs && fmtReach(e.floorTs, now)) || "recent window";
+      const kept = e.latest - e.floor;
+      const b = buckets.get(label);
+      if (b) {
+        b.count += 1;
+        b.kept = Math.max(b.kept, kept);
+        b.ms = Math.max(b.ms, ms);
+      } else buckets.set(label, { label, count: 1, kept, ms });
+    }
+    const ordered = [...buckets.values()].sort((a, b) => b.ms - a.ms);
+    const slots = Math.max(1, MAX_SCHED_ROWS - rows.length);
+    if (ordered.length <= slots) {
+      for (const b of ordered) rows.push({ label: b.label, count: b.count, kept: b.kept, fullCount: 0 });
+    } else {
+      // Too many distinct reaches for the budget: fold into the fixed ladder — each
+      // bucket lands in the deepest tier whose floor its reach clears.
+      const tierOf = (ms: number) => REACH_TIERS.find((t) => ms >= t.minMs) ?? REACH_TIERS[REACH_TIERS.length - 1];
+      for (const tier of REACH_TIERS) {
+        const members = ordered.filter((b) => tierOf(b.ms) === tier);
+        if (!members.length) continue;
+        rows.push({
+          label: tier.label,
+          count: members.reduce((n, b) => n + b.count, 0),
+          kept: Math.max(...members.map((b) => b.kept)),
+          fullCount: 0,
+          hint: tier.hint,
+        });
+      }
+    }
+  }
+  return { rows, unmeasured: Math.max(0, fleetTotal - entries.length) };
+}
+
 let cached: ArchiveCensus | null = null;
 let inflight: Promise<ArchiveCensus | null> | null = null;
 

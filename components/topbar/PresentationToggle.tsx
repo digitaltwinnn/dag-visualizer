@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { Focus, LayoutPanelLeft, Table2 } from "lucide-react";
+import { Focus, Table2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { useBreakpoint } from "@/components/useBreakpoint";
@@ -52,9 +52,13 @@ export default function PresentationToggle() {
     <div className="flex items-center gap-0.5" role="group" aria-label="How the information is presented">
       {/* SCENE ⇄ HUD — ONE toggle button (user, 2026-08-30, round 2: the two-segment group
           looked identical to the old radio at icon-only widths — "a toggle" means one button
-          that flips). It shows the CURRENT presentation and presses on Scene (the non-default,
-          chrome-hidden state); the title names what a click does. Stays live while RAW is open:
-          it then states (and edits) what the raw layer will return to. */}
+          that flips). A CONTROL NAMES WHAT IT PRESSES FOR, THE WASH SAYS WHETHER IT'S ON
+          (user, 2026-09-09: the label used to flip with the state, so "HUD" sat unlit while
+          the HUD was showing beside a "RAW" that names its target — two grammars in one
+          pair). So: stable "Scene" label + stable glyph, pressed while the chrome-hidden
+          presentation is active; the default HUD state needs no announcement — the HUD is
+          visibly there. The title still names what a click does. Stays live while RAW is
+          open: it then states (and edits) what the raw layer will return to. */}
       <button
         type="button"
         aria-pressed={railsHidden}
@@ -62,8 +66,8 @@ export default function PresentationToggle() {
         onClick={() => setRailsHidden(!railsHidden)}
         className={cn(SEG, "max-[1099px]:hidden")}
       >
-        {railsHidden ? <Focus aria-hidden className="size-4" /> : <LayoutPanelLeft aria-hidden className="size-4" />}
-        <span className="text-micro tracking-caps uppercase max-[1649px]:hidden">{railsHidden ? "Scene" : "HUD"}</span>
+        <Focus aria-hidden className="size-4" />
+        <span className="text-micro tracking-caps uppercase max-[1649px]:hidden">Scene</span>
       </button>
       {/* RAW — the layer toggle. aria-pressed, not a radio segment: it pushes a different
           surface in and pops it out, and the pair to its left survives the round trip. */}

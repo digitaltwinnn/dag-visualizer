@@ -83,4 +83,24 @@ describe("TrailRewind", () => {
     r.update(1, () => 3);
     expect(r.offset).toBe(0);
   });
+
+  it("nearlySettled leads settled, and both gate a fresh multi-slot glide", () => {
+    // The label's own tolerance (2026-09-11): the damped glide creeps toward settled's 0.01
+    // for a dead tail after the row already reads as home — nearlySettled opens the callout
+    // first, but NEVER during the early travel the 2026-09-04 complaint was about.
+    const r = new TrailRewind();
+    r.setPinned(100);
+    r.update(FRAME, () => 3); // a fresh pin, three slots deep — the glide begins (no jump)
+    expect(r.nearlySettled).toBe(false);
+    expect(r.settled).toBe(false);
+    let opened = -1;
+    let done = -1;
+    for (let i = 0; i < 600 && done < 0; i++) {
+      r.update(FRAME, () => 3);
+      if (opened < 0 && r.nearlySettled) opened = i;
+      if (done < 0 && r.settled) done = i;
+    }
+    expect(opened).toBeGreaterThanOrEqual(0);
+    expect(done).toBeGreaterThan(opened); // the label opens before the asymptotic tail ends
+  });
 });

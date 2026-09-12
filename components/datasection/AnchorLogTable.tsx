@@ -274,7 +274,13 @@ export default function AnchorLogTable() {
     allRows = sortAnchorLog([...listedRows, ...unlistedRows], sort.key, sort.dir, (metaId) => displayNetwork(metaId)?.ticker ?? metaId);
     total = allRows.length;
     pages = Math.max(1, Math.ceil(total / PAGE));
-    const p = Math.min(page, pages);
+    // A LANDED SEARCH HOLDS ITS ROW, NOT ITS PAGE NUMBER (user, 2026-09-09: "a search filter
+    // gets overwritten when a new live snapshot arrives") — the window's rows shift on every
+    // tick, so while a mark stands the shown page is re-derived from the marked row each
+    // render; paging away by hand releases the follow (the pager clears the mark). Inlined
+    // markOf (defined below) — the row's identity is its own ordinal, a seam its tick's.
+    const markIdx = marked != null ? allRows.findIndex((r) => (r.metaId == null ? r.global.ordinal : r.ordinal) === marked) : -1;
+    const p = markIdx >= 0 ? Math.floor(markIdx / PAGE) + 1 : Math.min(page, pages);
     rows = allRows.slice((p - 1) * PAGE, p * PAGE);
     from = total === 0 ? 0 : (p - 1) * PAGE + 1;
     to = Math.min(p * PAGE, total);
@@ -505,6 +511,39 @@ export default function AnchorLogTable() {
     }
   };
 
+  // THE LADDER'S INBOUND RUNG (convention 12): a /trends chart range arrives on the one-shot
+  // store bridge — open the search bar, prefill the date criteria, and when the handoff named
+  // a network (whose filter commit already happened on the trends side, through the table),
+  // run the date seek as soon as the chain's tip is known. Consumed on sight so a later
+  // manual search starts clean; the unscoped case stays prefilled-only (a date seek pages a
+  // committed chain — under "all" the fields wait for the reader, and the bar says why).
+  const logSeek = useStore((st) => st.logSeek);
+  const setLogSeek = useStore((st) => st.setLogSeek);
+  const pendingSeek = useRef(false);
+  useEffect(() => {
+    if (!logSeek) return;
+    const iso = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+    setSearchOpen(true);
+    setQFrom(iso(logSeek.fromMs));
+    setQTo(iso(logSeek.toMs));
+    if (logSeek.metaId) {
+      setSearchMeta(logSeek.metaId);
+      pendingSeek.current = true;
+    }
+    setLogSeek(null);
+  }, [logSeek, setLogSeek]);
+  useEffect(() => {
+    // `hist.current.net === lens` is the LOAD-BEARING guard (found live, 2026-09-09: the
+    // handoff committed BioFi while the walk cache still held DOR's, and line 184's fallback
+    // handed DOR's 28M tip to BioFi's pager — the tip probe came back empty and the seek
+    // honestly reported "could not locate"). The seek may only run once the walk IS the
+    // target chain's.
+    if (pendingSeek.current && histNet && hist.current.net === lens && latest && qFrom && !seeking) {
+      pendingSeek.current = false;
+      void seekAge();
+    }
+  });
+
   /** The chains the picker offers — the catalog as the explorer lists it, plus whatever network is
    *  already committed, so a filter can always preselect something the list actually contains. */
   const searchNets = useMemo(() => {
@@ -522,8 +561,11 @@ export default function AnchorLogTable() {
   // an exact address on one chain, a global snapshot is an exact address on the shared one, and a
   // date is a position to land NEAR. Filling more than one is not an error; the search simply
   // answers the most precise thing it was given, and the toolbar reports what is applied.
+  // A typed ordinal with NO chain picked still routes to seekSnapshot, whose "pick which
+  // metagraph's chain…" answer is the whole teaching (user, 2026-09-09 — the old guard let the
+  // press fall through silently, and the button before it sat disabled with no reason).
   const onSubmit = () => {
-    if (searchNet && qSnapshot) seekSnapshot();
+    if (qSnapshot) seekSnapshot();
     else if (qTick) void seekTick();
     else if (qFrom) void seekAge();
   };
@@ -545,6 +587,7 @@ export default function AnchorLogTable() {
       tick={qTick}
       from={qFrom}
       to={qTo}
+      miss={jumpMiss}
       onSnapshot={(v) => { setQSnapshot(v); if (v === "") { setMarked(null); setJumpMiss(null); } }}
       onTick={(v) => { setQTick(v); if (v === "") { setMarked(null); setJumpMiss(null); } }}
       onFrom={setQFrom}
@@ -803,10 +846,12 @@ export default function AnchorLogTable() {
           </TableBody>
         </Table>
       </ScrollArea>
-      {/* THE MISS IS STATED, never swallowed (rule 10). It sits by the pager rather than in a header
-          cell because that is the strip already describing WHERE in the chain you are. */}
-      {jumpMiss && (
-        <p className="flex-none pt-1 text-micro text-muted-foreground">{jumpMiss}</p>
+      {/* THE MISS IS STATED, never swallowed (rule 10). Its home moved INTO the search bar
+          (2026-09-09 — a screen below the button, it read as the search not working); this
+          pager-side line remains only for a FOLDED bar, whose applied search would otherwise
+          sit unexplained. */}
+      {jumpMiss && !searchOpen && (
+        <p className="flex-none pt-1 text-micro text-[var(--warn-soft)]">{jumpMiss}</p>
       )}
       <TablePager
         page={histNet ? page : Math.min(page, pages)}
@@ -824,7 +869,12 @@ export default function AnchorLogTable() {
           word: "window",
           title: "The recently retained span, held by time rather than by count — each network snapshots at its own rate, so these counts are not proportional to any chain's length. Pick a network in the top-bar filter to page its whole chain, back to genesis.",
         }}
-        onPage={setPageState}
+        onPage={(n) => {
+          setPageState(n);
+          // Manual paging is the reader leaving the landing — release the row-follow, or the
+          // next live tick would snap the view straight back to the mark.
+          if (!histNet) setMarked(null);
+        }}
       />
     </>
   );

@@ -20,8 +20,10 @@ const BP_SVG = "w-[min(26vw,280px)] h-auto overflow-visible";
 
 // The schematic BLUEPRINT GALLERY for the one consolidated "Coming soon" view (2026-09-04 —
 // three separate placeholder modes said the same nothing three times; the ONE view now previews
-// every coming feature side by side). Faint, abstract wireframes — explicitly labelled
-// `preview · in development` so nothing reads as live data (no numbers, no real values).
+// every coming feature side by side). Faint, abstract wireframes with no numbers and no real
+// values, so nothing reads as live data — the register itself carries that claim since the
+// `preview · in development` eyebrow retired (user, 2026-09-09: the view switch already says
+// "Coming soon").
 // Structural chrome only (blueprint = chrome, not identity); accent/flow lines in cyan. Renders
 // on the empty scene (the canvas hides for the flat view). Not shown for the three 3D views.
 // Each feature keeps the mark it wore as a bar button (Radar / ArrowLeftRight / HandCoins), so
@@ -138,9 +140,9 @@ export default function Blueprint() {
     // scroll (the flat view has nothing pickable behind).
     <figure id="blueprint" className="fixed inset-x-0 top-[38vh] bottom-[calc(var(--footer-h,0px)+16px)] z-[6] flex flex-col items-center overflow-y-auto overscroll-contain px-6">
       <div className="mb-auto flex flex-col items-center gap-8 py-2">
-      <span className="text-label tracking-caps uppercase [color:color-mix(in_oklch,var(--primary)_80%,#fff)] opacity-[0.85]">
-        preview · in development
-      </span>
+      {/* The `preview · in development` eyebrow RETIRED (user, 2026-09-09): the view switch
+          already says "Coming soon" and the wireframes carry no numbers, so the caption
+          restated what the whole surface's register — dashed art, no values — says itself. */}
       <div className="flex flex-wrap items-start justify-center gap-x-10 gap-y-8 max-w-[1160px]">
         {SOON_FEATURES.map((f) => (
           <figcaption key={f.name} className="flex flex-col items-center gap-3 text-center max-w-[270px]">

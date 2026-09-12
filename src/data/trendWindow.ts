@@ -68,6 +68,18 @@ export function leadingTrim(data: TrendsWindowData): TrendsWindowData {
   return cut(data, from);
 }
 
+/** An arbitrary [fromMs, toMs] cut — the /trends range selection (the observation ladder's
+ *  zoom, 2026-09-09): keeps every bucket that INTERSECTS the range (a bucket is [start,
+ *  start+step)), so a range drawn mid-bucket still shows the bucket it touches. An inverted
+ *  or non-overlapping range cuts to empty rather than throwing — a drag is user input. */
+export function cutRange(data: TrendsWindowData, fromMs: number, toMs: number): TrendsWindowData {
+  const from = data.buckets.findIndex((t) => t + data.stepMs > fromMs);
+  if (from < 0) return cut(data, data.buckets.length);
+  let to = data.buckets.length;
+  while (to > from && data.buckets[to - 1] > toMs) to--;
+  return cut(data, from, to);
+}
+
 /** Calendar-month aggregation of a DAILY window — the 1Y bars. Counters SUM per month; a
  *  month with no measured day stays null. BOTH partial edge months are trimmed (the review:
  *  the forming current month was, the mid-month leading edge was not — the partial-edge rule
@@ -108,4 +120,75 @@ export function monthlySum(data: TrendsWindowData): TrendsWindowData {
     series: Object.fromEntries(Object.entries(series).map(([k, v]) => [k, v.slice(from, to)])),
     now: data.now,
   };
+}
+
+// ---- THE RANGE ZOOM'S TIER VOCABULARY (2026-09-10, the keep-forever flip) ------------------
+// Since 2026-09-10 every tier keeps forever, but history has FLOORS — the dates before which
+// a tier's fields simply never existed (retention pruned them in the finite era, and the
+// backfills wrote daily only). The zoom must never pick a tier whose floor its range
+// predates: the tiles would come back empty and the charts would claim an outage about an
+// era that is measured perfectly well one tier up.
+export const TIER_SINCE: Record<"5m" | "1h", number> = {
+  // ONE floor for both fine tiers since the 2026-09-11 clean-sheet walk (rebuild-trends
+  // --recompute-from=2025-07-01, then --extend-to): it rebuilds 5m AND hourly back to the
+  // start of the store's fine-history era. While a walk is still filling, a fine range may
+  // transiently read sparse — the walk's progressive flush closes it from the newest days
+  // backward; the floors moved ahead of the walk by decision (user, 2026-09-11).
+  "5m": Date.UTC(2025, 6, 1),
+  "1h": Date.UTC(2025, 6, 1),
+};
+
+/** The finest tier that can honestly serve [fromMs, toMs]: fine enough to have the range's
+ *  START (the floors above) and coarse enough that the tile fan-out stays small — a 5m tile
+ *  is a day, an hourly tile a month, and daily rides the one `all` payload. */
+export function pickRangeTier(fromMs: number, toMs: number): "5m" | "1h" | "1d" {
+  const span = toMs - fromMs;
+  if (span <= 2 * 86_400_000 && fromMs >= TIER_SINCE["5m"]) return "5m";
+  if (span <= 62 * 86_400_000 && fromMs >= TIER_SINCE["1h"]) return "1h";
+  return "1d";
+}
+
+/** The tile units [fromMs, toMs] touches — day units for the 5m tier ("2026-09-08"), month
+ *  units for hourly ("2026-08"); the API serves one immutable-cacheable payload per unit
+ *  (the map-tile pattern: user ranges are snowflakes, their units are shared). */
+export function tilesFor(tier: "5m" | "1h", fromMs: number, toMs: number): string[] {
+  const out: string[] = [];
+  const d = new Date(fromMs);
+  if (tier === "5m") {
+    let t = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    for (; t < toMs && out.length < 64; t += 86_400_000) {
+      const u = new Date(t);
+      out.push(`${u.getUTCFullYear()}-${String(u.getUTCMonth() + 1).padStart(2, "0")}-${String(u.getUTCDate()).padStart(2, "0")}`);
+    }
+  } else {
+    let y = d.getUTCFullYear();
+    let m = d.getUTCMonth();
+    while (Date.UTC(y, m, 1) < toMs && out.length < 64) {
+      out.push(`${y}-${String(m + 1).padStart(2, "0")}`);
+      m += 1;
+      if (m === 12) { m = 0; y += 1; }
+    }
+  }
+  return out;
+}
+
+/** Stitch tile payloads into one window: buckets concatenate in time order and every series
+ *  spans the whole seam, null-filled where a tile never carried it (a chain absent from one
+ *  month's hashes is simply unmeasured there — the same nulls the store itself speaks). */
+export function stitchWindows(tiles: TrendsWindowData[]): TrendsWindowData {
+  const sorted = [...tiles].filter((t) => t.buckets.length > 0).sort((a, b) => a.buckets[0] - b.buckets[0]);
+  if (sorted.length === 0) return { buckets: [], stepMs: 86_400_000, series: {}, now: Date.now() };
+  const names = new Set<string>();
+  for (const t of sorted) for (const n of Object.keys(t.series)) names.add(n);
+  const buckets: number[] = [];
+  const series: Record<string, (number | null)[]> = {};
+  for (const n of names) series[n] = [];
+  for (const t of sorted) {
+    buckets.push(...t.buckets);
+    for (const n of names) {
+      const src = t.series[n];
+      series[n].push(...(src ?? new Array<null>(t.buckets.length).fill(null)));
+    }
+  }
+  return { buckets, stepMs: sorted[0].stepMs, series, now: Math.max(...sorted.map((t) => t.now)) };
 }

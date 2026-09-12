@@ -49,7 +49,7 @@
 // survives a lane switch instead of resetting under the user.
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DEEP_GIVE_UP_MS } from "@/components/RawSnapshotBridge";
 import { useStore } from "@/src/store/store";
@@ -63,7 +63,7 @@ import { PAYLOAD_LANES, parsePayload, payloadKinds, stateSchema, unifyFieldKinds
 import { identityHudCss } from "@/src/palette/identity";
 import { CopyButton, FootRow, IdentityDot, RoleChips } from "@/components/inspector/parts";
 import { fmtDag, fmtKB, midHash } from "@/src/util/format";
-import JsonTree from "@/components/datasection/JsonTree";
+import JsonTree, { type JsonTreeCmd } from "@/components/datasection/JsonTree";
 import { LANE_ICONS } from "@/components/icons";
 import TablePager from "@/components/datasection/TablePager";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -257,6 +257,15 @@ function RawSection({
   onToggle: () => void;
   data: unknown;
 }) {
+  // The whole-tree fold control (user, 2026-09-11: "a collapse / expand all control for the
+  // raw json section") — ONE toggling button, since the per-node states are mixed and two
+  // standing buttons would both claim to apply: it offers expand-all first, collapse-all
+  // after. Collapse restores the tree's default reading state (root open one level) rather
+  // than a fully shut root. Reset when the payload changes — a standing command must not
+  // auto-expand the NEXT snapshot's tree.
+  const [cmd, setCmd] = useState<JsonTreeCmd | null>(null);
+  useEffect(() => setCmd(null), [data]);
+  const nextMode = cmd?.mode === "expand" ? "collapse" : "expand";
   return (
     // mt-1.5 on top of the lane's gap-2 (user, 2026-08-14 — the disclosure hugged the shape
     // table): the raw tier sits visibly below the shape it expands on. The header row carries
@@ -302,7 +311,31 @@ function RawSection({
           />
           raw JSON
         </CollapsibleTrigger>
-        <CopyButton value={JSON.stringify(data, null, 2)} subject="raw JSON" />
+        <div className="flex items-center gap-1.5">
+          {/* Fold control — CopyButton's own quiet-at-rest recipe (revealed with the row's
+              group/copy hover, slot always reserved), shown only while the section is open:
+              folding a tree you cannot see is not a gesture. */}
+          {open && (
+            <button
+              type="button"
+              aria-label={nextMode === "expand" ? "Expand all levels" : "Collapse to one level"}
+              title={nextMode === "expand" ? "Expand all levels" : "Collapse to one level"}
+              className={cn(
+                "flex-none inline-flex items-center justify-center size-4 -my-0.5 rounded-xs cursor-pointer",
+                "text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
+                "opacity-0 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
+              )}
+              onClick={() => setCmd({ mode: nextMode, epoch: (cmd?.epoch ?? 0) + 1 })}
+            >
+              {nextMode === "expand" ? (
+                <ChevronsUpDown aria-hidden className="size-3" />
+              ) : (
+                <ChevronsDownUp aria-hidden className="size-3" />
+              )}
+            </button>
+          )}
+          <CopyButton value={JSON.stringify(data, null, 2)} subject="raw JSON" />
+        </div>
       </div>
       {/* `forceMount` + a manual `open` gate: the well must be a real flex CHILD of the column
           above, and Radix's own hidden-when-closed wrapper would sit between them and break the
@@ -325,7 +358,7 @@ function RawSection({
         // longer scrolls (overflow-hidden, a flex column), the schema block keeps its natural
         // height, and the well takes the rest — one bar, and it belongs to the tree.
         <div className="min-h-[7rem] flex-1 overflow-auto slim-scroll rounded-md border border-border/50 bg-[var(--background)] px-2.5 py-2 max-[700px]:flex-none max-[700px]:max-h-none">
-          <JsonTree data={data} />
+          <JsonTree data={data} cmd={cmd} />
         </div>
       )}
     </Collapsible>

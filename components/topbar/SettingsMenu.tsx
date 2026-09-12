@@ -34,7 +34,7 @@ export default function SettingsMenu() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={`Settings — theme, pages, network (current: ${code})`}
+          aria-label={`Settings — theme, doc pages, network (current: ${code})`}
           className={cn(
             // px + chevron trimmed on phone: the gear is the one addition the phone bar
             // absorbed from the consolidation, and the filter face is the first thing a
@@ -55,7 +55,7 @@ export default function SettingsMenu() {
         <SectionLabel>Theme</SectionLabel>
         <ThemeRows onDone={() => setOpen(false)} />
         <SectionRule />
-        <SectionLabel>Pages</SectionLabel>
+        <SectionLabel>Doc pages</SectionLabel>
         <DocRows onDone={() => setOpen(false)} />
         <SectionRule />
         <SectionLabel>Network</SectionLabel>

@@ -297,7 +297,19 @@ export class Engine {
   // Store mirror for the rails-hidden camera lean — _tweenTo composes railsLean into every
   // dolly-eligible destination while it holds (see the subscription note). Seeded at boot.
   private railsHidden = false;
+  // The user holds the camera (a free orbit/dolly since the last pose flight) — the SCENE⇄HUD
+  // toggle then leaves it alone. Set by _onControlsStart, cleared by _resolveFocus and setMode.
+  private _freeOrbit = false;
+  // The running flight moves the camera but not the subject (the rails toggle's lean, the
+  // aspect re-frame) — CalloutSync keeps the label up through it instead of the flight blackout.
+  private _sameSubjectFlight = false;
   private _onControlsStart = () => {
+    // A user gesture CLAIMS the camera (2026-09-11): any orbit/dolly marks the pose as freely
+    // held, and the SCENE⇄HUD toggle then leaves the camera alone (see the railsHidden branch)
+    // instead of flying it back to the canonical pose. Cleared by _resolveFocus — the next
+    // real pose flight re-takes the camera for the pose system. Auto-rotate never fires this
+    // (it is frame-driven), so resting drift keeps the designed lean behaviour.
+    this._freeOrbit = true;
     clearTimeout(this._dragEndT);
     this._dragEndT = undefined;
     if (!useStore.getState().sceneDragging) useStore.getState().setSceneDragging(true);
@@ -344,7 +356,10 @@ export class Engine {
       const aspect = this.ctx.camera.aspect;
       if (Math.abs(aspect - this._framedAspect) / this._framedAspect < 0.04) return;
       this._framedAspect = aspect;
-      if (VIEW_POLICIES[this.mode].canvas && !this.transition.active()) this._resolveFocus();
+      if (VIEW_POLICIES[this.mode].canvas && !this.transition.active()) {
+        this._resolveFocus();
+        this._sameSubjectFlight = true; // an aspect re-frame moves the camera, never the subject
+      }
     }, 250);
   };
   private _resizeReframeT: ReturnType<typeof setTimeout> | undefined;
@@ -455,6 +470,10 @@ export class Engine {
     }
     setNodeDimTarget(colors); // the fabrics' shared mute target follows the ground (see NodeFabric)
     this.ctx = createScene(canvas, colors);
+    // The reframe gate's baseline is the aspect the poses actually resolve against — the
+    // camera's, which createScene measures from the CANVAS BOX, not the window (the two
+    // diverge by the browser-chrome band on mobile; see SceneContext's boxOf note).
+    this._framedAspect = this.ctx.camera.aspect;
     // The shared chip studio env, handed over before any fabric builds a material — every chip
     // material born after this carries it (see NodeFabric's note for the physics).
     setNodeEnv(this.ctx.nodeEnv());
@@ -496,6 +515,7 @@ export class Engine {
       get filter() { return engineSelf.filter; },
       transitionActive: () => this.transition.active(),
       flyingNow: () => useStore.getState().cameraFlying,
+      sameSubjectFlight: () => this._sameSubjectFlight,
       calloutAllowed: () => this._policy.callout,
       dofMeta: () => this._dofMeta,
     });
@@ -693,9 +713,23 @@ export class Engine {
         // the flag and RE-RESOLVES the canonical pose — focus flights, transition landings and
         // the toggle all agree, and no inverse math can desync (holdCamera gates the OUT phase
         // internally; the boundary's own re-derive composes the lean on arrival).
+        // ⚠️ UNLESS THE USER HOLDS THE CAMERA (user, 2026-09-11: "I'd like the user to freely
+        // move around and decide to switch modes without being forced back") — a free orbit is
+        // off-pose, where the lean is pose arithmetic about a pose the camera isn't at, so the
+        // toggle re-resolving there reads as a reset, not a lean. `_freeOrbit` (set by the
+        // controls' own start event, cleared by the next pose flight) gates it; a camera at
+        // rest keeps today's exact behaviour.
         if (st.railsHidden !== prev.railsHidden) {
           this.railsHidden = st.railsHidden;
-          if (VIEW_POLICIES[this.mode].canvas) this._resolveFocus();
+          if (VIEW_POLICIES[this.mode].canvas && !this._freeOrbit) {
+            this._resolveFocus();
+            // The lean flight keeps the callout (user, 2026-09-11: "when we switch between
+            // HUD and Scene, the callout is always redrawn why is that?") — the toggle moves
+            // the CAMERA, never the subject, so the wait-out-the-arrival rule has nothing to
+            // wait for; the label rides the dolly on its per-frame projection instead of
+            // blinking off and fading back.
+            this._sameSubjectFlight = true;
+          }
         }
         // THE CAMERA FRAMES THE BOXED RUNG (user, 2026-08-09). Opening a rail card asks for that
         // rung's pose — the same resolver its explorer row would have run, just entered from a
@@ -1099,6 +1133,9 @@ export class Engine {
   setMode(mode: Mode) {
     const prevMode = this.mode; // capture BEFORE the reassignment — the choreography branches on it
     this.mode = mode;
+    // A view switch lands the camera on the destination's own pose (the boundary re-derive),
+    // so a pre-switch free orbit no longer holds it — see _onControlsStart.
+    this._freeOrbit = false;
     // A view switch re-lays the scene under a stationary pointer, so any in-flight hover
     // (tooltip + the hover channels) would linger re-projected at a wrong screen position
     // until the next pointermove — clear it as part of the switch.
@@ -1470,6 +1507,13 @@ export class Engine {
   // the only difference is where the walk begins, so a card and a row can't drift. Falling THROUGH
   // to coarser rungs stays intact, which is also the safety net if the named rung isn't active.
   private _resolveFocus(from?: FocusLevel): void {
+    // A pose flight re-takes the camera from a free orbit (see _onControlsStart) — every
+    // resolver path lands the camera on a canonical pose, so the next rails toggle may
+    // compose its lean again. And a resolve is a SUBJECT flight unless the caller marks it
+    // otherwise right after (the rails toggle, the aspect re-frame) — the callout hides
+    // through subject flights and rides the same-subject ones.
+    this._freeOrbit = false;
+    this._sameSubjectFlight = false;
     const st = useStore.getState();
     if (this.mode !== "hyper" && this.mode !== "geo" && this.mode !== "ledger") return;
     const sel: SelectionSnapshot = {

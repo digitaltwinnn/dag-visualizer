@@ -27,3 +27,6 @@ next-env.d.ts
 
 # Visual brainstorming companion
 .superpowers/
+
+# rebuild-trends crash-safety checkpoints (scripts/rebuild-trends.ts --resume)
+.rebuild-trends-ckpt/

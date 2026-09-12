@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { shortHash, metagraphById, getNetwork, SIGNER_GROUPS, nodeSigned, coLocatedNetworks, filterAccent } from "@/src/data/network";
@@ -8,22 +8,22 @@ import { UNLISTED_ID, UNLISTED_HUE, observedUnlistedIds } from "@/src/data/unlis
 import { identityHudCss } from "@/src/palette/identity";
 import { fmtDag, fmtKB, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
-import { statusBreakdown } from "@/src/data/nodeStatus";
 import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
 import { metaSnapDeepKey } from "@/src/data/types";
 import AnchoredTags from "./AnchoredTags";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import Odometer from "@/components/Odometer";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
 import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS } from "@/components/icons";
-import { ExternalLink } from "lucide-react";
+import { ChevronRight, ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
-import { useArchive, archiveFactState, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
+import { useArchive, archiveFactState, archiveSchedule, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
 import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
 import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
-import { Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark } from "./parts";
+import { cap, BarCell, Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark } from "./parts";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { pickNetId, followToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -411,6 +411,104 @@ function UnlistedMemberFacts({ id, last }: { id: string; last: boolean }) {
   );
 }
 
+// EACH SCHEDULE GROUP DISCLOSES (user, 2026-09-10: "add a dropdown chevron to each
+// breakdown") — the one Collapsible + .disclose-panel recipe, the caption row as the
+// trigger. The chevron stays ALWAYS visible (not the explorer's hover-reveal: a folded
+// group's caption is otherwise indistinguishable from a plain label, and the chevron was
+// asked for as the affordance), rotating on the shared 150ms clock.
+// CLOSED by default (user, round 21) — the captions are the card's index and a breakdown
+// is opened on demand; state is local and plain — folding commits nothing, so the store
+// owns none of it — and survives pager steps, since the group's identity does.
+function ScheduleGroup({ label, children }: { label: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Collapsible open={open} onOpenChange={setOpen}>
+      {/* No default focus ring and no text selection (user, round 22: clicking drew "an
+          ugly white selection border … separate to the chevron" — the double-click text
+          selection, which can never include the chevron): the row is one CONTROL, so it
+          selects nothing, and focus shows only for the keyboard in CopyButton's own
+          focus-visible recipe. */}
+      <CollapsibleTrigger className="group mt-2 flex w-full items-center gap-1 cursor-pointer select-none outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]">
+        <span className="text-micro tracking-caps uppercase text-muted-foreground">{label}</span>
+        <ChevronRight
+          aria-hidden
+          className={cn(
+            "size-3.5 flex-none text-muted-foreground transition-transform duration-150 motion-reduce:transition-none",
+            open && "rotate-90",
+          )}
+        />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="disclose-panel">
+        <div className="mt-1 pl-2">{children}</div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+// THE "BY ARCHIVAL" GROUP — one renderer for every dossier (user, 2026-09-10: "missing the
+// archival breakdown for DAG / hypergraph; should behave the same"): the census's reaches as
+// merged rows (full-node + kept-snapshot tags), the honest unmeasured remainder, stars while
+// the census is in flight. The metagraph dossiers seat it as the third schedule under Online
+// nodes; the DAG dossier seats the same group standalone (its roster isn't `nodes`).
+function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> }) {
+  return (
+    <ScheduleGroup label="by archived snapshots">
+      {sched ? (
+          <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-x-2 gap-y-[7px]">
+            {sched.rows.map((row) => (
+              <Fragment key={`${row.fullCount > 0 ? "full|" : ""}${row.label}`}>
+                {/* EVERY tag rides the right-aligned tag column (user, rounds 8 and 11:
+                    "right aligned, not based on label length", then the full-node tag
+                    too), so the tags share one edge whatever the labels run. A full row's
+                    tag is the bare "full archive" (round 9 — was "full node": the tag
+                    qualifies the ARCHIVE, and completeness got its opposite number,
+                    "incomplete archive", on the holed deep row) — no count in the words,
+                    the row's own count column already says how many (round 4). */}
+                <span
+                  className="text-body text-foreground"
+                  title={row.hint ?? (row.kept != null ? `${fmtSnapCount(row.kept)} snapshots kept` : undefined)}
+                >
+                  {cap(row.label)}
+                </span>
+                {row.fullCount > 0 || row.kept != null ? (
+                  <span className="justify-self-end inline-flex items-center gap-1">
+                    {row.fullCount > 0 && (
+                      <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap">
+                        full
+                      </span>
+                    )}
+                    {row.kept != null && (
+                      <span
+                        className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap"
+                        title={row.hint ? `${fmtSnapCount(row.kept)} snapshots — ${row.hint}` : `${fmtSnapCount(row.kept)} snapshots kept`}
+                      >
+                        {fmtSnapCount(row.kept)}
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  <span />
+                )}
+                <BarCell count={row.count} max={Math.max(...sched.rows.map((x) => x.count))} hue="var(--muted-foreground)" />
+                <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{row.count}</span>
+              </Fragment>
+            ))}
+            {sched.unmeasured > 0 && (
+              <Fragment key="__unmeasured">
+                <span className="text-body text-foreground" title="The probe read nothing from these nodes — what they keep is unknown.">Unknown</span>
+                <span />
+                <span />
+                <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{sched.unmeasured}</span>
+              </Fragment>
+            )}
+          </div>
+        ) : (
+          <NodeStars count={4} />
+        )}
+    </ScheduleGroup>
+  );
+}
+
 // The metagraph context pane (top-right "context" slot): identity only — description,
 // make-up rows, website. Its live/economic counterpart is the top-bar vitals (filter-aware
 // "live activity"), so the dossier stays a stable identity card.
@@ -444,6 +542,19 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const archSum = archCensus ? archiveSummary(archCensus, cfg.id === "dag" ? "global" : cfg.id) : null;
   const archAcquiring = archSum == null && !archSettled && (cfg.id === "dag" || metagraphById(cfg.id) != null);
   const nodes = mg?.nodes || [];
+  // ONE schedule for both seats (the fleet's third group and the DAG's standalone block —
+  // review cleanup, 2026-09-11: it was computed twice, once in an inline IIFE): the DAG's
+  // chain in the census is "global" and its unmeasured remainder counts against the census's
+  // own probed universe (its roster isn't `nodes`); a metagraph counts against its live fleet.
+  // Memoized — archiveSchedule walks every census entry with date parsing, and this card
+  // re-renders on every poll and hover.
+  const archSched = useMemo(
+    () =>
+      archCensus
+        ? archiveSchedule(archCensus, cfg.id === "dag" ? "global" : cfg.id, cfg.id === "dag" ? archCensus.total : nodes.length)
+        : null,
+    [archCensus, cfg.id, nodes.length],
+  );
   // The unlisted blurb COUNTS its members (user, 2026-08-14) — built here, beside the member
   // list it describes, so the two can't drift.
   const blurb =
@@ -460,10 +571,8 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const site = mg?.siteUrl ?? cfg.siteUrl;
   // The summary row: "Online nodes" + the TOTAL (user, 2026-07-12 — it summarizes the
   // composition table above, whose counts sum to the total; a joining node is online too,
-  // just not ready yet). The pill row below appears only when something is NOT ready.
+  // just not ready yet).
   const states = nodes.map((n) => n.state);
-  const buckets = statusBreakdown(states);
-  const nonReady = buckets.progress + buckets.down + buckets.unknown > 0;
   // Hover pairing (synced 3D hub glow) lives on the OUTER pane (ContextCard's #metapane), not here.
   // The full identity header (avatar + name + ticker) lives in the card HEAD now (MetaTitle via
   // CardHead's title slot, rolled via titleKey) — the body starts at the description.
@@ -472,82 +581,68 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
       {/* Keyed on the text so the expand state resets when the subject (or its description
           arriving from /api/metagraphs) changes — an expanded DOR must not leak into DED. */}
       <Desc key={blurb} text={blurb} />
-      {nodes.length > 0 && (
+      {(nodes.length > 0 || (cfg.id !== "dag" && cfg.id !== UNLISTED_ID && metagraphById(cfg.id) != null)) && (
         <>
-          {/* The snapshot card's rhythm, applied here (user, 2026-07-12): the BREAKDOWN first
-              (composition table — rows carry their own counts), then the shared Separator,
-              then ONE summary row in the snapshot card's "Fees paid" grammar — muted label
-              left, the bold total + per-state breakdown right. Totals sit BELOW their parts;
-              the old "166 nodes with 3 different compositions" header restated the table.
-              The "Composition" micro-uppercase label above this table was the LAST survivor of
-              the retired stacked label-above-block form (user, 2026-08-10) — it outlived the
-              sweep only because CompositionRows is a table rather than a Fact. Dropped: each
-              row already names its own composition, and with it gone the description above
-              reads as the card's LEAD (which is why the blurb stays in the body rather than
-              moving into the head — a paragraph in CardHead would both special-case the one
-              header standard and blow up this card's ~28px collapsed entry). */}
+          {/* THE SCHEDULE FORM (user, 2026-09-10: "both are breakdowns of the same total …
+              look at accounting"). Accounting's double-breakdown device is the SCHEDULE: the
+              control total LEADS, and each partition follows as a labeled of-which schedule
+              under one roof — the grouping, the "by …" labels and the slight inset carry the
+              relation that three divider-separated segments lost. This flips the 2026-07-12
+              totals-below rule to the band's own later ruling ("a total lives inside its own
+              breakdown and LEADS it"); the separators between the partitions retire, and the
+              indent keeps two column-aligned tables from reading as ONE summing to twice the
+              fleet (the job the middle separator used to do). "by status" ALWAYS renders now
+              (user, 2026-09-10 — it retired the 2026-08-18 all-ready-is-silent gate: with
+              the groups folded to caption rows, an omitted group reads as a missing section,
+              and an all-ready fleet opening to its one Ready row IS the reading). */}
+          {/* The CONTROL TOTAL leads in the normal Fact grammar with a divider beneath it
+              (user, 2026-09-10, round 2: the larger font read as just a big number — the
+              DIVIDER is what says "what follows partitions this"). Shown even at 0 for a
+              catalog metagraph (an empty fleet is a reading); the schedules below skip then. */}
           <div className="mt-3">
-            <CompositionRows nodes={nodes} />
+            <Fact label="Online nodes">
+              <b className="font-bold">{nodes.length}</b>
+            </Fact>
           </div>
-          {/* The SECOND partition of the same fleet — by state, in the same row grammar (user,
-              2026-08-18). It appears only when something is NOT ready (all-ready is the silent
-              default), and then it shows the FULL breakdown including the ready count, so a mixed
-              fleet reads as one complete picture. Its Separator is not decoration: column-aligned
-              and undivided, the two tables would read as ONE whose four partitions sum to twice
-              the fleet. */}
-          {nonReady && (
+          {/* The divider announces the partitions that follow, so at 0 nodes — where every
+              schedule skips — it stands down too (review find, 2026-09-11: a dangling rule
+              over an empty region, back-to-back with the site row's own Separator). */}
+          {nodes.length > 0 && <Separator className="my-2" />}
+          {nodes.length > 0 && (
             <>
-              <Separator className="my-2" />
-              <StatusBreakdown states={states} />
+              <ScheduleGroup label="by node composition">
+                <CompositionRows nodes={nodes} />
+              </ScheduleGroup>
+              <ScheduleGroup label="by node status">
+                <StatusBreakdown states={states} />
+              </ScheduleGroup>
+              {/* THIRD SCHEDULE — "by archival" (user, 2026-09-10): the census's own kinds as
+                  rows — the full-chain keepers, then one DYNAMIC row per distinct partial reach
+                  in the age grammar ("~2 months") — and the honest remainder as unmeasured (an
+                  absent probe entry proves nothing about what a node keeps). The deepest reach +
+                  kept-count ride as the group's muted underline; this absorbs the old
+                  divider-separated "Full archive nodes" fact for fleets. */}
+              {(archSched != null || archAcquiring) && <ArchivalGroup sched={archSched} />}
             </>
           )}
-          <Separator className="my-2" />
-          {/* Summary in the shared Fact grammar — muted label left, the bold TOTAL right,
-              column-aligned with the counts of both tables it summarizes. Totals sit BELOW their
-              parts, which is why the state table sits above this row rather than hanging under it
-              as its underline: below, it would wedge between this Fact and the archive Fact, and
-              those two read as one summary block. */}
-          <Fact label="Online nodes">
-            <b className="font-bold">{nodes.length}</b>
-          </Fact>
         </>
       )}
-      {/* Fleet-level archive summary, in the same summary block as Online nodes; the DAG
-          dossier carries no composition block, so it brings its own separator. ONE fact in
-          the Fees-paid stacked grammar (user, 2026-08-14, settled over several passes —
-          "from genesis as a separate fact, like a checkmark", then "the ~15 months as an
-          underline like fees paid"): the main line counts the machines keeping the whole
-          chain — ratio bold under the Online nodes total it counts against, checked in the
-          success hue when any exist — and the muted underline carries the fleet's deepest
-          surviving reach in the time register. */}
-      {(archSum || archAcquiring) && (
+      {/* The ZERO-FLEET archival reading — the DAG dossier always lands here (its roster
+          isn't `nodes`), and a catalog metagraph whose live fleet reads 0 keeps its census
+          data too (review find, 2026-09-11: the old fleet-gated block silently dropped a
+          probed chain's archival facts, and the acquiring stars with them, on a fleet dip).
+          The SAME by-archival schedule the metagraph dossiers carry (user, 2026-09-10: "missing the archival breakdown for DAG /
+          hypergraph; should behave the same" — this absorbs the old single "Full archive
+          nodes" fact). Its chain in the census is "global"; the unmeasured remainder counts
+          against the census's own probed universe, the global L0 fleet at probe time —
+          the DAG core's roster isn't `nodes` (that list is per-metagraph). Deep-kind rows
+          ("back to Nov 2023") carry their SPAN as the kept chip — archiveSchedule's rule,
+          with the shared-gaps caveat riding the chip's own hover, since the deep archives
+          hold the reach, not every ordinal in it. */}
+      {nodes.length === 0 && ((archSched?.rows.length ?? 0) > 0 || archAcquiring) && (
         <>
-          {nodes.length === 0 && <Separator className="my-2" />}
-          {/* "Full archive nodes", not "genesis nodes" (user, 2026-08-14): the latter reads as
-              validators PRESENT at genesis — a different claim than keeping the whole chain. */}
-          <Fact
-            label={
-              <span className="inline-flex items-center gap-1">
-                Full archive nodes <RoleChips codes={["L0"]} />
-              </span>
-            }
-          >
-            {archSum ? (
-              /* No checkmark here (user, 2026-08-14 — "it just clutters the view"): the ratio
-                 already answers, and the node card's Yes keeps the check where it is the value. */
-              <span className="flex flex-col items-end" title={`${archSum.genesisTitle} ${archSum.reachTitle}`}>
-                <b className="font-bold">{archSum.genesisCount}</b>
-                <span className="text-label text-muted-foreground">{archSum.reach}</span>
-                {/* Second underline: what that reach holds in snapshots — absent for the holed
-                    global deep archives, where any count would overclaim. */}
-                {archSum.kept != null && (
-                  <span className="text-label text-muted-foreground">{fmtSnapCount(archSum.kept)} snapshots</span>
-                )}
-              </span>
-            ) : (
-              <NodeStars count={4} />
-            )}
-          </Fact>
+          <Separator className="my-2" />
+          <ArchivalGroup sched={archSched} />
         </>
       )}
       {unlistedMembers.map((id, i) => (
@@ -701,8 +796,10 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // across networks (the Upsider pattern) carries it on its metagraph record too, which is
   // why the match runs for every node kind (user, 2026-08-16: "keep it actual"). The row is
   // ALWAYS stated, "not known" when nothing resolves. The registry's other reading, the
-  // delegated-staking OPT-IN, is its own row (user, 2026-08-16: "would that be a separate
-  // attribute?") in the service block below: Yes/No for DAG validators only — only a Global
+  // delegated-staking OPT-IN, is the ROW RIGHT UNDER IT (user, 2026-09-11: "alias and
+  // delegated staking are directly related, no?" — both are the one registry's readings, the
+  // alias IS its display name, and adjacency is this grammar's relation device; supersedes
+  // the 2026-08-16 service-block placement): Yes/No for DAG validators only — only a Global
   // L0 validator can register (measured: 31 of 147 live validators haven't).
   const isDagValidator = p.kind === "l0" || p.kind === "l1";
   const nickState = useNodeNames();
@@ -772,6 +869,35 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
             </span>
           ))}
         </Fact>
+        {/* DELEGATED STAKING — the registry's opt-in reading, DIRECTLY under the Alias it
+            shares a registry with (user, 2026-09-11 — see the note above; the adjacency IS
+            the relation statement): whether this validator registered as a candidate DAG
+            holders can delegate to. Validators only — the question doesn't apply to a
+            metagraph machine (the archive row's n/a lesson, taken one further: no row at
+            all). */}
+        {isDagValidator && (
+          <Fact label="Delegated staking">
+            {!nickState.settled ? (
+              <NodeStars count={3} />
+            ) : nickState.names ? (
+              <span
+                className="inline-flex items-center gap-1.5"
+                title={
+                  registered
+                    ? "Registered as a delegated-staking candidate in the Global L0 registry — DAG holders can delegate stake to this L0 validator."
+                    : "Whitelisted to validate but not registered as a delegated-staking candidate — separate, independent gates, which is why a live L0 validator can lack an entry."
+                }
+              >
+                <BoolMark on={registered} />
+                <b className="font-bold">{registered ? "Yes" : "No"}</b>
+              </span>
+            ) : (
+              <span className="text-muted-foreground italic" title="The delegated-staking registry could not be read — retried on the next visit.">
+                not available
+              </span>
+            )}
+          </Fact>
+        )}
         {/* STATUS — only while the SIGNED relation holds the head aside (its usual home). */}
         {signedSel && (
           <Fact label="Status">
@@ -825,35 +951,8 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           )}
         </Fact>
         {/* Reading order: place → role → host → SERVICE — what this machine serves sits with
-            the host block, above the reference foot. */}
-        {/* DELEGATED STAKING — the registry's opt-in reading (see the Nickname note): whether
-            this validator registered as a candidate DAG holders can delegate to. A service the
-            machine offers, so it sits with the host block like Full archive, and it shares that
-            row's Yes/No grammar. Validators only — the question doesn't apply to a metagraph
-            machine (the archive row's n/a lesson, taken one further: no row at all). */}
-        {isDagValidator && (
-          <Fact label="Delegated staking">
-            {!nickState.settled ? (
-              <NodeStars count={3} />
-            ) : nickState.names ? (
-              <span
-                className="inline-flex items-center gap-1.5"
-                title={
-                  registered
-                    ? "Registered as a delegated-staking candidate in the Global L0 registry — DAG holders can delegate stake to this L0 validator."
-                    : "Whitelisted to validate but not registered as a delegated-staking candidate — separate, independent gates, which is why a live L0 validator can lack an entry."
-                }
-              >
-                <BoolMark on={registered} />
-                <b className="font-bold">{registered ? "Yes" : "No"}</b>
-              </span>
-            ) : (
-              <span className="text-muted-foreground italic" title="The delegated-staking registry could not be read — retried on the next visit.">
-                not available
-              </span>
-            )}
-          </Fact>
-        )}
+            the host block, above the reference foot. (Delegated staking moved up beside its
+            registry sibling Alias, 2026-09-11 — see that pair's note.) */}
         {archState.kind === "value" && archEntry && archive && (
           /* The dossier's settled stacked grammar, machine-scoped (user, 2026-08-14 — "in the
              node card follow the same thinking; still says 'archive'"): Yes/No against the

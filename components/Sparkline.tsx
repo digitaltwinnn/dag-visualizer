@@ -70,13 +70,19 @@ export default function Sparkline({
   // a READING and never reaches here: it plots as a flat line.
   // A null-riddled series is judged by what it can DRAW: fewer than two measured points is
   // the same "window has not filled" fact whatever the array's length.
+  // ⚠️ EXCEPT a delivered window with NO measured bucket at all (user, 2026-09-09, watching
+  // the backfill's cron lock-out park every 1H card on a promise): the payload came back and
+  // every bucket is null — that is "looked, and nothing sampled this window", an outage that
+  // can stand for hours, not a fill still in progress. It states itself; the rim names the
+  // window, so the short form carries it.
   if (!data || data.filter((v) => v != null).length < 2) {
+    const unsampled = !!data && data.length > 0 && data.every((v) => v == null);
     return (
       <span
         className={cn("flex items-center justify-center text-micro text-muted-foreground", stretch && "w-full")}
         style={{ height, width: stretch ? undefined : width }}
       >
-        acquiring…
+        {unsampled ? "not sampled" : "acquiring…"}
       </span>
     );
   }

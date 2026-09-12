@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { addInc, bucketGlobals, bucketMetas, bucketFleet, type IncMap } from "./bucketing";
+import { slotOf, fieldOf } from "./keys";
 
 const ts = (h: number, m: number, s = 0) => new Date(Date.UTC(2026, 8, 6, h, m, s)).toISOString();
 const get = (inc: IncMap, key: string, field: string) => inc.get(key)?.get(field);
@@ -114,5 +115,76 @@ describe("bucketFleet", () => {
     expect(get(inc, "t:mainnet:1d:2026", "09-06|f.cc.DE")).toBe(60);
     expect(get(inc, "t:mainnet:1h:2026-09", "06-14|f.cc.DE")).toBeUndefined(); // daily only
     expect(inc.get("t:mainnet:5m:2026-09-06")).toBeUndefined(); // no fine-tier gauges
+  });
+});
+
+// The Sep 8 2026 find: a real 4-hour global stall (consecutive ordinals, 10:40 → 14:47 UTC)
+// must read as MEASURED SILENCE in every tier — the hourly/daily coverage zero-fill is what
+// keeps a 7D window from painting a chain stall in the not-sampled gray.
+describe("coverage zero-fill reaches every tier", () => {
+  it("a batch bracketing hours of silence marks the empty hourly buckets with g.ticks 0", () => {
+    const inc: IncMap = new Map();
+    bucketGlobals(inc, "mainnet", [
+      { ordinal: 1, timestamp: "2026-09-08T10:40:00Z", metagraphSnapshotCount: 0, blocks: [] },
+      { ordinal: 2, timestamp: "2026-09-08T14:47:00Z", metagraphSnapshotCount: 0, blocks: [] },
+    ], null);
+    const hourKey = slotOf("mainnet", "1h", Date.parse("2026-09-08T12:00:00Z"));
+    const hourField = fieldOf(hourKey.bucket, "g.ticks");
+    expect(inc.get(hourKey.key)?.get(hourField)).toBe(0);
+    // both records share this DAY, so its bucket holds their real count — the daily
+    // zero-fill only speaks when a batch brackets a wholly-silent day
+    const dayKey = slotOf("mainnet", "1d", Date.parse("2026-09-08T12:00:00Z"));
+    expect(inc.get(dayKey.key)?.get(fieldOf(dayKey.bucket, "g.ticks"))).toBe(2);
+    // the record-bearing hours carry real counts, not zeros
+    const h1 = slotOf("mainnet", "1h", Date.parse("2026-09-08T10:40:00Z"));
+    expect(inc.get(h1.key)?.get(fieldOf(h1.bucket, "g.ticks"))).toBe(1);
+  });
+  it("the fill starts at the cross-run boundary: a stall straddling two runs is covered by the SECOND run's batch (Sep 10's 13.5-min stall read gray because neither batch spanned it)", () => {
+    const inc: IncMap = new Map();
+    // previous run ended at 10:22; this run's first record is 10:35 — the silent buckets
+    // between belong to THIS run's measurement
+    bucketGlobals(inc, "mainnet", [
+      { ordinal: 2, timestamp: "2026-09-10T10:35:58Z", metagraphSnapshotCount: 0, blocks: [] },
+    ], Date.parse("2026-09-10T10:22:25Z"));
+    for (const hhmm of ["10:25", "10:30"]) {
+      const k = slotOf("mainnet", "5m", Date.parse(`2026-09-10T${hhmm}:00Z`));
+      expect(inc.get(k.key)?.get(fieldOf(k.bucket, "g.ticks"))).toBe(0);
+    }
+    // and a single-record batch with NO boundary still fills nothing (cold cursor rule)
+    const inc2: IncMap = new Map();
+    bucketGlobals(inc2, "mainnet", [
+      { ordinal: 2, timestamp: "2026-09-10T10:35:58Z", metagraphSnapshotCount: 0, blocks: [] },
+    ], null);
+    const k2 = slotOf("mainnet", "5m", Date.parse("2026-09-10T10:25:00Z"));
+    expect(inc2.get(k2.key)?.get(fieldOf(k2.bucket, "g.ticks"))).toBeUndefined();
+  });
+});
+
+// Per-network layer gauges (2026-09-11): the /trends per-network node panels draw layer
+// lines, so the fleet sample keeps each network's role tally beside its total.
+describe("bucketFleet per-network layers", () => {
+  it("writes f.layer.{id}.{role} for every network's tally", () => {
+    const inc: IncMap = new Map();
+    bucketFleet(inc, "mainnet", Date.parse("2026-09-11T10:00:00Z"), {
+      total: 5, perNet: { dag: 2, up: 3 }, layers: { l0: 3, cl1: 3 },
+      perNetLayers: { up: { l0: 3, cl1: 3 } }, countries: {},
+    });
+    const k = slotOf("mainnet", "1h", Date.parse("2026-09-11T10:00:00Z"));
+    expect(inc.get(k.key)?.get(fieldOf(k.bucket, "f.layer.up.l0"))).toBe(3);
+    expect(inc.get(k.key)?.get(fieldOf(k.bucket, "f.layer.up.cl1"))).toBe(3);
+  });
+});
+
+// Per-network blocks (2026-09-11): a token transfer rides in a block, so each network's
+// sealed-block count is stored beside its snaps/fee/kb.
+describe("bucketMetas blocks", () => {
+  it("counts each record's blocks array into m.{id}.blocks", () => {
+    const inc: IncMap = new Map();
+    bucketMetas(inc, "mainnet", "up", [
+      { ordinal: 1, timestamp: "2026-09-11T10:00:00Z", fee: 0, sizeInKB: 2, blocks: ["a", "b"] },
+      { ordinal: 2, timestamp: "2026-09-11T10:01:00Z", fee: 0, sizeInKB: 2 },
+    ]);
+    const k = slotOf("mainnet", "1h", Date.parse("2026-09-11T10:00:00Z"));
+    expect(inc.get(k.key)?.get(fieldOf(k.bucket, "m.up.blocks"))).toBe(2);
   });
 });

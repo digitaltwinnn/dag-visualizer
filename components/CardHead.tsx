@@ -1,8 +1,10 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
+import { useRef } from "react";
 import { Plus, Minus, X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useStore } from "@/src/store/store";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { KIND_MARK_CLASS } from "@/components/icons";
@@ -43,6 +45,34 @@ const EYEBROW = "text-micro font-bold tracking-[0.1em] uppercase leading-none";
 // The ONE title standard every card head uses (panel h2 and inspector h3 alike).
 const TITLE = "m-0 text-title font-semibold";
 
+/** The title, rolled ONLY when its arrival is worth announcing. The roll's gate is the
+ *  store's `navQuiet` provenance (user, 2026-09-11 — "solve it structurally", ending a
+ *  timer-based suppression): a QUIET navigation (the plank's ∧/∨, a manual expand) remounts
+ *  heads whose subjects didn't newly arrive, so their titles must not roll — and because the
+ *  flag is state, a card mounting seconds later off the same gesture still knows. FROZEN per
+ *  (mount, titleKey): the decision is made when this span first renders for a key and never
+ *  revised, or a later loud commit elsewhere would re-trigger the animation by class change
+ *  on a standing element. The flag is SAMPLED at freeze time via getState, not subscribed
+ *  (review find, 2026-09-11): a key change always arrives with a re-render of this head, and
+ *  a subscription re-rendered every card head in the app on each flip for a value none of
+ *  them re-consults. */
+function useRolledTitle(titleKey: string | number | undefined, title: ReactNode): ReactNode {
+  const frozen = useRef<{ key: string | number | undefined; quiet: boolean } | null>(null);
+  if (frozen.current == null || frozen.current.key !== titleKey) {
+    frozen.current = { key: titleKey, quiet: useStore.getState().navQuiet };
+  }
+  if (titleKey == null) return title;
+  return (
+    // `min-w-0 max-w-full` bounds this inline-block wrapper to its parent's width so a long
+    // title inside (e.g. a provider's "City · Long Provider GmbH") can actually truncate — an
+    // unbounded inline-block shrinks to content and lets the inner `.truncate` overflow the card
+    // (surfaced once the ladder lane narrows the deeper cards, 2026-07-19).
+    <span key={titleKey} className={cn("min-w-0 max-w-full", !frozen.current.quiet && "roll-in")}>
+      {title}
+    </span>
+  );
+}
+
 // The right-rail card frame — the ONE definition of the inspector-rail Card composition. It is the
 // className you hand to `<Card asChild className={RIGHT_CARD}>`: the Card baseline already supplies
 // `ig-panel`, so this only carries the right-rail OVERRIDES on top of it —
@@ -75,17 +105,26 @@ export const RIGHT_CARD = "relative block w-auto pointer-events-auto [--spine:tr
 // pointer): the dim RELEASES to full luminance AND a small brightness boost rides on top, so
 // entries resting at dim 1 (the anchor-adjacent ones — found live: the metagraph-snapshot entry
 // had nothing to release) still visibly respond. Click does the actual expand.
+// ⚠️ THE TOP PAD MATCHES THE BOX'S 18px (user, 2026-09-11: "the card header jumps down a bit …
+// when it's inactive it sits too high"): the eyebrow sat 6px from an entry's top and 18px from
+// a box's, so every expand dropped the header 12px inside the easing height. With the top edge
+// shared, the header holds still across the tier swap; the BOTTOM stays compact — an entry is
+// still a one-liner, just seated at the box's own first-content line.
 const RAIL_ENTRY =
-  "rail-entry relative block w-auto pointer-events-auto [--spine:transparent] px-[18px] py-1.5 min-h-0 flex-none rounded-md bg-[var(--panel-solid)] [backdrop-filter:blur(10px)] opacity-[var(--entry-dim,1)] hover:opacity-100 hover:brightness-[1.18] transition-[opacity,filter] duration-150 motion-reduce:transition-none";
+  "rail-entry relative block w-auto pointer-events-auto [--spine:transparent] px-[18px] pt-[18px] pb-1.5 min-h-0 flex-none rounded-md bg-[var(--panel-solid)] [backdrop-filter:blur(10px)] opacity-[var(--entry-dim,1)] hover:opacity-100 hover:brightness-[1.18] transition-[opacity,filter] duration-150 motion-reduce:transition-none";
 // Exported for the LEFT rail's entry-tier cards (AboutView — the collapsed About sheds its box
 // into the same grammar, 2026-08-08); the right rail routes through RailPane below.
 export { RAIL_ENTRY };
 
 // The ONE right-rail pane frame — every facts-rail pane renders through this switch:
 //   • `entry` false → the full glass panel (Card baseline supplies `.ig-panel`; RIGHT_CARD the
-//     rail overrides; `.sig-left` the scene-facing signal edge; `animate-card-in` plays the
-//     materialize moment on mount — which is exactly the entry→box swap, since RailPane changes
-//     the element structure and React remounts the subtree).
+//     rail overrides; `.sig-left` the scene-facing signal edge). NO `animate-card-in` (user,
+//     2026-09-11 — the ladder pair made re-boxing a repeated gesture and the materialize's
+//     opacity-0 start + scale pop read as a flash on every ∧/∨ step, since the entry→box swap
+//     remounts this subtree): a rung's state change is carried by the accordion's own geometry
+//     (HeightEase, the seams), and a genuinely new subject is announced by the title roll-in
+//     and the edge pulse — the same reasoning that already made the left tool card
+//     transform-free.
 //   • `entry` true → the unboxed RAIL_ENTRY above. It carries `.sig-left` too (2026-08-09): the
 //     entry is a card in the signal system's terms, so hover whisper / pairing edge / pulse all
 //     speak on it — globals.css supplies the pseudo's geometry, since the shared rules light
@@ -127,7 +166,7 @@ export function RailPane({
     );
   }
   return (
-    <Card asChild className={cn(RIGHT_CARD, "sig-left", "animate-card-in motion-reduce:animate-none", className)}>
+    <Card asChild className={cn(RIGHT_CARD, "sig-left", className)}>
       <aside id={id} style={style} onMouseEnter={onMouseEnter} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} onFocus={onFocus} onBlur={onBlur}>
         {children}
       </aside>
@@ -178,18 +217,7 @@ export default function CardHead({
   // and the card body's own `.no-signal` wrapper no longer sits as its ancestor).
   eyebrowMuted?: boolean;
 }) {
-  const rolled =
-    titleKey != null ? (
-      // `min-w-0 max-w-full` bounds this inline-block wrapper to its parent's width so a long
-      // title inside (e.g. a provider's "City · Long Provider GmbH") can actually truncate — an
-      // unbounded inline-block shrinks to content and lets the inner `.truncate` overflow the card
-      // (surfaced once the ladder lane narrows the deeper cards, 2026-07-19).
-      <span key={titleKey} className="roll-in min-w-0 max-w-full">
-        {title}
-      </span>
-    ) : (
-      title
-    );
+  const rolled = useRolledTitle(titleKey, title);
   const eyebrowClass = cn(EYEBROW, eyebrowMuted ? "text-muted-foreground" : "text-accent");
 
   if (panel) {
@@ -287,13 +315,16 @@ export default function CardHead({
   // (they share the card's top edge); the title row sits BELOW them and runs to the content
   // edge, so its aside (status pill, live dot, site link) ends flush with the ×'s glyph and the
   // body's right-aligned columns (user, 2026-07-12 — the 22px title-row clearance double-inset
-  // the aside ~40px from the card edge while everything else aligned at ~18px). Right cards are
-  // COLLAPSIBLE too (user, 2026-07-12): expanded (the BOX), the +/− rides the eyebrow line and
-  // the × floats at the corner. COLLAPSED (the unboxed ENTRY, card-redesign 2026-08-08) the
-  // chrome disappears entirely — no ×, no +/− (user: it read as clutter on a one-line entry);
-  // the WHOLE entry is one invisible stretched toggle (aria-expanded, sr-only label), so a click
-  // anywhere re-materializes it as the box. Deselection of an entry happens by stepping down
-  // from the box / clear-all, not per-entry chrome.
+  // the aside ~40px from the card edge while everything else aligned at ~18px). The BOX carries
+  // NO minimize control (user, 2026-09-11 — "hardly used"; it was the − on the eyebrow line
+  // plus a whole-head stretched toggle): the box moves by expanding another entry or by the
+  // plank's ladder pair, never by collapsing into nothing. COLLAPSED (the unboxed ENTRY,
+  // card-redesign 2026-08-08) the chrome disappears entirely — no ×, no +/− (user: it read as
+  // clutter on a one-line entry); the WHOLE entry is one invisible stretched toggle
+  // (aria-expanded, sr-only label), so a click anywhere re-materializes it as the box.
+  // Deselection of an entry happens by stepping down from the box / clear-all, not per-entry
+  // chrome. The LEFT rail's panel layout above keeps its collapse toggle — the removal is the
+  // right rail's alone.
   const entryMode = !!collapsed && !!onToggle;
   return (
     <>
@@ -321,38 +352,21 @@ export default function CardHead({
             <span className="sr-only">Expand</span>
           </button>
         )}
-        {(eyebrow || caption != null || (onToggle && !entryMode)) && (
+        {(eyebrow || caption != null) && (
           <div className={cn("flex items-start justify-between gap-2 mb-2", onClose && !entryMode && "pr-[30px]")}>
             {/* `data-eyebrow` is RailThread's read: on an unboxed ENTRY the thread runs its
                 depth-reach connector at the EYEBROW's height (user, 2026-08-08 — the entry's
                 vertical centre put the line through the title-row aside's space). */}
             {eyebrow ? <span data-eyebrow="" className={cn("block", eyebrowClass)}>{eyebrow}</span> : <span />}
-            {/* The right cluster — caption, then the +/− indicator, the SAME order and the same
-                line the panel layout puts them on. ⚠️ The caption belongs HERE and not in the
-                title row's aside (user, 2026-08-12 — "the network view collapse is broken in the
-                card"): About's collapsed entry passed `SOON` as the aside, so a title that fits
-                the expanded card's 202px lane ran straight THROUGH it in the narrower entry, and
-                since nothing bounds an unbounded inline-flex title it couldn't truncate either.
-                Level with the eyebrow the title gets the whole lane back, and the two tiers stop
-                disagreeing about where a card's status tag lives. */}
-            {(caption != null || (onToggle && !entryMode)) && (
+            {/* The right cluster — the caption, on the eyebrow's own line. ⚠️ It belongs HERE
+                and not in the title row's aside (user, 2026-08-12 — "the network view collapse
+                is broken in the card"): About's collapsed entry passed `SOON` as the aside, so
+                a title that fits the expanded card's 202px lane ran straight THROUGH it in the
+                narrower entry, and since nothing bounds an unbounded inline-flex title it
+                couldn't truncate either. */}
+            {caption != null && (
               <div className="flex items-center gap-1.5 flex-none pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
-                {caption != null && (
-                  <span className="text-micro text-muted-foreground text-right tabular-nums">{caption}</span>
-                )}
-                {onToggle && !entryMode && (
-                  // -mt aligns the glyph's centre with the ×'s (the × floats at the card corner,
-                  // outside this row's flow — measured, not eyeballed).
-                  <button
-                    type="button"
-                    aria-expanded={!collapsed}
-                    title={collapsed ? "Expand" : "Collapse"}
-                    onClick={onToggle}
-                    className="appearance-none bg-transparent border-0 p-0 -mt-[7px] -mb-1 inline-flex items-center justify-center w-5 h-[18px] leading-none text-muted-foreground group-hover:text-foreground rounded-sm focus-visible:outline-1 focus-visible:outline-ring/60 after:absolute after:inset-0 after:cursor-pointer after:content-['']"
-                  >
-                    {collapsed ? <Plus className="size-3.5" aria-hidden /> : <Minus className="size-3.5" aria-hidden />}
-                  </button>
-                )}
+                <span className="text-micro text-muted-foreground text-right tabular-nums">{caption}</span>
               </div>
             )}
           </div>

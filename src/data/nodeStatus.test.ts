@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { nodeStatus, statusBreakdown, labelBreakdown, BUCKET_COLOR } from "./nodeStatus";
+import { nodeStatus, statusBreakdown, labelBreakdown, statusItems, BUCKET_COLOR, BUCKET_WORD } from "./nodeStatus";
 
 describe("nodeStatus", () => {
   it("buckets Ready as green consensus", () => {
@@ -48,5 +48,22 @@ describe("labelBreakdown", () => {
     expect(labelBreakdown(["Observing", "WaitingForObserving"], "progress")).toEqual([
       { label: "observing", count: 2 },
     ]);
+  });
+});
+
+// The one row derivation both status tables render (the dossier schedule and the vitals
+// band's Node status cell): ready/unknown as their bucket word, progress/down spelled out
+// by exact state, colour always the bucket's.
+describe("statusItems", () => {
+  it("non-zero buckets in lifecycle order, progress spelled out, bucket colour throughout", () => {
+    expect(statusItems(["Ready", "Ready", "DownloadInProgress", "Offline", "Martian"])).toEqual([
+      { label: BUCKET_WORD.ready, count: 2, color: BUCKET_COLOR.ready },
+      { label: "syncing", count: 1, color: BUCKET_COLOR.progress },
+      { label: "offline", count: 1, color: BUCKET_COLOR.down },
+      { label: BUCKET_WORD.unknown, count: 1, color: BUCKET_COLOR.unknown },
+    ]);
+  });
+  it("an all-ready fleet is one row", () => {
+    expect(statusItems(["Ready", "Ready"])).toEqual([{ label: "ready", count: 2, color: BUCKET_COLOR.ready }]);
   });
 });

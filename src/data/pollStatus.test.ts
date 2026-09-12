@@ -4,7 +4,7 @@ import type { PollHealth } from "./api";
 
 const row = (p: Partial<PollHealth>): PollHealth => ({
   id: "global", label: "Global snapshots", target: "block explorer", everyMs: 4000,
-  lastOkAt: null, lastErrAt: null, ok: 0, err: 0, ...p,
+  when: null, lastOkAt: null, lastErrAt: null, ok: 0, err: 0, ...p,
 });
 const NOW = 1_000_000;
 

@@ -42,6 +42,7 @@ import { Arcs } from "./objects/Arcs";
 import { makeRadialGradientTexture } from "./objects/gradientTexture";
 import type { HyperView } from "./views/HyperView";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
+import { nodeStatus } from "@/src/data/nodeStatus";
 import type {
   CountryStat,
   DagCore,
@@ -86,8 +87,11 @@ const hexPitchDeg = (r: number) => ((2 * r * 1.04) / (R + LAND_H)) * (180 / Math
 // thing that makes a stack of chips sit ON the globe rather than float over it, and with the sun's
 // terminator now shading the sphere underneath it the two agree instead of competing. So it stays,
 // with a weight; if it ever has to go, delete the mechanism rather than zero it again.
+// 0.55 → 0.72 (user, 2026-09-11: "make the bloom attached to the nodes/cohorts' earth surface
+// a bit stronger" in light mode) — the shade steps up from a whisper toward a seated contact
+// shadow while staying well short of the blot the OP comment above warns about.
 const POOL_SHADE = 0.34;
-const POOL_SHADE_OP = 0.55;
+const POOL_SHADE_OP = 0.72;
 
 // View-transition staging grid: THE cell pitch (world units). setGatherFit may only shrink it
 // (with the chip size, by one factor) to make the packed row of per-network squares
@@ -129,6 +133,18 @@ type MetaLayout = RouteMetagraph & {
 
 const geoOf = (pick: PickDescriptor): GeoInfo | undefined => ("geo" in pick ? pick.geo : undefined);
 
+// THE STATUS FILL CHANNEL (user, 2026-09-10: "a chip/sphere with only outline/edge but no
+// fill") — a node whose cluster state MEASURED as not ready (the amber/red buckets:
+// observing/waiting/syncing/joining, offline/leaving) renders as a rim-only hollow shell in
+// its own identity hue, in every presentation. UNKNOWN stays solid (rule 10: an unread state
+// is not "not ready" — BioFi's whole fleet would otherwise hollow while anchoring hundreds
+// of snapshots an hour). Status still never touches colour, size, or the dim system: fill is
+// its own channel, resolved once per record at build (statuses arrive with data rebuilds).
+const nodeFillOf = (state?: string | null): number => {
+  const b = nodeStatus(state).bucket;
+  return b === "progress" || b === "down" ? 0 : 1;
+};
+
 export class Globe implements GeoViewHost {
   surface!: THREE.Group;
   /** The surface's effective alpha this frame (max of surf/extras fades) — the Engine reads it
@@ -155,6 +171,16 @@ export class Globe implements GeoViewHost {
   private _glowTex?: THREE.Texture; // shared radial-gradient sprite for the light pools
   private _glowDim = 1; // eased 1→~0.2 while a country is drilled, so its highlight isn't overruled
   private _glowAllDim = 1; // eased ~0.62 in "all" (overlapping per-network planes stack additively)
+  // ⚠️ THE SHELL ROTATION SURVIVES A DATA REBUILD (user, 2026-09-11: "the spheres … at some
+  // point jump to a different point in their rotation"). The per-frame hyper orbit MUTATES
+  // each record's position in place (update() below), so the accumulated rotation lives only
+  // in the records — and a rebuild recomputes positions from the static armillary layout,
+  // snapping every bead back to its slot. These two accumulators are the rotation's second
+  // home: update() advances them alongside the mutation, and both build sites bake them into
+  // fresh positions, so a rebuild lands each bead where the motion had carried it. Kept mod
+  // 2π so a long-lived tab never feeds applyAxisAngle a huge angle.
+  private _coreRingAng = 0;
+  private _metaRingAng = 0;
   morph = 0;
   // The view-transition state machine (Engine-owned, set once); null = no transition support wired
   // yet at that call site. Read each frame by _frameCtx into ctx.transition for NodeFabric's gather.
@@ -441,13 +467,17 @@ export class Globe implements GeoViewHost {
         const primary = node.id == null || !seen.has(node.id);
         if (node.id != null) seen.add(node.id);
         const col = new THREE.Color(color);
-        // NB: node colour is NOT dimmed by ready state — status lives in the card/explorer, never in
-        // the 3D scene (matches the uniform-size rule); off-ready nodes render at full identity colour.
+        // NB: node colour is NOT dimmed by ready state (nor size — the uniform-size rule):
+        // status in the scene is the FILL channel alone (nodeFillOf above) — a measured
+        // not-ready node hollows to its rim, at full identity colour.
 
         const hyperPos = armillaryPos(i, n, ring.radius, ring.numRings, ring.tilt);
         // The node's ring normal — nodes orbit ALONG their shell around this axis (see update()).
         const _rf = armillaryFrame(i % ring.numRings, ring.numRings, ring.tilt);
         const ringAxis = ringNormal(_rf, new THREE.Vector3()); // event-time
+        // Re-apply the live shell rotation (see _coreRingAng) — a rebuild must not reset the
+        // orbit phase; hyperDir/azimuth below derive from the rotated position.
+        hyperPos.applyAxisAngle(ringAxis, this._coreRingAng);
         const g = geoMap[node.ip];
         const geoDir = g ? latLonToVec3(g.lat!, g.lon!, 1).normalize() : null;
 
@@ -465,6 +495,7 @@ export class Globe implements GeoViewHost {
         } as unknown as PickDescriptor;
         const u: ValidatorRecord = {
           index: idx, layer: role, roles: node.roles || [role], nodeId: node.id, geoPrimary: primary, ready, base: col.clone(),
+          fill: nodeFillOf(node.state),
           ledgerPos, ledgerHide,
           hyperPos, hyperDir: hyperPos.clone().normalize(), hyperRadius: hyperPos.length(), ringAxis,
           geoDir, trueDir: geoDir ? geoDir.clone() : null, geoRadius: HEX_BASE_R, noGeo: !g,
@@ -799,6 +830,9 @@ export class Globe implements GeoViewHost {
           const primary = !seen.has(node.ip);
           seen.add(node.ip);
           const offset = ringFramePos(i, cnt, META_RING.radii[layer], frame);
+          // Re-apply the live shell rotation (see _metaRingAng) — a rebuild must not reset
+          // the orbit phase; hyperPos below adds the rotated offset.
+          offset.applyAxisAngle(ringAxis, this._metaRingAng);
           const dir = latLonToVec3(g.lat!, g.lon!, 1).normalize(); // real location; fanned out below
           // LEDGER: one chip per MACHINE in this metagraph's own tray (2026-08-07) — the
           // machine's primary record carries the chip, its other layer instances hide.
@@ -826,7 +860,7 @@ export class Globe implements GeoViewHost {
             spinAxis: new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).normalize(),
             spinSpeed: 0.3 + Math.random() * 0.5, spinPhase: Math.random() * 6.2831,
             dim: 0, dimTarget: 0,
-            pick, fw: 0,
+            pick, fill: nodeFillOf(node.state), fw: 0,
             gU: 0, gV: 0, gRank: 0, gCount: 0, gS: 0,
           });
         });
@@ -1829,6 +1863,9 @@ export class Globe implements GeoViewHost {
       // too fast — give the core (validators) a slower angular rate than the metagraph rings (user).
       const coreAng = dt * 0.09;
       const metaAng = dt * 0.12;
+      // The accumulators mirror the mutation (see their declaration) — a rebuild re-applies them.
+      this._coreRingAng = (this._coreRingAng + coreAng) % (Math.PI * 2);
+      this._metaRingAng = (this._metaRingAng + metaAng) % (Math.PI * 2);
       for (const r of this.nodes) { r.hyperPos.applyAxisAngle(r.ringAxis, coreAng); r.hyperDir.applyAxisAngle(r.ringAxis, coreAng); }
       for (const r of this.metaNodes) r.offset.applyAxisAngle(r.ringAxis, metaAng);
     }

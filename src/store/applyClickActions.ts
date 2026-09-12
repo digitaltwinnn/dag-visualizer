@@ -6,8 +6,14 @@
 import { useStore } from "./store";
 import type { ClickAction } from "@/src/engine/domain/pickActions";
 
-export function applyClickActions(actions: ClickAction[]): void {
+export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boolean }): void {
   const st = useStore.getState();
+  // Every commit states HOW it was reached (user, 2026-09-11 — the structural end of the
+  // timer-based roll suppression): LOUD by default — a new subject announces itself with the
+  // title roll — and QUIET only when the caller says so (the plank's first-child ∨, whose
+  // gesture reads as the pile unfolding, not an arrival). CardHead freezes this per mount, so
+  // a card mounting late off this commit still knows its provenance.
+  st.setNavQuiet(opts?.quiet ?? false);
   for (const a of actions) {
     switch (a.kind) {
       case "filter":

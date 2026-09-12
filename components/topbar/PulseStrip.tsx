@@ -1,12 +1,13 @@
 "use client";
 
-import { pollHealthRows } from "@/src/data/api";
+import { pollHealthRows, type PollHealth } from "@/src/data/api";
 import { pollStatusOf, type PollStatus } from "@/src/data/pollStatus";
 import { relativeAge } from "@/src/util/relativeAge";
 import { BandCard } from "@/components/VitalsBand";
 import { useNowTick } from "@/components/useNowTick";
 import { cn } from "@/lib/utils";
 import { BAR_EASE } from "@/components/RollSwap";
+import { Timer } from "lucide-react";
 // THE PULSE STRIP — the heartbeat's own row (user, 2026-08-30: clicking the ECG "should show a
 // bottom section (like the filter) with relevant information about the liveliness of the app —
 // when did it last poll successfully? which polls do we have?"). The filter strip's exact
@@ -16,15 +17,27 @@ import { BAR_EASE } from "@/components/RollSwap";
 // JSX), the plate is the vitals band's own BandCard (one band-card recipe app-wide), and the
 // age words are relativeAge, the app's one age grammar.
 
-const DOT: Record<PollStatus, string> = {
-  ok: "var(--success)",
-  stale: "var(--warn-soft)",
-  failing: "var(--destructive)",
-  acquiring: "var(--muted-foreground)",
+// The status inks the READING itself (user, 2026-09-10, after the head dot retired: "tint
+// the age value") — the same derived states the dot spoke, on the value they qualify: a
+// stale age goes advisory amber, a failing one destructive; ok stays the plain foreground.
+const AGE_INK: Record<PollStatus, string> = {
+  ok: "text-foreground",
+  stale: "text-[var(--warn-soft)]",
+  failing: "text-[var(--destructive)]",
+  acquiring: "text-muted-foreground",
 };
 
-const everyWord = (ms: number | null): string =>
-  ms == null ? "on demand" : ms >= 60_000 ? `every ${Math.round(ms / 60_000)} min` : `every ${Math.round(ms / 1000)}s`;
+// The cadence chip says the DURATION, the timer glyph says "scheduled" (user, 2026-09-11 —
+// "can't we say 5 mins with an icon?"): a fixed-cadence feed wears the glyph + the bare
+// duration. A feed with no fixed cadence wears its `when` words instead — the honest trigger
+// ("at start" for the boot-loaded geo map, "5 min · in view" for trends), because "on demand"
+// claimed a user gesture neither feed answers to (same user round).
+const cadenceWord = (r: PollHealth): string =>
+  r.everyMs != null
+    ? r.everyMs >= 60_000
+      ? `${Math.round(r.everyMs / 60_000)} min`
+      : `${Math.round(r.everyMs / 1000)}s`
+    : (r.when ?? "—");
 
 export default function PulseStrip() {
   const now = useNowTick(1000);
@@ -46,36 +59,50 @@ export default function PulseStrip() {
       {rows.map((r) => {
         const status = pollStatusOf(r, now);
         return (
-          <BandCard
-            key={r.id}
-            label={r.label}
-            className="min-w-[150px]"
-            mark={<span aria-hidden className="size-1.5 rounded-full flex-none" style={{ background: DOT[status] }} />}
-          >
-            <span className="flex flex-col gap-0.5 min-w-0">
-              <span className="flex items-baseline gap-2 whitespace-nowrap">
-                <span className="font-mono font-bold text-caption tabular-nums text-foreground">
-                  {r.lastOkAt != null ? relativeAge(now - r.lastOkAt) : status === "failing" ? "failing" : "—"}
+          // No head mark (user, 2026-09-10: "the bullet doesn't add anything and elsewhere
+          // we don't do it" — the band's cards carry bare labels). The status still reads:
+          // a failing feed says the word and shows its failed count, and a stale one wears
+          // the growing age beside its own cadence chip.
+          <BandCard key={r.id} label={r.label} className="min-w-[150px]">
+            <span className="flex flex-col gap-1 min-w-0">
+              {/* The band's STACKED-LEAD grammar (user, 2026-09-10, two rounds): the bare
+                  bold reading, and the CADENCE as a chip in the taxonomy-chrome recipe —
+                  RoleChips' own squared pill (faint wash, hairline, muted ink; chrome, not
+                  identity) — instead of plain words. No "ago": the ticking value under a
+                  liveliness dot carries it. */}
+              <span className="flex items-center gap-1.5 whitespace-nowrap">
+                <span className={cn("font-mono font-bold text-caption tabular-nums leading-tight", AGE_INK[status])}>
+                  {r.lastOkAt != null ? relativeAge(now - r.lastOkAt, true) : status === "failing" ? "failing" : "—"}
                 </span>
-                <span className="text-micro text-muted-foreground">{everyWord(r.everyMs)}</span>
+                {/* A touch roomier than RoleChips' full pill (px 5→6, py 2→3) and a 12px glyph:
+                    at the compact py-px the icon-bearing chip read cramped and the glyph sat
+                    optically high beside the 10px text (user, 2026-09-11 — "padding … they look
+                    small and text icon alignment feels a bit off"). */}
+                <span className="inline-flex items-center gap-1 rounded-xs border border-border bg-wash-faint px-1.5 py-[3px] text-micro leading-none text-muted-foreground">
+                  {r.everyMs != null && <Timer aria-hidden className="size-3 flex-none" />}
+                  {cadenceWord(r)}
+                </span>
               </span>
               <span className="text-micro text-muted-foreground truncate">{r.target}</span>
-              {/* The ok/err record as a GLANCE instrument (user, 2026-09-04 — the "219 ok ·
-                  14 err" prose was hard to read): a hairline ratio bar in the two status
-                  tones, exact counts beside it (identity is never colour-alone — each count
-                  keeps its word). The err segment floors at 3px so one failure among
-                  thousands stays a visible mark; the numbers carry the measurement. */}
-              <span className="flex items-center gap-1.5 whitespace-nowrap">
-                <span aria-hidden className="flex h-[3px] w-12 flex-none rounded-full overflow-hidden bg-border/60">
-                  <span style={{ width: `${(r.ok / Math.max(1, r.ok + r.err)) * 100}%`, background: "var(--success)" }} className={cn("opacity-70", BAR_EASE)} />
-                  {r.err > 0 && (
+              {/* The ok/err record shows ONLY when there is something to weigh (user,
+                  2026-09-09, second round: the all-ok "N polls, all ok" line said what the
+                  green dot and the ticking last-success already say — chrome restating
+                  health). With failures it is a GLANCE instrument (2026-09-04): a hairline
+                  ratio bar in the two status tones, exact counts beside it (identity is
+                  never colour-alone — each count keeps its word, and "failed" is the human
+                  word for the red share). The err segment floors at 3px so one failure
+                  among thousands stays a visible mark. */}
+              {r.err > 0 && (
+                <span className="flex items-center gap-1.5 whitespace-nowrap">
+                  <span aria-hidden className="flex h-[3px] w-12 flex-none rounded-full overflow-hidden bg-border/60">
+                    <span style={{ width: `${(r.ok / Math.max(1, r.ok + r.err)) * 100}%`, background: "var(--success)" }} className={cn("opacity-70", BAR_EASE)} />
                     <span style={{ width: `${(r.err / Math.max(1, r.ok + r.err)) * 100}%`, background: "var(--destructive)" }} className={cn("opacity-80 min-w-[3px]", BAR_EASE)} />
-                  )}
+                  </span>
+                  <span className="text-micro tabular-nums text-muted-foreground">
+                    {r.ok.toLocaleString()} ok · {r.err.toLocaleString()} failed
+                  </span>
                 </span>
-                <span className="text-micro tabular-nums text-muted-foreground">
-                  {r.ok.toLocaleString()} ok{r.err > 0 ? ` · ${r.err.toLocaleString()} err` : ""}
-                </span>
-              </span>
+              )}
             </span>
           </BandCard>
         );
