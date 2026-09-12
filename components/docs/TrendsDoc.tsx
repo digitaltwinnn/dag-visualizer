@@ -86,7 +86,14 @@ const scale = (points: (number | null)[], k: number): (number | null)[] =>
 
 function Section({ id, title, lead, children }: { id: string; title: string; lead: string; children: React.ReactNode }) {
   return (
-    <section id={id} className="mt-8 scroll-mt-24">
+    <section
+      id={id}
+      // mt-8 is the BETWEEN-sections rhythm; the first section in a tab drawer has no
+      // predecessor, and the drawer's own padding is the inset (user, 2026-09-12: "does the
+      // header text inside the tab need so much top margin?" — measured 52px, the panel's
+      // 20 plus this 32). first:mt-0 leaves the drawer's 20px, matching its own px-5.
+      className="mt-8 first:mt-0 scroll-mt-24"
+    >
       <h2 className="text-lg font-semibold text-foreground">{title}</h2>
       <div className="mt-3 border-t border-border" />
       <p className="mt-3 text-label text-muted-foreground leading-relaxed">{lead}</p>
@@ -336,7 +343,7 @@ export default function TrendsDoc() {
       pressed ? cn("font-bold text-foreground", SELECTED_ROW) : "text-muted-foreground hover:text-foreground hover:bg-wash-hover",
     );
   const zoomPicker = (
-    <div role="group" aria-label="Time window" className="inline-flex items-center rounded-lg bg-muted p-[3px]">
+    <div role="group" aria-label="Time window" className="inline-flex items-center rounded-lg bg-muted p-[3px] max-[700px]:flex max-[700px]:justify-center max-[700px]:[&>button]:flex-1">
       {!range && ZOOMS.map((z) => (
         <button
           key={z.id}
@@ -373,7 +380,7 @@ export default function TrendsDoc() {
       type="button"
       onClick={inspectHere}
       title="Open this range in the Snapshots view's raw data search (uses the committed network's chain when one is filtered)"
-      className="ml-auto inline-flex items-center gap-1.5 h-6 px-2 rounded-md text-micro tracking-caps uppercase text-[var(--primary)]/80 hover:text-[var(--primary)] hover:bg-wash-soft whitespace-nowrap"
+      className="ml-auto max-[700px]:ml-0 max-[700px]:justify-center inline-flex items-center gap-1.5 h-6 px-2 rounded-md text-micro tracking-caps uppercase text-[var(--primary)]/80 hover:text-[var(--primary)] hover:bg-wash-soft whitespace-nowrap"
     >
       <Table2 aria-hidden className="size-3" />
       snapshot records
@@ -389,7 +396,7 @@ export default function TrendsDoc() {
   // spread them wide and broke when the list WRAPS on phone (the h-auto rows below) — as
   // compact pills they pack left and wrap cleanly (user, 2026-09-08: the tabs overflowed).
   const topicPicker = (
-    <div role="group" aria-label="Topic" className="inline-flex items-center rounded-lg bg-muted p-[3px]">
+    <div role="group" aria-label="Topic" className="inline-flex items-center rounded-lg bg-muted p-[3px] max-[700px]:flex max-[700px]:justify-center max-[700px]:[&>button]:flex-1">
       {/* The topic's user-facing word is "Fees" (user, 2026-09-11: "Economics = Fees" — the
           plainer word for what the sections show: fees paid, and the data they anchored);
           the internal id stays `economics`, one concept two registers. */}
@@ -434,9 +441,17 @@ export default function TrendsDoc() {
 
       {p && (
         <>
-        <div className="mt-6 flex items-center justify-between gap-2 flex-wrap">
+        {/* ONE LINE on desktop, a full-width STACK on the phone (user, 2026-09-12: "the
+            topics and range do not fit on one line — perhaps both underneath each other and
+            full width?"). At 390px the three controls already wrapped, but each landed on its
+            own ragged indent (measured: 33 / 156 / 193), which read as three stray controls
+            rather than one toolbar. Stacking costs NOTHING vertically — the same three lines —
+            and each picker spanning the width distributes its pills evenly, which also grows
+            their hit boxes on the surface that needs them. `max-[700px]` is the phone arm
+            every other tier rule here uses (CSS trap 8). */}
+        <div className="mt-6 flex items-center justify-between gap-2 flex-wrap max-[700px]:flex-col max-[700px]:items-stretch">
           {topicPicker}
-          <div className="flex items-center gap-2 flex-wrap justify-end">{zoomPicker}{rangeInspect}</div>
+          <div className="flex items-center gap-2 flex-wrap justify-end max-[700px]:flex-col max-[700px]:items-stretch">{zoomPicker}{rangeInspect}</div>
         </div>
         <Tabs
           defaultValue={initialTab}
