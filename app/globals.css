@@ -415,6 +415,35 @@
    what the geometry actually depends on, so the tier is what the wrapper states.
    Members are the two committed tiers; GHOSTS stay outside the slab and keep the plain gap. */
 .rail-ladder { gap: 0; }
+/* A LADDER STEP GATES THE HOVER TREATMENTS (user, 2026-09-11, several rounds; review-hardened
+   the same day): the ∧/∨ step (and the sibling slide, which arms the same window) re-lays
+   cards under a resting cursor, and Chromium keeps — even grants freshly-mounted elements —
+   a latched `:hover` until a real hit test, which lags the re-layout. So while RailPager's
+   `data-stepping` holds, the hover EFFECTS below simply do not apply, whatever :hover claims.
+   ⚠️ Deliberately NOT `pointer-events: none` on the lane (review find: it made clicks FALL
+   THROUGH the lane to the canvas — `#rightcol` is pointer-events:none — so a click on an
+   entry right after a step could fire an accidental scene pick, and reduced-motion users got
+   a dead zone after an instant swap). Clicks stay live; only the hover visuals stand down.
+   JS-toggled attribute — a contract like the marker classes. */
+/* THE TIER SWAP SETTLES, NEVER SNAPS (user, 2026-09-11, closing the ladder-step polish:
+   "focus should fade and only be fully active when the card is expanded to its final
+   shape. Check also when going up."): a rung arriving as the BOX eases its presence up from
+   the entry register on the height ease's own clock, and a rung falling back to an ENTRY
+   eases down from the box's full presence toward its distance dim. The box's OUTLINE rides
+   the same settle (user, round two: "it also suddenly has rounded outline") — the border
+   fades in from transparent and the radius grows from the entry's own --radius-md to the
+   panel's --radius, so the frame arrives WITH the emphasis instead of a beat before it.
+   No transforms — the geometry-never-animates rule keeps its spirit: nothing moves, the
+   arriving frame simply fades and rounds into place. The `from`-only keyframes land on
+   each element's own computed values. */
+@keyframes tierSettleIn { from { opacity: 0.72; border-color: transparent; border-radius: var(--radius-md); } }
+@keyframes tierSettleOut { from { opacity: 1; } }
+.rail-ladder [data-tier="box"] .ig-panel { animation: tierSettleIn var(--tempo-roll) var(--ease-roll); }
+.rail-ladder [data-tier="entry"] .rail-entry { animation: tierSettleOut var(--tempo-roll) var(--ease-roll); }
+@media (prefers-reduced-motion: reduce) {
+  .rail-ladder [data-tier="box"] .ig-panel,
+  .rail-ladder [data-tier="entry"] .rail-entry { animation: none; }
+}
 .rail-ladder > * + * { margin-top: var(--rail-gap); }
 
 /* Any committed rung directly following another committed rung joins the pile — the box included,
@@ -464,6 +493,31 @@
   left: 0;
   right: 0;
 }
+/* WHILE A LADDER STEP RUNS, THE HOVER TREATMENTS THEMSELVES STAND DOWN (user, 2026-09-11,
+   fourth round — "still flashes"): `pointer-events: none` above only affects FUTURE hit
+   tests, and Chromium keeps (and even grants a freshly-mounted element) a latched `:hover`
+   until the next real hit test, which lags the re-layout by hundreds of ms — measured as a
+   ~330ms brightness(1.18) flash on the collapsing card despite the inert lane. So the
+   stepping window also gates the EFFECTS: the entry's lift and the seams' full-width reach
+   don't apply while `data-stepping` holds, whatever :hover claims. Unlayered on purpose —
+   these must beat the entry's own hover utilities (CSS trap 1). */
+.rail-ladder[data-stepping] .rail-entry,
+.rail-ladder[data-stepping] .rail-entry:hover {
+  opacity: var(--entry-dim, 1);
+  filter: none;
+}
+.rail-ladder[data-stepping] > [data-tier="entry"] + [data-tier="entry"]:has(.rail-entry:hover)::before,
+.rail-ladder[data-stepping] > [data-tier="entry"]:has(.rail-entry:hover) + [data-tier="entry"]::before {
+  left: 18px;
+  right: 18px;
+}
+/* …and the CARD-INTERNAL hover reveals stand down in the same window (user, 2026-09-11:
+   "check the card swipes also for [the same] machinery") — the pager slide translates the
+   incoming card under a latched pointer exactly like a ladder step re-lays the pile, so the
+   whisper edge and the copy-button reveal could light mid-slide. One attribute, every
+   hover-treatment gate. */
+.rail-ladder[data-stepping] .sig-left:hover::before { opacity: 0; }
+.rail-ladder[data-stepping] .group\/copy:hover button[aria-label^="Copy"] { opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
   .rail-ladder > [data-tier="entry"] + [data-tier="entry"]::before { transition: none; }
 }
@@ -663,8 +717,13 @@
   /* The advisory amber — NOT --destructive (amber ≠ red): a distinct "work-in-progress /
      advisory" accent. Its home is /about's unofficial-project notice (the always-on experimental
      banner it was made for was retired 2026-08-09; the token stays because the advisory REGISTER
-     is still a real one, distinct from an error). */
-  --warn-soft: light-dark(#8a6a00, #ffd166);
+     is still a real one, distinct from an error); also the pulse strip's STALE dot, the raw
+     layer's JSON booleans, and the trends charts' not-sampled bands. BOTH grounds are real
+     ORANGE (user, 2026-09-09, two rounds: light's #8a6a00 read "dull and hardly orange", then
+     dark's #ffd166 amber-yellow went brown inside a translucent fill) — light an amber-700
+     ink dark enough to carry text on paper, dark a luminous orange that stays orange when
+     alpha pulls it toward the ground. */
+  --warn-soft: light-dark(oklch(0.55 0.17 55), oklch(0.78 0.16 60));
 
   --border: light-dark(rgba(30, 60, 140, 0.38), rgba(90, 140, 255, 0.22));        /* panel/hairline border (was the --panel-border alias) */
   --input: var(--border);
@@ -950,9 +1009,11 @@
        rasterization covers it is a browser rounding call — where it doesn't, the body's
        `--background` shows through as a hairline against the dark scene (doc pages paint the
        same colour there, which is why only scene pages showed it). Overdrawing clips offscreen,
-       so every fractional edge row is scene pixels at any rounding; the resulting ~0.2% stretch
-       of the integer-sized buffer is invisible and pick math reads the live rect anyway.
-       Pairs with SceneContext's setSize(..., false) — CSS owns this box. */
+       so every fractional edge row is scene pixels at any rounding.
+       Pairs with SceneContext's setSize(..., false) — CSS owns this box, and since 2026-09-11
+       the engine MEASURES it (boxOf) for the buffer and the camera aspect, so the box and the
+       render agree to sub-pixel even where 100vh and innerHeight diverge (mobile browser
+       chrome — the tablet's stretched globe). */
     width: calc(100vw + 2px);
     height: calc(100vh + 2px);
     display: block;

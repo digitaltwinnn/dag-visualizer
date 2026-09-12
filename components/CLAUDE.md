@@ -298,6 +298,38 @@ box unique) — it is the tier's own `boxed` condition, and `railTierBoundary.te
 can't drift. Keying it to the FOCUS rung was the same mistake `data-tier` fixed above, and it also shut
 out the two snapshot slots, which ride the lane with no focus rung at all.
 
+**The plank also carries the LADDER PAIR** (`∧ ∨`, 2026-09-11 — the user liked the sibling swipe
+and asked for the vertical axis; a vertical SWIPE was rejected together because it fights the
+rails' touch scrolling and the sheets' drag gestures, so it is buttons): ∧ re-boxes the next
+coarser COMMITTED rung and ∨ the next finer one — the accordion's own `toggleCollapse`, committing
+nothing, with the camera and callout following the box as always — and where nothing finer is
+committed, ∨ falls through to `childStep` (railSiblings.ts, tested) and COMMITS the rung's FIRST
+child in the explorer's own order ("just pick the 1st one"). A rung with no child vocabulary
+(a node, a metagraph snapshot, the ledger's network — its finer subjects belong to the tick axis)
+disables the control. The sibling trio is CENTERED as one cluster with the ladder pair at the
+right, a hairline between the axes so they never read as one four-way control — and **an
+exhausted direction is INACTIVE while an axis with nothing to ever navigate is ABSENT** (user,
+2026-09-11, two rounds; supersedes 2026-09-03's invisible rule, which predates the pair): a
+direction that ran out mid-set dims — a vanishing chevron re-composes the row at every edge,
+and the dimmed state reads as "the control exists, the direction is exhausted" — while a card
+that is the only record at its rung shows no trio at all, and one with no ladder step shows no
+pair. Permanently dead chrome is not a control.
+
+**Ladder steps are QUIET, and the quiet is PROVENANCE, not a timer** (user, 2026-09-11, four
+rounds ending in "solve it structurally"): `store.navQuiet` records HOW the current state was
+reached — set true by `toggleCollapse` (any manual expand, the About card's own
+never-roll-on-a-manual-expand rule) and by the one executor when a caller passes `quiet` (the
+plank's first-child ∨); reset false by every ordinary commit, by `setMode`, and by the
+`advanceSnap`/`advanceMetaSnap` heartbeat writes (a new tick IS an arrival — without that
+reset a stale quiet suppressed every later live-advance roll). `CardHead.useRolledTitle`
+freezes the answer per (mount, titleKey) via `getState` — no subscription, no re-trigger by
+class change — so a card mounting seconds late off a quiet gesture still skips its roll while
+explorer clicks and the ‹ › sibling steps keep theirs. The `data-stepping` attribute is the
+separate MOTION window (lane-owned timer on the `--tempo-roll` token; the sibling slide arms
+it on its own clock): it gates only the hover TREATMENTS — entry lift, seam reach, whisper,
+copy reveals — because a latched `:hover` survives `pointer-events` changes; it deliberately
+does NOT make the lane pointer-inert (clicks would fall through `#rightcol` to the canvas).
+
 **A pager's parent scope is whatever the step must NOT change, which for the metagraph snapshot makes it
 a PAIR — this metagraph × this tick** (user, 2026-08-09). The set is the subject's own `metaId` rows of the
 pinned tick's exact read, ordinal-desc, never every contributor: `metaSnapSelectActions` filter-firsts, so
@@ -698,7 +730,12 @@ grammar everywhere: label left, value right, one line.** The stacked micro-upper
 form is retired — it cost two lines per fact and read as a form, not an instrument. Its last survivor was
 the `Composition` label over the dossier's composition table, which outlived the sweep only because that
 table isn't a `Fact`; dropped 2026-08-10, since each row already names its own composition and without it
-the description above reads as the card's lead.
+the description above reads as the card's lead. **ONE deliberate exception since 2026-09-10: the
+dossier's accounting SCHEDULES** — the `by node composition` / `by node status` / `by archived
+snapshots` caption rows are user-directed disclosure captions over partition tables (the accounting
+form: one control total, labeled partitions beneath), not fact labels — a caption that FOLDS is a
+control, which is what takes it out of this rule's reach. Don't strip them as a regression of the
+2026-08-10 sweep, and don't cite them as precedent for stacking a label over a `Fact`.
 
 Three weights, and a fact's weight is a claim about what the card is FOR:
 
@@ -828,12 +865,15 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
   plus 2px to reach the 16px `--panel-pad-x` the head rule uses. Deriving it from the tokens is what
   makes the lines actually share an edge.
 - **One close**: every dismissible card's × is CardHead's ghost close labelled "Clear selection", with
-  no per-card variants. Right cards are collapsible too — the whole head is the disclosure toggle (the
-  stretched-hit-area pattern, required for touch), with the × and the aside floating above the overlay
-  so closing and links keep working. ⚠️ **Floating above it means `pointer-events-none` on the wrapper
-  and `pointer-events-auto` on its own links/buttons** (`[&_a]:pointer-events-auto`,
-  `[&_button]:pointer-events-auto`) — a `z-index` alone leaves the whole aside eating the toggle click,
-  which is exactly how a collapsed head stopped expanding.
+  no per-card variants. A right-rail ENTRY expands on click (the whole entry is one invisible
+  stretched toggle, required for touch) — but the BOX carries **no minimize** (user, 2026-09-11:
+  "hardly used"; the − on the eyebrow line and the whole-head collapse toggle both went): the box
+  moves by expanding another entry or by the plank's ladder pair, never by collapsing into
+  nothing. The LEFT rail's explore cards keep their collapse toggle. The × and the aside float
+  above the entry overlay so closing and links keep working. ⚠️ **Floating above it means
+  `pointer-events-none` on the wrapper and `pointer-events-auto` on its own links/buttons**
+  (`[&_a]:pointer-events-auto`, `[&_button]:pointer-events-auto`) — a `z-index` alone leaves the
+  whole aside eating the toggle click, which is exactly how a collapsed head stopped expanding.
 - **The cards ARE the rail's controls — there is no rail toolbar.** The collapse-all/restore + clear-all
   pair above the pile was removed (2026-08-09): every head is already a disclosure toggle, so a
   collapse-all button restates what a click says, and its × was the coarsest card's own × — clearing

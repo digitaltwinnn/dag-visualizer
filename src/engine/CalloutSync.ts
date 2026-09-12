@@ -54,6 +54,10 @@ export interface CalloutHost {
   transitionActive(): boolean;
   /** Is the camera mid-flight to a subject? The callout waits out the whole arrival. */
   flyingNow(): boolean;
+  /** The running flight moves the CAMERA but not the subject (the rails toggle's lean, the
+   *  aspect re-frame) — the label rides it on its per-frame projection instead of blinking
+   *  off for the arrival wait (user, 2026-09-11: the HUD⇄Scene switch "always redrew" it). */
+  sameSubjectFlight(): boolean;
   calloutAllowed(): boolean;
   /** The focused metagraph's hyper group, or null (unlisted/unknown — an honest absence). */
   dofMeta(): { group: THREE.Object3D } | null;
@@ -115,7 +119,9 @@ export class CalloutSync {
       // …and not while the camera is still FLYING to the subject (user, 2026-09-04: the label
       // appeared "a bit too quickly" — it points at a settled scene, so it waits for the whole
       // arrival, the commit flight included; the view transition above is the other half).
-      !this.h.flyingNow() &&
+      // A SAME-SUBJECT flight is exempt (see the host field): nothing is arriving, only the
+      // camera leans, and the label tracks its unchanged subject per frame.
+      (!this.h.flyingNow() || this.h.sameSubjectFlight()) &&
       breakpointOf(window.innerWidth) !== "phone";
     if (on) {
       const v = this._calloutV;

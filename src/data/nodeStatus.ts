@@ -67,3 +67,28 @@ export function labelBreakdown(
     .map((label) => ({ label, count: counts.get(label)! }))
     .sort((a, b) => b.count - a.count);
 }
+
+// The status TABLE'S rows, one derivation for both status surfaces (the dossier's "by node
+// status" schedule and the vitals band's Node status cell, 2026-09-10 — extracted from the
+// dossier component so the two can't drift): the non-zero buckets in lifecycle order, the
+// amber "progress" and red "down" buckets spelled out by their exact lifecycle state(s)
+// instead of collapsing to the bucket word (the dossier said "down" while the node card said
+// "leaving", user 2026-07-12); colour is always the BUCKET's.
+export const BUCKET_WORD: Record<StatusBucket, string> = {
+  ready: "ready",
+  progress: "in progress",
+  down: "down",
+  unknown: "unknown",
+};
+export interface StatusItem { label: string; count: number; color: string }
+export function statusItems(states: (string | null | undefined)[]): StatusItem[] {
+  const b = statusBreakdown(states);
+  const order: StatusBucket[] = ["ready", "progress", "down", "unknown"];
+  return order
+    .filter((k) => b[k] > 0)
+    .flatMap((k) =>
+      k === "progress" || k === "down"
+        ? labelBreakdown(states, k).map((it) => ({ ...it, color: BUCKET_COLOR[k] }))
+        : [{ label: BUCKET_WORD[k], count: b[k], color: BUCKET_COLOR[k] }],
+    );
+}

@@ -71,7 +71,7 @@ export default function AboutDoc() {
   return (
     <article className="pt-14">
       <Eyebrow>About</Eyebrow>
-      <h1 className="mt-3 text-3xl font-semibold tracking-[-0.01em] leading-tight">
+      <h1 className="mt-3 text-2xl font-semibold tracking-[-0.01em] leading-tight">
         A live 3D map of the Constellation Network
       </h1>
       <p className="mt-5 text-base text-foreground-dim leading-relaxed">
@@ -136,6 +136,15 @@ export default function AboutDoc() {
           while a snapshot is pinned and its card leads with how the two are related; a fact
           already stated by the card above it isn&apos;t repeated below; and the label floating
           in the scene follows whichever card you open, just as the camera does.
+        </p>
+        {/* The observation ladder, in the human register (user, 2026-09-09 — the same
+            principle CLAUDE.md carries as convention 12 and the README states in its own
+            voice; this page keeps it to one warm paragraph). */}
+        <p>
+          And everything here comes at <strong>three depths</strong>: the scene shows the
+          network <em>live</em>, the Trends page shows its <em>measured history</em>, and the
+          raw data view opens the <em>individual snapshots</em> themselves — each one step
+          deeper, and each step carries along what you were looking at.
         </p>
       </Section>
 

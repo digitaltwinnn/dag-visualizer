@@ -36,6 +36,10 @@ export interface ValidatorRecord {
   spinSpeed: number;
   spinPhase: number;
   pick: PickDescriptor;
+  /** The STATUS fill channel (user, 2026-09-10): 1 = solid, 0 = a rim-only hollow shell for a
+   *  node whose cluster state measured as not ready (the amber/red buckets — never unknown,
+   *  rule 10). Status still touches neither colour nor size; fill is its own channel. */
+  fill: number;
   /** Eased focus weight (dimModel.focusWeightOf, approached at emphasisK) — the SIZE channel's
    *  state, the way the emissive buffer is the glow channel's. Lives on the record because the
    *  scale and the glow are written by different passes and must swell together. */
@@ -91,6 +95,8 @@ export interface MetaNodeRecord {
   dim: number;
   dimTarget: number;
   pick: PickDescriptor;
+  /** The STATUS fill channel — see ValidatorRecord.fill (1 = solid, 0 = hollow shell). */
+  fill: number;
   /** Eased focus weight (dimModel.focusWeightOf, approached at emphasisK) — the SIZE channel's
    *  state, the way the emissive buffer is the glow channel's. Lives on the record because the
    *  scale and the glow are written by different passes and must swell together. */

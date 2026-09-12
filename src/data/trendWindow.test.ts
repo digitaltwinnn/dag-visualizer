@@ -4,7 +4,7 @@
 // as "no leading gap"; the client clock judging a CDN-cached payload's newest bucket; the
 // leading partial month drawn whole while the trailing one was trimmed).
 import { describe, expect, it } from "vitest";
-import { leadingTrim, monthlySum, sliceWindow, trimNewestPartial, type TrendsWindowData } from "./trendWindow";
+import { cutRange, leadingTrim, monthlySum, pickRangeTier, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, type TrendsWindowData } from "./trendWindow";
 
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
@@ -84,5 +84,76 @@ describe("monthlySum", () => {
     const m = monthlySum(win(jan15, DAY, ticks, Date.UTC(2026, 2, 5)));
     expect(m.buckets).toEqual([Date.UTC(2026, 1, 1)]);
     expect(m.series["g.ticks"]).toEqual([28]);
+  });
+});
+
+describe("cutRange", () => {
+  const t0 = Date.UTC(2026, 8, 1);
+  it("keeps every bucket the range intersects, mid-bucket edges included", () => {
+    const w = win(t0, HOUR, [1, 2, 3, 4, 5, 6]);
+    // from inside bucket 1, to inside bucket 4 — both partial-touched buckets stay
+    const c = cutRange(w, t0 + HOUR + 60_000, t0 + 4 * HOUR + 60_000);
+    expect(c.buckets).toEqual([t0 + HOUR, t0 + 2 * HOUR, t0 + 3 * HOUR, t0 + 4 * HOUR]);
+    expect(c.series["g.ticks"]).toEqual([2, 3, 4, 5]);
+  });
+  it("cuts to empty on a non-overlapping or inverted range instead of throwing", () => {
+    const w = win(t0, HOUR, [1, 2, 3]);
+    expect(cutRange(w, t0 + 10 * HOUR, t0 + 12 * HOUR).buckets).toEqual([]);
+    expect(cutRange(w, t0 + 2 * HOUR, t0).buckets).toEqual([]);
+  });
+  it("is the whole window when the range covers it", () => {
+    const w = win(t0, HOUR, [1, 2, 3]);
+    expect(cutRange(w, t0 - HOUR, t0 + 10 * HOUR).buckets.length).toBe(3);
+  });
+});
+
+describe("pickRangeTier", () => {
+  const d5 = TIER_SINCE["5m"];
+  it("goes finest only where the tier's history floor allows", () => {
+    expect(pickRangeTier(d5 + DAY, d5 + 2 * DAY)).toBe("5m");
+    // both fine floors share one date since the clean-sheet walk (2026-09-11), so any range
+    // opening before it is daily-only regardless of span — there is no between-floors rung
+    expect(pickRangeTier(d5 - 3 * DAY, d5 - DAY)).toBe("1d");
+    expect(pickRangeTier(d5 - 30 * DAY, d5 - DAY)).toBe("1d");
+  });
+  it("widens the tier with the span", () => {
+    expect(pickRangeTier(d5, d5 + 30 * DAY)).toBe("1h");
+    expect(pickRangeTier(d5, d5 + 90 * DAY)).toBe("1d");
+  });
+});
+
+describe("tilesFor", () => {
+  it("day units for 5m, months for 1h, spanning the whole range", () => {
+    expect(tilesFor("5m", Date.UTC(2026, 8, 8, 14), Date.UTC(2026, 8, 10, 2))).toEqual([
+      "2026-09-08", "2026-09-09", "2026-09-10",
+    ]);
+    expect(tilesFor("1h", Date.UTC(2026, 6, 20), Date.UTC(2026, 8, 2))).toEqual([
+      "2026-07", "2026-08", "2026-09",
+    ]);
+  });
+  it("crosses year boundaries and stays bounded", () => {
+    expect(tilesFor("1h", Date.UTC(2026, 11, 20), Date.UTC(2027, 0, 5))).toEqual(["2026-12", "2027-01"]);
+    expect(tilesFor("5m", 0, 1e15).length).toBe(64);
+  });
+});
+
+describe("stitchWindows", () => {
+  it("concatenates in time order and null-fills series a tile never carried", () => {
+    const a = win(Date.UTC(2026, 8, 8), HOUR, [1, 2]);
+    const b: TrendsWindowData = {
+      buckets: [Date.UTC(2026, 8, 9)],
+      stepMs: HOUR,
+      series: { "g.ticks": [7], "m.y.snaps": [3] },
+      now: Date.UTC(2026, 8, 9, 12),
+    };
+    const s2 = stitchWindows([b, a]);
+    expect(s2.buckets).toEqual([Date.UTC(2026, 8, 8), Date.UTC(2026, 8, 8) + HOUR, Date.UTC(2026, 8, 9)]);
+    expect(s2.series["g.ticks"]).toEqual([1, 2, 7]);
+    expect(s2.series["m.y.snaps"]).toEqual([null, null, 3]);
+    expect(s2.series["m.x.snaps"]).toEqual([2, 4, null]);
+    expect(s2.now).toBe(Date.UTC(2026, 8, 9, 12));
+  });
+  it("is empty-safe", () => {
+    expect(stitchWindows([]).buckets).toEqual([]);
   });
 });

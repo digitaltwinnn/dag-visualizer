@@ -57,12 +57,19 @@ async function fleetCounts(net: ReturnType<typeof netOf>): Promise<FleetCounts |
     let total = dagIps.length;
     // f.layer.* counts metagraph-layer roles only — per-layer validator attribution isn't
     // derivable from the geo map (it carries no role/layer field for validator IPs).
+    // f.layer.{id}.{role} is the same tally kept per network (2026-09-11 — the /trends
+    // per-network node panels draw the layer lines the hypergraph tab already has).
+    const perNetLayers: Record<string, Record<string, number>> = {};
     for (const m of metagraphs) {
       perNet[m.id] = m.nodes.length;
       total += m.nodes.length;
-      for (const n of m.nodes) for (const role of n.roles) layers[role] = (layers[role] || 0) + 1;
+      const mine: Record<string, number> = (perNetLayers[m.id] = {});
+      for (const n of m.nodes) for (const role of n.roles) {
+        layers[role] = (layers[role] || 0) + 1;
+        mine[role] = (mine[role] || 0) + 1;
+      }
     }
-    return total > 0 ? { total, perNet, layers, countries } : null;
+    return total > 0 ? { total, perNet, layers, perNetLayers, countries } : null;
   } catch {
     return null;
   }

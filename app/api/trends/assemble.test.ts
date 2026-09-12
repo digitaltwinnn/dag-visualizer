@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { assemble, WINDOWS } from "./assemble";
+import { assemble, assembleSpan, WINDOWS } from "./assemble";
 
 describe("assemble", () => {
   const now = Date.UTC(2026, 8, 6, 14, 12);
@@ -12,6 +12,10 @@ describe("assemble", () => {
     expect(WINDOWS["180d"].tier).toBe("1d");
     expect(WINDOWS["180d"].ms).toBe(180 * 86400000);
     expect(WINDOWS["1y"].tier).toBe("1d");
+    // "all" spans far past the store's own birth — the honest span is the consumer's leading
+    // trim, so the table only promises daily tier and room (≥ the global chain's 2022 genesis).
+    expect(WINDOWS["all"].tier).toBe("1d");
+    expect(WINDOWS["all"].ms).toBeGreaterThan(4 * 365 * 86400000);
   });
   it("null for uncovered buckets, 0 for covered-but-absent counters, null for absent gauges", () => {
     const p = assemble("mainnet", "24h", now, {
@@ -45,5 +49,23 @@ describe("assemble", () => {
     expect(p.stepMs).toBe(300000);
     expect(p.buckets.length).toBe(24 * 12 + 1);
     expect(p.buckets[p.buckets.length - 1]).toBe(Date.UTC(2026, 8, 6, 14, 10));
+  });
+});
+
+describe("assembleSpan (the tile body)", () => {
+  it("serves an arbitrary calendar unit with the same honesty contract", () => {
+    const day = Date.UTC(2026, 8, 8);
+    const p = assembleSpan("mainnet", "tile", "5m", day, day + 86400000, Date.UTC(2026, 8, 10), {
+      "t:mainnet:5m:2026-09-08": {
+        "10:00|g.ticks": "3", "10:00|g.anchors": "9",
+        "10:05|g.ticks": "0",
+      },
+    });
+    expect(p.buckets.length).toBe(288);
+    const i = p.buckets.indexOf(day + 10 * 3600000);
+    expect(p.series["g.anchors"][i]).toBe(9);
+    expect(p.series["g.anchors"][i + 1]).toBe(0); // covered, empty → honest zero
+    expect(p.series["g.anchors"][i + 2]).toBeNull(); // never sampled → null
+    expect(p.window).toBe("tile");
   });
 });

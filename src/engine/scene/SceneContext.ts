@@ -187,8 +187,23 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   // zoom. Depth reads through DoF (hyper focus), the facing dims, and the closeness uniform;
   // darkening is never a zoom side-effect.
 
+  // ⚠️ SIZE FROM THE CANVAS'S OWN BOX, NEVER THE WINDOW (2026-09-11 — user's tablet: "the
+  // globe is not as round as on my PC"). `.scene-canvas` sizes itself in vh units, and
+  // mobile browsers resolve vh against the LARGE viewport (URL bar collapsed) while
+  // window.innerHeight is the CURRENT one — with browser chrome visible the CSS box runs
+  // ~5% taller than a window-derived buffer, and that stretch renders every circle as an
+  // egg. The box is the one truth (globals.css: "CSS owns this box"), so the buffer, the
+  // camera aspect and every pass target measure IT; the window is only the pre-layout
+  // fallback (a 0-sized box must never seed a NaN aspect). clientWidth/Height are
+  // integers, which keeps the buffer integer-sized exactly as setSize(…, false) expects.
+  const boxOf = () => ({
+    w: canvas.clientWidth || window.innerWidth,
+    h: canvas.clientHeight || window.innerHeight,
+  });
+  const box0 = boxOf();
+
   const camera = new THREE.PerspectiveCamera(
-    55, window.innerWidth / window.innerHeight, 0.1, 2000
+    55, box0.w / box0.h, 0.1, 2000
   );
   camera.position.set(0, 14, 54);
 
@@ -207,7 +222,7 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   // canvas: invisible on the dark ground, a light hairline under the scene in light mode (user,
   // 2026-09-04 — "1 pixel more than the scene at the bottom"). The buffer stays integer-sized;
   // CSS stretches it by <1px, which no pick math notices (NDC is derived from the live rect).
-  renderer.setSize(window.innerWidth, window.innerHeight, false);
+  renderer.setSize(box0.w, box0.h, false);
   // Tone mapping — ACESFilmicToneMapping. (Applies via the OutputPass; an EffectComposer bypasses
   // the renderer's direct-to-screen output, so without OutputPass this would be a no-op.) Switched
   // from NeutralToneMapping (user, on-device): Khronos Neutral does a min-channel `color -= offset`
@@ -266,14 +281,14 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   // original call.
   const dofParams: BokehPassParameters & { width: number; height: number } = {
     focus: 54, aperture: 0.00028, maxblur: 0.01,
-    width: window.innerWidth, height: window.innerHeight,
+    width: box0.w, height: box0.h,
   };
   const dof = new BokehPass(scene, camera, dofParams) as DofPass;
   dof.enabled = false;
   composer.addPass(dof);
 
   const bloom = new UnrealBloomPass(
-    new THREE.Vector2(window.innerWidth, window.innerHeight),
+    new THREE.Vector2(box0.w, box0.h),
     0.30,  // strength — the dominant "overpowering" lever; well down from the r0.161 default. The
            // whole-scene glow, the geo node "dark halo" (a bloom mip/tonemap ring, not a radius
            // artifact — it survives radius cuts but vanishes with strength), and the fuzzy selected
@@ -308,8 +323,9 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
 
   function ensureSel() {
     if (sel) return;
-    const w = Math.max(1, Math.round(window.innerWidth * SEL_SCALE));
-    const h = Math.max(1, Math.round(window.innerHeight * SEL_SCALE));
+    const box = boxOf();
+    const w = Math.max(1, Math.round(box.w * SEL_SCALE));
+    const h = Math.max(1, Math.round(box.h * SEL_SCALE));
     const c = new EffectComposer(renderer);
     c.renderToScreen = false;
     const rp = new RenderPass(scene, camera);
@@ -373,15 +389,16 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
 
   // The caller (engine) owns the resize listener so it can be removed on dispose.
   function resize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
+    const box = boxOf();
+    camera.aspect = box.w / box.h;
     camera.updateProjectionMatrix();
     // updateStyle=false — same reason as construction: CSS owns the canvas box.
-    renderer.setSize(window.innerWidth, window.innerHeight, false);
-    composer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(box.w, box.h, false);
+    composer.setSize(box.w, box.h);
     if (sel) {
       sel.composer.setSize(
-        Math.max(1, Math.round(window.innerWidth * SEL_SCALE)),
-        Math.max(1, Math.round(window.innerHeight * SEL_SCALE)),
+        Math.max(1, Math.round(box.w * SEL_SCALE)),
+        Math.max(1, Math.round(box.h * SEL_SCALE)),
       );
       // setSize rebuilds the composer's targets, so the mix pass's captured texture is stale.
       sel.mix.uniforms.bloomTexture.value = sel.composer.renderTarget2.texture;

@@ -38,6 +38,7 @@ export default function LogSearchBar({
   tick,
   from,
   to,
+  miss,
   onSnapshot,
   onTick,
   onFrom,
@@ -57,6 +58,10 @@ export default function LogSearchBar({
   tick: string;
   from: string;
   to: string;
+  /** The last search's refusal or miss — answered HERE, beside the button that asked (user,
+   *  2026-09-09: the message used to sit by the pager, a screen away from the press, and the
+   *  search read as simply not working). */
+  miss?: string | null;
   onSnapshot: (v: string) => void;
   onTick: (v: string) => void;
   onFrom: (v: string) => void;
@@ -82,9 +87,12 @@ export default function LogSearchBar({
   // share theirs. Desktop keeps the one-line flow untouched.
   const label = "flex-none text-micro uppercase tracking-caps text-muted-foreground max-[700px]:w-24";
 
-  // What the one button would actually do — so it can refuse a press it has nothing to answer
-  // with, rather than accepting it and reporting a miss.
-  const canGo = (!!metaId && !!snapshot) || !!tick || !!from;
+  // What the one button would actually do. Any typed criterion ENABLES it — including a
+  // metagraph ordinal with no chain picked, which the handler answers with "pick which
+  // metagraph's chain…" (user, 2026-09-09: the old refusal was a silently-disabled button,
+  // which read as the search simply not working; a press that gets an ANSWER teaches, a
+  // grey button explains nothing).
+  const canGo = !!snapshot || !!tick || !!from;
 
   return (
     <div
@@ -182,9 +190,11 @@ export default function LogSearchBar({
           // RIGHT-ALIGNED ON THE FIELDS' OWN LINE (user, 2026-09-01: "why is search on the left,
           // can't it be on the right and same line as the input fields?"). `ml-auto` pushes it to
           // the far end of whatever line it lands on, so the criteria read left-to-right and the
-          // action sits where an action sits — and on a narrow pane, where the row wraps, it still
-          // ends its own line rather than floating mid-row.
-          "ml-auto inline-flex flex-none items-center gap-1 h-6 pointer-coarse:h-10 px-2.5 pointer-coarse:px-4 rounded-xs cursor-pointer",
+          // action sits where an action sits. On the PHONE tier, where the criteria are already
+          // full-width labelled rows, the button goes full-width too (2026-09-10) — a small
+          // control floating right on an empty line read as an afterthought, and the wide press
+          // is the touch form the rest of the bar already takes.
+          "ml-auto inline-flex flex-none items-center justify-center gap-1 h-6 pointer-coarse:h-10 px-2.5 pointer-coarse:px-4 rounded-xs cursor-pointer max-[700px]:w-full",
           "text-micro uppercase tracking-caps transition-colors",
           "border border-[var(--primary)]/40 bg-[var(--wash-soft)] text-[var(--primary)]",
           "hover:bg-[var(--wash-hover)] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
@@ -194,6 +204,14 @@ export default function LogSearchBar({
         {seeking && <Loader2 aria-hidden className="size-3 animate-spin motion-reduce:animate-none" />}
         search
       </button>
+
+      {/* The search's answer, IN the bar (user, 2026-09-09 — see the `miss` prop note): a
+          refusal or a miss lands on its own full-width line right under the fields, in the
+          advisory tone, instead of whispering by the pager a screen below. aria-live so the
+          answer is spoken when it changes, not just painted. */}
+      {miss && (
+        <p aria-live="polite" className="w-full basis-full text-micro text-[var(--warn-soft)]">{miss}</p>
+      )}
     </div>
   );
 }

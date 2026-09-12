@@ -3,7 +3,7 @@
 import { netUrl } from "@/src/net/current";
 import { reportPoll, touchPoll } from "@/src/data/api";
 import { POLL } from "@/src/engine/config";
-import { type TrendsWindowData } from "@/src/data/trendWindow";
+import { stitchWindows, tilesFor, type TrendsWindowData } from "@/src/data/trendWindow";
 import { useEffect, useState } from "react";
 
 // The trends store's window, client side (2026-09-08 — the vitals band's measured history;
@@ -61,7 +61,7 @@ function fresh(url: string): TrendsWindowData | null {
 
 /** The measured window plus the failure signal. A null `window` skips the fetch entirely —
  *  for consumers whose need is conditional, since a hook cannot be called conditionally. */
-export default function useTrendsWindow(window: "24h" | "7d" | "30d" | "90d" | "1y" | null): TrendsWindowState {
+export default function useTrendsWindow(window: "24h" | "7d" | "30d" | "90d" | "1y" | "all" | null): TrendsWindowState {
   const url = window ? netUrl(`/api/trends?window=${window}`) : null;
   const [state, setState] = useState<TrendsWindowState>(() => ({
     data: url ? (cache.get(url)?.data ?? null) : null,
@@ -100,4 +100,54 @@ export default function useTrendsWindow(window: "24h" | "7d" | "30d" | "90d" | "
     };
   }, [url]);
   return url ? state : { data: null, error: false };
+}
+
+/** The RANGE fetch — the map-tile side of the observation ladder's zoom (2026-09-10): the
+ *  few calendar-unit tiles a range touches, each through the same cache/inflight discipline
+ *  as the windows (a complete unit is immutable and CDN-cached for a year, so re-zooming
+ *  costs the browser cache at most), stitched into one window for the page to cut. */
+export function useTrendsRange(
+  req: { tier: "5m" | "1h"; fromMs: number; toMs: number } | null,
+): TrendsWindowState {
+  const key = req ? `${req.tier}:${tilesFor(req.tier, req.fromMs, req.toMs).join(",")}` : null;
+  const [state, setState] = useState<TrendsWindowState>({ data: null, error: false });
+  useEffect(() => {
+    if (!key) {
+      setState({ data: null, error: false });
+      return;
+    }
+    touchPoll("api-trends");
+    const [tier, units] = key.split(":");
+    const urls = units.split(",").map((u) => netUrl(`/api/trends/tile/${tier}/${u}`));
+    let dead = false;
+    const pull = () => {
+      void Promise.all(
+        urls.map((u) => {
+          const hit = fresh(u);
+          if (hit) return Promise.resolve<TrendsWindowData | null>(hit);
+          let p = inflight.get(u);
+          if (!p) {
+            p = load(u);
+            inflight.set(u, p);
+          }
+          return p;
+        }),
+      ).then((tiles) => {
+        if (dead) return;
+        if (tiles.every((t): t is TrendsWindowData => t != null)) {
+          setState({ data: stitchWindows(tiles), error: false });
+        } else {
+          // Stale beats blank, and the failure is a signal (the windows' own rule).
+          setState((prev) => ({ data: prev.data, error: true }));
+        }
+      });
+    };
+    pull();
+    const t = setInterval(pull, POLL.trendsMs);
+    return () => {
+      dead = true;
+      clearInterval(t);
+    };
+  }, [key]);
+  return key ? state : { data: null, error: false };
 }

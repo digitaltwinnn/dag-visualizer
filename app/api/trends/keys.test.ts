@@ -16,9 +16,12 @@ describe("trends keys", () => {
     expect(cursorKeyOf("mainnet")).toBe("t:mainnet:cursor");
     expect(lockKeyOf("mainnet")).toBe("t:mainnet:lock");
   });
-  it("pins the retention contract", () => {
-    expect(TTL_S["5m"]).toBe(259200);
-    expect(TTL_S["1h"]).toBe(10368000);
+  // EVERY tier keeps forever since 2026-09-10: the range zoom sharpens to the finest grain
+  // that exists, and a null TTL also means applyWrites never re-arms an expiry on a
+  // PERSISTed key (the one-time sweep that lifted the finite era's pending expiries).
+  it("pins the retention contract — every tier keeps forever", () => {
+    expect(TTL_S["5m"]).toBeNull();
+    expect(TTL_S["1h"]).toBeNull();
     expect(TTL_S["1d"]).toBeNull();
   });
   it("enumerates window slots inclusively and in order, crossing key boundaries", () => {

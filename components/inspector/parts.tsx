@@ -3,16 +3,11 @@
 import { Fragment, useRef, useState, type ReactNode } from "react";
 import { Check, Copy, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BAR_EASE } from "@/components/RollSwap";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { NodeInfo } from "@/src/data/types";
-import {
-  nodeStatus,
-  statusBreakdown,
-  labelBreakdown,
-  BUCKET_COLOR,
-  type StatusBucket,
-} from "@/src/data/nodeStatus";
+import { nodeStatus, statusItems } from "@/src/data/nodeStatus";
 import { compositionRows } from "@/src/data/composition";
 
 // Shared building blocks for the inspector cards (the React port of ui.js _cardBody),
@@ -259,33 +254,17 @@ export function StatusMark({ state }: { state?: string | null }) {
 }
 
 // Rolled-up status for a node group (dossier): the non-zero buckets as one small TABLE, the
-// composition table's own row grammar (see the placement note inside). The amber "progress" AND
-// red "down" buckets are spelled out by their exact lifecycle state(s) — the same wording the
-// single node's own card shows (`StatusMark`; the dossier said "down" while the node card said
-// "leaving", user 2026-07-12) — instead of collapsing to the bucket word; the bucket colour
-// (BUCKET_COLOR) rides the CHIPS only, never the word or the count. It went pills → stacked inline
+// composition table's own row grammar (see the placement note inside). Row derivation lives in
+// `statusItems` (src/data/nodeStatus.ts), shared with the vitals band's Node status cell; the
+// bucket colour rides the BAR only, never the word or the count. It went pills → stacked inline
 // counts → rows over three passes; the pill form has no consumer left, so it is gone rather than
 // kept as a dead branch.
-const BUCKET_WORD: Record<StatusBucket, string> = {
-  ready: "ready",
-  progress: "in progress",
-  down: "down",
-  unknown: "unknown",
-};
 /** Row-leading capital for a lifecycle word — the labels beside it in the make-up table are
  *  proper nouns of a sort ("Hybrid", "Data"), so a bare lowercase state broke the column. */
-const cap = (w: string): string => w.charAt(0).toUpperCase() + w.slice(1);
+export const cap = (w: string): string => w.charAt(0).toUpperCase() + w.slice(1);
 
 export function StatusBreakdown({ states }: { states: (string | null | undefined)[] }) {
-  const b = statusBreakdown(states);
-  const order: StatusBucket[] = ["ready", "progress", "down", "unknown"];
-  const items = order
-    .filter((k) => b[k] > 0)
-    .flatMap((k) =>
-      k === "progress" || k === "down"
-        ? labelBreakdown(states, k).map((it) => ({ ...it, color: BUCKET_COLOR[k] }))
-        : [{ label: BUCKET_WORD[k], count: b[k], color: BUCKET_COLOR[k] }],
-    );
+  const items = statusItems(states);
   // The COMPOSITION table's grammar, applied to the second partition (user, 2026-08-18). It was
   // an inline run of coloured counts hanging under the Online-nodes total, which wrapped the
   // moment a fleet was mixed — exactly when it has something to say. The card already asks this
@@ -300,13 +279,14 @@ export function StatusBreakdown({ states }: { states: (string | null | undefined
     <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-[7px]">
       {items.map((it) => (
         <Fragment key={it.label}>
-          {/* The bucket colour rides the CHIPS alone (user, 2026-08-18) — the word takes the
-              default ink, like the composition labels above it, and the count column stays
-              neutral in both tables. One colour per row, on the one element that is nothing but
-              colour; a hued label as well made the state table read as an alert list beside its
-              plain twin. Capitalized to match those labels, since a bucket word opens a row. */}
+          {/* The bucket colour rides the BAR alone (user, 2026-08-18, chips then; bars since
+              2026-09-10) — the word takes the default ink, like the composition labels above
+              it, and the count column stays neutral in both tables. One colour per row, on the
+              one element that is nothing but colour; a hued label as well made the state table
+              read as an alert list beside its plain twin. Capitalized to match those labels,
+              since a bucket word opens a row. */}
           <span className="text-body text-foreground">{cap(it.label)}</span>
-          <ChipStack count={it.count} color={it.color} />
+          <BarCell count={it.count} max={Math.max(...items.map((x) => x.count))} hue={it.color} />
           <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{it.count}</span>
         </Fragment>
       ))}
@@ -314,27 +294,24 @@ export function StatusBreakdown({ states }: { states: (string | null | undefined
   );
 }
 
-// The miniature node cloud — ONE renderer for both partition tables (extracted 2026-08-18 when
-// the status breakdown became rows). Identity-hued discs that OVERLAP like stacked avatars, each
-// ringed in the panel colour so the overlap reads. Visual scale only, capped ≤10 with no +N — the
-// authoritative number is the count column beside it. Plain overlapping dots (no image/fallback
-// content), so a bare utility span reproduces the look more directly than fighting Avatar's
-// chrome. `color` is the ONLY difference between the two tables: the filter's identity hue for a
-// make-up row, the status bucket's for a state row.
-export function ChipStack({ count, color }: { count: number; color?: string }) {
-  const hue = color ?? "var(--filter-accent, var(--foreground-dim))";
+// The miniature bar — the vitals band's micro-bar recipe (one weight, fill only, eased —
+// see MicroBars) as a dossier table cell (user, 2026-09-10: "remove the node chips and use
+// the horizontal bars we already have in many places" — the overlapping-disc ChipStack
+// retired). The track is FIXED and sits right-aligned against the count column, so its left
+// edge is constant per table and every bar grows from one origin; widths are on the table's
+// own max, the caller's business, like MicroBars' row max. A zero draws nothing (rule 10);
+// real counts keep a small visible floor.
+export function BarCell({ count, max, hue }: { count: number; max: number; hue?: string }) {
   return (
-    <span className="inline-flex justify-end items-center pl-1" aria-hidden>
-      {Array.from({ length: Math.min(count, 10) }).map((_, j) => (
-        <span
-          key={j}
-          className="w-[9px] h-[9px] rounded-full -ml-1"
-          style={{
-            background: `color-mix(in oklch, ${hue} 60%, transparent)`,
-            boxShadow: "0 0 0 1.5px var(--panel)",
-          }}
-        />
-      ))}
+    <span aria-hidden className="flex items-center justify-self-end w-14 h-[5px]">
+      <span
+        className={cn("h-[5px] rounded-full", BAR_EASE)}
+        style={{
+          background: hue ?? "var(--filter-accent, var(--foreground-dim))",
+          opacity: 0.75,
+          width: count > 0 ? `${Math.max(4, (count / Math.max(1, max)) * 100)}%` : 0,
+        }}
+      />
     </span>
   );
 }
@@ -358,13 +335,20 @@ export function LayerWho({ who }: { who: string }) {
   );
 }
 
-export function RoleChips({ codes }: { codes: string[] }) {
+export function RoleChips({ codes, compact }: { codes: string[]; compact?: boolean }) {
   return (
     <span className="inline-flex items-center gap-1">
       {codes.map((c) => (
         <span
           key={c}
-          className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-[2px] text-micro leading-none text-muted-foreground"
+          // `compact` — the vitals band's fixed-height rows (user, 2026-09-09: three full-height
+          // pills consumed the card's whole 48px column and the rows read as one fused block;
+          // 2px less pill is what buys justify-evenly its air). Same pill, same vocabulary —
+          // only the vertical padding narrows; every roomier surface keeps the full form.
+          className={cn(
+            "inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] text-micro leading-none text-muted-foreground",
+            compact ? "py-px" : "py-[2px]",
+          )}
         >
           {c}
         </span>
@@ -373,22 +357,26 @@ export function RoleChips({ codes }: { codes: string[] }) {
   );
 }
 
-// One composition row per make-up: role (bright) + code pills + a capped chip stack
-// (visual scale only, ≤10, no +N) + the authoritative count. (A per-row status line lived
+// One composition row per make-up: role (bright) + code pills + a micro bar (visual
+// scale on the table's max) + the authoritative count. (A per-row status line lived
 // here briefly — reverted: it read too busy; the dossier shows ONE aggregate StatusBreakdown
 // in its STATUS segment instead.)
 export function CompositionRows({ nodes }: { nodes: NodeInfo[] }) {
   const rows = compositionRows(nodes);
   // ONE grid for the whole table (not per-row grids): the label column sizes to the WIDEST
-  // label, so the code-pill column starts at one consistent x on every row (user, 2026-07-12
-  // — per-row grids let each label push its own pills around).
+  // label so labels share an edge, and the code pills RIGHT-ALIGN into their own column
+  // (user, 2026-09-10: "same right align" as the archival tags — a tag column keyed to
+  // label length ragged the rows; before that, 2026-07-12, per-row grids let each label
+  // push its own pills around).
   return (
-    <div className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-x-2 gap-y-[7px] mt-2">
+    <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-x-2 gap-y-[7px] mt-2">
       {rows.map((r, i) => (
         <Fragment key={i}>
           <span className="text-body text-foreground">{r.label}</span>
-          <RoleChips codes={r.codes} />
-          <ChipStack count={r.count} />
+          <span className="justify-self-end">
+            <RoleChips codes={r.codes} />
+          </span>
+          <BarCell count={r.count} max={Math.max(...rows.map((x) => x.count))} />
           <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{r.count}</span>
         </Fragment>
       ))}

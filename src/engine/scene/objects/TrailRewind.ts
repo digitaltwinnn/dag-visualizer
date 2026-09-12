@@ -41,10 +41,19 @@ export class TrailRewind {
     return this._off;
   }
 
-  /** Is the trail at rest (the glide arrived)? The callout's quiet gate reads this — a label
+  /** Is the trail at rest (the glide arrived)? A label
    *  must not point at a row still sliding to its slot. */
   get settled(): boolean {
     return Math.abs(this._target - this._off) < 0.01;
+  }
+
+  /** Within the label's own tolerance of rest (user, 2026-09-11: a fresh pin's callout "takes
+   *  a while" — the damped glide covers its distance early and then creeps toward `settled`'s
+   *  0.01 for over a second of dead tail). At ~14% of a slot the row reads as home and the
+   *  label — whose anchor is recorded live every frame — rides the last creep invisibly, while
+   *  a genuine multi-slot glide (the 2026-09-04 complaint this gate answers) stays gated. */
+  get nearlySettled(): boolean {
+    return Math.abs(this._target - this._off) < 0.5;
   }
 
   /** The COMMITTED (clicked) or FOLLOWED snapshot — the only thing the rewind tracks. */

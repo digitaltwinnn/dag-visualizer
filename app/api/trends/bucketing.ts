@@ -6,10 +6,12 @@ import { TIERS, slotOf, fieldOf, type Tier } from "./keys";
 import { mergeVals } from "./merge";
 
 export interface GlobalRec { ordinal: number; timestamp: string; metagraphSnapshotCount?: number; blocks?: unknown[] }
-export interface MetaRec { ordinal: number; timestamp: string; fee?: number; sizeInKB?: number }
+export interface MetaRec { ordinal: number; timestamp: string; fee?: number; sizeInKB?: number; blocks?: unknown[] }
 export interface FleetCounts {
   total: number;
   perNet: Record<string, number>;
+  /** Per-network per-layer role tallies — f.layer.{id}.{role} (2026-09-11). */
+  perNetLayers?: Record<string, Record<string, number>>;
   layers: Record<string, number>;
   countries: Record<string, number>;
 }
@@ -44,12 +46,25 @@ export function bucketGlobals(inc: IncMap, net: string, recs: GlobalRec[], prevT
     }
     prev = t;
   }
-  // COVERAGE (rule 10): every 5m bucket the batch spans gets a g.ticks field even when no
-  // tick landed in it, so the read side can tell "measured, empty" from "not measured".
-  if (recs.length >= 2) {
-    const from = Date.parse(recs[0].timestamp);
+  // COVERAGE (rule 10): every bucket the batch spans — IN EVERY TIER — gets a g.ticks field
+  // even when no tick landed in it, so the read side can tell "measured, empty" from "not
+  // measured". The hourly/daily tiers were exempt until 2026-09-10 on the silent assumption
+  // that every hour holds ticks; the Sep 8 chain stall (consecutive ordinals 4h07m apart,
+  // 10:40→14:47 UTC) broke it, and the 7D/30D windows painted a MEASURED chain silence in
+  // the not-sampled gray instead of the stall amber. Stepping by the bucket width from an
+  // arbitrary offset covers consecutive buckets and cannot skip one (the ledger's fuzz note,
+  // same day); the final partial bucket is marked by its own record.
+  //   And the fill starts at the CROSS-RUN BOUNDARY (prevTickTsMs, the previous run's newest
+  // tick) when it is known: a batch-only span leaves a stall that crosses a run boundary
+  // marked by NEITHER run — caught live twice the same day (Sep 10's 13.5-min stall at
+  // 10:22→10:35 straddled two cron runs and read gray; the lone unhealed Sep-9 10:55 bucket
+  // was the same blind spot, its evidence erased by repair before the mechanism was found).
+  const fillFrom = prevTickTsMs ?? (recs.length >= 2 ? Date.parse(recs[0].timestamp) : null);
+  if (fillFrom != null && recs.length >= 1) {
     const to = Date.parse(recs[recs.length - 1].timestamp);
-    for (let t = from; t <= to; t += 300000) addInc(inc, net, t, "g.ticks", 0, ["5m"]);
+    for (let t = fillFrom; t <= to; t += 300000) addInc(inc, net, t, "g.ticks", 0, ["5m"]);
+    for (let t = fillFrom; t <= to; t += 3600000) addInc(inc, net, t, "g.ticks", 0, ["1h"]);
+    for (let t = fillFrom; t <= to; t += 86400000) addInc(inc, net, t, "g.ticks", 0, ["1d"]);
   }
 }
 
@@ -66,6 +81,9 @@ export function bucketMetas(inc: IncMap, net: string, id: string, recs: MetaRec[
     addInc(inc, net, t, `m.${id}.snaps`, 1);
     addInc(inc, net, t, `m.${id}.fee`, r.fee || 0);
     addInc(inc, net, t, `m.${id}.kb`, r.sizeInKB || 0);
+    // Each network's own sealed blocks (2026-09-11 — transfers of its token and a data
+    // network's application records ride in blocks; the raw cron records carry the array).
+    addInc(inc, net, t, `m.${id}.blocks`, Array.isArray(r.blocks) ? r.blocks.length : 0);
     addInc(inc, net, t, "g.feeFloor", r.fee || 0);
     addInc(inc, net, t, "g.kbFloor", r.sizeInKB || 0);
     if (prev !== undefined) {
@@ -86,5 +104,7 @@ export function bucketFleet(inc: IncMap, net: string, tsMs: number, fleet: Fleet
   addInc(inc, net, tsMs, "f.nodes", fleet.total, tiers);
   for (const [id, n] of Object.entries(fleet.perNet)) addInc(inc, net, tsMs, `f.nodes.${id}`, n, tiers);
   for (const [layer, n] of Object.entries(fleet.layers)) addInc(inc, net, tsMs, `f.layer.${layer}`, n, tiers);
+  for (const [id, roles] of Object.entries(fleet.perNetLayers ?? {}))
+    for (const [layer, n] of Object.entries(roles)) addInc(inc, net, tsMs, `f.layer.${id}.${layer}`, n, tiers);
   for (const [cc, n] of Object.entries(fleet.countries)) addInc(inc, net, tsMs, `f.cc.${cc}`, n, ["1d"]);
 }

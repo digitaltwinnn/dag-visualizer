@@ -146,6 +146,11 @@ interface AppState {
   // never a Mode — a document is over the network, not a view of it. While set, the HUD's
   // scene furniture stands down (DocGate) and RouteSync publishes the doc page's own path.
   docPage: "about" | "design" | "trends" | null;
+  // ONE-SHOT HANDOFF down the observation ladder (convention 12, 2026-09-09): a /trends chart
+  // range handed to the anchor log's search. The trends page writes it as it closes; the log
+  // consumes it on sight (prefills the date criteria, seeks when it can) and clears it — a
+  // navigation bridge, not a selection (the network commit itself rides the pickActions table).
+  logSeek: { metaId: string | null; fromMs: number; toMs: number } | null;
   // The doc overlay's STAGE-READY signal, written by the Engine (the one clock that knows the
   // choreography's real boundary — frame-driven, so ?slowmo and low FPS stretch it correctly,
   // where a wall-clock wait in the HUD desynced). DEFAULT TRUE so a document never waits on a
@@ -188,7 +193,7 @@ interface AppState {
   // The vitals band's measured-window pick (2026-09-08 — the ledger band's trends rim): which
   // reach of the trends store the windowed cells chart. Session-only UI state like `section`;
   // both presentations of the cells read it, the rim (desktop band's top edge) writes it.
-  vitalsWindow: "24h" | "30d" | "1y";
+  vitalsWindow: "1h" | "24h" | "7d" | "30d" | "1y" | "all";
   // TRUE while the user is DIRECTLY manipulating the scene (OrbitControls' `start`→`end`, which
   // fire on real pointer/touch/wheel input only — Engine tweens and programmatic camera moves
   // never set this). The rails dim while it holds, so direct manipulation pushes the HUD back
@@ -236,6 +241,13 @@ interface AppState {
   // via setRailCollapse returns a slot to auto. UI state, not selection (the selection boundary
   // rule doesn't apply); session-only, like phoneDock.
   railCollapse: Record<string, boolean>;
+  // HOW the current rail state was reached (user, 2026-09-11 — "solve it structurally", ending
+  // the timer-based roll suppression): true when the latest navigation was a QUIET gesture —
+  // the plank's ladder steps and any manual expand/collapse (the About card's never-roll-on-a-
+  // manual-expand rule) — so a card mounting from it, however late its data arrives, skips the
+  // title roll-in. The one executor resets it to false on every ordinary commit; CardHead
+  // freezes the answer per mount. UI state, not selection.
+  navQuiet: boolean;
   // THE CAMERA FRAMES THE BOXED RUNG (user, 2026-08-09: "when we click the card, can we also
   // update the view camera position, we do the same when we click a row in the explorer"). The
   // rail's open plank and the camera name the same subject, so opening a rung asks the Engine to
@@ -257,6 +269,7 @@ interface AppState {
   setActivity: (activity: Activity | null) => void;
   setMode: (mode: Mode) => void;
   setDocPage: (docPage: "about" | "design" | "trends" | null) => void;
+  setLogSeek: (logSeek: { metaId: string | null; fromMs: number; toMs: number } | null) => void;
   setDocStageReady: (ready: boolean) => void;
   setDocClosing: (closing: boolean) => void;
   setFilter: (filter: string) => void;
@@ -292,7 +305,7 @@ interface AppState {
   setPhoneDock: (dock: "explore" | "details" | "vitals" | null) => void;
   setSection: (section: "scene" | "data") => void;
   setRailsHidden: (hidden: boolean) => void;
-  setVitalsWindow: (w: "24h" | "30d" | "1y") => void;
+  setVitalsWindow: (w: "1h" | "24h" | "7d" | "30d" | "1y" | "all") => void;
   setSceneDragging: (dragging: boolean) => void;
   setCameraFlying: (flying: boolean) => void;
   setPhoneSheetPx: (px: number | null) => void;
@@ -300,6 +313,7 @@ interface AppState {
   setSceneCover: (side: "left" | "right", px: number) => void;
   setBoxedCard: (id: string | null) => void;
   setRailCollapse: (id: string, collapsed: boolean | null) => void;
+  setNavQuiet: (navQuiet: boolean) => void;
   setRailCollapseMany: (entries: Record<string, boolean | null>) => void;
   /** Ask the Engine to frame this ladder rung (see `focusRung`). One-shot; the Engine reads it
    *  on change and never clears it — the value IS the last request, not a pending queue. */
@@ -329,6 +343,7 @@ export const useStore = create<AppState>((set) => ({
   activity: null,
   mode: "hyper",
   docPage: null,
+  logSeek: null,
   docStageReady: true,
   docClosing: false,
   filter: "all",
@@ -362,6 +377,7 @@ export const useStore = create<AppState>((set) => ({
   sceneDragging: false,
   cameraFlying: false,
   railCollapse: {},
+  navQuiet: false,
   focusRung: null,
   phoneSheetPx: null,
   sceneCoverL: 0,
@@ -382,7 +398,9 @@ export const useStore = create<AppState>((set) => ({
   // be, and the two publish to one address bar (RouteSync derives the path from doc ?? mode).
   // Closing (either route) arms `docClosing` — the doc's exit animation is its OUT phase, and
   // the engine waits on it before entering the destination view.
-  setMode: (mode) => set((s) => ({ mode, docPage: null, docClosing: s.docPage != null || s.docClosing })),
+  // A view switch is a LOUD navigation (the no-pop rule rolls view-scoped content on arrival),
+  // so it clears any standing quiet mark from a rail gesture.
+  setMode: (mode) => set((s) => ({ mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing })),
   // Opening a doc also SURFACES THE SCENE POSE: the overlay sits at z-8, under the raw layer's
   // z-9 — a doc opened from the RAW pose rendered beneath the still-interactive table, with the
   // RAW toggle that could exit it hidden by the doc's own control gating (review find,
@@ -395,6 +413,7 @@ export const useStore = create<AppState>((set) => ({
     })),
   setDocStageReady: (docStageReady) => set({ docStageReady }),
   setDocClosing: (docClosing) => set({ docClosing }),
+  setLogSeek: (logSeek) => set({ logSeek }),
   // Committing a network IS a user gesture (user, 2026-08-14 — changing the filter or paging
   // the dossier left the snapshot card as the box): it bumps the recency stack like every
   // other selection, so the facts rail focuses the metagraph card. "all" clears the entry.
@@ -408,6 +427,12 @@ export const useStore = create<AppState>((set) => ({
   advanceSnap: (snap) =>
     set((s) => ({
       snap,
+      // A NEW tick arriving is an ARRIVAL, never part of a quiet gesture — it lifts the
+      // navQuiet provenance so the loud default governs the next title freeze (review find,
+      // 2026-09-11: this path bypasses applyClickActions, the flag's usual reset, so a stale
+      // quiet from a manual expand suppressed every later live-advance roll). Same-ordinal
+      // re-points leave the flag alone — a poll is not an arrival.
+      navQuiet: snap && s.snap?.data.ordinal !== snap.data.ordinal ? false : s.navQuiet,
       selStack: !snap
         ? s.selStack.filter((x) => x !== "snap")
         : s.selStack.includes("snap")
@@ -418,6 +443,11 @@ export const useStore = create<AppState>((set) => ({
   advanceMetaSnap: (metaSnap) =>
     set((s) => ({
       metaSnap,
+      // Same arrival rule as advanceSnap above — identity is metaId+ordinal (sameMetaSnap's).
+      navQuiet:
+        metaSnap && !(s.metaSnap && s.metaSnap.metaId === metaSnap.metaId && s.metaSnap.ordinal === metaSnap.ordinal)
+          ? false
+          : s.navQuiet,
       selStack: !metaSnap
         ? s.selStack.filter((x) => x !== "metaSnap")
         : s.selStack.includes("metaSnap")
@@ -492,6 +522,7 @@ export const useStore = create<AppState>((set) => ({
   setVitalsWindow: (vitalsWindow) => set({ vitalsWindow }),
   setSceneDragging: (sceneDragging) => set({ sceneDragging }),
   setCameraFlying: (cameraFlying) => set({ cameraFlying }),
+  setNavQuiet: (navQuiet) => set({ navQuiet }),
   setRailCollapse: (id, collapsed) =>
     set((s) => {
       const railCollapse = { ...s.railCollapse };

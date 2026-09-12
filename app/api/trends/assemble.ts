@@ -6,7 +6,7 @@
 import { fieldOf, slotsInWindow, stepMsOf, type Tier } from "./keys";
 import { opOf } from "./merge";
 
-export type WindowId = "24h" | "7d" | "30d" | "90d" | "180d" | "1y";
+export type WindowId = "24h" | "7d" | "30d" | "90d" | "180d" | "1y" | "all";
 export const WINDOWS: Record<WindowId, { tier: Tier; ms: number }> = {
   "24h": { tier: "5m", ms: 86400000 },
   "7d": { tier: "1h", ms: 604800000 },
@@ -17,12 +17,20 @@ export const WINDOWS: Record<WindowId, { tier: Tier; ms: number }> = {
   "90d": { tier: "1d", ms: 7776000000 },
   "180d": { tier: "1d", ms: 15552000000 },
   "1y": { tier: "1d", ms: 31536000000 },
+  // "all" = everything the store can hold (user, 2026-09-09 — the backfill reaches past a
+  // year, and both zoom rims want an everything view). Six years of daily slots: covers the
+  // global chain's own 2022 genesis with room to grow, and the cost of the unmeasured years
+  // is a run of nulls that gzips to almost nothing (missing year hashes read back empty) —
+  // consumers leading-trim to where measuring began, so the honest span is derived, not
+  // asserted here.
+  all: { tier: "1d", ms: 189216000000 },
 };
 
 export interface TrendsPayload {
   v: 1;
   net: string;
-  window: WindowId;
+  /** "tile" for the map-tile route's unit payloads (2026-09-10). */
+  window: WindowId | "tile";
   tier: Tier;
   stepMs: number;
   /** Server clock at assembly — the only honest "now" a CDN-cached payload can be trimmed
@@ -38,7 +46,21 @@ export function assemble(
   hashes: Record<string, Record<string, string>>,
 ): TrendsPayload {
   const { tier, ms } = WINDOWS[window];
-  const slots = slotsInWindow(net, tier, nowMs - ms, nowMs);
+  return assembleSpan(net, window, tier, nowMs - ms, nowMs, nowMs, hashes);
+}
+
+/** The window body over an ARBITRARY [startMs, endMs) span — assemble() delegates here, and
+ *  the tile route (2026-09-10, the range zoom's map-tile reads) calls it with a calendar
+ *  unit's own bounds. Same honesty contract: uncovered bucket → null everywhere, covered +
+ *  absent counter → 0, covered + absent gauge → null. */
+export function assembleSpan(
+  net: string, window: WindowId | "tile", tier: Tier, startMs: number, endMs: number, nowMs: number,
+  hashes: Record<string, Record<string, string>>,
+): TrendsPayload {
+  // slotsInWindow is END-INCLUSIVE (the rolling windows want their newest bucket); a SPAN is
+  // half-open [start, end) so adjacent tiles can never share a boundary bucket — stitching
+  // duplicates it otherwise.
+  const slots = slotsInWindow(net, tier, startMs, endMs - 1);
 
   // Collect every series name present in any hash of this window.
   const names = new Set<string>();

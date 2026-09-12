@@ -394,27 +394,35 @@ export default function Inspector() {
   // open — single-open accordion semantics across the present ladder rungs, written as overrides
   // in one store update. Collapsing the open box just closes it (no box open is a legal rest).
   const presentLadderIds = ladderIds.filter(presentOf);
+  // EXPAND-ONLY since the box lost its minimize (review find, 2026-09-11): every reachable
+  // caller — an entry's stretched toggle, the plank's ∧/∨ targeting collapsed neighbours —
+  // arrives with effCollapsed(id) true, so this always OPENS `id` (single-open collapses the
+  // rest); there is no gesture left that collapses a box into nothing. Kept under its
+  // historical name because cx/onToggle is the wiring vocabulary CardHead shares.
   const toggleCollapse = (id: string) => {
-    const next = !effCollapsed(id);
-    if (!next && ladderIds.includes(id)) {
+    // A manual expand is a QUIET navigation (the About card's never-roll-on-a-manual-
+    // expand rule, structural since 2026-09-11): heads remounting from this gesture — the
+    // plank's ∧/∨ and an entry's own click alike — skip the title roll. The provenance lives
+    // in the store so a late-mounting card still knows it; the next ordinary commit resets it
+    // through the one executor.
+    useStore.getState().setNavQuiet(true);
+    if (ladderIds.includes(id)) {
       setRailCollapseMany({
         ...Object.fromEntries(presentLadderIds.filter((x) => x !== id).map((x) => [x, true])),
         [id]: false,
       });
     } else {
-      setRailCollapse(id, next);
+      setRailCollapse(id, false);
     }
     // THE CAMERA FRAMES THE BOXED RUNG (user, 2026-08-09: "when we click the card, can we also
-    // update the view camera position, we do the same when we click a row in the explorer"). Only
-    // on OPEN, and only for a real rung — closing a box leaves no subject to frame, and the
-    // snapshot slots aren't rungs (no pose of their own). The Engine re-walks its own ladder from
-    // this rung, so the card lands the pose its explorer row would have, without re-applying the
-    // row's actions — those are TOGGLES, and feeding a committed rung back through one would
-    // DESELECT it. Nothing is committed or released here, so the finest selection stands.
-    if (!next) {
-      const level = ladderLevelOfSlot(id);
-      if (level) requestFocusRung(level);
-    }
+    // update the view camera position, we do the same when we click a row in the explorer").
+    // Only for a real rung — the snapshot slots aren't rungs (no pose of their own). The
+    // Engine re-walks its own ladder from this rung, so the card lands the pose its explorer
+    // row would have, without re-applying the row's actions — those are TOGGLES, and feeding a
+    // committed rung back through one would DESELECT it. Nothing is committed or released
+    // here, so the finest selection stands.
+    const level = ladderLevelOfSlot(id);
+    if (level) requestFocusRung(level);
   };
   const cx = (id: string) => ({ collapsed: effCollapsed(id), onToggle: () => toggleCollapse(id) });
 
@@ -592,7 +600,14 @@ export default function Inspector() {
         // (`railLadderBoundary.test.ts` asserts rung → slot, never the reverse). RailPager renders
         // children untouched when the rung has no sibling set.
         const focused = id === focusId;
-        const wrapped = boxed ? <RailPager slot={card.kind}>{body}</RailPager> : body;
+        // The plank's ladder pair steps the PILE: the boxed rung's committed neighbours in
+        // display order, opened through the accordion's own toggleCollapse (single-open makes
+        // the target the box). With no finer committed rung, RailPager's ∨ falls through to
+        // childStep and commits the first child (user, 2026-09-11).
+        const pi = presentLadderIds.indexOf(id);
+        const upSlot = pi > 0 ? presentLadderIds[pi - 1] : null;
+        const downSlot = pi >= 0 && pi < presentLadderIds.length - 1 ? presentLadderIds[pi + 1] : null;
+        const wrapped = boxed ? <RailPager slot={card.kind} upSlot={upSlot} downSlot={downSlot} onOpenSlot={toggleCollapse}>{body}</RailPager> : body;
         return (
           // The distance-dim rides a VAR, not wrapper opacity (2026-08-08): the entry itself
           // applies `opacity-[var(--entry-dim,1)]` and RELEASES it on hover (the materialize
