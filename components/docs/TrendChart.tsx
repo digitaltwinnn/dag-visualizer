@@ -43,6 +43,7 @@ export default function TrendChart({
   gaps,
   onRange,
   inspect,
+  inspectCommits,
   readout,
   className,
 }: {
@@ -76,6 +77,13 @@ export default function TrendChart({
   /** One step down the ladder: "open these buckets as records". Rendered as a small action in
    *  the head — the page passes it only while a range is active and the chart knows its chain. */
   inspect?: () => void;
+  /** The network this chart's `inspect` COMMITS, in words (user, 2026-09-12 — "when I click
+   *  'snapshot records' it sets filter to DOR?"): the raw layer's record search pages one
+   *  chain at a time, so a per-network chart's door commits its own network on the way
+   *  through. That is a visible change — the scene's dim, the dossier and the camera all
+   *  answer it — so the control says so rather than letting the destination explain it. The
+   *  global charts pass nothing: their door commits only what is already committed. */
+  inspectCommits?: string;
   /** Overrides the head readout for COUNTER charts at day-denominated zooms (user,
    *  2026-09-09: "latest full hour" atop a 7-day view answered too fine a question) — the
    *  page hands the DAILY tier's own newest complete day, so no client re-summing invents a
@@ -253,7 +261,11 @@ export default function TrendChart({
           <button
             type="button"
             onClick={inspect}
-            title="Open this range in the Snapshots view's raw data search"
+            title={
+              inspectCommits
+                ? `Open the snapshot records for ${inspectCommits} in this range — also selects it as the network`
+                : "Open this range in the Snapshots view's raw data search"
+            }
             // Reads as a LINK, not a label (user, 2026-09-09): primary ink + a trailing
             // arrow mark + hover underline — the app's "this goes somewhere" signals. Text
             // FIRST so the flex baseline is the text's (a leading icon was what knocked the

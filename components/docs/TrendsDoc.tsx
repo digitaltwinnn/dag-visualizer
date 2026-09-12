@@ -223,7 +223,7 @@ export default function TrendsDoc() {
       .map(({ m, points }) => {
         const net = displayNetwork(m.id);
         const line: TrendLine = { label: suffix, points, hue: net?.hue };
-        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} name={net?.name ?? m.id!} unit={unit} readout={dayReadout(`m.${m.id}.${suffix}`, k)} buckets={cBuckets} stepMs={stepMs} format={fmt} lines={[line]} />;
+        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={unit} readout={dayReadout(`m.${m.id}.${suffix}`, k)} buckets={cBuckets} stepMs={stepMs} format={fmt} lines={[line]} />;
       });
   /** Per-network GAUGE panels (fleet): untrimmed — a point sample is complete the moment it
    *  is taken — and null where never sampled (gauges are not zero-filled). */
@@ -253,7 +253,7 @@ export default function TrendsDoc() {
           { label: "nodes", points, hue: net?.hue },
           ...present.map((r) => ({ label: SHORT[r]!, points: S(pF, `f.layer.${m.id}.${r}`), hue: net?.hue, dash: DASH[r] || true })),
         ];
-        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} name={net?.name ?? m.id!} unit={unit} buckets={fBuckets} stepMs={fStep} lines={lines} />;
+        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={unit} buckets={fBuckets} stepMs={fStep} lines={lines} />;
       });
   };
   /** Per-network CONTINUITY panels: real measured gap stats (m.{id}.gapSum/gapMax — live
@@ -279,7 +279,7 @@ export default function TrendsDoc() {
         // `sampled` = the chain's own snaps series: amber only where the SAMPLER missed;
         // a null point over a sampled bucket (a quiet stretch — nothing to space) just
         // breaks the line (user, 2026-09-09: DOR's quiet buckets wore outage amber).
-        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} name={net?.name ?? m.id!} unit="seconds" buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, `m.${m.id}.snaps`))} gaps={trim(gmax)} lines={[line]} />;
+        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit="seconds" buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, `m.${m.id}.snaps`))} gaps={trim(gmax)} lines={[line]} />;
       });
   const secs = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}s`;
   const mb = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 1 })} MB`;
