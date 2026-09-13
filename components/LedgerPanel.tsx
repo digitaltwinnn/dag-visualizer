@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import ExplorerShell from "@/components/ExplorerShell";
 import { SelectedRowMark, selectedRow, selectionHue } from "@/components/selection";
@@ -21,7 +21,9 @@ import { DepthCaption, DisclosureChevron, Disclosure, DisclosurePanel, Disclosur
 import { CONTENT_EASE } from "@/components/RollSwap";
 import { NoSignalDot } from "@/components/state/StateAtoms";
 import { buildAnchorLog, type AnchorLogRow, type ChannelLogRow } from "@/src/data/anchorLog";
-import { SLOT_N } from "@/src/engine/domain/ledgerModel";
+import { POLL } from "@/src/engine/config";
+import TablePager from "@/components/datasection/TablePager";
+import { ensurePage } from "@/components/RawSnapshotBridge";
 import { fmtDag } from "@/src/util/format";
 
 // The Snapshots view's left-rail tool — ONE AXIS: TIME (user, 2026-08-09). A single uniform tree
@@ -47,9 +49,14 @@ import { fmtDag } from "@/src/util/format";
 // row above them. Don't grow the second axis back as a tree.
 //
 // Everything selectable routes through the tested pickActions builders + the ONE executor, so an
-// explorer row and a 3D click can never drift. The browse window is the chamber's own visible
-// trail (SLOT_N ticks — the same buffer LiveStrip plots), so "what the list shows" is exactly
-// "what the 3D scene shows".
+// explorer row and a 3D click can never drift. The browse window is the LIVE BUFFER, paged —
+// see the window note at `useSnapshotFeed` below for why it is no longer the 3D trail.
+
+/** How many ticks a page of the explorer shows. Fifteen because the card is a peephole, not the
+ *  chain: enough rows that the list reads as a run of history rather than as the last handful
+ *  (user, 2026-09-13: "can you do 10-20 by default"), few enough that opening one still leaves
+ *  its breakdown on screen in a rail-width card. */
+const TICK_PAGE = 15;
 
 /** A COMMITTED FILTER IS A LENS, and inside a tick the lens decides what is drillable: with a
  *  network committed, every OTHER network's group is preview-only (user, 2026-08-10). The tick still
@@ -367,9 +374,23 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const selNode = inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode") ? inspect : null;
   const selIp = selNode?.node?.ip ?? null;
   const selLayer = selNode ? (selNode.kind === "metanode" ? selNode.node?.layer ?? null : selNode.kind) : null;
-  // The visible window: the same live buffer LiveStrip reads, capped to the chamber's own
-  // visible-slot count so "visible ticks" matches the 3D trail.
-  const { snaps } = useSnapshotFeed(SLOT_N);
+  // ⚠️ THE LIST IS NO LONGER THE TRAIL. It used to ask for SLOT_N ticks so "what the list
+  // shows" was exactly "what the 3D scene shows" — a real symmetry, and the wrong trade at nine
+  // rows (user, 2026-09-13: "it shows only few snapshots while actually the number is almost
+  // unlimited; can you do 10-20 by default and add simple <> to move back/forward in the
+  // chain?"). Nine rows made the explorer look like the whole chain rather than a peephole onto
+  // it. It now reads the WHOLE live buffer and pages through it.
+  //
+  // The buffer is the reach, deliberately: `POLL.maxSnapshots` ticks is what the app already
+  // holds, so paging costs no fetch, no loading state and no error state — and the raw layer is
+  // where a walk to genesis belongs (user, same round: "raw will be there for more advanced
+  // search etc"). Convention 12's ladder, unchanged: live scene → this peephole → the records.
+  //
+  // What the decoupling costs: hovering a row older than the trail previews nothing in the
+  // scene, because the scene holds no tile for it. That is an honest no-op — the pairing
+  // channel is a global tick ordinal and the scene simply has no such subject — not a broken
+  // pair to go fixing.
+  const { snaps } = useSnapshotFeed(POLL.maxSnapshots);
   const net = getNetwork();
   const visibleTs = new Set(snaps.map((s) => s.timestamp));
   // Every anchored metagraph snapshot in the window, newest first (rebuilt per event-driven
@@ -390,10 +411,29 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // The ONE story rule (src/data/ledgerStory.ts) — the same membership the strip/scene read.
   const tickFilterCount = (d: GlobalSnapshot): number =>
     storyCount(filter, getAnchor(d.timestamp), snapshotExact[d.ordinal]) ?? 0;
+  const [tickPage, setTickPage] = useState(1);
   const orderedSnaps = [...snaps]
     .reverse() // newest first, the log convention
     .filter((d) => !filterNet || tickFilterCount(d) > 0);
   const activeSnapOrd = snap?.data.ordinal ?? null;
+  // ⚠️ PAGE 1 IS THE LIVE PAGE, and it is the only one that moves under the reader — the buffer
+  // is a rolling window, so a deeper page drifts as ticks age out of it. That is the same
+  // contract the raw layer's pager states, arrived at from the other end (it freezes `latest`
+  // off page 1; here the window itself is what slides), so the words are the same: the live tip
+  // is the mutable page.
+  const pages = Math.max(1, Math.ceil(orderedSnaps.length / TICK_PAGE));
+  const page = Math.min(tickPage, pages); // a shrinking filter must not strand the reader
+  const pagedSnaps = orderedSnaps.slice((page - 1) * TICK_PAGE, page * TICK_PAGE);
+  // ⚠️ A PAGE IN VIEW IS A PAGE IN FOCUS. Exact reads (the fee each row states) are fetched for
+  // the live tick, the selected one and the backfill behind them — about one page's worth — so
+  // paging back used to show a column of honest dashes. The bridge's charter is "the snapshots
+  // currently in focus", and the page the reader is looking at is exactly that; `ensurePage`
+  // walks it at the backfill's own pace, deduped against everything already held or in flight.
+  const pagedKey = pagedSnaps.map((d) => d.ordinal).join(",");
+  useEffect(() => {
+    const ords = pagedKey ? pagedKey.split(",").map(Number) : [];
+    return ensurePage(ords);
+  }, [pagedKey]);
 
   // Disclosure state: single-open at each of the two disclosing depths, plain local UI state.
   // The tick rows are the card's own first level now, so there is no group to open first (user,
@@ -548,7 +588,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         >
           {orderedSnaps.length === 0
             ? empty
-            : orderedSnaps.map((d) => {
+            : pagedSnaps.map((d) => {
                 const tickGroups = groupByMeta(rows.filter((r) => r.global.ordinal === d.ordinal));
                 // The tick's uncataloged anchors: the exact read's authoritative COUNT, and the
                 // per-channel entries that same read yields (identical source, so the entry list
@@ -871,6 +911,31 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
                 );
               })}
         </div>
+        {/* The raw layer's OWN pager strip (datasection/TablePager) — one pager in the app, and
+            it already renders nothing for a single page, so a quiet filtered list stays a plain
+            list. Page arithmetic lives with the caller, which is its stated contract. */}
+        {live && orderedSnaps.length > 0 && (
+          <TablePager
+            page={page}
+            pages={pages}
+            from={(page - 1) * TICK_PAGE + 1}
+            to={Math.min(page * TICK_PAGE, orderedSnaps.length)}
+            total={orderedSnaps.length}
+            compact
+            scope={{
+              word: "held",
+              title: `The snapshots this page is holding live — the newest ${POLL.maxSnapshots} global ticks. Open the raw data layer to search the chain back to genesis.`,
+            }}
+            onPage={(p) => {
+              setTickPage(p);
+              // A page turn is a new set of rows; a disclosure left open on the page you just
+              // left would reopen against a different tick's ordinal.
+              setOpenTick(null);
+              setOpenContrib(null);
+              setOpenSigners(null);
+            }}
+          />
+        )}
       </div>
     </ExplorerShell>
   );

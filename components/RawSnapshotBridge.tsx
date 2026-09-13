@@ -81,6 +81,25 @@ function scheduleRetry(ordinal: number) {
   retryTimers.add(t);
 }
 
+/** PACE A RUN OF ORDINALS INTO the same one-per-ordinal `ensure`, for a surface that has just
+ *  put a WHOLE PAGE of ticks in focus (2026-09-13 — the Snapshots explorer's pager). The
+ *  bridge's charter is "the snapshots currently in focus", and a page the reader is looking at
+ *  is exactly that; without this, paging back showed a column of honest dashes, because only
+ *  the live tick, the selected one and BACKFILL_N behind them are ever read.
+ *
+ *  It reuses the backfill's own pacing and dedupe rather than adding a second fetch policy:
+ *  `ensure` early-outs on anything already held or in flight, each ordinal is immutable and
+ *  cached for a day, and misses take the same bounded retry the backfill queue takes. The
+ *  returned canceller stops the run when the reader pages away mid-walk. */
+export function ensurePage(ordinals: number[]): () => void {
+  let i = 0;
+  const t = setInterval(() => {
+    if (i >= ordinals.length) { clearInterval(t); return; }
+    ensure(ordinals[i++], true);
+  }, BACKFILL_GAP_MS);
+  return () => clearInterval(t);
+}
+
 function ensure(ordinal: number | null | undefined, retry = false) {
   if (ordinal == null) return;
   const st = useStore.getState();
