@@ -122,7 +122,20 @@ export default function HeightEase({
       }
       const from = first ? 0 : last.current;
       last.current = h;
-      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        // ⚠️ REDUCED MOTION STILL GETS THE POINTER-INERT WINDOW. The flash it prevents is not
+        // motion — it is Chromium handing a freshly-mounted element a LATCHED `:hover` from a
+        // cursor that never moved — so it happens whether or not we animated, and the pager's
+        // own `stillLane()` opens its window under reduce for the same reason. The window here
+        // is simply as long as the re-lay, which under reduce is one frame: mark, let the new
+        // pile lay out and paint, then release. No timer, and nothing moves.
+        if (arriving.current) {
+          arriving.current = false;
+          o.dataset.arriving = "";
+          requestAnimationFrame(() => requestAnimationFrame(() => { delete o.dataset.arriving; }));
+        }
+        return;
+      }
       // ⚠️ PIN TO THE OLD HEIGHT *HERE*, IN THE OBSERVER, NOT IN THE CONFIRMATION FRAME
       // (user, 2026-09-13: "it briefly expands/snaps to its full height already before
       // starting the smooth grow towards its height"). An RO callback runs after layout and
