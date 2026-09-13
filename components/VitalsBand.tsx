@@ -18,10 +18,8 @@ import { isGlobalActivityScope, type Activity } from "@/src/data/api";
 import { POLL } from "@/src/engine/config";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import useTrendsWindow from "@/components/useTrendsWindow";
-import { sliceWindow, leadingTrim, monthlySum, trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow";
-import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
+import { sliceWindow, trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow";
 import { DOC_ICONS } from "@/components/icons";
-import { SELECTED_ROW } from "@/components/selection";
 import { useSceneYield } from "@/components/RailShade";
 import { ageWords } from "@/src/util/relativeAge";
 import { cn } from "@/lib/utils";
@@ -814,57 +812,32 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
   // payload the DAILY tier (7d/30d slices = exact per-day sums). No client re-bucketing —
   // a client sum over part-null buckets would have to invent a floor rule the store already
   // solved.
-  const zoom = useStore((s) => s.vitalsWindow);
-  // Each window fetches only while picked (review: the unconditional 7d fetch kept
-  // re-downloading the largest payload to discard it whenever the rim sat on 30D/1Y).
-  // 1H rides the 24h payload — the store's finest tier (5m), sliced to the newest hour.
-  const t24 = useTrendsWindow(zoom === "1h" ? "24h" : null);
-  const t7 = useTrendsWindow(zoom === "24h" ? "7d" : null);
-  // 7D and 30D both ride the 90d DAILY payload (one fetch, the store's own sums — the
-  // no-client-rebucketing rule): the rim's 7D is seven daily bars, each NAMED by its weekday
-  // in the chart (user, 2026-09-11, two rounds: first "only 7 bars", then the hourly 168 was
-  // too many and a 6-hour re-bucket would need bucketing machinery the store already solved —
-  // "does 7 make more sense; in that case say the weekdays"). The hour-by-hour 7D lives on
-  // /trends, the observation ladder's next rung down.
-  const t90 = useTrendsWindow(zoom === "30d" || zoom === "7d" ? "90d" : null);
-  const t1y = useTrendsWindow(zoom === "1y" ? "1y" : null);
-  const tAll = useTrendsWindow(zoom === "all" ? "all" : null);
-  const windowed = useMemo<TrendsWindowData | null>(() => {
-    // trimNewestPartial FIRST (the payload's own clock drops the still-filling bucket —
-    // the CDN finding), then the window cut; 1y/all add the leading trim so the span the
-    // aside claims below is derived from the DATA, never asserted.
-    if (zoom === "1h") return t24.data ? sliceWindow(trimNewestPartial(t24.data), 3_600_000) : null;
-    if (zoom === "24h") return t7.data ? sliceWindow(trimNewestPartial(t7.data), 24 * 3_600_000) : null;
-    if (zoom === "7d") return t90.data ? sliceWindow(trimNewestPartial(t90.data), 7 * 86_400_000) : null;
-    if (zoom === "30d") return t90.data ? sliceWindow(trimNewestPartial(t90.data), 30 * 86_400_000) : null;
-    if (zoom === "1y") return t1y.data ? leadingTrim(trimNewestPartial(t1y.data)) : null;
-    return tAll.data ? leadingTrim(trimNewestPartial(tAll.data)) : null;
-  }, [zoom, t24.data, t7.data, t90.data, t1y.data, tAll.data]);
+  // ⚠️ ONE WINDOW, NOT A PICK (user, 2026-09-13). The band carried a six-segment range rim
+  // (1H…ALL) that only the ledger's cells could honour, which is why the Trends LINK beside it
+  // could only appear there too — and the link is the useful half in every view. So the range
+  // control is gone and the band states ONE window; the ranges themselves live one rung down,
+  // on /trends, where the charts are built to be ranged (convention 12: the band is the live
+  // instrument, /trends the measured history). 24H is the band's window because it is the one
+  // reach that reads as "the network right now" beside live numerals.
+  //
+  // It rides the 7d payload — the store's HOURLY tier, whose newest-24h slice is exact per-hour
+  // sums. No client re-bucketing: a client sum over part-null buckets would have to invent a
+  // floor rule the store already solved.
+  const t7 = useTrendsWindow("7d");
+  const windowed = useMemo<TrendsWindowData | null>(
+    // trimNewestPartial FIRST (the payload's own clock drops the still-filling bucket — the
+    // CDN finding), then the window cut.
+    () => (t7.data ? sliceWindow(trimNewestPartial(t7.data), 24 * 3_600_000) : null),
+    [t7.data],
+  );
   // NO outage fallback to the live buffers — considered after the review and declined
   // (user, 2026-09-09: "keep the code simple, no complex fallback logic"). A store outage
   // leaves the measured cards on their acquiring state while the hook retries; the pulse
   // strip's api-trends row is where the outage itself is stated.
-  // The BARS at 1Y/ALL are calendar months, the still-forming current month trimmed (the
-  // /trends counters' partial-edge rule); the lines stay daily — a 20-point mean over the
-  // trimmed span. Elsewhere bars and lines share the windowed buckets exactly.
-  // barData feeds the stacked chart AND the roster that legends it (review: ranking the
-  // roster over the untrimmed daily window while the chart drew trimmed months broke the
-  // card pair's own same-window rule for the first weeks of every month).
-  const monthlyZoom = zoom === "1y" || zoom === "all";
-  const barData = useMemo(
-    () => (windowed ? (monthlyZoom ? monthlySum(windowed) : windowed) : null),
-    [monthlyZoom, windowed],
-  );
-  const span =
-    zoom === "1h" ? "last hour"
-    : zoom === "24h" ? "last 24 hours"
-    : zoom === "7d" ? "last 7 days"
-    : zoom === "30d" ? "last 30 days"
-    : windowed?.buckets.length
-      // Month + full year (the range row's own 2026-09-09 ruling): post-backfill the deep
-      // windows open in a PREVIOUS year, and a bare month claims the wrong one.
-      ? `since ${new Date(windowed.buckets[0]).toLocaleString("en", { month: "short", timeZone: "UTC" })} ${new Date(windowed.buckets[0]).getUTCFullYear()}`
-      : zoom === "all" ? "all measured history" : "past year";
+  // The bars and the lines share the windowed buckets exactly — one window, one payload, so
+  // the chart and the roster that legends it can never rank over different reaches.
+  const barData = windowed;
+  const span = "last 24 hours";
   const stepWord =
     windowed?.stepMs === 300_000 ? "in five-minute buckets"
     : windowed?.stepMs === 3_600_000 ? "hour by hour"
@@ -932,29 +905,13 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
     };
   };
   const rate = (label: string, spark: SparkSpec, note?: string) => {
-    // THE 1Y LINE CARRIES ITS ENDPOINTS (user, 2026-09-09, closing the month-axis round: "for
-    // a year I can't see if it's the last 12 months or until current year"): at 1Y the window's
-    // edges are the ambiguity — months repeat across the year boundary — so the line gets a
-    // start/end range row WITH years, while the wide chart's per-bar ticks carry the months
-    // between. Shorter windows stay axis-free (position-in-window still reads as "when", and
-    // the rim states the range). Rim-windowed cards only — the live-fallback line states its
-    // own window in words already.
-    // The year written OUT ("sep 2026", not "sep '26" — user, 2026-09-09: the apostrophe form
-    // read as a day-of-month; and month+day was considered and declined, because a trailing
-    // year starts and ends on almost the same date, which would read as a two-day window).
-    const monthYear = (ts: number): string =>
-      `${new Date(ts).toLocaleString("en", { month: "short", timeZone: "UTC" }).toLowerCase()} ${new Date(ts).getUTCFullYear()}`;
-    const rangeRow =
-      !spark.offRim && (zoom === "1y" || zoom === "all") && windowed && windowed.buckets.length > 1 ? (
-        <span aria-hidden className="flex justify-between leading-none text-micro text-muted-foreground/70">
-          <span>{monthYear(windowed.buckets[0])}</span>
-          <span>{monthYear(windowed.buckets[windowed.buckets.length - 1])}</span>
-        </span>
-      ) : null;
+    // NO ENDPOINT AXIS. It existed for the 1Y/ALL windows, where months repeat across the year
+    // boundary and position-in-window stopped reading as "when" (user, 2026-09-09). Over a
+    // single 24-hour window position IS when, and the card's own words state the reach — the
+    // deep windows that needed the axis are /trends' business now.
     const line = (
-      <span className={cn("flex-1 min-w-0 self-center", rangeRow && "flex flex-col justify-center gap-0.5")}>
-        <Sparkline data={spark.data} color={accent} height={rangeRow ? 32 : 42} maxPoints={20} stretch />
-        {rangeRow}
+      <span className="flex-1 min-w-0 self-center">
+        <Sparkline data={spark.data} color={accent} height={42} maxPoints={20} stretch />
       </span>
     );
     // A STOPPED CHAIN REPORTS WHEN, NOT HOW FAST — and now also SHOWS it (user, 2026-09-08:
@@ -1165,59 +1122,27 @@ function ViewCells({ mode, accent, filter }: { mode: string; accent: string; fil
   );
 }
 
-/** The TRENDS RIM — the band's one interactive strip (user, 2026-09-08: "some sort of separate
- *  control bar that sets the range + links to the separate trends page"). A small tab riding
- *  the band's TOP edge in the file-cabinet vocabulary the Trends page itself uses: the window
- *  pills set `store.vitalsWindow` (which every windowed ledger cell reads), the divider, then
- *  the route to the page where the elaborate versions live. It is a fixed SIBLING of the band,
- *  not a child — the band's clip-path would amputate anything protruding past its border box,
- *  and the band's `pointer-events-none` charter stays intact: the cards below remain
- *  read-only, and this strip is the one deliberate exception, OUTSIDE the plate.
- *  Gated per view by `viewPolicy.vitalsWindows` (convention 7): only the ledger's cells read
- *  the store, and a picker over live-fleet cells would be a control wired to nothing. */
-const WINDOW_CHOICES = [["1h", "1H"], ["24h", "24H"], ["7d", "7D"], ["30d", "30D"], ["1y", "1Y"], ["all", "All"]] as const;
+/** The TRENDS LINK — the band's one interactive element (user, 2026-09-08: "some sort of
+ *  separate control bar that sets the range + links to the separate trends page"; the range
+ *  half retired 2026-09-13). A small tab riding the band's TOP edge in the file-cabinet
+ *  vocabulary the Trends page itself uses: the route to the page where the elaborate,
+ *  RANGEABLE versions live. It is a fixed SIBLING of the band, not a child — the band's
+ *  clip-path would amputate anything protruding past its border box, and the band's
+ *  `pointer-events-none` charter stays intact: the cards below remain read-only, and this tab
+ *  is the one deliberate exception, OUTSIDE the plate.
+ *
+ *  ⚠️ UNGATED, IN EVERY VIEW THAT CARRIES THE BAND (user, 2026-09-13). It used to ride
+ *  `viewPolicy.vitalsWindows` — right for a range PICKER, whose windowed cells only the ledger
+ *  reads, and wrong for the link: /trends is the measured history of the whole network, so the
+ *  step down the observation ladder (convention 12) is offered from wherever the band is. It
+ *  therefore needs no policy row of its own; the band's own `vitalsLane` gate is its gate. */
 const TrendsMark = DOC_ICONS.trends;
 
-/** The rim's segments, shared by both presentations (2026-09-08): the desktop band's floating
- *  pill and the phone Vitals sheet's control row render ONE group, so a window added or a
- *  route renamed reaches both in the same edit — the ViewCells rule, applied to the control.
- *  `grow` is the phone form: equal thumb-width segments across the sheet's column. */
-function WindowSegments({ grow = false }: { grow?: boolean }) {
-  const zoom = useStore((s) => s.vitalsWindow);
-  const setZoom = useStore((s) => s.setVitalsWindow);
-  return (
-    <>
-      {WINDOW_CHOICES.map(([id, label]) => (
-        <button
-          key={id}
-          type="button"
-          aria-pressed={zoom === id}
-          onClick={() => setZoom(id)}
-          className={cn(
-            // rounded-full per segment INSIDE the padded pill (user, 2026-09-08: the flush
-            // clipped segments left the container's cyan hairline with "missing parts on the
-            // rounded corners" — SELECTED_ROW's square inset ring was being cut against the
-            // curve; a segment that carries its own curve keeps its ring whole).
-            "px-2 flex items-center rounded-full text-micro tracking-[0.1em] uppercase leading-none",
-            grow && "flex-1 justify-center",
-            // The pressed segment wears SELECTED_ROW — the app's ONE committed-selection
-            // language (wash + inset ring), which is what a picked window IS. That is also
-            // what says CONTROL, not card (user, 2026-09-08: stacked in the phone sheet the
-            // pill read as one more card): cards are spineless and never wash; a segment
-            // carrying the selection wash can only be an instrument you set.
-            zoom === id ? cn("font-bold", SELECTED_ROW) : "text-muted-foreground hover:text-foreground hover:bg-wash-hover",
-          )}
-        >
-          {label}
-        </button>
-      ))}
-    </>
-  );
-}
-
-/** The Trends route as a LINK, outside the range group (user, 2026-09-08: "should not be part
- *  of the button-group, it should show as a link") — the site row's own link register: primary
- *  ink, normal case, the page's mark. A destination is a link; only the range is a control. */
+/** The Trends route as a LINK (user, 2026-09-08: "should not be part of the button-group, it
+ *  should show as a link") — the site row's own link register: primary ink, normal case, the
+ *  page's mark. Shared by both presentations (2026-09-08): the desktop band's floating tab and
+ *  the phone Vitals sheet's row render ONE component, so a route renamed reaches both in the
+ *  same edit — the ViewCells rule, applied to the control. */
 function TrendsLink({ className }: { className?: string }) {
   const setDocPage = useStore((s) => s.setDocPage);
   return (
@@ -1225,10 +1150,6 @@ function TrendsLink({ className }: { className?: string }) {
       type="button"
       onClick={() => setDocPage("trends")}
       title="The measured history behind these vitals — open the Trends page."
-      // RIDES THE SAME PILL as the range group but stays a LINK (user, 2026-09-08, second
-      // round: "keep it on the same rounded pill still but just with some transparency while
-      // the button-group stays as-is"): transparent ground, primary ink, normal case — the
-      // colour split is the separation, no divider.
       className={cn("inline-flex items-center gap-1.5 rounded-full px-2 text-label text-primary/75 hover:text-primary whitespace-nowrap bg-transparent", className)}
     >
       <TrendsMark aria-hidden className="size-3.5" />
@@ -1242,23 +1163,16 @@ function TrendsRim({ yielding }: { yielding: boolean }) {
     <div
       style={{ right: "var(--bar-margin)", bottom: "calc(var(--footer-h, 0px) + var(--vitals-h) + 6px)" }}
       className={cn(
-        // ONE PILL for range + route (user, 2026-09-08, after a fully-split round): the range
-        // group keeps its control segments, the Trends LINK rides the same pill on a
-        // transparent ground — the ink split is the separation. Padded rather than clipped
-        // (p-0.5, no overflow-hidden): flush segments under the old clip cut SELECTED_ROW's
-        // square ring against the curve, which read as "missing parts" of the cyan hairline.
-        // That hairline is PRIMARY-TINTED, not the cards' neutral: cyan is the app's one
-        // affordance signal, so a cyan-edged pill among neutral-edged plates reads as the
-        // thing you touch.
-        "fixed z-10 flex items-stretch h-[26px] p-0.5 gap-0.5 rounded-full border border-primary/25",
+        // The pill survived the range group's retirement (user, 2026-09-13) — it is what makes
+        // the link read as a thing you touch rather than a caption over the plate. Its hairline
+        // is PRIMARY-TINTED, not the cards' neutral: cyan is the app's one affordance signal,
+        // so a cyan-edged pill among neutral-edged plates reads as the affordance.
+        "fixed z-10 flex items-stretch h-[26px] p-0.5 rounded-full border border-primary/25",
         "[background:var(--topbar-glass)] backdrop-blur-sm",
         "transition-opacity duration-300 motion-reduce:!transition-none",
         yielding && "opacity-40",
       )}
-      role="group"
-      aria-label="Vitals history window"
     >
-      <WindowSegments />
       <TrendsLink />
     </div>
   );
@@ -1292,7 +1206,7 @@ export default function VitalsBand() {
   const coverR = useStore((s) => s.sceneCoverR);
   return (
     <>
-      {VIEW_POLICIES[mode].vitalsWindows && <TrendsRim yielding={yielding} />}
+      <TrendsRim yielding={yielding} />
       <section
       id="vitalsband"
       aria-label="View vitals"
@@ -1396,19 +1310,12 @@ export function VitalsSheetBody() {
       )}
     >
       {!live && <span className="self-center flex-none mb-2"><NoSignalDot /></span>}
-      {/* The rim, in the sheet's own register (2026-09-08): an in-flow full-width pill of
-          equal thumb-height segments above the cards — the sheet is interactive (unlike the
-          band), so it simply sits in the column. Same policy gate as the desktop pill. */}
-      {VIEW_POLICIES[mode].vitalsWindows && (
-        <div
-          role="group"
-          aria-label="Vitals history window"
-          className="flex items-stretch h-10 p-0.5 gap-0.5 mb-2 flex-none rounded-full border border-primary/25 [background:var(--topbar-glass)]"
-        >
-          <WindowSegments grow />
-          <TrendsLink className="flex-1 justify-center" />
-        </div>
-      )}
+      {/* The link, in the sheet's own register (2026-09-08): an in-flow full-width pill at
+          thumb height above the cards — the sheet is interactive (unlike the band), so it
+          simply sits in the column. Ungated like the desktop tab (2026-09-13). */}
+      <div className="flex items-stretch h-10 p-0.5 mb-2 flex-none rounded-full border border-primary/25 [background:var(--topbar-glass)]">
+        <TrendsLink className="flex-1 justify-center" />
+      </div>
       {/* The no-pop swap — the cell-targeting `[&>*]` rules ride the wrapper for the same
           retargeting reason the band's do (see the desktop section above). */}
       <RollSwap
