@@ -243,33 +243,54 @@
 .rail-entry.sig-left::before {
   content: "";
   position: absolute;
-  left: 0;
-  top: 5px;
-  bottom: 5px;
-  width: 2px;
-  border-radius: 2px;
   opacity: 0;
   transition: opacity 0.16s ease;
   pointer-events: none;
 }
 
 /* THE ONE edge-line recipe (user refinement): EVERY hover-edge signal — the neutral whisper AND
-   the hued pairing line, both rails, any variant — renders the SAME soft gradient-faded tips
-   (transparent→line→transparent, the travelling-pulse tip treatment; no hard ends anywhere on
-   the edge). The line's colour rides `--edge-hue` (neutral `--thread-line` at rest/whisper; the
-   pairing rules below swap the hue in WHILE paired — swapping a var, not the background, keeps
-   the opacity-only invariant: a pairing leave still falls back to the neutral instantly and only
-   the opacity fades, no colour transition). The ig-panel ::before base rule lives in
-   `@layer components`, so this unlayered recipe beats it. */
+   the hued pairing line, both rails, any variant — renders the SAME soft tips (no hard ends
+   anywhere on the edge). The line's colour rides `--edge-hue` (neutral `--thread-line` at
+   rest/whisper; the pairing rules below swap the hue in WHILE paired — swapping a var, not the
+   paint, keeps the opacity-only invariant: a pairing leave still falls back to the neutral
+   instantly and only the opacity fades, no colour transition). The ig-panel ::before base rule
+   lives in `@layer components`, so this unlayered recipe beats it.
+
+   ⚠️ THE TIPS RUN OFF INTO THE CORNERS — it is `.edge-spine`'s device, adopted here (user,
+   2026-09-13: "when collapsed the edge fades away too quick because of the limited height; can
+   you also smooth it around the corner a bit to have more space for it to fade?"). That is the
+   SAME complaint the callout's spine answered on 2026-08-15, one signal over, and its note
+   already anticipated this adoption.
+
+   The old recipe was a 2px bar inset 10px (5px on an entry) from each end, tipped by a
+   PERCENTAGE gradient — and a percentage is what broke on a short card: 14% of a 440px box is
+   62px of fade, 14% of a 49px collapsed entry is 7px, so the same rule read as a soft line on
+   one tier and a hard stub on the other. Now the pseudo spans the card (`inset: 0`), carries
+   the ink on ONE side of an otherwise transparent border — a border follows the box's rounded
+   corners, so the ink bends into the top and bottom arcs — and a FIXED-LENGTH mask spends the
+   fade over 22px whatever the height. A tall card confines the fade to its corners; a collapsed
+   one fades across most of its edge, which is the extra room the complaint asked for.
+
+   22px is `--edge-runoff`, shared with `.edge-spine` so the app has ONE fade length. */
 .sig-left::before, .sig-right::after {
-  background: linear-gradient(to bottom,
-    transparent 0,
-    var(--edge-hue, var(--thread-line)) 14%,
-    var(--edge-hue, var(--thread-line)) 86%,
-    transparent 100%);
+  inset: 0;
+  width: auto;
+  height: auto;
+  background: none;
+  border: 2px solid transparent;
+  border-radius: inherit;
+  -webkit-mask: linear-gradient(180deg, transparent, #000 var(--edge-runoff), #000 calc(100% - var(--edge-runoff)), transparent);
+  mask: linear-gradient(180deg, transparent, #000 var(--edge-runoff), #000 calc(100% - var(--edge-runoff)), transparent);
 }
-.sig-left:hover::before  { opacity: 1; box-shadow: none; }
-.sig-right:hover::after  { opacity: 1; box-shadow: none; }
+.sig-left::before  { border-left-color: var(--edge-hue, var(--thread-line)); }
+.sig-right::after  { border-right-color: var(--edge-hue, var(--thread-line)); }
+/* ⚠️ THE GLOW IS A `drop-shadow`, NOT A `box-shadow`, now that the pseudo is a full-box border
+   ring: a box-shadow would be cast by the whole rounded box and light all four edges, where the
+   signal is one edge. `drop-shadow` follows the rendered ALPHA — the single coloured border side
+   — so the glow stays on the edge, and the mask trims it with the ink it belongs to. The
+   outward 2px offset and its per-rail sign are unchanged (see the pairing note below). */
+.sig-left:hover::before  { opacity: 1; filter: none; }
+.sig-right:hover::after  { opacity: 1; filter: none; }
 
 /* Hover PAIRING — the only non-pulse edge signal, shown strictly WHILE HOVERED (the class comes
    and goes with the hover; the 0.16s transition on the base elements eases it in/out).
@@ -287,7 +308,7 @@
 .sig-left.subject-paired::before {
   opacity: 1;
   --edge-hue: var(--row-hue, var(--filter-accent, var(--primary)));
-  box-shadow: -2px 0 7px 0 var(--row-hue, var(--filter-accent, var(--primary)));
+  filter: drop-shadow(-2px 0 7px var(--row-hue, var(--filter-accent, var(--primary))));
 }
 
 /* LEFT-rail cards (`.sig-right`) — the mirror: pairing lights an ::after on the card's RIGHT
@@ -295,13 +316,13 @@
    forward-compatible mirror + /design demo. Geometry only here — the soft-tipped background
    comes from the shared edge-line recipe above (neutral at rest; see the opacity-only warning). */
 .sig-right::after {
-  content: ""; position: absolute; right: 0; top: 10px; bottom: 10px; width: 2px;
-  border-radius: 2px; opacity: 0; transition: opacity 0.16s ease; pointer-events: none;
+  content: ""; position: absolute;
+  opacity: 0; transition: opacity 0.16s ease; pointer-events: none;
 }
 .sig-right.subject-paired::after {
   opacity: 1;
   --edge-hue: var(--row-hue, var(--spine, var(--primary)));
-  box-shadow: 2px 0 7px 0 var(--row-hue, var(--spine, var(--primary)));
+  filter: drop-shadow(2px 0 7px var(--row-hue, var(--spine, var(--primary))));
 }
 
 /* The identity EDGE SPINE with corner run-off (user, 2026-08-15 — "the fade drops too quickly
@@ -366,8 +387,8 @@
 #callout[data-flip] .edge-spine {
   border-left-color: transparent;
   border-right-color: var(--spine, var(--primary));
-  -webkit-mask: linear-gradient(180deg, transparent, #000 22px, #000 calc(100% - 22px), transparent);
-  mask: linear-gradient(180deg, transparent, #000 22px, #000 calc(100% - 22px), transparent);
+  -webkit-mask: linear-gradient(180deg, transparent, #000 var(--edge-runoff), #000 calc(100% - var(--edge-runoff)), transparent);
+  mask: linear-gradient(180deg, transparent, #000 var(--edge-runoff), #000 calc(100% - var(--edge-runoff)), transparent);
 }
 
 .edge-spine {
@@ -377,8 +398,8 @@
   border: 1.5px solid transparent;
   border-left-color: var(--spine, var(--primary));
   pointer-events: none;
-  -webkit-mask: linear-gradient(180deg, transparent, #000 22px, #000 calc(100% - 22px), transparent);
-  mask: linear-gradient(180deg, transparent, #000 22px, #000 calc(100% - 22px), transparent);
+  -webkit-mask: linear-gradient(180deg, transparent, #000 var(--edge-runoff), #000 calc(100% - var(--edge-runoff)), transparent);
+  mask: linear-gradient(180deg, transparent, #000 var(--edge-runoff), #000 calc(100% - var(--edge-runoff)), transparent);
 }
 
 /* Sheets (tablet/phone RailDock): the sheet's own `.ig-sheet-edge` spine is the single identity
@@ -389,7 +410,7 @@
    order wins. */
 .sheet-cards .ig-panel::before,
 .sheet-cards .rail-entry::before,
-.sheet-cards .sig-right::after { opacity: 0; box-shadow: none; }
+.sheet-cards .sig-right::after { opacity: 0; filter: none; }
 
 /* ── The facts-rail SLAB (`.rail-ladder`, card-redesign variant A, 2026-08-08) ────────────────
    The right rail already IS a stack — coarsest→finest, distance-dimmed, single-open accordion —
@@ -816,6 +837,7 @@
      spacing scale, one "selected" treatment; component utilities reference these. */
   --panel-pad-x: 16px;     /* horizontal padding inside a panel header/section */
   --panel-pad-y: 12px;     /* vertical   padding inside a panel header/section */
+  --edge-runoff: 22px;   /* the fixed length every edge signal spends its tips over — `.edge-spine` and the hover/pairing recipe share it so the app has ONE fade reach */
   --rail-gap: 16px;        /* gap between stacked panels in a column — 12 → 16 (user, 2026-08-30: the explore rail's cards sat too close, felt on paper where both are bright glass) */
   --topbar-extra: 0px;     /* how far the command bar has GROWN downward (the attached filter
                               strip, 2026-07-12) — published live by TopBar via ResizeObserver;
