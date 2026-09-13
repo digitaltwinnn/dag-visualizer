@@ -16,6 +16,13 @@ import { Timer } from "lucide-react";
 // the status MEANING lives in src/data/pollStatus.ts (rule 10 wants it testable, not buried in
 // JSX), the plate is the vitals band's own BandCard (one band-card recipe app-wide), and the
 // age words are relativeAge, the app's one age grammar.
+//
+// ⚠️ A CELL NAMES THE FEED, NEVER ITS SOURCE (user, 2026-09-13: "no need to provide info to
+// users about the source"). Each cell carried a third row naming the upstream — "block
+// explorer", "cluster info (via app)" — which answered a question the strip is not for: this
+// row exists to say whether the numbers above it are CURRENT, and an upstream's name is
+// plumbing the reader can do nothing with. The `target` field retired from the FEEDS table
+// with it, so there is no unused descriptor waiting to drift.
 
 // The status inks the READING itself (user, 2026-09-10, after the head dot retired: "tint
 // the age value") — the same derived states the dot spoke, on the value they qualify: a
@@ -83,7 +90,6 @@ export default function PulseStrip() {
                   {cadenceWord(r)}
                 </span>
               </span>
-              <span className="text-micro text-muted-foreground truncate">{r.target}</span>
               {/* The ok/err record shows ONLY when there is something to weigh (user,
                   2026-09-09, second round: the all-ok "N polls, all ok" line said what the
                   green dot and the ticking last-success already say — chrome restating
