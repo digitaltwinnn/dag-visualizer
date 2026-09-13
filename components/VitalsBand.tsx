@@ -762,7 +762,7 @@ function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: b
 // ledger — the activity cells: the two rates as number + sparkline cards (slot 2 swaps with the
 // scope exactly as the bar's vitals did: filtered, "anchors" would be a different quantity, so
 // the network's DAG fees show instead), and the tick chart as one wide card.
-function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
+function LedgerCells({ accent, filter, paused }: { accent: string; filter: string; paused: boolean }) {
   const activity = useStore((s) => s.activity);
   // ONE feed subscription for the whole row (review, 2026-08-31) — the roster's live
   // fallback still reads it while the store hasn't answered.
@@ -786,7 +786,10 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
   // It rides the 7d payload — the store's HOURLY tier, whose newest-24h slice is exact per-hour
   // sums. No client re-bucketing: a client sum over part-null buckets would have to invent a
   // floor rule the store already solved.
-  const t7 = useTrendsWindow("7d");
+  // `paused` while the HUD is stepped aside (2026-09-13): the band stays MOUNTED through the
+  // SCENE toggle so it can slide out, and a mounted-but-hidden band that kept polling would
+  // make the pulse strip's "while shown" words a lie about this feed.
+  const t7 = useTrendsWindow(paused ? null : "7d");
   const windowed = useMemo<TrendsWindowData | null>(
     // trimNewestPartial FIRST (the payload's own clock drops the still-filling bucket — the
     // CDN finding), then the window cut.
@@ -1077,12 +1080,12 @@ function useVitalsScope() {
 
 /** The one view→cells dispatch — a cell added or gated here reaches desktop and phone in the
  *  same edit, which is the whole point of extracting it. */
-function ViewCells({ mode, accent, filter }: { mode: string; accent: string; filter: string }) {
+function ViewCells({ mode, accent, filter, paused = false }: { mode: string; accent: string; filter: string; paused?: boolean }) {
   return (
     <>
       {mode === "hyper" && <HyperCells accent={accent} />}
       {mode === "geo" && <GeoCells accent={accent} />}
-      {mode === "ledger" && <LedgerCells accent={accent} filter={filter} />}
+      {mode === "ledger" && <LedgerCells accent={accent} filter={filter} paused={paused} />}
     </>
   );
 }
@@ -1123,18 +1126,22 @@ function TrendsLink({ className }: { className?: string }) {
   );
 }
 
-function TrendsRim({ yielding }: { yielding: boolean }) {
+function TrendsRim({ yielding, hidden }: { yielding: boolean; hidden: boolean }) {
   return (
     <div
       style={{ right: "var(--bar-margin)", bottom: "calc(var(--footer-h, 0px) + var(--vitals-h) + 6px)" }}
+      // The tab rides the band's own exit (2026-09-13): it is furniture ON the lane's top edge,
+      // so it leaves through the bottom with it rather than fading on its own account.
+      data-hidden={hidden ? "" : undefined}
       className={cn(
+        "band-shade",
         // The pill survived the range group's retirement (user, 2026-09-13) — it is what makes
         // the link read as a thing you touch rather than a caption over the plate. Its hairline
         // is PRIMARY-TINTED, not the cards' neutral: cyan is the app's one affordance signal,
         // so a cyan-edged pill among neutral-edged plates reads as the affordance.
         "fixed z-10 flex items-stretch h-[26px] p-0.5 rounded-full border border-primary/25",
         "[background:var(--topbar-glass)] backdrop-blur-sm",
-        "transition-opacity duration-300 motion-reduce:!transition-none",
+        "[transition:opacity_300ms_ease,transform_300ms_ease] motion-reduce:!transition-none",
         yielding && "opacity-40",
       )}
     >
@@ -1145,7 +1152,7 @@ function TrendsRim({ yielding }: { yielding: boolean }) {
 
 /** The band. Mounted by BottomStream (per viewPolicy.vitalsLane + scene pose + rails visible);
  *  this component reads the mode only to pick which view's cells to lay out. */
-export default function VitalsBand() {
+export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
   const { mode, live, filter, accent } = useVitalsScope();
   // The band does NOT inset by the tablet sheets any more (user, 2026-09-04 — "the bottom bar
   // should behave the same as the top bar; the collapsible card panels go over the bar instead
@@ -1171,7 +1178,7 @@ export default function VitalsBand() {
   const coverR = useStore((s) => s.sceneCoverR);
   return (
     <>
-      <TrendsRim yielding={yielding} />
+      <TrendsRim yielding={yielding} hidden={hidden} />
       <section
       id="vitalsband"
       aria-label="View vitals"
@@ -1179,7 +1186,13 @@ export default function VitalsBand() {
         ["--cover-l" as string]: `${coverL}px`,
         ["--cover-r" as string]: `${coverR}px`,
       }}
+      // The SCENE toggle's exit (2026-09-13): the band leaves through the BOTTOM edge it lives
+      // against, the way each rail leaves through its own — see the `.band-shade` recipe. It
+      // stays MOUNTED while hidden (BottomStream's two gates), because a component that
+      // unmounts has no exit to animate.
+      data-hidden={hidden ? "" : undefined}
       className={cn(
+        "band-shade",
         // pointer-events-none: the band is a read-only instrument — orbit drags pass through it.
         // --bar-margin, THE COMMAND BAR'S OWN INSET (globals.css), so the two bars bracket the
         // scene as a matched pair. At desktop it resolves to --rail-margin, which keeps the band's
@@ -1226,7 +1239,7 @@ export default function VitalsBand() {
         // yielding arm's duration-300 overrides all of them to the away tempo while the hand
         // is on the camera. motion-reduce carries `!` — a variant loses to an equal-weight
         // single class on stylesheet order alone (CSS trap 4).
-        "[transition:opacity_180ms_ease-out,left_300ms_ease-out,right_300ms_ease-out,clip-path_300ms_ease-out]",
+        "[transition:opacity_180ms_ease-out,transform_300ms_ease,left_300ms_ease-out,right_300ms_ease-out,clip-path_300ms_ease-out]",
         "motion-reduce:!transition-none",
         yielding && "opacity-40 duration-300",
         !live && "saturate-[.45]",
@@ -1239,7 +1252,7 @@ export default function VitalsBand() {
           silently retargets it at the wrapper. */}
       <RollSwap
         swapKey={mode as Mode}
-        render={(m) => <ViewCells mode={m} accent={accent} filter={filter} />}
+        render={(m) => <ViewCells mode={m} accent={accent} filter={filter} paused={hidden} />}
         className={cn(
           "flex-1 min-w-0 flex items-stretch justify-center gap-0",
           "[&>*]:rounded-none [&>*]:border-0 [&>*]:backdrop-blur-none [&>*]:[background:none]",

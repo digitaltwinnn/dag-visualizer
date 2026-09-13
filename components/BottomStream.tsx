@@ -46,10 +46,19 @@ export default function BottomStream() {
     mq.addEventListener("change", apply);
     return () => mq.removeEventListener("change", apply);
   }, []);
-  const lane = VIEW_POLICIES[mode].vitalsLane && section === "scene" && !railsHidden && bp !== "phone" && !short;
+  // ⚠️ TWO GATES, NOT ONE (2026-09-13, the SCENE-toggle exit slide). `applicable` is whether
+  // this surface HAS a vitals lane at all — the policy flag, the scene pose, the tier. `lane`
+  // adds the presentation toggle, and is what the reserve and the band's shown-ness key on.
+  // They are separate because the toggle is the one gate the band must survive: a component
+  // that unmounts cannot animate out, and the band is asked to leave through the bottom edge
+  // the way the rails leave through theirs. So presentation mode keeps it MOUNTED and hands it
+  // `hidden`, exactly as RailShade keeps the rails mounted behind `visibility: hidden`. Every
+  // other gate still unmounts — there is nothing to slide when the lane does not apply.
+  const applicable = VIEW_POLICIES[mode].vitalsLane && section === "scene" && bp !== "phone" && !short;
+  const lane = applicable && !railsHidden;
   useEffect(() => {
     document.documentElement.style.setProperty("--bottom-reserve", lane ? `${RESERVE}px` : "0px");
     return () => document.documentElement.style.setProperty("--bottom-reserve", "0px");
   }, [lane]);
-  return lane ? <VitalsBand /> : null;
+  return applicable ? <VitalsBand hidden={!lane} /> : null;
 }
