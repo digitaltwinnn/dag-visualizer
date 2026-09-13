@@ -13,7 +13,7 @@ import { countryToggleActions, nodeSelectActions, cohortToggleActions, sameCohor
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useLadderFocus } from "@/components/useLadderFocus";
-import { DepthCaption, DisclosureChevron, Disclosure, DisclosurePanel, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
+import { DepthCaption, DisclosureChevron, Disclosure, DisclosurePanel, DisclosureRow, NodePickerRow, ROW_NEST, ROW_NEST_DEEP, ROW_OUTSET } from "@/components/ExploreRows";
 import type { NodeRow } from "@/src/data/types";
 import type { CohortSel } from "@/src/engine/domain/focusLadder";
 
@@ -366,7 +366,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
                               <span className="ml-auto flex-none tabular-nums text-body font-semibold">{ch.rows.length}</span>
                             </DisclosureRow>
 
-                            <DisclosurePanel className="mb-1 ml-[7px] pl-2 border-l border-border">
+                            <DisclosurePanel className={ROW_NEST_DEEP}>
                                 {ch.rows.map((r, i) => {
                                   const nodeOn =
                                     selIp != null && r.layer === selLayer &&

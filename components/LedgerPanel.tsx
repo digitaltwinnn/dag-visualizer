@@ -17,12 +17,12 @@ import { IdentityDot, LayerWho } from "@/components/inspector/parts";
 import { useStore } from "@/src/store/store";
 import { metaSnapSelectActions, snapshotSelectActions, sameMetaSnap, followToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { DepthCaption, DisclosureChevron, Disclosure, DisclosurePanel, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
+import { DepthCaption, DisclosureChevron, Disclosure, DisclosurePanel, DisclosureRow, NodePickerRow, ROW_NEST, ROW_NEST_DEEP, ROW_OUTSET } from "@/components/ExploreRows";
 import { CONTENT_EASE } from "@/components/RollSwap";
 import { NoSignalDot } from "@/components/state/StateAtoms";
 import { buildAnchorLog, type AnchorLogRow, type ChannelLogRow } from "@/src/data/anchorLog";
 import { SLOT_N } from "@/src/engine/domain/ledgerModel";
-import { fmtKB } from "@/src/util/format";
+import { fmtDag } from "@/src/util/format";
 
 // The Snapshots view's left-rail tool — ONE AXIS: TIME (user, 2026-08-09). A single uniform tree
 // whose DEPTH means exactly one thing everywhere, and where every depth commits its own subject:
@@ -287,7 +287,7 @@ function SignerList({
   setHoverNodeId: (id: string | null) => void;
 }) {
   return (
-    <div className="mb-1 ml-[7px] pl-2 border-l border-border">
+    <div className={ROW_NEST_DEEP}>
       {/* WHICH cluster this list is — the cards' own phrase ("Signed by N L0 validators"), whose
           words come from the one home SIGNER_GROUPS (user, 2026-08-16 — redesigned from the
           `label · count · layer` interpunct line into the DepthCaption register). The explorer is
@@ -567,18 +567,34 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
                 // on mount (the no-pop arrival ease; keys are ordinals, so live re-renders
                 // never replay it).
                 return (
-                  <div key={d.ordinal} className={CONTENT_EASE}>
+                  // ⚠️ AN OPEN TICK WEARS THE FAINT WASH, like every other explorer (user,
+                  // 2026-09-13: "breakdown for snapshot keeps same background as card while in
+                  // geo and hyper it has a slight effect; keep effect as that I think was
+                  // intentional"). It was: geo and hyper wash the whole open group so the
+                  // disclosed rows read as INSIDE their parent rather than as more rows in the
+                  // card. The ledger's tick was the one explorer that never took it, so its
+                  // breakdown floated on the card's own ground. Same recipe, verbatim.
+                  <div
+                    key={d.ordinal}
+                    className={cn(CONTENT_EASE, isOpen && "bg-wash-faint rounded-btn my-0.5 -mx-1.5 px-1.5")}
+                  >
                     {/* The tick row SELECTS (pin / live re-follow — the same tested table the
                         strip's bars run) AND discloses its contributors in the same click. */}
                     <SnapRow
                       outset
                       mark={filterNet ? { hue: filterNet.hue, count: tickFilterCount(d) } : null}
                       label={d.ordinal.toLocaleString()}
-                      // The one honest per-tick byte figure: the exact read's measured KB;
-                      // absent = a dash, never derived from count or fee (the honesty rule).
+                      // ⚠️ THE METRIC IS THE FEE, NOT THE SIZE (user, 2026-09-13: "instead of size
+                      // in kb show the fees paid in DAG"). Both are exact reads off the same
+                      // fetch, so this is a swap of which fact the row leads with — and the fee
+                      // is the one a reader can act on: it is what anchoring COST, in the unit
+                      // the network charges, where bytes are an implementation detail of the
+                      // payload. `totalFee` is the exact read's own figure and includes the
+                      // unlisted channels, so it matches the rows disclosed beneath it.
+                      // Absent = a dash, never derived from count or size (the honesty rule).
                       metric={
-                        snapshotExact[d.ordinal]?.totalSizeKB != null
-                          ? fmtKB(snapshotExact[d.ordinal]!.totalSizeKB)
+                        snapshotExact[d.ordinal]?.totalFee != null
+                          ? `${fmtDag(snapshotExact[d.ordinal]!.totalFee)} DAG`
                           : "—"
                       }
                       selected={d.ordinal === activeSnapOrd}
@@ -694,7 +710,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
                                 </DisclosureRow>
                                 {/* Level 2+: INDENT ONLY — re-applying ROW_NEST here would
                                     compound its negative margin to +12px (the right-edge rule). */}
-                                <DisclosurePanel className="mb-1 ml-[7px] pl-2 border-l border-border">
+                                <DisclosurePanel className={ROW_NEST_DEEP}>
                                     {g.rows.map((r) => {
                                       const sel = {
                                         metaId: r.metaId,
@@ -711,7 +727,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
                                           <SnapRow
                                             nested
                                             label={r.ordinal.toLocaleString()}
-                                            metric={fmtKB(r.sizeInKB)}
+                                            metric={`${fmtDag(r.fee)} DAG`}
                                             selected={sameMetaSnap(metaSnap, sel)}
                                             hoverOrd={hoverMetaSnap}
                                             pairOrd={metaSnapHoverKey(r.metaId, r.ordinal)}
@@ -790,7 +806,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
                                 {tickUnlisted}
                               </span>
                             </DisclosureRow>
-                            <DisclosurePanel className="mb-1 ml-[7px] pl-2 border-l border-border">
+                            <DisclosurePanel className={ROW_NEST_DEEP}>
                                 {tickEntries.map((r, i) => {
                                   const sel = {
                                     metaId: r.metaId,
@@ -811,7 +827,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
                                         // sequence — one tick can carry several chains, so the short
                                         // address says which chain a number counts on (2026-08-08).
                                         sub={r.ordinal > 0 ? shortHash(r.metaId) : undefined}
-                                        metric={fmtKB(r.sizeInKB)}
+                                        metric={`${fmtDag(r.fee)} DAG`}
                                         selected={sameMetaSnap(metaSnap, sel)}
                                         hoverOrd={hoverMetaSnap}
                                         pairOrd={metaSnapHoverKey(r.metaId, r.ordinal)}

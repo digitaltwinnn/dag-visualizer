@@ -31,7 +31,18 @@ export const ROW_OUTSET = "w-[calc(100%+12px)] -mx-1.5 pl-1.5 pr-2";
 // The level-1 dropdown container: indents its rows from the left with the hairline rule, and
 // extends 6px right so its `w-full` children reach the top-level row's edge. `pr-2` on the rows
 // themselves then puts every trailing ✓/chevron in one column across depths.
-export const ROW_NEST = "-mr-1.5 border-l border-border";
+export const ROW_NEST = "-mr-1.5 border-l border-[var(--thread-line)]";
+// ⚠️ THE CONNECTING HAIRLINE IS `--thread-line`, NOT `--border` (user, 2026-09-13: "make the
+// hairlines connecting the snapshots older rows to their metagraph snapshots a bit more
+// visible"). `--border` is the PANEL hairline — the edge of a plate, which wants to recede —
+// and at 0.22 alpha on the dark face it all but vanished behind a nested row's own wash.
+// `--thread-line` is the app's own name for "the neutral base line the ticks hang off", which
+// is exactly this line's job (it is the rail thread's device, one instrument in), and it runs
+// at 0.40/0.55. Same token both faces, so paper gains the readability too.
+//
+// The level-2+ indent, which five explorers had spelled out verbatim: indent only, never
+// ROW_NEST's negative margin (it would compound to +12px — the right-edge rule above).
+export const ROW_NEST_DEEP = "mb-1 ml-[7px] pl-2 border-l border-[var(--thread-line)]";
 
 // Stable no-op for a DisclosureRow rendered without the group-pairing channel (the ledger's
 // floor/lane rows) — a fresh arrow each render would be a new `set` every time.
