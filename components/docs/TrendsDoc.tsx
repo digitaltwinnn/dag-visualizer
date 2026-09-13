@@ -12,7 +12,6 @@ import { filterToggleActions } from "@/src/engine/domain/pickActions";
 import { metagraphById } from "@/src/data/network";
 import { displayNetwork } from "@/src/data/unlisted";
 import { cn } from "@/lib/utils";
-import { Table2 } from "lucide-react";
 import { SELECTED_ROW } from "@/components/selection";
 
 // THE TRENDS DOCUMENT (user, 2026-09-06; widened twice since) — the first UI consumer of the
@@ -373,19 +372,11 @@ export default function TrendsDoc() {
       )}
     </div>
   );
-  // THE LADDER'S BUTTON, its own control beside the group (user, 2026-09-09: "a separate
-  // button and be specific") — names the destination: the Snapshots view's raw data search.
-  const rangeInspect = buckets.length ? (
-    <button
-      type="button"
-      onClick={inspectHere}
-      title="Open this range in the Snapshots view's raw data search (uses the committed network's chain when one is filtered)"
-      className="ml-auto max-[700px]:ml-0 max-[700px]:justify-center inline-flex items-center gap-1.5 h-6 px-2 rounded-md text-micro tracking-caps uppercase text-[var(--primary)]/80 hover:text-[var(--primary)] hover:bg-wash-soft whitespace-nowrap"
-    >
-      <Table2 aria-hidden className="size-3" />
-      snapshot records
-    </button>
-  ) : null;
+  // ⚠️ NO RECORDS BUTTON IN THE TOOLBAR (user, 2026-09-13: "the links are already inside the
+  // tabs"). It was the ladder's one standalone control (2026-09-09), added before every chart
+  // carried its own — and once each chart did, the toolbar's copy said the same thing a second
+  // time, one level further from the buckets it opens. The bridge is unchanged: `inspectHere`
+  // still reaches the anchor log, from the chart whose range you are actually reading.
   // SECTIONS AS SUB-TABS (user, 2026-09-07): one section at a time inside each drawer. The
   // hierarchy carries the design: the outer pair is the file-cabinet (primary), the inner
   // switcher the segmented-pill register the zoom already wears (secondary) — two drawer
@@ -451,7 +442,7 @@ export default function TrendsDoc() {
             every other tier rule here uses (CSS trap 8). */}
         <div className="mt-6 flex items-center justify-between gap-2 flex-wrap max-[700px]:flex-col max-[700px]:items-stretch">
           {topicPicker}
-          <div className="flex items-center gap-2 flex-wrap justify-end max-[700px]:flex-col max-[700px]:items-stretch">{zoomPicker}{rangeInspect}</div>
+          {zoomPicker}
         </div>
         <Tabs
           defaultValue={initialTab}
