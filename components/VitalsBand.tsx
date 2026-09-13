@@ -115,64 +115,27 @@ function windowNote(a: Activity | null | undefined, unit: string): string | unde
  *  A band card in TWO SEGMENTS: the LEAD (the headline total this card exists to say) and the
  *  DETAIL (its breakdown), divided by a hairline (user pick, 2026-09-01 — over spacing alone).
  *
- *  ⚠️ `size` IS THE ONE WIDTH VOCABULARY (user, 2026-09-01: "sometimes certain vitals cards are
- *  huge while others are tiny; can we have an agreed small/medium/large size"). It replaced six
- *  hand-picked flex values (1.4 / 1.5 / 1.6 / 1.8 / 2 / auto) that each encoded a guess about one
- *  card's content. Three tiers, and a tier is a claim about WHAT THE CARD IS, not how wide it looked:
+ *  ⚠️ EVERY CARD TAKES AN EQUAL SHARE OF THE PLATE (user, 2026-09-13: "instead of S/M/L type of
+ *  vitals card sizes, just make use of the width available in the bottom section and spread
+ *  evenly"). This replaces a three-tier `size` vocabulary (sm/md/lg, 2026-09-01) that in turn
+ *  replaced six hand-picked flex values — each round tuned how EAGERLY a card took leftover
+ *  width, and each left a different card looking starved beside a bloated neighbour, because a
+ *  tier is a guess about content made once and then read at every viewport.
  *
- *    sm — states ONE reading and has no breakdown to spend width on (geo's NODES, the anchoring
- *         roster, hyper's single-characteristic type card). Sizes to its content.
- *    md — a reading AND its breakdown, or a rate and its sparkline. The row's default.
- *    lg — a chart that genuinely reads better wide (the ledger's tick bars).
+ *  An equal share is not a guess: the plate is divided by the number of cells the view has, and
+ *  the row reads as one instrument lane rather than as sections that each negotiated their own
+ *  width. `basis-0` is what makes it EQUAL — with the old `auto` basis a card's content set its
+ *  starting width and the share only divided the surplus, which is why a one-number roster and a
+ *  32-bar chart could never sit in comparable columns.
  *
- *  Every tier keeps an `auto` BASIS, never `basis-0`: a share computed with no reference to the
- *  card's content is what clipped the rate cards' extrapolation note off the plate at tablet width.
- *  A card asks for what it needs first, and grows from there by its tier's weight.
+ *  ⚠️ A CARD MAY STILL CLAIM A FLOOR, and that is not a tier returning: `min-w` on a chart cell
+ *  says "below this I am not readable at all", which binds only on a squeezed row and is silent
+ *  at every width where the even split has room. The equal share decides the LAYOUT; a floor
+ *  only refuses to disappear.
  *
  *  Either segment may stand alone: lead-only (geo's NODES), detail-only (NETWORK LAYERS, and
  *  PulseStrip's poll cards, which pass no lead). The divider draws only when both are present. */
-export type BandCardSize = "sm" | "md" | "lg";
-
-/** The tier→flex table. `auto` basis throughout (see the note above); only the GROW weight differs,
- *  so a tier says how eagerly a card takes leftover width, never how wide it starts. */
-/** ⚠️ THE CEILING IS WHAT MAKES A TIER A TIER. Without it every `md` card grows to fill whatever
- *  the viewport gives it, and at 1600px three of them each held ~500px — a lead pinned left, a
- *  capped bar block pinned right, and a void between the two (the very "huge cards" complaint the
- *  scale exists to answer). The grow weight decides who takes leftover width; the ceiling decides
- *  when everyone stops taking it and the row simply ends. */
-/*  ⚠️ THE CEILING MOVED OFF THE BOX AND ONTO THE CONTENT (user, 2026-09-01: "can we align the
- *  vitals sections in the center of its designated space on the bottom bar?"). With the cap on the
- *  BOX, a capped row stopped short of the plate and the whole group centred as one clump — so all
- *  the leftover collected at the two ENDS and hyper's three sections began 234px into a bar they
- *  were supposed to divide. The box now takes its share of the plate and the CONTENT is capped and
- *  centred inside it, which is what "its designated space" means: the slack is distributed between
- *  the sections instead of banked outside them, and every card still refuses to stretch its own
- *  lead and breakdown apart (the ceiling's original job, unchanged).
- *
- *  ⚠️ THE BASIS STAYS `auto` ON BOTH HALVES. A share computed with no reference to the card's
- *  content is what clipped the rate cards' extrapolation note off the plate at tablet width; with
- *  an auto basis a squeezed row simply has no surplus to hand out and every box falls back to its
- *  content width, which is exactly the pre-plate behaviour. */
-/** The tier→flex table for the BOX. An equal `1 1 0` share per section was tried and withdrawn
- *  the same minute (user, 2026-09-01: "the 1/3rd rule can't apply based on vitals card count") —
- *  a plate cut into N identical columns gives a one-number roster the same room as a 32-bar chart
- *  and squeezes the chart to pay for it, and N changes per view. The tier still says how eagerly a
- *  card takes LEFTOVER width, and `auto` basis throughout means it asks for what it needs first —
- *  the rule that keeps a squeezed row from clipping the rate cards' extrapolation note. */
-const BAND_SIZE: Record<BandCardSize, string> = {
-  sm: "flex-initial",            // 0 1 auto — content-sized, and still shrinks when tight
-  md: "flex-auto",               // 1 1 auto
-  lg: "flex-[2_1_auto]",
-};
-
-/** …and the cap the tier puts on its CONTENT, centred in whatever share the row gave it. */
-const BAND_CAP: Record<BandCardSize, string> = {
-  sm: "max-w-[240px]",
-  md: "max-w-[360px]",
-  lg: "max-w-[560px]",
-};
-
-export function BandCard({ label, children, className, mark, lead, size = "md", aside }: { label: string; children?: React.ReactNode; className?: string; mark?: React.ReactNode; lead?: React.ReactNode; size?: BandCardSize; aside?: React.ReactNode }) {
+export function BandCard({ label, children, className, mark, lead, aside }: { label: string; children?: React.ReactNode; className?: string; mark?: React.ReactNode; lead?: React.ReactNode; aside?: React.ReactNode }) {
   return (
     <div className={cn(
       // The plate is the COMMAND BAR's own glass (`--topbar-glass` — a gradient token, so the
@@ -180,17 +143,17 @@ export function BandCard({ label, children, className, mark, lead, size = "md", 
       // the earlier `bg-card/40` was tuned under light and sat near-invisible over the dark
       // scene's glow (user, 2026-08-30: "in dark the card needs a bit more contrast").
       "flex rounded-lg border border-border/60 [background:var(--topbar-glass)] backdrop-blur-sm px-3 py-1.5 min-w-0",
-      // ⚠️ `sm` is `flex-initial` (0 1 auto), NOT `flex-none`: a content-sized card must still
-      // SHRINK when the row is tight, or its widest child — which is usually the LABEL, not the
-      // reading — pins it. "Metagraphs anchoring" held 305px of a 684px tablet row that way,
-      // starving the two rate cards beside it; shrinking, it truncates its eyebrow and yields.
-      BAND_SIZE[size],
+      // `1 1 0` — an EQUAL share of the plate, not a share of the surplus. `min-w-0` above is
+      // what lets it actually reach that share: without it a card's widest child (usually the
+      // LABEL, not the reading) pins the column, which is how "Metagraphs anchoring" once held
+      // 305px of a 684px row. Shrinking, it truncates its eyebrow and yields.
+      "flex-1 basis-0",
       className,
     )}>
-    {/* THE CAPPED, CENTRED CONTENT. `mx-auto` is what puts a section in the middle of its own
-        share rather than at the left of it; `w-full` keeps it filling that share up to the cap,
-        so nothing changes at the widths where there is no surplus to centre within. */}
-    <div className={cn("flex flex-col gap-1 w-full min-w-0 mx-auto", BAND_CAP[size])}>
+    {/* No content ceiling any more: a cell's share IS its designated space now, so the content
+        simply fills it. The cap + `mx-auto` pair existed to centre content inside an over-wide
+        tier (2026-09-01) — an equal split has no over-wide tier to correct for. */}
+    <div className="flex flex-col gap-1 w-full min-w-0">
       <span className="flex items-center gap-1.5 leading-none min-w-0">
         {mark}
         {/* TRUNCATE, not `whitespace-nowrap`: at 760px "Metagraphs anchoring" clipped mid-glyph
@@ -1009,7 +972,7 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
         ? rate("DAG fees", sparkOf(cfg ? `m.${cfg.id}.fee` : null, activity?.feesSeries, activity?.feesPerHour, true), "$DAG this network pays to anchor.")
         : rate("Anchors", sparkOf("g.anchors", activity?.anchoredSeries, activity?.anchorsPerHour), "Metagraph snapshots anchored into the global chain.")}
       {rate("Snapshots", sparkOf(scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries, activity?.snapsPerHour))}
-      <BandCard label="Anchors by metagraph" size="lg" className="min-w-[220px]">
+      <BandCard label="Anchors by metagraph" className="min-w-[220px]">
         <StackBars accent={accent} isMeta={isMeta} filter={filter} data={barData} />
       </BandCard>
     </>
@@ -1053,11 +1016,13 @@ function AnchoringNetworks({ windowed, snaps, filter }: { windowed: TrendsWindow
     list = [...ids];
   }
   return (
-    // CONTENT-SIZED (grow=false): the roster is a fixed run of dots, so an equal share of the row
-    // left ~200px of empty plate beside five dots — the band's worst offender before 2026-09-01.
+    // AN EQUAL SHARE LIKE EVERY OTHER CELL (2026-09-13). This card is why the tiers existed —
+    // a fixed run of dots left ~200px of quiet plate beside them — but quiet plate inside an
+    // even lane reads as breathing room, while an uneven lane reads as cards that disagree
+    // about how wide they should be. The dots keep their own `max-w` wrap below, so the slack
+    // collects around the roster rather than stretching it.
     <BandCard
       label="Metagraphs anchoring"
-      size="sm"
       lead={<span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={list.length || null} /></span>}
     >
       {/* ⚠️ THE LENS DIMS, IT DOES NOT EDIT (user, 2026-09-01: "if we filter, should we then also
@@ -1296,8 +1261,8 @@ export default function VitalsBand() {
  *  do with what was asked for ("it feels confusing as it's not related to the actual dropdown").
  *  The dock parallels the desktop band: vitals live on the bottom edge on every tier. Vertical
  *  because the sheet has height to spend and a stacked read beats a sideways thumb-scroll; the
- *  width ceilings the band's `size` tiers carry are overridden — in a column every card takes
- *  the sheet's width, and the ceilings exist for a 1600px row, not a 360px column. */
+ *  band's equal horizontal share is overridden — in a column every card takes the sheet's full
+ *  width, which is what `[&>*]:flex-none [&>*]:basis-auto` on the wrapper below says. */
 export function VitalsSheetBody() {
   const { mode, live, filter, accent } = useVitalsScope();
   return (
