@@ -457,8 +457,34 @@
    No transforms — the geometry-never-animates rule keeps its spirit: nothing moves, the
    arriving frame simply fades and rounds into place. The `from`-only keyframes land on
    each element's own computed values. */
-@keyframes tierSettleIn { from { opacity: 0.72; border-color: transparent; border-radius: var(--radius-md); } }
-@keyframes tierSettleOut { from { opacity: 1; } }
+/* ⚠️ THE TIER CROSS-FADES; IT USED TO ARRIVE FINISHED (user, 2026-09-13, second round on the
+   same click: "still needs more work … the bottom section still appears immediately"). The
+   height ease was already right — pinned before paint, no bleed past the clip (both verified by
+   hit-test) — but only the HEIGHT was easing. `data-tier` flips in the commit frame, so at t=0
+   the clicked rung already wore its whole BOX identity (plate, border, wash, the pager plank)
+   inside a slot still the size of an entry, and the rung it displaced already wore its ENTRY
+   identity inside a slot still the size of a box. Every rung below them was therefore in its
+   final form from the first frame, which is what "the bottom section appears immediately" is:
+   the pile's IDENTITY was final while only its measurements moved, so the eye read the change
+   as done and the motion as a separate, pointless reflow.
+
+   `tierSettleIn` started at 0.72 — too high to read as an arrival — and `tierSettleOut` started
+   at opacity 1, which is no animation at all. Both now start at 0, so a rung that CHANGED tier
+   fades in across the same clock its slot is resizing on, and the two read as one event. A rung
+   whose tier did not change (the untouched entries between) keeps its element, so its animation
+   never restarts and it simply travels — correct: it did not change, it moved. Measured on a
+   real focus move: the two rungs that flipped read opacity 0.00, the two that did not held
+   0.58 and 0.86 (their `--entry-dim`) exactly.
+
+   ⚠️ MEASURING THIS NEEDS THE CLOCK SET BEFORE THE CLICK, NOT WITH IT. `--tempo-roll` IS the
+   `animation-duration` here, so writing the token re-times every matching element and restarts
+   all four from `from` — which looks exactly like the regression this change would cause if it
+   were wrong. Slow the clock, let it settle, then interact.
+
+   The slab's "geometry does not animate" rule is unamended: seams, corners and washes are still
+   static. What animates is the rung's PRESENCE, which is what changed. */
+@keyframes tierSettleIn { from { opacity: 0; border-color: transparent; border-radius: var(--radius-md); } }
+@keyframes tierSettleOut { from { opacity: 0; } }
 .rail-ladder [data-tier="box"] .ig-panel { animation: tierSettleIn var(--tempo-roll) var(--ease-roll); }
 .rail-ladder [data-tier="entry"] .rail-entry { animation: tierSettleOut var(--tempo-roll) var(--ease-roll); }
 @media (prefers-reduced-motion: reduce) {
