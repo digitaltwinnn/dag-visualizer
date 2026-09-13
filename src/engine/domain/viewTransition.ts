@@ -8,7 +8,7 @@
 //   IN   (t: 0→DUR_IN)   — the to-view's furniture builds while nodes fly, staggered, to
 //                          their destination poses (gatherWeight 1→0); the camera flies.
 // Pure and allocation-free; the scene calls gatherWeight per node per frame.
-import { smooth, smoother } from "./nodeLayout";
+import { smooth, smoothest } from "./nodeLayout";
 
 export type View3D = "hyper" | "geo" | "ledger";
 
@@ -189,12 +189,17 @@ export class ViewTransition {
     if (this.phase === "idle") return 0;
     if (this.phase === "staged") return 1; // parked at the grids
     const delay = (rank / Math.max(1, count - 1)) * STAGGER_SPREAD;
-    // `smoother` (quintic), not `smooth`: a pronounced glide — slow launch, fast cruise for
-    // the big distance, slow landing (user). Same 0.5-symmetry, so retarget continuity holds.
+    // `smoothest` (septic), not `smooth` or `smoother`: a pronounced glide — slow launch, fast
+    // cruise for the big distance, slow landing (user). The cruise was raised one order on
+    // 2026-09-13 ("speed up the mid-section … between the holding position and their final
+    // destination"): the stretch between the staging grid and the view pose is mostly empty, so
+    // the middle is where the time was being spent for nothing. The FLIGHT's duration is
+    // unchanged — only the distribution inside it — so nothing downstream retimes. Same
+    // 0.5-symmetry, so retarget continuity holds.
     if (this.phase === "out") {
-      return smoother(Math.min(1, Math.max(0, (this.t - delay) / FLIGHT_OUT)));
+      return smoothest(Math.min(1, Math.max(0, (this.t - delay) / FLIGHT_OUT)));
     }
-    return 1 - smoother(Math.min(1, Math.max(0, (this.t - delay) / FLIGHT_IN)));
+    return 1 - smoothest(Math.min(1, Math.max(0, (this.t - delay) / FLIGHT_IN)));
   }
 
   // Furniture multiplier for `view` this frame. At most one view is ever lit (spec:

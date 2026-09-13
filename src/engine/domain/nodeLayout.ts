@@ -8,11 +8,24 @@ import * as THREE from "three";
 export const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 export const smooth = (m: number) => m * m * (3 - 2 * m);
 // Quintic smootherstep: zero first AND second derivative at both ends — a pronounced
-// slow-start → fast-middle → slow-landing profile (the transition flight's speed curve;
-// plain `smooth` reads too mild over the long IN placement window). Shares smoothstep's
-// odd symmetry about 0.5 (smoother(1-x) = 1-smoother(x)), which the retarget continuity
-// math relies on.
+// slow-start → fast-middle → slow-landing profile. Shares smoothstep's odd symmetry about 0.5
+// (smoother(1-x) = 1-smoother(x)), which the retarget continuity math relies on.
+// ⚠️ NO LONGER ON ANY FRAME PATH (2026-09-13): the flight moved up to `smoothest` below. It is
+// kept as the family's REFERENCE — the curve the steeper one is specified against, in its own
+// test ("cruises faster than smoother while launching and landing softer") — so don't go
+// looking for callers, and don't reach for it for new work without saying why it beats the
+// two either side of it.
 export const smoother = (m: number) => m * m * m * (m * (6 * m - 15) + 10);
+// Septic smootheststep: zero first, second AND third derivative at both ends — the same glide
+// one order steeper, so the CRUISE is faster while the launch and landing stay soft (user,
+// 2026-09-13: "make the view node entry animation a bit faster by speeding up the mid-section
+// when they are in flight between the holding position and their final destination … the speed
+// should already have some curve to it"). The speed-up is in the middle alone: peak slope
+// 35/16 against the quintic's 15/8, ~17% faster at the crossing, with the flight's total
+// duration untouched — the nodes spend less of it dawdling through the long empty stretch and
+// the same time arriving. Keeps the odd symmetry about 0.5 that `smoother`'s note calls out,
+// which is what the retarget continuity math needs, so it is a drop-in for it.
+export const smoothest = (m: number) => m * m * m * m * (35 + m * (-84 + m * (70 - 20 * m)));
 export const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // fibonacci-shell / phyllotaxis spacing
 
 // A node's role set, shared by the DAG core + metagraph nodes. A node (one machine) can run
