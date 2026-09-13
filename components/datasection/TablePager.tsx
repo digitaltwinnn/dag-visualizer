@@ -29,7 +29,13 @@ export default function TablePager({
    *  `title` carries the explanation (user, 2026-09-02: the spelled-out "in window — pick a
    *  network…" line was "too long text" standing under the table on every render — the scope is
    *  a qualifier read once, not a sentence read 25 times). The dotted underline is the standard
-   *  there-is-more affordance at the strip's own weight. */
+   *  there-is-more affordance at the strip's own weight.
+   *
+   *  ⚠️ THE WORD IS PLAIN LANGUAGE, NEVER THE MECHANISM'S NAME (user, 2026-09-13: "held"/"window"
+   *  — "no human understands this"). It reads directly after a number, so it must complete the
+   *  sentence a reader is already forming — "501 recent", not "501 window". Both consumers say
+   *  "recent", deliberately: the qualifier is one idea (this is not the whole chain) and is
+   *  learned once; only the `title` differs, because the way to see more differs per surface. */
   scope?: { word: string; title: string };
   /** RAIL WIDTH (2026-09-13, the Snapshots explorer's pager). The strip was drawn for a raw-layer
    *  table with hundreds of pixels to spend; in a ~264px rail card the range words and the

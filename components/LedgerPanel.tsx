@@ -922,9 +922,17 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
             to={Math.min(page * TICK_PAGE, orderedSnaps.length)}
             total={orderedSnaps.length}
             compact
+            // ⚠️ THE WORD IS PLAIN LANGUAGE, AND IT IS THE SAME WORD THE RAW LOG USES (user,
+            // 2026-09-13: "no human understands this, what is held/window?"). It said "held",
+            // which named the MECHANISM — the app is holding these in memory — and a reader
+            // has no reason to know or care that there is a buffer. What they actually need to
+            // know is the one thing the number does not say on its own: it is not the whole
+            // chain. "Recent" says that, and the raw log's pager now says it too, so the
+            // qualifier is learned once and means the same thing in both places. Only the
+            // explanation behind it differs, because the way to see more differs.
             scope={{
-              word: "held",
-              title: `The snapshots this page is holding live — the newest ${POLL.maxSnapshots} global ticks. Open the raw data layer to search the chain back to genesis.`,
+              word: "recent",
+              title: `These are the ${POLL.maxSnapshots} most recent global snapshots — the stretch this page follows live. The chain goes back very much further: open the raw data layer to search all of it.`,
             }}
             onPage={(p) => {
               setTickPage(p);
