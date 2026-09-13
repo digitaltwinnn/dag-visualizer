@@ -540,13 +540,36 @@
    stepping window also gates the EFFECTS: the entry's lift and the seams' full-width reach
    don't apply while `data-stepping` holds, whatever :hover claims. Unlayered on purpose —
    these must beat the entry's own hover utilities (CSS trap 1). */
+/* ⚠️ THE FOCUS RING HOLDS OFF WHILE A RUNG ARRIVES, AND EASES BACK AS IT LANDS (user,
+   2026-09-13: "the focus still gives a blink … it goes from a hovered focus on a square element
+   straight to a rounded corner element. Maybe just let the focus re-appear once animation is
+   close to completion?"). A rung's click swaps a full-bleed SQUARE ring (the entry's absolutely
+   positioned expand button) for a ROUNDED card, so the ring does not move — it is destroyed at
+   one shape and recreated at another, which is the blink. Holding its colour transparent for
+   the arrival means the shape change happens while there is nothing to see, and the ring then
+   fades in over the landing rather than appearing at it. `outline-color` is the animatable half
+   of an outline, which is why the hold is a colour and not `outline: none`: the ring keeps its
+   geometry throughout, so nothing reflows when it returns.
+
+   The window is the ARRIVAL's, not a timer's — see HeightEase, which states it. Unlayered, so
+   it beats the focus-visible utilities the cards carry (CSS trap 1). */
+.rail-ladder :focus-visible { transition: outline-color 0.22s ease-out; }
+.rail-ladder:has([data-arriving]) :focus-visible { outline-color: transparent; }
+@media (prefers-reduced-motion: reduce) {
+  .rail-ladder :focus-visible { transition: none; }
+}
+
 .rail-ladder[data-stepping] .rail-entry,
-.rail-ladder[data-stepping] .rail-entry:hover {
+.rail-ladder[data-stepping] .rail-entry:hover,
+.rail-ladder:has([data-arriving]) .rail-entry,
+.rail-ladder:has([data-arriving]) .rail-entry:hover {
   opacity: var(--entry-dim, 1);
   filter: none;
 }
 .rail-ladder[data-stepping] > [data-tier="entry"] + [data-tier="entry"]:has(.rail-entry:hover)::before,
-.rail-ladder[data-stepping] > [data-tier="entry"]:has(.rail-entry:hover) + [data-tier="entry"]::before {
+.rail-ladder[data-stepping] > [data-tier="entry"]:has(.rail-entry:hover) + [data-tier="entry"]::before,
+.rail-ladder:has([data-arriving]) > [data-tier="entry"] + [data-tier="entry"]:has(.rail-entry:hover)::before,
+.rail-ladder:has([data-arriving]) > [data-tier="entry"]:has(.rail-entry:hover) + [data-tier="entry"]::before {
   left: 18px;
   right: 18px;
 }
@@ -555,8 +578,11 @@
    incoming card under a latched pointer exactly like a ladder step re-lays the pile, so the
    whisper edge and the copy-button reveal could light mid-slide. One attribute, every
    hover-treatment gate. */
-.rail-ladder[data-stepping] .sig-left:hover::before { opacity: 0; }
-.rail-ladder[data-stepping] .group\/copy:hover button[aria-label^="Copy"] { opacity: 0; }
+.rail-ladder[data-stepping] .sig-left:hover::before,
+.rail-ladder:has([data-arriving]) .sig-left:hover::before,
+.rail-ladder:has([data-arriving]) .sig-right:hover::after { opacity: 0; }
+.rail-ladder[data-stepping] .group\/copy:hover button[aria-label^="Copy"],
+.rail-ladder:has([data-arriving]) .group\/copy:hover button[aria-label^="Copy"] { opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
   .rail-ladder > [data-tier="entry"] + [data-tier="entry"]::before { transition: none; }
 }

@@ -97,6 +97,7 @@ export default function HeightEase({
     const o = outer.current!;
     const i = inner.current!;
     const clearStyles = () => {
+      delete o.dataset.arriving;
       i.style.opacity = "";
       o.style.height = "";
       o.style.overflow = "";
@@ -187,6 +188,23 @@ export default function HeightEase({
         arriving.current = false;
         i.style.opacity = "1";
         fade.current = i.animate([{ opacity: 0 }, { opacity: 1 }], timing);
+        // ⚠️ AND THE RUNG GOES POINTER-INERT WHILE IT ARRIVES (user, 2026-09-13: "when I click a
+        // card in the right rail node stack, the focus still gives a blink … it goes from a
+        // hovered focus on a square element straight to a rounded corner element. Maybe just let
+        // the focus re-appear once animation is close to completion?").
+        //
+        // The lane already had this window — `data-stepping`, iterated four times against
+        // exactly this flash — but it was armed by the PAGER's plank alone, so the commonest
+        // gesture of all, clicking a card, never got it. Hence the blink survived: the entry's
+        // full-bleed square ring unmounts, a rounded box mounts under a cursor Chromium still
+        // reports as hovering, and both light before anything has moved.
+        //
+        // It is stated here rather than re-armed there because this is where the fact lives: the
+        // rung is in motion exactly while this animation runs. That also retires the timer for
+        // this path — the window cannot end early or late, and the user's own standing ruling on
+        // the sibling suppression ("timer-based is too fragile, solve it structurally") is what
+        // this follows.
+        o.dataset.arriving = "";
       }
       a.onfinish = a.oncancel = () => {
         if (anim.current === a) {
