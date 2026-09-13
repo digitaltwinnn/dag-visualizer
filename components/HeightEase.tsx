@@ -57,19 +57,47 @@ export default function HeightEase({
   children,
   className,
   growIn = false,
-}: { children: ReactNode; className?: string; growIn?: boolean }) {
+  settleKey,
+}: { children: ReactNode; className?: string; growIn?: boolean; settleKey?: string }) {
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const anim = useRef<Animation | null>(null);
+  const fade = useRef<Animation | null>(null);
   const confirm = useRef(0);
   const stretched = useRef<HTMLElement[]>([]);
   const last = useRef(-1);
   const growInRef = useRef(growIn);
   growInRef.current = growIn;
+  // ⚠️ THE ARRIVAL IS A STATED FACT, NOT AN INFERRED ONE (user, 2026-09-13: "don't make it a
+  // timing fix but do it structurally"). `settleKey` names WHAT THIS SLOT IS SHOWING — the
+  // ladder passes its rung's tier. When it changes, the slot's occupant has been replaced, and
+  // the replacement must ARRIVE rather than appear already finished.
+  //
+  // The first cut expressed that in CSS, as `tierSettleIn`/`tierSettleOut` keyframes restarting
+  // because React happened to swap the inner element's type. Two things were wrong with it and
+  // neither was the look: the trigger was an ACCIDENT of reconciliation (reuse the element and
+  // the arrival silently stops happening; recreate one for any other reason and it fires when
+  // nothing changed), and the fade ran on its own CSS clock that merely READ the same token as
+  // the height — two animations agreeing by convention, free to drift the moment either is
+  // retuned. Now the fact comes down as a prop and the fade is started by the same code, in the
+  // same tick, with the same duration and easing object as the height. They cannot disagree.
+  //
+  // The flag is raised in a LAYOUT EFFECT, not during render: a render may be thrown away under
+  // concurrent rendering, and an arrival armed by a discarded render would fire on the next
+  // unrelated resize. Layout effects run after the commit and before the browser's layout step,
+  // so the flag is always up before the observer below can read it in the same frame.
+  const settleRef = useRef(settleKey);
+  const arriving = useRef(false);
+  useLayoutEffect(() => {
+    if (settleRef.current === settleKey) return;
+    settleRef.current = settleKey;
+    arriving.current = true;   // consumed by the next ease; a mount never arms it
+  }, [settleKey]);
   useLayoutEffect(() => {
     const o = outer.current!;
     const i = inner.current!;
     const clearStyles = () => {
+      i.style.opacity = "";
       o.style.height = "";
       o.style.overflow = "";
       o.style.overflowClipMargin = "";
@@ -147,14 +175,24 @@ export default function HeightEase({
         panel.style.overflow = "clip";
         stretched.current = chain;
       }
-      const a = o.animate([{ height: `${from}px` }, { height: `${h}px` }], {
-        duration: ms,
-        easing: ease,
-      });
+      const timing = { duration: ms, easing: ease };
+      const a = o.animate([{ height: `${from}px` }, { height: `${h}px` }], timing);
       anim.current = a;
+      // THE ARRIVAL, on the height's own clock. `i` is HeightEase's OWN wrapper, never the
+      // card — so this can never collide with what the card does with its own opacity (the
+      // ladder's entries carry `--entry-dim` there, and the two simply multiply). Started in
+      // this same tick from the same `timing`, so the slot's resize and its occupant's arrival
+      // are one gesture by construction rather than by agreement.
+      if (arriving.current) {
+        arriving.current = false;
+        i.style.opacity = "1";
+        fade.current = i.animate([{ opacity: 0 }, { opacity: 1 }], timing);
+      }
       a.onfinish = a.oncancel = () => {
         if (anim.current === a) {
           anim.current = null;
+          fade.current?.cancel();
+          fade.current = null;
           clearStyles();
         }
       };
@@ -164,6 +202,7 @@ export default function HeightEase({
     return () => {
       ro.disconnect();
       cancelAnimationFrame(confirm.current);
+      fade.current?.cancel();
       anim.current?.cancel();
     };
   }, []);

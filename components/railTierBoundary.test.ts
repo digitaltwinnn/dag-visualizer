@@ -93,3 +93,33 @@ describe("rail pager boundary — the plank rides the boxed tier", () => {
     expect(inspector, "`tier` must derive from the same `boxed`").toMatch(/const tier\s*=[^;]*\bboxed\b/);
   });
 });
+
+// ⚠️ THE RUNG'S ARRIVAL IS OWNED BY ONE ANIMATOR (user, 2026-09-13: "don't make it a timing fix
+// but do it structurally"). A rung that CHANGES TIER is a new occupant of that slot, so it must
+// fade in — and on the very animation that resizes the slot, never on a second clock beside it.
+//
+// The first cut did it in CSS: `tierSettleIn`/`tierSettleOut` started at opacity 0 and restarted
+// because React swapped `.rail-entry` for `.ig-panel`. It looked identical and was wrong twice —
+// the trigger was an ACCIDENT of reconciliation (reuse the element and the arrival silently stops
+// happening; recreate one for any other reason and it fires when nothing changed), and the fade
+// merely READ the same `--tempo-roll` as the height, so the two agreed by convention and could
+// drift the moment either was retuned.
+//
+// So the rule this pins: the tier travels to HeightEase as `settleKey` (the stated fact), and the
+// tier keyframes own no opacity (the CSS may settle the plate's border and radius — decoration
+// with no timing contract — and nothing else).
+describe("rail tier boundary — the arrival is HeightEase's, not the stylesheet's", () => {
+  it("hands the tier to HeightEase as settleKey", () => {
+    const src = readFileSync("components/Inspector.tsx", "utf8");
+    expect(src).toMatch(/<HeightEase[^>]*settleKey=\{tier\}/);
+  });
+
+  it("leaves no opacity in the tier keyframes", () => {
+    const css = readFileSync("app/globals.css", "utf8");
+    const frames = [...css.matchAll(/@keyframes\s+(tierSettle\w*)\s*\{([\s\S]*?)\n\}/g)];
+    expect(frames.length).toBeGreaterThan(0);
+    for (const [, name, body] of frames) {
+      expect(`${name}: ${body}`).not.toMatch(/opacity/);
+    }
+  });
+});

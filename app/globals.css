@@ -457,39 +457,31 @@
    No transforms — the geometry-never-animates rule keeps its spirit: nothing moves, the
    arriving frame simply fades and rounds into place. The `from`-only keyframes land on
    each element's own computed values. */
-/* ⚠️ THE TIER CROSS-FADES; IT USED TO ARRIVE FINISHED (user, 2026-09-13, second round on the
-   same click: "still needs more work … the bottom section still appears immediately"). The
-   height ease was already right — pinned before paint, no bleed past the clip (both verified by
-   hit-test) — but only the HEIGHT was easing. `data-tier` flips in the commit frame, so at t=0
-   the clicked rung already wore its whole BOX identity (plate, border, wash, the pager plank)
-   inside a slot still the size of an entry, and the rung it displaced already wore its ENTRY
-   identity inside a slot still the size of a box. Every rung below them was therefore in its
-   final form from the first frame, which is what "the bottom section appears immediately" is:
-   the pile's IDENTITY was final while only its measurements moved, so the eye read the change
-   as done and the motion as a separate, pointless reflow.
+/* ⚠️ THE TIER'S ARRIVAL IS NOT HERE ANY MORE — it belongs to HeightEase (user, 2026-09-13:
+   "don't make it a timing fix but do it structurally"). The problem it answers is real and
+   worth stating: `data-tier` flips in the commit frame, so at t=0 a clicked rung already wore
+   its whole BOX identity — plate, border, wash, the pager plank — inside a slot still the size
+   of an entry, and the rung it displaced already wore its ENTRY identity inside a slot still
+   the size of a box. Every rung below them was in final form from the first frame, which is
+   what "the bottom section appears immediately" was: the pile's IDENTITY was final while only
+   its measurements moved.
 
-   `tierSettleIn` started at 0.72 — too high to read as an arrival — and `tierSettleOut` started
-   at opacity 1, which is no animation at all. Both now start at 0, so a rung that CHANGED tier
-   fades in across the same clock its slot is resizing on, and the two read as one event. A rung
-   whose tier did not change (the untouched entries between) keeps its element, so its animation
-   never restarts and it simply travels — correct: it did not change, it moved. Measured on a
-   real focus move: the two rungs that flipped read opacity 0.00, the two that did not held
-   0.58 and 0.86 (their `--entry-dim`) exactly.
+   The first cut fixed that HERE, by starting both keyframes at opacity 0. It looked right and
+   was structurally wrong twice over: the trigger was an ACCIDENT of reconciliation (these
+   animations restart only because React swaps `.rail-entry` for `.ig-panel` — reuse the element
+   and the arrival silently stops happening), and the fade ran on its own CSS clock that merely
+   READ the same `--tempo-roll` as the height, so two animations agreed by convention and were
+   free to drift the moment either was retuned.
 
-   ⚠️ MEASURING THIS NEEDS THE CLOCK SET BEFORE THE CLICK, NOT WITH IT. `--tempo-roll` IS the
-   `animation-duration` here, so writing the token re-times every matching element and restarts
-   all four from `from` — which looks exactly like the regression this change would cause if it
-   were wrong. Slow the clock, let it settle, then interact.
-
-   The slab's "geometry does not animate" rule is unamended: seams, corners and washes are still
-   static. What animates is the rung's PRESENCE, which is what changed. */
-@keyframes tierSettleIn { from { opacity: 0; border-color: transparent; border-radius: var(--radius-md); } }
-@keyframes tierSettleOut { from { opacity: 0; } }
+   So the OPACITY moved to `HeightEase`'s `settleKey`, where the tier comes down as a stated
+   fact and the fade is started by the same code, in the same tick, with the same timing object
+   as the height ease. What stays here is what is genuinely decoration and owns no timing
+   contract: the box's plate settling its border and radius in. `tierSettleOut` is gone with the
+   opacity — it had nothing else in it. */
+@keyframes tierSettleIn { from { border-color: transparent; border-radius: var(--radius-md); } }
 .rail-ladder [data-tier="box"] .ig-panel { animation: tierSettleIn var(--tempo-roll) var(--ease-roll); }
-.rail-ladder [data-tier="entry"] .rail-entry { animation: tierSettleOut var(--tempo-roll) var(--ease-roll); }
 @media (prefers-reduced-motion: reduce) {
-  .rail-ladder [data-tier="box"] .ig-panel,
-  .rail-ladder [data-tier="entry"] .rail-entry { animation: none; }
+  .rail-ladder [data-tier="box"] .ig-panel { animation: none; }
 }
 .rail-ladder > * + * { margin-top: var(--rail-gap); }
 

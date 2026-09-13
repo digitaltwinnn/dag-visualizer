@@ -617,7 +617,12 @@ export default function Inspector() {
                 follow-don't-fight heuristic that keeps it off the pager's own slides). The
                 slab selectors are descendant, not child, so the extra level is free — the
                 RailPager precedent. */}
-            <HeightEase growIn={laneBooted.current}>{wrapped}</HeightEase>
+            {/* `settleKey` is the rung's TIER, stated (2026-09-13): when it changes, this slot
+                is showing a different thing and HeightEase fades the new occupant in on the
+                very animation that resizes the slot. It used to be inferred — CSS keyframes
+                restarting because React swapped `.rail-entry` for `.ig-panel` — which made the
+                arrival an accident of reconciliation and put it on a second clock. */}
+            <HeightEase growIn={laneBooted.current} settleKey={tier}>{wrapped}</HeightEase>
           </div>
         );
       })}
