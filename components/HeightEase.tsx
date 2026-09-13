@@ -35,6 +35,12 @@ import { useLayoutEffect, useRef, type ReactNode } from "react";
 // The leaving side stays a snap — animating an unmount needs exit-hold machinery (the
 // accordion-clone lessons), not a casual add.
 //
+// ⚠️ THE PIN LANDS BEFORE PAINT. The observer fires after layout and before the frame is
+// painted; the confirmation rAF below it runs a whole frame later. Everything that keeps the
+// box from showing its destination must therefore happen in the OBSERVER — see the pin note
+// at the `o.style.height = from` line for what that fixed and why the stretch chain stays
+// behind in the confirmation frame.
+//
 // ⚠️ FOLLOW, DON'T FIGHT: the pile already has animators — the pager pins and eases heights
 // through a sibling slide, Radix disclosures run .disclose-panel inside card bodies. Their
 // tell is that the content is STILL MOVING one frame later — so every would-be ease first
@@ -64,6 +70,7 @@ export default function HeightEase({
     const o = outer.current!;
     const i = inner.current!;
     const clearStyles = () => {
+      o.style.height = "";
       o.style.overflow = "";
       o.style.overflowClipMargin = "";
       i.style.height = "";
@@ -87,14 +94,34 @@ export default function HeightEase({
       const from = first ? 0 : last.current;
       last.current = h;
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      // ⚠️ PIN TO THE OLD HEIGHT *HERE*, IN THE OBSERVER, NOT IN THE CONFIRMATION FRAME
+      // (user, 2026-09-13: "it briefly expands/snaps to its full height already before
+      // starting the smooth grow towards its height"). An RO callback runs after layout and
+      // BEFORE paint; the confirmation rAF below runs a whole frame later. So the frame that
+      // changed the content used to PAINT at the new full height, and only the frame after
+      // that dropped back to `from` and began easing — one 16ms flash of the destination,
+      // then a jump backwards. It also explained the second half of the same report ("the
+      // bottom cards section appears immediately"): in that flash frame every card below had
+      // already been pushed to its final place, and they snapped back with it.
+      //
+      // Pinning the BOX before paint is enough to erase it. Only `o`'s own height and clip
+      // are touched — never the stretch chain, which stays in the confirmation frame below,
+      // so the follow-don't-fight guarantee is unchanged: a foreign animator's pin is still
+      // never written by us, and the pin here is released the moment one is detected.
+      o.style.height = `${from}px`;
+      o.style.overflow = "clip";
+      o.style.overflowClipMargin = "18px";
       // The one-frame confirmation (see the follow-don't-fight note above): a foreign
       // animator shows up as the height still moving next frame.
       cancelAnimationFrame(confirm.current);
       confirm.current = requestAnimationFrame(() => {
         confirm.current = 0;
+        // `i` is not stretched yet, so this still reads the CONTENT's natural height —
+        // the pin above constrains `o` alone.
         const h2 = i.offsetHeight;
         if (h2 !== h) {
           last.current = h2;
+          clearStyles(); // a foreign animator owns this box — hand it straight back
           return;
         }
       const root = getComputedStyle(document.documentElement);
@@ -107,8 +134,10 @@ export default function HeightEase({
       // bottom under a moving outer), and the outermost panel itself, which also clips its
       // own overflowing content (an element's overflow clips descendants, never its own
       // border or shadow).
-      o.style.overflow = "clip";
-      o.style.overflowClipMargin = "18px";
+      // The pin's base value becomes the DESTINATION now, so the moment the (fill: none)
+      // animation finishes the inline height already equals what it rendered — clearStyles
+      // then drops to `auto` with nothing to flash through.
+      o.style.height = `${h}px`;
       i.style.height = "100%";
       const panel = i.querySelector<HTMLElement>(".ig-panel, .rail-entry");
       if (panel) {
