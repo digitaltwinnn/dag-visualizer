@@ -136,9 +136,18 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     sims: { arcs: false, hubOrbits: true, globeSpin: false },
     show: { hyperFurniture: true, globeSurface: true, ledger: false },
     pickSources: ["globe", "layers"],
-    // DoF dropped (user, 2026-07-17): the bokeh read as FUZZ on the selected atom. No view is
-    // DoF-eligible now; the BokehPass machinery stays wired for a future re-tune.
-    dofEligible: false,
+    // ⚠️ DoF IS BACK (user, 2026-09-13: "add background blur effect again to hyper when a
+    // metagraph is selected"). It was dropped on 2026-07-17 because "the bokeh read as FUZZ on
+    // the selected atom" — and the two things that caused that have both since been fixed
+    // elsewhere, which is why the re-tune the old note anticipated turns out to be a flag:
+    //   · the SHARP ZONE was widened for exactly this complaint (SceneContext's dofParams: a low
+    //     0.00028 aperture, so the selected hub's own shells — a few units of depth either side
+    //     of the focal plane — stay inside it while the core and the far hubs saturate);
+    //   · the fuzziness on the selected hub itself traced to OVER-STRONG BLOOM, not to the
+    //     bokeh (see the UnrealBloomPass note), and hyper's strength has come down to 0.27 since.
+    // Still ANDed in the Engine with a single metagraph committed and the morph window, so it
+    // says exactly what the user asked for: blur the background when a network is the subject.
+    dofEligible: true,
     countryHover: false,
     minCamDist: 12,
     minCamAlt: null,
