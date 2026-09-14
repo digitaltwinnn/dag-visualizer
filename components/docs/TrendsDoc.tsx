@@ -433,20 +433,33 @@ export default function TrendsDoc() {
   // flex-none + a fixed h-8: the primitive's triggers are flex-1 at a %-height, which is what
   // spread them wide and broke when the list WRAPS on phone (the h-auto rows below) — as
   // compact pills they pack left and wrap cleanly (user, 2026-09-08: the tabs overflowed).
-  /* The scale control. Same pill register as the topic and window pickers — it is a third
-     setting on the same reading, not a new kind of thing — and it is rendered ONLY on the
-     metagraphs tab, because a scale shared across charts is only a question where there is a
-     COLUMN of comparable charts. The hypergraph tab's charts each measure a different quantity,
-     so there is nothing there to share a scale with. */
-  const scalePicker = (
-    <div role="group" aria-label="Chart scale" className={PICKER_GROUP}>
-      {([["own", "Per network", "Each chart scales to its own data — best for reading one network's peaks and dips."],
-         ["shared", "Same scale", "Every chart shares the busiest network's scale — best for comparing networks. Quiet ones will read as slivers; each chart still states its own peak."]] as const).map(([id, label, title]) => (
-        <button key={id} type="button" aria-pressed={scaleMode === id} title={title} onClick={() => setScaleMode(id)} className={zoomBtn(scaleMode === id)}>
-          {label}
-        </button>
-      ))}
-    </div>
+  /* The scale control. It keeps the pickers' pill register — it is a setting on the same
+     reading, not a new kind of thing — and it is rendered ONLY on the metagraphs tab, because a
+     scale shared across charts is only a question where there is a COLUMN of comparable charts.
+     The hypergraph tab's charts each measure a different quantity, so there is nothing there to
+     share a scale with.
+
+     ⚠️ IT IS ONE BUTTON THAT FLIPS, not a two-segment group (user, 2026-09-14: "should read
+     like a simple toggle") — the SAME correction the Scene⇄HUD control took on 2026-08-30, for
+     the same reason: a binary drawn as two segments is a radio, and a radio asks the reader to
+     compare two labels before pressing either. So the app's toggle grammar, verbatim from that
+     control: a STABLE label naming what the button presses FOR, and the wash saying whether it
+     is on. The title names what a click does, in both directions, because "Same scale" pressed
+     and unpressed are two readings a reader may not have a word for yet. */
+  const scaleToggle = (
+    <button
+      type="button"
+      aria-pressed={scaleMode === "shared"}
+      onClick={() => setScaleMode(scaleMode === "shared" ? "own" : "shared")}
+      title={
+        scaleMode === "shared"
+          ? "Every chart shares the busiest network's scale, so the column compares. Click to let each chart scale to its own data."
+          : "Each chart scales to its own data. Click to put every chart on the busiest network's scale."
+      }
+      className={cn(PICKER_GROUP, "cursor-pointer max-[700px]:w-full max-[700px]:justify-center")}
+    >
+      <span className={zoomBtn(scaleMode === "shared")}>Same scale</span>
+    </button>
   );
   const topicPicker = (
     <div role="group" aria-label="Topic" className={PICKER_GROUP}>
@@ -646,7 +659,7 @@ export default function TrendsDoc() {
               these charts only, and a control that appears and disappears as the reader crosses
               the tab row would read as the toolbar losing a button. Right-aligned so the tab's
               own content still opens on its first section heading. */}
-          <div className="flex justify-end max-[700px]:justify-stretch">{scalePicker}</div>
+          <div className="flex justify-end max-[700px]:justify-stretch">{scaleToggle}</div>
           {sectionTab === "snapshots" && (<>
           <Section
             id="networks"
