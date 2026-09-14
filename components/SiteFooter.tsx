@@ -73,6 +73,15 @@ export default function SiteFooter() {
   // Constellation link below wears (same record the dossier avatar reads).
   const dag = metagraphById("dag");
   const doc = useStore((s) => s.docPage);
+  // SCENE mode takes the strip FULL-BLEED (user, 2026-09-14: "expand the footer to full width —
+  // the vitals it attached to is no longer there"). The `--bar-margin` inset is not a margin for
+  // its own sake: it exists so this row's edges line up with the two BARS and the rail cards
+  // above them. Presentation mode sends the rails out through their own edges and the vitals lane
+  // down through this one, so the alignment has nothing left to align TO — and an inset veil under
+  // an empty scene reads as a strip that failed to reach the screen, the same misread the phone
+  // arm below already fixes for the dock. The top bar keeps its inset: it is still on screen, so
+  // it is still the thing an inset would answer to.
+  const railsHidden = useStore((s) => s.railsHidden);
   return (
     // pointer-events-none on the band, auto on the links: an orbit drag started along the bottom
     // edge must still reach the scene. FULL-WIDTH STRIP since 2026-09-04 (user: the centred
@@ -84,7 +93,15 @@ export default function SiteFooter() {
     <footer
       id="sitefoot"
       className={cn(
-        "fixed inset-x-[var(--bar-margin)] bottom-0 z-10 flex items-stretch pointer-events-none",
+        "fixed bottom-0 z-10 flex items-stretch pointer-events-none",
+        // ⚠️ THE SHADE RECIPE'S TWO TEMPOS, because this is the same gesture as the rails' exit:
+        // 0.3s away, 0.18s back (the HUD returns faster than it steps aside — the return answers a
+        // gesture already finished). Named as `left,right` rather than `all`: this row also carries
+        // a `height` change on the phone/doc arms, and a blanket transition would animate that too.
+        "transition-[left,right] duration-[180ms] ease-out motion-reduce:transition-none",
+        railsHidden
+          ? "inset-x-0 duration-300 ease-[ease]"
+          : "inset-x-[var(--bar-margin)]",
         // The +min(10px, --bottom-reserve) TUCK (user, 2026-09-04): the vitals band's rounded
         // bottom corners left notches of bare scene where they met this strip's square top.
         // The strip reaches ~10px up BEHIND the band (later in the DOM at the same z, so the
