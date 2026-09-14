@@ -20,7 +20,7 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 import { DepthCaption, DisclosureChevron, Disclosure, DisclosurePanel, DisclosureRow, NodePickerRow, ROW_NEST, ROW_NEST_DEEP, ROW_OUTSET } from "@/components/ExploreRows";
 import { CONTENT_EASE } from "@/components/RollSwap";
 import { NoSignalDot } from "@/components/state/StateAtoms";
-import { buildAnchorLog, type AnchorLogRow, type ChannelLogRow } from "@/src/data/anchorLog";
+import { buildAnchorLog, buildChannelLog, type AnchorLogRow, type ChannelLogRow } from "@/src/data/anchorLog";
 import { POLL } from "@/src/engine/config";
 import TablePager from "@/components/datasection/TablePager";
 import { ensurePage } from "@/components/RawSnapshotBridge";
@@ -77,6 +77,26 @@ interface MetaGroup {
   name: string;
   hue: string;
   rows: ChannelLogRow[];
+}
+
+/** Stable empty — a fresh `[]` per render would be a new prop identity on every tick row. */
+const EMPTY_GROUPS: MetaGroup[] = [];
+
+/** ONE TICK'S ROWS, from both sources, POLLED FIRST. The polled row wins where both hold the same
+ *  (metagraph, ordinal) because it carries the metagraph snapshot's own `hash`, which the exact
+ *  read does not; the exact read then supplies every anchor the per-network buffer has aged out.
+ *  See the call site for why either alone is wrong. */
+function unionRows(
+  polled: readonly AnchorLogRow[],
+  exact: readonly AnchorLogRow[],
+  tickOrdinal: number,
+): AnchorLogRow[] {
+  const mine = polled.filter((r) => r.global.ordinal === tickOrdinal);
+  const seen = new Set(mine.map((r) => `${r.metaId}|${r.ordinal}`));
+  const extra = exact.filter(
+    (r) => r.global.ordinal === tickOrdinal && !seen.has(`${r.metaId}|${r.ordinal}`),
+  );
+  return extra.length ? [...mine, ...extra] : mine;
 }
 
 function groupByMeta(rows: readonly AnchorLogRow[]): MetaGroup[] {
@@ -399,6 +419,11 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // The UNLISTED channels (user, 2026-08-07 — navigable like any network): the one-home row
   // source (src/data/unlisted.ts — the exact reads, the only honest source), windowed here.
   const unlistedEntries = unlistedLog([...snaps].reverse(), snapshotExact);
+  // The LISTED half of the same source. `unlistedLog` has always read the exact snapshots for the
+  // uncataloged channels — "the polled buffers only track the public catalog, so the EXACT reads
+  // are the only honest source" — and the catalog's own rows turn out to need it just as much, for
+  // a different reason: the buffers track them, but only 160 rows deep PER NETWORK.
+  const exactChannelRows = buildChannelLog([...snaps].reverse(), snapshotExact, (id: string) => LISTED_IDS.has(id));
   // Under a NETWORK filter the global list shows ONLY that network's story — the ticks it
   // anchored into, the LiveStrip's filtered idiom (user, 2026-08-07: one mental model, no
   // two-outcome clicks in the explorer; the scene keeps all ticks and the filter-releases rule
@@ -589,13 +614,29 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           {orderedSnaps.length === 0
             ? empty
             : pagedSnaps.map((d) => {
-                const tickGroups = groupByMeta(rows.filter((r) => r.global.ordinal === d.ordinal));
+                // ⚠️ THE BREAKDOWN IS THE UNION OF BOTH SOURCES, and only the exact read makes it
+                // COMPLETE (user, 2026-09-14: "why it shows 2 rows in the explorer instead of 3 —
+                // DED is missing"). `rows` comes from the polled `metaSnaps` buffers, which hold
+                // POLL.metaSnapBuffer rows PER NETWORK — a depth in ROWS, not in ticks. Measured on
+                // the reported tick: Digital Evidence anchored 46 snapshots into it, so 160 rows is
+                // barely three ticks of that chain and every older tick quietly lost its busiest
+                // contributor — while the fee this very row states, which comes from the exact read,
+                // went on counting it. A breakdown that cannot add up to the number above it is
+                // exactly what rule 10 forbids. (Paging the list from 9 ticks to 52 is what turned
+                // this from rare into normal, which is how it surfaced.)
+                //
+                // The POLLED row wins where both have it, because it carries the metagraph
+                // snapshot's own `hash` and the exact read does not; the exact read then supplies
+                // everything the buffer has aged out. Computed only while the tick is OPEN — it is
+                // the disclosure's content, and building it for all 15 rows of a page was work
+                // nobody could see.
+                const isOpen = openTick === d.ordinal;
+                const tickGroups = !isOpen ? EMPTY_GROUPS : groupByMeta(unionRows(rows, exactChannelRows, d.ordinal));
                 // The tick's uncataloged anchors: the exact read's authoritative COUNT, and the
                 // per-channel entries that same read yields (identical source, so the entry list
                 // can't disagree with the count).
                 const tickUnlisted = snapshotExact[d.ordinal]?.unlistedCount ?? 0;
                 const tickEntries = unlistedEntries.filter((e) => e.global.ordinal === d.ordinal);
-                const isOpen = openTick === d.ordinal;
                 const globalPick = {
                   kind: "snapshot",
                   title: `Global snapshot #${d.ordinal}`,

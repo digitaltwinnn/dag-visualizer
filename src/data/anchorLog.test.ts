@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAnchorLog, sortAnchorLog, buildUnlistedLog, snapsAtTick } from "@/src/data/anchorLog";
+import { buildAnchorLog, buildChannelLog, sortAnchorLog, buildUnlistedLog, snapsAtTick } from "@/src/data/anchorLog";
 import type { MetaSnapRecord } from "@/src/data/api";
 import type { GlobalSnapshot } from "@/src/data/types";
 
@@ -133,5 +133,47 @@ describe("sortAnchorLog (user, 2026-08-13 — the log sorts like the roster)", (
     expect(sortAnchorLog(rows, "fee", 1, nameOf).map((r) => r.fee)).toEqual([1, 3, 5]);
     expect(sortAnchorLog(rows, "size", -1, nameOf).map((r) => r.sizeInKB)).toEqual([9, 4, 2]);
     expect(sortAnchorLog(rows, "tick", 1, nameOf).map((r) => r.global.ordinal)).toEqual([1, 2, 2]);
+  });
+});
+
+// The catalog half of the same source (2026-09-14). `buildUnlistedLog` reads the exact snapshots
+// because the polled buffers do not TRACK uncataloged channels at all; the listed rows need the
+// same source for a different reason — the buffers track them, but only POLL.metaSnapBuffer rows
+// deep PER NETWORK, which is a depth in ROWS, not in ticks. A chain anchoring 46 snapshots into
+// one global tick therefore reaches back about three ticks, and the by-network breakdown under any
+// older tick lost it while the tick's own fee total went on counting it.
+describe("buildChannelLog (the exact read is the complete answer to who anchored)", () => {
+  const g1 = { ordinal: 10, timestamp: "T1", hash: "h1" } as never;
+  const g2 = { ordinal: 11, timestamp: "T2", hash: "h2" } as never;
+  const exact = {
+    10: { rows: [{ metaId: "LISTED", ordinal: 5, fee: 1, bytes: 1024 }, { metaId: "DAGxyz", ordinal: 7, fee: 2, bytes: 2048 }] },
+    11: { rows: [{ metaId: "LISTED", ordinal: 6, fee: 3, bytes: 512 }] },
+  };
+
+  it("keeps exactly what `keep` selects — the listed half here", () => {
+    const rows = buildChannelLog([g1, g2], exact, (id) => id === "LISTED");
+    expect(rows.map((r) => `${r.metaId}:${r.ordinal}`)).toEqual(["LISTED:6", "LISTED:5"]);
+  });
+
+  it("carries the TICK's timestamp and no hash — the exact read knows neither", () => {
+    const [row] = buildChannelLog([g1], exact, () => true);
+    expect(row.ts).toBe("T1");
+    expect(row.hash).toBe("");
+    expect(row.global.ordinal).toBe(10);
+  });
+
+  it("reports a listed channel the polled buffer never held — the reported bug", () => {
+    // The buffer aged this chain out; only the exact read still knows it anchored here.
+    const polled: string[] = [];
+    const fromExact = buildChannelLog([g1], exact, (id) => id === "LISTED").map((r) => r.metaId);
+    expect(polled).toEqual([]);
+    expect(fromExact).toEqual(["LISTED"]);
+  });
+
+  it("is what buildUnlistedLog is now expressed in — same rows, inverted predicate", () => {
+    const listed = new Set(["LISTED"]);
+    expect(buildUnlistedLog([g1, g2], exact, listed)).toEqual(
+      buildChannelLog([g1, g2], exact, (id) => !listed.has(id)),
+    );
   });
 });
