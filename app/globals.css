@@ -574,11 +574,33 @@
    2px so it reads inside the plate, and it rides the arrival hold above like every other ring,
    which is what makes the landing appear as the rung settles rather than during its flight.
    `:focus-visible` only, so a mouse click that hands focus the same way shows nothing. */
-/* ⚠️ NO `border-radius` HERE. An outline already follows the element's own corners, and an
-   `inherit` added "to make it round" did the opposite: it overrode the panel's 14px with the
-   wrapper's 0 and SQUARED the card for as long as it held focus (caught in the live check). */
-.rail-ladder .ig-panel:focus-visible {
-  outline: 1px solid var(--ring);
+/* ⚠️ THE RAIL HAS ONE FOCUS RING, AND IT IS THE CARD'S OWN ACCENT (user, 2026-09-14: "the
+   section does not [focus] while the buttons focus but give it a gray focus while the card focus
+   is either cyan or metagraph if filtered"). The plank's chevrons are shadcn Buttons carrying the
+   primitive's generic `ring-ring/50`, which on this glass reads as a neutral smudge and belongs
+   to no card — while everything else in the rail speaks the identity lane. `--filter-accent` is
+   inherited all the way down (measured: the plank and the `.rail-card` wrapper both carry it), so
+   one rule covers the panel, the entries and every control inside them: structural cyan at rest,
+   the committed network's hue under a filter, exactly like the edge signals beside it.
+   ⚠️ (0,2,0) on purpose — the arrival hold above is (0,3,0) and must still win, so a ring that
+   lands mid-flight stays transparent until the rung settles. */
+.rail-ladder :focus-visible {
+  outline: 1px solid var(--filter-accent, var(--primary));
+  outline-offset: 2px;
+}
+/* ⚠️ THE STABLE ELEMENT HOLDS THE FOCUS, THE VISIBLE ONE SHOWS IT. A rung's focus lives on its
+   WRAPPER — the one node that survives a tier change, which is what lets CardHead hand focus over
+   before the old control unmounts (see `keepFocusOnRung`). But the wrapper is a bare box with no
+   radius, so a ring drawn on it would square off a 14px card. So the wrapper shows nothing and
+   the ring is drawn on the PANEL inside it, which already has the card's own corners and bounds.
+   Inset, because this ring means "this card" — it is the card itself, not a control on it, and an
+   outset ring on a rounded plate reads as a second border.
+   (No `border-radius` on these: an outline already follows its element's corners, and an
+   `inherit` added "to make it round" overrode the panel's 14px with the wrapper's 0.) */
+.rail-ladder [data-rung]:focus-visible { outline: none; }
+.rail-ladder [data-rung]:focus-visible .ig-panel,
+.rail-ladder [data-rung]:focus-visible .rail-entry {
+  outline: 1px solid var(--filter-accent, var(--primary));
   outline-offset: -2px;
 }
 .rail-ladder:has([data-arriving]) :focus-visible { outline-color: transparent; }
