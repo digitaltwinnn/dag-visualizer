@@ -874,6 +874,30 @@ function LedgerCells({ accent, filter, paused }: { accent: string; filter: strin
       offRim: true, // the live buffer's window is NOT the rim's — this card must say so
     };
   };
+  /** THE QUESTION DOESN'T APPLY — the node card's `n/a` rule reaching the band (user, 2026-09-14:
+   *  "does DAG pay snapshot fees, that's what is implied now?"). It does not: a global snapshot
+   *  carries no `fee` field at all, because the DAG core has nothing to anchor INTO — it is the
+   *  thing anchored into. So under a committed DAG the fees slot had been printing 251/day as if
+   *  that were the core's outgoing, when it is every metagraph's outgoing flowing the other way.
+   *
+   *  `n/a`, not a muted zero and not the summed figure relabelled: a 0 would claim the core could
+   *  pay and didn't, and the sum is a real number answering a question nobody asked at this scope.
+   *  The reason line carries the fact that makes the absence interesting — this is the end fees
+   *  arrive at — and the summed reading is one filter step away, under All, where it belongs. */
+  const notApplicable = (label: string, reason: string, title: string) => (
+    <BandCard
+      key={label}
+      label={label}
+      title={title}
+      lead={
+        <span className="flex flex-col items-start">
+          <span className="font-mono font-bold text-muted-foreground tabular-nums whitespace-nowrap">n/a</span>
+        </span>
+      }
+    >
+      <span className="flex items-center self-stretch text-micro text-muted-foreground">{reason}</span>
+    </BandCard>
+  );
   const rate = (label: string, spark: SparkSpec, note?: string, title?: string) => {
     // NO ENDPOINT AXIS. It existed for the 1Y/ALL windows, where months repeat across the year
     // boundary and position-in-window stopped reading as "when" (user, 2026-09-09). Over a
@@ -999,6 +1023,11 @@ function LedgerCells({ accent, filter, paused }: { accent: string; filter: strin
           ⚠️ NOT "transaction fees" (user asked, 2026-09-14). Neither side has ever shown one. A
           DAG transfer's fee is a different quantity entirely and ~1,100x smaller: measured off
           /transactions, ~0.93 DAG a day against this slot's ~259. It belongs in its own reading.
+          ⚠️ AND THE DAG CORE IS NOT A THIRD SCOPE OF THE SAME READING — it is the one scope where
+          the question does not apply, which is why it branches FIRST and off `filter` rather than
+          off `scoped` (`isGlobalActivityScope` folds "all" and "dag" together, and here they are
+          opposites: "all" is everyone's outgoing, "dag" is the end it arrives at). See
+          `notApplicable`.
           Anchors lose nothing by leaving: the roster to the left counts who anchored and the chart
           to the right plots how much, both over this same window. This slot was their third home.
           ⚠️ THE TWO SCOPES ARE NOT EQUALLY EXACT, though, and the card says so. A network's own
@@ -1006,13 +1035,19 @@ function LedgerCells({ accent, filter, paused }: { accent: string; filter: strin
           the public catalog — so it is a FLOOR, the same lower bound the snapshot card marks. It
           cannot be silent about that (rule 10), and a caveat about the reading has nowhere to sit
           but the card's title. */}
-      {scoped
-        ? rate("Snapshot fees", sparkOf(cfg ? `m.${cfg.id}.fee` : null, activity?.feesSeries, activity?.feesPerHour, true),
-               "$DAG this network pays to anchor its snapshots into the global chain.",
-               "What this network pays in $DAG to anchor its snapshots into the global chain. Its own fees, in full.")
-        : rate("Snapshot fees", sparkOf("g.feeFloor", activity?.feesSeries, activity?.feesPerHour, true),
-               "$DAG paid to anchor snapshots into the global chain, every network summed. A floor: it counts only the metagraphs in the public catalog.",
-               "What every network pays in $DAG to anchor its snapshots into the global chain, summed — so this is also what the base ledger takes in. A lower bound: only the metagraphs in the public catalog are counted, so the real figure is higher.")}
+      {filter === "dag"
+        ? notApplicable(
+            "Snapshot fees",
+            "the base ledger is paid these, it pays none",
+            "A snapshot fee is what a metagraph pays to anchor into the global chain. The DAG core has nothing to anchor into — it is the chain they anchor into — so a global snapshot carries no fee at all. What flows IN is every network's fees summed; commit All to read it.",
+          )
+        : scoped
+          ? rate("Snapshot fees", sparkOf(cfg ? `m.${cfg.id}.fee` : null, activity?.feesSeries, activity?.feesPerHour, true),
+                 "$DAG this network pays to anchor its snapshots into the global chain.",
+                 "What this network pays in $DAG to anchor its snapshots into the global chain. Its own fees, in full.")
+          : rate("Snapshot fees", sparkOf("g.feeFloor", activity?.feesSeries, activity?.feesPerHour, true),
+                 "$DAG paid to anchor snapshots into the global chain, every network summed. A floor: it counts only the metagraphs in the public catalog.",
+                 "What every network pays in $DAG to anchor its snapshots into the global chain, summed — so this is also what the base ledger takes in. A lower bound: only the metagraphs in the public catalog are counted, so the real figure is higher.")}
       {rate("Snapshots", sparkOf(scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries, activity?.snapsPerHour))}
       {/* The chart states the same reach its rows do — it plots the very buckets the rate cards
           average, so a silent chart beside two captioned ones would read as a different window. */}
