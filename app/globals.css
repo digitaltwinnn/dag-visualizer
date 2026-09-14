@@ -291,6 +291,20 @@
    outward 2px offset and its per-rail sign are unchanged (see the pairing note below). */
 .sig-left:hover::before  { opacity: 1; filter: none; }
 .sig-right:hover::after  { opacity: 1; filter: none; }
+/* ⚠️ THE PLANK COUNTS AS THE CARD (user, 2026-09-14: "the bottom section of the cards drop the
+   focus, so when that is hovered the focus flashes as well"). The pager plank is a SIBLING of
+   the panel, not a descendant — it must be, since `#rightcol` is pointer-events:none and the
+   plank has to take the pointer — and `:hover` climbs to ancestors, never to siblings. So moving
+   the pointer down the card and into its bottom strip un-hovered the card and dropped the edge
+   signal, a blink in the middle of one continuous gesture. `.rail-card` is RailPager's wrapper,
+   which contains BOTH, and is therefore what "the pointer is on this card" really means.
+   ⚠️ OPACITY ONLY, and no `filter`. These arms sit above the pairing rules like the two hover
+   rules they extend, but they are a specificity step higher (0,3,1 against 0,2,1) — so anything
+   they set would beat pairing instead of losing to it, which is the one ordering this block
+   guarantees. Setting opacity alone is safe (both states want 1); `--edge-hue` and the glow stay
+   entirely with pairing, and a paired card hovered on its plank still reads as paired. */
+.rail-card:hover .sig-left::before  { opacity: 1; }
+.rail-card:hover .sig-right::after  { opacity: 1; }
 
 /* Hover PAIRING — the only non-pulse edge signal, shown strictly WHILE HOVERED (the class comes
    and goes with the hover; the 0.16s transition on the base elements eases it in/out).
@@ -571,6 +585,20 @@
 @media (prefers-reduced-motion: reduce) {
   .rail-ladder :focus-visible { transition: none; }
 }
+
+/* ⚠️ AN ARRIVING RUNG TAKES NO POINTER (user, 2026-09-14: "should we stop the mouse-pointer on
+   the revealed card as well, I think it leads to a flash also"). The effect gating below stands
+   down the treatments this file knows about, but a revealed BOX brings its own — row washes,
+   disclosure chevrons, the copy reveal — and it materialises under a cursor that never moved, so
+   they all lit at once on content the reader had not arrived at.
+   This is the SLIDE's own device, one gesture over (see RailPager's "THE SLIDE IS HOVER-INERT"
+   note, from the same report about a pointer resting on top of the cards): the card body goes
+   inert for the window, and the PLANK stays interactive — it is a sibling, not a descendant, so
+   it never inherits this — which is what keeps rapid stepping working and means a click is never
+   swallowed. When the window closes, whatever sits under the pointer hovers normally: a resting
+   state, no flash. */
+.rail-ladder [data-arriving] .ig-panel,
+.rail-ladder [data-arriving] .rail-entry { pointer-events: none; }
 
 .rail-ladder[data-stepping] .rail-entry,
 .rail-ladder[data-stepping] .rail-entry:hover,

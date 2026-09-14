@@ -892,7 +892,7 @@ function LedgerCells({ accent, filter, paused }: { accent: string; filter: strin
         <BandCard
           key={label}
           label={label}
-          aside={spark.offRim && spark.data != null ? spark.span : undefined}
+          aside={spark.data != null ? spark.span || undefined : undefined}
           lead={
             <span className="flex flex-col items-start">
               <span className="font-mono font-bold text-muted-foreground tabular-nums whitespace-nowrap">idle</span>
@@ -920,10 +920,17 @@ function LedgerCells({ accent, filter, paused }: { accent: string; filter: strin
       // window — it described the numeral, not the card). The unit rides UNDER the number
       // as a muted underline (the idle card's own stacked-lead grammar), so it qualifies
       // exactly the thing it belongs to; the header carries no aside and the rim alone
-      // speaks for the charts' range. The one exception stands: the live-fallback line
-      // states its own window, because it is NOT the rim's, and silence would let the
-      // rim's claim cover a chart it doesn't describe.
-      aside={spark.offRim ? spark.span || undefined : undefined}
+      // spoke for the charts' range.
+      //
+      // ⚠️ AND NOW EVERY CARD STATES ITS OWN REACH (user, 2026-09-14: "the vitals card now also
+      // need to indicate what range they show"). The rim WAS the range statement, so retiring it
+      // left the measured cards silent about a window they very much have — a chart with no
+      // stated reach beside live numerals invites both to be read as "now", which is the
+      // confusion the rim's own 2026-09-08 rounds were spent on. `spark.span` already carries
+      // the right words per card and needs no new rule: the measured cards say the band's
+      // window, and the live fallback keeps saying its own — which is the one case where the
+      // two genuinely differ, and the reason this is one expression rather than a constant.
+      aside={spark.span || undefined}
       lead={
         <span className="flex flex-col items-start">
           {/* NodeStars while the window's mean is still in flight (user, 2026-09-08: the
@@ -975,7 +982,9 @@ function LedgerCells({ accent, filter, paused }: { accent: string; filter: strin
         ? rate("DAG fees", sparkOf(cfg ? `m.${cfg.id}.fee` : null, activity?.feesSeries, activity?.feesPerHour, true), "$DAG this network pays to anchor.")
         : rate("Anchors", sparkOf("g.anchors", activity?.anchoredSeries, activity?.anchorsPerHour), "Metagraph snapshots anchored into the global chain.")}
       {rate("Snapshots", sparkOf(scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries, activity?.snapsPerHour))}
-      <BandCard label="Anchors by metagraph" className="min-w-[220px]">
+      {/* The chart states the same reach its rows do — it plots the very buckets the rate cards
+          average, so a silent chart beside two captioned ones would read as a different window. */}
+      <BandCard label="Anchors by metagraph" aside={span} className="min-w-[220px]">
         <StackBars accent={accent} isMeta={isMeta} filter={filter} data={barData} />
       </BandCard>
     </>
@@ -1042,12 +1051,31 @@ function AnchoringNetworks({ windowed, snaps, filter }: { windowed: TrendsWindow
           being distinguished from — the eye had to find the bright one among five identical marks
           rather than being handed it. `items-center` keeps the row's baseline steady while one dot
           grows, so nothing below it shifts. */}
-      <span className="flex flex-wrap items-center gap-1 max-w-[120px]">
-        {list.slice(0, 12).map((id) => {
+      {/* ⚠️ EVERY BULLET IS NAMED, AND THE RUN IS CENTRED (user, 2026-09-14: "metagraphs anchoring
+          can be centre-aligned and each bullet has room for a label"). The dots were bare and
+          capped at 120px because the card was `sm` and had no width to spend; on an equal share it
+          has plenty, and a bare dot made this the one roster in the app naming its subjects by
+          colour alone — which is the rule the sr-only line below existed to paper over. The TICKER
+          is the label: it is what the rest of the band already calls a network ("following DOR"),
+          and it stays short enough that four or five pairs wrap cleanly at a third of the plate.
+          ⚠️ THE CAP DROPS 12 → 8 with the labels: twelve NAMED entries is a list, not a legend,
+          and the honest total is the lead numeral beside them, not the length of this run. */}
+      <span className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 flex-1 min-w-0">
+        {list.slice(0, 8).map((id) => {
           const on = filter !== "all" && id === filter;
+          const label = metagraphById(id)?.ticker ?? displayNetwork(id)?.ticker ?? null;
           return (
-            <span key={id} className={cn("flex", filter !== "all" && !on && "opacity-45")}>
+            <span key={id} className={cn("inline-flex items-center gap-1 min-w-0", filter !== "all" && !on && "opacity-45")}>
               <IdentityDot hue={identityHudCss(id)} className={on ? "w-3.5 h-3.5" : undefined} />
+              {/* No hand-written fallback label — `displayNetwork` is the one home for what an
+                  uncatalogued channel is CALLED (unlistedBoundary.test.ts enforces that the id
+                  literal has two homes, and this is not one of them). With no name to give, the
+                  dot stands alone rather than being captioned with a guess. */}
+              {label && (
+                <span className={cn("text-micro truncate", on ? "text-foreground" : "text-muted-foreground")}>
+                  {label}
+                </span>
+              )}
             </span>
           );
         })}
