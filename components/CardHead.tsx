@@ -317,6 +317,35 @@ export default function CardHead({
   // body's right-aligned columns (user, 2026-07-12 — the 22px title-row clearance double-inset
   // the aside ~40px from the card edge while everything else aligned at ~18px). The BOX carries
   // NO minimize control (user, 2026-09-11 — "hardly used"; it was the − on the eyebrow line
+/** ⚠️ A CONTROL THAT DESTROYS ITSELF HANDS FOCUS ON (2026-09-14, the a11y gap the tablet/phone
+ *  pass turned up). The right rail's disclosure is asymmetric by design: an unboxed ENTRY is one
+ *  invisible stretched toggle, and the BOX it opens into has no toggle at all — its chrome is the
+ *  × alone (see the entry note below for why). So activating an entry does not MOVE focus, it
+ *  DESTROYS the focused element, and focus fell to `<body>`: a keyboard user lost their place in
+ *  the rail entirely and had to Tab in again from the top of the document.
+ *
+ *  There is no equivalent control to hand to — the × is a destructive action and must not catch a
+ *  stray Enter — so this follows the disclosure pattern's other branch: put the user at the START
+ *  of the region that was just revealed. The panel takes a programmatic-only tabstop and the
+ *  focus; Tab then continues into the card's own controls.
+ *
+ *  Two guards. It only fires when focus was genuinely LOST (`<body>`), so a user who has already
+ *  moved on is never yanked back; and `preventScroll`, because the rail is a scroll container and
+ *  a focus that jumps it would undo the very orientation this restores. The ring that lands is
+ *  held off until the rung finishes arriving — that is the `data-arriving` window, not this. */
+function handFocusToPanel(rung: HTMLElement): void {
+  // Two frames: React commits the new tier, then the panel exists to receive it.
+  requestAnimationFrame(() =>
+    requestAnimationFrame(() => {
+      if (document.activeElement && document.activeElement !== document.body) return;
+      const panel = rung.querySelector<HTMLElement>(".ig-panel");
+      if (!panel) return;
+      panel.tabIndex = -1;
+      panel.focus({ preventScroll: true });
+    }),
+  );
+}
+
   // plus a whole-head stretched toggle): the box moves by expanding another entry or by the
   // plank's ladder pair, never by collapsing into nothing. COLLAPSED (the unboxed ENTRY,
   // card-redesign 2026-08-08) the chrome disappears entirely — no ×, no +/− (user: it read as
@@ -346,7 +375,11 @@ export default function CardHead({
             type="button"
             aria-expanded={false}
             title="Expand"
-            onClick={onToggle}
+            onClick={(e) => {
+              const rung = e.currentTarget.closest<HTMLElement>("[data-tier]");
+              onToggle?.();
+              if (rung) handFocusToPanel(rung);
+            }}
             className="absolute inset-0 z-[1] appearance-none bg-transparent border-0 p-0 m-0 cursor-pointer rounded-sm focus-visible:outline-1 focus-visible:outline-ring/60"
           >
             <span className="sr-only">Expand</span>

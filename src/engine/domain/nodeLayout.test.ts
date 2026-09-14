@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
 import {
-  GOLDEN_ANGLE, lerp, smooth, smoother, smoothest, discFall, fibShellPos, spreadCoLocated,
+  GOLDEN_ANGLE, lerp, smooth, smoothest, discFall, fibShellPos, spreadCoLocated,
   stackSizes, STACK_MIN, STACK_MAX,
   armillaryFrame, ringFramePos, ringNormal, armillaryRings, armillaryPos,
   nodeRoles, hexCell,
@@ -35,28 +35,10 @@ describe("discFall", () => {
   });
 });
 
-describe("smoother (quintic)", () => {
-  it("pins the endpoints and midpoint", () => {
-    expect(smoother(0)).toBe(0);
-    expect(smoother(1)).toBe(1);
-    expect(smoother(0.5)).toBeCloseTo(0.5, 12);
-  });
-
-  it("is odd-symmetric about 0.5 — the retarget continuity contract", () => {
-    for (const x of [0.1, 0.25, 0.4]) expect(smoother(1 - x)).toBeCloseTo(1 - smoother(x), 12);
-  });
-
-  it("has a more pronounced slow-fast-slow profile than smooth (flatter ends, steeper middle)", () => {
-    expect(smoother(0.1)).toBeLessThan(smooth(0.1));
-    expect(smoother(0.9)).toBeGreaterThan(smooth(0.9));
-    const midSlope = (f: (m: number) => number) => (f(0.51) - f(0.49)) / 0.02;
-    expect(midSlope(smoother)).toBeGreaterThan(midSlope(smooth));
-  });
-});
-
-// The FLIGHT's own curve (the transition's gatherWeight uses this one, not `smoother`). The
-// contract is the same one `smoother` carries, plus the reason it exists: a faster CRUISE
-// without a faster launch or landing.
+// The FLIGHT's own curve (the transition's gatherWeight). Specified against `smooth`, which is
+// still live (furnitureAlpha), and against its own exact numbers — the quintic it used to be
+// compared with was deleted as dead on 2026-09-14, and a spec that leans on a curve nothing
+// renders is a spec that can rot without anything noticing.
 describe("smoothest (septic)", () => {
   it("pins the endpoints and midpoint", () => {
     expect(smoothest(0)).toBe(0);
@@ -68,14 +50,16 @@ describe("smoothest (septic)", () => {
     for (const x of [0.1, 0.25, 0.4, 0.73]) expect(smoothest(1 - x)).toBeCloseTo(1 - smoothest(x), 12);
   });
 
-  it("cruises faster than smoother while launching and landing softer", () => {
-    // Flatter at BOTH ends than the quintic — the launch and the landing are not sped up.
-    expect(smoothest(0.1)).toBeLessThan(smoother(0.1));
-    expect(smoothest(0.9)).toBeGreaterThan(smoother(0.9));
-    // …and steeper through the middle, which is the whole point: 35/16 against 15/8.
+  it("cruises faster than smooth while launching and landing softer", () => {
+    // Flatter at BOTH ends — the launch and the landing are not sped up, only the middle.
+    expect(smoothest(0.1)).toBeLessThan(smooth(0.1));
+    expect(smoothest(0.9)).toBeGreaterThan(smooth(0.9));
+    // …and steeper through the middle, which is the whole point. The numbers are absolute so
+    // the contract survives whatever else the family gains or loses: 35/16 against smooth's 3/2.
     const midSlope = (f: (m: number) => number) => (f(0.5 + 1e-6) - f(0.5 - 1e-6)) / 2e-6;
     expect(midSlope(smoothest)).toBeCloseTo(35 / 16, 4);
-    expect(midSlope(smoothest)).toBeGreaterThan(midSlope(smoother));
+    expect(midSlope(smooth)).toBeCloseTo(3 / 2, 4);
+    expect(midSlope(smoothest)).toBeGreaterThan(midSlope(smooth));
   });
 
   it("stays monotonic across the flight", () => {

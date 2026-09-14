@@ -554,6 +554,19 @@
    The window is the ARRIVAL's, not a timer's — see HeightEase, which states it. Unlayered, so
    it beats the focus-visible utilities the cards carry (CSS trap 1). */
 .rail-ladder :focus-visible { transition: outline-color 0.22s ease-out; }
+/* The panel's own ring, for the focus an activated ENTRY hands it (CardHead's handFocusToPanel):
+   the panel takes a programmatic-only tabstop, so without this the landing is silent for a
+   keyboard user — and a browser default outline would square off a 14px-rounded card. Inset by
+   2px so it reads inside the plate, and it rides the arrival hold above like every other ring,
+   which is what makes the landing appear as the rung settles rather than during its flight.
+   `:focus-visible` only, so a mouse click that hands focus the same way shows nothing. */
+/* ⚠️ NO `border-radius` HERE. An outline already follows the element's own corners, and an
+   `inherit` added "to make it round" did the opposite: it overrode the panel's 14px with the
+   wrapper's 0 and SQUARED the card for as long as it held focus (caught in the live check). */
+.rail-ladder .ig-panel:focus-visible {
+  outline: 1px solid var(--ring);
+  outline-offset: -2px;
+}
 .rail-ladder:has([data-arriving]) :focus-visible { outline-color: transparent; }
 @media (prefers-reduced-motion: reduce) {
   .rail-ladder :focus-visible { transition: none; }

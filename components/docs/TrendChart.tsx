@@ -251,10 +251,22 @@ export default function TrendChart({
 
   return (
     <div className={className ? `min-w-0 select-none ${className}` : "min-w-0 select-none"}>
-      <div className="flex items-baseline gap-2 mb-1">
-        <span className="inline-block w-2 h-2 rounded-full flex-none" style={{ background: hue0 }} aria-hidden />
-        <span className="text-label font-semibold text-foreground truncate">{name}</span>
-        {unit && <span className="text-micro text-muted-foreground">{unit}</span>}
+      {/* ⚠️ THE HEAD WRAPS RATHER THAN CRUSHING ITS NAME (2026-09-14, found in the phone pass).
+          Four things share this row — the series name, its unit, the records link and the
+          readout — and only the name could shrink, so at 390px it was the one that paid:
+          "Global snapshots" became "G…" while "per day" broke across two lines beside it, and
+          the two nowrap items kept every pixel they asked for.
+          The name, its dot and its unit are ONE group now (they are one phrase — a unit beside
+          a truncated name says nothing), and the group does not shrink, so when the row runs
+          out the LINK and the READOUT wrap to a second line instead. `max-w-full` is the
+          backstop: a name longer than the whole row still truncates inside the group rather
+          than overflowing it. Nothing changes at any width where the row already fit. */}
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-1">
+        <span className="inline-flex items-baseline gap-2 min-w-0 max-w-full flex-none">
+          <span className="inline-block w-2 h-2 rounded-full flex-none" style={{ background: hue0 }} aria-hidden />
+          <span className="text-label font-semibold text-foreground truncate">{name}</span>
+          {unit && <span className="text-micro text-muted-foreground whitespace-nowrap">{unit}</span>}
+        </span>
         {/* One rung down the ladder (convention 12): only offered while a range is active,
             because the destination — the anchor log's date search — receives that range. */}
         {inspect && (
