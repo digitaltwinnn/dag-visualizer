@@ -143,4 +143,48 @@ describe("CSS trap 3 — bg-[var()] only ever carries a colour", () => {
     }
     expect(all.some(({ src }) => /\[background:var\(--[a-z0-9-]+\)\]/.test(src))).toBe(true);
   });
+
+  // TRAP 9 — A DECORATIVE FULL-BOX PSEUDO SWALLOWS THE CARD'S CLICKS (found live, 2026-09-14:
+  // "not [all] of the items are clickable in the cards"). The signal edge used to be a 2px bar
+  // inset from each end; on 2026-09-13 it became a full-box border ring so the ink could bend
+  // into the rounded corners (`inset: 0`, one coloured border side, a fixed-length mask). The
+  // look was right and the consequence was invisible: the pseudo is `position: absolute` and
+  // therefore paints ABOVE the card's in-flow content, so with the default `pointer-events: auto`
+  // it became the hit target for the whole card. Only descendants with a positioned box of their
+  // own still worked — the close mark, the copy buttons, the pager strip — which is exactly why
+  // it read as "some things click and some don't" rather than as a dead card.
+  //
+  // The rule these pseudos must obey: a pseudo that covers its host and carries no text is
+  // DECORATION, and decoration is never a hit target. Measured in the browser before the fix,
+  // three controls in the metagraph dossier were unreachable and `pointer-events: none` on this
+  // one selector cleared all three.
+  it("a full-box decorative pseudo never takes the pointer", () => {
+    // Comments stripped first: this file's rationale blocks are long and sit directly above the
+    // rules they explain, so an uncleaned match drags the prose in as part of the selector.
+    const css = globals().replace(/\/\*[\s\S]*?\*\//g, "");
+    const offenders: string[] = [];
+    // Blocks whose selector is a ::before/::after and whose body spans the host (`inset: 0`).
+    const re = /([^{}]*::(?:before|after)[^{}]*)\{([^{}]*)\}/g;
+    /** Does a rule for exactly this selector declare the pseudo's host inert? `pointer-events`
+     *  INHERITS, so a decoration whose host is already `none` needs no declaration of its own —
+     *  `.edge-pulse` is the live example, a span that exists only to carry the travelling light. */
+    const hostIsInert = (host: string): boolean => {
+      const esc = host.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const rule = new RegExp(`(^|\\})\\s*${esc}\\s*\\{([^{}]*)\\}`, "m");
+      return /pointer-events:\s*none/.test(rule.exec(css)?.[2] ?? "");
+    };
+    for (const m of css.matchAll(re)) {
+      const [, selector, block] = m;
+      if (!/(^|[\s;])inset:\s*0(\s|;|$)/.test(block)) continue;
+      if (/pointer-events:\s*none/.test(block)) continue;
+      // Every host in the (possibly grouped) selector must be inert for the pseudo to be safe.
+      const hosts = selector.split(",").map((part) => part.replace(/::(before|after)/g, "").trim());
+      if (hosts.every((h) => h && hostIsInert(h))) continue;
+      offenders.push(selector.trim().replace(/\s+/g, " ").slice(0, 80));
+    }
+    expect(
+      offenders,
+      `these pseudos cover their host and would intercept every in-flow click inside it — add pointer-events: none:\n${offenders.join("\n")}`,
+    ).toEqual([]);
+  });
 });
