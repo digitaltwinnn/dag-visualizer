@@ -840,8 +840,21 @@
   --core: light-dark(oklch(0.45 0.16 265), oklch(0.66 0.16 265));              /* DAG hypergraph-core blue #5b8cff — ONE hue for the
                                                 core; L0/L1 are NOT colour-distinguished anywhere */
   /* A second muted text tone — brighter than --muted-foreground, dimmer than --foreground.
-     The repeated "muted blue-grey" copy tone (dossier description, geo rows, tooltip figures). */
-  --foreground-dim: light-dark(#3a4460, #c7d0ea);
+     The repeated "muted blue-grey" copy tone (dossier description, geo rows, tooltip figures).
+
+     ⚠️ ITS JOB IS A POSITION IN THE RAMP, AND THE TWO FACES MUST AGREE ON IT (user, 2026-09-14:
+     the About card's lead paragraph "in light mode it's not visible"). The two values were tuned
+     independently and ended up on OPPOSITE sides of the ramp: measured, dark ran
+     foreground→dim 1.29 and dim→muted 2.03 — a tone sitting just under the foreground, which is
+     what the name promises — while light ran 1.84 and 1.23, parking it almost ON muted. So every
+     surface that uses this token to mean "one step down from foreground" (the About card's lead
+     paragraph, the dossier description, the geo rows) said exactly that on the dark face and
+     nothing at all on paper: 1.23:1 is not a distinction, it is a rounding error.
+     The light value moves up to sit where its dark twin sits — foreground→dim 1.31, dim→muted
+     1.73. The light ramp is shorter overall (2.27 against dark's 2.62, because paper's foreground
+     is not as far from its muted as the dark face's is), so the two steps cannot both match; what
+     matters is the SHAPE — close to foreground, clear of muted — and that now holds on both. */
+  --foreground-dim: light-dark(#262e44, #c7d0ea);
   /* The advisory amber — NOT --destructive (amber ≠ red): a distinct "work-in-progress /
      advisory" accent. Its home is /about's unofficial-project notice (the always-on experimental
      banner it was made for was retired 2026-08-09; the token stays because the advisory REGISTER
