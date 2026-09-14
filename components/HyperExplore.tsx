@@ -14,7 +14,7 @@ import { compositionToggleActions, filterToggleActions, nodeSelectActions } from
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useLadderFocus } from "@/components/useLadderFocus";
-import { DepthCaption, DisclosureChevron, Disclosure, DisclosurePanel, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
+import { DepthCaption, DisclosureChevron, Disclosure, DisclosurePanel, DisclosureRow, NodePickerRow, ROW_NEST, ROW_NEST_DEEP, ROW_OUTSET } from "@/components/ExploreRows";
 import type { NodeRow } from "@/src/data/types";
 
 // Hypergraph's single **explore** card — the architectural sibling of GeoExplore: each view's
@@ -219,7 +219,7 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
                                 <span className="ml-auto flex-none tabular-nums text-body font-semibold">{g.rows.length}</span>
                               </DisclosureRow>
 
-                              <DisclosurePanel className="mb-1 ml-[7px] pl-2 border-l border-border">
+                              <DisclosurePanel className={ROW_NEST_DEEP}>
                                   {/* Depth caption (user, 2026-08-16, twice refined — first to the
                                       group's codes, then past them: "rather than repeating its
                                       parent, say what it DOES"): the parent row already names the

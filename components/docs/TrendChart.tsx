@@ -45,6 +45,7 @@ export default function TrendChart({
   inspect,
   inspectCommits,
   readout,
+  scaleMax,
   className,
 }: {
   name: string;
@@ -57,6 +58,10 @@ export default function TrendChart({
    *  stamps' precision. Daily by default. */
   stepMs?: number;
   format?: (v: number) => string;
+  /** A y-max imposed from OUTSIDE, so a run of charts can share one scale (TrendsDoc's
+   *  per-network panels). Omitted, the chart scales to its own data — which is right for a
+   *  chart read on its own and wrong for a column of charts read against each other. */
+  scaleMax?: number;
   /** COVERAGE, for charts whose plotted values are DERIVED (user, 2026-09-09: DOR's 24H
    *  continuity wore far more amber than its neighbours — every quiet bucket's mean gap is
    *  null because there is nothing to divide, and the band read those as sampling outages).
@@ -149,7 +154,13 @@ export default function TrendChart({
       }
     : {};
   const measured = lines.some((l) => l.points.some((v) => v != null));
-  const max = Math.max(1e-9, ...lines.flatMap((l) => l.points.filter((v): v is number => v != null))) * 1.12;
+  // ⚠️ THE PEAK READOUT IS THE CHART'S OWN, WHATEVER THE SCALE. `ownMax` is what this chart's
+  // data reaches; `max` is the height it is drawn against, which a caller may impose to put a
+  // column of charts on one scale. Keeping them separate is what lets a chart shrink to a sliver
+  // and still say, in its own corner, how high it actually got — otherwise a shared scale would
+  // flatten the small networks AND take away the number that says by how much.
+  const ownMax = Math.max(1e-9, ...lines.flatMap((l) => l.points.filter((v): v is number => v != null)));
+  const max = (scaleMax != null && scaleMax > 0 ? scaleMax : ownMax) * 1.12;
 
   const rows = buckets.map((ts, i) => {
     const row: Record<string, number | null> = { ts };
@@ -251,10 +262,22 @@ export default function TrendChart({
 
   return (
     <div className={className ? `min-w-0 select-none ${className}` : "min-w-0 select-none"}>
-      <div className="flex items-baseline gap-2 mb-1">
-        <span className="inline-block w-2 h-2 rounded-full flex-none" style={{ background: hue0 }} aria-hidden />
-        <span className="text-label font-semibold text-foreground truncate">{name}</span>
-        {unit && <span className="text-micro text-muted-foreground">{unit}</span>}
+      {/* ⚠️ THE HEAD WRAPS RATHER THAN CRUSHING ITS NAME (2026-09-14, found in the phone pass).
+          Four things share this row — the series name, its unit, the records link and the
+          readout — and only the name could shrink, so at 390px it was the one that paid:
+          "Global snapshots" became "G…" while "per day" broke across two lines beside it, and
+          the two nowrap items kept every pixel they asked for.
+          The name, its dot and its unit are ONE group now (they are one phrase — a unit beside
+          a truncated name says nothing), and the group does not shrink, so when the row runs
+          out the LINK and the READOUT wrap to a second line instead. `max-w-full` is the
+          backstop: a name longer than the whole row still truncates inside the group rather
+          than overflowing it. Nothing changes at any width where the row already fit. */}
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-1">
+        <span className="inline-flex items-baseline gap-2 min-w-0 max-w-full flex-none">
+          <span className="inline-block w-2 h-2 rounded-full flex-none" style={{ background: hue0 }} aria-hidden />
+          <span className="text-label font-semibold text-foreground truncate">{name}</span>
+          {unit && <span className="text-micro text-muted-foreground whitespace-nowrap">{unit}</span>}
+        </span>
         {/* One rung down the ladder (convention 12): only offered while a range is active,
             because the destination — the anchor log's date search — receives that range. */}
         {inspect && (
@@ -314,7 +337,7 @@ export default function TrendChart({
         </div>
       ) : (
         <div
-          className={`relative rounded-md bg-[var(--panel-plate)] overflow-hidden${onRange ? " cursor-crosshair select-none touch-pan-y" : ""}`}
+          className={`relative rounded-md border border-border overflow-hidden${onRange ? " cursor-crosshair select-none touch-pan-y" : ""}`}
           role="img"
           aria-label={`${name} — ${stepMs >= 86400000 ? "daily" : stepMs >= 3600000 ? "hourly" : "5-minute"} buckets, ${n} of them`}
         >
@@ -448,7 +471,7 @@ export default function TrendChart({
               top-left beside the head's readout top-right was two unexplained values) — it
               is the window's peak, and the baseline is 0 by construction. */}
           <span aria-hidden className="absolute top-1 left-1.5 text-micro text-muted-foreground pointer-events-none tabular-nums">
-            peak {format(max / 1.12)}
+            peak {format(ownMax)}
           </span>
         </div>
       )}

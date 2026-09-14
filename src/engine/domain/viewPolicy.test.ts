@@ -20,8 +20,12 @@ describe("VIEW_POLICIES", () => {
     for (const m of MODES) expect(VIEW_POLICIES[m].sims.arcs).toBe(m === "geo");
   });
 
-  it("makes NO view dofEligible (DoF dropped — user 2026-07-17: bokeh read as fuzz on the selection)", () => {
-    for (const m of MODES) expect(VIEW_POLICIES[m].dofEligible).toBe(false);
+  // DoF was dropped on 2026-07-17 (the bokeh read as fuzz on the selection) and restored on
+  // 2026-09-13 once the sharp zone and hyper's bloom had both been re-tuned — see the policy
+  // row's own note. What the rule has always been is that DoF is HYPER'S ALONE: geo's globe
+  // doesn't need it, the ledger's chamber is coplanar, and a flat view has no depth to blur.
+  it("makes only hyper dofEligible", () => {
+    for (const m of MODES) expect(VIEW_POLICIES[m].dofEligible).toBe(m === "hyper");
   });
 
   it("morphs hyper→toHyper, geo→toGeo, ledger→frozen, flat→toHyper", () => {

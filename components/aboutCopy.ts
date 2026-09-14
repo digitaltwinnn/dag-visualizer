@@ -203,6 +203,46 @@ import type { Mode } from "@/src/store/store";
 // The word is "levels", never "layers": app-wide a LAYER is an L0 / cL1 / dL1 process on a node (see
 // CLAUDE.md's vocabulary rule), so calling the two storeys layers would collide with the three codes
 // the composition chips, the signer copy and hyper's own About card all use.
+//
+// ⚠️ …AND THE LEAD MUST NAME BOTH OF THEM, NOT PROMISE THEM (user, 2026-09-14: "starts by saying it
+// happens at two levels but then describes only one"). The promise and its payoff used to be split
+// across paragraphs — "Snapshots happen at two levels" opened, the network's own level finished that
+// sentence, and the base ledger's arrived a paragraph later. That read as a broken promise even
+// before the card's LEAD became a visually separate standfirst (AboutView, same day); once it did,
+// the lead had to stand alone, and standing alone it named one level out of two. It now states both
+// in one line — each network seals its own, the base ledger seals one for all of them — and the
+// paragraphs below elaborate rather than complete it.
+//
+// ⚠️ AND WHAT A SNAPSHOT HOLDS IS STATED GENERICALLY (user, same round). "holding whatever it
+// validates: sensor readings, file fingerprints, a token's balances" ended on three examples, which
+// read as the list rather than as three of many — the same trap the hyper card's own note warns
+// about. "whatever it validates — whatever its business runs on" says the general case, and the
+// examples live on /about where there is room to spend on them.
+//
+// ⚠️ LENGTH WENT DOWN, NOT UP (user, 2026-09-14: "text should not get larger, if any make it a bit
+// shorter", then "shorten the secondary paragraphs as well"). Worth recording that the first pass
+// only did half the job: the lead nearly halved, but BOTH secondary paragraphs came out LONGER than
+// the ones they replaced (224 → 254 and 148 → 185), so the card as a whole barely moved. Shortening
+// the part that is already loud is not shortening the card.
+//
+// ⚠️ AND THE SECOND PARAGRAPH KEEPS ONLY WHAT ONLY IT SAYS (user, same round: "maybe drop 2nd
+// paragraph entirely? what does it really add?"). Nearly the right call — most of it was restating
+// the lead. Audited clause by clause, it made four claims and one of them ("every few seconds the
+// base ledger takes a global snapshot") was the lead again in other words; the cadence it added is
+// something the view itself shows live, so the card was spending a sentence on what the instrument
+// already says. What could NOT be dropped is the anchoring: "anchors into the global snapshot what
+// it wants kept" is the mechanism this card is TITLED for ("When the network anchors"), and the
+// lead's "seals one for all of them" does not say it — nothing else in the card would. So the
+// restatement went and the paragraph kept its three new facts: a network's own schedule and schema,
+// what its snapshot holds, and what it chooses to anchor.
+//
+// ⚠️ AND "PROVABLE" CARRIES ITS OWN GLOSS (user, same round: remove "no one has to trust who wrote
+// it"). The clause was explaining the word it followed, which is the reader-can't-be-trusted-to-read
+// register this file already refuses elsewhere — provable says it, and a card that stops to define
+// its own plain words is a card that has stopped trusting the reader.
+//
+// 192/224/148 → 106/148/116, the card 564 → 370 characters, a third off — the length rule above
+// actually applied rather than gestured at.
 // The bridging "So what lands here comes in very different sizes and shapes." was CUT to pay for it,
 // under the delete-the-back-reference rule above: the sentence behind it carries the claim, so
 // stating it first only made the reader hold an abstraction. ~95 words in three paragraphs, under
@@ -276,9 +316,9 @@ export const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string
     title: "When the network anchors",
     eyebrow: "About",
     lines: [
-      "Snapshots happen at two levels. Each network snapshots on its own, at its own pace and to its own schema, holding whatever it validates: sensor readings, file fingerprints, a token's balances.",
-      "Every few seconds the base ledger takes one global snapshot, and a network anchors into it what it wants kept on the shared record. Each arrives already sealed, and stays provable without anyone having to trust who wrote it.",
-      "How often a network anchors differs, and so do the size and the kind of information it anchors. Those differences are what make each network unique.",
+      "Snapshots happen at two levels: each network seals its own, and the base ledger seals one for all of them.",
+      "A network snapshots on its own schedule and schema, holding whatever its business runs on, then anchors into the global snapshot what it wants kept.",
+      "Each arrives already sealed and stays provable. How often a network anchors, and how much, depends on what it does.",
     ],
   },
   soon: {

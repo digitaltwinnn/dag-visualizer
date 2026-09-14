@@ -243,33 +243,68 @@
 .rail-entry.sig-left::before {
   content: "";
   position: absolute;
-  left: 0;
-  top: 5px;
-  bottom: 5px;
-  width: 2px;
-  border-radius: 2px;
   opacity: 0;
   transition: opacity 0.16s ease;
   pointer-events: none;
 }
 
 /* THE ONE edge-line recipe (user refinement): EVERY hover-edge signal — the neutral whisper AND
-   the hued pairing line, both rails, any variant — renders the SAME soft gradient-faded tips
-   (transparent→line→transparent, the travelling-pulse tip treatment; no hard ends anywhere on
-   the edge). The line's colour rides `--edge-hue` (neutral `--thread-line` at rest/whisper; the
-   pairing rules below swap the hue in WHILE paired — swapping a var, not the background, keeps
-   the opacity-only invariant: a pairing leave still falls back to the neutral instantly and only
-   the opacity fades, no colour transition). The ig-panel ::before base rule lives in
-   `@layer components`, so this unlayered recipe beats it. */
+   the hued pairing line, both rails, any variant — renders the SAME soft tips (no hard ends
+   anywhere on the edge). The line's colour rides `--edge-hue` (neutral `--thread-line` at
+   rest/whisper; the pairing rules below swap the hue in WHILE paired — swapping a var, not the
+   paint, keeps the opacity-only invariant: a pairing leave still falls back to the neutral
+   instantly and only the opacity fades, no colour transition). The ig-panel ::before base rule
+   lives in `@layer components`, so this unlayered recipe beats it.
+
+   ⚠️ THE TIPS RUN OFF INTO THE CORNERS — it is `.edge-spine`'s device, adopted here (user,
+   2026-09-13: "when collapsed the edge fades away too quick because of the limited height; can
+   you also smooth it around the corner a bit to have more space for it to fade?"). That is the
+   SAME complaint the callout's spine answered on 2026-08-15, one signal over, and its note
+   already anticipated this adoption.
+
+   The old recipe was a 2px bar inset 10px (5px on an entry) from each end, tipped by a
+   PERCENTAGE gradient — and a percentage is what broke on a short card: 14% of a 440px box is
+   62px of fade, 14% of a 49px collapsed entry is 7px, so the same rule read as a soft line on
+   one tier and a hard stub on the other. Now the pseudo spans the card (`inset: 0`), carries
+   the ink on ONE side of an otherwise transparent border — a border follows the box's rounded
+   corners, so the ink bends into the top and bottom arcs — and a FIXED-LENGTH mask spends the
+   fade over 22px whatever the height. A tall card confines the fade to its corners; a collapsed
+   one fades across most of its edge, which is the extra room the complaint asked for.
+
+   22px is `--edge-runoff`, shared with `.edge-spine` so the app has ONE fade length. */
 .sig-left::before, .sig-right::after {
-  background: linear-gradient(to bottom,
-    transparent 0,
-    var(--edge-hue, var(--thread-line)) 14%,
-    var(--edge-hue, var(--thread-line)) 86%,
-    transparent 100%);
+  inset: 0;
+  width: auto;
+  height: auto;
+  background: none;
+  border: 2px solid transparent;
+  border-radius: inherit;
+  -webkit-mask: linear-gradient(180deg, transparent, #000 var(--edge-runoff), #000 calc(100% - var(--edge-runoff)), transparent);
+  mask: linear-gradient(180deg, transparent, #000 var(--edge-runoff), #000 calc(100% - var(--edge-runoff)), transparent);
 }
-.sig-left:hover::before  { opacity: 1; box-shadow: none; }
-.sig-right:hover::after  { opacity: 1; box-shadow: none; }
+.sig-left::before  { border-left-color: var(--edge-hue, var(--thread-line)); }
+.sig-right::after  { border-right-color: var(--edge-hue, var(--thread-line)); }
+/* ⚠️ THE GLOW IS A `drop-shadow`, NOT A `box-shadow`, now that the pseudo is a full-box border
+   ring: a box-shadow would be cast by the whole rounded box and light all four edges, where the
+   signal is one edge. `drop-shadow` follows the rendered ALPHA — the single coloured border side
+   — so the glow stays on the edge, and the mask trims it with the ink it belongs to. The
+   outward 2px offset and its per-rail sign are unchanged (see the pairing note below). */
+.sig-left:hover::before  { opacity: 1; filter: none; }
+.sig-right:hover::after  { opacity: 1; filter: none; }
+/* ⚠️ THE PLANK COUNTS AS THE CARD (user, 2026-09-14: "the bottom section of the cards drop the
+   focus, so when that is hovered the focus flashes as well"). The pager plank is a SIBLING of
+   the panel, not a descendant — it must be, since `#rightcol` is pointer-events:none and the
+   plank has to take the pointer — and `:hover` climbs to ancestors, never to siblings. So moving
+   the pointer down the card and into its bottom strip un-hovered the card and dropped the edge
+   signal, a blink in the middle of one continuous gesture. `.rail-card` is RailPager's wrapper,
+   which contains BOTH, and is therefore what "the pointer is on this card" really means.
+   ⚠️ OPACITY ONLY, and no `filter`. These arms sit above the pairing rules like the two hover
+   rules they extend, but they are a specificity step higher (0,3,1 against 0,2,1) — so anything
+   they set would beat pairing instead of losing to it, which is the one ordering this block
+   guarantees. Setting opacity alone is safe (both states want 1); `--edge-hue` and the glow stay
+   entirely with pairing, and a paired card hovered on its plank still reads as paired. */
+.rail-card:hover .sig-left::before  { opacity: 1; }
+.rail-card:hover .sig-right::after  { opacity: 1; }
 
 /* Hover PAIRING — the only non-pulse edge signal, shown strictly WHILE HOVERED (the class comes
    and goes with the hover; the 0.16s transition on the base elements eases it in/out).
@@ -287,7 +322,7 @@
 .sig-left.subject-paired::before {
   opacity: 1;
   --edge-hue: var(--row-hue, var(--filter-accent, var(--primary)));
-  box-shadow: -2px 0 7px 0 var(--row-hue, var(--filter-accent, var(--primary)));
+  filter: drop-shadow(-2px 0 7px var(--row-hue, var(--filter-accent, var(--primary))));
 }
 
 /* LEFT-rail cards (`.sig-right`) — the mirror: pairing lights an ::after on the card's RIGHT
@@ -295,13 +330,13 @@
    forward-compatible mirror + /design demo. Geometry only here — the soft-tipped background
    comes from the shared edge-line recipe above (neutral at rest; see the opacity-only warning). */
 .sig-right::after {
-  content: ""; position: absolute; right: 0; top: 10px; bottom: 10px; width: 2px;
-  border-radius: 2px; opacity: 0; transition: opacity 0.16s ease; pointer-events: none;
+  content: ""; position: absolute;
+  opacity: 0; transition: opacity 0.16s ease; pointer-events: none;
 }
 .sig-right.subject-paired::after {
   opacity: 1;
   --edge-hue: var(--row-hue, var(--spine, var(--primary)));
-  box-shadow: 2px 0 7px 0 var(--row-hue, var(--spine, var(--primary)));
+  filter: drop-shadow(2px 0 7px var(--row-hue, var(--spine, var(--primary))));
 }
 
 /* The identity EDGE SPINE with corner run-off (user, 2026-08-15 — "the fade drops too quickly
@@ -366,8 +401,8 @@
 #callout[data-flip] .edge-spine {
   border-left-color: transparent;
   border-right-color: var(--spine, var(--primary));
-  -webkit-mask: linear-gradient(180deg, transparent, #000 22px, #000 calc(100% - 22px), transparent);
-  mask: linear-gradient(180deg, transparent, #000 22px, #000 calc(100% - 22px), transparent);
+  -webkit-mask: linear-gradient(180deg, transparent, #000 var(--edge-runoff), #000 calc(100% - var(--edge-runoff)), transparent);
+  mask: linear-gradient(180deg, transparent, #000 var(--edge-runoff), #000 calc(100% - var(--edge-runoff)), transparent);
 }
 
 .edge-spine {
@@ -377,8 +412,8 @@
   border: 1.5px solid transparent;
   border-left-color: var(--spine, var(--primary));
   pointer-events: none;
-  -webkit-mask: linear-gradient(180deg, transparent, #000 22px, #000 calc(100% - 22px), transparent);
-  mask: linear-gradient(180deg, transparent, #000 22px, #000 calc(100% - 22px), transparent);
+  -webkit-mask: linear-gradient(180deg, transparent, #000 var(--edge-runoff), #000 calc(100% - var(--edge-runoff)), transparent);
+  mask: linear-gradient(180deg, transparent, #000 var(--edge-runoff), #000 calc(100% - var(--edge-runoff)), transparent);
 }
 
 /* Sheets (tablet/phone RailDock): the sheet's own `.ig-sheet-edge` spine is the single identity
@@ -389,7 +424,7 @@
    order wins. */
 .sheet-cards .ig-panel::before,
 .sheet-cards .rail-entry::before,
-.sheet-cards .sig-right::after { opacity: 0; box-shadow: none; }
+.sheet-cards .sig-right::after { opacity: 0; filter: none; }
 
 /* ── The facts-rail SLAB (`.rail-ladder`, card-redesign variant A, 2026-08-08) ────────────────
    The right rail already IS a stack — coarsest→finest, distance-dimmed, single-open accordion —
@@ -436,13 +471,31 @@
    No transforms — the geometry-never-animates rule keeps its spirit: nothing moves, the
    arriving frame simply fades and rounds into place. The `from`-only keyframes land on
    each element's own computed values. */
-@keyframes tierSettleIn { from { opacity: 0.72; border-color: transparent; border-radius: var(--radius-md); } }
-@keyframes tierSettleOut { from { opacity: 1; } }
+/* ⚠️ THE TIER'S ARRIVAL IS NOT HERE ANY MORE — it belongs to HeightEase (user, 2026-09-13:
+   "don't make it a timing fix but do it structurally"). The problem it answers is real and
+   worth stating: `data-tier` flips in the commit frame, so at t=0 a clicked rung already wore
+   its whole BOX identity — plate, border, wash, the pager plank — inside a slot still the size
+   of an entry, and the rung it displaced already wore its ENTRY identity inside a slot still
+   the size of a box. Every rung below them was in final form from the first frame, which is
+   what "the bottom section appears immediately" was: the pile's IDENTITY was final while only
+   its measurements moved.
+
+   The first cut fixed that HERE, by starting both keyframes at opacity 0. It looked right and
+   was structurally wrong twice over: the trigger was an ACCIDENT of reconciliation (these
+   animations restart only because React swaps `.rail-entry` for `.ig-panel` — reuse the element
+   and the arrival silently stops happening), and the fade ran on its own CSS clock that merely
+   READ the same `--tempo-roll` as the height, so two animations agreed by convention and were
+   free to drift the moment either was retuned.
+
+   So the OPACITY moved to `HeightEase`'s `settleKey`, where the tier comes down as a stated
+   fact and the fade is started by the same code, in the same tick, with the same timing object
+   as the height ease. What stays here is what is genuinely decoration and owns no timing
+   contract: the box's plate settling its border and radius in. `tierSettleOut` is gone with the
+   opacity — it had nothing else in it. */
+@keyframes tierSettleIn { from { border-color: transparent; border-radius: var(--radius-md); } }
 .rail-ladder [data-tier="box"] .ig-panel { animation: tierSettleIn var(--tempo-roll) var(--ease-roll); }
-.rail-ladder [data-tier="entry"] .rail-entry { animation: tierSettleOut var(--tempo-roll) var(--ease-roll); }
 @media (prefers-reduced-motion: reduce) {
-  .rail-ladder [data-tier="box"] .ig-panel,
-  .rail-ladder [data-tier="entry"] .rail-entry { animation: none; }
+  .rail-ladder [data-tier="box"] .ig-panel { animation: none; }
 }
 .rail-ladder > * + * { margin-top: var(--rail-gap); }
 
@@ -501,13 +554,85 @@
    stepping window also gates the EFFECTS: the entry's lift and the seams' full-width reach
    don't apply while `data-stepping` holds, whatever :hover claims. Unlayered on purpose —
    these must beat the entry's own hover utilities (CSS trap 1). */
+/* ⚠️ THE FOCUS RING HOLDS OFF WHILE A RUNG ARRIVES, AND EASES BACK AS IT LANDS (user,
+   2026-09-13: "the focus still gives a blink … it goes from a hovered focus on a square element
+   straight to a rounded corner element. Maybe just let the focus re-appear once animation is
+   close to completion?"). A rung's click swaps a full-bleed SQUARE ring (the entry's absolutely
+   positioned expand button) for a ROUNDED card, so the ring does not move — it is destroyed at
+   one shape and recreated at another, which is the blink. Holding its colour transparent for
+   the arrival means the shape change happens while there is nothing to see, and the ring then
+   fades in over the landing rather than appearing at it. `outline-color` is the animatable half
+   of an outline, which is why the hold is a colour and not `outline: none`: the ring keeps its
+   geometry throughout, so nothing reflows when it returns.
+
+   The window is the ARRIVAL's, not a timer's — see HeightEase, which states it. Unlayered, so
+   it beats the focus-visible utilities the cards carry (CSS trap 1). */
+.rail-ladder :focus-visible { transition: outline-color 0.22s ease-out; }
+/* The panel's own ring, for the focus an activated ENTRY hands it (CardHead's handFocusToPanel):
+   the panel takes a programmatic-only tabstop, so without this the landing is silent for a
+   keyboard user — and a browser default outline would square off a 14px-rounded card. Inset by
+   2px so it reads inside the plate, and it rides the arrival hold above like every other ring,
+   which is what makes the landing appear as the rung settles rather than during its flight.
+   `:focus-visible` only, so a mouse click that hands focus the same way shows nothing. */
+/* ⚠️ THE RAIL HAS ONE FOCUS RING, AND IT IS THE CARD'S OWN ACCENT (user, 2026-09-14: "the
+   section does not [focus] while the buttons focus but give it a gray focus while the card focus
+   is either cyan or metagraph if filtered"). The plank's chevrons are shadcn Buttons carrying the
+   primitive's generic `ring-ring/50`, which on this glass reads as a neutral smudge and belongs
+   to no card — while everything else in the rail speaks the identity lane. `--filter-accent` is
+   inherited all the way down (measured: the plank and the `.rail-card` wrapper both carry it), so
+   one rule covers the panel, the entries and every control inside them: structural cyan at rest,
+   the committed network's hue under a filter, exactly like the edge signals beside it.
+   ⚠️ (0,2,0) on purpose — the arrival hold above is (0,3,0) and must still win, so a ring that
+   lands mid-flight stays transparent until the rung settles. */
+.rail-ladder :focus-visible {
+  outline: 1px solid var(--filter-accent, var(--primary));
+  outline-offset: 2px;
+}
+/* ⚠️ THE STABLE ELEMENT HOLDS THE FOCUS, THE VISIBLE ONE SHOWS IT. A rung's focus lives on its
+   WRAPPER — the one node that survives a tier change, which is what lets CardHead hand focus over
+   before the old control unmounts (see `keepFocusOnRung`). But the wrapper is a bare box with no
+   radius, so a ring drawn on it would square off a 14px card. So the wrapper shows nothing and
+   the ring is drawn on the PANEL inside it, which already has the card's own corners and bounds.
+   Inset, because this ring means "this card" — it is the card itself, not a control on it, and an
+   outset ring on a rounded plate reads as a second border.
+   (No `border-radius` on these: an outline already follows its element's corners, and an
+   `inherit` added "to make it round" overrode the panel's 14px with the wrapper's 0.) */
+.rail-ladder [data-rung]:focus-visible { outline: none; }
+.rail-ladder [data-rung]:focus-visible .ig-panel,
+.rail-ladder [data-rung]:focus-visible .rail-entry {
+  outline: 1px solid var(--filter-accent, var(--primary));
+  outline-offset: -2px;
+}
+.rail-ladder:has([data-arriving]) :focus-visible { outline-color: transparent; }
+@media (prefers-reduced-motion: reduce) {
+  .rail-ladder :focus-visible { transition: none; }
+}
+
+/* ⚠️ AN ARRIVING RUNG TAKES NO POINTER (user, 2026-09-14: "should we stop the mouse-pointer on
+   the revealed card as well, I think it leads to a flash also"). The effect gating below stands
+   down the treatments this file knows about, but a revealed BOX brings its own — row washes,
+   disclosure chevrons, the copy reveal — and it materialises under a cursor that never moved, so
+   they all lit at once on content the reader had not arrived at.
+   This is the SLIDE's own device, one gesture over (see RailPager's "THE SLIDE IS HOVER-INERT"
+   note, from the same report about a pointer resting on top of the cards): the card body goes
+   inert for the window, and the PLANK stays interactive — it is a sibling, not a descendant, so
+   it never inherits this — which is what keeps rapid stepping working and means a click is never
+   swallowed. When the window closes, whatever sits under the pointer hovers normally: a resting
+   state, no flash. */
+.rail-ladder [data-arriving] .ig-panel,
+.rail-ladder [data-arriving] .rail-entry { pointer-events: none; }
+
 .rail-ladder[data-stepping] .rail-entry,
-.rail-ladder[data-stepping] .rail-entry:hover {
+.rail-ladder[data-stepping] .rail-entry:hover,
+.rail-ladder:has([data-arriving]) .rail-entry,
+.rail-ladder:has([data-arriving]) .rail-entry:hover {
   opacity: var(--entry-dim, 1);
   filter: none;
 }
 .rail-ladder[data-stepping] > [data-tier="entry"] + [data-tier="entry"]:has(.rail-entry:hover)::before,
-.rail-ladder[data-stepping] > [data-tier="entry"]:has(.rail-entry:hover) + [data-tier="entry"]::before {
+.rail-ladder[data-stepping] > [data-tier="entry"]:has(.rail-entry:hover) + [data-tier="entry"]::before,
+.rail-ladder:has([data-arriving]) > [data-tier="entry"] + [data-tier="entry"]:has(.rail-entry:hover)::before,
+.rail-ladder:has([data-arriving]) > [data-tier="entry"]:has(.rail-entry:hover) + [data-tier="entry"]::before {
   left: 18px;
   right: 18px;
 }
@@ -516,8 +641,11 @@
    incoming card under a latched pointer exactly like a ladder step re-lays the pile, so the
    whisper edge and the copy-button reveal could light mid-slide. One attribute, every
    hover-treatment gate. */
-.rail-ladder[data-stepping] .sig-left:hover::before { opacity: 0; }
-.rail-ladder[data-stepping] .group\/copy:hover button[aria-label^="Copy"] { opacity: 0; }
+.rail-ladder[data-stepping] .sig-left:hover::before,
+.rail-ladder:has([data-arriving]) .sig-left:hover::before,
+.rail-ladder:has([data-arriving]) .sig-right:hover::after { opacity: 0; }
+.rail-ladder[data-stepping] .group\/copy:hover button[aria-label^="Copy"],
+.rail-ladder:has([data-arriving]) .group\/copy:hover button[aria-label^="Copy"] { opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
   .rail-ladder > [data-tier="entry"] + [data-tier="entry"]::before { transition: none; }
 }
@@ -712,8 +840,21 @@
   --core: light-dark(oklch(0.45 0.16 265), oklch(0.66 0.16 265));              /* DAG hypergraph-core blue #5b8cff — ONE hue for the
                                                 core; L0/L1 are NOT colour-distinguished anywhere */
   /* A second muted text tone — brighter than --muted-foreground, dimmer than --foreground.
-     The repeated "muted blue-grey" copy tone (dossier description, geo rows, tooltip figures). */
-  --foreground-dim: light-dark(#3a4460, #c7d0ea);
+     The repeated "muted blue-grey" copy tone (dossier description, geo rows, tooltip figures).
+
+     ⚠️ ITS JOB IS A POSITION IN THE RAMP, AND THE TWO FACES MUST AGREE ON IT (user, 2026-09-14:
+     the About card's lead paragraph "in light mode it's not visible"). The two values were tuned
+     independently and ended up on OPPOSITE sides of the ramp: measured, dark ran
+     foreground→dim 1.29 and dim→muted 2.03 — a tone sitting just under the foreground, which is
+     what the name promises — while light ran 1.84 and 1.23, parking it almost ON muted. So every
+     surface that uses this token to mean "one step down from foreground" (the About card's lead
+     paragraph, the dossier description, the geo rows) said exactly that on the dark face and
+     nothing at all on paper: 1.23:1 is not a distinction, it is a rounding error.
+     The light value moves up to sit where its dark twin sits — foreground→dim 1.31, dim→muted
+     1.73. The light ramp is shorter overall (2.27 against dark's 2.62, because paper's foreground
+     is not as far from its muted as the dark face's is), so the two steps cannot both match; what
+     matters is the SHAPE — close to foreground, clear of muted — and that now holds on both. */
+  --foreground-dim: light-dark(#262e44, #c7d0ea);
   /* The advisory amber — NOT --destructive (amber ≠ red): a distinct "work-in-progress /
      advisory" accent. Its home is /about's unofficial-project notice (the always-on experimental
      banner it was made for was retired 2026-08-09; the token stays because the advisory REGISTER
@@ -774,6 +915,13 @@
   --panel: light-dark(rgba(252, 253, 255, 0.85), rgba(12, 16, 32, 0.72));
   --panel-light: light-dark(rgba(252, 253, 255, 0.40), rgba(12, 16, 32, 0.35));
   --panel-solid: light-dark(rgba(248, 250, 255, 0.94), rgba(8, 12, 26, 0.92));
+  /* The SWITCH's OFF knob (components/ui/switch.tsx, 2026-09-14) — PALE ON BOTH LANES, which is
+     why it needs a token of its own. Off, the knob sits on the faint --border hairline over
+     whatever page is behind it, so it must read against a dark ground and a light one alike, and
+     every other pale surface here inverts with the lane by design (--foreground is ink,
+     --panel-solid is glass). Stated once, for both. The ON knob needs no token: its ground is
+     --primary, and --primary-foreground is already that ground's own ink. */
+  --switch-knob: light-dark(rgba(252, 253, 255, 0.98), rgba(226, 234, 252, 0.95));
   /* --panel-plate is the BASE PLATE a card's FOOT sits on (user, 2026-08-10: the foot's tier
      change "is only the font", asked for more). A NEUTRAL WHITE lift, and the mechanism is the
      whole point — measured live against both grounds: a dark scrim (tried first, at black 40%)
@@ -816,6 +964,7 @@
      spacing scale, one "selected" treatment; component utilities reference these. */
   --panel-pad-x: 16px;     /* horizontal padding inside a panel header/section */
   --panel-pad-y: 12px;     /* vertical   padding inside a panel header/section */
+  --edge-runoff: 22px;   /* the fixed length every edge signal spends its tips over — `.edge-spine` and the hover/pairing recipe share it so the app has ONE fade reach */
   --rail-gap: 16px;        /* gap between stacked panels in a column — 12 → 16 (user, 2026-08-30: the explore rail's cards sat too close, felt on paper where both are bright glass) */
   --topbar-extra: 0px;     /* how far the command bar has GROWN downward (the attached filter
                               strip, 2026-07-12) — published live by TopBar via ResizeObserver;
@@ -1028,7 +1177,10 @@
      (design evolution, Task 12: both rails carry the identity thread). */
   #leftcol {
     position: fixed; z-index: 10; top: calc(var(--rail-top) + var(--topbar-extra, 0px)); left: var(--rail-margin);
-    transition: top 0.25s ease-out;
+    /* `transform` rides the shade's RETURN tempo here and its away tempo on the hidden arm
+       above the rule pair — the recipe's rule that the HUD comes back faster than it steps
+       aside, because the return answers a gesture already finished. */
+    transition: top 0.25s ease-out, transform 0.18s ease-out;
     width: var(--rail-w);
     display: flex; flex-direction: column; gap: var(--rail-gap);
     /* The box's own bottom must never enter the bottom lane's reserved band — the rail-clip fade
@@ -1067,6 +1219,48 @@
   .rail-shade { transition: opacity 0.18s ease-out, visibility 0s linear 0s; }
   .rail-shade[data-hidden] { opacity: 0; visibility: hidden; transition: opacity 0.3s ease, visibility 0s linear 0.3s; }
   .rail-shade[data-dim] { opacity: 0.4; transition: opacity 0.3s ease; }
+
+  /* ⚠️ THE HUD LEAVES BY ITS OWN EDGE (user, 2026-09-13: "when we switch between HUD and Scene,
+     can we animate the cards in/out of the view; left rail cards slide in from the left, right
+     rail cards from the right"). The fade alone said "gone" without saying WHERE — and the
+     toggle's whole claim is that the chrome has stepped ASIDE, not been destroyed, so the
+     direction is the message: each rail exits through the screen edge it lives against and
+     comes back from it.
+
+     THE COLUMN TRANSLATES, NOT `.rail-shade`. The columns are `overflow-y: auto`, which
+     computes the x axis to `auto` as well — a transform on the inner shade would push content
+     sideways inside a scroll container and could open a horizontal scroller. The fixed column
+     has no such container, so it simply moves. `:has()` reads the shade's own `data-hidden`,
+     which keeps the SIDE structural (the column IS the side) and leaves RailShade with no prop
+     to pass — the same reasoning that made the dock's covers sided by the two rails.
+
+     The thread is a SIBLING of each column (see ExploreRail), so it does not ride along: the
+     dots stay as the minimized rail, which is the whole point of hiding by visibility rather
+     than by display. */
+  /* The bottom lane's half of the same exit: it leaves through the BOTTOM edge it lives
+     against. `.rail-shade`'s away tempo (0.3s), because this
+     is the same gesture reaching a third surface — the toggle's claim is that the whole HUD
+     stepped aside, and three surfaces leaving at three speeds would read as three events.
+     Both the plate and the Trends tab above it carry the class; the tab is furniture ON the
+     lane's edge, so it rides the lane rather than fading on its own account.
+     100% + the footer clears the plate's own height AND the strip it sits flush on.
+
+     ⚠️ THE STATE LIVES HERE, THE TRANSITION LIVES ON THE ELEMENT. Unlike `.rail-shade`, both
+     band surfaces already declare their own `transition` as an arbitrary PROPERTY (the band's
+     own one-statement rule — utility pairs eat each other, see its note), and a recipe
+     transition at (0,1,0) would just lose to it on stylesheet order (CSS trap 4). So each
+     element lists `transform` in its own statement, and only the STATE is written here, at
+     (0,2,0) so it beats the yield dim's `opacity-40` utility it can never co-occur with. */
+  .band-shade[data-hidden] {
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(calc(100% + var(--footer-h, 0px)));
+  }
+
+  #leftcol:has(> .rail-shade[data-hidden]),
+  #rightcol:has(> .rail-shade[data-hidden]) { transition: top 0.25s ease-out, transform 0.3s ease; }
+  #leftcol:has(> .rail-shade[data-hidden]) { transform: translateX(calc(-100% - var(--rail-margin))); }
+  #rightcol:has(> .rail-shade[data-hidden]) { transform: translateX(calc(100% + var(--rail-margin))); }
   /* The same yield on the tablet/phone dock sheets, which are the rails at those widths
      (RailDock.tsx) — WIDER on the PHONE half alone: that sheet covers most of a small viewport
      with no way to step it aside, so it also dims while the engine flies the camera after a
@@ -1093,7 +1287,7 @@
      `pointer-events-auto` in RIGHT_CARD (CardHead.tsx). */
   #rightcol {
     position: fixed; z-index: 10; top: calc(var(--rail-top) + var(--topbar-extra, 0px)); right: var(--rail-margin);
-    transition: top 0.25s ease-out;
+    transition: top 0.25s ease-out, transform 0.18s ease-out;
     width: var(--detail-w);
     display: flex; flex-direction: column; gap: var(--rail-gap);
     /* Must never enter the bottom lane's reserved band — see the matching #leftcol comment above
@@ -1113,9 +1307,13 @@
      — spine + tick + node-dot — a rail-width away from it. The slab is the cards' own bodies. */
 
 
-  /* The rails' strip-follow slide (top rides --topbar-extra) — motion off under reduce. */
+  /* The rails' strip-follow slide (top rides --topbar-extra) and the SCENE-toggle exit slide —
+     motion off under reduce. ⚠️ Both hidden arms must be listed: they carry their own
+     `transition` at (1,2,0) and a bare id reset at (1,0,0) loses to them (CSS trap 4). */
   @media (prefers-reduced-motion: reduce) {
-    #leftcol, #rightcol { transition: none; }
+    #leftcol, #rightcol,
+    #leftcol:has(> .rail-shade[data-hidden]),
+    #rightcol:has(> .rail-shade[data-hidden]) { transition: none; }
   }
 
   /* Both rails scroll: native touch panning (pan-y + momentum) and a grab-drag fallback for

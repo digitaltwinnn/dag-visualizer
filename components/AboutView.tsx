@@ -83,14 +83,33 @@ export default function AboutView({
                 "animate-in fade-in slide-in-from-bottom-2 duration-(--tempo-doc-rise) ease-(--ease-roll) delay-(--tempo-roll-lag) fill-mode-both motion-reduce:animate-none",
             )}
           >
-            {lines.map((l, i) => (
-              <p
-                key={i}
-                className={cn(
-                  "m-0 text-body",
-                  i > 0 ? "text-muted-foreground" : "text-foreground-dim",
-                )}
-              >
+            {/* ⚠️ A LEAD NEEDS TWO CHANNELS, NOT A COLOUR STEP (user, 2026-09-14: in light mode
+                the first paragraph was "still hard to see … color difference is clear enough?").
+                It had only ever been a tone apart — `--foreground-dim` against
+                `--muted-foreground` — and a single step between two DARK inks on paper is the
+                weakest version of the weakest channel: on the dark face the pair sit at 199 and
+                134, where the eye is sensitive, and on the light face at 38 and 73, where it
+                reads both as simply "text".
+                So the lead takes the same treatment /about's own lead does — FULL `--foreground`,
+                not the dim tone (AboutDoc: `text-base text-foreground` over
+                `text-label text-muted-foreground`) — which is also the widest step either ramp
+                has. And since this card has no size headroom to spend (the HUD scale steps 12.5
+                → 15, and 15 is the card TITLE's size), the second channel is WEIGHT: medium, not
+                semibold, so it reads as a standfirst and never as a heading. Two channels means
+                the distinction survives a face, a monitor and an eye that struggles with either
+                one alone — the same reason identity is never colour-alone anywhere else here. */}
+            {lines[0] != null && <p className="m-0 text-body text-foreground font-medium">{lines[0]}</p>}
+            {/* ⚠️ THE LEAD IS DIVIDED FROM THE BODY BY A HAIRLINE (user, 2026-09-14), which is the
+                third channel and the only STRUCTURAL one — colour and weight mark the lead, a rule
+                separates it. Same decision the vitals band's cards took on 2026-09-01, and for the
+                same stated reason: a hairline over spacing alone. The device is the house one — the
+                card-head rule's own `border-b border-border` — and it needs no inset of its own,
+                because this body already carries the panel's horizontal padding, so the rule lands
+                on exactly the head hairline's line. Drawn only when there IS a body to divide from:
+                a one-paragraph card gets a lead, not a lead and an empty half. */}
+            {lines.length > 1 && <div className="border-b border-border" aria-hidden />}
+            {lines.slice(1).map((l, i) => (
+              <p key={i} className="m-0 text-body text-muted-foreground">
                 {l}
               </p>
             ))}

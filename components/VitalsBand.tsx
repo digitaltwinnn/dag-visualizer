@@ -18,10 +18,8 @@ import { isGlobalActivityScope, type Activity } from "@/src/data/api";
 import { POLL } from "@/src/engine/config";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import useTrendsWindow from "@/components/useTrendsWindow";
-import { sliceWindow, leadingTrim, monthlySum, trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow";
-import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
+import { sliceWindow, trimNewestPartial, type TrendsWindowData } from "@/src/data/trendWindow";
 import { DOC_ICONS } from "@/components/icons";
-import { SELECTED_ROW } from "@/components/selection";
 import { useSceneYield } from "@/components/RailShade";
 import { ageWords } from "@/src/util/relativeAge";
 import { cn } from "@/lib/utils";
@@ -117,64 +115,27 @@ function windowNote(a: Activity | null | undefined, unit: string): string | unde
  *  A band card in TWO SEGMENTS: the LEAD (the headline total this card exists to say) and the
  *  DETAIL (its breakdown), divided by a hairline (user pick, 2026-09-01 — over spacing alone).
  *
- *  ⚠️ `size` IS THE ONE WIDTH VOCABULARY (user, 2026-09-01: "sometimes certain vitals cards are
- *  huge while others are tiny; can we have an agreed small/medium/large size"). It replaced six
- *  hand-picked flex values (1.4 / 1.5 / 1.6 / 1.8 / 2 / auto) that each encoded a guess about one
- *  card's content. Three tiers, and a tier is a claim about WHAT THE CARD IS, not how wide it looked:
+ *  ⚠️ EVERY CARD TAKES AN EQUAL SHARE OF THE PLATE (user, 2026-09-13: "instead of S/M/L type of
+ *  vitals card sizes, just make use of the width available in the bottom section and spread
+ *  evenly"). This replaces a three-tier `size` vocabulary (sm/md/lg, 2026-09-01) that in turn
+ *  replaced six hand-picked flex values — each round tuned how EAGERLY a card took leftover
+ *  width, and each left a different card looking starved beside a bloated neighbour, because a
+ *  tier is a guess about content made once and then read at every viewport.
  *
- *    sm — states ONE reading and has no breakdown to spend width on (geo's NODES, the anchoring
- *         roster, hyper's single-characteristic type card). Sizes to its content.
- *    md — a reading AND its breakdown, or a rate and its sparkline. The row's default.
- *    lg — a chart that genuinely reads better wide (the ledger's tick bars).
+ *  An equal share is not a guess: the plate is divided by the number of cells the view has, and
+ *  the row reads as one instrument lane rather than as sections that each negotiated their own
+ *  width. `basis-0` is what makes it EQUAL — with the old `auto` basis a card's content set its
+ *  starting width and the share only divided the surplus, which is why a one-number roster and a
+ *  32-bar chart could never sit in comparable columns.
  *
- *  Every tier keeps an `auto` BASIS, never `basis-0`: a share computed with no reference to the
- *  card's content is what clipped the rate cards' extrapolation note off the plate at tablet width.
- *  A card asks for what it needs first, and grows from there by its tier's weight.
+ *  ⚠️ A CARD MAY STILL CLAIM A FLOOR, and that is not a tier returning: `min-w` on a chart cell
+ *  says "below this I am not readable at all", which binds only on a squeezed row and is silent
+ *  at every width where the even split has room. The equal share decides the LAYOUT; a floor
+ *  only refuses to disappear.
  *
  *  Either segment may stand alone: lead-only (geo's NODES), detail-only (NETWORK LAYERS, and
  *  PulseStrip's poll cards, which pass no lead). The divider draws only when both are present. */
-export type BandCardSize = "sm" | "md" | "lg";
-
-/** The tier→flex table. `auto` basis throughout (see the note above); only the GROW weight differs,
- *  so a tier says how eagerly a card takes leftover width, never how wide it starts. */
-/** ⚠️ THE CEILING IS WHAT MAKES A TIER A TIER. Without it every `md` card grows to fill whatever
- *  the viewport gives it, and at 1600px three of them each held ~500px — a lead pinned left, a
- *  capped bar block pinned right, and a void between the two (the very "huge cards" complaint the
- *  scale exists to answer). The grow weight decides who takes leftover width; the ceiling decides
- *  when everyone stops taking it and the row simply ends. */
-/*  ⚠️ THE CEILING MOVED OFF THE BOX AND ONTO THE CONTENT (user, 2026-09-01: "can we align the
- *  vitals sections in the center of its designated space on the bottom bar?"). With the cap on the
- *  BOX, a capped row stopped short of the plate and the whole group centred as one clump — so all
- *  the leftover collected at the two ENDS and hyper's three sections began 234px into a bar they
- *  were supposed to divide. The box now takes its share of the plate and the CONTENT is capped and
- *  centred inside it, which is what "its designated space" means: the slack is distributed between
- *  the sections instead of banked outside them, and every card still refuses to stretch its own
- *  lead and breakdown apart (the ceiling's original job, unchanged).
- *
- *  ⚠️ THE BASIS STAYS `auto` ON BOTH HALVES. A share computed with no reference to the card's
- *  content is what clipped the rate cards' extrapolation note off the plate at tablet width; with
- *  an auto basis a squeezed row simply has no surplus to hand out and every box falls back to its
- *  content width, which is exactly the pre-plate behaviour. */
-/** The tier→flex table for the BOX. An equal `1 1 0` share per section was tried and withdrawn
- *  the same minute (user, 2026-09-01: "the 1/3rd rule can't apply based on vitals card count") —
- *  a plate cut into N identical columns gives a one-number roster the same room as a 32-bar chart
- *  and squeezes the chart to pay for it, and N changes per view. The tier still says how eagerly a
- *  card takes LEFTOVER width, and `auto` basis throughout means it asks for what it needs first —
- *  the rule that keeps a squeezed row from clipping the rate cards' extrapolation note. */
-const BAND_SIZE: Record<BandCardSize, string> = {
-  sm: "flex-initial",            // 0 1 auto — content-sized, and still shrinks when tight
-  md: "flex-auto",               // 1 1 auto
-  lg: "flex-[2_1_auto]",
-};
-
-/** …and the cap the tier puts on its CONTENT, centred in whatever share the row gave it. */
-const BAND_CAP: Record<BandCardSize, string> = {
-  sm: "max-w-[240px]",
-  md: "max-w-[360px]",
-  lg: "max-w-[560px]",
-};
-
-export function BandCard({ label, children, className, mark, lead, size = "md", aside }: { label: string; children?: React.ReactNode; className?: string; mark?: React.ReactNode; lead?: React.ReactNode; size?: BandCardSize; aside?: React.ReactNode }) {
+export function BandCard({ label, children, className, mark, lead, aside }: { label: string; children?: React.ReactNode; className?: string; mark?: React.ReactNode; lead?: React.ReactNode; aside?: React.ReactNode }) {
   return (
     <div className={cn(
       // The plate is the COMMAND BAR's own glass (`--topbar-glass` — a gradient token, so the
@@ -182,17 +143,17 @@ export function BandCard({ label, children, className, mark, lead, size = "md", 
       // the earlier `bg-card/40` was tuned under light and sat near-invisible over the dark
       // scene's glow (user, 2026-08-30: "in dark the card needs a bit more contrast").
       "flex rounded-lg border border-border/60 [background:var(--topbar-glass)] backdrop-blur-sm px-3 py-1.5 min-w-0",
-      // ⚠️ `sm` is `flex-initial` (0 1 auto), NOT `flex-none`: a content-sized card must still
-      // SHRINK when the row is tight, or its widest child — which is usually the LABEL, not the
-      // reading — pins it. "Metagraphs anchoring" held 305px of a 684px tablet row that way,
-      // starving the two rate cards beside it; shrinking, it truncates its eyebrow and yields.
-      BAND_SIZE[size],
+      // `1 1 0` — an EQUAL share of the plate, not a share of the surplus. `min-w-0` above is
+      // what lets it actually reach that share: without it a card's widest child (usually the
+      // LABEL, not the reading) pins the column, which is how "Metagraphs anchoring" once held
+      // 305px of a 684px row. Shrinking, it truncates its eyebrow and yields.
+      "flex-1 basis-0",
       className,
     )}>
-    {/* THE CAPPED, CENTRED CONTENT. `mx-auto` is what puts a section in the middle of its own
-        share rather than at the left of it; `w-full` keeps it filling that share up to the cap,
-        so nothing changes at the widths where there is no surplus to centre within. */}
-    <div className={cn("flex flex-col gap-1 w-full min-w-0 mx-auto", BAND_CAP[size])}>
+    {/* No content ceiling any more: a cell's share IS its designated space now, so the content
+        simply fills it. The cap + `mx-auto` pair existed to centre content inside an over-wide
+        tier (2026-09-01) — an equal split has no over-wide tier to correct for. */}
+    <div className="flex flex-col gap-1 w-full min-w-0">
       <span className="flex items-center gap-1.5 leading-none min-w-0">
         {mark}
         {/* TRUNCATE, not `whitespace-nowrap`: at 760px "Metagraphs anchoring" clipped mid-glyph
@@ -801,7 +762,7 @@ function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: b
 // ledger — the activity cells: the two rates as number + sparkline cards (slot 2 swaps with the
 // scope exactly as the bar's vitals did: filtered, "anchors" would be a different quantity, so
 // the network's DAG fees show instead), and the tick chart as one wide card.
-function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
+function LedgerCells({ accent, filter, paused }: { accent: string; filter: string; paused: boolean }) {
   const activity = useStore((s) => s.activity);
   // ONE feed subscription for the whole row (review, 2026-08-31) — the roster's live
   // fallback still reads it while the store hasn't answered.
@@ -814,57 +775,35 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
   // payload the DAILY tier (7d/30d slices = exact per-day sums). No client re-bucketing —
   // a client sum over part-null buckets would have to invent a floor rule the store already
   // solved.
-  const zoom = useStore((s) => s.vitalsWindow);
-  // Each window fetches only while picked (review: the unconditional 7d fetch kept
-  // re-downloading the largest payload to discard it whenever the rim sat on 30D/1Y).
-  // 1H rides the 24h payload — the store's finest tier (5m), sliced to the newest hour.
-  const t24 = useTrendsWindow(zoom === "1h" ? "24h" : null);
-  const t7 = useTrendsWindow(zoom === "24h" ? "7d" : null);
-  // 7D and 30D both ride the 90d DAILY payload (one fetch, the store's own sums — the
-  // no-client-rebucketing rule): the rim's 7D is seven daily bars, each NAMED by its weekday
-  // in the chart (user, 2026-09-11, two rounds: first "only 7 bars", then the hourly 168 was
-  // too many and a 6-hour re-bucket would need bucketing machinery the store already solved —
-  // "does 7 make more sense; in that case say the weekdays"). The hour-by-hour 7D lives on
-  // /trends, the observation ladder's next rung down.
-  const t90 = useTrendsWindow(zoom === "30d" || zoom === "7d" ? "90d" : null);
-  const t1y = useTrendsWindow(zoom === "1y" ? "1y" : null);
-  const tAll = useTrendsWindow(zoom === "all" ? "all" : null);
-  const windowed = useMemo<TrendsWindowData | null>(() => {
-    // trimNewestPartial FIRST (the payload's own clock drops the still-filling bucket —
-    // the CDN finding), then the window cut; 1y/all add the leading trim so the span the
-    // aside claims below is derived from the DATA, never asserted.
-    if (zoom === "1h") return t24.data ? sliceWindow(trimNewestPartial(t24.data), 3_600_000) : null;
-    if (zoom === "24h") return t7.data ? sliceWindow(trimNewestPartial(t7.data), 24 * 3_600_000) : null;
-    if (zoom === "7d") return t90.data ? sliceWindow(trimNewestPartial(t90.data), 7 * 86_400_000) : null;
-    if (zoom === "30d") return t90.data ? sliceWindow(trimNewestPartial(t90.data), 30 * 86_400_000) : null;
-    if (zoom === "1y") return t1y.data ? leadingTrim(trimNewestPartial(t1y.data)) : null;
-    return tAll.data ? leadingTrim(trimNewestPartial(tAll.data)) : null;
-  }, [zoom, t24.data, t7.data, t90.data, t1y.data, tAll.data]);
+  // ⚠️ ONE WINDOW, NOT A PICK (user, 2026-09-13). The band carried a six-segment range rim
+  // (1H…ALL) that only the ledger's cells could honour, which is why the Trends LINK beside it
+  // could only appear there too — and the link is the useful half in every view. So the range
+  // control is gone and the band states ONE window; the ranges themselves live one rung down,
+  // on /trends, where the charts are built to be ranged (convention 12: the band is the live
+  // instrument, /trends the measured history). 24H is the band's window because it is the one
+  // reach that reads as "the network right now" beside live numerals.
+  //
+  // It rides the 7d payload — the store's HOURLY tier, whose newest-24h slice is exact per-hour
+  // sums. No client re-bucketing: a client sum over part-null buckets would have to invent a
+  // floor rule the store already solved.
+  // `paused` while the HUD is stepped aside (2026-09-13): the band stays MOUNTED through the
+  // SCENE toggle so it can slide out, and a mounted-but-hidden band that kept polling would
+  // make the pulse strip's "while shown" words a lie about this feed.
+  const t7 = useTrendsWindow(paused ? null : "7d");
+  const windowed = useMemo<TrendsWindowData | null>(
+    // trimNewestPartial FIRST (the payload's own clock drops the still-filling bucket — the
+    // CDN finding), then the window cut.
+    () => (t7.data ? sliceWindow(trimNewestPartial(t7.data), 24 * 3_600_000) : null),
+    [t7.data],
+  );
   // NO outage fallback to the live buffers — considered after the review and declined
   // (user, 2026-09-09: "keep the code simple, no complex fallback logic"). A store outage
   // leaves the measured cards on their acquiring state while the hook retries; the pulse
   // strip's api-trends row is where the outage itself is stated.
-  // The BARS at 1Y/ALL are calendar months, the still-forming current month trimmed (the
-  // /trends counters' partial-edge rule); the lines stay daily — a 20-point mean over the
-  // trimmed span. Elsewhere bars and lines share the windowed buckets exactly.
-  // barData feeds the stacked chart AND the roster that legends it (review: ranking the
-  // roster over the untrimmed daily window while the chart drew trimmed months broke the
-  // card pair's own same-window rule for the first weeks of every month).
-  const monthlyZoom = zoom === "1y" || zoom === "all";
-  const barData = useMemo(
-    () => (windowed ? (monthlyZoom ? monthlySum(windowed) : windowed) : null),
-    [monthlyZoom, windowed],
-  );
-  const span =
-    zoom === "1h" ? "last hour"
-    : zoom === "24h" ? "last 24 hours"
-    : zoom === "7d" ? "last 7 days"
-    : zoom === "30d" ? "last 30 days"
-    : windowed?.buckets.length
-      // Month + full year (the range row's own 2026-09-09 ruling): post-backfill the deep
-      // windows open in a PREVIOUS year, and a bare month claims the wrong one.
-      ? `since ${new Date(windowed.buckets[0]).toLocaleString("en", { month: "short", timeZone: "UTC" })} ${new Date(windowed.buckets[0]).getUTCFullYear()}`
-      : zoom === "all" ? "all measured history" : "past year";
+  // The bars and the lines share the windowed buckets exactly — one window, one payload, so
+  // the chart and the roster that legends it can never rank over different reaches.
+  const barData = windowed;
+  const span = "last 24 hours";
   const stepWord =
     windowed?.stepMs === 300_000 ? "in five-minute buckets"
     : windowed?.stepMs === 3_600_000 ? "hour by hour"
@@ -932,29 +871,13 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
     };
   };
   const rate = (label: string, spark: SparkSpec, note?: string) => {
-    // THE 1Y LINE CARRIES ITS ENDPOINTS (user, 2026-09-09, closing the month-axis round: "for
-    // a year I can't see if it's the last 12 months or until current year"): at 1Y the window's
-    // edges are the ambiguity — months repeat across the year boundary — so the line gets a
-    // start/end range row WITH years, while the wide chart's per-bar ticks carry the months
-    // between. Shorter windows stay axis-free (position-in-window still reads as "when", and
-    // the rim states the range). Rim-windowed cards only — the live-fallback line states its
-    // own window in words already.
-    // The year written OUT ("sep 2026", not "sep '26" — user, 2026-09-09: the apostrophe form
-    // read as a day-of-month; and month+day was considered and declined, because a trailing
-    // year starts and ends on almost the same date, which would read as a two-day window).
-    const monthYear = (ts: number): string =>
-      `${new Date(ts).toLocaleString("en", { month: "short", timeZone: "UTC" }).toLowerCase()} ${new Date(ts).getUTCFullYear()}`;
-    const rangeRow =
-      !spark.offRim && (zoom === "1y" || zoom === "all") && windowed && windowed.buckets.length > 1 ? (
-        <span aria-hidden className="flex justify-between leading-none text-micro text-muted-foreground/70">
-          <span>{monthYear(windowed.buckets[0])}</span>
-          <span>{monthYear(windowed.buckets[windowed.buckets.length - 1])}</span>
-        </span>
-      ) : null;
+    // NO ENDPOINT AXIS. It existed for the 1Y/ALL windows, where months repeat across the year
+    // boundary and position-in-window stopped reading as "when" (user, 2026-09-09). Over a
+    // single 24-hour window position IS when, and the card's own words state the reach — the
+    // deep windows that needed the axis are /trends' business now.
     const line = (
-      <span className={cn("flex-1 min-w-0 self-center", rangeRow && "flex flex-col justify-center gap-0.5")}>
-        <Sparkline data={spark.data} color={accent} height={rangeRow ? 32 : 42} maxPoints={20} stretch />
-        {rangeRow}
+      <span className="flex-1 min-w-0 self-center">
+        <Sparkline data={spark.data} color={accent} height={42} maxPoints={20} stretch />
       </span>
     );
     // A STOPPED CHAIN REPORTS WHEN, NOT HOW FAST — and now also SHOWS it (user, 2026-09-08:
@@ -969,7 +892,7 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
         <BandCard
           key={label}
           label={label}
-          aside={spark.offRim && spark.data != null ? spark.span : undefined}
+          aside={spark.data != null ? spark.span || undefined : undefined}
           lead={
             <span className="flex flex-col items-start">
               <span className="font-mono font-bold text-muted-foreground tabular-nums whitespace-nowrap">idle</span>
@@ -997,10 +920,17 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
       // window — it described the numeral, not the card). The unit rides UNDER the number
       // as a muted underline (the idle card's own stacked-lead grammar), so it qualifies
       // exactly the thing it belongs to; the header carries no aside and the rim alone
-      // speaks for the charts' range. The one exception stands: the live-fallback line
-      // states its own window, because it is NOT the rim's, and silence would let the
-      // rim's claim cover a chart it doesn't describe.
-      aside={spark.offRim ? spark.span || undefined : undefined}
+      // spoke for the charts' range.
+      //
+      // ⚠️ AND NOW EVERY CARD STATES ITS OWN REACH (user, 2026-09-14: "the vitals card now also
+      // need to indicate what range they show"). The rim WAS the range statement, so retiring it
+      // left the measured cards silent about a window they very much have — a chart with no
+      // stated reach beside live numerals invites both to be read as "now", which is the
+      // confusion the rim's own 2026-09-08 rounds were spent on. `spark.span` already carries
+      // the right words per card and needs no new rule: the measured cards say the band's
+      // window, and the live fallback keeps saying its own — which is the one case where the
+      // two genuinely differ, and the reason this is one expression rather than a constant.
+      aside={spark.span || undefined}
       lead={
         <span className="flex flex-col items-start">
           {/* NodeStars while the window's mean is still in flight (user, 2026-09-08: the
@@ -1052,7 +982,9 @@ function LedgerCells({ accent, filter }: { accent: string; filter: string }) {
         ? rate("DAG fees", sparkOf(cfg ? `m.${cfg.id}.fee` : null, activity?.feesSeries, activity?.feesPerHour, true), "$DAG this network pays to anchor.")
         : rate("Anchors", sparkOf("g.anchors", activity?.anchoredSeries, activity?.anchorsPerHour), "Metagraph snapshots anchored into the global chain.")}
       {rate("Snapshots", sparkOf(scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries, activity?.snapsPerHour))}
-      <BandCard label="Anchors by metagraph" size="lg" className="min-w-[220px]">
+      {/* The chart states the same reach its rows do — it plots the very buckets the rate cards
+          average, so a silent chart beside two captioned ones would read as a different window. */}
+      <BandCard label="Anchors by metagraph" aside={span} className="min-w-[220px]">
         <StackBars accent={accent} isMeta={isMeta} filter={filter} data={barData} />
       </BandCard>
     </>
@@ -1096,11 +1028,13 @@ function AnchoringNetworks({ windowed, snaps, filter }: { windowed: TrendsWindow
     list = [...ids];
   }
   return (
-    // CONTENT-SIZED (grow=false): the roster is a fixed run of dots, so an equal share of the row
-    // left ~200px of empty plate beside five dots — the band's worst offender before 2026-09-01.
+    // AN EQUAL SHARE LIKE EVERY OTHER CELL (2026-09-13). This card is why the tiers existed —
+    // a fixed run of dots left ~200px of quiet plate beside them — but quiet plate inside an
+    // even lane reads as breathing room, while an uneven lane reads as cards that disagree
+    // about how wide they should be. The dots keep their own `max-w` wrap below, so the slack
+    // collects around the roster rather than stretching it.
     <BandCard
       label="Metagraphs anchoring"
-      size="sm"
       lead={<span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={list.length || null} /></span>}
     >
       {/* ⚠️ THE LENS DIMS, IT DOES NOT EDIT (user, 2026-09-01: "if we filter, should we then also
@@ -1117,12 +1051,31 @@ function AnchoringNetworks({ windowed, snaps, filter }: { windowed: TrendsWindow
           being distinguished from — the eye had to find the bright one among five identical marks
           rather than being handed it. `items-center` keeps the row's baseline steady while one dot
           grows, so nothing below it shifts. */}
-      <span className="flex flex-wrap items-center gap-1 max-w-[120px]">
-        {list.slice(0, 12).map((id) => {
+      {/* ⚠️ EVERY BULLET IS NAMED, AND THE RUN IS CENTRED (user, 2026-09-14: "metagraphs anchoring
+          can be centre-aligned and each bullet has room for a label"). The dots were bare and
+          capped at 120px because the card was `sm` and had no width to spend; on an equal share it
+          has plenty, and a bare dot made this the one roster in the app naming its subjects by
+          colour alone — which is the rule the sr-only line below existed to paper over. The TICKER
+          is the label: it is what the rest of the band already calls a network ("following DOR"),
+          and it stays short enough that four or five pairs wrap cleanly at a third of the plate.
+          ⚠️ THE CAP DROPS 12 → 8 with the labels: twelve NAMED entries is a list, not a legend,
+          and the honest total is the lead numeral beside them, not the length of this run. */}
+      <span className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 flex-1 min-w-0">
+        {list.slice(0, 8).map((id) => {
           const on = filter !== "all" && id === filter;
+          const label = metagraphById(id)?.ticker ?? displayNetwork(id)?.ticker ?? null;
           return (
-            <span key={id} className={cn("flex", filter !== "all" && !on && "opacity-45")}>
+            <span key={id} className={cn("inline-flex items-center gap-1 min-w-0", filter !== "all" && !on && "opacity-45")}>
               <IdentityDot hue={identityHudCss(id)} className={on ? "w-3.5 h-3.5" : undefined} />
+              {/* No hand-written fallback label — `displayNetwork` is the one home for what an
+                  uncatalogued channel is CALLED (unlistedBoundary.test.ts enforces that the id
+                  literal has two homes, and this is not one of them). With no name to give, the
+                  dot stands alone rather than being captioned with a guess. */}
+              {label && (
+                <span className={cn("text-micro truncate", on ? "text-foreground" : "text-muted-foreground")}>
+                  {label}
+                </span>
+              )}
             </span>
           );
         })}
@@ -1155,69 +1108,37 @@ function useVitalsScope() {
 
 /** The one view→cells dispatch — a cell added or gated here reaches desktop and phone in the
  *  same edit, which is the whole point of extracting it. */
-function ViewCells({ mode, accent, filter }: { mode: string; accent: string; filter: string }) {
+function ViewCells({ mode, accent, filter, paused = false }: { mode: string; accent: string; filter: string; paused?: boolean }) {
   return (
     <>
       {mode === "hyper" && <HyperCells accent={accent} />}
       {mode === "geo" && <GeoCells accent={accent} />}
-      {mode === "ledger" && <LedgerCells accent={accent} filter={filter} />}
+      {mode === "ledger" && <LedgerCells accent={accent} filter={filter} paused={paused} />}
     </>
   );
 }
 
-/** The TRENDS RIM — the band's one interactive strip (user, 2026-09-08: "some sort of separate
- *  control bar that sets the range + links to the separate trends page"). A small tab riding
- *  the band's TOP edge in the file-cabinet vocabulary the Trends page itself uses: the window
- *  pills set `store.vitalsWindow` (which every windowed ledger cell reads), the divider, then
- *  the route to the page where the elaborate versions live. It is a fixed SIBLING of the band,
- *  not a child — the band's clip-path would amputate anything protruding past its border box,
- *  and the band's `pointer-events-none` charter stays intact: the cards below remain
- *  read-only, and this strip is the one deliberate exception, OUTSIDE the plate.
- *  Gated per view by `viewPolicy.vitalsWindows` (convention 7): only the ledger's cells read
- *  the store, and a picker over live-fleet cells would be a control wired to nothing. */
-const WINDOW_CHOICES = [["1h", "1H"], ["24h", "24H"], ["7d", "7D"], ["30d", "30D"], ["1y", "1Y"], ["all", "All"]] as const;
+/** The TRENDS LINK — the band's one interactive element (user, 2026-09-08: "some sort of
+ *  separate control bar that sets the range + links to the separate trends page"; the range
+ *  half retired 2026-09-13). A small tab riding the band's TOP edge in the file-cabinet
+ *  vocabulary the Trends page itself uses: the route to the page where the elaborate,
+ *  RANGEABLE versions live. It is a fixed SIBLING of the band, not a child — the band's
+ *  clip-path would amputate anything protruding past its border box, and the band's
+ *  `pointer-events-none` charter stays intact: the cards below remain read-only, and this tab
+ *  is the one deliberate exception, OUTSIDE the plate.
+ *
+ *  ⚠️ UNGATED, IN EVERY VIEW THAT CARRIES THE BAND (user, 2026-09-13). It used to ride
+ *  `viewPolicy.vitalsWindows` — right for a range PICKER, whose windowed cells only the ledger
+ *  reads, and wrong for the link: /trends is the measured history of the whole network, so the
+ *  step down the observation ladder (convention 12) is offered from wherever the band is. It
+ *  therefore needs no policy row of its own; the band's own `vitalsLane` gate is its gate. */
 const TrendsMark = DOC_ICONS.trends;
 
-/** The rim's segments, shared by both presentations (2026-09-08): the desktop band's floating
- *  pill and the phone Vitals sheet's control row render ONE group, so a window added or a
- *  route renamed reaches both in the same edit — the ViewCells rule, applied to the control.
- *  `grow` is the phone form: equal thumb-width segments across the sheet's column. */
-function WindowSegments({ grow = false }: { grow?: boolean }) {
-  const zoom = useStore((s) => s.vitalsWindow);
-  const setZoom = useStore((s) => s.setVitalsWindow);
-  return (
-    <>
-      {WINDOW_CHOICES.map(([id, label]) => (
-        <button
-          key={id}
-          type="button"
-          aria-pressed={zoom === id}
-          onClick={() => setZoom(id)}
-          className={cn(
-            // rounded-full per segment INSIDE the padded pill (user, 2026-09-08: the flush
-            // clipped segments left the container's cyan hairline with "missing parts on the
-            // rounded corners" — SELECTED_ROW's square inset ring was being cut against the
-            // curve; a segment that carries its own curve keeps its ring whole).
-            "px-2 flex items-center rounded-full text-micro tracking-[0.1em] uppercase leading-none",
-            grow && "flex-1 justify-center",
-            // The pressed segment wears SELECTED_ROW — the app's ONE committed-selection
-            // language (wash + inset ring), which is what a picked window IS. That is also
-            // what says CONTROL, not card (user, 2026-09-08: stacked in the phone sheet the
-            // pill read as one more card): cards are spineless and never wash; a segment
-            // carrying the selection wash can only be an instrument you set.
-            zoom === id ? cn("font-bold", SELECTED_ROW) : "text-muted-foreground hover:text-foreground hover:bg-wash-hover",
-          )}
-        >
-          {label}
-        </button>
-      ))}
-    </>
-  );
-}
-
-/** The Trends route as a LINK, outside the range group (user, 2026-09-08: "should not be part
- *  of the button-group, it should show as a link") — the site row's own link register: primary
- *  ink, normal case, the page's mark. A destination is a link; only the range is a control. */
+/** The Trends route as a LINK (user, 2026-09-08: "should not be part of the button-group, it
+ *  should show as a link") — the site row's own link register: primary ink, normal case, the
+ *  page's mark. Shared by both presentations (2026-09-08): the desktop band's floating tab and
+ *  the phone Vitals sheet's row render ONE component, so a route renamed reaches both in the
+ *  same edit — the ViewCells rule, applied to the control. */
 function TrendsLink({ className }: { className?: string }) {
   const setDocPage = useStore((s) => s.setDocPage);
   return (
@@ -1225,10 +1146,6 @@ function TrendsLink({ className }: { className?: string }) {
       type="button"
       onClick={() => setDocPage("trends")}
       title="The measured history behind these vitals — open the Trends page."
-      // RIDES THE SAME PILL as the range group but stays a LINK (user, 2026-09-08, second
-      // round: "keep it on the same rounded pill still but just with some transparency while
-      // the button-group stays as-is"): transparent ground, primary ink, normal case — the
-      // colour split is the separation, no divider.
       className={cn("inline-flex items-center gap-1.5 rounded-full px-2 text-label text-primary/75 hover:text-primary whitespace-nowrap bg-transparent", className)}
     >
       <TrendsMark aria-hidden className="size-3.5" />
@@ -1237,28 +1154,25 @@ function TrendsLink({ className }: { className?: string }) {
   );
 }
 
-function TrendsRim({ yielding }: { yielding: boolean }) {
+function TrendsRim({ yielding, hidden }: { yielding: boolean; hidden: boolean }) {
   return (
     <div
       style={{ right: "var(--bar-margin)", bottom: "calc(var(--footer-h, 0px) + var(--vitals-h) + 6px)" }}
+      // The tab rides the band's own exit (2026-09-13): it is furniture ON the lane's top edge,
+      // so it leaves through the bottom with it rather than fading on its own account.
+      data-hidden={hidden ? "" : undefined}
       className={cn(
-        // ONE PILL for range + route (user, 2026-09-08, after a fully-split round): the range
-        // group keeps its control segments, the Trends LINK rides the same pill on a
-        // transparent ground — the ink split is the separation. Padded rather than clipped
-        // (p-0.5, no overflow-hidden): flush segments under the old clip cut SELECTED_ROW's
-        // square ring against the curve, which read as "missing parts" of the cyan hairline.
-        // That hairline is PRIMARY-TINTED, not the cards' neutral: cyan is the app's one
-        // affordance signal, so a cyan-edged pill among neutral-edged plates reads as the
-        // thing you touch.
-        "fixed z-10 flex items-stretch h-[26px] p-0.5 gap-0.5 rounded-full border border-primary/25",
+        "band-shade",
+        // The pill survived the range group's retirement (user, 2026-09-13) — it is what makes
+        // the link read as a thing you touch rather than a caption over the plate. Its hairline
+        // is PRIMARY-TINTED, not the cards' neutral: cyan is the app's one affordance signal,
+        // so a cyan-edged pill among neutral-edged plates reads as the affordance.
+        "fixed z-10 flex items-stretch h-[26px] p-0.5 rounded-full border border-primary/25",
         "[background:var(--topbar-glass)] backdrop-blur-sm",
-        "transition-opacity duration-300 motion-reduce:!transition-none",
+        "[transition:opacity_300ms_ease,transform_300ms_ease] motion-reduce:!transition-none",
         yielding && "opacity-40",
       )}
-      role="group"
-      aria-label="Vitals history window"
     >
-      <WindowSegments />
       <TrendsLink />
     </div>
   );
@@ -1266,7 +1180,7 @@ function TrendsRim({ yielding }: { yielding: boolean }) {
 
 /** The band. Mounted by BottomStream (per viewPolicy.vitalsLane + scene pose + rails visible);
  *  this component reads the mode only to pick which view's cells to lay out. */
-export default function VitalsBand() {
+export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
   const { mode, live, filter, accent } = useVitalsScope();
   // The band does NOT inset by the tablet sheets any more (user, 2026-09-04 — "the bottom bar
   // should behave the same as the top bar; the collapsible card panels go over the bar instead
@@ -1292,7 +1206,7 @@ export default function VitalsBand() {
   const coverR = useStore((s) => s.sceneCoverR);
   return (
     <>
-      {VIEW_POLICIES[mode].vitalsWindows && <TrendsRim yielding={yielding} />}
+      <TrendsRim yielding={yielding} hidden={hidden} />
       <section
       id="vitalsband"
       aria-label="View vitals"
@@ -1300,7 +1214,13 @@ export default function VitalsBand() {
         ["--cover-l" as string]: `${coverL}px`,
         ["--cover-r" as string]: `${coverR}px`,
       }}
+      // The SCENE toggle's exit (2026-09-13): the band leaves through the BOTTOM edge it lives
+      // against, the way each rail leaves through its own — see the `.band-shade` recipe. It
+      // stays MOUNTED while hidden (BottomStream's two gates), because a component that
+      // unmounts has no exit to animate.
+      data-hidden={hidden ? "" : undefined}
       className={cn(
+        "band-shade",
         // pointer-events-none: the band is a read-only instrument — orbit drags pass through it.
         // --bar-margin, THE COMMAND BAR'S OWN INSET (globals.css), so the two bars bracket the
         // scene as a matched pair. At desktop it resolves to --rail-margin, which keeps the band's
@@ -1347,7 +1267,7 @@ export default function VitalsBand() {
         // yielding arm's duration-300 overrides all of them to the away tempo while the hand
         // is on the camera. motion-reduce carries `!` — a variant loses to an equal-weight
         // single class on stylesheet order alone (CSS trap 4).
-        "[transition:opacity_180ms_ease-out,left_300ms_ease-out,right_300ms_ease-out,clip-path_300ms_ease-out]",
+        "[transition:opacity_180ms_ease-out,transform_300ms_ease,left_300ms_ease-out,right_300ms_ease-out,clip-path_300ms_ease-out]",
         "motion-reduce:!transition-none",
         yielding && "opacity-40 duration-300",
         !live && "saturate-[.45]",
@@ -1360,7 +1280,7 @@ export default function VitalsBand() {
           silently retargets it at the wrapper. */}
       <RollSwap
         swapKey={mode as Mode}
-        render={(m) => <ViewCells mode={m} accent={accent} filter={filter} />}
+        render={(m) => <ViewCells mode={m} accent={accent} filter={filter} paused={hidden} />}
         className={cn(
           "flex-1 min-w-0 flex items-stretch justify-center gap-0",
           "[&>*]:rounded-none [&>*]:border-0 [&>*]:backdrop-blur-none [&>*]:[background:none]",
@@ -1382,8 +1302,8 @@ export default function VitalsBand() {
  *  do with what was asked for ("it feels confusing as it's not related to the actual dropdown").
  *  The dock parallels the desktop band: vitals live on the bottom edge on every tier. Vertical
  *  because the sheet has height to spend and a stacked read beats a sideways thumb-scroll; the
- *  width ceilings the band's `size` tiers carry are overridden — in a column every card takes
- *  the sheet's width, and the ceilings exist for a 1600px row, not a 360px column. */
+ *  band's equal horizontal share is overridden — in a column every card takes the sheet's full
+ *  width, which is what `[&>*]:flex-none [&>*]:basis-auto` on the wrapper below says. */
 export function VitalsSheetBody() {
   const { mode, live, filter, accent } = useVitalsScope();
   return (
@@ -1396,19 +1316,12 @@ export function VitalsSheetBody() {
       )}
     >
       {!live && <span className="self-center flex-none mb-2"><NoSignalDot /></span>}
-      {/* The rim, in the sheet's own register (2026-09-08): an in-flow full-width pill of
-          equal thumb-height segments above the cards — the sheet is interactive (unlike the
-          band), so it simply sits in the column. Same policy gate as the desktop pill. */}
-      {VIEW_POLICIES[mode].vitalsWindows && (
-        <div
-          role="group"
-          aria-label="Vitals history window"
-          className="flex items-stretch h-10 p-0.5 gap-0.5 mb-2 flex-none rounded-full border border-primary/25 [background:var(--topbar-glass)]"
-        >
-          <WindowSegments grow />
-          <TrendsLink className="flex-1 justify-center" />
-        </div>
-      )}
+      {/* The link, in the sheet's own register (2026-09-08): an in-flow full-width pill at
+          thumb height above the cards — the sheet is interactive (unlike the band), so it
+          simply sits in the column. Ungated like the desktop tab (2026-09-13). */}
+      <div className="flex items-stretch h-10 p-0.5 mb-2 flex-none rounded-full border border-primary/25 [background:var(--topbar-glass)]">
+        <TrendsLink className="flex-1 justify-center" />
+      </div>
       {/* The no-pop swap — the cell-targeting `[&>*]` rules ride the wrapper for the same
           retargeting reason the band's do (see the desktop section above). */}
       <RollSwap

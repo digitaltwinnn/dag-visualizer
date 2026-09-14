@@ -35,6 +35,12 @@ import { useLayoutEffect, useRef, type ReactNode } from "react";
 // The leaving side stays a snap — animating an unmount needs exit-hold machinery (the
 // accordion-clone lessons), not a casual add.
 //
+// ⚠️ THE PIN LANDS BEFORE PAINT. The observer fires after layout and before the frame is
+// painted; the confirmation rAF below it runs a whole frame later. Everything that keeps the
+// box from showing its destination must therefore happen in the OBSERVER — see the pin note
+// at the `o.style.height = from` line for what that fixed and why the stretch chain stays
+// behind in the confirmation frame.
+//
 // ⚠️ FOLLOW, DON'T FIGHT: the pile already has animators — the pager pins and eases heights
 // through a sibling slide, Radix disclosures run .disclose-panel inside card bodies. Their
 // tell is that the content is STILL MOVING one frame later — so every would-be ease first
@@ -51,19 +57,49 @@ export default function HeightEase({
   children,
   className,
   growIn = false,
-}: { children: ReactNode; className?: string; growIn?: boolean }) {
+  settleKey,
+}: { children: ReactNode; className?: string; growIn?: boolean; settleKey?: string }) {
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const anim = useRef<Animation | null>(null);
+  const fade = useRef<Animation | null>(null);
   const confirm = useRef(0);
   const stretched = useRef<HTMLElement[]>([]);
   const last = useRef(-1);
   const growInRef = useRef(growIn);
   growInRef.current = growIn;
+  // ⚠️ THE ARRIVAL IS A STATED FACT, NOT AN INFERRED ONE (user, 2026-09-13: "don't make it a
+  // timing fix but do it structurally"). `settleKey` names WHAT THIS SLOT IS SHOWING — the
+  // ladder passes its rung's tier. When it changes, the slot's occupant has been replaced, and
+  // the replacement must ARRIVE rather than appear already finished.
+  //
+  // The first cut expressed that in CSS, as `tierSettleIn`/`tierSettleOut` keyframes restarting
+  // because React happened to swap the inner element's type. Two things were wrong with it and
+  // neither was the look: the trigger was an ACCIDENT of reconciliation (reuse the element and
+  // the arrival silently stops happening; recreate one for any other reason and it fires when
+  // nothing changed), and the fade ran on its own CSS clock that merely READ the same token as
+  // the height — two animations agreeing by convention, free to drift the moment either is
+  // retuned. Now the fact comes down as a prop and the fade is started by the same code, in the
+  // same tick, with the same duration and easing object as the height. They cannot disagree.
+  //
+  // The flag is raised in a LAYOUT EFFECT, not during render: a render may be thrown away under
+  // concurrent rendering, and an arrival armed by a discarded render would fire on the next
+  // unrelated resize. Layout effects run after the commit and before the browser's layout step,
+  // so the flag is always up before the observer below can read it in the same frame.
+  const settleRef = useRef(settleKey);
+  const arriving = useRef(false);
+  useLayoutEffect(() => {
+    if (settleRef.current === settleKey) return;
+    settleRef.current = settleKey;
+    arriving.current = true;   // consumed by the next ease; a mount never arms it
+  }, [settleKey]);
   useLayoutEffect(() => {
     const o = outer.current!;
     const i = inner.current!;
     const clearStyles = () => {
+      delete o.dataset.arriving;
+      i.style.opacity = "";
+      o.style.height = "";
       o.style.overflow = "";
       o.style.overflowClipMargin = "";
       i.style.height = "";
@@ -86,15 +122,48 @@ export default function HeightEase({
       }
       const from = first ? 0 : last.current;
       last.current = h;
-      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        // ⚠️ REDUCED MOTION STILL GETS THE POINTER-INERT WINDOW. The flash it prevents is not
+        // motion — it is Chromium handing a freshly-mounted element a LATCHED `:hover` from a
+        // cursor that never moved — so it happens whether or not we animated, and the pager's
+        // own `stillLane()` opens its window under reduce for the same reason. The window here
+        // is simply as long as the re-lay, which under reduce is one frame: mark, let the new
+        // pile lay out and paint, then release. No timer, and nothing moves.
+        if (arriving.current) {
+          arriving.current = false;
+          o.dataset.arriving = "";
+          requestAnimationFrame(() => requestAnimationFrame(() => { delete o.dataset.arriving; }));
+        }
+        return;
+      }
+      // ⚠️ PIN TO THE OLD HEIGHT *HERE*, IN THE OBSERVER, NOT IN THE CONFIRMATION FRAME
+      // (user, 2026-09-13: "it briefly expands/snaps to its full height already before
+      // starting the smooth grow towards its height"). An RO callback runs after layout and
+      // BEFORE paint; the confirmation rAF below runs a whole frame later. So the frame that
+      // changed the content used to PAINT at the new full height, and only the frame after
+      // that dropped back to `from` and began easing — one 16ms flash of the destination,
+      // then a jump backwards. It also explained the second half of the same report ("the
+      // bottom cards section appears immediately"): in that flash frame every card below had
+      // already been pushed to its final place, and they snapped back with it.
+      //
+      // Pinning the BOX before paint is enough to erase it. Only `o`'s own height and clip
+      // are touched — never the stretch chain, which stays in the confirmation frame below,
+      // so the follow-don't-fight guarantee is unchanged: a foreign animator's pin is still
+      // never written by us, and the pin here is released the moment one is detected.
+      o.style.height = `${from}px`;
+      o.style.overflow = "clip";
+      o.style.overflowClipMargin = "18px";
       // The one-frame confirmation (see the follow-don't-fight note above): a foreign
       // animator shows up as the height still moving next frame.
       cancelAnimationFrame(confirm.current);
       confirm.current = requestAnimationFrame(() => {
         confirm.current = 0;
+        // `i` is not stretched yet, so this still reads the CONTENT's natural height —
+        // the pin above constrains `o` alone.
         const h2 = i.offsetHeight;
         if (h2 !== h) {
           last.current = h2;
+          clearStyles(); // a foreign animator owns this box — hand it straight back
           return;
         }
       const root = getComputedStyle(document.documentElement);
@@ -107,8 +176,10 @@ export default function HeightEase({
       // bottom under a moving outer), and the outermost panel itself, which also clips its
       // own overflowing content (an element's overflow clips descendants, never its own
       // border or shadow).
-      o.style.overflow = "clip";
-      o.style.overflowClipMargin = "18px";
+      // The pin's base value becomes the DESTINATION now, so the moment the (fill: none)
+      // animation finishes the inline height already equals what it rendered — clearStyles
+      // then drops to `auto` with nothing to flash through.
+      o.style.height = `${h}px`;
       i.style.height = "100%";
       const panel = i.querySelector<HTMLElement>(".ig-panel, .rail-entry");
       if (panel) {
@@ -118,14 +189,41 @@ export default function HeightEase({
         panel.style.overflow = "clip";
         stretched.current = chain;
       }
-      const a = o.animate([{ height: `${from}px` }, { height: `${h}px` }], {
-        duration: ms,
-        easing: ease,
-      });
+      const timing = { duration: ms, easing: ease };
+      const a = o.animate([{ height: `${from}px` }, { height: `${h}px` }], timing);
       anim.current = a;
+      // THE ARRIVAL, on the height's own clock. `i` is HeightEase's OWN wrapper, never the
+      // card — so this can never collide with what the card does with its own opacity (the
+      // ladder's entries carry `--entry-dim` there, and the two simply multiply). Started in
+      // this same tick from the same `timing`, so the slot's resize and its occupant's arrival
+      // are one gesture by construction rather than by agreement.
+      if (arriving.current) {
+        arriving.current = false;
+        i.style.opacity = "1";
+        fade.current = i.animate([{ opacity: 0 }, { opacity: 1 }], timing);
+        // ⚠️ AND THE RUNG GOES POINTER-INERT WHILE IT ARRIVES (user, 2026-09-13: "when I click a
+        // card in the right rail node stack, the focus still gives a blink … it goes from a
+        // hovered focus on a square element straight to a rounded corner element. Maybe just let
+        // the focus re-appear once animation is close to completion?").
+        //
+        // The lane already had this window — `data-stepping`, iterated four times against
+        // exactly this flash — but it was armed by the PAGER's plank alone, so the commonest
+        // gesture of all, clicking a card, never got it. Hence the blink survived: the entry's
+        // full-bleed square ring unmounts, a rounded box mounts under a cursor Chromium still
+        // reports as hovering, and both light before anything has moved.
+        //
+        // It is stated here rather than re-armed there because this is where the fact lives: the
+        // rung is in motion exactly while this animation runs. That also retires the timer for
+        // this path — the window cannot end early or late, and the user's own standing ruling on
+        // the sibling suppression ("timer-based is too fragile, solve it structurally") is what
+        // this follows.
+        o.dataset.arriving = "";
+      }
       a.onfinish = a.oncancel = () => {
         if (anim.current === a) {
           anim.current = null;
+          fade.current?.cancel();
+          fade.current = null;
           clearStyles();
         }
       };
@@ -135,6 +233,7 @@ export default function HeightEase({
     return () => {
       ro.disconnect();
       cancelAnimationFrame(confirm.current);
+      fade.current?.cancel();
       anim.current?.cancel();
     };
   }, []);

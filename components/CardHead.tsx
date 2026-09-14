@@ -317,6 +317,34 @@ export default function CardHead({
   // body's right-aligned columns (user, 2026-07-12 — the 22px title-row clearance double-inset
   // the aside ~40px from the card edge while everything else aligned at ~18px). The BOX carries
   // NO minimize control (user, 2026-09-11 — "hardly used"; it was the − on the eyebrow line
+/** ⚠️ FOCUS MOVES BEFORE THE UNMOUNT, NEVER AFTER IT (user, 2026-09-14: "the background card can
+ *  sometimes take the focus as sizes are changing while the clicked card is appearing").
+ *
+ *  The right rail's disclosure is asymmetric by design: an unboxed ENTRY is one invisible
+ *  stretched toggle, and the BOX it opens into has no toggle at all — its chrome is the × alone.
+ *  So activating an entry does not MOVE focus, it DESTROYS the focused element, and the browser
+ *  is left to pick a successor while the whole pile is re-laying out. That is the bug: focus was
+ *  being decided by unmount order and whatever happened to be mounted at that instant, which is
+ *  why it sometimes landed on the card going to BACKGROUND and sometimes on nothing at all.
+ *
+ *  The first cut answered it afterwards — wait two frames, see where focus ended up, put it back.
+ *  That is a race with a guess about its length, and it can only ever be right after the fact.
+ *  The structural answer is to leave nothing to decide: hand focus to the element that SURVIVES
+ *  the transition, synchronously, while the doomed button still has it. React keys the rung
+ *  wrapper by its slot id, so the wrapper is the one node that is the same object before and
+ *  after — it is the RUNG, where both tiers live. Focus it first and the unmount destroys an
+ *  element nobody is focused on; there is no successor to pick, no frame to wait for, and no
+ *  window in which another card can take it.
+ *
+ *  The RING is drawn on the panel, not here — see the `[data-rung]:focus-visible .ig-panel` rule.
+ *  The stable element holds the focus; the visible one shows it. */
+function keepFocusOnRung(el: HTMLElement): void {
+  // Only when the doomed control actually HAS focus: a mouse user who never focused it should not
+  // be handed a focus they did not ask for.
+  if (document.activeElement !== el) return;
+  el.closest<HTMLElement>("[data-rung]")?.focus({ preventScroll: true });
+}
+
   // plus a whole-head stretched toggle): the box moves by expanding another entry or by the
   // plank's ladder pair, never by collapsing into nothing. COLLAPSED (the unboxed ENTRY,
   // card-redesign 2026-08-08) the chrome disappears entirely — no ×, no +/− (user: it read as
@@ -346,7 +374,11 @@ export default function CardHead({
             type="button"
             aria-expanded={false}
             title="Expand"
-            onClick={onToggle}
+            // ⚠️ FOCUS FIRST, THEN TOGGLE — the order is the whole fix (see keepFocusOnRung).
+            onClick={(e) => {
+              keepFocusOnRung(e.currentTarget);
+              onToggle?.();
+            }}
             className="absolute inset-0 z-[1] appearance-none bg-transparent border-0 p-0 m-0 cursor-pointer rounded-sm focus-visible:outline-1 focus-visible:outline-ring/60"
           >
             <span className="sr-only">Expand</span>

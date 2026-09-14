@@ -14,7 +14,7 @@ import PresentationToggle from "@/components/topbar/PresentationToggle";
 import SettingsMenu from "@/components/topbar/SettingsMenu";
 import { NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
 import { useBreakpoint } from "@/components/useBreakpoint";
-import { DOC_PAGES, VIEWS } from "@/components/views";
+import { DOC_PAGES, VIEWS, docReadsFilter } from "@/components/views";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import type { Mode } from "@/src/store/store";
 
@@ -38,7 +38,15 @@ export default function TopBar() {
   // act on something the reader can't see, so they hide; brand/pulse, the view switch (which
   // closes the doc and lands in the view), theme and network stay — they are the overlay's
   // chrome as much as the app's.
+  //
+  // ⚠️ …EXCEPT WHERE THE DOC ITSELF READS THE FILTER (user, 2026-09-14 — Trends is a document
+  // made of per-network charts). The reason the filter hid was that it acted unseen, and over a
+  // scoped doc it does not: it cuts the charts the reader is looking at. So the gate is the
+  // doc's own `scoped` flag (views.ts, which carries the full rationale) and the bar keeps its
+  // ordinary face there. The PRESENTATION pair still stands down under every doc — SCENE and
+  // RAW act on the layer the overlay covers, scoped or not.
   const doc = useStore((s) => s.docPage);
+  const filterOff = doc != null && !docReadsFilter(doc);
   // The presentation pair is VIEW-SCOPED (SCENE⇄HUD and RAW act on the 3D view under the bar),
   // so it stands down wherever there is no such view: a doc overlay, or the flat "soon" view
   // (gated on the policy's own canvas flag, convention 7 — never a mode list).
@@ -58,9 +66,11 @@ export default function TopBar() {
   }, [bp]);
 
   // A doc overlay opening closes whichever strip is grown — the strip previews the scene the
-  // overlay is about to cover.
+  // overlay is about to cover. A SCOPED doc keeps the filter strip open: there the chips act on
+  // the document itself, so the strip is not previewing anything that went away. The PULSE strip
+  // closes under every doc — it reports the feeds behind the live scene.
   useEffect(() => {
-    if (doc) setStrip(null);
+    if (doc) setStrip((cur) => (cur === "filter" && docReadsFilter(doc) ? cur : null));
   }, [doc]);
 
   // Consume the NetworkSwitch's one-shot view handoff (see its header): a network switch is a
@@ -221,7 +231,7 @@ export default function TopBar() {
           </span>
           <span className="sr-only">— show app liveliness</span>
         </button>
-        <span className={cn("w-px self-stretch bg-border my-1 max-[860px]:hidden", doc && "hidden")} />
+        <span className={cn("w-px self-stretch bg-border my-1 max-[860px]:hidden", filterOff && "hidden")} />
 
         {/* Filter (toned, de-nested) — toggles the ATTACHED filter strip below (user,
             2026-07-12: reversed the 2026-07-04 detached-popover decision; the strip lives on
@@ -236,7 +246,7 @@ export default function TopBar() {
             "flex items-center gap-[7px] bg-transparent border-0 cursor-pointer py-1.5 px-2 rounded-btn",
             "hover:bg-wash-soft",
             strip === "filter" && "bg-wash-soft",
-            doc && "hidden",
+            filterOff && "hidden",
             // The 44px tap minimum keys on the POINTER, not the width (user, 2026-08-14 —
       // resizing a desktop window smaller made the bar GROW): a coarse pointer is a
       // touch device wherever the window edge sits; a fine pointer never needs it.

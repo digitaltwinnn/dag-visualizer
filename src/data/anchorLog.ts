@@ -128,20 +128,46 @@ export function sortAnchorLog(
  *  so the builder below states that in its type rather than making each consumer re-prove it. */
 export type ChannelLogRow = AnchorLogRow & { metaId: string };
 
-export function buildUnlistedLog(
+export type ExactByOrdinal = Readonly<
+  Record<number, { rows?: readonly { metaId: string; ordinal: number; fee: number; bytes: number }[] } | undefined>
+>;
+
+/** EVERY channel row the exact reads know about, listed and unlisted alike — `keep` chooses which.
+ *
+ *  ⚠️ THE EXACT READ IS THE ONLY COMPLETE ANSWER TO "WHO ANCHORED HERE", for catalog metagraphs
+ *  as much as for uncataloged ones (2026-09-14). The polled `metaSnaps` buffers hold
+ *  `POLL.metaSnapBuffer` rows PER NETWORK, which is a depth in ROWS, not in ticks — so how far
+ *  back a network reaches depends on how fast it runs. Measured live: Digital Evidence anchors
+ *  37–46 snapshots into a single global tick, so 160 rows is barely three ticks of it, and the
+ *  by-network breakdown under any older tick silently lost the busiest contributor while the
+ *  tick's own fee total — which comes from the exact read — went on counting it. A breakdown
+ *  that cannot add up to the number above it is the honesty rule's own failure case.
+ *
+ *  `hash` is "" and `ts` is the TICK's timestamp, because the exact read carries neither: it
+ *  answers which channel anchored what, not the metagraph snapshot's own identity. Consumers
+ *  that want the hash prefer a polled row where they still have one (see LedgerPanel's union). */
+export function buildChannelLog(
   globalSnapshots: readonly GlobalSnapshot[],
-  exactByOrdinal: Readonly<Record<number, { rows?: readonly { metaId: string; ordinal: number; fee: number; bytes: number }[] } | undefined>>,
-  listedIds: ReadonlySet<string>,
+  exactByOrdinal: ExactByOrdinal,
+  keep: (metaId: string) => boolean,
 ): ChannelLogRow[] {
   const rows: ChannelLogRow[] = [];
   for (const g of globalSnapshots) {
     const ex = exactByOrdinal[g.ordinal];
     if (!ex?.rows) continue;
     for (const r of ex.rows) {
-      if (listedIds.has(r.metaId)) continue;
+      if (!keep(r.metaId)) continue;
       rows.push({ metaId: r.metaId, ordinal: r.ordinal, hash: "", fee: r.fee, sizeInKB: r.bytes / 1024, ts: g.timestamp, global: g });
     }
   }
   rows.sort((a, b) => (a.ts === b.ts ? b.ordinal - a.ordinal : a.ts < b.ts ? 1 : -1));
   return rows;
+}
+
+export function buildUnlistedLog(
+  globalSnapshots: readonly GlobalSnapshot[],
+  exactByOrdinal: ExactByOrdinal,
+  listedIds: ReadonlySet<string>,
+): ChannelLogRow[] {
+  return buildChannelLog(globalSnapshots, exactByOrdinal, (id) => !listedIds.has(id));
 }

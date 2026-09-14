@@ -7,12 +7,21 @@ import * as THREE from "three";
 
 export const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 export const smooth = (m: number) => m * m * (3 - 2 * m);
-// Quintic smootherstep: zero first AND second derivative at both ends — a pronounced
-// slow-start → fast-middle → slow-landing profile (the transition flight's speed curve;
-// plain `smooth` reads too mild over the long IN placement window). Shares smoothstep's
-// odd symmetry about 0.5 (smoother(1-x) = 1-smoother(x)), which the retarget continuity
-// math relies on.
-export const smoother = (m: number) => m * m * m * (m * (6 * m - 15) + 10);
+// Septic smootheststep: zero first, second AND third derivative at both ends — a pronounced
+// slow-launch → fast-cruise → slow-landing glide, and the transition FLIGHT's speed curve
+// (`viewTransition.gatherWeight`). The cruise is where it earns its order: peak slope 35/16
+// against smoothstep's 3/2, so the nodes spend less of the flight dawdling through the long
+// empty stretch between the staging grid and the view pose, and the same time arriving (user,
+// 2026-09-13: "speed up the mid-section … the speed should already have some curve to it").
+//
+// ⚠️ Shares smoothstep's odd symmetry about 0.5 (smoothest(1-x) = 1-smoothest(x)), which the
+// retarget continuity math relies on — a replacement that breaks it breaks retargeting.
+//
+// A QUINTIC `smoother` sat here until 2026-09-14, between `smooth` and this one. It went with
+// the flight that was its only caller: a third curve nothing rendered was a menu item, not a
+// tool, and the coverage test could not see it was dead (a sibling-test reference counts as
+// use). If a middle gear is ever wanted again, write it back with the caller that needs it.
+export const smoothest = (m: number) => m * m * m * m * (35 + m * (-84 + m * (70 - 20 * m)));
 export const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // fibonacci-shell / phyllotaxis spacing
 
 // A node's role set, shared by the DAG core + metagraph nodes. A node (one machine) can run

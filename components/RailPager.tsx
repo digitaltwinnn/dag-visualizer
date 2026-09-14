@@ -636,7 +636,13 @@ export default function RailPager({
         // full-bleeds to the panel's bottom edge. Without it the plate would stop at the default
         // 18 and leave the plank floating on bare glass below its own ground; with it the plank
         // and its hairline (siblings of the panel, so painted after it) ride ON the plate.
-        className="relative touch-pan-y select-none transition-transform duration-[380ms] ease-[var(--ease-spring)] motion-reduce:transition-none [--pager-strip:36px] [--foot-bleed:var(--pager-strip)] [&>.ig-panel]:pb-[var(--pager-strip)]"
+        // `rail-card` — the CARD'S REAL HOVER SUBJECT (globals.css). The plank below is a
+        // SIBLING of the panel, not a descendant (it has to be: #rightcol is
+        // pointer-events:none and the plank must take the pointer), and `:hover` climbs to
+        // ancestors, never to siblings — so crossing off the panel into the bottom strip
+        // un-hovered the card and its edge signal blinked off mid-card. This wrapper is what
+        // contains both, so it is what "the pointer is on this card" actually means.
+        className="rail-card relative touch-pan-y select-none transition-transform duration-[380ms] ease-[var(--ease-spring)] motion-reduce:transition-none [--pager-strip:36px] [--foot-bleed:var(--pager-strip)] [&>.ig-panel]:pb-[var(--pager-strip)]"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}

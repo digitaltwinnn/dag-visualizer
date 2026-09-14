@@ -612,12 +612,24 @@ export default function Inspector() {
           // The distance-dim rides a VAR, not wrapper opacity (2026-08-08): the entry itself
           // applies `opacity-[var(--entry-dim,1)]` and RELEASES it on hover (the materialize
           // preview) — a wrapper opacity would clamp the hover lift from outside.
-          <div key={id} data-depth={depth} data-tier={tier} data-focus={focused ? "" : undefined} style={{ ["--entry-dim" as string]: entryDim(id) } as CSSProperties}>
+          // ⚠️ `data-rung` + `tabIndex={-1}` make the wrapper the RUNG'S FOCUS HOME (2026-09-14).
+          // React keys it by slot id, so it is the one node that is the same object across a
+          // tier change — which is exactly what a disclosure needs when activating it destroys
+          // the control that had focus. CardHead hands focus here BEFORE the toggle, so the
+          // unmount never has a successor to pick; see `keepFocusOnRung` for the full reasoning.
+          // -1, so it is programmatically focusable but never a tab stop of its own: Tab still
+          // walks the card's real controls, not the box around them.
+          <div key={id} data-rung={id} tabIndex={-1} data-depth={depth} data-tier={tier} data-focus={focused ? "" : undefined} style={{ ["--entry-dim" as string]: entryDim(id) } as CSSProperties}>
             {/* Every rung's height EASES (HeightEase — its header carries the rule and the
                 follow-don't-fight heuristic that keeps it off the pager's own slides). The
                 slab selectors are descendant, not child, so the extra level is free — the
                 RailPager precedent. */}
-            <HeightEase growIn={laneBooted.current}>{wrapped}</HeightEase>
+            {/* `settleKey` is the rung's TIER, stated (2026-09-13): when it changes, this slot
+                is showing a different thing and HeightEase fades the new occupant in on the
+                very animation that resizes the slot. It used to be inferred — CSS keyframes
+                restarting because React swapped `.rail-entry` for `.ig-panel` — which made the
+                arrival an accident of reconciliation and put it on a second clock. */}
+            <HeightEase growIn={laneBooted.current} settleKey={tier}>{wrapped}</HeightEase>
           </div>
         );
       })}

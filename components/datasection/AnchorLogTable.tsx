@@ -861,13 +861,14 @@ export default function AnchorLogTable() {
         total={total}
         // The windowed lenses state their scope and the way further back (user, 2026-08-14) —
         // since 2026-09-02 as one underlined word with the explanation behind it, because the
-        // spelled-out line ran too long. The title says what the count actually is: the window
-        // is a span of TIME, and networks snapshot at their own rates, so 262 here is not a
-        // fraction of anything — a fast chain fills the window with hundreds while a slow one
-        // contributes three, and neither number is proportional to its chain.
+        // spelled-out line ran too long. The word was "window" until 2026-09-13, which named
+        // the MECHANISM rather than the fact (user: "no human understands this"); "recent" is
+        // the Snapshots explorer's word too, so the qualifier is learned once. The title still
+        // carries what the count actually is: the window is a span of TIME, and networks
+        // snapshot at their own rates, so 262 here is not a fraction of anything.
         scope={histNet ? undefined : {
-          word: "window",
-          title: "The recently retained span, held by time rather than by count — each network snapshots at its own rate, so these counts are not proportional to any chain's length. Pick a network in the top-bar filter to page its whole chain, back to genesis.",
+          word: "recent",
+          title: "These are only the most recent snapshots, not a whole chain. This view keeps a short stretch of TIME, and every network snapshots at its own rate — so a busy network fills it with hundreds while a quiet one adds three, and the count says nothing about how long either chain is. Pick a network in the top-bar filter to page through all of its snapshots, back to the very first one.",
         }}
         onPage={(n) => {
           setPageState(n);

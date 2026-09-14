@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import ExplorerShell from "@/components/ExplorerShell";
 import { SelectedRowMark, selectedRow, selectionHue } from "@/components/selection";
@@ -17,12 +17,14 @@ import { IdentityDot, LayerWho } from "@/components/inspector/parts";
 import { useStore } from "@/src/store/store";
 import { metaSnapSelectActions, snapshotSelectActions, sameMetaSnap, followToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { DepthCaption, DisclosureChevron, Disclosure, DisclosurePanel, DisclosureRow, NodePickerRow, ROW_NEST, ROW_OUTSET } from "@/components/ExploreRows";
+import { DepthCaption, DisclosureChevron, Disclosure, DisclosurePanel, DisclosureRow, NodePickerRow, ROW_NEST, ROW_NEST_DEEP, ROW_OUTSET } from "@/components/ExploreRows";
 import { CONTENT_EASE } from "@/components/RollSwap";
 import { NoSignalDot } from "@/components/state/StateAtoms";
-import { buildAnchorLog, type AnchorLogRow, type ChannelLogRow } from "@/src/data/anchorLog";
-import { SLOT_N } from "@/src/engine/domain/ledgerModel";
-import { fmtKB } from "@/src/util/format";
+import { buildAnchorLog, buildChannelLog, type AnchorLogRow, type ChannelLogRow } from "@/src/data/anchorLog";
+import { POLL } from "@/src/engine/config";
+import TablePager from "@/components/datasection/TablePager";
+import { ensurePage } from "@/components/RawSnapshotBridge";
+import { fmtDag } from "@/src/util/format";
 
 // The Snapshots view's left-rail tool — ONE AXIS: TIME (user, 2026-08-09). A single uniform tree
 // whose DEPTH means exactly one thing everywhere, and where every depth commits its own subject:
@@ -47,9 +49,14 @@ import { fmtKB } from "@/src/util/format";
 // row above them. Don't grow the second axis back as a tree.
 //
 // Everything selectable routes through the tested pickActions builders + the ONE executor, so an
-// explorer row and a 3D click can never drift. The browse window is the chamber's own visible
-// trail (SLOT_N ticks — the same buffer LiveStrip plots), so "what the list shows" is exactly
-// "what the 3D scene shows".
+// explorer row and a 3D click can never drift. The browse window is the LIVE BUFFER, paged —
+// see the window note at `useSnapshotFeed` below for why it is no longer the 3D trail.
+
+/** How many ticks a page of the explorer shows. Fifteen because the card is a peephole, not the
+ *  chain: enough rows that the list reads as a run of history rather than as the last handful
+ *  (user, 2026-09-13: "can you do 10-20 by default"), few enough that opening one still leaves
+ *  its breakdown on screen in a rail-width card. */
+const TICK_PAGE = 15;
 
 /** A COMMITTED FILTER IS A LENS, and inside a tick the lens decides what is drillable: with a
  *  network committed, every OTHER network's group is preview-only (user, 2026-08-10). The tick still
@@ -70,6 +77,26 @@ interface MetaGroup {
   name: string;
   hue: string;
   rows: ChannelLogRow[];
+}
+
+/** Stable empty — a fresh `[]` per render would be a new prop identity on every tick row. */
+const EMPTY_GROUPS: MetaGroup[] = [];
+
+/** ONE TICK'S ROWS, from both sources, POLLED FIRST. The polled row wins where both hold the same
+ *  (metagraph, ordinal) because it carries the metagraph snapshot's own `hash`, which the exact
+ *  read does not; the exact read then supplies every anchor the per-network buffer has aged out.
+ *  See the call site for why either alone is wrong. */
+function unionRows(
+  polled: readonly AnchorLogRow[],
+  exact: readonly AnchorLogRow[],
+  tickOrdinal: number,
+): AnchorLogRow[] {
+  const mine = polled.filter((r) => r.global.ordinal === tickOrdinal);
+  const seen = new Set(mine.map((r) => `${r.metaId}|${r.ordinal}`));
+  const extra = exact.filter(
+    (r) => r.global.ordinal === tickOrdinal && !seen.has(`${r.metaId}|${r.ordinal}`),
+  );
+  return extra.length ? [...mine, ...extra] : mine;
 }
 
 function groupByMeta(rows: readonly AnchorLogRow[]): MetaGroup[] {
@@ -109,6 +136,7 @@ function SnapRow<K extends string | number>({
   onClick,
   sub,
   mark,
+  lensOut,
   outset,
   nested,
   disclose,
@@ -130,6 +158,11 @@ function SnapRow<K extends string | number>({
   /** The committed network's anchor count in this tick, in its hue — absent = the network is
    *  not in this tick's story (and clicking would release the filter; user, 2026-08-07). */
   mark?: { hue: string; count: number } | null;
+  /** THE LENS STEPS A ROW BACK, it never removes it — see the tick list's own note. `opacity-45`
+   *  is the app's existing "present, but not your subject" level (the filter picker's 0-count
+   *  rows, hyper's 0-node networks, the vitals roster's unfiltered dots). Never applied to a
+   *  SELECTED row: a commit outranks a lens. */
+  lensOut?: boolean;
   /** TOP-LEVEL row (the tick rows, since the axis collapse made them the card's own first level):
    *  takes the right-edge contract's outset instead of a plain `w-full` — ExploreRows' ROW_OUTSET
    *  and ROW_NEST are the only two places allowed to own it. */
@@ -177,6 +210,7 @@ function SnapRow<K extends string | number>({
         // the header set the hue vars but no wash class, so it stayed uncolored). Its own
         // selection keeps the full mark.
         (selected || disclose?.holdsSel) && selectedRow(!!selected),
+        lensOut && !selected && !disclose?.holdsSel && "opacity-45",
         pair.paired && pair.className,
       )}
       // The selection follows the subject's identity (selection.tsx · selectionHue): `accent` is
@@ -287,7 +321,7 @@ function SignerList({
   setHoverNodeId: (id: string | null) => void;
 }) {
   return (
-    <div className="mb-1 ml-[7px] pl-2 border-l border-border">
+    <div className={ROW_NEST_DEEP}>
       {/* WHICH cluster this list is — the cards' own phrase ("Signed by N L0 validators"), whose
           words come from the one home SIGNER_GROUPS (user, 2026-08-16 — redesigned from the
           `label · count · layer` interpunct line into the DepthCaption register). The explorer is
@@ -367,9 +401,23 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const selNode = inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode") ? inspect : null;
   const selIp = selNode?.node?.ip ?? null;
   const selLayer = selNode ? (selNode.kind === "metanode" ? selNode.node?.layer ?? null : selNode.kind) : null;
-  // The visible window: the same live buffer LiveStrip reads, capped to the chamber's own
-  // visible-slot count so "visible ticks" matches the 3D trail.
-  const { snaps } = useSnapshotFeed(SLOT_N);
+  // ⚠️ THE LIST IS NO LONGER THE TRAIL. It used to ask for SLOT_N ticks so "what the list
+  // shows" was exactly "what the 3D scene shows" — a real symmetry, and the wrong trade at nine
+  // rows (user, 2026-09-13: "it shows only few snapshots while actually the number is almost
+  // unlimited; can you do 10-20 by default and add simple <> to move back/forward in the
+  // chain?"). Nine rows made the explorer look like the whole chain rather than a peephole onto
+  // it. It now reads the WHOLE live buffer and pages through it.
+  //
+  // The buffer is the reach, deliberately: `POLL.maxSnapshots` ticks is what the app already
+  // holds, so paging costs no fetch, no loading state and no error state — and the raw layer is
+  // where a walk to genesis belongs (user, same round: "raw will be there for more advanced
+  // search etc"). Convention 12's ladder, unchanged: live scene → this peephole → the records.
+  //
+  // What the decoupling costs: hovering a row older than the trail previews nothing in the
+  // scene, because the scene holds no tile for it. That is an honest no-op — the pairing
+  // channel is a global tick ordinal and the scene simply has no such subject — not a broken
+  // pair to go fixing.
+  const { snaps } = useSnapshotFeed(POLL.maxSnapshots);
   const net = getNetwork();
   const visibleTs = new Set(snaps.map((s) => s.timestamp));
   // Every anchored metagraph snapshot in the window, newest first (rebuilt per event-driven
@@ -378,6 +426,11 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // The UNLISTED channels (user, 2026-08-07 — navigable like any network): the one-home row
   // source (src/data/unlisted.ts — the exact reads, the only honest source), windowed here.
   const unlistedEntries = unlistedLog([...snaps].reverse(), snapshotExact);
+  // The LISTED half of the same source. `unlistedLog` has always read the exact snapshots for the
+  // uncataloged channels — "the polled buffers only track the public catalog, so the EXACT reads
+  // are the only honest source" — and the catalog's own rows turn out to need it just as much, for
+  // a different reason: the buffers track them, but only 160 rows deep PER NETWORK.
+  const exactChannelRows = buildChannelLog([...snaps].reverse(), snapshotExact, (id: string) => LISTED_IDS.has(id));
   // Under a NETWORK filter the global list shows ONLY that network's story — the ticks it
   // anchored into, the LiveStrip's filtered idiom (user, 2026-08-07: one mental model, no
   // two-outcome clicks in the explorer; the scene keeps all ticks and the filter-releases rule
@@ -390,10 +443,44 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // The ONE story rule (src/data/ledgerStory.ts) — the same membership the strip/scene read.
   const tickFilterCount = (d: GlobalSnapshot): number =>
     storyCount(filter, getAnchor(d.timestamp), snapshotExact[d.ordinal]) ?? 0;
-  const orderedSnaps = [...snaps]
-    .reverse() // newest first, the log convention
-    .filter((d) => !filterNet || tickFilterCount(d) > 0);
+  const [tickPage, setTickPage] = useState(1);
+  // ⚠️ THE LENS DIMS, IT DOES NOT EDIT — the tick list is the BASE LEDGER'S CHAIN (user,
+  // 2026-09-14: "the snapshot explorer now sometimes shows few rows, sometimes several pages,
+  // depending on time/filter etc. This is confusing to a user; how can we keep it consistent?").
+  //
+  // It used to drop every tick the committed network sat out, which made the list's LENGTH — and
+  // therefore its page count — a function of the filter: 52 ticks over 4 pages unfiltered, 29 over
+  // 2 with USDC.dag committed, and a different pair for every network. The same window kept
+  // answering "how much is there?" differently depending on what you were looking through.
+  //
+  // Every global tick happened, whichever network you are looking through, so the list is now
+  // always the whole retained window and the filter is what it is everywhere else in this app: a
+  // LENS. A tick the network anchored into carries its count in the network's hue; one it sat out
+  // is stepped back and carries none. That is also what the tick CHART beside it has always done
+  // under a filter — "its own cadence, with empty ticks as honest gaps" — so the two finally agree,
+  // and the gaps are now readable as the network's rhythm instead of being silently closed up.
+  const orderedSnaps = [...snaps].reverse(); // newest first, the log convention
   const activeSnapOrd = snap?.data.ordinal ?? null;
+  // ⚠️ PAGE 1 IS THE LIVE PAGE, and it is the only one that moves under the reader — the buffer
+  // is a rolling window, so a deeper page drifts as ticks age out of it. That is the same
+  // contract the raw layer's pager states, arrived at from the other end (it freezes `latest`
+  // off page 1; here the window itself is what slides), so the words are the same: the live tip
+  // is the mutable page.
+  // The page count is now the WINDOW's alone — it no longer moves when the filter does. It still
+  // grows as the retained window fills after a cold load, which is the one honest variable left.
+  const pages = Math.max(1, Math.ceil(orderedSnaps.length / TICK_PAGE));
+  const page = Math.min(tickPage, pages); // a shrinking window must not strand the reader
+  const pagedSnaps = orderedSnaps.slice((page - 1) * TICK_PAGE, page * TICK_PAGE);
+  // ⚠️ A PAGE IN VIEW IS A PAGE IN FOCUS. Exact reads (the fee each row states) are fetched for
+  // the live tick, the selected one and the backfill behind them — about one page's worth — so
+  // paging back used to show a column of honest dashes. The bridge's charter is "the snapshots
+  // currently in focus", and the page the reader is looking at is exactly that; `ensurePage`
+  // walks it at the backfill's own pace, deduped against everything already held or in flight.
+  const pagedKey = pagedSnaps.map((d) => d.ordinal).join(",");
+  useEffect(() => {
+    const ords = pagedKey ? pagedKey.split(",").map(Number) : [];
+    return ensurePage(ords);
+  }, [pagedKey]);
 
   // Disclosure state: single-open at each of the two disclosing depths, plain local UI state.
   // The tick rows are the card's own first level now, so there is no group to open first (user,
@@ -548,14 +635,31 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         >
           {orderedSnaps.length === 0
             ? empty
-            : orderedSnaps.map((d) => {
-                const tickGroups = groupByMeta(rows.filter((r) => r.global.ordinal === d.ordinal));
+            : pagedSnaps.map((d) => {
+                // ⚠️ THE BREAKDOWN IS THE UNION OF BOTH SOURCES, and only the exact read makes it
+                // COMPLETE (user, 2026-09-14: "why it shows 2 rows in the explorer instead of 3 —
+                // DED is missing"). `rows` comes from the polled `metaSnaps` buffers, which hold
+                // POLL.metaSnapBuffer rows PER NETWORK — a depth in ROWS, not in ticks. Measured on
+                // the reported tick: Digital Evidence anchored 46 snapshots into it, so 160 rows is
+                // barely three ticks of that chain and every older tick quietly lost its busiest
+                // contributor — while the fee this very row states, which comes from the exact read,
+                // went on counting it. A breakdown that cannot add up to the number above it is
+                // exactly what rule 10 forbids. (Paging the list from 9 ticks to 52 is what turned
+                // this from rare into normal, which is how it surfaced.)
+                //
+                // The POLLED row wins where both have it, because it carries the metagraph
+                // snapshot's own `hash` and the exact read does not; the exact read then supplies
+                // everything the buffer has aged out. Computed only while the tick is OPEN — it is
+                // the disclosure's content, and building it for all 15 rows of a page was work
+                // nobody could see.
+                const tickCount = tickFilterCount(d);
+                const isOpen = openTick === d.ordinal;
+                const tickGroups = !isOpen ? EMPTY_GROUPS : groupByMeta(unionRows(rows, exactChannelRows, d.ordinal));
                 // The tick's uncataloged anchors: the exact read's authoritative COUNT, and the
                 // per-channel entries that same read yields (identical source, so the entry list
                 // can't disagree with the count).
                 const tickUnlisted = snapshotExact[d.ordinal]?.unlistedCount ?? 0;
                 const tickEntries = unlistedEntries.filter((e) => e.global.ordinal === d.ordinal);
-                const isOpen = openTick === d.ordinal;
                 const globalPick = {
                   kind: "snapshot",
                   title: `Global snapshot #${d.ordinal}`,
@@ -567,18 +671,39 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
                 // on mount (the no-pop arrival ease; keys are ordinals, so live re-renders
                 // never replay it).
                 return (
-                  <div key={d.ordinal} className={CONTENT_EASE}>
+                  // ⚠️ AN OPEN TICK WEARS THE FAINT WASH, like every other explorer (user,
+                  // 2026-09-13: "breakdown for snapshot keeps same background as card while in
+                  // geo and hyper it has a slight effect; keep effect as that I think was
+                  // intentional"). It was: geo and hyper wash the whole open group so the
+                  // disclosed rows read as INSIDE their parent rather than as more rows in the
+                  // card. The ledger's tick was the one explorer that never took it, so its
+                  // breakdown floated on the card's own ground. Same recipe, verbatim.
+                  <div
+                    key={d.ordinal}
+                    className={cn(CONTENT_EASE, isOpen && "bg-wash-faint rounded-btn my-0.5 -mx-1.5 px-1.5")}
+                  >
                     {/* The tick row SELECTS (pin / live re-follow — the same tested table the
                         strip's bars run) AND discloses its contributors in the same click. */}
                     <SnapRow
                       outset
-                      mark={filterNet ? { hue: filterNet.hue, count: tickFilterCount(d) } : null}
+                      // The lens's two channels on a tick row: a COUNT in the network's hue where
+                      // it anchored, and a step back where it did not. No "0" mark — a zero in a
+                      // network's own colour reads as a reading about that network, when the
+                      // honest statement is simply that this tick is not part of its story.
+                      mark={filterNet && tickCount > 0 ? { hue: filterNet.hue, count: tickCount } : null}
+                      lensOut={!!filterNet && tickCount === 0}
                       label={d.ordinal.toLocaleString()}
-                      // The one honest per-tick byte figure: the exact read's measured KB;
-                      // absent = a dash, never derived from count or fee (the honesty rule).
+                      // ⚠️ THE METRIC IS THE FEE, NOT THE SIZE (user, 2026-09-13: "instead of size
+                      // in kb show the fees paid in DAG"). Both are exact reads off the same
+                      // fetch, so this is a swap of which fact the row leads with — and the fee
+                      // is the one a reader can act on: it is what anchoring COST, in the unit
+                      // the network charges, where bytes are an implementation detail of the
+                      // payload. `totalFee` is the exact read's own figure and includes the
+                      // unlisted channels, so it matches the rows disclosed beneath it.
+                      // Absent = a dash, never derived from count or size (the honesty rule).
                       metric={
-                        snapshotExact[d.ordinal]?.totalSizeKB != null
-                          ? fmtKB(snapshotExact[d.ordinal]!.totalSizeKB)
+                        snapshotExact[d.ordinal]?.totalFee != null
+                          ? `${fmtDag(snapshotExact[d.ordinal]!.totalFee)} DAG`
                           : "—"
                       }
                       selected={d.ordinal === activeSnapOrd}
@@ -694,7 +819,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
                                 </DisclosureRow>
                                 {/* Level 2+: INDENT ONLY — re-applying ROW_NEST here would
                                     compound its negative margin to +12px (the right-edge rule). */}
-                                <DisclosurePanel className="mb-1 ml-[7px] pl-2 border-l border-border">
+                                <DisclosurePanel className={ROW_NEST_DEEP}>
                                     {g.rows.map((r) => {
                                       const sel = {
                                         metaId: r.metaId,
@@ -711,7 +836,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
                                           <SnapRow
                                             nested
                                             label={r.ordinal.toLocaleString()}
-                                            metric={fmtKB(r.sizeInKB)}
+                                            metric={`${fmtDag(r.fee)} DAG`}
                                             selected={sameMetaSnap(metaSnap, sel)}
                                             hoverOrd={hoverMetaSnap}
                                             pairOrd={metaSnapHoverKey(r.metaId, r.ordinal)}
@@ -790,7 +915,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
                                 {tickUnlisted}
                               </span>
                             </DisclosureRow>
-                            <DisclosurePanel className="mb-1 ml-[7px] pl-2 border-l border-border">
+                            <DisclosurePanel className={ROW_NEST_DEEP}>
                                 {tickEntries.map((r, i) => {
                                   const sel = {
                                     metaId: r.metaId,
@@ -811,7 +936,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
                                         // sequence — one tick can carry several chains, so the short
                                         // address says which chain a number counts on (2026-08-08).
                                         sub={r.ordinal > 0 ? shortHash(r.metaId) : undefined}
-                                        metric={fmtKB(r.sizeInKB)}
+                                        metric={`${fmtDag(r.fee)} DAG`}
                                         selected={sameMetaSnap(metaSnap, sel)}
                                         hoverOrd={hoverMetaSnap}
                                         pairOrd={metaSnapHoverKey(r.metaId, r.ordinal)}
@@ -855,6 +980,39 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
                 );
               })}
         </div>
+        {/* The raw layer's OWN pager strip (datasection/TablePager) — one pager in the app, and
+            it already renders nothing for a single page, so a quiet filtered list stays a plain
+            list. Page arithmetic lives with the caller, which is its stated contract. */}
+        {live && orderedSnaps.length > 0 && (
+          <TablePager
+            page={page}
+            pages={pages}
+            from={(page - 1) * TICK_PAGE + 1}
+            to={Math.min(page * TICK_PAGE, orderedSnaps.length)}
+            total={orderedSnaps.length}
+            compact
+            // ⚠️ THE WORD IS PLAIN LANGUAGE, AND IT IS THE SAME WORD THE RAW LOG USES (user,
+            // 2026-09-13: "no human understands this, what is held/window?"). It said "held",
+            // which named the MECHANISM — the app is holding these in memory — and a reader
+            // has no reason to know or care that there is a buffer. What they actually need to
+            // know is the one thing the number does not say on its own: it is not the whole
+            // chain. "Recent" says that, and the raw log's pager now says it too, so the
+            // qualifier is learned once and means the same thing in both places. Only the
+            // explanation behind it differs, because the way to see more differs.
+            scope={{
+              word: "recent",
+              title: `These are the ${POLL.maxSnapshots} most recent global snapshots — the stretch this page follows live. The chain goes back very much further: open the raw data layer to search all of it.`,
+            }}
+            onPage={(p) => {
+              setTickPage(p);
+              // A page turn is a new set of rows; a disclosure left open on the page you just
+              // left would reopen against a different tick's ordinal.
+              setOpenTick(null);
+              setOpenContrib(null);
+              setOpenSigners(null);
+            }}
+          />
+        )}
       </div>
     </ExplorerShell>
   );

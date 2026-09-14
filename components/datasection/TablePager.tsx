@@ -17,6 +17,7 @@ export default function TablePager({
   to,
   total,
   scope,
+  compact = false,
   onPage,
 }: {
   page: number; // 1-based
@@ -28,8 +29,22 @@ export default function TablePager({
    *  `title` carries the explanation (user, 2026-09-02: the spelled-out "in window — pick a
    *  network…" line was "too long text" standing under the table on every render — the scope is
    *  a qualifier read once, not a sentence read 25 times). The dotted underline is the standard
-   *  there-is-more affordance at the strip's own weight. */
+   *  there-is-more affordance at the strip's own weight.
+   *
+   *  ⚠️ THE WORD IS PLAIN LANGUAGE, NEVER THE MECHANISM'S NAME (user, 2026-09-13: "held"/"window"
+   *  — "no human understands this"). It reads directly after a number, so it must complete the
+   *  sentence a reader is already forming — "501 recent", not "501 window". Both consumers say
+   *  "recent", deliberately: the qualifier is one idea (this is not the whole chain) and is
+   *  learned once; only the `title` differs, because the way to see more differs per surface. */
   scope?: { word: string; title: string };
+  /** RAIL WIDTH (2026-09-13, the Snapshots explorer's pager). The strip was drawn for a raw-layer
+   *  table with hundreds of pixels to spend; in a ~264px rail card the range words and the
+   *  four-button cluster fought for the same line and "1 / 4" wrapped onto two. Compact keeps
+   *  the exact same strip and drops what a peephole doesn't need: the first/last jumps (there
+   *  is no genesis to leap to inside a live buffer) and the row range (the rows are right
+   *  there). The total and its scope word stay — they are the honest statement of how much
+   *  there is and how far it reaches. */
+  compact?: boolean;
   onPage: (p: number) => void;
 }) {
   // The scope term's explanation must be REACHABLE ON TOUCH (2026-09-03, the phone review's
@@ -46,7 +61,7 @@ export default function TablePager({
     <div className="flex-none pt-1.5">
       <div className="flex items-center justify-between gap-2">
       <span className="min-w-0 truncate text-micro tracking-caps uppercase tabular-nums text-muted-foreground">
-        {from}–{to} of {fmtCount(total)}
+        {compact ? fmtCount(total) : `${from}–${to} of ${fmtCount(total)}`}
         {scope ? (
           <>
             {" · "}
@@ -62,25 +77,29 @@ export default function TablePager({
           </>
         ) : null}
       </span>
-      <span className="inline-flex items-center gap-1">
+      <span className="inline-flex flex-none items-center gap-1">
         {/* First/last jumps (user, 2026-08-14 — "I want to see the genesis block; now I have to
             go page by page"): the standard « ‹ › » cluster. The last page IS genesis in the
             history mode, one jump deep now that pages are ordinal-addressed. */}
-        <button type="button" className={btn} aria-label="First page" disabled={page <= 1} onClick={() => onPage(1)}>
-          <ChevronsLeft aria-hidden className="size-3.5" />
-        </button>
+        {!compact && (
+          <button type="button" className={btn} aria-label="First page" disabled={page <= 1} onClick={() => onPage(1)}>
+            <ChevronsLeft aria-hidden className="size-3.5" />
+          </button>
+        )}
         <button type="button" className={btn} aria-label="Previous page" disabled={page <= 1} onClick={() => onPage(page - 1)}>
           <ChevronLeft aria-hidden className="size-3.5" />
         </button>
-        <span className={cn("text-micro tabular-nums text-muted-foreground")}>
+        <span className={cn("text-micro tabular-nums text-muted-foreground whitespace-nowrap")}>
           {page} / {fmtCount(pages)}
         </span>
         <button type="button" className={btn} aria-label="Next page" disabled={page >= pages} onClick={() => onPage(page + 1)}>
           <ChevronRight aria-hidden className="size-3.5" />
         </button>
-        <button type="button" className={btn} aria-label="Last page" disabled={page >= pages} onClick={() => onPage(pages)}>
-          <ChevronsRight aria-hidden className="size-3.5" />
-        </button>
+        {!compact && (
+          <button type="button" className={btn} aria-label="Last page" disabled={page >= pages} onClick={() => onPage(pages)}>
+            <ChevronsRight aria-hidden className="size-3.5" />
+          </button>
+        )}
       </span>
       </div>
       {explain && scope && (

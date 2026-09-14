@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Panel } from "@/components/docs/AboutDoc";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import useTrendsWindow, { useTrendsRange } from "@/components/useTrendsWindow";
@@ -11,8 +11,8 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 import { filterToggleActions } from "@/src/engine/domain/pickActions";
 import { metagraphById } from "@/src/data/network";
 import { displayNetwork } from "@/src/data/unlisted";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { Table2 } from "lucide-react";
 import { SELECTED_ROW } from "@/components/selection";
 
 // THE TRENDS DOCUMENT (user, 2026-09-06; widened twice since) — the first UI consumer of the
@@ -84,6 +84,26 @@ const stepMsOfMain = (w: { stepMs: number } | undefined): number => w?.stepMs ??
 const scale = (points: (number | null)[], k: number): (number | null)[] =>
   points.map((v) => (v == null ? null : v * k));
 
+/** ⚠️ THE PICKERS ARE HAIRLINE GROUPS, NOT FILLED TRACKS (user, 2026-09-14: in light mode they
+ *  "all have a gray background which looks a bit off on a nice light clean background"). Measured,
+ *  the shadcn track lands about 24 sRGB levels below this document's paper — a grey slab, and the
+ *  only slab on a page that is otherwise paper and hairlines.
+ *  (The measurement is stated in words on purpose: rule 3's test reads comments too, and a literal
+ *  here would be a colour this file does not own.)
+ *
+ *  `bg-muted` is the primitive's own default, adopted unchanged; it reads acceptably on the dark
+ *  face, where everything is low-luminance, and as UI chrome dropped onto a document on the light
+ *  one. /trends is explicitly a DOCUMENT (convention 12 — prose, sections, 2D charts), and this
+ *  app's document register is a hairline: the card-head rule, the raw layer's search box, and the
+ *  file-cabinet tabs DIRECTLY BELOW these pickers all define their groups that way. So the group
+ *  keeps its shape and loses its fill — a hairline plus `--wash-faint`, the app's own quiet
+ *  surface, which is `light-dark()` by construction and so answers both faces at once.
+ *
+ *  ONE HOME for all three (topic, window, scale): they were three copies of the same literal, and
+ *  a fourth picker would have been a fourth. */
+const PICKER_GROUP =
+  "inline-flex items-center rounded-lg border border-border bg-wash-faint p-[3px] max-[700px]:flex max-[700px]:justify-center max-[700px]:[&>button]:flex-1";
+
 function Section({ id, title, lead, children }: { id: string; title: string; lead: string; children: React.ReactNode }) {
   return (
     <section
@@ -120,6 +140,26 @@ export default function TrendsDoc() {
   // inner Tabs controlled by one state is the whole fix, and only one control row is ever
   // on screen (the inactive drawer unmounts).
   const [sectionTab, setSectionTab] = useState("snapshots");
+  // ⚠️ ONE SCALE OR EACH ITS OWN — and the reader picks (user, 2026-09-14: "looks like they are
+  // equal because the scale is different"). Exactly right, and it is the classic small-multiples
+  // trap: a column of per-network charts that each autoscale answers "how did THIS network's week
+  // go?" beautifully and "which of these networks is bigger?" with a flat lie, because a chain
+  // anchoring three a day and one anchoring forty draw the same silhouette.
+  //
+  // Neither answer is the right default for everyone, so this is a CONTROL rather than a ruling:
+  // `own` keeps each chart's shape legible (the peaks, the dips, the quiet stretches), `shared`
+  // puts them all on the busiest one's scale so the column reads as a comparison.
+  //
+  // ⚠️ SHARED IS THE DEFAULT (user, 2026-09-14, the same round that asked for the control): a
+  // column of charts is read AS a column before it is read one chart at a time, so whatever the
+  // sections are titled, the first thing this page says is a comparison — and the autoscaled
+  // version said it wrongly. A reader who wants one network's own shape asks for it with one
+  // click and gets a chart that is still fully legible; a reader who never touches the control
+  // is not left with the flat lie. The honest reading is the one that needs no gesture.
+  // The peak readout stays each chart's OWN number in both modes (TrendChart's `ownMax`), so a
+  // sliver can still say how high it actually got.
+  const [scaleMode, setScaleMode] = useState<"own" | "shared">("shared");
+  const scaleId = useId();
   // AUTO-TIER (map-tile edition, 2026-09-10): a selected range picks the FINEST tier whose
   // HISTORY FLOOR its start clears (pickRangeTier — since the keep-forever flip, retention
   // no longer prunes, but the floors record where fine grain begins to exist) and fetches
@@ -134,6 +174,21 @@ export default function TrendsDoc() {
   const rangeTiles = useTrendsRange(
     range && (rangeTier === "5m" || rangeTier === "1h") ? { tier: rangeTier, fromMs: range.fromMs, toMs: range.toMs } : null,
   );
+  // ⚠️ THE COMMITTED NETWORK SCOPES EVERY PER-NETWORK COLUMN (user, 2026-09-14: "Trends is a
+  // doc-page, but actually it shows data that could benefit from the metagraph filter … hide the
+  // other metagraph charts"). ONE roster, read by all three panel builders, so a section cannot
+  // answer the filter differently from the section under it — and SUBSCRIBED, unlike the mount-
+  // once `initialTab` below: picking a chip in the bar's filter strip must cut the charts under
+  // the reader's eyes, which is the whole reason the bar keeps that strip over this doc
+  // (views.ts `scoped`). "all" is every catalog network, as before.
+  //
+  // A filter with no catalog row — the DAG core, the unlisted channels — leaves this EMPTY, and
+  // that is honest rather than broken: the trends store keys its series per listed metagraph, so
+  // there is genuinely nothing measured here for either. The tab says which case it is and names
+  // where the reading does live; see `scopeEmpty`.
+  const filter = useStore((s) => s.filter);
+  const roster = METAGRAPHS.filter((m) => m.id && (filter === "all" || m.id === filter));
+
   // Opened from a committed metagraph's dossier ("Show the trends", 2026-09-08), the page
   // opens on that side of the network. Read ONCE at mount (the doc remounts per open): the
   // Tabs stay uncontrolled, so browsing the tabs afterwards owes the filter nothing. The DAG
@@ -219,19 +274,27 @@ export default function TrendsDoc() {
    *  ranked by the LAST measured day, busiest first (per-section — each ranking is its own
    *  reading). The vitals' catalog-order rule guards live charts that reshuffle under the
    *  reader; a document laid out once per visit can rank honestly. */
-  const netPanels = (suffix: string, unit: string, k = 1, fmt?: (v: number) => string) =>
-    METAGRAPHS.filter((m) => m.id)
+  const netPanels = (suffix: string, unit: string, k = 1, fmt?: (v: number) => string) => {
+    const panels = roster
       .map((m) => {
         const points = trim(scale(S(p, `m.${m.id}.${suffix}`), k));
         const last = points.reduce<number | null>((acc, v) => (v != null ? v : acc), null);
         return { m, points, last };
       })
-      .sort((a, b) => (b.last ?? -1) - (a.last ?? -1))
-      .map(({ m, points }) => {
-        const net = displayNetwork(m.id);
-        const line: TrendLine = { label: suffix, points, hue: net?.hue };
-        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={unit} readout={dayReadout(`m.${m.id}.${suffix}`, k)} buckets={cBuckets} stepMs={stepMs} format={fmt} lines={[line]} />;
-      });
+      .sort((a, b) => (b.last ?? -1) - (a.last ?? -1));
+    // The shared ceiling is the busiest network's peak ACROSS THIS SECTION — per section, because
+    // each section is its own quantity (snapshots, blocks, fees, KB) and a scale shared across
+    // units would mean nothing. Undefined in `own` mode, which is TrendChart's "scale yourself".
+    const sharedMax =
+      scaleMode === "shared"
+        ? Math.max(0, ...panels.flatMap((x) => x.points.filter((v): v is number => v != null)))
+        : undefined;
+    return panels.map(({ m, points }) => {
+      const net = displayNetwork(m.id);
+      const line: TrendLine = { label: suffix, points, hue: net?.hue };
+      return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={unit} readout={dayReadout(`m.${m.id}.${suffix}`, k)} buckets={cBuckets} stepMs={stepMs} format={fmt} lines={[line]} scaleMax={sharedMax} />;
+    });
+  };
   /** Per-network GAUGE panels (fleet): untrimmed — a point sample is complete the moment it
    *  is taken — and null where never sampled (gauges are not zero-filled). */
   /** Per-network GAUGE panels ride the FLEET payload (hourly at fine zooms — see fleetRaw). */
@@ -245,7 +308,7 @@ export default function TrendsDoc() {
     const metaList = useStore.getState().metaList;
     const DASH: Record<string, string | boolean> = { l0: "", cl1: "2 4", dl1: "6 4" };
     const SHORT: Record<string, string> = { l0: "L0", cl1: "cL1", dl1: "dL1" };
-    return METAGRAPHS.filter((m) => m.id)
+    return roster
       .map((m) => {
         const points = S(pF, `f.nodes.${m.id}`);
         const last = points.reduce<number | null>((acc, v) => (v != null ? v : acc), null);
@@ -270,7 +333,7 @@ export default function TrendsDoc() {
    *  batching network (DOR: dozens of snapshots in one tick, then idle) it reads as spacing
    *  that never existed. Ranked by the latest reading, most-stalled first. */
   const netGapPanels = () =>
-    METAGRAPHS.filter((m) => m.id)
+    roster
       .map((m) => {
         const sum = S(p, `m.${m.id}.gapSum`);
         const snaps = S(p, `m.${m.id}.snaps`);
@@ -343,7 +406,7 @@ export default function TrendsDoc() {
       pressed ? cn("font-bold text-foreground", SELECTED_ROW) : "text-muted-foreground hover:text-foreground hover:bg-wash-hover",
     );
   const zoomPicker = (
-    <div role="group" aria-label="Time window" className="inline-flex items-center rounded-lg bg-muted p-[3px] max-[700px]:flex max-[700px]:justify-center max-[700px]:[&>button]:flex-1">
+    <div role="group" aria-label="Time window" className={PICKER_GROUP}>
       {!range && ZOOMS.map((z) => (
         <button
           key={z.id}
@@ -373,19 +436,11 @@ export default function TrendsDoc() {
       )}
     </div>
   );
-  // THE LADDER'S BUTTON, its own control beside the group (user, 2026-09-09: "a separate
-  // button and be specific") — names the destination: the Snapshots view's raw data search.
-  const rangeInspect = buckets.length ? (
-    <button
-      type="button"
-      onClick={inspectHere}
-      title="Open this range in the Snapshots view's raw data search (uses the committed network's chain when one is filtered)"
-      className="ml-auto max-[700px]:ml-0 max-[700px]:justify-center inline-flex items-center gap-1.5 h-6 px-2 rounded-md text-micro tracking-caps uppercase text-[var(--primary)]/80 hover:text-[var(--primary)] hover:bg-wash-soft whitespace-nowrap"
-    >
-      <Table2 aria-hidden className="size-3" />
-      snapshot records
-    </button>
-  ) : null;
+  // ⚠️ NO RECORDS BUTTON IN THE TOOLBAR (user, 2026-09-13: "the links are already inside the
+  // tabs"). It was the ladder's one standalone control (2026-09-09), added before every chart
+  // carried its own — and once each chart did, the toolbar's copy said the same thing a second
+  // time, one level further from the buckets it opens. The bridge is unchanged: `inspectHere`
+  // still reaches the anchor log, from the chart whose range you are actually reading.
   // SECTIONS AS SUB-TABS (user, 2026-09-07): one section at a time inside each drawer. The
   // hierarchy carries the design: the outer pair is the file-cabinet (primary), the inner
   // switcher the segmented-pill register the zoom already wears (secondary) — two drawer
@@ -395,8 +450,76 @@ export default function TrendsDoc() {
   // flex-none + a fixed h-8: the primitive's triggers are flex-1 at a %-height, which is what
   // spread them wide and broke when the list WRAPS on phone (the h-auto rows below) — as
   // compact pills they pack left and wrap cleanly (user, 2026-09-08: the tabs overflowed).
+  /* The scale control — a LABEL and an on/off switch (user, 2026-09-14, two rounds: first "should
+     read like a simple toggle", then "make it a label with a simple on/off control"). It is
+     rendered ONLY on the metagraphs tab, because a scale shared across charts is only a question
+     where there is a COLUMN of comparable charts; the hypergraph tab's charts each measure a
+     different quantity, and under a commit there is one network left.
+
+     ⚠️ A SWITCH IS NOT THE PRESSED-TOGGLE GRAMMAR, and the difference is the reason this stopped
+     being a pill. The command bar's Scene⇄HUD and RAW name an ACTION the reader presses FOR, with
+     the wash reporting that it is on — right for a control that pushes a surface in and pops it
+     out. This is a SETTING: the reader is not doing something, they are choosing how the column
+     is drawn, and a setting reads as a name plus its state. The two-segment group it replaced was
+     a radio wearing a toggle's clothes; the pill after it was the bar's action grammar on a
+     setting. `components/ui/switch.tsx` is the adopted primitive, restated in this app's tokens.
+
+     The label is the switch's own `<label>`, so the words are a hit target too — the switch alone
+     is 28×16, well under the touch floor the bar's controls keep. */
+  const scaleToggle = (
+    <span className="inline-flex items-center gap-2">
+      <label htmlFor={scaleId} className="text-micro tracking-caps uppercase text-muted-foreground cursor-pointer select-none">
+        Same scale
+      </label>
+      <Switch
+        id={scaleId}
+        checked={scaleMode === "shared"}
+        onCheckedChange={(on) => setScaleMode(on ? "shared" : "own")}
+        title={
+          scaleMode === "shared"
+            ? "Every chart shares the busiest network's scale, so the column compares. Switch off to let each chart scale to its own data."
+            : "Each chart scales to its own data. Switch on to put every chart on the busiest network's scale."
+        }
+      />
+    </span>
+  );
+  /* WHAT IS APPLIED, IN WORDS, AND A WAY TO CLEAR IT — the raw layer's search toolbar rule,
+     which is the same problem: a surface showing a cut of its data must say so on itself, or the
+     reader is left to infer a missing column from a control one zone away. It is the selected-row
+     pill the range chip beside the window picker already wears, so the two scopes on this page
+     read as one species. Clearing goes through `filterToggleActions` (rule 2's one write path) —
+     toggling the committed network OFF is what returns the page to every network, and it commits
+     the same release the explorer row and the scene do. */
+  const scopeNet = filter === "all" ? null : displayNetwork(filter);
+  const scopeChip =
+    filter === "all" ? null : (
+      <span className={cn("h-6 px-2 mr-auto inline-flex items-center gap-1.5 rounded-md text-micro font-bold text-foreground whitespace-nowrap", SELECTED_ROW)}>
+        <span className="inline-block size-2 rounded-full flex-none" style={{ background: scopeNet?.hue ?? "var(--primary)" }} aria-hidden />
+        {scopeNet?.name ?? filter} only
+        <button
+          type="button"
+          onClick={() => applyClickActions(filterToggleActions(filter, filter))}
+          title="Show every network again"
+          className="text-muted-foreground hover:text-foreground"
+        >
+          ×
+        </button>
+      </span>
+    );
+  /* The scoped tab with nothing to draw. Both cases are real commits a reader can reach from the
+     bar, and neither is a failure — the trends store keeps one series set per LISTED metagraph,
+     so the DAG core and the unlisted channels have no per-network record here by construction.
+     Each names where its own reading does live (the empty-state rule: name a gesture available on
+     THIS surface — both routes are visible from here, the tab row above and the chip beside it). */
+  const scopeEmpty = (
+    <p className="mt-3 text-label text-muted-foreground max-w-[62ch]">
+      {filter === "dag"
+        ? "The base ledger anchors metagraph snapshots rather than producing them, so it has no chart in this column. Its own history is the Hypergraph tab above."
+        : "These charts are kept per listed metagraph, and the unlisted channels are the ones the catalog does not name — so there is no measured history here for them. The Snapshots view's records still show what they anchored."}
+    </p>
+  );
   const topicPicker = (
-    <div role="group" aria-label="Topic" className="inline-flex items-center rounded-lg bg-muted p-[3px] max-[700px]:flex max-[700px]:justify-center max-[700px]:[&>button]:flex-1">
+    <div role="group" aria-label="Topic" className={PICKER_GROUP}>
       {/* The topic's user-facing word is "Fees" (user, 2026-09-11: "Economics = Fees" — the
           plainer word for what the sections show: fees paid, and the data they anchored);
           the internal id stays `economics`, one concept two registers. */}
@@ -451,7 +574,7 @@ export default function TrendsDoc() {
             every other tier rule here uses (CSS trap 8). */}
         <div className="mt-6 flex items-center justify-between gap-2 flex-wrap max-[700px]:flex-col max-[700px]:items-stretch">
           {topicPicker}
-          <div className="flex items-center gap-2 flex-wrap justify-end max-[700px]:flex-col max-[700px]:items-stretch">{zoomPicker}{rangeInspect}</div>
+          {zoomPicker}
         </div>
         <Tabs
           defaultValue={initialTab}
@@ -589,6 +712,18 @@ export default function TrendsDoc() {
           </TabsContent>
 
           <TabsContent value="metagraphs" className="pt-5">
+          {/* The scale control sits INSIDE this tab, not in the toolbar above it: it governs
+              these charts only, and a control that appears and disappears as the reader crosses
+              the tab row would read as the toolbar losing a button. Right-aligned so the tab's
+              own content still opens on its first section heading. */}
+          <div className="flex items-center gap-2 justify-end max-[700px]:flex-wrap">
+            {scopeChip}
+            {/* A scale shared across ONE chart is not a setting (the plank's own rule: an axis
+                with nothing to navigate is absent, not disabled) — under a commit the column is
+                a single network and the control has nothing left to say. */}
+            {roster.length > 1 && scaleToggle}
+          </div>
+          {roster.length === 0 ? scopeEmpty : (<>
           {sectionTab === "snapshots" && (<>
           <Section
             id="networks"
@@ -649,6 +784,7 @@ export default function TrendsDoc() {
             {netGapPanels()}
           </Section>
           )}
+          </>)}
           </TabsContent>
           </div>
         </Tabs>

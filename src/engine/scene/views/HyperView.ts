@@ -656,9 +656,18 @@ export class HyperView implements SceneView {
     // metagraph blocks, so there's nothing to orbit here.
     if (this.ledger) return;
 
-    // Hubs are fully gone by ~30% into the morph, before the root-scale collapse
-    // would be noticeable.
-    const hubFade = THREE.MathUtils.clamp(1 - morph / 0.3, 0, 1);
+    // ⚠️ THE HUBS TAKE LONGER TO GO, AND GO ON A CURVE (user, 2026-09-13: "make the hub appear /
+    // disappear a bit slower when we change mode"). One expression covers both directions — the
+    // morph runs 1→0 coming back to hyper — so the arrival is the departure reversed.
+    //
+    // The window can't simply be widened: `layers.root` scales by `1 - morph`, so a hub still
+    // visible at 0.45 is a hub visibly shrinking toward the centre, which is the collapse the
+    // old 0.3 existed to stay ahead of. So the SPAN grows to 0.45 and the shape carries the
+    // difference — smoothstep leaves the fade with a long soft tail, so the hubs read as present
+    // for meaningfully longer (half gone at 0.22 where the linear ramp had them at 0.25) and are
+    // effectively invisible by ~0.36, still well ahead of any collapse the eye can catch.
+    const HUB_MORPH_SPAN = 0.45;
+    const hubFade = smoothstep(0, 1, THREE.MathUtils.clamp(1 - morph / HUB_MORPH_SPAN, 0, 1));
 
     // Core stays fully lit; hubs fade out with the morph (hubFade).
     const coreF = 1;
