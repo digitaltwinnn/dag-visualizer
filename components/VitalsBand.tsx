@@ -984,26 +984,35 @@ function LedgerCells({ accent, filter, paused }: { accent: string; filter: strin
   return (
     <>
       <AnchoringNetworks windowed={barData} snaps={snaps} filter={filter} />
-      {/* ⚠️ ONE QUANTITY, TWO SIDES — the slot no longer changes what it measures (user, 2026-09-14:
-          "filter DAG, vitals stop showing fees but now anchors count instead; keep it consistent").
-          It used to swap between a FEE and a COUNT, which is not a scope change at all: committing
-          the DAG core and committing a metagraph are the same gesture, and the reader got two
-          unrelated readings out of it with nothing saying why.
-          Fees are the axis both sides share. A metagraph PAYS to anchor; the base ledger COLLECTS
-          what they pay — the same DAG, named from whichever end the filter is standing at — so the
-          labels differ by one word and the card stays the card.
+      {/* ⚠️ ONE QUANTITY, ONE LABEL, SCOPED BY THE FILTER — the slot no longer changes what it
+          measures (user, 2026-09-14: "filter DAG, vitals stop showing fees but now anchors count
+          instead; keep it consistent"). It used to swap between a FEE and a COUNT, which is not a
+          scope change at all: committing the DAG core and committing a metagraph are the same
+          gesture, and the reader got two unrelated readings out of it with nothing saying why.
+          ⚠️ AND THE LABEL DOES NOT MOVE EITHER. A first pass split it into "fees paid" / "fees
+          collected", which dramatised the scope into a change of wording — and the two are not
+          two things: `g.feeFloor` is byte-identical to the sum of every `m.*.fee` (checked against
+          the live store, 1818.13 DAG both ways over 7 days; DOR alone is 1023.6 of it). Unscoped
+          it is every chain summed, which is also what the base ledger takes in; scoped it is that
+          chain's share. That is exactly the SNAPSHOTS card's grammar one slot over — one label,
+          narrowed by the filter — and the band should not invent a second grammar for fees.
+          ⚠️ NOT "transaction fees" (user asked, 2026-09-14). Neither side has ever shown one. A
+          DAG transfer's fee is a different quantity entirely and ~1,100x smaller: measured off
+          /transactions, ~0.93 DAG a day against this slot's ~259. It belongs in its own reading.
           Anchors lose nothing by leaving: the roster to the left counts who anchored and the chart
           to the right plots how much, both over this same window. This slot was their third home.
-          ⚠️ AND THE TWO SIDES ARE NOT EQUALLY EXACT. A network's own fees are every fee it paid;
-          the collected figure sums only the chains the sampler covers — the public catalog — so it
-          is a FLOOR, the same lower bound the snapshot card marks. It cannot be silent about that
-          (rule 10), and a caveat about the reading has nowhere to sit but the card's title. */}
+          ⚠️ THE TWO SCOPES ARE NOT EQUALLY EXACT, though, and the card says so. A network's own
+          fees are every fee it paid; the summed figure covers only the chains the sampler sees —
+          the public catalog — so it is a FLOOR, the same lower bound the snapshot card marks. It
+          cannot be silent about that (rule 10), and a caveat about the reading has nowhere to sit
+          but the card's title. */}
       {scoped
-        ? rate("DAG fees paid", sparkOf(cfg ? `m.${cfg.id}.fee` : null, activity?.feesSeries, activity?.feesPerHour, true),
-               "$DAG this network pays to anchor its snapshots into the global chain.")
-        : rate("DAG fees collected", sparkOf("g.feeFloor", activity?.feesSeries, activity?.feesPerHour, true),
-               "$DAG the base ledger takes in anchoring fees. A floor: it counts only the metagraphs in the public catalog.",
-               "What the base ledger takes in anchoring fees — every metagraph pays DAG to anchor a snapshot into the global chain. A lower bound: only the metagraphs in the public catalog are counted, so the real figure is higher.")}
+        ? rate("Snapshot fees", sparkOf(cfg ? `m.${cfg.id}.fee` : null, activity?.feesSeries, activity?.feesPerHour, true),
+               "$DAG this network pays to anchor its snapshots into the global chain.",
+               "What this network pays in $DAG to anchor its snapshots into the global chain. Its own fees, in full.")
+        : rate("Snapshot fees", sparkOf("g.feeFloor", activity?.feesSeries, activity?.feesPerHour, true),
+               "$DAG paid to anchor snapshots into the global chain, every network summed. A floor: it counts only the metagraphs in the public catalog.",
+               "What every network pays in $DAG to anchor its snapshots into the global chain, summed — so this is also what the base ledger takes in. A lower bound: only the metagraphs in the public catalog are counted, so the real figure is higher.")}
       {rate("Snapshots", sparkOf(scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries, activity?.snapsPerHour))}
       {/* The chart states the same reach its rows do — it plots the very buckets the rate cards
           average, so a silent chart beside two captioned ones would read as a different window. */}
