@@ -172,6 +172,21 @@ export default function TrendsDoc() {
   const rangeTiles = useTrendsRange(
     range && (rangeTier === "5m" || rangeTier === "1h") ? { tier: rangeTier, fromMs: range.fromMs, toMs: range.toMs } : null,
   );
+  // ⚠️ THE COMMITTED NETWORK SCOPES EVERY PER-NETWORK COLUMN (user, 2026-09-14: "Trends is a
+  // doc-page, but actually it shows data that could benefit from the metagraph filter … hide the
+  // other metagraph charts"). ONE roster, read by all three panel builders, so a section cannot
+  // answer the filter differently from the section under it — and SUBSCRIBED, unlike the mount-
+  // once `initialTab` below: picking a chip in the bar's filter strip must cut the charts under
+  // the reader's eyes, which is the whole reason the bar keeps that strip over this doc
+  // (views.ts `scoped`). "all" is every catalog network, as before.
+  //
+  // A filter with no catalog row — the DAG core, the unlisted channels — leaves this EMPTY, and
+  // that is honest rather than broken: the trends store keys its series per listed metagraph, so
+  // there is genuinely nothing measured here for either. The tab says which case it is and names
+  // where the reading does live; see `scopeEmpty`.
+  const filter = useStore((s) => s.filter);
+  const roster = METAGRAPHS.filter((m) => m.id && (filter === "all" || m.id === filter));
+
   // Opened from a committed metagraph's dossier ("Show the trends", 2026-09-08), the page
   // opens on that side of the network. Read ONCE at mount (the doc remounts per open): the
   // Tabs stay uncontrolled, so browsing the tabs afterwards owes the filter nothing. The DAG
@@ -258,7 +273,7 @@ export default function TrendsDoc() {
    *  reading). The vitals' catalog-order rule guards live charts that reshuffle under the
    *  reader; a document laid out once per visit can rank honestly. */
   const netPanels = (suffix: string, unit: string, k = 1, fmt?: (v: number) => string) => {
-    const panels = METAGRAPHS.filter((m) => m.id)
+    const panels = roster
       .map((m) => {
         const points = trim(scale(S(p, `m.${m.id}.${suffix}`), k));
         const last = points.reduce<number | null>((acc, v) => (v != null ? v : acc), null);
@@ -291,7 +306,7 @@ export default function TrendsDoc() {
     const metaList = useStore.getState().metaList;
     const DASH: Record<string, string | boolean> = { l0: "", cl1: "2 4", dl1: "6 4" };
     const SHORT: Record<string, string> = { l0: "L0", cl1: "cL1", dl1: "dL1" };
-    return METAGRAPHS.filter((m) => m.id)
+    return roster
       .map((m) => {
         const points = S(pF, `f.nodes.${m.id}`);
         const last = points.reduce<number | null>((acc, v) => (v != null ? v : acc), null);
@@ -316,7 +331,7 @@ export default function TrendsDoc() {
    *  batching network (DOR: dozens of snapshots in one tick, then idle) it reads as spacing
    *  that never existed. Ranked by the latest reading, most-stalled first. */
   const netGapPanels = () =>
-    METAGRAPHS.filter((m) => m.id)
+    roster
       .map((m) => {
         const sum = S(p, `m.${m.id}.gapSum`);
         const snaps = S(p, `m.${m.id}.snaps`);
@@ -456,10 +471,48 @@ export default function TrendsDoc() {
           ? "Every chart shares the busiest network's scale, so the column compares. Click to let each chart scale to its own data."
           : "Each chart scales to its own data. Click to put every chart on the busiest network's scale."
       }
-      className={cn(PICKER_GROUP, "cursor-pointer max-[700px]:w-full max-[700px]:justify-center")}
+      // PICKER_GROUP's phone arm turns the shell into a block-level flex so its BUTTONS can
+      // share the row; this shell has one child and no row to share, so it keeps its own width
+      // — stretched, it read as a wide empty track with a pill adrift in the middle.
+      className={cn(PICKER_GROUP, "cursor-pointer max-[700px]:inline-flex")}
     >
       <span className={zoomBtn(scaleMode === "shared")}>Same scale</span>
     </button>
+  );
+  /* WHAT IS APPLIED, IN WORDS, AND A WAY TO CLEAR IT — the raw layer's search toolbar rule,
+     which is the same problem: a surface showing a cut of its data must say so on itself, or the
+     reader is left to infer a missing column from a control one zone away. It is the selected-row
+     pill the range chip beside the window picker already wears, so the two scopes on this page
+     read as one species. Clearing goes through `filterToggleActions` (rule 2's one write path) —
+     toggling the committed network OFF is what returns the page to every network, and it commits
+     the same release the explorer row and the scene do. */
+  const scopeNet = filter === "all" ? null : displayNetwork(filter);
+  const scopeChip =
+    filter === "all" ? null : (
+      <span className={cn("h-6 px-2 mr-auto inline-flex items-center gap-1.5 rounded-md text-micro font-bold text-foreground whitespace-nowrap", SELECTED_ROW)}>
+        <span className="inline-block size-2 rounded-full flex-none" style={{ background: scopeNet?.hue ?? "var(--primary)" }} aria-hidden />
+        {scopeNet?.name ?? filter} only
+        <button
+          type="button"
+          onClick={() => applyClickActions(filterToggleActions(filter, filter))}
+          title="Show every network again"
+          className="text-muted-foreground hover:text-foreground"
+        >
+          ×
+        </button>
+      </span>
+    );
+  /* The scoped tab with nothing to draw. Both cases are real commits a reader can reach from the
+     bar, and neither is a failure — the trends store keeps one series set per LISTED metagraph,
+     so the DAG core and the unlisted channels have no per-network record here by construction.
+     Each names where its own reading does live (the empty-state rule: name a gesture available on
+     THIS surface — both routes are visible from here, the tab row above and the chip beside it). */
+  const scopeEmpty = (
+    <p className="mt-3 text-label text-muted-foreground max-w-[62ch]">
+      {filter === "dag"
+        ? "The base ledger anchors metagraph snapshots rather than producing them, so it has no chart in this column. Its own history is the Hypergraph tab above."
+        : "These charts are kept per listed metagraph, and the unlisted channels are the ones the catalog does not name — so there is no measured history here for them. The Snapshots view's records still show what they anchored."}
+    </p>
   );
   const topicPicker = (
     <div role="group" aria-label="Topic" className={PICKER_GROUP}>
@@ -659,7 +712,14 @@ export default function TrendsDoc() {
               these charts only, and a control that appears and disappears as the reader crosses
               the tab row would read as the toolbar losing a button. Right-aligned so the tab's
               own content still opens on its first section heading. */}
-          <div className="flex justify-end max-[700px]:justify-stretch">{scaleToggle}</div>
+          <div className="flex items-center gap-2 justify-end max-[700px]:flex-wrap">
+            {scopeChip}
+            {/* A scale shared across ONE chart is not a setting (the plank's own rule: an axis
+                with nothing to navigate is absent, not disabled) — under a commit the column is
+                a single network and the control has nothing left to say. */}
+            {roster.length > 1 && scaleToggle}
+          </div>
+          {roster.length === 0 ? scopeEmpty : (<>
           {sectionTab === "snapshots" && (<>
           <Section
             id="networks"
@@ -720,6 +780,7 @@ export default function TrendsDoc() {
             {netGapPanels()}
           </Section>
           )}
+          </>)}
           </TabsContent>
           </div>
         </Tabs>

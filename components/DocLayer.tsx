@@ -57,8 +57,13 @@ const DOC_COMPONENTS: Record<DocPage, ReturnType<typeof dynamic>> = {
 // the stage's warm gradient (user, same day; the second brown strike after the full-viewport
 // wash) — with a 2px backdrop blur to calm the stage's grid behind prose. min-h-full so a
 // short document still reads as one sheet to the fold, not a scrap ending mid-viewport.
+// ⚠️ THE TOP PAD CLEARS THE BAR AS IT ACTUALLY STANDS, grown strip included (2026-09-14, with
+// the filter's return over a scoped doc): `--topbar-extra` is how far the command bar has grown
+// downward, and the rails have always added it to their own top. Without it here, opening the
+// filter strip over Trends laid the bar's second row across the document's eyebrow. Same token,
+// same arithmetic, and it is 0 whenever no strip is open — a no-op everywhere else.
 const DOC_COLUMN =
-  "relative mx-auto max-w-3xl min-h-full px-8 pt-[68px] pb-24 " +
+  "relative mx-auto max-w-3xl min-h-full px-8 pt-[calc(68px+var(--topbar-extra,0px))] pb-24 " +
   "bg-[var(--footer-glass)] backdrop-blur-[2px] " +
   "border-x border-border shadow-[0_0_50px_rgba(0,0,0,0.14)]";
 
@@ -278,7 +283,7 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
             size="icon-xs"
             aria-label={`Close ${DOC_PAGES[render].label}`}
             title={`Close ${DOC_PAGES[render].label}`}
-            className="absolute top-[74px] right-2 pointer-events-auto text-muted-foreground hover:text-foreground pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+            className="absolute top-[calc(74px+var(--topbar-extra,0px))] right-2 pointer-events-auto text-muted-foreground hover:text-foreground pointer-coarse:min-h-11 pointer-coarse:min-w-11"
             onClick={() => setDocPage(null)}
           >
             <X aria-hidden />

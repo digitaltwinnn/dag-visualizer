@@ -82,13 +82,37 @@ export function viewTitle(name: string): string {
 // adding a doc page is: one entry here, its component in components/docs/ + DocLayer's map, a
 // thin route file passing `doc`, and a footer DocToggle if it should be reachable there. The
 // engine's bare stage, both transition signals and the roll grammar follow automatically.
+type DocDef = {
+  label: string;
+  title: string;
+  /** This doc READS THE COMMITTED NETWORK — so the command bar keeps its filter while the doc
+   *  is open, and the doc scopes itself to whatever is committed (user, 2026-09-14: "Trends is
+   *  a doc-page, but actually it shows data that could benefit from the metagraph filter").
+   *
+   *  ⚠️ This flag is the 2026-09-04 doc rule getting its real condition. That rule hid the
+   *  bar's scene-action controls because they acted on something the reader could not see —
+   *  true of the filter over /about and /design, whose prose has no network in it, and FALSE
+   *  of a doc made of per-network charts, where the filter acts on what is right there. So the
+   *  gate is "has this doc got something for the filter to do", not "is a doc open", and it
+   *  lives with the doc rather than as a page list inside TopBar. The PRESENTATION pair still
+   *  stands down under every doc: SCENE and RAW act on the layer the overlay covers, and no
+   *  doc changes that. */
+  scoped?: true;
+};
+
 export const DOC_PAGES = {
   about: { label: "About", title: "About — DAG Visualizer" },
   design: { label: "Design", title: "Design — DAG Visualizer" },
-  trends: { label: "Trends", title: "Trends — DAG Visualizer" },
-} as const;
+  trends: { label: "Trends", title: "Trends — DAG Visualizer", scoped: true },
+} satisfies Record<string, DocDef>;
 
 export type DocPage = keyof typeof DOC_PAGES;
+
+/** Whether the open doc (if any) reads the committed network — the one home for that question,
+ *  consulted by the command bar and by the doc itself. */
+export function docReadsFilter(doc: DocPage | null): boolean {
+  return doc != null && (DOC_PAGES[doc] as DocDef).scoped === true;
+}
 
 export const DOC_PATHS = Object.fromEntries(Object.keys(DOC_PAGES).map((k) => [k, `/${k}`])) as Record<
   DocPage,
