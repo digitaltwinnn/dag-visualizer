@@ -45,6 +45,7 @@ export default function TrendChart({
   inspect,
   inspectCommits,
   readout,
+  scaleMax,
   className,
 }: {
   name: string;
@@ -57,6 +58,10 @@ export default function TrendChart({
    *  stamps' precision. Daily by default. */
   stepMs?: number;
   format?: (v: number) => string;
+  /** A y-max imposed from OUTSIDE, so a run of charts can share one scale (TrendsDoc's
+   *  per-network panels). Omitted, the chart scales to its own data — which is right for a
+   *  chart read on its own and wrong for a column of charts read against each other. */
+  scaleMax?: number;
   /** COVERAGE, for charts whose plotted values are DERIVED (user, 2026-09-09: DOR's 24H
    *  continuity wore far more amber than its neighbours — every quiet bucket's mean gap is
    *  null because there is nothing to divide, and the band read those as sampling outages).
@@ -149,7 +154,13 @@ export default function TrendChart({
       }
     : {};
   const measured = lines.some((l) => l.points.some((v) => v != null));
-  const max = Math.max(1e-9, ...lines.flatMap((l) => l.points.filter((v): v is number => v != null))) * 1.12;
+  // ⚠️ THE PEAK READOUT IS THE CHART'S OWN, WHATEVER THE SCALE. `ownMax` is what this chart's
+  // data reaches; `max` is the height it is drawn against, which a caller may impose to put a
+  // column of charts on one scale. Keeping them separate is what lets a chart shrink to a sliver
+  // and still say, in its own corner, how high it actually got — otherwise a shared scale would
+  // flatten the small networks AND take away the number that says by how much.
+  const ownMax = Math.max(1e-9, ...lines.flatMap((l) => l.points.filter((v): v is number => v != null)));
+  const max = (scaleMax != null && scaleMax > 0 ? scaleMax : ownMax) * 1.12;
 
   const rows = buckets.map((ts, i) => {
     const row: Record<string, number | null> = { ts };
@@ -460,7 +471,7 @@ export default function TrendChart({
               top-left beside the head's readout top-right was two unexplained values) — it
               is the window's peak, and the baseline is 0 by construction. */}
           <span aria-hidden className="absolute top-1 left-1.5 text-micro text-muted-foreground pointer-events-none tabular-nums">
-            peak {format(max / 1.12)}
+            peak {format(ownMax)}
           </span>
         </div>
       )}

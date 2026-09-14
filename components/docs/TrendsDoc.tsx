@@ -119,6 +119,20 @@ export default function TrendsDoc() {
   // inner Tabs controlled by one state is the whole fix, and only one control row is ever
   // on screen (the inactive drawer unmounts).
   const [sectionTab, setSectionTab] = useState("snapshots");
+  // ⚠️ ONE SCALE OR EACH ITS OWN — and the reader picks (user, 2026-09-14: "looks like they are
+  // equal because the scale is different"). Exactly right, and it is the classic small-multiples
+  // trap: a column of per-network charts that each autoscale answers "how did THIS network's week
+  // go?" beautifully and "which of these networks is bigger?" with a flat lie, because a chain
+  // anchoring three a day and one anchoring forty draw the same silhouette.
+  //
+  // Neither answer is the right default for everyone, so this is a CONTROL rather than a ruling:
+  // `own` keeps each chart's shape legible (the peaks, the dips, the quiet stretches), `shared`
+  // puts them all on the busiest one's scale so the column reads as a comparison. Per network is
+  // the default because that is what the sections are titled for — "each network's own daily
+  // snapshot count" — and because a reader who wants the comparison has the stacked chart in the
+  // vitals band and the roster beside it. The peak readout stays each chart's OWN number in both
+  // modes (TrendChart's `ownMax`), so a sliver can still say how high it actually got.
+  const [scaleMode, setScaleMode] = useState<"own" | "shared">("own");
   // AUTO-TIER (map-tile edition, 2026-09-10): a selected range picks the FINEST tier whose
   // HISTORY FLOOR its start clears (pickRangeTier — since the keep-forever flip, retention
   // no longer prunes, but the floors record where fine grain begins to exist) and fetches
@@ -218,19 +232,27 @@ export default function TrendsDoc() {
    *  ranked by the LAST measured day, busiest first (per-section — each ranking is its own
    *  reading). The vitals' catalog-order rule guards live charts that reshuffle under the
    *  reader; a document laid out once per visit can rank honestly. */
-  const netPanels = (suffix: string, unit: string, k = 1, fmt?: (v: number) => string) =>
-    METAGRAPHS.filter((m) => m.id)
+  const netPanels = (suffix: string, unit: string, k = 1, fmt?: (v: number) => string) => {
+    const panels = METAGRAPHS.filter((m) => m.id)
       .map((m) => {
         const points = trim(scale(S(p, `m.${m.id}.${suffix}`), k));
         const last = points.reduce<number | null>((acc, v) => (v != null ? v : acc), null);
         return { m, points, last };
       })
-      .sort((a, b) => (b.last ?? -1) - (a.last ?? -1))
-      .map(({ m, points }) => {
-        const net = displayNetwork(m.id);
-        const line: TrendLine = { label: suffix, points, hue: net?.hue };
-        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={unit} readout={dayReadout(`m.${m.id}.${suffix}`, k)} buckets={cBuckets} stepMs={stepMs} format={fmt} lines={[line]} />;
-      });
+      .sort((a, b) => (b.last ?? -1) - (a.last ?? -1));
+    // The shared ceiling is the busiest network's peak ACROSS THIS SECTION — per section, because
+    // each section is its own quantity (snapshots, blocks, fees, KB) and a scale shared across
+    // units would mean nothing. Undefined in `own` mode, which is TrendChart's "scale yourself".
+    const sharedMax =
+      scaleMode === "shared"
+        ? Math.max(0, ...panels.flatMap((x) => x.points.filter((v): v is number => v != null)))
+        : undefined;
+    return panels.map(({ m, points }) => {
+      const net = displayNetwork(m.id);
+      const line: TrendLine = { label: suffix, points, hue: net?.hue };
+      return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={unit} readout={dayReadout(`m.${m.id}.${suffix}`, k)} buckets={cBuckets} stepMs={stepMs} format={fmt} lines={[line]} scaleMax={sharedMax} />;
+    });
+  };
   /** Per-network GAUGE panels (fleet): untrimmed — a point sample is complete the moment it
    *  is taken — and null where never sampled (gauges are not zero-filled). */
   /** Per-network GAUGE panels ride the FLEET payload (hourly at fine zooms — see fleetRaw). */
@@ -386,6 +408,21 @@ export default function TrendsDoc() {
   // flex-none + a fixed h-8: the primitive's triggers are flex-1 at a %-height, which is what
   // spread them wide and broke when the list WRAPS on phone (the h-auto rows below) — as
   // compact pills they pack left and wrap cleanly (user, 2026-09-08: the tabs overflowed).
+  /* The scale control. Same pill register as the topic and window pickers — it is a third
+     setting on the same reading, not a new kind of thing — and it is rendered ONLY on the
+     metagraphs tab, because a scale shared across charts is only a question where there is a
+     COLUMN of comparable charts. The hypergraph tab's charts each measure a different quantity,
+     so there is nothing there to share a scale with. */
+  const scalePicker = (
+    <div role="group" aria-label="Chart scale" className="inline-flex items-center rounded-lg bg-muted p-[3px] max-[700px]:flex max-[700px]:justify-center max-[700px]:[&>button]:flex-1">
+      {([["own", "Per network", "Each chart scales to its own data — best for reading one network's peaks and dips."],
+         ["shared", "Same scale", "Every chart shares the busiest network's scale — best for comparing networks. Quiet ones will read as slivers; each chart still states its own peak."]] as const).map(([id, label, title]) => (
+        <button key={id} type="button" aria-pressed={scaleMode === id} title={title} onClick={() => setScaleMode(id)} className={zoomBtn(scaleMode === id)}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
   const topicPicker = (
     <div role="group" aria-label="Topic" className="inline-flex items-center rounded-lg bg-muted p-[3px] max-[700px]:flex max-[700px]:justify-center max-[700px]:[&>button]:flex-1">
       {/* The topic's user-facing word is "Fees" (user, 2026-09-11: "Economics = Fees" — the
@@ -580,6 +617,11 @@ export default function TrendsDoc() {
           </TabsContent>
 
           <TabsContent value="metagraphs" className="pt-5">
+          {/* The scale control sits INSIDE this tab, not in the toolbar above it: it governs
+              these charts only, and a control that appears and disappears as the reader crosses
+              the tab row would read as the toolbar losing a button. Right-aligned so the tab's
+              own content still opens on its first section heading. */}
+          <div className="flex justify-end max-[700px]:justify-stretch">{scalePicker}</div>
           {sectionTab === "snapshots" && (<>
           <Section
             id="networks"
