@@ -135,9 +135,13 @@ function windowNote(a: Activity | null | undefined, unit: string): string | unde
  *
  *  Either segment may stand alone: lead-only (geo's NODES), detail-only (NETWORK LAYERS, and
  *  PulseStrip's poll cards, which pass no lead). The divider draws only when both are present. */
-export function BandCard({ label, children, className, mark, lead, aside }: { label: string; children?: React.ReactNode; className?: string; mark?: React.ReactNode; lead?: React.ReactNode; aside?: React.ReactNode }) {
+export function BandCard({ label, children, className, mark, lead, aside, title }: { label: string; children?: React.ReactNode; className?: string; mark?: React.ReactNode; lead?: React.ReactNode; aside?: React.ReactNode; title?: string }) {
   return (
-    <div className={cn(
+    // `title` is for a caveat that qualifies the READING and has nowhere else to sit: the eyebrow
+    // is a label, the aside is the window, and the sr-only note is by definition invisible. The
+    // fees-collected card is its first consumer — its number is a floor, and rule 10 says a
+    // lower bound has to be reachable, not merely true.
+    <div title={title} className={cn(
       // The plate is the COMMAND BAR's own glass (`--topbar-glass` — a gradient token, so the
       // arbitrary-property form per CSS trap 3): the band is that bar's sibling instrument, and
       // the earlier `bg-card/40` was tuned under light and sat near-invisible over the dark
@@ -870,7 +874,7 @@ function LedgerCells({ accent, filter, paused }: { accent: string; filter: strin
       offRim: true, // the live buffer's window is NOT the rim's — this card must say so
     };
   };
-  const rate = (label: string, spark: SparkSpec, note?: string) => {
+  const rate = (label: string, spark: SparkSpec, note?: string, title?: string) => {
     // NO ENDPOINT AXIS. It existed for the 1Y/ALL windows, where months repeat across the year
     // boundary and position-in-window stopped reading as "when" (user, 2026-09-09). Over a
     // single 24-hour window position IS when, and the card's own words state the reach — the
@@ -892,6 +896,7 @@ function LedgerCells({ accent, filter, paused }: { accent: string; filter: strin
         <BandCard
           key={label}
           label={label}
+          title={title}
           aside={spark.data != null ? spark.span || undefined : undefined}
           lead={
             <span className="flex flex-col items-start">
@@ -914,6 +919,7 @@ function LedgerCells({ accent, filter, paused }: { accent: string; filter: strin
     return (
     <BandCard
       label={label}
+      title={title}
       // THE LABEL NAMES THE QUANTITY, THE NUMERAL CARRIES ITS OWN UNIT (user, 2026-09-08,
       // two rounds: "ANCHORS/HOUR" over a year-long line put the lead's unit on the whole
       // card, and an aside saying "live · /hour" was hard to read and repeated on every
@@ -978,9 +984,26 @@ function LedgerCells({ accent, filter, paused }: { accent: string; filter: strin
   return (
     <>
       <AnchoringNetworks windowed={barData} snaps={snaps} filter={filter} />
+      {/* ⚠️ ONE QUANTITY, TWO SIDES — the slot no longer changes what it measures (user, 2026-09-14:
+          "filter DAG, vitals stop showing fees but now anchors count instead; keep it consistent").
+          It used to swap between a FEE and a COUNT, which is not a scope change at all: committing
+          the DAG core and committing a metagraph are the same gesture, and the reader got two
+          unrelated readings out of it with nothing saying why.
+          Fees are the axis both sides share. A metagraph PAYS to anchor; the base ledger COLLECTS
+          what they pay — the same DAG, named from whichever end the filter is standing at — so the
+          labels differ by one word and the card stays the card.
+          Anchors lose nothing by leaving: the roster to the left counts who anchored and the chart
+          to the right plots how much, both over this same window. This slot was their third home.
+          ⚠️ AND THE TWO SIDES ARE NOT EQUALLY EXACT. A network's own fees are every fee it paid;
+          the collected figure sums only the chains the sampler covers — the public catalog — so it
+          is a FLOOR, the same lower bound the snapshot card marks. It cannot be silent about that
+          (rule 10), and a caveat about the reading has nowhere to sit but the card's title. */}
       {scoped
-        ? rate("DAG fees", sparkOf(cfg ? `m.${cfg.id}.fee` : null, activity?.feesSeries, activity?.feesPerHour, true), "$DAG this network pays to anchor.")
-        : rate("Anchors", sparkOf("g.anchors", activity?.anchoredSeries, activity?.anchorsPerHour), "Metagraph snapshots anchored into the global chain.")}
+        ? rate("DAG fees paid", sparkOf(cfg ? `m.${cfg.id}.fee` : null, activity?.feesSeries, activity?.feesPerHour, true),
+               "$DAG this network pays to anchor its snapshots into the global chain.")
+        : rate("DAG fees collected", sparkOf("g.feeFloor", activity?.feesSeries, activity?.feesPerHour, true),
+               "$DAG the base ledger takes in anchoring fees. A floor: it counts only the metagraphs in the public catalog.",
+               "What the base ledger takes in anchoring fees — every metagraph pays DAG to anchor a snapshot into the global chain. A lower bound: only the metagraphs in the public catalog are counted, so the real figure is higher.")}
       {rate("Snapshots", sparkOf(scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries, activity?.snapsPerHour))}
       {/* The chart states the same reach its rows do — it plots the very buckets the rate cards
           average, so a silent chart beside two captioned ones would read as a different window. */}
