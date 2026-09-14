@@ -337,7 +337,7 @@ export default function TrendChart({
         </div>
       ) : (
         <div
-          className={`relative rounded-md bg-[var(--panel-plate)] overflow-hidden${onRange ? " cursor-crosshair select-none touch-pan-y" : ""}`}
+          className={`relative rounded-md border border-border overflow-hidden${onRange ? " cursor-crosshair select-none touch-pan-y" : ""}`}
           role="img"
           aria-label={`${name} — ${stepMs >= 86400000 ? "daily" : stepMs >= 3600000 ? "hourly" : "5-minute"} buckets, ${n} of them`}
         >

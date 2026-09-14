@@ -147,12 +147,17 @@ export default function TrendsDoc() {
   //
   // Neither answer is the right default for everyone, so this is a CONTROL rather than a ruling:
   // `own` keeps each chart's shape legible (the peaks, the dips, the quiet stretches), `shared`
-  // puts them all on the busiest one's scale so the column reads as a comparison. Per network is
-  // the default because that is what the sections are titled for — "each network's own daily
-  // snapshot count" — and because a reader who wants the comparison has the stacked chart in the
-  // vitals band and the roster beside it. The peak readout stays each chart's OWN number in both
-  // modes (TrendChart's `ownMax`), so a sliver can still say how high it actually got.
-  const [scaleMode, setScaleMode] = useState<"own" | "shared">("own");
+  // puts them all on the busiest one's scale so the column reads as a comparison.
+  //
+  // ⚠️ SHARED IS THE DEFAULT (user, 2026-09-14, the same round that asked for the control): a
+  // column of charts is read AS a column before it is read one chart at a time, so whatever the
+  // sections are titled, the first thing this page says is a comparison — and the autoscaled
+  // version said it wrongly. A reader who wants one network's own shape asks for it with one
+  // click and gets a chart that is still fully legible; a reader who never touches the control
+  // is not left with the flat lie. The honest reading is the one that needs no gesture.
+  // The peak readout stays each chart's OWN number in both modes (TrendChart's `ownMax`), so a
+  // sliver can still say how high it actually got.
+  const [scaleMode, setScaleMode] = useState<"own" | "shared">("shared");
   // AUTO-TIER (map-tile edition, 2026-09-10): a selected range picks the FINEST tier whose
   // HISTORY FLOOR its start clears (pickRangeTier — since the keep-forever flip, retention
   // no longer prunes, but the floors record where fine grain begins to exist) and fetches
