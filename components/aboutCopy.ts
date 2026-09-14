@@ -219,9 +219,25 @@ import type { Mode } from "@/src/store/store";
 // about. "whatever it validates — whatever its business runs on" says the general case, and the
 // examples live on /about where there is room to spend on them.
 //
-// ⚠️ LENGTH WENT DOWN, NOT UP (user, same round: "text should not get larger, if any make it a bit
-// shorter"). The lead nearly halved (192 → 106 characters) and the card is 19 characters shorter
-// overall — the length rule above, applied to a rewrite that could easily have grown.
+// ⚠️ LENGTH WENT DOWN, NOT UP (user, 2026-09-14: "text should not get larger, if any make it a bit
+// shorter", then "shorten the secondary paragraphs as well"). Worth recording that the first pass
+// only did half the job: the lead nearly halved, but BOTH secondary paragraphs came out LONGER than
+// the ones they replaced (224 → 254 and 148 → 185), so the card as a whole barely moved. Shortening
+// the part that is already loud is not shortening the card.
+//
+// ⚠️ AND THE SECOND PARAGRAPH KEEPS ONLY WHAT ONLY IT SAYS (user, same round: "maybe drop 2nd
+// paragraph entirely? what does it really add?"). Nearly the right call — most of it was restating
+// the lead. Audited clause by clause, it made four claims and one of them ("every few seconds the
+// base ledger takes a global snapshot") was the lead again in other words; the cadence it added is
+// something the view itself shows live, so the card was spending a sentence on what the instrument
+// already says. What could NOT be dropped is the anchoring: "anchors into the global snapshot what
+// it wants kept" is the mechanism this card is TITLED for ("When the network anchors"), and the
+// lead's "seals one for all of them" does not say it — nothing else in the card would. So the
+// restatement went and the paragraph kept its three new facts: a network's own schedule and schema,
+// what its snapshot holds, and what it chooses to anchor.
+//
+// 192/224/148 → 106/148/149, the card 564 → 403 characters, near enough a third off — the length
+// rule above actually applied rather than gestured at.
 // The bridging "So what lands here comes in very different sizes and shapes." was CUT to pay for it,
 // under the delete-the-back-reference rule above: the sentence behind it carries the claim, so
 // stating it first only made the reader hold an abstraction. ~95 words in three paragraphs, under
@@ -296,8 +312,8 @@ export const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string
     eyebrow: "About",
     lines: [
       "Snapshots happen at two levels: each network seals its own, and the base ledger seals one for all of them.",
-      "A network snapshots at its own pace and to its own schema, holding whatever it validates — whatever its business runs on. Every few seconds the base ledger takes a global snapshot, and each network anchors into it what it wants kept on the shared record.",
-      "An anchored snapshot arrives already sealed and stays provable, without anyone having to trust who wrote it. How often a network anchors, and how much, is part of what makes it its own.",
+      "A network snapshots on its own schedule and schema, holding whatever its business runs on, then anchors into the global snapshot what it wants kept.",
+      "Each arrives already sealed and stays provable: no one has to trust who wrote it. How often a network anchors, and how much, depends on what it does.",
     ],
   },
   soon: {
