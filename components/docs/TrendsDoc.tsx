@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Panel } from "@/components/docs/AboutDoc";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import useTrendsWindow, { useTrendsRange } from "@/components/useTrendsWindow";
@@ -11,6 +11,7 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 import { filterToggleActions } from "@/src/engine/domain/pickActions";
 import { metagraphById } from "@/src/data/network";
 import { displayNetwork } from "@/src/data/unlisted";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { SELECTED_ROW } from "@/components/selection";
 
@@ -158,6 +159,7 @@ export default function TrendsDoc() {
   // The peak readout stays each chart's OWN number in both modes (TrendChart's `ownMax`), so a
   // sliver can still say how high it actually got.
   const [scaleMode, setScaleMode] = useState<"own" | "shared">("shared");
+  const scaleId = useId();
   // AUTO-TIER (map-tile edition, 2026-09-10): a selected range picks the FINEST tier whose
   // HISTORY FLOOR its start clears (pickRangeTier — since the keep-forever flip, retention
   // no longer prunes, but the floors record where fine grain begins to exist) and fetches
@@ -448,36 +450,38 @@ export default function TrendsDoc() {
   // flex-none + a fixed h-8: the primitive's triggers are flex-1 at a %-height, which is what
   // spread them wide and broke when the list WRAPS on phone (the h-auto rows below) — as
   // compact pills they pack left and wrap cleanly (user, 2026-09-08: the tabs overflowed).
-  /* The scale control. It keeps the pickers' pill register — it is a setting on the same
-     reading, not a new kind of thing — and it is rendered ONLY on the metagraphs tab, because a
-     scale shared across charts is only a question where there is a COLUMN of comparable charts.
-     The hypergraph tab's charts each measure a different quantity, so there is nothing there to
-     share a scale with.
+  /* The scale control — a LABEL and an on/off switch (user, 2026-09-14, two rounds: first "should
+     read like a simple toggle", then "make it a label with a simple on/off control"). It is
+     rendered ONLY on the metagraphs tab, because a scale shared across charts is only a question
+     where there is a COLUMN of comparable charts; the hypergraph tab's charts each measure a
+     different quantity, and under a commit there is one network left.
 
-     ⚠️ IT IS ONE BUTTON THAT FLIPS, not a two-segment group (user, 2026-09-14: "should read
-     like a simple toggle") — the SAME correction the Scene⇄HUD control took on 2026-08-30, for
-     the same reason: a binary drawn as two segments is a radio, and a radio asks the reader to
-     compare two labels before pressing either. So the app's toggle grammar, verbatim from that
-     control: a STABLE label naming what the button presses FOR, and the wash saying whether it
-     is on. The title names what a click does, in both directions, because "Same scale" pressed
-     and unpressed are two readings a reader may not have a word for yet. */
+     ⚠️ A SWITCH IS NOT THE PRESSED-TOGGLE GRAMMAR, and the difference is the reason this stopped
+     being a pill. The command bar's Scene⇄HUD and RAW name an ACTION the reader presses FOR, with
+     the wash reporting that it is on — right for a control that pushes a surface in and pops it
+     out. This is a SETTING: the reader is not doing something, they are choosing how the column
+     is drawn, and a setting reads as a name plus its state. The two-segment group it replaced was
+     a radio wearing a toggle's clothes; the pill after it was the bar's action grammar on a
+     setting. `components/ui/switch.tsx` is the adopted primitive, restated in this app's tokens.
+
+     The label is the switch's own `<label>`, so the words are a hit target too — the switch alone
+     is 28×16, well under the touch floor the bar's controls keep. */
   const scaleToggle = (
-    <button
-      type="button"
-      aria-pressed={scaleMode === "shared"}
-      onClick={() => setScaleMode(scaleMode === "shared" ? "own" : "shared")}
-      title={
-        scaleMode === "shared"
-          ? "Every chart shares the busiest network's scale, so the column compares. Click to let each chart scale to its own data."
-          : "Each chart scales to its own data. Click to put every chart on the busiest network's scale."
-      }
-      // PICKER_GROUP's phone arm turns the shell into a block-level flex so its BUTTONS can
-      // share the row; this shell has one child and no row to share, so it keeps its own width
-      // — stretched, it read as a wide empty track with a pill adrift in the middle.
-      className={cn(PICKER_GROUP, "cursor-pointer max-[700px]:inline-flex")}
-    >
-      <span className={zoomBtn(scaleMode === "shared")}>Same scale</span>
-    </button>
+    <span className="inline-flex items-center gap-2">
+      <label htmlFor={scaleId} className="text-micro tracking-caps uppercase text-muted-foreground cursor-pointer select-none">
+        Same scale
+      </label>
+      <Switch
+        id={scaleId}
+        checked={scaleMode === "shared"}
+        onCheckedChange={(on) => setScaleMode(on ? "shared" : "own")}
+        title={
+          scaleMode === "shared"
+            ? "Every chart shares the busiest network's scale, so the column compares. Switch off to let each chart scale to its own data."
+            : "Each chart scales to its own data. Switch on to put every chart on the busiest network's scale."
+        }
+      />
+    </span>
   );
   /* WHAT IS APPLIED, IN WORDS, AND A WAY TO CLEAR IT — the raw layer's search toolbar rule,
      which is the same problem: a surface showing a cut of its data must say so on itself, or the
