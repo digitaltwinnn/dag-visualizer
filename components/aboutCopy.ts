@@ -203,6 +203,25 @@ import type { Mode } from "@/src/store/store";
 // The word is "levels", never "layers": app-wide a LAYER is an L0 / cL1 / dL1 process on a node (see
 // CLAUDE.md's vocabulary rule), so calling the two storeys layers would collide with the three codes
 // the composition chips, the signer copy and hyper's own About card all use.
+//
+// ⚠️ …AND THE LEAD MUST NAME BOTH OF THEM, NOT PROMISE THEM (user, 2026-09-14: "starts by saying it
+// happens at two levels but then describes only one"). The promise and its payoff used to be split
+// across paragraphs — "Snapshots happen at two levels" opened, the network's own level finished that
+// sentence, and the base ledger's arrived a paragraph later. That read as a broken promise even
+// before the card's LEAD became a visually separate standfirst (AboutView, same day); once it did,
+// the lead had to stand alone, and standing alone it named one level out of two. It now states both
+// in one line — each network seals its own, the base ledger seals one for all of them — and the
+// paragraphs below elaborate rather than complete it.
+//
+// ⚠️ AND WHAT A SNAPSHOT HOLDS IS STATED GENERICALLY (user, same round). "holding whatever it
+// validates: sensor readings, file fingerprints, a token's balances" ended on three examples, which
+// read as the list rather than as three of many — the same trap the hyper card's own note warns
+// about. "whatever it validates — whatever its business runs on" says the general case, and the
+// examples live on /about where there is room to spend on them.
+//
+// ⚠️ LENGTH WENT DOWN, NOT UP (user, same round: "text should not get larger, if any make it a bit
+// shorter"). The lead nearly halved (192 → 106 characters) and the card is 19 characters shorter
+// overall — the length rule above, applied to a rewrite that could easily have grown.
 // The bridging "So what lands here comes in very different sizes and shapes." was CUT to pay for it,
 // under the delete-the-back-reference rule above: the sentence behind it carries the claim, so
 // stating it first only made the reader hold an abstraction. ~95 words in three paragraphs, under
@@ -276,9 +295,9 @@ export const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string
     title: "When the network anchors",
     eyebrow: "About",
     lines: [
-      "Snapshots happen at two levels. Each network snapshots on its own, at its own pace and to its own schema, holding whatever it validates: sensor readings, file fingerprints, a token's balances.",
-      "Every few seconds the base ledger takes one global snapshot, and a network anchors into it what it wants kept on the shared record. Each arrives already sealed, and stays provable without anyone having to trust who wrote it.",
-      "How often a network anchors differs, and so do the size and the kind of information it anchors. Those differences are what make each network unique.",
+      "Snapshots happen at two levels: each network seals its own, and the base ledger seals one for all of them.",
+      "A network snapshots at its own pace and to its own schema, holding whatever it validates — whatever its business runs on. Every few seconds the base ledger takes a global snapshot, and each network anchors into it what it wants kept on the shared record.",
+      "An anchored snapshot arrives already sealed and stays provable, without anyone having to trust who wrote it. How often a network anchors, and how much, is part of what makes it its own.",
     ],
   },
   soon: {

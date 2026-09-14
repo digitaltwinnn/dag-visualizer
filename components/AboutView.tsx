@@ -98,14 +98,18 @@ export default function AboutView({
                 semibold, so it reads as a standfirst and never as a heading. Two channels means
                 the distinction survives a face, a monitor and an eye that struggles with either
                 one alone — the same reason identity is never colour-alone anywhere else here. */}
-            {lines.map((l, i) => (
-              <p
-                key={i}
-                className={cn(
-                  "m-0 text-body",
-                  i > 0 ? "text-muted-foreground" : "text-foreground font-medium",
-                )}
-              >
+            {lines[0] != null && <p className="m-0 text-body text-foreground font-medium">{lines[0]}</p>}
+            {/* ⚠️ THE LEAD IS DIVIDED FROM THE BODY BY A HAIRLINE (user, 2026-09-14), which is the
+                third channel and the only STRUCTURAL one — colour and weight mark the lead, a rule
+                separates it. Same decision the vitals band's cards took on 2026-09-01, and for the
+                same stated reason: a hairline over spacing alone. The device is the house one — the
+                card-head rule's own `border-b border-border` — and it needs no inset of its own,
+                because this body already carries the panel's horizontal padding, so the rule lands
+                on exactly the head hairline's line. Drawn only when there IS a body to divide from:
+                a one-paragraph card gets a lead, not a lead and an empty half. */}
+            {lines.length > 1 && <div className="border-b border-border" aria-hidden />}
+            {lines.slice(1).map((l, i) => (
+              <p key={i} className="m-0 text-body text-muted-foreground">
                 {l}
               </p>
             ))}
