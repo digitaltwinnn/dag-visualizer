@@ -236,8 +236,13 @@ import type { Mode } from "@/src/store/store";
 // restatement went and the paragraph kept its three new facts: a network's own schedule and schema,
 // what its snapshot holds, and what it chooses to anchor.
 //
-// 192/224/148 → 106/148/149, the card 564 → 403 characters, near enough a third off — the length
-// rule above actually applied rather than gestured at.
+// ⚠️ AND "PROVABLE" CARRIES ITS OWN GLOSS (user, same round: remove "no one has to trust who wrote
+// it"). The clause was explaining the word it followed, which is the reader-can't-be-trusted-to-read
+// register this file already refuses elsewhere — provable says it, and a card that stops to define
+// its own plain words is a card that has stopped trusting the reader.
+//
+// 192/224/148 → 106/148/116, the card 564 → 370 characters, a third off — the length rule above
+// actually applied rather than gestured at.
 // The bridging "So what lands here comes in very different sizes and shapes." was CUT to pay for it,
 // under the delete-the-back-reference rule above: the sentence behind it carries the claim, so
 // stating it first only made the reader hold an abstraction. ~95 words in three paragraphs, under
@@ -313,7 +318,7 @@ export const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string
     lines: [
       "Snapshots happen at two levels: each network seals its own, and the base ledger seals one for all of them.",
       "A network snapshots on its own schedule and schema, holding whatever its business runs on, then anchors into the global snapshot what it wants kept.",
-      "Each arrives already sealed and stays provable: no one has to trust who wrote it. How often a network anchors, and how much, depends on what it does.",
+      "Each arrives already sealed and stays provable. How often a network anchors, and how much, depends on what it does.",
     ],
   },
   soon: {
