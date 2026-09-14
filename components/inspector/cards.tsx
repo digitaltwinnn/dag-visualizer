@@ -23,7 +23,7 @@ import { useArchive, archiveFactState, archiveSchedule, archiveSummary, fmtSnapC
 import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
 import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
-import { cap, BarCell, Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark } from "./parts";
+import { cap, BarCell, CountCell, CountTag, Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark } from "./parts";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { pickNetId, followToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -478,19 +478,18 @@ function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> })
                       </span>
                     )}
                     {row.kept != null && (
-                      <span
-                        className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap"
+                      <CountTag
                         title={row.hint ? `${fmtSnapCount(row.kept)} snapshots — ${row.hint}` : `${fmtSnapCount(row.kept)} snapshots kept`}
                       >
                         {fmtSnapCount(row.kept)}
-                      </span>
+                      </CountTag>
                     )}
                   </span>
                 ) : (
                   <span />
                 )}
                 <BarCell count={row.count} max={Math.max(...sched.rows.map((x) => x.count))} hue="var(--muted-foreground)" />
-                <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{row.count}</span>
+                <CountCell>{row.count}</CountCell>
               </Fragment>
             ))}
             {sched.unmeasured > 0 && (
@@ -498,7 +497,7 @@ function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> })
                 <span className="text-body text-foreground" title="The probe read nothing from these nodes — what they keep is unknown.">Unknown</span>
                 <span />
                 <span />
-                <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{sched.unmeasured}</span>
+                <CountCell>{sched.unmeasured}</CountCell>
               </Fragment>
             )}
           </div>
@@ -601,7 +600,10 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
               catalog metagraph (an empty fleet is a reading); the schedules below skip then. */}
           <div className="mt-3">
             <Fact label="Online nodes">
-              <b className="font-bold">{nodes.length}</b>
+              {/* Mono, like the partition counts it totals — `/design`'s sans/mono split puts counts
+                  in the data face, and this row sums the very columns directly below it. The BOLD
+                  stays: this is the total the two tables partition, not one value among peers. */}
+              <b className="font-mono font-bold">{nodes.length}</b>
             </Fact>
           </div>
           {/* The divider announces the partitions that follow, so at 0 nodes — where every

@@ -147,7 +147,12 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
                     <span className="flex-1 min-w-0 text-body text-foreground-dim whitespace-nowrap overflow-hidden text-ellipsis" title={name}>
                       {name}
                     </span>
-                    <span className="flex-none text-right text-body tabular-nums font-semibold">{m.nodes.length}</span>
+                    {/* ⚠️ MONO, like every count in this app — `/design`'s sans/mono split names counts as machine
+                        data, and this column had `tabular-nums` without the face it belongs to. It matters here more
+                        than most: this row's body states the same breakdown as the dossier's BY NODE COMPOSITION one
+                        rail over, and the vitals band's MicroBars state it a third time — three surfaces, one set of
+                        numbers, and two of them were already mono (user, 2026-09-14). */}
+                    <span className="flex-none text-right font-mono text-body tabular-nums font-semibold">{m.nodes.length}</span>
                     {open ? (
                       <SelectedRowMark className="flex-none" muted={focus !== "context"} hue={hue} />
                     ) : (
@@ -216,7 +221,7 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
                                   <span className="col-start-1 row-start-1 invisible" aria-hidden>{longest}</span>
                                 </span>
                                 <RoleChips codes={g.codes} />
-                                <span className="ml-auto flex-none tabular-nums text-body font-semibold">{g.rows.length}</span>
+                                <span className="ml-auto flex-none font-mono tabular-nums text-body font-semibold">{g.rows.length}</span>
                               </DisclosureRow>
 
                               <DisclosurePanel className={ROW_NEST_DEEP}>
