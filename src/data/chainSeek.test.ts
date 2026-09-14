@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { pageOfOrdinal, estimateOrdinal, dayStartMs, dayEndMs, tsInRange, seekOrdinalByTime, civilDate, civilString } from "./chainSeek";
+import { pageOfOrdinal, estimateOrdinal, dayStartMs, dayEndMs, tsInRange, seekOrdinalByTime, probeBudget, civilDate, civilString } from "./chainSeek";
 
 // The executable spec for the raw log's two non-arithmetic searches. The interpolation is the part
 // worth pinning: it is what turns a ~21-probe binary search into a handful, and its failure modes
@@ -179,5 +179,56 @@ describe("seekOrdinalByTime (the walk the Age and Anchored-into columns spend)",
   it("refuses a chain with no arithmetic base", async () => {
     const c = chain(0, (n) => n);
     expect(await seekOrdinalByTime(EPOCH, 0, c.loadPage)).toBeNull();
+  });
+
+  // ⚠️ THE REGRESSION THIS SUITE MISSED, and the reason the budget is derived rather than typed
+  // (user, 2026-09-14: a range a few days back answered "could not locate that date in the chain").
+  // Every chain above is ~10^5–10^6 ordinals, where a fixed budget of 8 is ample. The real DOR is
+  // 28.1M ordinals AND batches — it seals dozens of snapshots on one timestamp, so whole pages
+  // share a stamp and the interpolation has nothing to interpolate across near the target. Measured
+  // against the live chain, that seek needed 13 probes for a date three days back and 20 for one a
+  // month back; it was given 8, so it truthfully reported a miss for a date that is plainly there.
+  // DOR's two shapes at once, because either alone is survivable and the pair is not. BATCHED: 40
+  // snapshots sealed on one timestamp, so a whole page can share a stamp and `estimateOrdinal`
+  // divides by a zero span. CURVED: the chain ran slowly for its first half and sped up 6x, so
+  // every interpolation lands on the same side of the target and the bracket creeps instead of
+  // halving. A regular batched chain is NOT a regression test — interpolation solves it in three
+  // probes, which is how this suite passed while the live search was failing.
+  const KNEE = 14_000_000;
+  const dorLike = (n: number) => {
+    const tick = Math.floor((n - 1) / 40);
+    const knee = KNEE / 40;
+    return tick < knee ? tick * 180_000 : knee * 180_000 + (tick - knee) * 30_000;
+  };
+
+  it("lands on a real chain's scale: 28M ordinals, batched and curved", async () => {
+    const latest = 28_100_000;
+    const c = chain(latest, dorLike);
+    const target = dorLike(22_000_001) + EPOCH;
+    const got = await seekOrdinalByTime(target, latest, c.loadPage);
+    // The answer is the FIRST ordinal at or after the target, which on a batched chain is the
+    // first member of that tick's batch.
+    expect(got).toBe(22_000_001);
+  });
+
+  it("gives a 28M chain a budget that can actually bracket it", () => {
+    // Bisection over 28.1M ordinals, 25 rows to a page, is ~21 probes — the fixed 8 could not
+    // finish, and no amount of interpolation guarantees it will on a curved chain. The assertion
+    // is the ORDER, not the constant: the budget must clear bisection's own worst case.
+    expect(probeBudget(28_100_000)).toBeGreaterThanOrEqual(Math.log2(28_100_000 / 25));
+    // …and it must not grow without bound on a long chain, or a genuinely unanswerable search
+    // would spend a minute of requests before saying so.
+    expect(probeBudget(28_100_000)).toBeLessThanOrEqual(32);
+  });
+
+  it("keeps a floor for short chains, and grows with the chain", () => {
+    expect(probeBudget(1)).toBeGreaterThanOrEqual(8);
+    expect(probeBudget(1_000)).toBeGreaterThanOrEqual(8);
+    expect(probeBudget(30_000_000)).toBeGreaterThan(probeBudget(100_000));
+  });
+
+  it("still honours an explicit budget, so the give-up path stays testable", async () => {
+    const c = chain(28_100_000, dorLike);
+    expect(await seekOrdinalByTime(dorLike(22_000_001) + EPOCH, 28_100_000, c.loadPage, 1)).toBeNull();
   });
 });

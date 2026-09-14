@@ -10,6 +10,9 @@
 // the false-position step) converges in a handful. This module is that math, kept pure and tested;
 // the async walk that spends it lives with the caller, which owns the fetching.
 //
+// ⚠️ "A HANDFUL" IS THE COMMON CASE, NOT THE BUDGET. What the walk is ALLOWED to spend has to cover
+// the chain it is actually given — see `probeBudget`, and the batched-and-curved test that pins it.
+//
 // ⚠️ THE ESTIMATE IS A GUESS, AND THE REFINEMENT IS WHAT MAKES IT HONEST. Cadence changes over a
 // chain's life — a network that sped up leaves the interpolation biased — so a caller must keep
 // probing until the answer BRACKETS the target rather than trusting the first estimate. The bracket
@@ -92,6 +95,28 @@ export function civilString(d: Date): string {
 /** One row as the walk needs it: an ordinal and the stamp the explorer gave it. */
 export interface SeekRow { ordinal: number; ts: string }
 
+/** How many probes a chain of `latest` ordinals is worth spending, paged `size` at a time.
+ *
+ *  ⚠️ THE BUDGET IS DERIVED BECAUSE A CONSTANT CANNOT BE RIGHT FOR TWO CHAINS (user, 2026-09-14: a
+ *  range a few days back answered "could not locate that date in the chain"). It was a flat 8,
+ *  which is generous for the ~10^5-ordinal chains this module was written and tested against and
+ *  simply not enough for DOR: 28.1M ordinals, 25 to a page, is ~21 probes by bisection alone. The
+ *  walk did exactly what its contract says — it ran out and refused rather than paging somewhere
+ *  plausible — so the only wrong number in the system was this one, and the reader was told the
+ *  chain did not contain a date that was plainly in it.
+ *
+ *  Bisection's own worst case is the floor (interpolation only ever beats it, and the stagnation
+ *  guard falls back to it), plus slack for the two end probes and the guard's own warm-up. The
+ *  ceiling matters as much as the floor: a budget that grew without bound would spend a minute of
+ *  sequential requests before admitting a genuinely unanswerable search, so the log term keeps it
+ *  near 25 even for a chain ten times DOR's. Costs nothing when the walk converges early — it
+ *  returns the moment a page BRACKETS the target, which on a regular chain is three or four
+ *  probes. Measured against the live chain: three days back needed 13, a month back 20. */
+export function probeBudget(latest: number, size = 25): number {
+  const pages = Math.max(2, latest / Math.max(1, size));
+  return Math.max(8, Math.ceil(Math.log2(pages)) + 4);
+}
+
 /**
  * Find the ordinal of the FIRST snapshot at or after `targetMs`, by interpolating over the chain.
  *
@@ -109,7 +134,7 @@ export async function seekOrdinalByTime(
   targetMs: number,
   latest: number,
   loadPage: (before: number) => Promise<SeekRow[]>,
-  maxProbes = 8,
+  maxProbes = probeBudget(latest),
 ): Promise<number | null> {
   if (latest < 1) return null;
   const ms = (r: SeekRow) => Date.parse(r.ts);
