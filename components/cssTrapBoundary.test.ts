@@ -2,10 +2,11 @@ import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-// CSS traps 6 and 3, made executable (2026-08-19). Both are SILENT failures: the class compiles,
-// the page renders, and the only symptom is that the rule you wrote isn't the rule that ships. So
-// neither trap can be caught by tsc, by vitest, or by looking at the JSX — only by measuring the
-// browser, which is exactly the debugging session these tests exist to spare.
+// CSS traps 6, 3 and 10, made executable (6 and 3 on 2026-08-19; 10 on 2026-09-14). All three are
+// SILENT failures: the class compiles, the page renders, and the only symptom is that the rule you
+// wrote isn't the rule that ships — or, for trap 10, that a pointer never reaches what it points at.
+// None can be caught by tsc, by vitest, or by looking at the JSX: only by measuring the browser,
+// which is exactly the debugging session these tests exist to spare.
 //
 // Neither trap is currently violated. That is the point: this pins the clean state so the next
 // token added under one of these namespaces fails here rather than in a screenshot three days
@@ -144,7 +145,7 @@ describe("CSS trap 3 — bg-[var()] only ever carries a colour", () => {
     expect(all.some(({ src }) => /\[background:var\(--[a-z0-9-]+\)\]/.test(src))).toBe(true);
   });
 
-  // TRAP 9 — A DECORATIVE FULL-BOX PSEUDO SWALLOWS THE CARD'S CLICKS (found live, 2026-09-14:
+  // TRAP 10 — A DECORATIVE FULL-BOX PSEUDO SWALLOWS THE CARD'S CLICKS (found live, 2026-09-14:
   // "not [all] of the items are clickable in the cards"). The signal edge used to be a 2px bar
   // inset from each end; on 2026-09-13 it became a full-box border ring so the ink could bend
   // into the rounded corners (`inset: 0`, one coloured border side, a fixed-length mask). The
