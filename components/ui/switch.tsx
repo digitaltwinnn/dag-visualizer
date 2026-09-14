@@ -41,7 +41,16 @@ function Switch({ className, ...props }: React.ComponentProps<typeof SwitchPrimi
       <SwitchPrimitive.Thumb
         data-slot="switch-thumb"
         className={cn(
-          "pointer-events-none block size-3 rounded-full bg-[var(--switch-knob)] shadow-sm ring-0",
+          "pointer-events-none block size-3 rounded-full shadow-sm ring-0",
+          // ⚠️ THE KNOB CHANGES INK WITH THE TRACK IT SITS ON, because the two tracks are
+          // opposite grounds (user, 2026-09-14: on the dark lane the pale knob was "hardly
+          // visible against the bright cyan"). ON, the ground is `--primary` — and
+          // `--primary-foreground` is that ground's own ink by definition, near-white over the
+          // light lane's mid teal and near-black over the dark lane's bright cyan, so it reads
+          // on both without either face being named here. OFF, the ground is the faint
+          // `--border` hairline on whatever page is behind it, which is dark on one lane and
+          // light on the other and therefore needs the pale-on-both token.
+          "data-[state=checked]:bg-[var(--primary-foreground)] data-[state=unchecked]:bg-[var(--switch-knob)]",
           "transition-transform duration-150 motion-reduce:transition-none",
           "data-[state=checked]:translate-x-3 data-[state=unchecked]:translate-x-0",
         )}

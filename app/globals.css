@@ -915,10 +915,12 @@
   --panel: light-dark(rgba(252, 253, 255, 0.85), rgba(12, 16, 32, 0.72));
   --panel-light: light-dark(rgba(252, 253, 255, 0.40), rgba(12, 16, 32, 0.35));
   --panel-solid: light-dark(rgba(248, 250, 255, 0.94), rgba(8, 12, 26, 0.92));
-  /* The SWITCH's knob (components/ui/switch.tsx, 2026-09-14) — PALE ON BOTH LANES, which is why
-     it needs a token of its own. Every other pale surface here inverts with the lane by design
-     (--foreground is ink, --panel-solid is glass), and a knob that inverted would sink into its
-     own track on one face: near-black on the dark lane's faint --border. Stated once, for both. */
+  /* The SWITCH's OFF knob (components/ui/switch.tsx, 2026-09-14) — PALE ON BOTH LANES, which is
+     why it needs a token of its own. Off, the knob sits on the faint --border hairline over
+     whatever page is behind it, so it must read against a dark ground and a light one alike, and
+     every other pale surface here inverts with the lane by design (--foreground is ink,
+     --panel-solid is glass). Stated once, for both. The ON knob needs no token: its ground is
+     --primary, and --primary-foreground is already that ground's own ink. */
   --switch-knob: light-dark(rgba(252, 253, 255, 0.98), rgba(226, 234, 252, 0.95));
   /* --panel-plate is the BASE PLATE a card's FOOT sits on (user, 2026-08-10: the foot's tier
      change "is only the font", asked for more). A NEUTRAL WHITE lift, and the mechanism is the
