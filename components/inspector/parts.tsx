@@ -215,7 +215,13 @@ export function IdentityDot({ hue, className }: { hue: string; className?: strin
 /** The Yes/No FACT mark (user, 2026-08-16 — "yes has a checkmark, so for no add a x"): Yes
  *  takes the check, No an ✕, BOTH at soft tints — the status pill's own discipline ("even the
  *  green stays un-dominant"); a raw `--success` glyph read stronger than anything else on the
- *  card. One component so the two Yes/No rows (Full archive, Delegated staking) can't drift. */
+ *  card. One component so the two Yes/No rows (Full archive, Delegated staking) can't drift.
+ *
+ *  ⚠️ THE MARK CARRIES THE EMPHASIS; THE WORD STAYS IN THE VALUE REGISTER (user, 2026-09-14:
+ *  "'full archive' shouldn't be bold because all other values aren't either"). Both rows used to
+ *  bold their Yes/No — and the n/a beside it — which made two facts shout on a card where every
+ *  other value, the measured "none" included, is plain. The check and the ✕ already say which
+ *  answer this is, at the soft tints above; a bold word on top of them is the same claim twice. */
 export function BoolMark({ on }: { on: boolean }) {
   return on ? (
     <Check aria-hidden className="size-3" style={{ color: "color-mix(in oklch, var(--success) 72%, transparent)" }} />

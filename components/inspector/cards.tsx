@@ -889,7 +889,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
                 }
               >
                 <BoolMark on={registered} />
-                <b className="font-bold">{registered ? "Yes" : "No"}</b>
+                {registered ? "Yes" : "No"}
               </span>
             ) : (
               <span className="text-muted-foreground italic" title="The delegated-staking registry could not be read — retried on the next visit.">
@@ -971,7 +971,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
             >
               <span className="inline-flex items-center gap-1.5">
                 <BoolMark on={archState.display.genesis} />
-                <b className="font-bold">{archState.display.genesis ? "Yes" : "No"}</b>
+                {archState.display.genesis ? "Yes" : "No"}
               </span>
               {archState.display.reach && <span className="text-label text-muted-foreground">{archState.display.reach}</span>}
               {archState.display.count && <span className="text-label text-muted-foreground">{archState.display.count}</span>}
@@ -996,7 +996,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
               className="flex flex-col items-end"
               title="A chain's snapshots are served by its L0 validators; this node runs no L0 process, so it keeps no snapshot archive."
             >
-              <b className="font-bold">n/a</b>
+              <span>n/a</span>
               <span className="inline-flex items-center gap-1 text-label text-muted-foreground">
                 not an <RoleChips codes={["L0"]} /> validator
               </span>
