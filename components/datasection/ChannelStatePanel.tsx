@@ -63,6 +63,7 @@ import { PAYLOAD_LANES, parsePayload, payloadKinds, stateSchema, unifyFieldKinds
 import { identityHudCss } from "@/src/palette/identity";
 import { CopyButton, FootRow, IdentityDot, RoleChips } from "@/components/inspector/parts";
 import { fmtDag, fmtKB, midHash } from "@/src/util/format";
+import { relativeAge } from "@/src/util/relativeAge";
 import JsonTree, { type JsonTreeCmd } from "@/components/datasection/JsonTree";
 import { LANE_ICONS } from "@/components/icons";
 import TablePager from "@/components/datasection/TablePager";
@@ -84,6 +85,25 @@ function nonEmpty(v: unknown): boolean {
  *  takes the room (user, 2026-08-14). Head AND tail kept, like shortHash: a chain hash's tail
  *  is what gets compared. */
 const paneHash = (v: string): string => midHash(v, 46);
+
+/** The pane's absolute stamp: `Sep 14, 2026 · 14:34:42 UTC`.
+ *
+ *  ⚠️ SECONDS, BECAUSE THIS IS THE RECORD RUNG. Everywhere else the app rounds a time to the
+ *  minute — a chart axis, a range label — because there the stamp locates a BUCKET. Here it
+ *  identifies one sealed artefact, and a batching network seals dozens inside a single minute, so
+ *  a minute-rounded stamp would print the same value for rows the reader can see are different.
+ *  Unparsed input yields the instrument's own absence rather than "Invalid Date" (rule 10). */
+const stampUtc = (ts: string): string => {
+  const ms = Date.parse(ts);
+  if (!Number.isFinite(ms)) return "—";
+  const d = new Date(ms);
+  return (
+    d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) +
+    " · " +
+    d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone: "UTC" }) +
+    " UTC"
+  );
+};
 
 type LaneId = "state" | "data" | "signers";
 type Lane = { id: LaneId; name: string; title: string };
@@ -580,6 +600,21 @@ export function ChannelStatePanel() {
               strip below, and "· compressed" keeps naming the wire figure's basis against the
               lanes' decoded sizes. */}
           <div className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-0.5 flex-none text-label">
+            {/* ⚠️ WHEN, BEFORE WHAT IT COST (user, 2026-09-14: "add a date/time attribute to the
+                snapshot details section"). The anchor log to the left addresses this row by AGE —
+                a relative reading, right for a column repeated down 25 rows — and the pane it
+                opens then stated four facts about the snapshot without ever saying WHEN it
+                happened. The raw layer is the record-level rung of the observation ladder, so the
+                answer here is the ABSOLUTE stamp, to the second, not another relative one: it is
+                the only place in the app that can be quoted, and "2m ago" cannot.
+                UTC, and it says so — the explorer's own stamps are UTC and every other absolute
+                time in this app is printed that way, so a viewer's local midnight can never
+                silently re-date a snapshot. The relative age rides the title, which is the reading
+                the reader already has from the column they clicked. */}
+            <span className="text-muted-foreground">Timestamp</span>
+            <span className="text-right tabular-nums text-foreground-dim" title={`${relativeAge(Date.now() - Date.parse(sel.ts))} — the stamp this snapshot shares with the global snapshot it anchored into`}>
+              {stampUtc(sel.ts)}
+            </span>
             <span className="text-muted-foreground">Fee</span>
             <span className="text-right tabular-nums text-foreground"><b className="font-bold">{fmtDag(deep.fee)}</b> DAG</span>
             <span className="text-muted-foreground">Anchored</span>
