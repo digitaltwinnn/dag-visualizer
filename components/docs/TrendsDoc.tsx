@@ -83,6 +83,26 @@ const stepMsOfMain = (w: { stepMs: number } | undefined): number => w?.stepMs ??
 const scale = (points: (number | null)[], k: number): (number | null)[] =>
   points.map((v) => (v == null ? null : v * k));
 
+/** ⚠️ THE PICKERS ARE HAIRLINE GROUPS, NOT FILLED TRACKS (user, 2026-09-14: in light mode they
+ *  "all have a gray background which looks a bit off on a nice light clean background"). Measured,
+ *  the shadcn track lands about 24 sRGB levels below this document's paper — a grey slab, and the
+ *  only slab on a page that is otherwise paper and hairlines.
+ *  (The measurement is stated in words on purpose: rule 3's test reads comments too, and a literal
+ *  here would be a colour this file does not own.)
+ *
+ *  `bg-muted` is the primitive's own default, adopted unchanged; it reads acceptably on the dark
+ *  face, where everything is low-luminance, and as UI chrome dropped onto a document on the light
+ *  one. /trends is explicitly a DOCUMENT (convention 12 — prose, sections, 2D charts), and this
+ *  app's document register is a hairline: the card-head rule, the raw layer's search box, and the
+ *  file-cabinet tabs DIRECTLY BELOW these pickers all define their groups that way. So the group
+ *  keeps its shape and loses its fill — a hairline plus `--wash-faint`, the app's own quiet
+ *  surface, which is `light-dark()` by construction and so answers both faces at once.
+ *
+ *  ONE HOME for all three (topic, window, scale): they were three copies of the same literal, and
+ *  a fourth picker would have been a fourth. */
+const PICKER_GROUP =
+  "inline-flex items-center rounded-lg border border-border bg-wash-faint p-[3px] max-[700px]:flex max-[700px]:justify-center max-[700px]:[&>button]:flex-1";
+
 function Section({ id, title, lead, children }: { id: string; title: string; lead: string; children: React.ReactNode }) {
   return (
     <section
@@ -364,7 +384,7 @@ export default function TrendsDoc() {
       pressed ? cn("font-bold text-foreground", SELECTED_ROW) : "text-muted-foreground hover:text-foreground hover:bg-wash-hover",
     );
   const zoomPicker = (
-    <div role="group" aria-label="Time window" className="inline-flex items-center rounded-lg bg-muted p-[3px] max-[700px]:flex max-[700px]:justify-center max-[700px]:[&>button]:flex-1">
+    <div role="group" aria-label="Time window" className={PICKER_GROUP}>
       {!range && ZOOMS.map((z) => (
         <button
           key={z.id}
@@ -414,7 +434,7 @@ export default function TrendsDoc() {
      COLUMN of comparable charts. The hypergraph tab's charts each measure a different quantity,
      so there is nothing there to share a scale with. */
   const scalePicker = (
-    <div role="group" aria-label="Chart scale" className="inline-flex items-center rounded-lg bg-muted p-[3px] max-[700px]:flex max-[700px]:justify-center max-[700px]:[&>button]:flex-1">
+    <div role="group" aria-label="Chart scale" className={PICKER_GROUP}>
       {([["own", "Per network", "Each chart scales to its own data — best for reading one network's peaks and dips."],
          ["shared", "Same scale", "Every chart shares the busiest network's scale — best for comparing networks. Quiet ones will read as slivers; each chart still states its own peak."]] as const).map(([id, label, title]) => (
         <button key={id} type="button" aria-pressed={scaleMode === id} title={title} onClick={() => setScaleMode(id)} className={zoomBtn(scaleMode === id)}>
@@ -424,7 +444,7 @@ export default function TrendsDoc() {
     </div>
   );
   const topicPicker = (
-    <div role="group" aria-label="Topic" className="inline-flex items-center rounded-lg bg-muted p-[3px] max-[700px]:flex max-[700px]:justify-center max-[700px]:[&>button]:flex-1">
+    <div role="group" aria-label="Topic" className={PICKER_GROUP}>
       {/* The topic's user-facing word is "Fees" (user, 2026-09-11: "Economics = Fees" — the
           plainer word for what the sections show: fees paid, and the data they anchored);
           the internal id stays `economics`, one concept two registers. */}
