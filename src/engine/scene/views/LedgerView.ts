@@ -766,11 +766,17 @@ export class LedgerView implements SceneView {
     // frame, which is the one place trail motion is allowed to live.
     if (prevLead != null && this.model.tickOrdinal !== prevLead) this._advanced = true;
 
-    for (let s = 0; s < SLOT_N; s++) this._slotSnap[s] = null;
+    // ⚠️ THE POOLS FOLLOW THE TRAIL'S CAPACITY, NOT THE VISIBLE DEPTH (user, 2026-09-14). SLOT_N is
+    // how many rows the chamber SHOWS; `model.trailCap` is how many it HOLDS, which grows once the
+    // reader selects an older row — the rewind then slides those extra rows into view, so they must
+    // exist as bars, specs and picks or the chamber empties behind the selection. Grown here, at
+    // tick rate, never per frame.
+    this._ensureSlotCapacity(this.model.trailCap);
+    for (let s = 0; s < this._slotSnap.length; s++) this._slotSnap[s] = null;
     if (this.model.tickOrdinal != null)
       this._slotSnap[0] = this._byOrd.get(this.model.tickOrdinal) ?? null;
     for (const tr of this.model.trail)
-      if (tr.slot >= 0 && tr.slot < SLOT_N)
+      if (tr.slot >= 0 && tr.slot < this._slotSnap.length)
         this._slotSnap[tr.slot] = this._byOrd.get(tr.ordinal) ?? null;
 
     this._recomputeHoverSlot();
@@ -930,9 +936,21 @@ export class LedgerView implements SceneView {
     return snap.ordinal;
   }
 
+  /** Grow the per-slot arrays and the bar's mesh pool to `n`. Never shrinks: the rows are already
+   *  paid for, and a reader who has gone back once usually goes back again. The entry-stagger
+   *  arrays deliberately stay SLOT_N long — that animation belongs to the VISIBLE depth, and every
+   *  read of them is already guarded `slot < SLOT_N ? … : default`. */
+  private _ensureSlotCapacity(n: number): void {
+    while (this._specs.length < n) {
+      this._specs.push(makeBarSpec());
+      this._slotSnap.push(null);
+    }
+    this._bar.ensureSlots(n);
+  }
+
   private _rebuildAllSlots(): void {
     const liveOrd = this._liveOrd();
-    for (let s = 0; s < SLOT_N; s++) {
+    for (let s = 0; s < this._slotSnap.length; s++) {
       const snap = this._slotSnap[s];
       // A slot with no tick at all renders NOTHING — the seam is reserved for a tick that HAPPENED
       // (ByteBar leaves a never-populated slot's meshes and outline hidden from construction).
@@ -1006,7 +1024,7 @@ export class LedgerView implements SceneView {
     // does not exist: exactly the dangling-line defect the SEED was drawn to answer. It is named
     // the moment its read lands and it becomes an ordinary measured row.
     const liveOrd = this._liveOrd();
-    for (let s = 0; s < SLOT_N; s++) {
+    for (let s = 0; s < this._slotSnap.length; s++) {
       const snap = this._slotSnap[s];
       if (!snap || snap.ordinal === liveOrd) continue;
       seen.add(snap.ordinal);
@@ -1067,13 +1085,13 @@ export class LedgerView implements SceneView {
     // Separate rows (2026-08-07): with a snapshot pinned, a hover needs its own sheet — the
     // active row keeps its ribbons regardless of hover, and the preview never goes missing.
     const hot = this.model.selectedSlot;
-    if (hot > 0 && hot < SLOT_N && this._slotSnap[hot]) {
+    if (hot > 0 && hot < this._slotSnap.length && this._slotSnap[hot]) {
       this._ribbonTopSlot = hot;
       this._ribbons.setRow(1, hot, this._specs[hot], this._laneZOf, this._topHalfOf);
       this._ribbons.setRowFade(1, 1);
     } else this._ribbons.clearRow(1);
     const hov = this._hoverSlot;
-    if (hov > 0 && hov < SLOT_N && hov !== hot && this._slotSnap[hov]) {
+    if (hov > 0 && hov < this._slotSnap.length && hov !== hot && this._slotSnap[hov]) {
       this._ribbonTopSlot = hov;
       this._ribbons.setRow(2, hov, this._specs[hov], this._laneZOf, this._topHalfOf);
       // The hover ribbon IS the group tier — a hovered row is a preview of what a click would pin,
@@ -1086,7 +1104,7 @@ export class LedgerView implements SceneView {
     if (this._graceOrd != null && this._graceT > 0) {
       for (const tr of this.model.trail) if (tr.ordinal === this._graceOrd) { g = tr.slot; break; }
     }
-    if (g > 0 && g < SLOT_N && g !== hot && this._slotSnap[g] && this._specs[g].measured) {
+    if (g > 0 && g < this._slotSnap.length && g !== hot && this._slotSnap[g] && this._specs[g].measured) {
       this._ribbonTopSlot = g;
       this._ribbons.setRow(3, g, this._specs[g], this._laneZOf, this._topHalfOf);
     } else {
@@ -1105,7 +1123,7 @@ export class LedgerView implements SceneView {
     this._threadSpecs.length = 0;
     for (const tr of this.model.trail) {
       const slot = tr.slot;
-      if (slot < 0 || slot >= SLOT_N) continue;
+      if (slot < 0 || slot >= this._slotSnap.length) continue;
       // A row that already carries a SHEET says the relation in full — no thread under it.
       if (slot === 0 || slot === this.model.selectedSlot || slot === this._hoverSlot || slot === this._graceSlot) continue;
       if (!this._slotSnap[slot] || !this._specs[slot].measured) continue;

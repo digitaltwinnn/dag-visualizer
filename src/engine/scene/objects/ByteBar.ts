@@ -135,7 +135,16 @@ export class ByteBar {
     this._neutral = colors.core;
     this._paper = isLightGround(colors);
 
-    for (let s = 0; s < SLOT_N; s++) {
+    this.ensureSlots(SLOT_N);
+  }
+
+  /** Grow the pool to `n` slots. SLOT_N is the VISIBLE depth; the TRAIL can hold more once the
+   *  reader selects an older row, because the rewind then slides those extra rows into view (see
+   *  LedgerModel.trailCap). Allocation happens on demand and never shrinks — a reader who has been
+   *  back once usually goes back again, and freeing meshes to re-make them is the churn the pool
+   *  exists to avoid. Nothing here runs per frame: this is called from `setData`, at tick rate. */
+  ensureSlots(n: number): void {
+    for (let s = this._slots.length; s < n; s++) {
       const bands: THREE.Mesh[] = [];
       const mats: THREE.MeshBasicMaterial[] = [];
       for (let b = 0; b < BANDS_PER_SLOT; b++) {
@@ -321,7 +330,7 @@ export class ByteBar {
   }
 
   private _onFirst = 0;
-  private _onLast = SLOT_N - 1;
+  private _onLast = SLOT_N - 1; // re-derived by _refreshOnSpan over the live pool length
 
   /** Re-derive the span of slots still on the chamber; true when it moved. Contiguous by
    *  construction — x falls monotonically with the slot index and each boundary is one-sided — so a

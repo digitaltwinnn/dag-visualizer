@@ -252,6 +252,29 @@ export class LedgerModel {
   // js/ledger.js:115 (`_selectedSlot`), same -1 "nothing selected" sentinel.
   selectedSlot = -1;
 
+  /** Extra slots the trail holds BEYOND the visible depth, because the reader has gone back.
+   *
+   *  ⚠️ SLOT_N IS THE VISIBLE DEPTH, NOT THE CAPACITY — the two were one number and that was the
+   *  bug (user, 2026-09-14: selecting older rows "eventually clears the 3rd byterow since it's not
+   *  backfilled by more older rows"). The chamber shows SLOT_N rows and the rewind slides the trail
+   *  forward until the selected row sits at the lead — so a selection `k` back needs SLOT_N rows
+   *  BEHIND it, and the trail only ever held SLOT_N in total. Seven steps back left one row and a
+   *  void, because nothing extends the trail: `seedHistory` runs once and every later row arrives
+   *  from a live tick at the FRONT.
+   *
+   *  The reach grows on demand and never shrinks — the rows are already paid for, and a reader who
+   *  went back once usually goes back again ("next time if I then select #5 add 5 more to the
+   *  back"). It is bounded without a constant: the deepest selectable row is the oldest the buffer
+   *  retains, and `fillTrailTo` stops there rather than inventing rows (rule 10). Every fade still
+   *  reads SLOT_N, so a row beyond the visible depth simply sits past the horizon until the rewind
+   *  brings it forward — which is why nothing about the look had to change. */
+  private _reach = 0;
+
+  /** How many slots the trail is currently asked to hold. Sizes the scene's per-slot pools too. */
+  get trailCap(): number {
+    return SLOT_N + this._reach;
+  }
+
   // js/ledger.js:109 (`_emitted`) — per-CURRENT-tick "how much of this metagraph's count have we
   // already drawn" bookkeeping; cleared every new tick (js/ledger.js:525).
   private emitted = new Map<string, number>();
@@ -314,6 +337,48 @@ export class LedgerModel {
     }
   }
 
+  /** Append trail rows (and their lane blocks) at the BACK until the trail reaches `trailCap` or
+   *  the retained buffer runs out — the "add 3 more rows to the back" half of the reach.
+   *
+   *  Slot `s` is `s` ticks behind the live lead, so the row is `snaps[lead - s]`: the buffer is a
+   *  rolling window of consecutive global ordinals and the model's lead IS its newest entry. The
+   *  lead is LOOKED UP rather than assumed to be the last element, so a poll that arrives with the
+   *  model one tick behind appends the rows it actually has, not rows off by one.
+   *
+   *  It only ever grows the tail — existing slots keep their numbers, so a selected row's slot is
+   *  stable across a fill and the rewind's target does not move under it. */
+  private fillTrailTo(snaps: GlobalSnapshot[], getAnchor: (ts: string) => Anchor | null): void {
+    if (this.tickOrdinal == null || !snaps || snaps.length < 2) return;
+    let lead = snaps.length - 1;
+    if (snaps[lead].ordinal !== this.tickOrdinal) {
+      const i = snaps.findIndex((x) => x.ordinal === this.tickOrdinal);
+      if (i < 0) return; // the lead isn't in this buffer — nothing to count slots from
+      lead = i;
+    }
+    let deepest = 0;
+    for (const t of this.trail) if (t.slot > deepest) deepest = t.slot;
+    const want = Math.min(this.trailCap, lead); // `lead` IS how many ticks sit behind it
+    for (let s = deepest + 1; s <= want; s++) {
+      const snap = snaps[lead - s];
+      if (!snap) break;
+      this.trail.push({ ordinal: snap.ordinal, slot: s, ts: snap.timestamp });
+      const a = getAnchor ? getAnchor(snap.timestamp) : null;
+      const counts = a && a.metaCounts ? a.metaCounts : null;
+      for (let i = 0; i < LANE_IDS.length; i++) {
+        const id = LANE_IDS[i];
+        const nc = counts ? counts.get(id) || 0 : 0;
+        const lane = this.lane(id, i);
+        if (nc > 0) {
+          for (const tl of anchorTiles(nc)) {
+            lane.blocks.push({ slot: s, fade: slotFade(s), bright: 0, ox: tl.ox, oz: tl.oz, size: tl.size, filled: true, link: tl.link, ts: snap.timestamp, count: nc });
+          }
+        } else {
+          lane.blocks.push({ slot: s, fade: slotFade(s), bright: 0, ox: 0, oz: 0, size: 0.24, filled: false, link: false, ts: snap.timestamp, count: 0 });
+        }
+      }
+    }
+  }
+
   // js/ledger.js:572-577 (`_recomputeSelectedSlot`) verbatim. Maps the selected ordinal -> its
   // current slot (0 = the live centre; else find it in the trail; -1 = not selected/not found).
   private recomputeSelectedSlot(): void {
@@ -345,11 +410,11 @@ export class LedgerModel {
       if (this.tickOrdinal !== null) {
         for (const t of this.trail) t.slot += 1;
         this.trail.unshift({ ordinal: this.tickOrdinal, slot: 1, ts: this.tickTs ?? "" });
-        while (this.trail.length > SLOT_N) this.trail.pop();
+        while (this.trail.length > this.trailCap) this.trail.pop();
 
         for (const lane of this.lanes.values()) {
           for (const b of lane.blocks) b.slot += 1;
-          while (lane.blocks.length && lane.blocks[lane.blocks.length - 1].slot > SLOT_N) lane.blocks.pop();
+          while (lane.blocks.length && lane.blocks[lane.blocks.length - 1].slot > this.trailCap) lane.blocks.pop();
         }
       }
       this.emitted.clear();
@@ -376,12 +441,39 @@ export class LedgerModel {
       this.emitted.set(id, n);
     }
     this.recomputeSelectedSlot(); // slots just shifted on a new tick -> refresh which slot is selected
+    this.growReach(snaps, getAnchor);
+  }
+
+  /** The reach follows the reader: a selection `k` back wants SLOT_N rows behind it. Called after
+   *  the slot recompute, because that is what turns a selected ORDINAL into a depth.
+   *
+   *  ⚠️ DEPTH COMES FROM THE ORDINALS, NOT FROM THE SLOT. `selectedSlot` is resolved by FINDING the
+   *  ordinal in the trail, so a selection already beyond the reach answers −1 — and a reach that
+   *  only grew from a positive slot could never grow again, leaving the chamber permanently empty
+   *  behind that row. Found live (2026-09-14): stepping slowly filled correctly, stepping fast
+   *  enough to outrun the fill did not, and neither did letting live ticks push the pin out while
+   *  the reader read. Global ordinals are sequential and gapless, so `tick − selected` IS the
+   *  depth whether or not the row is currently held; it is bounded by the buffer below, because a
+   *  reach past what is retained would ask `fillTrailTo` for rows that do not exist (rule 10). */
+  private growReach(snaps: GlobalSnapshot[], getAnchor: (ts: string) => Anchor | null): void {
+    let depth = this.selectedSlot;
+    if (depth < 0 && this.selectedOrd != null && this.tickOrdinal != null && this.selectedOrd < this.tickOrdinal) {
+      depth = this.tickOrdinal - this.selectedOrd;
+    }
+    const retained = snaps && snaps.length ? snaps.length - 1 : 0;
+    if (depth > 0) this._reach = Math.max(this._reach, Math.min(depth, retained));
+    this.fillTrailTo(snaps, getAnchor);
+    // The row may only now exist — re-resolve, or the rewind spends a frame on a stale −1.
+    this.recomputeSelectedSlot();
   }
 
   // js/ledger.js:560-563 (`setSelected`) verbatim.
   setSelected(ordinal: number | null): void {
     this.selectedOrd = ordinal == null ? null : ordinal;
     this.recomputeSelectedSlot();
+    // The reach is raised HERE so a click is registered even between polls; the rows themselves
+    // arrive on the next `setData`, which is the only call that carries the buffer to fill from.
+    if (this.selectedSlot > 0 && this.selectedSlot > this._reach) this._reach = this.selectedSlot;
   }
 
   /** Ordinal → its current slot (0 = the live lead, else its trail slot, −1 = not visible).
