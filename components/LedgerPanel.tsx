@@ -136,6 +136,7 @@ function SnapRow<K extends string | number>({
   onClick,
   sub,
   mark,
+  lensOut,
   outset,
   nested,
   disclose,
@@ -157,6 +158,11 @@ function SnapRow<K extends string | number>({
   /** The committed network's anchor count in this tick, in its hue — absent = the network is
    *  not in this tick's story (and clicking would release the filter; user, 2026-08-07). */
   mark?: { hue: string; count: number } | null;
+  /** THE LENS STEPS A ROW BACK, it never removes it — see the tick list's own note. `opacity-45`
+   *  is the app's existing "present, but not your subject" level (the filter picker's 0-count
+   *  rows, hyper's 0-node networks, the vitals roster's unfiltered dots). Never applied to a
+   *  SELECTED row: a commit outranks a lens. */
+  lensOut?: boolean;
   /** TOP-LEVEL row (the tick rows, since the axis collapse made them the card's own first level):
    *  takes the right-edge contract's outset instead of a plain `w-full` — ExploreRows' ROW_OUTSET
    *  and ROW_NEST are the only two places allowed to own it. */
@@ -204,6 +210,7 @@ function SnapRow<K extends string | number>({
         // the header set the hue vars but no wash class, so it stayed uncolored). Its own
         // selection keeps the full mark.
         (selected || disclose?.holdsSel) && selectedRow(!!selected),
+        lensOut && !selected && !disclose?.holdsSel && "opacity-45",
         pair.paired && pair.className,
       )}
       // The selection follows the subject's identity (selection.tsx · selectionHue): `accent` is
@@ -437,17 +444,32 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const tickFilterCount = (d: GlobalSnapshot): number =>
     storyCount(filter, getAnchor(d.timestamp), snapshotExact[d.ordinal]) ?? 0;
   const [tickPage, setTickPage] = useState(1);
-  const orderedSnaps = [...snaps]
-    .reverse() // newest first, the log convention
-    .filter((d) => !filterNet || tickFilterCount(d) > 0);
+  // ⚠️ THE LENS DIMS, IT DOES NOT EDIT — the tick list is the BASE LEDGER'S CHAIN (user,
+  // 2026-09-14: "the snapshot explorer now sometimes shows few rows, sometimes several pages,
+  // depending on time/filter etc. This is confusing to a user; how can we keep it consistent?").
+  //
+  // It used to drop every tick the committed network sat out, which made the list's LENGTH — and
+  // therefore its page count — a function of the filter: 52 ticks over 4 pages unfiltered, 29 over
+  // 2 with USDC.dag committed, and a different pair for every network. The same window kept
+  // answering "how much is there?" differently depending on what you were looking through.
+  //
+  // Every global tick happened, whichever network you are looking through, so the list is now
+  // always the whole retained window and the filter is what it is everywhere else in this app: a
+  // LENS. A tick the network anchored into carries its count in the network's hue; one it sat out
+  // is stepped back and carries none. That is also what the tick CHART beside it has always done
+  // under a filter — "its own cadence, with empty ticks as honest gaps" — so the two finally agree,
+  // and the gaps are now readable as the network's rhythm instead of being silently closed up.
+  const orderedSnaps = [...snaps].reverse(); // newest first, the log convention
   const activeSnapOrd = snap?.data.ordinal ?? null;
   // ⚠️ PAGE 1 IS THE LIVE PAGE, and it is the only one that moves under the reader — the buffer
   // is a rolling window, so a deeper page drifts as ticks age out of it. That is the same
   // contract the raw layer's pager states, arrived at from the other end (it freezes `latest`
   // off page 1; here the window itself is what slides), so the words are the same: the live tip
   // is the mutable page.
+  // The page count is now the WINDOW's alone — it no longer moves when the filter does. It still
+  // grows as the retained window fills after a cold load, which is the one honest variable left.
   const pages = Math.max(1, Math.ceil(orderedSnaps.length / TICK_PAGE));
-  const page = Math.min(tickPage, pages); // a shrinking filter must not strand the reader
+  const page = Math.min(tickPage, pages); // a shrinking window must not strand the reader
   const pagedSnaps = orderedSnaps.slice((page - 1) * TICK_PAGE, page * TICK_PAGE);
   // ⚠️ A PAGE IN VIEW IS A PAGE IN FOCUS. Exact reads (the fee each row states) are fetched for
   // the live tick, the selected one and the backfill behind them — about one page's worth — so
@@ -630,6 +652,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
                 // everything the buffer has aged out. Computed only while the tick is OPEN — it is
                 // the disclosure's content, and building it for all 15 rows of a page was work
                 // nobody could see.
+                const tickCount = tickFilterCount(d);
                 const isOpen = openTick === d.ordinal;
                 const tickGroups = !isOpen ? EMPTY_GROUPS : groupByMeta(unionRows(rows, exactChannelRows, d.ordinal));
                 // The tick's uncataloged anchors: the exact read's authoritative COUNT, and the
@@ -663,7 +686,12 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
                         strip's bars run) AND discloses its contributors in the same click. */}
                     <SnapRow
                       outset
-                      mark={filterNet ? { hue: filterNet.hue, count: tickFilterCount(d) } : null}
+                      // The lens's two channels on a tick row: a COUNT in the network's hue where
+                      // it anchored, and a step back where it did not. No "0" mark — a zero in a
+                      // network's own colour reads as a reading about that network, when the
+                      // honest statement is simply that this tick is not part of its story.
+                      mark={filterNet && tickCount > 0 ? { hue: filterNet.hue, count: tickCount } : null}
+                      lensOut={!!filterNet && tickCount === 0}
                       label={d.ordinal.toLocaleString()}
                       // ⚠️ THE METRIC IS THE FEE, NOT THE SIZE (user, 2026-09-13: "instead of size
                       // in kb show the fees paid in DAG"). Both are exact reads off the same
