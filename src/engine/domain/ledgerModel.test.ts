@@ -497,3 +497,165 @@ describe("the trail's boundaries finish inside the glass", () => {
     expect(frontAt(FRONT_INK_X)).toBeCloseTo(0, 10);
   });
 });
+
+// ── THE TRAIL'S REACH (user, 2026-09-14: "if I go select the #3rd historic row which then moves to
+// the front add 3 rows to the back, next time if I then select #5 add 5 more to the back no?") ────
+//
+// The chamber shows SLOT_N rows. It used to HOLD exactly SLOT_N — seeded once from the retained
+// buffer and thereafter advanced only by live ticks — so selecting an older row, which rewinds the
+// trail until that row sits at the lead, left `k` empty slots at the back with nothing to fill
+// them. Seven steps back and the chamber was one row and a void.
+//
+// `trailCap` is the fix's whole shape: SLOT_N stays the VISIBLE depth (the fades, the horizon and
+// the entry stagger all keep reading it), and the capacity grows with how far back the reader has
+// actually gone. Growth is on demand and naturally bounded — the deepest selectable row is the
+// oldest in the retained buffer.
+describe("LedgerModel — the trail reaches behind a selected row", () => {
+  /** A buffer of `n` ticks, newest last, one anchor each so every row has a lane block. */
+  const buffer = (n: number) => Array.from({ length: n }, (_, i) => snap(100 + i, `T${100 + i}`, 1));
+  const feed = (model: LedgerModel, snaps: ReturnType<typeof buffer>) =>
+    model.setData(snaps, () => anchor({ [idA]: 1 }));
+
+  it("holds SLOT_N rows while nothing older is selected", () => {
+    const model = new LedgerModel();
+    feed(model, buffer(40));
+    expect(model.trailCap).toBe(SLOT_N);
+    expect(model.trail.length).toBe(SLOT_N);
+  });
+
+  it("selecting the 3rd row back adds 3 rows at the back", () => {
+    const model = new LedgerModel();
+    const snaps = buffer(40);
+    feed(model, snaps);
+    const third = model.trail.find((t) => t.slot === 3)!;
+    model.setSelected(third.ordinal);
+    feed(model, snaps);
+
+    expect(model.selectedSlot).toBe(3);
+    expect(model.trailCap).toBe(SLOT_N + 3);
+    // SLOT_N rows now sit BEHIND the selection — which is what the rewind brings into view.
+    const behind = model.trail.filter((t) => t.slot > 3).length;
+    expect(behind).toBe(SLOT_N);
+  });
+
+  it("selecting deeper again extends further — the reach follows the reader", () => {
+    const model = new LedgerModel();
+    const snaps = buffer(40);
+    feed(model, snaps);
+    for (const depth of [3, 5, 8]) {
+      const row = model.trail.find((t) => t.slot === depth)!;
+      model.setSelected(row.ordinal);
+      feed(model, snaps);
+      expect(model.selectedSlot).toBe(depth);
+      expect(model.trail.filter((t) => t.slot > depth).length).toBe(SLOT_N);
+    }
+  });
+
+  it("the appended rows are the REAL older ticks, in order, never invented", () => {
+    const model = new LedgerModel();
+    const snaps = buffer(40);
+    feed(model, snaps);
+    const row = model.trail.find((t) => t.slot === 4)!;
+    model.setSelected(row.ordinal);
+    feed(model, snaps);
+    const live = snaps[snaps.length - 1].ordinal;
+    for (const t of model.trail) expect(t.ordinal).toBe(live - t.slot);
+  });
+
+  it("stops at the oldest tick the buffer retains rather than inventing rows", () => {
+    const model = new LedgerModel();
+    const snaps = buffer(12); // only 12 ticks retained
+    feed(model, snaps);
+    const deepest = model.trail.reduce((a, t) => Math.max(a, t.slot), 0);
+    model.setSelected(model.trail.find((t) => t.slot === deepest)!.ordinal);
+    feed(model, snaps);
+    // asked for `deepest + SLOT_N`, but the buffer only holds 11 behind the live lead
+    expect(model.trail.length).toBe(snaps.length - 1);
+    for (const t of model.trail) expect(t.ordinal).toBeGreaterThanOrEqual(snaps[0].ordinal);
+  });
+
+  it("a lane gains blocks for every appended row, so the tiles are not a hole behind the bars", () => {
+    const model = new LedgerModel();
+    const snaps = buffer(40);
+    feed(model, snaps);
+    const row = model.trail.find((t) => t.slot === 5)!;
+    model.setSelected(row.ordinal);
+    feed(model, snaps);
+    const lane = model.lanes.get(idA)!;
+    const slots = new Set(lane.blocks.map((b) => b.slot));
+    for (let s = 1; s <= SLOT_N + 5; s++) expect(slots.has(s)).toBe(true);
+  });
+
+  // ⚠️ THE RECOVERY CASE, and the one the first cut of this fix missed (found live, 2026-09-14:
+  // the chamber filled correctly ten rows back and was empty again at fifteen). `selectedSlot` is
+  // resolved by FINDING the ordinal in the trail, so a selection that is already beyond the trail's
+  // reach answers −1 — and a reach that only grows from a positive slot can then never grow again.
+  // Stepping fast enough, or letting live ticks push the pin out while the reader reads, lands
+  // exactly there. Depth has to come from the ORDINALS, which are sequential on the global chain.
+  it("reaches a selection that is ALREADY beyond the trail — the slot is −1, the depth is not", () => {
+    const model = new LedgerModel();
+    const snaps = buffer(40);
+    feed(model, snaps);
+    const live = snaps[snaps.length - 1].ordinal;
+    model.setSelected(live - 20); // never in the 9-row trail: slot would resolve to −1
+    feed(model, snaps);
+
+    expect(model.selectedSlot).toBe(20);
+    expect(model.trail.filter((t) => t.slot > 20).length).toBe(SLOT_N);
+  });
+
+  it("does not chase a selection the buffer cannot reach", () => {
+    const model = new LedgerModel();
+    const snaps = buffer(15);
+    feed(model, snaps);
+    model.setSelected(snaps[0].ordinal - 500); // far older than anything retained
+    feed(model, snaps);
+    expect(model.trail.length).toBe(snaps.length - 1); // the buffer's depth, not the ask
+  });
+
+  // The contract the VIEW depends on: a click alone must not grow the capacity, because only
+  // setData knows what the buffer can actually supply. The view answers by re-entering setData
+  // with its stored inputs on a historic selection — without that, the rows arrived a tick late
+  // (~28s) or never, which is how the chamber kept emptying after the reach itself was correct.
+  it("a bare setSelected does not grow the capacity — only setData, which holds the buffer, does", () => {
+    const model = new LedgerModel();
+    const snaps = buffer(40);
+    feed(model, snaps);
+    expect(model.trailCap).toBe(SLOT_N);
+    model.setSelected(snaps[snaps.length - 1].ordinal - 6);
+    expect(model.trailCap).toBe(SLOT_N); // not yet — nothing has offered a buffer
+    feed(model, snaps);
+    expect(model.trailCap).toBe(SLOT_N + 6);
+  });
+
+  // ⚠️ A TICK THAT ANCHORED NOTHING STILL HAS TO FILL (review find, 2026-09-15). `setData` returns
+  // early when the tick carries no anchor record — a documented verbatim quirk of the js/ledger.js
+  // port — and the reach was added BELOW that return, so it inherited a skip it has no reason to
+  // share. Empty ticks are routine (the explorer shows runs of "0 anchors" on mainnet, and they
+  // are the norm on the test networks), and the immediate-fill re-entry `LedgerView.setSelected`
+  // makes lands on exactly this path: press a rail step on a quiet tick and nothing backfills.
+  it("fills the trail on a tick that anchored nothing", () => {
+    const model = new LedgerModel();
+    const snaps = buffer(40);
+    feed(model, snaps);
+    const row = model.trail.find((t) => t.slot === 6)!;
+    model.setSelected(row.ordinal);
+    // the quiet tick: no anchor record for any timestamp
+    model.setData(snaps, () => null);
+    expect(model.trailCap).toBe(SLOT_N + 6);
+    expect(model.trail.filter((t) => t.slot > 6).length).toBe(SLOT_N);
+  });
+
+  it("returning to the live lead keeps the reach — the rows are paid for, not re-fetched", () => {
+    const model = new LedgerModel();
+    const snaps = buffer(40);
+    feed(model, snaps);
+    const row = model.trail.find((t) => t.slot === 6)!;
+    model.setSelected(row.ordinal);
+    feed(model, snaps);
+    expect(model.trailCap).toBe(SLOT_N + 6);
+    model.setSelected(null);
+    feed(model, snaps);
+    expect(model.trailCap).toBe(SLOT_N + 6);
+  });
+});

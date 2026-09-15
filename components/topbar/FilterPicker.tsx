@@ -88,7 +88,10 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
         <span className="text-body text-foreground">All</span>
         {/* ONE count like every other chip (user, 2026-08-14): the node total. The metagraph
             count is the strip itself — its chips are countable right there. */}
-        <span className="text-label text-muted-foreground tabular-nums">{totalNodes}</span>
+        {/* Mono: a count is machine data (`/design`'s sans/mono split). These chips print the same node
+            counts the explorer rows below them print, so the two were reading in different faces in one
+            viewport (user, 2026-09-14). */}
+        <span className="font-mono text-label text-muted-foreground tabular-nums">{totalNodes}</span>
       </button>
       <span className="w-px self-stretch bg-foreground/25 my-1.5 mx-1" aria-hidden />
       {rows.map((m, i) => {
@@ -114,7 +117,7 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
               {/* The count column belongs to the WITH-NODES group alone (user, 2026-08-13): past
                   the divider every count is 0 by construction, so the divider carries that fact
                   once and the chips drop the noise. */}
-              {!off && <span className="text-label text-muted-foreground tabular-nums">{m.located ?? 0}</span>}
+              {!off && <span className="font-mono text-label text-muted-foreground tabular-nums">{m.located ?? 0}</span>}
             </button>
           </Fragment>
         );

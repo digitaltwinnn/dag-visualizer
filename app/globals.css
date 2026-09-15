@@ -276,6 +276,16 @@
   inset: 0;
   width: auto;
   height: auto;
+  /* ⚠️ DECORATION IS NEVER A HIT TARGET (found live, 2026-09-14: "not all of the items are
+     clickable in the cards"). Spanning the card is what lets the ink bend into the corners, and
+     it is also what makes this pseudo the whole card's hit surface — it is `position: absolute`
+     from the `.ig-panel::before` base rule, so it paints ABOVE the card's in-flow content. With
+     the default `pointer-events: auto` the dossier's schedule triggers and its Site link became
+     unreachable, while the close mark, the copy buttons and the pager strip kept working because
+     each has a positioned box of its own. That "some things click and some don't" is the whole
+     signature; a dead card would have been noticed the same day the ring landed.
+     It costs the signal nothing: the hover that lights it is `.sig-left:hover`, on the HOST. */
+  pointer-events: none;
   background: none;
   border: 2px solid transparent;
   border-radius: inherit;

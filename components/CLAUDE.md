@@ -1031,8 +1031,8 @@ composition (the doubled caption, the three-orientation chevron). The engine-anc
 
 ### CSS traps
 
-Each has cost real debugging time. Traps 3, 6 and 8 are executable — `components/cssTrapBoundary.test.ts`
-for the first two, `components/breakpointArmBoundary.test.ts` for the last; the rest are yours to remember.
+Each has cost real debugging time. Traps 3, 6, 8 and 10 are executable — `components/cssTrapBoundary.test.ts`
+for 3, 6 and 10, `components/breakpointArmBoundary.test.ts` for 8; the rest are yours to remember.
 
 1. **Recipes that must beat element utilities stay UNLAYERED.** Tailwind v4 orders `theme, base,
    components, utilities`, so a rule in `@layer components` loses to a utility **at ANY specificity** —
@@ -1079,6 +1079,13 @@ for the first two, `components/breakpointArmBoundary.test.ts` for the last; the 
    default paints a chunky bright bar that reads as a browser part laid over the panel. It's a class
    rather than a token because its consumers are reusable primitives (the filter strip's phone overflow,
    the raw layer's lane pane), and it styles **both axes**, because a JSON tree scrolls sideways too.
+10. **A decorative pseudo that COVERS its host must declare `pointer-events: none`.** An absolutely
+   positioned `::before`/`::after` at `inset: 0` paints above the host's in-flow content, so with the
+   default `pointer-events` it becomes the hit target for the whole box. Cost real time on 2026-09-14:
+   the card signal edge grew from a 2px bar into a full-box border ring (so the ink could bend into the
+   corners) and silently took every click in the rail cards — and the tell was that only SOME controls
+   died, because a descendant with a positioned box of its own still wins. `pointer-events` inherits, so
+   an already-inert host (`.edge-pulse`) needs no declaration of its own.
 
 **Settle any cascade or specificity question by reading the compiled CSS in the browser**, not by
 reasoning about it.

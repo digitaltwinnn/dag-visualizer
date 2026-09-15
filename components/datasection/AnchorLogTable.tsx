@@ -485,6 +485,13 @@ export default function AnchorLogTable() {
     }
   };
 
+  /** The one answer for "this view cannot reach that date". Said in terms of what to DO, never in
+   *  terms of the retained window (user, 2026-09-14: "perhaps has to do with the active window, but
+   *  to a user that does not matter and makes no sense"). The window is this table's own
+   *  implementation, and a reader who asked for a date in August is owed the route to August, not a
+   *  description of the buffer that failed to hold it. */
+  const PICK_A_CHAIN = "pick a network in the top-bar filter to search its history by date";
+
   /** AGE — the FROM bound is the destination; `to` only bounds which rows the landing marks. */
   const seekAge = async () => {
     const fromMs = dayStartMs(qFrom);
@@ -493,16 +500,35 @@ export default function AnchorLogTable() {
     if (!histNet) {
       const toMs = dayEndMs(qTo);
       const idx = allRows.findIndex((r) => tsInRange(r.ts, fromMs, toMs));
-      if (idx < 0) { setMarked(null); setJumpMiss("nothing in that range inside the window"); return; }
-      setPageState(Math.floor(idx / PAGE) + 1);
-      setMarked(markOf(allRows[idx]));
+      if (idx >= 0) {
+        setPageState(Math.floor(idx / PAGE) + 1);
+        setMarked(markOf(allRows[idx]));
+        return;
+      }
+      setMarked(null);
+      // ⚠️ TWO MISSES, NOT ONE — they are different facts and only one of them is the reader's to
+      // fix. If the range reaches back past the oldest row here, the date is simply out of this
+      // view's reach and the answer is the route that does reach it. If it lies INSIDE what is
+      // loaded and still matched nothing, the search genuinely found no snapshots, which is an
+      // answer rather than a failure. The old single line ("nothing in that range inside the
+      // window") conflated them and explained itself with the mechanism.
+      const oldest = allRows.reduce<number | null>((acc, r) => {
+        const ms = Date.parse(r.ts);
+        return Number.isFinite(ms) && (acc == null || ms < acc) ? ms : acc;
+      }, null);
+      setJumpMiss(oldest != null && fromMs >= oldest ? "no snapshots in that range" : PICK_A_CHAIN);
       return;
     }
     if (!latest) { setJumpMiss("still reading the chain"); return; }
     setSeeking(true);
     try {
       const hit = await seekOrdinalByTime(fromMs, latest, loadPage);
-      if (hit == null) { setJumpMiss("could not locate that date in the chain"); return; }
+      // ⚠️ A MISS HERE IS NOW GENUINELY EXCEPTIONAL, and the copy says what to do about it rather
+      // than pronouncing on the chain. The walk's budget covers bisection's own worst case for the
+      // chain it was given (see chainSeek's probeBudget), so running out means a pathological run,
+      // not a chain that lacks the date — and the probe cache survives the press, so a second one
+      // resumes from a narrower bracket instead of starting over.
+      if (hit == null) { setJumpMiss("could not reach that date — press search again"); return; }
       landOn(hit);
     } catch {
       setJumpMiss("the chain read failed — try again");
@@ -529,6 +555,12 @@ export default function AnchorLogTable() {
     if (logSeek.metaId) {
       setSearchMeta(logSeek.metaId);
       pendingSeek.current = true;
+    } else {
+      // ⚠️ AN ARRIVAL THAT CANNOT RUN MUST SAY SO. A global chart's range names no chain, so the
+      // dates land prefilled and the seek waits — and with nothing on screen to explain it, the
+      // ladder's own door read as a button that did nothing. It answers with the route, in the
+      // same words the manual search uses (user, 2026-09-14).
+      setJumpMiss(PICK_A_CHAIN);
     }
     setLogSeek(null);
   }, [logSeek, setLogSeek]);

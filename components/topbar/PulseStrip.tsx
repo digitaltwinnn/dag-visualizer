@@ -3,7 +3,7 @@
 import { pollHealthRows, type PollHealth } from "@/src/data/api";
 import { pollStatusOf, type PollStatus } from "@/src/data/pollStatus";
 import { relativeAge } from "@/src/util/relativeAge";
-import { BandCard } from "@/components/VitalsBand";
+import { BandCard } from "@/components/vitals/bandParts";
 import { useNowTick } from "@/components/useNowTick";
 import { cn } from "@/lib/utils";
 import { BAR_EASE } from "@/components/RollSwap";

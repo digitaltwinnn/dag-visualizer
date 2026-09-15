@@ -51,7 +51,7 @@ Twelve invariants. Six are executable — `npm test` fails when they break.
 
 | # | Rule, in one line | The test that defines it |
 |---|---|---|
-| 1 | **Engine layering.** `domain/` = pure logic, `scene/` = Three adapters, `Engine.ts` = the only store bridge. | `src/engine/layerBoundaries.test.ts` |
+| 1 | **Engine layering.** `domain/` = pure logic, `scene/` = Three adapters, the **engine layer** = the only store bridge (a named allow-list, not one file). | `src/engine/layerBoundaries.test.ts` |
 | 2 | **One selection write path.** Every interactive surface expresses intent through the decision table and applies it through the one executor. | `components/selectionBoundary.test.ts` |
 | 3 | **One colour source.** CSS tokens are canonical; no raw hex in `scene/` or `components/` outside the allowlist. | `src/engine/noHardcodedColors.test.ts` |
 | 4 | **Pure-module export coverage.** Every value export of a `domain/` or `src/data/` module is referenced by its sibling test. | `src/engine/domainExportCoverage.test.ts`, `src/data/dataExportCoverage.test.ts` |
@@ -207,7 +207,15 @@ The layering rule and its exact import boundaries are `src/engine/layerBoundarie
 **`domain/` is pure logic and data** — may import THREE's math classes, `config` and data types; not
 `scene/`, addons, react, or store values. **`scene/` holds the Three adapters** — they own their
 meshes and scratch objects, read domain and write GPU, and never touch the store or react.
-**`Engine.ts` is the only layer that touches the store.**
+**The ENGINE LAYER is the only layer that touches the store** — `src/engine/*.ts`, and only the
+files named in `layerBoundaries.test.ts`'s `STORE_BRIDGE`. It is a LAYER, not a file (user,
+2026-09-15: "the rule should not force things to be in one file, the rule is a concept/principal
+and code refactoring should be able to be done within those bounds"). Worded as `Engine.ts` it
+made a 2000-line module the price of the invariant; what actually matters is that the scene is
+driven by plain data and one layer answers to the store. Splitting that layer is ordinary work —
+silently growing a SECOND bridge is not, which is why the allow-list is explicit and why a stale
+entry fails too. `import type` is free everywhere: the `Mode` string-union is a shape, not a
+channel.
 
 Two disciplines the tests only partly backstop: **every instanced slot is written or zero-scaled every
 frame**, so a stale slot from a previous view can never linger; and **simulations emit through a ring

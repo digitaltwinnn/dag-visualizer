@@ -5,6 +5,7 @@ import {
   compositionToggleActions,
   countryToggleActions,
   metaSnapSelectActions,
+  filterToggleActions,
   nodeSelectActions,
   snapshotSelectActions,
 } from "@/src/engine/domain/pickActions";
@@ -379,21 +380,88 @@ describe("childStep — the first-child DOWN step", () => {
     expect(step.label).toBe(deA.label);
     expect(step.actions).toEqual(nodeSelectActions(deA.pick, { mode: "geo", currentFilter: "all", deselect: false }));
   });
-  it("the global tick opens its first exact-read channel row (the anchor log's first-row rule)", () => {
+  // ⚠️ THE TICK'S CHILD IS A NETWORK (user, 2026-09-15 — the lane runs tick → metagraph →
+  // metagraph snapshot → node). Under the old lane ∨ skipped the dossier and landed two levels
+  // down, dragging the filter along as a SIDE EFFECT of opening a snapshot, which is what made
+  // "go finer" read as "and also filter". Here the filter IS the step, one level, and the tick
+  // card already offers exactly this list.
+  it("the global tick opens the network that anchored most into it", () => {
     const rows = [
       { metaId: "dor", ordinal: 900, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
+      { metaId: "dor", ordinal: 901, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
+      { metaId: "ded", ordinal: 500, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
     ] as unknown as SiblingState["exactRows"];
     const s = base({ mode: "ledger", snap: snapPick, exactRows: rows });
     const step = childStep("snap", s)!;
-    expect(step.label).toContain("DOR");
+    expect(step.key).toBe("dor");
+    expect(step.actions).toEqual(filterToggleActions("dor", "all"));
+  });
+
+  // ⚠️ THE BUSIEST LISTED ONE, not "the busiest, and give up if it is unlisted" (review find,
+  // 2026-09-15). An unlisted channel names no filter, so it cannot be the step — but a tick LED by
+  // one still has committable networks under it, and dimming ∨ there would hide them behind an
+  // anchor the reader cannot act on anyway.
+  it("skips an unlisted leader and opens the busiest network that CAN be committed", () => {
+    const rows = [
+      { metaId: "DAG-not-in-catalog", ordinal: 1, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
+      { metaId: "DAG-not-in-catalog", ordinal: 2, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
+      { metaId: "DAG-not-in-catalog", ordinal: 3, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
+      { metaId: "ded", ordinal: 500, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
+    ] as unknown as SiblingState["exactRows"];
+    const step = childStep("snap", base({ mode: "ledger", snap: snapPick, exactRows: rows }))!;
+    expect(step.key).toBe("ded");
+    expect(step.actions).toEqual(filterToggleActions("ded", "all"));
+  });
+
+  it("an UNLISTED channel names no filter, so the tick has no child to open", () => {
+    const rows = [
+      { metaId: "DAG-not-in-catalog", ordinal: 7, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
+    ] as unknown as SiblingState["exactRows"];
+    expect(childStep("snap", base({ mode: "ledger", snap: snapPick, exactRows: rows }))).toBeNull();
+  });
+
+  // …and the dossier's own child is that network's snapshot in the shown tick — the rung now
+  // directly beneath it.
+  it("the dossier opens the committed network's snapshot in the shown tick", () => {
+    const rows = [
+      { metaId: "ded", ordinal: 500, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
+    ] as unknown as SiblingState["exactRows"];
+    const s = base({ mode: "ledger", filter: "ded", snap: snapPick, exactRows: rows });
+    const step = childStep("context", s)!;
+    expect(step.label).toContain("500");
     expect(step.actions).toEqual(
       metaSnapSelectActions(
-        { metaId: "dor", ordinal: 900, hash: "", globalOrdinal: 42, ts: "T" },
+        { metaId: "ded", ordinal: 500, hash: "", globalOrdinal: 42, ts: "T" },
         snapPick,
-        { filter: "all", metaSnap: null },
+        { filter: "ded", metaSnap: null },
       ),
     );
   });
+
+  it("a network that did not anchor into this tick has nothing to open", () => {
+    const rows = [
+      { metaId: "dor", ordinal: 900, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
+    ] as unknown as SiblingState["exactRows"];
+    expect(childStep("context", base({ mode: "ledger", filter: "ded", snap: snapPick, exactRows: rows }))).toBeNull();
+  });
+
+  // The scope rule, restated for the new lane: a ∨ may commit the rung directly below it, and
+  // the network IS that rung under the tick — so the tick may name a filter. Every step BELOW
+  // the dossier must not, because from there the network is an ancestor.
+  it("no ∨ below the dossier moves the filter", () => {
+    const rows = [
+      { metaId: "ded", ordinal: 500, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
+    ] as unknown as SiblingState["exactRows"];
+    for (const slot of ["context", "metaSnap", "node"] as const) {
+      const step = childStep(slot, base({ mode: "ledger", filter: "ded", snap: snapPick, exactRows: rows, inspect: deA.pick }));
+      if (!step) continue;
+      for (const a of step.actions) {
+        if (a.kind !== "filter") continue;
+        expect(a.id).toBe("ded"); // a restatement of what is already committed, never a change
+      }
+    }
+  });
+
   it("an unread tick and the leaf rungs answer null", () => {
     expect(childStep("snap", base({ mode: "ledger", snap: snapPick, exactRows: [] }))).toBeNull();
     expect(childStep("node", base({ inspect: deA.pick }))).toBeNull();
@@ -402,15 +470,18 @@ describe("childStep — the first-child DOWN step", () => {
   // A filter is a LENS (the explorer's previewOnly rule): the tick's ∨ opens the committed
   // story's own first row, never a cross-network row whose builder would filter-first and
   // silently re-commit the network — and with no row for the story in this tick, nothing.
-  it("under a committed filter the tick's ∨ stays inside the lens", () => {
+  // The 2026-09-11 review find — ∨ from the tick must never release the committed story by
+  // re-filtering to whichever network leads the exact read — is now answered by the LANE rather
+  // than by a guard: with a filter committed the tick's child is the dossier, which IS that
+  // network, so it is already populated and the pager re-boxes it without reaching childStep.
+  // The concern itself moved one rung down, to `context`, and is asserted there: the dossier
+  // opens its OWN network's row, and answers null when that network did not anchor here.
+  it("under a committed filter the tick has no child step — the dossier below it is the lens", () => {
     const rows = [
       { metaId: "dor", ordinal: 900 },
       { metaId: "ded", ordinal: 55 },
     ] as unknown as SiblingState["exactRows"];
-    const s = base({ mode: "ledger", filter: "ded", snap: snapPick, exactRows: rows });
-    const step = childStep("snap", s)!;
-    expect(step.key).toBe("ded:55");
-    expect(step.actions.some((a) => a.kind === "filter")).toBe(false); // never re-commits the network
+    expect(childStep("snap", base({ mode: "ledger", filter: "ded", snap: snapPick, exactRows: rows }))).toBeNull();
     expect(childStep("snap", base({ mode: "ledger", filter: "paca", snap: snapPick, exactRows: rows }))).toBeNull();
   });
 });

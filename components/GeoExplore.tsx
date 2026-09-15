@@ -255,7 +255,8 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
                       }}
                     />
                   </span>
-                  <span className="flex-none w-[26px] text-right text-body tabular-nums font-semibold">{c.count}</span>
+                  {/* Mono: a count is machine data (`/design`'s sans/mono split) — see HyperExplore's note. */}
+                  <span className="flex-none w-[26px] text-right font-mono text-body tabular-nums font-semibold">{c.count}</span>
                   {/* Trailing slot: the drilled country shows the shared selection ✓ (same mark
                     as the node rows / filter picker — one selection language, user); closed rows
                     keep the expand-affordance chevron — hidden on a mouse (revealed on row hover/
@@ -363,7 +364,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
                                   {ch.isp}
                                 </span>
                               )}
-                              <span className="ml-auto flex-none tabular-nums text-body font-semibold">{ch.rows.length}</span>
+                              <span className="ml-auto flex-none font-mono tabular-nums text-body font-semibold">{ch.rows.length}</span>
                             </DisclosureRow>
 
                             <DisclosurePanel className={ROW_NEST_DEEP}>

@@ -87,7 +87,25 @@ import type { SceneView } from "./SceneView";
 import { joinBloom, inMarkPass } from "../SceneContext";
 import type { TuneSchema } from "../../tune";
 
-const META_TRAIL_MAX = 1500;
+/** The lane-tile instance budget.
+ *
+ *  ⚠️ IT IS SIZED PER SLOT, SO IT SCALES WITH THE TRAIL'S CAPACITY (review find, 2026-09-15). 1500
+ *  was sized when the trail held exactly SLOT_N slots; since the reach landed it holds `trailCap`,
+ *  which grows with how far back the reader has gone and tops out at the retained buffer — about
+ *  61 slots. The budget did not follow, and the overflow `break` below is LANE-MAJOR: it truncates
+ *  whole lanes rather than far rows, so a busy first lane could starve the later ones (the unlisted
+ *  lane last of all) while the starved tiles were still on screen.
+ *
+ *  The arithmetic: a slot costs one placeholder per lane (13 today) plus one tile per anchor in
+ *  that tick — `anchorTiles` is uncapped, so a 150-anchor burst is 150 tiles for that lane-slot.
+ *  Measured load is ~16 anchors/tick (g.anchors ÷ g.ticks), i.e. ~29 per slot, so 61 slots ≈ 1,770;
+ *  a sustained busy stretch at ~50 per slot ≈ 3,050. 6000 keeps roughly the same headroom over a
+ *  busy load that 1500 gave the 9-slot trail, which is the property that actually mattered.
+ *
+ *  Cost is memory and two EVENT-TIME sweeps (`_resolveSelTile`, `_syncHoverTile`), not per-frame
+ *  work — the draw loop walks `lane.blocks`, which the model bounds. The truncation MODE is
+ *  unchanged from before the reach; only its reachability is restored to what the design assumed. */
+const META_TRAIL_MAX = 6000;
 
 /** The floors' X footprint lives in `domain/ledgerLayout` (the trail's front boundary is derived
  *  from that rim, so the domain has to own it). What stays here is the label X — the gutter label
@@ -766,11 +784,17 @@ export class LedgerView implements SceneView {
     // frame, which is the one place trail motion is allowed to live.
     if (prevLead != null && this.model.tickOrdinal !== prevLead) this._advanced = true;
 
-    for (let s = 0; s < SLOT_N; s++) this._slotSnap[s] = null;
+    // ⚠️ THE POOLS FOLLOW THE TRAIL'S CAPACITY, NOT THE VISIBLE DEPTH (user, 2026-09-14). SLOT_N is
+    // how many rows the chamber SHOWS; `model.trailCap` is how many it HOLDS, which grows once the
+    // reader selects an older row — the rewind then slides those extra rows into view, so they must
+    // exist as bars, specs and picks or the chamber empties behind the selection. Grown here, at
+    // tick rate, never per frame.
+    this._ensureSlotCapacity(this.model.trailCap);
+    for (let s = 0; s < this._slotSnap.length; s++) this._slotSnap[s] = null;
     if (this.model.tickOrdinal != null)
       this._slotSnap[0] = this._byOrd.get(this.model.tickOrdinal) ?? null;
     for (const tr of this.model.trail)
-      if (tr.slot >= 0 && tr.slot < SLOT_N)
+      if (tr.slot >= 0 && tr.slot < this._slotSnap.length)
         this._slotSnap[tr.slot] = this._byOrd.get(tr.ordinal) ?? null;
 
     this._recomputeHoverSlot();
@@ -813,6 +837,22 @@ export class LedgerView implements SceneView {
 
   setSelected(ordinal: number | null) {
     this.model.setSelected(ordinal);
+    // ⚠️ THE BACKFILL CANNOT WAIT FOR THE NEXT TICK (found live, 2026-09-15 — the trail reached
+    // correctly in the model's own tests and the chamber still emptied). Selecting a historic row
+    // raises what the trail must hold, but only `setData` carries the buffer those rows come FROM,
+    // and the next one arrives with the next global snapshot — ~28s away, and further still if the
+    // reader steps again first. So the rewind slid the trail forward immediately while the rows
+    // behind it were half a minute late or never came: measured, `setData` had not run once across
+    // six steps back, the bar pool was still nine slots deep, and exactly three rows survived.
+    //
+    // Re-entering with the stored inputs is this file's established idiom for "the model needs to
+    // re-run against data it already has" (see the colour rebuild above); `_advanced` stays false
+    // because the tick ordinal has not moved, so the rewind's calm-jump contract is untouched.
+    // Gated on a HISTORIC selection: following the live lead needs nothing, and this does a tick's
+    // worth of slot rebuilding, which is fine at click rate and wasteful on every hover-commit.
+    if (ordinal != null && ordinal !== this.model.tickOrdinal && this._lastSnaps && this._lastGetAnchor) {
+      this.setData(this._lastSnaps, this._lastGetAnchor);
+    }
     this._syncRibbonRows();
   }
 
@@ -930,9 +970,21 @@ export class LedgerView implements SceneView {
     return snap.ordinal;
   }
 
+  /** Grow the per-slot arrays and the bar's mesh pool to `n`. Never shrinks: the rows are already
+   *  paid for, and a reader who has gone back once usually goes back again. The entry-stagger
+   *  arrays deliberately stay SLOT_N long — that animation belongs to the VISIBLE depth, and every
+   *  read of them is already guarded `slot < SLOT_N ? … : default`. */
+  private _ensureSlotCapacity(n: number): void {
+    while (this._specs.length < n) {
+      this._specs.push(makeBarSpec());
+      this._slotSnap.push(null);
+    }
+    this._bar.ensureSlots(n);
+  }
+
   private _rebuildAllSlots(): void {
     const liveOrd = this._liveOrd();
-    for (let s = 0; s < SLOT_N; s++) {
+    for (let s = 0; s < this._slotSnap.length; s++) {
       const snap = this._slotSnap[s];
       // A slot with no tick at all renders NOTHING — the seam is reserved for a tick that HAPPENED
       // (ByteBar leaves a never-populated slot's meshes and outline hidden from construction).
@@ -1006,7 +1058,7 @@ export class LedgerView implements SceneView {
     // does not exist: exactly the dangling-line defect the SEED was drawn to answer. It is named
     // the moment its read lands and it becomes an ordinary measured row.
     const liveOrd = this._liveOrd();
-    for (let s = 0; s < SLOT_N; s++) {
+    for (let s = 0; s < this._slotSnap.length; s++) {
       const snap = this._slotSnap[s];
       if (!snap || snap.ordinal === liveOrd) continue;
       seen.add(snap.ordinal);
@@ -1067,13 +1119,13 @@ export class LedgerView implements SceneView {
     // Separate rows (2026-08-07): with a snapshot pinned, a hover needs its own sheet — the
     // active row keeps its ribbons regardless of hover, and the preview never goes missing.
     const hot = this.model.selectedSlot;
-    if (hot > 0 && hot < SLOT_N && this._slotSnap[hot]) {
+    if (hot > 0 && hot < this._slotSnap.length && this._slotSnap[hot]) {
       this._ribbonTopSlot = hot;
       this._ribbons.setRow(1, hot, this._specs[hot], this._laneZOf, this._topHalfOf);
       this._ribbons.setRowFade(1, 1);
     } else this._ribbons.clearRow(1);
     const hov = this._hoverSlot;
-    if (hov > 0 && hov < SLOT_N && hov !== hot && this._slotSnap[hov]) {
+    if (hov > 0 && hov < this._slotSnap.length && hov !== hot && this._slotSnap[hov]) {
       this._ribbonTopSlot = hov;
       this._ribbons.setRow(2, hov, this._specs[hov], this._laneZOf, this._topHalfOf);
       // The hover ribbon IS the group tier — a hovered row is a preview of what a click would pin,
@@ -1086,7 +1138,7 @@ export class LedgerView implements SceneView {
     if (this._graceOrd != null && this._graceT > 0) {
       for (const tr of this.model.trail) if (tr.ordinal === this._graceOrd) { g = tr.slot; break; }
     }
-    if (g > 0 && g < SLOT_N && g !== hot && this._slotSnap[g] && this._specs[g].measured) {
+    if (g > 0 && g < this._slotSnap.length && g !== hot && this._slotSnap[g] && this._specs[g].measured) {
       this._ribbonTopSlot = g;
       this._ribbons.setRow(3, g, this._specs[g], this._laneZOf, this._topHalfOf);
     } else {
@@ -1105,7 +1157,7 @@ export class LedgerView implements SceneView {
     this._threadSpecs.length = 0;
     for (const tr of this.model.trail) {
       const slot = tr.slot;
-      if (slot < 0 || slot >= SLOT_N) continue;
+      if (slot < 0 || slot >= this._slotSnap.length) continue;
       // A row that already carries a SHEET says the relation in full — no thread under it.
       if (slot === 0 || slot === this.model.selectedSlot || slot === this._hoverSlot || slot === this._graceSlot) continue;
       if (!this._slotSnap[slot] || !this._specs[slot].measured) continue;

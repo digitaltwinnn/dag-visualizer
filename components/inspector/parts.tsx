@@ -215,7 +215,13 @@ export function IdentityDot({ hue, className }: { hue: string; className?: strin
 /** The Yes/No FACT mark (user, 2026-08-16 — "yes has a checkmark, so for no add a x"): Yes
  *  takes the check, No an ✕, BOTH at soft tints — the status pill's own discipline ("even the
  *  green stays un-dominant"); a raw `--success` glyph read stronger than anything else on the
- *  card. One component so the two Yes/No rows (Full archive, Delegated staking) can't drift. */
+ *  card. One component so the two Yes/No rows (Full archive, Delegated staking) can't drift.
+ *
+ *  ⚠️ THE MARK CARRIES THE EMPHASIS; THE WORD STAYS IN THE VALUE REGISTER (user, 2026-09-14:
+ *  "'full archive' shouldn't be bold because all other values aren't either"). Both rows used to
+ *  bold their Yes/No — and the n/a beside it — which made two facts shout on a card where every
+ *  other value, the measured "none" included, is plain. The check and the ✕ already say which
+ *  answer this is, at the soft tints above; a bold word on top of them is the same claim twice. */
 export function BoolMark({ on }: { on: boolean }) {
   return on ? (
     <Check aria-hidden className="size-3" style={{ color: "color-mix(in oklch, var(--success) 72%, transparent)" }} />
@@ -287,7 +293,7 @@ export function StatusBreakdown({ states }: { states: (string | null | undefined
               since a bucket word opens a row. */}
           <span className="text-body text-foreground">{cap(it.label)}</span>
           <BarCell count={it.count} max={Math.max(...items.map((x) => x.count))} hue={it.color} />
-          <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{it.count}</span>
+          <CountCell>{it.count}</CountCell>
         </Fragment>
       ))}
     </div>
@@ -301,6 +307,36 @@ export function StatusBreakdown({ states }: { states: (string | null | undefined
 // edge is constant per table and every bar grows from one origin; widths are on the table's
 // own max, the caller's business, like MicroBars' row max. A zero draws nothing (rule 10);
 // real counts keep a small visible floor.
+/** The breakdown tables' COUNT column — one home for what was three copies of the same class
+ *  string (this file's two tables plus the archival group's two cells), which is how they came to
+ *  disagree with the band in the first place.
+ *
+ *  ⚠️ MONO, BECAUSE A COUNT IS MACHINE DATA. `/design` states the split in one line — a
+ *  proportional sans for everything you read, "a monospace for machine data: hashes, counts,
+ *  codes, $DAG amounts, snapshot numbers" — and these columns had `tabular-nums` without the face,
+ *  so the digits lined up in a typeface that was never meant to carry them. The tell was that the
+ *  vitals band renders THE SAME NUMBERS through MicroBars in `font-mono text-micro tabular-nums`:
+ *  with a metagraph committed, the band's NODE COMPOSITION and this card's BY NODE COMPOSITION sit
+ *  on screen together saying Hybrid 137 / Consensus 8 / Currency 4 in two different faces (user,
+ *  2026-09-14: "the font appears wrong for this type of info"). */
+export function CountCell({ children }: { children: React.ReactNode }) {
+  return <span className="font-mono text-body text-foreground tabular-nums min-w-[1.5em] text-right">{children}</span>;
+}
+
+/** …and the same table's TAG column, for a tag whose content is a quantity (the kept-snapshot
+ *  reaches: 6.9M, 809k, 90k). The `full` tag beside it is a WORD and keeps the reading face —
+ *  the split is by what the tag says, not by which column it sits in. */
+export function CountTag({ children, title }: { children: React.ReactNode; title?: string }) {
+  return (
+    <span
+      title={title}
+      className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px font-mono text-micro tabular-nums leading-none text-muted-foreground whitespace-nowrap"
+    >
+      {children}
+    </span>
+  );
+}
+
 export function BarCell({ count, max, hue }: { count: number; max: number; hue?: string }) {
   return (
     <span aria-hidden className="flex items-center justify-self-end w-14 h-[5px]">
@@ -377,7 +413,7 @@ export function CompositionRows({ nodes }: { nodes: NodeInfo[] }) {
             <RoleChips codes={r.codes} />
           </span>
           <BarCell count={r.count} max={Math.max(...rows.map((x) => x.count))} />
-          <span className="text-body text-foreground tabular-nums min-w-[1.5em] text-right">{r.count}</span>
+          <CountCell>{r.count}</CountCell>
         </Fragment>
       ))}
     </div>

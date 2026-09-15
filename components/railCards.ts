@@ -5,7 +5,7 @@ import type { Mode } from "@/src/store/store";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
 // LADDERS is plain DATA (the domain focus-ladder rung tables) — importing it keeps this module
 // data-only; CohortSel rides along type-only (the store mirrors the same import).
-import { LADDERS, type FocusLevel, type CohortSel, type CompositionSel } from "@/src/engine/domain/focusLadder";
+import { type FocusLevel, type CohortSel, type CompositionSel } from "@/src/engine/domain/focusLadder";
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 // The RAIL MANIFEST — ONE source of truth for "which cards does each rail host, in what order".
@@ -26,11 +26,14 @@ import { LADDERS, type FocusLevel, type CohortSel, type CompositionSel } from "@
 export type RailCardKind = "about" | "tool" | "context" | "metaSnap" | "country" | "cohort" | "composition" | "node" | "snap";
 
 // ── The rail LADDER lane (Inspector's descent spine, variant-A redesign 2026-07-19) ──────────
-// Which facts-rail slots are FOCUS-LADDER rungs in this view, in DISPLAY order (coarsest→finest,
-// top-down — the reverse of the domain rung tables, which walk finest→coarsest). Derived from
-// `focusLadder.LADDERS` so the spine can never disagree with the camera walk / deselect
-// stepping: a future rung lands on the ladder lane automatically (and
-// `railLadderBoundary.test.ts` already forces it a card slot). Flat views have no ladder.
+// Which facts-rail slot stands for each FOCUS-LADDER rung. The lane's ORDER lives in
+// `DISPLAY_LANE` below; this table is the rung↔slot mapping both directions read.
+//
+// ⚠️ The lane used to be DERIVED from `focusLadder.LADDERS` through this table, which is what kept
+// the spine from disagreeing with the camera walk. It is a table now (see DISPLAY_LANE), so that
+// agreement is ASSERTED instead — `railLadderBoundary.test.ts` requires every rung's slot to be in
+// its view's lane, and the lane restricted to rung slots to run in the reverse of the rung order.
+// A new rung therefore fails a test rather than silently missing the spine.
 const LADDER_SLOT: Partial<Record<FocusLevel, string>> = {
   network: "context",
   country: "country",
@@ -49,23 +52,44 @@ export function ladderLevelOfSlot(id: string): FocusLevel | null {
   return null;
 }
 
+/** The FACTS-RAIL DISPLAY LANE per view, coarsest→finest, top-down.
+ *
+ *  ⚠️ A TABLE, NOT A DERIVATION (2026-09-15). This was computed from `LADDERS` — reversed, mapped
+ *  through `LADDER_SLOT` — and then patched for the ledger with two `indexOf` splices. The
+ *  derivation looked like it was keeping the lane honest, and for hyper and geo it was; for the
+ *  ledger it bought nothing, because BOTH entries it produced were repositioned by the splices.
+ *  What it actually cost was legibility: the lane's reasoning — which card leads this view and why
+ *  — lived in a comment attached to a mutation instead of in something you can read as data, next
+ *  to the rung table it answers to.
+ *
+ *  The contract the derivation used to enforce for free is now ASSERTED instead, in
+ *  `railLadderBoundary.test.ts`: every committable rung's slot appears in its view's lane, and the
+ *  lane restricted to rung slots runs in the reverse of the rung order. A lane that drifts from the
+ *  camera walk fails there rather than in a screenshot.
+ *
+ *  Members with no rung are card slots only (the ledger's two snapshot slots) — display hierarchy,
+ *  no camera pose, no deselect step. `ladderLevelOfSlot` is the inverse read and stays the one
+ *  place a slot can name a rung. */
+const DISPLAY_LANE: Partial<Record<Mode, readonly string[]>> = {
+  hyper: ["context", "composition", "node"],
+  geo: ["context", "country", "cohort", "node"],
+  // ⚠️ THE TICK LEADS (user, 2026-09-15). The lane is a containment claim — the slab abuts
+  // committed cards into one body, and adjacency is what says what holds what — so the question is
+  // which claim is least wrong. Neither order is literally true: a tick does not contain a network,
+  // and a network certainly does not contain a global tick, which is what the old lane asserted by
+  // putting the dossier on top. What the tick DOES contain is that network's anchor, and the tick
+  // card already lists exactly that (DOR 48 · DED 29 · …), so reading down the pile now follows the
+  // card's own next step instead of contradicting it.
+  //
+  // It also seats a POPULATED card at the head in the one view whose coarsest subject needs no
+  // commit — the tick follows live by itself — so the lane opens speaking rather than inviting.
+  // (The chamber's storeys are unchanged: geometry still shows ribbons falling INTO the global
+  // floor; the rail states the reading order.)
+  ledger: ["snap", "context", "metaSnap", "node"],
+};
+
 export function ladderSlotIds(mode: Mode): string[] {
-  if (mode !== "hyper" && mode !== "geo" && mode !== "ledger") return [];
-  const ids = [...LADDERS[mode]]
-    .reverse()
-    .flatMap((r) => (LADDER_SLOT[r.level] ? [LADDER_SLOT[r.level] as string] : []));
-  if (mode === "ledger") {
-    // The ledger's SNAPSHOT CHAIN rides the display lane between the network and the node —
-    // GLOBAL SNAPSHOT ABOVE the metagraph snapshot it anchors (user, 2026-08-08, with the slab):
-    // once the lane's committed cards abut as ONE body, adjacency reads as CONTAINMENT, so the
-    // pair must run coarse→fine like every other rung — the global tick CARRIES the metagraph
-    // snapshot, not the other way around. (The chamber's storeys stay as they are: geometry
-    // shows ribbons falling INTO the global floor; the rail states the containment.) Display
-    // hierarchy only — both stay card slots with no focus-ladder rung (the camera/deselect walk
-    // is unchanged).
-    ids.splice(ids.indexOf("node"), 0, "snap", "metaSnap");
-  }
-  return ids;
+  return [...(DISPLAY_LANE[mode] ?? [])];
 }
 
 /** The selection fields the ladder derivation needs — the manifest state minus the ghost-copy
@@ -357,8 +381,8 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     present: !!s.snap,
     hint: snapHint(s),
   };
-  // snap BEFORE metaSnap (2026-08-08, with the slab): the manifest order drives the tablet/phone
-  // flat stack + tray icons, and it must agree with the desktop lane — the global tick contains
-  // the metagraph snapshot it anchors, so the pair runs coarse→fine like every other rung.
-  return [context, country, cohort, composition, snap, metaSnap, node];
+  // The manifest order drives the tablet/phone flat stack + tray icons and MUST agree with the
+  // desktop lane above: tick → dossier → the tick's own metagraph snapshot → node.
+  return [snap, context, country, cohort, composition, metaSnap, node];
 }
+

@@ -28,6 +28,11 @@ import { cn } from "@/lib/utils";
 // ⚠️ THE LABEL CARRIES THE MEANING, NOT A PLACEHOLDER. The row this replaces put its hints inside
 // the boxes, where they read as a first row of data ("the hint looks ugly"); here each field is
 // named beside it, and the global-snapshot box holds no hint at all, per the user.
+/** The "no chain chosen" row's value. Radix reserves the empty string for the placeholder, so the
+ *  unscoped state needs a sentinel of its own; it is mapped back to `null` at the boundary below,
+ *  and nothing outside this file ever sees it. */
+const ANY_NET = "__any";
+
 export default function LogSearchBar({
   networks,
   metaId,
@@ -49,7 +54,7 @@ export default function LogSearchBar({
   /** The chains that can be searched, in the order the explorer lists them. */
   networks: { id: string; label: string }[];
   metaId: string | null;
-  setMetaId: (id: string) => void;
+  setMetaId: (id: string | null) => void;
   /** True while a network is committed: the table IS that chain, so the picker states it rather
    *  than offering a choice this surface could not run (see AnchorLogTable's `searchNet`). */
   metaLocked: boolean;
@@ -126,7 +131,7 @@ export default function LogSearchBar({
             metagraph coloured bullet with the selected snapshot number in the field"). The two
             halves are JOINED — squared inner corners, no gap — because they are one criterion, and
             a gap between them would read as two. */}
-        <Select value={metaId ?? undefined} onValueChange={setMetaId} disabled={metaLocked}>
+        <Select value={metaId ?? ANY_NET} onValueChange={(v) => setMetaId(v === ANY_NET ? null : v)} disabled={metaLocked}>
           <SelectTrigger
             size="sm"
             aria-label="Which metagraph's chain"
@@ -138,7 +143,36 @@ export default function LogSearchBar({
           >
             <SelectValue placeholder="network" />
           </SelectTrigger>
-          <SelectContent className="rounded-btn">
+          {/* ⚠️ POPPER, NOT THE PRIMITIVE'S `item-aligned` DEFAULT (user, 2026-09-14: "its dropdown
+              is on top of the control instead of underneath"). Item-aligned positioning lifts the
+              list so the CHOSEN row lands over the trigger — a sensible default for a long settings
+              menu you reopen to change one value, and the wrong one here: this trigger sits inside a
+              bordered criteria box directly under the toolbar, so the list covered the very field it
+              belongs to and the reader lost sight of what they were picking FOR. Measured before the
+              change: trigger top 135px, list top 10px — the list opened ABOVE and across it.
+              `align="start"` because the trigger is the left end of a joined control; centring the
+              list under a 116px trigger would hang it off both sides of that seam. */}
+          <SelectContent className="rounded-btn" position="popper" align="start" sideOffset={4}>
+            {/* ⚠️ THE WAY BACK (user, 2026-09-14: "the metagraph filter doesn't support 'all'").
+                The picker could be entered but never left: once a chain was chosen every later
+                search stayed scoped to it, with no row to undo the choice and no reason on screen
+                that it was still in force. "All" is the top bar filter's own word for the same
+                idea, so the vocabulary is learned once.
+                It RESTORES the unscoped state; it does not promise an all-chain ordinal search.
+                Ordinals are per-chain — DOR's 27,813,700 and DED's are unrelated snapshots of
+                unrelated ledgers — so a number typed with All standing still routes to the
+                "pick which metagraph's chain…" teaching, which is the honest answer and the
+                reason this picker exists at all. The title says so before the press. */}
+            <SelectItem
+              value={ANY_NET}
+              className="text-micro uppercase tracking-caps"
+              title="No chain chosen. A date search reaches any of them; a snapshot number still needs one, since ordinals count per chain."
+            >
+              <span className="flex items-center gap-1.5">
+                <span aria-hidden className="size-2 flex-none rounded-full border border-muted-foreground/60" />
+                All
+              </span>
+            </SelectItem>
             {networks.map((n) => (
               <SelectItem key={n.id} value={n.id} className="text-micro uppercase tracking-caps">
                 <span className="flex items-center gap-1.5">
