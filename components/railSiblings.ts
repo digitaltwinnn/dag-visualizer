@@ -438,8 +438,15 @@ const firstAnchoringNetwork = (s: SiblingState): SiblingStep | null => {
   if (!s.snap || !s.exactRows?.length || s.filter !== "all") return null;
   const counts = new Map<string, number>();
   for (const r of s.exactRows) counts.set(r.metaId, (counts.get(r.metaId) ?? 0) + 1);
-  const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
-  const meta = top ? s.metaList.find((m) => m.id === top[0]) : undefined;
+  // ⚠️ THE BUSIEST COMMITTABLE ONE, not simply the busiest (review find, 2026-09-15). An unlisted
+  // channel names no filter, so it can never be the step — but a tick LED by one still has listed
+  // networks under it, and taking only the top row meant the whole control dimmed behind an anchor
+  // the reader could not have acted on anyway. Sorted busiest-first, then the first that the filter
+  // vocabulary knows; all-unlisted still answers null, which is the honest dim.
+  const meta = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([id]) => s.metaList.find((m) => m.id === id))
+    .find((m) => m != null);
   return meta ? { key: meta.id, label: meta.name, actions: filterToggleActions(meta.id, s.filter) } : null;
 };
 /** ledger: the committed network's OWN snapshot in the shown tick — never the tick's first row,

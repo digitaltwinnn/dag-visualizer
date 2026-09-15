@@ -397,6 +397,22 @@ describe("childStep — the first-child DOWN step", () => {
     expect(step.actions).toEqual(filterToggleActions("dor", "all"));
   });
 
+  // ⚠️ THE BUSIEST LISTED ONE, not "the busiest, and give up if it is unlisted" (review find,
+  // 2026-09-15). An unlisted channel names no filter, so it cannot be the step — but a tick LED by
+  // one still has committable networks under it, and dimming ∨ there would hide them behind an
+  // anchor the reader cannot act on anyway.
+  it("skips an unlisted leader and opens the busiest network that CAN be committed", () => {
+    const rows = [
+      { metaId: "DAG-not-in-catalog", ordinal: 1, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
+      { metaId: "DAG-not-in-catalog", ordinal: 2, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
+      { metaId: "DAG-not-in-catalog", ordinal: 3, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
+      { metaId: "ded", ordinal: 500, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
+    ] as unknown as SiblingState["exactRows"];
+    const step = childStep("snap", base({ mode: "ledger", snap: snapPick, exactRows: rows }))!;
+    expect(step.key).toBe("ded");
+    expect(step.actions).toEqual(filterToggleActions("ded", "all"));
+  });
+
   it("an UNLISTED channel names no filter, so the tick has no child to open", () => {
     const rows = [
       { metaId: "DAG-not-in-catalog", ordinal: 7, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
