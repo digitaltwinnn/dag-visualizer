@@ -350,6 +350,22 @@ export class ByteBar {
   }
 
   private _entryFade: Float32Array | null = null;
+
+  /** The view-entry ramp's value for a slot — 1 (fully arrived) when the ramp is parked OR when the
+   *  slot sits beyond it.
+   *
+   *  ⚠️ THE RAMP IS SLOT_N LONG; THE POOL IS NOT (review find, 2026-09-15). `ensureSlots` grows the
+   *  pool with the trail's reach, and the entry stagger deliberately stays the VISIBLE depth — it
+   *  is a choreography of the nine rows you can see, and its start times are keyed to SLOT_N. But
+   *  three reads indexed the ramp by raw slot, so once a reader had gone back far enough and then
+   *  left and re-entered the view (`beginEntry` re-arms it), every slot ≥ 9 read `undefined` out of
+   *  the Float32Array. That is NaN in the opacity easing below — and because the easing is `+=`,
+   *  NaN is ABSORBING: those bands never come back for the life of the pool. The symptom would have
+   *  been the chamber empty behind the selection, i.e. exactly the defect this reach was built to
+   *  fix, returning by a different door. */
+  private _entryFadeAt(slot: number): number {
+    return this._entryFade?.[slot] ?? 1;
+  }
   private _graceSlot = -1;
 
   /** The tick-handoff grace row (LedgerView drives): its bands keep IDENTITY hue while the
@@ -405,7 +421,7 @@ export class ByteBar {
     // snapshot landed on the plane"): the drop is the scene's CLOSING beat, playing AFTER the
     // transition settles, so the transition gate can't see it. While its ramp still fades this
     // slot, the row is literally mid-landing. LedgerView parks the ramp at null when settled.
-    if (this._entryFade && (this._entryFade[slot] ?? 0) < 0.999) return false;
+    if (this._entryFade && this._entryFadeAt(slot) < 0.999) return false;
     return s.forming || (s.grow >= 1 && s.rise >= 1);
   }
 
@@ -432,7 +448,7 @@ export class ByteBar {
       // and skipping the front dissolve is what left forming blocks hanging off the glass under a
       // filtered follow (see `frontAt`).
       if (s.forming) {
-        const fade0 = horizonAt(x) * frontAt(x) * (this._entryFade ? this._entryFade[si] : 1);
+        const fade0 = horizonAt(x) * frontAt(x) * this._entryFadeAt(si);
         s.mats[0].opacity = inkPresence(s.mute ? 0 : SEED_STILL_OP, this._paper) * fade0 * this._alpha;
         s.mats[0].color.setHex(this._neutral);
         continue;
@@ -504,7 +520,7 @@ export class ByteBar {
         // weight, and flooring a dissolve would stop a row ever leaving the chamber.
         const emph = inkPresence(snapBright(rest, offNet, focus, anyFocus && !rowFocus, mine), this._paper, rest);
         const t = (this._paper ? barInk + (1 - barInk) * emph : emph)
-          * fade * front * this._alpha * (this._entryFade ? this._entryFade[si] : 1);
+          * fade * front * this._alpha * this._entryFadeAt(si);
         s.mats[i].opacity += (t - s.mats[i].opacity) * k;
         s.mats[i].color.setHex(hot || hov || onNet ? s.colors[i] : this._neutral);
       }

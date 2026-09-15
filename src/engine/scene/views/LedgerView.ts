@@ -87,7 +87,25 @@ import type { SceneView } from "./SceneView";
 import { joinBloom, inMarkPass } from "../SceneContext";
 import type { TuneSchema } from "../../tune";
 
-const META_TRAIL_MAX = 1500;
+/** The lane-tile instance budget.
+ *
+ *  ⚠️ IT IS SIZED PER SLOT, SO IT SCALES WITH THE TRAIL'S CAPACITY (review find, 2026-09-15). 1500
+ *  was sized when the trail held exactly SLOT_N slots; since the reach landed it holds `trailCap`,
+ *  which grows with how far back the reader has gone and tops out at the retained buffer — about
+ *  61 slots. The budget did not follow, and the overflow `break` below is LANE-MAJOR: it truncates
+ *  whole lanes rather than far rows, so a busy first lane could starve the later ones (the unlisted
+ *  lane last of all) while the starved tiles were still on screen.
+ *
+ *  The arithmetic: a slot costs one placeholder per lane (13 today) plus one tile per anchor in
+ *  that tick — `anchorTiles` is uncapped, so a 150-anchor burst is 150 tiles for that lane-slot.
+ *  Measured load is ~16 anchors/tick (g.anchors ÷ g.ticks), i.e. ~29 per slot, so 61 slots ≈ 1,770;
+ *  a sustained busy stretch at ~50 per slot ≈ 3,050. 6000 keeps roughly the same headroom over a
+ *  busy load that 1500 gave the 9-slot trail, which is the property that actually mattered.
+ *
+ *  Cost is memory and two EVENT-TIME sweeps (`_resolveSelTile`, `_syncHoverTile`), not per-frame
+ *  work — the draw loop walks `lane.blocks`, which the model bounds. The truncation MODE is
+ *  unchanged from before the reach; only its reachability is restored to what the design assumed. */
+const META_TRAIL_MAX = 6000;
 
 /** The floors' X footprint lives in `domain/ledgerLayout` (the trail's front boundary is derived
  *  from that rim, so the domain has to own it). What stays here is the label X — the gutter label
