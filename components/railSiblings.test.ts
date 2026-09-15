@@ -5,6 +5,7 @@ import {
   compositionToggleActions,
   countryToggleActions,
   metaSnapSelectActions,
+  metaSnapArrivalActions,
   nodeSelectActions,
   snapshotSelectActions,
 } from "@/src/engine/domain/pickActions";
@@ -386,13 +387,38 @@ describe("childStep — the first-child DOWN step", () => {
     const s = base({ mode: "ledger", snap: snapPick, exactRows: rows });
     const step = childStep("snap", s)!;
     expect(step.label).toContain("DOR");
+    // ⚠️ AT "ALL" IT COMMITS THE ROW, NOT A NETWORK (user, 2026-09-15: going finer "requires a
+    // forced decision to filter on a metagraph"). The arrival-shaped builder is the one whose
+    // stated contract is "no gesture named a network"; the click-shaped one filter-firsts, which
+    // turned one press of ∨ into a lens over the whole app chosen by whichever network happened
+    // to lead the exact read.
     expect(step.actions).toEqual(
-      metaSnapSelectActions(
-        { metaId: "dor", ordinal: 900, hash: "", globalOrdinal: 42, ts: "T" },
-        snapPick,
-        { filter: "all", metaSnap: null },
-      ),
+      metaSnapArrivalActions({ metaId: "dor", ordinal: 900, hash: "", globalOrdinal: 42, ts: "T" }, snapPick),
     );
+  });
+
+  // The rule stated once, over every rung that has a child: a DIRECTION may commit a finer
+  // subject and must never commit a coarser one. Only the ledger's tick could break it — the
+  // other child steps are already inside their committed scope — but asserting it over the whole
+  // table is what stops the next rung from re-learning it.
+  it("a child step never commits a coarser rung — no ∨ moves the filter", () => {
+    const rows = [
+      { metaId: "dor", ordinal: 900, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
+    ] as unknown as SiblingState["exactRows"];
+    const states: SiblingState[] = [
+      base({ mode: "ledger", snap: snapPick, exactRows: rows }),
+      base({ mode: "ledger", filter: "ded", snap: snapPick, exactRows: rows }),
+    ];
+    for (const s of states) {
+      const step = childStep("snap", s);
+      if (!step) continue;
+      for (const a of step.actions) {
+        if (a.kind !== "filter") continue;
+        // A filter action is only allowed when it names the network ALREADY committed — that is
+        // a no-op restatement, not a scope change the reader did not ask for.
+        expect(a.id).toBe(s.filter);
+      }
+    }
   });
   it("an unread tick and the leaf rungs answer null", () => {
     expect(childStep("snap", base({ mode: "ledger", snap: snapPick, exactRows: [] }))).toBeNull();

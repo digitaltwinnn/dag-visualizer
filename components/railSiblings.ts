@@ -38,6 +38,7 @@ import {
   countryToggleActions,
   filterToggleActions,
   metaSnapSelectActions,
+  metaSnapArrivalActions,
   nodeSelectActions,
   sameCohort,
   sameMetaSnap,
@@ -482,7 +483,23 @@ export function childStep(slot: RailCardKind, s: SiblingState): SiblingStep | nu
       return {
         key: `${r.metaId}:${r.ordinal}`,
         label: `${who} ${r.ordinal > 0 ? r.ordinal.toLocaleString() : "undecoded"}`,
-        actions: metaSnapSelectActions(sel, s.snap, { filter: s.filter, metaSnap: s.metaSnap }),
+        // ⚠️ AND AT "ALL" IT MUST NOT COMMIT A NETWORK EITHER (user, 2026-09-15: "going up or down
+        // requires a forced decision to filter on a metagraph"). The note above guards the FILTERED
+        // case against releasing a committed story; the unfiltered one has the same defect and the
+        // opposite tell — there is no story to release, only one to INVENT. `metaSnapSelectActions`
+        // filter-firsts, so ∨ from the tick silently committed whichever network happened to lead
+        // the exact read, turning "show me one level finer" into "and also filter the whole app on
+        // DOR". The reader pressed a direction, not a name.
+        //
+        // `metaSnapArrivalActions` is the builder that already exists for exactly this, with
+        // exactly this reason written on it ("no gesture named a network") — the raw layer's own
+        // arrival commit. Under a committed filter the row IS the committed network, so naming it
+        // again changes nothing and the click-shaped builder stays: the guard is about scope, not
+        // about which function is nicer.
+        actions:
+          s.filter === "all"
+            ? metaSnapArrivalActions(sel, s.snap)
+            : metaSnapSelectActions(sel, s.snap, { filter: s.filter, metaSnap: s.metaSnap }),
       };
     }
 
