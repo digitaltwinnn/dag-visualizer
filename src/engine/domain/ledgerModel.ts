@@ -24,6 +24,13 @@
 // that advances every slot but arrives with no anchor data yet, `_selectedSlot` is stale until the
 // next call that does carry anchor data. Kept verbatim below rather than "fixed" (the observable
 // behaviour must match js/ledger.js exactly since Task 13 will diff against it).
+//
+// ⚠️ THE TRAIL'S REACH IS EXEMPT FROM THAT QUIRK, deliberately (2026-09-15). It is this codebase's
+// own behaviour, not the port's, and a quiet tick skipping the backfill is a live defect rather
+// than a fidelity question — so `growReach` runs on BOTH arms of that guard. The fidelity argument
+// is in any case spent: js/ledger.js is no longer in the tree and Task 13 shipped, so there is
+// nothing left to diff against. `_selectedSlot` itself still follows the quirk on the anchor-ful
+// path; only the reach crosses it.
 
 import { METAGRAPHS } from "@/src/net/current";
 import { ledgerSite, lanePlaneHalf, BAR_D, FLOOR_BACK_X, FLOOR_FRONT_X, LEAD_X } from "./ledgerLayout";
@@ -430,7 +437,19 @@ export class LedgerModel {
     // `touched` is the ms the anchor count last GREW; quiet for LEAD_SETTLE_MS = settled.
     this.leadForming = !!a && Date.now() - a.touched < LEAD_SETTLE_MS;
 
-    if (!a || !a.metaCounts) { this.leadForming = false; return; } // see file-header DEVIATION note — verbatim quirk
+    if (!a || !a.metaCounts) {
+      this.leadForming = false;
+      // ⚠️ THE REACH DOES NOT INHERIT THE QUIRK (review find, 2026-09-15). The early return below is
+      // the documented js/ledger.js deviation, and the reach was added AFTER it — so a tick that
+      // anchored nothing skipped the backfill entirely. Empty ticks are routine on mainnet and the
+      // norm on the test networks, and the immediate-fill re-entry `LedgerView.setSelected` makes
+      // lands here whenever the shown tick happens to be quiet: press a rail step and nothing
+      // arrives. The quirk is about `_selectedSlot` staleness in a PORT that no longer has a source
+      // to diff against (js/ledger.js is gone, Task 13 shipped); the trail's capacity is this
+      // codebase's own behaviour and answers to correctness instead.
+      this.growReach(snaps, getAnchor);
+      return;
+    }
 
     for (const [id, n] of a.metaCounts) {
       const prev = this.emitted.get(id) || 0;

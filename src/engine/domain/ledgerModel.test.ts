@@ -628,6 +628,24 @@ describe("LedgerModel — the trail reaches behind a selected row", () => {
     expect(model.trailCap).toBe(SLOT_N + 6);
   });
 
+  // ⚠️ A TICK THAT ANCHORED NOTHING STILL HAS TO FILL (review find, 2026-09-15). `setData` returns
+  // early when the tick carries no anchor record — a documented verbatim quirk of the js/ledger.js
+  // port — and the reach was added BELOW that return, so it inherited a skip it has no reason to
+  // share. Empty ticks are routine (the explorer shows runs of "0 anchors" on mainnet, and they
+  // are the norm on the test networks), and the immediate-fill re-entry `LedgerView.setSelected`
+  // makes lands on exactly this path: press a rail step on a quiet tick and nothing backfills.
+  it("fills the trail on a tick that anchored nothing", () => {
+    const model = new LedgerModel();
+    const snaps = buffer(40);
+    feed(model, snaps);
+    const row = model.trail.find((t) => t.slot === 6)!;
+    model.setSelected(row.ordinal);
+    // the quiet tick: no anchor record for any timestamp
+    model.setData(snaps, () => null);
+    expect(model.trailCap).toBe(SLOT_N + 6);
+    expect(model.trail.filter((t) => t.slot > 6).length).toBe(SLOT_N);
+  });
+
   it("returning to the live lead keeps the reach — the rows are paid for, not re-fetched", () => {
     const model = new LedgerModel();
     const snaps = buffer(40);
