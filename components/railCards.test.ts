@@ -59,15 +59,15 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
   it("the DAG filter → Context dossier populated", () => {
     expect(presentKinds(detailsCards(details({ filter: "dag" })))).toEqual(["context"]);
   });
-  it("slots come in ONE fixed order (context, country, cohort, composition, snap, metaSnap, node) regardless of selection", () => {
-    // snap before metaSnap (2026-08-08, with the slab): the manifest agrees with the display
-    // lane, where adjacency now reads as containment — the global tick carries the metagraph
-    // snapshot, so the pair runs coarse→fine like every other rung.
+  it("slots come in ONE fixed order (snap, context, country, cohort, composition, metaSnap, node)", () => {
+    // The manifest agrees with the display lane: the ledger reads tick → dossier → that tick's
+    // metagraph snapshot → node (user, 2026-09-15). This order also drives the phone flat stack
+    // and the tray icons, so the two can never disagree.
     const ids = detailsCards(details({ filter: "dor", inspect: nodePick, snap: snapPick })).map((c) => c.id);
-    expect(ids).toEqual(["context", "country", "cohort", "composition", "snap", "metaSnap", "node"]);
+    expect(ids).toEqual(["snap", "context", "country", "cohort", "composition", "metaSnap", "node"]);
   });
-  it("ledger ghosts: context + snapshot + metaSnap + node invites (nodes pick in the chamber too)", () => {
-    expect(ghostIds(detailsCards(details({})))).toEqual(["context", "snap", "metaSnap", "node"]);
+  it("ledger ghosts: snapshot + context + metaSnap + node invites (nodes pick in the chamber too)", () => {
+    expect(ghostIds(detailsCards(details({})))).toEqual(["snap", "context", "metaSnap", "node"]);
   });
   it("hyper ghosts: context + composition + node (the snapshot slot is ledger-scoped, spec 2026-08-01)", () => {
     expect(ghostIds(detailsCards(details({ mode: "hyper" })))).toEqual(["context", "composition", "node"]);
@@ -169,7 +169,12 @@ describe("ladderSlotIds — the descent-spine lane (display order = reversed run
     // the slab): once the lane's committed cards abut as ONE body, adjacency reads as
     // CONTAINMENT, so the pair runs coarse→fine like every other rung — the tick carries the
     // metagraph snapshot. Card slots, not focus rungs.
-    expect(ladderSlotIds("ledger")).toEqual(["context", "snap", "metaSnap", "node"]);
+    // Ledger: the TICK LEADS (user, 2026-09-15) — tick → metagraph → that tick's metagraph
+    // snapshot → node. The lane is a containment claim and neither order is literally true, but
+    // a tick at least contains the network's ANCHOR, and its card already lists exactly that;
+    // the old lane asserted that a network contains a global tick. It also opens with a card
+    // that speaks, since the tick follows live without any commit. Card slots, not focus rungs.
+    expect(ladderSlotIds("ledger")).toEqual(["snap", "context", "metaSnap", "node"]);
   });
   it("flat views have no ladder", () => {
     expect(ladderSlotIds("soon")).toEqual([]);
@@ -320,47 +325,27 @@ describe("ghost hints — the copy rule", () => {
   });
 });
 
-// ── A GHOST NEVER LEADS A SPEAKING PILE (user, 2026-09-15) ───────────────────────────────────
-// A ghost invites a NEXT step; above a live subject it instead claims a missing ancestor. The
-// Snapshots chamber is the one view whose coarsest card is populated without a commit — the live
-// tick follows by itself — so "METAGRAPH · pick one in the top-bar filter" sat at the top of a
-// pile that was already speaking, reading as though the tick had lost its parent. It never had
-// one: a metagraph is not a global tick's parent, it is the LENS.
-describe("leading ghosts stand down once the pile speaks", () => {
-  it("the ledger at 'all' with a live tick leads with the snapshot, not a metagraph ghost", () => {
+// ── THE LEDGER LANE OPENS ON A CARD THAT SPEAKS (user, 2026-09-15) ──────────────────────────
+// The reorder is what fixes the leading ghost, structurally: the tick needs no commit to be
+// populated, so putting it at the head means the pile never opens by inviting. An earlier cut
+// suppressed the leading ghost instead; it was retired here rather than kept, because a second
+// mechanism for a problem the order already solves is what convention 8 forbids.
+describe("the ledger lane leads with the tick", () => {
+  it("at 'all' with a live tick, the head card is populated and no ghost sits above it", () => {
     const cards = detailsCards(details({ mode: "ledger", filter: "all", snap: snapPick }));
-    expect(ghostIds(cards)).not.toContain("context");
-    // the lane's first card that says anything is the tick itself
     const lane = ladderSlotIds("ledger");
-    const speaking = lane.filter((id) => {
-      const c = cards.find((x) => x.id === id)!;
-      return c.present || c.hint != null;
-    });
-    expect(speaking[0]).toBe("snap");
+    expect(lane[0]).toBe("snap");
+    expect(cards.find((c) => c.id === "snap")!.present).toBe(true);
   });
 
-  it("with nothing populated the ghosts remain — they ARE the teaching surface", () => {
-    for (const mode of ["hyper", "geo", "ledger"] as const) {
-      const cards = detailsCards(details({ mode, filter: "all" }));
-      expect(ghostIds(cards).length, `${mode} keeps its invitations`).toBeGreaterThan(0);
-      expect(ghostIds(cards)[0], `${mode} still invites at the top`).toBe(ladderSlotIds(mode)[0]);
-    }
+  it("the dossier sits UNDER the tick, where the tick's own anchor list points", () => {
+    const lane = ladderSlotIds("ledger");
+    expect(lane.indexOf("context")).toBeGreaterThan(lane.indexOf("snap"));
+    expect(lane.indexOf("metaSnap")).toBeGreaterThan(lane.indexOf("context"));
   });
 
-  it("a committed filter puts the dossier back at the top, populated", () => {
-    const cards = detailsCards(details({ mode: "ledger", filter: "ded", snap: snapPick }));
-    expect(cards.find((c) => c.id === "context")!.present).toBe(true);
-    expect(ladderSlotIds("ledger")[0]).toBe("context");
-  });
-
-  it("TRAILING ghosts are untouched — a trailing ghost is the next gesture", () => {
-    const cards = detailsCards(details({ mode: "ledger", filter: "all", snap: snapPick }));
-    expect(ghostIds(cards)).toContain("node");
-  });
-
-  it("an INTERIOR ghost is untouched — that is the parked hole question, not this rule", () => {
-    // snap populated, metaSnap empty, node populated: the hole sits BETWEEN speaking cards.
-    const cards = detailsCards(details({ mode: "ledger", filter: "all", snap: snapPick, inspect: nodePick }));
-    expect(ghostIds(cards)).toContain("metaSnap");
+  it("hyper and geo are untouched — their coarsest subject still needs a commit", () => {
+    expect(ladderSlotIds("hyper")[0]).toBe("context");
+    expect(ladderSlotIds("geo")[0]).toBe("context");
   });
 });

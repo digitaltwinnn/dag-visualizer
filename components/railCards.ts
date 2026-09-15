@@ -55,15 +55,25 @@ export function ladderSlotIds(mode: Mode): string[] {
     .reverse()
     .flatMap((r) => (LADDER_SLOT[r.level] ? [LADDER_SLOT[r.level] as string] : []));
   if (mode === "ledger") {
-    // The ledger's SNAPSHOT CHAIN rides the display lane between the network and the node —
-    // GLOBAL SNAPSHOT ABOVE the metagraph snapshot it anchors (user, 2026-08-08, with the slab):
-    // once the lane's committed cards abut as ONE body, adjacency reads as CONTAINMENT, so the
-    // pair must run coarse→fine like every other rung — the global tick CARRIES the metagraph
-    // snapshot, not the other way around. (The chamber's storeys stay as they are: geometry
-    // shows ribbons falling INTO the global floor; the rail states the containment.) Display
-    // hierarchy only — both stay card slots with no focus-ladder rung (the camera/deselect walk
-    // is unchanged).
-    ids.splice(ids.indexOf("node"), 0, "snap", "metaSnap");
+    // The ledger's chain runs GLOBAL SNAPSHOT → METAGRAPH → METAGRAPH SNAPSHOT → NODE
+    // (user, 2026-09-15). The tick LEADS, and the dossier sits under it.
+    //
+    // ⚠️ THE LANE IS A CONTAINMENT CLAIM, so the question is which claim is least wrong — the
+    // slab abuts committed cards into one body and adjacency is what says what holds what.
+    // Neither order is literally true here: a tick does not contain a network, and a network
+    // certainly does not contain a global tick, which is what the old lane asserted by putting
+    // the dossier on top. What the tick DOES contain is that network's anchor — and the tick
+    // card already lists exactly that (DOR 48 · DED 29 · …), so reading down the pile now
+    // follows the card's own next step instead of contradicting it.
+    //
+    // It also puts a POPULATED card at the head in the one view whose coarsest subject needs no
+    // commit: the tick follows live by itself, so the lane opens speaking rather than inviting.
+    // (The chamber's storeys are unchanged — geometry still shows ribbons falling INTO the
+    // global floor; the rail states the reading order.) Display hierarchy only: snap and
+    // metaSnap remain card slots with no focus-ladder rung, so the camera walk and the deselect
+    // stepping are untouched.
+    ids.splice(ids.indexOf("context"), 0, "snap");
+    ids.splice(ids.indexOf("node"), 0, "metaSnap");
   }
   return ids;
 }
@@ -357,47 +367,8 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     present: !!s.snap,
     hint: snapHint(s),
   };
-  // snap BEFORE metaSnap (2026-08-08, with the slab): the manifest order drives the tablet/phone
-  // flat stack + tray icons, and it must agree with the desktop lane — the global tick contains
-  // the metagraph snapshot it anchors, so the pair runs coarse→fine like every other rung.
-  return standDownLeadingGhosts([context, country, cohort, composition, snap, metaSnap, node], s.mode);
+  // The manifest order drives the tablet/phone flat stack + tray icons and MUST agree with the
+  // desktop lane above: tick → dossier → the tick's own metagraph snapshot → node.
+  return [snap, context, country, cohort, composition, metaSnap, node];
 }
 
-/** A ghost ABOVE the pile's first populated card stands down (user, 2026-09-15: "I am bothered
- *  about a ghost structurally at the top of the card pile").
- *
- *  ⚠️ A GHOST INVITES A NEXT STEP; ABOVE A LIVE SUBJECT IT CLAIMS A MISSING ANCESTOR. That is the
- *  whole distinction, and it is why this is not a ledger rule even though the ledger is where it
- *  shows: the Snapshots chamber is the one view whose coarsest card is populated WITHOUT a commit
- *  (the live tick follows by itself), so "METAGRAPH — pick one in the top-bar filter" sat at the
- *  top of a pile that was already speaking. The pile read as though the tick were missing its
- *  parent, when the truth is that a metagraph is not a global tick's parent at all — it is the
- *  LENS, and the chamber is unlensed until you commit one. In hyper and geo at "all" nothing below
- *  is populated, so their leading ghosts are the whole teaching surface and are untouched.
- *
- *  Gated on PRESENCE, never on `mode` — the story-state rule (components/CLAUDE.md, "CARDS TELL THE
- *  STORY, NOT A STATIC RECORD"): a card is its subject as seen from the current scene, and the gate
- *  names the state it answers to. `mode` rides along only to read the lane ORDER, which is the same
- *  order the pile renders in; it never decides the outcome.
- *
- *  ⚠️ IT STANDS DOWN, IT DOES NOT UNMOUNT. Dropping the hint is the whole mechanism: Inspector's
- *  context branch always mounts ContextCard — that is deliberate and load-bearing, so the card's
- *  EdgePulse survives the dossier ⇄ nothing swap — and the card self-nulls at "all". With no ghost
- *  beside it the rung collapses to a ZERO-HEIGHT marker carrying no thread dot, so the pile reads
- *  as beginning at the tick while the mount the pulse needs stays alive. Measured both ways: at
- *  "all" the context rung is 0px and GLOBAL SNAPSHOT leads; commit a network and the dossier is
- *  back at the top as a full box.
- *
- *  TRAILING and INTERIOR ghosts are deliberately left alone. A trailing ghost is the next gesture
- *  (NODE's "click one in any of the trays" is the whole invitation). An interior one — a populated
- *  card under a hole — is a different question and a parked one (the node-above-a-metaSnap-ghost
- *  round, 2026-09-13); it is not this rule's business and suppressing it here would answer it by
- *  accident. */
-function standDownLeadingGhosts(cards: RailCard[], mode: Mode): RailCard[] {
-  const lane = ladderSlotIds(mode);
-  if (!lane.length) return cards;
-  const firstPopulated = lane.findIndex((id) => cards.find((c) => c.id === id)?.present);
-  if (firstPopulated <= 0) return cards; // nothing populated, or the top card already speaks
-  const above = new Set(lane.slice(0, firstPopulated));
-  return cards.map((c) => (above.has(c.id) && !c.present ? { ...c, hint: null } : c));
-}

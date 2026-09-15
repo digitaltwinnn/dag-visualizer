@@ -38,7 +38,6 @@ import {
   countryToggleActions,
   filterToggleActions,
   metaSnapSelectActions,
-  metaSnapArrivalActions,
   nodeSelectActions,
   sameCohort,
   sameMetaSnap,
@@ -394,6 +393,21 @@ export function childStep(slot: RailCardKind, s: SiblingState): SiblingStep | nu
           actions: countryToggleActions(c.cc, { country: s.country, hasInspect: !!s.inspect, cohort: s.cohort }),
         };
       }
+      if (s.mode === "ledger") {
+        // The dossier's child in the chamber is THIS NETWORK'S snapshot in the shown tick — the
+        // rung directly below it since the 2026-09-15 lane. No tick or no row for the committed
+        // network → nothing to open and the control dims, which is the honest answer: the
+        // network simply did not anchor here.
+        if (!s.snap || !s.exactRows) return null;
+        const r = s.exactRows.find((x) => x.metaId === s.filter);
+        if (!r) return null;
+        const sel = metaSnapSelOf(r, s.snap.data.ordinal, s.snap.data.timestamp);
+        return {
+          key: `${r.metaId}:${r.ordinal}`,
+          label: ordinalLabel(r),
+          actions: metaSnapSelectActions(sel, s.snap, { filter: s.filter, metaSnap: s.metaSnap }),
+        };
+      }
       if (s.mode === "hyper") {
         // Hyper's explorer leads with the composition groups, size-desc.
         const g = compositionGroups(s.selNodes)[0];
@@ -457,50 +471,38 @@ export function childStep(slot: RailCardKind, s: SiblingState): SiblingStep | nu
       };
     }
 
-    // The global tick's first child is its first exact-read channel row — the anchor log's own
-    // "commit the first row" precedent. The builder filter-firsts exactly like a row click.
+    // ⚠️ THE TICK'S CHILD IS A NETWORK NOW, not a metagraph snapshot (user, 2026-09-15 — the lane
+    // runs tick → metagraph → metagraph snapshot → node). Under the old lane ∨ skipped the
+    // dossier entirely and landed two levels down, dragging the filter along as a SIDE EFFECT of
+    // opening a snapshot — which is what made it read as "going finer forces a filter". Here the
+    // filter IS the step: committing the network is what opening the metagraph card means, and
+    // the tick's own card already offers exactly this list (DOR 48 · DED 29 · …). One level, and
+    // the gesture's meaning matches what it commits.
+    //
+    // Busiest-first, which is the order the tick card prints its anchors in — the childStep
+    // convention everywhere else ("the rung's first child in the explorer's own order").
     case "snap": {
       if (!s.snap || !s.exactRows || s.exactRows.length === 0) return null;
-      // ⚠️ UNDER A COMMITTED FILTER, THE STORY'S OWN FIRST ROW — never the tick's (review find,
-      // 2026-09-11). A filter is a lens: the ledger explorer makes every OTHER network's rows
-      // non-drillable (`previewOnly`/`outOfLens`), and the metaSnap pager refuses cross-network
-      // steps for the same reason — but `metaSnapSelectActions` filter-firsts, so handing ∨ the
-      // tick's raw first row would silently re-commit the filter to whichever network happens to
-      // lead the exact read, releasing the committed story with no gesture naming a network (and
-      // quietly, since this commit passes `quiet`). No row for the committed network → nothing
-      // to open, and the control dims.
-      const r = s.filter === "all" ? s.exactRows[0] : s.exactRows.find((x) => x.metaId === s.filter);
-      if (!r) return null;
-      const meta = s.metaList.find((m) => m.id === r.metaId);
-      const who = meta?.symbol || meta?.name || `${r.metaId.slice(0, 6)}…`;
-      const sel: MetaSnapSel = {
-        metaId: r.metaId,
-        ordinal: r.ordinal,
-        hash: "", // the exact read carries no hash; sameMetaSnap keys on metaId+ordinal
-        globalOrdinal: s.snap.data.ordinal,
-        ts: s.snap.data.timestamp,
-      };
-      return {
-        key: `${r.metaId}:${r.ordinal}`,
-        label: `${who} ${r.ordinal > 0 ? r.ordinal.toLocaleString() : "undecoded"}`,
-        // ⚠️ AND AT "ALL" IT MUST NOT COMMIT A NETWORK EITHER (user, 2026-09-15: "going up or down
-        // requires a forced decision to filter on a metagraph"). The note above guards the FILTERED
-        // case against releasing a committed story; the unfiltered one has the same defect and the
-        // opposite tell — there is no story to release, only one to INVENT. `metaSnapSelectActions`
-        // filter-firsts, so ∨ from the tick silently committed whichever network happened to lead
-        // the exact read, turning "show me one level finer" into "and also filter the whole app on
-        // DOR". The reader pressed a direction, not a name.
-        //
-        // `metaSnapArrivalActions` is the builder that already exists for exactly this, with
-        // exactly this reason written on it ("no gesture named a network") — the raw layer's own
-        // arrival commit. Under a committed filter the row IS the committed network, so naming it
-        // again changes nothing and the click-shaped builder stays: the guard is about scope, not
-        // about which function is nicer.
-        actions:
-          s.filter === "all"
-            ? metaSnapArrivalActions(sel, s.snap)
-            : metaSnapSelectActions(sel, s.snap, { filter: s.filter, metaSnap: s.metaSnap }),
-      };
+      if (s.filter === "all") {
+        const counts = new Map<string, number>();
+        for (const r of s.exactRows) counts.set(r.metaId, (counts.get(r.metaId) ?? 0) + 1);
+        const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+        if (!top) return null;
+        const meta = s.metaList.find((m) => m.id === top[0]);
+        if (!meta) return null; // an UNLISTED channel names no filter — nothing to commit
+        return {
+          key: meta.id,
+          label: meta.name,
+          actions: filterToggleActions(meta.id, s.filter),
+        };
+      }
+      // A COMMITTED FILTER NEEDS NO CHILD STEP HERE: the dossier is the rung directly below the
+      // tick and a committed filter is exactly what populates it, so ∨ re-boxes a card that is
+      // already there and the pager never reaches this fallback. (Before the 2026-09-15 lane the
+      // tick's child WAS the metagraph snapshot, which is why this branch used to carry the
+      // "story's own first row" guard; that reasoning moved down to the `context` case, where the
+      // rung it protects now lives.)
+      return null;
     }
 
     // A node and a metagraph snapshot are leaves; About/tool never focus.
