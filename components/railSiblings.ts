@@ -379,134 +379,103 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
  *  subjects belong to the tick axis) — and the plank DIMS the ∨ (the inactive-at-the-edge
  *  rule; only a card with no ladder step in EITHER direction shows no pair at all — see
  *  RailPager). A finer COMMITTED rung never reaches here: the caller steps the pile instead. */
+/** ONE child step: the first candidate at the slot directly BELOW this one in the view's lane.
+ *
+ *  ⚠️ EACH ENTRY DECLARES WHERE IT GOES (`to`), and `railLadderBoundary.test.ts` checks that it is
+ *  the next slot in `DISPLAY_LANE` for that view. That is the whole point of writing this as a
+ *  table: "a ∨ commits a finer subject, never a coarser one" has been the rule all along, and it
+ *  has been enforced by comments and by whoever remembered it — the ledger's tick used to reach two
+ *  levels down and drag the filter with it, which is that rule broken twice over. Declared, a step
+ *  that skips a rung or reaches back up fails a test.
+ *
+ *  The step FUNCTIONS stay small and named, and they keep using this file's shared item builders,
+ *  so a rung's sibling set and its parent's child step still commit the same subject through the
+ *  same pickActions builder. */
+interface ChildEntry { to: RailCardKind; step: (s: SiblingState) => SiblingStep | null }
+
+// geo: the explorer's own first row, countries count-desc. Like every child-of-the-dossier step
+// it states its own precondition — the dossier only exists under a committed network, so at "all"
+// there is no card to open anything FROM (the same shape `firstCohort` asserts with `s.country`).
+const firstCountry = (s: SiblingState): SiblingStep | null => {
+  if (s.filter === "all") return null;
+  const c = s.countries[0];
+  return c ? countryItem(c, s) : null;
+};
+// geo: the committed country's first cohort.
+const firstCohort = (s: SiblingState): SiblingStep | null => {
+  if (!s.country) return null;
+  const g = cohortsOf(s.selNodes.filter((r) => r.cc === s.country))[0];
+  return g ? cohortItem(s.country, g, s) : null;
+};
+// geo: the committed cohort's first machine.
+const firstNodeOfCohort = (s: SiblingState): SiblingStep | null => {
+  const c = s.cohort;
+  if (!c) return null;
+  const g = cohortsOf(s.selNodes.filter((r) => r.cc === c.cc)).find((x) =>
+    sameCohort(c, { cc: c.cc, city: x.city, isp: x.isp }),
+  );
+  const r = g ? machineRows(g.rows).sort(nodeSort)[0] : undefined;
+  return r ? nodeItem(r, s) : null;
+};
+// hyper: the explorer leads with the composition groups, size-desc (same dossier precondition).
+const firstComposition = (s: SiblingState): SiblingStep | null => {
+  if (s.filter === "all") return null;
+  const g = compositionGroups(s.selNodes)[0];
+  return g ? compositionItem(g, s) : null;
+};
+// hyper: the committed group's own row order — the same sequence the node pager steps.
+const firstNodeOfComposition = (s: SiblingState): SiblingStep | null => {
+  if (!s.composition) return null;
+  const g = compositionGroups(s.selNodes).find((x) => x.key === s.composition!.key);
+  const r = g ? machineRows(g.rows)[0] : undefined;
+  return r && g ? nodeItem(r, s, { netId: s.filter, key: g.key }) : null;
+};
+/** ledger: the network that anchored MOST into this tick — the order the tick card prints its
+ *  anchors in. Committing it is what opening the metagraph card means, so the filter IS the step
+ *  rather than a side effect (user, 2026-09-15); an UNLISTED channel names no filter, so there is
+ *  nothing to commit and the control dims. */
+const firstAnchoringNetwork = (s: SiblingState): SiblingStep | null => {
+  if (!s.snap || !s.exactRows?.length || s.filter !== "all") return null;
+  const counts = new Map<string, number>();
+  for (const r of s.exactRows) counts.set(r.metaId, (counts.get(r.metaId) ?? 0) + 1);
+  const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+  const meta = top ? s.metaList.find((m) => m.id === top[0]) : undefined;
+  return meta ? { key: meta.id, label: meta.name, actions: filterToggleActions(meta.id, s.filter) } : null;
+};
+/** ledger: the committed network's OWN snapshot in the shown tick — never the tick's first row,
+ *  which would re-commit the filter to whichever network leads the exact read and release the
+ *  committed story (review find, 2026-09-11). No row → the network did not anchor here, which is
+ *  the honest answer, and the control dims. */
+const firstMetaSnapOfTick = (s: SiblingState): SiblingStep | null => {
+  if (s.filter === "all" || !s.snap || !s.exactRows) return null;
+  const r = s.exactRows.find((x) => x.metaId === s.filter);
+  if (!r) return null;
+  const sel = metaSnapSelOf(r, s.snap.data.ordinal, s.snap.data.timestamp);
+  return {
+    key: `${r.metaId}:${r.ordinal}`,
+    label: ordinalLabel(r),
+    actions: metaSnapSelectActions(sel, s.snap, { filter: s.filter, metaSnap: s.metaSnap }),
+  };
+};
+
+export const CHILD_OF: Partial<Record<Mode, Partial<Record<RailCardKind, ChildEntry>>>> = {
+  geo: {
+    context: { to: "country", step: firstCountry },
+    country: { to: "cohort", step: firstCohort },
+    cohort: { to: "node", step: firstNodeOfCohort },
+  },
+  hyper: {
+    context: { to: "composition", step: firstComposition },
+    composition: { to: "node", step: firstNodeOfComposition },
+  },
+  ledger: {
+    snap: { to: "context", step: firstAnchoringNetwork },
+    context: { to: "metaSnap", step: firstMetaSnapOfTick },
+  },
+};
+
+/** The rung's first child, or null when there is nothing finer to open (the control dims).
+ *  A node and a metagraph snapshot are leaves; About and the tool card never focus. */
 export function childStep(slot: RailCardKind, s: SiblingState): SiblingStep | null {
-  switch (slot) {
-    case "context": {
-      if (s.filter === "all") return null;
-      if (s.mode === "geo") {
-        // The geo explorer's own first row: countries count-desc.
-        const c = s.countries[0];
-        if (!c) return null;
-        return {
-          key: c.cc,
-          label: c.country,
-          actions: countryToggleActions(c.cc, { country: s.country, hasInspect: !!s.inspect, cohort: s.cohort }),
-        };
-      }
-      if (s.mode === "ledger") {
-        // The dossier's child in the chamber is THIS NETWORK'S snapshot in the shown tick — the
-        // rung directly below it since the 2026-09-15 lane. No tick or no row for the committed
-        // network → nothing to open and the control dims, which is the honest answer: the
-        // network simply did not anchor here.
-        if (!s.snap || !s.exactRows) return null;
-        const r = s.exactRows.find((x) => x.metaId === s.filter);
-        if (!r) return null;
-        const sel = metaSnapSelOf(r, s.snap.data.ordinal, s.snap.data.timestamp);
-        return {
-          key: `${r.metaId}:${r.ordinal}`,
-          label: ordinalLabel(r),
-          actions: metaSnapSelectActions(sel, s.snap, { filter: s.filter, metaSnap: s.metaSnap }),
-        };
-      }
-      if (s.mode === "hyper") {
-        // Hyper's explorer leads with the composition groups, size-desc.
-        const g = compositionGroups(s.selNodes)[0];
-        if (!g) return null;
-        return {
-          key: g.key,
-          label: g.label,
-          actions: compositionToggleActions(
-            { netId: s.filter, key: g.key },
-            { composition: s.composition, hasInspect: !!s.inspect, filter: s.filter },
-          ),
-        };
-      }
-      return null;
-    }
-
-    case "country": {
-      if (!s.country) return null;
-      const g = cohortsOf(s.selNodes.filter((r) => r.cc === s.country))[0];
-      if (!g) return null;
-      return {
-        key: `${s.country}|${g.city}|${g.isp}`,
-        label: cohortLabel(g),
-        actions: cohortToggleActions(
-          { cc: s.country, city: g.city, isp: g.isp },
-          { cohort: s.cohort, hasInspect: !!s.inspect },
-        ),
-      };
-    }
-
-    case "cohort": {
-      if (!s.cohort) return null;
-      const c = s.cohort;
-      const g = cohortsOf(s.selNodes.filter((r) => r.cc === c.cc)).find((x) =>
-        sameCohort(c, { cc: c.cc, city: x.city, isp: x.isp }),
-      );
-      const r = g ? machineRows(g.rows).sort(nodeSort)[0] : undefined;
-      if (!r) return null;
-      return {
-        key: hoverKeyOf(r.pick) ?? r.label,
-        label: r.label,
-        actions: nodeSelectActions(r.pick, { mode: s.mode, currentFilter: s.filter, deselect: false }),
-      };
-    }
-
-    case "composition": {
-      if (!s.composition) return null;
-      const g = compositionGroups(s.selNodes).find((x) => x.key === s.composition!.key);
-      // The group's own row order — the same sequence the node pager steps in hyper.
-      const r = g ? machineRows(g.rows)[0] : undefined;
-      if (!r || !g) return null;
-      return {
-        key: hoverKeyOf(r.pick) ?? r.label,
-        label: r.label,
-        actions: nodeSelectActions(r.pick, {
-          mode: s.mode,
-          currentFilter: s.filter,
-          deselect: false,
-          compositionSel: { netId: s.filter, key: g.key },
-        }),
-      };
-    }
-
-    // ⚠️ THE TICK'S CHILD IS A NETWORK NOW, not a metagraph snapshot (user, 2026-09-15 — the lane
-    // runs tick → metagraph → metagraph snapshot → node). Under the old lane ∨ skipped the
-    // dossier entirely and landed two levels down, dragging the filter along as a SIDE EFFECT of
-    // opening a snapshot — which is what made it read as "going finer forces a filter". Here the
-    // filter IS the step: committing the network is what opening the metagraph card means, and
-    // the tick's own card already offers exactly this list (DOR 48 · DED 29 · …). One level, and
-    // the gesture's meaning matches what it commits.
-    //
-    // Busiest-first, which is the order the tick card prints its anchors in — the childStep
-    // convention everywhere else ("the rung's first child in the explorer's own order").
-    case "snap": {
-      if (!s.snap || !s.exactRows || s.exactRows.length === 0) return null;
-      if (s.filter === "all") {
-        const counts = new Map<string, number>();
-        for (const r of s.exactRows) counts.set(r.metaId, (counts.get(r.metaId) ?? 0) + 1);
-        const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
-        if (!top) return null;
-        const meta = s.metaList.find((m) => m.id === top[0]);
-        if (!meta) return null; // an UNLISTED channel names no filter — nothing to commit
-        return {
-          key: meta.id,
-          label: meta.name,
-          actions: filterToggleActions(meta.id, s.filter),
-        };
-      }
-      // A COMMITTED FILTER NEEDS NO CHILD STEP HERE: the dossier is the rung directly below the
-      // tick and a committed filter is exactly what populates it, so ∨ re-boxes a card that is
-      // already there and the pager never reaches this fallback. (Before the 2026-09-15 lane the
-      // tick's child WAS the metagraph snapshot, which is why this branch used to carry the
-      // "story's own first row" guard; that reasoning moved down to the `context` case, where the
-      // rung it protects now lives.)
-      return null;
-    }
-
-    // A node and a metagraph snapshot are leaves; About/tool never focus.
-    default:
-      return null;
-  }
+  return CHILD_OF[s.mode]?.[slot]?.step(s) ?? null;
 }

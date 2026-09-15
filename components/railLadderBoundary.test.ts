@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { LADDERS, type FocusLevel } from "@/src/engine/domain/focusLadder";
 import { detailsCards, ladderSlotIds, type RailManifestState } from "@/components/railCards";
+import { CHILD_OF } from "@/components/railSiblings";
 import { LEDGER_LAYERS } from "@/src/data/ledgerLayers";
 
 // THE LADDER↔RAIL CONTRACT (spec Part 6): every committable ladder rung has a right-rail
@@ -74,6 +75,33 @@ describe("ladder↔lane boundary — the lane still agrees with the rung tables"
 
   it("a flat view has no lane at all", () => {
     expect(ladderSlotIds("soon")).toEqual([]);
+  });
+});
+
+// ⚠️ A ∨ STEP GOES EXACTLY ONE SLOT DOWN THE LANE (2026-09-15). This rule has been enforced by
+// comments and by whoever remembered it, and it was broken twice in the same place: the ledger's
+// tick used to reach TWO levels down (straight to a metagraph snapshot) and drag the filter — a
+// coarser rung — along with it. `CHILD_OF` declares each step's destination, so both halves are
+// checkable: a step that skips a rung fails here, and so does one that reaches back up.
+describe("child steps descend exactly one rung of the lane", () => {
+  for (const [view, slots] of Object.entries(CHILD_OF)) {
+    const lane = ladderSlotIds(view as RailManifestState["mode"]);
+    for (const [from, entry] of Object.entries(slots ?? {})) {
+      it(`${view}: ${from} → ${entry!.to} is the next slot down`, () => {
+        const at = lane.indexOf(from);
+        expect(at, `"${from}" is not in ${view}'s lane at all`).toBeGreaterThanOrEqual(0);
+        expect(lane[at + 1], `${view}: ${from}'s child should be ${lane[at + 1]}, not ${entry!.to}`).toBe(entry!.to);
+      });
+    }
+  }
+
+  it("every lane slot with something below it is reachable, or is a deliberate leaf", () => {
+    // Not every slot needs a child — a leaf is a leaf — but a slot that HAS one must not be
+    // silently unreachable, which is what a stale table entry would look like.
+    for (const [view, slots] of Object.entries(CHILD_OF)) {
+      const lane = ladderSlotIds(view as RailManifestState["mode"]);
+      for (const from of Object.keys(slots ?? {})) expect(lane).toContain(from);
+    }
   });
 });
 
