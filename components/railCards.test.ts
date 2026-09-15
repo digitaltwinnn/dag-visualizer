@@ -319,3 +319,48 @@ describe("ghost hints — the copy rule", () => {
     }
   });
 });
+
+// ── A GHOST NEVER LEADS A SPEAKING PILE (user, 2026-09-15) ───────────────────────────────────
+// A ghost invites a NEXT step; above a live subject it instead claims a missing ancestor. The
+// Snapshots chamber is the one view whose coarsest card is populated without a commit — the live
+// tick follows by itself — so "METAGRAPH · pick one in the top-bar filter" sat at the top of a
+// pile that was already speaking, reading as though the tick had lost its parent. It never had
+// one: a metagraph is not a global tick's parent, it is the LENS.
+describe("leading ghosts stand down once the pile speaks", () => {
+  it("the ledger at 'all' with a live tick leads with the snapshot, not a metagraph ghost", () => {
+    const cards = detailsCards(details({ mode: "ledger", filter: "all", snap: snapPick }));
+    expect(ghostIds(cards)).not.toContain("context");
+    // the lane's first card that says anything is the tick itself
+    const lane = ladderSlotIds("ledger");
+    const speaking = lane.filter((id) => {
+      const c = cards.find((x) => x.id === id)!;
+      return c.present || c.hint != null;
+    });
+    expect(speaking[0]).toBe("snap");
+  });
+
+  it("with nothing populated the ghosts remain — they ARE the teaching surface", () => {
+    for (const mode of ["hyper", "geo", "ledger"] as const) {
+      const cards = detailsCards(details({ mode, filter: "all" }));
+      expect(ghostIds(cards).length, `${mode} keeps its invitations`).toBeGreaterThan(0);
+      expect(ghostIds(cards)[0], `${mode} still invites at the top`).toBe(ladderSlotIds(mode)[0]);
+    }
+  });
+
+  it("a committed filter puts the dossier back at the top, populated", () => {
+    const cards = detailsCards(details({ mode: "ledger", filter: "ded", snap: snapPick }));
+    expect(cards.find((c) => c.id === "context")!.present).toBe(true);
+    expect(ladderSlotIds("ledger")[0]).toBe("context");
+  });
+
+  it("TRAILING ghosts are untouched — a trailing ghost is the next gesture", () => {
+    const cards = detailsCards(details({ mode: "ledger", filter: "all", snap: snapPick }));
+    expect(ghostIds(cards)).toContain("node");
+  });
+
+  it("an INTERIOR ghost is untouched — that is the parked hole question, not this rule", () => {
+    // snap populated, metaSnap empty, node populated: the hole sits BETWEEN speaking cards.
+    const cards = detailsCards(details({ mode: "ledger", filter: "all", snap: snapPick, inspect: nodePick }));
+    expect(ghostIds(cards)).toContain("metaSnap");
+  });
+});

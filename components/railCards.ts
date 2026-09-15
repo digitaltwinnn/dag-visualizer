@@ -360,5 +360,44 @@ export function detailsCards(s: RailManifestState): RailCard[] {
   // snap BEFORE metaSnap (2026-08-08, with the slab): the manifest order drives the tablet/phone
   // flat stack + tray icons, and it must agree with the desktop lane — the global tick contains
   // the metagraph snapshot it anchors, so the pair runs coarse→fine like every other rung.
-  return [context, country, cohort, composition, snap, metaSnap, node];
+  return standDownLeadingGhosts([context, country, cohort, composition, snap, metaSnap, node], s.mode);
+}
+
+/** A ghost ABOVE the pile's first populated card stands down (user, 2026-09-15: "I am bothered
+ *  about a ghost structurally at the top of the card pile").
+ *
+ *  ⚠️ A GHOST INVITES A NEXT STEP; ABOVE A LIVE SUBJECT IT CLAIMS A MISSING ANCESTOR. That is the
+ *  whole distinction, and it is why this is not a ledger rule even though the ledger is where it
+ *  shows: the Snapshots chamber is the one view whose coarsest card is populated WITHOUT a commit
+ *  (the live tick follows by itself), so "METAGRAPH — pick one in the top-bar filter" sat at the
+ *  top of a pile that was already speaking. The pile read as though the tick were missing its
+ *  parent, when the truth is that a metagraph is not a global tick's parent at all — it is the
+ *  LENS, and the chamber is unlensed until you commit one. In hyper and geo at "all" nothing below
+ *  is populated, so their leading ghosts are the whole teaching surface and are untouched.
+ *
+ *  Gated on PRESENCE, never on `mode` — the story-state rule (components/CLAUDE.md, "CARDS TELL THE
+ *  STORY, NOT A STATIC RECORD"): a card is its subject as seen from the current scene, and the gate
+ *  names the state it answers to. `mode` rides along only to read the lane ORDER, which is the same
+ *  order the pile renders in; it never decides the outcome.
+ *
+ *  ⚠️ IT STANDS DOWN, IT DOES NOT UNMOUNT. Dropping the hint is the whole mechanism: Inspector's
+ *  context branch always mounts ContextCard — that is deliberate and load-bearing, so the card's
+ *  EdgePulse survives the dossier ⇄ nothing swap — and the card self-nulls at "all". With no ghost
+ *  beside it the rung collapses to a ZERO-HEIGHT marker carrying no thread dot, so the pile reads
+ *  as beginning at the tick while the mount the pulse needs stays alive. Measured both ways: at
+ *  "all" the context rung is 0px and GLOBAL SNAPSHOT leads; commit a network and the dossier is
+ *  back at the top as a full box.
+ *
+ *  TRAILING and INTERIOR ghosts are deliberately left alone. A trailing ghost is the next gesture
+ *  (NODE's "click one in any of the trays" is the whole invitation). An interior one — a populated
+ *  card under a hole — is a different question and a parked one (the node-above-a-metaSnap-ghost
+ *  round, 2026-09-13); it is not this rule's business and suppressing it here would answer it by
+ *  accident. */
+function standDownLeadingGhosts(cards: RailCard[], mode: Mode): RailCard[] {
+  const lane = ladderSlotIds(mode);
+  if (!lane.length) return cards;
+  const firstPopulated = lane.findIndex((id) => cards.find((c) => c.id === id)?.present);
+  if (firstPopulated <= 0) return cards; // nothing populated, or the top card already speaks
+  const above = new Set(lane.slice(0, firstPopulated));
+  return cards.map((c) => (above.has(c.id) && !c.present ? { ...c, hint: null } : c));
 }
