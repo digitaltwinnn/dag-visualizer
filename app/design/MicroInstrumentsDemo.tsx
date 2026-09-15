@@ -4,7 +4,7 @@
 // components (VitalsBand's exported Donut + MicroBars) with sample values, so the reference
 // can't drift from what the bottom band actually draws. Client component: the pieces are
 // interactive-tree components (store-free here — sample data in, pixels out).
-import { Donut, MicroBars } from "@/components/VitalsBand";
+import { Donut, MicroBars } from "@/components/vitals/bandParts";
 import { RoleChips } from "@/components/inspector/parts";
 
 const SAMPLE_COMPOSITION = { Hybrid: 141, Consensus: 39, Currency: 5, Data: 16 };
