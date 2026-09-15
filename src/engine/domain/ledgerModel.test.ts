@@ -613,6 +613,21 @@ describe("LedgerModel — the trail reaches behind a selected row", () => {
     expect(model.trail.length).toBe(snaps.length - 1); // the buffer's depth, not the ask
   });
 
+  // The contract the VIEW depends on: a click alone must not grow the capacity, because only
+  // setData knows what the buffer can actually supply. The view answers by re-entering setData
+  // with its stored inputs on a historic selection — without that, the rows arrived a tick late
+  // (~28s) or never, which is how the chamber kept emptying after the reach itself was correct.
+  it("a bare setSelected does not grow the capacity — only setData, which holds the buffer, does", () => {
+    const model = new LedgerModel();
+    const snaps = buffer(40);
+    feed(model, snaps);
+    expect(model.trailCap).toBe(SLOT_N);
+    model.setSelected(snaps[snaps.length - 1].ordinal - 6);
+    expect(model.trailCap).toBe(SLOT_N); // not yet — nothing has offered a buffer
+    feed(model, snaps);
+    expect(model.trailCap).toBe(SLOT_N + 6);
+  });
+
   it("returning to the live lead keeps the reach — the rows are paid for, not re-fetched", () => {
     const model = new LedgerModel();
     const snaps = buffer(40);

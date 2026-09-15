@@ -819,6 +819,22 @@ export class LedgerView implements SceneView {
 
   setSelected(ordinal: number | null) {
     this.model.setSelected(ordinal);
+    // ⚠️ THE BACKFILL CANNOT WAIT FOR THE NEXT TICK (found live, 2026-09-15 — the trail reached
+    // correctly in the model's own tests and the chamber still emptied). Selecting a historic row
+    // raises what the trail must hold, but only `setData` carries the buffer those rows come FROM,
+    // and the next one arrives with the next global snapshot — ~28s away, and further still if the
+    // reader steps again first. So the rewind slid the trail forward immediately while the rows
+    // behind it were half a minute late or never came: measured, `setData` had not run once across
+    // six steps back, the bar pool was still nine slots deep, and exactly three rows survived.
+    //
+    // Re-entering with the stored inputs is this file's established idiom for "the model needs to
+    // re-run against data it already has" (see the colour rebuild above); `_advanced` stays false
+    // because the tick ordinal has not moved, so the rewind's calm-jump contract is untouched.
+    // Gated on a HISTORIC selection: following the live lead needs nothing, and this does a tick's
+    // worth of slot rebuilding, which is fine at click rate and wasteful on every hover-commit.
+    if (ordinal != null && ordinal !== this.model.tickOrdinal && this._lastSnaps && this._lastGetAnchor) {
+      this.setData(this._lastSnaps, this._lastGetAnchor);
+    }
     this._syncRibbonRows();
   }
 

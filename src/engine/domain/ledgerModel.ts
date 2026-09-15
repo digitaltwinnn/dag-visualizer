@@ -471,9 +471,9 @@ export class LedgerModel {
   setSelected(ordinal: number | null): void {
     this.selectedOrd = ordinal == null ? null : ordinal;
     this.recomputeSelectedSlot();
-    // The reach is raised HERE so a click is registered even between polls; the rows themselves
-    // arrive on the next `setData`, which is the only call that carries the buffer to fill from.
-    if (this.selectedSlot > 0 && this.selectedSlot > this._reach) this._reach = this.selectedSlot;
+    // The REACH is deliberately not raised here. Only `setData` carries the buffer the new rows
+    // come from, and only it can bound the ask by what is actually retained — so the view re-enters
+    // setData on a historic selection rather than letting a click grow a capacity nothing can fill.
   }
 
   /** Ordinal → its current slot (0 = the live lead, else its trail slot, −1 = not visible).
