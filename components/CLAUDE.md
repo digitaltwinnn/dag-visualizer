@@ -194,6 +194,24 @@ decisions inside them are design, not detail:
   columns don't shift), takes the cursor back to `default` and mutes its words one step — but its
   identity dot stays at full hue, because it did anchor here and identity is not a state.
 
+- **History's tool card is the view's CONTROLS plus its roster** (`components/TrendExplore.tsx`,
+  2026-09-19). It is the first explorer whose card holds an instrument the reader OPERATES rather
+  than a state it reports, and the grammar splits on that: the METRIC is a PICKER — the same
+  hairline group the window pills wear, because a metric is a committed statement about what is on
+  screen — while `Align to front` and `Same scale` are SETTINGS and read as a name plus its state
+  (`SettingSwitch`, `components/trendPickers.tsx`; the command bar's pressed-toggle is an ACTION
+  grammar and wrong for a setting, which is the reasoning the scale control was rebuilt on twice).
+  None of the three is a selection, so they write their setters directly — `selectionBoundary`'s
+  own scope note says why, and why the plane FOCUS is in the table instead. Below the instrument
+  hairline the LAYERS list is an ordinary browse list: mark, name, last measured reading, and a
+  click that applies the SAME `trendPlaneActions` the plane's header strip runs. Its PAGER is
+  absent unless the roster exceeds `VISIBLE_PLANES` and clamps with the stack's own `clampScroll`,
+  so a chevron can never offer a step the geometry refuses.
+  ⚠️ **The roster is computed ONCE, in `components/useTrendRoster.ts`** — the planes, this list and
+  the cursor card all read it, counter EDGE TRIM included. A surface reading the payload directly
+  is one bucket out of step with the axis, which is exactly how the cursor card briefly quoted
+  yesterday's number; `components/trendRailBoundary.test.ts` pins all three "one home" rules.
+
 **Naming and copy rules:** About states the view's point of view ("How the network is built"); the tool
 card says what you BROWSE ("Nodes by network"). Eyebrows are bare role words, and each explorer's usage
 hint leads its card rather than trailing it. An explorer ROW is a browse target — mark, name, count,
@@ -205,6 +223,33 @@ place.
 dossier, country, provider, composition, then the snapshot chain (global snapshot ABOVE the metagraph
 snapshot it anchors), then node. `components/railCards.ts` is the manifest and
 `components/railCards.test.ts` pins the order, the availability and every hint.
+
+**History's lane is the network dossier, then the INSTANT** (2026-09-19) — the cursor card, a slot
+with NO focus rung, exactly as the two snapshot slots are. Its subject is `trendCursorMs`, which the
+band's timeline writes at most once per BUCKET (`sameBucket`, both gestures since 2026-09-19), so the
+title roll, the edge pulse and the tray highlight fire once per bucket rather than once per
+pointermove. Three rules are worth knowing before touching it:
+
+- **Presence is VIEW-SCOPED, unlike a pinned snapshot's.** A pinned snapshot keeps meaning wherever
+  you carry it, which is why its card renders in any 3D view; an instant is a reading OF THIS STACK,
+  so outside History it names no chart and ranks no roster. The cursor itself survives the switch;
+  only the card stands down.
+- **The cursor takes a place in `selStack`.** Without it the mode-entry collapse snapshot pinned the
+  slot shut and nothing in this view was a selection change that would drop it, so a click on the
+  timeline populated a card that stayed collapsed under its own eyebrow. It is still not a rung: no
+  pose, no deselect step, and the × clears the channel alone (`setTrendCursor`, deliberately outside
+  the pickActions table).
+- **THE TWO EXITS ARE THE CARD'S OWN FOOT CONTROLS, and one of them is shared.** `Snapshot records`
+  and the Trends document's per-chart link call ONE helper (`components/trendDoors.ts`): commit the
+  network through the table (guarded — that builder TOGGLES), hand the span to the log, switch the
+  mode, open the raw layer. Two copies of four ordered steps is how two surfaces start landing a
+  reader in different places. `All charts` is the other REGISTER of the same rung — this view's RAW
+  surface is the document, so it is one `setSection("data")` and no mode step at all.
+
+**Hovering pairs over `hoverFilter`, the app's own network channel** (convention 9). A Layers row, a
+plane's header strip and a cursor-card row are three ends of one pairing, with no channel of their
+own: hovering any of them lifts that plane to full opacity and washes the rows. The lift is the ONLY
+thing that moves — a preview that re-staggered the stack would read as a commit.
 
 The chain runs coarse→fine like every other rung: a lane whose committed cards abut as one body reads
 adjacency as containment. (The chamber's storeys are the other way round — ribbons fall INTO the global
@@ -587,7 +632,8 @@ nothing (rule 9). Every decision a pointer makes is pure and tested in
 states) and `TrendTrack.tsx` the INSTRUMENT (the SVG and every gesture), because the track's whole
 subject is a geometry it measures itself and nothing above it has those numbers. The window pills are shared with the
 Trends document through `components/trendPickers.tsx` — the two had already been caught drifting
-once (user, 2026-09-09), so the class strings have one home.
+once (user, 2026-09-09), so the class strings have one home, and since 2026-09-19 the METRIC picker,
+the setting SWITCH and the scope CHIP live there beside them for the same reason.
 
 ### Boot entrance, routes & the doc overlay (2026-09-04)
 
