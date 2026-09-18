@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { DOC_PAGES } from "@/components/views";
+import { DOC_PAGES, type DocPage } from "@/components/views";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 
 // WHICH SURFACE THE RAW LAYER SHOWS IS A POLICY ROW (2026-09-18, the History view's two
@@ -24,6 +24,22 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 //  3. THE DOCUMENT CHUNK STAYS SPLIT. TrendsDoc is the app's largest single component; the raw
 //     layer mounts in every view, so it must reach the document through `dynamic()` exactly as
 //     DocLayer did.
+//
+// ⚠️ THE LAST TWO CASES ARE INHERITED, and they were never about the flag that died (review,
+// 2026-09-18). `components/docScopeBoundary.test.ts` held four cases when `trends` was a doc
+// overlay; two of them tested `scoped`/`docReadsFilter` and went with the flag, and two did not:
+//
+//  4. THE DOCUMENT SUBSCRIBES TO THE FILTER. A one-shot `getState()` read would keep the promise
+//     on arrival and break it on every pick after, and the symptom is a DEAD CONTROL, not a stack
+//     trace. The confusion is live rather than hypothetical: `initialTab` sits two lines below the
+//     roster and reads `getState()` ON PURPOSE (a mount-once default), so the two reads are
+//     adjacent and only one of them may be one-shot. Moving the document behind RAW changed
+//     nothing about this — the bar keeps its filter over a raw layer, so the chips still cut the
+//     charts the reader is looking at, and this case simply moved home with the document.
+//  5. THE COMMAND BAR NEVER GATES ON A DOC ID. With `docReadsFilter` gone the bar's gate is the
+//     plain `doc != null`, and the shortcut that rule existed to prevent — `doc === "about" || …`
+//     growing a page list inside TopBar — is exactly as available as it ever was. It is convention
+//     7's shape for docs, and it costs one line to keep pinned.
 const ROOTS = ["components", "app"];
 const DISPATCH = "components/DataSection.tsx";
 const DOCUMENT_SURFACE = "components/datasection/DocumentSurface.tsx";
@@ -51,7 +67,13 @@ describe("raw-surface boundary", () => {
         new RegExp(`(^|[\\s{])["']?${surface}["']?\\s*:`, "m"),
       );
     }
-    expect(code, "the surface decision is the policy's, never a mode list").not.toMatch(/mode\s*===/);
+    // The near-miss forms too (review, 2026-09-18): a deny-list reads `mode !==`, a fall-through
+    // reads `switch (mode`, and a set membership reads `.includes(mode)`. All three are the same
+    // mistake wearing different syntax, and pinning only `===` invites whichever one the next
+    // author reaches for.
+    for (const form of [/mode\s*===/, /mode\s*!==/, /switch\s*\(\s*mode/, /\.includes\(\s*mode/]) {
+      expect(code, `the surface decision is the policy's, never a mode list (${form.source})`).not.toMatch(form);
+    }
   });
 
   it("the document surface lazy-loads TrendsDoc, and it is the only thing that does", () => {
@@ -81,5 +103,18 @@ describe("raw-surface boundary", () => {
       }
     }
     expect(offenders, `the doc overlay cannot host the raw register: ${offenders.join(", ")}`).toEqual([]);
+  });
+
+  it("the document SUBSCRIBES to the committed filter — a one-shot read would be a dead control", () => {
+    const doc = read("components/docs/TrendsDoc.tsx");
+    expect(doc).toMatch(/useStore\(\(s\)\s*=>\s*s\.filter\)/);
+  });
+
+  it("the command bar gates the filter on whether a doc is open, never on a doc id", () => {
+    const bar = read("components/TopBar.tsx");
+    for (const id of Object.keys(DOC_PAGES) as DocPage[]) {
+      expect(bar, `TopBar must not name the "${id}" page`).not.toContain(`doc === "${id}"`);
+      expect(bar, `TopBar must not name the "${id}" page`).not.toContain(`doc !== "${id}"`);
+    }
   });
 });

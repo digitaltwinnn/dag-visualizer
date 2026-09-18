@@ -21,8 +21,10 @@ import DocumentSurface from "@/components/datasection/DocumentSurface";
 //
 // A MAP rather than a ternary, for the same reason DocLayer keys its documents by the registry's
 // own union: a third register would then be a compile error here instead of falling silently
-// through to the records layer — which is the failure convention 7 is about.
-const SURFACES: Record<ViewPolicy["rawSurface"], () => React.ReactElement> = {
+// through to the records layer — which is the failure convention 7 is about. `ComponentType`, not
+// a concrete element return: a surface may render NOTHING and still be the right surface — the
+// document does exactly that while RAW is closed (its own header says why).
+const SURFACES: Record<ViewPolicy["rawSurface"], React.ComponentType> = {
   records: RecordsSurface,
   document: DocumentSurface,
 };

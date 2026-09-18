@@ -165,10 +165,14 @@ export default function TrendsDoc() {
   const filter = useStore((s) => s.filter);
   const roster = METAGRAPHS.filter((m) => m.id && (filter === "all" || m.id === filter));
 
-  // A committed metagraph opens the page on that side of the network. Read ONCE at mount, which
-  // is still the right register now that the mount is the RAW toggle (the document remounts per
-  // open): the Tabs stay uncontrolled, so browsing the tabs afterwards owes the filter nothing,
-  // while the roster above stays SUBSCRIBED so a chip picked mid-read still cuts the charts. The
+  // A committed metagraph opens the document on that side of the network. Read ONCE AT MOUNT, and
+  // the mount is the RAW TOGGLE: `datasection/DocumentSurface` mounts this component when the raw
+  // register OPENS and unmounts it when the recede finishes, so "at mount" is "when the reader
+  // asked to read it" — which is what makes this read the committed filter as it stands right
+  // then. (It was briefly mounted with the VIEW instead, and that latched the answer before the
+  // reader had committed anything; the surface's header carries that history.) The Tabs stay
+  // uncontrolled, so browsing them afterwards owes the filter nothing, while the roster above
+  // stays SUBSCRIBED so a chip picked mid-read still cuts the charts under the reader's eyes. The
   // DAG core's history is the Hypergraph tab — only a catalog metagraph flips the default.
   const [initialTab] = useState<"hypergraph" | "metagraphs">(() => {
     const f = useStore.getState().filter;
