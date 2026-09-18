@@ -31,8 +31,11 @@ import { PICKER_GROUP, WindowPicker, zoomBtn } from "@/components/trendPickers";
 
 // THE TRENDS DOCUMENT (user, 2026-09-06; widened twice since) — the first UI consumer of the
 // trends backend: one daily-resolution chart per stored metric over the /api/trends 1y window,
-// leading-trimmed to where measuring began. It rides the doc-overlay recipe like About and
-// Design (registry entry in views.ts, thin route, footer + info-menu toggles follow).
+// leading-trimmed to where measuring began. It is the History view's RAW REGISTER (2026-09-18):
+// the measured history is ONE rung of the observation ladder read two ways — the 3D stack of
+// chart planes, and this document behind that view's RAW toggle (`viewPolicy.rawSurface`, mounted
+// by datasection/DocumentSurface). It rode the doc-overlay recipe until then, alongside About and
+// Design; a doc overlay cannot host it, because opening one forces `section` back to "scene".
 //
 // HONESTY (rule 10, the trends store's own contract rendered): a null bucket draws as a GAP,
 // never a zero — the copy says so once, up front. The fees/bytes charts carry the FLOOR label
@@ -152,8 +155,8 @@ export default function TrendsDoc() {
   // other metagraph charts"). ONE roster, read by all three panel builders, so a section cannot
   // answer the filter differently from the section under it — and SUBSCRIBED, unlike the mount-
   // once `initialTab` below: picking a chip in the bar's filter strip must cut the charts under
-  // the reader's eyes, which is the whole reason the bar keeps that strip over this doc
-  // (views.ts `scoped`). "all" is every catalog network, as before.
+  // the reader's eyes — and over a raw layer the command bar keeps its whole ordinary face, so
+  // the strip is simply there. "all" is every catalog network, as before.
   //
   // A filter with no catalog row — the DAG core, the unlisted channels — leaves this EMPTY, and
   // that is honest rather than broken: the trends store keys its series per listed metagraph, so
@@ -162,10 +165,11 @@ export default function TrendsDoc() {
   const filter = useStore((s) => s.filter);
   const roster = METAGRAPHS.filter((m) => m.id && (filter === "all" || m.id === filter));
 
-  // Opened from a committed metagraph's dossier ("Show the trends", 2026-09-08), the page
-  // opens on that side of the network. Read ONCE at mount (the doc remounts per open): the
-  // Tabs stay uncontrolled, so browsing the tabs afterwards owes the filter nothing. The DAG
-  // core's history is the Hypergraph tab — only a catalog metagraph flips the default.
+  // A committed metagraph opens the page on that side of the network. Read ONCE at mount, which
+  // is still the right register now that the mount is the RAW toggle (the document remounts per
+  // open): the Tabs stay uncontrolled, so browsing the tabs afterwards owes the filter nothing,
+  // while the roster above stays SUBSCRIBED so a chip picked mid-read still cuts the charts. The
+  // DAG core's history is the Hypergraph tab — only a catalog metagraph flips the default.
   const [initialTab] = useState<"hypergraph" | "metagraphs">(() => {
     const f = useStore.getState().filter;
     return f !== "dag" && metagraphById(f) ? "metagraphs" : "hypergraph";
@@ -276,8 +280,13 @@ export default function TrendsDoc() {
   // ONE RUNG DOWN THE LADDER (convention 12): hand the selected range to the anchor log's
   // date search. The network commit rides the pickActions table (rule 2 — the same
   // filterToggleActions row the explorer uses, guarded so it never toggles OFF); the range
-  // itself travels the one-shot store bridge the log consumes on sight. Closing the doc
-  // before opening the raw layer matters: setDocPage forces section back to "scene".
+  // itself travels the one-shot store bridge the log consumes on sight.
+  //
+  // The door is a MODE step, not a section one (2026-09-18): this document IS the raw layer of
+  // the view it is read in, so `section` is already "data" and stays there — changing `mode` is
+  // what swaps the layer's surface from this document to the ledger's records, with no depth
+  // transition to replay. `setSection("data")` below is what makes the step work from anywhere
+  // else too, and a no-op when we are already down here.
   const inspectRange = (metaId: string | null) => {
     // No custom range = the WINDOW you are looking at (user, 2026-09-09: "that button can
     // always exist") — the zoom is a range statement too, so the ladder's door is always open.
@@ -287,7 +296,6 @@ export default function TrendsDoc() {
     const st = useStore.getState();
     if (metaId && st.filter !== metaId) applyClickActions(filterToggleActions(metaId, st.filter));
     st.setLogSeek({ metaId, fromMs: span.fromMs, toMs: span.toMs });
-    st.setDocPage(null);
     // The anchor log is the LEDGER view's raw projection — the ladder lands on the rung
     // that can actually show records (mode navigation, not a selection).
     if (st.mode !== "ledger") st.setMode("ledger");

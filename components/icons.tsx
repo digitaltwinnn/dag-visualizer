@@ -21,7 +21,6 @@ import {
   BadgeCheck,
   GitMerge,
   FlaskConical,
-  ChartLine,
   ChartSpline,
   type LucideIcon,
 } from "lucide-react";
@@ -40,8 +39,10 @@ export const VIEW_ICONS: Record<Mode, LucideIcon> = {
   hyper: Orbit,
   geo: Globe,
   ledger: Layers,
-  // The measured-history view: a spline through data points — distinct from the doc page's own
-  // ChartLine mark (DOC_ICONS.trends below), which predates this view and stays where it is.
+  // The measured-history view: a spline through data points. ONE MARK FOR ONE DESTINATION
+  // (2026-09-18) — the Trends doc page's own ChartLine retired with the page, so every surface
+  // that offers the measured history (the vitals band's rim link, the phone Vitals row, the bar's
+  // view switch, the footer) now wears this.
   trend: ChartSpline,
   // The one consolidated placeholder view: a dashed circle — not yet formed, the same dashed
   // grammar the Blueprint wireframes speak. The coming features' own marks (Radar,
@@ -62,8 +63,6 @@ export const ABOUT_ICON: LucideIcon = Info;
 export const DOC_ICONS: Record<DocPage, LucideIcon> = {
   about: Info,
   design: SwatchBook,
-  // Trends wears the line chart — the page IS timeseries charts, so the mark says exactly that.
-  trends: ChartLine,
 };
 
 // The left-rail TOOL cards' ONE mark (GeoExplore, LedgerPanel — user decision: the SAME standard

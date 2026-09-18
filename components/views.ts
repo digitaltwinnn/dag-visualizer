@@ -90,58 +90,39 @@ export function viewTitle(name: string): string {
 // adding a doc page is: one entry here, its component in components/docs/ + DocLayer's map, a
 // thin route file passing `doc`, and a footer DocToggle if it should be reachable there. The
 // engine's bare stage, both transition signals and the roll grammar follow automatically.
+//
+// ⚠️ A DOC PAGE IS PROSE OVER THE BARE STAGE, AND THE REGISTRY IS ONLY FOR THAT (2026-09-18).
+// The Trends document was a third entry until the measured history got a VIEW of its own; it is
+// that view's RAW register now (`viewPolicy.rawSurface`, rendered by
+// datasection/DocumentSurface), not an overlay. The two flags it needed — `scoped`, which kept
+// the command bar's filter up over it, and `routeless`, which gave it no URL of its own — left
+// with it: a document reached through RAW keeps the bar's ordinary face by construction, and it
+// is its view's URL that the address bar states. Don't reintroduce either for a surface that is
+// really a view's second register; give it a policy row instead.
 export type DocDef = {
   label: string;
   title: string;
-  /** This doc READS THE COMMITTED NETWORK — so the command bar keeps its filter while the doc
-   *  is open, and the doc scopes itself to whatever is committed (user, 2026-09-14: "Trends is
-   *  a doc-page, but actually it shows data that could benefit from the metagraph filter").
-   *
-   *  ⚠️ This flag is the 2026-09-04 doc rule getting its real condition. That rule hid the
-   *  bar's scene-action controls because they acted on something the reader could not see —
-   *  true of the filter over /about and /design, whose prose has no network in it, and FALSE
-   *  of a doc made of per-network charts, where the filter acts on what is right there. So the
-   *  gate is "has this doc got something for the filter to do", not "is a doc open", and it
-   *  lives with the doc rather than as a page list inside TopBar. The PRESENTATION pair still
-   *  stands down under every doc: SCENE and RAW act on the layer the overlay covers, and no
-   *  doc changes that. */
-  scoped?: true;
-  /** No URL of its own — reached only through the RAW toggle on its own view, the way the
-   *  placeholder views carry no slug. The doc registry's path/title maps skip these. */
-  routeless?: true;
 };
 
 export const DOC_PAGES = {
   about: { label: "About", title: "About — DAG Visualizer" },
   design: { label: "Design", title: "Design — DAG Visualizer" },
-  trends: { label: "Trends", title: "Trends — DAG Visualizer", scoped: true, routeless: true },
 } satisfies Record<string, DocDef>;
 
 export type DocPage = keyof typeof DOC_PAGES;
 
-/** Whether the open doc (if any) reads the committed network — the one home for that question,
- *  consulted by the command bar and by the doc itself. */
-export function docReadsFilter(doc: DocPage | null): boolean {
-  return doc != null && (DOC_PAGES[doc] as DocDef).scoped === true;
-}
-
-/** The routed subset of the doc registry — null for a routeless doc (`trends`, since it moved
- *  behind its own view's RAW toggle). `Partial` rather than the old exhaustive `Record`, so a
- *  routeless key genuinely has no entry instead of lying about one via a cast. */
-export const DOC_PATHS: Partial<Record<DocPage, string>> = Object.fromEntries(
-  (Object.keys(DOC_PAGES) as DocPage[])
-    .filter((k) => !(DOC_PAGES[k] as DocDef).routeless)
-    .map((k) => [k, `/${k}`]),
-);
+/** Every doc page's route — the overlay is a real URL, so the footer and the Pages section can
+ *  hand out honest hrefs (middle-click and new-tab keep working). */
+export const DOC_PATHS = Object.fromEntries(
+  (Object.keys(DOC_PAGES) as DocPage[]).map((k) => [k, `/${k}`]),
+) as Record<DocPage, string>;
 
 export const DOC_TITLES = Object.fromEntries(
   (Object.keys(DOC_PAGES) as DocPage[]).map((k) => [k, DOC_PAGES[k].title]),
 ) as Record<DocPage, string>;
 
-/** The doc page a pathname names, or null — derived from the registry, never a second list.
- *  A routeless doc's own slug names no doc page (it names its VIEW instead, if any). */
+/** The doc page a pathname names, or null — derived from the registry, never a second list. */
 export function docForPath(pathname: string): DocPage | null {
   const seg = pathname.replace(/^\/+|\/+$/g, "");
-  if (!(seg in DOC_PAGES)) return null;
-  return (DOC_PAGES[seg as DocPage] as DocDef).routeless ? null : (seg as DocPage);
+  return seg in DOC_PAGES ? (seg as DocPage) : null;
 }

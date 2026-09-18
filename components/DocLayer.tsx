@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { DOC_ROLL } from "@/src/engine/domain/viewTransition";
 import { DOC_PAGES, type DocPage } from "@/components/views";
+import { DOC_MEASURE } from "@/components/docs/measure";
 import RailThread from "@/components/RailThread";
 
 // THE DOC OVERLAY (2026-09-04, user: "keep the background AND don't reboot the whole scene").
@@ -43,11 +44,12 @@ import RailThread from "@/components/RailThread";
 const DOC_COMPONENTS: Record<DocPage, ReturnType<typeof dynamic>> = {
   about: dynamic(() => import("@/components/docs/AboutDoc")),
   design: dynamic(() => import("@/components/docs/DesignDoc")),
-  trends: dynamic(() => import("@/components/docs/TrendsDoc")),
 };
 
-// The one doc column (both documents read it): max-w-3xl is the document reading measure;
-// /design's specimen grids wrap rather than widening past it. pt clears the fixed command bar.
+// The one doc column (both documents read it). The MEASURE itself is docs/measure.ts, shared
+// with the History view's raw register, which sets the same document on the raw layer's glass;
+// everything added here is the overlay's own — see the sheet note below. pt clears the fixed
+// command bar.
 //
 // THE COLUMN IS A SHEET (user, 2026-09-04 — "a slight fill and shadow make it look like a
 // doc?"): a faint veil fill, hairline side edges and a soft ambient shadow lift the reading
@@ -63,7 +65,7 @@ const DOC_COMPONENTS: Record<DocPage, ReturnType<typeof dynamic>> = {
 // filter strip over Trends laid the bar's second row across the document's eyebrow. Same token,
 // same arithmetic, and it is 0 whenever no strip is open — a no-op everywhere else.
 const DOC_COLUMN =
-  "relative mx-auto max-w-3xl min-h-full px-8 pt-[calc(68px+var(--topbar-extra,0px))] pb-24 " +
+  `relative ${DOC_MEASURE} min-h-full pt-[calc(68px+var(--topbar-extra,0px))] pb-24 ` +
   "bg-[var(--footer-glass)] backdrop-blur-[2px] " +
   "border-x border-border shadow-[0_0_50px_rgba(0,0,0,0.14)]";
 

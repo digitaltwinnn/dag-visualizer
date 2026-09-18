@@ -95,7 +95,7 @@ export default function AboutDoc() {
           Node locations come from their public internet addresses, so they are accurate to a
           city and a hosting provider, not to a street. The only thing stored behind this site
           is the network&apos;s own public history — daily activity totals summed from the chain
-          for the Trends page. Nothing about you: the page keeps a short memory of recent
+          for the History view. Nothing about you: the page keeps a short memory of recent
           snapshots while it is open, and forgets it when you close the tab.
         </p>
         <p className="mt-2 text-label text-muted-foreground leading-relaxed">
@@ -142,7 +142,7 @@ export default function AboutDoc() {
             voice; this page keeps it to one warm paragraph). */}
         <p>
           And everything here comes at <strong>three depths</strong>: the scene shows the
-          network <em>live</em>, the Trends page shows its <em>measured history</em>, and the
+          network <em>live</em>, the History view shows its <em>measured history</em>, and the
           raw data view opens the <em>individual snapshots</em> themselves — each one step
           deeper, and each step carries along what you were looking at.
         </p>

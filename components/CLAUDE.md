@@ -101,13 +101,29 @@ every remount silently wiped the landing mark. That mark is an OUTLINE and delib
 the washes are the selection language, and looking something up is not committing it (rule 2 keeps
 one write path).
 
-The scene layer is the four-zone HUD over the 3D canvas; the raw layer is the view's raw-data table —
-*the same data one level down*, not a second page. ⚠️ The store value for that layer is **`"data"`,
+The scene layer is the four-zone HUD over the 3D canvas; the raw layer is *the same subject one level
+down*, not a second page. ⚠️ The store value for that layer is **`"data"`,
 not `"raw"`** — every word the user reads says RAW, so the two registers don't match and grepping for
 `"raw"` finds nothing. The RAW switch runs one GSAP timeline: the HUD
 fades, the scene recedes (still live behind), the raw layer surfaces out of that depth. Back is the
 mirror, with three ways to ask for it — the switch, Escape, the layer's own × — all calling
 `setSection("scene")`. Reduced motion makes it an instant swap.
+
+⚠️ **WHAT THAT LAYER HOLDS IS A POLICY ROW, NOT A FIXED SURFACE** (2026-09-18). `section` is a
+PRESENTATION axis — one subject, two presentations — so `VIEW_POLICIES[mode].rawSurface` is where
+each view says which register it shows: `"records"` for the structural views (the anchor log, the
+node roster) and `"document"` for History, whose RAW is the measured-history DOCUMENT
+(`components/docs/TrendsDoc.tsx`, the view's other register under convention 12). The two live in
+`components/datasection/` as `RecordsSurface` / `DocumentSurface`, and `components/DataSection.tsx`
+is nothing but the keyed dispatch between them — a map, so a third register is a compile error
+rather than a silent fall-through, and gated on the row rather than a mode (convention 7). The mode
+compares that pick WHICH TABLE the records surface draws are records-internal, which is why they sit
+inside that surface and never in the dispatch; `components/rawSurfaceBoundary.test.ts` pins the
+split. The document's chunk is `dynamic()`-loaded — the raw layer mounts in every view — and it is
+set in the shared reading measure (`components/docs/measure.ts`) with no sheet of its own: the
+layer's `.ig-panel` glass IS its sheet, and a plate on a plate flattens both. Everything else about
+RAW is identical there: the toggle shows pressed, Escape and the × return to the scene, and the
+command bar keeps its whole ordinary face, filter included.
 
 **The page never scrolls.** The scene wrapper is `position:fixed; inset:0` with an identity transform
 from first paint, which makes it the containing block for every fixed descendant — see CSS trap 2,
@@ -594,6 +610,11 @@ once (user, 2026-09-09), so the class strings have one home.
   route file passing `doc`, a footer `DocToggle`. The engine's bare stage, both transition
   signals and the roll grammar follow automatically; the store's `docPage` union is the one
   deliberate duplicate, and tsc flags it the moment the registries disagree.
+  ⚠️ **The registry is for PROSE OVER THE BARE STAGE, and nothing else** (2026-09-18). A document
+  that is a VIEW's second register is not a doc page: it belongs to the raw layer, through that
+  view's `rawSurface` row. The Trends document was a third entry until History became a view, and
+  the two flags it needed there — `scoped` (keep the bar's filter up over it) and `routeless` (no
+  URL of its own) — were removed with it, since RAW gives both for free. Don't reintroduce either.
 
 - **The HUD arrives staged** (`useBootStage` + `BootFade`, wired in `AppShell`): command bar when
   the engine is up (or failed — chrome is controls), rails/dock/footer on first data, vitals band

@@ -5,7 +5,7 @@ import { SELECTED_ROW } from "@/components/selection";
 import { useStore } from "@/src/store/store";
 import NetLink from "@/components/NetLink";
 import { DOC_ICONS } from "@/components/icons";
-import { DOC_PAGES, DOC_PATHS, type DocDef, type DocPage } from "@/components/views";
+import { DOC_PAGES, DOC_PATHS, type DocPage } from "@/components/views";
 import { cn } from "@/lib/utils";
 
 // The doc-page rows — SECTION of the SettingsMenu since 2026-09-08 (user consolidation; the
@@ -15,25 +15,22 @@ import { cn } from "@/lib/utils";
 // DocToggles are (real hrefs keep middle-click/new-tab honest; a plain click flips the overlay
 // in place, and clicking the open page's row closes it).
 //
-// ⚠️ ROUTELESS DOCS HAVE NO ROW HERE (2026-09-18): `trends` moved behind its own view's RAW
-// toggle (DOC_PATHS carries no entry for it) — a row with no href would either dead-end or need
-// a second navigation mechanism this menu doesn't have. A later task wires the RAW toggle.
+// The section lists the WHOLE registry, and the registry is only prose pages over the bare stage
+// (views.ts). The Trends document is not one of them — it is the History view's RAW register, so
+// its route into the app is that view plus the bar's RAW toggle, not a page row here.
 export default function DocRows({ onDone }: { onDone: () => void }) {
   const doc = useStore((s) => s.docPage);
   const setDocPage = useStore((s) => s.setDocPage);
   return (
     <>
       {(Object.keys(DOC_PAGES) as DocPage[])
-        .filter((id) => !(DOC_PAGES[id] as DocDef).routeless)
         .map((id) => {
           const RowIcon = DOC_ICONS[id];
           const current = doc === id;
-          const href = DOC_PATHS[id];
-          if (!href) return null; // narrows what the filter above already guaranteed
           return (
             <NetLink
               key={id}
-              href={href}
+              href={DOC_PATHS[id]}
               aria-current={current ? "page" : undefined}
               className={cn(
                 "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-label no-underline",

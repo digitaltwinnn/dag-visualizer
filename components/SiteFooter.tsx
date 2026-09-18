@@ -157,15 +157,15 @@ export default function SiteFooter() {
             brand already do. Phone drops the view group (the header's… the BAR's own switch
             carries the views there). */}
         <FooterViewLinks />
-        {/* `!`: DOC_PATHS is Partial (a routeless doc, `trends` since 2026-09-18, carries no
-            entry) but About and Design are always routed — the footer names them directly, so
-            the assertion is exact rather than a filtered map. Trends dropped its own row here
-            the same day it gained a view of its own; History appears via FooterViewLinks now. */}
-        <DocToggle page="about" href={DOC_PATHS.about!}>
+        {/* The two doc pages, named directly rather than mapped: the row's ORDER and its
+            mid-dot are typography, not registry data. The measured history is not among them —
+            it gained a view of its own on 2026-09-18, so History appears via FooterViewLinks
+            and its document lives behind that view's RAW toggle. */}
+        <DocToggle page="about" href={DOC_PATHS.about}>
           About
         </DocToggle>
         <span aria-hidden className="opacity-70 text-muted-foreground">·</span>
-        <DocToggle page="design" href={DOC_PATHS.design!}>
+        <DocToggle page="design" href={DOC_PATHS.design}>
           Design
         </DocToggle>
         <span aria-hidden className="w-px h-3.5 self-center bg-muted-foreground/35" />

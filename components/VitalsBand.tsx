@@ -29,7 +29,7 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import RollSwap from "@/components/RollSwap";
 import { filterAccent } from "@/src/data/network";
 import { NoSignalDot } from "@/components/state/StateAtoms";
-import { DOC_ICONS } from "@/components/icons";
+import { VIEW_ICONS } from "@/components/icons";
 import { useSceneYield } from "@/components/RailShade";
 import { cn } from "@/lib/utils";
 import { HyperCells, GeoCells, LedgerCells } from "@/components/vitals/viewCells";
@@ -77,12 +77,14 @@ function ViewCells({ mode, accent, filter, paused = false }: { mode: Mode; accen
  *  VIEW of its own, and the document became its RAW register (`viewPolicy.rawSurface`), reached
  *  through that view's own RAW toggle — so the link's destination moved up one rung with it. It
  *  commits the same way every other view link does: `setMode`, which RouteSync publishes to the
- *  address bar as a shallow pushState, so the engine is never rebooted for it.
+ *  address bar as a shallow pushState, so the engine is never rebooted for it. The mark moved
+ *  with the destination: one icon for one place, so it is `VIEW_ICONS.trend` and the doc page's
+ *  old ChartLine is gone.
  *
  *  ⚠️ AND IT STANDS DOWN INSIDE THAT VIEW, gated on the band's own content policy
  *  (`bandContent === "timeline"`) rather than a mode compare — convention 7, and it is the honest
  *  condition besides: the link is a route to the surface the timeline IS. */
-const TrendsMark = DOC_ICONS.trends;
+const TrendsMark = VIEW_ICONS.trend;
 
 /** The History view as a LINK (user, 2026-09-08: "should not be part of the button-group, it
  *  should show as a link") — the site row's own link register: primary ink, normal case, the
