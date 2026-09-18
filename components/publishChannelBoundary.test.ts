@@ -51,6 +51,17 @@ describe("the React → Engine publish channels are one-way", () => {
     ).toEqual([]);
   });
 
+  it("trendIds is published, never subscribed — React must not render from it", () => {
+    // The feedback loop this file's header warns about, in its most literal form: the roster is
+    // DERIVED from fetched data by the one component that renders the planes, so a second surface
+    // reading it back out of the store would be rendering from its own publish — one commit late,
+    // and re-rendering every time the rank moved. `focusRung` has the analogous rule above.
+    const readers = ["app", "components"]
+      .flatMap(walk)
+      .filter((p) => /\bs\.trendIds\b|\bstate\.trendIds\b|\btrendIds\s*[,}]/.test(read(p)));
+    expect(readers, `trendIds is write-only from React: ${readers.join(", ")}`).toEqual([]);
+  });
+
   it("focusRung is a request, so nothing renders from it", () => {
     // It is a one-shot ASK, consumed by the Engine's reference bridge and never cleared. A
     // component that rendered from it would show a stale request forever and re-render on every

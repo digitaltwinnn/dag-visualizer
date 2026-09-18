@@ -112,4 +112,23 @@ describe("the trends view is registered and inert", () => {
     expect(VIEW_POLICIES.trend.chartStack).toBe(true);
     expect(VIEW_POLICIES.hyper.chartStack).toBe(false);
   });
+
+  // ⚠️ THE IDLE ORBIT IS A ROW, NOT A DENY-LIST (2026-09-18). `Engine._applyDestLayout` carried
+  // `controls.autoRotate = mode !== "geo"` — the shape convention 7 exists to prevent — and it had
+  // already gone wrong: the trends view inherited hyper's spin by default, which slid a page of
+  // charts sideways forever and kept `TrendStackSync`'s idle skip from ever engaging. Every value
+  // below is what the old expression GAVE that view, so this pins the preservation as much as the
+  // rule: `ledger` is false because its branch in `_applyDestLayout` returns before the generic
+  // line ever ran, and `hyper` is true because that line did run for it — even though its camera
+  // does not in fact orbit, `CameraDirector.focusFilter` having switched it off a moment later.
+  // Measured in the browser after the change: camera drift over 1.5s idle is 0 in all four views.
+  it("says per view whether the camera idles in an orbit", () => {
+    expect(VIEW_POLICIES.hyper.autoRotate).toBe(true);
+    expect(VIEW_POLICIES.geo.autoRotate).toBe(false);
+    expect(VIEW_POLICIES.ledger.autoRotate).toBe(false);
+    expect(VIEW_POLICIES.trend.autoRotate).toBe(false);
+    // The flat placeholder never applies a destination layout, so nothing reads its row — it keeps
+    // the old expression's answer so wiring one up later changes nothing by accident.
+    expect(VIEW_POLICIES.soon.autoRotate).toBe(true);
+  });
 });

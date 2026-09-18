@@ -43,9 +43,11 @@ export interface TrendPlaneEl {
   isConnected: boolean;
 }
 
-/** The `#trend-stack` root, as narrowly as this module needs it: one attribute the CSS fades on. */
+/** The `#trend-stack` root, as narrowly as this module needs it: one attribute the CSS fades on,
+ *  plus the liveness flag that makes writing it idempotent against a REMOUNT. */
 export interface TrendRootEl {
   dataset: { on?: string };
+  isConnected: boolean;
 }
 
 /** The engine-side values the projection needs. Bound once — a stable camera ref plus getters for
@@ -117,8 +119,15 @@ export class TrendStackSync {
   /** Set when a pose had no element to write to — React has not mounted it yet, so the projector
    *  must keep looking rather than falling asleep on a plane that never got placed. */
   private _missing = false;
-  /** The root's announced state; `null` = never written. */
+  /** What we last told the ROOT, and WHICH root we told. ⚠️ Keyed on the element, never on the
+   *  flag alone (F1): React remounts `#trend-stack` whenever the layer is unmounted and brought
+   *  back with the view still active — a doc overlay opening and closing is the everyday case —
+   *  and the fresh root carries no `data-on` at all, so a cached boolean would leave the whole
+   *  stack parked at opacity 0 for the rest of the session. This is `CalloutSync`'s rule
+   *  (`el.dataset.on !== flag` against the LIVE element), with the element cached so the steady
+   *  state still costs no DOM read. */
   private _on: boolean | null = null;
+  private _onEl: TrendRootEl | null = null;
 
   constructor(host: TrendStackHost) {
     this.h = host;
@@ -165,9 +174,18 @@ export class TrendStackSync {
     // the camera parks between gestures, so this view's steady state is "nothing to say"; five DOM
     // style writes a frame for an unchanged answer is exactly the cost a DOM-in-3D layer has to
     // avoid. Every clause is a real way the answer can change: the camera, the canvas box, the
-    // requested poses, an ease still travelling, a plane React has not mounted yet, and the view
-    // itself coming back.
-    if (!retarget && !moved && w === this._w && h === this._h && this._settled && this._wasActive && !this._missing) {
+    // requested poses, an ease still travelling, a plane React has not mounted yet, the elements
+    // going away under us, and the view itself coming back.
+    //
+    // ⚠️ `_elementsLive()` is not belt-and-braces (F2). The freshness check that re-resolves a
+    // remounted plane lives inside `_write`, which this very `return` prevents from running — so
+    // without it, a stack remounted while the projector sleeps (a doc overlay closing, a roster
+    // re-render) stays `invisible` with an empty transform until something happens to move the
+    // camera. The skip has to be able to notice that the DOM it is asleep on is gone.
+    if (
+      !retarget && !moved && w === this._w && h === this._h &&
+      this._settled && this._wasActive && !this._missing && this._elementsLive()
+    ) {
       return;
     }
     this._w = w;
@@ -262,11 +280,27 @@ export class TrendStackSync {
       const tx = (v.x * 0.5 + 0.5) * w;
       const ty = (-v.y * 0.5 + 0.5) * h;
       const s = (PLANE_WORLD_W * (pxPerUnitAt1 / d)) / PLANE_PX_W * sl.s;
-      // Rounded so an imperceptible drift never shows up as a fresh string: 3 decimals of scale is
-      // ~0.27px at the plane's own edge, 2 decimals of translate is a hundredth of a px.
-      el.style.transform = `matrix3d(${s.toFixed(3)},0,0,0,0,${s.toFixed(3)},0,0,0,0,1,0,${tx.toFixed(2)},${ty.toFixed(2)},0,1)`;
+      // Rounded to keep the STRING short and its parse cheap — the browser re-parses this value on
+      // every write, and `0.8231045836…` costs more than `0.823` for a difference no display can
+      // show (3 decimals of scale is ~0.27px at the plane's own edge; 2 of translate is a
+      // hundredth of a px). ⚠️ It has nothing to do with the idle skip: that is decided upstream by
+      // the float32 matrix compare, and this code never runs on a frame the skip would have taken.
+      const fs = s.toFixed(3);
+      el.style.transform = `matrix3d(${fs},0,0,0,0,${fs},0,0,0,0,1,0,${tx.toFixed(2)},${ty.toFixed(2)},0,1)`;
       this._setVis(sl, el, true);
     }
+  }
+
+  /** Are the elements this projector last wrote still the ones on the page? A slot whose element
+   *  has been detached (or was never resolved) means the next frame must re-resolve and re-write —
+   *  `_write` is where that happens, so the answer here is what lets the skip get out of the way.
+   *  One field read per plane, five in this view. */
+  private _elementsLive(): boolean {
+    for (let i = 0; i < this._order.length; i++) {
+      const sl = this._slots.get(this._order[i]!);
+      if (!sl || sl.el === null || !sl.el.isConnected) return false;
+    }
+    return true;
   }
 
   /** True when the camera's pose or lens changed since the last write — and copies the new one in.
@@ -314,9 +348,27 @@ export class TrendStackSync {
   // is legitimately gone and it remounts carrying no attribute at all, which already reads as off.
   // Retrying that one would leave this reaching for a node that is never coming back.
   private _announce(on: boolean): void {
-    if (this._on === on) return;
+    // ⚠️ THE TWO DIRECTIONS ARE NOT SYMMETRIC, and each asymmetry is a bug that was there.
+    // OFF needs only the flag: the view is not live, so a root that remounts meanwhile carries no
+    // `data-on` at all, which already reads as off — and continuing to ask would be a
+    // `getElementById` every frame in every OTHER view, for a node that is never coming back.
+    // ON has to check the live ELEMENT (F1): a doc overlay opening and closing remounts
+    // `#trend-stack` with the view still active, and a cached boolean would leave the whole layer
+    // parked at opacity 0 for the rest of the session. That is `CalloutSync`'s rule — write
+    // against the element, not against a flag — with the element cached so the steady state still
+    // costs no DOM read.
+    if (this._on === on && (!on || (this._onEl !== null && this._onEl.isConnected))) return;
     const root = this.h.root();
-    if (root) root.dataset.on = on ? "1" : "0";
-    if (root || !on) this._on = on;
+    if (root !== this._onEl) {
+      this._onEl = root;
+      this._on = null; // a different element has never been told anything
+    }
+    if (!root) {
+      if (!on) this._on = false;
+      return;
+    }
+    if (this._on === on) return;
+    root.dataset.on = on ? "1" : "0";
+    this._on = on;
   }
 }

@@ -106,9 +106,20 @@ export interface ViewPolicy {
   // one hardcoded surface: the structural views show the records layer, and the trends view
   // shows the measured-history DOCUMENT, which is its other register (CLAUDE.md convention 12).
   rawSurface: "records" | "document";
-  // Does this view mount the DOM chart-plane stack (a later task's `TrendStack` component gates
-  // on this — convention 7: gate on the view a behaviour is FOR, never `mode === "x"`)?
+  // Does this view mount the DOM chart-plane stack (`components/TrendStack.tsx` gates on this —
+  // convention 7: gate on the view a behaviour is FOR, never `mode === "x"`)?
   chartStack: boolean;
+  // Does the camera idle-ORBIT in this view (OrbitControls.autoRotate)? A row rather than the
+  // `mode !== "geo"` deny-list the Engine carried until 2026-09-18 — which is exactly the shape
+  // convention 7 exists to prevent, and it had already gone wrong: the fourth view inherited
+  // hyper's spin by default and nobody decided it. The question a row makes each view answer is
+  // "is this a thing you LOOK AT, or a thing you READ?" — an idling orbit keeps a structure alive
+  // and shows its far side, and it makes a page of text slide sideways forever.
+  // ⚠️ This is the view's DEFAULT, applied when the destination layout lands. A framing resolver
+  // may still switch the orbit off afterwards for a subject it is aiming at (CameraDirector's
+  // `focusFilter`, the geo node/cohort resolvers) — those are selection state, not view state,
+  // and they are why a row can read `true` while the view's camera is in practice still.
+  autoRotate: boolean;
 }
 
 // The calm bloom the ledger view uses — the reference the design likes (thin lines, sparse
@@ -138,6 +149,10 @@ const FLAT: ViewPolicy = {
   fleet: "placed",
   rawSurface: "records",
   chartStack: false,
+  // Never read today — a flat view PARKS the fleet and applies no destination layout, so it is
+  // the only row nothing consults. It keeps the value the old `mode !== "geo"` line would have
+  // given it, so wiring one up later changes nothing by accident.
+  autoRotate: true,
 };
 
 export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
@@ -178,6 +193,12 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     fleet: "placed",
     rawSurface: "records",
     chartStack: false,
+    // TRUE, which is what the old `mode !== "geo"` line gave it — and it stays the row's answer
+    // even though hyper's camera does not in fact idle-orbit today: `CameraDirector.focusFilter`
+    // switches it off for EVERY filter, "all" included, because the structure spins itself
+    // (setHyperSpin) and two rotations over one subject read as neither. The view's default and
+    // the framing's override are different facts and they live in different places.
+    autoRotate: true,
     },
   // Footprint: the holographic globe + travelling packets; picks the globe nodes only.
   geo: {
@@ -201,6 +222,9 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     fleet: "placed",
     rawSurface: "records",
     chartStack: false,
+    // OFF: the globe does its own spinning (sims.globeSpin) and it turns to face a selection —
+    // a camera orbiting a spinning globe is two rotations fighting over one subject.
+    autoRotate: false,
     },
   // Snapshots: the settlement chamber. Morph frozen (nodes fly into lanes); picks the centred
   // snapshot + the reused producer dots. (The ledger-specific depth-fog recency treatment was
@@ -225,6 +249,10 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     fleet: "placed",
     rawSurface: "records",
     chartStack: false,
+    // OFF, and it always was: the chamber's branch in `_applyDestLayout` returns before the
+    // generic line, so `mode !== "geo"` never reached it. The trail reads as a TIME axis running
+    // away from the reader, and an orbit turns that axis into a shape being inspected.
+    autoRotate: false,
   },
   // MEASURED HISTORY (2026-09-18) — the charts ARE the scene: DOM planes driven by
   // TrendStackSync, so almost every engine-side switch here is OFF. The canvas stays on because
@@ -255,6 +283,11 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     fleet: "parked",
     rawSurface: "document",
     chartStack: true,
+    // ⚠️ OFF, and this row is why the field exists (2026-09-18). The planes are TEXT — a chart you
+    // are reading has to hold still, and an idle orbit slid the whole stack sideways forever. It
+    // also defeats `TrendStackSync`'s idle skip outright: a camera that never stops moving means
+    // five DOM style writes every frame, in the one view that already runs five composited layers.
+    autoRotate: false,
   },
   soon: FLAT,
 };

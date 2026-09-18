@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import * as THREE from "three";
-import { TrendStackSync, type TrendPlaneEl, type TrendStackState } from "./TrendStackSync";
+import { TrendStackSync, type TrendPlaneEl, type TrendRootEl, type TrendStackState } from "./TrendStackSync";
 import { FOCI } from "./domain/cameraRig";
 
 // THE PROJECTOR'S CONTRACT, made executable. `TrendStackSync` is `CalloutSync`'s sibling — narrow
@@ -30,7 +30,7 @@ function fakeHost(opts: { pos?: THREE.Vector3; target?: THREE.Vector3 } = {}) {
   const els = new Map<string, TrendPlaneEl>();
   let active = true;
   let dt = 1 / 60;
-  const root = { dataset: {} as { on?: string } };
+  let root: TrendRootEl | null = { dataset: {}, isConnected: true };
   const host = {
     camera,
     width: () => 1500,
@@ -47,9 +47,21 @@ function fakeHost(opts: { pos?: THREE.Vector3; target?: THREE.Vector3 } = {}) {
     active: () => active,
   };
   return {
-    host, els, camera, root,
+    host, els, camera,
+    /** The live root — read through a getter, because the remount tests swap it. */
+    get root() { return root; },
     setActive: (v: boolean) => { active = v; },
     setDt: (v: number) => { dt = v; },
+    /** React's remount, as the projector sees it: the old node detaches, a fresh one arrives. */
+    remountRoot: () => {
+      if (root) root.isConnected = false;
+      root = { dataset: {}, isConnected: true };
+    },
+    /** The same, for the planes: every cached element detaches and `plane(id)` mints new ones. */
+    remountPlanes: () => {
+      for (const e of els.values()) e.isConnected = false;
+      els.clear();
+    },
   };
 }
 
@@ -159,12 +171,15 @@ describe("TrendStackSync", () => {
 
     const flat = state({ layout: "flat" });
     const seen: string[] = [];
-    for (let i = 0; i < 4; i++) { sync.sync(flat); seen.push(els.get("c")!.style.transform); }
+    for (let i = 0; i < 8; i++) { sync.sync(flat); seen.push(els.get("c")!.style.transform); }
     expect(seen[0]).not.toBe(rest);              // it moved
     expect(new Set(seen).size).toBe(seen.length); // and kept moving — a jump would repeat at once
-    // Converging: each step is smaller than the last (an exponential ease, not a linear ramp).
-    const sc = seen.map(scaleOf);
-    expect(Math.abs(sc[1]! - sc[0]!)).toBeLessThan(Math.abs(sc[0]! - scaleOf(rest)));
+    // CONVERGING, not ramping: an exponential ease spends most of the distance early, so a late
+    // step is smaller than an early one. Measured across the window rather than between adjacent
+    // frames — at 3 decimals of scale two neighbouring steps can round to the same size.
+    const sc = [scaleOf(rest), ...seen.map(scaleOf)];
+    const step = (i: number) => Math.abs(sc[i + 1]! - sc[i]!);
+    expect(step(sc.length - 2)).toBeLessThan(step(0));
 
     for (let i = 0; i < 400; i++) sync.sync(flat);
     els.get("c")!.style.transform = "";
@@ -173,14 +188,56 @@ describe("TrendStackSync", () => {
   });
 
   it("hides the whole stack while the view is not live, and announces it on the root", () => {
-    const { host, els, root, setActive } = fakeHost();
-    const sync = new TrendStackSync(host);
+    const h = fakeHost();
+    const sync = new TrendStackSync(h.host);
     sync.sync(state());
-    expect(root.dataset.on).toBe("1");
-    setActive(false);
+    expect(h.root!.dataset.on).toBe("1");
+    h.setActive(false);
     sync.sync(state());
-    expect(root.dataset.on).toBe("0");
-    expect(els.get("a")!.style.visibility).toBe("hidden");
+    expect(h.root!.dataset.on).toBe("0");
+    expect(h.els.get("a")!.style.visibility).toBe("hidden");
+  });
+
+  it("re-announces onto a root that REMOUNTED while the view stayed live", () => {
+    // ⚠️ F1. `DocGate` unmounts the whole stack when a doc overlay opens and mounts it again when
+    // it closes — `active()` never flips, so nothing else in this module notices. The fresh root
+    // carries no `data-on`, so a cached boolean would leave the entire layer at opacity 0 for the
+    // rest of the session: the charts are placed, sized, visible, and invisible.
+    const h = fakeHost();
+    const sync = new TrendStackSync(h.host);
+    sync.sync(state());
+    expect(h.root!.dataset.on).toBe("1");
+
+    h.remountRoot();
+    expect(h.root!.dataset.on).toBeUndefined();
+    sync.sync(state()); // no camera move, no state change
+    expect(h.root!.dataset.on, "the remounted root must be told again").toBe("1");
+  });
+
+  it("wakes from the idle skip when the planes it wrote have been remounted", () => {
+    // ⚠️ F2. The element-freshness check lives in `_write`, which the idle skip prevents from
+    // running — so the skip itself has to be able to see that the DOM it fell asleep on is gone.
+    // Without this the remounted planes sit `invisible` with an empty transform until something
+    // happens to move the camera, which in a view whose camera is deliberately parked is never.
+    const h = fakeHost();
+    const sync = new TrendStackSync(h.host);
+    // ONE state object, reused — `ids` is bridged by reference, so a fresh array every call would
+    // retarget every frame and the skip under test would never engage at all.
+    const s = state();
+    sync.sync(s);
+    sync.sync(s);
+    const placed = h.els.get("a")!.style.transform;
+    expect(placed).toMatch(/^matrix3d\(/);
+    h.els.get("a")!.style.transform = "";
+    sync.sync(s);
+    expect(h.els.get("a")!.style.transform, "the skip must be engaged for this test to mean anything").toBe("");
+    h.els.get("a")!.style.transform = placed;
+
+    h.remountPlanes();
+    sync.sync(s); // again: no camera move, no state change
+    const fresh = h.els.get("a")!;
+    expect(fresh.style.transform, "a remounted plane must be placed again").toBe(placed);
+    expect(fresh.style.visibility).toBe("visible");
   });
 
   it("stops reaching for a root that has gone away, but keeps waiting for one that has not arrived", () => {
@@ -200,6 +257,28 @@ describe("TrendStackSync", () => {
     looks = 0;
     for (let i = 0; i < 5; i++) sync.sync(state());
     expect(looks).toBe(1);
+  });
+
+  it("starts a first-seen plane AT its target, not eased in from the origin", () => {
+    // A roster refresh (every five minutes) or a scroll brings ids the projector has never placed.
+    // Easing those from a zero would make each one fly in from the world origin — an entrance the
+    // data never asked for, five times an hour.
+    const h = fakeHost();
+    const sync = new TrendStackSync(h.host);
+    sync.sync(state({ ids: ["a", "b", "c"] }));
+    const firstFrame = h.els.get("b")!.style.transform;
+
+    // Whatever many frames later, the same plane has not moved a pixel: frame one WAS the target.
+    for (let i = 0; i < 200; i++) sync.sync(state({ ids: ["a", "b", "c"] }));
+    expect(h.els.get("b")!.style.transform).toBe(firstFrame);
+
+    // And the same for an id that appears later, alongside planes that are already settled.
+    const grown = ["a", "b", "c", "d"];
+    sync.sync(state({ ids: grown }));
+    const dFirst = h.els.get("d")!.style.transform;
+    expect(dFirst).toMatch(/^matrix3d\(/);
+    for (let i = 0; i < 200; i++) sync.sync(state({ ids: grown }));
+    expect(h.els.get("d")!.style.transform, "a newly seen plane must not travel").toBe(dFirst);
   });
 
   it("never imports the store as a value", () => {

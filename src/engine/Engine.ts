@@ -534,7 +534,7 @@ export class Engine {
       height: () => this.ctx.renderer.domElement.clientHeight || window.innerHeight,
       dt: () => this._frameDt,
       plane: (id) => this._planeEl(id),
-      root: () => document.getElementById("trend-stack"),
+      root: () => this._trendRoot(),
       // Convention 7: the policy flag, never a `mode === "trend"` compare. The second clause is the
       // callout's own judgement — a view mid-transition has a camera in flight and furniture still
       // building, so a plane placed against that pose is placed against nothing yet. `furnitureAlpha`
@@ -1305,7 +1305,10 @@ export class Engine {
     if (mode === "ledger") {
       this.layers.focusId = null;
       this.globe.focusDensest(false);
-      this.ctx.controls.autoRotate = false;
+      // The same per-view row the generic branch below reads — this branch returns early, so it
+      // needs its own write, but not its own OPINION (the hardcoded `false` here is what the
+      // `mode !== "geo"` line never actually reached; convention 8, one home).
+      this.ctx.controls.autoRotate = VIEW_POLICIES[mode].autoRotate;
       this.globe.setFilter(this.filter); // dim non-selected metagraph columns (no camera move)
       this.ledger.setFilter(ledgerLens(this.filter)); // the chamber's COLOURED dim, through the ledger's lens (dag = the whole chamber)
       this._refreshLedger();
@@ -1320,7 +1323,10 @@ export class Engine {
     // are both gated to hyper/geo internally and no-op for it (no shared nodes to dim or carry
     // ancestry for), and _resolveFocus still lands the camera correctly — LADDERS.trend has its
     // own rungs and resolvers (Task 1 stubs, both flying to FOCI.trend).
-    this.ctx.controls.autoRotate = mode !== "geo";
+    // Convention 7: the per-view row, never a deny-list. `mode !== "geo"` sat here until
+    // 2026-09-18 and had already gone wrong — the trends view inherited hyper's idle spin by
+    // default, which slid a page of charts sideways forever and kept the projector awake.
+    this.ctx.controls.autoRotate = VIEW_POLICIES[mode].autoRotate;
     this.applyFilter(false); // apply the filter's visuals, but leave the camera to _resolveFocus
     // The carried node's ancestry for THIS view (country + provider in geo, the composition
     // group in hyper) — committed before the focus walk, so the finer node rung still wins the
@@ -2217,6 +2223,16 @@ export class Engine {
   // change that asks for it and remounts the set when the roster moves, so the cache re-resolves
   // whenever its element has left the document — the `#callout` getElementById discipline, one level
   // up because there are five of them. The query itself is event-time, never per frame.
+  // The stack's ROOT, cached the same way and for the same reason. `TrendStackSync` asks for it
+  // whenever its cached one has left the document (a doc overlay unmounts the whole layer), so the
+  // lookup must be a cache miss rather than a per-frame `getElementById`.
+  private _trendRootEl: HTMLElement | null = null;
+  private _trendRoot(): HTMLElement | null {
+    if (this._trendRootEl && this._trendRootEl.isConnected) return this._trendRootEl;
+    this._trendRootEl = document.getElementById("trend-stack"); // event-time
+    return this._trendRootEl;
+  }
+
   private _planeEls = new Map<string, HTMLElement>();
   private _planeEl(id: string): HTMLElement | null {
     const hit = this._planeEls.get(id);
