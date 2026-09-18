@@ -57,6 +57,18 @@ describe("VIEW_POLICIES", () => {
     for (const m of MODES) expect(VIEW_POLICIES[m].vitalsLane).toBe(VIEW_POLICIES[m].canvas);
   });
 
+  // The band is ONE mounted surface whose CONTENT is per view (2026-09-18): `vitalsLane` says
+  // whether it mounts and reserves space, `bandContent` says what it holds. Pinned as an
+  // allow-list rather than "everything except trend", which is the deny-list shape convention 7
+  // exists to prevent — a sixth view must answer for itself.
+  it("fills the band with vitals cells everywhere but the trends view, which gets the timeline", () => {
+    expect(VIEW_POLICIES.trend.bandContent).toBe("timeline");
+    for (const m of MODES) {
+      if (m === "trend") continue;
+      expect(VIEW_POLICIES[m].bandContent, `${m} should still show the vitals cells`).toBe("vitals");
+    }
+  });
+
   it("gives flat views NO sims, NO picks, NO DoF, NO canvas, NO show", () => {
     for (const m of FLAT_MODES) {
       const p = VIEW_POLICIES[m];

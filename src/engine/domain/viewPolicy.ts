@@ -79,6 +79,17 @@ export interface ViewPolicy {
   // views stay false — numbers beside a `preview` wireframe would be the mixed signal rule 10
   // exists to prevent.
   vitalsLane: boolean;
+  // WHAT the mounted band CONTAINS (2026-09-18). The band is ONE surface with a fixed height and
+  // one set of edges, and `vitalsLane` above says whether it mounts and reserves space — a
+  // question that stays the same. What it HOLDS is a different question, and the trends view
+  // answers it differently: its bottom lane is the shared TIMELINE (the overview track, the brush
+  // that is `trendRange`, the cursor that is `trendCursorMs`, the window pills), not a row of
+  // read-only vitals cells. A row rather than a `mode === "trend"` inside VitalsBand, because
+  // that is the deny-list shape convention 7 exists to prevent: a sixth view would inherit
+  // "vitals" by silence instead of answering for itself. Both presentations (the desktop band and
+  // the phone dock's Vitals sheet) read it through the ONE `ViewCells` dispatch, so a band's
+  // content can never differ between them.
+  bandContent: "vitals" | "timeline";
   // Does this view anchor the SUBJECT CALLOUT (user, 2026-08-15) — the HUD-layer label the Engine
   // positions over the committed subject's projected anchor each frame? Two readers: SceneCallout
   // mounts on it, the Engine's per-frame sync gates on it — one flag, so the label and its
@@ -149,6 +160,7 @@ const FLAT: ViewPolicy = {
   minPolarAngle: 0.25,
   nodeList: false,
   vitalsLane: false,
+  bandContent: "vitals",
   callout: false,
   bloom: BLOOM_CALM,
   chipEnv: 1,
@@ -192,6 +204,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // so hyper shares the overview pose with the other views and never needs the pole-crossing relax
     nodeList: true,
     vitalsLane: true,
+    bandContent: "vitals",
     callout: true, // first consumer of the subject callout (rolling out view by view)
     // Calmer than ledger: the core + dense node field piled up an additive bleed on OLED/HDR.
     bloom: { strength: 0.27, radius: 0.32, threshold: 0.14 },
@@ -220,6 +233,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minPolarAngle: 0.25,
     nodeList: true,
     vitalsLane: true,
+    bandContent: "vitals",
     callout: true, // node > cohort > country anchors; the distributed network rung has none
     // The lowest bloom of the three views: strength drives the "black halo" ring the saturated
     // node/wall hues cast on the globe, and the additive coastal walls read fuzzy under bloom.
@@ -249,6 +263,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // The Snapshots node browser (LedgerPanel's floor disclosures) reads store.selNodes.
     nodeList: true,
     vitalsLane: true,
+    bandContent: "vitals",
     callout: true, // the pinned snapshot — the lane lead tile, or the global tick's bar
     bloom: BLOOM_CALM, // the reference look the design likes — unchanged
     chipEnv: 0.5, // low, not zero — coplanar trays wash at full sheen, go bland at none (field note)
@@ -281,9 +296,10 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minCamAlt: null,
     minPolarAngle: 0.25,
     nodeList: false,
-    // The band is MOUNTED but its content is this view's timeline (Task 8), not the vitals
-    // cells — the reserve it publishes is the same either way.
+    // The band is MOUNTED but its content is this view's TIMELINE, not the vitals cells — the
+    // reserve it publishes is the same either way, which is why the two are separate rows.
     vitalsLane: true,
+    bandContent: "timeline",
     // The planes carry their own headers, so a floating label over a projected anchor would be
     // a second name for the same thing.
     callout: false,
