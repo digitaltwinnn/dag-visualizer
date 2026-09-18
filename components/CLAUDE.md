@@ -1107,6 +1107,8 @@ seam and corner rules select on the same markers the thread measures:
 | `.nb-row` | The pairing row-wash selector |
 | `#topbar`, `#metapane`, `#tooltip` | Layout and positioning |
 | `#callout` (+ `data-on`) | The subject callout's 0-size anchor wrapper — `SceneCallout` renders it, `CalloutSync` writes its transform + `data-on` per frame (the Tooltip discipline: position never renders React) |
+| `#trend-stack` | The trend view's chart-plane layer — `TrendStack` renders it, the engine queries it to find the planes |
+| `[data-plane]` (the network id) | One chart plane. **React renders the plane and owns everything inside it**; `TrendStackSync` (engine layer) writes its `transform` per frame — the `#callout` discipline exactly, so a plane's position never triggers a React render |
 
 ⚠️ The card query is deliberately **depth-agnostic** (filtered to outermost panels): a `:scope >
 .ig-panel` form silently matches nothing once the ladder lane nests the cards.

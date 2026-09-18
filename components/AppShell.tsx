@@ -19,6 +19,7 @@ import RouteSync from "@/components/RouteSync";
 import Tooltip from "@/components/Tooltip";
 import HintTips from "@/components/HintTips";
 import SceneCallout from "@/components/SceneCallout";
+import TrendStack from "@/components/TrendStack";
 import DevCssCanary from "@/components/DevCssCanary";
 import SectionShell from "@/components/SectionShell";
 import DataSection from "@/components/DataSection";
@@ -86,6 +87,12 @@ export default function AppShell({ doc }: { doc?: DocPage }) {
             depth transition the shell scales, but the callout has already hidden itself (it only
             renders in the scene pose). */}
         <DocGate>
+          {/* The trends view's chart planes (2026-09-18) — a HUD layer over the canvas, under the
+              rails, inside the shell for the same reason the callout is: its `absolute inset-0`
+              must resolve against the shell's own fixed box (CSS trap 2), and it stands down with
+              the rest of the scene furniture while a doc overlay is open. It gates itself on
+              `VIEW_POLICIES[mode].chartStack`, so it costs every other view one null render. */}
+          <TrendStack />
           <SceneCallout />
         </DocGate>
         <BootFade at="data">

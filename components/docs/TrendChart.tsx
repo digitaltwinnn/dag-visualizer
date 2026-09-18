@@ -47,6 +47,7 @@ export default function TrendChart({
   readout,
   scaleMax,
   className,
+  headClassName,
 }: {
   name: string;
   /** The unit word the head carries once (" /day", " seconds", " total"…). */
@@ -96,6 +97,12 @@ export default function TrendChart({
    *  and a day-mean of gaps needs the weighting the store already did per bucket. */
   readout?: { value: number; word: string };
   className?: string;
+  /** Extra classes for the HEAD ROW alone (2026-09-18). The 3D trend stack's planes have no
+   *  chrome of their own — the head IS each plane's header strip, the one part of a fully
+   *  transparent plane that carries a plate so the network name and unit stay readable over the
+   *  scene. One prop rather than a second head: the document's own head renders unchanged when
+   *  nothing is passed, so both registers keep one chart implementation. */
+  headClassName?: string;
 }) {
   const n = buckets.length;
   // The hatch pattern's SVG id — per chart instance (useId), sanitized because url(#…)
@@ -272,7 +279,7 @@ export default function TrendChart({
           out the LINK and the READOUT wrap to a second line instead. `max-w-full` is the
           backstop: a name longer than the whole row still truncates inside the group rather
           than overflowing it. Nothing changes at any width where the row already fit. */}
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-1">
+      <div className={headClassName ? `flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-1 ${headClassName}` : "flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-1"}>
         <span className="inline-flex items-baseline gap-2 min-w-0 max-w-full flex-none">
           <span className="inline-block w-2 h-2 rounded-full flex-none" style={{ background: hue0 }} aria-hidden />
           <span className="text-label font-semibold text-foreground truncate">{name}</span>
