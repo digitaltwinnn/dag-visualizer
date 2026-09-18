@@ -5,11 +5,21 @@
 // plane is the busiest chain (or the focused one) and the column behind it is everyone else.
 //
 // SPLIT OF LABOUR, the callout's exactly (`components/SceneCallout.tsx`): REACT owns this DOM and
-// everything inside it — which networks, which metric, what each chart asserts — and a later
-// task's `TrendStackSync` (engine layer) owns the per-frame PLACEMENT, projecting each
-// `PlanePose` through the camera and writing one `transform` onto the matching `[data-plane]`
-// element. So `#trend-stack` and `[data-plane]` are marker contracts (components/CLAUDE.md's
-// table), and position never triggers a React render.
+// everything inside it — which networks, which metric, what each chart asserts, plus each plane's
+// opacity, paint order and interactivity, all read from the same `PlanePose` — and
+// `src/engine/TrendStackSync.ts` (engine layer) owns the per-frame PLACEMENT, projecting that pose
+// through the camera and writing one `transform` onto the matching `[data-plane]` anchor. So
+// `#trend-stack` and `[data-plane]` are marker contracts (components/CLAUDE.md's table), and
+// position never triggers a React render.
+//
+// ⚠️ A PLANE IS AN ANCHOR PLUS A CHILD, and the split is load-bearing. `[data-plane]` is a 0-size
+// box pinned at the layer's top-left with `transform-origin: 0 0`, so the engine's matrix can be
+// the projected point itself — a translate and a uniform scale, no centring term to compose and no
+// rotation, which is what keeps the chart's text crisp and the compositor off the re-raster path.
+// Its ONE child is the actual `PLANE_PX_W` plane, centred on that origin by its own −50%/−50%. The
+// anchor mounts `invisible` and the ENGINE flips `style.visibility`: a class, so React's own
+// re-renders can never clobber the engine's inline write, and a plane can never flash at the
+// corner before the first projection lands.
 //
 // ONE CHART PRIMITIVE, TWO REGISTERS. These planes and the Trends document render the same
 // component, so every honesty rule travels unchanged: a null bucket is a GAP (never a zero), a
@@ -45,32 +55,14 @@ import {
   trimCounterEdges,
 } from "@/src/data/trendSeries";
 import { leadingTrim } from "@/src/data/trendWindow";
-import { PLANE_GAP, stackPoses } from "@/src/engine/domain/trendStack";
+import { PLANE_PX_W, stackPoses } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { METAGRAPHS } from "@/src/net/current";
 import { useStore } from "@/src/store/store";
 
-/** The plane's own width at scale 1. There is no height: the plane is CONTENT-height, because the
- *  chart's own plot frame IS the plane's one hairline — a box around it would be a second edge
- *  around the same rectangle. */
-const PLANE_W = 540;
-
 /** The empty roster, as ONE frozen reference. Publishing a fresh `[]` would be a content-free
  *  change the engine's `!==` still has to answer. */
 const NO_IDS: readonly string[] = [];
-
-/** ⚠️ STATIC PLACEMENT ONLY — `TrendStackSync` (the next task) takes this over and writes a
- *  projected `matrix3d` onto the same `transform`. It lives here, in ONE expression, precisely so
- *  that hand-over is a deletion rather than a hunt: the look can be reviewed before the projector
- *  exists, and nothing else in this file encodes where a plane sits.
- *
- *  It reads the POSE, never the array index, so `layout: "flat"` and the focus lift are visible
- *  before the projector exists: `pose.z` is world depth with NEARER = LARGER z (the cameraRig
- *  looks down −Z), so a screen-y of `+z` puts the nearest plane LOWEST and the rear ones stepping
- *  up behind it — the same reading the real projection gives, at a fake scale. */
-const STEP_Y = 38;
-const staticTransform = (pose: { z: number; scale: number }): string =>
-  `translate(-50%, -50%) translateY(${(pose.z / PLANE_GAP) * STEP_Y}px) scale(${pose.scale})`;
 
 export default function TrendStack() {
   // Convention 7: gate on the view this behaviour is FOR, read from the allow-list — never a
@@ -161,7 +153,16 @@ export default function TrendStack() {
     // A HUD layer over the canvas and under the rails: `absolute inset-0` resolves against the
     // scene shell (CSS trap 2 — the shell is the fixed/positioned ancestor), and z-[4] sits above
     // the canvas's tree-order paint and below the rails' z-10.
-    <div id="trend-stack" className="absolute inset-0 pointer-events-none z-[4]">
+    //
+    // THE ENTRANCE IS ONE ATTRIBUTE. The planes mount the instant the view commits, but the camera
+    // is still flying and the room still building for the first second of the choreography — so the
+    // layer waits at opacity 0 and the ENGINE says when the view has arrived (`data-on`, the
+    // `#callout` precedent). One arbitrary `[transition:…]` property rather than two utilities:
+    // `transition-*` is a twMerge group, so a second one would silently drop the first.
+    <div
+      id="trend-stack"
+      className="absolute inset-0 pointer-events-none z-[4] opacity-0 [transition:opacity_var(--tempo-nav)_ease] data-[on='1']:opacity-100 motion-reduce:!transition-none"
+    >
       {poses.map((pose) => {
         const net = displayNetwork(pose.id);
         const s = metricSeries(metric, pose.id, series);
@@ -174,16 +175,17 @@ export default function TrendStack() {
             key={pose.id}
             data-plane={pose.id}
             className={cn(
-              "absolute left-1/2 top-1/2",
+              // THE ANCHOR: a 0-size box at the layer's origin, hidden until the engine has
+              // projected it. `origin-top-left` is what makes the engine's matrix a plain
+              // translate — see this file's header.
+              "absolute left-0 top-0 origin-top-left invisible",
               // The body takes no pointer events — the orbit drag belongs to the canvas beneath.
               // The one plane the pose marks interactive is the exception, and its header strip
-              // re-enables them below whatever the pose says.
+              // re-enables them below whatever the pose says. `pointer-events` inherits, so the
+              // 0-size anchor carrying it reaches the plane inside.
               pose.interactive ? "pointer-events-auto" : "pointer-events-none",
             )}
             style={{
-              width: PLANE_W,
-              transform: staticTransform(pose),
-              transformOrigin: "center",
               opacity: pose.opacity,
               // PAINT ORDER IS DEPTH, from the pose itself: a nearer plane (larger z) paints over
               // a farther one, so a lifted focus lands in front of the stack it came from and the
@@ -192,6 +194,11 @@ export default function TrendStack() {
               zIndex: Math.round(100 + pose.z),
             }}
           >
+            {/* THE PLANE. Centred on the anchor's projected point, and CONTENT-height: the chart's
+                own plot frame IS its one hairline, so a box around it would be a second edge around
+                the same rectangle. Width is the shared `PLANE_PX_W` — the projector divides by the
+                same constant, so the two sides cannot drift about how big a plane is. */}
+            <div className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2" style={{ width: PLANE_PX_W }}>
             {p && (
               <TrendChart
                 name={net?.name ?? pose.id}
@@ -213,6 +220,7 @@ export default function TrendStack() {
                 headClassName="pointer-events-auto px-2 py-1 rounded-md [background:color-mix(in_oklch,var(--panel-solid)_62%,transparent)]"
               />
             )}
+            </div>
           </div>
         );
       })}

@@ -42,6 +42,7 @@ import { snapsAtTick } from "@/src/data/anchorLog";
 import { type Tap, DOUBLE_TAP_SLOP, LONG_PRESS_MS, LONG_PRESS_LINGER_MS, isDoubleTap } from "./domain/tapZoom";
 import { auditInstances, findingKey, type InstanceFinding } from "./scene/instanceAudit";
 import { CalloutSync, type CalloutState } from "./CalloutSync";
+import { TrendStackSync, type TrendStackState } from "./TrendStackSync";
 import { DevTunePanel } from "./DevTunePanel";
 import { CameraDirector } from "./CameraDirector";
 import type { GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
@@ -100,6 +101,10 @@ const resolveGeo = resolveMissing;
 export class Engine {
   /** The subject callout's per-frame placement — see CalloutSync. */
   private callout!: CalloutSync;
+  /** The trend view's chart planes, projected per frame — see TrendStackSync. */
+  private trendStack!: TrendStackSync;
+  /** This frame's clamped delta (slowmo applied) — read by the DOM-side projectors. */
+  private _frameDt = 0;
   /** The dev tuning panel (?tune / the dev switch) — see DevTunePanel. */
   private devTune!: DevTunePanel;
   /** Camera motion — pose tweens and the double-tap dolly. See CameraDirector. */
@@ -518,6 +523,25 @@ export class Engine {
       sameSubjectFlight: () => this._sameSubjectFlight,
       calloutAllowed: () => this._policy.callout,
       dofMeta: () => this._dofMeta,
+    });
+    // The trend stack's projector — CalloutSync's sibling, bound the same way (rule 5: the host is
+    // built ONCE, its getters carry the few values that change). It owns no DOM query of its own:
+    // element resolution is this host's, so `querySelector` stays in the one layer that touches the
+    // document and the projector can be tested with no DOM at all.
+    this.trendStack = new TrendStackSync({
+      camera: this.ctx.camera,
+      width: () => this.ctx.renderer.domElement.clientWidth || window.innerWidth,
+      height: () => this.ctx.renderer.domElement.clientHeight || window.innerHeight,
+      dt: () => this._frameDt,
+      plane: (id) => this._planeEl(id),
+      root: () => document.getElementById("trend-stack"),
+      // Convention 7: the policy flag, never a `mode === "trend"` compare. The second clause is the
+      // callout's own judgement — a view mid-transition has a camera in flight and furniture still
+      // building, so a plane placed against that pose is placed against nothing yet. `furnitureAlpha`
+      // completes on FURN_IN (1s into the IN phase), not at the end of the ~3.9s choreography, so the
+      // stack arrives with the room rather than long after it.
+      active: () =>
+        this._policy.chartStack && is3D(this.mode) && this.transition.furnitureAlpha(this.mode) > 0.999,
     });
     this.cam = new CameraDirector({
       ctx: this.ctx,
@@ -1832,6 +1856,10 @@ export class Engine {
       this.stats?.begin();
       this.clock.update(); // Timer: advance once per frame before reading the delta
       const dt = Math.min(this.clock.getDelta(), 0.05);
+      // Published for the DOM-side projectors, which ease on their own clock rather than through a
+      // phase argument. `?slowmo` divides it exactly as the choreography's tick does, so the debug
+      // flag stretches the stack's travel with everything else instead of leaving it at full speed.
+      this._frameDt = dt / this._slowmo;
       // ---- THE FRAME ORDER CONTRACT (spec C#1) -------------------------------------------
       // Phases run in this order and NOTHING may mutate a pose after the phase that derives
       // from it: inputs/boundary → camera → motion (spin/rotation) → derived frames (staging
@@ -2108,6 +2136,9 @@ export class Engine {
     }
 
     this._syncCallout();
+    // The chart planes ride the SETTLED camera, so they are placed here in the scene-write phase —
+    // last, beside the callout, for the same reason: both project this frame's final pose.
+    this._syncTrendStack();
     if (AUDIT_ON) this._auditPass();
   }
   // ---- the instance audit (dev only) -------------------------------------------------------
@@ -2167,6 +2198,33 @@ export class Engine {
     c.boxedCard = st.boxedCard; c.country = st.country; c.cohort = st.cohort;
     c.sceneCoverL = st.sceneCoverL; c.sceneCoverR = st.sceneCoverR;
     this.callout.sync(c);
+  }
+
+  // ---- the trend stack ---------------------------------------------------------------------
+  // The same bridge, for the same reason (see the callout's note above): the Engine reads the store
+  // once and hands the projector the narrow slice it declares. ⚠️ MUTATED, NEVER RE-ALLOCATED —
+  // this runs every frame and `TrendStackSync` copies nothing out of it, so one buffer is safe;
+  // `ids` rides in by REFERENCE, which is the projector's whole change signal (store `trendIds`).
+  private _trendState: TrendStackState = { layout: "stack", scroll: 0, focus: null, ids: [] };
+  private _syncTrendStack(): void {
+    const st = useStore.getState();
+    const t = this._trendState;
+    t.layout = st.trendLayout; t.scroll = st.trendScroll; t.focus = st.trendFocus; t.ids = st.trendIds;
+    this.trendStack.sync(t);
+  }
+
+  // The `[data-plane]` anchors, cached per network id. React mounts a plane a COMMIT after the store
+  // change that asks for it and remounts the set when the roster moves, so the cache re-resolves
+  // whenever its element has left the document — the `#callout` getElementById discipline, one level
+  // up because there are five of them. The query itself is event-time, never per frame.
+  private _planeEls = new Map<string, HTMLElement>();
+  private _planeEl(id: string): HTMLElement | null {
+    const hit = this._planeEls.get(id);
+    if (hit && hit.isConnected) return hit;
+    const el = document.querySelector<HTMLElement>(`#trend-stack [data-plane="${CSS.escape(id)}"]`); // event-time
+    if (el) this._planeEls.set(id, el);
+    else this._planeEls.delete(id);
+    return el;
   }
 
 

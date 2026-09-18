@@ -36,6 +36,18 @@ export const SCALE_FALLOFF = 0.03;
 /** Per-slot-index falloff: how much `opacity` drops for each step back into the stack. */
 export const OPACITY_FALLOFF = 0.16;
 
+/** THE PLANE'S WIDTH IN WORLD UNITS — the one number that ties this pose math to the DOM the
+ *  projector scales. The plane's content is `PLANE_PX_W` CSS px wide at scale 1, so the projector
+ *  resolves a slot's scale as `PLANE_WORLD_W × pxPerUnit / PLANE_PX_W`: state the plane's size
+ *  where the rest of the spatial grammar lives, and the browser number becomes a conversion rather
+ *  than a second opinion about how big a plane is. */
+export const PLANE_WORLD_W = 30;
+
+/** The plane's CSS width at scale 1 — READ BY BOTH SIDES (`components/TrendStack.tsx` sets it on
+ *  the element; the projector divides by it). A local 540 in either place is a silent drift: the
+ *  planes would simply render at the wrong size, with nothing failing. */
+export const PLANE_PX_W = 540;
+
 /** How far in FRONT of slot 0 a focused plane is lifted — half the inter-plane gap, so it clears
  *  the rest of the stack without leaving its own depth register. */
 export const FOCUS_LIFT = PLANE_GAP / 2;

@@ -1107,8 +1107,8 @@ seam and corner rules select on the same markers the thread measures:
 | `.nb-row` | The pairing row-wash selector |
 | `#topbar`, `#metapane`, `#tooltip` | Layout and positioning |
 | `#callout` (+ `data-on`) | The subject callout's 0-size anchor wrapper — `SceneCallout` renders it, `CalloutSync` writes its transform + `data-on` per frame (the Tooltip discipline: position never renders React) |
-| `#trend-stack` | The trend view's chart-plane layer — `TrendStack` renders it, the engine queries it to find the planes |
-| `[data-plane]` (the network id) | One chart plane. **React renders the plane and owns everything inside it**; `TrendStackSync` (engine layer) writes its `transform` per frame — the `#callout` discipline exactly, so a plane's position never triggers a React render |
+| `#trend-stack` (+ `data-on`) | The trend view's chart-plane layer — `TrendStack` renders it, the engine queries it to find the planes. It waits at `opacity: 0` and `TrendStackSync` writes `data-on="1"` once the view has ARRIVED (policy `chartStack` + the trend furniture alpha at full), so the stack fades in with the room rather than riding the camera's flight — the `#callout` `data-on` precedent |
+| `[data-plane]` (the network id) | One chart plane, as an ANCHOR + a CHILD. The anchor is a **0-size box at the layer's top-left with `origin-top-left`**, mounted `invisible`; its one child is the `PLANE_PX_W`-wide plane, centred on it by `-translate-x-1/2 -translate-y-1/2`. **React renders the plane and owns everything inside it** plus the anchor's `opacity` / `zIndex` / `pointer-events` (all from the same `PlanePose`); `TrendStackSync` (engine layer) writes the anchor's `transform` — a `matrix3d` translate + uniform scale, never a rotation — and its `style.visibility` per frame. The anchor's geometry IS that matrix's coordinate system, so don't give it a size, an origin or a transform of its own; `components/trendStackBoundary.test.ts` pins it |
 
 ⚠️ The card query is deliberately **depth-agnostic** (filtered to outermost panels): a `:scope >
 .ig-panel` form silently matches nothing once the ladder lane nests the cards.

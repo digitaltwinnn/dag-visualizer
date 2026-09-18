@@ -3,6 +3,8 @@ import {
   FOCUS_LIFT,
   OPACITY_FALLOFF,
   PLANE_GAP,
+  PLANE_PX_W,
+  PLANE_WORLD_W,
   PLANE_Y,
   SCALE_FALLOFF,
   VISIBLE_PLANES,
@@ -121,6 +123,20 @@ describe("stackPoses", () => {
 
   it("an empty roster yields no poses rather than throwing", () => {
     expect(stackPoses([], { layout: "stack", scroll: 0, focus: null })).toEqual([]);
+  });
+});
+
+describe("the plane's own size", () => {
+  it("states the plane in BOTH registers, so the projector's scale is a conversion", () => {
+    // `TrendStackSync` resolves a slot's CSS scale as `PLANE_WORLD_W × pxPerUnit / PLANE_PX_W`.
+    // Both numbers live here because the alternative — a world width in the engine and a `540` in
+    // the component — is a silent drift: nothing fails, the planes just render the wrong size.
+    // `components/TrendStack.tsx` reads `PLANE_PX_W` for the element's own width.
+    expect(PLANE_WORLD_W).toBeGreaterThan(0);
+    expect(PLANE_PX_W).toBeGreaterThan(0);
+    // A plane is WIDE against the stack's depth spacing — the column reads as a stack of charts,
+    // not a row of cards seen edge-on.
+    expect(PLANE_WORLD_W).toBeGreaterThan(PLANE_GAP * 2);
   });
 });
 
