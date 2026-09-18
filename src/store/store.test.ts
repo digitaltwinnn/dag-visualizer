@@ -61,6 +61,7 @@ describe("the trends view's channels", () => {
       trendScroll: 0,
       trendFocus: null,
       trendScale: "shared",
+      trendIds: [],
     });
   });
 
@@ -75,6 +76,20 @@ describe("the trends view's channels", () => {
     // first, and autoscaled per-plane it says "these are the same size" about networks that are
     // nothing of the kind. The honest reading is the one that needs no gesture.
     expect(s.trendScale).toBe("shared");
+    // The ranked roster starts EMPTY — no view is mounted, so there is genuinely nothing to place.
+    expect(s.trendIds).toEqual([]);
+  });
+
+  it("the ranked roster is published by reference", () => {
+    // ⚠️ The Engine's change signal is `!==` on this array (the fourth React → Engine publish
+    // channel). A setter that copied, sorted or normalised would mint a fresh reference on every
+    // publish and retarget the projector's ease every frame — so the stored value must BE the
+    // array handed in.
+    const ids = ["dor-metagraph", "pacaswap"];
+    useStore.getState().setTrendIds(ids);
+    expect(useStore.getState().trendIds).toBe(ids);
+    useStore.getState().setTrendIds([]);
+    expect(useStore.getState().trendIds).toEqual([]);
   });
 
   it("the scale preference flips, and a view switch leaves it alone", () => {

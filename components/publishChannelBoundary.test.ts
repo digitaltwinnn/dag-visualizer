@@ -2,11 +2,13 @@ import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-// The three REACT → ENGINE publish channels (2026-08-19): `boxedCard`, `sceneCoverL`/`sceneCoverR`
-// and `focusRung`. Each carries a fact only the DOM can know — which card is the box, how many px
-// of canvas a sheet covers, which rung a card just asked to be framed — into an imperative engine
-// that renders per frame and never reads the DOM. They are one-way by construction: React writes,
-// the Engine reads, and nothing writes back.
+// The four REACT → ENGINE publish channels (2026-08-19; the fourth 2026-09-18): `boxedCard`,
+// `sceneCoverL`/`sceneCoverR`, `focusRung` and `trendIds`. Each carries a fact only React can know
+// — which card is the box, how many px of canvas a sheet covers, which rung a card just asked to
+// be framed, and which networks the trend stack shows in which order (the busiest-first rank over
+// FETCHED trends data, which lives in React's cache and nowhere the engine can reach) — into an
+// imperative engine that renders per frame and never reads the DOM. They are one-way by
+// construction: React writes, the Engine reads, and nothing writes back.
 //
 // This pins the shape rather than the values, because every failure mode here is SILENT. The
 // channel keeps its name, tsc stays green, vitest stays green, and the symptom is a callout in the
@@ -14,10 +16,10 @@ import { join } from "node:path";
 // four rules below are recorded as ⚠️ comments in CLAUDE.md or at their call sites; this makes them
 // executable.
 //
-// EXEMPTIONS: none. All three channels are covered, and adding a fourth means adding it here.
-// Its consumers are separately covered — `components/calloutBoundary.test.ts` pins that both
+// EXEMPTIONS: none. All four channels are covered, and adding a fifth means adding it here.
+// Their consumers are separately covered — `components/calloutBoundary.test.ts` pins that both
 // callout owners consult `boxedCard`, which is the READ half of that channel.
-const CHANNELS = ["setBoxedCard", "setSceneCover", "requestFocusRung"] as const;
+const CHANNELS = ["setBoxedCard", "setSceneCover", "requestFocusRung", "setTrendIds"] as const;
 
 const walk = (dir: string): string[] =>
   readdirSync(dir).flatMap((name) => {
@@ -37,9 +39,9 @@ const callersOf = (setter: string, roots: string[]) =>
 
 describe("the React → Engine publish channels are one-way", () => {
   it("no engine module writes a publish channel", () => {
-    // Rule 1 makes `Engine.ts` the only layer that touches the store at all; this says what it may
-    // do there with these three. A channel the Engine could write is a feedback loop: it renders
-    // from the value it just set, and the DOM's own reading arrives a commit later to fight it.
+    // Rule 1 makes the engine layer the only one that touches the store at all; this says what it
+    // may do there with these four. A channel the Engine could write is a feedback loop: it renders
+    // from the value it just set, and React's own reading arrives a commit later to fight it.
     const offenders = walk(join("src", "engine"))
       .map((p) => ({ p, src: read(p) }))
       .flatMap(({ p, src }) => CHANNELS.filter((c) => src.includes(c)).map((c) => `${p}: ${c}`));
@@ -124,6 +126,29 @@ describe("sceneCover is measured by the dock and sided by the caller", () => {
     expect(
       els.some((name) => deps.includes(name)),
       `the cover effect must re-run when the node lands — deps are [${deps}], none of [${els.join(", ")}] present`,
+    ).toBe(true);
+  });
+});
+
+describe("trendIds carries the ranked roster, by reference", () => {
+  const store = read(join("src", "store", "store.ts"));
+
+  it("only TrendStack publishes the roster", () => {
+    // The rank is decided by the same pass that RENDERS the planes, so channel and render cannot
+    // disagree about which network sits in which slot (the `boxedCard` lesson). A second publisher
+    // would be a second opinion about the order, and the projector would take turns believing it.
+    expect(callersOf("setTrendIds", ["app", "components", "src"])).toEqual([join("components", "TrendStack.tsx")]);
+  });
+
+  it("the store stores the array it is handed, unchanged", () => {
+    // ⚠️ The Engine's change signal is `!==` on this array. A setter that copied, sorted or
+    // normalised would mint a fresh reference on every publish — the projector would retarget its
+    // ease every frame and the stack would never settle, while every type and test stayed green.
+    const setter = /setTrendIds:\s*\(([^)]*)\)\s*=>\s*set\(([^\n]*)\)/.exec(store);
+    expect(setter, "setTrendIds is no longer a one-line set() — re-check the by-reference rule").not.toBeNull();
+    expect(
+      /\{\s*trendIds\s*\}/.test(setter![2]),
+      `setTrendIds must store the array as given, got: ${setter![2]}`,
     ).toBe(true);
   });
 });

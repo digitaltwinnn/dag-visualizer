@@ -31,6 +31,8 @@
 // camera is driven by dragging it, so a plane body takes no pointer events; only its header strip
 // and the one plane the pose marks `interactive` do.
 
+import { useEffect, useMemo } from "react";
+
 import TrendChart from "@/components/docs/TrendChart";
 import useTrendsWindow from "@/components/useTrendsWindow";
 import { cn } from "@/lib/utils";
@@ -52,6 +54,10 @@ import { useStore } from "@/src/store/store";
  *  chart's own plot frame IS the plane's one hairline — a box around it would be a second edge
  *  around the same rectangle. */
 const PLANE_W = 540;
+
+/** The empty roster, as ONE frozen reference. Publishing a fresh `[]` would be a content-free
+ *  change the engine's `!==` still has to answer. */
+const NO_IDS: readonly string[] = [];
 
 /** ⚠️ STATIC PLACEMENT ONLY — `TrendStackSync` (the next task) takes this over and writes a
  *  projected `matrix3d` onto the same `transform`. It lives here, in ONE expression, precisely so
@@ -95,8 +101,32 @@ export default function TrendStack() {
   // series per listed metagraph, so there is genuinely nothing measured for either. Naming that
   // case in copy is a later task's job; for now the stack simply has no planes.
   const roster = METAGRAPHS.filter((m) => m.id && (filter === "all" || m.id === filter)).map((m) => m.id!);
-  const ranked = rankByLast(roster, (id) => metricSeries(metric, id, series).points);
+  const rankedNow = rankByLast(roster, (id) => metricSeries(metric, id, series).points);
+  // STABILISED BY CONTENT, because the roster is a PUBLISH CHANNEL (store `trendIds`). The rank is
+  // recomputed from scratch every render — a poll, a hover, any unrelated store write — so its
+  // identity changes constantly while the list itself sits still. The engine's change signal is
+  // `!==` on that array, so publishing the raw value would retarget the projector's ease on every
+  // render and the stack would never settle. Keying the memo on the joined ids publishes a fresh
+  // reference exactly when the CONTENT moves, which is the only time the engine needs to hear.
+  const rankedKey = rankedNow.join("|");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const ranked = useMemo(() => rankedNow, [rankedKey]);
   const poses = stackPoses(ranked, { layout, scroll, focus });
+
+  // THE ONE PUBLISH of the fourth React → Engine channel (see store `trendIds`). The engine's
+  // projector places a plane per id and needs the same order the planes are rendered in; only
+  // React holds the fetched series the rank is computed from. `[]` whenever the stack is not
+  // mounted — on the gate turning off and on unmount — so a view switch never leaves the
+  // projector chasing planes that no longer exist.
+  const setTrendIds = useStore((s) => s.setTrendIds);
+  useEffect(() => {
+    if (!on) {
+      setTrendIds(NO_IDS);
+      return;
+    }
+    setTrendIds(ranked);
+    return () => setTrendIds(NO_IDS);
+  }, [on, ranked, setTrendIds]);
 
   // ⚠️ ONE SCALE OR EACH ITS OWN, and the reader picks — `store.trendScale`, the document's own
   // control carried into the view. `shared` is the default because a stack is read AS a column

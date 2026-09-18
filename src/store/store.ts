@@ -285,6 +285,19 @@ interface AppState {
    *  view-scoped — it is how the reader likes their charts drawn, not a rung, so `setMode` leaves
    *  it alone. */
   trendScale: "shared" | "own";
+  /** THE RANKED ROSTER — a REACT → ENGINE publish channel (2026-09-18), the fourth.
+   *  Which networks the stack shows, busiest first, is decided from FETCHED trends data that only
+   *  React holds (`rankByLast` over the stored series), and the engine's projector needs exactly
+   *  that list to place one plane per id. One-way and single-publisher by construction:
+   *  `components/TrendStack.tsx` writes it, `TrendStackSync` reads it through the Engine's bridge,
+   *  and nothing writes back — an engine writer would be a feedback loop, re-ranking from the list
+   *  it had just set (`components/publishChannelBoundary.test.ts` makes that executable).
+   *  ⚠️ BRIDGED BY REFERENCE, like `focusRung`: the publisher passes a FRESH array only when the
+   *  list's CONTENT changes, because the Engine's `!==` is the whole change signal. A fresh array
+   *  every render would retarget the ease every frame and the stack would never settle; a mutated
+   *  array would never reach the Engine at all.
+   *  `[]` whenever the stack is not mounted — honest: no planes, nothing to place. */
+  trendIds: readonly string[];
 
   setLive: (live: boolean, lastGoodAt?: number) => void;
   setEngineReady: (v: boolean) => void;
@@ -350,6 +363,8 @@ interface AppState {
   setTrendScroll: (offset: number) => void;
   setTrendFocus: (id: string | null) => void;
   setTrendScale: (scale: "shared" | "own") => void;
+  /** Publish the ranked roster (see `trendIds`). Pass a fresh array only on a content change. */
+  setTrendIds: (ids: readonly string[]) => void;
   // THEME (light/dark spec §2). Unlike the network (a frozen page parameter), theme is genuine
   // runtime state: the resolved value drives the Engine's colour re-thread and any component
   // that renders theme-conditionally. ONE writer: ThemeController. `theme` boots "dark" (the
@@ -416,6 +431,7 @@ export const useStore = create<AppState>((set) => ({
   trendScroll: 0,
   trendFocus: null,
   trendScale: "shared",
+  trendIds: [],
   phoneSheetPx: null,
   sceneCoverL: 0,
   sceneCoverR: 0,
@@ -602,5 +618,9 @@ export const useStore = create<AppState>((set) => ({
   setTrendScroll: (offset) => set({ trendScroll: offset }),
   setTrendFocus: (id) => set({ trendFocus: id }),
   setTrendScale: (scale) => set({ trendScale: scale }),
+  // Stored BY REFERENCE — the array the publisher hands in is the one the Engine compares with
+  // `!==`. No copy, no sort, no normalising: any of those would mint a fresh reference per call
+  // and turn a no-op publish into a retarget (see the channel note on `trendIds`).
+  setTrendIds: (trendIds) => set({ trendIds }),
   setTheme: (pref, resolved) => set({ themePref: pref, theme: resolved }),
 }));
