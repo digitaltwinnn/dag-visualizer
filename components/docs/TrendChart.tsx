@@ -49,6 +49,7 @@ export default function TrendChart({
   readout,
   scaleMax,
   cursorMs,
+  note,
   className,
   headClassName,
 }: {
@@ -108,6 +109,13 @@ export default function TrendChart({
    *  the honest answer: the instant is not in this chart. The document passes nothing and renders
    *  exactly as before. */
   cursorMs?: number | null;
+  /** AN INSTRUMENT STATE THE SERIES CANNOT SAY (2026-09-18). When the caller knows something the
+   *  points don't — most concretely that the payload this chart needs is still IN FLIGHT — it
+   *  hands the words here and the plot is replaced by them, in the chart's own empty-state frame.
+   *  Rule 10: an absent payload is a state stated in words, and "no measurements in this window"
+   *  would be a different claim entirely — one about the data rather than about the reading. The
+   *  head still renders, so the plane keeps its name, its unit and its frame while it waits. */
+  note?: string;
   className?: string;
   /** Extra classes for the HEAD ROW alone (2026-09-18). The 3D trend stack's planes have no
    *  chrome of their own — the head IS each plane's header strip, the one part of a fully
@@ -355,9 +363,9 @@ export default function TrendChart({
           </span>
         )}
       </div>
-      {!measured ? (
+      {note || !measured ? (
         <div className="h-[138px] grid place-items-center rounded-md border border-border border-dashed">
-          <span className="text-label text-muted-foreground">no measurements in this window</span>
+          <span className="text-label text-muted-foreground">{note ?? "no measurements in this window"}</span>
         </div>
       ) : (
         <div

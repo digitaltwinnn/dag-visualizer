@@ -6,6 +6,10 @@ import type { HoverSubject } from "@/src/data/hoverSubject";
 // import of a domain type is legal and keeps CohortSel defined in exactly one place.
 import type { CohortSel, CompositionSel, FocusLevel } from "@/src/engine/domain/focusLadder";
 import type { ThemePref, Theme } from "@/src/theme/resolve";
+// Type-only, like the domain imports above: the window vocabulary has ONE home
+// (src/data/trendWindow.ts, read by the document's picker and by the stack), and a type-only
+// import keeps the store from holding a data-layer VALUE.
+import type { ZoomId } from "@/src/data/trendWindow";
 
 // The active view. `hyper`/`geo`/`ledger`/`trend` all drive the 3D scene (every switch among
 // them runs the gather choreography); `soon` is THE one flat placeholder view (consolidated
@@ -285,6 +289,18 @@ interface AppState {
    *  view-scoped — it is how the reader likes their charts drawn, not a rung, so `setMode` leaves
    *  it alone. */
   trendScale: "shared" | "own";
+  /** THE STACK'S WINDOW (2026-09-18) — the same vocabulary the Trends document's picker and the
+   *  vitals rim already wear (`ZOOMS`, src/data/trendWindow.ts; user, 2026-09-09: the ranges stay
+   *  consistent across surfaces). The stack and the document are two registers of ONE rung, so a
+   *  window means the same thing in both — but each holds its own: the document's zoom is local
+   *  component state, because the window a reader picks while reading the page is the page's.
+   *  NOT view-scoped: `setMode` leaves it alone, like `trendScale`. */
+  trendWindow: ZoomId;
+  /** THE STACK'S COMMITTED RANGE — a brushed span that replaces the window's cut entirely, and
+   *  auto-tiers to the finest grain its start can honestly carry (`planTrendFetch`). NO `metaId`,
+   *  unlike the document's: the stack's range is the WHOLE stack's, every plane cut to the same
+   *  span, which is the comparison a depth stack exists to make. null = the window stands. */
+  trendRange: { fromMs: number; toMs: number } | null;
   /** THE RANKED ROSTER — a REACT → ENGINE publish channel (2026-09-18), the fourth.
    *  Which networks the stack shows, busiest first, is decided from FETCHED trends data that only
    *  React holds (`rankByLast` over the stored series), and the engine's projector needs exactly
@@ -363,6 +379,10 @@ interface AppState {
   setTrendScroll: (offset: number) => void;
   setTrendFocus: (id: string | null) => void;
   setTrendScale: (scale: "shared" | "own") => void;
+  /** Pick the stack's window. It CLEARS any committed range — a window IS a range statement, the
+   *  Trends document's own rule for its zoom pills. */
+  setTrendWindow: (window: ZoomId) => void;
+  setTrendRange: (range: { fromMs: number; toMs: number } | null) => void;
   /** Publish the ranked roster (see `trendIds`). Pass a fresh array only on a content change. */
   setTrendIds: (ids: readonly string[]) => void;
   // THEME (light/dark spec §2). Unlike the network (a frozen page parameter), theme is genuine
@@ -431,6 +451,8 @@ export const useStore = create<AppState>((set) => ({
   trendScroll: 0,
   trendFocus: null,
   trendScale: "shared",
+  trendWindow: "all" as ZoomId,
+  trendRange: null,
   trendIds: [],
   phoneSheetPx: null,
   sceneCoverL: 0,
@@ -618,6 +640,10 @@ export const useStore = create<AppState>((set) => ({
   setTrendScroll: (offset) => set({ trendScroll: offset }),
   setTrendFocus: (id) => set({ trendFocus: id }),
   setTrendScale: (scale) => set({ trendScale: scale }),
+  // A window and a range are the SAME statement about what is on screen, so picking one retires
+  // the other (the document's zoom pills do exactly this).
+  setTrendWindow: (trendWindow) => set({ trendWindow, trendRange: null }),
+  setTrendRange: (trendRange) => set({ trendRange }),
   // Stored BY REFERENCE — the array the publisher hands in is the one the Engine compares with
   // `!==`. No copy, no sort, no normalising: any of those would mint a fresh reference per call
   // and turn a no-op publish into a retarget (see the channel note on `trendIds`).

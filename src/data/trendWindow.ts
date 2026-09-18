@@ -292,6 +292,9 @@ const HOUR_MS = 3_600_000;
 
 /** WHICH PAYLOADS a zoom (and an optional committed range) needs, and how each is cut.
  *
+ *  A COMMITTED RANGE REPLACES THE ZOOM'S CUT ENTIRELY — it is the more specific statement about
+ *  what is on screen, which is also why picking a window clears it.
+ *
  *  AUTO-TIER (map-tile edition, 2026-09-10): a selected range picks the FINEST tier whose
  *  HISTORY FLOOR its start clears (`pickRangeTier` — since the keep-forever flip, retention no
  *  longer prunes, but the floors record where fine grain begins to exist) and fetches the few

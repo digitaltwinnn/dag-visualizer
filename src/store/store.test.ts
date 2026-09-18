@@ -61,6 +61,8 @@ describe("the trends view's channels", () => {
       trendScroll: 0,
       trendFocus: null,
       trendScale: "shared",
+      trendWindow: "all",
+      trendRange: null,
       trendIds: [],
     });
   });
@@ -76,6 +78,9 @@ describe("the trends view's channels", () => {
     // first, and autoscaled per-plane it says "these are the same size" about networks that are
     // nothing of the kind. The honest reading is the one that needs no gesture.
     expect(s.trendScale).toBe("shared");
+    // The whole measured depth, and no brushed range — the document's own default window.
+    expect(s.trendWindow).toBe("all");
+    expect(s.trendRange).toBeNull();
     // The ranked roster starts EMPTY — no view is mounted, so there is genuinely nothing to place.
     expect(s.trendIds).toEqual([]);
   });
@@ -101,6 +106,28 @@ describe("the trends view's channels", () => {
     expect(useStore.getState().trendScale).toBe("own");
     useStore.getState().setTrendScale("shared");
     expect(useStore.getState().trendScale).toBe("shared");
+  });
+
+  it("picking a window CLEARS the committed range — a window is a range statement too", () => {
+    useStore.getState().setTrendRange({ fromMs: 1_700_000_000_000, toMs: 1_700_003_600_000 });
+    expect(useStore.getState().trendRange).toEqual({ fromMs: 1_700_000_000_000, toMs: 1_700_003_600_000 });
+    useStore.getState().setTrendWindow("7d");
+    expect(useStore.getState().trendWindow).toBe("7d");
+    // The document's own rule for its zoom pills, carried into the view: the two say the same
+    // kind of thing about what is on screen, so the newer statement retires the older.
+    expect(useStore.getState().trendRange).toBeNull();
+  });
+
+  it("the window and the range are NOT view-scoped — a view switch leaves both standing", () => {
+    useStore.getState().setTrendWindow("24h");
+    useStore.getState().setTrendRange({ fromMs: 1_700_000_000_000, toMs: 1_700_003_600_000 });
+    useStore.getState().setMode("hyper");
+    expect(useStore.getState().trendWindow).toBe("24h");
+    expect(useStore.getState().trendRange).toEqual({ fromMs: 1_700_000_000_000, toMs: 1_700_003_600_000 });
+    // And clearing a range is its own gesture, not a side effect of anything else.
+    useStore.getState().setTrendRange(null);
+    expect(useStore.getState().trendRange).toBeNull();
+    expect(useStore.getState().trendWindow).toBe("24h");
   });
 
   it("committing a focus does not move the cursor", () => {

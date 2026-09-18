@@ -31,7 +31,13 @@ import { PLANE_PX_W } from "@/src/engine/domain/trendStack";
 //     at the layer's corner before the first projection lands. React must also write no `transform`
 //     of its own on that element: two owners of one property is the whole failure mode this split
 //     exists to prevent, and the losing write is invisible in both files.
-//  7. ONE PLANE WIDTH, and it lives in `domain/trendStack.ts`. The projector divides by the same
+//  7. ONE WINDOW DATA PATH, two registers (2026-09-18). The planes and the Trends DOCUMENT are two
+//     registers of one rung, so WHICH payloads a window needs and how each is cut must be the one
+//     shared path (`components/useTrendsSlice.ts` over `src/data/trendWindow.ts`'s plan). A private
+//     `useTrendsWindow` call here is exactly how the two drifted before: it compiles, it renders,
+//     and the scene quietly answers a different question from the page — no fleet payload at the
+//     fine windows, no auto-tiered range, no daily readout.
+//  8. ONE PLANE WIDTH, and it lives in `domain/trendStack.ts`. The projector divides by the same
 //     constant to resolve a slot's scale, so a local copy of the number here would render every
 //     plane at the wrong size with nothing failing anywhere. The check reads the live
 //     `PLANE_PX_W` rather than naming a value, so re-tuning the plane can never quietly retire it.
@@ -101,6 +107,18 @@ describe("trend-stack boundary", () => {
     ).toBe(false);
     // `origin-top-left` is the class form; an inline transformOrigin would be a second opinion.
     expect(/transformOrigin/.test(src), `${FILE} states the anchor's origin as a class, not inline`).toBe(false);
+  });
+
+  it("reads its window through the shared slice hook, never a fetch of its own", () => {
+    const src = code();
+    expect(
+      /import\s+useTrendsSlice\s+from\s+["']@\/components\/useTrendsSlice["']/.test(src),
+      `${FILE} must take its data from @/components/useTrendsSlice — one window data path, two registers`,
+    ).toBe(true);
+    expect(
+      /useTrendsWindow|useTrendsRange/.test(src),
+      `${FILE} fetches a window of its own: the plan in src/data/trendWindow.ts decides what a window needs, and useTrendsSlice is how both registers ask for it`,
+    ).toBe(false);
   });
 
   it("takes the plane's width from the pose module, never a local number", () => {

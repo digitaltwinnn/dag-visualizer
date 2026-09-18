@@ -44,7 +44,7 @@
 import { useEffect, useMemo } from "react";
 
 import TrendChart from "@/components/docs/TrendChart";
-import useTrendsWindow from "@/components/useTrendsWindow";
+import useTrendsSlice from "@/components/useTrendsSlice";
 import { cn } from "@/lib/utils";
 import { displayNetwork } from "@/src/data/unlisted";
 import {
@@ -54,7 +54,6 @@ import {
   rankByLast,
   trimCounterEdges,
 } from "@/src/data/trendSeries";
-import { leadingTrim } from "@/src/data/trendWindow";
 import { PLANE_PX_W, stackPoses } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { METAGRAPHS } from "@/src/net/current";
@@ -81,17 +80,31 @@ export default function TrendStack() {
   // stack is read at ONE moment rather than five. A COMMIT, not a hover (store `trendCursorMs`);
   // nothing writes it yet, and `null` draws nothing anywhere.
   const cursorMs = useStore((s) => s.trendCursorMs);
-  // The store's whole measured depth, leading-trimmed to where measuring began — the document's
-  // own default window. `null` while the view is elsewhere is the hook's documented conditional
-  // form (a hook cannot be called conditionally), so no other view pays for this fetch; the cache
-  // is shared with the vitals rim and the document either way.
-  const win = useTrendsWindow(on ? "all" : null);
+  // THE WINDOW, AND THE SAME ONE THE DOCUMENT READS. `trendWindow`/`trendRange` are the store's
+  // own statement of what is on screen; `useTrendsSlice` turns that into the payloads it needs and
+  // the cuts they take (`planTrendFetch`/`assembleTrendSlice`, src/data/trendWindow.ts) — the
+  // auto-tiered range, the 1H slice and the fleet's hourly payload all come free, because the
+  // Trends document asks the very same question through the very same hook.
+  // `null` while the view is elsewhere is the hook's documented conditional form (a hook cannot be
+  // called conditionally), so no other view pays for the fetch; the cache is shared with the
+  // vitals rim and the document either way.
+  const windowId = useStore((s) => s.trendWindow);
+  const range = useStore((s) => s.trendRange);
+  const { p, buckets, stepMs, pF, fBuckets, fStep, fleetPending, error } = useTrendsSlice(on ? windowId : null, range);
 
-  const p = win.data ? leadingTrim(win.data) : undefined;
-  const series = p?.series ?? {};
-  const buckets = p?.buckets ?? [];
-  const stepMs = p?.stepMs ?? 86400000;
   const spec = TREND_METRICS[metric];
+  // A GAUGE reads the FLEET's window — hourly where the main one is finer than the gauges are
+  // written, the main one otherwise — and a counter reads the main one. Everything below (the
+  // rank, the shared ceiling, the axis, the unit word) takes the same source, or a plane would
+  // draw one window's points against another's dates.
+  const gauge = spec.kind === "gauge";
+  const src = gauge ? pF : p;
+  const series = src?.series ?? {};
+  const axis = gauge ? fBuckets : buckets;
+  const step = gauge ? fStep : stepMs;
+  // The gauges' hourly payload is still in flight: the planes keep their frames and say so in the
+  // document's own words, rather than drawing an empty plot over a window that HAS measurements.
+  const pending = gauge && fleetPending;
   // The roster is the catalog, scoped by the committed filter — a filter with no catalog row (the
   // DAG core, an unlisted channel) leaves it EMPTY, which is honest: the trends store keys its
   // series per listed metagraph, so there is genuinely nothing measured for either. Naming that
@@ -143,7 +156,7 @@ export default function TrendStack() {
 
   // FAILURE IS A SIGNAL, NOT A SILENCE (rule 10, and the trends hook's own contract): no cached
   // payload and a failed load says so in the document's words. No spinner, no fabricated series.
-  if (!p && win.error) {
+  if (!p && error) {
     return (
       <div id="trend-stack" className="absolute inset-0 pointer-events-none grid place-items-center z-[4]">
         <p className="text-label text-muted-foreground">
@@ -173,7 +186,7 @@ export default function TrendStack() {
         // COUNTER series drop their partial edge buckets; a GAUGE keeps everything. The axis is
         // cut by the same rule as the lines, or the plot desyncs from its own dates.
         const counter = spec.kind === "counter";
-        const cut = <T,>(a: readonly T[]): T[] => (counter ? trimCounterEdges(a, stepMs) : a.slice());
+        const cut = <T,>(a: readonly T[]): T[] => (counter ? trimCounterEdges(a, step) : a.slice());
         return (
           <div
             key={pose.id}
@@ -206,10 +219,13 @@ export default function TrendStack() {
             {p && (
               <TrendChart
                 name={net?.name ?? pose.id}
-                unit={metricUnit(metric, stepMs)}
+                // The unit word follows the TIER — an hourly bucket labelled "per day" would
+                // misstate every reading by a factor of 24 (the document's own rule).
+                unit={metricUnit(metric, step)}
                 format={spec.format}
-                buckets={cut(buckets)}
-                stepMs={stepMs}
+                note={pending ? "reading the hourly samples…" : undefined}
+                buckets={cut(axis)}
+                stepMs={step}
                 sampled={s.sampled && cut(s.sampled)}
                 gaps={s.gaps && cut(s.gaps)}
                 lines={[{ label: metric, points: cut(s.points), hue: net?.hue }]}
