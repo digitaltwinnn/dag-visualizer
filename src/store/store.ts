@@ -14,6 +14,9 @@ import type { ThemePref, Theme } from "@/src/theme/resolve";
 // history view — chart planes as the scene, convention 12's MEASURED HISTORY rung made a view.
 export type Mode = "hyper" | "geo" | "ledger" | "trend" | "soon";
 
+// The stored metric every trend plane draws — one picker, one column (see `trendMetric` below).
+export type TrendMetric = "snapshots" | "blocks" | "fees" | "kb" | "nodes" | "continuity";
+
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
 export type SelSlot = "network" | "node" | "snap" | "metaSnap" | "country" | "cohort" | "composition";
 
@@ -256,6 +259,24 @@ interface AppState {
   // fire again, and a fresh reference is what the Engine's `!==` bridge sees.
   focusRung: { level: FocusLevel } | null;
 
+  /** THE SHARED TIME CURSOR (2026-09-18) — one instant, read by every plane and by the right
+   *  rail's "all layers at cursor" list. It is a COMMIT, not a hover: it drives rail content,
+   *  so it survives a pointer leaving the timeline. null = no instant picked, and the rail says
+   *  so rather than inventing one. */
+  trendCursorMs: number | null;
+  /** Which stored metric every plane draws. One picker, one column — the planes are a
+   *  comparison, so a per-plane metric would make the stack meaningless. */
+  trendMetric: TrendMetric;
+  /** `stack` = receding in depth; `flat` = collapsed to one plane ("Align to front"). This is a
+   *  LAYOUT change, not a camera move — camera principle 2. */
+  trendLayout: "stack" | "flat";
+  /** How far the stack is scrolled through the roster, in planes. The catalog is longer than the
+   *  visible window, so the stack pages rather than capping at a top-N. */
+  trendScroll: number;
+  /** The plane brought forward (5b). View-scoped: it clears on leaving the view, like the other
+   *  view-scoped ladder levels. */
+  trendFocus: string | null;
+
   setLive: (live: boolean, lastGoodAt?: number) => void;
   setEngineReady: (v: boolean) => void;
   setSceneReady: (v: boolean) => void;
@@ -314,6 +335,11 @@ interface AppState {
   /** Ask the Engine to frame this ladder rung (see `focusRung`). One-shot; the Engine reads it
    *  on change and never clears it — the value IS the last request, not a pending queue. */
   requestFocusRung: (level: FocusLevel) => void;
+  setTrendCursor: (ms: number | null) => void;
+  setTrendMetric: (metric: TrendMetric) => void;
+  setTrendLayout: (layout: "stack" | "flat") => void;
+  setTrendScroll: (offset: number) => void;
+  setTrendFocus: (id: string | null) => void;
   // THEME (light/dark spec §2). Unlike the network (a frozen page parameter), theme is genuine
   // runtime state: the resolved value drives the Engine's colour re-thread and any component
   // that renders theme-conditionally. ONE writer: ThemeController. `theme` boots "dark" (the
@@ -374,6 +400,11 @@ export const useStore = create<AppState>((set) => ({
   railCollapse: {},
   navQuiet: false,
   focusRung: null,
+  trendCursorMs: null,
+  trendMetric: "snapshots",
+  trendLayout: "stack",
+  trendScroll: 0,
+  trendFocus: null,
   phoneSheetPx: null,
   sceneCoverL: 0,
   sceneCoverR: 0,
@@ -394,8 +425,10 @@ export const useStore = create<AppState>((set) => ({
   // Closing (either route) arms `docClosing` — the doc's exit animation is its OUT phase, and
   // the engine waits on it before entering the destination view.
   // A view switch is a LOUD navigation (the no-pop rule rolls view-scoped content on arrival),
-  // so it clears any standing quiet mark from a rail gesture.
-  setMode: (mode) => set((s) => ({ mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing })),
+  // so it clears any standing quiet mark from a rail gesture. `trendFocus` clears with it — it's
+  // view-scoped, like the other ladder levels; `trendCursorMs` does NOT (an instant is a
+  // universal subject and carries, the way `node` and `network` do in `LEVEL_CARRY`).
+  setMode: (mode) => set((s) => ({ mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing, trendFocus: null })),
   // Opening a doc also SURFACES THE SCENE POSE: the overlay sits at z-8, under the raw layer's
   // z-9 — a doc opened from the RAW pose rendered beneath the still-interactive table, with the
   // RAW toggle that could exit it hidden by the doc's own control gating (review find,
@@ -552,5 +585,10 @@ export const useStore = create<AppState>((set) => ({
   // A fresh object every call — the request is the EVENT, so re-opening the same rung must reach
   // the Engine's reference-compare bridge again.
   requestFocusRung: (level) => set({ focusRung: { level } }),
+  setTrendCursor: (ms) => set({ trendCursorMs: ms }),
+  setTrendMetric: (metric) => set({ trendMetric: metric }),
+  setTrendLayout: (layout) => set({ trendLayout: layout }),
+  setTrendScroll: (offset) => set({ trendScroll: offset }),
+  setTrendFocus: (id) => set({ trendFocus: id }),
   setTheme: (pref, resolved) => set({ themePref: pref, theme: resolved }),
 }));

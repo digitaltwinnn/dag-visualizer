@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { useStore } from "./store";
 import { metaSnapDeepKey } from "@/src/data/types";
 
@@ -46,5 +46,44 @@ describe("the deep channel read cache", () => {
     expect(useStore.getState().metaSnapDeep[metaSnapDeepKey(42, "DAG0", 7)]).toEqual(d);
     useStore.getState().setMetaSnapDeep({ ...d, bytes: 999 });
     expect(useStore.getState().metaSnapDeep[metaSnapDeepKey(42, "DAG0", 7)].bytes).toBe(2);
+  });
+});
+
+describe("the trends view's channels", () => {
+  // Each test is self-contained: reset the trend channels (and mode) here rather than relying
+  // on ordering between tests — a shared singleton store persists state across `it` blocks.
+  beforeEach(() => {
+    useStore.setState({
+      mode: "hyper",
+      trendCursorMs: null,
+      trendMetric: "snapshots",
+      trendLayout: "stack",
+      trendScroll: 0,
+      trendFocus: null,
+    });
+  });
+
+  it("defaults to no cursor, the snapshots metric and a stacked layout", () => {
+    const s = useStore.getState();
+    expect(s.trendCursorMs).toBeNull();
+    expect(s.trendMetric).toBe("snapshots");
+    expect(s.trendLayout).toBe("stack");
+    expect(s.trendScroll).toBe(0);
+    expect(s.trendFocus).toBeNull();
+  });
+
+  it("committing a focus does not move the cursor", () => {
+    useStore.getState().setTrendCursor(1_700_000_000_000);
+    useStore.getState().setTrendFocus("dor-metagraph");
+    expect(useStore.getState().trendCursorMs).toBe(1_700_000_000_000);
+    expect(useStore.getState().trendFocus).toBe("dor-metagraph");
+  });
+
+  it("leaving the trends view clears the focus but keeps the cursor", () => {
+    useStore.getState().setTrendCursor(1_700_000_000_000);
+    useStore.getState().setTrendFocus("dor-metagraph");
+    useStore.getState().setMode("hyper");
+    expect(useStore.getState().trendFocus).toBeNull();
+    expect(useStore.getState().trendCursorMs).toBe(1_700_000_000_000);
   });
 });
