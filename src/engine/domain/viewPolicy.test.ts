@@ -40,6 +40,15 @@ describe("VIEW_POLICIES", () => {
     for (const m of MODES) expect(VIEW_POLICIES[m].show.ledger).toBe(m === "ledger");
   });
 
+  // The trends GROUND is the one thing TrendsView draws in WebGL, and it belongs to that view
+  // alone — the DOM chart planes would otherwise stand in a void. It is a `show` row rather than
+  // a `mode === "trend"` in the Engine for convention 7's reason: the Engine owns root-group
+  // visibility (rule 6), so the view has to be TOLD whether it is on, and the allow-list is where
+  // a fifth view answers that question for itself.
+  it("shows the trends ground ONLY in trend", () => {
+    for (const m of MODES) expect(VIEW_POLICIES[m].show.trendGround).toBe(m === "trend");
+  });
+
   // The bottom vitals band (2026-08-30 — the vitals leave the command bar) mounts in every 3D
   // view and never beside a flat view's `preview` wireframe (rule 10). Pinned here rather than
   // left to `BottomStream` because the flag governs TWO things that must agree: whether the band
@@ -91,7 +100,7 @@ describe("the trends view is registered and inert", () => {
   it("shows no shared geometry and picks nothing", () => {
     const p = VIEW_POLICIES.trend;
     expect(p.canvas).toBe(true);
-    expect(p.show).toEqual({ hyperFurniture: false, globeSurface: false, ledger: false });
+    expect(p.show).toEqual({ hyperFurniture: false, globeSurface: false, ledger: false, trendGround: true });
     expect(p.pickSources).toEqual([]);
     expect(p.sims).toEqual({ arcs: false, hubOrbits: false, globeSpin: false });
   });

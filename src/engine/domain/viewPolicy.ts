@@ -33,8 +33,14 @@ export interface ViewPolicy {
   //  - globeSurface:   the globe group (shared nodes + earth surface) is visible.
   //  - ledger:         the ledger chamber group is visible (and it keeps the hyper root as its
   //                    metagraph-L0 row).
+  //  - trendGround:    the trends view's GROUND GRID (scene/views/TrendsView) is visible — the one
+  //                    thing that view draws in WebGL, the depth axis its DOM chart planes stand
+  //                    on. A row rather than a `mode === "trend"` in the Engine, because root-group
+  //                    visibility is the Engine's (rule 6) and scene modules are mode-agnostic: the
+  //                    view has to be TOLD it is on, and this allow-list is where a fifth view
+  //                    would answer the same question for itself (convention 7).
   // (There is no skydome/starfield — the scene's solid clear colour + fog are the whole backdrop.)
-  show: { hyperFurniture: boolean; globeSurface: boolean; ledger: boolean };
+  show: { hyperFurniture: boolean; globeSurface: boolean; ledger: boolean; trendGround: boolean };
   // Which mesh pools this view raycasts — resolved to `THREE.Object3D[]` by `Engine._pickablesFor`.
   // Unlisted = pick nothing. Order is immaterial (the raycaster sorts hits by distance).
   pickSources: Array<"globe" | "layers" | "ledger">;
@@ -134,7 +140,7 @@ const FLAT: ViewPolicy = {
   canvas: false,
   morph: "toHyper",
   sims: { arcs: false, hubOrbits: false, globeSpin: false },
-  show: { hyperFurniture: false, globeSurface: false, ledger: false },
+  show: { hyperFurniture: false, globeSurface: false, ledger: false, trendGround: false },
   pickSources: [],
   dofEligible: false,
   countryHover: false,
@@ -165,7 +171,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // the unrotated frame) — an idle group spin would rotate the nodes off them. The camera
     // autoRotate provides the motion instead.
     sims: { arcs: false, hubOrbits: true, globeSpin: false },
-    show: { hyperFurniture: true, globeSurface: true, ledger: false },
+    show: { hyperFurniture: true, globeSurface: true, ledger: false, trendGround: false },
     pickSources: ["globe", "layers"],
     // ⚠️ DoF IS BACK (user, 2026-09-13: "add background blur effect again to hyper when a
     // metagraph is selected"). It was dropped on 2026-07-17 because "the bokeh read as FUZZ on
@@ -205,7 +211,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     canvas: true,
     morph: "toGeo",
     sims: { arcs: true, hubOrbits: false, globeSpin: true },
-    show: { hyperFurniture: true, globeSurface: true, ledger: false },
+    show: { hyperFurniture: true, globeSurface: true, ledger: false, trendGround: false },
     pickSources: ["globe"],
     dofEligible: false,
     countryHover: true, // pointer over a drillable country previews its border (pairs both ways)
@@ -233,7 +239,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     canvas: true,
     morph: "frozen",
     sims: { arcs: false, hubOrbits: false, globeSpin: false },
-    show: { hyperFurniture: false, globeSurface: true, ledger: true },
+    show: { hyperFurniture: false, globeSurface: true, ledger: true, trendGround: false },
     pickSources: ["ledger", "globe"],
     dofEligible: false,
     countryHover: false,
@@ -264,7 +270,10 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     canvas: true,
     morph: "frozen",
     sims: { arcs: false, hubOrbits: false, globeSpin: false },
-    show: { hyperFurniture: false, globeSurface: false, ledger: false },
+    // The ONE thing shown: the ground grid TrendsView draws, so the DOM chart planes recede over
+    // a visible depth axis instead of floating in a void. Nothing SHARED is shown — no nodes, no
+    // hubs, no chamber.
+    show: { hyperFurniture: false, globeSurface: false, ledger: false, trendGround: true },
     pickSources: [],
     dofEligible: false,
     countryHover: false,

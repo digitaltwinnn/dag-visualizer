@@ -13,6 +13,7 @@ import { createScene, type SceneCtx } from "./scene/SceneContext";
 import { HyperView, type MetaHubRec } from "./scene/views/HyperView";
 import { Globe } from "./scene/Globe";
 import { LedgerView } from "./scene/views/LedgerView";
+import { TrendsView } from "./scene/views/TrendsView";
 import { UNLISTED_KEY } from "./domain/ledgerBands";
 
 // The public catalog's ids — the unknown-lane tile resolver splits listed from unlisted rows.
@@ -113,6 +114,8 @@ export class Engine {
   private layers: HyperView;
   private globe: Globe;
   private ledger: LedgerView;
+  /** The trends view's WebGL half — its ground grid, and nothing else (scene/views/TrendsView). */
+  private trends: TrendsView;
   // THE stage light — one shared SpotLight the focused view CLAIMS per frame (scene/objects/
   // StageLight). Constructed after the scene exists, so it is assigned in the constructor.
   private _stageLight!: StageLight;
@@ -507,6 +510,9 @@ export class Engine {
     // config colour ("dag" included — its own brand hue, distinct from structural cyan; see
     // palette/identity.ts). refreshMeta below refreshes/extends both once the live set is known.
     this.ledger = new LedgerView(this.ctx.scene, colors, this._sceneColorMap, this._stageLight);
+    // The trends GROUND — static furniture, built once. It takes no identity map and no stage light:
+    // the view draws no per-network geometry and stages no light (StagedView excludes it).
+    this.trends = new TrendsView(this.ctx.scene, colors);
 
     const engineSelf = this;
     // Bound ONCE (rule 5: nothing per frame). The host carries the stable view refs plus getters
@@ -979,6 +985,10 @@ export class Engine {
     setNodeDimTarget(this._colors);
     this._pushSceneColors();
     for (const m of this._colorConsumers) m.setColors(this._colors);
+    // The trends ground takes the STRUCTURAL palette only and is deliberately NOT a
+    // `_colorConsumers` member: that list's contract is both setters, and the grid names no
+    // network, so a no-op `setSceneColors` would be ceremony standing in for a fact.
+    this.trends.setColors(this._colors);
     this._bloomMul = theme === "light" ? LIGHT_TUNE.bloomMul : 1;
   }
 
@@ -2054,6 +2064,10 @@ export class Engine {
     this.layers.setViewAlpha(hyperAlpha);
     const ledgerAlpha = this.transition.furnitureAlpha("ledger");
     this.ledger.setViewAlpha(ledgerAlpha);
+    // The trends ground rides the same channel — it is furniture, so it builds and tears down with
+    // the room like hyper's hoops and the chamber's labels.
+    const trendAlpha = this.transition.furnitureAlpha("trend");
+    this.trends.setViewAlpha(trendAlpha);
     // The stage light's per-view PRESENCE, published BEFORE the view updates that claim it: a claim
     // is scaled by its view's furniture alpha, so a fading view's light fades with its furniture and
     // a dark view's claim is worth nothing. That is the whole off-switch — not claiming IS off.
@@ -2116,6 +2130,13 @@ export class Engine {
     const ledgerActive = this.mode === "ledger" ||
       (this.transition.active() && (this.transition.from === "ledger" || this.transition.to === "ledger"));
     this.ledger.group.visible = ledgerActive && ledgerAlpha > 0.001;
+    // The trends ground, on exactly the ledger chamber's rule (and the same two owners: the Engine
+    // writes `visible`, the view owns alpha — rule 6). `show.trendGround` is the policy row, so
+    // there is no mode compare here or in the view; the transition clause keeps the grid alive
+    // while a switch INTO or OUT OF trends is still animating, or it would blink instead of fading.
+    const trendActive = this._policy.show.trendGround ||
+      (this.transition.active() && (this.transition.from === "trend" || this.transition.to === "trend"));
+    this.trends.group.visible = trendActive && trendAlpha > 0.001;
     if (ledgerActive) {
       if (this._ledgerDirty) this._refreshLedger();
       this.ledger.update(dt);
@@ -2271,6 +2292,7 @@ export class Engine {
     if (useStore.getState().sceneDragging) useStore.getState().setSceneDragging(false);
     if (useStore.getState().cameraFlying) useStore.getState().setCameraFlying(false);
     this.stats?.dom.remove();
+    this.trends.dispose();
     this.devTune.dispose();
     this.unsub.forEach((u) => u());
     cancelAnimationFrame(this.raf);
