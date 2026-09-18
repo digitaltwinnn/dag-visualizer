@@ -443,6 +443,13 @@ export default function Inspector() {
     cohort ? `${cohort.cc}|${cohort.city}|${cohort.isp}` : "",
     composition ? `${composition.netId}|${composition.key}` : "",
     inspect ? hoverKeyOf(inspect) ?? "" : "",
+    // HISTORY'S OWN SUBJECT (2026-09-19). Picking an instant is a new selection moment like any
+    // other, and it has to be IN this key or the mode-entry snapshot below pins the cursor card
+    // shut forever: that snapshot writes `instant: true` on arrival (the slot is not yet present),
+    // and nothing else in this view is a selection change that would drop it. Unguarded on
+    // purpose, unlike the two live-advancing ordinals above — a cursor never advances by itself,
+    // and the timeline writes it at most once per bucket.
+    trendCursorMs ?? "",
     // While FOLLOWING, the auto-advancing ordinals are NOT a new selection moment — the heartbeat
     // must not drop the user's +/− overrides every ~4s (item 8; advanceSnap already keeps the
     // recency stack still for the same reason). Guards BOTH live-advanced cards: the global

@@ -6,6 +6,7 @@ import type { TrendsSlice } from "@/components/useTrendsSlice";
 import { trendRoster, trendScope, type TrendScope } from "@/src/data/trendScope";
 import {
   TREND_METRICS,
+  globalSeries,
   lastMeasured,
   metricSeries,
   metricUnit,
@@ -58,6 +59,11 @@ export interface TrendRosterView {
    *  itself moves, which is what the `trendIds` publish channel requires of its publisher. */
   ranked: readonly string[];
   rows: ReadonlyMap<string, TrendRosterRow>;
+  /** The WHOLE NETWORK's series for this metric (`globalSeries`) — the reading a surface states
+   *  when no one network is the subject. Cut by the SAME edge rule as the per-network rows, which
+   *  is exactly why it lives here: read straight off the payload it is one bucket out of step with
+   *  the axis, and a cursor then quotes yesterday's number (caught live, 2026-09-19). */
+  global: (number | null)[];
   /** The axis every row is drawn against, cut by the same rule the series were. */
   buckets: number[];
   /** The cadence of those buckets — the unit word, the stamp's precision and the cursor's
@@ -123,7 +129,12 @@ export default function useTrendRoster(
         last: lastMeasured(points),
       });
     }
-    return { rows, order: rankByLast(ids, (id) => rows.get(id)!.series.points), buckets: cut(rawAxis) };
+    return {
+      rows,
+      order: rankByLast(ids, (id) => rows.get(id)!.series.points),
+      buckets: cut(rawAxis),
+      global: cut(globalSeries(metric, series)),
+    };
   }, [filter, metric, series, rawAxis, stepMs]);
 
   // STABILISED BY CONTENT (the `trendIds` channel's rule, which the stack publishes from this
@@ -138,6 +149,7 @@ export default function useTrendRoster(
   return {
     ranked,
     rows: pass.rows,
+    global: pass.global,
     buckets: pass.buckets,
     stepMs,
     unit: metricUnit(metric, stepMs),

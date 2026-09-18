@@ -642,7 +642,11 @@ export const useStore = create<AppState>((set) => ({
   // step, and `setTrendCursor` deliberately stays outside the pickActions table — clearing it is
   // the card's × and nothing cascades), and a SCRUB bumps at most once per bucket, because the
   // timeline is its one writer and quantises there.
-  setTrendCursor: (ms) => set((s) => ({ trendCursorMs: ms, selStack: bumpStack(s.selStack, "instant", ms != null) })),
+  // `navQuiet: false` for the same reason every ordinary commit clears it: an instant ARRIVING is
+  // exactly the moment the card's title roll and edge pulse exist to announce, and a stale quiet
+  // mark left by an earlier manual expand would swallow the first one.
+  setTrendCursor: (ms) =>
+    set((s) => ({ trendCursorMs: ms, navQuiet: false, selStack: bumpStack(s.selStack, "instant", ms != null) })),
   setTrendMetric: (metric) => set({ trendMetric: metric }),
   setTrendLayout: (layout) => set({ trendLayout: layout }),
   setTrendScroll: (offset) => set({ trendScroll: offset }),

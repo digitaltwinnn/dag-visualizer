@@ -10,7 +10,7 @@ import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { cn } from "@/lib/utils";
-import { globalSeries, orderAt, rankAt, valueAt } from "@/src/data/trendSeries";
+import { orderAt, rankAt, valueAt } from "@/src/data/trendSeries";
 import { stampInstant } from "@/src/data/trendTimeline";
 import { bucketAt } from "@/src/data/trendWindow";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
@@ -59,8 +59,7 @@ export default function TrendInstantPane({
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
 
-  const slice = useTrendsSlice(windowId, range);
-  const roster = useTrendRoster(slice, filter, metric);
+  const roster = useTrendRoster(useTrendsSlice(windowId, range), filter, metric);
   const { ranked, rows, buckets, stepMs, unit, format } = roster;
 
   // THE BUCKET, not the instant, is this card's subject: two pointer positions inside one bucket
@@ -82,10 +81,7 @@ export default function TrendInstantPane({
   // WITH NO NETWORK AS THE SUBJECT, THE LEAD IS THE WHOLE NETWORK. The global row answers the same
   // question the planes answer per chain (`globalSeries`, one home with the band's own overview),
   // so a reader who has focused nothing still gets a reading rather than an invitation.
-  const globalValue =
-    cursorMs != null && !subject
-      ? valueAt(globalSeries(metric, (slice.p?.series ?? {}) as Record<string, (number | null)[]>), buckets, stepMs, cursorMs)
-      : null;
+  const globalValue = cursorMs != null && !subject ? valueAt(roster.global, buckets, stepMs, cursorMs) : null;
 
   // The tier in words — the card's aside, so the body never has to caption its own precision.
   const tier = stepMs >= 86_400_000 ? "daily" : stepMs >= 3_600_000 ? "hourly" : "5 min";
