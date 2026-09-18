@@ -27,6 +27,7 @@ import { useTrayActives } from "@/components/useTrayActives";
 import { countryToggleActions, cohortToggleActions, compositionToggleActions } from "@/src/engine/domain/pickActions";
 import { CountryTitle, CountryAside, CountryCard, ProviderTitle, ProviderCard, ProviderAside, CompositionTitle, CompositionCard, CompositionAside } from "@/components/inspector/cards";
 import MetaSnapPane from "@/components/inspector/MetaSnapPane";
+import TrendInstantPane from "@/components/inspector/TrendInstantPane";
 import type { TabSignal } from "@/components/RailDock";
 import type { PickDescriptor } from "@/src/data/types";
 import type { Mode } from "@/src/store/store";
@@ -284,7 +285,7 @@ function CompositionPane({ sel, onClose, collapsed, onToggle }: { sel: Compositi
 // same single source of truth the dock trays read.
 const GHOST_EYEBROW: Record<string, string> = {
   context: "Metagraph", country: "Country", cohort: "Provider", composition: "Composition", node: "Node", snap: "Global snapshot",
-  metaSnap: "Metagraph snapshot",
+  metaSnap: "Metagraph snapshot", instant: "Instant",
 };
 export function GhostCard({ card }: { card: RailCard }) {
   const Icon = card.icon;
@@ -356,8 +357,9 @@ export default function Inspector() {
   // survives the dossier ⇄ nothing swap; the manifest only decides its tray-icon presence.
   const selNodes = useStore((s) => s.selNodes);
   const coarse = usePointerCoarse();
+  const trendCursorMs = useStore((s) => s.trendCursorMs);
   const manifest = detailsCards({
-    mode, filter, inspect, snap, country, cohort, composition, metaSnap, coarse,
+    mode, filter, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs,
     selNodesCount: selNodes.length,
     filterLabel: displayNetwork(filter)?.ticker ?? null, // one lookup — catalog + the unlisted pseudo-network
   });
@@ -536,6 +538,13 @@ export default function Inspector() {
     ),
     snap: snap ? (
       <CardPane key="snap" pick={snap} eyebrow="Global snapshot" onClose={() => applyClickActions([{ kind: "snapshot", pick: null }])} {...cx("snap")} />
+    ) : null,
+    // History's committed INSTANT: a card slot with no ladder rung, so its × clears its own
+    // channel and nothing cascades. It is NOT a selection write (`setTrendCursor` is deliberately
+    // outside the pickActions table — see selectionBoundary.test.ts's scope note), so it calls
+    // the setter rather than the executor.
+    instant: trendCursorMs != null ? (
+      <TrendInstantPane key="instant" onClose={() => useStore.getState().setTrendCursor(null)} {...cx("instant")} />
     ) : null,
     // The metagraph-snapshot tile: a card slot with no ladder rung (spec §7.1), so its × just
     // clears its own channel — there is no coarser rung for it to step back to.

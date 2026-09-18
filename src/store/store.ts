@@ -22,7 +22,7 @@ export type Mode = "hyper" | "geo" | "ledger" | "trend" | "soon";
 export type TrendMetric = "snapshots" | "blocks" | "fees" | "kb" | "nodes" | "continuity";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
-export type SelSlot = "network" | "node" | "snap" | "metaSnap" | "country" | "cohort" | "composition";
+export type SelSlot = "network" | "node" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "instant";
 
 // Move `slot` to the FRONT of the recency stack when it becomes active, or drop it when cleared.
 function bumpStack(stack: SelSlot[], slot: SelSlot, active: boolean): SelSlot[] {
@@ -634,7 +634,15 @@ export const useStore = create<AppState>((set) => ({
   // A fresh object every call — the request is the EVENT, so re-opening the same rung must reach
   // the Engine's reference-compare bridge again.
   requestFocusRung: (level) => set({ focusRung: { level } }),
-  setTrendCursor: (ms) => set({ trendCursorMs: ms }),
+  // THE CURSOR IS A COMMITTED SUBJECT OF ITS VIEW (2026-09-19), so it takes a place in the
+  // recency stack like every other card slot: the facts rail's collapse rule reads `selStack` to
+  // decide which present card is the ACTIVE one, and without a rung here the cursor card would
+  // rest as an entry under a dossier committed minutes earlier — a click on the timeline that
+  // populates a card nobody can see. It is NOT a selection rung (no camera pose, no deselect
+  // step, and `setTrendCursor` deliberately stays outside the pickActions table — clearing it is
+  // the card's × and nothing cascades), and a SCRUB bumps at most once per bucket, because the
+  // timeline is its one writer and quantises there.
+  setTrendCursor: (ms) => set((s) => ({ trendCursorMs: ms, selStack: bumpStack(s.selStack, "instant", ms != null) })),
   setTrendMetric: (metric) => set({ trendMetric: metric }),
   setTrendLayout: (layout) => set({ trendLayout: layout }),
   setTrendScroll: (offset) => set({ trendScroll: offset }),
