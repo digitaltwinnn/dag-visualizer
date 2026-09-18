@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+import { PLANE_PX_W } from "@/src/engine/domain/trendStack";
 
 // THE TREND STACK's contracts, made executable (2026-09-18 — the boundary-test idiom).
 //
@@ -31,8 +32,9 @@ import { readFileSync } from "node:fs";
 //     of its own on that element: two owners of one property is the whole failure mode this split
 //     exists to prevent, and the losing write is invisible in both files.
 //  7. ONE PLANE WIDTH, and it lives in `domain/trendStack.ts`. The projector divides by the same
-//     constant to resolve a slot's scale, so a local `540` here would render every plane at the
-//     wrong size with nothing failing anywhere.
+//     constant to resolve a slot's scale, so a local copy of the number here would render every
+//     plane at the wrong size with nothing failing anywhere. The check reads the live
+//     `PLANE_PX_W` rather than naming a value, so re-tuning the plane can never quietly retire it.
 //
 // EXEMPTIONS: none. The scan is this one file's source, comments stripped (the prose above and
 // the component's own header are allowed to name what the rules forbid).
@@ -107,6 +109,12 @@ describe("trend-stack boundary", () => {
       /PLANE_PX_W/.test(src) && /from\s+["']@\/src\/engine\/domain\/trendStack["']/.test(src),
       `${FILE} must read PLANE_PX_W from domain/trendStack — the projector divides by the same constant`,
     ).toBe(true);
-    expect(/\b540\b/.test(src), `${FILE} carries a literal 540 — that number has one home now`).toBe(false);
+    // Not `\b540\b` — a pinned literal stops meaning anything the moment the constant is retuned.
+    // This asks the question the rule is actually about: does the file repeat TODAY's width?
+    const bare = new RegExp(`(^|[^\\w.])${PLANE_PX_W}([^\\w]|$)`);
+    expect(
+      bare.test(src),
+      `${FILE} repeats the plane width (${PLANE_PX_W}) as a literal — PLANE_PX_W has one home`,
+    ).toBe(false);
   });
 });

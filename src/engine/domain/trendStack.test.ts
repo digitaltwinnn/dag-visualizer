@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  FLAT_SCALE,
+  FLAT_STEP_Y,
   FOCUS_LIFT,
   OPACITY_FALLOFF,
   PLANE_GAP,
   PLANE_PX_W,
+  PLANE_STEP_X,
+  PLANE_STEP_Y,
   PLANE_WORLD_W,
   PLANE_Y,
   SCALE_FALLOFF,
@@ -39,10 +43,30 @@ describe("stackPoses", () => {
     expect(p[4].opacity).toBeCloseTo(1 - OPACITY_FALLOFF * 4);
   });
 
-  it("every pose sits at PLANE_Y with x = 0", () => {
+  it("STAGGERS up and to the right, so no header strip is covered", () => {
+    // ⚠️ The rule this replaces (every plane at x = 0, y = PLANE_Y) is what made the built view
+    // read as ONE chart with ghost headers behind it — see the module header. Each receding slot
+    // steps by exactly one PLANE_STEP_X / PLANE_STEP_Y.
     const p = stackPoses(IDS, { layout: "stack", scroll: 0, focus: null });
-    expect(p.every((x) => x.y === PLANE_Y)).toBe(true);
-    expect(p.every((x) => x.x === 0)).toBe(true);
+    for (let i = 1; i < p.length; i++) {
+      expect(p[i].x - p[i - 1].x).toBeCloseTo(PLANE_STEP_X);
+      expect(p[i].y - p[i - 1].y).toBeCloseTo(PLANE_STEP_Y);
+    }
+    // UP and RIGHT, not down and left: the header band sits above the plane in front of it.
+    expect(PLANE_STEP_X).toBeGreaterThan(0);
+    expect(PLANE_STEP_Y).toBeGreaterThan(0);
+  });
+
+  it("centres the stagger on the VISIBLE count, so a short roster still sits mid-canvas", () => {
+    // Read from VISIBLE_PLANES instead, a two-plane window would hang off to one side.
+    const full = stackPoses(IDS, { layout: "stack", scroll: 0, focus: null });
+    const mean = (a: { x: number; y: number }[], k: "x" | "y") =>
+      a.reduce((t, v) => t + v[k], 0) / a.length;
+    expect(mean(full, "x")).toBeCloseTo(0);
+    expect(mean(full, "y")).toBeCloseTo(PLANE_Y);
+    const two = stackPoses(IDS.slice(0, 2), { layout: "stack", scroll: 0, focus: null });
+    expect(mean(two, "x")).toBeCloseTo(0);
+    expect(mean(two, "y")).toBeCloseTo(PLANE_Y);
   });
 
   it("scrolling pages through the roster", () => {
@@ -78,6 +102,11 @@ describe("stackPoses", () => {
     expect(f.interactive).toBe(true);
     expect(f.opacity).toBe(1);
     expect(f.scale).toBe(1);
+    // …and CONTINUES THE STAGGER forward: half a step further down-and-left than slot 0, so the
+    // front of the stack reads as one sequence rather than a plane parked over its own column.
+    const slot0 = p.find((x) => x.id === "dag-l0")!;
+    expect(f.x).toBeCloseTo(slot0.x - PLANE_STEP_X / 2);
+    expect(f.y).toBeCloseTo(slot0.y - PLANE_STEP_Y / 2);
   });
 
   it("a focus leaves its neighbours' slot position, scale and opacity untouched", () => {
@@ -86,6 +115,8 @@ describe("stackPoses", () => {
     for (const id of ["dag-l0", "pacaswap", "dor-metagraph", "constellation-l1"]) {
       const a = noFocus.find((x) => x.id === id)!;
       const b = focused.find((x) => x.id === id)!;
+      expect(b.x).toBe(a.x);
+      expect(b.y).toBe(a.y);
       expect(b.z).toBe(a.z);
       expect(b.scale).toBe(a.scale);
       expect(b.opacity).toBe(a.opacity);
@@ -106,19 +137,31 @@ describe("stackPoses", () => {
     expect(Math.max(...p.map((x) => x.z))).toBe(p[0].z);
   });
 
-  it("flat collapses every plane to one depth and keeps the order", () => {
+  it("flat is a COLUMN at one depth and one scale, nearest on top", () => {
+    // ⚠️ NOT a pile. Collapsing five planes onto the same pixels is unreadable — a worse answer
+    // than the stack "Align to front" is meant to clarify.
     const p = stackPoses(IDS, { layout: "flat", scroll: 0, focus: null });
     expect(new Set(p.map((x) => x.z)).size).toBe(1);
+    expect(p.every((x) => x.z === 0)).toBe(true);
     expect(p.map((x) => x.id)).toEqual(IDS.slice(0, VISIBLE_PLANES));
     expect(p.every((x) => x.opacity === 1)).toBe(true);
-    expect(p.every((x) => x.scale === 1)).toBe(true);
+    expect(p.every((x) => x.scale === FLAT_SCALE)).toBe(true);
+    expect(p.every((x) => x.x === 0)).toBe(true);
+    // Tiled down the column by FLAT_STEP_Y, nearest HIGHEST — the stack's own order, read top-down.
+    for (let i = 1; i < p.length; i++) expect(p[i - 1].y - p[i].y).toBeCloseTo(FLAT_STEP_Y);
+    const mean = p.reduce((t, v) => t + v.y, 0) / p.length;
+    expect(mean).toBeCloseTo(PLANE_Y);
   });
 
-  it("flat with a focus keeps z at 0 but still marks only the focused plane interactive", () => {
+  it("flat makes EVERY plane interactive — nothing is covered, so nothing needs protecting", () => {
+    const p = stackPoses(IDS, { layout: "flat", scroll: 0, focus: null });
+    expect(p.every((x) => x.interactive)).toBe(true);
+  });
+
+  it("a focus changes no geometry in flat", () => {
+    const plain = stackPoses(IDS, { layout: "flat", scroll: 0, focus: null });
     const p = stackPoses(IDS, { layout: "flat", scroll: 0, focus: "elpaca" });
-    expect(p.every((x) => x.z === 0)).toBe(true);
-    expect(p.filter((x) => x.interactive)).toHaveLength(1);
-    expect(p.find((x) => x.interactive)!.id).toBe("elpaca");
+    expect(p).toEqual(plain);
   });
 
   it("an empty roster yields no poses rather than throwing", () => {
@@ -137,6 +180,9 @@ describe("the plane's own size", () => {
     // A plane is WIDE against the stack's depth spacing — the column reads as a stack of charts,
     // not a row of cards seen edge-on.
     expect(PLANE_WORLD_W).toBeGreaterThan(PLANE_GAP * 2);
+    // …and the STAGGER is a fraction of the plane, not a tiling: the planes must overlap, or this
+    // stops being a stack and becomes a scattered row.
+    expect(PLANE_STEP_X * (VISIBLE_PLANES - 1)).toBeLessThan(PLANE_WORLD_W);
   });
 });
 

@@ -60,7 +60,14 @@ export const FOCI = {
   // The trends RESTING pose: frontal, looking down the stack's −Z depth axis so every plane
   // presents flat-on and depth reads as scale and fade rather than perspective skew. Elevated
   // only enough to separate the planes' bottom edges.
-  trend: { pos: new THREE.Vector3(0, 6, 54), target: new THREE.Vector3(0, 2, -18) },
+  // ⚠️ THE LOW AIM IS THE FRAMING, and it is a pure TRANSLATION — pos and target drop by the same
+  // 3.5, so the forward axis, the distance and the pitch are all untouched and the pose stays
+  // frontal (measured 2026-09-18 against the staggered stack). It exists because the stack
+  // staggers UPWARD: the block's centre of area sits above the plane it is measured from, so
+  // aiming at `PLANE_Y` itself parked the whole thing low in the free canvas. Aiming below it
+  // splits the difference between the two layouts — the stack (whose tall near plane pulls the
+  // block down) and the flat column (which is centred on PLANE_Y exactly).
+  trend: { pos: new THREE.Vector3(0, 2.5, 54), target: new THREE.Vector3(0, -1.5, -18) },
 } satisfies Record<string, CameraFraming>;
 /** A pose that exists. Every caller of `focus()` names one of these, checked. */
 export type FocusName = keyof typeof FOCI;
