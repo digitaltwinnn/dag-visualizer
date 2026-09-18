@@ -67,6 +67,24 @@ export function fleetFaded(
   return docFaded || entering === "parked" || leaving === "parked";
 }
 
+// …and WHO still holds it, read off the machine's phase right after a switch. The hold above is
+// released at the boundary, so a switch that reaches NO boundary has to release it itself, exactly
+// as its boundary would have — otherwise the hold is permanent. One such path exists and it is not
+// theoretical: a reverse-to-origin retarget (start's `to === this.from` branch) flips straight from
+// OUT to IN with no boundary tick, so Hypergraph → History → Hypergraph mid-gather left the fleet
+// invisible in the view it returned to until some later switch healed it. `place()`'s "immediate"
+// answer lands in the same phase and resolves the same way (there the Engine's own boundary call
+// already agreed).
+//
+// "staged" deliberately KEEPS the hold: a flat/"soon" view fires no boundary by design, and the
+// fleet stays parked at the grids exactly as the view it left it there asked.
+export function fleetHolder(
+  phaseAfterSwitch: ViewTransition["phase"],
+  leaving: FleetPlacement,
+): FleetPlacement | null {
+  return phaseAfterSwitch === "in" ? null : leaving;
+}
+
 export class ViewTransition {
   // "staged" = parked at the gathering grids with NO destination (a "soon"/placeholder view
   // is active): step 1 ran, step 2 waits for the next 3D view (user, 2026-07-17). The grids

@@ -32,7 +32,7 @@ import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt } from "./domain/cam
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
-import { ViewTransition, is3D, fleetFaded, type FleetPlacement } from "./domain/viewTransition";
+import { ViewTransition, is3D, fleetFaded, fleetHolder, type FleetPlacement } from "./domain/viewTransition";
 import { gatherBand, type GatherBand } from "./domain/gatherLayout";
 import { LADDERS, LEVEL_CARRY, hasLevel, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
@@ -1234,14 +1234,6 @@ export class Engine {
     // below re-fires on the null), so a glow can never outlive its subject.
     if (mode !== "ledger" && st0.metaSnap != null) st0.setMetaSnap(null);
 
-    // THE PARKED FLEET, at the switch moment: entering a view with nowhere to put a node starts
-    // the fade NOW, so it completes inside the shorter OUT phase and the group hides over nothing;
-    // leaving one HOLDS the fade, and the reveal waits for the boundary, where the fleet stands at
-    // the grids. Read off the policy rows, never a mode compare (convention 7). Before the branch
-    // below, so the flat→3D path's own boundary call (which is the truer one — the boundary has
-    // passed there) lands last.
-    this._fleetFade(VIEW_POLICIES[prevMode].fleet, policy.fleet);
-
     if (is3D(prevMode) && is3D(mode) && prevMode !== mode) {
       // 3D → 3D: run the staged gather choreography. The machine handles retargeting (a switch
       // mid-flight) without teleports; the render loop applies _pendingBoundary's layout + camera
@@ -1278,6 +1270,14 @@ export class Engine {
         this._pendingBoundary = mode;
       }
     }
+    // THE PARKED FLEET, at the switch moment: entering a view with nowhere to put a node starts
+    // the fade NOW, so it completes inside the shorter OUT phase and the group hides over nothing;
+    // leaving one HOLDS the fade, and the reveal waits for the boundary, where the fleet stands at
+    // the grids. Read off the policy rows, never a mode compare (convention 7). AFTER the branch
+    // above, because `fleetHolder` reads the phase the machine settled into: a switch that will
+    // reach no boundary (the reverse-to-origin retarget, place()'s "immediate") releases the hold
+    // here, exactly as its boundary would have, or the hold never lifts.
+    this._fleetFade(fleetHolder(this.transition.phase, VIEW_POLICIES[prevMode].fleet), policy.fleet);
   }
 
   // The boundary-equivalent layout application: morph snapped to the destination's value +
