@@ -3,7 +3,7 @@
 import { netUrl } from "@/src/net/current";
 import { reportPoll, touchPoll } from "@/src/data/api";
 import { POLL } from "@/src/engine/config";
-import { stitchWindows, tilesFor, type TrendsWindowData } from "@/src/data/trendWindow";
+import { stitchWindows, tilesFor, type TrendApiWindow, type TrendsWindowData } from "@/src/data/trendWindow";
 import { useEffect, useState } from "react";
 
 // The trends store's window, client side (2026-09-08 — the vitals band's measured history;
@@ -61,7 +61,7 @@ function fresh(url: string): TrendsWindowData | null {
 
 /** The measured window plus the failure signal. A null `window` skips the fetch entirely —
  *  for consumers whose need is conditional, since a hook cannot be called conditionally. */
-export default function useTrendsWindow(window: "24h" | "7d" | "30d" | "90d" | "1y" | "all" | null): TrendsWindowState {
+export default function useTrendsWindow(window: TrendApiWindow | null): TrendsWindowState {
   const url = window ? netUrl(`/api/trends?window=${window}`) : null;
   const [state, setState] = useState<TrendsWindowState>(() => ({
     data: url ? (cache.get(url)?.data ?? null) : null,

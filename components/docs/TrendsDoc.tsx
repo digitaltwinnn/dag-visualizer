@@ -2,8 +2,8 @@
 import { useId, useState } from "react";
 import { Panel } from "@/components/docs/AboutDoc";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import useTrendsWindow, { useTrendsRange } from "@/components/useTrendsWindow";
-import { cutRange, leadingTrim, pickRangeTier, sliceWindow, trimNewestPartial } from "@/src/data/trendWindow";
+import useTrendsSlice from "@/components/useTrendsSlice";
+import { ZOOMS, type ZoomId } from "@/src/data/trendWindow";
 import TrendChart, { type TrendLine } from "@/components/docs/TrendChart";
 import {
   TREND_METRICS,
@@ -51,23 +51,6 @@ interface TrendsPayload {
   series: Record<string, (number | null)[]>;
 }
 
-// THE ZOOM (user, 2026-09-07: "can we zoom in?") — the window picker is the tiers made
-// visible: 1H and 24H read the 5-minute buckets (48 h retention), 7D and 30D the hourly tier,
-// 1Y and ALL the daily tier. Same charts, same honesty rules, finer buckets. 1Y and ALL split
-// 2026-09-09 (user — the ranges stay consistent with the vitals rim, which is also where 1H
-// came from the same day): 1Y is the trailing year, ALL is the store's whole depth (the `all`
-// window), both leading-trimmed to where measuring began, so ALL says exactly as much as has
-// been measured. 1H rides the 24h payload, sliced to the newest hour — a window is not always
-// an API window of its own.
-const ZOOMS = [
-  { id: "1h", label: "1H" },
-  { id: "24h", label: "24H" },
-  { id: "7d", label: "7D" },
-  { id: "30d", label: "30D" },
-  { id: "1y", label: "1Y" },
-  { id: "all", label: "All" },
-] as const;
-type ZoomId = (typeof ZOOMS)[number]["id"];
 
 /** The h1's span phrase, from the measured buckets themselves. */
 function spanPhrase(buckets: number[], stepMs: number): string {
@@ -91,8 +74,6 @@ function meanGap(p: TrendsPayload): (number | null)[] {
   const sum = S(p, "g.gapSum");
   return ticks.map((t, i) => (t != null && t > 0 && sum[i] != null ? sum[i]! / t : null));
 }
-
-const stepMsOfMain = (w: { stepMs: number } | undefined): number => w?.stepMs ?? 86400000;
 
 const scale = (points: (number | null)[], k: number): (number | null)[] =>
   points.map((v) => (v == null ? null : v * k));
@@ -173,20 +154,15 @@ export default function TrendsDoc() {
   // sliver can still say how high it actually got.
   const [scaleMode, setScaleMode] = useState<"own" | "shared">("shared");
   const scaleId = useId();
-  // AUTO-TIER (map-tile edition, 2026-09-10): a selected range picks the FINEST tier whose
-  // HISTORY FLOOR its start clears (pickRangeTier — since the keep-forever flip, retention
-  // no longer prunes, but the floors record where fine grain begins to exist) and fetches
-  // the few calendar-unit tiles it touches; daily ranges keep riding the one `all` payload.
-  const rangeTier = range ? pickRangeTier(range.fromMs, range.toMs) : null;
-  // ONE fetch path with the band (review, 2026-09-09 — the doc carried its own raw fetch
-  // and a second, divergent leading-trim): the hook brings the shared cache (a rim-to-doc
-  // hop re-uses the band's payload), the pulse-strip health reporting, and the 5-minute
-  // refresh. The hook keeps the previous window's payload until the new one lands, which
-  // preserves the doc's own no-loading-flash rule on zoom changes.
-  const fetched = useTrendsWindow(range ? (rangeTier === "1d" ? "all" : null) : zoom === "1h" ? "24h" : zoom);
-  const rangeTiles = useTrendsRange(
-    range && (rangeTier === "5m" || rangeTier === "1h") ? { tier: rangeTier, fromMs: range.fromMs, toMs: range.toMs } : null,
-  );
+  // THE WINDOW, IN ONE CALL (2026-09-18) — which payloads this zoom (and any committed range)
+  // needs and how each is cut are `planTrendFetch`/`assembleTrendSlice` in src/data/trendWindow,
+  // fetched by `useTrendsSlice`. ONE HOME with the 3D trend stack, which reads the same hook off
+  // the store's own window: this page and that view are two registers of one rung (convention
+  // 12), and they already share the chart primitive and the per-network series maths. The auto-
+  // tiering, the 1H slice, the fleet's hourly payload and the daily readout's 90d window all
+  // moved there with their reasons; the document's zoom and range stay LOCAL state, because the
+  // window a reader picks on this page is the page's own.
+  const { p, buckets, stepMs, pF, fBuckets, fStep, fleetPending, daily, error } = useTrendsSlice(zoom, range);
   // ⚠️ THE COMMITTED NETWORK SCOPES EVERY PER-NETWORK COLUMN (user, 2026-09-14: "Trends is a
   // doc-page, but actually it shows data that could benefit from the metagraph filter … hide the
   // other metagraph charts"). ONE roster, read by all three panel builders, so a section cannot
@@ -211,50 +187,6 @@ export default function TrendsDoc() {
     return f !== "dag" && metagraphById(f) ? "metagraphs" : "hypergraph";
   });
 
-  // THE FLEET RIDES THE HOURLY TIER at fine zooms (user, 2026-09-09: "1H/24H on Nodes says
-  // no data while 7D has it") — the gauges are written hourly+daily only, so the 5m payload
-  // honestly lacks them; instead of gating, the Nodes sections fetch the 7d hourly payload
-  // and slice it to the picked span (the rim's own recipe). Small, shared-cache fetch, made
-  // only while a fine zoom stands.
-  const fleetFine = useTrendsWindow(!range && (zoom === "1h" || zoom === "24h") ? "7d" : null);
-  const fleetTiles = useTrendsRange(
-    range && rangeTier === "5m" ? { tier: "1h", fromMs: range.fromMs, toMs: range.toMs } : null,
-  );
-  // COUNTER READOUTS AT DAY SCALE (user, 2026-09-09: 7D's "latest full hour" answered too
-  // fine a question for a week-wide view): at the hourly zooms the counter charts' head
-  // readout rides the DAILY tier's own newest complete day — the store's exact sums, the
-  // same cached 90d payload the vitals rim already shares. No client re-summing.
-  const daily = useTrendsWindow(zoom === "7d" || zoom === "30d" ? "90d" : null);
-  const raw = fetched.data ?? undefined;
-  // 1H is the 24h payload's newest hour (the rim's own recipe — sliceWindow measures from
-  // the payload's newest bucket, so a cached payload yields a consistent hour). A committed
-  // RANGE replaces the zoom's cut entirely.
-  const windowedRaw =
-    range
-      ? rangeTier === "1d"
-        ? raw && cutRange(raw, range.fromMs, range.toMs)
-        : rangeTiles.data
-          ? cutRange(rangeTiles.data, range.fromMs, range.toMs)
-          : undefined
-      : zoom === "1h" && raw
-        ? sliceWindow(raw, 3_600_000)
-        : raw;
-  // LEADING TRIM (src/data/trendWindow — the one home since the review): the 1y window
-  // reaches further back than measuring does, and months of leading null days would draw as
-  // a long empty runway. The axis begins where history begins and the page widens by itself
-  // as the store grows; interior gaps still draw as gaps — only the unmeasured PREFIX goes.
-  const p: TrendsPayload | undefined = windowedRaw ? leadingTrim(windowedRaw) : undefined;
-  const buckets = p?.buckets ?? [];
-  const stepMs = p?.stepMs ?? 86400000;
-  const fleetRaw =
-    stepMsOfMain(windowedRaw) < 3600000
-      ? range
-        ? fleetTiles.data && cutRange(fleetTiles.data, range.fromMs, range.toMs)
-        : fleetFine.data && sliceWindow(fleetFine.data, zoom === "1h" ? 3_600_000 : 24 * 3_600_000)
-      : undefined;
-  const pF = fleetRaw ?? p;
-  const fBuckets = fleetRaw?.buckets ?? buckets;
-  const fStep = fleetRaw?.stepMs ?? stepMs;
   // COUNTER charts drop partial edge buckets — a partial sum charted whole reads as a crash, the
   // classic last-bucket lie. Which edges go is `trimCounterEdges` (src/data/trendSeries.ts), one
   // home with the 3D stack; the axis and every line are cut by the same call.
@@ -270,9 +202,8 @@ export default function TrendsDoc() {
   /** The daily tier's newest COMPLETE day for a counter series (yesterday — today still
    *  fills), scaled like the chart it captions; undefined off the hourly zooms. */
   const dayReadout = (name: string, k = 1): { value: number; word: string } | undefined => {
-    if (!daily.data) return undefined;
-    const d = trimNewestPartial(daily.data);
-    const series = d.series[name];
+    if (!daily) return undefined;
+    const series = daily.series[name];
     for (let i = (series?.length ?? 0) - 1; i >= 0; i--) {
       if (series![i] != null) return { value: series![i]! * k, word: "latest full day" };
     }
@@ -308,7 +239,7 @@ export default function TrendsDoc() {
   };
   /** Per-network GAUGE panels (fleet): untrimmed — a point sample is complete the moment it
    *  is taken — and null where never sampled (gauges are not zero-filled). */
-  /** Per-network GAUGE panels ride the FLEET payload (hourly at fine zooms — see fleetRaw). */
+  /** Per-network GAUGE panels ride the FLEET payload (hourly at fine windows — see `pF`). */
   const netGaugePanels = () => {
     // The LAYER LINES (user, 2026-09-11: "metagraph nodes don't show the role") — the same
     // three-line treatment the hypergraph tab's Network layers chart wears, per network, in
@@ -552,12 +483,12 @@ export default function TrendsDoc() {
         click <em>snapshot records</em> to see the actual snapshots behind it.
       </p>
 
-      {!p && !fetched.error && (
+      {!p && !error && (
         <Panel className="mt-8 py-4 px-5">
           <p className="text-label text-muted-foreground">reading the measured history…</p>
         </Panel>
       )}
-      {!p && fetched.error && (
+      {!p && error && (
         <Panel className="mt-8 py-4 px-5">
           <p className="text-label text-muted-foreground">
             The trends store is unreachable right now. It recovers on its own — reopen this page
@@ -682,7 +613,7 @@ export default function TrendsDoc() {
             title="Total nodes"
             lead="Every node across the whole network — the DAG's own validators and every metagraph's nodes — counted live each hour. The layers split the work: L0 seals a network's own state, currency L1 (cL1) moves its token, data L1 (dL1) takes in what applications write — and one node can run several."
           >
-            {stepMs < 3600000 && !fleetRaw ? (
+            {fleetPending ? (
               /* The gauges are HOURLY instruments; at fine zooms their hourly payload is a
                  separate fetch — this line only stands while it is in flight. */
               <p className="text-label text-muted-foreground">reading the hourly samples…</p>
@@ -772,7 +703,7 @@ export default function TrendsDoc() {
             title="Nodes per metagraph"
             lead="Each network's own node count, sampled live every hour, with a line for each layer it runs: L0 seals its state, cL1 moves its token, dL1 takes in what applications write."
           >
-            {stepMs < 3600000 && !fleetRaw ? (
+            {fleetPending ? (
               <p className="text-label text-muted-foreground">reading the hourly samples…</p>
             ) : (
               netGaugePanels()

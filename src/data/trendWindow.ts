@@ -220,3 +220,191 @@ export function bucketAt(buckets: readonly number[], stepMs: number, ms: number)
   }
   return buckets[lo];
 }
+
+// ---- THE WINDOW/RANGE DATA PATH, AS A PLAN (2026-09-18) ------------------------------------
+// ONE HOME for "which payloads does this window need, and how is each one cut" — the decision the
+// Trends DOCUMENT carried inline as component state until Task 8a. The document and the 3D trend
+// stack are TWO REGISTERS OF ONE RUNG (convention 12's MEASURED HISTORY), so a windowing rule
+// living in one component is a rule the other register has to guess at; the two already share the
+// chart primitive and the per-network series maths, and this is the third leg.
+//
+// PURE BY CONSTRUCTION: this decides WHAT to fetch and HOW to cut it, never fetches. The React
+// side is `components/useTrendsSlice.ts`, which is nothing but the hook calls the plan names.
+
+/** The API's own window vocabulary — `/api/trends?window=…`. */
+export type TrendApiWindow = "24h" | "7d" | "30d" | "90d" | "1y" | "all";
+
+// THE ZOOM (user, 2026-09-07: "can we zoom in?") — the window picker is the tiers made
+// visible: 1H and 24H read the 5-minute buckets (48 h retention), 7D and 30D the hourly tier,
+// 1Y and ALL the daily tier. Same charts, same honesty rules, finer buckets. 1Y and ALL split
+// 2026-09-09 (user — the ranges stay consistent with the vitals rim, which is also where 1H
+// came from the same day): 1Y is the trailing year, ALL is the store's whole depth (the `all`
+// window), both leading-trimmed to where measuring began, so ALL says exactly as much as has
+// been measured. 1H rides the 24h payload, sliced to the newest hour — a window is not always
+// an API window of its own.
+export const ZOOMS = [
+  { id: "1h", label: "1H" },
+  { id: "24h", label: "24H" },
+  { id: "7d", label: "7D" },
+  { id: "30d", label: "30D" },
+  { id: "1y", label: "1Y" },
+  { id: "all", label: "All" },
+] as const;
+export type ZoomId = (typeof ZOOMS)[number]["id"];
+
+/** A committed range — a drag on any chart (convention 12's zoom). `metaId` is whose chart the
+ *  drag was drawn on (user, 2026-09-09: DOR committed, a range dragged on BIOFI's chart, "go to
+ *  raw: no biofi in the filter" — a range must remember its network, and the document's records
+ *  action prefers it over the committed filter). The stack's own range carries none: it is the
+ *  whole stack's, not one plane's. Nothing here reads it — it travels with the range. */
+export interface TrendRange {
+  fromMs: number;
+  toMs: number;
+  metaId?: string | null;
+}
+
+/** How a fetched payload becomes the window on screen. */
+export type TrendCut =
+  | { kind: "none" }
+  | { kind: "slice"; ms: number }
+  | { kind: "range"; fromMs: number; toMs: number };
+
+/** One payload to fetch and its cut: an API WINDOW or a TILE request, never both. */
+export interface TrendFetchLeg {
+  window: TrendApiWindow | null;
+  tiles: { tier: "5m" | "1h"; fromMs: number; toMs: number } | null;
+  cut: TrendCut;
+}
+
+export interface TrendFetchPlan {
+  /** The charts' own payload. */
+  main: TrendFetchLeg;
+  /** The fleet gauges' HOURLY payload, when the main window is finer than they are written. */
+  fleet: TrendFetchLeg;
+  /** The daily tier behind the counter charts' head readout at the hourly zooms. */
+  daily: TrendApiWindow | null;
+  /** The tier a committed range resolved to; null with no range. */
+  tier: "5m" | "1h" | "1d" | null;
+}
+
+const NO_LEG: TrendFetchLeg = { window: null, tiles: null, cut: { kind: "none" } };
+const HOUR_MS = 3_600_000;
+
+/** WHICH PAYLOADS a zoom (and an optional committed range) needs, and how each is cut.
+ *
+ *  AUTO-TIER (map-tile edition, 2026-09-10): a selected range picks the FINEST tier whose
+ *  HISTORY FLOOR its start clears (`pickRangeTier` — since the keep-forever flip, retention no
+ *  longer prunes, but the floors record where fine grain begins to exist) and fetches the few
+ *  calendar-unit tiles it touches; daily ranges keep riding the one `all` payload.
+ *
+ *  THE FLEET RIDES THE HOURLY TIER at fine zooms (user, 2026-09-09: "1H/24H on Nodes says no
+ *  data while 7D has it") — the gauges are written hourly+daily only, so the 5m payload honestly
+ *  lacks them; instead of gating, the Nodes sections fetch the 7d hourly payload and slice it to
+ *  the picked span (the rim's own recipe). Small, shared-cache fetch, made only while a fine
+ *  window stands.
+ *
+ *  COUNTER READOUTS AT DAY SCALE (user, 2026-09-09: 7D's "latest full hour" answered too fine a
+ *  question for a week-wide view): at the hourly zooms the counter charts' head readout rides the
+ *  DAILY tier's own newest complete day — the store's exact sums, the same cached 90d payload the
+ *  vitals rim already shares. No client re-summing. It answers the ZOOM, so a committed range
+ *  leaves it standing.
+ *
+ *  A null `zoom` plans NOTHING — the conditional form for a consumer that is not currently
+ *  showing charts (the 3D stack while the view is elsewhere), since a hook cannot be called
+ *  conditionally and no other view should pay for this fetch. */
+export function planTrendFetch(zoom: ZoomId | null, range: TrendRange | null): TrendFetchPlan {
+  if (!zoom) return { main: NO_LEG, fleet: NO_LEG, daily: null, tier: null };
+  const daily: TrendApiWindow | null = zoom === "7d" || zoom === "30d" ? "90d" : null;
+  if (range) {
+    const tier = pickRangeTier(range.fromMs, range.toMs);
+    const cut: TrendCut = { kind: "range", fromMs: range.fromMs, toMs: range.toMs };
+    return {
+      main:
+        tier === "1d"
+          ? { window: "all", tiles: null, cut }
+          : { window: null, tiles: { tier, fromMs: range.fromMs, toMs: range.toMs }, cut },
+      // Only the 5m tier is finer than the gauges are written; an hourly range already IS their grain.
+      fleet:
+        tier === "5m"
+          ? { window: null, tiles: { tier: "1h", fromMs: range.fromMs, toMs: range.toMs }, cut }
+          : NO_LEG,
+      daily,
+      tier,
+    };
+  }
+  return {
+    main:
+      zoom === "1h"
+        ? { window: "24h", tiles: null, cut: { kind: "slice", ms: HOUR_MS } }
+        : { window: zoom, tiles: null, cut: { kind: "none" } },
+    fleet:
+      zoom === "1h" || zoom === "24h"
+        ? { window: "7d", tiles: null, cut: { kind: "slice", ms: zoom === "1h" ? HOUR_MS : 24 * HOUR_MS } }
+        : NO_LEG,
+    daily,
+    tier: null,
+  };
+}
+
+/** The payloads a plan's legs fetched — `null`/absent means "not here (yet)", which is an
+ *  instrument state, never an empty series. */
+export interface TrendPayloads {
+  main?: TrendsWindowData | null;
+  fleet?: TrendsWindowData | null;
+  daily?: TrendsWindowData | null;
+}
+
+/** The window on screen: the charts' own payload, the fleet's, and the daily readout's. */
+export interface TrendSlice {
+  /** The counter/continuity charts' window, cut and leading-trimmed; undefined = nothing yet. */
+  p: TrendsWindowData | undefined;
+  buckets: number[];
+  stepMs: number;
+  /** The GAUGE charts' window — the fleet's own hourly payload where the main one is too fine,
+   *  else the main one itself. */
+  pF: TrendsWindowData | undefined;
+  fBuckets: number[];
+  fStep: number;
+  /** The gauges' hourly payload is still in flight: say so in words, draw nothing (rule 10). */
+  fleetPending: boolean;
+  /** The daily tier behind the head readout, with its still-filling newest day already trimmed. */
+  daily: TrendsWindowData | undefined;
+}
+
+function applyCut(data: TrendsWindowData, cut: TrendCut): TrendsWindowData {
+  if (cut.kind === "range") return cutRange(data, cut.fromMs, cut.toMs);
+  if (cut.kind === "slice") return sliceWindow(data, cut.ms);
+  return data;
+}
+
+/** Perform a plan's cuts over the payloads it asked for.
+ *
+ *  LEADING TRIM: the 1y window reaches further back than measuring does, and months of leading
+ *  null days would draw as a long empty runway. The axis begins where history begins and the page
+ *  widens by itself as the store grows; interior gaps still draw as gaps — only the unmeasured
+ *  PREFIX goes.
+ *
+ *  ⚠️ THE FLEET'S TAKEOVER IS DECIDED BY THE ASSEMBLED WINDOW, not by the plan: the gauges are
+ *  hourly instruments, so their own payload only stands in where the main window's buckets are
+ *  FINER THAN AN HOUR. Reading it off the cut payload rather than the zoom is what keeps a range
+ *  and a zoom answering the same question. */
+export function assembleTrendSlice(plan: TrendFetchPlan, payloads: TrendPayloads): TrendSlice {
+  const rawMain = payloads.main ?? undefined;
+  const windowed = rawMain ? applyCut(rawMain, plan.main.cut) : undefined;
+  const p = windowed ? leadingTrim(windowed) : undefined;
+  const buckets = p?.buckets ?? [];
+  const stepMs = p?.stepMs ?? 86_400_000;
+  const rawFleet = payloads.fleet ?? undefined;
+  const fine = stepMs < HOUR_MS;
+  const fleet = fine && rawFleet ? applyCut(rawFleet, plan.fleet.cut) : undefined;
+  return {
+    p,
+    buckets,
+    stepMs,
+    pF: fleet ?? p,
+    fBuckets: fleet?.buckets ?? buckets,
+    fStep: fleet?.stepMs ?? stepMs,
+    fleetPending: fine && !fleet,
+    daily: payloads.daily ? trimNewestPartial(payloads.daily) : undefined,
+  };
+}
