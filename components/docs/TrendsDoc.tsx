@@ -3,7 +3,7 @@ import { useId, useState } from "react";
 import { Panel } from "@/components/docs/AboutDoc";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import useTrendsSlice from "@/components/useTrendsSlice";
-import { ZOOMS, type ZoomId } from "@/src/data/trendWindow";
+import { type ZoomId } from "@/src/data/trendWindow";
 import TrendChart, { type TrendLine } from "@/components/docs/TrendChart";
 import {
   TREND_METRICS,
@@ -27,6 +27,7 @@ import { displayNetwork } from "@/src/data/unlisted";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { SELECTED_ROW } from "@/components/selection";
+import { PICKER_GROUP, WindowPicker, zoomBtn } from "@/components/trendPickers";
 
 // THE TRENDS DOCUMENT (user, 2026-09-06; widened twice since) — the first UI consumer of the
 // trends backend: one daily-resolution chart per stored metric over the /api/trends 1y window,
@@ -78,25 +79,8 @@ function meanGap(p: TrendsPayload): (number | null)[] {
 const scale = (points: (number | null)[], k: number): (number | null)[] =>
   points.map((v) => (v == null ? null : v * k));
 
-/** ⚠️ THE PICKERS ARE HAIRLINE GROUPS, NOT FILLED TRACKS (user, 2026-09-14: in light mode they
- *  "all have a gray background which looks a bit off on a nice light clean background"). Measured,
- *  the shadcn track lands about 24 sRGB levels below this document's paper — a grey slab, and the
- *  only slab on a page that is otherwise paper and hairlines.
- *  (The measurement is stated in words on purpose: rule 3's test reads comments too, and a literal
- *  here would be a colour this file does not own.)
- *
- *  `bg-muted` is the primitive's own default, adopted unchanged; it reads acceptably on the dark
- *  face, where everything is low-luminance, and as UI chrome dropped onto a document on the light
- *  one. /trends is explicitly a DOCUMENT (convention 12 — prose, sections, 2D charts), and this
- *  app's document register is a hairline: the card-head rule, the raw layer's search box, and the
- *  file-cabinet tabs DIRECTLY BELOW these pickers all define their groups that way. So the group
- *  keeps its shape and loses its fill — a hairline plus `--wash-faint`, the app's own quiet
- *  surface, which is `light-dark()` by construction and so answers both faces at once.
- *
- *  ONE HOME for all three (topic, window, scale): they were three copies of the same literal, and
- *  a fourth picker would have been a fourth. */
-const PICKER_GROUP =
-  "inline-flex items-center rounded-lg border border-border bg-wash-faint p-[3px] max-[700px]:flex max-[700px]:justify-center max-[700px]:[&>button]:flex-1";
+// The pickers' group + pill classes are `components/trendPickers.tsx` — shared with the History
+// view's band timeline, which wears the same window control (2026-09-18).
 
 function Section({ id, title, lead, children }: { id: string; title: string; lead: string; children: React.ReactNode }) {
   return (
@@ -318,58 +302,18 @@ export default function TrendsDoc() {
     const f = useStore.getState().filter;
     inspectRange(range?.metaId ?? (metagraphById(f) && f !== "dag" ? f : null));
   };
-  const stampRange = (ms: number): string =>
-    new Date(ms).toLocaleString(undefined, {
-      month: "short", day: "numeric",
-      ...(stepMs < 86400000 ? { hour: "2-digit", minute: "2-digit", hour12: false } : {}),
-      timeZone: "UTC",
-    });
-  // The zoom — a filter over every chart at once; it rides each inner section row so it is
-  // always beside the control it composes with. An active RANGE joins the group as one more
-  // (pressed) option (user, 2026-09-09: a chip beside the group read as a second control),
-  // carrying its own × and the ladder's "records" action so the bridge is reachable from any
-  // tab. Compact sizing throughout (h-6/px-2/text-micro — the h-7 pills stopped fitting one
-  // line beside the section tabs once ALL and the range joined, same user note).
-  // The PRESSED register is the RIM'S (user, 2026-09-09: "styled differently in bottom bar
-  // than in the trend view — deliberate?" — no, drift: the rim adopted this picker's register
-  // in 2026-09-08's round, then evolved to SELECTED_ROW while this stayed behind; same
-  // control, one language now). The section pills above deliberately keep the tab register —
-  // a section is furniture, a window is a committed selection.
-  const zoomBtn = (pressed: boolean) =>
-    cn(
-      "h-6 px-1.5 rounded-md text-micro tracking-caps uppercase",
-      pressed ? cn("font-bold text-foreground", SELECTED_ROW) : "text-muted-foreground hover:text-foreground hover:bg-wash-hover",
-    );
+  // THE WINDOW PICKER is `components/trendPickers.tsx`'s `WindowPicker`, shared with the History
+  // view's band timeline (2026-09-18) — same six windows, same range chip, same pressed register.
+  // The doc keeps its zoom in LOCAL state (the window a reader picks while reading the page is the
+  // page's), so it clears its own range where the store's setter does that by itself.
   const zoomPicker = (
-    <div role="group" aria-label="Time window" className={PICKER_GROUP}>
-      {!range && ZOOMS.map((z) => (
-        <button
-          key={z.id}
-          type="button"
-          aria-pressed={!range && zoom === z.id}
-          onClick={() => { setZoom(z.id); setRange(null); }}
-          className={zoomBtn(!range && zoom === z.id)}
-        >
-          {z.label}
-        </button>
-      ))}
-      {range && (
-        <span className={cn("h-6 px-2 inline-flex items-center gap-1.5 rounded-md text-micro font-bold text-foreground whitespace-nowrap", SELECTED_ROW)}>
-          <span className="tabular-nums">
-            {range.metaId ? `${displayNetwork(range.metaId)?.ticker ?? ""} · ` : ""}
-            {stampRange(range.fromMs)}–{stampRange(range.toMs)}
-          </span>
-          <button
-            type="button"
-            onClick={() => setRange(null)}
-            title="Clear the selected range"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            ×
-          </button>
-        </span>
-      )}
-    </div>
+    <WindowPicker
+      zoom={zoom}
+      range={range}
+      stepMs={stepMs}
+      onPick={(id) => { setZoom(id); setRange(null); }}
+      onClearRange={() => setRange(null)}
+    />
   );
   // ⚠️ NO RECORDS BUTTON IN THE TOOLBAR (user, 2026-09-13: "the links are already inside the
   // tabs"). It was the ladder's one standalone control (2026-09-09), added before every chart

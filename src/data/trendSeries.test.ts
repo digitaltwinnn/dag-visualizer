@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
+  GLOBAL_METRIC_ROWS,
   TREND_METRICS,
+  globalSeries,
   formatDag,
   formatMb,
   formatSeconds,
@@ -167,5 +169,47 @@ describe("the busiest-first ranking", () => {
       d: [2],
     };
     expect(rankByLast(["a", "b", "c", "d"], (id) => rows[id])).toEqual(["c", "a", "d", "b"]);
+  });
+});
+
+// ── THE OVERVIEW REGISTER (2026-09-18, the band's timeline) ─────────────────────────────────
+// The same six metrics read for the WHOLE network rather than per chain. It is the third reader
+// of this mapping, so the honesty rules are the same ones and the tests say so: a null bucket is
+// a gap, and the derived continuity row divides only where the division is provable.
+describe("the global (whole-network) series", () => {
+  it("names one stored row per stored metric, with the unit the reader is shown", () => {
+    expect(GLOBAL_METRIC_ROWS.snapshots).toEqual({ key: "g.anchors", scale: 1 });
+    expect(GLOBAL_METRIC_ROWS.blocks).toEqual({ key: "g.blocks", scale: 1 });
+    expect(GLOBAL_METRIC_ROWS.fees).toEqual({ key: "g.feeFloor", scale: 1e-8 });
+    expect(GLOBAL_METRIC_ROWS.kb).toEqual({ key: "g.kbFloor", scale: 1 / 1024 });
+    expect(GLOBAL_METRIC_ROWS.nodes).toEqual({ key: "f.nodes", scale: 1 });
+    // Derived from two rows, so it names none — the same shape TREND_METRICS.continuity has.
+    expect(GLOBAL_METRIC_ROWS.continuity.key).toBeNull();
+  });
+
+  it("rescales a stored row into the unit the formatter states, and keeps nulls null", () => {
+    const series = { "g.feeFloor": [100_000_000, null, 0] };
+    expect(globalSeries("fees", series)).toEqual([1, null, 0]);
+    expect(globalSeries("kb", { "g.kbFloor": [1024, null] })).toEqual([1, null]);
+  });
+
+  it("copies rather than aliasing the payload's own row", () => {
+    const row = [1, 2, 3];
+    const out = globalSeries("snapshots", { "g.anchors": row });
+    expect(out).toEqual([1, 2, 3]);
+    expect(out).not.toBe(row);
+  });
+
+  it("answers an absent row with an empty series, never a row of zeros", () => {
+    expect(globalSeries("blocks", {})).toEqual([]);
+  });
+
+  it("derives continuity as the MEAN gap, null wherever the division is not provable", () => {
+    const series = {
+      "g.gapSum": [100, 100, 100, null, 50],
+      "g.ticks": [10, 0, null, 5, 5],
+    };
+    //            measured   ticks=0   ticks null  sum null  measured
+    expect(globalSeries("continuity", series)).toEqual([10, null, null, null, 10]);
   });
 });

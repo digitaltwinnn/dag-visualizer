@@ -415,8 +415,11 @@ sparkline off the live buffers) beside the declicked tick bar-chart. This delibe
 snapshots-only rule (2026-08-12): each band is the view's OWN vitals — the numbers the bar's vitals
 region used to show — so nothing generic returned. **The band's plate takes no pointer events**
 (`pointer-events-none` — user: "no clicking etc required"): every route the old strip's clicks served
-survives in the explorer rows and the global card's pager. The ONE exception is the ledger's TRENDS
-RIM (2026-09-08), a fixed SIBLING outside the plate — see the ledger row below. Colour is rule 3's: structural cyan, the
+survives in the explorer rows and the global card's pager. The ONE exception is the TRENDS
+RIM (2026-09-08), a fixed SIBLING outside the plate — since 2026-09-18 it commits the HISTORY VIEW
+through `setMode` (the measured history got a view; the document became that view's RAW register),
+and it stands down inside that view, gated on `bandContent === "timeline"` rather than a mode
+compare. Colour is rule 3's: structural cyan, the
 identity hue only under a committed filter — resolved once per band (`useVitalsScope`) and handed to
 every chart as its `accent` prop; the band wears NO filter-scope hairline (user, 2026-08-30 — the
 charts themselves state the scope). Identity is never colour-alone — every donut segment, country bar
@@ -526,6 +529,31 @@ rails keep clear of the band before the effect runs. The SCENE⇄HUD toggle is t
 writer, and it clears its own state when the viewport drops below 1100px — below that the control is
 CSS-hidden and SCENE has no meaning, so a stuck `true` would strand the band and the camera's
 rails-lean with no visible way back.
+
+⚠️ **THE BAND'S CONTENT IS A POLICY ROW, AND ITS ONE INTERACTIVE TENANT IS THE TIMELINE**
+(2026-09-18). `vitalsLane` says whether the band MOUNTS and reserves space; `bandContent`
+(`"vitals" | "timeline"`) says what it HOLDS — two questions, two rows, because the History view
+answers them differently: it mounts the same band at the same `--vitals-h` behind the same
+`--bar-margin`, and fills it with `components/TrendTimeline.tsx` instead of read-only cells. The
+dispatch is the ONE `ViewCells` function, so the desktop band and the phone Vitals sheet can never
+hold different things, and the gate is the policy row rather than `mode === "trend"` (convention 7 —
+a sixth view must answer for itself instead of inheriting "vitals" by silence).
+**The plate stays `pointer-events-none`.** "No clicking etc required on any visualization here at
+the bottom" (user, 2026-08-30) is a rule about VITALS, which are readings; a timeline is a control,
+and a track you cannot press is a picture of one. So the timeline re-enables pointer events on ITS
+OWN ROOT and nothing else — every other view's band keeps the charter and the orbit drag keeps
+passing through. The sheets' `sceneCover` clip still governs it: measured, a covered strip hands
+both paint and hit-testing to the sheet above.
+**The gesture split is the decision: a CLICK sets the cursor (`trendCursorMs`), a DRAG brushes the
+range (`trendRange`)** — press inside an existing brush pans it, press an edge resizes it, `×` or
+Escape clears it. Both gestures want the whole track and the alternative (a modifier for one of
+them) is unreachable on touch, which is the surface this most needs to work on; TRAVEL is the one
+discriminator every pointer type reports. The cursor is a COMMIT — it persists when the pointer
+leaves, because the rail reads it — while hovering previews a faint line locally and writes
+nothing (rule 9). Every decision a pointer makes is pure and tested in
+`src/data/trendTimeline.ts`; the component is a shell over it. The window pills are shared with the
+Trends document through `components/trendPickers.tsx` — the two had already been caught drifting
+once (user, 2026-09-09), so the class strings have one home.
 
 ### Boot entrance, routes & the doc overlay (2026-09-04)
 

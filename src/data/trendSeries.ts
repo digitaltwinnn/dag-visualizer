@@ -163,3 +163,50 @@ export function rankByLast(
     .sort((a, b) => (b.last ?? -1) - (a.last ?? -1))
     .map((x) => x.id);
 }
+
+// ── THE OVERVIEW REGISTER (2026-09-18, the vitals band's timeline) ───────────────────────────
+// The same six metrics read for the WHOLE NETWORK rather than per chain. The band's timeline
+// draws ONE quiet line over the whole measured span — a stack of per-network lines there would be
+// a second copy of the scene it sits under — so it needs the global row that ANSWERS THE SAME
+// QUESTION the planes above it are answering, and it has to be the same mapping or the overview
+// would quietly describe a different quantity than the charts it frames.
+//
+// It lives beside the per-network table on purpose: the two are one decision read at two scales,
+// and a `g.*` mapping kept inside a component is exactly the second home the per-network one was
+// pulled out of. The honesty rules are unchanged — a null bucket is a GAP, a rescale states its
+// unit, and a division with no provable denominator is null.
+
+/** The stored GLOBAL row a metric reads, and the factor into the unit the formatter states.
+ *  `key: null` = derived from more than one row (continuity), exactly as `MetricSpec.key` is. */
+export const GLOBAL_METRIC_ROWS: Record<TrendMetric, { key: string | null; scale: number }> = {
+  // The whole network's snapshot activity is what it ANCHORED — `g.ticks` counts global
+  // snapshots, which is the hypergraph's own cadence, not the chains' production.
+  snapshots: { key: "g.anchors", scale: 1 },
+  blocks: { key: "g.blocks", scale: 1 },
+  fees: { key: "g.feeFloor", scale: 1e-8 },
+  kb: { key: "g.kbFloor", scale: 1 / 1024 },
+  nodes: { key: "f.nodes", scale: 1 },
+  continuity: { key: null, scale: 1 },
+};
+
+/** What the overview track draws for one metric across the whole network. Mirrors
+ *  `metricSeries` — copies, never aliases, so a consumer's trim cannot reach the shared window
+ *  cache — and derives continuity as the MEAN gap (`g.gapSum ÷ g.ticks`), null wherever the
+ *  division is not provable: no numerator, no denominator, or a bucket in which the hypergraph
+ *  sealed nothing at all. */
+export function globalSeries(
+  metric: TrendMetric,
+  series: Readonly<Record<string, (number | null)[]>>,
+): (number | null)[] {
+  if (metric === "continuity") {
+    const sum = series["g.gapSum"] ?? [];
+    const ticks = series["g.ticks"] ?? [];
+    return sum.map((v, i) => {
+      const n = ticks[i];
+      return v != null && n != null && n > 0 ? v / n : null;
+    });
+  }
+  const row = GLOBAL_METRIC_ROWS[metric];
+  const raw = (row.key != null ? series[row.key] : undefined) ?? [];
+  return row.scale === 1 ? raw.slice() : raw.map((v) => (v == null ? null : v * row.scale));
+}

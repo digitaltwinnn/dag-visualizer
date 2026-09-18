@@ -25,6 +25,7 @@
 // jobs. Splitting it changed no behaviour: the three cell sets were already separate components.
 
 import { useStore, type Mode } from "@/src/store/store";
+import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import RollSwap from "@/components/RollSwap";
 import { filterAccent } from "@/src/data/network";
 import { NoSignalDot } from "@/components/state/StateAtoms";
@@ -32,6 +33,7 @@ import { DOC_ICONS } from "@/components/icons";
 import { useSceneYield } from "@/components/RailShade";
 import { cn } from "@/lib/utils";
 import { HyperCells, GeoCells, LedgerCells } from "@/components/vitals/viewCells";
+import TrendTimeline from "@/components/TrendTimeline";
 
 function useVitalsScope() {
   const mode = useStore((s) => s.mode);
@@ -42,8 +44,17 @@ function useVitalsScope() {
 }
 
 /** The one view→cells dispatch — a cell added or gated here reaches desktop and phone in the
- *  same edit, which is the whole point of extracting it. */
-function ViewCells({ mode, accent, filter, paused = false }: { mode: string; accent: string; filter: string; paused?: boolean }) {
+ *  same edit, which is the whole point of extracting it.
+ *
+ *  ⚠️ IT ALSO DISPATCHES THE BAND'S CONTENT (2026-09-18). The band is ONE mounted surface with a
+ *  fixed height and one set of edges, and `viewPolicy.bandContent` says what it HOLDS — vitals
+ *  cells in the structural views, the shared TIMELINE in the History view. A policy row rather
+ *  than a `mode === "trend"` here, per convention 7: the question is "what is this view's bottom
+ *  lane for", and a view that never answers it would inherit "vitals" by silence. It belongs in
+ *  this dispatch for the same reason the cells do — both presentations render it, so the band and
+ *  the phone sheet can never hold different things. */
+function ViewCells({ mode, accent, filter, paused = false }: { mode: Mode; accent: string; filter: string; paused?: boolean }) {
+  if (VIEW_POLICIES[mode].bandContent === "timeline") return <TrendTimeline />;
   return (
     <>
       {mode === "hyper" && <HyperCells accent={accent} />}
