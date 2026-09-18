@@ -40,6 +40,33 @@ export const STAGGER_SPREAD = 0.25; // window over which node flights START (ran
 const FLIGHT_OUT = DUR_OUT - STAGGER_SPREAD;
 const FLIGHT_IN = DUR_IN - STAGGER_SPREAD;
 
+// THE PARKED FLEET (2026-09-18). A view whose policy row reads `fleet: "parked"` is made of
+// something other than nodes — the History view is DOM chart planes — so it has nowhere honest to
+// put the shared population and the fleet leaves on the DOC_ROLL clock instead of being placed.
+// The choreography itself is unchanged: the gather still runs, the boundary still applies the
+// destination layout and flies the camera, the furniture still builds. Only the fleet's OPACITY
+// answers the row.
+//
+// This is the ONE place the two requests for that fade compose, and the reason it is a function
+// rather than two Engine conditionals: the doc overlay's bare stage and a parked view ask for the
+// same thing, and either stomping the other is a stranded fleet (About opened over History and
+// closed again used to hand the fleet back in a view that has no poses for it).
+//
+// `leaving` is the view being left WHILE IT STILL OWNS the gathered fleet (the switch moment), and
+// null once the boundary has handed the fleet to the destination. That one distinction carries both
+// directions: entering a parked view fades from the click, so the DOC_ROLL fade completes inside
+// the shorter OUT phase and the group hides over nothing; LEAVING one holds the fade until the
+// boundary, where the fleet is revealed AT THE GRIDS for the entry flight instead of popping back
+// in at the stale poses it was hidden at.
+export type FleetPlacement = "placed" | "parked";
+export function fleetFaded(
+  leaving: FleetPlacement | null,
+  entering: FleetPlacement,
+  docFaded: boolean,
+): boolean {
+  return docFaded || entering === "parked" || leaving === "parked";
+}
+
 export class ViewTransition {
   // "staged" = parked at the gathering grids with NO destination (a "soon"/placeholder view
   // is active): step 1 ran, step 2 waits for the next 3D view (user, 2026-07-17). The grids

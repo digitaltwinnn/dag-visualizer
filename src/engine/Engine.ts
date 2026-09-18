@@ -32,7 +32,7 @@ import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt } from "./domain/cam
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
-import { ViewTransition, is3D } from "./domain/viewTransition";
+import { ViewTransition, is3D, fleetFaded, type FleetPlacement } from "./domain/viewTransition";
 import { gatherBand, type GatherBand } from "./domain/gatherLayout";
 import { LADDERS, LEVEL_CARRY, hasLevel, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
@@ -174,6 +174,11 @@ export class Engine {
   // The DOC overlay's deferred bare-stage hide: armed by the doc fold, applied by the frame loop
   // the first frame the transition is past its OUT phase (see the tick site).
   private _docHideArmed = false;
+  // The DOC overlay's half of the fleet fade, once the hide above has actually fired. The other
+  // half is the destination view's `fleet` policy row, and `_fleetFade` below is the one place
+  // the two compose (domain/viewTransition.fleetFaded) — so closing About over a view that PARKS
+  // the fleet can't hand it back, and closing it over one that places it always does.
+  private _docFleetFaded = false;
   // Set when a 3D→3D retarget reverses straight back to its origin mid-OUT (no boundary will
   // fire, so the held camera never replays a mid-flight commit) — re-resolve focus once the
   // transition settles. See _integrateInputs' completion-edge check below.
@@ -686,6 +691,12 @@ export class Engine {
     this.mode = s.docPage || s.docClosing ? "soon" : s.mode;
     this.filter = s.filter;
     this.cohortSel = s.cohort;
+    // A BOOT straight into a view that parks the fleet seeds the fade rather than easing it: the
+    // node meshes are built lazily, when the first poll lands, so an ease from full would flash a
+    // partly-lit fleet into a view with no poses for it — the very pop the fade exists to remove.
+    // The doc overlay's own cold boot is NOT this case: its bare stage is armed below and applied
+    // by the frame loop, which keeps the ease it has always had.
+    this._fleetFade(null, VIEW_POLICIES[this.mode].fleet, true);
     // A cold doc boot arms the bare-stage hide; the frame loop applies it (no OUT phase runs).
     this._docHideArmed = s.docPage != null;
     // Booting straight into geo (deep link / persisted view): seed morph=1 so the boot layout
@@ -730,7 +741,10 @@ export class Engine {
             // the fleet's DOC_ROLL fade-in runs concurrently with the doc's own roll-out — both
             // on the one clock — so the grids stand fully lit the moment the document is gone,
             // ready for the entry flight that begins then.
-            this.globe.setFleetVisible(true);
+            this._docFleetFaded = false;
+            // …but only the DOC's half is released: the view underneath may be one that parks
+            // the fleet, and there the reveal never comes (fleetFaded composes the two).
+            this._fleetFade(VIEW_POLICIES[this.mode].fleet, VIEW_POLICIES[st.mode].fleet);
           }
         }
         // The engine learns of a theme flip the one allowed way (spec §3). The CSS has already
@@ -1164,6 +1178,14 @@ export class Engine {
 
   // ---- view + filter (ports ui.setMode / _applyFilter / camera focus) ----
 
+  // The fleet's one visibility write path (domain/viewTransition.fleetFaded decides). `leaving` is
+  // the view being left while it still owns the gathered fleet — null at the boundary, where the
+  // destination has taken it over. Called at exactly two moments per switch plus the doc fold's
+  // two edges, so the doc's bare stage and a parked view's row can never stomp each other.
+  private _fleetFade(leaving: FleetPlacement | null, entering: FleetPlacement, snap = false): void {
+    this.globe.setFleetVisible(!fleetFaded(leaving, entering, this._docFleetFaded), snap);
+  }
+
   setMode(mode: Mode) {
     const prevMode = this.mode; // capture BEFORE the reassignment — the choreography branches on it
     this.mode = mode;
@@ -1211,6 +1233,14 @@ export class Engine {
     // so its card can't follow the view out. This also drops the signer glow (the store effect
     // below re-fires on the null), so a glow can never outlive its subject.
     if (mode !== "ledger" && st0.metaSnap != null) st0.setMetaSnap(null);
+
+    // THE PARKED FLEET, at the switch moment: entering a view with nowhere to put a node starts
+    // the fade NOW, so it completes inside the shorter OUT phase and the group hides over nothing;
+    // leaving one HOLDS the fade, and the reveal waits for the boundary, where the fleet stands at
+    // the grids. Read off the policy rows, never a mode compare (convention 7). Before the branch
+    // below, so the flat→3D path's own boundary call (which is the truer one — the boundary has
+    // passed there) lands last.
+    this._fleetFade(VIEW_POLICIES[prevMode].fleet, policy.fleet);
 
     if (is3D(prevMode) && is3D(mode) && prevMode !== mode) {
       // 3D → 3D: run the staged gather choreography. The machine handles retargeting (a switch
@@ -1261,6 +1291,11 @@ export class Engine {
     // and flips HERE, not at switch time, so the from-view's chips hold their look through the
     // visible OUT phase (the setSimFlags orientation rule).
     this.globe.setChipEnv(VIEW_POLICIES[dest].chipEnv);
+    // …and the fleet's own fade flips on the same frame, for the same reason: the from-view held
+    // it through the visible OUT phase, and from here the DESTINATION's row owns it alone — so a
+    // placed view reveals the fleet at the grids for its entry flight, and a parked one leaves
+    // nothing to pop when the group hides.
+    this._fleetFade(null, VIEW_POLICIES[dest].fleet);
     // ledger snaps nothing — it freezes morph at the source view's value.
     // Bring the DESTINATION's frame state up BEFORE any framing math reads it: the hyper
     // root's scale is still collapsed from geo's morph 1 at this instant (a hub
@@ -1938,7 +1973,8 @@ export class Engine {
     // fleet mid-flight.
     if (this._docHideArmed && this.transition.phase !== "out") {
       this._docHideArmed = false;
-      this.globe.setFleetVisible(false);
+      this._docFleetFaded = true;
+      this._fleetFade(null, VIEW_POLICIES[this.mode].fleet);
       // The same boundary frame releases the document's entrance (store.docStageReady) — the
       // fleet blinking off and the prose rising are one moment, on the choreography's own clock.
       useStore.getState().setDocStageReady(true);

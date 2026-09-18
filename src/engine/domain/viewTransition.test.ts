@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ViewTransition, is3D, DUR_OUT, DUR_IN, FURN_IN, STAGGER_SPREAD, DOC_ROLL } from "./viewTransition";
+import { ViewTransition, is3D, fleetFaded, DUR_OUT, DUR_IN, FURN_IN, STAGGER_SPREAD, DOC_ROLL } from "./viewTransition";
 
 const settled = (v: "hyper" | "geo" | "ledger" = "hyper") => {
   const tr = new ViewTransition();
@@ -286,5 +286,40 @@ describe("settleAlpha (the nodes' own arrival ramp)", () => {
     expect(mid).toBeLessThan(0.8);
     tr.tick(10); // run the IN phase out
     expect(tr.settleAlpha("geo")).toBe(1);
+  });
+});
+
+// THE PARKED FLEET (2026-09-18). A view whose policy parks the fleet has nowhere honest to put a
+// node, so the shared population fades out on the DOC_ROLL clock instead of being placed. These
+// pin the COMPOSITION — the doc overlay's bare stage and a parked view are two requests for the
+// same fade, and neither may stomp the other — and the two moments the Engine applies it at.
+describe("fleetFaded (the parked fleet's one composition point)", () => {
+  it("fades ENTERING a parked view, from the click, and keeps it faded past the boundary", () => {
+    expect(fleetFaded("placed", "parked", false)).toBe(true); // the switch: fade with the gather
+    expect(fleetFaded(null, "parked", false)).toBe(true); //     the boundary: nothing to reveal
+  });
+
+  it("the entering fade completes inside the OUT phase, so nothing is left to pop", () => {
+    // Relation, not numbers: the fade starts at the click and the group hides at the boundary.
+    expect(DOC_ROLL).toBeLessThan(DUR_OUT);
+  });
+
+  it("holds the fade LEAVING a parked view until the boundary, then reveals at the grids", () => {
+    expect(fleetFaded("parked", "placed", false)).toBe(true); // the click: no pop-in at stale poses
+    expect(fleetFaded(null, "placed", false)).toBe(false); //    the boundary: fade in at the grids
+  });
+
+  it("never fades a placed → placed switch", () => {
+    expect(fleetFaded("placed", "placed", false)).toBe(false);
+    expect(fleetFaded(null, "placed", false)).toBe(false);
+  });
+
+  it("composes with the doc overlay's bare stage, which wins in every combination", () => {
+    expect(fleetFaded("placed", "placed", true)).toBe(true); // About over a placed view
+    expect(fleetFaded("parked", "placed", true)).toBe(true);
+    expect(fleetFaded(null, "placed", true)).toBe(true);
+    // Closing About clears only the DOC's half — a parked destination keeps the fleet away.
+    expect(fleetFaded("placed", "parked", false)).toBe(true);
+    expect(fleetFaded("placed", "placed", false)).toBe(false); // …and a placed one gets it back
   });
 });
