@@ -77,6 +77,10 @@ export default function TrendStack() {
   const scroll = useStore((s) => s.trendScroll);
   const focus = useStore((s) => s.trendFocus);
   const scaleMode = useStore((s) => s.trendScale);
+  // THE SHARED TIME CURSOR — one instant, marked on every plane whose span contains it, so the
+  // stack is read at ONE moment rather than five. A COMMIT, not a hover (store `trendCursorMs`);
+  // nothing writes it yet, and `null` draws nothing anywhere.
+  const cursorMs = useStore((s) => s.trendCursorMs);
   // The store's whole measured depth, leading-trimmed to where measuring began — the document's
   // own default window. `null` while the view is elsewhere is the hook's documented conditional
   // form (a hook cannot be called conditionally), so no other view pays for this fetch; the cache
@@ -210,6 +214,7 @@ export default function TrendStack() {
                 gaps={s.gaps && cut(s.gaps)}
                 lines={[{ label: metric, points: cut(s.points), hue: net?.hue }]}
                 scaleMax={sharedMax}
+                cursorMs={cursorMs}
                 className="w-full"
                 // THE HEAD IS THE PLANE'S HEADER STRIP. The body is fully transparent — the
                 // chart's own hairline and its coloured line are all the ink it has — so this one

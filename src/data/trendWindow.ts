@@ -192,3 +192,31 @@ export function stitchWindows(tiles: TrendsWindowData[]): TrendsWindowData {
   }
   return { buckets, stepMs: sorted[0].stepMs, series, now: Math.max(...sorted.map((t) => t.now)) };
 }
+
+/** THE SHARED TIME CURSOR'S BUCKET (2026-09-18). `store.trendCursorMs` is ONE instant and every
+ *  chart in the trend stack has to mark the bucket that CONTAINS it — the greatest bucket start
+ *  ≤ `ms`. Returns that start, or null when the instant is outside the window's span: before
+ *  `buckets[0]`, or at/after the exclusive end `last + stepMs`. A bucket is the half-open
+ *  interval [start, start + stepMs), which is exactly how `cutRange` above already treats one.
+ *
+ *  ⚠️ THE NEAREST BUCKET IS NOT THE ANSWER. Snapping a cursor to whichever start is closest would
+ *  put the mark on tomorrow for any instant past a bucket's midpoint — a chart saying "here" about
+ *  a day that is not the day the reader asked for, which is rule 10 in the one place a reader
+ *  could never catch it. Containment, or nothing.
+ *
+ *  `buckets` is ASCENDING and CONTIGUOUS by contract — the API assembles the axis in order and
+ *  `stitchWindows` sorts, and nulls in the SERIES (never missing entries in `buckets`) are how a
+ *  payload speaks a hole. So the search is a plain binary one and an unsorted array is not a case
+ *  this has to answer. Colocated tests are the specification (rule 4). */
+export function bucketAt(buckets: readonly number[], stepMs: number, ms: number): number | null {
+  const n = buckets.length;
+  if (n === 0 || ms < buckets[0] || ms >= buckets[n - 1] + stepMs) return null;
+  let lo = 0;
+  let hi = n - 1;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (buckets[mid] <= ms) lo = mid;
+    else hi = mid - 1;
+  }
+  return buckets[lo];
+}

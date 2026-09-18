@@ -1,8 +1,9 @@
 "use client";
 import { useId, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
-import { CartesianGrid, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { CartesianGrid, Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { cn } from "@/lib/utils";
+import { bucketAt } from "@/src/data/trendWindow";
 
 // THE TRENDS DOC'S ONE CHART PRIMITIVE — a small-multiple line chart over the /api/trends
 // buckets, on RECHARTS (user, 2026-09-07: "why hand-roll charts if we have a neat library?" —
@@ -47,6 +48,7 @@ export default function TrendChart({
   inspectCommits,
   readout,
   scaleMax,
+  cursorMs,
   className,
   headClassName,
 }: {
@@ -97,6 +99,15 @@ export default function TrendChart({
    *  floor rule. Gauges and continuity keep their bucket readout: a gauge's day is not a sum,
    *  and a day-mean of gaps needs the weighting the store already did per bucket. */
   readout?: { value: number; word: string };
+  /** THE SHARED TIME CURSOR (2026-09-18) — `store.trendCursorMs`, one instant every plane of the
+   *  3D trend stack marks at once, so a reader comparing five chains is looking at the same
+   *  moment on all of them. Drawn as a vertical rule at the bucket that CONTAINS the instant
+   *  (`bucketAt`), never at the nearest one: a mark one bucket off is a chart naming the wrong
+   *  day, which is the kind of quiet lie rule 10 exists to prevent. Outside this chart's own span
+   *  — a chain measured over a shorter window than its neighbours — NOTHING is drawn, which is
+   *  the honest answer: the instant is not in this chart. The document passes nothing and renders
+   *  exactly as before. */
+  cursorMs?: number | null;
   className?: string;
   /** Extra classes for the HEAD ROW alone (2026-09-18). The 3D trend stack's planes have no
    *  chrome of their own — the head IS each plane's header strip, the one part of a fully
@@ -201,6 +212,11 @@ export default function TrendChart({
     stepMs < 86400000
       ? new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" }) + " UTC"
       : new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+
+  // The cursor's bucket on THIS chart's own axis — the chart owns its scale, so the lookup runs
+  // against the buckets it was actually handed (a counter series trims its partial edges, so the
+  // caller's array and this one are not the same).
+  const cursorBucket = cursorMs == null ? null : bucketAt(buckets, stepMs, cursorMs);
 
   const hue0 = lines[0]?.hue ?? "var(--primary)";
   // The head's right-hand readout: the NEWEST MEASURED BUCKET, stamped with its own date —
@@ -434,6 +450,20 @@ export default function TrendChart({
                   }
                 />
               ))}
+              {/* THE SHARED CURSOR, on the bucket that CONTAINS the instant. Structural accent,
+                  one hairline, and no animation — it is a POSITION, and a position that eases in
+                  lags the gesture that set it. (`ReferenceLine` takes no `isAnimationActive`:
+                  unlike `Line` and `Tooltip` it has no animation to switch off, which is the
+                  answer we wanted.) It takes no pointer events — the plot's own drag and hover
+                  belong to the chart. */}
+              {cursorBucket != null && (
+                <ReferenceLine
+                  x={cursorBucket}
+                  stroke="var(--primary)"
+                  strokeWidth={1}
+                  style={{ pointerEvents: "none" }}
+                />
+              )}
               <Tooltip
                 isAnimationActive={false}
                 cursor={{ stroke: "var(--primary)", strokeOpacity: 0.4 }}

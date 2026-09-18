@@ -4,7 +4,7 @@
 // as "no leading gap"; the client clock judging a CDN-cached payload's newest bucket; the
 // leading partial month drawn whole while the trailing one was trimmed).
 import { describe, expect, it } from "vitest";
-import { cutRange, leadingTrim, monthlySum, pickRangeTier, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, type TrendsWindowData } from "./trendWindow";
+import { bucketAt, cutRange, leadingTrim, monthlySum, pickRangeTier, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, type TrendsWindowData } from "./trendWindow";
 
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
@@ -155,5 +155,45 @@ describe("stitchWindows", () => {
   });
   it("is empty-safe", () => {
     expect(stitchWindows([]).buckets).toEqual([]);
+  });
+});
+
+// The shared time cursor's bucket lookup (2026-09-18). `store.trendCursorMs` is ONE instant and
+// every chart plane has to mark the bucket that CONTAINS it — a mark placed on the nearest bucket
+// instead would misstate which day the reader is being shown, which is rule 10 in the one place a
+// reader would never catch it. Buckets are ascending START instants, `stepMs` wide, half-open
+// [start, start + stepMs) — the same interval `cutRange` already treats them as. Ascending is a
+// CONTRACT of every TrendsWindowData in the app (the API assembles them in order, `stitchWindows`
+// sorts), so an unsorted array is not a case this is required to answer.
+describe("bucketAt", () => {
+  const B = [0, HOUR, 2 * HOUR];
+
+  it("returns the bucket START of the bucket containing the instant", () => {
+    expect(bucketAt(B, HOUR, HOUR + 1)).toBe(HOUR);
+    expect(bucketAt(B, HOUR, 2 * HOUR + HOUR - 1)).toBe(2 * HOUR);
+  });
+
+  it("is half-open: a bucket's own start is inside it, the next start is not", () => {
+    expect(bucketAt(B, HOUR, HOUR)).toBe(HOUR);
+    expect(bucketAt(B, HOUR, 2 * HOUR)).toBe(2 * HOUR);
+  });
+
+  it("returns null before the first bucket", () => {
+    expect(bucketAt(B, HOUR, -1)).toBe(null);
+  });
+
+  it("returns null at and after the span's exclusive end (last + stepMs)", () => {
+    expect(bucketAt(B, HOUR, 3 * HOUR)).toBe(null);
+    expect(bucketAt(B, HOUR, 3 * HOUR + 1)).toBe(null);
+    expect(bucketAt(B, HOUR, 2 * HOUR + HOUR - 1)).toBe(2 * HOUR); // the last instant inside
+  });
+
+  it("is empty-safe — no buckets is no span, so nothing contains anything", () => {
+    expect(bucketAt([], HOUR, 0)).toBe(null);
+  });
+
+  it("finds a DAILY bucket from an instant partway through it", () => {
+    const days = [Date.UTC(2026, 8, 1), Date.UTC(2026, 8, 2), Date.UTC(2026, 8, 3)];
+    expect(bucketAt(days, DAY, Date.UTC(2026, 8, 2, 13, 47))).toBe(Date.UTC(2026, 8, 2));
   });
 });
