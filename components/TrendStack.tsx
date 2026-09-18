@@ -129,9 +129,14 @@ export default function TrendStack() {
   // pairing on leave — while it is still there to hear one. It often is not: paging drops a plane
   // out of the visible window, a metric switch re-ranks the roster, a filter commit cuts it to one,
   // and an element that has been removed under a stationary pointer never fires a leave. The
-  // channel would then keep a plane previewed with nothing pointing at it. `poses`, not `ranked`:
-  // only the planes actually on screen can hold a hover.
-  useHoverRelease(hoverFilter, poses.map((p) => p.id), () => setHoverFilter(null));
+  // channel would then keep a plane previewed with nothing pointing at it.
+  //
+  // ⚠️ THE RETURNED SETTER IS WHAT THE PAIRING WRITES THROUGH, so the hook knows which hovers are
+  // THIS surface's. It matters most here: the stack renders ~5 of a roster of 11, and a domain
+  // check would have it wiping every hover the rails and the top-bar filter strip set on the other
+  // six, on its very next render — which is every write, since it subscribes to the channel.
+  // `poses`, not `ranked`: only the planes actually on screen can hold a hover of its own.
+  const setHover = useHoverRelease(hoverFilter, poses.map((p) => p.id), setHoverFilter);
 
   // THE ONE PUBLISH of the fourth React → Engine channel (see store `trendIds`). The engine's
   // projector places a plane per id and needs the same order the planes are rendered in; only
@@ -248,7 +253,7 @@ export default function TrendStack() {
         // metric's own edge rule, so a rail can never quote a bucket this plane does not draw.
         const row = roster.rows.get(pose.id);
         if (!row) return null;
-        const pair = subjectPairing(hoverFilter, pose.id, setHoverFilter, row.hue);
+        const pair = subjectPairing(hoverFilter, pose.id, setHover, row.hue);
         return (
           <div
             key={pose.id}

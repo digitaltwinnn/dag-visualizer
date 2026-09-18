@@ -104,7 +104,12 @@ export default function TrendInstantPane({
   // stationary pointer — a filter commit, a re-rank that drops it — never fires its own leave, and
   // this card unmounts wholesale on the × and on a view switch. Either way the channel must not be
   // left holding a subject nothing is pointing at.
-  useHoverRelease(hoverFilter, ranked, () => setHoverFilter(null));
+  //
+  // ⚠️ …AND MUST NOT BE CLEARED WHEN SOMEONE ELSE IS HOLDING IT. This card's roster is the WHOLE
+  // roster, so without ownership its unmount would wipe a Layers row's live hover on the way out:
+  // hover a row here, move onto the rail, close the card. The returned setter is what makes the
+  // difference — the hook sees this card's writes and releases nothing else.
+  const setHover = useHoverRelease(hoverFilter, ranked, setHoverFilter);
 
   return (
     <RailPane entry={collapsed}>
@@ -171,7 +176,7 @@ export default function TrendInstantPane({
                     if (!row) return null;
                     const v = valueOf(id);
                     const on = id === subject;
-                    const pair = subjectPairing(hoverFilter, id, setHoverFilter, row.hue);
+                    const pair = subjectPairing(hoverFilter, id, setHover, row.hue);
                     return (
                       <button
                         key={id}

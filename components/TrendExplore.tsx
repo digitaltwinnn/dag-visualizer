@@ -79,8 +79,10 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
 
   // The unmount backstop for the pairing — a row that leaves the roster under a stationary pointer
   // (a filter commit, a re-rank) never fires its own leave. `onLeave` on the shell covers the
-  // ordinary case; this covers the structural one.
-  useHoverRelease(hoverFilter, ranked, () => setHoverFilter(null));
+  // ordinary case; this covers the structural one. Every write goes through the RETURNED setter, so
+  // the hook releases only hovers this card set and never one the stack or the top bar's filter
+  // strip is holding.
+  const setHover = useHoverRelease(hoverFilter, ranked, setHoverFilter);
 
   return (
     <ExplorerShell
@@ -95,7 +97,7 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
       hint={
         empty ? null : "Every network's own chart, busiest first. Pick one to bring its plane to the front."
       }
-      onLeave={() => setHoverFilter(null)}
+      onLeave={() => setHover(null)}
     >
       {/* ── THE CONTROLS ──────────────────────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-2">
@@ -144,7 +146,7 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
             const row = rows.get(id);
             if (!row) return null;
             const on = focus === id;
-            const pair = subjectPairing(hoverFilter, id, setHoverFilter, row.hue);
+            const pair = subjectPairing(hoverFilter, id, setHover, row.hue);
             return (
               <button
                 key={id}
