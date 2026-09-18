@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   FLAT_SCALE,
+  clampScroll,
   FLAT_STEP_Y,
   FOCUS_LIFT,
   OPACITY_FALLOFF,
@@ -291,5 +292,37 @@ describe("scrollToShow (the paging a focus asks for)", () => {
         expect(p.find((x) => x.id === id)!.z).toBeCloseTo(FOCUS_LIFT);
       }
     }
+  });
+});
+
+// ── THE PAGER'S END STOPS (2026-09-19) ──────────────────────────────────────────────────────
+// `clampScroll` became the rail pager's rule as well as the stack's own: the control and the
+// geometry have to agree about where the ends are, or a chevron dims one step early or one step
+// late. The visibility question — whether the pager exists at all — is the plank's own rule (an
+// axis with nothing to navigate is ABSENT, not disabled), which is exactly `count > VISIBLE_PLANES`.
+describe("clampScroll — one rule for the stack and its pager", () => {
+  it("a roster that FITS the window has exactly one legal scroll", () => {
+    for (const count of [0, 1, VISIBLE_PLANES]) {
+      expect(clampScroll(count, 0)).toBe(0);
+      expect(clampScroll(count, 3)).toBe(0);
+      expect(clampScroll(count, -2)).toBe(0);
+    }
+  });
+
+  it("one plane past the window opens exactly one step", () => {
+    expect(clampScroll(VISIBLE_PLANES + 1, 0)).toBe(0);
+    expect(clampScroll(VISIBLE_PLANES + 1, 1)).toBe(1);
+    expect(clampScroll(VISIBLE_PLANES + 1, 2)).toBe(1);
+  });
+
+  it("floors a fractional scroll rather than rounding it", () => {
+    expect(clampScroll(VISIBLE_PLANES + 3, 1.9)).toBe(1);
+  });
+
+  it("agrees with stackPoses about which window a scroll means", () => {
+    const ids = ["a", "b", "c", "d", "e", "f", "g"];
+    const start = clampScroll(ids.length, 99);
+    const poses = stackPoses(ids, { layout: "stack", scroll: 99, focus: null });
+    expect(poses.map((p) => p.id)).toEqual(ids.slice(start, start + VISIBLE_PLANES));
   });
 });

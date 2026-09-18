@@ -108,8 +108,13 @@ interface StackOpts {
 }
 
 /** Clamp `scroll` to the roster's own end and floor it to an integer slot — a fractional scroll
- *  is a later concern. */
-function clampScroll(count: number, scroll: number): number {
+ *  is a later concern.
+ *
+ *  EXPORTED because the rail's PAGER steps this same axis (2026-09-19): a control that clamped
+ *  with its own arithmetic could offer a step the stack would then refuse, or refuse one it would
+ *  take — the plank's "an exhausted direction is inactive" rule only reads honestly while the
+ *  control and the geometry agree about where the ends are. */
+export function clampScroll(count: number, scroll: number): number {
   const max = Math.max(0, count - VISIBLE_PLANES);
   return Math.min(max, Math.max(0, Math.floor(scroll)));
 }

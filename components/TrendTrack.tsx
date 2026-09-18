@@ -254,7 +254,14 @@ export default function TrendTrack({
         // A PRESS THAT DID NOT TRAVEL IS A CLICK, wherever it landed — inside the brush included.
         // Setting the cursor is the one gesture a reader wants most often, so it gets the whole
         // track and the drag gestures get the travel.
-        setTrendCursor(clampCursor(msAtX(localX(e), geom), geom));
+        //
+        // ⚠️ ONCE PER BUCKET HERE TOO (2026-09-19). The scrub has always quantised (`sameBucket`),
+        // but a CLICK wrote whatever instant the pixel named — so two clicks inside one bucket,
+        // which every surface reads as the same reading, still moved the channel. The right rail's
+        // cursor card keys its title roll and its edge pulse on this value, so the second click
+        // announced a new subject that was not new. One bucket, one write, whichever gesture.
+        const next = clampCursor(msAtX(localX(e), geom), geom);
+        if (!sameBucket(cursorMs, next, stepMs)) setTrendCursor(next);
         setPreview(null);
         return;
       }
@@ -262,7 +269,7 @@ export default function TrendTrack({
       setPreview(null);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [geom, setTrendCursor, setTrendRange, track],
+    [geom, cursorMs, stepMs, setTrendCursor, setTrendRange, track],
   );
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {

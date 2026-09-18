@@ -53,6 +53,7 @@ export default function TrendChart({
   className,
   headClassName,
   headAction,
+  headHover,
 }: {
   name: string;
   /** The unit word the head carries once (" /day", " seconds", " total"…). */
@@ -140,6 +141,18 @@ export default function TrendChart({
    *  "<network> <unit> — <action>". `fromKey` tells the caller which path activated it — a
    *  pointer gesture can be a drag, a key press never is. */
   headAction?: { activate: (fromKey: boolean) => void; pressed: boolean; label: string };
+  /** THE HEAD AS A PAIRED SUBJECT (2026-09-19) — the scene↔HUD hover pairing (convention 9) run
+   *  over the strip, because the strip is the one part of a plane that takes pointer events at
+   *  every depth. Handed in whole from `subjectPairing`, so hover and keyboard focus preview
+   *  identically and the caller owns which channel is being previewed. The document passes
+   *  nothing and its head pairs with nothing. */
+  headHover?: {
+    onMouseEnter: () => void;
+    onMouseMove: () => void;
+    onMouseLeave: () => void;
+    onFocus: () => void;
+    onBlur: () => void;
+  };
 }) {
   const n = buckets.length;
   // The hatch pattern's SVG id — per chart instance (useId), sanitized because url(#…)
@@ -323,6 +336,7 @@ export default function TrendChart({
           than overflowing it. Nothing changes at any width where the row already fit. */}
       <div
         className={cn("flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-1", headClassName)}
+        {...headHover}
         {...(headAction && {
           role: "button",
           tabIndex: 0,

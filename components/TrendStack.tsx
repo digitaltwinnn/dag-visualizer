@@ -56,21 +56,14 @@
 import { useEffect, useMemo, useRef } from "react";
 
 import TrendChart from "@/components/docs/TrendChart";
+import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { cn } from "@/lib/utils";
-import { displayNetwork } from "@/src/data/unlisted";
-import {
-  TREND_METRICS,
-  metricSeries,
-  metricUnit,
-  rankByLast,
-  trimCounterEdges,
-  type MetricSeries,
-} from "@/src/data/trendSeries";
+import { scopeEmptyCopy } from "@/src/data/trendScope";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { PLANE_PX_W, stackPoses } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
-import { METAGRAPHS } from "@/src/net/current";
+import { subjectPairing } from "@/components/useSubjectPairing";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 
@@ -81,10 +74,6 @@ const NO_IDS: readonly string[] = [];
 /** How far a press may travel and still count as a click, in px. Generous enough for a shaky
  *  finger, tight enough that a deliberate orbit attempt never commits a focus. */
 const DRAG_SLOP = 4;
-
-/** No payload yet, as ONE reference — a fresh `{}` per render would be a new memo key on a fact
- *  that has not changed. */
-const NO_SERIES: Readonly<Record<string, (number | null)[]>> = {};
 
 export default function TrendStack() {
   // Convention 7: gate on the view this behaviour is FOR, read from the allow-list — never a
@@ -103,6 +92,12 @@ export default function TrendStack() {
   // stack is read at ONE moment rather than five. A COMMIT, not a hover (store `trendCursorMs`);
   // nothing writes it yet, and `null` draws nothing anywhere.
   const cursorMs = useStore((s) => s.trendCursorMs);
+  // THE SCENE↔HUD HOVER PAIRING (convention 9), on the network channel every other surface in the
+  // app already pairs a network on: hovering a plane's header previews its Layers row in the rail,
+  // and hovering that row previews this plane. A preview is never a commit — the only thing it
+  // changes here is the plane's OPACITY, never its pose.
+  const hoverFilter = useStore((s) => s.hoverFilter);
+  const setHoverFilter = useStore((s) => s.setHoverFilter);
   // THE WINDOW, AND THE SAME ONE THE DOCUMENT READS. `trendWindow`/`trendRange` are the store's
   // own statement of what is on screen; `useTrendsSlice` turns that into the payloads it needs and
   // the cuts they take (`planTrendFetch`/`assembleTrendSlice`, src/data/trendWindow.ts) — the
@@ -113,52 +108,22 @@ export default function TrendStack() {
   // vitals rim and the document either way.
   const windowId = useStore((s) => s.trendWindow);
   const range = useStore((s) => s.trendRange);
-  const { p, buckets, stepMs, pF, fBuckets, fStep, fleetPending, error } = useTrendsSlice(on ? windowId : null, range);
+  const slice = useTrendsSlice(on ? windowId : null, range);
+  const { p, error } = slice;
 
-  const spec = TREND_METRICS[metric];
-  // A GAUGE reads the FLEET's window — hourly where the main one is finer than the gauges are
-  // written, the main one otherwise — and a counter reads the main one. Everything below (the
-  // rank, the shared ceiling, the axis, the unit word) takes the same source, or a plane would
-  // draw one window's points against another's dates.
-  const gauge = spec.kind === "gauge";
-  const src = gauge ? pF : p;
-  const series = src?.series ?? NO_SERIES;
-  const axis = gauge ? fBuckets : buckets;
-  const step = gauge ? fStep : stepMs;
-  // The gauges' hourly payload is still in flight: the planes keep their frames and say so in the
-  // document's own words, rather than drawing an empty plot over a window that HAS measurements.
-  const pending = gauge && fleetPending;
-  // The roster is the catalog, scoped by the committed filter — a filter with no catalog row (the
-  // DAG core, an unlisted channel) leaves it EMPTY, which is honest: the trends store keys its
-  // series per listed metagraph, so there is genuinely nothing measured for either. Naming that
-  // case in copy is a later task's job; for now the stack simply has no planes.
-  const roster = METAGRAPHS.filter((m) => m.id && (filter === "all" || m.id === filter)).map((m) => m.id!);
-  // ⚠️ ONE PASS OVER THE ROSTER, MEMOISED (2026-09-18 round 2; the deferred Task 4 minor, folded
-  // in because the scrub made it hot). `metricSeries` ran THREE times per network per render —
-  // once inside the ranking, once inside the shared ceiling and once per plane body — and it
-  // copies or maps every bucket of every series it touches. This component subscribes to
-  // `trendCursorMs`, so a scrub paid all three for a value that changes neither the payload nor
-  // the metric.
-  //
-  // The key is what the answer actually depends on: the committed `filter` (which IS the roster —
-  // `METAGRAPHS` is a module constant), the metric, and the SERIES REFERENCE, which `useTrendsSlice`
-  // now holds still across a render that changed none of its inputs. The cursor is in none of them.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const rows = useMemo(() => {
-    const byId = new Map<string, MetricSeries>();
-    for (const id of roster) byId.set(id, metricSeries(metric, id, series));
-    return { byId, order: rankByLast(roster, (id) => byId.get(id)!.points) };
-  }, [filter, metric, series]);
-  const rankedNow = rows.order;
-  // STABILISED BY CONTENT, because the roster is a PUBLISH CHANNEL (store `trendIds`). The rank is
-  // recomputed from scratch every render — a poll, a hover, any unrelated store write — so its
-  // identity changes constantly while the list itself sits still. The engine's change signal is
-  // `!==` on that array, so publishing the raw value would retarget the projector's ease on every
-  // render and the stack would never settle. Keying the memo on the joined ids publishes a fresh
-  // reference exactly when the CONTENT moves, which is the only time the engine needs to hear.
-  const rankedKey = rankedNow.join("|");
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const ranked = useMemo(() => rankedNow, [rankedKey]);
+  // ⚠️ ONE ROSTER PASS, SHARED WITH BOTH RAILS (2026-09-19). Which networks, in what order, drawn
+  // against which axis and with what measured — `components/useTrendRoster.ts` is the one answer,
+  // read here, by the Layers card and by the cursor card. Three copies of it would be three
+  // chances to disagree about the very ranking these planes are laid out by. It carries the
+  // counter EDGE TRIM too, so a rail can never quote a number no chart on screen agrees with.
+  const roster = useTrendRoster(slice, filter, metric);
+  const { ranked, buckets: axis, stepMs: step, unit: unitWord, pending } = roster;
+  // THE SCOPE WITH NOTHING TO DRAW (2026-09-19, Task 12's remainder): a `dag` or unlisted commit
+  // leaves the roster EMPTY, because the trends store keeps one series set per LISTED metagraph.
+  // The sentences are `src/data/trendScope.ts`'s, shared with the document so the two registers of
+  // this rung cannot say different things about the same commit.
+  const empty = scopeEmptyCopy(roster.scope, "view");
+
   const poses = stackPoses(ranked, { layout, scroll, focus });
 
   // THE ONE PUBLISH of the fourth React → Engine channel (see store `trendIds`). The engine's
@@ -191,11 +156,11 @@ export default function TrendStack() {
             // measured bucket, and a long window across a full roster is tens of thousands of them
             // — the shape that throws `RangeError: Maximum call stack size exceeded` the day the
             // store grows past the engine's argument limit.
-            (m, id) => (rows.byId.get(id)?.points ?? []).reduce<number>((n, v) => (v != null && v > n ? v : n), m),
+            (m, id) => (roster.rows.get(id)?.series.points ?? []).reduce<number>((n, v) => (v != null && v > n ? v : n), m),
             0,
           )
         : undefined,
-    [scaleMode, ranked, rows],
+    [scaleMode, ranked, roster],
   );
 
   // THE DRAG GUARD (see the header): pointerdown records where the press started, pointerup says
@@ -229,11 +194,21 @@ export default function TrendStack() {
     applyClickActions(trendPlaneActions(id, useStore.getState().trendFocus));
   };
 
-  // The head's unit word, resolved ONCE: the chart renders it beside the name and the header
-  // strip's accessible name repeats it (label in name — see `headAction` below).
-  const unitWord = metricUnit(metric, step);
-
   if (!on) return null;
+
+  // A SCOPE WITH NOTHING TO DRAW SAYS SO, IN THE CANVAS CENTRE (2026-09-19). A `dag` or unlisted
+  // commit leaves the roster empty, and an empty stage would read as a broken view rather than as
+  // the honest fact it is (rule 10). The sentences are the document's, from the one home both
+  // registers read, with the ROUTE named as a gesture available HERE.
+  if (empty) {
+    return (
+      <div id="trend-stack" className="absolute inset-0 pointer-events-none grid place-items-center z-[4]">
+        <p className="max-w-[46ch] text-center text-label text-muted-foreground">
+          {empty.fact} {empty.route}
+        </p>
+      </div>
+    );
+  }
 
   // FAILURE IS A SIGNAL, NOT A SILENCE (rule 10, and the trends hook's own contract): no cached
   // payload and a failed load says so in the document's words. No spinner, no fabricated series.
@@ -262,14 +237,11 @@ export default function TrendStack() {
       className="absolute inset-0 pointer-events-none z-[4] opacity-0 [transition:opacity_var(--tempo-nav)_ease] data-[on='1']:opacity-100 motion-reduce:!transition-none"
     >
       {poses.map((pose) => {
-        const net = displayNetwork(pose.id);
-        // The same pass the rank and the ceiling read — never a fourth `metricSeries` call.
-        const s = rows.byId.get(pose.id);
-        if (!s) return null;
-        // COUNTER series drop their partial edge buckets; a GAUGE keeps everything. The axis is
-        // cut by the same rule as the lines, or the plot desyncs from its own dates.
-        const counter = spec.kind === "counter";
-        const cut = <T,>(a: readonly T[]): T[] => (counter ? trimCounterEdges(a, step) : a.slice());
+        // The one roster pass the rank, the ceiling and both rails read — already cut by the
+        // metric's own edge rule, so a rail can never quote a bucket this plane does not draw.
+        const row = roster.rows.get(pose.id);
+        if (!row) return null;
+        const pair = subjectPairing(hoverFilter, pose.id, setHoverFilter, row.hue);
         return (
           <div
             key={pose.id}
@@ -294,7 +266,10 @@ export default function TrendStack() {
             // never fire for one press.
             onClick={pose.interactive ? () => activate(pose.id, false) : undefined}
             style={{
-              opacity: pose.opacity,
+              // A PREVIEWED PLANE LIFTS TO FULL, AND NOTHING ELSE MOVES (rule 9 — hovers preview,
+              // never commit). The pose is untouched: depth, scale and paint order are what a
+              // COMMIT changes, so a hover that re-staggered the stack would read as one.
+              opacity: pair.paired ? 1 : pose.opacity,
               // PAINT ORDER IS DEPTH, from the pose itself: a nearer plane (larger z) paints over
               // a farther one, so a lifted focus lands in front of the stack it came from and the
               // flat layout's equal z leaves tree order to break the tie. Local to this root,
@@ -309,17 +284,17 @@ export default function TrendStack() {
             <div className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2" style={{ width: PLANE_PX_W }}>
             {p && (
               <TrendChart
-                name={net?.name ?? pose.id}
+                name={row.name}
                 // The unit word follows the TIER — an hourly bucket labelled "per day" would
                 // misstate every reading by a factor of 24 (the document's own rule).
                 unit={unitWord}
-                format={spec.format}
+                format={roster.format}
                 note={pending ? "reading the hourly samples…" : undefined}
-                buckets={cut(axis)}
+                buckets={axis}
                 stepMs={step}
-                sampled={s.sampled && cut(s.sampled)}
-                gaps={s.gaps && cut(s.gaps)}
-                lines={[{ label: metric, points: cut(s.points), hue: net?.hue }]}
+                sampled={row.series.sampled}
+                gaps={row.series.gaps}
+                lines={[{ label: metric, points: row.series.points, hue: row.hue }]}
                 scaleMax={sharedMax}
                 cursorMs={cursorMs}
                 className="w-full"
@@ -341,13 +316,24 @@ export default function TrendStack() {
                 // so a header strip over a busy chart gains presence exactly when it is the thing
                 // being pointed at.
                 headClassName="pointer-events-auto cursor-pointer px-2 py-1 rounded-md [background:color-mix(in_oklch,var(--panel-solid)_62%,transparent)] hover:[background:color-mix(in_oklch,var(--wash-hover)_35%,var(--panel-solid))] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
+                // The pairing's five writers, on the one element of a plane that takes pointer
+                // events at every depth. `onMouseMove` is the swap-under-pointer healer and
+                // `onFocus`/`onBlur` the keyboard mirror — one pair of functions, five props, so
+                // a keyboard walk previews exactly what a hover does.
+                headHover={{
+                  onMouseEnter: pair.onMouseEnter,
+                  onMouseMove: pair.onMouseMove,
+                  onMouseLeave: pair.onMouseLeave,
+                  onFocus: pair.onFocus,
+                  onBlur: pair.onBlur,
+                }}
                 headAction={{
                   activate: (fromKey) => activate(pose.id, fromKey),
                   pressed: focus === pose.id,
                   // LABEL IN NAME (WCAG 2.5.3): an `aria-label` replaces the accessible name, so it
                   // opens with the strip's own visible words — the network and its unit — and then
                   // says what the press does. "Dor Technologies per day — bring forward".
-                  label: `${net?.name ?? pose.id}${unitWord ? ` ${unitWord}` : ""} — ${
+                  label: `${row.name}${unitWord ? ` ${unitWord}` : ""} — ${
                     focus === pose.id ? "send back" : "bring forward"
                   }`,
                 }}

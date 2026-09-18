@@ -1,3 +1,4 @@
+import { bucketAt } from "@/src/data/trendWindow";
 import type { TrendMetric } from "@/src/store/store";
 
 // THE PER-NETWORK SERIES MATHS — one home (2026-09-18, the 3D trends view). What a per-network
@@ -210,3 +211,85 @@ export function globalSeries(
   const raw = (row.key != null ? series[row.key] : undefined) ?? [];
   return row.scale === 1 ? raw.slice() : raw.map((v) => (v == null ? null : v * row.scale));
 }
+
+// ── READING THE STACK AT ONE INSTANT (2026-09-19, the History view's cursor card) ────────────
+// The rails read every network AT ONE MOMENT — the timeline commits an instant and the facts
+// card states what each chain measured there. Three decidable questions, stated here beside the
+// series maths they read, because the answers are exactly the sort rule 10 is about: a value
+// that was never measured, a rank an unmeasured chain never earned, a zero standing in for a
+// hole. The card composes; it decides nothing.
+
+/** The reading in the bucket CONTAINING `ms`, or null.
+ *
+ *  ⚠️ CONTAINMENT, NEVER THE NEAREST BUCKET (`bucketAt`'s own rule, which this delegates to): an
+ *  instant past a bucket's midpoint would otherwise read the NEXT day's number under a cursor the
+ *  reader put on this one. Null in three cases, all of them facts rather than failures — outside
+ *  the span on screen, a gap bucket (the chain measured nothing there), or a series shorter than
+ *  the axis. Never interpolated, never zero-filled. */
+export function valueAt(
+  points: readonly (number | null)[],
+  buckets: readonly number[],
+  stepMs: number,
+  ms: number,
+): number | null {
+  const start = bucketAt(buckets, stepMs, ms);
+  if (start == null) return null;
+  // A scan, not arithmetic: `(start − buckets[0]) / stepMs` assumes a UNIFORM axis, and
+  // `monthlySum` builds one that is not. The axis is at most a few hundred buckets and this runs
+  // once per network per cursor change.
+  const i = buckets.indexOf(start);
+  return i < 0 ? null : points[i] ?? null;
+}
+
+/** Where one reading stands among the others at the same instant. */
+export interface InstantRank {
+  /** 1-based, best first. */
+  rank: number;
+  /** How many networks HAD a reading there — the only honest denominator. */
+  of: number;
+}
+
+/** `value`'s standing among `readings` (one per roster network, nulls included).
+ *
+ *  Two rules carry it. Only MEASURED readings count, on both sides: a chain with nothing in that
+ *  bucket gets no rank at all (null) and is not in the total either, because a place in an order
+ *  built from readings has to be earned by one. And TIES SHARE THE BETTER RANK (competition
+ *  ranking, 1·2·2·4) — two chains that measured the same number are not first and second.
+ *
+ *  Ordered by value DESCENDING, the same direction `rankByLast` ranks the planes by, so "2 of 5"
+ *  in the card and the second plane in the stack mean the same kind of thing. */
+export function rankAt(readings: readonly (number | null)[], value: number | null): InstantRank | null {
+  if (value == null) return null;
+  let of = 0;
+  let above = 0;
+  for (const v of readings) {
+    if (v == null) continue;
+    of++;
+    if (v > value) above++;
+  }
+  return of === 0 ? null : { rank: above + 1, of };
+}
+
+/** The cursor list's order: largest reading first, nothing measured LAST, ties keeping the order
+ *  they came in. `rankByLast`'s rule read at one instant instead of at the newest one — a list
+ *  that reshuffles is a list nobody can follow, so the tie-break is stability. */
+export function orderAt(readings: readonly { id: string; value: number | null }[]): string[] {
+  return readings
+    .map((r, i) => ({ ...r, i }))
+    .sort((a, b) => (a.value == null ? 1 : 0) - (b.value == null ? 1 : 0) || (b.value ?? 0) - (a.value ?? 0) || a.i - b.i)
+    .map((r) => r.id);
+}
+
+/** THE READER'S WORD FOR EACH METRIC — one home, shared by the History view's metric picker and
+ *  anything else that names a metric on glass. The document's own vocabulary: `kb` is stored in
+ *  KB and read as DATA (nobody picks a unit off a menu), `continuity` is the spacing between a
+ *  chain's snapshots. The internal ids stay what they are — one concept, two registers, the
+ *  `cohort`/provider rule. */
+export const METRIC_LABELS: Record<TrendMetric, string> = {
+  snapshots: "Snapshots",
+  blocks: "Blocks",
+  fees: "Fees",
+  kb: "Data",
+  nodes: "Nodes",
+  continuity: "Continuity",
+};

@@ -1,5 +1,5 @@
 "use client";
-import { useId, useState } from "react";
+import { useState } from "react";
 import { Panel } from "@/components/docs/AboutDoc";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import useTrendsSlice from "@/components/useTrendsSlice";
@@ -20,14 +20,13 @@ import {
 } from "@/src/data/trendSeries";
 import { METAGRAPHS } from "@/src/net/current";
 import { useStore } from "@/src/store/store";
-import { applyClickActions } from "@/src/store/applyClickActions";
-import { filterToggleActions } from "@/src/engine/domain/pickActions";
 import { metagraphById } from "@/src/data/network";
 import { displayNetwork } from "@/src/data/unlisted";
-import { Switch } from "@/components/ui/switch";
+
 import { cn } from "@/lib/utils";
-import { SELECTED_ROW } from "@/components/selection";
-import { PICKER_GROUP, WindowPicker, zoomBtn } from "@/components/trendPickers";
+import { PICKER_GROUP, ScaleToggle, ScopeChip, WindowPicker, zoomBtn } from "@/components/trendPickers";
+import { openRecords, spanOfWindow } from "@/components/trendDoors";
+import { scopeEmptyCopy, trendRoster, trendScope } from "@/src/data/trendScope";
 
 // THE TRENDS DOCUMENT (user, 2026-09-06; widened twice since) — the first UI consumer of the
 // trends backend: one daily-resolution chart per stored metric over the /api/trends 1y window,
@@ -140,7 +139,6 @@ export default function TrendsDoc() {
   // The peak readout stays each chart's OWN number in both modes (TrendChart's `ownMax`), so a
   // sliver can still say how high it actually got.
   const [scaleMode, setScaleMode] = useState<"own" | "shared">("shared");
-  const scaleId = useId();
   // THE WINDOW, IN ONE CALL (2026-09-18) — which payloads this zoom (and any committed range)
   // needs and how each is cut are `planTrendFetch`/`assembleTrendSlice` in src/data/trendWindow,
   // fetched by `useTrendsSlice`. ONE HOME with the 3D trend stack, which reads the same hook off
@@ -163,7 +161,9 @@ export default function TrendsDoc() {
   // there is genuinely nothing measured here for either. The tab says which case it is and names
   // where the reading does live; see `scopeEmpty`.
   const filter = useStore((s) => s.filter);
-  const roster = METAGRAPHS.filter((m) => m.id && (filter === "all" || m.id === filter));
+  // ONE ROSTER RULE, shared with the History view's stack (`src/data/trendScope.ts`, 2026-09-19):
+  // which chains a filter leaves in scope is a property of the trends store, not of this page.
+  const roster = trendRoster(filter).map((id) => METAGRAPHS.find((m) => m.id === id)!);
 
   // A committed metagraph opens the document on that side of the network. Read ONCE AT MOUNT, and
   // the mount is the RAW TOGGLE: `datasection/DocumentSurface` mounts this component when the raw
@@ -281,29 +281,14 @@ export default function TrendsDoc() {
         return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={metricUnit("continuity", stepMs)} buckets={cBuckets} stepMs={stepMs} format={TREND_METRICS.continuity.format} sampled={trim(s.sampled!)} gaps={trim(s.gaps!)} lines={[line]} />;
       });
 
-  // ONE RUNG DOWN THE LADDER (convention 12): hand the selected range to the anchor log's
-  // date search. The network commit rides the pickActions table (rule 2 — the same
-  // filterToggleActions row the explorer uses, guarded so it never toggles OFF); the range
-  // itself travels the one-shot store bridge the log consumes on sight.
-  //
-  // The door is a MODE step, not a section one (2026-09-18): this document IS the raw layer of
-  // the view it is read in, so `section` is already "data" and stays there — changing `mode` is
-  // what swaps the layer's surface from this document to the ledger's records, with no depth
-  // transition to replay. `setSection("data")` below is what makes the step work from anywhere
-  // else too, and a no-op when we are already down here.
+  // ONE RUNG DOWN THE LADDER (convention 12) — `components/trendDoors.ts`, shared with the
+  // History view's cursor card since 2026-09-19. The sequence (commit the network through the one
+  // write path, hand the span to the log, land on the view that can show records) lived here and
+  // is now called from two surfaces, so they cannot land a reader in different places.
   const inspectRange = (metaId: string | null) => {
     // No custom range = the WINDOW you are looking at (user, 2026-09-09: "that button can
     // always exist") — the zoom is a range statement too, so the ladder's door is always open.
-    const span =
-      range ?? (buckets.length ? { fromMs: buckets[0], toMs: buckets[buckets.length - 1] + stepMs } : null);
-    if (!span) return;
-    const st = useStore.getState();
-    if (metaId && st.filter !== metaId) applyClickActions(filterToggleActions(metaId, st.filter));
-    st.setLogSeek({ metaId, fromMs: span.fromMs, toMs: span.toMs });
-    // The anchor log is the LEDGER view's raw projection — the ladder lands on the rung
-    // that can actually show records (mode navigation, not a selection).
-    if (st.mode !== "ledger") st.setMode("ledger");
-    st.setSection("data");
+    openRecords(metaId, range ?? spanOfWindow(buckets, stepMs));
   };
   const onRange = (fromMs: number, toMs: number) => setRange({ fromMs, toMs, metaId: null });
   /** The per-network charts' drag: the range carries the chart's own chain. */
@@ -341,72 +326,27 @@ export default function TrendsDoc() {
   // flex-none + a fixed h-8: the primitive's triggers are flex-1 at a %-height, which is what
   // spread them wide and broke when the list WRAPS on phone (the h-auto rows below) — as
   // compact pills they pack left and wrap cleanly (user, 2026-09-08: the tabs overflowed).
-  /* The scale control — a LABEL and an on/off switch (user, 2026-09-14, two rounds: first "should
-     read like a simple toggle", then "make it a label with a simple on/off control"). It is
+  /* The scale control — `trendPickers.tsx`'s shared `ScaleToggle` (extracted 2026-09-19 for the
+     History view's Layers card: the same question about the same charts, and a second copy of a
+     control with this much reasoning in it is the drift that file exists to prevent). It is
      rendered ONLY on the metagraphs tab, because a scale shared across charts is only a question
      where there is a COLUMN of comparable charts; the hypergraph tab's charts each measure a
-     different quantity, and under a commit there is one network left.
-
-     ⚠️ A SWITCH IS NOT THE PRESSED-TOGGLE GRAMMAR, and the difference is the reason this stopped
-     being a pill. The command bar's Scene⇄HUD and RAW name an ACTION the reader presses FOR, with
-     the wash reporting that it is on — right for a control that pushes a surface in and pops it
-     out. This is a SETTING: the reader is not doing something, they are choosing how the column
-     is drawn, and a setting reads as a name plus its state. The two-segment group it replaced was
-     a radio wearing a toggle's clothes; the pill after it was the bar's action grammar on a
-     setting. `components/ui/switch.tsx` is the adopted primitive, restated in this app's tokens.
-
-     The label is the switch's own `<label>`, so the words are a hit target too — the switch alone
-     is 28×16, well under the touch floor the bar's controls keep. */
-  const scaleToggle = (
-    <span className="inline-flex items-center gap-2">
-      <label htmlFor={scaleId} className="text-micro tracking-caps uppercase text-muted-foreground cursor-pointer select-none">
-        Same scale
-      </label>
-      <Switch
-        id={scaleId}
-        checked={scaleMode === "shared"}
-        onCheckedChange={(on) => setScaleMode(on ? "shared" : "own")}
-        title={
-          scaleMode === "shared"
-            ? "Every chart shares the busiest network's scale, so the column compares. Switch off to let each chart scale to its own data."
-            : "Each chart scales to its own data. Switch on to put every chart on the busiest network's scale."
-        }
-      />
-    </span>
-  );
-  /* WHAT IS APPLIED, IN WORDS, AND A WAY TO CLEAR IT — the raw layer's search toolbar rule,
-     which is the same problem: a surface showing a cut of its data must say so on itself, or the
-     reader is left to infer a missing column from a control one zone away. It is the selected-row
-     pill the range chip beside the window picker already wears, so the two scopes on this page
-     read as one species. Clearing goes through `filterToggleActions` (rule 2's one write path) —
-     toggling the committed network OFF is what returns the page to every network, and it commits
-     the same release the explorer row and the scene do. */
-  const scopeNet = filter === "all" ? null : displayNetwork(filter);
-  const scopeChip =
-    filter === "all" ? null : (
-      <span className={cn("h-6 px-2 mr-auto inline-flex items-center gap-1.5 rounded-md text-micro font-bold text-foreground whitespace-nowrap", SELECTED_ROW)}>
-        <span className="inline-block size-2 rounded-full flex-none" style={{ background: scopeNet?.hue ?? "var(--primary)" }} aria-hidden />
-        {scopeNet?.name ?? filter} only
-        <button
-          type="button"
-          onClick={() => applyClickActions(filterToggleActions(filter, filter))}
-          title="Show every network again"
-          className="text-muted-foreground hover:text-foreground"
-        >
-          ×
-        </button>
-      </span>
-    );
+     different quantity, and under a commit there is one network left. */
+  const scaleToggle = <ScaleToggle shared={scaleMode === "shared"} onChange={(on) => setScaleMode(on ? "shared" : "own")} />;
+  // The scope pill and its × are `trendPickers.tsx`'s `ScopeChip`, shared with the History view's
+  // Layers card (2026-09-19) — one statement of "what is applied, and how to clear it".
+  const scopeChip = <ScopeChip filter={filter} className="mr-auto" />;
   /* The scoped tab with nothing to draw. Both cases are real commits a reader can reach from the
      bar, and neither is a failure — the trends store keeps one series set per LISTED metagraph,
      so the DAG core and the unlisted channels have no per-network record here by construction.
-     Each names where its own reading does live (the empty-state rule: name a gesture available on
-     THIS surface — both routes are visible from here, the tab row above and the chip beside it). */
-  const scopeEmpty = (
+     The sentences are `src/data/trendScope.ts`'s, shared since 2026-09-19 with the History view's
+     stack, which meets the same two commits and must not describe them differently: the FACT is
+     the store's and travels verbatim, while the ROUTE names a gesture available on THIS surface
+     (the empty-state rule — here, the tab row above). */
+  const scopeCopy = scopeEmptyCopy(trendScope(filter), "document");
+  const scopeEmpty = scopeCopy && (
     <p className="mt-3 text-label text-muted-foreground max-w-[62ch]">
-      {filter === "dag"
-        ? "The base ledger anchors metagraph snapshots rather than producing them, so it has no chart in this column. Its own history is the Hypergraph tab above."
-        : "These charts are kept per listed metagraph, and the unlisted channels are the ones the catalog does not name — so there is no measured history here for them. The Snapshots view's records still show what they anchored."}
+      {scopeCopy.fact} {scopeCopy.route}
     </p>
   );
   const topicPicker = (

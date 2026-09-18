@@ -13,6 +13,10 @@ import {
   rankByLast,
   seriesKey,
   trimCounterEdges,
+  METRIC_LABELS,
+  orderAt,
+  rankAt,
+  valueAt,
 } from "./trendSeries";
 
 // The per-network series maths, as a specification (rule 4 — dataExportCoverage enforces this
@@ -211,5 +215,93 @@ describe("the global (whole-network) series", () => {
     };
     //            measured   ticks=0   ticks null  sum null  measured
     expect(globalSeries("continuity", series)).toEqual([10, null, null, null, 10]);
+  });
+});
+
+// ── READING ONE INSTANT (2026-09-19, the History view's cursor card) ─────────────────────────
+// The rail reads every network AT ONE MOMENT, so three questions become decidable facts: what
+// this network measured in the bucket CONTAINING that instant, where it stands among the others
+// there, and in what order the list runs. Every one of them is a place rule 10 could be broken
+// invisibly — an interpolated value, a zero standing in for a gap, an unmeasured network given
+// a rank it never earned.
+describe("valueAt — the reading in the bucket CONTAINING an instant", () => {
+  const buckets = [0, DAY, 2 * DAY, 3 * DAY];
+  const points = [10, null, 30, 40];
+
+  it("reads the bucket the instant falls in, at either edge", () => {
+    expect(valueAt(points, buckets, DAY, 0)).toBe(10);
+    expect(valueAt(points, buckets, DAY, DAY - 1)).toBe(10);
+    expect(valueAt(points, buckets, DAY, 2 * DAY)).toBe(30);
+    expect(valueAt(points, buckets, DAY, 4 * DAY - 1)).toBe(40);
+  });
+
+  it("answers null OUTSIDE the span, never the nearest bucket", () => {
+    expect(valueAt(points, buckets, DAY, -1)).toBeNull();
+    expect(valueAt(points, buckets, DAY, 4 * DAY)).toBeNull();
+    expect(valueAt(points, [], DAY, 0)).toBeNull();
+  });
+
+  it("answers null for a GAP bucket — never a zero, never an interpolation", () => {
+    expect(valueAt(points, buckets, DAY, DAY + 5)).toBeNull();
+  });
+
+  it("answers null where the series is shorter than the axis", () => {
+    expect(valueAt([10], buckets, DAY, 3 * DAY)).toBeNull();
+  });
+});
+
+describe("rankAt — where one reading stands among the others at that instant", () => {
+  it("counts only the networks that HAVE a reading there", () => {
+    expect(rankAt([50, 30, null, 10], 30)).toEqual({ rank: 2, of: 3 });
+    expect(rankAt([50, 30, null, 10], 50)).toEqual({ rank: 1, of: 3 });
+    expect(rankAt([50, 30, null, 10], 10)).toEqual({ rank: 3, of: 3 });
+  });
+
+  it("gives an unmeasured network NO rank — a place in an order built from readings", () => {
+    expect(rankAt([50, 30, null], null)).toBeNull();
+    expect(rankAt([null, null], null)).toBeNull();
+  });
+
+  it("answers null when nothing at all was measured", () => {
+    expect(rankAt([], 5)).toBeNull();
+  });
+
+  it("ties SHARE the better rank (competition ranking)", () => {
+    expect(rankAt([30, 30, 10], 30)).toEqual({ rank: 1, of: 3 });
+    expect(rankAt([30, 30, 10], 10)).toEqual({ rank: 3, of: 3 });
+  });
+
+  it("ranks a single-network roster first of one", () => {
+    expect(rankAt([7], 7)).toEqual({ rank: 1, of: 1 });
+  });
+});
+
+describe("orderAt — the cursor list's order", () => {
+  it("runs largest first, with nothing measured LAST", () => {
+    expect(
+      orderAt([
+        { id: "a", value: 10 },
+        { id: "b", value: null },
+        { id: "c", value: 40 },
+      ]),
+    ).toEqual(["c", "a", "b"]);
+  });
+
+  it("keeps the incoming order for ties and for a roster of all nulls", () => {
+    expect(orderAt([{ id: "a", value: 5 }, { id: "b", value: 5 }])).toEqual(["a", "b"]);
+    expect(orderAt([{ id: "a", value: null }, { id: "b", value: null }])).toEqual(["a", "b"]);
+  });
+
+  it("answers an empty roster with an empty order", () => {
+    expect(orderAt([])).toEqual([]);
+  });
+});
+
+describe("METRIC_LABELS — the reader's word for each metric", () => {
+  it("names every metric, in the document's own vocabulary", () => {
+    expect(Object.keys(METRIC_LABELS).sort()).toEqual(Object.keys(TREND_METRICS).sort());
+    // `kb` is stored in bytes and read as DATA — the reader's word, never the stored unit.
+    expect(METRIC_LABELS.kb).toBe("Data");
+    expect(METRIC_LABELS.snapshots).toBe("Snapshots");
   });
 });
