@@ -64,38 +64,42 @@ function ViewCells({ mode, accent, filter, paused = false }: { mode: Mode; accen
   );
 }
 
-/** The TRENDS LINK — the band's one interactive element (user, 2026-09-08: "some sort of
- *  separate control bar that sets the range + links to the separate trends page"; the range
- *  half retired 2026-09-13). A small tab riding the band's TOP edge in the file-cabinet
- *  vocabulary the Trends page itself uses: the route to the page where the elaborate,
- *  RANGEABLE versions live. It is a fixed SIBLING of the band, not a child — the band's
- *  clip-path would amputate anything protruding past its border box, and the band's
+/** The TRENDS LINK — the band's one interactive element in the structural views (user,
+ *  2026-09-08: "some sort of separate control bar that sets the range + links to the separate
+ *  trends page"; the range half retired 2026-09-13). A small tab riding the band's TOP edge in
+ *  the file-cabinet vocabulary the History view itself uses: the step down the observation
+ *  ladder, offered from wherever the band is. It is a fixed SIBLING of the band, not a child —
+ *  the band's clip-path would amputate anything protruding past its border box, and the band's
  *  `pointer-events-none` charter stays intact: the cards below remain read-only, and this tab
  *  is the one deliberate exception, OUTSIDE the plate.
  *
- *  ⚠️ UNGATED, IN EVERY VIEW THAT CARRIES THE BAND (user, 2026-09-13). It used to ride
- *  `viewPolicy.vitalsWindows` — right for a range PICKER, whose windowed cells only the ledger
- *  reads, and wrong for the link: /trends is the measured history of the whole network, so the
- *  step down the observation ladder (convention 12) is offered from wherever the band is. It
- *  therefore needs no policy row of its own; the band's own `vitalsLane` gate is its gate. */
+ *  ⚠️ IT OPENS THE HISTORY VIEW NOW, NOT THE DOCUMENT (2026-09-18). The measured history got a
+ *  VIEW of its own, and the document became its RAW register (`viewPolicy.rawSurface`), reached
+ *  through that view's own RAW toggle — so the link's destination moved up one rung with it. It
+ *  commits the same way every other view link does: `setMode`, which RouteSync publishes to the
+ *  address bar as a shallow pushState, so the engine is never rebooted for it.
+ *
+ *  ⚠️ AND IT STANDS DOWN INSIDE THAT VIEW, gated on the band's own content policy
+ *  (`bandContent === "timeline"`) rather than a mode compare — convention 7, and it is the honest
+ *  condition besides: the link is a route to the surface the timeline IS. */
 const TrendsMark = DOC_ICONS.trends;
 
-/** The Trends route as a LINK (user, 2026-09-08: "should not be part of the button-group, it
+/** The History view as a LINK (user, 2026-09-08: "should not be part of the button-group, it
  *  should show as a link") — the site row's own link register: primary ink, normal case, the
- *  page's mark. Shared by both presentations (2026-09-08): the desktop band's floating tab and
- *  the phone Vitals sheet's row render ONE component, so a route renamed reaches both in the
- *  same edit — the ViewCells rule, applied to the control. */
+ *  view's mark. Shared by both presentations (2026-09-08): the desktop band's floating tab and
+ *  the phone Vitals sheet's row render ONE component, so a destination renamed reaches both in
+ *  the same edit — the ViewCells rule, applied to the control. */
 function TrendsLink({ className }: { className?: string }) {
-  const setDocPage = useStore((s) => s.setDocPage);
+  const setMode = useStore((s) => s.setMode);
   return (
     <button
       type="button"
-      onClick={() => setDocPage("trends")}
-      title="The measured history behind these vitals — open the Trends page."
+      onClick={() => setMode("trend")}
+      title="See how busy and how steady each chain has been — open the History view."
       className={cn("inline-flex items-center gap-1.5 rounded-full px-2 text-label text-primary/75 hover:text-primary whitespace-nowrap bg-transparent", className)}
     >
       <TrendsMark aria-hidden className="size-3.5" />
-      Trends
+      History
     </button>
   );
 }
@@ -150,9 +154,12 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
   // so the inset collapses to identity there.
   const coverL = useStore((s) => s.sceneCoverL);
   const coverR = useStore((s) => s.sceneCoverR);
+  // The link is a ROUTE TO THIS VIEW, so it has nothing to offer inside it — gated on the band's
+  // own content row, never a mode compare (convention 7).
+  const linked = VIEW_POLICIES[mode].bandContent !== "timeline";
   return (
     <>
-      <TrendsRim yielding={yielding} hidden={hidden} />
+      {linked && <TrendsRim yielding={yielding} hidden={hidden} />}
       <section
       id="vitalsband"
       aria-label="View vitals"
@@ -264,10 +271,14 @@ export function VitalsSheetBody() {
       {!live && <span className="self-center flex-none mb-2"><NoSignalDot /></span>}
       {/* The link, in the sheet's own register (2026-09-08): an in-flow full-width pill at
           thumb height above the cards — the sheet is interactive (unlike the band), so it
-          simply sits in the column. Ungated like the desktop tab (2026-09-13). */}
-      <div className="flex items-stretch h-10 p-0.5 mb-2 flex-none rounded-full border border-primary/25 [background:var(--topbar-glass)]">
-        <TrendsLink className="flex-1 justify-center" />
-      </div>
+          simply sits in the column. Gated exactly as the desktop tab is (2026-09-18): inside
+          the History view this section HOLDS the timeline, so a link to that view would point
+          at itself. */}
+      {VIEW_POLICIES[mode].bandContent !== "timeline" && (
+        <div className="flex items-stretch h-10 p-0.5 mb-2 flex-none rounded-full border border-primary/25 [background:var(--topbar-glass)]">
+          <TrendsLink className="flex-1 justify-center" />
+        </div>
+      )}
       {/* The no-pop swap — the cell-targeting `[&>*]` rules ride the wrapper for the same
           retargeting reason the band's do (see the desktop section above). */}
       <RollSwap
