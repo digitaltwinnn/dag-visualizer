@@ -293,3 +293,63 @@ export const METRIC_LABELS: Record<TrendMetric, string> = {
   nodes: "Nodes",
   continuity: "Continuity",
 };
+
+// ── WHY A MOMENT HAS NO CHART (2026-09-19) ──────────────────────────────────────────────────
+// The band's timeline spans the whole MEASURED history; the planes draw that span minus the edge
+// buckets a counter must lose (`trimCounterEdges` — a partial sum drawn whole reads as a crash).
+// So on the default metric in the default window the far RIGHT of the track is clickable and
+// undrawn at the same time, and it is the most natural click there is: "what is happening now?".
+//
+// The card used to answer every undrawn instant with "pick a wider window", which for that click
+// is advice that cannot work — there is no wider window, the bucket is excluded because it is
+// STILL FILLING. Two different facts, so two different sentences, decided here rather than in the
+// component: the classification is span arithmetic and the wording follows the TIER, which is the
+// same rule `perPhrase` above already answers to.
+
+/** Where an instant falls relative to what the charts actually DRAW. */
+export type InstantPlace = "drawn" | "edge-newest" | "edge-oldest" | "outside";
+
+/** Classify `ms` against the DRAWN axis and the payload's own (untrimmed) one.
+ *
+ *  A gauge passes the same array twice and is therefore always `drawn` or `outside`, which is
+ *  correct: nothing is trimmed from a point sample. An EMPTY drawn axis is `outside` rather than
+ *  an edge — with nothing on screen there is no edge to be just past. */
+export function placeInstant(
+  ms: number,
+  drawn: readonly number[],
+  raw: readonly number[],
+  stepMs: number,
+): InstantPlace {
+  if (bucketAt(drawn, stepMs, ms) != null) return "drawn";
+  const b = bucketAt(raw, stepMs, ms);
+  if (b == null || drawn.length === 0) return "outside";
+  // `drawn` is a contiguous slice of `raw`, so a raw bucket that is not drawn is on one side or
+  // the other and there is nothing in between to get wrong.
+  return b < drawn[0] ? "edge-oldest" : "edge-newest";
+}
+
+/** The tier's own word, with the agreement that word forces. Five minutes are plural; a day and
+ *  an hour are not, and a sentence that gets that wrong reads as machine copy. */
+const TIER_WORDS = (stepMs: number): { n: string; is: string; it: string } =>
+  stepMs >= 86_400_000
+    ? { n: "day", is: "is", it: "it" }
+    : stepMs >= 3_600_000
+      ? { n: "hour", is: "is", it: "it" }
+      : { n: "five minutes", is: "are", it: "them" };
+
+/** What the card says about an instant it cannot chart, or null where it can.
+ *
+ *  ⚠️ ONLY THE `outside` CASE OFFERS A ROUTE, and that is the distinction this function exists
+ *  for: a wider window really does reach an instant the current one excludes, and nothing reaches
+ *  a bucket that has not finished happening. Stating a fact and inviting a gesture that cannot
+ *  work are different things, and the second is the failure rule 10 is about. */
+export function instantNote(place: InstantPlace, stepMs: number): string | null {
+  if (place === "drawn") return null;
+  if (place === "outside") {
+    return "This instant is outside the window on screen. Pick a wider window below, or move the cursor.";
+  }
+  const { n, is, it } = TIER_WORDS(stepMs);
+  return place === "edge-newest"
+    ? `The newest ${n} ${is} still filling, so no chart draws ${it} yet.`
+    : `The oldest ${n} here ${is} only partly measured, so no chart draws ${it}.`;
+}

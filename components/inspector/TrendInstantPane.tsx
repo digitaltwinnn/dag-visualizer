@@ -8,9 +8,9 @@ import { openCharts, openRecords, spanOfWindow } from "@/components/trendDoors";
 import { Button } from "@/components/ui/button";
 import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
-import { subjectPairing } from "@/components/useSubjectPairing";
+import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { cn } from "@/lib/utils";
-import { orderAt, rankAt, valueAt } from "@/src/data/trendSeries";
+import { instantNote, orderAt, placeInstant, rankAt, valueAt } from "@/src/data/trendSeries";
 import { stampInstant } from "@/src/data/trendTimeline";
 import { bucketAt } from "@/src/data/trendWindow";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
@@ -30,6 +30,12 @@ import { useStore } from "@/src/store/store";
 // a value here always matches the chart it is about. The bucket is resolved by `bucketAt` —
 // CONTAINMENT, never the nearest bucket — and a cursor outside the window on screen, or in a bucket
 // nothing was measured in, is a GAP said in words (rule 10). Never interpolated, never a zero.
+//
+// ⚠️ AND THERE ARE TWO WAYS TO HAVE NO CHART, which is not a detail (2026-09-19). The band's track
+// spans the whole measured history while these planes drop a counter's partial edge buckets, so the
+// far RIGHT of the track — the most natural click there is — lands on a real, still-filling day that
+// nothing draws. Answering that with "pick a wider window" is advice that cannot work. `placeInstant`
+// tells the two apart and `instantNote` says which, both in src/data/trendSeries.ts with tests.
 //
 // ⚠️ AND IT MUST NOT RE-RENDER THE STACK. Both components subscribe narrowly to the same store
 // fields and share `useTrendsSlice`'s module-level cache, so this card costs one extra React
@@ -67,6 +73,9 @@ export default function TrendInstantPane({
   // whenever the cursor sits outside the window on screen — a real state, said below.
   const bucket = cursorMs != null ? bucketAt(buckets, stepMs, cursorMs) : null;
   const pulseKey = useEdgePulse(bucket);
+  // WHY there is no chart, when there is none. `null` cursor is its own case: the slot is a ghost
+  // then and this card does not render at all.
+  const note = cursorMs == null ? null : instantNote(placeInstant(cursorMs, buckets, roster.rawBuckets, stepMs), stepMs);
 
   const subject = subjectOf(focus, filter, ranked);
   // Every network's reading at the cursor, in ONE pass — the rank, the order and the rows all read
@@ -91,6 +100,12 @@ export default function TrendInstantPane({
   // helper, shared with the document (`components/trendDoors.ts`).
   const span = range ?? spanOfWindow(buckets, stepMs);
 
+  // THE UNMOUNT BACKSTOP (convention 9's other half): a row that leaves the roster under a
+  // stationary pointer — a filter commit, a re-rank that drops it — never fires its own leave, and
+  // this card unmounts wholesale on the × and on a view switch. Either way the channel must not be
+  // left holding a subject nothing is pointing at.
+  useHoverRelease(hoverFilter, ranked, () => setHoverFilter(null));
+
   return (
     <RailPane entry={collapsed}>
       <CardHead
@@ -108,12 +123,10 @@ export default function TrendInstantPane({
       {!collapsed && (
         <div>
           {bucket == null ? (
-            // AN HONEST TERMINAL, not an empty card: the cursor is a real commit that simply sits
-            // outside the span these planes draw. Naming the gesture that fixes it is the
-            // empty-state rule.
-            <p className="text-label text-muted-foreground">
-              This instant is outside the window on screen. Pick a wider window below, or move the cursor.
-            </p>
+            // AN HONEST TERMINAL, not an empty card. The sentence is `instantNote`'s: only the
+            // out-of-window case offers a route, because only that one has a gesture that answers
+            // it — the empty-state rule read strictly.
+            <p className="text-label text-muted-foreground">{note}</p>
           ) : (
             <>
               {/* ── LEAD: the one reading this card exists to say ───────────────────────────
@@ -163,10 +176,17 @@ export default function TrendInstantPane({
                       <button
                         key={id}
                         type="button"
+                        // The control's PRESSED state is the plane focus it toggles — not `on`,
+                        // which also lights for the committed filter (a scope, not this button's
+                        // doing).
+                        aria-pressed={focus === id}
                         onClick={() => applyClickActions(trendPlaneActions(id, focus))}
                         title={`${row.name} · ${v != null ? `${format(v)}${unit ? ` ${unit}` : ""}` : NO_READING}`}
                         className={cn(
-                          "nb-row -mx-1 px-1 py-[3px] rounded-sm cursor-pointer text-left bg-transparent border-0",
+                          // `block w-full`: this is the one `.nb-row` whose content is a single
+                          // flex row rather than its own flex children, so it has to claim the
+                          // width the row grammar assumes (label left, value right, one line).
+                          "nb-row block w-full -mx-1 px-1 py-[3px] rounded-sm cursor-pointer text-left bg-transparent border-0",
                           "hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
                           on && SELECTED_ROW,
                           pair.paired && pair.className,
@@ -179,6 +199,9 @@ export default function TrendInstantPane({
                         onBlur={pair.onBlur}
                       >
                         <Fact
+                          // PHRASING CONTENT inside a <button> (see `Fact`'s own note): a div row
+                          // here is a content-model violation, and the span is the same box.
+                          as="span"
                           label={
                             <span className="inline-flex items-center gap-2">
                               <IdentityDot hue={row.hue} />

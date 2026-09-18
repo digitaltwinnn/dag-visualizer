@@ -25,9 +25,18 @@ export type TrendMetric = "snapshots" | "blocks" | "fees" | "kb" | "nodes" | "co
 export type SelSlot = "network" | "node" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "instant";
 
 // Move `slot` to the FRONT of the recency stack when it becomes active, or drop it when cleared.
+//
+// ⚠️ A NO-OP WRITE IS A NO-OP REFERENCE (2026-09-19). `selStack` is subscribed by `useLadderFocus`,
+// which every explorer row and the whole facts rail read — so rebuilding the array on every call
+// re-rendered both rails for a list that had not moved. That is free for a channel written once per
+// click and it is not free for `setTrendCursor`, which writes at BUCKET frequency during a scrub
+// with `instant` already at the front. Returning the incoming array unchanged when nothing moved
+// costs one comparison over a list that is never longer than the ladder.
 function bumpStack(stack: SelSlot[], slot: SelSlot, active: boolean): SelSlot[] {
   const without = stack.filter((s) => s !== slot);
-  return active ? [slot, ...without] : without;
+  const next = active ? [slot, ...without] : without;
+  if (next.length === stack.length && next.every((s, i) => s === stack[i])) return stack;
+  return next;
 }
 
 // Per-hour rates + per-snapshot series from NetworkData.getActivity(). ONE HOME: this was a

@@ -17,6 +17,8 @@ import {
   orderAt,
   rankAt,
   valueAt,
+  instantNote,
+  placeInstant,
 } from "./trendSeries";
 
 // The per-network series maths, as a specification (rule 4 — dataExportCoverage enforces this
@@ -303,5 +305,81 @@ describe("METRIC_LABELS — the reader's word for each metric", () => {
     // `kb` is stored in bytes and read as DATA — the reader's word, never the stored unit.
     expect(METRIC_LABELS.kb).toBe("Data");
     expect(METRIC_LABELS.snapshots).toBe("Snapshots");
+  });
+});
+
+// ── A MOMENT NO CHART DRAWS (2026-09-19, fix round 1) ───────────────────────────────────────
+// The band's timeline spans the whole MEASURED history; the planes draw that span minus the
+// partial edge buckets a counter must lose (`trimCounterEdges`). So the far right of the track is
+// clickable and undrawn at the same time — on the default metric in the default window — and the
+// two reasons a cursor finds no chart are completely different facts. Telling them apart is what
+// lets the card stop offering "pick a wider window" for a bucket that is excluded because it is
+// still filling.
+describe("placeInstant — drawn, trimmed at an edge, or outside the window", () => {
+  const raw = [0, DAY, 2 * DAY, 3 * DAY, 4 * DAY];
+  const drawn = raw.slice(1, -1); // what a daily COUNTER draws: both edges gone
+
+  it("answers `drawn` anywhere the charts actually plot", () => {
+    expect(placeInstant(DAY, drawn, raw, DAY)).toBe("drawn");
+    expect(placeInstant(3 * DAY - 1, drawn, raw, DAY)).toBe("drawn");
+  });
+
+  it("names the NEWEST trimmed bucket, which is the most natural click on the track", () => {
+    expect(placeInstant(4 * DAY, drawn, raw, DAY)).toBe("edge-newest");
+    expect(placeInstant(5 * DAY - 1, drawn, raw, DAY)).toBe("edge-newest");
+  });
+
+  it("names the OLDEST trimmed bucket, which only the daily tier loses", () => {
+    expect(placeInstant(0, drawn, raw, DAY)).toBe("edge-oldest");
+    expect(placeInstant(DAY - 1, drawn, raw, DAY)).toBe("edge-oldest");
+  });
+
+  it("answers `outside` beyond the payload's own span — a real window question", () => {
+    expect(placeInstant(-1, drawn, raw, DAY)).toBe("outside");
+    expect(placeInstant(5 * DAY, drawn, raw, DAY)).toBe("outside");
+  });
+
+  it("is `drawn` everywhere for a GAUGE, whose axis is never trimmed", () => {
+    for (const t of [0, 2 * DAY, 4 * DAY]) expect(placeInstant(t, raw, raw, DAY)).toBe("drawn");
+  });
+
+  it("calls an empty drawn axis `outside` — nothing is on screen to be at an edge of", () => {
+    expect(placeInstant(2 * DAY, [], raw, DAY)).toBe("outside");
+    expect(placeInstant(2 * DAY, [], [], DAY)).toBe("outside");
+  });
+});
+
+describe("instantNote — why no chart draws this moment", () => {
+  it("says nothing where there IS a chart", () => {
+    expect(instantNote("drawn", DAY)).toBeNull();
+  });
+
+  it("names the still-filling edge in the tier's own word, and agrees with itself", () => {
+    expect(instantNote("edge-newest", DAY)).toBe("The newest day is still filling, so no chart draws it yet.");
+    expect(instantNote("edge-newest", 3_600_000)).toBe("The newest hour is still filling, so no chart draws it yet.");
+    expect(instantNote("edge-newest", 300_000)).toBe(
+      "The newest five minutes are still filling, so no chart draws them yet.",
+    );
+  });
+
+  it("names the part-measured oldest edge", () => {
+    expect(instantNote("edge-oldest", DAY)).toBe(
+      "The oldest day here is only partly measured, so no chart draws it.",
+    );
+  });
+
+  it("keeps the WINDOW sentence for a genuinely out-of-window instant, with its route", () => {
+    const out = instantNote("outside", DAY)!;
+    expect(out).toMatch(/outside the window/);
+    expect(out).toMatch(/wider window/);
+  });
+
+  // The app-wide plain-writing rule: two clauses get two sentences, never a dash clause.
+  it("carries no dash clause in anything a reader sees", () => {
+    for (const place of ["edge-newest", "edge-oldest", "outside"] as const) {
+      for (const step of [DAY, 3_600_000, 300_000]) {
+        expect(instantNote(place, step)!).not.toMatch(/[—–]|\s-\s/);
+      }
+    }
   });
 });

@@ -66,6 +66,11 @@ export interface TrendRosterView {
   global: (number | null)[];
   /** The axis every row is drawn against, cut by the same rule the series were. */
   buckets: number[];
+  /** The payload's OWN axis, before the counter edge trim. Exposed so a surface can tell the two
+   *  reasons an instant has no chart apart (`placeInstant`): a bucket that is in the window but
+   *  still filling is a different fact from one the window does not reach, and only the second has
+   *  a gesture that answers it. Identical to `buckets` for a gauge, which trims nothing. */
+  rawBuckets: readonly number[];
   /** The cadence of those buckets — the unit word, the stamp's precision and the cursor's
    *  containment all follow it. */
   stepMs: number;
@@ -151,6 +156,7 @@ export default function useTrendRoster(
     rows: pass.rows,
     global: pass.global,
     buckets: pass.buckets,
+    rawBuckets: rawAxis,
     stepMs,
     unit: metricUnit(metric, stepMs),
     format: spec.format ?? PLAIN,

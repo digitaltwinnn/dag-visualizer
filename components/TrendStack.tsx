@@ -63,7 +63,7 @@ import { scopeEmptyCopy } from "@/src/data/trendScope";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { PLANE_PX_W, stackPoses } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
-import { subjectPairing } from "@/components/useSubjectPairing";
+import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 
@@ -125,6 +125,13 @@ export default function TrendStack() {
   const empty = scopeEmptyCopy(roster.scope, "view");
 
   const poses = stackPoses(ranked, { layout, scroll, focus });
+  // THE UNMOUNT BACKSTOP (convention 9's other half, 2026-09-19). A header strip clears its own
+  // pairing on leave — while it is still there to hear one. It often is not: paging drops a plane
+  // out of the visible window, a metric switch re-ranks the roster, a filter commit cuts it to one,
+  // and an element that has been removed under a stationary pointer never fires a leave. The
+  // channel would then keep a plane previewed with nothing pointing at it. `poses`, not `ranked`:
+  // only the planes actually on screen can hold a hover.
+  useHoverRelease(hoverFilter, poses.map((p) => p.id), () => setHoverFilter(null));
 
   // THE ONE PUBLISH of the fourth React → Engine channel (see store `trendIds`). The engine's
   // projector places a plane per id and needs the same order the planes are rendered in; only

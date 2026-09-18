@@ -9,11 +9,11 @@ import { SelectedRowMark, selectedRow, selectionHue } from "@/components/selecti
 import { MetricPicker, ScaleToggle, ScopeChip, SettingSwitch } from "@/components/trendPickers";
 import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
-import { subjectPairing } from "@/components/useSubjectPairing";
+import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { cn } from "@/lib/utils";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
-import { VISIBLE_PLANES, clampScroll } from "@/src/engine/domain/trendStack";
+import { VISIBLE_PLANES, clampScroll, pagerVisible } from "@/src/engine/domain/trendStack";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 
@@ -76,6 +76,11 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   const start = clampScroll(ranked.length, scroll);
   const last = Math.min(start + VISIBLE_PLANES, ranked.length);
   const maxScroll = Math.max(0, ranked.length - VISIBLE_PLANES);
+
+  // The unmount backstop for the pairing — a row that leaves the roster under a stationary pointer
+  // (a filter commit, a re-rank) never fires its own leave. `onLeave` on the shell covers the
+  // ordinary case; this covers the structural one.
+  useHoverRelease(hoverFilter, ranked, () => setHoverFilter(null));
 
   return (
     <ExplorerShell
@@ -189,11 +194,13 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
             );
           })}
 
-          {/* THE PAGER — ABSENT unless there is something to navigate (the rail plank's own rule:
-              permanently dead chrome is not a control), and an EXHAUSTED direction is inactive
-              rather than gone, so the row never re-composes at the ends. It cannot be exercised on
-              mainnet today: the live roster is exactly `VISIBLE_PLANES`. */}
-          {ranked.length > VISIBLE_PLANES && (
+          {/* THE PAGER — ABSENT unless there is something to navigate, and the predicate is the
+              DOMAIN's (`pagerVisible`, beside the clamp): presence and the end stops are the same
+              question asked twice, and a component that answered one of them itself could drift by
+              a plane with nothing failing. An EXHAUSTED direction is inactive rather than gone, so
+              the row never re-composes at the ends. Live on mainnet today: the catalog holds more
+              metagraphs than the stack shows at once. */}
+          {pagerVisible(ranked.length) && (
             <div className="mt-1.5 flex items-center justify-center gap-2">
               <button
                 type="button"

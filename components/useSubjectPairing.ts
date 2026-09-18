@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 
 // The ONE shared "focus pairing" every rail card + explorer row uses, so a node, a snapshot, and a
 // metagraph card all behave identically: a subject is "paired" when its key equals its store
@@ -49,4 +49,41 @@ export function subjectPairing<T extends string | number>(
     onFocus: enter,
     onBlur: leave,
   };
+}
+
+/** THE UNMOUNT BACKSTOP for a pairing (2026-09-19) — the structural half of the stuck-hover class
+ *  of bug that `ExplorerShell`'s `onLeave` answers at container scale.
+ *
+ *  A row clears its own hover on `mouseleave`, and that is enough while the row is still there to
+ *  hear one. It is not: a subject can LEAVE THE RENDERED SET under a stationary pointer — a metric
+ *  switch re-ranks the roster, the stack pages a plane out of its window, a filter commit cuts the
+ *  list to one — and an element that has been removed never fires a leave. The channel then holds a
+ *  subject nothing on screen is pointing at, and the scene keeps a preview lit until the next hover
+ *  somewhere else.
+ *
+ *  Two effects, because there are two ways to disappear. The unkeyed one runs after every render and
+ *  answers "the hovered subject is no longer in this surface's set". The mount-scoped one answers
+ *  "this whole surface is going away while it holds the channel" — reading the LATEST values through
+ *  a ref, since an empty-dep cleanup closes over the first render otherwise.
+ *
+ *  ⚠️ It only ever CLEARS, and only a value this surface could have set. Clearing a preview is
+ *  always safe (a preview is not a commit, rule 9), and the worst case is that a hover drops one
+ *  frame early on a surface that was unmounting anyway. */
+export function useHoverRelease<T extends string | number>(
+  active: T | null,
+  present: readonly T[],
+  clear: () => void,
+): void {
+  const live = useRef({ active, present, clear });
+  live.current = { active, present, clear };
+  useEffect(() => {
+    if (active != null && !present.includes(active)) clear();
+  });
+  useEffect(
+    () => () => {
+      const now = live.current;
+      if (now.active != null && now.present.includes(now.active)) now.clear();
+    },
+    [],
+  );
 }
