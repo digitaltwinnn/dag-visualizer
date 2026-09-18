@@ -545,8 +545,15 @@ OWN ROOT and nothing else — every other view's band keeps the charter and the 
 passing through. The sheets' `sceneCover` clip still governs it: measured, a covered strip hands
 both paint and hit-testing to the sheet above.
 **The gesture split is the decision: a CLICK sets the cursor (`trendCursorMs`), a DRAG brushes the
-range (`trendRange`)** — press inside an existing brush pans it, press an edge resizes it, `×` or
-Escape clears it. Both gestures want the whole track and the alternative (a modifier for one of
+range (`trendRange`)** — press inside the span ON SCREEN to pan it, press an edge to resize it, `×`
+or Escape clears it. ⚠️ **What is DRAWN is what is GRABBED** (`drawnSpan`, one function read by both
+the paint and the hit test): the track shows `trendRange` when one stands and otherwise the span the
+window pill implies, and computing those two separately left the visible rectangle ungrabbable in
+five of the six window states. Panning or resizing a window-implied span COMMITS it as a range —
+that is what the gesture means. ⚠️ **And the scrub writes ONCE PER BUCKET, not per pointermove**
+(`sameBucket`): the whole stack subscribes to `trendCursorMs`, so every write re-plans the fetch and
+repaints five charts, while two instants inside one bucket paint the identical frame. Measured on
+phone, a 300-event precise scrub went 271 writes / 1084 slice assemblies / 2.9 FPS → 45 / 0 / 9.8. Both gestures want the whole track and the alternative (a modifier for one of
 them) is unreachable on touch, which is the surface this most needs to work on; TRAVEL is the one
 discriminator every pointer type reports. The cursor is a COMMIT — it persists when the pointer
 leaves, because the rail reads it — while hovering previews a faint line locally and writes

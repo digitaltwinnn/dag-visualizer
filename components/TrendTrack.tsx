@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 import { globalSeries } from "@/src/data/trendSeries";
@@ -9,15 +9,16 @@ import {
   axisTicks,
   classifyPress,
   clampCursor,
+  drawnSpan,
   isDrag,
   msAtX,
   panRange,
   rangeFrom,
+  sameBucket,
   stampInstant,
   stepCursor,
   tickLabel,
   trackRuns,
-  windowSpan,
   xAtMs,
   type Span,
   type TrackGeom,
@@ -37,11 +38,23 @@ import type { ZoomId } from "@/src/data/trendWindow";
 // pointer makes over that geometry is pure and tested in `src/data/trendTimeline.ts`; this file
 // is the wiring.
 //
-// ⚠️ THE GESTURE SPLIT: a CLICK sets the cursor, a DRAG brushes a range — press inside a standing
-// brush to pan it, on an edge to resize it, Escape to clear it. Both gestures want the whole
+// ⚠️ THE GESTURE SPLIT: a CLICK sets the cursor, a DRAG brushes a range — press inside the span
+// on screen to pan it, on an edge to resize it, Escape to clear it. Both gestures want the whole
 // track, and the alternative (a modifier key for one of them) is unreachable on touch, which is
 // the surface this most needs to work on. TRAVEL is the one discriminator every pointer type
 // reports, so the press's distance decides which gesture it was.
+//
+// ⚠️ WHAT IS DRAWN IS WHAT IS GRABBED, and it is ONE expression (`drawnSpan`, review 2026-09-18).
+// The paint used to fall back to the window pill's implied span while the hit test saw only the
+// committed range, so in five of the six window states the rectangle on screen had edges that
+// would not resize and an interior that would not pan. Both now read the same function, and
+// panning or resizing a window-implied span COMMITS it as a `trendRange` — that is what the
+// gesture means, and the pills then show the range chip as they do for any range. A press OUTSIDE
+// the drawn span still starts a fresh brush.
+//
+// ⚠️ AND THE SCRUB WRITES ONCE PER BUCKET, not once per pointermove (`sameBucket`). Every write
+// re-plans the fetch and re-renders five recharts plots for the whole stack, and two instants
+// inside one bucket paint the identical frame — see the quantiser's own note.
 
 /** The plot's height inside the track box; the rest is the month strip. */
 const LABEL_H = 13;
@@ -95,11 +108,16 @@ export default function TrendTrack({
 
   const buckets = overview.buckets;
   const ovStep = overview.stepMs;
-  const geom: TrackGeom = {
-    width: box.w,
-    fromMs: buckets.length ? buckets[0] : 0,
-    toMs: buckets.length ? buckets[buckets.length - 1] + ovStep : 1,
-  };
+  // MEMOISED so everything derived from it can be too: `geom` is the identity the ink, the ticks
+  // and every gesture callback key on, and a fresh object per render would defeat all of them.
+  const geom = useMemo<TrackGeom>(
+    () => ({
+      width: box.w,
+      fromMs: buckets.length ? buckets[0] : 0,
+      toMs: buckets.length ? buckets[buckets.length - 1] + ovStep : 1,
+    }),
+    [box.w, buckets, ovStep],
+  );
 
   // The live gesture. A ref, not state: a 60–120Hz pointer stream must not re-render.
   const press = useRef<{
@@ -114,6 +132,9 @@ export default function TrendTrack({
      *  commit the stale `null` a state-only version still held — caught live while verifying pan
      *  and resize. State is what the frame shows; the gesture keeps its own answer. */
     span: Span | null;
+    /** The instant last WRITTEN to the store, for the scrub's per-bucket quantiser. Seeded null
+     *  so the first move of any drag always lands. */
+    wroteMs: number | null;
   } | null>(null);
   // THE PREVIEW IS LOCAL, AND DELIBERATELY SO. A store write re-plans the fetch (`planTrendFetch`)
   // and can re-tier every plane, so writing one per pointermove would put a fetch storm behind a
@@ -127,6 +148,13 @@ export default function TrendTrack({
     const r = track?.getBoundingClientRect();
     return r ? e.clientX - r.left : 0;
   };
+
+  /** DISARM. Hoisted above the handlers because every one of them defers to it — a cancel, a
+   *  lost capture, and the stale-button bail inside `onMove`. */
+  const onCancel = useCallback(() => {
+    press.current = null;
+    setPreview(null);
+  }, []);
 
   const onDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
@@ -143,18 +171,22 @@ export default function TrendTrack({
       // The hover preview stands down for the duration — a second faint line trailing the real
       // gesture reads as the instrument disagreeing with itself.
       setHoverX(null);
+      // THE SPAN ON SCREEN, not the committed range — see the header. `preview` is null at press
+      // time by construction, so this is the same expression the paint reads one render later.
+      const shown = drawnSpan(null, range, windowId, geom);
       press.current = {
         id: e.pointerId,
-        zone: classifyPress(x, geom, range, cursorMs),
+        zone: classifyPress(x, geom, shown, cursorMs),
         startX: x,
         anchorMs: msAtX(x, geom),
-        startRange: range,
+        startRange: shown,
         moved: false,
         span: null,
+        wroteMs: null,
       };
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [buckets.length, box.w, geom.fromMs, geom.toMs, range, cursorMs, track],
+    [buckets.length, box.w, geom, range, windowId, cursorMs, track],
   );
 
   const onMove = useCallback(
@@ -165,13 +197,27 @@ export default function TrendTrack({
         setHoverX(x);
         return;
       }
+      // ⚠️ A RELEASE THIS ELEMENT NEVER SAW leaves the press armed, and the next hover would
+      // silently continue the drag. A mouse reporting no buttons is that state, exactly — the
+      // button went up somewhere we do not get events from (capture lost, a release outside the
+      // window). `onLostPointerCapture` covers the other route. Touch has no button bitmask, so
+      // the check names the pointer type rather than trusting `buttons` everywhere.
+      if (e.pointerType === "mouse" && e.buttons === 0) {
+        onCancel();
+        setHoverX(x);
+        return;
+      }
       if (!p.moved && !isDrag(x - p.startX)) return;
       p.moved = true;
       const at = msAtX(x, geom);
       if (p.zone.kind === "cursor") {
-        // CONTINUOUS: the cursor costs no fetch — every plane just moves its reference line — so
-        // it is written live and the stack tracks the finger.
-        setTrendCursor(clampCursor(at, geom));
+        // ONCE PER BUCKET, not once per move (`sameBucket`): the planes mark the bucket CONTAINING
+        // the instant, so two instants inside one bucket paint the identical frame — while each
+        // store write re-plans the fetch and re-renders the whole stack.
+        const next = clampCursor(at, geom);
+        if (sameBucket(p.wroteMs, next, stepMs)) return;
+        p.wroteMs = next;
+        setTrendCursor(next);
         return;
       }
       const next =
@@ -186,7 +232,7 @@ export default function TrendTrack({
       setPreview(next);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [geom.fromMs, geom.toMs, geom.width, setTrendCursor, track],
+    [geom, stepMs, setTrendCursor, onCancel, track],
   );
 
   const onUp = useCallback(
@@ -213,13 +259,8 @@ export default function TrendTrack({
       setPreview(null);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [geom.fromMs, geom.toMs, geom.width, setTrendCursor, setTrendRange, track],
+    [geom, setTrendCursor, setTrendRange, track],
   );
-
-  const onCancel = useCallback(() => {
-    press.current = null;
-    setPreview(null);
-  }, []);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (!buckets.length) return;
@@ -245,15 +286,25 @@ export default function TrendTrack({
     }
   };
 
-  // The brush on screen: the live preview beats the committed range, which beats the window's own
-  // implied span. `all` implies nothing, and that absence IS the statement.
-  const brush = preview ?? range ?? (buckets.length ? windowSpan(windowId, geom) : null);
+  // THE SPAN ON SCREEN — the SAME call `onDown` hit-tests against, which is the whole point of
+  // `drawnSpan` being a function rather than an expression written twice.
+  const brush = buckets.length ? drawnSpan(preview, range, windowId, geom) : null;
 
   const plotH = Math.max(0, box.h - LABEL_H);
-  const points = globalSeries(metric, overview.series);
-  const peak = points.reduce<number>((m, v) => (v != null && v > m ? v : m), 0);
-  const runs = box.w > 0 ? trackRuns(points, buckets, ovStep, geom, peak, plotH) : [];
-  const ticks = box.w > 0 ? axisTicks(buckets, ovStep, geom, TICK_GAP_PX) : [];
+  // MEMOISED (review, 2026-09-18): these three walk the whole overview — ~450 daily buckets here,
+  // and `globalSeries` copies every one of them — and the component re-renders on a plain HOVER
+  // move (`setHoverX`), on every scrub write and on any store change the shell passes down. None
+  // of that touches the payload, the metric or the box, so none of it should re-derive the ink.
+  const points = useMemo(() => globalSeries(metric, overview.series), [metric, overview]);
+  const peak = useMemo(() => points.reduce<number>((m, v) => (v != null && v > m ? v : m), 0), [points]);
+  const runs = useMemo(
+    () => (box.w > 0 ? trackRuns(points, buckets, ovStep, geom, peak, plotH) : []),
+    [box.w, points, buckets, ovStep, geom, peak, plotH],
+  );
+  const ticks = useMemo(
+    () => (box.w > 0 ? axisTicks(buckets, ovStep, geom, TICK_GAP_PX) : []),
+    [box.w, buckets, ovStep, geom],
+  );
 
   const cursorX = cursorMs != null && buckets.length ? xAtMs(cursorMs, geom) : null;
   const cursorInSpan = cursorMs != null && cursorMs >= geom.fromMs && cursorMs < geom.toMs;
@@ -269,12 +320,19 @@ export default function TrendTrack({
       aria-label="Time cursor over the measured history"
       aria-valuemin={geom.fromMs}
       aria-valuemax={geom.toMs}
-      {...(cursorMs != null ? { "aria-valuenow": cursorMs } : {})}
+      // ⚠️ `role="slider"` REQUIRES `aria-valuenow`, so it is always supplied — the span's start
+      // when nothing is picked — and the HONESTY rides `aria-valuetext`, which is what a screen
+      // reader actually announces. Omitting the number left the role's contract broken; putting
+      // the fiction in the text would have broken rule 10. Each carries what it is for.
+      aria-valuenow={cursorMs ?? geom.fromMs}
       aria-valuetext={cursorMs != null ? stampInstant(cursorMs, stepMs) : "No instant picked"}
       onPointerDown={onDown}
       onPointerMove={onMove}
       onPointerUp={onUp}
       onPointerCancel={onCancel}
+      // The other way a release never arrives: the browser revokes the capture (a context menu, a
+      // drag-and-drop takeover). Disarming here is what keeps the next hover from continuing it.
+      onLostPointerCapture={onCancel}
       onPointerLeave={() => setHoverX(null)}
       onKeyDown={onKeyDown}
       className={cn(

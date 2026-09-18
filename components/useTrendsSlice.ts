@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+
 import useTrendsWindow, { useTrendsRange } from "@/components/useTrendsWindow";
 import {
   assembleTrendSlice,
@@ -45,10 +47,33 @@ export default function useTrendsSlice(zoom: ZoomId | null, range: TrendRange | 
   const fleetTiles = useTrendsRange(plan.fleet.tiles);
   const daily = useTrendsWindow(plan.daily);
 
-  const slice = assembleTrendSlice(plan, {
-    main: plan.main.tiles ? mainTiles.data : main.data,
-    fleet: plan.fleet.tiles ? fleetTiles.data : fleet.data,
-    daily: daily.data,
-  });
+  const mainData = plan.main.tiles ? mainTiles.data : main.data;
+  const fleetData = plan.fleet.tiles ? fleetTiles.data : fleet.data;
+  const dailyData = daily.data;
+  const fromMs = range?.fromMs ?? null;
+  const toMs = range?.toMs ?? null;
+
+  // ⚠️ MEMOISED, AND THE KEY IS NOT THE PLAN (review, 2026-09-18). `assembleTrendSlice` cuts,
+  // trims and copies every series of a payload that is ~450 daily buckets wide — and this hook
+  // runs on EVERY render of both its consumers, including the ones a time-cursor scrub causes,
+  // where not one of its inputs has moved. The plan cannot be the key: `planTrendFetch` builds a
+  // fresh object each call, so a plan-keyed memo would never hit. The identity-stable inputs are
+  // the ZOOM, the range's two NUMBERS and the three payload REFERENCES (the fetch hooks hand back
+  // the same object until a load replaces it), so those are the key and the plan is rebuilt
+  // inside — it is a handful of object literals against an O(buckets × series) walk.
+  //
+  // Rebuilding the range from its two numbers is behaviour-identical: `planTrendFetch` reads only
+  // `fromMs`/`toMs`, and the document's extra `metaId` (whose chart a drag was drawn on) travels
+  // with the range elsewhere and reaches nothing in this path. The document's own behaviour is
+  // therefore unchanged — same payloads, same cuts, same object shape.
+  const slice = useMemo(
+    () =>
+      assembleTrendSlice(planTrendFetch(zoom, fromMs != null && toMs != null ? { fromMs, toMs } : null), {
+        main: mainData,
+        fleet: fleetData,
+        daily: dailyData,
+      }),
+    [zoom, fromMs, toMs, mainData, fleetData, dailyData],
+  );
   return { ...slice, error: plan.main.tiles ? mainTiles.error : main.error };
 }

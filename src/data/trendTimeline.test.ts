@@ -8,11 +8,13 @@ import {
   axisTicks,
   classifyPress,
   clampCursor,
+  drawnSpan,
   isDrag,
   minSpanMs,
   msAtX,
   panRange,
   rangeFrom,
+  sameBucket,
   stampInstant,
   stepCursor,
   tickLabel,
@@ -109,6 +111,26 @@ describe("what is under the press", () => {
   it("ignores a cursor outside the track's own span — nothing is drawn there to grab", () => {
     expect(classifyPress(0, G, null, G.fromMs - DAY)).toEqual({ kind: "empty" });
   });
+
+  // ⚠️ THE SPAN IT IS GIVEN IS THE ONE ON SCREEN, not the committed range (review, 2026-09-18).
+  // With a window pill selected the track paints the span that pill implies, and a rectangle the
+  // reader can see must be a rectangle the reader can grab — so the same classification has to
+  // hold for a window-implied span as for a brushed one.
+  it("grabs a WINDOW-IMPLIED span exactly as it grabs a committed one", () => {
+    const w = windowSpan("30d", G)!;
+    const a = xAtMs(w.fromMs, G);
+    const b = xAtMs(w.toMs, G);
+    expect(classifyPress(a, G, w, null)).toEqual({ kind: "edge", edge: "from" });
+    expect(classifyPress(b, G, w, null)).toEqual({ kind: "edge", edge: "to" });
+    expect(classifyPress((a + b) / 2, G, w, null)).toEqual({ kind: "inside" });
+    // OUTSIDE the drawn span is still bare track — that is how a fresh brush starts.
+    expect(classifyPress(a - EDGE_PX - 1, G, w, null)).toEqual({ kind: "empty" });
+  });
+
+  it("leaves the WHOLE track grabbable for a fresh brush when `all` draws no span", () => {
+    expect(windowSpan("all", G)).toBeNull();
+    expect(classifyPress(G.width / 2, G, windowSpan("all", G), null)).toEqual({ kind: "empty" });
+  });
 });
 
 describe("the minimum span", () => {
@@ -154,6 +176,32 @@ describe("a brushed range", () => {
   it("gives up gracefully on a track shorter than the minimum — the whole track", () => {
     const tiny = { width: 100, fromMs: G.fromMs, toMs: G.fromMs + 60_000 };
     expect(rangeFrom(tiny.fromMs, tiny.fromMs, tiny)).toEqual({ fromMs: tiny.fromMs, toMs: tiny.toMs });
+  });
+
+  // ⚠️ A RESIZE DRAGGED TOWARD ITS PARTNER hits the floor, and the floor has to move SOMETHING.
+  // It moves the edge the user is NOT holding — the anchor — because the held edge is the one the
+  // finger is on, and an edge that refuses to follow the pointer reads as a broken control.
+  it("moves the ANCHOR, not the held edge, when a resize is dragged under the minimum", () => {
+    const to = G.fromMs + 200 * DAY;
+    const min = minSpanMs(G.fromMs + 199 * DAY);
+    // Dragging the `from` edge right, up against `to`: `to` is the anchor and it is what gives.
+    const r = rangeFrom(to, to - 1000, G);
+    expect(r.toMs).toBe(to);
+    expect(r.fromMs).toBe(to - min);
+    expect(r.toMs - r.fromMs).toBe(min);
+    // And it stays inside the track whichever end it had to grow through.
+    expect(r.fromMs).toBeGreaterThanOrEqual(G.fromMs);
+    expect(r.toMs).toBeLessThanOrEqual(G.toMs);
+  });
+
+  it("keeps a floored resize inside the track when the anchor sits against an edge", () => {
+    const min = minSpanMs(G.fromMs);
+    // The `to` edge dragged left onto the very first instant, anchored there: there is no room
+    // to the LEFT, so the span grows right and both ends stay in the track.
+    const r = rangeFrom(G.fromMs, G.fromMs, G);
+    expect(r.fromMs).toBe(G.fromMs);
+    expect(r.toMs).toBe(G.fromMs + min);
+    expect(r.toMs).toBeLessThanOrEqual(G.toMs);
   });
 
   it("RESIZES by anchoring the opposite edge — the same one function", () => {
@@ -211,6 +259,55 @@ describe("the cursor", () => {
   it("stops at the span's ends rather than wrapping", () => {
     expect(stepCursor(G.fromMs, DAY, -5, G)).toBe(G.fromMs);
     expect(stepCursor(G.toMs - 1, DAY, 5, G)).toBe(G.toMs - 1);
+  });
+});
+
+describe("the span on screen", () => {
+  const brushed = { fromMs: G.fromMs + 100 * DAY, toMs: G.fromMs + 200 * DAY };
+
+  it("prefers the live drag, then a committed range, then the window's own span", () => {
+    const preview = { fromMs: G.fromMs, toMs: G.fromMs + 10 * DAY };
+    expect(drawnSpan(preview, brushed, "30d", G)).toBe(preview);
+    expect(drawnSpan(null, brushed, "30d", G)).toBe(brushed);
+    expect(drawnSpan(null, null, "30d", G)).toEqual(windowSpan("30d", G));
+  });
+
+  it("draws NOTHING for `all` — the absence is the statement", () => {
+    expect(drawnSpan(null, null, "all", G)).toBeNull();
+  });
+
+  // ⚠️ THE POINT OF THE FUNCTION. What is painted is what is hit-tested: feeding `classifyPress`
+  // the committed range instead left a window-implied rectangle visible and ungrabbable.
+  it("is what classifyPress must be given — a window's span is as grabbable as a brushed one", () => {
+    const shown = drawnSpan(null, null, "7d", G)!;
+    expect(classifyPress(xAtMs(shown.fromMs, G), G, shown, null)).toEqual({ kind: "edge", edge: "from" });
+    // …whereas the committed range (there is none) would have classified the same press as bare
+    // track, which is the defect this function exists to make impossible.
+    expect(classifyPress(xAtMs(shown.fromMs, G), G, null, null)).toEqual({ kind: "empty" });
+  });
+});
+
+describe("the scrub's quantiser", () => {
+  const t = Date.UTC(2026, 0, 1, 12, 0);
+
+  it("is the SAME bucket for two instants the planes cannot tell apart", () => {
+    expect(sameBucket(t, t + 60_000, HOUR)).toBe(true);
+    expect(sameBucket(t, t + HOUR - 1, HOUR)).toBe(true);
+  });
+
+  it("is a CHANGE the moment the containing bucket does", () => {
+    expect(sameBucket(t, t + HOUR, HOUR)).toBe(false);
+    expect(sameBucket(t, t - 1, HOUR)).toBe(false);
+  });
+
+  it("follows the STACK's grain, not the track's — a day and an hour disagree on purpose", () => {
+    expect(sameBucket(t, t + 3 * HOUR, DAY)).toBe(true);
+    expect(sameBucket(t, t + 3 * HOUR, HOUR)).toBe(false);
+  });
+
+  it("treats a first write as a change, and never divides by a zero step", () => {
+    expect(sameBucket(null, t, HOUR)).toBe(false);
+    expect(sameBucket(t, t, 0)).toBe(false);
   });
 });
 
@@ -281,6 +378,20 @@ describe("the month marks under the track", () => {
     expect(narrow.length).toBeLessThan(wide.length);
     // Whatever survives is still a real month start.
     for (const t of narrow) expect(new Date(t).getUTCDate()).toBe(1);
+  });
+
+  // THE COARSE BRANCH (stepMs > 1d). A daily window's marks snap back to the month's 1st, because
+  // some day inside that month is the first one measured and the CALENDAR boundary is what the
+  // label names. Once the buckets are wider than a day that snap becomes a lie: the 1st need not
+  // be a bucket at all, so the mark would sit where no measurement is. The bucket's own instant
+  // is marked instead. Built with a 45-day step, which is the one shape that separates the two.
+  it("marks the BUCKET ITSELF once the buckets are coarser than a day", () => {
+    const STEP = 45 * DAY;
+    const buckets = [Date.UTC(2026, 0, 20), Date.UTC(2026, 0, 20) + STEP]; // Jan 20 → Mar 6
+    const g = { width: 300, fromMs: buckets[0], toMs: buckets[1] + STEP };
+    expect(axisTicks(buckets, STEP, g, 10)).toEqual([buckets[1]]);
+    // The same axis read at a DAILY step snaps to the calendar instead — the branches differ.
+    expect(axisTicks(buckets, DAY, g, 10)).toEqual([Date.UTC(2026, 2, 1)]);
   });
 
   it("names a January by its YEAR and every other month by its name", () => {

@@ -69,23 +69,32 @@ export type PressZone =
   | { kind: "inside" }
   | { kind: "empty" };
 
-/** ⚠️ HIT ORDER FOLLOWS PAINT ORDER. The cursor's handle is drawn ON TOP of the brush, so it has
- *  to be tested first or the pointer would lie about what it is over — you would press a visible
- *  grab handle and resize the rectangle behind it. Then the brush's edges (the narrower target),
- *  then its interior, then bare track. A cursor outside the track's span is not drawn at all, so
- *  there is nothing there to grab. */
+/** ⚠️ HIT ORDER FOLLOWS PAINT ORDER, and `drawn` is THE SPAN ON SCREEN — not the committed range.
+ *
+ *  The second half of that is the whole rule, and it was got wrong first (review, 2026-09-18): the
+ *  track paints `trendRange` when one stands and otherwise the span the WINDOW PILL implies, so
+ *  feeding the committed range alone left the visible rectangle ungrabbable in five of the six
+ *  window states — edges that would not resize, an interior that would not pan, over a mark the
+ *  reader can plainly see. What is drawn is what can be grabbed; panning or resizing a
+ *  window-implied span simply COMMITS it as a range, which is what the gesture means.
+ *
+ *  The cursor's handle is drawn ON TOP of the brush, so it is tested FIRST or the pointer would
+ *  lie about what it is over — you would press a visible grab handle and resize the rectangle
+ *  behind it. Then the brush's edges (the narrower target), then its interior, then bare track: a
+ *  press OUTSIDE the drawn span is still how a fresh brush starts. A cursor outside the track's
+ *  own span is not drawn at all, so there is nothing there to grab. */
 export function classifyPress(
   x: number,
   g: TrackGeom,
-  range: Span | null,
+  drawn: Span | null,
   cursorMs: number | null,
 ): PressZone {
   if (cursorMs != null && cursorMs >= g.fromMs && cursorMs < g.toMs) {
     if (Math.abs(x - xAtMs(cursorMs, g)) <= HANDLE_PX) return { kind: "cursor" };
   }
-  if (range) {
-    const a = xAtMs(range.fromMs, g);
-    const b = xAtMs(range.toMs, g);
+  if (drawn) {
+    const a = xAtMs(drawn.fromMs, g);
+    const b = xAtMs(drawn.toMs, g);
     if (Math.abs(x - a) <= EDGE_PX) return { kind: "edge", edge: "from" };
     if (Math.abs(x - b) <= EDGE_PX) return { kind: "edge", edge: "to" };
     if (x > a && x < b) return { kind: "inside" };
@@ -158,6 +167,28 @@ export function clampCursor(ms: number, g: TrackGeom): number {
   return clamp(ms, g.fromMs, Math.max(g.fromMs, g.toMs - 1));
 }
 
+/** ⚠️ A SCRUB WRITES ONCE PER BUCKET, NOT ONCE PER POINTERMOVE (review, 2026-09-18).
+ *
+ *  `trendCursorMs` is a store channel the whole stack subscribes to, so every write re-plans the
+ *  fetch, re-ranks the roster, re-derives each network's series and re-renders five recharts
+ *  plots. A drag fires that at pointer rate — and buys NOTHING, because each plane marks the
+ *  BUCKET CONTAINING the instant (`bucketAt`): two instants inside one bucket paint the identical
+ *  frame. So the write is quantised to the grain the planes can actually resolve, and the visible
+ *  result is unchanged.
+ *
+ *  The handle follows the same quantisation rather than gliding on local state — the handle IS
+ *  the cursor, and a handle resting between two buckets while every plane marks one of them would
+ *  be the instrument disagreeing with itself. At the daily tier one bucket is ~2.6px of a
+ *  1150px track; at the finer tiers it is sub-pixel.
+ *
+ *  Buckets are epoch-aligned multiples of their step (5m, 1h, 1d all divide a UTC day), which is
+ *  what makes the index a plain floor. A null `prev` is always a change: nothing has been written
+ *  yet. */
+export function sameBucket(prevMs: number | null, ms: number, stepMs: number): boolean {
+  if (prevMs == null || stepMs <= 0) return false;
+  return Math.floor(prevMs / stepMs) === Math.floor(ms / stepMs);
+}
+
 /** One keyboard step: `steps` buckets of the STACK's current tier, so ← and → move by exactly
  *  what the charts above can resolve. With nothing picked yet the first press lands on the span's
  *  newest instant rather than stepping from an invented zero. */
@@ -183,6 +214,24 @@ export function windowSpan(zoom: ZoomId, g: TrackGeom): Span | null {
   const ms = WINDOW_MS[zoom];
   if (ms == null) return null;
   return { fromMs: Math.max(g.fromMs, g.toMs - ms), toMs: g.toMs };
+}
+
+/** THE SPAN ON SCREEN — ONE expression, two consumers (2026-09-18, the review's F2). The track
+ *  PAINTS this and `classifyPress` is HIT-TESTED against it, and the whole defect it answers was
+ *  those two being computed separately: the paint fell back to the window pill's implied span
+ *  while the hit test saw only the committed range, so five of the six window states drew a
+ *  rectangle nobody could grab. Deriving both from one function is what makes them unable to
+ *  disagree — the component may not re-derive it.
+ *
+ *  Precedence: the live drag's preview, then a committed range, then the window's implied span.
+ *  `all` implies none, and that absence is the statement that the whole track is showing. */
+export function drawnSpan(
+  preview: Span | null,
+  range: Span | null,
+  zoom: ZoomId,
+  g: TrackGeom,
+): Span | null {
+  return preview ?? range ?? windowSpan(zoom, g);
 }
 
 /** One point of the overview's polyline. */

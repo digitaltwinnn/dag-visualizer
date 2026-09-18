@@ -58,6 +58,10 @@ export default function TrendTimeline() {
   // than from a second reading of the window. Every payload it names is already fetched by the
   // stack; the hook's module-level cache makes this call free.
   const { stepMs } = useTrendsSlice(windowId, range);
+  // AN ARRIVED-BUT-EMPTY PAYLOAD IS NOT A LOADING ONE. `leadingTrim` cuts a window with no
+  // measured bucket at all to EMPTY (its own documented rule), and an empty window is still an
+  // object — so presence alone cannot be the gate for drawing a track.
+  const measured = overview != null && overview.buckets.length > 0;
 
   return (
     // THE ONE `pointer-events-auto` (see the header). Everything else in the band stays inert.
@@ -66,21 +70,24 @@ export default function TrendTimeline() {
           ABOVE it — the document's own stacking idiom, and the thumb wants the pills nearer the
           dock's edge than a full-width scrub target does. */}
       <div className="flex-1 min-w-0 flex flex-col justify-center max-[700px]:order-2 max-[700px]:min-h-[54px]">
-        {/* HONESTY STATES (rule 10): the band's own quiet acquiring word while the overview is in
-            flight — never an empty axis, which would read as a measured span with nothing in it —
-            and the document's outage sentence, short form, when the load has failed. The pills
-            beside them keep working in both. */}
+        {/* HONESTY STATES (rule 10). THREE facts, not two — the third was a review find: an
+            ARRIVED payload with nothing measured in it. `leadingTrim` answers that case with a
+            ZERO-BUCKET window, which is truthy, so the track used to render a bare axis with
+            gestures that silently did nothing. "Acquiring" and "nothing measured yet" are
+            different facts and a reader waiting on the first would wait forever. The pills beside
+            all three keep working. */}
         {!overview && !ov.error && (
-          <span className="text-micro text-muted-foreground self-center" aria-hidden>
-            acquiring…
-          </span>
+          <span className="text-micro text-muted-foreground self-center">acquiring…</span>
         )}
         {!overview && ov.error && (
           <span className="text-micro text-muted-foreground self-center">
             The trends store is unreachable right now.
           </span>
         )}
-        {overview && (
+        {overview && !measured && (
+          <span className="text-micro text-muted-foreground self-center">nothing measured yet</span>
+        )}
+        {measured && (
           <TrendTrack
             overview={overview}
             metric={metric}
