@@ -60,6 +60,7 @@ describe("the trends view's channels", () => {
       trendLayout: "stack",
       trendScroll: 0,
       trendFocus: null,
+      trendScale: "shared",
     });
   });
 
@@ -70,6 +71,21 @@ describe("the trends view's channels", () => {
     expect(s.trendLayout).toBe("stack");
     expect(s.trendScroll).toBe(0);
     expect(s.trendFocus).toBeNull();
+    // SHARED IS THE DEFAULT (the document's own rule): a column of charts is read AS a column
+    // first, and autoscaled per-plane it says "these are the same size" about networks that are
+    // nothing of the kind. The honest reading is the one that needs no gesture.
+    expect(s.trendScale).toBe("shared");
+  });
+
+  it("the scale preference flips, and a view switch leaves it alone", () => {
+    useStore.getState().setTrendScale("own");
+    expect(useStore.getState().trendScale).toBe("own");
+    // NOT view-scoped, unlike `trendFocus`: it is how the reader likes their charts drawn, not a
+    // rung of the ladder, so leaving and returning must not silently undo their choice.
+    useStore.getState().setMode("hyper");
+    expect(useStore.getState().trendScale).toBe("own");
+    useStore.getState().setTrendScale("shared");
+    expect(useStore.getState().trendScale).toBe("shared");
   });
 
   it("committing a focus does not move the cursor", () => {

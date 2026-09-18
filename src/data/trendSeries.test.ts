@@ -134,6 +134,20 @@ describe("metricSeries", () => {
     expect(metricSeries("snapshots", "dor", series).sampled).toBeUndefined();
     expect(metricSeries("snapshots", "dor", series).gaps).toBeUndefined();
   });
+
+  it("returns COPIES, never the payload's own rows — a caller's trim must not reach the cache", () => {
+    const s = { "m.dor.gapSum": [100], "m.dor.snaps": [10], "m.dor.gapMax": [40] };
+    const out = metricSeries("continuity", "dor", s);
+    expect(out.sampled).not.toBe(s["m.dor.snaps"]);
+    expect(out.gaps).not.toBe(s["m.dor.gapMax"]);
+    out.sampled!.length = 0;
+    out.gaps!.length = 0;
+    expect(s["m.dor.snaps"]).toEqual([10]);
+    expect(s["m.dor.gapMax"]).toEqual([40]);
+    // The unscaled counter path copies too (scale === 1 takes its own branch).
+    const counter = metricSeries("snapshots", "dor", { "m.dor.snaps": s["m.dor.snaps"] });
+    expect(counter.points).not.toBe(s["m.dor.snaps"]);
+  });
 });
 
 describe("the busiest-first ranking", () => {

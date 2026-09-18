@@ -276,6 +276,15 @@ interface AppState {
   /** The plane brought forward (5b). View-scoped: it clears on leaving the view, like the other
    *  view-scoped ladder levels. */
   trendFocus: string | null;
+  /** ONE SCALE OR EACH ITS OWN — the Trends document's 2026-09-14 rule, carried into the view.
+   *  A column of per-network charts that each autoscale answers "how did THIS network's week go?"
+   *  beautifully and "which of these is bigger?" with a flat lie: a chain anchoring three a day and
+   *  one anchoring forty draw the same silhouette. A depth STACK is read AS a column before it is
+   *  read one plane at a time, so `shared` is the default and the honest reading needs no gesture;
+   *  `own` is the reader's escape when a small network's own shape is what they want. NOT
+   *  view-scoped — it is how the reader likes their charts drawn, not a rung, so `setMode` leaves
+   *  it alone. */
+  trendScale: "shared" | "own";
 
   setLive: (live: boolean, lastGoodAt?: number) => void;
   setEngineReady: (v: boolean) => void;
@@ -340,6 +349,7 @@ interface AppState {
   setTrendLayout: (layout: "stack" | "flat") => void;
   setTrendScroll: (offset: number) => void;
   setTrendFocus: (id: string | null) => void;
+  setTrendScale: (scale: "shared" | "own") => void;
   // THEME (light/dark spec §2). Unlike the network (a frozen page parameter), theme is genuine
   // runtime state: the resolved value drives the Engine's colour re-thread and any component
   // that renders theme-conditionally. ONE writer: ThemeController. `theme` boots "dark" (the
@@ -405,6 +415,7 @@ export const useStore = create<AppState>((set) => ({
   trendLayout: "stack",
   trendScroll: 0,
   trendFocus: null,
+  trendScale: "shared",
   phoneSheetPx: null,
   sceneCoverL: 0,
   sceneCoverR: 0,
@@ -590,5 +601,6 @@ export const useStore = create<AppState>((set) => ({
   setTrendLayout: (layout) => set({ trendLayout: layout }),
   setTrendScroll: (offset) => set({ trendScroll: offset }),
   setTrendFocus: (id) => set({ trendFocus: id }),
+  setTrendScale: (scale) => set({ trendScale: scale }),
   setTheme: (pref, resolved) => set({ themePref: pref, theme: resolved }),
 }));

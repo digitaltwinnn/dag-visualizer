@@ -77,7 +77,20 @@ export const TREND_METRICS: Record<TrendMetric, MetricSpec> = {
   continuity: { kind: "counter", key: null, scale: 1, unit: () => "seconds", format: formatSeconds },
 };
 
-/** The stored row a metric reads for one network, or null where it is derived from several. */
+/** A metric that IS one stored row — everything but the derived `continuity`. Narrower than
+ *  `kind: "counter"` and deliberately so: continuity is counter-TRIMMED (it divides two counter
+ *  rows) yet has no row of its own, so the two ideas must not share one name. */
+export type StoredMetric = Exclude<TrendMetric, "continuity">;
+
+/** The metrics that are one stored COUNTER row — the four a per-network counter panel can serve.
+ *  `nodes` is a gauge and `continuity` is derived, so neither belongs. */
+export type CounterMetric = Exclude<StoredMetric, "nodes">;
+
+/** The stored row a metric reads for one network, or null where it is derived from several. The
+ *  overload is what lets a caller that already knows it holds a stored metric skip the null
+ *  branch instead of asserting it away. */
+export function seriesKey(metric: StoredMetric, id: string): string;
+export function seriesKey(metric: TrendMetric, id: string): string | null;
 export function seriesKey(metric: TrendMetric, id: string): string | null {
   return TREND_METRICS[metric].key?.(id) ?? null;
 }
@@ -116,13 +129,19 @@ export function metricSeries(
     return {
       // null wherever the division is not PROVABLE: no numerator, no denominator, or a bucket
       // in which the chain sealed nothing at all (there is no spacing between zero snapshots).
-      points: sum.map((v, i) => (v != null && snaps[i] != null && snaps[i]! > 0 ? v / snaps[i]! : null)),
-      sampled: snaps,
-      gaps: series[`m.${id}.gapMax`] ?? [],
+      points: sum.map((v, i) => {
+        const n = snaps[i];
+        return v != null && n != null && n > 0 ? v / n : null;
+      }),
+      // COPIES, like `points`. Every array this returns is the caller's to trim and slice; handing
+      // back the payload's own row would let one consumer's cut reach the shared window cache.
+      sampled: snaps.slice(),
+      gaps: (series[`m.${id}.gapMax`] ?? []).slice(),
     };
   }
   const spec = TREND_METRICS[metric];
-  const raw = series[spec.key!(id)] ?? [];
+  const key = spec.key?.(id);
+  const raw = (key != null ? series[key] : undefined) ?? [];
   return { points: spec.scale === 1 ? raw.slice() : raw.map((v) => (v == null ? null : v * spec.scale)) };
 }
 

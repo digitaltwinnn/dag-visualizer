@@ -18,6 +18,11 @@
 // row a metric reads, whether it rescales, counter or gauge, the busiest-first rank — is
 // `src/data/trendSeries.ts`, shared with the document for the same reason.
 //
+// ONE HAIRLINE PER PLANE, and it is the CHART'S. The body is fully transparent — no background,
+// no frame of its own — because `TrendChart` already draws a `border-border` box around its plot,
+// and a plane box around that would be a second edge around the same rectangle. So the plane is a
+// width and its content's height, and the only ink it adds is the header strip's plate.
+//
 // ⚠️ NO BLUR, NO SHADOW, ANYWHERE ON A PLANE. Each would force the compositor to re-raster a
 // transformed layer every frame, with five planes under a per-frame matrix — the single biggest
 // cost of doing this in DOM at all. `components/trendStackBoundary.test.ts` keeps it that way.
@@ -38,24 +43,28 @@ import {
   trimCounterEdges,
 } from "@/src/data/trendSeries";
 import { leadingTrim } from "@/src/data/trendWindow";
-import { stackPoses, VISIBLE_PLANES } from "@/src/engine/domain/trendStack";
+import { PLANE_GAP, stackPoses } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { METAGRAPHS } from "@/src/net/current";
 import { useStore } from "@/src/store/store";
 
-/** The plane's own box, in CSS pixels at scale 1 — a 16:7-ish pane, wide enough for the
- *  document's chart at its natural height with room above and below it. */
+/** The plane's own width at scale 1. There is no height: the plane is CONTENT-height, because the
+ *  chart's own plot frame IS the plane's one hairline — a box around it would be a second edge
+ *  around the same rectangle. */
 const PLANE_W = 540;
-const PLANE_H = 250;
 
 /** ⚠️ STATIC PLACEMENT ONLY — `TrendStackSync` (the next task) takes this over and writes a
  *  projected `matrix3d` onto the same `transform`. It lives here, in ONE expression, precisely so
  *  that hand-over is a deletion rather than a hunt: the look can be reviewed before the projector
- *  exists, and nothing else in this file encodes where a plane sits. The rear slots step UP and
- *  shrink, which is the depth cue the poses already carry as scale and opacity. */
+ *  exists, and nothing else in this file encodes where a plane sits.
+ *
+ *  It reads the POSE, never the array index, so `layout: "flat"` and the focus lift are visible
+ *  before the projector exists: `pose.z` is world depth with NEARER = LARGER z (the cameraRig
+ *  looks down −Z), so a screen-y of `+z` puts the nearest plane LOWEST and the rear ones stepping
+ *  up behind it — the same reading the real projection gives, at a fake scale. */
 const STEP_Y = 38;
-const staticTransform = (slot: number, scale: number): string =>
-  `translate(-50%, -50%) translateY(${-slot * STEP_Y}px) scale(${scale})`;
+const staticTransform = (pose: { z: number; scale: number }): string =>
+  `translate(-50%, -50%) translateY(${(pose.z / PLANE_GAP) * STEP_Y}px) scale(${pose.scale})`;
 
 export default function TrendStack() {
   // Convention 7: gate on the view this behaviour is FOR, read from the allow-list — never a
@@ -69,6 +78,7 @@ export default function TrendStack() {
   const layout = useStore((s) => s.trendLayout);
   const scroll = useStore((s) => s.trendScroll);
   const focus = useStore((s) => s.trendFocus);
+  const scaleMode = useStore((s) => s.trendScale);
   // The store's whole measured depth, leading-trimmed to where measuring began — the document's
   // own default window. `null` while the view is elsewhere is the hook's documented conditional
   // form (a hook cannot be called conditionally), so no other view pays for this fetch; the cache
@@ -88,16 +98,20 @@ export default function TrendStack() {
   const ranked = rankByLast(roster, (id) => metricSeries(metric, id, series).points);
   const poses = stackPoses(ranked, { layout, scroll, focus });
 
-  // ⚠️ ONE SCALE FOR THE WHOLE STACK (the document's own ruling, 2026-09-14): a column of
-  // per-network charts that each autoscale answers "how did THIS network's week go?" and "which
-  // of these is bigger?" with a flat lie — a chain anchoring three a day and one anchoring forty
-  // draw the same silhouette. A depth stack IS that comparison, so it shares one ceiling. Taken
-  // across the WHOLE ranked roster rather than the visible window, so scrolling never rescales
-  // the charts under the reader. Each chart still states its own peak (TrendChart's `ownMax`).
-  const sharedMax = Math.max(
-    0,
-    ...ranked.flatMap((id) => metricSeries(metric, id, series).points.filter((v): v is number => v != null)),
-  );
+  // ⚠️ ONE SCALE OR EACH ITS OWN, and the reader picks — `store.trendScale`, the document's own
+  // control carried into the view. `shared` is the default because a stack is read AS a column
+  // before it is read one plane at a time, and autoscaled per plane it says "these are the same
+  // size" about a chain anchoring three a day and one anchoring forty. The ceiling is taken across
+  // the WHOLE ranked roster rather than the visible window, so scrolling never rescales the charts
+  // under the reader; each chart still states its own peak (TrendChart's `ownMax`). `undefined` is
+  // TrendChart's "scale yourself".
+  const sharedMax =
+    scaleMode === "shared"
+      ? Math.max(
+          0,
+          ...ranked.flatMap((id) => metricSeries(metric, id, series).points.filter((v): v is number => v != null)),
+        )
+      : undefined;
 
   if (!on) return null;
 
@@ -118,7 +132,7 @@ export default function TrendStack() {
     // scene shell (CSS trap 2 — the shell is the fixed/positioned ancestor), and z-[4] sits above
     // the canvas's tree-order paint and below the rails' z-10.
     <div id="trend-stack" className="absolute inset-0 pointer-events-none z-[4]">
-      {poses.map((pose, slot) => {
+      {poses.map((pose) => {
         const net = displayNetwork(pose.id);
         const s = metricSeries(metric, pose.id, series);
         // COUNTER series drop their partial edge buckets; a GAUGE keeps everything. The axis is
@@ -130,7 +144,7 @@ export default function TrendStack() {
             key={pose.id}
             data-plane={pose.id}
             className={cn(
-              "absolute left-1/2 top-1/2 flex flex-col justify-center px-3 rounded-lg border border-border",
+              "absolute left-1/2 top-1/2",
               // The body takes no pointer events — the orbit drag belongs to the canvas beneath.
               // The one plane the pose marks interactive is the exception, and its header strip
               // re-enables them below whatever the pose says.
@@ -138,13 +152,14 @@ export default function TrendStack() {
             )}
             style={{
               width: PLANE_W,
-              height: PLANE_H,
-              transform: staticTransform(slot, pose.scale),
+              transform: staticTransform(pose),
               transformOrigin: "center",
               opacity: pose.opacity,
-              // Nearest slot on top, so a nearer plane's header can never be hidden by a farther
-              // one. Local to this root, which is its own stacking context.
-              zIndex: VISIBLE_PLANES - slot,
+              // PAINT ORDER IS DEPTH, from the pose itself: a nearer plane (larger z) paints over
+              // a farther one, so a lifted focus lands in front of the stack it came from and the
+              // flat layout's equal z leaves tree order to break the tie. Local to this root,
+              // which is its own stacking context; the offset keeps it positive.
+              zIndex: Math.round(100 + pose.z),
             }}
           >
             {p && (
@@ -157,7 +172,7 @@ export default function TrendStack() {
                 sampled={s.sampled && cut(s.sampled)}
                 gaps={s.gaps && cut(s.gaps)}
                 lines={[{ label: metric, points: cut(s.points), hue: net?.hue }]}
-                scaleMax={sharedMax > 0 ? sharedMax : undefined}
+                scaleMax={sharedMax}
                 className="w-full"
                 // THE HEAD IS THE PLANE'S HEADER STRIP. The body is fully transparent — the
                 // chart's own hairline and its coloured line are all the ink it has — so this one

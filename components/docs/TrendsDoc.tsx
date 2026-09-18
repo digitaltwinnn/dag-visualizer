@@ -7,6 +7,7 @@ import { cutRange, leadingTrim, pickRangeTier, sliceWindow, trimNewestPartial } 
 import TrendChart, { type TrendLine } from "@/components/docs/TrendChart";
 import {
   TREND_METRICS,
+  type CounterMetric,
   formatDag as dag,
   formatMb as mb,
   formatSeconds as secs,
@@ -18,7 +19,7 @@ import {
   trimCounterEdges,
 } from "@/src/data/trendSeries";
 import { METAGRAPHS } from "@/src/net/current";
-import { useStore, type TrendMetric } from "@/src/store/store";
+import { useStore } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { filterToggleActions } from "@/src/engine/domain/pickActions";
 import { metagraphById } from "@/src/data/network";
@@ -281,7 +282,10 @@ export default function TrendsDoc() {
    *  ranked by the LAST measured day, busiest first (per-section — each ranking is its own
    *  reading). The vitals' catalog-order rule guards live charts that reshuffle under the
    *  reader; a document laid out once per visit can rank honestly. */
-  const netPanels = (metric: TrendMetric) => {
+  // COUNTER metrics only — the four that ARE one stored row per network. A gauge needs the fleet
+  // payload (netGaugePanels) and continuity is derived from two rows (netGapPanels), so the type
+  // says which four this builder can actually serve rather than leaving it to the reader.
+  const netPanels = (metric: CounterMetric) => {
     const spec = TREND_METRICS[metric];
     const panels = roster
       .map((m) => {
@@ -299,7 +303,7 @@ export default function TrendsDoc() {
     return panels.map(({ m, points }) => {
       const net = displayNetwork(m.id);
       const line: TrendLine = { label: metric, points, hue: net?.hue };
-      return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={metricUnit(metric, stepMs)} readout={dayReadout(seriesKey(metric, m.id!)!, spec.scale)} buckets={cBuckets} stepMs={stepMs} format={spec.format} lines={[line]} scaleMax={sharedMax} />;
+      return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={metricUnit(metric, stepMs)} readout={dayReadout(seriesKey(metric, m.id!), spec.scale)} buckets={cBuckets} stepMs={stepMs} format={spec.format} lines={[line]} scaleMax={sharedMax} />;
     });
   };
   /** Per-network GAUGE panels (fleet): untrimmed — a point sample is complete the moment it

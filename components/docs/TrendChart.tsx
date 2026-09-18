@@ -2,6 +2,7 @@
 import { useId, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { CartesianGrid, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { cn } from "@/lib/utils";
 
 // THE TRENDS DOC'S ONE CHART PRIMITIVE — a small-multiple line chart over the /api/trends
 // buckets, on RECHARTS (user, 2026-09-07: "why hand-roll charts if we have a neat library?" —
@@ -279,7 +280,7 @@ export default function TrendChart({
           out the LINK and the READOUT wrap to a second line instead. `max-w-full` is the
           backstop: a name longer than the whole row still truncates inside the group rather
           than overflowing it. Nothing changes at any width where the row already fit. */}
-      <div className={headClassName ? `flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-1 ${headClassName}` : "flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-1"}>
+      <div className={cn("flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-1", headClassName)}>
         <span className="inline-flex items-baseline gap-2 min-w-0 max-w-full flex-none">
           <span className="inline-block w-2 h-2 rounded-full flex-none" style={{ background: hue0 }} aria-hidden />
           <span className="text-label font-semibold text-foreground truncate">{name}</span>
