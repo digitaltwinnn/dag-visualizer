@@ -24,7 +24,7 @@
 - **Copy rule:** user-facing copy says **"nodes", never "machines"**. Chart unit strings stay short.
 - **Never emoji** in interface glyphs — `lucide-react` only, monochrome via `currentColor` (`components/icons.tsx`).
 - **Dev-server discipline:** run ONE shared `npm run dev`. **Any edit to a long-lived singleton (the Engine, every `scene/` class, `NetworkData`) needs a full page reload, not HMR.**
-- **Commit trailer:** end commit messages with `Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>`.
+- **Commit trailer:** end commit messages with `Co-Authored-By: Claude <noreply@anthropic.com>`.
 - **Verify with:** `npx tsc --noEmit` and `npm test` after every task; visual checks against the running app via the chrome-devtools MCP.
 
 ---
@@ -357,7 +357,7 @@ RAW (routeless, like the placeholder views). Every exhaustive per-view
 table gains its row, and every behaviour stays off — convention 7's
 promise that a new view is inert until it opts in.
 
-Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
+Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
@@ -447,7 +447,7 @@ git commit -m "feat(trends): the view's store channels
 The shared cursor is a commit, not a hover, and it carries across views;
 the focus is view-scoped and clears with the mode.
 
-Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
+Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
@@ -574,7 +574,7 @@ Depth is the network; the visible window pages through the roster; flat
 collapses to one plane. Camera framing reads this, never a rendered
 transform (rule 6).
 
-Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
+Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
@@ -664,7 +664,7 @@ git commit -m "feat(trends): the chart planes, in the same primitive as the docu
 One TrendChart per network on a transparent plane — two registers, one
 chart implementation, so every honesty rule carries over unchanged.
 
-Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
+Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
@@ -758,7 +758,7 @@ TrendStackSync is CalloutSync's sibling — narrow state in, matrix3d out,
 nothing allocated per frame, and the projector goes quiet when the camera
 and the state both hold still.
 
-Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
+Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
@@ -805,7 +805,7 @@ Reload the page. Expected: a faint ground grid and a glowing cursor line crossin
 git add -A
 git commit -m "feat(trends): the view's WebGL half — ground and time cursor
 
-Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
+Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
@@ -836,7 +836,7 @@ git commit -m "feat(trends): entering History parks the fleet
 A chart-plane view has nowhere honest to put a node, so it reuses the doc
 overlay's park+fade rather than inventing poses. Driven by a policy row.
 
-Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
+Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
@@ -868,7 +868,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 git add -A
 git commit -m "feat(trends): the vitals band becomes the timeline
 
-Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
+Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
@@ -909,7 +909,7 @@ const document = () => useStore.getState().setSection("data");
 git add -A
 git commit -m "feat(trends): the rails — a Layers explorer and the cursor's facts
 
-Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
+Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
@@ -939,7 +939,7 @@ git commit -m "feat(trends): plane clicks, the focus dolly, and align-to-front
 Align to front moves the structure, not the camera — principle 2. The
 focus dolly is the one pose with one state-keyed variation.
 
-Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
+Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
@@ -969,7 +969,7 @@ git commit -m "feat(trends): RAW opens the document, the view's other register
 section is a presentation axis, so which surface RAW shows is per view —
 a policy row, not a hardcoded switch.
 
-Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
+Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
@@ -994,7 +994,7 @@ Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
 git add -A
 git commit -m "feat(trends): the committed network scopes the stack
 
-Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
+Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
@@ -1025,7 +1025,7 @@ git commit -m "docs(convention 12): measured history is one rung with two regist
 The scene face is /trends, the document face is RAW, and the raw layer
 stays rung 3. Supersedes the never-a-pseudo-scene rule.
 
-Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>"
+Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ---
