@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, type ClickAction } from "./pickActions";
+import { viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
 import { METAGRAPHS } from "@/src/net/current";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
@@ -508,5 +508,31 @@ describe("sameMetaSnap", () => {
     expect(sameMetaSnap(SEL, { ...SEL, ordinal: 1 })).toBe(false);
     expect(sameMetaSnap(SEL, null)).toBe(false);
     expect(sameMetaSnap(null, null)).toBe(true);
+  });
+});
+
+describe("trendPlaneActions — a plane click in the History view (2026-09-18)", () => {
+  // ⚠️ A PLANE CLICK IS FOCUS ONLY, and that is a decision, not an omission. In this view a
+  // committed network FILTER scopes the stack down to that one network — so committing the
+  // plane's network on a click would make the other four planes VANISH, which is the opposite of
+  // the focused state the gesture exists to reach ("the clicked layer comes forward, the rest
+  // hold their depth order behind it"). The top-bar filter stays the separate way to scope.
+  it("focuses the plane that was clicked", () => {
+    expect(trendPlaneActions("elpaca", null)).toEqual([{ kind: "trendFocus", id: "elpaca" }]);
+  });
+
+  it("re-clicking the FOCUSED plane releases it (one toggle language everywhere)", () => {
+    expect(trendPlaneActions("elpaca", "elpaca")).toEqual([{ kind: "trendFocus", id: null }]);
+  });
+
+  it("moves the focus straight across from another plane", () => {
+    expect(trendPlaneActions("elpaca", "dor-metagraph")).toEqual([{ kind: "trendFocus", id: "elpaca" }]);
+  });
+
+  it("leaves the filter, the inspect and the snapshot subjects untouched", () => {
+    // The whole action list, in every state the click can be made from — nothing else commits.
+    for (const current of [null, "elpaca", "dor-metagraph"]) {
+      expect(kinds(trendPlaneActions("elpaca", current))).toEqual(["trendFocus"]);
+    }
   });
 });

@@ -183,3 +183,25 @@ export function stackPoses(ids: readonly string[], opts: StackOpts): PlanePose[]
 export function focusDepth(ids: readonly string[], focus: string | null): number {
   return focus !== null && ids.includes(focus) ? FOCUS_LIFT : 0;
 }
+
+/**
+ * The scroll that brings `id` into the visible window, moving as little as possible.
+ *
+ * A plane click focuses whatever it names, and `stackPoses` deliberately lifts NOTHING for a focus
+ * outside the window — so the click's executor (`src/store/applyClickActions.ts`, the one place
+ * allowed to read the published roster) pages the window first and the focus lands somewhere the
+ * reader can see it. Minimal movement on purpose: paging further would re-order the rest of the
+ * stack around a gesture that named one plane.
+ *
+ * Unchanged when the plane is already on screen, and for an id the roster does not hold — a focus
+ * on nothing is not a place to go. Clamped by the same rule `stackPoses` clamps with, so the two
+ * can never disagree about which window a scroll means.
+ */
+export function scrollToShow(ids: readonly string[], id: string, scroll: number): number {
+  const start = clampScroll(ids.length, scroll);
+  const i = ids.indexOf(id);
+  if (i < 0) return start;
+  if (i < start) return i;
+  if (i >= start + VISIBLE_PLANES) return clampScroll(ids.length, i - VISIBLE_PLANES + 1);
+  return start;
+}

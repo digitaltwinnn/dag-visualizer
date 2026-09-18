@@ -355,3 +355,42 @@ export function ledgerCommitTilt(pos: THREE.Vector3, target: THREE.Vector3, outP
   _sph.radius *= LEDGER_TILT_DOLLY;
   outPos.setFromSpherical(_sph).add(target);
 }
+
+// ---- the History view's FOCUS LEAN ----------------------------------------------------------
+// The trends view owns ONE pose, `FOCI.trend`, with ONE state-keyed variation — this — which is
+// exactly the shape `ledgerCommitTilt` has in the chamber, and for the same reason: camera
+// principle 2 says view emphasis moves the STRUCTURE, and a second pose is a second thing the
+// reader has to learn. The structure already answers a plane click (`domain/trendStack.stackPoses`
+// lifts the focused plane forward, to full scale and opacity, in front of the stack it came from);
+// this is the camera's share of that one gesture — it leans IN while a focus stands and back out
+// when it clears, keyed on the STATE, so every rung of `LADDERS.trend` inherits it by delegating to
+// the resting pose.
+//
+// ⚠️ THE GEOMETRY IS LAYOUT DATA, NEVER A RENDERED TRANSFORM (rule 6). `depth` is the focused
+// plane's own lift, `domain/trendStack.focusDepth(ids, focus)`, which the Engine reads from the
+// published roster and the committed focus — never off a projected plane or a scene matrix. It is
+// a PARAMETER for the same reason `aspectFit` takes the aspect: the stack's spatial grammar lives
+// in its own module, the camera's lean lives here, and neither imports the other. Zero depth (no
+// focus, or a focus on a network the roster does not carry) contributes exactly nothing, so the
+// unfocused pose is `FOCI.trend` untouched.
+//
+// ⚠️ AND IT IS A PUSH ALONG THE VIEW AXIS, not an orbit. The whole proposition of this view is that
+// the planes present FLAT-ON — they host real text, and the projector writes a translate and a
+// uniform scale with no rotation term precisely so that text stays crisp. A lean that changed the
+// forward direction would skew the charts it exists to emphasise. So the target is untouched and
+// the position slides straight down the axis toward it, which also leaves the pose composable with
+// all three global levers (they scale (pos − target) about the target).
+//
+// The camera closes by the same depth the plane came forward: one lift, taken twice, so the gesture
+// reads as the front of the stack stepping toward the reader rather than as a zoom. Measured at the
+// resting pose that is ~14% apparent growth on the focused plane — noticed, not lurched into.
+export const TREND_FOCUS_PUSH = 1;
+/** Lean the settled trends pose in toward a focused plane. `depth` is `trendStack.focusDepth()`;
+ *  0 means no focus and writes `pos` through unchanged. Safe with `outPos === pos`. */
+export function trendFocusPush(pos: THREE.Vector3, target: THREE.Vector3, depth: number, outPos: THREE.Vector3): void {
+  _out.subVectors(target, pos); // the forward axis, read BEFORE outPos is written (in-place safe)
+  const d = _out.length();
+  const push = depth * TREND_FOCUS_PUSH;
+  outPos.copy(pos);
+  if (d > 1e-6 && push !== 0) outPos.addScaledVector(_out, push / d);
+}

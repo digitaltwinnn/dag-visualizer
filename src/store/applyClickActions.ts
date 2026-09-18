@@ -5,6 +5,7 @@
 // caller.
 import { useStore } from "./store";
 import type { ClickAction } from "@/src/engine/domain/pickActions";
+import { scrollToShow } from "@/src/engine/domain/trendStack";
 
 export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boolean }): void {
   const st = useStore.getState();
@@ -47,6 +48,19 @@ export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boole
         break;
       case "metaSnap":
         st.setMetaSnap(a.sel);
+        break;
+      case "trendFocus":
+        // THE HISTORY VIEW'S PLANE FOCUS — one store effect, plus the paging that makes it
+        // visible. `stackPoses` lifts nothing for a focus outside the visible window (its own
+        // tested rule), so a plane the reader scrolled past would focus INVISIBLY: the window
+        // pages to it first, by the minimum that brings it in. This is also the ONE place allowed
+        // to read `trendIds` back — it is React's publish channel, off limits to components, and
+        // the executor is neither React nor a second publisher.
+        if (a.id !== null) {
+          const scroll = scrollToShow(st.trendIds, a.id, st.trendScroll);
+          if (scroll !== st.trendScroll) st.setTrendScroll(scroll);
+        }
+        st.setTrendFocus(a.id);
         break;
     }
   }

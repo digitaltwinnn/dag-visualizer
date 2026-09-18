@@ -40,8 +40,20 @@
 // ⚠️ AND THE BODIES MUST NOT SWALLOW THE ORBIT DRAG. The canvas is under these planes and the
 // camera is driven by dragging it, so a plane body takes no pointer events; only its header strip
 // and the one plane the pose marks `interactive` do.
+//
+// A PLANE CLICK IS FOCUS ONLY, and the semantics are not this file's to decide: the header strip
+// (and, on the interactive plane, its body) applies `trendPlaneActions` through the one executor,
+// like every other interactive surface in the app (rule 2). It does NOT commit the network — a
+// committed filter scopes the stack to one plane, so a click would delete the four planes the
+// gesture is about; the decision and its reasoning live in `domain/pickActions.ts`.
+//
+// ⚠️ A DRAG IS NOT A CLICK. These strips sit over a camera you orbit by dragging, and a press that
+// TRAVELS is a drag whatever it started on — so the pointer's travel is measured and a click that
+// moved more than a few px is dropped. (A press that starts on a strip does not reach the canvas
+// at all, so it cannot orbit: the strips swallow that drag, which is the accepted cost of putting
+// a control over the scene. Every pixel that is not a header still orbits.)
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import TrendChart from "@/components/docs/TrendChart";
 import useTrendsSlice from "@/components/useTrendsSlice";
@@ -55,14 +67,20 @@ import {
   trimCounterEdges,
   type MetricSeries,
 } from "@/src/data/trendSeries";
+import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { PLANE_PX_W, stackPoses } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { METAGRAPHS } from "@/src/net/current";
+import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 
 /** The empty roster, as ONE frozen reference. Publishing a fresh `[]` would be a content-free
  *  change the engine's `!==` still has to answer. */
 const NO_IDS: readonly string[] = [];
+
+/** How far a press may travel and still count as a click, in px. Generous enough for a shaky
+ *  finger, tight enough that a deliberate orbit attempt never commits a focus. */
+const DRAG_SLOP = 4;
 
 /** No payload yet, as ONE reference — a fresh `{}` per render would be a new memo key on a fact
  *  that has not changed. */
@@ -180,6 +198,30 @@ export default function TrendStack() {
     [scaleMode, ranked, rows],
   );
 
+  // THE DRAG GUARD (see the header): pointerdown records where the press started, pointerup says
+  // whether it travelled, and `activate` drops a click that did. Refs, not state — a gesture must
+  // never re-render five charts.
+  const down = useRef<{ x: number; y: number } | null>(null);
+  const dragged = useRef(false);
+  const onPointerDown = (e: React.PointerEvent) => {
+    down.current = { x: e.clientX, y: e.clientY };
+    dragged.current = false;
+  };
+  const onPointerUp = (e: React.PointerEvent) => {
+    const d = down.current;
+    dragged.current = !!d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > DRAG_SLOP;
+  };
+  // ONE write path (rule 2): the table decides what a plane click means, the executor applies it.
+  // Read the focus from the store at ACTIVATION time rather than closing over the render's value —
+  // a keyboard press can land after a focus change from anywhere else.
+  const activate = (id: string) => {
+    if (dragged.current) {
+      dragged.current = false;
+      return;
+    }
+    applyClickActions(trendPlaneActions(id, useStore.getState().trendFocus));
+  };
+
   if (!on) return null;
 
   // FAILURE IS A SIGNAL, NOT A SILENCE (rule 10, and the trends hook's own contract): no cached
@@ -232,6 +274,14 @@ export default function TrendStack() {
               // 0-size anchor carrying it reaches the plane inside.
               pose.interactive ? "pointer-events-auto" : "pointer-events-none",
             )}
+            onPointerDown={onPointerDown}
+            onPointerUp={onPointerUp}
+            // THE INTERACTIVE PLANE'S WHOLE BODY is a target too — it is the one plane a click
+            // cannot be ambiguous about, and asking for the header strip alone on a plane that is
+            // already in front reads as a dead surface. Every other plane keeps the body inert, so
+            // the orbit drag passes through it. The header strip stops its own click, so the two
+            // never fire for one press.
+            onClick={pose.interactive ? () => activate(pose.id) : undefined}
             style={{
               opacity: pose.opacity,
               // PAINT ORDER IS DEPTH, from the pose itself: a nearer plane (larger z) paints over
@@ -268,7 +318,23 @@ export default function TrendStack() {
                 // scene and the light one. `--panel-solid` is the app's own near-opaque glass and
                 // the only token here; the mix is its presence, not a colour of its own. NO BLUR
                 // (see this file's header) — the plate does the work a backdrop-filter would.
-                headClassName="pointer-events-auto px-2 py-1 rounded-md [background:color-mix(in_oklch,var(--panel-solid)_62%,transparent)]"
+                // THE HEAD IS THE TARGET, so it reads as one: the pointer's own cursor, the app's
+                // hover wash mixed INTO the plate, and a focus ring for the keyboard. A hover
+                // previews, it never commits (rule 9).
+                // ⚠️ ONE `background` VALUE, in the plate's own shorthand form. A `bg-*` utility
+                // sets background-COLOR and would fight the shorthand this plate is written as
+                // (CSS trap 3's neighbourhood), so the hover state restates the whole value —
+                // and it restates it as a single mix rather than as a wash layered over the
+                // plate, which keeps it one property value to read. Mixing TOWARD `--panel-solid`
+                // (not toward transparent) means the hover lifts the plate as well as tinting it,
+                // so a header strip over a busy chart gains presence exactly when it is the thing
+                // being pointed at.
+                headClassName="pointer-events-auto cursor-pointer px-2 py-1 rounded-md [background:color-mix(in_oklch,var(--panel-solid)_62%,transparent)] hover:[background:color-mix(in_oklch,var(--wash-hover)_35%,var(--panel-solid))] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
+                headAction={{
+                  activate: () => activate(pose.id),
+                  pressed: focus === pose.id,
+                  label: `${focus === pose.id ? "Send" : "Bring"} ${net?.name ?? pose.id} ${focus === pose.id ? "back" : "forward"}`,
+                }}
               />
             )}
             </div>

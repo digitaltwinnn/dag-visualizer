@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
-import { FOCI, hubFraming, geoFraming, REST_ASPECT, aspectFit, ledgerCommitTilt, LEDGER_TILT_YAW, LEDGER_TILT_PITCH, LEDGER_TILT_DOLLY, easeInOutQuad, CAM_ZOOM, dollyBack, RAILS_HIDDEN_DOLLY, railsLean, restOrbit, restPitch, nodeFraming, cohortFraming, isSamePose, nudgeMix, NUDGE_AMP, NUDGE_DUR, NUDGE_SAME, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE } from "./cameraRig";
+import { FOCUS_LIFT } from "./trendStack";
+import { FOCI, hubFraming, geoFraming, REST_ASPECT, aspectFit, ledgerCommitTilt, LEDGER_TILT_YAW, LEDGER_TILT_PITCH, LEDGER_TILT_DOLLY, easeInOutQuad, CAM_ZOOM, dollyBack, RAILS_HIDDEN_DOLLY, railsLean, restOrbit, restPitch, nodeFraming, cohortFraming, isSamePose, nudgeMix, NUDGE_AMP, NUDGE_DUR, NUDGE_SAME, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE, trendFocusPush, TREND_FOCUS_PUSH } from "./cameraRig";
 
 // NO Snapshots framing is pinned here, because the view HAS none: it owns one pose, `FOCI.ledger`,
 // with one state-keyed variation — `ledgerCommitTilt`, the commit ORBIT, pinned below. Five framings
@@ -387,5 +388,66 @@ describe("ledgerCommitTilt (the Snapshots commit ORBIT, 2026-08-09)", () => {
     const p = pos();
     ledgerCommitTilt(p, tgt(), p);
     expect(p.distanceTo(expected)).toBeLessThan(1e-12);
+  });
+});
+
+describe("trendFocusPush (the History view's ONE state-keyed variation, 2026-09-18)", () => {
+  // The trends view owns ONE pose, `FOCI.trend`, exactly as the Snapshots chamber owns one — and
+  // this is its `ledgerCommitTilt`: the settled pose leans IN toward the front of the stack while a
+  // plane is focused, and back out when the focus clears. Not a pose per plane: `stackPoses` lifts
+  // whichever plane is focused to the SAME place, so there is one destination to frame.
+  const pos = () => FOCI.trend.pos.clone();
+  const tgt = () => FOCI.trend.target.clone();
+  // The lift `domain/trendStack` gives a focused plane — LAYOUT DATA, handed in by the Engine as
+  // `focusDepth(ids, focus)`. The function takes it as a PARAMETER, like `aspectFit` takes the
+  // aspect: the geometry belongs to the stack module, the lean belongs here, and neither imports
+  // the other. Read from the real constant so re-tuning the lift re-tunes this test with it.
+  const LIFT = FOCUS_LIFT;
+
+  it("contributes NOTHING when no plane is focused (depth 0 — the resting pose, exactly)", () => {
+    const out = new THREE.Vector3();
+    trendFocusPush(pos(), tgt(), 0, out);
+    expect(out.equals(FOCI.trend.pos)).toBe(true);
+  });
+
+  it("closes in on the stack — the focused pose orbits nearer than the resting one", () => {
+    const out = new THREE.Vector3();
+    trendFocusPush(pos(), tgt(), LIFT, out);
+    expect(out.distanceTo(FOCI.trend.target)).toBeLessThan(FOCI.trend.pos.distanceTo(FOCI.trend.target));
+  });
+
+  it("stays FRONTAL — the push is along the view axis, so the direction is untouched", () => {
+    // The whole point of this view's resting pose is that every plane presents flat-on. A lean that
+    // changed the forward axis would skew the charts' own text, which is the one thing DOM planes
+    // cannot afford.
+    const out = new THREE.Vector3();
+    trendFocusPush(pos(), tgt(), LIFT, out);
+    const before = new THREE.Vector3().subVectors(FOCI.trend.target, FOCI.trend.pos).normalize();
+    const after = new THREE.Vector3().subVectors(FOCI.trend.target, out).normalize();
+    expect(after.dot(before)).toBeCloseTo(1, 9);
+  });
+
+  it("travels exactly the plane's own lift, scaled by the one named factor", () => {
+    // Geometry from LAYOUT DATA (rule 6): the camera closes by the same depth the focused plane
+    // came forward, so the gesture reads as the front of the stack stepping toward the reader.
+    const out = new THREE.Vector3();
+    trendFocusPush(pos(), tgt(), LIFT, out);
+    expect(out.distanceTo(FOCI.trend.pos)).toBeCloseTo(LIFT * TREND_FOCUS_PUSH, 9);
+  });
+
+  it("stays MODEST — a lean, not a dive into the chart", () => {
+    const orbit = FOCI.trend.pos.distanceTo(FOCI.trend.target);
+    expect(LIFT * TREND_FOCUS_PUSH).toBeGreaterThan(0);
+    expect(LIFT * TREND_FOCUS_PUSH).toBeLessThan(orbit * 0.25);
+  });
+
+  it("is safe to compose IN PLACE (outPos === pos — the Engine leans a preset)", () => {
+    const expected = new THREE.Vector3();
+    trendFocusPush(pos(), tgt(), LIFT, expected);
+    const p = pos();
+    trendFocusPush(p, tgt(), LIFT, p);
+    expect(p.x).toBeCloseTo(expected.x, 9);
+    expect(p.y).toBeCloseTo(expected.y, 9);
+    expect(p.z).toBeCloseTo(expected.z, 9);
   });
 });

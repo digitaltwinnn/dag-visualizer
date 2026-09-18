@@ -28,7 +28,7 @@ import { readSceneColors, type SceneColors, LIGHT_TUNE } from "./sceneColors";
 import { setNodeDimTarget, setNodeEnv } from "./scene/objects/NodeFabric";
 import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme/resolve";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
-import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt } from "./domain/cameraRig";
+import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
@@ -44,6 +44,7 @@ import { type Tap, DOUBLE_TAP_SLOP, LONG_PRESS_MS, LONG_PRESS_LINGER_MS, isDoubl
 import { auditInstances, findingKey, type InstanceFinding } from "./scene/instanceAudit";
 import { CalloutSync, type CalloutState } from "./CalloutSync";
 import { TrendStackSync, type TrendStackState } from "./TrendStackSync";
+import { focusDepth } from "./domain/trendStack";
 import { DevTunePanel } from "./DevTunePanel";
 import { CameraDirector } from "./CameraDirector";
 import type { GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
@@ -829,6 +830,28 @@ export class Engine {
         }
         // The selected node card (geo or hyper) keeps that node's layer shells lit on the globe.
         if (st.inspect !== prev.inspect) this.globe.setSelectedNode(this._pickNodeId(st.inspect));
+        // A PLANE FOCUS is the History view's commit, and the camera answers it like any other
+        // (camera principle 3): the settled pose leans in toward the front of the stack, and
+        // releasing it leans back out. Gated on the policy row for the view the behaviour is FOR
+        // (convention 7) — `chartStack` is the stack's own flag, so a view without planes can
+        // never reach this. Focusing a DIFFERENT plane resolves to the pose already held and is
+        // answered by the nudge, which is what `tweenTo` decides.
+        //
+        // ⚠️ THE TRIGGER IS THE DEPTH, NOT THE FOCUS — two channels decide it (2026-09-18, found
+        // live). The lean is worth taking only while the focused plane is actually IN the stack,
+        // which `focusDepth` answers from the published roster; and a filter commit SCOPES that
+        // roster, one React commit after the store write this subscription is reading. Watching
+        // `trendFocus` alone, a filter commit resolved against the OLD roster and left the camera
+        // leaning toward a plane the scoped stack no longer shows — measured: the single plane sat
+        // at 1.085× its resting projection with nothing lifted. Watching the depth answers both
+        // directions, so clearing the filter leans back in as the plane returns.
+        if (
+          (st.trendFocus !== prev.trendFocus || st.trendIds !== prev.trendIds) &&
+          VIEW_POLICIES[st.mode].chartStack &&
+          focusDepth(st.trendIds, st.trendFocus) !== focusDepth(prev.trendIds, prev.trendFocus)
+        ) {
+          this._resolveFocus();
+        }
         // A node commit is answered by the camera in every 3D view (user, 2026-08-13). The pose is
         // the view's own business: geo flies to the node, hyper and the ledger resolve to a pose
         // they may already hold and answer with the NUDGE (_tweenTo). Hyper had no branch here at
@@ -1574,12 +1597,33 @@ export class Engine {
       this.cam.tweenTo(this.cam.out.pos, this.cam.out.target);
       return true;
     },
-    // STUBS (Task 1, 2026-09-18): the trends view has no committed-state camera variation yet —
-    // both rungs fly to the one resting pose, mirroring ledgerOverview's simplest branch. A later
-    // task (the chart-plane framing work) replaces these with real per-plane/per-network poses.
+    // The History view has ONE camera POSE, exactly as the Snapshots chamber does — `FOCI.trend`,
+    // the frontal resting pose — with ONE state-keyed variation, the focus LEAN below. The network
+    // rung has no pose of its own and inherits its parent's (camera principle 2): with a filter
+    // committed the stack holds a single plane, which `stackPoses` already CENTRES, so there is
+    // nothing left for a camera to say about it.
     trendNetwork: () => this._resolvers.trendOverview(),
     trendOverview: () => {
-      this.cam.focus("trend");
+      // The lean is keyed on the committed FOCUS, like the ledger's tilt is keyed on the filter, so
+      // both rungs inherit it by delegating here and releasing the focus tweens back out on its own.
+      // ⚠️ LAYOUT DATA (rule 6): `focusDepth` reads the published roster and the committed focus —
+      // the same numbers `stackPoses` places the planes from — never a projected plane or a scene
+      // matrix. An off-roster focus answers 0, which is the resting pose exactly.
+      const st = useStore.getState();
+      const depth = focusDepth(st.trendIds, st.trendFocus);
+      if (depth === 0) {
+        this.cam.focus("trend");
+        return true;
+      }
+      const f = FOCI.trend;
+      trendFocusPush(f.pos, f.target, depth, this.cam.out.pos);
+      this.cam.out.target.copy(f.target);
+      // DOLLIED like every resting pose: this pose's target IS its subject — the stack's own front,
+      // which the resting aim was tuned against — so there is no composed look-at to exempt it from
+      // `dollyBack` / `railsLean` / `aspectFit` (the ⚠️ next to CAM_ZOOM). And a commit that lands on
+      // the pose already held — focusing plane B while A is focused — takes the NUDGE, since the
+      // lean is the same wherever the focus points (camera principle 3, applied by `tweenTo`).
+      this.cam.tweenTo(this.cam.out.pos, this.cam.out.target);
       return true;
     },
   };

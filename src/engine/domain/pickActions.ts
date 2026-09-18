@@ -28,7 +28,10 @@ export type ClickAction =
   // Select a snapshot (follow decides pin vs heartbeat) — or CLEAR it (pick null, follow
   // omitted: the follow state is untouched; FollowController owns the re-follow).
   | { kind: "snapshot"; pick: Extract<PickDescriptor, { kind: "snapshot" }> | null; follow?: boolean }
-  | { kind: "metaSnap"; sel: MetaSnapSel | null };
+  | { kind: "metaSnap"; sel: MetaSnapSel | null }
+  // Bring a trend plane forward, or release the focused one (null) — a VIEW-LOCAL emphasis, not a
+  // selection rung: see `trendPlaneActions`.
+  | { kind: "trendFocus"; id: string | null };
 
 // The network a node pick belongs to: its metagraph, or the DAG core for a validator.
 export const pickNetId = (p: PickDescriptor): string | null =>
@@ -253,6 +256,22 @@ export function metaSnapSelectActions(
   out.push({ kind: "snapshot", pick: global, follow: false });
   out.push({ kind: "metaSnap", sel });
   return out;
+}
+
+/** A PLANE in the History view's stack (2026-09-18) — and it is FOCUS ONLY.
+ *
+ *  ⚠️ The plane does NOT commit its network, and that is a decision rather than an omission. A
+ *  committed network filter SCOPES the stack down to that one network, so committing on a plane
+ *  click would make the other four planes vanish — the exact opposite of the focused state the
+ *  gesture reaches for, where the clicked layer comes forward and the rest hold their depth order
+ *  behind it. The top-bar filter stays the separate, deliberate way to scope the stack.
+ *
+ *  So this is the whole action list: one `trendFocus`, toggling like every other rung's subject
+ *  (re-clicking the focused plane releases it — one toggle language everywhere). The executor owns
+ *  the one consequence that is not a store write of its own: paging an off-window plane into view.
+ */
+export function trendPlaneActions(id: string, currentFocus: string | null): ClickAction[] {
+  return [{ kind: "trendFocus", id: currentFocus === id ? null : id }];
 }
 
 /** The raw layer's ARRIVAL commit — "the layer opens on a subject": with nothing selected the

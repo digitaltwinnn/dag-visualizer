@@ -13,6 +13,7 @@ import {
   SCALE_FALLOFF,
   VISIBLE_PLANES,
   focusDepth,
+  scrollToShow,
   stackPoses,
 } from "./trendStack";
 
@@ -200,5 +201,51 @@ describe("focusDepth", () => {
     expect(focusDepth(IDS, null)).toBe(0);
     expect(focusDepth(IDS, "elpaca")).toBe(FOCUS_LIFT);
     expect(focusDepth(IDS, "not-in-roster")).toBe(0);
+  });
+});
+
+describe("scrollToShow (the paging a focus asks for)", () => {
+  // The executor calls this when a plane click focuses an id the window does not hold: the focus
+  // must be SEEN, and `stackPoses` deliberately lifts nothing for an off-window focus.
+  const LONG = [...IDS, "seven", "eight"]; // 8 ids, window 5, so scroll runs 0..3
+
+  it("leaves the scroll alone when the plane is already in the window", () => {
+    expect(scrollToShow(LONG, "dag-l0", 0)).toBe(0);
+    expect(scrollToShow(LONG, "constellation-l1", 0)).toBe(0); // slot 4, the last visible one
+    expect(scrollToShow(LONG, "ded", 1)).toBe(1);
+  });
+
+  it("pages FORWARD by the minimum that brings the plane into the window", () => {
+    // "ded" is index 5; a window starting at 0 ends at 4, so exactly one step is enough.
+    expect(scrollToShow(LONG, "ded", 0)).toBe(1);
+    expect(scrollToShow(LONG, "eight", 0)).toBe(3); // index 7 → start 7 − 5 + 1
+  });
+
+  it("pages BACKWARD to the plane itself, and no further", () => {
+    expect(scrollToShow(LONG, "dag-l0", 3)).toBe(0);
+    expect(scrollToShow(LONG, "pacaswap", 3)).toBe(1);
+  });
+
+  it("clamps exactly as stackPoses clamps — the two must agree about the window", () => {
+    expect(scrollToShow(LONG, "dag-l0", 99)).toBe(0);
+    expect(scrollToShow(LONG, "eight", -4)).toBe(3);
+    // A roster shorter than the window has one window, and it is 0.
+    expect(scrollToShow(IDS.slice(0, 3), "elpaca", 2)).toBe(0);
+  });
+
+  it("holds still for an id the roster does not carry", () => {
+    expect(scrollToShow(LONG, "not-in-roster", 2)).toBe(2);
+    expect(scrollToShow([], "dag-l0", 0)).toBe(0);
+  });
+
+  it("whatever it returns, stackPoses' window contains the plane", () => {
+    // The contract, stated against the other half of the module rather than against arithmetic.
+    for (const id of LONG) {
+      for (const from of [0, 1, 2, 3]) {
+        const p = stackPoses(LONG, { layout: "stack", scroll: scrollToShow(LONG, id, from), focus: id });
+        expect(p.map((x) => x.id)).toContain(id);
+        expect(p.find((x) => x.id === id)!.z).toBeCloseTo(FOCUS_LIFT);
+      }
+    }
   });
 });

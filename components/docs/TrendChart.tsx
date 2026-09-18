@@ -52,6 +52,7 @@ export default function TrendChart({
   note,
   className,
   headClassName,
+  headAction,
 }: {
   name: string;
   /** The unit word the head carries once (" /day", " seconds", " total"…). */
@@ -123,6 +124,18 @@ export default function TrendChart({
    *  scene. One prop rather than a second head: the document's own head renders unchanged when
    *  nothing is passed, so both registers keep one chart implementation. */
   headClassName?: string;
+  /** THE HEAD AS A TARGET (2026-09-18) — the 3D stack's header strip is what a reader presses to
+   *  bring a plane forward, so the strip has to BE a control: focusable, activated by Enter and
+   *  Space, and stating whether its plane is the focused one. The document passes nothing and its
+   *  head stays a plain div.
+   *
+   *  ⚠️ `role="button"` rather than a real `<button>` element, deliberately: the head can already
+   *  contain a button of its own (the `inspect` link), and a button inside a button is invalid
+   *  HTML that browsers re-parse — the inner control would land OUTSIDE the outer one and stop
+   *  working. The role plus tabIndex plus the key handler is the same contract without that trap.
+   *  `label` says what the press will DO ("Bring X forward" / "Send X back"), because the strip's
+   *  own text is a network name and a reading. */
+  headAction?: { activate: () => void; pressed: boolean; label: string };
 }) {
   const n = buckets.length;
   // The hatch pattern's SVG id — per chart instance (useId), sanitized because url(#…)
@@ -304,7 +317,32 @@ export default function TrendChart({
           out the LINK and the READOUT wrap to a second line instead. `max-w-full` is the
           backstop: a name longer than the whole row still truncates inside the group rather
           than overflowing it. Nothing changes at any width where the row already fit. */}
-      <div className={cn("flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-1", headClassName)}>
+      <div
+        className={cn("flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-1", headClassName)}
+        {...(headAction && {
+          role: "button",
+          tabIndex: 0,
+          "aria-pressed": headAction.pressed,
+          "aria-label": headAction.label,
+          onClick: (e: React.MouseEvent) => {
+            // The plane BODY beneath runs the same activation (the stack's interactive plane), so
+            // the strip's own click stops here — once per gesture, never twice.
+            e.stopPropagation();
+            // …and a nested control inside the head keeps its own click (the `inspect` records
+            // link). The head is a div with `role="button"`, so a `closest` hit is always a real
+            // nested element rather than the strip itself.
+            if ((e.target as HTMLElement).closest("a,button")) return;
+            headAction.activate();
+          },
+          onKeyDown: (e: React.KeyboardEvent) => {
+            // The two keys a button answers to. Space scrolls by default and Enter would submit
+            // a form, so both are taken here rather than left to the page.
+            if (e.key !== "Enter" && e.key !== " ") return;
+            e.preventDefault();
+            headAction.activate();
+          },
+        })}
+      >
         <span className="inline-flex items-baseline gap-2 min-w-0 max-w-full flex-none">
           <span className="inline-block w-2 h-2 rounded-full flex-none" style={{ background: hue0 }} aria-hidden />
           <span className="text-label font-semibold text-foreground truncate">{name}</span>

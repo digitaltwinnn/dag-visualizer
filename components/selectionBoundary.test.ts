@@ -16,8 +16,18 @@ import { join } from "node:path";
 //     executor like everything else.
 //
 // In scope: the selection setters (setFilter / setCountry / setInspect / setSnap / setLayer /
-// setFollowing). NOT in scope: the hover channels (subjectPairing's lane), view/mode
-// navigation, phone-UI chrome, and data-bridge setters — those are not selections.
+// setFollowing / setCohort / setTrendFocus). NOT in scope: the hover channels (subjectPairing's
+// lane), view/mode navigation, phone-UI chrome, and data-bridge setters — those are not
+// selections.
+//
+// ⚠️ `setTrendFocus` is in scope although a trend focus is view-LOCAL emphasis rather than a
+// selection rung (2026-09-18). What puts it here is the rule's own shape: it is a committed
+// SUBJECT written by a click on an interactive surface — the History stack's header strips — and
+// it carries a consequence beyond its own channel (an off-window plane pages into view first).
+// That consequence belongs in the executor, where every caller inherits it, which is exactly what
+// this boundary exists to guarantee. `trendPlaneActions` is the table entry; `setTrendLayout`,
+// `setTrendScroll` and `setTrendMetric` stay OUT — they are how the reader wants the stack drawn,
+// not what it is about.
 //
 // Cheap grep over real source (the house pattern — see engine/layerBoundaries.test.ts and
 // engine/noHardcodedColors.test.ts).
@@ -28,7 +38,7 @@ const COMPONENTS = join(import.meta.dirname, ".");
 // not a user pick). Anything else that needs an exemption should instead get a table entry.
 const ALLOW = new Set(["FollowController.tsx"]);
 
-const SELECTION_SETTERS = /\bset(Filter|Country|Inspect|Snap|Layer|Following|Cohort)\b/;
+const SELECTION_SETTERS = /\bset(Filter|Country|Inspect|Snap|Layer|Following|Cohort|TrendFocus)\b/;
 
 function sourceFiles(dir: string): string[] {
   const out: string[] = [];
