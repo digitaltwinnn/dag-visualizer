@@ -551,7 +551,10 @@ them) is unreachable on touch, which is the surface this most needs to work on; 
 discriminator every pointer type reports. The cursor is a COMMIT — it persists when the pointer
 leaves, because the rail reads it — while hovering previews a faint line locally and writes
 nothing (rule 9). Every decision a pointer makes is pure and tested in
-`src/data/trendTimeline.ts`; the component is a shell over it. The window pills are shared with the
+`src/data/trendTimeline.ts`; the component is a shell over it, split in two at ~300 lines —
+`TrendTimeline.tsx` is the band TENANT (which payload, the readout, the pills, the honesty
+states) and `TrendTrack.tsx` the INSTRUMENT (the SVG and every gesture), because the track's whole
+subject is a geometry it measures itself and nothing above it has those numbers. The window pills are shared with the
 Trends document through `components/trendPickers.tsx` — the two had already been caught drifting
 once (user, 2026-09-09), so the class strings have one home.
 
