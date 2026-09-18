@@ -5,8 +5,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import useTrendsWindow, { useTrendsRange } from "@/components/useTrendsWindow";
 import { cutRange, leadingTrim, pickRangeTier, sliceWindow, trimNewestPartial } from "@/src/data/trendWindow";
 import TrendChart, { type TrendLine } from "@/components/docs/TrendChart";
+import {
+  TREND_METRICS,
+  formatDag as dag,
+  formatMb as mb,
+  formatSeconds as secs,
+  lastMeasured,
+  metricSeries,
+  metricUnit,
+  perPhrase,
+  seriesKey,
+  trimCounterEdges,
+} from "@/src/data/trendSeries";
 import { METAGRAPHS } from "@/src/net/current";
-import { useStore } from "@/src/store/store";
+import { useStore, type TrendMetric } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { filterToggleActions } from "@/src/engine/domain/pickActions";
 import { metagraphById } from "@/src/data/network";
@@ -233,12 +245,6 @@ export default function TrendsDoc() {
   const p: TrendsPayload | undefined = windowedRaw ? leadingTrim(windowedRaw) : undefined;
   const buckets = p?.buckets ?? [];
   const stepMs = p?.stepMs ?? 86400000;
-  // COUNTER charts drop partial edge buckets — a partial sum charted whole reads as a crash,
-  // the classic last-bucket lie. Daily windows lose both edges (the cutoff day starts mid-day,
-  // the last IS today, still filling); sub-daily windows lose only the newest bucket (stored
-  // fine buckets are complete once written — only the current slot is still filling). GAUGE
-  // charts keep everything: a point sample is complete the moment it is taken, and trimming
-  // today would hide the fleet's only readings.
   const fleetRaw =
     stepMsOfMain(windowedRaw) < 3600000
       ? range
@@ -248,17 +254,18 @@ export default function TrendsDoc() {
   const pF = fleetRaw ?? p;
   const fBuckets = fleetRaw?.buckets ?? buckets;
   const fStep = fleetRaw?.stepMs ?? stepMs;
-  const lead = stepMs >= 86400000 ? 1 : 0;
-  const cBuckets = buckets.slice(lead, -1);
-  const trim = (points: (number | null)[]): (number | null)[] => points.slice(lead, -1);
+  // COUNTER charts drop partial edge buckets — a partial sum charted whole reads as a crash, the
+  // classic last-bucket lie. Which edges go is `trimCounterEdges` (src/data/trendSeries.ts), one
+  // home with the 3D stack; the axis and every line are cut by the same call.
+  const cBuckets = trimCounterEdges(buckets, stepMs);
+  const trim = (points: (number | null)[]): (number | null)[] => trimCounterEdges(points, stepMs);
 
   // The unit word follows the tier — an hourly bucket labelled "per day" would misstate every
   // reading by a factor of 24. Prose ("per day"), not the "/day" glyph (user, 2026-09-09:
   // "what is /day?" — the slash form made the head four cryptic fragments; spelled out, the
   // head reads as a sentence: "Global snapshots per day … Sep 8 · 1,863").
-  const per = stepMs >= 86400000 ? "per day" : stepMs >= 3600000 ? "per hour" : "per 5 min";
+  const per = perPhrase(stepMs);
   const bucketWord = stepMs >= 86400000 ? "daily" : stepMs >= 3600000 ? "hourly" : "five-minute";
-  const dag = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: v < 10 ? 2 : 0 })}`;
   /** The daily tier's newest COMPLETE day for a counter series (yesterday — today still
    *  fills), scaled like the chart it captions; undefined off the hourly zooms. */
   const dayReadout = (name: string, k = 1): { value: number; word: string } | undefined => {
@@ -274,12 +281,12 @@ export default function TrendsDoc() {
    *  ranked by the LAST measured day, busiest first (per-section — each ranking is its own
    *  reading). The vitals' catalog-order rule guards live charts that reshuffle under the
    *  reader; a document laid out once per visit can rank honestly. */
-  const netPanels = (suffix: string, unit: string, k = 1, fmt?: (v: number) => string) => {
+  const netPanels = (metric: TrendMetric) => {
+    const spec = TREND_METRICS[metric];
     const panels = roster
       .map((m) => {
-        const points = trim(scale(S(p, `m.${m.id}.${suffix}`), k));
-        const last = points.reduce<number | null>((acc, v) => (v != null ? v : acc), null);
-        return { m, points, last };
+        const points = trim(metricSeries(metric, m.id!, p?.series ?? {}).points);
+        return { m, points, last: lastMeasured(points) };
       })
       .sort((a, b) => (b.last ?? -1) - (a.last ?? -1));
     // The shared ceiling is the busiest network's peak ACROSS THIS SECTION — per section, because
@@ -291,14 +298,14 @@ export default function TrendsDoc() {
         : undefined;
     return panels.map(({ m, points }) => {
       const net = displayNetwork(m.id);
-      const line: TrendLine = { label: suffix, points, hue: net?.hue };
-      return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={unit} readout={dayReadout(`m.${m.id}.${suffix}`, k)} buckets={cBuckets} stepMs={stepMs} format={fmt} lines={[line]} scaleMax={sharedMax} />;
+      const line: TrendLine = { label: metric, points, hue: net?.hue };
+      return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={metricUnit(metric, stepMs)} readout={dayReadout(seriesKey(metric, m.id!)!, spec.scale)} buckets={cBuckets} stepMs={stepMs} format={spec.format} lines={[line]} scaleMax={sharedMax} />;
     });
   };
   /** Per-network GAUGE panels (fleet): untrimmed — a point sample is complete the moment it
    *  is taken — and null where never sampled (gauges are not zero-filled). */
   /** Per-network GAUGE panels ride the FLEET payload (hourly at fine zooms — see fleetRaw). */
-  const netGaugePanels = (unit: string) => {
+  const netGaugePanels = () => {
     // The LAYER LINES (user, 2026-09-11: "metagraph nodes don't show the role") — the same
     // three-line treatment the hypergraph tab's Network layers chart wears, per network, in
     // its identity hue: total solid, each layer the fleet chart's own dash. Which layers a
@@ -310,9 +317,8 @@ export default function TrendsDoc() {
     const SHORT: Record<string, string> = { l0: "L0", cl1: "cL1", dl1: "dL1" };
     return roster
       .map((m) => {
-        const points = S(pF, `f.nodes.${m.id}`);
-        const last = points.reduce<number | null>((acc, v) => (v != null ? v : acc), null);
-        return { m, points, last };
+        const points = metricSeries("nodes", m.id!, pF?.series ?? {}).points;
+        return { m, points, last: lastMeasured(points) };
       })
       .sort((a, b) => (b.last ?? -1) - (a.last ?? -1))
       .map(({ m, points }) => {
@@ -323,7 +329,7 @@ export default function TrendsDoc() {
           { label: "nodes", points, hue: net?.hue },
           ...present.map((r) => ({ label: SHORT[r]!, points: S(pF, `f.layer.${m.id}.${r}`), hue: net?.hue, dash: DASH[r] || true })),
         ];
-        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={unit} buckets={fBuckets} stepMs={fStep} lines={lines} />;
+        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={metricUnit("nodes", fStep)} buckets={fBuckets} stepMs={fStep} lines={lines} />;
       });
   };
   /** Per-network CONTINUITY panels: real measured gap stats (m.{id}.gapSum/gapMax — live
@@ -335,24 +341,18 @@ export default function TrendsDoc() {
   const netGapPanels = () =>
     roster
       .map((m) => {
-        const sum = S(p, `m.${m.id}.gapSum`);
-        const snaps = S(p, `m.${m.id}.snaps`);
-        const gmax = S(p, `m.${m.id}.gapMax`);
-        const points = sum.map((v, i) => (v != null && snaps[i] != null && snaps[i]! > 0 ? v / snaps[i]! : null));
-        const last = points.reduce<number | null>((acc, v) => (v != null ? v : acc), null);
-        return { m, points, last, gmax };
+        const s = metricSeries("continuity", m.id!, p?.series ?? {});
+        return { m, s, last: lastMeasured(s.points) };
       })
       .sort((a, b) => (b.last ?? -1) - (a.last ?? -1))
-      .map(({ m, points, gmax }) => {
+      .map(({ m, s }) => {
         const net = displayNetwork(m.id);
-        const line: TrendLine = { label: "mean", points: trim(points), hue: net?.hue };
+        const line: TrendLine = { label: "mean", points: trim(s.points), hue: net?.hue };
         // `sampled` = the chain's own snaps series: amber only where the SAMPLER missed;
         // a null point over a sampled bucket (a quiet stretch — nothing to space) just
         // breaks the line (user, 2026-09-09: DOR's quiet buckets wore outage amber).
-        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit="seconds" buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, `m.${m.id}.snaps`))} gaps={trim(gmax)} lines={[line]} />;
+        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={metricUnit("continuity", stepMs)} buckets={cBuckets} stepMs={stepMs} format={TREND_METRICS.continuity.format} sampled={trim(s.sampled!)} gaps={trim(s.gaps!)} lines={[line]} />;
       });
-  const secs = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}s`;
-  const mb = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 1 })} MB`;
 
   // ONE RUNG DOWN THE LADDER (convention 12): hand the selected range to the anchor log's
   // date search. The network commit rides the pickActions table (rule 2 — the same
@@ -730,7 +730,7 @@ export default function TrendsDoc() {
             title="Metagraph snapshots anchored to global"
             lead={`Each network's own ${bucketWord} snapshot count.`}
           >
-            {netPanels("snaps", per)}
+            {netPanels("snapshots")}
           </Section>
           <Section
             id="net-blocks"
@@ -742,7 +742,7 @@ export default function TrendsDoc() {
             // same day — the two-carrier fact, one example each, the zero rule.
             lead="The blocks each network sealed inside its own snapshots. A block carries transactions — a token transfer, or a batch of application records — and it is one of two places a snapshot carries work: the other is its state, and each network decides what goes where. A zero means no blocks, not no activity."
           >
-            {netPanels("blocks", per)}
+            {netPanels("blocks")}
           </Section>
           </>)}
           {sectionTab === "economics" && (<>
@@ -751,7 +751,7 @@ export default function TrendsDoc() {
             title="Fees paid per metagraph"
             lead="What each network paid to anchor into the global ledger."
           >
-            {netPanels("fee", `DAG ${per}`, 1e-8, dag)}
+            {netPanels("fees")}
           </Section>
 
           <Section
@@ -759,7 +759,7 @@ export default function TrendsDoc() {
             title="Data anchored per metagraph"
             lead="How much data each network anchored into the global ledger."
           >
-            {netPanels("kb", per, 1 / 1024, mb)}
+            {netPanels("kb")}
           </Section>
           </>)}
           {sectionTab === "fleet" && (
@@ -771,7 +771,7 @@ export default function TrendsDoc() {
             {stepMs < 3600000 && !fleetRaw ? (
               <p className="text-label text-muted-foreground">reading the hourly samples…</p>
             ) : (
-              netGaugePanels("nodes")
+              netGaugePanels()
             )}
           </Section>
           )}
