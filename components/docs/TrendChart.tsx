@@ -133,9 +133,13 @@ export default function TrendChart({
    *  contain a button of its own (the `inspect` link), and a button inside a button is invalid
    *  HTML that browsers re-parse — the inner control would land OUTSIDE the outer one and stop
    *  working. The role plus tabIndex plus the key handler is the same contract without that trap.
-   *  `label` says what the press will DO ("Bring X forward" / "Send X back"), because the strip's
-   *  own text is a network name and a reading. */
-  headAction?: { activate: () => void; pressed: boolean; label: string };
+   *  `label` says what the press will DO, and it must CONTAIN the strip's own visible words
+   *  (WCAG 2.5.3, label in name): an `aria-label` REPLACES the accessible name, so a bare
+   *  "Bring it forward" would leave speech input with no way to say this control's name and a
+   *  screen-reader user hearing an action with no subject. The stack composes it as
+   *  "<network> <unit> — <action>". `fromKey` tells the caller which path activated it — a
+   *  pointer gesture can be a drag, a key press never is. */
+  headAction?: { activate: (fromKey: boolean) => void; pressed: boolean; label: string };
 }) {
   const n = buckets.length;
   // The hatch pattern's SVG id — per chart instance (useId), sanitized because url(#…)
@@ -332,14 +336,23 @@ export default function TrendChart({
             // link). The head is a div with `role="button"`, so a `closest` hit is always a real
             // nested element rather than the strip itself.
             if ((e.target as HTMLElement).closest("a,button")) return;
-            headAction.activate();
+            headAction.activate(false);
           },
+          // ⚠️ A NATIVE BUTTON'S KEY TIMING, because this only LOOKS like one (`role="button"` — see
+          // the prop's note for why it cannot be a real `<button>`): ENTER fires on keydown and
+          // repeats while held, SPACE fires on key UP and does nothing until then. Matching that is
+          // not pedantry — a reader who presses Space, thinks better of it and moves off before
+          // releasing expects nothing to have happened, which is the escape hatch every button on
+          // the page gives them. Space's keydown is still swallowed, or the page scrolls under the
+          // press.
           onKeyDown: (e: React.KeyboardEvent) => {
-            // The two keys a button answers to. Space scrolls by default and Enter would submit
-            // a form, so both are taken here rather than left to the page.
-            if (e.key !== "Enter" && e.key !== " ") return;
+            if (e.key === " ") e.preventDefault();
+            else if (e.key === "Enter") { e.preventDefault(); headAction.activate(true); }
+          },
+          onKeyUp: (e: React.KeyboardEvent) => {
+            if (e.key !== " ") return;
             e.preventDefault();
-            headAction.activate();
+            headAction.activate(true);
           },
         })}
       >

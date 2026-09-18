@@ -800,6 +800,14 @@ export class Engine {
           if (st.composition) useStore.getState().setComposition(null);
           // A metagraph snapshot belongs to exactly ONE network, so a switch can only orphan it.
           if (st.metaSnap) useStore.getState().setMetaSnap(null);
+          // …and the History view's PLANE FOCUS goes with them (2026-09-18). It is view-local
+          // emphasis rather than a ladder rung, but it is finer than a network by construction —
+          // it names ONE chain's chart — and the filter SCOPES the stack to a single plane, so a
+          // focus left standing either points at a plane that is no longer shown or silently
+          // re-lifts one when the filter clears. Clearing it here is also what keeps the camera to
+          // ONE move: the clear and the filter's own resolve agree on the destination, where a
+          // surviving focus made the roster's later arrival a second, contradicting flight.
+          if (st.trendFocus) useStore.getState().setTrendFocus(null);
           this.applyFilter();
           // (Committing a METAGRAPH in the ledger turns LIVE MODE on for it — the
           // FollowController owns that flow now, 2026-08-07: following flips true and
@@ -837,20 +845,33 @@ export class Engine {
         // never reach this. Focusing a DIFFERENT plane resolves to the pose already held and is
         // answered by the nudge, which is what `tweenTo` decides.
         //
-        // ⚠️ THE TRIGGER IS THE DEPTH, NOT THE FOCUS — two channels decide it (2026-09-18, found
-        // live). The lean is worth taking only while the focused plane is actually IN the stack,
-        // which `focusDepth` answers from the published roster; and a filter commit SCOPES that
-        // roster, one React commit after the store write this subscription is reading. Watching
-        // `trendFocus` alone, a filter commit resolved against the OLD roster and left the camera
-        // leaning toward a plane the scoped stack no longer shows — measured: the single plane sat
-        // at 1.085× its resting projection with nothing lifted. Watching the depth answers both
-        // directions, so clearing the filter leans back in as the plane returns.
+        // ⚠️ THE TRIGGER IS THE DEPTH **OR** A FOCUS THAT MOVED, and both halves were bugs
+        // (2026-09-18, one found live, one in review). They pull in opposite directions:
+        //
+        //   · Watching `trendFocus` ALONE resolved against state the stack had not caught up with.
+        //     The depth is decided by THREE channels — the focus, the published ROSTER and the
+        //     LAYOUT — so a filter commit, which scopes the roster one React commit after the store
+        //     write this subscription reads, left the camera leaning toward a plane the scoped
+        //     stack no longer shows (measured: the single plane sat at 1.085× its resting
+        //     projection with nothing lifted).
+        //   · Watching the DEPTH alone silently dropped the commit that needs the NUDGE. Moving a
+        //     focus from plane A to plane B leaves the depth at `FOCUS_LIFT` either way, so the
+        //     guard never fired, `_resolveFocus` never ran, and `tweenTo` — where the nudge is
+        //     decided — was never entered. A click that visibly re-stacked the planes was answered
+        //     by a camera that did not move at all, which is the dead-click reading camera
+        //     principle 3 exists to prevent.
+        //
+        // So: resolve when the depth CHANGED (a real flight in or out), or when a standing focus
+        // MOVED (same pose, hence the nudge). The depth is computed only when one of its three
+        // inputs actually changed.
         if (
-          (st.trendFocus !== prev.trendFocus || st.trendIds !== prev.trendIds) &&
-          VIEW_POLICIES[st.mode].chartStack &&
-          focusDepth(st.trendIds, st.trendFocus) !== focusDepth(prev.trendIds, prev.trendFocus)
+          (st.trendFocus !== prev.trendFocus || st.trendIds !== prev.trendIds ||
+            st.trendLayout !== prev.trendLayout) &&
+          VIEW_POLICIES[st.mode].chartStack
         ) {
-          this._resolveFocus();
+          const was = focusDepth(prev.trendIds, prev.trendFocus, prev.trendLayout);
+          const now = focusDepth(st.trendIds, st.trendFocus, st.trendLayout);
+          if (now !== was || (now !== 0 && st.trendFocus !== prev.trendFocus)) this._resolveFocus();
         }
         // A node commit is answered by the camera in every 3D view (user, 2026-08-13). The pose is
         // the view's own business: geo flies to the node, hyper and the ledger resolve to a pose
@@ -1606,11 +1627,12 @@ export class Engine {
     trendOverview: () => {
       // The lean is keyed on the committed FOCUS, like the ledger's tilt is keyed on the filter, so
       // both rungs inherit it by delegating here and releasing the focus tweens back out on its own.
-      // ⚠️ LAYOUT DATA (rule 6): `focusDepth` reads the published roster and the committed focus —
-      // the same numbers `stackPoses` places the planes from — never a projected plane or a scene
-      // matrix. An off-roster focus answers 0, which is the resting pose exactly.
+      // ⚠️ LAYOUT DATA (rule 6): `focusDepth` reads the published roster, the committed focus and
+      // the LAYOUT — the same three things `stackPoses` places the planes from — never a projected
+      // plane or a scene matrix. An off-roster focus answers 0, and so does any focus in `flat`
+      // (nothing comes forward there), which is the resting pose exactly.
       const st = useStore.getState();
-      const depth = focusDepth(st.trendIds, st.trendFocus);
+      const depth = focusDepth(st.trendIds, st.trendFocus, st.trendLayout);
       if (depth === 0) {
         this.cam.focus("trend");
         return true;

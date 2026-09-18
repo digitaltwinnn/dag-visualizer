@@ -190,17 +190,55 @@ describe("the plane's own size", () => {
 describe("focusDepth", () => {
   it("is the focused plane's own z", () => {
     const p = stackPoses(IDS, { layout: "stack", scroll: 0, focus: "elpaca" });
-    expect(focusDepth(IDS, "elpaca")).toBeCloseTo(p.find((x) => x.id === "elpaca")!.z);
+    expect(focusDepth(IDS, "elpaca", "stack")).toBeCloseTo(p.find((x) => x.id === "elpaca")!.z);
   });
 
   it("falls back to the nearest plane's depth with no focus", () => {
-    expect(focusDepth(IDS, null)).toBeCloseTo(stackPoses(IDS, { layout: "stack", scroll: 0, focus: null })[0].z);
+    expect(focusDepth(IDS, null, "stack")).toBeCloseTo(
+      stackPoses(IDS, { layout: "stack", scroll: 0, focus: null })[0].z,
+    );
   });
 
-  it("takes no scroll or layout — it frames the front of the stack either way", () => {
-    expect(focusDepth(IDS, null)).toBe(0);
-    expect(focusDepth(IDS, "elpaca")).toBe(FOCUS_LIFT);
-    expect(focusDepth(IDS, "not-in-roster")).toBe(0);
+  it("takes no scroll — a plane outside the window is a scroll concern, not a framing one", () => {
+    expect(focusDepth(IDS, null, "stack")).toBe(0);
+    expect(focusDepth(IDS, "elpaca", "stack")).toBe(FOCUS_LIFT);
+    expect(focusDepth(IDS, "not-in-roster", "stack")).toBe(0);
+  });
+
+  it("is ZERO in flat, whatever is focused — nothing comes forward, so nothing is framed", () => {
+    // The camera's half of `stackPoses`' own rule that a focus "changes no geometry in flat". A
+    // lean there would move the camera over a structure that held still — camera principle 2
+    // inverted. The click is still acknowledged: same pose, so `tweenTo` runs the nudge.
+    for (const id of [...IDS, null, "not-in-roster"]) {
+      expect(focusDepth(IDS, id, "flat")).toBe(0);
+    }
+  });
+
+  it("agrees with the poses it is derived from, in BOTH layouts", () => {
+    // Stated against `stackPoses` rather than against arithmetic: the depth the camera frames is
+    // the front plane's own z, whatever the layout says that is.
+    for (const layout of ["stack", "flat"] as const) {
+      for (const focus of ["elpaca", null]) {
+        const poses = stackPoses(IDS, { layout, scroll: 0, focus });
+        expect(focusDepth(IDS, focus, layout)).toBeCloseTo(Math.max(...poses.map((p) => p.z)));
+      }
+    }
+  });
+});
+
+describe("the LAYOUT alone never moves the camera (camera principle 2)", () => {
+  // "Align to front" is a plain layout setting: it moves the STRUCTURE. The Engine re-resolves the
+  // camera only when `focusDepth` changes (or a standing focus moves), so this pure equality IS the
+  // pin — with nothing focused, flipping the layout changes no depth, so no resolve can run.
+  it("with nothing focused, both layouts frame the same depth", () => {
+    expect(focusDepth(IDS, null, "stack")).toBe(focusDepth(IDS, null, "flat"));
+    expect(focusDepth([], null, "stack")).toBe(focusDepth([], null, "flat"));
+  });
+
+  it("and the planes DO move — the structure carries the change, by itself", () => {
+    const a = stackPoses(IDS, { layout: "stack", scroll: 0, focus: null });
+    const b = stackPoses(IDS, { layout: "flat", scroll: 0, focus: null });
+    expect(b.map((p) => [p.x, p.y, p.z, p.scale])).not.toEqual(a.map((p) => [p.x, p.y, p.z, p.scale]));
   });
 });
 
@@ -229,13 +267,19 @@ describe("scrollToShow (the paging a focus asks for)", () => {
   it("clamps exactly as stackPoses clamps — the two must agree about the window", () => {
     expect(scrollToShow(LONG, "dag-l0", 99)).toBe(0);
     expect(scrollToShow(LONG, "eight", -4)).toBe(3);
-    // A roster shorter than the window has one window, and it is 0.
-    expect(scrollToShow(IDS.slice(0, 3), "elpaca", 2)).toBe(0);
   });
 
-  it("holds still for an id the roster does not carry", () => {
+  it("holds still for an id the roster does not carry — including an empty roster", () => {
+    // It hands the caller's own scroll back rather than a clamped one: neither case is a paging
+    // request, and normalising the window on a focus the stack cannot show is a silent move.
     expect(scrollToShow(LONG, "not-in-roster", 2)).toBe(2);
+    expect(scrollToShow(IDS.slice(0, 3), "elpaca", 2)).toBe(2);
+    expect(scrollToShow([], "dag-l0", 2)).toBe(2);
     expect(scrollToShow([], "dag-l0", 0)).toBe(0);
+    // …and the same for a plane that is on screen under an out-of-range scroll: a roster shorter
+    // than the window IS one window, so there is no paging to do and `stackPoses` does the
+    // clamping the display needs.
+    expect(scrollToShow(IDS.slice(0, 3), "dag-l0", 9)).toBe(9);
   });
 
   it("whatever it returns, stackPoses' window contains the plane", () => {

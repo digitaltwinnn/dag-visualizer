@@ -214,13 +214,24 @@ export default function TrendStack() {
   // ONE write path (rule 2): the table decides what a plane click means, the executor applies it.
   // Read the focus from the store at ACTIVATION time rather than closing over the render's value —
   // a keyboard press can land after a focus change from anywhere else.
-  const activate = (id: string) => {
-    if (dragged.current) {
-      dragged.current = false;
-      return;
-    }
+  //
+  // ⚠️ A KEY PRESS IS NEVER A DRAG, AND THE FLAG NEVER OUTLIVES ONE GESTURE (2026-09-18, review).
+  // These refs are shared by all five planes, and a pointer gesture does not always end in an
+  // activation: press on plane A's header, release over plane B's, and the browser fires the click
+  // on their common ancestor — no handler, nothing consumes the flag, and `dragged` stays true.
+  // The next activation from ANY plane would then be swallowed, and for the keyboard that is a
+  // control that silently stops working. So the flag is consumed on every activation whatever the
+  // outcome, and the keyboard path never reads it: travel is a pointer's property alone.
+  const activate = (id: string, fromKey: boolean) => {
+    const wasDrag = dragged.current;
+    dragged.current = false;
+    if (wasDrag && !fromKey) return;
     applyClickActions(trendPlaneActions(id, useStore.getState().trendFocus));
   };
+
+  // The head's unit word, resolved ONCE: the chart renders it beside the name and the header
+  // strip's accessible name repeats it (label in name — see `headAction` below).
+  const unitWord = metricUnit(metric, step);
 
   if (!on) return null;
 
@@ -281,7 +292,7 @@ export default function TrendStack() {
             // already in front reads as a dead surface. Every other plane keeps the body inert, so
             // the orbit drag passes through it. The header strip stops its own click, so the two
             // never fire for one press.
-            onClick={pose.interactive ? () => activate(pose.id) : undefined}
+            onClick={pose.interactive ? () => activate(pose.id, false) : undefined}
             style={{
               opacity: pose.opacity,
               // PAINT ORDER IS DEPTH, from the pose itself: a nearer plane (larger z) paints over
@@ -301,7 +312,7 @@ export default function TrendStack() {
                 name={net?.name ?? pose.id}
                 // The unit word follows the TIER — an hourly bucket labelled "per day" would
                 // misstate every reading by a factor of 24 (the document's own rule).
-                unit={metricUnit(metric, step)}
+                unit={unitWord}
                 format={spec.format}
                 note={pending ? "reading the hourly samples…" : undefined}
                 buckets={cut(axis)}
@@ -331,9 +342,14 @@ export default function TrendStack() {
                 // being pointed at.
                 headClassName="pointer-events-auto cursor-pointer px-2 py-1 rounded-md [background:color-mix(in_oklch,var(--panel-solid)_62%,transparent)] hover:[background:color-mix(in_oklch,var(--wash-hover)_35%,var(--panel-solid))] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
                 headAction={{
-                  activate: () => activate(pose.id),
+                  activate: (fromKey) => activate(pose.id, fromKey),
                   pressed: focus === pose.id,
-                  label: `${focus === pose.id ? "Send" : "Bring"} ${net?.name ?? pose.id} ${focus === pose.id ? "back" : "forward"}`,
+                  // LABEL IN NAME (WCAG 2.5.3): an `aria-label` replaces the accessible name, so it
+                  // opens with the strip's own visible words — the network and its unit — and then
+                  // says what the press does. "Dor Technologies per day — bring forward".
+                  label: `${net?.name ?? pose.id}${unitWord ? ` ${unitWord}` : ""} — ${
+                    focus === pose.id ? "send back" : "bring forward"
+                  }`,
                 }}
               />
             )}

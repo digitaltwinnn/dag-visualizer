@@ -29,6 +29,11 @@
 // TOP (the stack's own order, read top-down), and since nothing overlaps there, every plane is
 // interactive: the interactivity rule exists to protect a covered plane from stealing a click, and
 // in flat nothing is covered.
+// ⚠️ AND A FOCUS MOVES NOTHING THERE, WHICH REACHES THE CAMERA: `focusDepth` answers 0 in `flat`,
+// so the camera holds its resting pose while a flat column is read. The structure is what carries
+// emphasis (camera principle 2) — with no plane coming forward there is nothing for a lean to meet,
+// and a camera moving over a still structure is that principle exactly inverted. The commit is
+// still acknowledged: the destination is then the pose already held, which is the NUDGE's job.
 //
 // No imports — this is arithmetic over plain objects, same discipline as `calloutPlacement.ts`.
 
@@ -92,7 +97,9 @@ export const FLAT_SCALE = 0.7;
  *  neighbouring charts never touch. */
 export const FLAT_STEP_Y = 10.5;
 
-type Layout = "stack" | "flat";
+/** The two ways the planes can sit. Exported because `focusDepth` takes it: a caller that asks
+ *  what the camera should frame has to say which layout it is asking about. */
+export type Layout = "stack" | "flat";
 
 interface StackOpts {
   layout: Layout;
@@ -176,11 +183,23 @@ export function stackPoses(ids: readonly string[], opts: StackOpts): PlanePose[]
 
 /**
  * The z the camera frames: the focused plane's own depth when `focus` names a plane in the
- * roster, else slot 0's resting depth (`0`). Takes no scroll or layout — the camera frames the
- * front of the stack either way, and a plane outside the current window is a scroll concern, not
- * a framing one.
+ * roster, else slot 0's resting depth (`0`). Takes no SCROLL — a plane outside the current window
+ * is a scroll concern, not a framing one — but it does take the LAYOUT, and that is the point:
+ *
+ * ⚠️ IN `flat` A FOCUS MOVES NOTHING, SO THERE IS NOTHING FOR THE CAMERA TO MEET (2026-09-18).
+ * `stackPoses` says so itself — in `flat` every plane sits at `z: 0` at `FLAT_SCALE` and every one
+ * of them is interactive, and a focus there "changes no geometry" by that function's own tested
+ * rule. Answering `FOCUS_LIFT` anyway made the camera lean toward a plane that had not come
+ * forward: the structure holding still while the camera moves is camera principle 2 exactly
+ * inverted. The commit is still acknowledged — the destination is then the pose the camera already
+ * holds, which is what the NUDGE is for (principle 3).
+ *
+ * The answer lives HERE rather than as a `layout === "flat"` compare in the Engine, because this
+ * module is where the stack's spatial grammar is stated: the camera reads the geometry, it does not
+ * re-derive it.
  */
-export function focusDepth(ids: readonly string[], focus: string | null): number {
+export function focusDepth(ids: readonly string[], focus: string | null, layout: Layout): number {
+  if (layout === "flat") return 0;
   return focus !== null && ids.includes(focus) ? FOCUS_LIFT : 0;
 }
 
@@ -193,15 +212,19 @@ export function focusDepth(ids: readonly string[], focus: string | null): number
  * reader can see it. Minimal movement on purpose: paging further would re-order the rest of the
  * stack around a gesture that named one plane.
  *
- * Unchanged when the plane is already on screen, and for an id the roster does not hold — a focus
- * on nothing is not a place to go. Clamped by the same rule `stackPoses` clamps with, so the two
- * can never disagree about which window a scroll means.
+ * ⚠️ IT ONLY EVER ANSWERS THE QUESTION IT WAS ASKED — "what scroll shows this plane?" — and where
+ * there is nothing to show it hands the caller's own scroll straight back, UNNORMALISED. A plane
+ * already on screen, an id the roster does not hold, a roster still EMPTY because React has not
+ * published one yet: none of those is a paging request, and answering them with a clamped value
+ * would let a focus click quietly move the window (at boot, all the way back to 0) for a plane it
+ * could not bring into view anyway. Where it does page, the result is clamped by the same rule
+ * `stackPoses` clamps with, so the two can never disagree about which window a scroll means.
  */
 export function scrollToShow(ids: readonly string[], id: string, scroll: number): number {
-  const start = clampScroll(ids.length, scroll);
   const i = ids.indexOf(id);
-  if (i < 0) return start;
+  if (i < 0) return scroll; // nothing to bring into view — no opinion about the window
+  const start = clampScroll(ids.length, scroll);
   if (i < start) return i;
   if (i >= start + VISIBLE_PLANES) return clampScroll(ids.length, i - VISIBLE_PLANES + 1);
-  return start;
+  return scroll; // already on screen under the window this scroll means
 }

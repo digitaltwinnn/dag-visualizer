@@ -155,4 +155,26 @@ describe("trendFocus action (the History view's plane click)", () => {
     applyClickActions([{ kind: "trendFocus", id: null }]);
     expect(useStore.getState().trendScroll).toBe(2);
   });
+
+  it("with an EMPTY roster (the boot state) the focus still lands and the scroll holds still", () => {
+    // The roster is React's publish, so it is `[]` until the stack has rendered once — and a click
+    // cannot happen before there are planes, but a programmatic caller or a race can still get
+    // here. There is no window to page, so paging must be a no-op rather than a clamp to 0 that
+    // silently discards wherever the reader had scrolled to.
+    const st = useStore.getState();
+    st.setTrendIds([]);
+    st.setTrendScroll(2);
+    applyClickActions([{ kind: "trendFocus", id: "c" }]);
+    expect(useStore.getState().trendFocus).toBe("c");
+    expect(useStore.getState().trendScroll).toBe(2);
+  });
+
+  it("a roster SHORTER than the window never pages — every plane is already on screen", () => {
+    const st = useStore.getState();
+    st.setTrendIds(["a", "b", "c"]);
+    st.setTrendScroll(0);
+    applyClickActions([{ kind: "trendFocus", id: "c" }]);
+    expect(useStore.getState().trendFocus).toBe("c");
+    expect(useStore.getState().trendScroll).toBe(0);
+  });
 });
