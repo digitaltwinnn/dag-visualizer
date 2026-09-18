@@ -367,12 +367,13 @@ export function ledgerCommitTilt(pos: THREE.Vector3, target: THREE.Vector3, outP
 // the resting pose.
 //
 // ⚠️ THE GEOMETRY IS LAYOUT DATA, NEVER A RENDERED TRANSFORM (rule 6). `depth` is the focused
-// plane's own lift, `domain/trendStack.focusDepth(ids, focus)`, which the Engine reads from the
-// published roster and the committed focus — never off a projected plane or a scene matrix. It is
-// a PARAMETER for the same reason `aspectFit` takes the aspect: the stack's spatial grammar lives
-// in its own module, the camera's lean lives here, and neither imports the other. Zero depth (no
-// focus, or a focus on a network the roster does not carry) contributes exactly nothing, so the
-// unfocused pose is `FOCI.trend` untouched.
+// plane's own lift, `domain/trendStack.focusDepth(ids, focus, layout)`, which the Engine reads from
+// the published roster, the committed focus and the layout — never off a projected plane or a scene
+// matrix. It is a PARAMETER for the same reason `aspectFit` takes the aspect: the stack's spatial
+// grammar lives in its own module, the camera's lean lives here, and neither imports the other.
+// Zero depth contributes exactly nothing, so the unfocused pose is `FOCI.trend` untouched — and
+// that is the answer in three cases, not one: no focus, a focus on a network the roster does not
+// carry, and ANY focus in the `flat` layout, where no plane comes forward for the camera to meet.
 //
 // ⚠️ AND IT IS A PUSH ALONG THE VIEW AXIS, not an orbit. The whole proposition of this view is that
 // the planes present FLAT-ON — they host real text, and the projector writes a translate and a

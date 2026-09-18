@@ -339,15 +339,23 @@ export default function TrendChart({
             headAction.activate(false);
           },
           // ⚠️ A NATIVE BUTTON'S KEY TIMING, because this only LOOKS like one (`role="button"` — see
-          // the prop's note for why it cannot be a real `<button>`): ENTER fires on keydown and
-          // repeats while held, SPACE fires on key UP and does nothing until then. Matching that is
-          // not pedantry — a reader who presses Space, thinks better of it and moves off before
-          // releasing expects nothing to have happened, which is the escape hatch every button on
-          // the page gives them. Space's keydown is still swallowed, or the page scrolls under the
-          // press.
+          // the prop's note for why it cannot be a real `<button>`): ENTER fires on keydown, SPACE
+          // fires on key UP and does nothing until then. Matching that is not pedantry — a reader
+          // who presses Space, thinks better of it and moves off before releasing expects nothing
+          // to have happened, which is the escape hatch every button on the page gives them.
+          //
+          // ⚠️ …WITH ONE DELIBERATE DIFFERENCE: A HELD ENTER COMMITS ONCE. A native button repeats
+          // its activation while Enter is held, which is harmless because a button's action is
+          // normally idempotent — and this one is a TOGGLE. Repeating it would flip the focus on
+          // and off for as long as the key is down, each flip now also a camera resolve, and
+          // whatever state the release happened to land on would be the result. So auto-repeat is
+          // ignored: `e.repeat` is the browser saying "this is the same press continuing", and one
+          // press is one commit. The default is still taken on every keydown, repeats included, or
+          // the page scrolls under a held Space.
           onKeyDown: (e: React.KeyboardEvent) => {
-            if (e.key === " ") e.preventDefault();
-            else if (e.key === "Enter") { e.preventDefault(); headAction.activate(true); }
+            if (e.key !== " " && e.key !== "Enter") return;
+            e.preventDefault();
+            if (e.key === "Enter" && !e.repeat) headAction.activate(true);
           },
           onKeyUp: (e: React.KeyboardEvent) => {
             if (e.key !== " ") return;
