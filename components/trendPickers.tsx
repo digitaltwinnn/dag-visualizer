@@ -1,12 +1,20 @@
 "use client";
 
+import { useId } from "react";
+
 import { cn } from "@/lib/utils";
 import { SELECTED_ROW } from "@/components/selection";
+import { Switch } from "@/components/ui/switch";
+import { METRIC_LABELS } from "@/src/data/trendSeries";
 import { displayNetwork } from "@/src/data/unlisted";
 import { ZOOMS, type TrendRange, type ZoomId } from "@/src/data/trendWindow";
+import { filterToggleActions } from "@/src/engine/domain/pickActions";
+import { applyClickActions } from "@/src/store/applyClickActions";
+import type { TrendMetric } from "@/src/store/store";
 
-// THE TRENDS PICKERS, ONE HOME (2026-09-18) — the window pills and the group they sit in, shared
-// by the Trends DOCUMENT and the History view's band TIMELINE. They are two registers of one rung
+// THE TRENDS CONTROLS, ONE HOME (2026-09-18; widened 2026-09-19) — the window pills, the metric
+// picker and the scale switch, shared by the Trends DOCUMENT, the History view's band TIMELINE
+// and that view's Layers card. They are two registers of one rung
 // (convention 12), and the pair had already been noted drifting once: the vitals rim adopted this
 // register in 2026-09-08's round and then evolved to SELECTED_ROW while the document's copy stayed
 // behind — "styled differently in bottom bar than in the trend view — deliberate?" (user,
@@ -110,5 +118,143 @@ export function WindowPicker({
         </span>
       )}
     </div>
+  );
+}
+
+
+/** THE METRIC PICKER (2026-09-19) — which stored measure every chart draws, in the reader's own
+ *  words (`METRIC_LABELS`, src/data/trendSeries.ts). Six pills in the same hairline group the
+ *  window wears, because a metric is the same species of statement: a committed choice about what
+ *  is on screen, not a tab into another subject.
+ *
+ *  ⚠️ ONE PICKER, ONE COLUMN. The planes are a COMPARISON, so a per-plane metric would make the
+ *  stack meaningless (store `trendMetric`'s own note) — which is why this control lives in the
+ *  rail, above the list of layers it governs, rather than on any one of them.
+ *
+ *  It WRAPS: the rail is ~224–288px wide and six pills do not fit one line there. The group's own
+ *  `flex-wrap` plus `justify-start` is the whole answer — the phone arm's `[&>button]:flex-1`
+ *  stretch would make a wrapped last row's single pill span the card, so this passes its own
+ *  layout rather than the group's default. */
+export function MetricPicker({
+  metric,
+  onPick,
+  className,
+}: {
+  metric: TrendMetric;
+  onPick: (m: TrendMetric) => void;
+  className?: string;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="Measure"
+      className={cn(PICKER_GROUP, "flex flex-wrap justify-start gap-0.5 max-[700px]:[&>button]:flex-none", className)}
+    >
+      {(Object.keys(METRIC_LABELS) as TrendMetric[]).map((m) => (
+        <button key={m} type="button" aria-pressed={metric === m} onClick={() => onPick(m)} className={zoomBtn(metric === m)}>
+          {METRIC_LABELS[m]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** ONE SETTING, AS A NAME PLUS ITS STATE (2026-09-19).
+ *
+ *  ⚠️ A SWITCH IS NOT THE PRESSED-TOGGLE GRAMMAR, and the difference is why the scale control
+ *  stopped being a pill (user, 2026-09-14, two rounds: first "should read like a simple toggle",
+ *  then "make it a label with a simple on/off control"). The command bar's Scene⇄HUD and RAW name
+ *  an ACTION the reader presses FOR, with the wash reporting that it is on — right for a control
+ *  that pushes a surface in and pops it out. A SETTING is different: the reader is not doing
+ *  something, they are choosing how the charts are DRAWN, and a setting reads as a name plus its
+ *  state. Both of History's settings (`Same scale`, `Align to front`) are that species, which is
+ *  why they share one shape rather than borrowing the bar's.
+ *
+ *  The label is the switch's own `<label>`, so the words are a hit target too — the switch alone is
+ *  28×16, well under the touch floor every other control here keeps. */
+export function SettingSwitch({
+  label,
+  on,
+  onChange,
+  title,
+  className,
+}: {
+  label: string;
+  on: boolean;
+  onChange: (on: boolean) => void;
+  /** What each state means, in the reader's words — both states stated, so the tooltip explains
+   *  the setting rather than only its current half. */
+  title?: string;
+  className?: string;
+}) {
+  const id = useId();
+  return (
+    <span className={cn("inline-flex items-center gap-2", className)}>
+      <label htmlFor={id} className="text-micro tracking-caps uppercase text-muted-foreground cursor-pointer select-none">
+        {label}
+      </label>
+      <Switch id={id} checked={on} onCheckedChange={onChange} title={title} />
+    </span>
+  );
+}
+
+/** THE SCALE SETTING — shared by the Trends document's metagraphs tab and the History view's
+ *  Layers card (2026-09-19): it is the same question about the same charts, and the two would
+ *  otherwise be the sort of near-copy this file exists to prevent. */
+export function ScaleToggle({
+  shared,
+  onChange,
+  className,
+}: {
+  shared: boolean;
+  onChange: (shared: boolean) => void;
+  className?: string;
+}) {
+  return (
+    <SettingSwitch
+      label="Same scale"
+      on={shared}
+      onChange={onChange}
+      className={className}
+      title={
+        shared
+          ? "Every chart shares the busiest network's scale, so the column compares. Switch off to let each chart scale to its own data."
+          : "Each chart scales to its own data. Switch on to put every chart on the busiest network's scale."
+      }
+    />
+  );
+}
+
+/** WHAT IS APPLIED, IN WORDS, AND A WAY TO CLEAR IT — the raw layer's search-toolbar rule, which
+ *  answers the same problem: a surface showing a CUT of its data must say so on itself, or the
+ *  reader is left inferring a missing column from a control one zone away. It is the same
+ *  selected-row pill the range chip above wears, so the two scopes read as one species.
+ *
+ *  Clearing goes through `filterToggleActions` (rule 2's one write path) — toggling the committed
+ *  network OFF is what returns the surface to every network, and it commits the same release the
+ *  explorer row and the scene do. Shared by the document and the History view's Layers card
+ *  (2026-09-19). */
+export function ScopeChip({ filter, className }: { filter: string; className?: string }) {
+  if (filter === "all") return null;
+  const net = displayNetwork(filter);
+  return (
+    <span
+      className={cn(
+        "h-6 px-2 inline-flex items-center gap-1.5 rounded-md text-micro font-bold text-foreground whitespace-nowrap",
+        SELECTED_ROW,
+        className,
+      )}
+    >
+      <span className="inline-block size-2 rounded-full flex-none" style={{ background: net?.hue ?? "var(--primary)" }} aria-hidden />
+      {net?.name ?? filter} only
+      <button
+        type="button"
+        onClick={() => applyClickActions(filterToggleActions(filter, filter))}
+        title="Show every network again"
+        className="text-muted-foreground hover:text-foreground"
+      >
+        ×
+      </button>
+    </span>
   );
 }
