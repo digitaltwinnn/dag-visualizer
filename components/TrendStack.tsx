@@ -53,6 +53,7 @@ import {
   metricUnit,
   rankByLast,
   trimCounterEdges,
+  type MetricSeries,
 } from "@/src/data/trendSeries";
 import { PLANE_PX_W, stackPoses } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
@@ -62,6 +63,10 @@ import { useStore } from "@/src/store/store";
 /** The empty roster, as ONE frozen reference. Publishing a fresh `[]` would be a content-free
  *  change the engine's `!==` still has to answer. */
 const NO_IDS: readonly string[] = [];
+
+/** No payload yet, as ONE reference — a fresh `{}` per render would be a new memo key on a fact
+ *  that has not changed. */
+const NO_SERIES: Readonly<Record<string, (number | null)[]>> = {};
 
 export default function TrendStack() {
   // Convention 7: gate on the view this behaviour is FOR, read from the allow-list — never a
@@ -99,7 +104,7 @@ export default function TrendStack() {
   // draw one window's points against another's dates.
   const gauge = spec.kind === "gauge";
   const src = gauge ? pF : p;
-  const series = src?.series ?? {};
+  const series = src?.series ?? NO_SERIES;
   const axis = gauge ? fBuckets : buckets;
   const step = gauge ? fStep : stepMs;
   // The gauges' hourly payload is still in flight: the planes keep their frames and say so in the
@@ -110,7 +115,23 @@ export default function TrendStack() {
   // series per listed metagraph, so there is genuinely nothing measured for either. Naming that
   // case in copy is a later task's job; for now the stack simply has no planes.
   const roster = METAGRAPHS.filter((m) => m.id && (filter === "all" || m.id === filter)).map((m) => m.id!);
-  const rankedNow = rankByLast(roster, (id) => metricSeries(metric, id, series).points);
+  // ⚠️ ONE PASS OVER THE ROSTER, MEMOISED (2026-09-18 round 2; the deferred Task 4 minor, folded
+  // in because the scrub made it hot). `metricSeries` ran THREE times per network per render —
+  // once inside the ranking, once inside the shared ceiling and once per plane body — and it
+  // copies or maps every bucket of every series it touches. This component subscribes to
+  // `trendCursorMs`, so a scrub paid all three for a value that changes neither the payload nor
+  // the metric.
+  //
+  // The key is what the answer actually depends on: the committed `filter` (which IS the roster —
+  // `METAGRAPHS` is a module constant), the metric, and the SERIES REFERENCE, which `useTrendsSlice`
+  // now holds still across a render that changed none of its inputs. The cursor is in none of them.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const rows = useMemo(() => {
+    const byId = new Map<string, MetricSeries>();
+    for (const id of roster) byId.set(id, metricSeries(metric, id, series));
+    return { byId, order: rankByLast(roster, (id) => byId.get(id)!.points) };
+  }, [filter, metric, series]);
+  const rankedNow = rows.order;
   // STABILISED BY CONTENT, because the roster is a PUBLISH CHANNEL (store `trendIds`). The rank is
   // recomputed from scratch every render — a poll, a hover, any unrelated store write — so its
   // identity changes constantly while the list itself sits still. The engine's change signal is
@@ -144,13 +165,20 @@ export default function TrendStack() {
   // the WHOLE ranked roster rather than the visible window, so scrolling never rescales the charts
   // under the reader; each chart still states its own peak (TrendChart's `ownMax`). `undefined` is
   // TrendChart's "scale yourself".
-  const sharedMax =
-    scaleMode === "shared"
-      ? Math.max(
-          0,
-          ...ranked.flatMap((id) => metricSeries(metric, id, series).points.filter((v): v is number => v != null)),
-        )
-      : undefined;
+  const sharedMax = useMemo(
+    () =>
+      scaleMode === "shared"
+        ? ranked.reduce(
+            // A REDUCE, not `Math.max(...flatMap)`: the spread puts one argument on the stack per
+            // measured bucket, and a long window across a full roster is tens of thousands of them
+            // — the shape that throws `RangeError: Maximum call stack size exceeded` the day the
+            // store grows past the engine's argument limit.
+            (m, id) => (rows.byId.get(id)?.points ?? []).reduce<number>((n, v) => (v != null && v > n ? v : n), m),
+            0,
+          )
+        : undefined,
+    [scaleMode, ranked, rows],
+  );
 
   if (!on) return null;
 
@@ -182,7 +210,9 @@ export default function TrendStack() {
     >
       {poses.map((pose) => {
         const net = displayNetwork(pose.id);
-        const s = metricSeries(metric, pose.id, series);
+        // The same pass the rank and the ceiling read — never a fourth `metricSeries` call.
+        const s = rows.byId.get(pose.id);
+        if (!s) return null;
         // COUNTER series drop their partial edge buckets; a GAUGE keeps everything. The axis is
         // cut by the same rule as the lines, or the plot desyncs from its own dates.
         const counter = spec.kind === "counter";

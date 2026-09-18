@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+
 import { cn } from "@/lib/utils";
 import TrendTrack from "@/components/TrendTrack";
 import { WindowPicker } from "@/components/trendPickers";
@@ -51,7 +53,15 @@ export default function TrendTimeline() {
   // for the page's own rule: a window that opens months before measuring began would draw a long
   // runway of hole nobody dug.
   const ov = useTrendsWindow("all");
-  const overview = ov.data ? leadingTrim(ov.data) : null;
+  // ⚠️ MEMOISED, AND THE REVIEW'S REASON IS THE WHOLE POINT (2026-09-18, round 2). `leadingTrim`
+  // returns its input unchanged ONLY when there is no leading gap; in the `all` window's normal
+  // production state it cuts, allocating a fresh `buckets` array and `series` object every call.
+  // This component subscribes to `trendCursorMs`, so it re-renders on every quantised scrub write
+  // — and an un-memoised trim handed `TrendTrack` a NEW payload reference each time, invalidating
+  // `geom`, `points`, `peak`, `runs` and `ticks` in one go. Every memo in the track was keyed on
+  // exactly the reference this line was churning, which made them cost-free no-ops during the one
+  // gesture they were added for.
+  const overview = useMemo(() => (ov.data ? leadingTrim(ov.data) : null), [ov.data]);
   // THE STACK'S OWN GRAIN, from the one home that decides it (`planTrendFetch`/`assembleTrendSlice`
   // through `useTrendsSlice`). The readout's precision and the arrow keys' step both follow the
   // buckets on screen, so they have to come from the same answer the planes are drawn from rather
@@ -102,7 +112,16 @@ export default function TrendTimeline() {
       </div>
       {/* THE READOUT AND THE PILLS. On the phone arm this row sits above the track and spreads. */}
       <div className="flex-none flex items-center gap-2 max-[700px]:order-1 max-[700px]:justify-between">
-        <span className="flex flex-col leading-none gap-1 whitespace-nowrap">
+        {/* ⚠️ THE READOUT RESERVES ITS SLOT, and this is not tidiness (2026-09-18 round 2, found by
+            instrumenting the scrub). The track is `flex-1` and this column was content-sized, so
+            every time the stamp changed WIDTH — "Dec 26, 2025" to "Sep 18, 13:45 UTC" — the track
+            was re-measured and its whole x↔ms geometry re-derived. Measured: 10 width changes
+            during a single 60-event scrub, which is both the memo invalidation the round was about
+            AND a correctness smell in its own right, since the mapping was shifting under the
+            pointer mid-gesture. It is the `NodeStars` rule reaching a committed value: a slot a
+            changing value lands in reserves its width so nothing around it reflows. 16ch clears
+            the widest form (the fine-tier stamp with its UTC suffix). */}
+        <span className="flex flex-col leading-none gap-1 whitespace-nowrap min-w-[16ch]">
           <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Cursor</span>
           {/* NO INSTANT IS A STATE, NOT A BLANK (rule 10): the rail reads this channel, so the band
               says when nothing has been picked rather than showing an empty slot. */}

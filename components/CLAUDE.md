@@ -553,7 +553,15 @@ five of the six window states. Panning or resizing a window-implied span COMMITS
 that is what the gesture means. ⚠️ **And the scrub writes ONCE PER BUCKET, not per pointermove**
 (`sameBucket`): the whole stack subscribes to `trendCursorMs`, so every write re-plans the fetch and
 repaints five charts, while two instants inside one bucket paint the identical frame. Measured on
-phone, a 300-event precise scrub went 271 writes / 1084 slice assemblies / 2.9 FPS → 45 / 0 / 9.8. Both gestures want the whole track and the alternative (a modifier for one of
+phone, a 300-event precise scrub went 271 writes / 1084 slice assemblies / 2.9 FPS → 45 / 0 / 9.8.
+⚠️ **A memo is only worth its key.** Two references were being rebuilt on the very renders the
+memos existed for, and both were invisible in review: the shell's `leadingTrim` call (it returns its
+input unchanged ONLY when there is no leading gap, and the live `all` window always has one), and
+the stack's triple `metricSeries` pass. Both are memoised now — and instrumenting the scrub turned
+up a third, a LAYOUT one: the cursor readout was content-sized beside a `flex-1` track, so a stamp
+changing width re-measured the track and re-derived its whole x↔ms geometry mid-gesture. A value
+slot reserves its width (the `NodeStars` rule, reaching a committed value). Across a 200-event
+scrub: `metricSeries` 8262 → **0**, `globalSeries`/`trackRuns`/`axisTicks` 306/334/334 → **0**. Both gestures want the whole track and the alternative (a modifier for one of
 them) is unreachable on touch, which is the surface this most needs to work on; TRAVEL is the one
 discriminator every pointer type reports. The cursor is a COMMIT — it persists when the pointer
 leaves, because the rail reads it — while hovering previews a faint line locally and writes

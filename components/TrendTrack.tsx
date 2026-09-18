@@ -132,8 +132,11 @@ export default function TrendTrack({
      *  commit the stale `null` a state-only version still held — caught live while verifying pan
      *  and resize. State is what the frame shows; the gesture keeps its own answer. */
     span: Span | null;
-    /** The instant last WRITTEN to the store, for the scrub's per-bucket quantiser. Seeded null
-     *  so the first move of any drag always lands. */
+    /** The instant last WRITTEN to the store, for the scrub's per-bucket quantiser. Seeded from
+     *  the COMMITTED cursor, not null: a handle drag starts on the bucket the cursor already
+     *  occupies, so a null seed spent one guaranteed no-op write — the full stack re-render — on
+     *  the first move of every scrub (review, 2026-09-18 round 2). Unread outside the cursor
+     *  branch, which is why seeding it unconditionally costs nothing. */
     wroteMs: number | null;
   } | null>(null);
   // THE PREVIEW IS LOCAL, AND DELIBERATELY SO. A store write re-plans the fetch (`planTrendFetch`)
@@ -182,7 +185,7 @@ export default function TrendTrack({
         startRange: shown,
         moved: false,
         span: null,
-        wroteMs: null,
+        wroteMs: cursorMs,
       };
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
