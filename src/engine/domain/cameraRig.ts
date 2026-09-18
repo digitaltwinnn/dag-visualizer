@@ -57,6 +57,10 @@ export const FOCI = {
   // the topbar and the LiveStrip. Both global levers survive it: dollyBack and railsLean scale
   // (pos − target) around the target, so a pure translation of the pair is invariant under them.
   ledger: { pos: new THREE.Vector3(0, -1, 54), target: new THREE.Vector3(0, -7, 0) },
+  // The trends RESTING pose: frontal, looking down the stack's −Z depth axis so every plane
+  // presents flat-on and depth reads as scale and fade rather than perspective skew. Elevated
+  // only enough to separate the planes' bottom edges.
+  trend: { pos: new THREE.Vector3(0, 6, 54), target: new THREE.Vector3(0, 2, -18) },
 } satisfies Record<string, CameraFraming>;
 /** A pose that exists. Every caller of `focus()` names one of these, checked. */
 export type FocusName = keyof typeof FOCI;
@@ -106,7 +110,7 @@ export function dollyBack(pos: THREE.Vector3, target: THREE.Vector3, outPos: THR
 export const RAILS_HIDDEN_DOLLY = 0.86;
 // The resting pose each view's lean is measured against — the user's "scene starting position".
 // Read out of FOCI rather than restated, so re-tuning a resting pose re-tunes the ramp with it.
-const REST_POSE: Record<View3D, FocusName> = { hyper: "overview", geo: "geo", ledger: "ledger" };
+const REST_POSE: Record<View3D, FocusName> = { hyper: "overview", geo: "geo", ledger: "ledger", trend: "trend" };
 export function restOrbit(view: View3D): number {
   const f = FOCI[REST_POSE[view]];
   return f.pos.distanceTo(f.target);

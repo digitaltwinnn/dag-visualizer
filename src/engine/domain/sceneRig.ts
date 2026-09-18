@@ -86,6 +86,15 @@ export const SCENE_RIG: Record<View3D, RigRow> = {
     rimAz: 2.7, rimEl: 0.5, rimInt: 0.7, rimTemp: -0.9,
     ambInt: 0.42, ambTemp: -1,
   },
+  // trend — almost no lit geometry (the shared time cursor and the ground plane), so this is a
+  // low, neutral wash rather than a sculpted look: ledger's row COPIED VERBATIM as the starting
+  // point (2026-09-18) and re-tuned live under `?tune` once the chart planes exist (Task 13).
+  trend: {
+    keyAz: 0.8, keyEl: 0.6, keyInt: 1.45, keyTemp: -0.2,
+    fillAz: 0.3, fillEl: 0.15, fillInt: 0.42, fillTemp: -0.95,
+    rimAz: 2.7, rimEl: 0.5, rimInt: 0.7, rimTemp: -0.9,
+    ambInt: 0.42, ambTemp: -1,
+  },
 };
 
 /** THE GROUND'S OWN ANSWER — per-channel multipliers over whichever row won the frame.
@@ -125,6 +134,7 @@ export const SCENE_RIG_DEFAULTS: Readonly<Record<View3D, RigRow>> = {
   hyper: { ...SCENE_RIG.hyper },
   geo: { ...SCENE_RIG.geo },
   ledger: { ...SCENE_RIG.ledger },
+  trend: { ...SCENE_RIG.trend },
 };
 
 export const RIG_PAPER_DEFAULTS: Readonly<RigGround> = { ...RIG_PAPER };

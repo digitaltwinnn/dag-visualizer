@@ -12,7 +12,7 @@ import {
 
 describe("scene rig", () => {
   it("stages every 3D view", () => {
-    expect(Object.keys(SCENE_RIG_DEFAULTS).sort()).toEqual(["geo", "hyper", "ledger"]);
+    expect(Object.keys(SCENE_RIG_DEFAULTS).sort()).toEqual(["geo", "hyper", "ledger", "trend"]);
     // The live struct is the same shape — the panel binds it directly.
     expect(Object.keys(SCENE_RIG).sort()).toEqual(Object.keys(SCENE_RIG_DEFAULTS).sort());
   });

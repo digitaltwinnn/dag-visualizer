@@ -48,6 +48,14 @@ export const VIEWS: readonly ViewDef[] = [
       "Live snapshot anchoring in 3D: watch each metagraph seal its ledger and anchor it into " +
       "the Constellation Network's global snapshots as they happen.",
   },
+  {
+    id: "trend",
+    name: "History",
+    slug: "trends",
+    desc:
+      "The Constellation Network's measured history in 3D: one chart per metagraph, stacked " +
+      "through time, with a shared cursor reading every chain at the same moment.",
+  },
   // ONE consolidated entry (user, 2026-09-04): three dimmed dead buttons spent bar width saying
   // the same nothing — the generic soon view's Blueprint gallery names what is coming instead.
   { id: "soon", name: "Coming soon", soon: true },
@@ -82,7 +90,7 @@ export function viewTitle(name: string): string {
 // adding a doc page is: one entry here, its component in components/docs/ + DocLayer's map, a
 // thin route file passing `doc`, and a footer DocToggle if it should be reachable there. The
 // engine's bare stage, both transition signals and the roll grammar follow automatically.
-type DocDef = {
+export type DocDef = {
   label: string;
   title: string;
   /** This doc READS THE COMMITTED NETWORK — so the command bar keeps its filter while the doc
@@ -98,12 +106,15 @@ type DocDef = {
    *  stands down under every doc: SCENE and RAW act on the layer the overlay covers, and no
    *  doc changes that. */
   scoped?: true;
+  /** No URL of its own — reached only through the RAW toggle on its own view, the way the
+   *  placeholder views carry no slug. The doc registry's path/title maps skip these. */
+  routeless?: true;
 };
 
 export const DOC_PAGES = {
   about: { label: "About", title: "About — DAG Visualizer" },
   design: { label: "Design", title: "Design — DAG Visualizer" },
-  trends: { label: "Trends", title: "Trends — DAG Visualizer", scoped: true },
+  trends: { label: "Trends", title: "Trends — DAG Visualizer", scoped: true, routeless: true },
 } satisfies Record<string, DocDef>;
 
 export type DocPage = keyof typeof DOC_PAGES;
@@ -114,17 +125,23 @@ export function docReadsFilter(doc: DocPage | null): boolean {
   return doc != null && (DOC_PAGES[doc] as DocDef).scoped === true;
 }
 
-export const DOC_PATHS = Object.fromEntries(Object.keys(DOC_PAGES).map((k) => [k, `/${k}`])) as Record<
-  DocPage,
-  string
->;
+/** The routed subset of the doc registry — null for a routeless doc (`trends`, since it moved
+ *  behind its own view's RAW toggle). `Partial` rather than the old exhaustive `Record`, so a
+ *  routeless key genuinely has no entry instead of lying about one via a cast. */
+export const DOC_PATHS: Partial<Record<DocPage, string>> = Object.fromEntries(
+  (Object.keys(DOC_PAGES) as DocPage[])
+    .filter((k) => !(DOC_PAGES[k] as DocDef).routeless)
+    .map((k) => [k, `/${k}`]),
+);
 
 export const DOC_TITLES = Object.fromEntries(
   (Object.keys(DOC_PAGES) as DocPage[]).map((k) => [k, DOC_PAGES[k].title]),
 ) as Record<DocPage, string>;
 
-/** The doc page a pathname names, or null — derived from the registry, never a second list. */
+/** The doc page a pathname names, or null — derived from the registry, never a second list.
+ *  A routeless doc's own slug names no doc page (it names its VIEW instead, if any). */
 export function docForPath(pathname: string): DocPage | null {
   const seg = pathname.replace(/^\/+|\/+$/g, "");
-  return seg in DOC_PAGES ? (seg as DocPage) : null;
+  if (!(seg in DOC_PAGES)) return null;
+  return (DOC_PAGES[seg as DocPage] as DocDef).routeless ? null : (seg as DocPage);
 }

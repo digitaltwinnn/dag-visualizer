@@ -667,7 +667,7 @@ export class Engine {
     // view — user 2026-07-17: accepted as the boot animation, final layout is correct). A
     // flat/"soon" boot parks the fleet at the grids instead; the first 3D view entered later
     // runs step 2 from there — one choreography everywhere.
-    if (this.mode === "hyper" || this.mode === "geo" || this.mode === "ledger") this.transition.settle(this.mode);
+    if (is3D(this.mode)) this.transition.settle(this.mode);
     else this.transition.stageInstant();
     this.unsub.push(
       useStore.subscribe((st, prev) => {
@@ -1245,7 +1245,7 @@ export class Engine {
   // blocks; the ledger LAYOUT snaps (globe.applyLedgerLayout + layers.setLedger's hard hide) belong
   // at the boundary so the hyper furniture FADES out under the alpha instead of vanishing at switch
   // time, and the camera flies during the IN phase rather than at transition start.
-  // Reached ONLY via _applyBoundary, whose `dest` is always a 3D view (hyper/geo/ledger) —
+  // Reached ONLY via _applyBoundary, whose `dest` is always a 3D view (hyper/geo/ledger/trend) —
   // flat/"soon" views never route here (they PARK the fleet and never apply a destination
   // layout, see setMode's !is3D branch). So there is no flat-view reset case below.
   // The per-view owner of the subject-arrival beat (see _applyDestLayout's note).
@@ -1291,7 +1291,11 @@ export class Engine {
       this._resolveFocus();
       return;
     }
-    // hyper / geo (ledger returned above; flat views never reach here — see the method note):
+    // hyper / geo / trend (ledger returned above; flat views never reach here — see the method
+    // note). trend falls through this generic branch too: applyFilter/_commitViewEntryAncestry
+    // are both gated to hyper/geo internally and no-op for it (no shared nodes to dim or carry
+    // ancestry for), and _resolveFocus still lands the camera correctly — LADDERS.trend has its
+    // own rungs and resolvers (Task 1 stubs, both flying to FOCI.trend).
     this.ctx.controls.autoRotate = mode !== "geo";
     this.applyFilter(false); // apply the filter's visuals, but leave the camera to _resolveFocus
     // The carried node's ancestry for THIS view (country + provider in geo, the composition
@@ -1495,12 +1499,20 @@ export class Engine {
       this.cam.tweenTo(this.cam.out.pos, this.cam.out.target);
       return true;
     },
+    // STUBS (Task 1, 2026-09-18): the trends view has no committed-state camera variation yet —
+    // both rungs fly to the one resting pose, mirroring ledgerOverview's simplest branch. A later
+    // task (the chart-plane framing work) replaces these with real per-plane/per-network poses.
+    trendNetwork: () => this._resolvers.trendOverview(),
+    trendOverview: () => {
+      this.cam.focus("trend");
+      return true;
+    },
   };
 
 
   // Resolve the camera for the CURRENT selection state by walking the current view's ladder  // (domain/focusLadder.LADDERS) — the one entry point every selection-driven camera flight
   // goes through (a filter/country/cohort/layer/inspect change, a view switch, a transition
-  // boundary). No-ops outside the three 3D views.
+  // boundary). No-ops outside the 3D views.
   //
   // `from` starts the walk at a COARSER rung, skipping the finer ones: the rail's boxed rung asking
   // to be framed (store.focusRung). Same rungs, same resolvers, same poses a row click lands on —
@@ -1515,7 +1527,7 @@ export class Engine {
     this._freeOrbit = false;
     this._sameSubjectFlight = false;
     const st = useStore.getState();
-    if (this.mode !== "hyper" && this.mode !== "geo" && this.mode !== "ledger") return;
+    if (!is3D(this.mode)) return;
     const sel: SelectionSnapshot = {
       inspectIsNode:
         !!st.inspect && (st.inspect.kind === "l0" || st.inspect.kind === "l1" || st.inspect.kind === "metanode"),

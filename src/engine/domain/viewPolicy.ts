@@ -96,6 +96,19 @@ export interface ViewPolicy {
   // match the other views without the wash, and the boundary flip becomes a half-step instead of a
   // cliff on chips that are in plain view at the staging grids.
   chipEnv: number;
+  // Does the shared node population get PLACED in this view, or gathered to the staging grids
+  // and faded out? The three structural views place it; the trends view is made of chart planes
+  // and has nowhere honest to put a node, so it reuses the doc overlay's park+fade path
+  // (NodeFabric.tickFleetFade, the DOC_ROLL clock) rather than inventing node poses.
+  fleet: "placed" | "parked";
+  // Which surface the RAW half of the `section` presentation axis shows. `section` is a
+  // PRESENTATION axis — same subject, two presentations — so the answer is per view rather than
+  // one hardcoded surface: the structural views show the records layer, and the trends view
+  // shows the measured-history DOCUMENT, which is its other register (CLAUDE.md convention 12).
+  rawSurface: "records" | "document";
+  // Does this view mount the DOM chart-plane stack (a later task's `TrendStack` component gates
+  // on this — convention 7: gate on the view a behaviour is FOR, never `mode === "x"`)?
+  chartStack: boolean;
 }
 
 // The calm bloom the ledger view uses — the reference the design likes (thin lines, sparse
@@ -122,6 +135,9 @@ const FLAT: ViewPolicy = {
   callout: false,
   bloom: BLOOM_CALM,
   chipEnv: 1,
+  fleet: "placed",
+  rawSurface: "records",
+  chartStack: false,
 };
 
 export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
@@ -159,6 +175,9 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // Calmer than ledger: the core + dense node field piled up an additive bleed on OLED/HDR.
     bloom: { strength: 0.27, radius: 0.32, threshold: 0.14 },
     chipEnv: 1,
+    fleet: "placed",
+    rawSurface: "records",
+    chartStack: false,
     },
   // Footprint: the holographic globe + travelling packets; picks the globe nodes only.
   geo: {
@@ -179,6 +198,9 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // node/wall hues cast on the globe, and the additive coastal walls read fuzzy under bloom.
     bloom: { strength: 0.20, radius: 0.30, threshold: 0.16 },
     chipEnv: 1,
+    fleet: "placed",
+    rawSurface: "records",
+    chartStack: false,
     },
   // Snapshots: the settlement chamber. Morph frozen (nodes fly into lanes); picks the centred
   // snapshot + the reused producer dots. (The ledger-specific depth-fog recency treatment was
@@ -200,6 +222,39 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     callout: true, // the pinned snapshot — the lane lead tile, or the global tick's bar
     bloom: BLOOM_CALM, // the reference look the design likes — unchanged
     chipEnv: 0.5, // low, not zero — coplanar trays wash at full sheen, go bland at none (field note)
+    fleet: "placed",
+    rawSurface: "records",
+    chartStack: false,
+  },
+  // MEASURED HISTORY (2026-09-18) — the charts ARE the scene: DOM planes driven by
+  // TrendStackSync, so almost every engine-side switch here is OFF. The canvas stays on because
+  // TrendsView still owns real WebGL (the shared time cursor and the ground); nothing shared is
+  // shown, nothing is raycast (the planes take DOM clicks and route them through pickActions),
+  // and the fleet parks. No stage light: StagedView is an explicit Extract of the other three,
+  // so claiming one here is a compile error rather than a silent no-op.
+  trend: {
+    canvas: true,
+    morph: "frozen",
+    sims: { arcs: false, hubOrbits: false, globeSpin: false },
+    show: { hyperFurniture: false, globeSurface: false, ledger: false },
+    pickSources: [],
+    dofEligible: false,
+    countryHover: false,
+    minCamDist: 12,
+    minCamAlt: null,
+    minPolarAngle: 0.25,
+    nodeList: false,
+    // The band is MOUNTED but its content is this view's timeline (Task 8), not the vitals
+    // cells — the reserve it publishes is the same either way.
+    vitalsLane: true,
+    // The planes carry their own headers, so a floating label over a projected anchor would be
+    // a second name for the same thing.
+    callout: false,
+    bloom: BLOOM_CALM,
+    chipEnv: 1,
+    fleet: "parked",
+    rawSurface: "document",
+    chartStack: true,
   },
   soon: FLAT,
 };

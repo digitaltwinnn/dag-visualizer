@@ -321,6 +321,15 @@ export const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string
       "Each arrives already sealed and stays provable. How often a network anchors, and how much, depends on what it does.",
     ],
   },
+  trend: {
+    eyebrow: "Measured history",
+    title: "The network, over time",
+    lines: [
+      "Every chain's own record, one chart per network, stacked back through time.",
+      "Drag the timeline to move the cursor; the rail reads every network at that moment.",
+      "Click a layer to bring it forward, or open the full document for the prose and the exact numbers.",
+    ],
+  },
   soon: {
     title: "What is coming next",
     eyebrow: "About",

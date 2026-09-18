@@ -86,6 +86,9 @@ const DISPLAY_LANE: Partial<Record<Mode, readonly string[]>> = {
   // (The chamber's storeys are unchanged: geometry still shows ribbons falling INTO the global
   // floor; the rail states the reading order.)
   ledger: ["snap", "context", "metaSnap", "node"],
+  // The trends ladder has one committable rung (network → the context dossier); the plane rung
+  // (Task 1's focusLadder comment) has no card of its own yet — a later task decides its slot.
+  trend: ["context"],
 };
 
 export function ladderSlotIds(mode: Mode): string[] {
@@ -237,7 +240,7 @@ export function exploreCards(s: Pick<RailManifestState, "mode">): RailCard[] {
 //    the Hypergraph view."). This is an app-wide copy rule, not a ghost-hint one; it applies to every
 //    surface the reader reads (the About cards, the explorer hints, the empty states). Comments and
 //    docs like this one are dev-facing and keep their dashes.
-const IN_3D = (m: Mode) => m === "hyper" || m === "geo" || m === "ledger";
+const IN_3D = (m: Mode) => m === "hyper" || m === "geo" || m === "ledger" || m === "trend";
 // The pointer's own verb (2026-09-04): "Click" taught a mouse to a thumb. One helper so no hint
 // can pick its own word.
 const CLICK = (s: RailManifestState) => (s.coarse ? "Tap" : "Click");

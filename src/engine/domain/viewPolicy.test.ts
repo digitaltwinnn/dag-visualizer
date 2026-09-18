@@ -1,17 +1,18 @@
 import { describe, it, expect } from "vitest";
 import type { Mode } from "@/src/store/store";
 import { VIEW_POLICIES } from "./viewPolicy";
+import { is3D } from "./viewTransition";
 
-const MODES: Mode[] = ["hyper", "geo", "ledger", "soon"];
-const CANVAS_MODES: Mode[] = ["hyper", "geo", "ledger"];
+const MODES: Mode[] = ["hyper", "geo", "ledger", "trend", "soon"];
+const CANVAS_MODES: Mode[] = ["hyper", "geo", "ledger", "trend"];
 const FLAT_MODES: Mode[] = ["soon"];
 
 describe("VIEW_POLICIES", () => {
-  it("defines exactly the six modes", () => {
+  it("defines exactly the five modes", () => {
     expect(Object.keys(VIEW_POLICIES).sort()).toEqual([...MODES].sort());
   });
 
-  it("gives canvas ONLY to the three 3D modes", () => {
+  it("gives canvas ONLY to the four 3D modes", () => {
     for (const m of CANVAS_MODES) expect(VIEW_POLICIES[m].canvas).toBe(true);
     for (const m of FLAT_MODES) expect(VIEW_POLICIES[m].canvas).toBe(false);
   });
@@ -79,5 +80,36 @@ describe("VIEW_POLICIES", () => {
     for (const m of MODES) {
       if (m !== "ledger") expect(VIEW_POLICIES[m].chipEnv).toBeGreaterThan(ledger);
     }
+  });
+});
+
+describe("the trends view is registered and inert", () => {
+  it("is a 3D view", () => {
+    expect(is3D("trend")).toBe(true);
+  });
+
+  it("shows no shared geometry and picks nothing", () => {
+    const p = VIEW_POLICIES.trend;
+    expect(p.canvas).toBe(true);
+    expect(p.show).toEqual({ hyperFurniture: false, globeSurface: false, ledger: false });
+    expect(p.pickSources).toEqual([]);
+    expect(p.sims).toEqual({ arcs: false, hubOrbits: false, globeSpin: false });
+  });
+
+  it("parks the fleet rather than placing it", () => {
+    expect(VIEW_POLICIES.trend.fleet).toBe("parked");
+    expect(VIEW_POLICIES.hyper.fleet).toBe("placed");
+  });
+
+  it("answers RAW with the document, not the records layer", () => {
+    expect(VIEW_POLICIES.trend.rawSurface).toBe("document");
+    expect(VIEW_POLICIES.ledger.rawSurface).toBe("records");
+  });
+
+  // Controller ruling: `chartStack` is the flag a later task's `TrendStack` component gates on
+  // (convention 7 — gate on the view a behaviour is FOR, never `mode === "x"`).
+  it("mounts the chart-plane stack only in trend", () => {
+    expect(VIEW_POLICIES.trend.chartStack).toBe(true);
+    expect(VIEW_POLICIES.hyper.chartStack).toBe(false);
   });
 });

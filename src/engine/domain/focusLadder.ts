@@ -33,7 +33,8 @@ export interface SelectionSnapshot {
 export type ResolverKey =
   | "geoNode" | "geoCohort" | "geoCountry" | "geoNetwork" | "geoOverview"
   | "hyperNode" | "hyperComposition" | "hyperNetwork" | "hyperOverview"
-  | "ledgerNode" | "ledgerNetwork" | "ledgerOverview";
+  | "ledgerNode" | "ledgerNetwork" | "ledgerOverview"
+  | "trendNetwork" | "trendOverview";
 
 export interface Rung {
   level: FocusLevel;
@@ -67,6 +68,13 @@ export const LADDERS: Record<View3D, Rung[]> = {
     { level: "node",    active: (s) => s.inspectIsNode,    resolver: "ledgerNode" },
     { level: "network", active: (s) => s.filter !== "all", resolver: "ledgerNetwork" },
     { level: "all",     active: () => true,                resolver: "ledgerOverview" },
+  ],
+  // The trends ladder: a PLANE (one network's chart) is the fine rung, the committed network the
+  // coarse one. There is no node rung — a node has no chart of its own. `trendPlane` frames the
+  // focused plane (the 5b dolly); `trendNetwork` is its parent and `trendOverview` the resting stack.
+  trend: [
+    { level: "network", active: (s) => s.filter !== "all", resolver: "trendNetwork" },
+    { level: "all",     active: () => true,                resolver: "trendOverview" },
   ],
 };
 

@@ -22,6 +22,7 @@ import {
   GitMerge,
   FlaskConical,
   ChartLine,
+  ChartSpline,
   type LucideIcon,
 } from "lucide-react";
 import type { NetworkId } from "@/src/engine/config";
@@ -39,6 +40,9 @@ export const VIEW_ICONS: Record<Mode, LucideIcon> = {
   hyper: Orbit,
   geo: Globe,
   ledger: Layers,
+  // The measured-history view: a spline through data points — distinct from the doc page's own
+  // ChartLine mark (DOC_ICONS.trends below), which predates this view and stays where it is.
+  trend: ChartSpline,
   // The one consolidated placeholder view: a dashed circle — not yet formed, the same dashed
   // grammar the Blueprint wireframes speak. The coming features' own marks (Radar,
   // ArrowLeftRight, HandCoins) moved into the Blueprint gallery that previews them.
