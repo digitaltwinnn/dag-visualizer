@@ -95,8 +95,8 @@ export default function TrendStack() {
   const focus = useStore((s) => s.trendFocus);
   const scaleMode = useStore((s) => s.trendScale);
   // THE SHARED TIME CURSOR — one instant, marked on every plane whose span contains it, so the
-  // stack is read at ONE moment rather than five. A COMMIT, not a hover (store `trendCursorMs`);
-  // nothing writes it yet, and `null` draws nothing anywhere.
+  // stack is read at ONE moment rather than five. A COMMIT, not a hover (store `trendCursorMs`,
+  // written by the band's timeline at most once per BUCKET), and `null` draws nothing anywhere.
   const cursorMs = useStore((s) => s.trendCursorMs);
   // THE SCENE↔HUD HOVER PAIRING (convention 9), on the network channel every other surface in the
   // app already pairs a network on: hovering a plane's header previews its Layers row in the rail,
@@ -178,9 +178,10 @@ export default function TrendStack() {
             0,
           )
         : undefined,
-    // ⚠️ `rows`, NEVER the whole `roster` — the hook returns a fresh VIEW object every render (it
-    // composes one from a memoised pass), so a dep on the whole thing recomputes this on every
-    // cursor write and every hover. The rows are the memoised part, and they are what this reads.
+    // ⚠️ THE DEPS ARE THE ROSTER'S MEMOISED PARTS, never a fresh object. `useTrendRoster` holds its
+    // whole return still now, but the narrow deps are what this actually reads — and the trap is
+    // one render away either way: a hook that composed a `{…}` per render would recompute this on
+    // every cursor write and every hover, which is exactly what it cost before it was memoised.
     [scaleMode, ranked, rows],
   );
 

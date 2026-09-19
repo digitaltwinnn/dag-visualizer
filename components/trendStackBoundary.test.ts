@@ -5,9 +5,9 @@ import { PLANE_PX_W } from "@/src/engine/domain/trendStack";
 // THE TREND STACK's contracts, made executable (2026-09-18 — the boundary-test idiom).
 //
 // The stack is split across two owners exactly like the subject callout: React renders the
-// planes and owns everything inside them (`components/TrendStack.tsx`), and a later task's
-// engine-side projector (`TrendStackSync`) writes each plane's `transform` per frame. That
-// split only holds while five agreements do, and every one of them fails SILENTLY — tsc stays
+// planes and owns everything inside them (`components/TrendStack.tsx`), and the engine-side
+// projector (`src/engine/TrendStackSync.ts`) writes each plane's `transform` per frame. That
+// split only holds while every agreement below does, and each one fails SILENTLY — tsc stays
 // green, vitest stays green, and the symptom is a frozen stack, a dead orbit drag or a frame
 // budget spent on re-rasters:
 //

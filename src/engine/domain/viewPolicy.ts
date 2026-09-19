@@ -93,7 +93,9 @@ export interface ViewPolicy {
   // Does this view anchor the SUBJECT CALLOUT (user, 2026-08-15) — the HUD-layer label the Engine
   // positions over the committed subject's projected anchor each frame? Two readers: SceneCallout
   // mounts on it, the Engine's per-frame sync gates on it — one flag, so the label and its
-  // positioning can't disagree. All three 3D views carry it; the flat placeholders stay false.
+  // positioning can't disagree. The three STRUCTURAL 3D views carry it; the flat placeholders stay
+  // false, and so does History — every one of its chart planes already carries its own header
+  // strip, so a floating label over a projected anchor would be a second name for the same thing.
   callout: boolean;
   // Per-view bloom (UnrealBloomPass strength/radius/threshold), applied by the Engine each frame.
   // Hyper/geo run CALMER than ledger on purpose: their dense, bright emitters (the core, hundreds

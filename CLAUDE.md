@@ -14,12 +14,12 @@ Present tense only. Git carries the history; `.superpowers/sdd/progress.md` carr
 
 An interactive 3D visualizer of the Constellation Network ($DAG). Next.js (App Router) + React +
 TypeScript + Zustand for the page and panels, driving a **vanilla Three.js engine** (not
-react-three-fiber) on one persistent canvas. The active view is `mode` in the store — and the three
-3D views are also real URLs (`/hypergraph` / `/geography` / `/snapshots`): `components/views.ts` is
-the one view-vocabulary home and `components/RouteSync.tsx` the URL↔mode bridge (shallow pushState,
-so a switch never reboots the engine; analytics see per-view routes).
+react-three-fiber) on one persistent canvas. The active view is `mode` in the store — and the four
+3D views are also real URLs (`/hypergraph` / `/geography` / `/snapshots` / `/trends`):
+`components/views.ts` is the one view-vocabulary home and `components/RouteSync.tsx` the URL↔mode
+bridge (shallow pushState, so a switch never reboots the engine; analytics see per-view routes).
 
-Three views drive the 3D scene:
+Four views drive the 3D scene:
 
 - **Hypergraph** (`hyper`) — abstract architecture: a glowing Global L0 core, the DAG's own validator
   shells around it, and the real metagraphs as orbiting hubs with their own L0 / cL1 / dL1 shells.
@@ -30,14 +30,22 @@ Three views drive the 3D scene:
 - **Snapshots** (`ledger`) — a 3D anchoring chamber: one global-ledger floor below, one narrow plane
   per metagraph above it. The gap between planes is the point — metagraphs are unrelated and only
   come together on the global plane.
+- **History** (`trend`) — the measured past: one CHART PLANE per network, receding into depth over a
+  ground that draws each plane's footprint, with a shared time cursor marking one instant on every
+  plane at once. The planes are DOM, not WebGL — the same `TrendChart` the document register uses —
+  and the bottom band is a scrubbable timeline rather than vitals cells.
 
 The placeholder is ONE consolidated `soon` Mode (2026-09-04; the old `status`/`transactions`/
 `staking` modes said the same nothing three times): the canvas fades out and `Blueprint.tsx` draws a
 wireframe GALLERY of the coming features, with no numbers, so it never reads as live data. The two
 doc pages (/about, /design) are an overlay over the same bare stage, not Modes.
 
-**The three 3D views are complementary projections of the same network: hyper = who/what, geo =
-where, ledger = when.** Activity metrics belong to ledger, structure to hyper.
+**The four 3D views are complementary projections of the same network: hyper = who/what, geo =
+where, ledger = when, trend = how it changed.** Structure belongs to hyper. Activity belongs to the
+time pair, split by TENSE: the ledger is the live instrument — this tick, this anchoring, right now —
+and History is the measured record of the same quantities, one bucket per day or hour, back to where
+the store's samples start. A rate you watch arrive is the ledger's; the same rate plotted against
+last month is History's.
 
 Interface glyphs are one system — `lucide-react`, monochrome via `currentColor` so accent and
 identity tinting inherit. **Never emoji**: they ignore CSS `color`. The view→icon map is
@@ -52,7 +60,7 @@ Twelve invariants. Six are executable — `npm test` fails when they break.
 | # | Rule, in one line | The test that defines it |
 |---|---|---|
 | 1 | **Engine layering.** `domain/` = pure logic, `scene/` = Three adapters, the **engine layer** = the only store bridge (a named allow-list, not one file). | `src/engine/layerBoundaries.test.ts` |
-| 2 | **One selection write path.** Every interactive surface expresses intent through the decision table and applies it through the one executor. | `components/selectionBoundary.test.ts` |
+| 2 | **One selection write path.** Every interactive surface expresses intent through the decision table and applies it through the one executor — `setTrendFocus` included, although a plane focus is view-local emphasis: it is a committed subject with a consequence beyond its own channel. | `components/selectionBoundary.test.ts` |
 | 3 | **One colour source.** CSS tokens are canonical; no raw hex in `scene/` or `components/` outside the allowlist. | `src/engine/noHardcodedColors.test.ts` |
 | 4 | **Pure-module export coverage.** Every value export of a `domain/` or `src/data/` module is referenced by its sibling test. | `src/engine/domainExportCoverage.test.ts`, `src/data/dataExportCoverage.test.ts` |
 | 5 | **Zero-allocation render loop.** No `new THREE.*`/`.clone()` in per-frame bodies unless marked `event-time`. | `src/engine/noFrameAllocations.test.ts` |
@@ -65,15 +73,24 @@ exemptions. `src/data/` holds the live singleton and the geo cache alongside the
 growing: a mechanical purity classifier was tried and rejected (its regex matched the words
 "window" and "fetch" inside this repo's own comments), and the header records why.
 
-Seven narrower boundary tests work the same way: `components/unlistedBoundary.test.ts` (the `"unlisted"`
+Ten narrower boundary tests work the same way: `components/unlistedBoundary.test.ts` (the `"unlisted"`
 id literal has exactly two homes), `components/railLadderBoundary.test.ts` (every committable focus
 rung maps to a hinted rail card slot), `components/railTierBoundary.test.ts` (`data-focus` has two
 homes and the slab's geometry — the pager included — keys on `data-tier`),
 `components/cssTrapBoundary.test.ts` (CSS traps 3 and 6 — a `bg-[var()]` never points at a gradient
 token, and every custom `text-*`/`tracking-*`/`rounded-*` token is registered with twMerge),
-`components/publishChannelBoundary.test.ts` (the React→Engine publish channels are one-way and
+`components/publishChannelBoundary.test.ts` (the four React→Engine publish channels are one-way and
 single-publisher: `focusRung` is a fresh object bridged by reference, `sceneCover` is measured by
-`RailDock` off an element ref and sided by the two rails, `boxedCard` is Inspector's alone),
+`RailDock` off an element ref and sided by the two rails, `boxedCard` is Inspector's alone, and
+`trendIds` — the History stack's busiest-first roster, derived from fetched data that lives only in
+React's cache — is `TrendStack`'s alone and is never read back by a component),
+`components/trendStackBoundary.test.ts` (the DOM chart planes' split with their projector: the two
+markers, the anchor's 0-size shape, no blur or shadow anywhere on a plane, the memoised plot and the
+plot box its cursor overlay is calculated against),
+`components/rawSurfaceBoundary.test.ts` (which surface the raw layer shows is a policy row, and the
+Trends document is a view's RAW register rather than a doc-overlay page),
+`components/trendRailBoundary.test.ts` (History's three "one home" rules: one plane-focus builder,
+one records door, one roster pass),
 `src/data/signerMatchBoundary.test.ts` (a peer-id prefix comparison lives only in `src/data/network.ts`)
 and `src/engine/scene/rowBoundary.test.ts` (a scene module that places a ledger row consults the
 trail's boundaries).
@@ -104,14 +121,23 @@ scope from the table.
     `text-*`/`rounded-*`/`tracking-*` token utilities must be registered in `lib/utils.ts` — see CSS
     trap 6, which is a silent failure.
 12. **The observation ladder: live scene → measured history → individual records** (user,
-    2026-09-09). Three depths, one subject: the 3D scene is the LIVE instrument, /trends is the
-    MEASURED HISTORY (a document — prose, sections, 2D charts; charts want 2D, so it stays a doc
-    overlay, never a pseudo-scene), and the raw layer is the RECORD-level microscope. Each step
-    down is one deliberate gesture that CARRIES ITS CONTEXT (a chart range hands its network and
-    dates to the anchor log's search), and every new surface must name its rung and its bridges
-    rather than invent a fourth depth. The registers complement each other on purpose: trends
-    grows coarser with distance (tier retention) exactly where the raw layer's chain paging stays
-    exact to genesis.
+    2026-09-09). Three depths, one subject: the 3D scene is the LIVE instrument, the measured
+    history is rung 2, and the raw layer is the RECORD-level microscope.
+    **Rung 2 has TWO REGISTERS and they are one rung** (user, 2026-09-18): a SCENE face — the
+    History view at `/trends`, one chart plane per network receding in depth, read at a shared
+    instant — and a DOCUMENT face, that same view's RAW register (prose, sections, the same charts
+    laid out as a page). One subject, two presentations, which is exactly what `section` already
+    means everywhere else; `viewPolicy.rawSurface` is where a view says which one its RAW shows.
+    The raw layer stays rung 3, reached from either face. This SUPERSEDES the old
+    "charts want 2D, so it stays a doc overlay, never a pseudo-scene" rule — the planes host the
+    document's own `TrendChart` in DOM, so the charts are still 2D and still crisp, and depth
+    carries the roster rather than pretending to be data.
+    Each step down is one deliberate gesture that CARRIES ITS CONTEXT (a chart range hands its
+    network and dates to the anchor log's search — one home, `components/trendDoors.ts`, shared by
+    both registers), and every new surface must name its rung, its register and its bridges rather
+    than invent a fourth depth. The registers complement each other on purpose: the measured
+    history grows coarser with distance (tier retention) exactly where the raw layer's chain paging
+    stays exact to genesis.
 
 ## Run & test
 
@@ -177,8 +203,8 @@ google-chrome-stable --headless=new --no-sandbox \
 
 Gotchas worth knowing before you burn time on them:
 
-- **The three 3D views ARE URL deep links** (2026-09-04): `/hypergraph`, `/geography`, `/snapshots`
-  boot straight into their view (`components/RouteSync.tsx` seeds the store from the pathname), so a
+- **The four 3D views ARE URL deep links** (2026-09-04): `/hypergraph`, `/geography`, `/snapshots`,
+  `/trends` boot straight into their view (`components/RouteSync.tsx` seeds the store from the pathname), so a
   one-shot screenshot of a view needs no store edit. In-app switches publish those paths by shallow
   pushState — never a navigation, the engine must survive. Only the placeholder views (routeless by
   decision) still need the old trick: temporarily seed the store default in `src/store/store.ts`,
@@ -222,16 +248,45 @@ frame**, so a stale slot from a previous view can never linger; and **simulation
 buffer that the owning adapter drains**, so a sim never reaches across views to mutate another's
 nodes.
 
+### One view is made of DOM, and the split is the same one
+
+**History's chart planes are real DOM over the canvas, not WebGL** (2026-09-18). A chart is text, axis
+labels, a tooltip and a hairline; drawn into a texture it is either blurry or a re-raster every frame,
+and it would be a second chart implementation beside the document's. In DOM it is the SAME
+`TrendChart` both registers of convention 12's rung render, crisp at any scale, with its tooltips and
+its accessible names for free.
+
+The split of labour is the subject callout's, exactly: **pure pose math in `domain/trendStack.ts`**
+(slots, stagger, focus lift, paging — arithmetic over plain objects), **the projection in the engine
+layer** (`src/engine/TrendStackSync.ts`, `CalloutSync`'s sibling: a narrow state struct in, one
+`matrix3d` per frame onto each `[data-plane]` anchor, zero allocation, and an idle skip that returns
+before any DOM write when the camera, the canvas box and the requested poses are all unchanged), and
+**the planes themselves in React** (`components/TrendStack.tsx`, which owns everything inside a plane
+plus its opacity, paint order and interactivity). `scene/` never sees React; the projector takes a
+plain slice from the Engine rather than reading the store, so no second store bridge appears. Position
+therefore never triggers a render, and a render never fights the engine for the `transform`.
+
+⚠️ **The hard limit is compositing: a DOM layer sits WHOLLY in front of the canvas**, whatever the
+depth buffer says. Nothing WebGL can occlude a plane, and a plane is transparent — so the view's one
+WebGL object, `scene/views/TrendsView.ts`'s ground, fades its rear rungs by the stack's own falloff
+SQUARED, or a far rung shows through the front chart's plot and reads as a gridline. Any new 3D mark
+in this view has to answer the same question.
+
+The shared node population is not placed here at all: `viewPolicy.fleet` reads `parked`, so the fleet
+gathers to the staging grids and fades on the doc overlay's own clock (`fleetFaded`/`fleetHolder` in
+`domain/viewTransition.ts`) rather than being given poses a stack of charts has no honest place for.
+
 ### Where things live
 
 | Path | Responsibility |
 |---|---|
-| `app/` | Next App Router. `globals.css` is **the one stylesheet**; `[view]/` serves the three routed 3D views; `/about` and `/design` are the **DOC OVERLAY** (2026-09-04) — they render AppShell with a scrollable document layer over the live scene (`components/DocLayer.tsx`; content in `components/docs/`, opened/closed by store `docPage` with no engine reboot; /about still server-renders its prose for crawlers and carries the **experimental disclosure** that used to be an always-on banner, retired 2026-08-09: a permanent banner over a live instrument reads as an alarm). The footer's About/Design entries toggle the overlay. `--warn-soft` is /about's amber (shared with the raw layer's JSON booleans and the pulse strip's STALE dot). `api/*` are the server-side data routes. |
+| `app/` | Next App Router. `globals.css` is **the one stylesheet**; `[view]/` serves the four routed 3D views (`/trends` is the History VIEW — the measured-history document is that view's RAW register, not a route of its own); `/about` and `/design` are the **DOC OVERLAY** (2026-09-04) — they render AppShell with a scrollable document layer over the live scene (`components/DocLayer.tsx`; content in `components/docs/`, opened/closed by store `docPage` with no engine reboot; /about still server-renders its prose for crawlers and carries the **experimental disclosure** that used to be an always-on banner, retired 2026-08-09: a permanent banner over a live instrument reads as an alarm). The footer's About/Design entries toggle the overlay. `--warn-soft` is /about's amber (shared with the raw layer's JSON booleans and the pulse strip's STALE dot). `api/*` are the server-side data routes. |
 | `components/` | React panels, each reading/writing the store. `SceneCanvas` mounts the engine (dynamic-imported so Three never enters the server bundle). |
 | `components/ui/` | The adopted shadcn/Radix primitives. |
 | `src/store/store.ts` | The Zustand store — mode, filter, selection, hover channels, `section`, phone UI state. |
 | `src/data/` | The live network data layer (`api.ts`'s typed `NetworkData` singleton, `network.ts`'s accessors), the pure row builders, the display vocabularies. No simulation. |
 | `src/engine/Engine.ts` | The imperative engine and the one store bridge: render loop, morph, camera, picking, focus resolution, command bridge. |
+| `src/engine/TrendStackSync.ts` | Engine-layer, alongside `CalloutSync`: projects History's plane poses through the camera and writes each `[data-plane]`'s `matrix3d` per frame (above). |
 | `src/engine/config.ts` | **Pure static data only** — endpoints, the `COLORS` mirror, the `METAGRAPHS` catalog, poll tuning. No math, no derived tables, no UI copy. |
 | `src/engine/domain/` | Pure logic + data (below). |
 | `src/engine/scene/` | The Three adapters — `SceneContext`, `Globe`, `objects/*`, `views/*`. |
@@ -245,7 +300,9 @@ specification. Most are named for exactly what they own; these are the ones wort
 you start:
 
 - **`viewPolicy.ts`** — the per-`Mode` allow-list behind convention 7: canvas, morph target, sim gates,
-  shown geometry, pick sources, DoF eligibility, camera floors, which views publish `selNodes`.
+  shown geometry, pick sources, DoF eligibility, camera floors, which views publish `selNodes`, whether
+  the fleet is placed or parked, what the bottom band holds, which surface RAW shows, and whether the
+  camera idle-orbits.
 - **`focusLadder.ts`** — the focus/zoom ladder as data: one rung table per 3D view plus the cross-view
   carry policy. `finerLevels()` is the single source `pickActions` derives deselect stepping from.
 - **`pickActions.ts`** — the click/select decision table (see *Selection semantics*).
@@ -253,6 +310,9 @@ you start:
 - **`ledgerBands.ts`** — the byte bar's spec as pure data, **with the honesty rules encoded here rather
   than in the adapter**.
 - **`countryShape.ts`** — the country drill's shape math over the topology.
+- **`trendStack.ts`** — History's whole spatial grammar as pure data: the staggered slots, the focus
+  lift, the `flat` column, the paging clamp, and `focusDepth()`, which is the only number the camera's
+  lean takes from the stack.
 
 ### The render loop
 
@@ -307,8 +367,9 @@ bug class the previous per-view-light + registry arrangement kept guarding again
 is already applied centrally, so a claim must not multiply by its own fade again.
 
 `StagedView` (`domain/stageLight.ts`) is the type that says which views stage a light, and the `?tune`
-panel builds a spotlight folder only for those — since the day-look work all three 3D views stage one;
-the ledger's claim is **paper-only** (its dark chamber stays lit by its own glass and emissive
+panel builds a spotlight folder only for those — the three STRUCTURAL 3D views stage one, and History
+stages none: its only WebGL object is a hairline ground drawn with an unlit material, and the planes a
+lamp would want to reach are DOM. The ledger's claim is **paper-only** (its dark chamber stays lit by its own glass and emissive
 snapshots, and emphasis there is the four colour dim tiers — on paper those need the lobe's help, see
 the lamp rule below). Claiming
 for an unstaged view is a compile error, not a silent no-op.
@@ -340,7 +401,14 @@ its claim is paper-only, so its one `intensity` already is its paper number.
    composed camera cleverness; camera poses stay dumb. Where a view *does* answer a commit with the
    camera, it gets **ONE pose with ONE state-keyed variation** — the ledger's `ledgerCommitTilt`
    (`domain/cameraRig.ts`) leans the settled chamber pose in when a network is committed and back out
-   when it isn't, and that is the whole vocabulary. Three bespoke ledger framings (a lane nudge, a node
+   when it isn't, and that is the whole vocabulary. **History is the second instance**:
+   `trendFocusPush` slides `FOCI.trend` straight down its own view axis by the focused plane's lift
+   (`trendStack.focusDepth()`, layout data — never a projected plane), and back out when the focus
+   clears, so every rung of `LADDERS.trend` inherits it by delegating to the resting pose. It is a
+   push, not an orbit: the planes host real text and present flat-on, so a lean that turned the
+   camera would skew the charts it exists to emphasise. **`Align to front` moves the STRUCTURE, not
+   the camera** — the `flat` layout tiles the planes as a column and `focusDepth` answers 0 there, so
+   the camera holds its resting pose while a flat column is read. Three bespoke ledger framings (a lane nudge, a node
    framing, a per-lane fly) were built and **retired** because each added a pose the user had to learn;
    don't grow a fourth. **Hyper's per-node framing went the same way** (2026-08-13): a node there is one
    bead on a shell, and diving to it lost the hub and shells that say what it belongs to, so the rung
@@ -396,7 +464,7 @@ timeseries — see `app/api/CLAUDE.md`.
 
 ⚠️ **Crons fire on the PRODUCTION deployment only — a PR preview is not production.** The preview
 deploys the trends routes against the SAME Upstash store (the marketplace env vars span all three
-scopes), so its /trends page shows real history — but `CRON_SECRET` is deliberately absent from the
+scopes), so its History view shows real history — but `CRON_SECRET` is deliberately absent from the
 Preview scope and the sampler FAILS CLOSED without it, so a public preview holds no credential that
 can write. Don't "fix" a preview's 401 by adding the secret there. Deploys and downtime self-heal:
 the cursor lives in Redis, and the next production run catches up to 30K records per chain (~a day
@@ -426,10 +494,10 @@ file, and the rules above govern them.
 | Area | File | Covers |
 |---|---|---|
 | React HUD | `components/CLAUDE.md` | the four-zone shell, the slab/card grammar, Instrument-Glass, CSS traps, the subject callout |
-| Three adapters | `src/engine/scene/CLAUDE.md` | nodes/layers/the filter, and the whole Snapshots chamber |
+| Three adapters | `src/engine/scene/CLAUDE.md` | nodes/layers/the filter, the whole Snapshots chamber, and History's ground |
 | Pure logic | `src/engine/domain/CLAUDE.md` | the 3D↔3D transition, selection semantics |
 | Engine | `src/engine/CLAUDE.md` | live look-tuning under `?tune` |
-| Data layer | `src/data/CLAUDE.md` | the snapshot stream, anchoring & fees, the tick lifecycle |
+| Data layer | `src/data/CLAUDE.md` | the snapshot stream, anchoring & fees, the tick lifecycle, the measured-history path both registers read |
 | Networks | `src/net/CLAUDE.md` | `?net=` and the three networks |
 | Theme | `src/theme/CLAUDE.md` | light/dark and the ground questions it forces |
 | Server routes | `app/api/CLAUDE.md` | every `/api/*` route and its caching |

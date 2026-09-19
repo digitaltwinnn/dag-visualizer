@@ -127,8 +127,8 @@ describe("the trends view is registered and inert", () => {
     expect(VIEW_POLICIES.ledger.rawSurface).toBe("records");
   });
 
-  // Controller ruling: `chartStack` is the flag a later task's `TrendStack` component gates on
-  // (convention 7 — gate on the view a behaviour is FOR, never `mode === "x"`).
+  // `chartStack` is the flag `components/TrendStack.tsx` gates its mount on (convention 7 — gate
+  // on the view a behaviour is FOR, never `mode === "x"`).
   it("mounts the chart-plane stack only in trend", () => {
     expect(VIEW_POLICIES.trend.chartStack).toBe(true);
     expect(VIEW_POLICIES.hyper.chartStack).toBe(false);

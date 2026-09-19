@@ -16,21 +16,25 @@ can understand how it works and why it's powerful.
 - A bottom **vitals band** carries each view's own instruments — donut, micro-bars,
   sparklines and the snapshot bar-chart — and the top-bar heartbeat opens a **pulse strip**
   showing every data feed's last successful poll.
-- A **/trends** page charts the network's measured history — daily since Jan 1 2026, with
-  hourly and 5-minute zoom — summed from the chain's own records into an Upstash Redis
-  timeseries by a 15-minute cron (the 3D views need no backend at all; only this history
-  does).
+- The **History** view (`/trends`) shows the network's measured history as the scene itself —
+  one chart plane per network, receding into depth, with a shared time cursor reading every
+  chain at the same moment and a scrubbable timeline along the bottom. The same history reads
+  as a document behind that view's RAW toggle. Daily since Jan 1 2026, with hourly and
+  5-minute zoom, summed from the chain's own records into an Upstash Redis timeseries by a
+  15-minute cron (the other three views need no backend at all; only this history does).
 
 ## Design language
 
 **Three depths, one subject — the observation ladder.** Everything the site shows is the same
 network at one of three depths: the **3D scene** is the live instrument (what is happening right
-now), the **/trends page** is the measured history (what the chain's own records say happened),
-and the **raw data layer** is the record-level microscope (the snapshots themselves, back to
-genesis). Each step down is one deliberate gesture that carries its context with it — zoom a
-trends chart into a range and you can hand that exact range to the snapshot search. The depths
-complement each other on purpose: history grows coarser the further back you look, precisely
-where the record microscope stays exact.
+now), the **measured history** is what the chain's own records say happened, and the **raw data
+layer** is the record-level microscope (the snapshots themselves, back to genesis). The middle
+depth has two faces of one thing — the History view's chart planes, and the same history written
+out as a document — so you can read it as an instrument or as a page without changing subject.
+Each step down is one deliberate gesture that carries its context with it — zoom a chart into a
+range and you can hand that exact range to the snapshot search. The depths complement each other
+on purpose: history grows coarser the further back you look, precisely where the record microscope
+stays exact.
 
 The HUD is four fixed zones over the canvas, each with **one role** that holds in every
 view, so switching views never relearns the screen:
@@ -39,7 +43,7 @@ view, so switching views never relearns the screen:
   the view switch + presentation/theme/network controls.
 - **Left rail** — explore & interact: a collapsed "About this view" card and view specific explorer cards
 - **Right rail** — facts on demand: a stack of selected-subject cards.
-- **Bottom** — the **vitals band**: per-view instrument cards (the ledger keeps the snapshot bar-chart as one of them)
+- **Bottom** — the **vitals band**: per-view instrument cards (the ledger keeps the snapshot bar-chart as one of them); in History the same band holds the timeline you scrub
 
 **Cards tell the story, not a static record.** A card is its subject *as seen from the current
 scene*: the same facts, redistributed to lead with what the context makes relevant. Select a node
@@ -49,7 +53,7 @@ facts they state better (a node under a committed country drops its Country line
 title says it); and the in-scene callout label follows whichever card you expand, exactly as the
 camera does. Nothing is duplicated, nothing is lost — the presentation follows the story's state.
 
-The three live views are **complementary projections of the same network** — each answers an
+The four live views are **complementary projections of the same network** — each answers an
 orthogonal question and owns one "signature" detail card, so the views never overlap:
 
 | View | Question | Explore tool (left rail) | Signature (detail) slot |
@@ -57,6 +61,7 @@ orthogonal question and owns one "signature" detail card, so the views never ove
 | **Hypergraph** | *who / what* — architecture + economic weight | nodes-by-network explorer | **Node card**; structure counts live in the bottom vitals band |
 | **Node geography** | *where* — footprint & decentralization | country→nodes explorer (countries → provider cohorts → nodes) | **Node card** (state, roles, location) + country / provider cards |
 | **Snapshots** | *when* — how the ledger advances + cost | settlement-layers explorer (floors disclose each lane's nodes) | **Snapshot card** (DAG position, anchors, fees) |
+| **History** | *how it changed* — the measured past | layers-over-time explorer (the metric, the layout, the roster) | **Cursor card** (every network read at one instant) |
 
 Visual uniformity is enforced with shared design tokens in one stylesheet (`app/globals.css`):
 one spacing scale, one panel radius, one "selected" treatment (`--sel-bg` / `--sel-border`),

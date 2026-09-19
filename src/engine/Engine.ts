@@ -1411,7 +1411,7 @@ export class Engine {
     // note). trend falls through this generic branch too: applyFilter/_commitViewEntryAncestry
     // are both gated to hyper/geo internally and no-op for it (no shared nodes to dim or carry
     // ancestry for), and _resolveFocus still lands the camera correctly — LADDERS.trend has its
-    // own rungs and resolvers (Task 1 stubs, both flying to FOCI.trend).
+    // own rungs and resolvers, both landing on `FOCI.trend` plus its focus lean.
     // Convention 7: the per-view row, never a deny-list. `mode !== "geo"` sat here until
     // 2026-09-18 and had already gone wrong — the trends view inherited hyper's idle spin by
     // default, which slid a page of charts sideways forever and kept the projector awake.

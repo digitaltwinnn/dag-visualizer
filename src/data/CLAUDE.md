@@ -148,3 +148,47 @@ backend and the chain holds the tamper-proof roots. So the decoder surfaces deco
 and the card shows "Data updates: N". This is structural, not per-network: probed across all anchoring
 channels over 12 live ticks, zero undecodable entries and three distinct payload shapes all rendering
 honestly through the same generic extraction.
+
+## The measured history — one data path, two registers
+
+Everything the History view and the Trends DOCUMENT read about the past comes from `/api/trends`
+through four pure modules here. They exist because the two registers of convention 12's rung ask the
+same questions, and the honesty rules below are what the app ASSERTS about a network — two copies
+would be two chances to assert different things about the same reading.
+
+- **`trendWindow.ts` — WHAT IS ON SCREEN.** The window/range vocabulary (`ZOOMS`), the fetch PLAN a
+  window implies (`planTrendFetch`: which stored tiers and tiles a span needs) and the assembled
+  answer (`assembleTrendSlice`), plus the cuts themselves — `sliceWindow`, `cutRange`, `leadingTrim`,
+  `monthlySum`, `stitchWindows`. Two readings live here too: `bucketAt`, which answers with the
+  bucket CONTAINING an instant, and `cursorFraction`, which places that bucket on the chart's own
+  numeric axis as a pure fraction.
+- **`trendSeries.ts` — WHAT A METRIC IS.** Which stored row a metric reads, whether it rescales,
+  whether it is a counter or a gauge, the formatter and unit word, the busiest-first rank, and the
+  instant readings the cursor card quotes (`valueAt` / `rankAt` / `orderAt` / `placeInstant`).
+- **`trendScope.ts` — WHAT A COMMITTED FILTER DOES TO IT.** Four states, not two: every network, one
+  network, and the two commits the trends store has nothing for — the base ledger (which anchors
+  metagraph snapshots rather than producing them) and the unlisted channels. Those last two are a
+  FACT to state, never an empty list to draw, so the SENTENCES live here as well as the
+  classification, split into a fact and a route because the route names a gesture available on
+  whichever surface is saying it.
+- **`trendTimeline.ts` — WHAT A POINTER MEANS ON THE BAND'S TRACK.** Click versus drag, what is under
+  the finger, where a panned or resized span lands, how far an arrow key moves. Pure because none of
+  it is exercisable from the component in a `node` test environment, and every one of those decisions
+  is arithmetic over a width and a span of milliseconds.
+
+Four honesty rules (rule 10) run through all of them, and each is a claim a chart would otherwise make
+without evidence:
+
+- **A null bucket is NOT MEASURED and survives as null** — never a zero, never an interpolation.
+  Coverage is `g.ticks`, the store's one marker.
+- **A derived value with an absent or zero denominator is null.** A chain that sealed nothing in a
+  bucket has no spacing; "0 seconds between snapshots" is a fabricated claim.
+- **A counter's partial EDGE buckets are trimmed, a gauge's are not** (`trimCounterEdges`). A partial
+  sum drawn whole reads as a crash; a gauge's newest reading is simply its newest reading. The trim is
+  against the PAYLOAD's own clock, never the client's — a CDN-cached payload is honestly assembled in
+  the past, while a client clock is just wrong. ⚠️ It has to be ONE decision per surface set: the
+  HUD's rails read the trimmed series through `components/useTrendRoster.ts` for exactly this reason,
+  or a cursor parked on the newest bucket quotes a number no chart on screen agrees with.
+- **The CONTAINING bucket, never the nearest** (`bucketAt`). A mark one bucket off is a chart naming
+  the wrong day in the one place a reader could never catch it, so an instant outside a chart's span
+  draws nothing at all.

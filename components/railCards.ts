@@ -90,8 +90,8 @@ const DISPLAY_LANE: Partial<Record<Mode, readonly string[]>> = {
   // focus rung — the two snapshot slots' precedent, and `railLadderBoundary.test.ts` asserts
   // rung → slot rather than the reverse. It sits UNDER the dossier because the lane is a
   // containment claim read coarse→fine: a network is the subject, and the cursor is one moment of
-  // it. (The plane rung named in Task 1's focusLadder comment still has no card: a plane IS its
-  // network's chart, and the dossier above already stands for the network.)
+  // it. (A focused PLANE gets no card of its own: a plane IS its network's chart, and the dossier
+  // above already stands for the network — which is also why it is no ladder rung.)
   trend: ["context", "instant"],
 };
 

@@ -86,9 +86,12 @@ export const SCENE_RIG: Record<View3D, RigRow> = {
     rimAz: 2.7, rimEl: 0.5, rimInt: 0.7, rimTemp: -0.9,
     ambInt: 0.42, ambTemp: -1,
   },
-  // trend — almost no lit geometry (the shared time cursor and the ground plane), so this is a
-  // low, neutral wash rather than a sculpted look: ledger's row COPIED VERBATIM as the starting
-  // point (2026-09-18) and re-tuned live under `?tune` once the chart planes exist (Task 13).
+  // trend — NOTHING here is lit. The view's only WebGL object is the ground's hairline
+  // `LineBasicMaterial`, which is unlit by construction, and every chart plane is DOM composited
+  // over the canvas. So this row is inert today and exists to keep the blend well-formed: the rig
+  // blends by view presence, and a missing row would have the gather boundary reading a neighbour's
+  // look. Ledger's row verbatim (2026-09-18) — a low, neutral wash, which is the right shape for
+  // whatever lit geometry this view might gain.
   trend: {
     keyAz: 0.8, keyEl: 0.6, keyInt: 1.45, keyTemp: -0.2,
     fillAz: 0.3, fillEl: 0.15, fillInt: 0.42, fillTemp: -0.95,

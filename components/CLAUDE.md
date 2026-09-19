@@ -458,7 +458,7 @@ honest variant naming that fact; but "all" with 0 nodes is boot, so that ghost s
 flashing a false invite. A populated card renders in any 3D view; the ghost only appears where the view
 can actually produce the card.
 
-**The placeholder views host NO facts cards at all** — `detailsCards` returns `[]` outside the three 3D
+**The placeholder views host NO facts cards at all** — `detailsCards` returns `[]` outside the 3D
 views (user, 2026-08-10). A live node card, status pill and real ids beside a `preview · in development`
 wireframe is exactly the mixed signal rule 10 exists to prevent, and it arrived half-formed anyway: with
 no ladder for those views every present card fell through to Inspector's trailing non-ladder pass, which
@@ -469,7 +469,8 @@ matches the left rail, which shows About and no tool card there.
 
 **Bottom — the VITALS BAND** (`components/VitalsBand.tsx`, 2026-08-30 — the vitals left the crowded
 command bar; docs/superpowers/plans/2026-08-30-vitals-bottom-band.md is the plan). A slim full-width
-row of **read-only info cards**, one set per 3D view: hyper leads with a composition DONUT (the four
+row of **read-only info cards**, one set per STRUCTURAL 3D view (History's band holds the timeline
+instead — see the `bandContent` rule below): hyper leads with a composition DONUT (the four
 counts are shares of one fleet — the one honest home for a donut) plus its legend; geo shows its
 footprint numbers plus a nodes-by-country micro-bar row; the ledger shows its two rate cards (number +
 sparkline off the live buffers) beside the declicked tick bar-chart. This deliberately widens the old
@@ -611,41 +612,58 @@ or Escape clears it. ⚠️ **What is DRAWN is what is GRABBED** (`drawnSpan`, o
 the paint and the hit test): the track shows `trendRange` when one stands and otherwise the span the
 window pill implies, and computing those two separately left the visible rectangle ungrabbable in
 five of the six window states. Panning or resizing a window-implied span COMMITS it as a range —
-that is what the gesture means. ⚠️ **And the scrub writes ONCE PER BUCKET, not per pointermove**
-(`sameBucket`): the whole stack subscribes to `trendCursorMs`, so every write re-plans the fetch and
-repaints five charts, while two instants inside one bucket paint the identical frame. Measured on
-phone, a 300-event precise scrub went 271 writes / 1084 slice assemblies / 2.9 FPS → 45 / 0 / 9.8.
-⚠️ **A memo is only worth its key.** Two references were being rebuilt on the very renders the
-memos existed for, and both were invisible in review: the shell's `leadingTrim` call (it returns its
-input unchanged ONLY when there is no leading gap, and the live `all` window always has one), and
-the stack's triple `metricSeries` pass. Both are memoised now — and instrumenting the scrub turned
-up a third, a LAYOUT one: the cursor readout was content-sized beside a `flex-1` track, so a stamp
-changing width re-measured the track and re-derived its whole x↔ms geometry mid-gesture. A value
-slot reserves its width (the `NodeStars` rule, reaching a committed value). Across a 200-event
-scrub: `metricSeries` 8262 → **0**, `globalSeries`/`trackRuns`/`axisTicks` 306/334/334 → **0**. Both gestures want the whole track and the alternative (a modifier for one of
-⚠️ **AND THE CHARTS THEMSELVES WERE THE REST OF IT — the cursor is DRAWN OUTSIDE the memo now**
-(2026-09-19). With the shared cursor as a recharts `ReferenceLine`, a bucket write re-rendered all
-five planes' charts: measured over a 60-step scrub of the `all` window at 1500×1000, **22.1s /
-2.7 FPS / 600 plot renders → 1.4s / 40.7 FPS / 0**, and the hover sweep over the Layers rows
-**8.0s / 2.7 FPS / 220 → 0.44s / 36.5 FPS / 0**. Two halves, both structural: `TrendChart`'s
-recharts subtree is a `React.memo` child (`TrendPlot`) whose props are the SERIES alone, and the
-cursor is a 1px CSS overlay beside it, positioned by `cursorFraction` over the chart's own numeric
-axis — `calc()` on a percentage of the plot box, so it needs no measurement and rides the plane's
-projected scale for free. ⚠️ **A memo is only worth its props, and a hook that returns a fresh view
-object every render defeats one silently**: `useTrendRoster` composes its return value from a
-memoised pass, so a consumer must depend on `roster.rows`, never on `roster`. That one dep was why
-the first cut measured no faster at all. `components/trendStackBoundary.test.ts` pins both halves.
-them) is unreachable on touch, which is the surface this most needs to work on; TRAVEL is the one
-discriminator every pointer type reports. The cursor is a COMMIT — it persists when the pointer
-leaves, because the rail reads it — while hovering previews a faint line locally and writes
+that is what the gesture means. Both gestures want the whole track and the alternative (a modifier
+for one of them) is unreachable on touch, which is the surface this most needs to work on; TRAVEL is
+the one discriminator every pointer type reports. The cursor is a COMMIT — it persists when the
+pointer leaves, because the rail reads it — while hovering previews a faint line locally and writes
 nothing (rule 9). Every decision a pointer makes is pure and tested in
 `src/data/trendTimeline.ts`; the component is a shell over it, split in two at ~300 lines —
 `TrendTimeline.tsx` is the band TENANT (which payload, the readout, the pills, the honesty
 states) and `TrendTrack.tsx` the INSTRUMENT (the SVG and every gesture), because the track's whole
-subject is a geometry it measures itself and nothing above it has those numbers. The window pills are shared with the
-Trends document through `components/trendPickers.tsx` — the two had already been caught drifting
-once (user, 2026-09-09), so the class strings have one home, and since 2026-09-19 the METRIC picker,
-the setting SWITCH and the scope CHIP live there beside them for the same reason.
+subject is a geometry it measures itself and nothing above it has those numbers. The window pills
+are shared with the Trends document through `components/trendPickers.tsx` — the two had already been
+caught drifting once (user, 2026-09-09), so the class strings have one home, and since 2026-09-19
+the METRIC picker, the setting SWITCH and the scope CHIP live there beside them for the same reason.
+
+**THE SCRUB IS THIS VIEW'S PRIMARY GESTURE, AND FOUR SEPARATE MEMO FAILURES MADE IT UNUSABLE.** All
+four were invisible in review and visible only in a frame counter, so they are recorded with their
+measurements — this is the shape the next one will take too.
+
+⚠️ **The scrub writes ONCE PER BUCKET, not per pointermove** (`sameBucket`, both gestures): the whole
+stack subscribes to `trendCursorMs`, so every write re-plans the fetch and repaints five charts,
+while two instants inside one bucket paint the identical frame. Measured on phone, a 300-event
+precise scrub went 271 writes / 1084 slice assemblies / 2.9 FPS → 45 / 0 / 9.8.
+
+⚠️ **A memo is only worth its key.** Two references were being rebuilt on the very renders the
+memos existed for: the shell's `leadingTrim` call (it returns its input unchanged ONLY when there is
+no leading gap, and the live `all` window always has one), and the stack's triple `metricSeries`
+pass. Both are memoised — and instrumenting the scrub turned up a third, a LAYOUT one: the cursor
+readout was content-sized beside a `flex-1` track, so a stamp changing width re-measured the track
+and re-derived its whole x↔ms geometry mid-gesture. A value slot reserves its width (the `NodeStars`
+rule, reaching a committed value). Across a 200-event scrub: `metricSeries` 8262 → **0**,
+`globalSeries`/`trackRuns`/`axisTicks` 306/334/334 → **0**.
+
+⚠️ **The charts themselves were the rest of it — the cursor is DRAWN OUTSIDE the memo** (2026-09-19).
+With the shared cursor as a recharts `ReferenceLine`, a bucket write re-rendered all five planes'
+charts: measured over a 60-step scrub of the `all` window at 1500×1000, **22.1s / 2.7 FPS / 600 plot
+renders → 1.4s / 40.7 FPS / 0**, and the hover sweep over the Layers rows **8.0s / 2.7 FPS / 220 →
+0.44s / 36.5 FPS / 0**. Two halves, both structural: `TrendChart`'s recharts subtree is a
+`React.memo` child (`TrendPlot`) whose props are the SERIES alone, and the cursor is a 1px CSS
+overlay beside it, positioned by `cursorFraction` over the chart's own numeric axis — `calc()` on a
+percentage of the plot box, so it needs no measurement and rides the plane's projected scale for
+free. `components/trendStackBoundary.test.ts` pins both halves, and the plot box they rest on: the
+chart keeps `<YAxis hide` (a shown axis would reserve width) and the one `PLOT_MARGIN` that both the
+plot and the overlay inset by.
+
+⚠️ **A memo is only worth its PROPS, and a hook that composes a fresh view object every render
+defeats one silently.** `useTrendRoster` runs its expensive pass in a `useMemo` and then returns a
+`{…}` built from it — which for one round was a new reference on every render, so a consumer's
+`useMemo([roster])` could not tell content-free churn from a real change, and the first cut of the
+measurement above came back no faster at all. The hook memoises its RETURN as well, on the pass plus
+stable or primitive fields, so `roster` itself holds still and a consumer may depend on it or on
+`roster.rows` alike. Keep it that way: every field it returns has to be the memoised pass, a
+reference its caller holds still, or something derived from a primitive dep — a field computed
+inline in the return would quietly restore the bug for every consumer at once.
 
 ### Boot entrance, routes & the doc overlay (2026-09-04)
 
@@ -655,6 +673,13 @@ the setting SWITCH and the scope CHIP live there beside them for the same reason
   `components/views.ts` (name + slug + desc). The bar button, the route (`app/[view]` +
   sitemap read `ROUTED_VIEWS`), the footer link, the gather/entry choreography, boot staging
   and the URL bridge all follow from those homes.
+  **History proved it** (2026-09-18): a fourth view landed through exactly those registries plus
+  `cameraRig`'s `FOCI`/rest-pose entry and a `sceneRig` row, and the policy row grew six fields
+  rather than the app growing six mode compares — `fleet` (placed or parked), `rawSurface` (which
+  register RAW shows), `chartStack` (does the DOM plane layer mount), `autoRotate` (does the camera
+  idle-orbit; it replaced a `mode !== "geo"` deny-list that had already silently handed the new view
+  hyper's spin), `bandContent` (vitals cells or the timeline) and `show.trendGround`. Each is the
+  same move: a question the app was answering by silence becomes a question every view answers.
 - **The placeholder is ONE view** ("soon", consolidated 2026-09-04 — three modes said the same
   nothing three times): one dimmed "Coming soon" bar entry, one FLAT policy row, and the
   Blueprint GALLERY inside it previews every coming feature (each keeping the mark it wore as a

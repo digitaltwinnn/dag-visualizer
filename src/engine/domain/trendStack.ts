@@ -147,7 +147,8 @@ export function pagerVisible(count: number): boolean {
  * the stack reads as one sequence — at full scale and opacity, and marks it the sole interactive
  * plane. Its neighbours keep exactly the slot pose they would have had with no focus: `n` does not
  * change when a plane is focused, so the lift does not close the gap it leaves. A focus naming a
- * plane OUTSIDE the window lifts nothing (a later task scrolls it into view first), and
+ * plane OUTSIDE the window lifts nothing — the ONE EXECUTOR pages it into the window first, which
+ * is why a plane focus goes through the click table rather than straight to its setter — and
  * interactivity falls back to the no-focus rule. With no focus at all, only slot 0 is interactive.
  * In `flat` a focus changes no geometry and every plane is interactive regardless: nothing is
  * covered there, so there is nothing for the rule to protect.

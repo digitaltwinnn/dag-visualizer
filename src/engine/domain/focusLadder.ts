@@ -69,9 +69,11 @@ export const LADDERS: Record<View3D, Rung[]> = {
     { level: "network", active: (s) => s.filter !== "all", resolver: "ledgerNetwork" },
     { level: "all",     active: () => true,                resolver: "ledgerOverview" },
   ],
-  // The trends ladder: a PLANE (one network's chart) is the fine rung, the committed network the
-  // coarse one. There is no node rung — a node has no chart of its own. `trendPlane` frames the
-  // focused plane (the 5b dolly); `trendNetwork` is its parent and `trendOverview` the resting stack.
+  // The trends ladder: the committed NETWORK is its one fine rung, over the resting stack. There is
+  // no node rung — a node has no chart of its own — and no PLANE rung either: bringing a plane
+  // forward is view-local emphasis (`trendFocus`), not a committed subject, so it has no ladder
+  // level and no card. The camera answers it all the same, as `trendOverview`'s one state-keyed
+  // lean, which `trendNetwork` inherits by delegating (camera principle 2).
   trend: [
     { level: "network", active: (s) => s.filter !== "all", resolver: "trendNetwork" },
     { level: "all",     active: () => true,                resolver: "trendOverview" },

@@ -465,6 +465,38 @@ every frame to serve the occasional click. `scene/instancedBounds.test.ts` pins 
 lesson: it must strip COMMENTS before counting, because the notes at these sites quote three's API and
 a naive regex counted the prose, which let the test pass with the fix deliberately removed.
 
+## The History view's ground
+
+`views/TrendsView.ts` is the ONLY thing History draws in WebGL, and it is one `LineSegments`: a level
+floor of horizontal rungs, one per slot of the DOM chart stack. The view's content is DOM
+(`components/TrendStack.tsx`, placed per frame by the engine's `TrendStackSync`), so the canvas under
+it is empty by design — and empty is the problem. A composited DOM layer carries no depth cues of its
+own, so with nothing behind them five planes read as five unrelated cards rather than as one stack
+receding into history. Each rung is the plane's FOOTPRINT — same depth, same width, same stagger,
+derived from `domain/trendStack.ts`'s own arithmetic rather than eyeballed against a screenshot — so
+re-tuning the stagger re-tunes the ground with it.
+
+Four decisions are recorded in the file's header and worth knowing before touching it:
+
+- **It is static furniture.** Built once, re-baked only on a theme flip, with no `update(dt)` at all;
+  its one per-frame input is the transition's furniture alpha through the shared `FadeSet`. Its root's
+  `visible` is the Engine's, from `viewPolicy.show.trendGround` (rule 6).
+- **THE RUNG FALLOFF IS THE STACK'S OWN, SQUARED, and the square is what DOM forces.** A chart plane
+  composites in front of the canvas whatever the depth buffer says, and it is transparent — so a rear
+  rung that any ordinary scene would hide behind the front plane instead shows THROUGH the plot being
+  read, where a horizontal hairline reads as a gridline. That is a claim about the DATA, which
+  furniture may not make. Measured at the resting pose, slots 2 and back land inside the front chart's
+  plot area and no drop escapes it, so the far rungs fade to almost nothing and the near ones carry
+  the axis. Any new 3D mark in this view meets the same constraint.
+- **The floor is LEVEL and there are no side rails.** A ramp putting each rung under its own plane
+  cannot work (`PLANE_STEP_Y` is smaller than a plane's own height, so the planes overlap and every
+  rung lands inside the plot in front of it), and rails joining the rungs' ends drew one hard diagonal
+  across the front chart. Both were built and cut after a look; the rungs alone carry the recession.
+- **The time cursor is NOT here.** One WebGL quad spanning the stack cannot line up with five
+  differently placed, differently scaled recharts plot areas, so the mark would miss its bucket on
+  four planes out of five — a cursor that misstates the data (rule 10). It is drawn per plane, in the
+  plane's own coordinate system, by the chart that owns the scale.
+
 ## The instance audit (dev only)
 
 `scene/instanceAudit.ts` + `Engine._auditPass` sweep what the frame ACTUALLY wrote into the node
