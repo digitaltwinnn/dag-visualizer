@@ -44,7 +44,7 @@ import { type Tap, DOUBLE_TAP_SLOP, LONG_PRESS_MS, LONG_PRESS_LINGER_MS, isDoubl
 import { auditInstances, findingKey, type InstanceFinding } from "./scene/instanceAudit";
 import { CalloutSync, type CalloutState } from "./CalloutSync";
 import { TrendStackSync, type TrendStackState } from "./TrendStackSync";
-import { focusDepth } from "./domain/trendStack";
+import { VISIBLE_PLANES, focusDepth, loneShiftPx, windowCount } from "./domain/trendStack";
 import { DevTunePanel } from "./DevTunePanel";
 import { CameraDirector } from "./CameraDirector";
 import type { GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
@@ -2178,7 +2178,15 @@ export class Engine {
     this.trends.setViewAlpha(trendAlpha);
     // The rungs are billboards like the cards above them — re-laid along the camera's right vector
     // (a no-op while the camera's orientation holds still, and skipped while the view is dark).
-    if (trendAlpha > 0.001) this.trends.face(this.ctx.camera);
+    // One rung per card that is there, and a lone card's rung takes the card's own screen shift.
+    if (trendAlpha > 0.001) {
+      const n = windowCount(useStore.getState().trendIds.length);
+      // Before React has published a roster there is no count to draw — hold the full floor
+      // rather than building the room around an empty one and popping the rungs in afterwards.
+      const count = n === 0 ? VISIBLE_PLANES : n;
+      const shift = loneShiftPx(count, railGapShiftPx(window.innerWidth, this.railsHidden));
+      this.trends.face(this.ctx.camera, count, shift, this.ctx.renderer.domElement.clientHeight || window.innerHeight);
+    }
     // The stage light's per-view PRESENCE, published BEFORE the view updates that claim it: a claim
     // is scaled by its view's furniture alpha, so a fading view's light fades with its furniture and
     // a dark view's claim is worth nothing. That is the whole off-switch — not claiming IS off.

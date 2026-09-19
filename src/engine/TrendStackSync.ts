@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { PLANE_PX_W, PLANE_WORLD_W, stackPoses } from "./domain/trendStack";
+import { PLANE_PX_W, PLANE_WORLD_W, loneShiftPx, stackPoses } from "./domain/trendStack";
 
 // THE TREND STACK'S PER-FRAME PLACEMENT — `CalloutSync`'s sibling, and the second instance of the
 // same mechanism (2026-09-18). React renders one transparent DOM plane per network
@@ -171,7 +171,7 @@ export class TrendStackSync {
       this._retarget(st);
       retarget = true;
     }
-    const shiftT = this._order.length === 1 ? st.gapShiftPx : 0;
+    const shiftT = loneShiftPx(this._order.length, st.gapShiftPx);
     if (shiftT !== this._shiftT) {
       // Arriving in the view with a lone plane starts AT the target, like a first-seen pose.
       if (!this._wasActive) this._shift = shiftT;

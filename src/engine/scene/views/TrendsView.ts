@@ -20,10 +20,15 @@
 // coordinate system, by the chart that owns the scale: `TrendChart`'s `cursorMs` prop over
 // `src/data/trendWindow.ts`'s `bucketAt`.
 //
-// ⚠️ NOTHING HERE RUNS PER FRAME. The grid is static furniture — built once, re-styled only on a
-// theme flip — and its one per-frame input is the transition's furniture alpha, which arrives
-// through the `FadeSet` like every other view's. There is no `update(dt)` to call and the Engine
-// does not call one.
+// ⚠️ ONE RUNG PER CARD THAT IS THERE (user, 2026-09-19). The floor first drew all five slots
+// whatever the roster held, on the argument that it states the stack's SHAPE — and under a
+// committed filter that left four lines receding behind a single card, footprints of planes that
+// do not exist. `face()` takes the window's count and lays exactly that many rungs, centred on the
+// same `staggerCentre(count)` the poses use, so the floor is the footprint of what stands on it.
+//
+// ⚠️ THERE IS NO `update(dt)`. The floor is furniture: colours are baked on a theme flip, the
+// transition's alpha arrives through the `FadeSet`, and `face()` — the one per-frame call —
+// returns before touching the buffer while its inputs hold still.
 //
 // ⚠️ AND IT NEVER WRITES ITS ROOT'S `visible` (rule 6). Root-group visibility is view LIFECYCLE
 // and the Engine owns it, from `viewPolicy.show.trendGround` — a row on the allow-list rather
@@ -46,15 +51,11 @@ import { glowBlend, inkMix, isLightGround, type SceneColors } from "../../sceneC
 import { FadeSet } from "../objects/FadeSet";
 import type { SceneView } from "./SceneView";
 
-/** The stagger's centre — `stackPoses`' own `staggerCentre` for a full window. The ground draws the SHAPE
- *  of the stack, which is the full five slots whether or not the roster fills them; a ground that
- *  shrank with a short roster would be a second, disagreeing statement about where the stack is. */
-const MID = staggerCentre(VISIBLE_PLANES);
 
 /** Slot indices the ground draws a rung for, front to back — one per slot. There was a sixth, in
  *  FRONT of slot 0, for a focused plane that stood ahead of the stack; a focus RE-DEALS the deck
  *  now (the focused card takes slot 0), so no card ever stands out there. */
-const RUNGS = [0, 1, 2, 3, 4];
+const RUNGS = Array.from({ length: VISIBLE_PLANES }, (_, i) => i);
 
 /** How much presence a rung loses per slot of depth — the FLOOR's own recession. It was the
  *  planes' `OPACITY_FALLOFF` while they faded with depth; the cards are opaque now (2026-09-19), so
@@ -88,8 +89,9 @@ const RUNG_FALLOFF = 0.16;
  *  stagger — the shadow the stack would cast. */
 const GROUND_DROP = PLANE_WORLD_H / 2 + PLANE_STEP_Y / 2 + PLANE_WORLD_H * 0.12;
 
-/** The floor's one world height, from the layout constants alone. */
-const GROUND_Y = PLANE_Y - MID * PLANE_STEP_Y - GROUND_DROP;
+/** The floor's world height under a window of `count` planes: `GROUND_DROP` below the FRONT
+ *  card's centre, which `stackPoses` places from the same `staggerCentre`. */
+const groundY = (count: number): number => PLANE_Y - staggerCentre(count) * PLANE_STEP_Y - GROUND_DROP;
 
 /** The nearest rung's PRESENCE, one number per ground — how much of the accent the floor carries
  *  at the front. Quiet by intent on both: this is furniture establishing an axis, and everything a
@@ -125,7 +127,7 @@ const slotPresence = (i: number, paper: boolean): number => {
  *  floor drops (see `GROUND_DROP`). One home: re-tune the stagger in `domain/trendStack.ts` and
  *  the ground follows, because it is derived from the same arithmetic rather than eyeballed
  *  against a screenshot of it. */
-const slotX = (i: number): number => (i - MID) * PLANE_STEP_X;
+const slotX = (i: number, count: number): number => (i - staggerCentre(count)) * PLANE_STEP_X;
 const slotZ = (i: number): number => -i * PLANE_GAP;
 
 /** Half the width of the card standing on rung `i` — the card's world width at ITS slot's scale
@@ -149,10 +151,17 @@ export class TrendsView implements SceneView {
   private readonly _col = new THREE.Color();
   /** `face()`'s scratch, and the camera orientation it last laid the rungs for (NaN = never). */
   private readonly _right = new THREE.Vector3();
+  private readonly _fwd = new THREE.Vector3();
   private _qx = NaN;
   private _qy = NaN;
   private _qz = NaN;
   private _qw = NaN;
+  private _count = -1;
+  private _shiftPx = 0;
+  private _viewH = 0;
+  private _px = NaN;
+  private _py = NaN;
+  private _pz = NaN;
 
   constructor(scene: THREE.Scene, colors: SceneColors) {
     this._colors = colors;
@@ -163,7 +172,8 @@ export class TrendsView implements SceneView {
     // world X here; `face()` re-lays them along the camera's right vector before the first frame
     // draws, so this is only the buffer's shape.
     for (const i of RUNGS) {
-      pos.push(slotX(i) - halfW(i), GROUND_Y, slotZ(i), slotX(i) + halfW(i), GROUND_Y, slotZ(i));
+      const y = groundY(VISIBLE_PLANES);
+      pos.push(slotX(i, VISIBLE_PLANES) - halfW(i), y, slotZ(i), slotX(i, VISIBLE_PLANES) + halfW(i), y, slotZ(i));
       this._vertSlot.push(i, i);
     }
 
@@ -207,20 +217,44 @@ export class TrendsView implements SceneView {
    *  so that is what a rung is: its CENTRE is layout data (the slot's x and z on the level floor),
    *  its DIRECTION is the camera's.
    *
-   *  Per-frame, allocation-free (rule 5): one scratch vector, writes straight into the position
-   *  buffer, and skips entirely while the camera's orientation holds still — which, in a view
-   *  whose camera does not idle-orbit, is nearly always. */
-  face(camera: THREE.Camera): void {
+   *  `count` is how many planes the window holds (`trendStack.windowCount`) — one rung each, and a
+   *  rung past the count collapses to a point, which draws nothing. `shiftPx` is the SCREEN shift
+   *  the projector gives a lone card (`trendStack.loneShiftPx`); the rung takes the same shift,
+   *  converted to world units at its own view depth and laid along the camera's right vector, so
+   *  the line stays under the card it belongs to. `viewH` is the canvas height that conversion
+   *  needs. All three are plain data handed in by the Engine.
+   *
+   *  Per-frame, allocation-free (rule 5): two scratch vectors, writes straight into the position
+   *  buffer, and skips entirely while its inputs hold still — the camera's orientation always, and
+   *  its position too while a shift stands (the px→world conversion reads the view depth). */
+  face(camera: THREE.PerspectiveCamera, count: number, shiftPx: number, viewH: number): void {
     const q = camera.quaternion;
-    if (q.x === this._qx && q.y === this._qy && q.z === this._qz && q.w === this._qw) return;
+    const p = camera.position;
+    const still =
+      q.x === this._qx && q.y === this._qy && q.z === this._qz && q.w === this._qw &&
+      count === this._count && shiftPx === this._shiftPx &&
+      (shiftPx === 0 || (viewH === this._viewH && p.x === this._px && p.y === this._py && p.z === this._pz));
+    if (still) return;
     this._qx = q.x; this._qy = q.y; this._qz = q.z; this._qw = q.w;
+    this._count = count; this._shiftPx = shiftPx; this._viewH = viewH;
+    this._px = p.x; this._py = p.y; this._pz = p.z;
     this._right.set(1, 0, 0).applyQuaternion(q);
+    this._fwd.set(0, 0, -1).applyQuaternion(q);
+    // px per world unit at one unit of depth — the projector's own expression.
+    const pxPerUnitAt1 = viewH / (2 * Math.tan((camera.fov * Math.PI) / 360));
+    const y = groundY(count);
     const attr = this._lines.geometry.getAttribute("position") as THREE.BufferAttribute;
     for (let r = 0; r < RUNGS.length; r++) {
       const i = RUNGS[r];
-      const cx = slotX(i), cz = slotZ(i), h = halfW(i);
-      attr.setXYZ(r * 2, cx - this._right.x * h, GROUND_Y - this._right.y * h, cz - this._right.z * h);
-      attr.setXYZ(r * 2 + 1, cx + this._right.x * h, GROUND_Y + this._right.y * h, cz + this._right.z * h);
+      const h = i < count ? halfW(i) : 0;
+      let cx = slotX(i, count), cy = y, cz = slotZ(i);
+      if (shiftPx !== 0 && pxPerUnitAt1 > 0) {
+        const d = (cx - p.x) * this._fwd.x + (cy - p.y) * this._fwd.y + (cz - p.z) * this._fwd.z;
+        const s = d > 0 ? (shiftPx * d) / pxPerUnitAt1 : 0;
+        cx += this._right.x * s; cy += this._right.y * s; cz += this._right.z * s;
+      }
+      attr.setXYZ(r * 2, cx - this._right.x * h, cy - this._right.y * h, cz - this._right.z * h);
+      attr.setXYZ(r * 2 + 1, cx + this._right.x * h, cy + this._right.y * h, cz + this._right.z * h);
     }
     attr.needsUpdate = true;
   }

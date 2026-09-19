@@ -17,6 +17,8 @@ import {
   STAGGER_ANCHOR,
   VISIBLE_PLANES,
   focusDepth,
+  loneShiftPx,
+  windowCount,
   focusInWindow,
   scrollToKeep,
   scrollToShow,
@@ -434,5 +436,28 @@ describe("scrollToKeep — a re-rank may not take away the card the reader put i
     expect(scrollToKeep(ELEVEN, ["a", "c"], "b", 0)).toBe(0);
     expect(scrollToKeep(ELEVEN, [], "b", 0)).toBe(0); // the unmount publish
     expect(scrollToKeep([], ELEVEN, "k", 0)).toBe(0); // the remount publish: nothing was on screen
+  });
+});
+
+describe("windowCount — how many cards stand on the floor", () => {
+  it("is the roster's size up to the window, and agrees with the poses for every size", () => {
+    for (let n = 0; n <= 12; n++) {
+      const ids = Array.from({ length: n }, (_, i) => `n${i}`);
+      expect(windowCount(n)).toBe(stackPoses(ids, { scroll: 0, focus: null }).length);
+      expect(windowCount(n)).toBe(stackPoses(ids, { scroll: 99, focus: null }).length);
+    }
+    expect(windowCount(-1)).toBe(0);
+  });
+});
+
+describe("loneShiftPx — only a card that stands ALONE centres in the rails' gap", () => {
+  it("hands the gap's shift to a window of one, and nothing to any other", () => {
+    expect(loneShiftPx(1, -28)).toBe(-28);
+    for (const n of [0, 2, 3, VISIBLE_PLANES]) expect(loneShiftPx(n, -28)).toBe(0);
+  });
+
+  it("a lone card sits at the stagger's origin, which is what the shift is measured from", () => {
+    const [only] = stackPoses(["solo"], { scroll: 0, focus: null });
+    expect(only.x).toBe(0);
   });
 });

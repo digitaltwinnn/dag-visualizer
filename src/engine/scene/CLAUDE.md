@@ -468,7 +468,9 @@ a naive regex counted the prose, which let the test pass with the fix deliberate
 ## The History view's ground
 
 `views/TrendsView.ts` is the ONLY thing History draws in WebGL, and it is one `LineSegments`: a level
-floor of horizontal rungs, one per slot of the DOM chart stack. The view's content is DOM
+floor of horizontal rungs, one per CARD the DOM chart stack is showing — five under a full window,
+one under a filtered stack's lone card (which also takes that card's screen shift into the rails'
+gap, `trendStack.loneShiftPx`), so the floor is always the footprint of what stands on it. The view's content is DOM
 (`components/TrendStack.tsx`, placed per frame by the engine's `TrendStackSync`), so the canvas under
 it is empty by design — and empty is the problem. A composited DOM layer carries no depth cues of its
 own, so with nothing behind them five planes read as five unrelated cards rather than as one stack
@@ -478,8 +480,9 @@ re-tuning the stagger re-tunes the ground with it.
 
 Four decisions are recorded in the file's header and worth knowing before touching it:
 
-- **It is static furniture.** Built once, re-baked only on a theme flip, with no `update(dt)` at all;
-  its one per-frame input is the transition's furniture alpha through the shared `FadeSet`. Its root's
+- **It is furniture.** Colours are baked on a theme flip and there is no `update(dt)`; per frame it
+  takes the transition's furniture alpha through the shared `FadeSet`, and `face()` — which lays
+  the rungs along the camera's right vector and returns early while its inputs hold still. Its root's
   `visible` is the Engine's, from `viewPolicy.show.trendGround` (rule 6).
 - **THE RUNGS RECEDE ON THEIR OWN FALLOFF, SQUARED** (`RUNG_FALLOFF`). A chart plane composites in
   front of the canvas whatever the depth buffer says, and the planes are opaque cards — so a rung is

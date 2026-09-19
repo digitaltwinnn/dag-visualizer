@@ -92,6 +92,23 @@ export function staggerCentre(n: number): number {
   return ((Math.max(1, n) - 1) / 2) * STAGGER_ANCHOR;
 }
 
+/** How many planes the visible window holds for a roster of `total` — the count `stackPoses`
+ *  returns, stated without building the poses. The ground (`scene/views/TrendsView`) draws one
+ *  rung per plane that is actually there, and centres them on `staggerCentre` of this number, so
+ *  the floor and the stack can never disagree about how many cards stand on it. */
+export function windowCount(total: number): number {
+  return Math.max(0, Math.min(VISIBLE_PLANES, total));
+}
+
+/** The screen-space shift a window of `count` planes takes, given where the gap between the rails
+ *  is centred (`gatherLayout.railGapShiftPx`). Only a plane that stands ALONE takes it: one card
+ *  has no stack to compose it, so the gap's centre is the only centre it has, while a window of
+ *  two or more is composed by its stagger, which already lands the front card mid-gap. ONE home,
+ *  read by the projector (the card) and the Engine (the rung under it). */
+export function loneShiftPx(count: number, gapShiftPx: number): number {
+  return count === 1 ? gapShiftPx : 0;
+}
+
 /** THE PLANE'S WIDTH IN WORLD UNITS — the one number that ties this pose math to the DOM the
  *  projector scales. The plane's content is `PLANE_PX_W` CSS px wide at scale 1, so the projector
  *  resolves a slot's scale as `PLANE_WORLD_W × pxPerUnit / PLANE_PX_W`: state the plane's size
