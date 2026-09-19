@@ -63,7 +63,7 @@
 // at all, so it cannot orbit: the strips swallow that drag, which is the accepted cost of putting
 // a control over the scene. Every pixel that is not a header still orbits.)
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 
 import TrendChart, { type TrendLine } from "@/components/docs/TrendChart";
 import useTrendRoster from "@/components/useTrendRoster";
@@ -171,15 +171,18 @@ export default function TrendStack() {
   // React holds the fetched series the rank is computed from. `[]` whenever the stack is not
   // mounted — on the gate turning off and on unmount — so a view switch never leaves the
   // projector chasing planes that no longer exist.
+  //
+  // A LAYOUT effect: the publish can also move `trendScroll` (the store keeps a focused card on
+  // screen through a re-rank, in the same write), and that must land before paint — a passive
+  // effect would paint one frame of the new order under the old window, mounting the wrong planes.
   const setTrendIds = useStore((s) => s.setTrendIds);
-  useEffect(() => {
-    if (!on) {
-      setTrendIds(NO_IDS);
-      return;
-    }
-    setTrendIds(order);
-    return () => setTrendIds(NO_IDS);
+  useLayoutEffect(() => {
+    setTrendIds(on ? order : NO_IDS);
   }, [on, order, setTrendIds]);
+  // ⚠️ The UNMOUNT clear is its own effect. As the publish's cleanup it ran between every two
+  // orders, so the store went old → [] → new and never saw a re-rank at all — only an empty roster
+  // being filled — which is exactly the case `scrollToKeep` declines.
+  useEffect(() => () => setTrendIds(NO_IDS), [setTrendIds]);
 
   // ⚠️ ONE SCALE OR EACH ITS OWN, and the reader picks — `store.trendScale`, the document's own
   // control carried into the view. `shared` is the default because a stack is read AS a column

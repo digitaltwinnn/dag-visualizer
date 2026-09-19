@@ -20,6 +20,7 @@ import {
   VISIBLE_PLANES,
   focusDepth,
   focusInWindow,
+  scrollToKeep,
   scrollToShow,
   staggerCentre,
   stackPoses,
@@ -466,5 +467,36 @@ describe("pagerVisible — an axis with nothing to navigate is absent", () => {
     for (const n of [0, 1, VISIBLE_PLANES, VISIBLE_PLANES + 1, VISIBLE_PLANES + 4]) {
       expect(pagerVisible(n)).toBe(clampScroll(n, Number.MAX_SAFE_INTEGER) > 0);
     }
+  });
+});
+
+describe("scrollToKeep — a re-rank may not take away the card the reader put in front", () => {
+  const ELEVEN = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"];
+  // The same eleven re-ranked by another measure: "b" falls from 2nd to 9th.
+  const RERANKED = ["a", "c", "d", "e", "f", "g", "h", "i", "b", "j", "k"];
+
+  it("pages the window after a focus the new order dropped off screen — and the poses put it FIRST", () => {
+    const scroll = scrollToKeep(ELEVEN, RERANKED, "b", 0);
+    expect(focusInWindow(RERANKED, scroll, "b")).toBe(true);
+    expect(stackPoses(RERANKED, { layout: "stack", scroll, focus: "b" })[0].id).toBe("b");
+  });
+
+  it("moves nothing while the focus is still on screen — the re-deal already holds it in front", () => {
+    const next = ["c", "a", "d", "b", "e", "f", "g", "h", "i", "j", "k"];
+    expect(scrollToKeep(ELEVEN, next, "b", 0)).toBe(0);
+    expect(stackPoses(next, { layout: "stack", scroll: 0, focus: "b" })[0].id).toBe("b");
+  });
+
+  it("does not drag back a reader who had PAGED AWAY from their focus", () => {
+    // "b" was off screen under scroll 4 before the re-rank: the window was the reader's choice.
+    expect(scrollToKeep(ELEVEN, RERANKED, "b", 4)).toBe(4);
+  });
+
+  it("has no opinion without a focus, without a re-rank, or for a card the new roster lacks", () => {
+    expect(scrollToKeep(ELEVEN, RERANKED, null, 3)).toBe(3);
+    expect(scrollToKeep(ELEVEN, ELEVEN, "b", 0)).toBe(0);
+    expect(scrollToKeep(ELEVEN, ["a", "c"], "b", 0)).toBe(0);
+    expect(scrollToKeep(ELEVEN, [], "b", 0)).toBe(0); // the unmount publish
+    expect(scrollToKeep([], ELEVEN, "k", 0)).toBe(0); // the remount publish: nothing was on screen
   });
 });

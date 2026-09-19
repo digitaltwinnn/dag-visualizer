@@ -10,6 +10,7 @@ import type { ThemePref, Theme } from "@/src/theme/resolve";
 // (src/data/trendWindow.ts, read by the document's picker and by the stack), and a type-only
 // import keeps the store from holding a data-layer VALUE.
 import type { ZoomId } from "@/src/data/trendWindow";
+import { scrollToKeep } from "@/src/engine/domain/trendStack";
 
 // The active view. `hyper`/`geo`/`ledger`/`trend` all drive the 3D scene (every switch among
 // them runs the gather choreography); `soon` is THE one flat placeholder view (consolidated
@@ -668,6 +669,9 @@ export const useStore = create<AppState>((set) => ({
   // Stored BY REFERENCE — the array the publisher hands in is the one the Engine compares with
   // `!==`. No copy, no sort, no normalising: any of those would mint a fresh reference per call
   // and turn a no-op publish into a retarget (see the channel note on `trendIds`).
-  setTrendIds: (trendIds) => set({ trendIds }),
+  // ONE set, so the Engine never sees the new order under the old window: a focus the reader had
+  // in front is kept on screen through a re-rank (`scrollToKeep`), and two writes would release the
+  // camera's lean and re-apply it in the same tick.
+  setTrendIds: (trendIds) => set((s) => ({ trendIds, trendScroll: scrollToKeep(s.trendIds, trendIds, s.trendFocus, s.trendScroll) })),
   setTheme: (pref, resolved) => set({ themePref: pref, theme: resolved }),
 }));

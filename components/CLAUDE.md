@@ -277,7 +277,11 @@ HELD order released (`holdOrder`) so the projector eases each card to its new ra
 remounted five recharts plots inside an enter animation while the stack re-ranked — three things at
 once, and the stutter was exactly that. The roll is ONE attribute on the stack root (`data-roll`,
 `group/stack`), read by every plot's wrapper; the title answers the press at once and the cards
-follow. A step taken mid-sequence RETARGETS, never queues; reduced motion skips the sequence (an
+follow. **A card the reader focused stays in front through the re-rank** (user, 2026-09-19): the
+re-deal holds it at slot 0 whatever its new rank, and where the new order would drop it out of the
+visible window the store pages the window after it in the SAME write that publishes the order
+(`trendStack.scrollToKeep`, inside `setTrendIds`) — one write, so the camera's lean never releases.
+A step taken mid-sequence RETARGETS, never queues; reduced motion skips the sequence (an
 exit with transitions off is a 140ms blank).
 
 ⚠️ **A DRAG THAT STARTS ON A CARD IS THE SCENE'S ORBIT** (`components/orbitHandoff.ts`). The header

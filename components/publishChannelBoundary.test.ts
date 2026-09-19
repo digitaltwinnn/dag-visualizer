@@ -158,7 +158,9 @@ describe("trendIds carries the ranked roster, by reference", () => {
     const setter = /setTrendIds:\s*\(([^)]*)\)\s*=>\s*set\(([^\n]*)\)/.exec(store);
     expect(setter, "setTrendIds is no longer a one-line set() — re-check the by-reference rule").not.toBeNull();
     expect(
-      /\{\s*trendIds\s*\}/.test(setter![2]),
+      // `[,}]`: the setter may write the paging that keeps a focus on screen BESIDE the array
+      // (one atomic set) — what it may never do is store anything but the array it was handed.
+      /\{\s*trendIds\s*[,}]/.test(setter![2]),
       `setTrendIds must store the array as given, got: ${setter![2]}`,
     ).toBe(true);
   });

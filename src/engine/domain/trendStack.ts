@@ -352,3 +352,28 @@ export function scrollToShow(ids: readonly string[], id: string, scroll: number)
   if (i >= start + VISIBLE_PLANES) return clampScroll(ids.length, i - VISIBLE_PLANES + 1);
   return scroll; // already on screen under the window this scroll means
 }
+
+/**
+ * The scroll that KEEPS a standing focus on screen when the roster re-orders under it (user,
+ * 2026-09-19: "keep front row if user selected it"). A measure step or a poll re-ranks the stack
+ * busiest-first; a card the reader put in front is the one thing that ranking may not take away,
+ * so where the new order would drop it out of the visible window the window follows the card — and
+ * `stackPoses` then re-deals it to first place as before. Inside the window nothing is needed: the
+ * re-deal already holds it at slot 0 whatever its rank.
+ *
+ * ⚠️ ONLY A FOCUS THAT WAS ON SCREEN IS KEPT. A reader who paged away from their focus chose the
+ * window over the card, and a re-rank is not a reason to drag them back; `prev` is what says which
+ * of the two it was. An unchanged roster (`prev === next`, the by-reference publish) is no re-rank
+ * at all, and everything `scrollToShow` declines — an id the new roster does not hold, a roster
+ * still empty — this declines with it.
+ */
+export function scrollToKeep(
+  prev: readonly string[],
+  next: readonly string[],
+  focus: string | null,
+  scroll: number,
+): number {
+  if (focus === null || prev === next) return scroll;
+  if (!focusInWindow(prev, scroll, focus)) return scroll;
+  return scrollToShow(next, focus, scroll);
+}
