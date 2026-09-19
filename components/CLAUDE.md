@@ -3,7 +3,7 @@
 The React HUD: the four-zone shell, the card grammar and the Instrument-Glass design system.
 
 Split out of the root `CLAUDE.md` (2026-08-31) so it loads when you work here rather
-than on every session. The root file holds what this is, the eleven rules, run & test,
+than on every session. The root file holds what this is, the twelve rules, run & test,
 the architecture map and the dev workflow; **its rules govern this file too**.
 
 ## Layout — the four-zone HUD over a raw data layer
