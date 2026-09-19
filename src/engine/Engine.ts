@@ -44,7 +44,8 @@ import { type Tap, DOUBLE_TAP_SLOP, LONG_PRESS_MS, LONG_PRESS_LINGER_MS, isDoubl
 import { auditInstances, findingKey, type InstanceFinding } from "./scene/instanceAudit";
 import { CalloutSync, type CalloutState } from "./CalloutSync";
 import { TrendStackSync, type TrendStackState } from "./TrendStackSync";
-import { VISIBLE_PLANES, focusDepth, loneShiftPx, windowCount } from "./domain/trendStack";
+import { focusDepth, loneShiftPx, windowCount } from "./domain/trendStack";
+import { trendRoster } from "@/src/data/trendScope";
 import { DevTunePanel } from "./DevTunePanel";
 import { CameraDirector } from "./CameraDirector";
 import type { GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
@@ -2180,12 +2181,21 @@ export class Engine {
     // (a no-op while the camera's orientation holds still, and skipped while the view is dark).
     // One rung per card that is there, and a lone card's rung takes the card's own screen shift.
     if (trendAlpha > 0.001) {
-      const n = windowCount(useStore.getState().trendIds.length);
-      // Before React has published a roster there is no count to draw — hold the full floor
-      // rather than building the room around an empty one and popping the rungs in afterwards.
-      const count = n === 0 ? VISIBLE_PLANES : n;
+      // The published window when there is one; until React publishes (boot, a refetch) the count
+      // the SCOPE will hold — so the room is built around the floor it is about to have, and a
+      // scope with nothing to draw (`dag`, unlisted: `trendRoster` is empty) draws no floor at all
+      // under the sentence that says so.
+      const n = useStore.getState().trendIds.length;
+      if (n === 0 && this._scopeFor !== this.filter) {
+        this._scopeFor = this.filter;
+        this._scopeCount = trendRoster(this.filter).length; // event-time: once per filter, never per frame
+      }
+      const count = windowCount(n > 0 ? n : this._scopeCount);
       const shift = loneShiftPx(count, railGapShiftPx(window.innerWidth, this.railsHidden));
-      this.trends.face(this.ctx.camera, count, shift, this.ctx.renderer.domElement.clientHeight || window.innerHeight);
+      // The canvas height is only read while a shift needs converting — it is a layout read.
+      const viewH = shift !== 0 ? this.ctx.renderer.domElement.clientHeight || window.innerHeight : 0;
+      // `_frameDt`, the projector's own clock (`?slowmo` included), so floor and cards ease as one.
+      this.trends.face(this.ctx.camera, count, shift, viewH, this._frameDt);
     }
     // The stage light's per-view PRESENCE, published BEFORE the view updates that claim it: a claim
     // is scaled by its view's furniture alpha, so a fading view's light fades with its furniture and
@@ -2356,6 +2366,10 @@ export class Engine {
   // once and hands the projector the narrow slice it declares. ⚠️ MUTATED, NEVER RE-ALLOCATED —
   // this runs every frame and `TrendStackSync` copies nothing out of it, so one buffer is safe;
   // `ids` rides in by REFERENCE, which is the projector's whole change signal (store `trendIds`).
+  /** The scope's own roster size, memoised per filter — what the ground draws before React has
+   *  published a roster (see `_writeScene`). */
+  private _scopeFor: string | null = null;
+  private _scopeCount = 0;
   private _trendState: TrendStackState = { scroll: 0, focus: null, ids: [], gapShiftPx: 0 };
   private _syncTrendStack(): void {
     const st = useStore.getState();

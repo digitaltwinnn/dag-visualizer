@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { PLANE_PX_W, PLANE_WORLD_W, loneShiftPx, stackPoses } from "./domain/trendStack";
+import { PLANE_PX_W, PLANE_WORLD_W, STACK_EASE_K, loneShiftPx, stackPoses } from "./domain/trendStack";
 
 // THE TREND STACK'S PER-FRAME PLACEMENT — `CalloutSync`'s sibling, and the second instance of the
 // same mechanism (2026-09-18). React renders one transparent DOM plane per network
@@ -72,11 +72,6 @@ export interface TrendStackHost {
   active(): boolean;
 }
 
-/** The ease rate, in e-folds per second. A focus or paging change TRAVELS: the stack is a spatial
- *  claim about which network is in front, and a jump reads as a redraw rather than a movement.
- *  Frame-rate independent by construction (`1 − e^(−k·dt)`), so the same gesture takes the same
- *  wall-clock time at 12fps and at 120. */
-const EASE_K = 8;
 
 /** Settled-enough, in world units / scale factor. Below it the value snaps to target and the idle
  *  skip may engage — an ease that only ever approaches would keep the projector awake forever. */
@@ -237,7 +232,7 @@ export class TrendStackSync {
   }
 
   private _ease(dt: number): void {
-    const k = 1 - Math.exp(-EASE_K * dt);
+    const k = 1 - Math.exp(-STACK_EASE_K * dt);
     let settled = true;
     for (let i = 0; i < this._order.length; i++) {
       const sl = this._slots.get(this._order[i]!)!;

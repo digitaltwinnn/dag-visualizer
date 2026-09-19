@@ -25,8 +25,9 @@ const ENGINE_FILE = join(HERE, "Engine.ts");
 // not about a directory.
 const PROJECTORS = ["CalloutSync.ts", "TrendStackSync.ts"].map((f) => join(HERE, f));
 // Method names whose bodies run every frame (or per-record within a frame). `sync`/`_sync*` are
-// the projectors' own per-frame entry points and their helpers.
-const PER_FRAME = /^\s*(?:private\s+|public\s+)?(update|updateRotation|setMorph|sync|_sync\w+|write\w+|place\w+|_apply\w+|_integrate\w+|_derive\w+|_write\w+)\s*\(/;
+// the projectors' own per-frame entry points and their helpers; `face` is the History ground's
+// per-frame billboard pass (`scene/views/TrendsView`).
+const PER_FRAME = /^\s*(?:private\s+|public\s+)?(update|updateRotation|setMorph|face|sync|_sync\w+|write\w+|place\w+|_apply\w+|_integrate\w+|_derive\w+|_write\w+)\s*\(/;
 const ALLOC = /new\s+THREE\.\w+\(|\.clone\(\)/;
 
 function tsFiles(dir: string): string[] {

@@ -92,6 +92,14 @@ export function staggerCentre(n: number): number {
   return ((Math.max(1, n) - 1) / 2) * STAGGER_ANCHOR;
 }
 
+/** How fast the stack TRAVELS to a new arrangement, in e-folds per second (`1 − e^(−k·dt)`, so the
+ *  same gesture takes the same wall-clock time at 12fps and at 120). A focus or paging change is
+ *  a spatial claim about which network is in front, and a jump reads as a redraw rather than a
+ *  movement. ONE number for the cards (`TrendStackSync`) and the floor under them
+ *  (`scene/views/TrendsView`): two rates would slide a rung out from under its own card for the
+ *  length of every move. */
+export const STACK_EASE_K = 8;
+
 /** How many planes the visible window holds for a roster of `total` — the count `stackPoses`
  *  returns, stated without building the poses. The ground (`scene/views/TrendsView`) draws one
  *  rung per plane that is actually there, and centres them on `staggerCentre` of this number, so

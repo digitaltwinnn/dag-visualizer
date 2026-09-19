@@ -14,6 +14,7 @@ import {
   PLANE_WORLD_W,
   PLANE_Y,
   SCALE_FALLOFF,
+  STACK_EASE_K,
   STAGGER_ANCHOR,
   VISIBLE_PLANES,
   focusDepth,
@@ -459,5 +460,18 @@ describe("loneShiftPx — only a card that stands ALONE centres in the rails' ga
   it("a lone card sits at the stagger's origin, which is what the shift is measured from", () => {
     const [only] = stackPoses(["solo"], { scroll: 0, focus: null });
     expect(only.x).toBe(0);
+  });
+});
+
+describe("STACK_EASE_K — one travel rate for the cards and the floor under them", () => {
+  it("is a real, frame-rate independent ease: the same wall-clock move at 12fps and at 120", () => {
+    const travel = (fps: number, seconds: number): number => {
+      let v = 0;
+      for (let i = 0; i < fps * seconds; i++) v += (1 - v) * (1 - Math.exp(-STACK_EASE_K / fps));
+      return v;
+    };
+    expect(STACK_EASE_K).toBeGreaterThan(0);
+    expect(travel(12, 0.5)).toBeCloseTo(travel(120, 0.5), 6);
+    expect(travel(60, 1)).toBeGreaterThan(0.99); // settles inside a second — a gesture, not a drift
   });
 });

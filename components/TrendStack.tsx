@@ -287,6 +287,8 @@ export default function TrendStack() {
   if (empty) {
     return (
       <div id="trend-stack" className="absolute inset-0 pointer-events-none grid place-items-center z-[4]">
+        {/* The measure stays: it is the view's title, and stepping it is still a way forward. */}
+        <TrendMeasure metric={metric} onStep={stepMeasure} />
         <p className="max-w-[46ch] text-center text-label text-muted-foreground">
           {empty.fact} {empty.route}
         </p>
@@ -299,6 +301,7 @@ export default function TrendStack() {
   if (!p && error) {
     return (
       <div id="trend-stack" className="absolute inset-0 pointer-events-none grid place-items-center z-[4]">
+        <TrendMeasure metric={metric} onStep={stepMeasure} />
         <p className="text-label text-muted-foreground">
           The trends store is unreachable right now. It recovers on its own.
         </p>
@@ -458,9 +461,10 @@ export default function TrendStack() {
                   // LABEL IN NAME (WCAG 2.5.3): an `aria-label` replaces the accessible name, so it
                   // opens with the strip's own visible words — the network and its unit — and then
                   // says what the press does. "Dor Technologies per day — bring forward".
+                  // …and then the axis a reader cannot see from here: ↑/↓ steps the measure.
                   label: `${row.name} ${caption} — ${
                     focus === pose.id ? "send back" : "bring forward"
-                  }`,
+                  }. Up and down arrows change the measure`,
                 }}
               />
             )}

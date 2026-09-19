@@ -365,8 +365,8 @@ export function ledgerCommitTilt(pos: THREE.Vector3, target: THREE.Vector3, outP
 // the resting pose.
 //
 // ⚠️ THE GEOMETRY IS LAYOUT DATA, NEVER A RENDERED TRANSFORM (rule 6). `depth` is the stack's
-// own `FOCUS_LEAN`, through `domain/trendStack.focusDepth(ids, focus, layout, scroll)`, which the Engine
-// reads from the published roster, the committed focus, the layout and the paging scroll — never
+// own `FOCUS_LEAN`, through `domain/trendStack.focusDepth(ids, focus, scroll)`, which the Engine
+// reads from the published roster, the committed focus and the paging scroll — never
 // off a projected plane or a scene matrix. It is a PARAMETER for the same reason `aspectFit` takes
 // the aspect: the stack's spatial grammar lives in its own module, the camera's lean lives here,
 // and neither imports the other. Zero depth contributes exactly nothing, so the unfocused pose is
