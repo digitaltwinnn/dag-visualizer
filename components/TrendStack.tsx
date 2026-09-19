@@ -33,6 +33,12 @@
 // and a plane box around that would be a second edge around the same rectangle. So the plane is a
 // width and its content's height, and the only ink it adds is the header strip's plate.
 //
+// THE COLOUR IS AN AREA UNDER THE LINE, not a fill behind the plane (`fill`, opt-in on the chart
+// and passed nowhere else in the app). A hairline alone floating over the scene reads as a wire;
+// the area is what makes a plane read as a translucent SHEET, which is the whole depth illusion.
+// It is the line's own hue fading to nothing at the baseline, and it carries the line's gaps: an
+// unmeasured bucket is a hole in the fill too, never a bridge and never a drop to zero.
+//
 // ⚠️ NO BLUR, NO SHADOW, ANYWHERE ON A PLANE. Each would force the compositor to re-raster a
 // transformed layer every frame, with five planes under a per-frame matrix — the single biggest
 // cost of doing this in DOM at all. `components/trendStackBoundary.test.ts` keeps it that way.
@@ -324,6 +330,11 @@ export default function TrendStack() {
                 lines={linesById.get(pose.id)!}
                 scaleMax={sharedMax}
                 cursorMs={cursorMs}
+                // THE PLANE CARRIES ITS COLOUR AS AN AREA, and only here. A plane's body is fully
+                // transparent, so without the fill a chart is a wire in mid-air and five of them
+                // read as five wires rather than as sheets receding in depth. A plain boolean, so
+                // it holds the plot's memo as still as every other prop on this call.
+                fill
                 className="w-full"
                 // THE HEAD IS THE PLANE'S HEADER STRIP. The body is fully transparent — the
                 // chart's own hairline and its coloured line are all the ink it has — so this one

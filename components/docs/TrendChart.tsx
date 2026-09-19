@@ -1,7 +1,7 @@
 "use client";
 import { memo, useId, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
-import { CartesianGrid, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, CartesianGrid, ComposedChart, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { cn } from "@/lib/utils";
 import { bucketAt, cursorFraction } from "@/src/data/trendWindow";
 
@@ -78,6 +78,7 @@ export default function TrendChart({
   readout,
   scaleMax,
   cursorMs,
+  fill,
   note,
   className,
   headClassName,
@@ -145,6 +146,20 @@ export default function TrendChart({
    *  by this component as a CSS overlay beside the memoised plot rather than inside it — see the
    *  overlay's own comment, and `TrendPlot`'s, for the measurement that forced the split. */
   cursorMs?: number | null;
+  /** THE AREA UNDER THE FIRST LINE, IN ITS OWN HUE (2026-09-19) — opt-in, and the 3D stack's
+   *  planes are the only caller. A plane is a fully transparent body with one hairline, and a bare
+   *  line floating in a scene reads as a wire rather than as a LAYER; the fill is what makes five
+   *  planes read as translucent sheets receding in depth. The DOCUMENT passes nothing and renders
+   *  the same `LineChart` it always did — the area needs recharts' `ComposedChart` (`Area` returns
+   *  null in any other chart, recharts 3's own `chartName` guard), so the chart type is switched
+   *  only when this is on.
+   *
+   *  ⚠️ IT IS A GAP WHERE THE LINE IS (rule 10). The area carries `connectNulls={false}` like the
+   *  line, so an unmeasured bucket leaves a hole in the fill too — an area that bridged a gap, or
+   *  dropped to the baseline across it, would draw a measurement nobody took. Only the FIRST line
+   *  is filled: a dashed secondary reading is a second channel, and filling both would make the
+   *  pair unreadable. */
+  fill?: boolean;
   /** AN INSTRUMENT STATE THE SERIES CANNOT SAY (2026-09-18). When the caller knows something the
    *  points don't — most concretely that the payload this chart needs is still IN FLIGHT — it
    *  hands the words here and the plot is replaced by them, in the chart's own empty-state frame.
@@ -342,6 +357,7 @@ export default function TrendChart({
             sampled={sampled}
             gaps={gaps}
             onRange={onRange}
+            fill={fill}
           />
           {/* THE SHARED CURSOR, AS AN OVERLAY RATHER THAN A RECHARTS CHILD (Task 12b,
               2026-09-19). It marks the bucket that CONTAINS the instant (`bucketAt`) or nothing at
@@ -409,6 +425,7 @@ const TrendPlot = memo(function TrendPlot({
   sampled,
   gaps,
   onRange,
+  fill,
 }: {
   lines: TrendLine[];
   buckets: number[];
@@ -418,12 +435,24 @@ const TrendPlot = memo(function TrendPlot({
   sampled?: (number | null)[];
   gaps?: (number | null)[];
   onRange?: (fromMs: number, toMs: number) => void;
+  /** See the outer component's prop — a plain boolean, so it holds the memo still. */
+  fill?: boolean;
 }) {
   const n = buckets.length;
   const hue0 = lines[0]?.hue ?? "var(--primary)";
   // The hatch pattern's SVG id — per chart instance (useId), sanitized because url(#…)
   // fragments dislike the ':' React ids carry.
   const hatchId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
+  /** The area gradient's id, off the same per-instance base — a paint server is referenced by
+   *  document id, so two planes sharing one would have the second silently repaint the first. */
+  const fillId = `${hatchId}-fill`;
+  // ⚠️ THE CHART TYPE IS THE FILL'S ONLY COST, AND THE DOCUMENT NEVER PAYS IT. recharts 3's `Area`
+  // returns null unless the chart names itself `AreaChart` or `ComposedChart`, and `chartName` is
+  // the ONLY thing separating `LineChart` from `ComposedChart` in this version — same
+  // `CartesianChart`, same defaults, same tooltip cursor. So the swap is inert for everything
+  // below, and it is still made conditionally: with `fill` off the document renders the very
+  // element it rendered before, which is a proof rather than a comparison.
+  const Chart = fill ? ComposedChart : LineChart;
   // The in-flight drag, as bucket instants — preview only; the committed range lives on the
   // page (one selection, every chart). Cleared on release or when the pointer leaves.
   const [drag, setDrag] = useState<{ a: number; b: number } | null>(null);
@@ -572,7 +601,23 @@ const TrendPlot = memo(function TrendPlot({
   return (
     <>
           <ResponsiveContainer width="100%" height={PLOT_H + AXIS_H}>
-            <LineChart data={rows} syncId="trends" syncMethod="value" margin={PLOT_MARGIN} {...dragProps}>
+            <Chart data={rows} syncId="trends" syncMethod="value" margin={PLOT_MARGIN} {...dragProps}>
+              {/* THE FILL'S GRADIENT — light, not a slab. It runs from the line's own hue at the
+                  area's top edge to nothing at the baseline, so a plane reads as a translucent
+                  sheet rather than as a painted block, and five of them stacked stay legible
+                  through each other. `--trend-fill-top` is a NUMBER token, so its per-ground value
+                  is CSS's to decide (globals.css states both, by the `--ident-l` exception's own
+                  mechanism): on paper the hue is ink and the same presence would read as a slab.
+                  Colour is the hue string itself — a CSS variable or an identity oklch — so no
+                  literal enters here (rule 3). */}
+              {fill && (
+                <defs>
+                  <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={hue0} style={{ stopOpacity: "var(--trend-fill-top)" }} />
+                    <stop offset="100%" stopColor={hue0} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+              )}
               {/* The drag preview — the committed cut happens on the PAGE at release. */}
               {drag && (
                 <ReferenceArea
@@ -656,6 +701,29 @@ const TrendPlot = memo(function TrendPlot({
                   }
                 />
               ))}
+              {/* THE AREA, UNDER THE FIRST LINE ONLY. It is drawn before the lines so the hairline
+                  stays the plane's sharpest mark, and it takes no part in anything else: no
+                  stroke of its own (the `Line` beside it IS the edge), no dots, and
+                  `tooltipType="none"` so a hover reads one value per series rather than two
+                  readings of the same one. `connectNulls={false}` and `baseValue={0}` are the two
+                  honesty props — a gap in the series is a gap in the fill, and the fill's floor is
+                  the axis's own zero rather than whatever the window's minimum happens to be. */}
+              {fill && lines[0] && (
+                <Area
+                  dataKey={lines[0].label}
+                  type="linear"
+                  stroke="none"
+                  fill={`url(#${fillId})`}
+                  fillOpacity={1}
+                  baseValue={0}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                  dot={false}
+                  activeDot={false}
+                  legendType="none"
+                  tooltipType="none"
+                />
+              )}
               <Tooltip
                 isAnimationActive={false}
                 cursor={{ stroke: "var(--primary)", strokeOpacity: 0.4 }}
@@ -695,7 +763,7 @@ const TrendPlot = memo(function TrendPlot({
                   }}
                 />
               ))}
-            </LineChart>
+            </Chart>
           </ResponsiveContainer>
           {/* The y scale's one number, with its ROLE said (user, 2026-09-09: a bare number
               top-left beside the head's readout top-right was two unexplained values) — it

@@ -52,6 +52,21 @@ import { PLANE_PX_W } from "@/src/engine/domain/trendStack";
 //     So this one rule reaches the CHART's source as well as the stack's; the stack is the only
 //     surface that pays for the regression, which is why the pin lives with it.
 //
+// 10. THE CURSOR OVERLAY'S GEOMETRY IS AN AGREEMENT WITH RECHARTS (2026-09-19, a review finding
+//     deferred from Task 12b). That overlay is a `calc()` over a PERCENTAGE of the plate, and it is
+//     exact only because the plot box is knowable without measuring it: the chart's margin is
+//     `PLOT_MARGIN` — the same constant the overlay insets by — and the YAxis is `hide`, so recharts
+//     reserves nothing for it. Give the axis a width, or restate the margin at one of the two call
+//     sites, and every cursor on every plane lands a few pixels off the bucket it names, in the one
+//     place a reader could never catch it. Both halves are pinned here because both fail silently.
+//
+// 11. THE PLANES' AREA FILL IS OPT-IN, AND IT IS AS HONEST AS THE LINE (2026-09-19). The stack's
+//     planes pass `fill`; the DOCUMENT passes nothing and keeps its `LineChart` element unchanged,
+//     which is why the chart type is switched conditionally rather than swapped outright. And the
+//     area carries `connectNulls={false}` exactly as the line does — an area that bridged an
+//     unmeasured bucket, or dropped to the baseline across it, would draw a measurement nobody took
+//     (rule 10), and it is invisible in a screenshot of a window that happens to have no holes.
+//
 // EXEMPTIONS: none. The scan is these two files' source, comments stripped (the prose above and
 // each component's own header are allowed to name what the rules forbid).
 const FILE = "components/TrendStack.tsx";
@@ -160,6 +175,40 @@ describe("trend-stack boundary", () => {
     expect(
       /cursorFraction/.test(src),
       `${CHART} must position its cursor overlay with cursorFraction (src/data/trendWindow.ts) — the chart's own numeric axis, re-expressed as a fraction, so the overlay needs no measurement`,
+    ).toBe(true);
+  });
+
+  it("keeps the plot box the cursor overlay is calculated against", () => {
+    const src = stripComments(readFileSync(CHART, "utf8"));
+    expect(
+      /<YAxis\s+hide\b/.test(src),
+      `${CHART} must keep its YAxis \`hide\` — a shown axis reserves width, and the cursor overlay's calc() assumes the plot box starts at PLOT_MARGIN.left`,
+    ).toBe(true);
+    expect(
+      /margin=\{PLOT_MARGIN\}/.test(src),
+      `${CHART} must pass margin={PLOT_MARGIN} — the overlay insets by that same constant, and a restated margin puts every cursor off its bucket`,
+    ).toBe(true);
+  });
+
+  it("fills the planes' area without inventing a measurement", () => {
+    const src = stripComments(readFileSync(CHART, "utf8"));
+    // A bare JSX boolean attribute on its own line — the stack's one call site.
+    const passesFill = (f: string): boolean => /^\s*fill\s*$/m.test(stripComments(readFileSync(f, "utf8")));
+    expect(
+      passesFill(FILE),
+      `${FILE} must pass \`fill\` to TrendChart — the plane's colour is the area under its line`,
+    ).toBe(true);
+    // The document's own call sites must NOT: a filled document chart is a different page, and
+    // the chart type only leaves `LineChart` when the fill is on.
+    expect(
+      passesFill("components/docs/TrendsDoc.tsx"),
+      `components/docs/TrendsDoc.tsx passes \`fill\` — the document register is line-only`,
+    ).toBe(false);
+    // The area is a graphical item like the line, so it takes the line's own honesty prop. Two
+    // occurrences: the Line's and the Area's.
+    expect(
+      (src.match(/connectNulls=\{false\}/g) ?? []).length >= 2,
+      `${CHART} must give its Area \`connectNulls={false}\` too — a filled gap is a measurement nobody took (rule 10)`,
     ).toBe(true);
   });
 
