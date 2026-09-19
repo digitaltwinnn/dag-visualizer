@@ -4,7 +4,8 @@
 import type { View3D } from "./viewTransition";
 import type { TuneSchema } from "../tune";
 
-/** The views that stage a light. All three 3D views have a row — but the ledger's is claimed ONLY
+/** The views that stage a light: the three STRUCTURAL 3D views, each with a row. History stages
+ *  none — its planes are DOM charts, lit by nothing in the scene. The ledger's is claimed ONLY
  *  on a light ground (LedgerView gates the claim on `_paper`, and says so at the claim site), so on
  *  the dark ground the chamber still stages nothing and is lit by its own glass and emissive
  *  snapshots exactly as before. The reason it stages one at all on paper is the day glass: an

@@ -36,7 +36,7 @@ describe("subjectPairing", () => {
   });
 });
 
-// ── WHO OWNS A HOVER (2026-09-19, fix round 2) ──────────────────────────────────────────────
+// ── WHO OWNS A HOVER (2026-09-19) ──────────────────────────────────────────────
 // `hoverFilter` is ONE shared channel (convention 9): the top bar's filter strip writes it over
 // every catalog metagraph, the History rails over the whole roster, the chart stack over only the
 // planes currently on screen. So "is this id in MY list" is a DOMAIN question, and using it as an

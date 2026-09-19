@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { useStore } from "@/src/store/store";
 
-// THE SELECTION RECENCY STACK'S IDENTITY (2026-09-19, fix round 1).
+// THE SELECTION RECENCY STACK'S IDENTITY (2026-09-19).
 //
 // `selStack` is subscribed by `useLadderFocus`, which every explorer row and the whole facts rail
 // read. `bumpStack` rebuilt the array on EVERY write, so a channel that writes repeatedly with the

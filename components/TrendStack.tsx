@@ -125,7 +125,7 @@ export default function TrendStack() {
   // counter EDGE TRIM too, so a rail can never quote a number no chart on screen agrees with.
   const roster = useTrendRoster(slice, filter, metric);
   const { ranked, rows, buckets: axis, stepMs: step, unit: unitWord, pending } = roster;
-  // THE SCOPE WITH NOTHING TO DRAW (2026-09-19, Task 12's remainder): a `dag` or unlisted commit
+  // THE SCOPE WITH NOTHING TO DRAW (2026-09-19): a `dag` or unlisted commit
   // leaves the roster EMPTY, because the trends store keeps one series set per LISTED metagraph.
   // The sentences are `src/data/trendScope.ts`'s, shared with the document so the two registers of
   // this rung cannot say different things about the same commit.
@@ -183,7 +183,7 @@ export default function TrendStack() {
     [scaleMode, ranked, rows],
   );
 
-  // ⚠️ ONE `lines` ARRAY PER PLANE, HELD STILL (Task 12b, 2026-09-19). `TrendChart`'s plot is
+  // ⚠️ ONE `lines` ARRAY PER PLANE, HELD STILL (2026-09-19). `TrendChart`'s plot is
   // memoised, and a `lines={[…]}` literal in the JSX below would be a fresh reference on every
   // render — which is EVERY cursor write and every hover, the two things the memo exists to
   // absorb. The chart is a one-series chart here, so the array's whole content is the metric's

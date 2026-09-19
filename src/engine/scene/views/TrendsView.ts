@@ -10,8 +10,8 @@
 // plane at — each plane's FOOTPRINT, the shadow it would cast — so the recession is something the
 // eye can follow back instead of something the scale differences have to imply.
 //
-// ⚠️ THE TIME CURSOR IS NOT HERE, and that is a decision rather than an omission (controller
-// ruling R16). The plan gave this view a WebGL quad spanning the stack's depth at the cursor's
+// ⚠️ THE TIME CURSOR IS NOT HERE, and that is a decision rather than an omission
+// (2026-09-19). The plan gave this view a WebGL quad spanning the stack's depth at the cursor's
 // instant. With the stagger landed, one quad cannot line up with five differently placed,
 // differently scaled recharts plot areas — each has its own margins and its own axis strip — so
 // the mark would sit beside the bucket it claims to name on four planes out of five. A cursor

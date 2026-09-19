@@ -155,7 +155,7 @@ export default function useTrendRoster(
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const ranked = useMemo(() => pass.order, [rankedKey]);
 
-  // ⚠️ THE VIEW OBJECT IS MEMOISED TOO, NOT JUST THE PASS INSIDE IT (Task 12b, 2026-09-19). A
+  // ⚠️ THE VIEW OBJECT IS MEMOISED TOO, NOT JUST THE PASS INSIDE IT (2026-09-19). A
   // fresh `{…}` here every render is content-free churn that a consumer's `useMemo([roster])`
   // cannot tell apart from a real change — and it defeated the whole point of this hook's memo
   // exactly once, in the stack's `sharedMax` and its per-plane `lines`, where a scrub rebuilt both

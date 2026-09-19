@@ -42,8 +42,8 @@ import { PLANE_PX_W } from "@/src/engine/domain/trendStack";
 //     plane at the wrong size with nothing failing anywhere. The check reads the live
 //     `PLANE_PX_W` rather than naming a value, so re-tuning the plane can never quietly retire it.
 //
-//  9. THE CHART PRIMITIVE'S PLOT STAYS MEMOISED, AND THE CURSOR STAYS OUT OF IT (Task 12b,
-//     2026-09-19). Measured: with the shared cursor drawn as a recharts `ReferenceLine`, every
+//  9. THE CHART PRIMITIVE'S PLOT STAYS MEMOISED, AND THE CURSOR STAYS OUT OF IT
+//     (2026-09-19). Measured: with the shared cursor drawn as a recharts `ReferenceLine`, every
 //     bucket write re-rendered all five planes' charts and a scrub ran at 3-4 FPS — the view's
 //     primary gesture, unusable. The fix is structural, not a tuning: the recharts subtree is a
 //     `React.memo` child whose props are the series alone, and the cursor is a CSS overlay beside
@@ -53,7 +53,7 @@ import { PLANE_PX_W } from "@/src/engine/domain/trendStack";
 //     surface that pays for the regression, which is why the pin lives with it.
 //
 // 10. THE CURSOR OVERLAY'S GEOMETRY IS AN AGREEMENT WITH RECHARTS (2026-09-19, a review finding
-//     deferred from Task 12b). That overlay is a `calc()` over a PERCENTAGE of the plate, and it is
+//     deferred when the memo landed). That overlay is a `calc()` over a PERCENTAGE of the plate, and it is
 //     exact only because the plot box is knowable without measuring it: the chart's margin is
 //     `PLOT_MARGIN` — the same constant the overlay insets by — and the YAxis is `hide`, so recharts
 //     reserves nothing for it. Give the axis a width, or restate the margin at one of the two call
@@ -193,7 +193,7 @@ describe("trend-stack boundary", () => {
   it("fills the planes' area without inventing a measurement", () => {
     const src = stripComments(readFileSync(CHART, "utf8"));
     const doc = "components/docs/TrendsDoc.tsx";
-    // ⚠️ THE TAG, NOT THE LINE (fix round 1). The first cut matched `/^\s*fill\s*$/m` — a line
+    // ⚠️ THE TAG, NOT THE LINE (2026-09-19). The first cut matched `/^\s*fill\s*$/m` — a line
     // holding nothing but `fill` — which is how the STACK happens to be formatted and is not how
     // the DOCUMENT is: every `<TrendChart …>` there is one long line, so a `fill` added to any of
     // them would have sailed past the negative half of this rule. The prop is found inside the

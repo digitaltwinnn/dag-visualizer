@@ -36,8 +36,8 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 //     adjacent and only one of them may be one-shot. Moving the document behind RAW changed
 //     nothing about this — the bar keeps its filter over a raw layer, so the chips still cut the
 //     charts the reader is looking at, and this case simply moved home with the document.
-//  6. THE DOCUMENT OPENS ON WHAT THE SCENE WAS SHOWING, AND WRITES NOTHING BACK (R33,
-//     2026-09-19). Convention 12's ladder says each step down carries its context, and the two
+//  6. THE DOCUMENT OPENS ON WHAT THE SCENE WAS SHOWING, AND WRITES NOTHING BACK
+//     (2026-09-19). Convention 12's ladder says each step down carries its context, and the two
 //     faces of rung 2 are one step apart — a reader who brushed a range on the History timeline
 //     and pressed RAW used to be handed the whole measured span back. So `TrendsDoc` SEEDS its
 //     `zoom` from `store.trendWindow` and its `range` from `store.trendRange`, once at mount
@@ -124,7 +124,7 @@ describe("raw-surface boundary", () => {
     // Seeded — a lazy `useState` initialiser over a ONE-SHOT `getState()` read, per channel.
     expect(
       doc,
-      "TrendsDoc must seed its zoom from store.trendWindow at mount (R33 — the document opens on the window the scene was showing)",
+      "TrendsDoc must seed its zoom from store.trendWindow at mount — the document opens on the window the scene was showing",
     ).toMatch(/useState<ZoomId>\(\s*\(\)\s*=>\s*useStore\.getState\(\)\.trendWindow\s*\)/);
     expect(
       doc,

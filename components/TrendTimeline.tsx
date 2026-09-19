@@ -13,7 +13,7 @@ import { stampInstant } from "@/src/data/trendTimeline";
 import { useStore } from "@/src/store/store";
 
 // THE BAND'S TIMELINE (2026-09-18) — what the vitals band holds in the History view, per the
-// policy row `bandContent`. The three 3D structural views put read-only vitals cells here; this
+// policy row `bandContent`. The three STRUCTURAL 3D views put read-only vitals cells here; this
 // view puts the axis its planes are drawn against, because the thing a reader wants at the bottom
 // edge of a stack of charts is the WHOLE measured span and a way to say "there".
 //

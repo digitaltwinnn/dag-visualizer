@@ -125,7 +125,7 @@ layer's `.ig-panel` glass IS its sheet, and a plate on a plate flattens both. Ev
 RAW is identical there: the toggle shows pressed, Escape and the × return to the scene, and the
 command bar keeps its whole ordinary face, filter included.
 
-⚠️ **AND THE DOCUMENT OPENS ON WHAT THE SCENE WAS SHOWING** (R33, 2026-09-19). The step ACROSS the
+⚠️ **AND THE DOCUMENT OPENS ON WHAT THE SCENE WAS SHOWING** (2026-09-19). The step ACROSS the
 rung carries its context exactly as the step DOWN does: `TrendsDoc` seeds its `zoom` from
 `store.trendWindow` and its `range` from `store.trendRange` — a brushed range arrives with
 `metaId: null`, since the timeline brushes the whole stack rather than one plane. These are its

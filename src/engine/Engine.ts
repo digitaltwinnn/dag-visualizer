@@ -2223,9 +2223,10 @@ export class Engine {
       this.layers.root.visible = show.ledger; // ledger: hubs become the metagraph-L0 row; flat: hidden
       this.layers.coreGroup.visible = false;
     }
-    // True for all three 3D views (the shared nodes never blink out mid-flight); the flat
-    // "soon" views set it false, but the PARKED staging grids live in this group too — the
-    // active/staged machine keeps it visible so the fleet shows above the Blueprint.
+    // True for the three views that PLACE the shared fleet (the nodes never blink out
+    // mid-flight). History PARKS it instead (`viewPolicy.fleet`) and the flat "soon" views set it
+    // false — but the parked staging grids live in this group too, so the active/staged machine
+    // keeps it visible through a transition and the fleet shows above the Blueprint.
     this.globe.group.visible = show.globeSurface || this.transition.active();
     // The geo SURFACE subtree hard-hides as one unit whenever its fades are fully out (settled
     // ledger/hyper/flat) — the structural fix for the invisible-but-depth-writing furniture class
@@ -2240,11 +2241,15 @@ export class Engine {
       (this.transition.active() && (this.transition.from === "ledger" || this.transition.to === "ledger"));
     this.ledger.group.visible = ledgerActive && ledgerAlpha > 0.001;
     // The trends ground, on exactly the ledger chamber's rule (and the same two owners: the Engine
-    // writes `visible`, the view owns alpha — rule 6). `show.trendGround` is the policy row, so
-    // there is no mode compare here or in the view; the transition clause keeps the grid alive
-    // while a switch INTO or OUT OF trends is still animating, or it would blink instead of fading.
+    // writes `visible`, the view owns alpha — rule 6). `show.trendGround` is the policy row, and
+    // BOTH SIDES of the transition read it too (2026-09-19) — the clause said "no mode compare
+    // here" while comparing `from === "trend"` on the very next line, which is convention 7's
+    // deny-list growth in miniature: a second view that drew this ground would have to be
+    // remembered here as well. The clause keeps the grid alive while a switch INTO or OUT OF it is
+    // still animating, or it would blink instead of fading.
+    const groundSide = (m: Mode | null) => m != null && VIEW_POLICIES[m].show.trendGround;
     const trendActive = this._policy.show.trendGround ||
-      (this.transition.active() && (this.transition.from === "trend" || this.transition.to === "trend"));
+      (this.transition.active() && (groundSide(this.transition.from) || groundSide(this.transition.to)));
     this.trends.group.visible = trendActive && trendAlpha > 0.001;
     if (ledgerActive) {
       if (this._ledgerDirty) this._refreshLedger();

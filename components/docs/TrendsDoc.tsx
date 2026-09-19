@@ -107,7 +107,7 @@ function Section({ id, title, lead, children }: { id: string; title: string; lea
 }
 
 export default function TrendsDoc() {
-  // ⚠️ THE DOCUMENT OPENS ON WHAT THE SCENE WAS SHOWING (controller ruling R33, 2026-09-19).
+  // ⚠️ THE DOCUMENT OPENS ON WHAT THE SCENE WAS SHOWING (2026-09-19).
   // Convention 12's ladder says each step down CARRIES ITS CONTEXT, and the two faces of rung 2
   // are one step apart: a reader who brushed Feb–Jun on the History timeline and pressed RAW was
   // handed the whole measured span back, which is the same lost-context complaint the per-chart

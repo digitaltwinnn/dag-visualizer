@@ -136,17 +136,16 @@ scope from the table.
     instant — and a DOCUMENT face, that same view's RAW register (prose, sections, the same charts
     laid out as a page). One subject, two presentations, which is exactly what `section` already
     means everywhere else; `viewPolicy.rawSurface` is where a view says which one its RAW shows.
-    The raw layer stays rung 3, reached from either face. This SUPERSEDES the old
-    "charts want 2D, so it stays a doc overlay, never a pseudo-scene" rule — the planes host the
-    document's own `TrendChart` in DOM, so the charts are still 2D and still crisp, and depth
-    carries the roster rather than pretending to be data.
+    The raw layer stays rung 3, reached from either face. Charts stay 2D in BOTH registers — the
+    planes host the document's own `TrendChart` in DOM, so the type is crisp and the reading is
+    flat-on, and depth carries the ROSTER rather than pretending to be data.
     Each step down is one deliberate gesture that CARRIES ITS CONTEXT (a chart range hands its
     network and dates to the anchor log's search — one home, `components/trendDoors.ts`, shared by
     both registers), and so is the step ACROSS: **the scene face hands its window and its range to
-    the document face** (R33, 2026-09-19 — `TrendsDoc` seeds its `zoom` from `store.trendWindow`
+    the document face** (2026-09-19 — `TrendsDoc` seeds its `zoom` from `store.trendWindow`
     and its `range` from `store.trendRange`, once at mount, which is once per RAW open; after that
-    the document's pickers are its own and it never writes back). and every new surface must name its rung, its register and its bridges rather
-    than invent a fourth depth. The two lower RUNGS complement each other on purpose: the measured
+    the document's pickers are its own and it never writes back). Every new surface must name its
+    rung, its register and its bridges rather than invent a fourth depth. The two lower RUNGS complement each other on purpose: the measured
     history grows coarser with distance (tier retention) exactly where the raw layer's chain paging
     stays exact to genesis.
 

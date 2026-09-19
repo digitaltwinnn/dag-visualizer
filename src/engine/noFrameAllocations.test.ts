@@ -17,8 +17,16 @@ const SCENE = join(HERE, "scene");
 // to hide this code from the gate entirely (its body lived in a closure, not a method the walk
 // could see) — extracting it into named phases brings it under the same enforcement.
 const ENGINE_FILE = join(HERE, "Engine.ts");
-// Method names whose bodies run every frame (or per-record within a frame).
-const PER_FRAME = /^\s*(?:private\s+|public\s+)?(update|updateRotation|setMorph|write\w+|place\w+|_apply\w+|_integrate\w+|_derive\w+|_write\w+)\s*\(/;
+// THE ENGINE-LAYER PROJECTORS JOIN THE SCAN (2026-09-19). `CalloutSync.sync()` and
+// `TrendStackSync.sync()` are per-frame bodies in every sense that matters — the Engine calls each
+// once per frame from its scene-write phase, and both carry `// event-time` markers on the
+// allocations they DO make. Those markers were decorative: the walk only reached `scene/` and
+// `Engine.ts`, so nothing checked the rule they were annotating. Rule 5 is about the render path,
+// not about a directory.
+const PROJECTORS = ["CalloutSync.ts", "TrendStackSync.ts"].map((f) => join(HERE, f));
+// Method names whose bodies run every frame (or per-record within a frame). `sync`/`_sync*` are
+// the projectors' own per-frame entry points and their helpers.
+const PER_FRAME = /^\s*(?:private\s+|public\s+)?(update|updateRotation|setMorph|sync|_sync\w+|write\w+|place\w+|_apply\w+|_integrate\w+|_derive\w+|_write\w+)\s*\(/;
 const ALLOC = /new\s+THREE\.\w+\(|\.clone\(\)/;
 
 function tsFiles(dir: string): string[] {
@@ -48,8 +56,8 @@ function perFrameBodies(lines: string[]): [number, number][] {
   return ranges;
 }
 
-describe("no per-frame allocations in scene/ + Engine.ts", () => {
-  for (const file of [...tsFiles(SCENE), ENGINE_FILE]) {
+describe("no per-frame allocations in scene/ + Engine.ts + the engine-layer projectors", () => {
+  for (const file of [...tsFiles(SCENE), ENGINE_FILE, ...PROJECTORS]) {
     const label = file.slice(HERE.length + 1); // "scene/objects/NodeFabric.ts" / "Engine.ts"
     it(`${label} allocates nothing in per-frame bodies (or marks it event-time)`, () => {
       const lines = readFileSync(file, "utf8").split("\n");

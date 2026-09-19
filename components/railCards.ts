@@ -6,6 +6,11 @@ import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
 // LADDERS is plain DATA (the domain focus-ladder rung tables) — importing it keeps this module
 // data-only; CohortSel rides along type-only (the store mirrors the same import).
 import { type FocusLevel, type CohortSel, type CompositionSel } from "@/src/engine/domain/focusLadder";
+// The ONE "is this Mode one of the 3D views" predicate, from the module that owns the type it
+// narrows to (convention 8). It is pure arithmetic over a string, so it keeps this module
+// data-only exactly as LADDERS does — and hand-rolling it here is the deny-list growth convention
+// 7 warns about: both copies below had already grown a fourth disjunct for History, in two edits.
+import { is3D } from "@/src/engine/domain/viewTransition";
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 // The RAIL MANIFEST — ONE source of truth for "which cards does each rail host, in what order".
@@ -198,7 +203,7 @@ const isNodePick = (p: PickDescriptor | null): boolean =>
 // tools: their subjectKeys are constants so they never read as "updated" (the tray stays a quiet
 // legend; view switches ride the separate switch-signal, not a per-card update highlight).
 export function exploreCards(s: Pick<RailManifestState, "mode">): RailCard[] {
-  const hasTool = s.mode === "hyper" || s.mode === "geo" || s.mode === "ledger" || s.mode === "trend";
+  const hasTool = is3D(s.mode);
   // The tray shows the tool card's OWN head mark (the ONE standard EXPLORE_ICON) — it used to
   // show VIEW_ICONS[mode], which in ledger put a Layers glyph on the left tab that read as the
   // snapshot card's mark (user bug report); card head and tray icon must agree.
@@ -251,12 +256,11 @@ export function exploreCards(s: Pick<RailManifestState, "mode">): RailCard[] {
 //    the Hypergraph view."). This is an app-wide copy rule, not a ghost-hint one; it applies to every
 //    surface the reader reads (the About cards, the explorer hints, the empty states). Comments and
 //    docs like this one are dev-facing and keep their dashes.
-const IN_3D = (m: Mode) => m === "hyper" || m === "geo" || m === "ledger" || m === "trend";
 // The pointer's own verb (2026-09-04): "Click" taught a mouse to a thumb. One helper so no hint
 // can pick its own word.
 const CLICK = (s: RailManifestState) => (s.coarse ? "Tap" : "Click");
 function contextHint(s: RailManifestState): string | null {
-  if (!IN_3D(s.mode)) return null;
+  if (!is3D(s.mode)) return null;
   // No noun at all: the slot label reads "Metagraph" while the app's broader word is "network", and
   // this hint used to put BOTH in one line ("Metagraph — Pick a network…").
   return "Pick one in the top-bar filter.";
@@ -340,7 +344,7 @@ export function detailsCards(s: RailManifestState): RailCard[] {
   // The SELECTION IS UNTOUCHED: this only stops the view speaking for it, so returning to a 3D view
   // restores the whole pile in place. Gated on the views the facts scope is FOR (convention 7),
   // and it matches what the left rail already does here — About only, no tool card.
-  if (!IN_3D(s.mode)) return [];
+  if (!is3D(s.mode)) return [];
   const context: RailCard = {
     id: "context",
     kind: "context",

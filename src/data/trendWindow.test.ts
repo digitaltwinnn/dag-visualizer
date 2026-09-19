@@ -198,7 +198,7 @@ describe("bucketAt", () => {
   });
 });
 
-// ---- WHERE THE CURSOR SITS ON THE PLOT (Task 12b, 2026-09-19) -------------------------------
+// ---- WHERE THE CURSOR SITS ON THE PLOT (2026-09-19) -------------------------------
 // The shared cursor used to be a recharts `ReferenceLine`, which meant every cursor write
 // re-rendered the whole chart — five of them per bucket, which measured at 3-4 FPS across a
 // scrub. It is a lightweight DOM overlay now, and this is the only maths that move moved out of
@@ -254,7 +254,7 @@ describe("cursorFraction", () => {
   });
 });
 
-// ---- THE WINDOW/RANGE DATA PATH (Task 8a, 2026-09-18) --------------------------------------
+// ---- THE WINDOW/RANGE DATA PATH (2026-09-18) --------------------------------------
 // The document and the 3D stack are TWO REGISTERS OF ONE RUNG, so the decision "which payloads
 // does this window need, and how is each cut" belongs to neither component. These tests ARE that
 // decision: the plan table below is what both surfaces fetch, and the assembler is every honesty

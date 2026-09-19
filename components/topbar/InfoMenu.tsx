@@ -23,33 +23,32 @@ export default function DocRows({ onDone }: { onDone: () => void }) {
   const setDocPage = useStore((s) => s.setDocPage);
   return (
     <>
-      {(Object.keys(DOC_PAGES) as DocPage[])
-        .map((id) => {
-          const RowIcon = DOC_ICONS[id];
-          const current = doc === id;
-          return (
-            <NetLink
-              key={id}
-              href={DOC_PATHS[id]}
-              aria-current={current ? "page" : undefined}
-              className={cn(
-                "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-label no-underline",
-                "text-muted-foreground hover:text-foreground hover:bg-wash-soft",
-                current && SELECTED_ROW,
-              )}
-              onClick={(e) => {
-                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
-                e.preventDefault();
-                setDocPage(current ? null : id);
-                onDone();
-              }}
-            >
-              <RowIcon aria-hidden className="size-4 flex-none opacity-80" />
-              <span className="flex-1 text-left">{DOC_PAGES[id].label}</span>
-              {current && <Check aria-hidden className="size-3.5 flex-none opacity-70" />}
-            </NetLink>
-          );
-        })}
+      {(Object.keys(DOC_PAGES) as DocPage[]).map((id) => {
+        const RowIcon = DOC_ICONS[id];
+        const current = doc === id;
+        return (
+          <NetLink
+            key={id}
+            href={DOC_PATHS[id]}
+            aria-current={current ? "page" : undefined}
+            className={cn(
+              "flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-label no-underline",
+              "text-muted-foreground hover:text-foreground hover:bg-wash-soft",
+              current && SELECTED_ROW,
+            )}
+            onClick={(e) => {
+              if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+              e.preventDefault();
+              setDocPage(current ? null : id);
+              onDone();
+            }}
+          >
+            <RowIcon aria-hidden className="size-4 flex-none opacity-80" />
+            <span className="flex-1 text-left">{DOC_PAGES[id].label}</span>
+            {current && <Check aria-hidden className="size-3.5 flex-none opacity-70" />}
+          </NetLink>
+        );
+      })}
     </>
   );
 }

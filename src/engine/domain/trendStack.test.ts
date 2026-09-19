@@ -387,7 +387,7 @@ describe("clampScroll — one rule for the stack and its pager", () => {
   });
 });
 
-// ⚠️ THE PAGER'S VISIBILITY IS THE PLANK'S RULE, NOT A JSX PREDICATE (2026-09-19, fix round 1):
+// ⚠️ THE PAGER'S VISIBILITY IS THE PLANK'S RULE, NOT A JSX PREDICATE (2026-09-19):
 // "an axis with nothing to navigate is ABSENT, not disabled". It lives here beside the clamp so
 // the control and the geometry agree about both questions, and so the two boundaries — exactly a
 // full window, and one plane past it — are pinned rather than eyeballed in a component.

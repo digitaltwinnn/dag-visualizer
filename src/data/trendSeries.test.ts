@@ -311,7 +311,7 @@ describe("METRIC_LABELS — the reader's word for each metric", () => {
   });
 });
 
-// ── A MOMENT NO CHART DRAWS (2026-09-19, fix round 1) ───────────────────────────────────────
+// ── A MOMENT NO CHART DRAWS (2026-09-19) ───────────────────────────────────────
 // The band's timeline spans the whole MEASURED history; the planes draw that span minus the
 // partial edge buckets a counter must lose (`trimCounterEdges`). So the far right of the track is
 // clickable and undrawn at the same time — on the default metric in the default window — and the

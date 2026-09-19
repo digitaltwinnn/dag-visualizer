@@ -221,7 +221,7 @@ export function bucketAt(buckets: readonly number[], stepMs: number, ms: number)
   return buckets[lo];
 }
 
-/** WHERE A BUCKET SITS ON THE PLOT, as a fraction of the plot box (Task 12b, 2026-09-19).
+/** WHERE A BUCKET SITS ON THE PLOT, as a fraction of the plot box (2026-09-19).
  *
  *  `TrendChart`'s XAxis is `type="number"` over `domain={["dataMin", "dataMax"]}`, so the axis is
  *  linear IN TIME between the oldest bucket (fraction 0) and the newest (fraction 1) — index
@@ -258,7 +258,7 @@ export function cursorFraction(buckets: readonly number[], bucket: number | null
 
 // ---- THE WINDOW/RANGE DATA PATH, AS A PLAN (2026-09-18) ------------------------------------
 // ONE HOME for "which payloads does this window need, and how is each one cut" — the decision the
-// Trends DOCUMENT carried inline as component state until Task 8a. The document and the 3D trend
+// Trends DOCUMENT carried inline as component state until 2026-09-18. The document and the 3D trend
 // stack are TWO REGISTERS OF ONE RUNG (convention 12's MEASURED HISTORY), so a windowing rule
 // living in one component is a rule the other register has to guess at; the two already share the
 // chart primitive and the per-network series maths, and this is the third leg.

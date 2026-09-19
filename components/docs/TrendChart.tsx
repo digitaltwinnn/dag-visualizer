@@ -34,7 +34,7 @@ export interface TrendLine {
 const PLOT_H = 120;
 const AXIS_H = 18;
 
-// THE PLOT BOX, AS NUMBERS THE CHART AND ITS OVERLAY BOTH READ (Task 12b, 2026-09-19). Recharts
+// THE PLOT BOX, AS NUMBERS THE CHART AND ITS OVERLAY BOTH READ (2026-09-19). Recharts
 // lays this plot area out from exactly three things — the LineChart's own margin, the XAxis's
 // declared height, and the YAxis, which is `hide` and therefore reserves NOTHING (recharts skips
 // a hidden axis when it accumulates the chart offset). So the box is knowable from this file
@@ -142,7 +142,7 @@ export default function TrendChart({
    *  the honest answer: the instant is not in this chart. The document passes nothing and renders
    *  exactly as before.
    *
-   *  ⚠️ IT IS THE ONE PROP THAT DOES NOT REACH THE PLOT (Task 12b, 2026-09-19). Everything else
+   *  ⚠️ IT IS THE ONE PROP THAT DOES NOT REACH THE PLOT (2026-09-19). Everything else
    *  here is chart data; this is a MARK on it, and it changes at gesture frequency. So it is drawn
    *  by this component as a CSS overlay beside the memoised plot rather than inside it — see the
    *  overlay's own comment, and `TrendPlot`'s, for the measurement that forced the split. */
@@ -368,8 +368,8 @@ export default function TrendChart({
             onRange={onRange}
             fill={fill}
           />
-          {/* THE SHARED CURSOR, AS AN OVERLAY RATHER THAN A RECHARTS CHILD (Task 12b,
-              2026-09-19). It marks the bucket that CONTAINS the instant (`bucketAt`) or nothing at
+          {/* THE SHARED CURSOR, AS AN OVERLAY RATHER THAN A RECHARTS CHILD
+              (2026-09-19). It marks the bucket that CONTAINS the instant (`bucketAt`) or nothing at
               all — the `ReferenceLine`'s rule exactly, and rule 10's: a mark one bucket off is a
               chart naming the wrong day, in the one place a reader could never catch it. What
               changed is WHO DRAWS IT. Inside the chart, every cursor write re-rendered the whole
@@ -401,7 +401,7 @@ export default function TrendChart({
   );
 }
 
-// ---- THE PLOT, MEMOISED (Task 12b, 2026-09-19) -----------------------------------------------
+// ---- THE PLOT, MEMOISED (2026-09-19) -----------------------------------------------
 //
 // THE SPLIT EXISTS FOR ONE MEASURED REASON. The History view's stack subscribes to the shared time
 // cursor, and a scrub writes once per BUCKET — so before this split, dragging the timeline
@@ -721,7 +721,7 @@ const TrendPlot = memo(function TrendPlot({
                   rather than whatever the window's minimum happens to be.
 
                   ⚠️ WHAT KEEPS A HOVER TO ONE READING PER SERIES IS THE TOOLTIP'S OWN CONTENT, not
-                  `tooltipType` (fix round 1 — the first cut of this comment named the wrong
+                  `tooltipType` (the first cut of this comment named the wrong
                   mechanism). The Area shares the Line's `dataKey`, so recharts hands the tooltip a
                   SECOND payload entry with the same key and the same value; the custom content
                   below iterates `lines` and looks each one up with `payload.find(e => e.dataKey
