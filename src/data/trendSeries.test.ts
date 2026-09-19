@@ -15,6 +15,7 @@ import {
   trimCounterEdges,
   METRIC_LABELS,
   METRIC_ORDER,
+  holdOrder,
   metricCaption,
   stepMetric,
   orderAt,
@@ -526,5 +527,27 @@ describe("metricCaption — what a card says it is showing", () => {
   });
   it("drops a unit that only repeats the name", () => {
     expect(metricCaption("nodes", DAY)).toBe("Nodes");
+  });
+});
+
+describe("holdOrder — the stack keeps its order while its plots change", () => {
+  it("keeps the order on screen, whatever the new measure wants", () => {
+    expect(holdOrder(["a", "b", "c"], ["c", "a", "b"])).toEqual(["a", "b", "c"]);
+  });
+  it("drops an id the roster no longer has — a hold can never point at a row that is gone", () => {
+    expect(holdOrder(["a", "b", "c"], ["c", "a"])).toEqual(["a", "c"]);
+  });
+  it("appends a newcomer, in the ranking's own order, behind what is held", () => {
+    expect(holdOrder(["a", "b"], ["z", "b", "y", "a"])).toEqual(["a", "b", "z", "y"]);
+  });
+  it("an empty hold adopts the ranking, and an empty ranking empties the hold", () => {
+    expect(holdOrder([], ["b", "a"])).toEqual(["b", "a"]);
+    expect(holdOrder(["a", "b"], [])).toEqual([]);
+  });
+  it("never mutates what it was given", () => {
+    const held = ["a", "b"], ranked = ["b", "c"];
+    holdOrder(held, ranked);
+    expect(held).toEqual(["a", "b"]);
+    expect(ranked).toEqual(["b", "c"]);
   });
 });

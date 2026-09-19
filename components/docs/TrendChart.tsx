@@ -82,7 +82,6 @@ export default function TrendChart({
   cursorMs,
   fill,
   plotHeight = PLOT_H,
-  rollKey,
   rollClassName,
   note,
   syncId = "trends",
@@ -172,14 +171,14 @@ export default function TrendChart({
    *  History stack is ONE chart being read on its own and wants a plot with room in it. A plain
    *  number, so it holds the plot's memo still. */
   plotHeight?: number;
-  /** THE PLOT ROLLS WHEN ITS SUBJECT CHANGES, AND THE FRAME DOES NOT (2026-09-19). When `rollKey`
-   *  is given, the recharts plot sits in a wrapper KEYED on it, so a new key remounts the plot and
-   *  `rollClassName` (an enter animation) plays inside the frame's own `overflow-hidden` — the
-   *  card, its head and its hairline hold still, and the cursor overlay stays out of it (a position
-   *  does not animate). The History stack keys it on the MEASURE, which is what makes stepping
-   *  through measures read as one card's content turning over rather than as five cards being
-   *  replaced. Absent, there is no wrapper at all and the document's DOM is what it always was. */
-  rollKey?: string;
+  /** THE PLOT ROLLS WHEN ITS SUBJECT CHANGES, AND THE FRAME DOES NOT (2026-09-19). Given, the
+   *  recharts plot sits in a wrapper wearing these classes — a CSS TRANSITION the caller drives
+   *  from outside (the History stack keys it off one attribute on its root, see
+   *  `components/useStagedMeasure.ts`), playing inside the frame's own `overflow-hidden`. The card,
+   *  its head and its hairline hold still, and the cursor overlay stays out of it (a position does
+   *  not animate). NOT a remount: the first cut keyed the wrapper so an enter animation replayed,
+   *  and five recharts plots mounting in the animation's first frames WAS the stutter. Absent,
+   *  there is no wrapper at all and the document's DOM is what it always was. */
   rollClassName?: string;
   /** AN INSTRUMENT STATE THE SERIES CANNOT SAY (2026-09-18). When the caller knows something the
    *  points don't — most concretely that the payload this chart needs is still IN FLIGHT — it
@@ -392,10 +391,12 @@ export default function TrendChart({
                 plotH={plotHeight}
               />
             );
-            // `relative`, so the plot's own absolutely-placed readout keeps the box it had: an
-            // enter animation is a transform, and a transformed element becomes the containing
-            // block of its absolute descendants whether it asked to or not.
-            return rollKey == null ? plot : <div key={rollKey} className={cn("relative", rollClassName)}>{plot}</div>;
+            // `relative`, so the plot's own absolutely-placed readout keeps the box it had: the roll
+            // is a transform, and a transformed element becomes the containing block of its
+            // absolute descendants whether it asked to or not. A plain template string, NOT `cn()`:
+            // the roll recipe carries several `[transition:…]` values under different variants and
+            // twMerge must not be given the chance to "resolve" them.
+            return rollClassName == null ? plot : <div className={`relative ${rollClassName}`}>{plot}</div>;
           })()}
           {/* THE SHARED CURSOR, AS AN OVERLAY RATHER THAN A RECHARTS CHILD
               (2026-09-19). It marks the bucket that CONTAINS the instant (`bucketAt`) or nothing at

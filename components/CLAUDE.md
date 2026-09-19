@@ -257,19 +257,37 @@ pointermove. Three rules are worth knowing before touching it:
   reader in different places. `All charts` is the other REGISTER of the same rung — this view's RAW
   surface is the document, so it is one `setSection("data")` and no mode step at all.
 
-**The History view has three axes and each has one gesture** (user, 2026-09-19): left/right on the
-timeline is WHEN, the depth of the stack is WHO, and UP/DOWN is WHAT — the measure. `↑`/`↓` from
-inside a card, a vertical SWIPE on touch and pen (never the mouse: it has chevrons and keys, and a
-vertical mouse drag over a chart is a slip), and a two-chevron stepper on the one interactive card
-all step `trendMetric` through `METRIC_ORDER` (`src/data/trendSeries.ts`) — the rail picker's own
-order, so the two controls are one list. Every card steps together, because a stack whose planes
-showed different measures would stop being a comparison; the ends go INACTIVE rather than wrapping
-(the plank's rule); and only the PLOT rolls, inside a frame that holds still (`TrendChart`'s
-`rollKey`) — the card is the network, and the network did not change. The card's head therefore
-names its measure (`metricCaption`), not just its unit. The stepper is a SIBLING of the head strip,
-never a child: the head is itself a button. It is a setting, not a selection, so it writes its
-setter directly, as the picker does. ⚠️ The vertical swipe belongs to the CARD alone — on the bare
-canvas that gesture is the orbit's.
+**The History view has three axes and each has one home** (user, 2026-09-19): left/right on the
+timeline is WHEN, the depth of the stack is WHO, and UP/DOWN is WHAT — the measure. Its control is
+the view's TITLE, centred under the command bar below the view switch (`TrendMeasure`: `∧ SNAPSHOTS
+∨`, riding `--rail-top` + `--topbar-extra` like the rails), plus `↑`/`↓` from inside a card; both
+step `trendMetric` through `METRIC_ORDER` (`src/data/trendSeries.ts`) — the rail picker's own order,
+so the two controls are one list. It is a view-level control because every card steps together (a
+stack whose planes showed different measures would stop being a comparison) — it first rode the
+front card's header as two bare chevrons, which said the measure belonged to that network and
+stepped through a list the reader could not see. The ends go INACTIVE rather than wrapping (the
+plank's rule). A setting, not a selection: it writes its setter directly, as the picker does.
+
+⚠️ **A MEASURE CHANGE IS TWO MOTIONS THAT TAKE TURNS** (`components/useStagedMeasure.ts`, user: "the
+animation is not smooth … load the new chart (smoothly) and then re-order"). The cards show a
+measure that LAGS the picked one: the old plots leave on a CSS transition (compositor-only — nothing
+re-renders), the shown measure swaps WHILE THE PLOTS ARE INVISIBLE (the one expensive render, where
+a hitch cannot be seen), the new plots ease in with the cards still in place, and only then is the
+HELD order released (`holdOrder`) so the projector eases each card to its new rank. The first cut
+remounted five recharts plots inside an enter animation while the stack re-ranked — three things at
+once, and the stutter was exactly that. The roll is ONE attribute on the stack root (`data-roll`,
+`group/stack`), read by every plot's wrapper; the title answers the press at once and the cards
+follow. A step taken mid-sequence RETARGETS, never queues; reduced motion skips the sequence (an
+exit with transitions off is a 140ms blank).
+
+⚠️ **A DRAG THAT STARTS ON A CARD IS THE SCENE'S ORBIT** (`components/orbitHandoff.ts`). The header
+strips and the front card are where a hand lands, and a drag begun there used to go nowhere. Past
+the click slop the pointer is handed to the canvas as ONE synthetic `pointerdown` carrying the real
+pointer's id; OrbitControls captures it and the rest of the gesture is native — same damping, same
+limits, same touch handling. No component imports the engine: it is DOM to DOM through
+`canvas.scene-canvas`. Never hand off AT pointerdown — capturing the pointer away retargets its
+pointerup, and with it the click. This is also why the cards carry NO swipe gesture: a vertical
+touch swipe stepped the measure for a few hours, until one gesture had to mean two things.
 
 **Hovering pairs over `hoverFilter`, the app's own network channel** (convention 9). A Layers row, a
 plane's header strip and a cursor-card row are three ends of one pairing, with no channel of their

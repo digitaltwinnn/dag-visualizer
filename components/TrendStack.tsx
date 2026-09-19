@@ -64,14 +64,16 @@
 // a control over the scene. Every pixel that is not a header still orbits.)
 
 import { useEffect, useMemo, useRef } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
 
 import TrendChart, { type TrendLine } from "@/components/docs/TrendChart";
 import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
+import useStagedMeasure, { ROLL_CLASS, useHeldOrder } from "@/components/useStagedMeasure";
+import TrendMeasure from "@/components/TrendMeasure";
 import { cn } from "@/lib/utils";
+import { handOrbitToScene } from "@/components/orbitHandoff";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
-import { METRIC_LABELS, METRIC_ORDER, metricCaption, sharedCeiling, stepMetric } from "@/src/data/trendSeries";
+import { metricCaption, sharedCeiling, stepMetric } from "@/src/data/trendSeries";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { PLANE_PLOT_PX_H, PLANE_PX_W, stackPoses } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
@@ -87,19 +89,6 @@ const NO_IDS: readonly string[] = [];
  *  finger, tight enough that a deliberate orbit attempt never commits a focus. */
 const DRAG_SLOP = 4;
 
-/** How far a finger must travel, mostly vertically, to step the measure. Well past the click slop
- *  and past a header tap's wobble — a swipe is a deliberate gesture, and a false one would change
- *  what all five cards show. */
-const SWIPE_PX = 48;
-
-/** The roll a plot arrives with when the measure changes, by DIRECTION: the next measure rises
- *  from below, the previous one drops from above, so the motion says which way the list went. The
- *  text clock and its curve are the app's own (`--tempo-roll` / `--ease-roll`); reduced motion
- *  snaps. */
-const ROLL = {
-  next: "animate-in fade-in slide-in-from-bottom-4 duration-(--tempo-roll) ease-(--ease-roll) motion-reduce:animate-none",
-  prev: "animate-in fade-in slide-in-from-top-4 duration-(--tempo-roll) ease-(--ease-roll) motion-reduce:animate-none",
-} as const;
 
 export default function TrendStack() {
   // Convention 7: gate on the view this behaviour is FOR, read from the allow-list — never a
@@ -125,15 +114,12 @@ export default function TrendStack() {
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const setMetric = useStore((s) => s.setTrendMetric);
-  // WHICH WAY THE MEASURE JUST MOVED, for the roll's direction — derived from the order rather
-  // than recorded by the stepper, so a pick in the rail's picker rolls the right way too. A ref
-  // adjusted during render (the `useRolledTitle` idiom): it is read in the same pass that changed.
-  const lastMetric = useRef(metric);
-  const rollDir = useRef<keyof typeof ROLL>("next");
-  if (lastMetric.current !== metric) {
-    rollDir.current = METRIC_ORDER.indexOf(metric) >= METRIC_ORDER.indexOf(lastMetric.current) ? "next" : "prev";
-    lastMetric.current = metric;
-  }
+  // THE CARDS SHOW `staged.shown`, WHICH LAGS THE PICKED MEASURE through an out → swap → in →
+  // re-order sequence (`components/useStagedMeasure.ts` has the whole argument). Everything a card
+  // draws — its roster pass, its caption, its lines — reads the SHOWN measure; only the control
+  // under the bar reads the picked one.
+  const staged = useStagedMeasure(metric);
+  const shown = staged.shown;
   // THE WINDOW, AND THE SAME ONE THE DOCUMENT READS. `trendWindow`/`trendRange` are the store's
   // own statement of what is on screen; `useTrendsSlice` turns that into the payloads it needs and
   // the cuts they take (`planTrendFetch`/`assembleTrendSlice`, src/data/trendWindow.ts) — the
@@ -152,19 +138,21 @@ export default function TrendStack() {
   // read here, by the Layers card and by the cursor card. Three copies of it would be three
   // chances to disagree about the very ranking these planes are laid out by. It carries the
   // counter EDGE TRIM too, so a rail can never quote a number no chart on screen agrees with.
-  const roster = useTrendRoster(slice, filter, metric);
+  const roster = useTrendRoster(slice, filter, shown);
   const { ranked, rows, buckets: axis, stepMs: step, pending } = roster;
-  // What a card says it shows, and where the stepper would go from here — `null` at an end.
-  const caption = metricCaption(metric, step);
-  const prevMetric = stepMetric(metric, -1);
-  const nextMetric = stepMetric(metric, 1);
+  // THE ORDER ON SCREEN — the ranking once settled, the HELD order while a measure change is in
+  // flight, so the plots land before the cards move. Poses, the hover backstop and the engine's
+  // `trendIds` all read THIS, never `ranked`: the projector and React must agree on the order.
+  const order = useHeldOrder(ranked, staged.settled);
+  // What a card says it shows.
+  const caption = metricCaption(shown, step);
   // THE SCOPE WITH NOTHING TO DRAW (2026-09-19): a `dag` or unlisted commit
   // leaves the roster EMPTY, because the trends store keeps one series set per LISTED metagraph.
   // The sentences are `src/data/trendScope.ts`'s, shared with the document so the two registers of
   // this rung cannot say different things about the same commit.
   const empty = scopeEmptyCopy(roster.scope, "view");
 
-  const poses = stackPoses(ranked, { layout, scroll, focus });
+  const poses = stackPoses(order, { layout, scroll, focus });
   // THE UNMOUNT BACKSTOP (convention 9's other half, 2026-09-19). A header strip clears its own
   // pairing on leave — while it is still there to hear one. It often is not: paging drops a plane
   // out of the visible window, a metric switch re-ranks the roster, a filter commit cuts it to one,
@@ -189,9 +177,9 @@ export default function TrendStack() {
       setTrendIds(NO_IDS);
       return;
     }
-    setTrendIds(ranked);
+    setTrendIds(order);
     return () => setTrendIds(NO_IDS);
-  }, [on, ranked, setTrendIds]);
+  }, [on, order, setTrendIds]);
 
   // ⚠️ ONE SCALE OR EACH ITS OWN, and the reader picks — `store.trendScale`, the document's own
   // control carried into the view. `shared` is the default because a stack is read AS a column
@@ -224,9 +212,9 @@ export default function TrendStack() {
   // it reads from, on exactly the deps that pass has.
   const linesById = useMemo(() => {
     const m = new Map<string, TrendLine[]>();
-    for (const [id, row] of rows) m.set(id, [{ label: metric, points: row.series.points, hue: row.hue }]);
+    for (const [id, row] of rows) m.set(id, [{ label: shown, points: row.series.points, hue: row.hue }]);
     return m;
-  }, [rows, metric]);
+  }, [rows, shown]);
 
   // THE DRAG GUARD (see the header): pointerdown records where the press started, pointerup says
   // whether it travelled, and `activate` drops a click that did. Refs, not state — a gesture must
@@ -237,24 +225,35 @@ export default function TrendStack() {
     down.current = { x: e.clientX, y: e.clientY };
     dragged.current = false;
   };
+  // A PRESS THAT TRAVELS IS THE SCENE'S ORBIT, NOT THE CARD'S (user, 2026-09-19). The header strips
+  // and the front card are where a hand lands, and a drag begun there used to go nowhere. Past the
+  // click slop the pointer is handed to the canvas (`orbitHandoff`) and the rest of the gesture is
+  // a native OrbitControls drag. `dragged` is raised at the handoff: the pointer is captured away,
+  // so this card never sees its pointerup, and whatever click the browser still synthesises must
+  // not read as a tap.
+  const onPointerMove = (e: React.PointerEvent) => {
+    const d = down.current;
+    if (!d || e.buttons === 0) return;
+    if (Math.hypot(e.clientX - d.x, e.clientY - d.y) <= DRAG_SLOP) return;
+    down.current = null;
+    dragged.current = true;
+    handOrbitToScene(e);
+  };
   const onPointerUp = (e: React.PointerEvent) => {
     const d = down.current;
-    dragged.current = !!d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > DRAG_SLOP;
-    // A VERTICAL SWIPE STEPS THE MEASURE, on touch and pen only. A finger has no chevron-sized
-    // precision and no arrow keys, so the swipe is its route; a mouse has both, and a vertical
-    // mouse drag over a chart is far likelier to be a slip than a request. Up means NEXT — the
-    // content moves with the finger and the next measure rises into place, the way a list scrolls.
-    if (d && e.pointerType !== "mouse") {
-      const dx = e.clientX - d.x, dy = e.clientY - d.y;
-      if (Math.abs(dy) > SWIPE_PX && Math.abs(dy) > Math.abs(dx) * 1.5) stepMeasure(dy < 0 ? 1 : -1);
-    }
+    down.current = null;
+    dragged.current = dragged.current || (!!d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > DRAG_SLOP);
   };
   // UP / DOWN IS THE VIEW'S THIRD AXIS (user, 2026-09-19). Left/right on the timeline is WHEN, the
-  // depth of the stack is WHO, and the measure — WHAT — was the one axis with no gesture on the
-  // canvas: it lived in the rail's picker alone. Every card steps together (a stack whose planes
-  // each showed a different measure would stop being a comparison), through the ONE order the
-  // picker reads, and the ends go inactive rather than wrapping. A SETTING, not a selection —
-  // it writes its setter directly, as the picker does (`selectionBoundary` names it out of scope).
+  // depth of the stack is WHO, and the measure — WHAT — had no gesture on the canvas: it lived in
+  // the rail's picker alone. The control is the title under the bar (`TrendMeasure`) and `↑`/`↓`
+  // from inside a card. Every card steps together (a stack whose planes each showed a different
+  // measure would stop being a comparison), through the ONE order the picker reads, and the ends
+  // go inactive rather than wrapping. A SETTING, not a selection — it writes its setter directly,
+  // as the picker does (`selectionBoundary` names it out of scope).
+  // ⚠️ THERE IS NO SWIPE. A vertical touch swipe on a card stepped the measure for a few hours —
+  // until a drag on a card became the scene's orbit, and one gesture cannot mean both. The title
+  // under the bar is a finger-sized target, so touch lost nothing.
   const stepMeasure = (dir: -1 | 1) => {
     const next = stepMetric(useStore.getState().trendMetric, dir);
     if (next) setMetric(next);
@@ -317,8 +316,19 @@ export default function TrendStack() {
     // `transition-*` is a twMerge group, so a second one would silently drop the first.
     <div
       id="trend-stack"
-      className="absolute inset-0 pointer-events-none z-[4] opacity-0 [transition:opacity_var(--tempo-nav)_ease] data-[on='1']:opacity-100 motion-reduce:!transition-none"
+      // `group/stack` + `data-roll`: every plot's roll is ONE attribute on this root, so five
+      // charts leave and arrive together without five pieces of state (`ROLL_CLASS` reads it).
+      // The two offsets are the direction: the next measure rises into place, the previous drops.
+      data-roll={staged.phase}
+      style={{
+        ["--roll-out-y" as string]: staged.dir === "next" ? "-10px" : "10px",
+        ["--roll-in-y" as string]: staged.dir === "next" ? "14px" : "-14px",
+      }}
+      className="group/stack absolute inset-0 pointer-events-none z-[4] opacity-0 [transition:opacity_var(--tempo-nav)_ease] data-[on='1']:opacity-100 motion-reduce:!transition-none"
     >
+      {/* THE MEASURE, UNDER THE BAR — the view's title and its up/down control in one. It reads the
+          PICKED measure, so it answers the press at once while the cards follow. */}
+      <TrendMeasure metric={metric} onStep={stepMeasure} />
       {poses.map((pose) => {
         // The one roster pass the rank, the ceiling and both rails read — already cut by the
         // metric's own edge rule, so a rail can never quote a bucket this plane does not draw.
@@ -333,7 +343,9 @@ export default function TrendStack() {
               // THE ANCHOR: a 0-size box at the layer's origin, hidden until the engine has
               // projected it. `origin-top-left` is what makes the engine's matrix a plain
               // translate — see this file's header.
-              "absolute left-0 top-0 origin-top-left invisible",
+              // `touch-none`: a finger that drags a card is orbiting the scene (see `onPointerMove`),
+              // so the browser must not claim the gesture for a pan and cancel the pointer mid-drag.
+              "absolute left-0 top-0 origin-top-left invisible touch-none",
               // The body takes no pointer events — the orbit drag belongs to the canvas beneath.
               // The one plane the pose marks interactive is the exception, and its header strip
               // re-enables them below whatever the pose says. `pointer-events` inherits, so the
@@ -341,6 +353,7 @@ export default function TrendStack() {
               pose.interactive ? "pointer-events-auto" : "pointer-events-none",
             )}
             onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
             onPointerUp={onPointerUp}
             // THE INTERACTIVE PLANE'S WHOLE BODY is a target too — it is the one plane a click
             // cannot be ambiguous about, and asking for the header strip alone on a plane that is
@@ -418,19 +431,15 @@ export default function TrendStack() {
                 plotHeight={PLANE_PLOT_PX_H}
                 // THE PLOT ROLLS ON A MEASURE CHANGE, inside a frame that holds still: the card is
                 // the NETWORK, and the network did not change — only what is being read off it.
-                rollKey={metric}
-                rollClassName={ROLL[rollDir.current]}
+                // A CSS transition keyed off the root's `data-roll`, NOT a remount: the plots leave
+                // on the compositor, swap while invisible and ease back in (`useStagedMeasure`).
+                rollClassName={ROLL_CLASS}
                 className="w-full"
                 // THE HEAD IS THE TARGET, so it reads as one: the pointer's own cursor, the app's
                 // hover wash, and a focus ring for the keyboard. It needs no plate of its own any
                 // more — it sits on the card's solid face. A hover previews, it never commits
                 // (rule 9).
-                headClassName={cn(
-                  "pointer-events-auto cursor-pointer px-2 py-1 rounded-md hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
-                  // Room for the measure stepper, which sits over the head's right end on the one
-                  // card that carries it.
-                  pose.interactive && "pr-[68px]",
-                )}
+                headClassName="pointer-events-auto cursor-pointer px-2 py-1 rounded-md hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
                 // The pairing's five writers, on the one element of a plane that takes pointer
                 // events at every depth. `onMouseMove` is the swap-under-pointer healer and
                 // `onFocus`/`onBlur` the keyboard mirror — one pair of functions, five props, so
@@ -453,36 +462,6 @@ export default function TrendStack() {
                   }`,
                 }}
               />
-            )}
-            {/* THE MEASURE STEPPER — on the ONE interactive card, which is the card being read
-                (the front plane, or the focused one; every card in `flat`). Two chevrons in the
-                app's hairline-group idiom, a SIBLING of the head strip rather than a child: the
-                head is itself a button, and a button inside a button is not a thing. An exhausted
-                direction goes INACTIVE rather than vanishing (the rail plank's rule — a control
-                that disappears re-composes the row at every edge). `stopPropagation`, or the
-                card body's own click would toggle the focus under the press. */}
-            {pose.interactive && p && (
-              <div
-                role="group"
-                aria-label="Measure"
-                className="absolute right-3 top-[11px] pointer-events-auto inline-flex items-center rounded-md border border-border bg-wash-faint p-px"
-                onClick={(e) => e.stopPropagation()}
-                onPointerDown={(e) => e.stopPropagation()}
-              >
-                {([[-1, ChevronUp, prevMetric], [1, ChevronDown, nextMetric]] as const).map(([dir, Icon, to]) => (
-                  <button
-                    key={dir}
-                    type="button"
-                    disabled={!to}
-                    onClick={() => stepMeasure(dir)}
-                    title={to ? `Show ${METRIC_LABELS[to]}` : dir === 1 ? "This is the last measure" : "This is the first measure"}
-                    aria-label={to ? `Show ${METRIC_LABELS[to]}` : dir === 1 ? "No next measure" : "No previous measure"}
-                    className="grid size-6 place-items-center rounded-[5px] text-muted-foreground hover:text-foreground hover:bg-wash-hover disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-muted-foreground focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
-                  >
-                    <Icon aria-hidden className="size-3.5" />
-                  </button>
-                ))}
-              </div>
             )}
             </div>
           </div>

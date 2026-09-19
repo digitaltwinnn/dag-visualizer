@@ -363,6 +363,20 @@ export function stepMetric(metric: TrendMetric, dir: -1 | 1): TrendMetric | null
   return METRIC_ORDER[i + dir] ?? null;
 }
 
+/** THE ORDER A STACK KEEPS WHILE ITS CONTENT IS CHANGING (2026-09-19). A measure change re-ranks
+ *  the stack (busiest first, per measure), and doing that in the same beat as the plots swapping
+ *  is two motions fighting: every chart redraws while every card flies to a new slot. So the stack
+ *  HOLDS its order until the new plots have landed and only then re-orders. `held` is the order on
+ *  screen, `ranked` the order the new measure wants: keep every held id that still exists, in held
+ *  order, and append anything new in ranked order — so a roster that changes underneath the hold (a
+ *  filter commit, a network appearing) can never leave the stack pointing at a row that is gone. */
+export function holdOrder(held: readonly string[], ranked: readonly string[]): string[] {
+  const want = new Set(ranked);
+  const kept = held.filter((id) => want.has(id));
+  const have = new Set(kept);
+  return [...kept, ...ranked.filter((id) => !have.has(id))];
+}
+
 /** What a History card says it is showing: the measure's name with its unit, in one phrase.
  *  The card's head used to carry the unit alone ("per day"), which was enough while the measure
  *  could only change in the rail's picker; once it can be stepped FROM the card (2026-09-19) the
