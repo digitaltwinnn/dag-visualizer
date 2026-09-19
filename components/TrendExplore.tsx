@@ -6,7 +6,7 @@ import ExplorerShell from "@/components/ExplorerShell";
 import { ROW_OUTSET } from "@/components/ExploreRows";
 import { IdentityDot } from "@/components/inspector/parts";
 import { SelectedRowMark, selectedRow, selectionHue } from "@/components/selection";
-import { MetricPicker, ScaleToggle, ScopeChip, SettingSwitch } from "@/components/trendPickers";
+import { MetricPicker, ScaleToggle, ScopeChip } from "@/components/trendPickers";
 import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
@@ -25,11 +25,11 @@ import { useStore } from "@/src/store/store";
 // instrument, then the browse list):
 //
 //   · THE CONTROLS this view has lacked. `trendMetric` is a PICKER — a committed choice about what
-//     every chart draws — while `trendLayout` and `trendScale` are SETTINGS: the reader is not
+//     every chart draws — while `trendScale` is a SETTING: the reader is not
 //     doing something, they are saying how the charts should be drawn, and a setting reads as a
 //     name plus its state (`SettingSwitch`, whose header carries the full reasoning). None of them
 //     is a selection, so they write their setters directly; `selectionBoundary.test.ts`'s scope
-//     note says why the metric, the layout and the scroll stay outside the decision table while
+//     note says why the metric and the scroll stay outside the decision table while
 //     the PLANE FOCUS is in it — they are how the reader wants the stack drawn, not what it is
 //     about.
 //
@@ -53,7 +53,6 @@ import { useStore } from "@/src/store/store";
 export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: boolean } = {}) {
   const filter = useStore((s) => s.filter);
   const metric = useStore((s) => s.trendMetric);
-  const layout = useStore((s) => s.trendLayout);
   const scale = useStore((s) => s.trendScale);
   const scroll = useStore((s) => s.trendScroll);
   const focus = useStore((s) => s.trendFocus);
@@ -62,7 +61,6 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const setTrendMetric = useStore((s) => s.setTrendMetric);
-  const setTrendLayout = useStore((s) => s.setTrendLayout);
   const setTrendScale = useStore((s) => s.setTrendScale);
   const setTrendScroll = useStore((s) => s.setTrendScroll);
 
@@ -102,25 +100,11 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
       {/* ── THE CONTROLS ──────────────────────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-2">
         <MetricPicker metric={metric} onPick={setTrendMetric} />
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-          <SettingSwitch
-            label="Align to front"
-            on={layout === "flat"}
-            onChange={(on) => setTrendLayout(on ? "flat" : "stack")}
-            // A LAYOUT, not a camera move and not a selection (store `trendLayout`) — the words
-            // say what the planes do, so nothing implies the view will fly anywhere.
-            title={
-              layout === "flat"
-                ? "The planes sit in one flat column, all at the same size. Switch off to send them back into depth."
-                : "The planes recede into depth, nearest first. Switch on to line them up facing you."
-            }
-          />
-          {/* Only where there is a COLUMN to compare: with one network in scope there is nothing
-              for a shared ceiling to be shared with. */}
-          {ranked.length > 1 && (
-            <ScaleToggle shared={scale === "shared"} onChange={(on) => setTrendScale(on ? "shared" : "own")} />
-          )}
-        </div>
+        {/* Only where there is a COLUMN to compare: with one network in scope there is nothing
+            for a shared ceiling to be shared with. */}
+        {ranked.length > 1 && (
+          <ScaleToggle shared={scale === "shared"} onChange={(on) => setTrendScale(on ? "shared" : "own")} />
+        )}
       </div>
 
       {/* The resting division between the INSTRUMENT and the LIST (LedgerPanel's rule): one weight

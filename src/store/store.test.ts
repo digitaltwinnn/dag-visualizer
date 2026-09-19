@@ -57,7 +57,6 @@ describe("the trends view's channels", () => {
       mode: "hyper",
       trendCursorMs: null,
       trendMetric: "snapshots",
-      trendLayout: "stack",
       trendScroll: 0,
       trendFocus: null,
       trendScale: "shared",
@@ -71,7 +70,6 @@ describe("the trends view's channels", () => {
     const s = useStore.getState();
     expect(s.trendCursorMs).toBeNull();
     expect(s.trendMetric).toBe("snapshots");
-    expect(s.trendLayout).toBe("stack");
     expect(s.trendScroll).toBe(0);
     expect(s.trendFocus).toBeNull();
     // SHARED IS THE DEFAULT (the document's own rule): a column of charts is read AS a column

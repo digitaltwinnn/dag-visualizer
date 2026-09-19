@@ -64,9 +64,7 @@ export const FOCI = {
   // 3.5, so the forward axis, the distance and the pitch are all untouched and the pose stays
   // frontal (measured 2026-09-18 against the staggered stack). It exists because the stack
   // staggers UPWARD: the block's centre of area sits above the plane it is measured from, so
-  // aiming at `PLANE_Y` itself parked the whole thing low in the free canvas. Aiming below it
-  // splits the difference between the two layouts — the stack (whose tall near plane pulls the
-  // block down) and the flat column (which is centred on PLANE_Y exactly).
+  // aiming at `PLANE_Y` itself parked the whole thing low in the free canvas.
   trend: { pos: new THREE.Vector3(0, 2.5, 54), target: new THREE.Vector3(0, -1.5, -18) },
 } satisfies Record<string, CameraFraming>;
 /** A pose that exists. Every caller of `focus()` names one of these, checked. */
@@ -372,10 +370,9 @@ export function ledgerCommitTilt(pos: THREE.Vector3, target: THREE.Vector3, outP
 // off a projected plane or a scene matrix. It is a PARAMETER for the same reason `aspectFit` takes
 // the aspect: the stack's spatial grammar lives in its own module, the camera's lean lives here,
 // and neither imports the other. Zero depth contributes exactly nothing, so the unfocused pose is
-// `FOCI.trend` untouched — and that is the answer in FOUR cases, not one: no focus, a focus on a
-// network the roster does not carry, a focus the visible window no longer holds (paged, re-ranked
-// or re-filtered away — nothing is re-dealt there), and ANY focus in the `flat` layout, where a
-// focus moves nothing for the camera to answer.
+// `FOCI.trend` untouched — and that is the answer in THREE cases, not one: no focus, a focus on a
+// network the roster does not carry, and a focus the visible window no longer holds (paged,
+// re-ranked or re-filtered away — nothing is re-dealt there).
 //
 // ⚠️ AND IT IS A PUSH ALONG THE VIEW AXIS, not an orbit. The whole proposition of this view is that
 // the planes present FLAT-ON — they host real text, and the projector writes a translate and a

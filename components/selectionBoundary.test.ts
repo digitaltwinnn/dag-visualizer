@@ -25,7 +25,7 @@ import { join } from "node:path";
 // SUBJECT written by a click on an interactive surface — the History stack's header strips — and
 // it carries a consequence beyond its own channel (an off-window plane pages into view first).
 // That consequence belongs in the executor, where every caller inherits it, which is exactly what
-// this boundary exists to guarantee. `trendPlaneActions` is the table entry; `setTrendLayout`,
+// this boundary exists to guarantee. `trendPlaneActions` is the table entry;
 // `setTrendScroll` and `setTrendMetric` stay OUT — they are how the reader wants the stack drawn,
 // not what it is about.
 //

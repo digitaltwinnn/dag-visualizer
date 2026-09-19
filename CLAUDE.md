@@ -323,7 +323,7 @@ you start:
 - **`countryShape.ts`** — the country drill's shape math over the topology.
 - **`trendStack.ts`** — History's whole spatial grammar as pure data: the staggered slots, the focus
   RE-DEAL (the focused plane takes first place and the planes ahead of it slide back one slot — user,
-  2026-09-19), the `flat` column, the paging clamp, and `focusDepth()`, which is the only number the camera's
+  2026-09-19), the paging clamp, and `focusDepth()`, which is the only number the camera's
   lean takes from the stack.
 
 ### The render loop
@@ -418,11 +418,10 @@ its claim is paper-only, so its one `intensity` already is its paper number.
    the stack (`trendStack.focusDepth()`, layout data — never a projected plane), and back out when the focus
    clears, so every rung of `LADDERS.trend` inherits it by delegating to the resting pose. It is a
    push, not an orbit: the planes host real text and present flat-on, so a lean that turned the
-   camera would skew the charts it exists to emphasise. **`Align to front` moves the STRUCTURE, not
-   the camera** — the `flat` layout tiles the planes as a column and `focusDepth` answers 0 there, so
-   the camera holds its resting pose while a flat column is read, and a focus click there moves
-   nothing at all. A focus the visible window no longer holds (paged away, re-ranked out) answers 0
-   for the same reason: the lean releases rather than standing over a stack that did not move. Three bespoke ledger framings (a lane nudge, a node
+   camera would skew the charts it exists to emphasise. A focus the visible window no longer holds
+   (paged away, re-ranked out) answers 0: the lean releases rather than standing over a stack that
+   did not move. The stack has ONE layout — a flat "Align to front" column was built and removed
+   (user, 2026-09-19): reading the charts laid out flat is what the view's RAW document is for. Three bespoke ledger framings (a lane nudge, a node
    framing, a per-lane fly) were built and **retired** because each added a pose the user had to learn;
    don't grow a fourth. **Hyper's per-node framing went the same way** (2026-08-13): a node there is one
    bead on a shell, and diving to it lost the hub and shells that say what it belongs to, so the rung

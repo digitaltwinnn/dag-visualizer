@@ -167,8 +167,8 @@ export function MetricPicker({
  *  an ACTION the reader presses FOR, with the wash reporting that it is on — right for a control
  *  that pushes a surface in and pops it out. A SETTING is different: the reader is not doing
  *  something, they are choosing how the charts are DRAWN, and a setting reads as a name plus its
- *  state. Both of History's settings (`Same scale`, `Align to front`) are that species, which is
- *  why they share one shape rather than borrowing the bar's.
+ *  state. History's `Same scale` is that species, which is why it wears this shape rather than
+ *  borrowing the bar's.
  *
  *  The label is the switch's own `<label>`, so the words are a hit target too — the switch alone is
  *  28×16, well under the touch floor every other control here keeps. */

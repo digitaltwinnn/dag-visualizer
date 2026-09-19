@@ -209,10 +209,10 @@ decisions inside them are design, not detail:
   2026-09-19). It is the first explorer whose card holds an instrument the reader OPERATES rather
   than a state it reports, and the grammar splits on that: the METRIC is a PICKER — the same
   hairline group the window pills wear, because a metric is a committed statement about what is on
-  screen — while `Align to front` and `Same scale` are SETTINGS and read as a name plus its state
+  screen — while `Same scale` is a SETTING and reads as a name plus its state
   (`SettingSwitch`, `components/trendPickers.tsx`; the command bar's pressed-toggle is an ACTION
   grammar and wrong for a setting, which is the reasoning the scale control was rebuilt on twice).
-  None of the three is a selection, so they write their setters directly — `selectionBoundary`'s
+  Neither is a selection, so they write their setters directly — `selectionBoundary`'s
   own scope note says why, and why the plane FOCUS is in the table instead. Below the instrument
   hairline the LAYERS list is an ordinary browse list: mark, name, last measured reading, and a
   click that applies the SAME `trendPlaneActions` the plane's header strip runs. Its PAGER is

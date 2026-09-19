@@ -99,7 +99,6 @@ export default function TrendStack() {
   // the reader's eyes, exactly as it cuts the document's per-network columns.
   const filter = useStore((s) => s.filter);
   const metric = useStore((s) => s.trendMetric);
-  const layout = useStore((s) => s.trendLayout);
   const scroll = useStore((s) => s.trendScroll);
   const focus = useStore((s) => s.trendFocus);
   const scaleMode = useStore((s) => s.trendScale);
@@ -152,7 +151,7 @@ export default function TrendStack() {
   // this rung cannot say different things about the same commit.
   const empty = scopeEmptyCopy(roster.scope, "view");
 
-  const poses = stackPoses(order, { layout, scroll, focus });
+  const poses = stackPoses(order, { scroll, focus });
   // THE UNMOUNT BACKSTOP (convention 9's other half, 2026-09-19). A header strip clears its own
   // pairing on leave — while it is still there to hear one. It often is not: paging drops a plane
   // out of the visible window, a metric switch re-ranks the roster, a filter commit cuts it to one,
@@ -376,9 +375,8 @@ export default function TrendStack() {
               // the stack, read here rather than assumed so the domain stays the one statement.
               opacity: pose.opacity,
               // PAINT ORDER IS DEPTH, from the pose itself: a nearer plane (larger z) paints over
-              // a farther one, so a focused plane — re-dealt to slot 0 — paints over the rest, and the
-              // flat layout's equal z leaves tree order to break the tie. Local to this root,
-              // which is its own stacking context; the offset keeps it positive.
+              // a farther one, so a focused plane — re-dealt to slot 0 — paints over the rest. Local
+              // to this root, which is its own stacking context; the offset keeps it positive.
               zIndex: Math.round(100 + pose.z),
             }}
           >

@@ -872,11 +872,11 @@ export class Engine {
         // no camera at all.
         if (
           (st.trendFocus !== prev.trendFocus || st.trendIds !== prev.trendIds ||
-            st.trendLayout !== prev.trendLayout || st.trendScroll !== prev.trendScroll) &&
+            st.trendScroll !== prev.trendScroll) &&
           VIEW_POLICIES[st.mode].chartStack
         ) {
-          const was = focusDepth(prev.trendIds, prev.trendFocus, prev.trendLayout, prev.trendScroll);
-          const now = focusDepth(st.trendIds, st.trendFocus, st.trendLayout, st.trendScroll);
+          const was = focusDepth(prev.trendIds, prev.trendFocus, prev.trendScroll);
+          const now = focusDepth(st.trendIds, st.trendFocus, st.trendScroll);
           if (now !== was || (now !== 0 && st.trendFocus !== prev.trendFocus)) this._resolveFocus();
         }
         // A node commit is answered by the camera in every 3D view (user, 2026-08-13). The pose is
@@ -1633,13 +1633,12 @@ export class Engine {
     trendOverview: () => {
       // The lean is keyed on the committed FOCUS, like the ledger's tilt is keyed on the filter, so
       // both rungs inherit it by delegating here and releasing the focus tweens back out on its own.
-      // ⚠️ LAYOUT DATA (rule 6): `focusDepth` reads the published roster, the committed focus, the
-      // LAYOUT and the SCROLL — exactly the four things `stackPoses` places the planes from — never
-      // a projected plane or a scene matrix. An off-roster focus answers 0, so does one the visible
-      // window does not hold (nothing is re-dealt there), and so does any focus in `flat` (nothing
-      // comes forward at all), which is the resting pose exactly.
+      // ⚠️ LAYOUT DATA (rule 6): `focusDepth` reads the published roster, the committed focus and
+      // the SCROLL — exactly the three things `stackPoses` places the planes from — never a
+      // projected plane or a scene matrix. An off-roster focus answers 0, and so does one the
+      // visible window does not hold (nothing is re-dealt there), which is the resting pose exactly.
       const st = useStore.getState();
-      const depth = focusDepth(st.trendIds, st.trendFocus, st.trendLayout, st.trendScroll);
+      const depth = focusDepth(st.trendIds, st.trendFocus, st.trendScroll);
       if (depth === 0) {
         this.cam.focus("trend");
         return true;
@@ -2349,11 +2348,11 @@ export class Engine {
   // once and hands the projector the narrow slice it declares. ⚠️ MUTATED, NEVER RE-ALLOCATED —
   // this runs every frame and `TrendStackSync` copies nothing out of it, so one buffer is safe;
   // `ids` rides in by REFERENCE, which is the projector's whole change signal (store `trendIds`).
-  private _trendState: TrendStackState = { layout: "stack", scroll: 0, focus: null, ids: [] };
+  private _trendState: TrendStackState = { scroll: 0, focus: null, ids: [] };
   private _syncTrendStack(): void {
     const st = useStore.getState();
     const t = this._trendState;
-    t.layout = st.trendLayout; t.scroll = st.trendScroll; t.focus = st.trendFocus; t.ids = st.trendIds;
+    t.scroll = st.trendScroll; t.focus = st.trendFocus; t.ids = st.trendIds;
     this.trendStack.sync(t);
   }
 

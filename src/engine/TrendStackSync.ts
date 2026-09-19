@@ -28,7 +28,6 @@ import { PLANE_PX_W, PLANE_WORLD_W, stackPoses } from "./domain/trendStack";
 
 /** Exactly the store keys the stack reads. Engine passes this in; see the bridge note above. */
 export interface TrendStackState {
-  layout: "stack" | "flat";
   scroll: number;
   focus: string | null;
   /** The ranked roster, busiest first — store `trendIds`, the React → Engine publish channel.
@@ -70,7 +69,7 @@ export interface TrendStackHost {
   active(): boolean;
 }
 
-/** The ease rate, in e-folds per second. A layout or focus change TRAVELS: the stack is a spatial
+/** The ease rate, in e-folds per second. A focus or paging change TRAVELS: the stack is a spatial
  *  claim about which network is in front, and a jump reads as a redraw rather than a movement.
  *  Frame-rate independent by construction (`1 − e^(−k·dt)`), so the same gesture takes the same
  *  wall-clock time at 12fps and at 120. */
@@ -108,7 +107,6 @@ export class TrendStackSync {
   private _order: string[] = [];
 
   // ---- last-seen state, for the idle skip ----------------------------------------------------
-  private _layout: TrendStackState["layout"] | null = null;
   private _scroll = -1;
   private _focus: string | null = null;
   private _ids: readonly string[] | null = null;
@@ -154,12 +152,10 @@ export class TrendStackSync {
     let retarget = false;
     if (
       st.ids !== this._ids ||
-      st.layout !== this._layout ||
       st.scroll !== this._scroll ||
       st.focus !== this._focus
     ) {
       this._ids = st.ids;
-      this._layout = st.layout;
       this._scroll = st.scroll;
       this._focus = st.focus;
       this._retarget(st);
@@ -201,7 +197,7 @@ export class TrendStackSync {
   // runs against plain numbers. A plane SEEN FOR THE FIRST TIME starts AT its target: a fly-in from
   // the origin would make every roster refresh look like an entrance.
   private _retarget(st: TrendStackState): void {
-    const poses = stackPoses(st.ids, { layout: st.layout, scroll: st.scroll, focus: st.focus }); // event-time
+    const poses = stackPoses(st.ids, { scroll: st.scroll, focus: st.focus }); // event-time
     this._order.length = 0;
     for (let i = 0; i < poses.length; i++) {
       const p = poses[i]!;

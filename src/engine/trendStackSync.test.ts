@@ -66,7 +66,7 @@ function fakeHost(opts: { pos?: THREE.Vector3; target?: THREE.Vector3 } = {}) {
 }
 
 const state = (over: Partial<TrendStackState> = {}): TrendStackState => ({
-  layout: "stack", scroll: 0, focus: null, ids: ["a", "b", "c"], ...over,
+  scroll: 0, focus: null, ids: ["a", "b", "c"], ...over,
 });
 
 /** The uniform scale out of a `matrix3d(s,0,0,0, 0,s,0,0, 0,0,1,0, tx,ty,0,1)` string. */
@@ -159,7 +159,7 @@ describe("TrendStackSync", () => {
     expect(els.get("b")!.style.transform).toBe("");
   });
 
-  it("travels to a new layout and then goes quiet again", () => {
+  it("travels to a re-dealt stack and then goes quiet again", () => {
     const { host, els } = fakeHost();
     const sync = new TrendStackSync(host);
     const stacked = state();
@@ -169,9 +169,10 @@ describe("TrendStackSync", () => {
     // stack is already settled here, which is what makes the travel below attributable to the ease.
     const rest = els.get("c")!.style.transform;
 
-    const flat = state({ layout: "flat" });
+    // A focus RE-DEALS the deck: "c" leaves slot 2 for first place.
+    const dealt = state({ focus: "c" });
     const seen: string[] = [];
-    for (let i = 0; i < 8; i++) { sync.sync(flat); seen.push(els.get("c")!.style.transform); }
+    for (let i = 0; i < 8; i++) { sync.sync(dealt); seen.push(els.get("c")!.style.transform); }
     expect(seen[0]).not.toBe(rest);              // it moved
     expect(new Set(seen).size).toBe(seen.length); // and kept moving — a jump would repeat at once
     // CONVERGING, not ramping: an exponential ease spends most of the distance early, so a late
@@ -181,9 +182,9 @@ describe("TrendStackSync", () => {
     const step = (i: number) => Math.abs(sc[i + 1]! - sc[i]!);
     expect(step(sc.length - 2)).toBeLessThan(step(0));
 
-    for (let i = 0; i < 400; i++) sync.sync(flat);
+    for (let i = 0; i < 400; i++) sync.sync(dealt);
     els.get("c")!.style.transform = "";
-    sync.sync(flat);
+    sync.sync(dealt);
     expect(els.get("c")!.style.transform, "the ease must settle and the idle skip re-engage").toBe("");
   });
 

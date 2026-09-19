@@ -281,9 +281,6 @@ interface AppState {
   /** Which stored metric every plane draws. One picker, one column — the planes are a
    *  comparison, so a per-plane metric would make the stack meaningless. */
   trendMetric: TrendMetric;
-  /** `stack` = receding in depth; `flat` = collapsed to one plane ("Align to front"). This is a
-   *  LAYOUT change, not a camera move — camera principle 2. */
-  trendLayout: "stack" | "flat";
   /** How far the stack is scrolled through the roster, in planes. The catalog is longer than the
    *  visible window, so the stack pages rather than capping at a top-N. */
   trendScroll: number;
@@ -385,7 +382,6 @@ interface AppState {
   requestFocusRung: (level: FocusLevel) => void;
   setTrendCursor: (ms: number | null) => void;
   setTrendMetric: (metric: TrendMetric) => void;
-  setTrendLayout: (layout: "stack" | "flat") => void;
   setTrendScroll: (offset: number) => void;
   setTrendFocus: (id: string | null) => void;
   setTrendScale: (scale: "shared" | "own") => void;
@@ -457,7 +453,6 @@ export const useStore = create<AppState>((set) => ({
   focusRung: null,
   trendCursorMs: null,
   trendMetric: "snapshots",
-  trendLayout: "stack",
   trendScroll: 0,
   trendFocus: null,
   trendScale: "shared",
@@ -658,7 +653,6 @@ export const useStore = create<AppState>((set) => ({
   setTrendCursor: (ms) =>
     set((s) => ({ trendCursorMs: ms, navQuiet: false, selStack: bumpStack(s.selStack, "instant", ms != null) })),
   setTrendMetric: (metric) => set({ trendMetric: metric }),
-  setTrendLayout: (layout) => set({ trendLayout: layout }),
   setTrendScroll: (offset) => set({ trendScroll: offset }),
   setTrendFocus: (id) => set({ trendFocus: id }),
   setTrendScale: (scale) => set({ trendScale: scale }),
