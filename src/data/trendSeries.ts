@@ -348,6 +348,36 @@ export const METRIC_LABELS: Record<TrendMetric, string> = {
   continuity: "Continuity",
 };
 
+/** THE MEASURES' ONE ORDER — the rail picker's left-to-right and the card stepper's up-to-down are
+ *  the same sequence, read from here, so stepping down from the third pill always lands on the
+ *  fourth. */
+export const METRIC_ORDER = Object.keys(METRIC_LABELS) as TrendMetric[];
+
+/** The measure one step from `metric` (`+1` = the next in `METRIC_ORDER`, `-1` = the previous),
+ *  or `null` at either end. It does NOT wrap: six measures are a short list with a first and a
+ *  last, and the app's steppers say "this direction is exhausted" by going inactive (the rail
+ *  plank's rule) rather than by looping — a loop hides where you are in the list. */
+export function stepMetric(metric: TrendMetric, dir: -1 | 1): TrendMetric | null {
+  const i = METRIC_ORDER.indexOf(metric);
+  if (i < 0) return null;
+  return METRIC_ORDER[i + dir] ?? null;
+}
+
+/** What a History card says it is showing: the measure's name with its unit, in one phrase.
+ *  The card's head used to carry the unit alone ("per day"), which was enough while the measure
+ *  could only change in the rail's picker; once it can be stepped FROM the card (2026-09-19) the
+ *  card has to name what it turned into. A bare rate reads as part of the name ("Snapshots per
+ *  day"); a unit with its own noun is set off ("Fees · DAG per day"); and a unit that only repeats
+ *  the name is dropped ("Nodes", never "Nodes · nodes"). */
+export function metricCaption(metric: TrendMetric, stepMs: number): string {
+  const label = METRIC_LABELS[metric];
+  const unit = metricUnit(metric, stepMs);
+  if (!unit || unit.toLowerCase() === label.toLowerCase()) return label;
+  // Asked of the SPEC, not sniffed off the string: a unit is a bare rate exactly when its row uses
+  // this module's own `rate`, and the words "per …" are that function's business, not this one's.
+  return TREND_METRICS[metric].unit === rate ? `${label} ${unit}` : `${label} · ${unit}`;
+}
+
 // ── WHY A MOMENT HAS NO CHART (2026-09-19) ──────────────────────────────────────────────────
 // The band's timeline spans the whole MEASURED history; the planes draw that span minus the edge
 // buckets a counter must lose (`trimCounterEdges` — a partial sum drawn whole reads as a crash).

@@ -82,6 +82,8 @@ export default function TrendChart({
   cursorMs,
   fill,
   plotHeight = PLOT_H,
+  rollKey,
+  rollClassName,
   note,
   syncId = "trends",
   className,
@@ -170,6 +172,15 @@ export default function TrendChart({
    *  History stack is ONE chart being read on its own and wants a plot with room in it. A plain
    *  number, so it holds the plot's memo still. */
   plotHeight?: number;
+  /** THE PLOT ROLLS WHEN ITS SUBJECT CHANGES, AND THE FRAME DOES NOT (2026-09-19). When `rollKey`
+   *  is given, the recharts plot sits in a wrapper KEYED on it, so a new key remounts the plot and
+   *  `rollClassName` (an enter animation) plays inside the frame's own `overflow-hidden` — the
+   *  card, its head and its hairline hold still, and the cursor overlay stays out of it (a position
+   *  does not animate). The History stack keys it on the MEASURE, which is what makes stepping
+   *  through measures read as one card's content turning over rather than as five cards being
+   *  replaced. Absent, there is no wrapper at all and the document's DOM is what it always was. */
+  rollKey?: string;
+  rollClassName?: string;
   /** AN INSTRUMENT STATE THE SERIES CANNOT SAY (2026-09-18). When the caller knows something the
    *  points don't — most concretely that the payload this chart needs is still IN FLIGHT — it
    *  hands the words here and the plot is replaced by them, in the chart's own empty-state frame.
@@ -365,19 +376,27 @@ export default function TrendChart({
           role="img"
           aria-label={`${name} — ${stepMs >= 86400000 ? "daily" : stepMs >= 3600000 ? "hourly" : "5-minute"} buckets, ${n} of them`}
         >
-          <TrendPlot
-            syncId={syncId}
-            lines={lines}
-            buckets={buckets}
-            stepMs={stepMs}
-            format={format}
-            scaleMax={scaleMax}
-            sampled={sampled}
-            gaps={gaps}
-            onRange={onRange}
-            fill={fill}
-            plotH={plotHeight}
-          />
+          {(() => {
+            const plot = (
+              <TrendPlot
+                syncId={syncId}
+                lines={lines}
+                buckets={buckets}
+                stepMs={stepMs}
+                format={format}
+                scaleMax={scaleMax}
+                sampled={sampled}
+                gaps={gaps}
+                onRange={onRange}
+                fill={fill}
+                plotH={plotHeight}
+              />
+            );
+            // `relative`, so the plot's own absolutely-placed readout keeps the box it had: an
+            // enter animation is a transform, and a transformed element becomes the containing
+            // block of its absolute descendants whether it asked to or not.
+            return rollKey == null ? plot : <div key={rollKey} className={cn("relative", rollClassName)}>{plot}</div>;
+          })()}
           {/* THE SHARED CURSOR, AS AN OVERLAY RATHER THAN A RECHARTS CHILD
               (2026-09-19). It marks the bucket that CONTAINS the instant (`bucketAt`) or nothing at
               all — the `ReferenceLine`'s rule exactly, and rule 10's: a mark one bucket off is a
@@ -626,7 +645,22 @@ const TrendPlot = memo(function TrendPlot({
   return (
     <>
           <ResponsiveContainer width="100%" height={plotH + AXIS_H}>
-            <Chart data={rows} syncId={syncId} syncMethod="value" margin={PLOT_MARGIN} {...dragProps}>
+            <Chart
+              data={rows}
+              syncId={syncId}
+              syncMethod="value"
+              margin={PLOT_MARGIN}
+              // ⚠️ NO RECHARTS ACCESSIBILITY LAYER (user, 2026-09-19: "the charts are selectable and
+              // get a white outline, that is not needed"). recharts 3 turns it on by default, which
+              // makes every chart's <svg> a focusable `role="application"` — so a click on a chart
+              // FOCUSED it and the browser drew its focus ring around the plot, on a surface with
+              // nothing to operate. It was also a contradiction: the frame around this chart is
+              // `role="img"` with a full label, and an application inside an image is two answers
+              // to "what is this". The chart is an image; the controls are the head strip, the
+              // timeline and the rail, each of which is a real, labelled target.
+              accessibilityLayer={false}
+              {...dragProps}
+            >
               {/* THE FILL'S GRADIENT — light, not a slab. It runs from the line's own hue at the
                   area's top edge to nothing at the baseline, so a plane reads as a translucent
                   sheet rather than as a painted block, and five of them stacked stay legible

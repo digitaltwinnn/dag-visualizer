@@ -5,7 +5,7 @@ import { useId } from "react";
 import { cn } from "@/lib/utils";
 import { SELECTED_ROW } from "@/components/selection";
 import { Switch } from "@/components/ui/switch";
-import { METRIC_LABELS } from "@/src/data/trendSeries";
+import { METRIC_LABELS, METRIC_ORDER } from "@/src/data/trendSeries";
 import { displayNetwork } from "@/src/data/unlisted";
 import { ZOOMS, type TrendRange, type ZoomId } from "@/src/data/trendWindow";
 import { filterToggleActions } from "@/src/engine/domain/pickActions";
@@ -150,7 +150,7 @@ export function MetricPicker({
       aria-label="Measure"
       className={cn(PICKER_GROUP, "flex flex-wrap justify-start gap-0.5 max-[700px]:[&>button]:flex-none", className)}
     >
-      {(Object.keys(METRIC_LABELS) as TrendMetric[]).map((m) => (
+      {METRIC_ORDER.map((m) => (
         <button key={m} type="button" aria-pressed={metric === m} onClick={() => onPick(m)} className={zoomBtn(metric === m)}>
           {METRIC_LABELS[m]}
         </button>

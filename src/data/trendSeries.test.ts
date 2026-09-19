@@ -14,6 +14,9 @@ import {
   seriesKey,
   trimCounterEdges,
   METRIC_LABELS,
+  METRIC_ORDER,
+  metricCaption,
+  stepMetric,
   orderAt,
   rankAt,
   valueAt,
@@ -483,5 +486,45 @@ describe("tierWord — one vocabulary, two forms", () => {
       const word = tierWord(step, "label");
       expect(per === "per day" ? "daily" : per === "per hour" ? "hourly" : "5 min").toBe(word);
     }
+  });
+});
+
+describe("stepping the measure from a card", () => {
+  it("METRIC_ORDER is the picker's own order — every measure, once", () => {
+    expect(METRIC_ORDER).toEqual(Object.keys(METRIC_LABELS));
+    expect(new Set(METRIC_ORDER).size).toBe(METRIC_ORDER.length);
+  });
+
+  it("steps to the neighbour in either direction", () => {
+    expect(stepMetric("snapshots", 1)).toBe("blocks");
+    expect(stepMetric("blocks", -1)).toBe("snapshots");
+    expect(stepMetric("nodes", 1)).toBe("continuity");
+  });
+
+  it("does not wrap: the ends answer null, which is what dims the chevron", () => {
+    expect(stepMetric(METRIC_ORDER[0], -1)).toBeNull();
+    expect(stepMetric(METRIC_ORDER[METRIC_ORDER.length - 1], 1)).toBeNull();
+  });
+
+  it("walking down from the first measure visits every one exactly once", () => {
+    const seen = [METRIC_ORDER[0]];
+    for (let m = stepMetric(seen[0], 1); m; m = stepMetric(m, 1)) seen.push(m);
+    expect(seen).toEqual(METRIC_ORDER);
+  });
+});
+
+describe("metricCaption — what a card says it is showing", () => {
+  const DAY = 86_400_000;
+  const HOUR = 3_600_000;
+  it("reads a bare rate as part of the name, at the tier's own grain", () => {
+    expect(metricCaption("snapshots", DAY)).toBe("Snapshots per day");
+    expect(metricCaption("blocks", HOUR)).toBe("Blocks per hour");
+  });
+  it("sets off a unit that carries its own noun", () => {
+    expect(metricCaption("fees", DAY)).toBe("Fees · DAG per day");
+    expect(metricCaption("continuity", DAY)).toBe("Continuity · seconds");
+  });
+  it("drops a unit that only repeats the name", () => {
+    expect(metricCaption("nodes", DAY)).toBe("Nodes");
   });
 });

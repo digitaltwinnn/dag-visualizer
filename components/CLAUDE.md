@@ -257,6 +257,20 @@ pointermove. Three rules are worth knowing before touching it:
   reader in different places. `All charts` is the other REGISTER of the same rung — this view's RAW
   surface is the document, so it is one `setSection("data")` and no mode step at all.
 
+**The History view has three axes and each has one gesture** (user, 2026-09-19): left/right on the
+timeline is WHEN, the depth of the stack is WHO, and UP/DOWN is WHAT — the measure. `↑`/`↓` from
+inside a card, a vertical SWIPE on touch and pen (never the mouse: it has chevrons and keys, and a
+vertical mouse drag over a chart is a slip), and a two-chevron stepper on the one interactive card
+all step `trendMetric` through `METRIC_ORDER` (`src/data/trendSeries.ts`) — the rail picker's own
+order, so the two controls are one list. Every card steps together, because a stack whose planes
+showed different measures would stop being a comparison; the ends go INACTIVE rather than wrapping
+(the plank's rule); and only the PLOT rolls, inside a frame that holds still (`TrendChart`'s
+`rollKey`) — the card is the network, and the network did not change. The card's head therefore
+names its measure (`metricCaption`), not just its unit. The stepper is a SIBLING of the head strip,
+never a child: the head is itself a button. It is a setting, not a selection, so it writes its
+setter directly, as the picker does. ⚠️ The vertical swipe belongs to the CARD alone — on the bare
+canvas that gesture is the orbit's.
+
 **Hovering pairs over `hoverFilter`, the app's own network channel** (convention 9). A Layers row, a
 plane's header strip and a cursor-card row are three ends of one pairing, with no channel of their
 own: hovering any of them turns that card's hairline to its network's hue and washes the rows. The
