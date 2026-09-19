@@ -19,6 +19,7 @@ import {
   valueAt,
   instantNote,
   placeInstant,
+  stepFor,
 } from "./trendSeries";
 
 // The per-network series maths, as a specification (rule 4 — dataExportCoverage enforces this
@@ -381,5 +382,44 @@ describe("instantNote — why no chart draws this moment", () => {
         expect(instantNote(place, step)!).not.toMatch(/[—–]|\s-\s/);
       }
     }
+  });
+});
+
+// ── THE GRAIN A METRIC IS ACTUALLY DRAWN ON (2026-09-19) ────────────────────────────────────
+// `nodes` is a GAUGE and therefore an hourly instrument: where the window's main payload is
+// finer than an hour, the fleet's own payload stands in and the planes are drawn on ITS buckets
+// (`assembleTrendSlice`'s takeover rule). Every surface that quantises, steps or stamps an
+// instant has to follow the same grain, or the band quantises at five minutes while the charts
+// draw hours: 11 of 12 arrow presses move nothing visible, and the band's stamp and the cursor
+// card's title disagree about which bucket is under the cursor. Found live, 2026-09-19.
+describe("stepFor — one answer about the grain, for every surface", () => {
+  const FINE = { stepMs: 300_000, fStep: 3_600_000 };
+
+  it("a COUNTER metric reads the window's own step", () => {
+    for (const m of ["snapshots", "blocks", "fees", "kb", "continuity"] as const) {
+      expect(stepFor(FINE, m)).toBe(FINE.stepMs);
+    }
+  });
+
+  it("the GAUGE reads the fleet's step — the grain its planes are actually drawn on", () => {
+    expect(stepFor(FINE, "nodes")).toBe(FINE.fStep);
+  });
+
+  it("falls back to the main step where the fleet has not taken over", () => {
+    // `assembleTrendSlice` already carries that fallback in `fStep` (an hourly-or-coarser window
+    // never hands the gauges a payload of their own), so the honest answer here is the slice's
+    // own — this function picks a field, it does not invent a default.
+    const DAILY = { stepMs: DAY, fStep: DAY };
+    expect(stepFor(DAILY, "nodes")).toBe(DAY);
+    expect(stepFor(DAILY, "snapshots")).toBe(DAY);
+  });
+
+  it("is the grain the metric's UNIT word is stated at, for every metric", () => {
+    // The pairing that makes the bug visible: a unit phrase and a cursor step that disagree is
+    // "per hour" printed over buckets the reader is stepping five minutes at a time.
+    for (const m of Object.keys(TREND_METRICS) as (keyof typeof TREND_METRICS)[]) {
+      expect(metricUnit(m, stepFor(FINE, m))).toBe(TREND_METRICS[m].unit(perPhrase(stepFor(FINE, m))));
+    }
+    expect(metricUnit("snapshots", stepFor(FINE, "snapshots"))).toBe("per 5 min");
   });
 });

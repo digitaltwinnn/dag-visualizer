@@ -11,6 +11,7 @@ import {
   metricSeries,
   metricUnit,
   rankByLast,
+  stepFor,
   trimCounterEdges,
   type MetricSeries,
 } from "@/src/data/trendSeries";
@@ -109,7 +110,10 @@ export default function useTrendRoster(
   const src = gauge ? slice.pF : slice.p;
   const series = src?.series ?? NO_SERIES;
   const rawAxis = gauge ? slice.fBuckets : slice.buckets;
-  const stepMs = gauge ? slice.fStep : slice.stepMs;
+  // THE GRAIN, from the one home that decides it (`stepFor`) — the band's timeline asks the very
+  // same question, and a second copy of this ternary is how the band came to quantise at five
+  // minutes over charts drawn in hours (2026-09-19).
+  const stepMs = stepFor(slice, metric);
   const scope = trendScope(filter);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `spec` is TREND_METRICS[metric]

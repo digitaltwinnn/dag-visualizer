@@ -7,6 +7,7 @@ import TrendTrack from "@/components/TrendTrack";
 import { WindowPicker } from "@/components/trendPickers";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import useTrendsWindow from "@/components/useTrendsWindow";
+import { stepFor } from "@/src/data/trendSeries";
 import { leadingTrim } from "@/src/data/trendWindow";
 import { stampInstant } from "@/src/data/trendTimeline";
 import { useStore } from "@/src/store/store";
@@ -67,7 +68,15 @@ export default function TrendTimeline() {
   // buckets on screen, so they have to come from the same answer the planes are drawn from rather
   // than from a second reading of the window. Every payload it names is already fetched by the
   // stack; the hook's module-level cache makes this call free.
-  const { stepMs } = useTrendsSlice(windowId, range);
+  //
+  // ⚠️ AND THE METRIC DECIDES WHICH OF THE SLICE'S TWO GRAINS THAT IS (`stepFor`, 2026-09-19).
+  // `nodes` is a GAUGE — an hourly instrument even when the window's main payload is 5-minute —
+  // so the planes and the cursor card run on the FLEET's buckets there. Reading `slice.stepMs`
+  // here made this band the one roster consumer that did not: it quantised, keyboard-stepped and
+  // stamped at five minutes over charts drawn in hours, so 11 of 12 ArrowRight presses moved
+  // nothing visible and the band's stamp disagreed with the card's title.
+  const slice = useTrendsSlice(windowId, range);
+  const stepMs = stepFor(slice, metric);
   // AN ARRIVED-BUT-EMPTY PAYLOAD IS NOT A LOADING ONE. `leadingTrim` cuts a window with no
   // measured bucket at all to EMPTY (its own documented rule), and an empty window is still an
   // object — so presence alone cannot be the gate for drawing a track.

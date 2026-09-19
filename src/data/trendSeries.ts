@@ -103,6 +103,25 @@ export function perPhrase(stepMs: number): string {
   return stepMs >= 86400000 ? "per day" : stepMs >= 3600000 ? "per hour" : "per 5 min";
 }
 
+/** THE GRAIN A METRIC IS ACTUALLY DRAWN ON — one answer, for every surface (2026-09-19).
+ *
+ *  A GAUGE is an hourly instrument: where the window's main payload is finer than an hour the
+ *  fleet's own hourly payload stands in, and `assembleTrendSlice` publishes that as `fStep` (which
+ *  already mirrors `stepMs` wherever no takeover happened, so there is no default to invent here).
+ *  Everything a reader touches follows the buckets ON SCREEN — the unit phrase, the cursor's
+ *  quantisation, the arrow-key step, the stamp's precision — so they all have to ask this one
+ *  question the same way.
+ *
+ *  ⚠️ THE BUG IT CLOSES: the band's timeline read `slice.stepMs` while the planes and the cursor
+ *  card read the roster's gauge-aware step. With metric = Nodes and a fine window the band
+ *  quantised, stepped and stamped at five minutes over charts drawn in hours — 11 of 12 ArrowRight
+ *  presses moved nothing visible, the scrub wrote twelve times per drawn bucket, and the band read
+ *  "13:45 UTC" beside a card titled "13:00 UTC". Two readings of the same window is the whole
+ *  defect, so this is a function rather than a line in each consumer. */
+export function stepFor(slice: { stepMs: number; fStep: number }, metric: TrendMetric): number {
+  return TREND_METRICS[metric].kind === "gauge" ? slice.fStep : slice.stepMs;
+}
+
 /** The unit word a chart head carries for this metric at this bucket size. */
 export function metricUnit(metric: TrendMetric, stepMs: number): string {
   return TREND_METRICS[metric].unit(perPhrase(stepMs));
