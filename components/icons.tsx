@@ -42,8 +42,7 @@ export const VIEW_ICONS: Record<Mode, LucideIcon> = {
   ledger: Layers,
   // The measured-history view: a spline through data points. ONE MARK FOR ONE DESTINATION
   // (2026-09-18) — the Trends doc page's own ChartLine retired with the page, so every surface
-  // that offers the measured history (the vitals band's rim link, the phone Vitals row, the bar's
-  // view switch, the footer) now wears this.
+  // that offers the measured history (the bar's view switch, the footer) wears this.
   trend: ChartSpline,
   // The one consolidated placeholder view: a dashed circle — not yet formed, the same dashed
   // grammar the Blueprint wireframes speak. The coming features' own marks (Radar,
