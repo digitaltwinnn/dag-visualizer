@@ -80,6 +80,7 @@ export default function TrendChart({
   cursorMs,
   fill,
   note,
+  syncId = "trends",
   className,
   headClassName,
   headAction,
@@ -167,6 +168,13 @@ export default function TrendChart({
    *  would be a different claim entirely — one about the data rather than about the reading. The
    *  head still renders, so the plane keeps its name, its unit and its frame while it waits. */
   note?: string;
+  /** THE RECHARTS SYNC GROUP (2026-09-19). Charts sharing a `syncId` share hover state, which is
+   *  what makes the document's column of small multiples read at one instant. It is a PROP because
+   *  the two registers of this rung can be MOUNTED AT ONCE: opening RAW over the History view
+   *  leaves the stack's five planes mounted behind the document, so one group would let a hover in
+   *  the document re-render five hidden plots. The default is the document's own value, so nothing
+   *  there changes; the stack passes its own. */
+  syncId?: string;
   className?: string;
   /** Extra classes for the HEAD ROW alone (2026-09-18). The 3D trend stack's planes have no
    *  chrome of their own — the head IS each plane's header strip, the one part of a fully
@@ -349,6 +357,7 @@ export default function TrendChart({
           aria-label={`${name} — ${stepMs >= 86400000 ? "daily" : stepMs >= 3600000 ? "hourly" : "5-minute"} buckets, ${n} of them`}
         >
           <TrendPlot
+            syncId={syncId}
             lines={lines}
             buckets={buckets}
             stepMs={stepMs}
@@ -417,6 +426,7 @@ export default function TrendChart({
 // THE DRAG-TO-SELECT STATE MOVED IN WITH IT. The range brush is the plot's own gesture and the
 // head has nothing to do with it, so its in-flight preview now re-renders only this subtree.
 const TrendPlot = memo(function TrendPlot({
+  syncId,
   lines,
   buckets,
   stepMs,
@@ -427,6 +437,8 @@ const TrendPlot = memo(function TrendPlot({
   onRange,
   fill,
 }: {
+  /** See the outer component's prop — a STRING, so it holds the memo still. */
+  syncId: string;
   lines: TrendLine[];
   buckets: number[];
   stepMs: number;
@@ -601,7 +613,7 @@ const TrendPlot = memo(function TrendPlot({
   return (
     <>
           <ResponsiveContainer width="100%" height={PLOT_H + AXIS_H}>
-            <Chart data={rows} syncId="trends" syncMethod="value" margin={PLOT_MARGIN} {...dragProps}>
+            <Chart data={rows} syncId={syncId} syncMethod="value" margin={PLOT_MARGIN} {...dragProps}>
               {/* THE FILL'S GRADIENT — light, not a slab. It runs from the line's own hue at the
                   area's top edge to nothing at the baseline, so a plane reads as a translucent
                   sheet rather than as a painted block, and five of them stacked stay legible

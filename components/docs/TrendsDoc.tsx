@@ -11,11 +11,13 @@ import {
   formatDag as dag,
   formatMb as mb,
   formatSeconds as secs,
-  lastMeasured,
   metricSeries,
   metricUnit,
   perPhrase,
+  rankByLast,
   seriesKey,
+  sharedCeiling,
+  tierWord,
   trimCounterEdges,
 } from "@/src/data/trendSeries";
 import { METAGRAPHS } from "@/src/net/current";
@@ -216,7 +218,10 @@ export default function TrendsDoc() {
   // "what is /day?" — the slash form made the head four cryptic fragments; spelled out, the
   // head reads as a sentence: "Global snapshots per day … Sep 8 · 1,863").
   const per = perPhrase(stepMs);
-  const bucketWord = stepMs >= 86400000 ? "daily" : stepMs >= 3600000 ? "hourly" : "five-minute";
+  // The tier in words, from the one table both registers read (`tierWord`): this one is the
+  // ADJECTIVE form, because it lands inside a section's lead sentence, while the cursor card's
+  // aside takes the short label. Two spellings of one vocabulary had grown in the two components.
+  const bucketWord = tierWord(stepMs, "attributive");
   /** The daily tier's newest COMPLETE day for a counter series (yesterday — today still
    *  fills), scaled like the chart it captions; undefined off the hourly zooms. */
   const dayReadout = (name: string, k = 1): { value: number; word: string } | undefined => {
@@ -236,19 +241,22 @@ export default function TrendsDoc() {
   // says which four this builder can actually serve rather than leaving it to the reader.
   const netPanels = (metric: CounterMetric) => {
     const spec = TREND_METRICS[metric];
-    const panels = roster
-      .map((m) => {
-        const points = trim(metricSeries(metric, m.id!, p?.series ?? {}).points);
-        return { m, points, last: lastMeasured(points) };
-      })
-      .sort((a, b) => (b.last ?? -1) - (a.last ?? -1));
+    // ⚠️ ONE RANKING FUNCTION, ONE CEILING FUNCTION (2026-09-19). `rankByLast` is what "busiest
+    // first" MEANS in this app and `sharedCeiling` is what "same scale" means — the 3D stack reads
+    // both, so writing either out inline here is the two registers of one rung quietly ordering or
+    // scaling the same networks differently. The ceiling's old `Math.max(0, ...flatMap(…))` was
+    // also the spread the stack had already replaced: one argument per measured bucket, which is
+    // the shape that throws `RangeError` the day the store grows past the engine's argument limit.
+    const ptsById = new Map(roster.map((m) => [m.id!, trim(metricSeries(metric, m.id!, p?.series ?? {}).points)]));
+    const nets = new Map(roster.map((m) => [m.id!, m]));
+    const panels = rankByLast([...ptsById.keys()], (id) => ptsById.get(id)!).map((id) => ({
+      m: nets.get(id)!,
+      points: ptsById.get(id)!,
+    }));
     // The shared ceiling is the busiest network's peak ACROSS THIS SECTION — per section, because
     // each section is its own quantity (snapshots, blocks, fees, KB) and a scale shared across
     // units would mean nothing. Undefined in `own` mode, which is TrendChart's "scale yourself".
-    const sharedMax =
-      scaleMode === "shared"
-        ? Math.max(0, ...panels.flatMap((x) => x.points.filter((v): v is number => v != null)))
-        : undefined;
+    const sharedMax = scaleMode === "shared" ? sharedCeiling(panels.map((x) => x.points)) : undefined;
     return panels.map(({ m, points }) => {
       const net = displayNetwork(m.id);
       const line: TrendLine = { label: metric, points, hue: net?.hue };
@@ -268,12 +276,11 @@ export default function TrendsDoc() {
     const metaList = useStore.getState().metaList;
     const DASH: Record<string, string | boolean> = { l0: "", cl1: "2 4", dl1: "6 4" };
     const SHORT: Record<string, string> = { l0: "L0", cl1: "cL1", dl1: "dL1" };
-    return roster
-      .map((m) => {
-        const points = metricSeries("nodes", m.id!, pF?.series ?? {}).points;
-        return { m, points, last: lastMeasured(points) };
-      })
-      .sort((a, b) => (b.last ?? -1) - (a.last ?? -1))
+    // Ranked through the one ranking function, like every other section (see `netPanels`).
+    const ptsById = new Map(roster.map((m) => [m.id!, metricSeries("nodes", m.id!, pF?.series ?? {}).points]));
+    const nets = new Map(roster.map((m) => [m.id!, m]));
+    return rankByLast([...ptsById.keys()], (id) => ptsById.get(id)!)
+      .map((id) => ({ m: nets.get(id)!, points: ptsById.get(id)! }))
       .map(({ m, points }) => {
         const net = displayNetwork(m.id);
         const roster = metaList.find((x) => x.id === m.id);
@@ -291,13 +298,13 @@ export default function TrendsDoc() {
    *  Mean = gapSum/snaps per bucket; a day÷snaps approximation was rejected — for a
    *  batching network (DOR: dozens of snapshots in one tick, then idle) it reads as spacing
    *  that never existed. Ranked by the latest reading, most-stalled first. */
-  const netGapPanels = () =>
-    roster
-      .map((m) => {
-        const s = metricSeries("continuity", m.id!, p?.series ?? {});
-        return { m, s, last: lastMeasured(s.points) };
-      })
-      .sort((a, b) => (b.last ?? -1) - (a.last ?? -1))
+  const netGapPanels = () => {
+    // Ranked through the one ranking function, like every other section (see `netPanels`) —
+    // most-stalled first falls out of it, since the value IS the mean spacing.
+    const seriesById = new Map(roster.map((m) => [m.id!, metricSeries("continuity", m.id!, p?.series ?? {})]));
+    const nets = new Map(roster.map((m) => [m.id!, m]));
+    return rankByLast([...seriesById.keys()], (id) => seriesById.get(id)!.points)
+      .map((id) => ({ m: nets.get(id)!, s: seriesById.get(id)! }))
       .map(({ m, s }) => {
         const net = displayNetwork(m.id);
         const line: TrendLine = { label: "mean", points: trim(s.points), hue: net?.hue };
@@ -306,6 +313,7 @@ export default function TrendsDoc() {
         // breaks the line (user, 2026-09-09: DOR's quiet buckets wore outage amber).
         return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={metricUnit("continuity", stepMs)} buckets={cBuckets} stepMs={stepMs} format={TREND_METRICS.continuity.format} sampled={trim(s.sampled!)} gaps={trim(s.gaps!)} lines={[line]} />;
       });
+  };
 
   // ONE RUNG DOWN THE LADDER (convention 12) — `components/trendDoors.ts`, shared with the
   // History view's cursor card since 2026-09-19. The sequence (commit the network through the one

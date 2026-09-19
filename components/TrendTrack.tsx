@@ -55,6 +55,15 @@ import type { ZoomId } from "@/src/data/trendWindow";
 // ⚠️ AND THE SCRUB WRITES ONCE PER BUCKET, not once per pointermove (`sameBucket`). Every write
 // re-plans the fetch and re-renders five recharts plots for the whole stack, and two instants
 // inside one bucket paint the identical frame — see the quantiser's own note.
+//
+// ⚠️ A BRUSH CANNOT BE CREATED FROM THE KEYBOARD, and that is a stated limitation rather than a
+// TODO. The track's keyboard contract is the CURSOR: arrows step it one bucket (ten with shift),
+// Escape clears a standing range. Drawing a span needs two positions and a travel between them,
+// which a slider role has no vocabulary for — a chord that invented one would be undiscoverable
+// and would collide with the arrows it shares. The keyboard route to a SPAN is the WINDOW PILLS
+// beside this track (`components/trendPickers.tsx`): every pill is an ordinary button naming a
+// real span, and panning or resizing a pill's span with the pointer commits exactly the range a
+// pill already states. So no span reachable here is unreachable there.
 
 /** The plot's height inside the track box; the rest is the month strip. */
 const LABEL_H = 13;

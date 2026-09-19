@@ -103,6 +103,41 @@ export function perPhrase(stepMs: number): string {
   return stepMs >= 86400000 ? "per day" : stepMs >= 3600000 ? "per hour" : "per 5 min";
 }
 
+/** ONE CEILING FOR A SET OF SERIES — what "same scale" means, in both registers (2026-09-19).
+ *
+ *  The largest MEASURED value across every series handed in, floored at 0 (a ceiling under the
+ *  baseline is not a scale, and an all-null set has no peak to state). Nulls are holes, never
+ *  zeros, so they contribute nothing either way.
+ *
+ *  ⚠️ A FOLD, NEVER `Math.max(0, ...points)`. The spread puts one argument on the stack per
+ *  measured bucket, and a long window across a full roster is tens of thousands of them — the
+ *  shape that throws `RangeError: Maximum call stack size exceeded` the day the store grows past
+ *  the engine's argument limit. The stack had already replaced its spread; the document had not,
+ *  which is exactly why this is a function and not a line in each. */
+export function sharedCeiling(series: readonly (readonly (number | null)[])[]): number {
+  let max = 0;
+  for (const points of series) {
+    for (const v of points) if (v != null && v > max) max = v;
+  }
+  return max;
+}
+
+/** The bucket TIER, as one classification — the thresholds `perPhrase` reads, named. */
+type Tier = "day" | "hour" | "fine";
+const tierOf = (stepMs: number): Tier => (stepMs >= 86400000 ? "day" : stepMs >= 3600000 ? "hour" : "fine");
+
+/** THE TIER'S WORD, IN THE TWO FORMS A READER MEETS IT IN (2026-09-19). ONE table, because it is
+ *  one vocabulary: the cursor card's aside is a short LABEL beside a title ("5 min"), while a
+ *  document section's lead needs the ADJECTIVE that reads inside a sentence ("Each network's own
+ *  five-minute snapshot count"). Two spellings had grown in two components, which is how one app
+ *  comes to call the same tier two things on two surfaces. */
+export function tierWord(stepMs: number, form: "label" | "attributive"): string {
+  const tier = tierOf(stepMs);
+  if (tier === "day") return "daily";
+  if (tier === "hour") return "hourly";
+  return form === "label" ? "5 min" : "five-minute";
+}
+
 /** THE GRAIN A METRIC IS ACTUALLY DRAWN ON — one answer, for every surface (2026-09-19).
  *
  *  A GAUGE is an hourly instrument: where the window's main payload is finer than an hour the
@@ -349,12 +384,12 @@ export function placeInstant(
 
 /** The tier's own word, with the agreement that word forces. Five minutes are plural; a day and
  *  an hour are not, and a sentence that gets that wrong reads as machine copy. */
-const TIER_WORDS = (stepMs: number): { n: string; is: string; it: string } =>
-  stepMs >= 86_400_000
-    ? { n: "day", is: "is", it: "it" }
-    : stepMs >= 3_600_000
-      ? { n: "hour", is: "is", it: "it" }
-      : { n: "five minutes", is: "are", it: "them" };
+const TIER_WORDS = (stepMs: number): { n: string; is: string; it: string } => {
+  const tier = tierOf(stepMs); // the same classifier `tierWord` reads — one set of thresholds
+  if (tier === "day") return { n: "day", is: "is", it: "it" };
+  if (tier === "hour") return { n: "hour", is: "is", it: "it" };
+  return { n: "five minutes", is: "are", it: "them" };
+};
 
 /** What the card says about an instant it cannot chart, or null where it can.
  *

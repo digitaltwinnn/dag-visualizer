@@ -19,7 +19,9 @@ import {
   valueAt,
   instantNote,
   placeInstant,
+  sharedCeiling,
   stepFor,
+  tierWord,
 } from "./trendSeries";
 
 // The per-network series maths, as a specification (rule 4 — dataExportCoverage enforces this
@@ -421,5 +423,65 @@ describe("stepFor — one answer about the grain, for every surface", () => {
       expect(metricUnit(m, stepFor(FINE, m))).toBe(TREND_METRICS[m].unit(perPhrase(stepFor(FINE, m))));
     }
     expect(metricUnit("snapshots", stepFor(FINE, "snapshots"))).toBe("per 5 min");
+  });
+});
+
+// ── THE SHARED CEILING (2026-09-19) ─────────────────────────────────────────────────────────
+// Both registers of this rung offer "same scale": one ceiling across a section's panels (the
+// document) or across the whole ranked roster (the stack). It is one question, and the two had
+// two answers — the document's `Math.max(0, ...flatMap(…))` is the SPREAD the stack already
+// replaced, one argument per measured bucket, which is the shape that throws `RangeError:
+// Maximum call stack size exceeded` the day the store grows past the engine's argument limit.
+describe("sharedCeiling — one ceiling function for both registers", () => {
+  it("is the largest measured value across every series", () => {
+    expect(sharedCeiling([[1, 9, 3], [4, null, 12], [2]])).toBe(12);
+  });
+
+  it("is 0 for no series at all, and for series with nothing measured", () => {
+    expect(sharedCeiling([])).toBe(0);
+    expect(sharedCeiling([[], []])).toBe(0);
+    expect(sharedCeiling([[null, null], [null]])).toBe(0);
+  });
+
+  it("never goes below 0 — a ceiling under the baseline is not a scale", () => {
+    expect(sharedCeiling([[-5, -2]])).toBe(0);
+  });
+
+  it("survives an input far past the engine's ARGUMENT limit (the spread's failure mode)", () => {
+    // ~200k buckets: `Math.max(0, ...points)` throws here. A fold does not.
+    const big = Array.from({ length: 200_000 }, (_, i) => (i % 7 === 0 ? null : i));
+    expect(sharedCeiling([big, [1]])).toBe(199_999);
+  });
+});
+
+// ── THE TIER'S WORD (2026-09-19) ────────────────────────────────────────────────────────────
+// Two surfaces name the bucket tier: the cursor card's aside (a short LABEL) and the document's
+// section leads (an adjective INSIDE a sentence). Two spellings of one vocabulary had grown —
+// "5 min" against "five-minute" — so it is one table with two forms, and each call site keeps
+// its own grammar.
+describe("tierWord — one vocabulary, two forms", () => {
+  it("labels the three tiers", () => {
+    expect(tierWord(DAY, "label")).toBe("daily");
+    expect(tierWord(3_600_000, "label")).toBe("hourly");
+    expect(tierWord(300_000, "label")).toBe("5 min");
+  });
+
+  it("gives the sentence form the adjective a lead reads with", () => {
+    expect(tierWord(DAY, "attributive")).toBe("daily");
+    expect(tierWord(3_600_000, "attributive")).toBe("hourly");
+    expect(tierWord(300_000, "attributive")).toBe("five-minute");
+    expect(`Each network's own ${tierWord(300_000, "attributive")} snapshot count.`).toBe(
+      "Each network's own five-minute snapshot count.",
+    );
+  });
+
+  it("classifies on the SAME thresholds the unit phrase does", () => {
+    // One tier, one answer — a head reading "per hour" over an aside reading "5 min" is the
+    // divergence this table exists to prevent.
+    for (const step of [DAY, 7 * DAY, 3_600_000, 7_200_000, 300_000, 60_000]) {
+      const per = perPhrase(step);
+      const word = tierWord(step, "label");
+      expect(per === "per day" ? "daily" : per === "per hour" ? "hourly" : "5 min").toBe(word);
+    }
   });
 });

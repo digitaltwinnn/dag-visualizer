@@ -10,7 +10,7 @@ import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { cn } from "@/lib/utils";
-import { instantNote, orderAt, placeInstant, rankAt, valueAt } from "@/src/data/trendSeries";
+import { instantNote, orderAt, placeInstant, rankAt, tierWord, valueAt } from "@/src/data/trendSeries";
 import { stampInstant } from "@/src/data/trendTimeline";
 import { bucketAt } from "@/src/data/trendWindow";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
@@ -93,7 +93,10 @@ export default function TrendInstantPane({
   const globalValue = cursorMs != null && !subject ? valueAt(roster.global, buckets, stepMs, cursorMs) : null;
 
   // The tier in words — the card's aside, so the body never has to caption its own precision.
-  const tier = stepMs >= 86_400_000 ? "daily" : stepMs >= 3_600_000 ? "hourly" : "5 min";
+  // ONE TABLE, TWO FORMS (`tierWord`, 2026-09-19): this aside is a short LABEL beside a title,
+  // while the document's section leads take the adjective that reads inside a sentence. They had
+  // grown two spellings of one vocabulary, "5 min" against "five-minute".
+  const tier = tierWord(stepMs, "label");
   const fmt = (v: number | null) => (v != null ? format(v) : NO_READING);
 
   // THE SPAN A DOOR CARRIES: the brushed range if one stands, else the window on screen. One

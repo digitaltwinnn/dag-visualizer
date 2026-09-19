@@ -113,6 +113,26 @@ describe("one roster pass", () => {
     expect(/\bmetricSeries\s*\(|\brankByLast\s*\(/.test(stripComments(readFileSync("components/useTrendRoster.ts", "utf8")))).toBe(true);
   });
 
+  it("no surface writes the RANKING out by hand", () => {
+    // ⚠️ THE NAME IS NOT THE RULE (2026-09-19). The check above forbids `rankByLast` outside the
+    // hook and exempts the document — so it could not see the document writing that function's
+    // COMPARATOR out inline, three times, which it was: `(b.last ?? -1) - (a.last ?? -1)`. The
+    // exemption is about which SURFACE composes a roster, never about re-deriving what
+    // "busiest first" means; two spellings of one ranking is how the registers of this rung start
+    // ordering the same networks differently. So the rule is stated as the shape, with no
+    // exemption at all: there is exactly one ranking function.
+    const LAST_COMPARATOR = /\?\?\s*-1\s*\)\s*-\s*\(|\.sort\([^;]{0,200}?lastMeasured\s*\(/;
+    const offenders = sources()
+      .filter(({ path }) => path.startsWith("components/"))
+      .filter(({ code }) => LAST_COMPARATOR.test(code))
+      .map((s) => s.path)
+      .sort();
+    expect(offenders, "rank with `rankByLast`, never with an inline last-value comparator").toEqual([]);
+    // …and the rule is LIVE: the pattern really does match the shape it forbids.
+    expect(LAST_COMPARATOR.test("xs.sort((a, b) => (b.last ?? -1) - (a.last ?? -1))")).toBe(true);
+    expect(LAST_COMPARATOR.test("xs.sort((a, b) => lastMeasured(b.pts)! - lastMeasured(a.pts)!)")).toBe(true);
+  });
+
   it("the hook is what the stack and both rails read", () => {
     for (const path of ["components/TrendStack.tsx", "components/TrendExplore.tsx", "components/inspector/TrendInstantPane.tsx"]) {
       const code = stripComments(readFileSync(path, "utf8"));

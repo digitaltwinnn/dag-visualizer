@@ -66,6 +66,7 @@ import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { cn } from "@/lib/utils";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
+import { sharedCeiling } from "@/src/data/trendSeries";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { PLANE_PX_W, stackPoses } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
@@ -168,16 +169,13 @@ export default function TrendStack() {
   // TrendChart's "scale yourself".
   const sharedMax = useMemo(
     () =>
-      scaleMode === "shared"
-        ? ranked.reduce(
-            // A REDUCE, not `Math.max(...flatMap)`: the spread puts one argument on the stack per
-            // measured bucket, and a long window across a full roster is tens of thousands of them
-            // — the shape that throws `RangeError: Maximum call stack size exceeded` the day the
-            // store grows past the engine's argument limit.
-            (m, id) => (rows.get(id)?.series.points ?? []).reduce<number>((n, v) => (v != null && v > n ? v : n), m),
-            0,
-          )
-        : undefined,
+      // ONE CEILING FUNCTION, shared with the document (`sharedCeiling`, 2026-09-19): it is a FOLD
+      // rather than `Math.max(0, ...spread)` — the spread puts one argument on the stack per
+      // measured bucket, and a long window across a full roster is tens of thousands of them, the
+      // shape that throws `RangeError: Maximum call stack size exceeded` the day the store grows
+      // past the engine's argument limit. The document had kept the spread until this was a
+      // function both registers read.
+      scaleMode === "shared" ? sharedCeiling(ranked.map((id) => rows.get(id)?.series.points ?? [])) : undefined,
     // ⚠️ THE DEPS ARE THE ROSTER'S MEMOISED PARTS, never a fresh object. `useTrendRoster` holds its
     // whole return still now, but the narrow deps are what this actually reads — and the trap is
     // one render away either way: a hook that composed a `{…}` per render would recompute this on
@@ -319,6 +317,13 @@ export default function TrendStack() {
             {p && (
               <TrendChart
                 name={row.name}
+                // ITS OWN SYNC GROUP (2026-09-19). recharts syncs hover across every chart sharing
+                // a `syncId`, and the stack stays MOUNTED behind the raw layer's document — so on
+                // the document's shared group a hover there re-rendered these five hidden plots.
+                // The planes are a group of their own: a hover on one plane still marks the same
+                // bucket on its neighbours, which is the whole point of reading a stack at one
+                // instant, and the document's column is untouched.
+                syncId="trend-stack"
                 // The unit word follows the TIER — an hourly bucket labelled "per day" would
                 // misstate every reading by a factor of 24 (the document's own rule).
                 unit={unitWord}
