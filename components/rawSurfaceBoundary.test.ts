@@ -36,6 +36,15 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 //     adjacent and only one of them may be one-shot. Moving the document behind RAW changed
 //     nothing about this — the bar keeps its filter over a raw layer, so the chips still cut the
 //     charts the reader is looking at, and this case simply moved home with the document.
+//  6. THE DOCUMENT OPENS ON WHAT THE SCENE WAS SHOWING, AND WRITES NOTHING BACK (R33,
+//     2026-09-19). Convention 12's ladder says each step down carries its context, and the two
+//     faces of rung 2 are one step apart — a reader who brushed a range on the History timeline
+//     and pressed RAW used to be handed the whole measured span back. So `TrendsDoc` SEEDS its
+//     `zoom` from `store.trendWindow` and its `range` from `store.trendRange`, once at mount
+//     (which is once per open — see case 3's remount). Both halves fail silently: seeding from a
+//     SUBSCRIPTION would fight the reader's own pill on the next cursor write, and a write back
+//     the other way would make reading the page silently re-cut the scene behind it.
+//
 //  5. THE COMMAND BAR NEVER GATES ON A DOC ID. With `docReadsFilter` gone the bar's gate is the
 //     plain `doc != null`, and the shortcut that rule existed to prevent — `doc === "about" || …`
 //     growing a page list inside TopBar — is exactly as available as it ever was. It is convention
@@ -108,6 +117,30 @@ describe("raw-surface boundary", () => {
   it("the document SUBSCRIBES to the committed filter — a one-shot read would be a dead control", () => {
     const doc = read("components/docs/TrendsDoc.tsx");
     expect(doc).toMatch(/useStore\(\(s\)\s*=>\s*s\.filter\)/);
+  });
+
+  it("the document seeds its window and range from the store at MOUNT, and never writes back", () => {
+    const doc = read("components/docs/TrendsDoc.tsx");
+    // Seeded — a lazy `useState` initialiser over a ONE-SHOT `getState()` read, per channel.
+    expect(
+      doc,
+      "TrendsDoc must seed its zoom from store.trendWindow at mount (R33 — the document opens on the window the scene was showing)",
+    ).toMatch(/useState<ZoomId>\(\s*\(\)\s*=>\s*useStore\.getState\(\)\.trendWindow\s*\)/);
+    expect(
+      doc,
+      "TrendsDoc must seed its range from store.trendRange at mount",
+    ).toMatch(/useStore\.getState\(\)\.trendRange/);
+    // NOT subscribed: a subscription would fight the reader's own pill on the next cursor write.
+    for (const ch of ["trendWindow", "trendRange"]) {
+      expect(
+        doc,
+        `TrendsDoc must not SUBSCRIBE to ${ch} — the seed is a one-shot read; after mount the window is the page's own`,
+      ).not.toMatch(new RegExp(`useStore\\(\\s*\\(s\\)\\s*=>\\s*s\\.${ch}\\b`));
+    }
+    // …and never the reverse: reading the page must not re-cut the scene behind it.
+    for (const setter of ["setTrendWindow", "setTrendRange", "setTrendCursor", "setTrendFocus"]) {
+      expect(doc, `TrendsDoc must not call ${setter} — the document reads the scene's window, it never writes it`).not.toContain(setter);
+    }
   });
 
   it("the command bar gates the filter on whether a doc is open, never on a doc id", () => {

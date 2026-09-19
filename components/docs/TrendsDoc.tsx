@@ -105,7 +105,25 @@ function Section({ id, title, lead, children }: { id: string; title: string; lea
 }
 
 export default function TrendsDoc() {
-  const [zoom, setZoom] = useState<ZoomId>("all");
+  // ⚠️ THE DOCUMENT OPENS ON WHAT THE SCENE WAS SHOWING (controller ruling R33, 2026-09-19).
+  // Convention 12's ladder says each step down CARRIES ITS CONTEXT, and the two faces of rung 2
+  // are one step apart: a reader who brushed Feb–Jun on the History timeline and pressed RAW was
+  // handed the whole measured span back, which is the same lost-context complaint the per-chart
+  // records door exists to answer one rung further down.
+  //
+  // So the window and the range are SEEDED from the store's own channels — `trendWindow` and
+  // `trendRange`, the ones the stack and the band read — and read ONCE AT MOUNT, exactly like
+  // `initialTab` below and for the same reason: `datasection/DocumentSurface` mounts this
+  // component when the raw register OPENS, so "at mount" is "when the reader asked to read it".
+  //
+  // ⚠️ SEEDED, NOT FOLLOWED, AND NEVER WRITTEN BACK. After mount these are the page's own state:
+  // the document's pickers move them and the stack behind it does not move. A subscription would
+  // make the document a second view of one window rather than a document (and would fight the
+  // reader's own pill the moment the band's cursor wrote), and a write back the other way would
+  // make reading the page silently re-cut the scene you left. The channels are read through
+  // `getState()` for that reason — a one-shot read is what the seed IS, and the adjacent
+  // `filter` read two blocks down is deliberately SUBSCRIBED, so the two must not be confused.
+  const [zoom, setZoom] = useState<ZoomId>(() => useStore.getState().trendWindow);
   // THE RANGE — a drag on any chart (convention 12's zoom). ONE selection for the whole
   // page: the shared-axis column means every chart cuts to it together. Picking a zoom pill
   // clears it (the pill IS a range statement); the chip row beside the pills states it, and
@@ -113,7 +131,13 @@ export default function TrendsDoc() {
   // `metaId` = whose chart the drag was drawn on (user, 2026-09-09: DOR committed, a range
   // dragged on BIOFI's chart, "go to raw: no biofi in the filter" — a range must remember
   // its network, and the standalone records button prefers it over the committed filter).
-  const [range, setRange] = useState<{ fromMs: number; toMs: number; metaId?: string | null } | null>(null);
+  // A range arriving from the SCENE carries no metagraph — the timeline brushes the whole stack,
+  // not one plane — so it seeds `metaId: null` and the records door falls back to the committed
+  // filter, which is exactly what that door does for the global charts already.
+  const [range, setRange] = useState<{ fromMs: number; toMs: number; metaId?: string | null } | null>(() => {
+    const r = useStore.getState().trendRange;
+    return r ? { fromMs: r.fromMs, toMs: r.toMs, metaId: null } : null;
+  });
   // ONE section selection for BOTH drawers (user, 2026-09-09: "have it once drive both
   // tabs") — the two cabinets carry the same four sections, and an uncontrolled pair reset
   // the pick on every drawer switch. The zoom/range already lives at page level; making the
@@ -145,8 +169,8 @@ export default function TrendsDoc() {
   // the store's own window: this page and that view are two registers of one rung (convention
   // 12), and they already share the chart primitive and the per-network series maths. The auto-
   // tiering, the 1H slice, the fleet's hourly payload and the daily readout's 90d window all
-  // moved there with their reasons; the document's zoom and range stay LOCAL state, because the
-  // window a reader picks on this page is the page's own.
+  // moved there with their reasons; the document's zoom and range stay LOCAL state after the
+  // mount SEED above, because the window a reader picks on this page is the page's own.
   const { p, buckets, stepMs, pF, fBuckets, fStep, fleetPending, daily, error } = useTrendsSlice(zoom, range);
   // ⚠️ THE COMMITTED NETWORK SCOPES EVERY PER-NETWORK COLUMN (user, 2026-09-14: "Trends is a
   // doc-page, but actually it shows data that could benefit from the metagraph filter … hide the
@@ -165,8 +189,10 @@ export default function TrendsDoc() {
   // which chains a filter leaves in scope is a property of the trends store, not of this page.
   const roster = trendRoster(filter).map((id) => METAGRAPHS.find((m) => m.id === id)!);
 
-  // A committed metagraph opens the document on that side of the network. Read ONCE AT MOUNT, and
-  // the mount is the RAW TOGGLE: `datasection/DocumentSurface` mounts this component when the raw
+  // A committed metagraph opens the document on that side of the network. The THIRD of this
+  // component's mount-once reads, with the window and the range above, and all three answer the
+  // same question — what was the reader looking at when they asked for this page? Read ONCE AT
+  // MOUNT, and the mount is the RAW TOGGLE: `datasection/DocumentSurface` mounts this component when the raw
   // register OPENS and unmounts it when the recede finishes, so "at mount" is "when the reader
   // asked to read it" — which is what makes this read the committed filter as it stands right
   // then. (It was briefly mounted with the VIEW instead, and that latched the answer before the
