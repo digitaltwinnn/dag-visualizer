@@ -43,9 +43,9 @@ doc pages (/about, /design) are an overlay over the same bare stage, not Modes.
 **The four 3D views are complementary projections of the same network: hyper = who/what, geo =
 where, ledger = when, trend = how it changed.** Structure belongs to hyper. Activity belongs to the
 time pair, split by TENSE: the ledger is the live instrument — this tick, this anchoring, right now —
-and History is the measured record of the same quantities, one bucket per day or hour, back to where
-the store's samples start. A rate you watch arrive is the ledger's; the same rate plotted against
-last month is History's.
+and History is the measured record of the same quantities — one bucket per day, hour or five
+minutes, back to where the store's samples start. A rate you watch arrive is the ledger's; the
+same rate plotted against last month is History's.
 
 Interface glyphs are one system — `lucide-react`, monochrome via `currentColor` so accent and
 identity tinting inherit. **Never emoji**: they ignore CSS `color`. The view→icon map is
@@ -73,7 +73,7 @@ exemptions. `src/data/` holds the live singleton and the geo cache alongside the
 growing: a mechanical purity classifier was tried and rejected (its regex matched the words
 "window" and "fetch" inside this repo's own comments), and the header records why.
 
-Ten narrower boundary tests work the same way: `components/unlistedBoundary.test.ts` (the `"unlisted"`
+Fourteen narrower boundary tests work the same way: `components/unlistedBoundary.test.ts` (the `"unlisted"`
 id literal has exactly two homes), `components/railLadderBoundary.test.ts` (every committable focus
 rung maps to a hinted rail card slot), `components/railTierBoundary.test.ts` (`data-focus` has two
 homes and the slab's geometry — the pager included — keys on `data-tier`),
@@ -91,9 +91,17 @@ plot box its cursor overlay is calculated against),
 Trends document is a view's RAW register rather than a doc-overlay page),
 `components/trendRailBoundary.test.ts` (History's three "one home" rules: one plane-focus builder,
 one records door, one roster pass),
-`src/data/signerMatchBoundary.test.ts` (a peer-id prefix comparison lives only in `src/data/network.ts`)
-and `src/engine/scene/rowBoundary.test.ts` (a scene module that places a ledger row consults the
-trail's boundaries).
+`components/calloutBoundary.test.ts` (`#callout` has two homes, both consult `boxedCard`, both
+decline on a phone through one `breakpointOf`, and `SCENE_GLASS` is the one scene-anchored label
+container), `components/breakpointArmBoundary.test.ts` (CSS trap 8 — a tier boundary names the same
+number on both arms), `src/data/signerMatchBoundary.test.ts` (a peer-id prefix comparison lives only
+in `src/data/network.ts`), `src/engine/scene/rowBoundary.test.ts` (a scene module that places a
+ledger row consults the trail's boundaries), `src/engine/entryBeatBoundary.test.ts` (every 3D view's
+entry owner still defines the arrival beat's begin/release pair — the wiring was silently lost once)
+and `src/net/netUrlBoundary.test.ts` (every own-server fetch goes through `netUrl()`, or carries an
+exemption with a reason).
+`ls **/*Boundary.test.ts` is the live count: fifteen files, of which
+`components/selectionBoundary.test.ts` is rule 2's and the other fourteen are these.
 
 Each of these files opens with a header comment giving the rationale, the scope and every exemption
 with its reason. **That header is the rule's authoritative statement** — read it rather than inferring
@@ -134,8 +142,11 @@ scope from the table.
     carries the roster rather than pretending to be data.
     Each step down is one deliberate gesture that CARRIES ITS CONTEXT (a chart range hands its
     network and dates to the anchor log's search — one home, `components/trendDoors.ts`, shared by
-    both registers), and every new surface must name its rung, its register and its bridges rather
-    than invent a fourth depth. The registers complement each other on purpose: the measured
+    both registers), and so is the step ACROSS: **the scene face hands its window and its range to
+    the document face** (R33, 2026-09-19 — `TrendsDoc` seeds its `zoom` from `store.trendWindow`
+    and its `range` from `store.trendRange`, once at mount, which is once per RAW open; after that
+    the document's pickers are its own and it never writes back). and every new surface must name its rung, its register and its bridges rather
+    than invent a fourth depth. The two lower RUNGS complement each other on purpose: the measured
     history grows coarser with distance (tier retention) exactly where the raw layer's chain paging
     stays exact to genesis.
 

@@ -29,7 +29,8 @@ for an explicit light pin. Two tokens use it and the CSS comment above each says
 `--ident-l`/`--ident-c` (the identity lanes' L and C), and **`--trend-fill-top`**, the opacity at
 the top of the History planes' area fill — 0.30 dark, 0.18 on paper, because there the hue is INK
 and the presence that reads as a translucent sheet over the dark chamber reads as a painted block
-over a ~0.8-L page, with five of them no longer see-through. The fill is drawn as an SVG gradient
+over the light scene ground (`--scene-ground`, the backdrop a transparent chart plane actually
+sits on), with five of them no longer see-through. The fill is drawn as an SVG gradient
 stop, so the token reaches it through `style={{ stopOpacity: "var(--trend-fill-top)" }}` — a
 presentation ATTRIBUTE would not resolve a `var()`, and a JS theme read would put a second theme
 owner beside `ThemeController`.

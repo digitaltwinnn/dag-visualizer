@@ -192,17 +192,53 @@ describe("trend-stack boundary", () => {
 
   it("fills the planes' area without inventing a measurement", () => {
     const src = stripComments(readFileSync(CHART, "utf8"));
-    // A bare JSX boolean attribute on its own line — the stack's one call site.
-    const passesFill = (f: string): boolean => /^\s*fill\s*$/m.test(stripComments(readFileSync(f, "utf8")));
+    const doc = "components/docs/TrendsDoc.tsx";
+    // ⚠️ THE TAG, NOT THE LINE (fix round 1). The first cut matched `/^\s*fill\s*$/m` — a line
+    // holding nothing but `fill` — which is how the STACK happens to be formatted and is not how
+    // the DOCUMENT is: every `<TrendChart …>` there is one long line, so a `fill` added to any of
+    // them would have sailed past the negative half of this rule. The prop is found inside the
+    // open TAG instead, which is formatting-agnostic.
+    //
+    // …and the tag's end is found by BALANCING BRACES rather than by the next `>`: these call
+    // sites pass arrow functions (`inspect={() => inspectRange(m.id!)}`), so a naive `[^>]*` ends
+    // the tag at the `>` of an `=>` and reads only the props before it.
+    const trendChartTags = (src: string): string[] => {
+      const out: string[] = [];
+      const open = /<TrendChart\b/g;
+      let m: RegExpExecArray | null;
+      while ((m = open.exec(src)) !== null) {
+        let depth = 0;
+        for (let i = m.index + m[0].length; i < src.length; i++) {
+          const c = src[i];
+          if (c === "{") depth++;
+          else if (c === "}") depth--;
+          else if (c === ">" && depth === 0) {
+            out.push(src.slice(m.index, i + 1));
+            break;
+          }
+        }
+      }
+      return out;
+    };
+    // A JSX prop token: preceded by whitespace or the tag's own name boundary, and followed by
+    // whitespace, `=`, `/` or the tag's close. `fillOpacity` and the like do not match.
+    const passesFill = (f: string): boolean =>
+      trendChartTags(stripComments(readFileSync(f, "utf8"))).some((tag) => /\sfill(\s|=|\/|>)/.test(tag));
+
     expect(
       passesFill(FILE),
       `${FILE} must pass \`fill\` to TrendChart — the plane's colour is the area under its line`,
     ).toBe(true);
     // The document's own call sites must NOT: a filled document chart is a different page, and
-    // the chart type only leaves `LineChart` when the fill is on.
+    // the chart type only leaves `LineChart` when the fill is on. Guarded against a VACUOUS pass —
+    // a rename of the component would otherwise leave this asserting about an empty list.
     expect(
-      passesFill("components/docs/TrendsDoc.tsx"),
-      `components/docs/TrendsDoc.tsx passes \`fill\` — the document register is line-only`,
+      trendChartTags(stripComments(readFileSync(doc, "utf8"))).length,
+      `${doc} renders no <TrendChart> at all — this rule would pass by finding nothing`,
+    ).toBeGreaterThan(0);
+    expect(
+      passesFill(doc),
+      `${doc} passes \`fill\` — the document register is line-only`,
     ).toBe(false);
     // The area is a graphical item like the line, so it takes the line's own honesty prop. Two
     // occurrences: the Line's and the Area's.

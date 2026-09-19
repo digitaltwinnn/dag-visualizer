@@ -19,9 +19,10 @@ can understand how it works and why it's powerful.
 - The **History** view (`/trends`) shows the network's measured history as the scene itself —
   one chart plane per network, receding into depth, with a shared time cursor reading every
   chain at the same moment and a scrubbable timeline along the bottom. The same history reads
-  as a document behind that view's RAW toggle. Daily since Jan 1 2026, with hourly and
-  5-minute zoom, summed from the chain's own records into an Upstash Redis timeseries by a
-  15-minute cron (the other three views need no backend at all; only this history does).
+  as a document behind that view's RAW toggle. Daily, hourly and 5-minute buckets, all
+  reaching the same mid-2025 floor (`TIER_SINCE` in `src/data/trendWindow.ts`), summed from
+  the chain's own records into an Upstash Redis timeseries by a 15-minute cron (the other
+  three views need no backend at all; only this history does).
 
 ## Design language
 
@@ -61,7 +62,7 @@ orthogonal question and owns one "signature" detail card, so the views never ove
 | **Hypergraph** | *who / what* — architecture + economic weight | nodes-by-network explorer | **Node card**; structure counts live in the bottom vitals band |
 | **Node geography** | *where* — footprint & decentralization | country→nodes explorer (countries → provider cohorts → nodes) | **Node card** (state, roles, location) + country / provider cards |
 | **Snapshots** | *when* — how the ledger advances + cost | settlement-layers explorer (floors disclose each lane's nodes) | **Snapshot card** (DAG position, anchors, fees) |
-| **History** | *how it changed* — the measured past | layers-over-time explorer (the metric, the layout, the roster) | **Cursor card** (every network read at one instant) |
+| **History** | *how it changed* — the measured past | layers-over-time explorer (the metric, the layout, the roster) | **Instant card** (every network read at one moment) |
 
 Visual uniformity is enforced with shared design tokens in one stylesheet (`app/globals.css`):
 one spacing scale, one panel radius, one "selected" treatment (`--sel-bg` / `--sel-border`),

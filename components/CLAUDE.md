@@ -125,6 +125,17 @@ layer's `.ig-panel` glass IS its sheet, and a plate on a plate flattens both. Ev
 RAW is identical there: the toggle shows pressed, Escape and the × return to the scene, and the
 command bar keeps its whole ordinary face, filter included.
 
+⚠️ **AND THE DOCUMENT OPENS ON WHAT THE SCENE WAS SHOWING** (R33, 2026-09-19). The step ACROSS the
+rung carries its context exactly as the step DOWN does: `TrendsDoc` seeds its `zoom` from
+`store.trendWindow` and its `range` from `store.trendRange` — a brushed range arrives with
+`metaId: null`, since the timeline brushes the whole stack rather than one plane. These are its
+THIRD and first mount-once reads beside `initialTab`, and `DocumentSurface` remounts the component
+per open, so "at mount" is "when the reader asked to read it". **Seeded, not followed, and never
+written back**: after mount the pickers are the page's own, a subscription would fight the reader's
+own pill on the next cursor write, and a write the other way would make reading the page silently
+re-cut the scene behind it. `components/rawSurfaceBoundary.test.ts` pins all three halves — the
+`getState()` seed, the absent subscription, and the absent setter call.
+
 **The page never scrolls.** The scene wrapper is `position:fixed; inset:0` with an identity transform
 from first paint, which makes it the containing block for every fixed descendant — see CSS trap 2,
 where both halves of that arrangement are load-bearing. The raw layer and the vitals band are siblings

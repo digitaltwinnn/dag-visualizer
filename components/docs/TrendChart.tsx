@@ -703,11 +703,21 @@ const TrendPlot = memo(function TrendPlot({
               ))}
               {/* THE AREA, UNDER THE FIRST LINE ONLY. It is drawn before the lines so the hairline
                   stays the plane's sharpest mark, and it takes no part in anything else: no
-                  stroke of its own (the `Line` beside it IS the edge), no dots, and
-                  `tooltipType="none"` so a hover reads one value per series rather than two
-                  readings of the same one. `connectNulls={false}` and `baseValue={0}` are the two
-                  honesty props — a gap in the series is a gap in the fill, and the fill's floor is
-                  the axis's own zero rather than whatever the window's minimum happens to be. */}
+                  stroke of its own (the `Line` beside it IS the edge) and no dots.
+                  `connectNulls={false}` and `baseValue={0}` are the two honesty props — a gap in
+                  the series is a gap in the fill, and the fill's floor is the axis's own zero
+                  rather than whatever the window's minimum happens to be.
+
+                  ⚠️ WHAT KEEPS A HOVER TO ONE READING PER SERIES IS THE TOOLTIP'S OWN CONTENT, not
+                  `tooltipType` (fix round 1 — the first cut of this comment named the wrong
+                  mechanism). The Area shares the Line's `dataKey`, so recharts hands the tooltip a
+                  SECOND payload entry with the same key and the same value; the custom content
+                  below iterates `lines` and looks each one up with `payload.find(e => e.dataKey
+                  === l.label)`, which takes the first match, so the duplicate is never read.
+                  `tooltipType="none"` is therefore inert HERE — recharts 3.9 honours it only in
+                  `DefaultTooltipContent`, which filters out entries whose `type` is `"none"` — and
+                  it stays as the declaration that this item is not a tooltip subject, load-bearing
+                  the moment a caller drops the custom content. */}
               {fill && lines[0] && (
                 <Area
                   dataKey={lines[0].label}
