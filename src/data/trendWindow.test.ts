@@ -4,7 +4,7 @@
 // as "no leading gap"; the client clock judging a CDN-cached payload's newest bucket; the
 // leading partial month drawn whole while the trailing one was trimmed).
 import { describe, expect, it } from "vitest";
-import { assembleTrendSlice, bucketAt, cutRange, leadingTrim, monthlySum, pickRangeTier, planTrendFetch, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, ZOOMS, type TrendsWindowData } from "./trendWindow";
+import { assembleTrendSlice, bucketAt, cursorFraction, cutRange, leadingTrim, monthlySum, pickRangeTier, planTrendFetch, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, ZOOMS, type TrendsWindowData } from "./trendWindow";
 
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
@@ -195,6 +195,62 @@ describe("bucketAt", () => {
   it("finds a DAILY bucket from an instant partway through it", () => {
     const days = [Date.UTC(2026, 8, 1), Date.UTC(2026, 8, 2), Date.UTC(2026, 8, 3)];
     expect(bucketAt(days, DAY, Date.UTC(2026, 8, 2, 13, 47))).toBe(Date.UTC(2026, 8, 2));
+  });
+});
+
+// ---- WHERE THE CURSOR SITS ON THE PLOT (Task 12b, 2026-09-19) -------------------------------
+// The shared cursor used to be a recharts `ReferenceLine`, which meant every cursor write
+// re-rendered the whole chart — five of them per bucket, which measured at 3-4 FPS across a
+// scrub. It is a lightweight DOM overlay now, and this is the only maths that move moved out of
+// recharts: WHERE, as a fraction of the plot box, the chart's own numeric XAxis puts a bucket.
+//
+// The axis is `type="number"`, `domain={["dataMin", "dataMax"]}` — so the OLDEST bucket sits at
+// the left edge of the plot box and the NEWEST at the right, linearly between. That is the whole
+// rule, and expressing it as a fraction is what lets the overlay be pure CSS `calc()` over a
+// percentage of that box: no measurement, no ResizeObserver, and it rides the 3D plane's own
+// scale for free.
+//
+// ⚠️ IT TAKES A BUCKET, NOT AN INSTANT. `bucketAt` above is still the containment rule — the
+// overlay marks the bucket that CONTAINS the instant or nothing at all (rule 10) — and this
+// function answers only "where is that bucket". A value that is not one of the axis's own
+// buckets has no place on it and gets `null` rather than an interpolated position.
+describe("cursorFraction", () => {
+  const B = [0, HOUR, 2 * HOUR, 3 * HOUR];
+
+  it("puts the first bucket at the plot's left edge", () => {
+    expect(cursorFraction(B, 0)).toBe(0);
+  });
+
+  it("puts the last bucket at the plot's right edge", () => {
+    expect(cursorFraction(B, 3 * HOUR)).toBe(1);
+  });
+
+  it("is linear in between — the axis is numeric, not categorical", () => {
+    expect(cursorFraction(B, HOUR)).toBeCloseTo(1 / 3, 12);
+    expect(cursorFraction(B, 2 * HOUR)).toBeCloseTo(2 / 3, 12);
+  });
+
+  it("spaces by TIME, not by index — an irregular axis is still linear in ms", () => {
+    expect(cursorFraction([0, HOUR, 4 * HOUR], HOUR)).toBeCloseTo(0.25, 12);
+  });
+
+  it("puts a single-bucket axis at the left edge — dataMin IS dataMax, and 0/0 is not a position", () => {
+    expect(cursorFraction([HOUR], HOUR)).toBe(0);
+    expect(cursorFraction([HOUR], 0)).toBe(null);
+  });
+
+  it("returns null for a bucket the axis does not carry", () => {
+    expect(cursorFraction(B, HOUR + 1)).toBe(null);
+    expect(cursorFraction(B, -HOUR)).toBe(null);
+    expect(cursorFraction(B, 9 * HOUR)).toBe(null);
+  });
+
+  it("returns null for no cursor at all, so the caller needs no second guard", () => {
+    expect(cursorFraction(B, null)).toBe(null);
+  });
+
+  it("is empty-safe — no axis is no position", () => {
+    expect(cursorFraction([], 0)).toBe(null);
   });
 });
 

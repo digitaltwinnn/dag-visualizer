@@ -55,7 +55,7 @@
 
 import { useEffect, useMemo, useRef } from "react";
 
-import TrendChart from "@/components/docs/TrendChart";
+import TrendChart, { type TrendLine } from "@/components/docs/TrendChart";
 import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { cn } from "@/lib/utils";
@@ -117,7 +117,7 @@ export default function TrendStack() {
   // chances to disagree about the very ranking these planes are laid out by. It carries the
   // counter EDGE TRIM too, so a rail can never quote a number no chart on screen agrees with.
   const roster = useTrendRoster(slice, filter, metric);
-  const { ranked, buckets: axis, stepMs: step, unit: unitWord, pending } = roster;
+  const { ranked, rows, buckets: axis, stepMs: step, unit: unitWord, pending } = roster;
   // THE SCOPE WITH NOTHING TO DRAW (2026-09-19, Task 12's remainder): a `dag` or unlisted commit
   // leaves the roster EMPTY, because the trends store keeps one series set per LISTED metagraph.
   // The sentences are `src/data/trendScope.ts`'s, shared with the document so the two registers of
@@ -168,12 +168,27 @@ export default function TrendStack() {
             // measured bucket, and a long window across a full roster is tens of thousands of them
             // — the shape that throws `RangeError: Maximum call stack size exceeded` the day the
             // store grows past the engine's argument limit.
-            (m, id) => (roster.rows.get(id)?.series.points ?? []).reduce<number>((n, v) => (v != null && v > n ? v : n), m),
+            (m, id) => (rows.get(id)?.series.points ?? []).reduce<number>((n, v) => (v != null && v > n ? v : n), m),
             0,
           )
         : undefined,
-    [scaleMode, ranked, roster],
+    // ⚠️ `rows`, NEVER the whole `roster` — the hook returns a fresh VIEW object every render (it
+    // composes one from a memoised pass), so a dep on the whole thing recomputes this on every
+    // cursor write and every hover. The rows are the memoised part, and they are what this reads.
+    [scaleMode, ranked, rows],
   );
+
+  // ⚠️ ONE `lines` ARRAY PER PLANE, HELD STILL (Task 12b, 2026-09-19). `TrendChart`'s plot is
+  // memoised, and a `lines={[…]}` literal in the JSX below would be a fresh reference on every
+  // render — which is EVERY cursor write and every hover, the two things the memo exists to
+  // absorb. The chart is a one-series chart here, so the array's whole content is the metric's
+  // name, the roster row's already-stable points and its hue: a Map built beside the roster pass
+  // it reads from, on exactly the deps that pass has.
+  const linesById = useMemo(() => {
+    const m = new Map<string, TrendLine[]>();
+    for (const [id, row] of rows) m.set(id, [{ label: metric, points: row.series.points, hue: row.hue }]);
+    return m;
+  }, [rows, metric]);
 
   // THE DRAG GUARD (see the header): pointerdown records where the press started, pointerup says
   // whether it travelled, and `activate` drops a click that did. Refs, not state — a gesture must
@@ -251,7 +266,7 @@ export default function TrendStack() {
       {poses.map((pose) => {
         // The one roster pass the rank, the ceiling and both rails read — already cut by the
         // metric's own edge rule, so a rail can never quote a bucket this plane does not draw.
-        const row = roster.rows.get(pose.id);
+        const row = rows.get(pose.id);
         if (!row) return null;
         const pair = subjectPairing(hoverFilter, pose.id, setHover, row.hue);
         return (
@@ -306,7 +321,7 @@ export default function TrendStack() {
                 stepMs={step}
                 sampled={row.series.sampled}
                 gaps={row.series.gaps}
-                lines={[{ label: metric, points: row.series.points, hue: row.hue }]}
+                lines={linesById.get(pose.id)!}
                 scaleMax={sharedMax}
                 cursorMs={cursorMs}
                 className="w-full"

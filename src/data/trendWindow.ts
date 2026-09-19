@@ -221,6 +221,41 @@ export function bucketAt(buckets: readonly number[], stepMs: number, ms: number)
   return buckets[lo];
 }
 
+/** WHERE A BUCKET SITS ON THE PLOT, as a fraction of the plot box (Task 12b, 2026-09-19).
+ *
+ *  `TrendChart`'s XAxis is `type="number"` over `domain={["dataMin", "dataMax"]}`, so the axis is
+ *  linear IN TIME between the oldest bucket (fraction 0) and the newest (fraction 1) — index
+ *  spacing has nothing to do with it. That single number is everything the shared cursor's
+ *  overlay needs: expressed as a fraction, its x is a pure CSS `calc()` over a percentage of the
+ *  plot box, so it needs no measurement, no ResizeObserver, and it rides the 3D plane's own scale
+ *  for free.
+ *
+ *  ⚠️ A BUCKET, NEVER AN INSTANT. `bucketAt` above is still the containment rule and the honesty
+ *  rule with it — the cursor marks the bucket that CONTAINS the instant or nothing at all — and
+ *  this answers only "where is that bucket on this chart's axis". Anything that is not one of the
+ *  axis's own buckets has no place on it, so it gets `null` rather than an interpolated position;
+ *  a chart handed a neighbour's axis draws nothing instead of a mark it cannot justify.
+ *
+ *  A single-bucket axis is the degenerate case recharts itself resolves to the left edge: dataMin
+ *  IS dataMax, so there is no span to be a fraction of. Colocated tests are the specification. */
+export function cursorFraction(buckets: readonly number[], bucket: number | null): number | null {
+  const n = buckets.length;
+  if (bucket == null || n === 0) return null;
+  // Membership, by the same binary search the axis's own ordering earns us.
+  let lo = 0;
+  let hi = n - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (buckets[mid] === bucket) {
+      const span = buckets[n - 1] - buckets[0];
+      return span > 0 ? (bucket - buckets[0]) / span : 0;
+    }
+    if (buckets[mid] < bucket) lo = mid + 1;
+    else hi = mid - 1;
+  }
+  return null;
+}
+
 // ---- THE WINDOW/RANGE DATA PATH, AS A PLAN (2026-09-18) ------------------------------------
 // ONE HOME for "which payloads does this window need, and how is each one cut" — the decision the
 // Trends DOCUMENT carried inline as component state until Task 8a. The document and the 3D trend

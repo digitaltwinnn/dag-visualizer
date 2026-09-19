@@ -151,16 +151,30 @@ export default function useTrendRoster(
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const ranked = useMemo(() => pass.order, [rankedKey]);
 
-  return {
-    ranked,
-    rows: pass.rows,
-    global: pass.global,
-    buckets: pass.buckets,
-    rawBuckets: rawAxis,
-    stepMs,
-    unit: metricUnit(metric, stepMs),
-    format: spec.format ?? PLAIN,
-    pending: gauge && slice.fleetPending,
-    scope,
-  };
+  // ⚠️ THE VIEW OBJECT IS MEMOISED TOO, NOT JUST THE PASS INSIDE IT (Task 12b, 2026-09-19). A
+  // fresh `{…}` here every render is content-free churn that a consumer's `useMemo([roster])`
+  // cannot tell apart from a real change — and it defeated the whole point of this hook's memo
+  // exactly once, in the stack's `sharedMax` and its per-plane `lines`, where a scrub rebuilt both
+  // on every bucket write and re-rendered five recharts trees behind them. The symptom is
+  // invisible: the numbers are right, the frame rate is not. Every field below is either the
+  // memoised pass, a stable slice reference, or derived from a primitive dep.
+  const pending = gauge && slice.fleetPending;
+  const unit = metricUnit(metric, stepMs);
+  const format = spec.format ?? PLAIN;
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `format` is TREND_METRICS[metric]'s
+  return useMemo(
+    () => ({
+      ranked,
+      rows: pass.rows,
+      global: pass.global,
+      buckets: pass.buckets,
+      rawBuckets: rawAxis,
+      stepMs,
+      unit,
+      format,
+      pending,
+      scope,
+    }),
+    [ranked, pass, rawAxis, stepMs, unit, format, pending, scope],
+  );
 }

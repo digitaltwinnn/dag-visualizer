@@ -623,6 +623,18 @@ up a third, a LAYOUT one: the cursor readout was content-sized beside a `flex-1`
 changing width re-measured the track and re-derived its whole x↔ms geometry mid-gesture. A value
 slot reserves its width (the `NodeStars` rule, reaching a committed value). Across a 200-event
 scrub: `metricSeries` 8262 → **0**, `globalSeries`/`trackRuns`/`axisTicks` 306/334/334 → **0**. Both gestures want the whole track and the alternative (a modifier for one of
+⚠️ **AND THE CHARTS THEMSELVES WERE THE REST OF IT — the cursor is DRAWN OUTSIDE the memo now**
+(2026-09-19). With the shared cursor as a recharts `ReferenceLine`, a bucket write re-rendered all
+five planes' charts: measured over a 60-step scrub of the `all` window at 1500×1000, **22.1s /
+2.7 FPS / 600 plot renders → 1.4s / 40.7 FPS / 0**, and the hover sweep over the Layers rows
+**8.0s / 2.7 FPS / 220 → 0.44s / 36.5 FPS / 0**. Two halves, both structural: `TrendChart`'s
+recharts subtree is a `React.memo` child (`TrendPlot`) whose props are the SERIES alone, and the
+cursor is a 1px CSS overlay beside it, positioned by `cursorFraction` over the chart's own numeric
+axis — `calc()` on a percentage of the plot box, so it needs no measurement and rides the plane's
+projected scale for free. ⚠️ **A memo is only worth its props, and a hook that returns a fresh view
+object every render defeats one silently**: `useTrendRoster` composes its return value from a
+memoised pass, so a consumer must depend on `roster.rows`, never on `roster`. That one dep was why
+the first cut measured no faster at all. `components/trendStackBoundary.test.ts` pins both halves.
 them) is unreachable on touch, which is the surface this most needs to work on; TRAVEL is the one
 discriminator every pointer type reports. The cursor is a COMMIT — it persists when the pointer
 leaves, because the rail reads it — while hovering previews a faint line locally and writes

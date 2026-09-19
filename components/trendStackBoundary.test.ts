@@ -42,9 +42,20 @@ import { PLANE_PX_W } from "@/src/engine/domain/trendStack";
 //     plane at the wrong size with nothing failing anywhere. The check reads the live
 //     `PLANE_PX_W` rather than naming a value, so re-tuning the plane can never quietly retire it.
 //
-// EXEMPTIONS: none. The scan is this one file's source, comments stripped (the prose above and
-// the component's own header are allowed to name what the rules forbid).
+//  9. THE CHART PRIMITIVE'S PLOT STAYS MEMOISED, AND THE CURSOR STAYS OUT OF IT (Task 12b,
+//     2026-09-19). Measured: with the shared cursor drawn as a recharts `ReferenceLine`, every
+//     bucket write re-rendered all five planes' charts and a scrub ran at 3-4 FPS — the view's
+//     primary gesture, unusable. The fix is structural, not a tuning: the recharts subtree is a
+//     `React.memo` child whose props are the series alone, and the cursor is a CSS overlay beside
+//     it. Both halves fail SILENTLY if undone — re-adding a `ReferenceLine` renders a correct
+//     chart at a fifth of the frame rate, and dropping the memo is invisible in every screenshot.
+//     So this one rule reaches the CHART's source as well as the stack's; the stack is the only
+//     surface that pays for the regression, which is why the pin lives with it.
+//
+// EXEMPTIONS: none. The scan is these two files' source, comments stripped (the prose above and
+// each component's own header are allowed to name what the rules forbid).
 const FILE = "components/TrendStack.tsx";
+const CHART = "components/docs/TrendChart.tsx";
 
 const stripComments = (src: string): string =>
   src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
@@ -60,7 +71,7 @@ describe("trend-stack boundary", () => {
 
   it("hosts the document's own chart primitive", () => {
     expect(
-      /import\s+TrendChart\s+from\s+["']@\/components\/docs\/TrendChart["']/.test(code()),
+      /import\s+TrendChart(\s*,\s*\{[^}]*\})?\s+from\s+["']@\/components\/docs\/TrendChart["']/.test(code()),
       `${FILE} must render @/components/docs/TrendChart — one chart implementation, two registers, so the honesty rules cannot diverge`,
     ).toBe(true);
   });
@@ -134,5 +145,33 @@ describe("trend-stack boundary", () => {
       bare.test(src),
       `${FILE} repeats the plane width (${PLANE_PX_W}) as a literal — PLANE_PX_W has one home`,
     ).toBe(false);
+  });
+
+  it("hosts a chart whose recharts plot is memoised — a cursor write must not re-render it", () => {
+    const src = stripComments(readFileSync(CHART, "utf8"));
+    expect(
+      /const\s+TrendPlot\s*=\s*memo\(/.test(src),
+      `${CHART} must keep its recharts plot behind React.memo — without it every cursor write and every hover re-renders five full charts (measured: 3-4 FPS across a scrub)`,
+    ).toBe(true);
+    expect(
+      /\bReferenceLine\b/.test(src),
+      `${CHART} draws the shared cursor with a recharts ReferenceLine again — that is INSIDE the memo boundary, so it re-renders the whole plot per bucket; the cursor is a CSS overlay positioned by cursorFraction`,
+    ).toBe(false);
+    expect(
+      /cursorFraction/.test(src),
+      `${CHART} must position its cursor overlay with cursorFraction (src/data/trendWindow.ts) — the chart's own numeric axis, re-expressed as a fraction, so the overlay needs no measurement`,
+    ).toBe(true);
+  });
+
+  it("holds every prop feeding that memo still across a cursor write", () => {
+    const src = code();
+    expect(
+      /lines=\{\[/.test(src),
+      `${FILE} passes an inline lines={[…]} literal — a fresh array every render defeats the plot's memo on exactly the writes it exists to absorb`,
+    ).toBe(false);
+    expect(
+      /linesById/.test(src) && /useMemo/.test(src),
+      `${FILE} must hand each plane a memoised lines array (linesById)`,
+    ).toBe(true);
   });
 });

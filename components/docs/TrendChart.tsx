@@ -1,9 +1,9 @@
 "use client";
-import { useId, useState } from "react";
+import { memo, useId, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
-import { CartesianGrid, Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { CartesianGrid, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { cn } from "@/lib/utils";
-import { bucketAt } from "@/src/data/trendWindow";
+import { bucketAt, cursorFraction } from "@/src/data/trendWindow";
 
 // THE TRENDS DOC'S ONE CHART PRIMITIVE — a small-multiple line chart over the /api/trends
 // buckets, on RECHARTS (user, 2026-09-07: "why hand-roll charts if we have a neat library?" —
@@ -34,13 +34,42 @@ export interface TrendLine {
 const PLOT_H = 120;
 const AXIS_H = 18;
 
+// THE PLOT BOX, AS NUMBERS THE CHART AND ITS OVERLAY BOTH READ (Task 12b, 2026-09-19). Recharts
+// lays this plot area out from exactly three things — the LineChart's own margin, the XAxis's
+// declared height, and the YAxis, which is `hide` and therefore reserves NOTHING (recharts skips
+// a hidden axis when it accumulates the chart offset). So the box is knowable from this file
+// alone: x runs [left, width − right], and the plot's own height is PLOT_H less the vertical
+// margins, with the axis strip below it. That is what lets the shared cursor be a CSS `calc()`
+// over a percentage of the plate rather than a measured pixel — no ResizeObserver, and it rides
+// the 3D plane's projected scale for free.
+// ⚠️ The margin must be READ from here by the chart too, never restated at the call site: the
+// overlay's x is only right while the two agree.
+const PLOT_MARGIN = { top: 10, right: 2, bottom: 4, left: 2 } as const;
+/** The plot box's horizontal inset, both sides together — what a 100% width must give back. */
+const PLOT_INSET_X = PLOT_MARGIN.left + PLOT_MARGIN.right;
+/** The plot box's own height, measured from the top margin: the axis strip sits below it. */
+const PLOT_INNER_H = PLOT_H - PLOT_MARGIN.top - PLOT_MARGIN.bottom;
+
+/** The default value formatter, hoisted out of the destructuring default so it is ONE reference
+ *  for every chart that states no formatter of its own — a default written in the parameter list
+ *  is a fresh function every render, which is exactly the prop churn the memoised plot below
+ *  exists to stop. (`useTrendRoster` restates this same shape for the rails, by the same rule.) */
+const PLAIN = (v: number) => v.toLocaleString(undefined, { maximumFractionDigits: 1 });
+
+/** A bucket instant in words, at the precision its own cadence earns. Module-level because both
+ *  halves of this file read it — the head's readout title and the plot's tooltip. */
+const stampOf = (ts: number, stepMs: number): string =>
+  stepMs < 86400000
+    ? new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" }) + " UTC"
+    : new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+
 export default function TrendChart({
   name,
   unit,
   lines,
   buckets,
   stepMs = 86400000,
-  format = (v) => v.toLocaleString(undefined, { maximumFractionDigits: 1 }),
+  format = PLAIN,
   sampled,
   gaps,
   onRange,
@@ -109,7 +138,12 @@ export default function TrendChart({
    *  day, which is the kind of quiet lie rule 10 exists to prevent. Outside this chart's own span
    *  — a chain measured over a shorter window than its neighbours — NOTHING is drawn, which is
    *  the honest answer: the instant is not in this chart. The document passes nothing and renders
-   *  exactly as before. */
+   *  exactly as before.
+   *
+   *  ⚠️ IT IS THE ONE PROP THAT DOES NOT REACH THE PLOT (Task 12b, 2026-09-19). Everything else
+   *  here is chart data; this is a MARK on it, and it changes at gesture frequency. So it is drawn
+   *  by this component as a CSS overlay beside the memoised plot rather than inside it — see the
+   *  overlay's own comment, and `TrendPlot`'s, for the measurement that forced the split. */
   cursorMs?: number | null;
   /** AN INSTRUMENT STATE THE SERIES CANNOT SAY (2026-09-18). When the caller knows something the
    *  points don't — most concretely that the payload this chart needs is still IN FLIGHT — it
@@ -155,106 +189,16 @@ export default function TrendChart({
   };
 }) {
   const n = buckets.length;
-  // The hatch pattern's SVG id — per chart instance (useId), sanitized because url(#…)
-  // fragments dislike the ':' React ids carry.
-  const hatchId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
-  // The in-flight drag, as bucket instants — preview only; the committed range lives on the
-  // page (one selection, every chart). Cleared on release or when the pointer leaves.
-  const [drag, setDrag] = useState<{ a: number; b: number } | null>(null);
-  const dragProps = onRange
-    ? {
-        onMouseDown: (e: { activeLabel?: string | number }, ev?: { preventDefault?: () => void }) => {
-          // preventDefault kills the NATIVE selection at its source: select-none only covers
-          // the chart, and a drag that crossed its edge started selecting the page text
-          // beyond it (user, 2026-09-09, round 2 of the selectable-chart bug).
-          ev?.preventDefault?.();
-          const ts = Number(e?.activeLabel);
-          if (Number.isFinite(ts)) setDrag({ a: ts, b: ts });
-        },
-        onMouseMove: (e: { activeLabel?: string | number }) => {
-          const ts = Number(e?.activeLabel);
-          if (drag && Number.isFinite(ts)) setDrag({ a: drag.a, b: ts });
-        },
-        onMouseUp: () => {
-          if (drag) {
-            const lo = Math.min(drag.a, drag.b);
-            const hi = Math.max(drag.a, drag.b);
-            // A click (no travel) is not a range — require at least one full bucket.
-            if (hi - lo >= stepMs) onRange(lo, hi + stepMs);
-          }
-          setDrag(null);
-        },
-        onMouseLeave: () => setDrag(null),
-        // TOUCH mirrors the mouse drag (user, 2026-09-10 — the zoom must work on tablet and
-        // phone). The plate's `touch-pan-y` splits the gestures: a horizontal drag selects,
-        // a vertical swipe still scrolls the document. Touchstart may fire before recharts
-        // has a coordinate, so the drag begins lazily on the first labelled event.
-        onTouchStart: (e: { activeLabel?: string | number }) => {
-          const ts = Number(e?.activeLabel);
-          if (Number.isFinite(ts)) setDrag({ a: ts, b: ts });
-        },
-        onTouchMove: (e: { activeLabel?: string | number }) => {
-          const ts = Number(e?.activeLabel);
-          if (!Number.isFinite(ts)) return;
-          setDrag((d) => (d ? { a: d.a, b: ts } : { a: ts, b: ts }));
-        },
-        onTouchEnd: () => {
-          // The closure's `drag`, like onMouseUp — committing inside a setState updater
-          // would double-fire under Strict Mode (updaters must stay pure).
-          if (drag) {
-            const lo = Math.min(drag.a, drag.b);
-            const hi = Math.max(drag.a, drag.b);
-            if (hi - lo >= stepMs) onRange(lo, hi + stepMs);
-          }
-          setDrag(null);
-        },
-      }
-    : {};
   const measured = lines.some((l) => l.points.some((v) => v != null));
-  // ⚠️ THE PEAK READOUT IS THE CHART'S OWN, WHATEVER THE SCALE. `ownMax` is what this chart's
-  // data reaches; `max` is the height it is drawn against, which a caller may impose to put a
-  // column of charts on one scale. Keeping them separate is what lets a chart shrink to a sliver
-  // and still say, in its own corner, how high it actually got — otherwise a shared scale would
-  // flatten the small networks AND take away the number that says by how much.
-  const ownMax = Math.max(1e-9, ...lines.flatMap((l) => l.points.filter((v): v is number => v != null)));
-  const max = (scaleMax != null && scaleMax > 0 ? scaleMax : ownMax) * 1.12;
-
-  const rows = buckets.map((ts, i) => {
-    const row: Record<string, number | null> = { ts };
-    for (const l of lines) row[l.label] = l.points[i];
-    return row;
-  });
-
-  // Axis marks at the granularity the window can carry: months for a long daily window, days
-  // for a week, weekly (Mondays) for a month of hours, six-hour marks inside a day.
-  const spanMs = n > 1 ? buckets[n - 1] - buckets[0] : 0;
-  const ticks: number[] = [];
-  for (let i = 1; i < n; i++) {
-    const d = new Date(buckets[i]);
-    const prev = new Date(buckets[i - 1]);
-    if (spanMs > 45 * 86400000) {
-      if (prev.getUTCMonth() !== d.getUTCMonth()) ticks.push(buckets[i]);
-    } else if (spanMs > 2 * 86400000) {
-      if (prev.getUTCDate() !== d.getUTCDate() && (spanMs <= 9 * 86400000 || d.getUTCDay() === 1)) ticks.push(buckets[i]);
-    } else if (d.getUTCHours() % 6 === 0 && d.getUTCMinutes() === 0 && !(prev.getUTCHours() === d.getUTCHours() && prev.getUTCDate() === d.getUTCDate())) {
-      ticks.push(buckets[i]);
-    }
-  }
-  const tickLabel = (ts: number): string => {
-    const d = new Date(ts);
-    if (spanMs > 45 * 86400000) return d.toLocaleDateString(undefined, { month: "short", timeZone: "UTC" });
-    if (spanMs > 2 * 86400000) return d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
-    return `${String(d.getUTCHours()).padStart(2, "0")}:00`;
-  };
-  const stampOf = (ts: number): string =>
-    stepMs < 86400000
-      ? new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" }) + " UTC"
-      : new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
 
   // The cursor's bucket on THIS chart's own axis — the chart owns its scale, so the lookup runs
   // against the buckets it was actually handed (a counter series trims its partial edges, so the
   // caller's array and this one are not the same).
   const cursorBucket = cursorMs == null ? null : bucketAt(buckets, stepMs, cursorMs);
+  // …and WHERE that bucket sits on the plot, as a fraction of the plot box. `null` covers both
+  // reasons there is nothing to draw at once — no cursor, or an instant this chart's span does
+  // not contain (a chain measured over a shorter window than its neighbours).
+  const cursorX = cursorFraction(buckets, cursorBucket);
 
   const hue0 = lines[0]?.hue ?? "var(--primary)";
   // The head's right-hand readout: the NEWEST MEASURED BUCKET, stamped with its own date —
@@ -264,63 +208,6 @@ export default function TrendChart({
     if (lines[0].points[i] != null) { lastIdx = i; break; }
   }
   const last = lastIdx >= 0 ? lines[0].points[lastIdx] : null;
-
-  /** An isolated measured point (both neighbours null) gets a dot — no segment can reach it. */
-  const isolated = (l: TrendLine, i: number): boolean =>
-    l.points[i] != null && (i === 0 || l.points[i - 1] == null) && (i === n - 1 || l.points[i + 1] == null);
-
-  // VERTICAL BANDS, THREE KINDS (user, 2026-09-09/10, one long arc — the 09-09 rounds set
-  // the form and flipped the meaning ("switch it around"); 09-10 split the silence itself,
-  // "is amber then the correct color?"): these charts are ABOUT the network, and a colour
-  // is a claim, so each band claims exactly what is provable.
-  //   AMBER — a measured silence EXCEPTIONAL for this chain: the run's ledger-proven pause
-  //     (the resume bucket's own gapMax, else the run's span) exceeds the chain's threshold.
-  //   GRAY (plain fill) — a measured silence WITHIN the chain's normal rhythm: sealed
-  //     nothing, said quietly, because for a bursty chain that is ordinary texture.
-  //   HATCHED — a stretch this app itself did not sample: a texture, not a tone, so our own
-  //     coverage caveat can never be confused with a statement about the chain.
-  //   The threshold is MEDIAN × 5 of the window's own per-bucket widest gaps — the median,
-  //   not a high quantile, because a p95 needs ~100+ buckets and lets a big stall inside a
-  //   small zoom become its own yardstick (the tail judging the tail); the median is stable
-  //   from a dozen buckets and one monster gap cannot move it. Fewer than 12 gap samples
-  //   (or no `gaps` series) falls back to every proven silence ambering — the pre-split
-  //   vocabulary, which only ever OVER-warns.
-  //   A bucket is unmeasured only when EVERY line has nothing there (a pair's one-sided null
-  //   is that series' own gap), and the never-measured LEADING prefix is the instrument's
-  //   birthdate — no band at all.
-  const bandRunsIdx = (inRun: (i: number) => boolean, startAt: number): { s: number; e: number }[] => {
-    const out: { s: number; e: number }[] = [];
-    let start = -1;
-    for (let i = startAt; i < n; i++) {
-      if (inRun(i)) {
-        if (start < 0) start = i;
-      } else if (start >= 0) {
-        out.push({ s: start, e: i - 1 });
-        start = -1;
-      }
-    }
-    if (start > 0) out.push({ s: start, e: n - 1 });
-    return out;
-  };
-  const spanOf = (r: { s: number; e: number }): { x1: number; x2: number } => ({
-    x1: buckets[Math.max(0, r.s - 1)],
-    x2: buckets[Math.min(n - 1, r.e + 1)],
-  });
-  const unmeasuredAt = (i: number): boolean =>
-    sampled ? sampled[i] == null : lines.every((l) => l.points[i] == null);
-  const firstMeasured = buckets.findIndex((_, i) => !unmeasuredAt(i));
-  const holes = (firstMeasured >= 0 ? bandRunsIdx(unmeasuredAt, Math.max(0, firstMeasured)) : []).map(spanOf);
-  const gapSamples = gaps ? gaps.filter((v): v is number => v != null).sort((a, b) => a - b) : [];
-  const gapThreshold = gapSamples.length >= 12 ? gapSamples[Math.floor(gapSamples.length / 2)] * 5 : null;
-  const stallRuns = sampled ? bandRunsIdx((i) => sampled[i] === 0, 0) : [];
-  const stallKind = (r: { s: number; e: number }): boolean => {
-    if (gapThreshold == null) return true; // no baseline — over-warn, never under
-    const proven = gaps?.[r.e + 1];
-    const pause = proven != null ? proven : ((r.e - r.s + 1) * stepMs) / 1000;
-    return pause > gapThreshold;
-  };
-  const stalls = stallRuns.filter((r) => stallKind(r)).map(spanOf);
-  const quiets = stallRuns.filter((r) => !stallKind(r)).map(spanOf);
 
   return (
     <div className={className ? `min-w-0 select-none ${className}` : "min-w-0 select-none"}>
@@ -427,7 +314,7 @@ export default function TrendChart({
           // stamp and the gray band are what actually say when the reading lags the clock.)
           <span
             className="ml-auto inline-flex items-baseline gap-1 whitespace-nowrap"
-            title={readout ? "The newest complete measured day, from the daily tier" : `The newest complete measured ${stepMs >= 86400000 ? "day" : stepMs >= 3600000 ? "hour" : "five-minute bucket"} (${stampOf(buckets[lastIdx])})`}
+            title={readout ? "The newest complete measured day, from the daily tier" : `The newest complete measured ${stepMs >= 86400000 ? "day" : stepMs >= 3600000 ? "hour" : "five-minute bucket"} (${stampOf(buckets[lastIdx], stepMs)})`}
           >
             <span className="text-label text-foreground-dim tabular-nums">{format(readout ? readout.value : last)}</span>
             <span className="text-micro text-muted-foreground">
@@ -446,8 +333,246 @@ export default function TrendChart({
           role="img"
           aria-label={`${name} — ${stepMs >= 86400000 ? "daily" : stepMs >= 3600000 ? "hourly" : "5-minute"} buckets, ${n} of them`}
         >
+          <TrendPlot
+            lines={lines}
+            buckets={buckets}
+            stepMs={stepMs}
+            format={format}
+            scaleMax={scaleMax}
+            sampled={sampled}
+            gaps={gaps}
+            onRange={onRange}
+          />
+          {/* THE SHARED CURSOR, AS AN OVERLAY RATHER THAN A RECHARTS CHILD (Task 12b,
+              2026-09-19). It marks the bucket that CONTAINS the instant (`bucketAt`) or nothing at
+              all — the `ReferenceLine`'s rule exactly, and rule 10's: a mark one bucket off is a
+              chart naming the wrong day, in the one place a reader could never catch it. What
+              changed is WHO DRAWS IT. Inside the chart, every cursor write re-rendered the whole
+              recharts tree; five planes of that per bucket measured at 3-4 FPS across a scrub,
+              which made this view's primary gesture unusable. Out here the plot is memoised and
+              untouched, and a scrub moves ONE absolutely-positioned hairline.
+              ⚠️ ITS X IS THE CHART'S OWN SCALE, RE-EXPRESSED IN CSS — not a second opinion about
+              it. The XAxis is numeric over `["dataMin","dataMax"]`, so a bucket's position is a
+              pure fraction of the plot box (`cursorFraction`), and the box is `PLOT_MARGIN` over a
+              hidden YAxis that reserves nothing. `calc()` over a percentage of this plate is
+              therefore exact at ANY width with no measurement and no ResizeObserver, which is also
+              what lets it ride the 3D plane's projected scale.
+              Structural accent, one hairline, no animation, no pointer events: it is a POSITION,
+              and a position that eases in lags the gesture that set it. */}
+          {cursorX != null && (
+            <div
+              aria-hidden
+              className="absolute w-px bg-[var(--primary)] pointer-events-none"
+              style={{
+                top: PLOT_MARGIN.top,
+                height: PLOT_INNER_H,
+                left: `calc(${PLOT_MARGIN.left}px + ${cursorX} * (100% - ${PLOT_INSET_X}px))`,
+              }}
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---- THE PLOT, MEMOISED (Task 12b, 2026-09-19) -----------------------------------------------
+//
+// THE SPLIT EXISTS FOR ONE MEASURED REASON. The History view's stack subscribes to the shared time
+// cursor, and a scrub writes once per BUCKET — so before this split, dragging the timeline
+// re-rendered five full recharts trees per step: measured at ~3-4 FPS over the `all` window, with
+// ~93% of the cost in these charts. A HOVER did the same, because the stack also subscribes to the
+// pairing channel. Neither gesture changes a single point of any series.
+//
+// So everything recharts draws lives HERE, behind `React.memo`, and its props are the SERIES and
+// the axis and nothing else. The cursor and the hover are drawn OUTSIDE this boundary: the cursor
+// as one absolutely-positioned hairline, the hover as the plane wrapper's own opacity. The memo is
+// a plain shallow compare, deliberately — a custom comparator deep-comparing a thousand-bucket
+// series on every render is the very cost it would be there to avoid, and it would HIDE prop churn
+// instead of fixing it. The references hold still because their owners hold them still
+// (`useTrendRoster`'s memoised pass, `TrendStack`'s memoised `lines` and `scaleMax`, and this
+// file's hoisted `PLAIN`).
+//
+// ⚠️ IT RENDERS A FRAGMENT, NOT A BOX. The plate, its hairline, its `role="img"` and the cursor
+// overlay all stay with the parent, so the DOM the Trends DOCUMENT produces is exactly what it was
+// before the split — a wrapper here would have changed every chart's box on a page of dozens of
+// them, for nothing.
+//
+// THE DRAG-TO-SELECT STATE MOVED IN WITH IT. The range brush is the plot's own gesture and the
+// head has nothing to do with it, so its in-flight preview now re-renders only this subtree.
+const TrendPlot = memo(function TrendPlot({
+  lines,
+  buckets,
+  stepMs,
+  format,
+  scaleMax,
+  sampled,
+  gaps,
+  onRange,
+}: {
+  lines: TrendLine[];
+  buckets: number[];
+  stepMs: number;
+  format: (v: number) => string;
+  scaleMax?: number;
+  sampled?: (number | null)[];
+  gaps?: (number | null)[];
+  onRange?: (fromMs: number, toMs: number) => void;
+}) {
+  const n = buckets.length;
+  const hue0 = lines[0]?.hue ?? "var(--primary)";
+  // The hatch pattern's SVG id — per chart instance (useId), sanitized because url(#…)
+  // fragments dislike the ':' React ids carry.
+  const hatchId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
+  // The in-flight drag, as bucket instants — preview only; the committed range lives on the
+  // page (one selection, every chart). Cleared on release or when the pointer leaves.
+  const [drag, setDrag] = useState<{ a: number; b: number } | null>(null);
+  const dragProps = onRange
+    ? {
+        onMouseDown: (e: { activeLabel?: string | number }, ev?: { preventDefault?: () => void }) => {
+          // preventDefault kills the NATIVE selection at its source: select-none only covers
+          // the chart, and a drag that crossed its edge started selecting the page text
+          // beyond it (user, 2026-09-09, round 2 of the selectable-chart bug).
+          ev?.preventDefault?.();
+          const ts = Number(e?.activeLabel);
+          if (Number.isFinite(ts)) setDrag({ a: ts, b: ts });
+        },
+        onMouseMove: (e: { activeLabel?: string | number }) => {
+          const ts = Number(e?.activeLabel);
+          if (drag && Number.isFinite(ts)) setDrag({ a: drag.a, b: ts });
+        },
+        onMouseUp: () => {
+          if (drag) {
+            const lo = Math.min(drag.a, drag.b);
+            const hi = Math.max(drag.a, drag.b);
+            // A click (no travel) is not a range — require at least one full bucket.
+            if (hi - lo >= stepMs) onRange(lo, hi + stepMs);
+          }
+          setDrag(null);
+        },
+        onMouseLeave: () => setDrag(null),
+        // TOUCH mirrors the mouse drag (user, 2026-09-10 — the zoom must work on tablet and
+        // phone). The plate's `touch-pan-y` splits the gestures: a horizontal drag selects,
+        // a vertical swipe still scrolls the document. Touchstart may fire before recharts
+        // has a coordinate, so the drag begins lazily on the first labelled event.
+        onTouchStart: (e: { activeLabel?: string | number }) => {
+          const ts = Number(e?.activeLabel);
+          if (Number.isFinite(ts)) setDrag({ a: ts, b: ts });
+        },
+        onTouchMove: (e: { activeLabel?: string | number }) => {
+          const ts = Number(e?.activeLabel);
+          if (!Number.isFinite(ts)) return;
+          setDrag((d) => (d ? { a: d.a, b: ts } : { a: ts, b: ts }));
+        },
+        onTouchEnd: () => {
+          // The closure's `drag`, like onMouseUp — committing inside a setState updater
+          // would double-fire under Strict Mode (updaters must stay pure).
+          if (drag) {
+            const lo = Math.min(drag.a, drag.b);
+            const hi = Math.max(drag.a, drag.b);
+            if (hi - lo >= stepMs) onRange(lo, hi + stepMs);
+          }
+          setDrag(null);
+        },
+      }
+    : {};
+  // ⚠️ THE PEAK READOUT IS THE CHART'S OWN, WHATEVER THE SCALE. `ownMax` is what this chart's
+  // data reaches; `max` is the height it is drawn against, which a caller may impose to put a
+  // column of charts on one scale. Keeping them separate is what lets a chart shrink to a sliver
+  // and still say, in its own corner, how high it actually got — otherwise a shared scale would
+  // flatten the small networks AND take away the number that says by how much.
+  const ownMax = Math.max(1e-9, ...lines.flatMap((l) => l.points.filter((v): v is number => v != null)));
+  const max = (scaleMax != null && scaleMax > 0 ? scaleMax : ownMax) * 1.12;
+
+  const rows = buckets.map((ts, i) => {
+    const row: Record<string, number | null> = { ts };
+    for (const l of lines) row[l.label] = l.points[i];
+    return row;
+  });
+
+  // Axis marks at the granularity the window can carry: months for a long daily window, days
+  // for a week, weekly (Mondays) for a month of hours, six-hour marks inside a day.
+  const spanMs = n > 1 ? buckets[n - 1] - buckets[0] : 0;
+  const ticks: number[] = [];
+  for (let i = 1; i < n; i++) {
+    const d = new Date(buckets[i]);
+    const prev = new Date(buckets[i - 1]);
+    if (spanMs > 45 * 86400000) {
+      if (prev.getUTCMonth() !== d.getUTCMonth()) ticks.push(buckets[i]);
+    } else if (spanMs > 2 * 86400000) {
+      if (prev.getUTCDate() !== d.getUTCDate() && (spanMs <= 9 * 86400000 || d.getUTCDay() === 1)) ticks.push(buckets[i]);
+    } else if (d.getUTCHours() % 6 === 0 && d.getUTCMinutes() === 0 && !(prev.getUTCHours() === d.getUTCHours() && prev.getUTCDate() === d.getUTCDate())) {
+      ticks.push(buckets[i]);
+    }
+  }
+  const tickLabel = (ts: number): string => {
+    const d = new Date(ts);
+    if (spanMs > 45 * 86400000) return d.toLocaleDateString(undefined, { month: "short", timeZone: "UTC" });
+    if (spanMs > 2 * 86400000) return d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+    return `${String(d.getUTCHours()).padStart(2, "0")}:00`;
+  };
+
+  /** An isolated measured point (both neighbours null) gets a dot — no segment can reach it. */
+  const isolated = (l: TrendLine, i: number): boolean =>
+    l.points[i] != null && (i === 0 || l.points[i - 1] == null) && (i === n - 1 || l.points[i + 1] == null);
+
+  // VERTICAL BANDS, THREE KINDS (user, 2026-09-09/10, one long arc — the 09-09 rounds set
+  // the form and flipped the meaning ("switch it around"); 09-10 split the silence itself,
+  // "is amber then the correct color?"): these charts are ABOUT the network, and a colour
+  // is a claim, so each band claims exactly what is provable.
+  //   AMBER — a measured silence EXCEPTIONAL for this chain: the run's ledger-proven pause
+  //     (the resume bucket's own gapMax, else the run's span) exceeds the chain's threshold.
+  //   GRAY (plain fill) — a measured silence WITHIN the chain's normal rhythm: sealed
+  //     nothing, said quietly, because for a bursty chain that is ordinary texture.
+  //   HATCHED — a stretch this app itself did not sample: a texture, not a tone, so our own
+  //     coverage caveat can never be confused with a statement about the chain.
+  //   The threshold is MEDIAN × 5 of the window's own per-bucket widest gaps — the median,
+  //   not a high quantile, because a p95 needs ~100+ buckets and lets a big stall inside a
+  //   small zoom become its own yardstick (the tail judging the tail); the median is stable
+  //   from a dozen buckets and one monster gap cannot move it. Fewer than 12 gap samples
+  //   (or no `gaps` series) falls back to every proven silence ambering — the pre-split
+  //   vocabulary, which only ever OVER-warns.
+  //   A bucket is unmeasured only when EVERY line has nothing there (a pair's one-sided null
+  //   is that series' own gap), and the never-measured LEADING prefix is the instrument's
+  //   birthdate — no band at all.
+  const bandRunsIdx = (inRun: (i: number) => boolean, startAt: number): { s: number; e: number }[] => {
+    const out: { s: number; e: number }[] = [];
+    let start = -1;
+    for (let i = startAt; i < n; i++) {
+      if (inRun(i)) {
+        if (start < 0) start = i;
+      } else if (start >= 0) {
+        out.push({ s: start, e: i - 1 });
+        start = -1;
+      }
+    }
+    if (start > 0) out.push({ s: start, e: n - 1 });
+    return out;
+  };
+  const spanOf = (r: { s: number; e: number }): { x1: number; x2: number } => ({
+    x1: buckets[Math.max(0, r.s - 1)],
+    x2: buckets[Math.min(n - 1, r.e + 1)],
+  });
+  const unmeasuredAt = (i: number): boolean =>
+    sampled ? sampled[i] == null : lines.every((l) => l.points[i] == null);
+  const firstMeasured = buckets.findIndex((_, i) => !unmeasuredAt(i));
+  const holes = (firstMeasured >= 0 ? bandRunsIdx(unmeasuredAt, Math.max(0, firstMeasured)) : []).map(spanOf);
+  const gapSamples = gaps ? gaps.filter((v): v is number => v != null).sort((a, b) => a - b) : [];
+  const gapThreshold = gapSamples.length >= 12 ? gapSamples[Math.floor(gapSamples.length / 2)] * 5 : null;
+  const stallRuns = sampled ? bandRunsIdx((i) => sampled[i] === 0, 0) : [];
+  const stallKind = (r: { s: number; e: number }): boolean => {
+    if (gapThreshold == null) return true; // no baseline — over-warn, never under
+    const proven = gaps?.[r.e + 1];
+    const pause = proven != null ? proven : ((r.e - r.s + 1) * stepMs) / 1000;
+    return pause > gapThreshold;
+  };
+  const stalls = stallRuns.filter((r) => stallKind(r)).map(spanOf);
+  const quiets = stallRuns.filter((r) => !stallKind(r)).map(spanOf);
+
+  return (
+    <>
           <ResponsiveContainer width="100%" height={PLOT_H + AXIS_H}>
-            <LineChart data={rows} syncId="trends" syncMethod="value" margin={{ top: 10, right: 2, bottom: 4, left: 2 }} {...dragProps}>
+            <LineChart data={rows} syncId="trends" syncMethod="value" margin={PLOT_MARGIN} {...dragProps}>
               {/* The drag preview — the committed cut happens on the PAGE at release. */}
               {drag && (
                 <ReferenceArea
@@ -531,20 +656,6 @@ export default function TrendChart({
                   }
                 />
               ))}
-              {/* THE SHARED CURSOR, on the bucket that CONTAINS the instant. Structural accent,
-                  one hairline, and no animation — it is a POSITION, and a position that eases in
-                  lags the gesture that set it. (`ReferenceLine` takes no `isAnimationActive`:
-                  unlike `Line` and `Tooltip` it has no animation to switch off, which is the
-                  answer we wanted.) It takes no pointer events — the plot's own drag and hover
-                  belong to the chart. */}
-              {cursorBucket != null && (
-                <ReferenceLine
-                  x={cursorBucket}
-                  stroke="var(--primary)"
-                  strokeWidth={1}
-                  style={{ pointerEvents: "none" }}
-                />
-              )}
               <Tooltip
                 isAnimationActive={false}
                 cursor={{ stroke: "var(--primary)", strokeOpacity: 0.4 }}
@@ -552,7 +663,7 @@ export default function TrendChart({
                   if (!active || !payload?.length) return null;
                   return (
                     <div className="rounded border border-border bg-[var(--panel)] px-1.5 py-0.5 text-micro text-foreground whitespace-nowrap tabular-nums">
-                      <span className="text-muted-foreground">{stampOf(Number(label))}{" · "}</span>
+                      <span className="text-muted-foreground">{stampOf(Number(label), stepMs)}{" · "}</span>
                       {lines.map((l, li) => {
                         const v = payload.find((e) => e.dataKey === l.label)?.value;
                         return (
@@ -592,8 +703,6 @@ export default function TrendChart({
           <span aria-hidden className="absolute top-1 left-1.5 text-micro text-muted-foreground pointer-events-none tabular-nums">
             peak {format(ownMax)}
           </span>
-        </div>
-      )}
-    </div>
+    </>
   );
-}
+});
