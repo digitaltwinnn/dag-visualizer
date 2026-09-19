@@ -33,7 +33,7 @@ import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
 import { ViewTransition, is3D, fleetFaded, fleetHolder, type FleetPlacement } from "./domain/viewTransition";
-import { gatherBand, type GatherBand } from "./domain/gatherLayout";
+import { gatherBand, railGapShiftPx, type GatherBand } from "./domain/gatherLayout";
 import { LADDERS, LEVEL_CARRY, hasLevel, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
 import { metaSnapDeepKey, metaSnapHoverKey } from "@/src/data/types";
@@ -2348,11 +2348,12 @@ export class Engine {
   // once and hands the projector the narrow slice it declares. ⚠️ MUTATED, NEVER RE-ALLOCATED —
   // this runs every frame and `TrendStackSync` copies nothing out of it, so one buffer is safe;
   // `ids` rides in by REFERENCE, which is the projector's whole change signal (store `trendIds`).
-  private _trendState: TrendStackState = { scroll: 0, focus: null, ids: [] };
+  private _trendState: TrendStackState = { scroll: 0, focus: null, ids: [], gapShiftPx: 0 };
   private _syncTrendStack(): void {
     const st = useStore.getState();
     const t = this._trendState;
     t.scroll = st.trendScroll; t.focus = st.trendFocus; t.ids = st.trendIds;
+    t.gapShiftPx = railGapShiftPx(window.innerWidth, this.railsHidden);
     this.trendStack.sync(t);
   }
 

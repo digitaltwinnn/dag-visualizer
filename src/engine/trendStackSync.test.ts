@@ -66,7 +66,7 @@ function fakeHost(opts: { pos?: THREE.Vector3; target?: THREE.Vector3 } = {}) {
 }
 
 const state = (over: Partial<TrendStackState> = {}): TrendStackState => ({
-  scroll: 0, focus: null, ids: ["a", "b", "c"], ...over,
+  scroll: 0, focus: null, ids: ["a", "b", "c"], gapShiftPx: 0, ...over,
 });
 
 /** The uniform scale out of a `matrix3d(s,0,0,0, 0,s,0,0, 0,0,1,0, tx,ty,0,1)` string. */
@@ -186,6 +186,28 @@ describe("TrendStackSync", () => {
     els.get("c")!.style.transform = "";
     sync.sync(dealt);
     expect(els.get("c")!.style.transform, "the ease must settle and the idle skip re-engage").toBe("");
+  });
+
+  it("centres a LONE plane in the gap between the rails, and leaves a stack on the screen's centre", () => {
+    const txOf = (m: string) => Number(m.slice(m.indexOf("(") + 1, -1).split(",")[12]);
+    // Arriving with one plane: it starts AT the shifted target, no slide.
+    const a = fakeHost();
+    const lone = new TrendStackSync(a.host);
+    lone.sync(state({ ids: ["a"] }));
+    const plain = txOf(a.els.get("a")!.style.transform);
+    const b = fakeHost();
+    const shifted = new TrendStackSync(b.host);
+    shifted.sync(state({ ids: ["a"], gapShiftPx: -28 }));
+    expect(txOf(b.els.get("a")!.style.transform)).toBeCloseTo(plain - 28, 1);
+
+    // A stack of several ignores the shift entirely — the stagger already composes it.
+    const c = fakeHost();
+    const d = fakeHost();
+    const s0 = new TrendStackSync(c.host);
+    const s1 = new TrendStackSync(d.host);
+    s0.sync(state());
+    s1.sync(state({ gapShiftPx: -28 }));
+    expect(d.els.get("a")!.style.transform).toBe(c.els.get("a")!.style.transform);
   });
 
   it("hides the whole stack while the view is not live, and announces it on the root", () => {

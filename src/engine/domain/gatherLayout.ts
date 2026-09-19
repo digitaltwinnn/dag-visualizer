@@ -158,6 +158,22 @@ export interface GatherBand {
  *  ~91). The band starts this much lower so the legend owns a clear strip. */
 export const GATHER_LEGEND_PX = 22;
 
+/**
+ * How far the centre of the GAP between the two rails sits from the centre of the screen, in CSS
+ * px — negative is left. The rails are not the same width (`--rail-w` 264 against `--detail-w`
+ * 320), so the free canvas between them is centred a little left of the viewport.
+ *
+ * The staging band above deliberately ignores that and centres on the SCREEN, because it spans
+ * nearly the whole gap and must not slide when the rails come and go. A subject that stands ALONE
+ * in the gap is the opposite case (user, 2026-09-19 — History's lone filtered card sat 61px from
+ * one rail and 3px from the other): nothing else composes it, so the gap's own centre is the only
+ * centre it has. Zero wherever the rails are not inline columns — scene mode, tablet, phone.
+ */
+export function railGapShiftPx(viewW: number, railsHidden: boolean): number {
+  const railed = !railsHidden && viewW >= RAILS_TIER;
+  return railed ? (LEFT_RAIL_W - RIGHT_RAIL_W) / 2 : 0;
+}
+
 export function gatherBand(viewW: number, viewH: number, railsHidden: boolean, out: GatherBand): GatherBand {
   const railed = !railsHidden && viewW >= RAILS_TIER;
   const reach = railed ? RAIL_GUTTER + Math.max(LEFT_RAIL_W, RIGHT_RAIL_W) : 0;

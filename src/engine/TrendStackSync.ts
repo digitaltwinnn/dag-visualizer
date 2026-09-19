@@ -30,6 +30,9 @@ import { PLANE_PX_W, PLANE_WORLD_W, stackPoses } from "./domain/trendStack";
 export interface TrendStackState {
   scroll: number;
   focus: string | null;
+  /** Where the gap between the rails is centred, in px from the canvas centre
+   *  (`domain/gatherLayout.railGapShiftPx`). Applied to a plane that stands ALONE — see `_shift`. */
+  gapShiftPx: number;
   /** The ranked roster, busiest first — store `trendIds`, the React → Engine publish channel.
    *  Compared BY REFERENCE: React publishes a fresh array only when the content changes. */
   ids: readonly string[];
@@ -103,6 +106,13 @@ export class TrendStackSync {
    *  an imperceptible-drift filter at this scene's scale (~6e-6 world units at the resting pose). */
   private _cam = new Float32Array(32);
   private _slots = new Map<string, Slot>();
+  /** A LONE plane's screen-space shift, eased like the poses, and its target. One card (a committed
+   *  filter) has no stack to compose it, so it centres in the GAP between the rails rather than on
+   *  the screen — the rails differ in width, and screen-centred it sat against the wider one. A
+   *  window of two or more keeps 0: the stagger already lands its front card mid-gap. Screen px on
+   *  purpose — the rails are screen furniture, so the answer should not swing with an orbit. */
+  private _shift = 0;
+  private _shiftT = 0;
   /** The visible window's ids, in slot order — rebuilt only when the state changes. */
   private _order: string[] = [];
 
@@ -160,6 +170,13 @@ export class TrendStackSync {
       this._focus = st.focus;
       this._retarget(st);
       retarget = true;
+    }
+    const shiftT = this._order.length === 1 ? st.gapShiftPx : 0;
+    if (shiftT !== this._shiftT) {
+      // Arriving in the view with a lone plane starts AT the target, like a first-seen pose.
+      if (!this._wasActive) this._shift = shiftT;
+      this._shiftT = shiftT;
+      this._settled = false;
     }
 
     const w = this.h.width();
@@ -237,6 +254,9 @@ export class TrendStackSync {
         settled = false;
       }
     }
+    this._shift += (this._shiftT - this._shift) * k;
+    if (Math.abs(this._shiftT - this._shift) < EPS) this._shift = this._shiftT;
+    else settled = false;
     this._settled = settled;
   }
 
@@ -273,7 +293,7 @@ export class TrendStackSync {
         continue;
       }
       v.applyMatrix4(cam.projectionMatrix); // view → NDC (w-divide included)
-      const tx = (v.x * 0.5 + 0.5) * w;
+      const tx = (v.x * 0.5 + 0.5) * w + this._shift;
       const ty = (-v.y * 0.5 + 0.5) * h;
       const s = (PLANE_WORLD_W * (pxPerUnitAt1 / d)) / PLANE_PX_W * sl.s;
       // Rounded to keep the STRING short and its parse cheap — the browser re-parses this value on
