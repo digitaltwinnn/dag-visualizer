@@ -15,6 +15,7 @@ import {
   SCALE_FALLOFF,
   VISIBLE_PLANES,
   focusDepth,
+  focusInWindow,
   scrollToShow,
   stackPoses,
 } from "./trendStack";
@@ -189,40 +190,98 @@ describe("the plane's own size", () => {
   });
 });
 
+describe("focusInWindow — the ONE predicate the poses and the camera share", () => {
+  // ⚠️ THE STRANDED-FOCUS BUG THIS EXISTS FOR (2026-09-19). `focusDepth` used to ignore the
+  // scroll on the assumption the executor always pages a focus INTO the window. The PAGER, a
+  // metric change and a poll re-rank all move a standing focus back OUT of it, and then
+  // `stackPoses` lifted nothing while `focusDepth` still answered `FOCUS_LIFT`: the camera leaned
+  // over a structure that had not moved, which is camera principle 2 inverted — the same
+  // inversion already fixed once for `flat`. One predicate, read by both, is the structural fix.
+  it("answers NO for no focus at all, and for an id the roster does not carry", () => {
+    expect(focusInWindow(IDS, 0, null)).toBe(false);
+    expect(focusInWindow(IDS, 0, "not-in-roster")).toBe(false);
+    expect(focusInWindow([], 0, "dag-l0")).toBe(false);
+  });
+
+  it("answers YES exactly for the ids the window holds, and moves with the scroll", () => {
+    expect(focusInWindow(IDS, 0, "dag-l0")).toBe(true);
+    expect(focusInWindow(IDS, 0, "ded")).toBe(false); // index 5, window 0..4
+    expect(focusInWindow(IDS, 1, "ded")).toBe(true);
+    expect(focusInWindow(IDS, 1, "dag-l0")).toBe(false);
+  });
+
+  it("clamps the scroll exactly as the poses do", () => {
+    expect(focusInWindow(IDS, 99, "ded")).toBe(true);
+    expect(focusInWindow(IDS, -3, "dag-l0")).toBe(true);
+  });
+
+  it("IS what stackPoses lifts by, for every id at every scroll", () => {
+    for (const focus of IDS) {
+      for (const scroll of [-1, 0, 1, 2, 9]) {
+        const p = stackPoses(IDS, { layout: "stack", scroll, focus });
+        const lifted = p.some((x) => x.id === focus && x.z === FOCUS_LIFT);
+        expect(lifted, `${focus} @ ${scroll}`).toBe(focusInWindow(IDS, scroll, focus));
+      }
+    }
+  });
+});
+
 describe("focusDepth", () => {
   it("is the focused plane's own z", () => {
     const p = stackPoses(IDS, { layout: "stack", scroll: 0, focus: "elpaca" });
-    expect(focusDepth(IDS, "elpaca", "stack")).toBeCloseTo(p.find((x) => x.id === "elpaca")!.z);
+    expect(focusDepth(IDS, "elpaca", "stack", 0)).toBeCloseTo(p.find((x) => x.id === "elpaca")!.z);
   });
 
   it("falls back to the nearest plane's depth with no focus", () => {
-    expect(focusDepth(IDS, null, "stack")).toBeCloseTo(
+    expect(focusDepth(IDS, null, "stack", 0)).toBeCloseTo(
       stackPoses(IDS, { layout: "stack", scroll: 0, focus: null })[0].z,
     );
   });
 
-  it("takes no scroll — a plane outside the window is a scroll concern, not a framing one", () => {
-    expect(focusDepth(IDS, null, "stack")).toBe(0);
-    expect(focusDepth(IDS, "elpaca", "stack")).toBe(FOCUS_LIFT);
-    expect(focusDepth(IDS, "not-in-roster", "stack")).toBe(0);
+  it("is the LIFT for a focus in the window, and 0 for one the roster does not carry", () => {
+    expect(focusDepth(IDS, null, "stack", 0)).toBe(0);
+    expect(focusDepth(IDS, "elpaca", "stack", 0)).toBe(FOCUS_LIFT);
+    expect(focusDepth(IDS, "not-in-roster", "stack", 0)).toBe(0);
+  });
+
+  it("RELEASES the camera when the focus is paged OUT of the window, and takes it back", () => {
+    // The pager does not clear the focus (the Layers row stays pressed), so a standing focus can
+    // sit outside the window — where nothing is lifted, so there is nothing to lean toward.
+    expect(focusDepth(IDS, "dag-l0", "stack", 0)).toBe(FOCUS_LIFT);
+    expect(focusDepth(IDS, "dag-l0", "stack", 1)).toBe(0); // paged past it
+    expect(focusDepth(IDS, "dag-l0", "stack", 0)).toBe(FOCUS_LIFT); // paged back
+  });
+
+  it("releases it when a RE-RANK carries the focused id out of the window", () => {
+    // A metric switch or a poll re-rank reorders the roster under a standing focus; the window is
+    // a slot range, so a plane can leave it without the scroll moving at all.
+    const ranked = ["dag-l0", "pacaswap", "dor-metagraph", "elpaca", "constellation-l1", "ded"];
+    const reranked = ["pacaswap", "dor-metagraph", "elpaca", "constellation-l1", "ded", "dag-l0"];
+    expect(focusDepth(ranked, "dag-l0", "stack", 0)).toBe(FOCUS_LIFT);
+    expect(focusDepth(reranked, "dag-l0", "stack", 0)).toBe(0);
   });
 
   it("is ZERO in flat, whatever is focused — nothing comes forward, so nothing is framed", () => {
     // The camera's half of `stackPoses`' own rule that a focus "changes no geometry in flat". A
     // lean there would move the camera over a structure that held still — camera principle 2
-    // inverted. The click is still acknowledged: same pose, so `tweenTo` runs the nudge.
+    // inverted. Nothing else is acknowledged either: the Engine's trigger never resolves in flat,
+    // so the camera simply holds still and the focus shows when the reader returns to the stack.
     for (const id of [...IDS, null, "not-in-roster"]) {
-      expect(focusDepth(IDS, id, "flat")).toBe(0);
+      for (const scroll of [0, 1, 9]) expect(focusDepth(IDS, id, "flat", scroll)).toBe(0);
     }
   });
 
-  it("agrees with the poses it is derived from, in BOTH layouts", () => {
+  it("agrees with the poses it is derived from — every id, every scroll, both layouts", () => {
     // Stated against `stackPoses` rather than against arithmetic: the depth the camera frames is
-    // the front plane's own z, whatever the layout says that is.
+    // the front plane's own z, whatever the layout says that is. THE CONTRACT: a lean can only
+    // ever answer a plane that actually came forward.
     for (const layout of ["stack", "flat"] as const) {
-      for (const focus of ["elpaca", null]) {
-        const poses = stackPoses(IDS, { layout, scroll: 0, focus });
-        expect(focusDepth(IDS, focus, layout)).toBeCloseTo(Math.max(...poses.map((p) => p.z)));
+      for (const focus of [...IDS, null, "not-in-roster"]) {
+        for (const scroll of [0, 1, 2, 9]) {
+          const poses = stackPoses(IDS, { layout, scroll, focus });
+          const front = poses.length === 0 ? 0 : Math.max(...poses.map((p) => p.z));
+          expect(focusDepth(IDS, focus, layout, scroll), `${focus} @ ${scroll} ${layout}`).toBeCloseTo(front);
+        }
       }
     }
   });
@@ -233,8 +292,8 @@ describe("the LAYOUT alone never moves the camera (camera principle 2)", () => {
   // camera only when `focusDepth` changes (or a standing focus moves), so this pure equality IS the
   // pin — with nothing focused, flipping the layout changes no depth, so no resolve can run.
   it("with nothing focused, both layouts frame the same depth", () => {
-    expect(focusDepth(IDS, null, "stack")).toBe(focusDepth(IDS, null, "flat"));
-    expect(focusDepth([], null, "stack")).toBe(focusDepth([], null, "flat"));
+    expect(focusDepth(IDS, null, "stack", 0)).toBe(focusDepth(IDS, null, "flat", 0));
+    expect(focusDepth([], null, "stack", 0)).toBe(focusDepth([], null, "flat", 0));
   });
 
   it("and the planes DO move — the structure carries the change, by itself", () => {

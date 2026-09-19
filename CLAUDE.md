@@ -419,7 +419,9 @@ its claim is paper-only, so its one `intensity` already is its paper number.
    push, not an orbit: the planes host real text and present flat-on, so a lean that turned the
    camera would skew the charts it exists to emphasise. **`Align to front` moves the STRUCTURE, not
    the camera** — the `flat` layout tiles the planes as a column and `focusDepth` answers 0 there, so
-   the camera holds its resting pose while a flat column is read. Three bespoke ledger framings (a lane nudge, a node
+   the camera holds its resting pose while a flat column is read, and a focus click there moves
+   nothing at all. A focus the visible window no longer holds (paged away, re-ranked out) answers 0
+   for the same reason: the lean releases rather than standing over a stack that did not move. Three bespoke ledger framings (a lane nudge, a node
    framing, a per-lane fly) were built and **retired** because each added a pose the user had to learn;
    don't grow a fourth. **Hyper's per-node framing went the same way** (2026-08-13): a node there is one
    bead on a shell, and diving to it lost the hub and shells that say what it belongs to, so the rung

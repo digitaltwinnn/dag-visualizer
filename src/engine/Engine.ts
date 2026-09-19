@@ -849,8 +849,8 @@ export class Engine {
         // (2026-09-18, one found live, one in review). They pull in opposite directions:
         //
         //   · Watching `trendFocus` ALONE resolved against state the stack had not caught up with.
-        //     The depth is decided by THREE channels — the focus, the published ROSTER and the
-        //     LAYOUT — so a filter commit, which scopes the roster one React commit after the store
+        //     The depth is decided by FOUR channels — the focus, the published ROSTER, the LAYOUT
+        //     and the paging SCROLL — so a filter commit, which scopes the roster one React commit after the store
         //     write this subscription reads, left the camera leaning toward a plane the scoped
         //     stack no longer shows (measured: the single plane sat at 1.085× its resting
         //     projection with nothing lifted).
@@ -862,15 +862,21 @@ export class Engine {
         //     principle 3 exists to prevent.
         //
         // So: resolve when the depth CHANGED (a real flight in or out), or when a standing focus
-        // MOVED (same pose, hence the nudge). The depth is computed only when one of its three
+        // MOVED (same pose, hence the nudge). The depth is computed only when one of its four
         // inputs actually changed.
+        // ⚠️ AND THE SCROLL IS ONE OF THE DEPTH'S INPUTS (2026-09-19). The pager does not clear
+        // the focus, so paging a focused plane out of the visible window leaves the focus standing
+        // with nothing lifted — `focusDepth` answers 0 there now, and watching `trendScroll` is
+        // what lets the camera lean back OUT on that page and back IN when the plane returns.
+        // Exactly one resolve each way: with no focus standing both depths are 0 and paging moves
+        // no camera at all.
         if (
           (st.trendFocus !== prev.trendFocus || st.trendIds !== prev.trendIds ||
-            st.trendLayout !== prev.trendLayout) &&
+            st.trendLayout !== prev.trendLayout || st.trendScroll !== prev.trendScroll) &&
           VIEW_POLICIES[st.mode].chartStack
         ) {
-          const was = focusDepth(prev.trendIds, prev.trendFocus, prev.trendLayout);
-          const now = focusDepth(st.trendIds, st.trendFocus, st.trendLayout);
+          const was = focusDepth(prev.trendIds, prev.trendFocus, prev.trendLayout, prev.trendScroll);
+          const now = focusDepth(st.trendIds, st.trendFocus, st.trendLayout, st.trendScroll);
           if (now !== was || (now !== 0 && st.trendFocus !== prev.trendFocus)) this._resolveFocus();
         }
         // A node commit is answered by the camera in every 3D view (user, 2026-08-13). The pose is
@@ -1627,12 +1633,13 @@ export class Engine {
     trendOverview: () => {
       // The lean is keyed on the committed FOCUS, like the ledger's tilt is keyed on the filter, so
       // both rungs inherit it by delegating here and releasing the focus tweens back out on its own.
-      // ⚠️ LAYOUT DATA (rule 6): `focusDepth` reads the published roster, the committed focus and
-      // the LAYOUT — the same three things `stackPoses` places the planes from — never a projected
-      // plane or a scene matrix. An off-roster focus answers 0, and so does any focus in `flat`
-      // (nothing comes forward there), which is the resting pose exactly.
+      // ⚠️ LAYOUT DATA (rule 6): `focusDepth` reads the published roster, the committed focus, the
+      // LAYOUT and the SCROLL — exactly the four things `stackPoses` places the planes from — never
+      // a projected plane or a scene matrix. An off-roster focus answers 0, so does one the visible
+      // window does not hold (nothing is lifted there), and so does any focus in `flat` (nothing
+      // comes forward at all), which is the resting pose exactly.
       const st = useStore.getState();
-      const depth = focusDepth(st.trendIds, st.trendFocus, st.trendLayout);
+      const depth = focusDepth(st.trendIds, st.trendFocus, st.trendLayout, st.trendScroll);
       if (depth === 0) {
         this.cam.focus("trend");
         return true;

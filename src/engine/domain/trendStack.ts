@@ -32,8 +32,16 @@
 // ⚠️ AND A FOCUS MOVES NOTHING THERE, WHICH REACHES THE CAMERA: `focusDepth` answers 0 in `flat`,
 // so the camera holds its resting pose while a flat column is read. The structure is what carries
 // emphasis (camera principle 2) — with no plane coming forward there is nothing for a lean to meet,
-// and a camera moving over a still structure is that principle exactly inverted. The commit is
-// still acknowledged: the destination is then the pose already held, which is the NUDGE's job.
+// and a camera moving over a still structure is that principle exactly inverted. So in `flat` a
+// focus click moves NOTHING and the camera holds still: the depth is 0 before and after, the
+// Engine's trigger never fires, and the focus shows when the reader returns to the stack. That is
+// the intended behaviour, not an omission — the flat column has no front for a lean to land on.
+//
+// ⚠️ AND A FOCUS THE WINDOW DOES NOT HOLD MOVES NOTHING EITHER, on the same terms (2026-09-19).
+// `focusInWindow` is the ONE predicate both halves of this module read: a focus paged, re-ranked
+// or re-filtered out of the visible window lifts no plane, so `focusDepth` answers 0 and the
+// camera leans back out. Two copies of "is it on screen" is exactly how the camera came to lean
+// over a structure that had not moved.
 //
 // No imports — this is arithmetic over plain objects, same discipline as `calloutPlacement.ts`.
 
@@ -131,6 +139,26 @@ export function pagerVisible(count: number): boolean {
   return count > VISIBLE_PLANES;
 }
 
+/** Is `focus` one of the planes the window currently holds?
+ *
+ *  ⚠️ ONE PREDICATE, TWO READERS (2026-09-19). `stackPoses` lifts a focused plane only while it is
+ *  in the window, and `focusDepth` tells the camera how far it came forward — so the two have to
+ *  answer "is it on screen" the same way or the camera leans toward a plane that did not move.
+ *  `focusDepth` used to skip the question entirely, on the assumption that the click executor
+ *  always pages a focus INTO view; it does, but the PAGER, a metric switch and a poll re-rank all
+ *  move a standing focus back out afterwards, and the lean then stood with nothing lifted (camera
+ *  principle 2 inverted — the same inversion already fixed once for `flat`).
+ *
+ *  Clamps with the module's own `clampScroll`, so it can never disagree with the window the poses
+ *  are cut from. */
+export function focusInWindow(ids: readonly string[], scroll: number, focus: string | null): boolean {
+  if (focus === null) return false;
+  const start = clampScroll(ids.length, scroll);
+  const end = Math.min(ids.length, start + VISIBLE_PLANES);
+  for (let i = start; i < end; i++) if (ids[i] === focus) return true;
+  return false;
+}
+
 /**
  * The visible window's poses, ordered by slot (nearest first, which is also roster order within
  * the window).
@@ -157,7 +185,9 @@ export function stackPoses(ids: readonly string[], opts: StackOpts): PlanePose[]
   const { layout, scroll, focus } = opts;
   const start = clampScroll(ids.length, scroll);
   const visible = ids.slice(start, start + VISIBLE_PLANES);
-  const focusInWindow = focus !== null && visible.includes(focus);
+  // The shared predicate, never a local `visible.includes` — `focusDepth` reads the same answer,
+  // and that agreement IS the fix for the stranded lean (see `focusInWindow`).
+  const lifted = focusInWindow(ids, scroll, focus);
   // The stagger's centre. Read from the VISIBLE count, never VISIBLE_PLANES: a short roster (a
   // committed filter, a small network set) would otherwise hang off to one side of the canvas.
   const mid = (visible.length - 1) / 2;
@@ -176,7 +206,7 @@ export function stackPoses(ids: readonly string[], opts: StackOpts): PlanePose[]
         interactive: true,
       };
     }
-    if (focusInWindow && id === focus) {
+    if (lifted && id === focus) {
       return {
         id,
         x: (0 - mid) * PLANE_STEP_X - PLANE_STEP_X / 2,
@@ -194,31 +224,45 @@ export function stackPoses(ids: readonly string[], opts: StackOpts): PlanePose[]
       z: -i * PLANE_GAP,
       scale: 1 - SCALE_FALLOFF * i,
       opacity: 1 - OPACITY_FALLOFF * i,
-      interactive: focusInWindow ? false : i === 0,
+      interactive: lifted ? false : i === 0,
     };
   });
 }
 
 /**
- * The z the camera frames: the focused plane's own depth when `focus` names a plane in the
- * roster, else slot 0's resting depth (`0`). Takes no SCROLL — a plane outside the current window
- * is a scroll concern, not a framing one — but it does take the LAYOUT, and that is the point:
+ * The z the camera frames: the focused plane's own depth when that plane is actually LIFTED, else
+ * slot 0's resting depth (`0`). It takes every input the lift takes — the roster, the focus, the
+ * LAYOUT and the SCROLL — because the whole contract is that it can only ever answer a plane that
+ * came forward:
  *
  * ⚠️ IN `flat` A FOCUS MOVES NOTHING, SO THERE IS NOTHING FOR THE CAMERA TO MEET (2026-09-18).
  * `stackPoses` says so itself — in `flat` every plane sits at `z: 0` at `FLAT_SCALE` and every one
  * of them is interactive, and a focus there "changes no geometry" by that function's own tested
  * rule. Answering `FOCUS_LIFT` anyway made the camera lean toward a plane that had not come
  * forward: the structure holding still while the camera moves is camera principle 2 exactly
- * inverted. The commit is still acknowledged — the destination is then the pose the camera already
- * holds, which is what the NUDGE is for (principle 3).
+ * inverted. Nothing is acknowledged by the camera there — the depth is 0 before and after, so the
+ * Engine's trigger never fires and the pose simply holds. The focus still stands; it shows the
+ * moment the reader returns to the stack layout.
+ *
+ * ⚠️ AND A FOCUS OUTSIDE THE VISIBLE WINDOW IS THE SAME FACT (2026-09-19). It used to ignore the
+ * SCROLL on the argument that a plane outside the window "is a scroll concern, not a framing one"
+ * — true only while something always pages the focus back in. The rail's PAGER, a metric change
+ * and a poll re-rank each strand a standing focus off-window, where `stackPoses` lifts nothing;
+ * the lean then stood over an unmoved stack, with slot 0 as the interactive plane. `focusInWindow`
+ * is the one predicate both halves read, so the two can no longer disagree.
  *
  * The answer lives HERE rather than as a `layout === "flat"` compare in the Engine, because this
  * module is where the stack's spatial grammar is stated: the camera reads the geometry, it does not
  * re-derive it.
  */
-export function focusDepth(ids: readonly string[], focus: string | null, layout: Layout): number {
+export function focusDepth(
+  ids: readonly string[],
+  focus: string | null,
+  layout: Layout,
+  scroll: number,
+): number {
   if (layout === "flat") return 0;
-  return focus !== null && ids.includes(focus) ? FOCUS_LIFT : 0;
+  return focusInWindow(ids, scroll, focus) ? FOCUS_LIFT : 0;
 }
 
 /**

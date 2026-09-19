@@ -399,7 +399,7 @@ describe("trendFocusPush (the History view's ONE state-keyed variation, 2026-09-
   const pos = () => FOCI.trend.pos.clone();
   const tgt = () => FOCI.trend.target.clone();
   // The lift `domain/trendStack` gives a focused plane — LAYOUT DATA, handed in by the Engine as
-  // `focusDepth(ids, focus)`. The function takes it as a PARAMETER, like `aspectFit` takes the
+  // `focusDepth(ids, focus, layout, scroll)`. The function takes it as a PARAMETER, like `aspectFit` takes the
   // aspect: the geometry belongs to the stack module, the lean belongs here, and neither imports
   // the other. Read from the real constant so re-tuning the lift re-tunes this test with it.
   const LIFT = FOCUS_LIFT;
