@@ -373,7 +373,7 @@ export default function TrendStack() {
               // the stack, read here rather than assumed so the domain stays the one statement.
               opacity: pose.opacity,
               // PAINT ORDER IS DEPTH, from the pose itself: a nearer plane (larger z) paints over
-              // a farther one, so a lifted focus lands in front of the stack it came from and the
+              // a farther one, so a focused plane — re-dealt to slot 0 — paints over the rest, and the
               // flat layout's equal z leaves tree order to break the tie. Local to this root,
               // which is its own stacking context; the offset keeps it positive.
               zIndex: Math.round(100 + pose.z),

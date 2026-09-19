@@ -267,7 +267,7 @@ and it would be a second chart implementation beside the document's. In DOM it i
 its accessible names for free.
 
 The split of labour is the subject callout's, exactly: **pure pose math in `domain/trendStack.ts`**
-(slots, stagger, focus lift, paging — arithmetic over plain objects), **the projection in the engine
+(slots, stagger, the focus re-deal, paging — arithmetic over plain objects), **the projection in the engine
 layer** (`src/engine/TrendStackSync.ts`, `CalloutSync`'s sibling: a narrow state struct in, one
 `matrix3d` per frame onto each `[data-plane]` anchor, zero allocation, and an idle skip that returns
 before any DOM write when the camera, the canvas box and the requested poses are all unchanged), and
@@ -322,7 +322,8 @@ you start:
   than in the adapter**.
 - **`countryShape.ts`** — the country drill's shape math over the topology.
 - **`trendStack.ts`** — History's whole spatial grammar as pure data: the staggered slots, the focus
-  lift, the `flat` column, the paging clamp, and `focusDepth()`, which is the only number the camera's
+  RE-DEAL (the focused plane takes first place and the planes ahead of it slide back one slot — user,
+  2026-09-19), the `flat` column, the paging clamp, and `focusDepth()`, which is the only number the camera's
   lean takes from the stack.
 
 ### The render loop
@@ -413,8 +414,8 @@ its claim is paper-only, so its one `intensity` already is its paper number.
    camera, it gets **ONE pose with ONE state-keyed variation** — the ledger's `ledgerCommitTilt`
    (`domain/cameraRig.ts`) leans the settled chamber pose in when a network is committed and back out
    when it isn't, and that is the whole vocabulary. **History is the second instance**:
-   `trendFocusPush` slides `FOCI.trend` straight down its own view axis by the focused plane's lift
-   (`trendStack.focusDepth()`, layout data — never a projected plane), and back out when the focus
+   `trendFocusPush` slides `FOCI.trend` a little way down its own view axis while a focus has re-dealt
+   the stack (`trendStack.focusDepth()`, layout data — never a projected plane), and back out when the focus
    clears, so every rung of `LADDERS.trend` inherits it by delegating to the resting pose. It is a
    push, not an orbit: the planes host real text and present flat-on, so a lean that turned the
    camera would skew the charts it exists to emphasise. **`Align to front` moves the STRUCTURE, not

@@ -855,7 +855,7 @@ export class Engine {
         //     stack no longer shows (measured: the single plane sat at 1.085× its resting
         //     projection with nothing lifted).
         //   · Watching the DEPTH alone silently dropped the commit that needs the NUDGE. Moving a
-        //     focus from plane A to plane B leaves the depth at `FOCUS_LIFT` either way, so the
+        //     focus from plane A to plane B leaves the depth at `FOCUS_LEAN` either way, so the
         //     guard never fired, `_resolveFocus` never ran, and `tweenTo` — where the nudge is
         //     decided — was never entered. A click that visibly re-stacked the planes was answered
         //     by a camera that did not move at all, which is the dead-click reading camera
@@ -866,7 +866,7 @@ export class Engine {
         // inputs actually changed.
         // ⚠️ AND THE SCROLL IS ONE OF THE DEPTH'S INPUTS (2026-09-19). The pager does not clear
         // the focus, so paging a focused plane out of the visible window leaves the focus standing
-        // with nothing lifted — `focusDepth` answers 0 there now, and watching `trendScroll` is
+        // with nothing re-dealt — `focusDepth` answers 0 there now, and watching `trendScroll` is
         // what lets the camera lean back OUT on that page and back IN when the plane returns.
         // Exactly one resolve each way: with no focus standing both depths are 0 and paging moves
         // no camera at all.
@@ -1636,7 +1636,7 @@ export class Engine {
       // ⚠️ LAYOUT DATA (rule 6): `focusDepth` reads the published roster, the committed focus, the
       // LAYOUT and the SCROLL — exactly the four things `stackPoses` places the planes from — never
       // a projected plane or a scene matrix. An off-roster focus answers 0, so does one the visible
-      // window does not hold (nothing is lifted there), and so does any focus in `flat` (nothing
+      // window does not hold (nothing is re-dealt there), and so does any focus in `flat` (nothing
       // comes forward at all), which is the resting pose exactly.
       const st = useStore.getState();
       const depth = focusDepth(st.trendIds, st.trendFocus, st.trendLayout, st.trendScroll);

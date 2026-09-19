@@ -118,7 +118,7 @@ The design rules behind the table, which the tests pin but don't explain:
   deliberate way to scope the stack, and a filter change CLEARS the focus (the Engine's filter
   subscription, beside the other finer rungs it drops) — a focus is finer than a network by
   construction, so one left standing either points at a plane the scope no longer shows or silently
-  re-lifts one when the filter clears, and the clear is also what keeps the camera to ONE move. The focus is view-local emphasis rather than a ladder rung (no level, no card, no
+  re-deals the stack around one when the filter clears, and the clear is also what keeps the camera to ONE move. The focus is view-local emphasis rather than a ladder rung (no level, no card, no
   deselect step), and it is still in the table and still guarded by `selectionBoundary.test.ts`,
   because it is a committed subject written by a click AND it carries a consequence beyond its own
   channel: a focus on an off-window plane pages that plane into view first, in the executor, where

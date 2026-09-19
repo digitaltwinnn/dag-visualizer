@@ -51,7 +51,7 @@ export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boole
         break;
       case "trendFocus":
         // THE HISTORY VIEW'S PLANE FOCUS — one store effect, plus the paging that makes it
-        // visible. `stackPoses` lifts nothing for a focus outside the visible window (its own
+        // visible. `stackPoses` moves nothing for a focus outside the visible window (its own
         // tested rule), so a plane the reader scrolled past would focus INVISIBLY: the window
         // pages to it first, by the minimum that brings it in. This is also the ONE place allowed
         // to read `trendIds` back — it is React's publish channel, off limits to components, and

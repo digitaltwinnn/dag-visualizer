@@ -4,7 +4,7 @@ import {
   clampScroll,
   pagerVisible,
   FLAT_STEP_Y,
-  FOCUS_LIFT,
+  FOCUS_LEAN,
   OPACITY_FALLOFF,
   PLANE_GAP,
   PLANE_PLOT_PX_H,
@@ -140,34 +140,42 @@ describe("stackPoses", () => {
     expect(p.slice(1).every((x) => !x.interactive)).toBe(true);
   });
 
-  it("the focused plane comes forward and is the interactive one", () => {
+  it("a focus RE-DEALS the deck: the focused plane takes first place, exactly", () => {
+    // ⚠️ The rule this replaces LIFTED the plane out in front of slot 0 while its neighbours held
+    // their slots — a hole where it had been and a sixth position hovering over the front card
+    // (user, 2026-09-19: "it should take the 1st place").
+    const rest = stackPoses(IDS, { layout: "stack", scroll: 0, focus: null });
     const p = stackPoses(IDS, { layout: "stack", scroll: 0, focus: "elpaca" });
     const f = p.find((x) => x.id === "elpaca")!;
-    expect(f.z).toBe(Math.max(...p.map((x) => x.z)));
-    expect(f.z).toBeCloseTo(FOCUS_LIFT);
+    // Slot 0's pose to the number — not nearer, not lower, not larger.
+    expect({ ...f, id: "" }).toEqual({ ...rest[0], id: "" });
+    expect(p[0].id).toBe("elpaca");
     expect(f.interactive).toBe(true);
-    expect(f.opacity).toBe(1);
-    expect(f.scale).toBe(1);
-    // …half a step BELOW slot 0 (what separates it from the plane it came forward past) but on
-    // slot 0's own x: the focused plane is the view's subject and holds the centre the front plane
-    // holds. Drifting left with the stagger ran its edge under the rail once the planes grew.
-    const slot0 = p.find((x) => x.id === "dag-l0")!;
-    expect(f.x).toBeCloseTo(slot0.x);
-    expect(f.y).toBeCloseTo(slot0.y - PLANE_STEP_Y / 2);
   });
 
-  it("a focus leaves its neighbours' slot position, scale and opacity untouched", () => {
-    const noFocus = stackPoses(IDS, { layout: "stack", scroll: 0, focus: null });
-    const focused = stackPoses(IDS, { layout: "stack", scroll: 0, focus: "elpaca" });
-    for (const id of ["dag-l0", "pacaswap", "dor-metagraph", "constellation-l1"]) {
-      const a = noFocus.find((x) => x.id === id)!;
-      const b = focused.find((x) => x.id === id)!;
-      expect(b.x).toBe(a.x);
-      expect(b.y).toBe(a.y);
-      expect(b.z).toBe(a.z);
-      expect(b.scale).toBe(a.scale);
-      expect(b.opacity).toBe(a.opacity);
-    }
+  it("the planes AHEAD of the focus slide back one slot and close the gap; those behind hold", () => {
+    const rest = stackPoses(IDS, { layout: "stack", scroll: 0, focus: null });
+    const p = stackPoses(IDS, { layout: "stack", scroll: 0, focus: "elpaca" }); // elpaca is slot 3
+    const pose = (list: typeof p, id: string) => ({ ...list.find((x) => x.id === id)!, id: "" });
+    // Ahead of it (slots 0, 1, 2) → each takes the slot BEHIND its own.
+    expect(pose(p, "dag-l0")).toEqual({ ...rest[1], id: "", interactive: false });
+    expect(pose(p, "pacaswap")).toEqual({ ...rest[2], id: "" });
+    expect(pose(p, "dor-metagraph")).toEqual({ ...rest[3], id: "" });
+    // Behind it (slot 4) → untouched.
+    expect(pose(p, "constellation-l1")).toEqual({ ...rest[4], id: "" });
+    // Every slot is filled exactly once: no hole, no sixth position.
+    expect(p.map((x) => x.z).sort((a, b) => b - a)).toEqual(rest.map((x) => x.z));
+  });
+
+  it("returns the poses nearest first, whatever was focused", () => {
+    const p = stackPoses(IDS, { layout: "stack", scroll: 0, focus: "dor-metagraph" });
+    expect(p.map((x) => x.id)).toEqual(["dor-metagraph", "dag-l0", "pacaswap", "elpaca", "constellation-l1"]);
+    for (let i = 1; i < p.length; i++) expect(p[i].z).toBeLessThan(p[i - 1].z);
+  });
+
+  it("focusing the plane that is already in front changes nothing", () => {
+    const rest = stackPoses(IDS, { layout: "stack", scroll: 0, focus: null });
+    expect(stackPoses(IDS, { layout: "stack", scroll: 0, focus: "dag-l0" })).toEqual(rest);
   });
 
   it("no other plane is interactive while a focus stands", () => {
@@ -176,7 +184,7 @@ describe("stackPoses", () => {
     expect(p.find((x) => x.interactive)!.id).toBe("elpaca");
   });
 
-  it("a focus outside the visible window lifts nothing and falls back to slot-0 interactivity", () => {
+  it("a focus outside the visible window moves nothing", () => {
     const p = stackPoses(IDS, { layout: "stack", scroll: 0, focus: "ded" }); // ded is slot 5, window is 0..4
     expect(p.map((x) => x.id)).not.toContain("ded");
     expect(p[0].interactive).toBe(true);
@@ -237,7 +245,7 @@ describe("focusInWindow — the ONE predicate the poses and the camera share", (
   // ⚠️ THE STRANDED-FOCUS BUG THIS EXISTS FOR (2026-09-19). `focusDepth` used to ignore the
   // scroll on the assumption the executor always pages a focus INTO the window. The PAGER, a
   // metric change and a poll re-rank all move a standing focus back OUT of it, and then
-  // `stackPoses` lifted nothing while `focusDepth` still answered `FOCUS_LIFT`: the camera leaned
+  // `stackPoses` lifted nothing while `focusDepth` still answered `FOCUS_LEAN`: the camera leaned
   // over a structure that had not moved, which is camera principle 2 inverted — the same
   // inversion already fixed once for `flat`. One predicate, read by both, is the structural fix.
   it("answers NO for no focus at all, and for an id the roster does not carry", () => {
@@ -258,21 +266,27 @@ describe("focusInWindow — the ONE predicate the poses and the camera share", (
     expect(focusInWindow(IDS, -3, "dag-l0")).toBe(true);
   });
 
-  it("IS what stackPoses lifts by, for every id at every scroll", () => {
+  it("IS what stackPoses re-deals by, for every id at every scroll", () => {
+    // A focus the window holds takes FIRST PLACE; one it does not hold moves nothing, so the front
+    // is whatever the window's own first id is. (When those coincide the two answers agree too.)
     for (const focus of IDS) {
       for (const scroll of [-1, 0, 1, 2, 9]) {
         const p = stackPoses(IDS, { layout: "stack", scroll, focus });
-        const lifted = p.some((x) => x.id === focus && x.z === FOCUS_LIFT);
-        expect(lifted, `${focus} @ ${scroll}`).toBe(focusInWindow(IDS, scroll, focus));
+        const rest = stackPoses(IDS, { layout: "stack", scroll, focus: null });
+        const inWindow = focusInWindow(IDS, scroll, focus);
+        expect(p[0].id, `${focus} @ ${scroll}`).toBe(inWindow ? focus : rest[0].id);
+        expect(p.some((x) => x.id === focus), `${focus} @ ${scroll} present`).toBe(inWindow);
       }
     }
   });
 });
 
 describe("focusDepth", () => {
-  it("is the focused plane's own z", () => {
+  it("is the camera's lean, not a plane's depth — the focused plane sits at slot 0", () => {
     const p = stackPoses(IDS, { layout: "stack", scroll: 0, focus: "elpaca" });
-    expect(focusDepth(IDS, "elpaca", "stack", 0)).toBeCloseTo(p.find((x) => x.id === "elpaca")!.z);
+    expect(p.find((x) => x.id === "elpaca")!.z).toBeCloseTo(0);
+    expect(focusDepth(IDS, "elpaca", "stack", 0)).toBe(FOCUS_LEAN);
+    expect(FOCUS_LEAN).toBeGreaterThan(0);
   });
 
   it("falls back to the nearest plane's depth with no focus", () => {
@@ -283,16 +297,16 @@ describe("focusDepth", () => {
 
   it("is the LIFT for a focus in the window, and 0 for one the roster does not carry", () => {
     expect(focusDepth(IDS, null, "stack", 0)).toBe(0);
-    expect(focusDepth(IDS, "elpaca", "stack", 0)).toBe(FOCUS_LIFT);
+    expect(focusDepth(IDS, "elpaca", "stack", 0)).toBe(FOCUS_LEAN);
     expect(focusDepth(IDS, "not-in-roster", "stack", 0)).toBe(0);
   });
 
   it("RELEASES the camera when the focus is paged OUT of the window, and takes it back", () => {
     // The pager does not clear the focus (the Layers row stays pressed), so a standing focus can
     // sit outside the window — where nothing is lifted, so there is nothing to lean toward.
-    expect(focusDepth(IDS, "dag-l0", "stack", 0)).toBe(FOCUS_LIFT);
+    expect(focusDepth(IDS, "dag-l0", "stack", 0)).toBe(FOCUS_LEAN);
     expect(focusDepth(IDS, "dag-l0", "stack", 1)).toBe(0); // paged past it
-    expect(focusDepth(IDS, "dag-l0", "stack", 0)).toBe(FOCUS_LIFT); // paged back
+    expect(focusDepth(IDS, "dag-l0", "stack", 0)).toBe(FOCUS_LEAN); // paged back
   });
 
   it("releases it when a RE-RANK carries the focused id out of the window", () => {
@@ -300,7 +314,7 @@ describe("focusDepth", () => {
     // a slot range, so a plane can leave it without the scroll moving at all.
     const ranked = ["dag-l0", "pacaswap", "dor-metagraph", "elpaca", "constellation-l1", "ded"];
     const reranked = ["pacaswap", "dor-metagraph", "elpaca", "constellation-l1", "ded", "dag-l0"];
-    expect(focusDepth(ranked, "dag-l0", "stack", 0)).toBe(FOCUS_LIFT);
+    expect(focusDepth(ranked, "dag-l0", "stack", 0)).toBe(FOCUS_LEAN);
     expect(focusDepth(reranked, "dag-l0", "stack", 0)).toBe(0);
   });
 
@@ -315,15 +329,17 @@ describe("focusDepth", () => {
   });
 
   it("agrees with the poses it is derived from — every id, every scroll, both layouts", () => {
-    // Stated against `stackPoses` rather than against arithmetic: the depth the camera frames is
-    // the front plane's own z, whatever the layout says that is. THE CONTRACT: a lean can only
-    // ever answer a plane that actually came forward.
+    // Stated against `stackPoses` rather than against arithmetic. THE CONTRACT: the camera leans
+    // exactly when the focus actually RE-DEALT the stack — the focused plane is in the window, the
+    // layout is the stack, and it therefore holds first place. A lean over a structure that did
+    // not answer the focus is camera principle 2 inverted.
     for (const layout of ["stack", "flat"] as const) {
       for (const focus of [...IDS, null, "not-in-roster"]) {
         for (const scroll of [0, 1, 2, 9]) {
           const poses = stackPoses(IDS, { layout, scroll, focus });
-          const front = poses.length === 0 ? 0 : Math.max(...poses.map((p) => p.z));
-          expect(focusDepth(IDS, focus, layout, scroll), `${focus} @ ${scroll} ${layout}`).toBeCloseTo(front);
+          const answered = layout === "stack" && focus != null && poses.some((p) => p.id === focus);
+          if (answered) expect(poses[0].id, `${focus} @ ${scroll} front`).toBe(focus);
+          expect(focusDepth(IDS, focus, layout, scroll), `${focus} @ ${scroll} ${layout}`).toBe(answered ? FOCUS_LEAN : 0);
         }
       }
     }
@@ -392,7 +408,9 @@ describe("scrollToShow (the paging a focus asks for)", () => {
       for (const from of [0, 1, 2, 3]) {
         const p = stackPoses(LONG, { layout: "stack", scroll: scrollToShow(LONG, id, from), focus: id });
         expect(p.map((x) => x.id)).toContain(id);
-        expect(p.find((x) => x.id === id)!.z).toBeCloseTo(FOCUS_LIFT);
+        // …and, being in the window, the focus has taken first place.
+        expect(p[0].id).toBe(id);
+        expect(p[0].z).toBeCloseTo(0);
       }
     }
   });

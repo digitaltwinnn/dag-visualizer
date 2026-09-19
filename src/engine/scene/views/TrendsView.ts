@@ -51,12 +51,10 @@ import type { SceneView } from "./SceneView";
  *  shrank with a short roster would be a second, disagreeing statement about where the stack is. */
 const MID = staggerCentre(VISIBLE_PLANES);
 
-/** Slot indices the ground draws a rung for, front to back. `-0.5` is the FOCUS pose exactly —
- *  `stackPoses` lifts a focused plane to `FOCUS_LIFT` (= `PLANE_GAP / 2`) on slot 0's own x, so
- *  the fractional index reproduces its DEPTH from the same arithmetic and `slotX` pins its x. It is drawn whether or not a plane is focused: the floor has to continue toward the
- *  reader past the front plane, or a focused plane would hang over its far edge — which is the one
- *  thing this grid exists to prevent. */
-const RUNGS = [-0.5, 0, 1, 2, 3, 4];
+/** Slot indices the ground draws a rung for, front to back — one per slot. There was a sixth, in
+ *  FRONT of slot 0, for a focused plane that stood ahead of the stack; a focus RE-DEALS the deck
+ *  now (the focused card takes slot 0), so no card ever stands out there. */
+const RUNGS = [0, 1, 2, 3, 4];
 
 /** How much presence a rung loses per slot of depth — the FLOOR's own recession. It was the
  *  planes' `OPACITY_FALLOFF` while they faded with depth; the cards are opaque now (2026-09-19), so
@@ -117,10 +115,9 @@ const GROUND_PRESENCE = { dark: 0.3, paper: 0.4 } as const;
  *  the near ones carry it. (While the planes were transparent the square had a harder job: rear
  *  rungs showed THROUGH the front plot, where a horizontal hairline reads as a gridline — a claim
  *  about the data that furniture has no business making. Opaque cards ended that; the falloff is
- *  kept because a floor that does not recede reads as a set of loose lines.) The focus rung
- *  (index < 0) keeps full presence, like the pose it serves. */
+ *  kept because a floor that does not recede reads as a set of loose lines.) */
 const slotPresence = (i: number, paper: boolean): number => {
-  const stack = Math.max(0, 1 - RUNG_FALLOFF * Math.max(0, i));
+  const stack = Math.max(0, 1 - RUNG_FALLOFF * i);
   return (paper ? GROUND_PRESENCE.paper : GROUND_PRESENCE.dark) * stack * stack;
 };
 
@@ -128,15 +125,13 @@ const slotPresence = (i: number, paper: boolean): number => {
  *  floor drops (see `GROUND_DROP`). One home: re-tune the stagger in `domain/trendStack.ts` and
  *  the ground follows, because it is derived from the same arithmetic rather than eyeballed
  *  against a screenshot of it. */
-// The focus rung (index −0.5) shares slot 0's x: `stackPoses` lifts a focused plane forward and
-// down, never sideways.
-const slotX = (i: number): number => (Math.max(0, i) - MID) * PLANE_STEP_X;
+const slotX = (i: number): number => (i - MID) * PLANE_STEP_X;
 const slotZ = (i: number): number => -i * PLANE_GAP;
 
 /** Half the width of the card standing on rung `i` — the card's world width at ITS slot's scale
- *  (`stackPoses` shrinks each slot by `SCALE_FALLOFF`; the focus rung, index < 0, is full size).
+ *  (`stackPoses` shrinks each slot by `SCALE_FALLOFF`).
  *  A rung as wide as the unscaled plane overhung the rear cards by up to 12%. */
-const halfW = (i: number): number => (PLANE_WORLD_W / 2) * (1 - SCALE_FALLOFF * Math.max(0, i));
+const halfW = (i: number): number => (PLANE_WORLD_W / 2) * (1 - SCALE_FALLOFF * i);
 
 export class TrendsView implements SceneView {
   /** The view root. ⚠️ Its `visible` is the ENGINE's (rule 6) — never written here. */

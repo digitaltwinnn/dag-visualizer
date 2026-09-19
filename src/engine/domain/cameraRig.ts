@@ -361,21 +361,21 @@ export function ledgerCommitTilt(pos: THREE.Vector3, target: THREE.Vector3, outP
 // exactly the shape `ledgerCommitTilt` has in the chamber, and for the same reason: camera
 // principle 2 says view emphasis moves the STRUCTURE, and a second pose is a second thing the
 // reader has to learn. The structure already answers a plane click (`domain/trendStack.stackPoses`
-// lifts the focused plane forward, to full scale and opacity, in front of the stack it came from);
+// RE-DEALS the deck: the focused plane takes first place and the planes ahead of it slide back);
 // this is the camera's share of that one gesture — it leans IN while a focus stands and back out
 // when it clears, keyed on the STATE, so every rung of `LADDERS.trend` inherits it by delegating to
 // the resting pose.
 //
-// ⚠️ THE GEOMETRY IS LAYOUT DATA, NEVER A RENDERED TRANSFORM (rule 6). `depth` is the focused
-// plane's own lift, `domain/trendStack.focusDepth(ids, focus, layout, scroll)`, which the Engine
+// ⚠️ THE GEOMETRY IS LAYOUT DATA, NEVER A RENDERED TRANSFORM (rule 6). `depth` is the stack's
+// own `FOCUS_LEAN`, through `domain/trendStack.focusDepth(ids, focus, layout, scroll)`, which the Engine
 // reads from the published roster, the committed focus, the layout and the paging scroll — never
 // off a projected plane or a scene matrix. It is a PARAMETER for the same reason `aspectFit` takes
 // the aspect: the stack's spatial grammar lives in its own module, the camera's lean lives here,
 // and neither imports the other. Zero depth contributes exactly nothing, so the unfocused pose is
 // `FOCI.trend` untouched — and that is the answer in FOUR cases, not one: no focus, a focus on a
 // network the roster does not carry, a focus the visible window no longer holds (paged, re-ranked
-// or re-filtered away — nothing is lifted there), and ANY focus in the `flat` layout, where no
-// plane comes forward for the camera to meet.
+// or re-filtered away — nothing is re-dealt there), and ANY focus in the `flat` layout, where a
+// focus moves nothing for the camera to answer.
 //
 // ⚠️ AND IT IS A PUSH ALONG THE VIEW AXIS, not an orbit. The whole proposition of this view is that
 // the planes present FLAT-ON — they host real text, and the projector writes a translate and a
@@ -384,10 +384,10 @@ export function ledgerCommitTilt(pos: THREE.Vector3, target: THREE.Vector3, outP
 // the position slides straight down the axis toward it, which also leaves the pose composable with
 // all three global levers (they scale (pos − target) about the target).
 //
-// The camera closes by a QUARTER of the depth the plane came forward. The plane's own lift already
-// carries most of the emphasis (~9% apparent growth); the camera adds a little more so the commit is
-// felt as a move toward the reader rather than as one card sliding. It was a full lift's worth while
-// the planes were small — once the front plane was sized to fill the free canvas (user, 2026-09-19:
+// The camera closes by a QUARTER of `FOCUS_LEAN` — about 2% apparent growth. The RE-DEAL carries
+// the emphasis (the focused card takes first place); the lean is the commit's acknowledgement, the
+// one thing that still answers a click on the card that is ALREADY in front. It was a full
+// `FOCUS_LEAN` while the planes were small — once the front plane was sized to fill the free canvas (user, 2026-09-19:
 // "larger"), a full push drove the focused plane ~50px under each rail. Emphasis has to fit the
 // room the rails leave it.
 export const TREND_FOCUS_PUSH = 0.25;

@@ -147,9 +147,12 @@ export const PLANE_PX_H = PLANE_PLOT_PX_H + PLANE_CHROME_PX_H;
 /** The plane's height in world units, from the two numbers above and its world width. */
 export const PLANE_WORLD_H = (PLANE_WORLD_W * PLANE_PX_H) / PLANE_PX_W;
 
-/** How far in FRONT of slot 0 a focused plane is lifted — half the inter-plane gap, so it clears
- *  the rest of the stack without leaving its own depth register. */
-export const FOCUS_LIFT = PLANE_GAP / 2;
+/** How far the CAMERA closes on the stack while a plane is focused (`focusDepth`, scaled by
+ *  `cameraRig.TREND_FOCUS_PUSH`). It was the focused plane's own lift in front of slot 0 until a
+ *  focus became a RE-DEAL (user, 2026-09-19) — the focused card takes first place, so there is no
+ *  plane out in front any more; what is left is the camera's small lean, which is how a focus
+ *  commit is acknowledged when the clicked card already IS the front one. */
+export const FOCUS_LEAN = PLANE_GAP / 2;
 
 /** `flat`'s uniform scale. Below 1 because five cards have to fit the canvas HEIGHT there, where
  *  the stack spent its room on depth instead — sized so a full window's column clears the command
@@ -226,16 +229,13 @@ export function focusInWindow(ids: readonly string[], scroll: number, focus: str
  *
  * `flat` tiles the same planes as a vertical COLUMN at one depth and one scale, nearest on top.
  *
- * A `focus` naming a plane inside the window lifts that one plane to `FOCUS_LIFT` and carries it
- * half a step further DOWN than slot 0, on slot 0's own x — it is the view's subject, so it holds
- * the horizontal centre the front plane holds — at full scale and opacity, and marks it the sole interactive
- * plane. Its neighbours keep exactly the slot pose they would have had with no focus: `n` does not
- * change when a plane is focused, so the lift does not close the gap it leaves. A focus naming a
- * plane OUTSIDE the window lifts nothing — the ONE EXECUTOR pages it into the window first, which
- * is why a plane focus goes through the click table rather than straight to its setter — and
- * interactivity falls back to the no-focus rule. With no focus at all, only slot 0 is interactive.
- * In `flat` a focus changes no geometry and every plane is interactive regardless: nothing is
- * covered there, so there is nothing for the rule to protect.
+ * A `focus` naming a plane inside the window RE-DEALS the stack: that plane takes slot 0, the
+ * planes that were ahead of it each step back one slot to close the gap, and the planes behind it
+ * do not move. The front slot is the interactive one, focused or not. A focus naming a plane
+ * OUTSIDE the window moves nothing — the ONE EXECUTOR pages it into the window first, which is why
+ * a plane focus goes through the click table rather than straight to its setter. In `flat` a focus
+ * changes no geometry and every plane is interactive regardless: nothing is covered there, so
+ * there is nothing for the rule to protect.
  */
 export function stackPoses(ids: readonly string[], opts: StackOpts): PlanePose[] {
   const { layout, scroll, focus } = opts;
@@ -251,10 +251,20 @@ export function stackPoses(ids: readonly string[], opts: StackOpts): PlanePose[]
   // below keeps the true `mid` — a column has no subject plane, so it centres as a block.
   const c = staggerCentre(visible.length);
 
-  return visible.map((id, i) => {
+  // A FOCUS RE-DEALS THE DECK (user, 2026-09-19: "it should take the 1st place and the other cards
+  // should slide back so that it fills the empty place left behind"). The focused card takes slot
+  // 0; every card that was AHEAD of it steps back one slot, closing the gap it left; the cards
+  // behind it do not move. It first LIFTED in front of the stack while its neighbours held their
+  // slots — which left a hole where it had been and a sixth position hovering over the front card,
+  // so the stack read as a deck with one card pulled half out. Re-dealt, the focused network is
+  // simply the one being read, in the place the view reads from.
+  const f = lifted ? visible.indexOf(focus as string) : -1;
+  const slotOf = (i: number): number => (f < 0 ? i : i === f ? 0 : i < f ? i + 1 : i);
+
+  const poses = visible.map((id, i): PlanePose => {
     if (layout === "flat") {
       // Nearest on TOP: the stack's own order read top-down, so switching layouts re-arranges the
-      // same sequence rather than reversing it.
+      // same sequence rather than reversing it. A focus changes NOTHING here — see the header.
       return {
         id,
         x: 0,
@@ -265,43 +275,32 @@ export function stackPoses(ids: readonly string[], opts: StackOpts): PlanePose[]
         interactive: true,
       };
     }
-    if (lifted && id === focus) {
-      return {
-        id,
-        // ON slot 0's x, not half a step further left: the focused plane is the view's subject, so
-        // it holds the horizontal centre the front plane holds (2026-09-19) — drifting left with
-        // the stagger ran its edge under the left rail once the planes grew. It still drops half
-        // a step, which is what separates it from the plane it came forward past.
-        x: (0 - c) * PLANE_STEP_X,
-        y: PLANE_Y + (0 - c) * PLANE_STEP_Y - PLANE_STEP_Y / 2,
-        z: FOCUS_LIFT,
-        scale: 1,
-        opacity: 1,
-        interactive: true,
-      };
-    }
+    const slot = slotOf(i);
     return {
       id,
-      x: (i - c) * PLANE_STEP_X,
-      y: PLANE_Y + (i - c) * PLANE_STEP_Y,
-      z: -i * PLANE_GAP,
-      scale: 1 - SCALE_FALLOFF * i,
-      opacity: 1 - OPACITY_FALLOFF * i,
-      interactive: lifted ? false : i === 0,
+      x: (slot - c) * PLANE_STEP_X,
+      y: PLANE_Y + (slot - c) * PLANE_STEP_Y,
+      z: -slot * PLANE_GAP,
+      scale: 1 - SCALE_FALLOFF * slot,
+      opacity: 1 - OPACITY_FALLOFF * slot,
+      // The front card is the one being read, focused or not — and it is the only one whose body
+      // nothing covers, so it is the only one a body click cannot be ambiguous about.
+      interactive: slot === 0,
     };
   });
+  // Ordered by SLOT, nearest first — the contract every consumer reads the array by.
+  return layout === "flat" ? poses : poses.sort((p, q) => q.z - p.z);
 }
 
 /**
- * The z the camera frames: the focused plane's own depth when that plane is actually LIFTED, else
- * slot 0's resting depth (`0`). It takes every input the lift takes — the roster, the focus, the
- * LAYOUT and the SCROLL — because the whole contract is that it can only ever answer a plane that
- * came forward:
+ * How far the camera leans in: `FOCUS_LEAN` while a focus has actually RE-DEALT the stack, else
+ * `0`. It takes every input the re-deal takes — the roster, the focus, the LAYOUT and the SCROLL —
+ * because the whole contract is that the camera only ever answers a structure that moved:
  *
  * ⚠️ IN `flat` A FOCUS MOVES NOTHING, SO THERE IS NOTHING FOR THE CAMERA TO MEET (2026-09-18).
  * `stackPoses` says so itself — in `flat` every plane sits at `z: 0` at `FLAT_SCALE` and every one
  * of them is interactive, and a focus there "changes no geometry" by that function's own tested
- * rule. Answering `FOCUS_LIFT` anyway made the camera lean toward a plane that had not come
+ * rule. Answering `FOCUS_LEAN` anyway made the camera lean toward a plane that had not come
  * forward: the structure holding still while the camera moves is camera principle 2 exactly
  * inverted. Nothing is acknowledged by the camera there — the depth is 0 before and after, so the
  * Engine's trigger never fires and the pose simply holds. The focus still stands; it shows the
@@ -310,8 +309,8 @@ export function stackPoses(ids: readonly string[], opts: StackOpts): PlanePose[]
  * ⚠️ AND A FOCUS OUTSIDE THE VISIBLE WINDOW IS THE SAME FACT (2026-09-19). It used to ignore the
  * SCROLL on the argument that a plane outside the window "is a scroll concern, not a framing one"
  * — true only while something always pages the focus back in. The rail's PAGER, a metric change
- * and a poll re-rank each strand a standing focus off-window, where `stackPoses` lifts nothing;
- * the lean then stood over an unmoved stack, with slot 0 as the interactive plane. `focusInWindow`
+ * and a poll re-rank each strand a standing focus off-window, where `stackPoses` moves nothing;
+ *  the lean then stood over an unmoved stack. `focusInWindow`
  * is the one predicate both halves read, so the two can no longer disagree.
  *
  * The answer lives HERE rather than as a `layout === "flat"` compare in the Engine, because this
@@ -325,7 +324,7 @@ export function focusDepth(
   scroll: number,
 ): number {
   if (layout === "flat") return 0;
-  return focusInWindow(ids, scroll, focus) ? FOCUS_LIFT : 0;
+  return focusInWindow(ids, scroll, focus) ? FOCUS_LEAN : 0;
 }
 
 /**
