@@ -57,6 +57,15 @@ export const FOCI = {
   // the topbar and the LiveStrip. Both global levers survive it: dollyBack and railsLean scale
   // (pos − target) around the target, so a pure translation of the pair is invariant under them.
   ledger: { pos: new THREE.Vector3(0, -1, 54), target: new THREE.Vector3(0, -7, 0) },
+  // The trends RESTING pose: frontal, looking down the stack's −Z depth axis so every plane
+  // presents flat-on and depth reads as scale and fade rather than perspective skew. Elevated
+  // only enough to separate the planes' bottom edges.
+  // ⚠️ THE LOW AIM IS THE FRAMING, and it is a pure TRANSLATION — pos and target drop by the same
+  // 3.5, so the forward axis, the distance and the pitch are all untouched and the pose stays
+  // frontal (measured 2026-09-18 against the staggered stack). It exists because the stack
+  // staggers UPWARD: the block's centre of area sits above the plane it is measured from, so
+  // aiming at `PLANE_Y` itself parked the whole thing low in the free canvas.
+  trend: { pos: new THREE.Vector3(0, 2.5, 54), target: new THREE.Vector3(0, -1.5, -18) },
 } satisfies Record<string, CameraFraming>;
 /** A pose that exists. Every caller of `focus()` names one of these, checked. */
 export type FocusName = keyof typeof FOCI;
@@ -106,7 +115,7 @@ export function dollyBack(pos: THREE.Vector3, target: THREE.Vector3, outPos: THR
 export const RAILS_HIDDEN_DOLLY = 0.86;
 // The resting pose each view's lean is measured against — the user's "scene starting position".
 // Read out of FOCI rather than restated, so re-tuning a resting pose re-tunes the ramp with it.
-const REST_POSE: Record<View3D, FocusName> = { hyper: "overview", geo: "geo", ledger: "ledger" };
+const REST_POSE: Record<View3D, FocusName> = { hyper: "overview", geo: "geo", ledger: "ledger", trend: "trend" };
 export function restOrbit(view: View3D): number {
   const f = FOCI[REST_POSE[view]];
   return f.pos.distanceTo(f.target);
@@ -343,4 +352,48 @@ export function ledgerCommitTilt(pos: THREE.Vector3, target: THREE.Vector3, outP
   _sph.phi -= LEDGER_TILT_PITCH; // phi is measured from +Y, so subtracting RAISES the camera
   _sph.radius *= LEDGER_TILT_DOLLY;
   outPos.setFromSpherical(_sph).add(target);
+}
+
+// ---- the History view's FOCUS LEAN ----------------------------------------------------------
+// The trends view owns ONE pose, `FOCI.trend`, with ONE state-keyed variation — this — which is
+// exactly the shape `ledgerCommitTilt` has in the chamber, and for the same reason: camera
+// principle 2 says view emphasis moves the STRUCTURE, and a second pose is a second thing the
+// reader has to learn. The structure already answers a plane click (`domain/trendStack.stackPoses`
+// RE-DEALS the deck: the focused plane takes first place and the planes ahead of it slide back);
+// this is the camera's share of that one gesture — it leans IN while a focus stands and back out
+// when it clears, keyed on the STATE, so every rung of `LADDERS.trend` inherits it by delegating to
+// the resting pose.
+//
+// ⚠️ THE GEOMETRY IS LAYOUT DATA, NEVER A RENDERED TRANSFORM (rule 6). `depth` is the stack's
+// own `FOCUS_LEAN`, through `domain/trendStack.focusDepth(ids, focus, scroll)`, which the Engine
+// reads from the published roster, the committed focus and the paging scroll — never
+// off a projected plane or a scene matrix. It is a PARAMETER for the same reason `aspectFit` takes
+// the aspect: the stack's spatial grammar lives in its own module, the camera's lean lives here,
+// and neither imports the other. Zero depth contributes exactly nothing, so the unfocused pose is
+// `FOCI.trend` untouched — and that is the answer in THREE cases, not one: no focus, a focus on a
+// network the roster does not carry, and a focus the visible window no longer holds (paged,
+// re-ranked or re-filtered away — nothing is re-dealt there).
+//
+// ⚠️ AND IT IS A PUSH ALONG THE VIEW AXIS, not an orbit. The whole proposition of this view is that
+// the planes present FLAT-ON — they host real text, and the projector writes a translate and a
+// uniform scale with no rotation term precisely so that text stays crisp. A lean that changed the
+// forward direction would skew the charts it exists to emphasise. So the target is untouched and
+// the position slides straight down the axis toward it, which also leaves the pose composable with
+// all three global levers (they scale (pos − target) about the target).
+//
+// The camera closes by a QUARTER of `FOCUS_LEAN` — about 2% apparent growth. The RE-DEAL carries
+// the emphasis (the focused card takes first place); the lean is the commit's acknowledgement, the
+// one thing that still answers a click on the card that is ALREADY in front. It was a full
+// `FOCUS_LEAN` while the planes were small — once the front plane was sized to fill the free canvas (user, 2026-09-19:
+// "larger"), a full push drove the focused plane ~50px under each rail. Emphasis has to fit the
+// room the rails leave it.
+export const TREND_FOCUS_PUSH = 0.25;
+/** Lean the settled trends pose in toward a focused plane. `depth` is `trendStack.focusDepth()`;
+ *  0 means no focus and writes `pos` through unchanged. Safe with `outPos === pos`. */
+export function trendFocusPush(pos: THREE.Vector3, target: THREE.Vector3, depth: number, outPos: THREE.Vector3): void {
+  _out.subVectors(target, pos); // the forward axis, read BEFORE outPos is written (in-place safe)
+  const d = _out.length();
+  const push = depth * TREND_FOCUS_PUSH;
+  outPos.copy(pos);
+  if (d > 1e-6 && push !== 0) outPos.addScaledVector(_out, push / d);
 }

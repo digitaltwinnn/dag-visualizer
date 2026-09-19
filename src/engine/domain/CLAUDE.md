@@ -3,12 +3,12 @@
 Pure logic: the view transition choreography and the click/select decision table.
 
 Split out of the root `CLAUDE.md` (2026-08-31) so it loads when you work here rather
-than on every session. The root file holds what this is, the eleven rules, run & test,
+than on every session. The root file holds what this is, the twelve rules, run & test,
 the architecture map and the dev workflow; **its rules govern this file too**.
 
 ## The 3D↔3D view transition
 
-Every switch among the three 3D views runs the same staged **gather choreography**
+Every switch among the four 3D views runs the same staged **gather choreography**
 (`domain/viewTransition.ts`) rather than a cut or a live morph flight: the from-view's nodes fly up,
 staggered, to per-network staging grids on a camera-anchored plane while its furniture fades; one
 invisible boundary frame where the nodes are gathered, the destination layout snaps in and the camera
@@ -45,6 +45,33 @@ rest to shrinking while vertical room went unused. Measured at 1600×897: the sa
 re-commits the node's country and provider, hyper its composition group — exactly the rungs a click on
 that node in the destination view would have committed. So every card up to the selection is on the
 rail in every view, and a deselect steps back down the local ladder instead of jumping to the network.
+
+**ONE VIEW PARKS THE FLEET INSTEAD OF PLACING IT** (2026-09-18). History is made of DOM chart planes,
+so it has nowhere honest to put the shared node population — `viewPolicy.fleet` reads `parked` there,
+and the fleet leaves on the doc overlay's own `DOC_ROLL` clock (`NodeFabric.tickFleetFade`) rather
+than being given poses. **The choreography itself is unchanged**: the gather still runs, the boundary
+still applies the destination layout and flies the camera, the furniture still builds. Only the
+fleet's OPACITY answers the row.
+
+`fleetFaded(leaving, entering, docFaded)` is the ONE place the two requests for that fade compose,
+and that is why it is a function rather than two Engine conditionals: the doc overlay's bare stage and
+a parked view ask for the same thing, and either stomping the other strands the fleet (About opened
+over History and closed again used to hand the fleet back in a view with no poses for it).
+
+⚠️ **The two directions are not symmetric, and `leaving` is what carries both.** `leaving` is the view
+being left WHILE IT STILL OWNS the gathered fleet, and null once the boundary has handed the fleet to
+the destination. ENTERING a parked view fades from the click, so the fade completes inside the shorter
+OUT phase and the group hides over nothing; LEAVING one holds the fade until the boundary, where the
+fleet is revealed AT THE GRIDS for the entry flight instead of popping back in at the stale poses it
+was hidden at.
+
+⚠️ **A switch that reaches NO BOUNDARY has to release the hold itself** — `fleetHolder` reads the
+phase right after a switch and answers who still holds it. One such path exists and it is not
+theoretical: a reverse-to-origin retarget flips straight from OUT to IN with no boundary tick, so
+Hypergraph → History → Hypergraph mid-gather left the fleet invisible in the view it returned to
+until some later switch healed it. `"staged"` deliberately KEEPS the hold: a flat/"soon" view fires no
+boundary by design, and the fleet stays parked at the grids exactly as the view that left it there
+asked.
 
 ## Selection semantics
 
@@ -84,6 +111,18 @@ The design rules behind the table, which the tests pin but don't explain:
   ADJACENCY IS CONTAINMENT — stating that tick B contains a snapshot that landed in tick A. It lives in
   `snapshotSelectActions`, so all remaining consumers (explorer row, the global card's pager,
   the 3D band click) inherit it.
+- **A History plane click is FOCUS ONLY** (2026-09-18). `trendPlaneActions` emits exactly one
+  `trendFocus`, toggling like every other rung's subject, and it deliberately does NOT commit the
+  plane's network: a committed filter SCOPES the stack to that one network, so committing on a plane
+  click would delete the four planes the gesture is about. The top-bar filter stays the separate,
+  deliberate way to scope the stack, and a filter change CLEARS the focus (the Engine's filter
+  subscription, beside the other finer rungs it drops) — a focus is finer than a network by
+  construction, so one left standing either points at a plane the scope no longer shows or silently
+  re-deals the stack around one when the filter clears, and the clear is also what keeps the camera to ONE move. The focus is view-local emphasis rather than a ladder rung (no level, no card, no
+  deselect step), and it is still in the table and still guarded by `selectionBoundary.test.ts`,
+  because it is a committed subject written by a click AND it carries a consequence beyond its own
+  channel: a focus on an off-window plane pages that plane into view first, in the executor, where
+  every caller inherits it.
 - **New click/select semantics go in the table with a test**, their effects in the executor, never
   inline. `components/selectionBoundary.test.ts` enforces this — and note the rule is **write**-based,
   so read-only facts cards cost nothing and every future explorer card inherits the table.

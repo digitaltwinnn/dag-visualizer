@@ -45,22 +45,32 @@ export const ROLE_ORDER = ["l0", "cl1", "dl1"];
 // card would be one gesture too many.
 
 // The one fact row. `title` carries the full value for anything the cell truncates.
+//
+// ⚠️ `as` exists for ONE structural reason (2026-09-19): a fact row that is itself a control. The
+// History cursor card's per-network rows are clickable — they run the same focus builder the Layers
+// rows do — and a `<button>` may only contain PHRASING content, so a `<div>` row inside one is a
+// content-model violation. A `span` carrying `display:flex` is the same box and is phrasing, so the
+// row stays this primitive's to draw rather than being hand-rolled beside it (the grammar rule: the
+// four primitives are the only way a card body draws a fact row). Not a styling hook — the default
+// stands everywhere else.
 export function Fact({
   label,
   children,
   title,
   className,
+  as: As = "div",
 }: {
   label: ReactNode;
   children: ReactNode;
   title?: string;
   className?: string;
+  as?: "div" | "span";
 }) {
   return (
-    <div className={cn("flex items-start justify-between gap-2.5", className)} title={title}>
+    <As className={cn("flex items-start justify-between gap-2.5", className)} title={title}>
       <span className="shrink-0 text-body text-muted-foreground">{label}</span>
       <span className="min-w-0 text-body text-foreground tabular-nums text-right">{children}</span>
-    </div>
+    </As>
   );
 }
 

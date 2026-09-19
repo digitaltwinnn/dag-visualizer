@@ -3,7 +3,7 @@
 Light/dark: the two-way pref and every ground question it forces.
 
 Split out of the root `CLAUDE.md` (2026-08-31) so it loads when you work here rather
-than on every session. The root file holds what this is, the eleven rules, run & test,
+than on every session. The root file holds what this is, the twelve rules, run & test,
 the architecture map and the dev workflow; **its rules govern this file too**.
 
 ## Light/dark
@@ -20,12 +20,19 @@ live: flipping the OS scheme with no reload repaints every token with zero JS, b
 but CSS is involved while `data-theme` is absent. layout.tsx's inline pre-paint script (the same
 device the network accent uses) reads `localStorage['dagviz:theme']` and stamps `data-theme`
 synchronously before first paint, so a stored explicit choice never flashes the wrong scheme.
-**The one number exception**: `--ident-l`/`--ident-c` are numbers, and `light-dark()` is
-`<color>`-only, so they use the guarded override pair instead — `:root` bakes the dark value,
+**The NUMBER exception**: `light-dark()` is `<color>`-only, so a token whose value is a number
+cannot use it and takes the guarded override TRIPLE instead — `:root` bakes the dark value,
 `@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { … } }` swaps in the
 light value under OS-light (`:not([data-theme="dark"])` guards an explicit dark pin from being
 overridden by the media query), and `:root[data-theme="light"]` restates that same light value
-for an explicit light pin — the CSS comment above them states it as the one exception.
+for an explicit light pin. Two tokens use it and the CSS comment above each says why:
+`--ident-l`/`--ident-c` (the identity lanes' L and C), and **`--trend-fill-top`**, the opacity at
+the top of the History cards' area fill — 0.30 dark, 0.18 on paper, because there the hue is INK
+and the presence that reads as a quiet tint on the dark card reads as a painted block on the light
+one (the card's face is `--panel-solid` over the opaque `--scene-ground`). The fill is drawn as an SVG gradient
+stop, so the token reaches it through `style={{ stopOpacity: "var(--trend-fill-top)" }}` — a
+presentation ATTRIBUTE would not resolve a `var()`, and a JS theme read would put a second theme
+owner beside `ThemeController`.
 
 **`components/ThemeController.tsx` is THE one owner of theme state.** It reads the stored pref on
 mount, adopts what the pre-paint script already stamped, and is the app's only

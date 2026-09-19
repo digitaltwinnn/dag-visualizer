@@ -508,8 +508,8 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
         // "avg" is part of the unit line on purpose (user, 2026-09-08: "is that the average
         // across the whole year or the latest?" — the mean-ness was sr-only, invisible to the
         // eye asking). The fallback keeps its bare "per hour": its lead is a current rate.
-        // Prose units, not the "/day" glyph — the trends page's own 2026-09-09 ruling, one
-        // vocabulary across both surfaces.
+        // Prose units, not the "/day" glyph — the Trends DOCUMENT's own 2026-09-09 ruling (user:
+        // "what is /day?"), one vocabulary across both surfaces.
         unit: "avg per day",
         span,
         sr: `Measured from the chain's own records (${span}, ${stepWord}); the rate is the window's mean, stated per day.`,

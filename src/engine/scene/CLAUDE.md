@@ -3,7 +3,7 @@
 The Three.js adapter layer: what the views draw and how the chamber is built.
 
 Split out of the root `CLAUDE.md` (2026-08-31) so it loads when you work here rather
-than on every session. The root file holds what this is, the eleven rules, run & test,
+than on every session. The root file holds what this is, the twelve rules, run & test,
 the architecture map and the dev workflow; **its rules govern this file too**.
 
 ## Nodes, layers & the filter
@@ -464,6 +464,41 @@ O(count), but picking is EVENT-TIME only, whereas recomputing the sphere per fra
 every frame to serve the occasional click. `scene/instancedBounds.test.ts` pins it — and note its own
 lesson: it must strip COMMENTS before counting, because the notes at these sites quote three's API and
 a naive regex counted the prose, which let the test pass with the fix deliberately removed.
+
+## The History view's ground
+
+`views/TrendsView.ts` is the ONLY thing History draws in WebGL, and it is one `LineSegments`: a level
+floor of horizontal rungs, one per CARD the DOM chart stack is showing — five under a full window,
+one under a filtered stack's lone card (which also takes that card's screen shift into the rails'
+gap, `trendStack.loneShiftPx`), so the floor is always the footprint of what stands on it. The view's content is DOM
+(`components/TrendStack.tsx`, placed per frame by the engine's `TrendStackSync`), so the canvas under
+it is empty by design — and empty is the problem. A composited DOM layer carries no depth cues of its
+own, so with nothing behind them five planes read as five unrelated cards rather than as one stack
+receding into history. Each rung is the plane's FOOTPRINT — same depth, same width, same stagger,
+derived from `domain/trendStack.ts`'s own arithmetic rather than eyeballed against a screenshot — so
+re-tuning the stagger re-tunes the ground with it.
+
+Four decisions are recorded in the file's header and worth knowing before touching it:
+
+- **It is furniture.** Colours are baked on a theme flip and there is no `update(dt)`; per frame it
+  takes the transition's furniture alpha through the shared `FadeSet`, and `face()` — which lays
+  the rungs along the camera's right vector and returns early while its inputs hold still. Its root's
+  `visible` is the Engine's, from `viewPolicy.show.trendGround` (rule 6).
+- **THE RUNGS RECEDE ON THEIR OWN FALLOFF, SQUARED** (`RUNG_FALLOFF`). A chart plane composites in
+  front of the canvas whatever the depth buffer says, and the planes are opaque cards — so a rung is
+  only ever seen where no card covers it, beside and below the deck. There it is furniture
+  establishing the depth axis: the far rungs fade to a whisper and the near ones carry it. The
+  floor's drop is DERIVED from the plane's own height (`PLANE_WORLD_H` in `domain/trendStack.ts`),
+  so enlarging a plane can never run the floor through its plot. Any new 3D mark in this view meets
+  the same compositing constraint.
+- **The floor is LEVEL and there are no side rails.** A ramp putting each rung under its own plane
+  cannot work (`PLANE_STEP_Y` is smaller than a plane's own height, so the planes overlap and every
+  rung lands inside the plot in front of it), and rails joining the rungs' ends drew one hard diagonal
+  across the front chart. Both were built and cut after a look; the rungs alone carry the recession.
+- **The time cursor is NOT here.** One WebGL quad spanning the stack cannot line up with five
+  differently placed, differently scaled recharts plot areas, so the mark would miss its bucket on
+  four planes out of five — a cursor that misstates the data (rule 10). It is drawn per plane, in the
+  plane's own coordinate system, by the chart that owns the scale.
 
 ## The instance audit (dev only)
 

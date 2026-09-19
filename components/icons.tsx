@@ -21,7 +21,8 @@ import {
   BadgeCheck,
   GitMerge,
   FlaskConical,
-  ChartLine,
+  ChartSpline,
+  Crosshair,
   type LucideIcon,
 } from "lucide-react";
 import type { NetworkId } from "@/src/engine/config";
@@ -39,6 +40,10 @@ export const VIEW_ICONS: Record<Mode, LucideIcon> = {
   hyper: Orbit,
   geo: Globe,
   ledger: Layers,
+  // The measured-history view: a spline through data points. ONE MARK FOR ONE DESTINATION
+  // (2026-09-18) — the Trends doc page's own ChartLine retired with the page, so every surface
+  // that offers the measured history (the bar's view switch, the footer) wears this.
+  trend: ChartSpline,
   // The one consolidated placeholder view: a dashed circle — not yet formed, the same dashed
   // grammar the Blueprint wireframes speak. The coming features' own marks (Radar,
   // ArrowLeftRight, HandCoins) moved into the Blueprint gallery that previews them.
@@ -58,8 +63,6 @@ export const ABOUT_ICON: LucideIcon = Info;
 export const DOC_ICONS: Record<DocPage, LucideIcon> = {
   about: Info,
   design: SwatchBook,
-  // Trends wears the line chart — the page IS timeseries charts, so the mark says exactly that.
-  trends: ChartLine,
 };
 
 // The left-rail TOOL cards' ONE mark (GeoExplore, LedgerPanel — user decision: the SAME standard
@@ -86,6 +89,13 @@ export const LAYER_ICON: LucideIcon = Layers2;
 // slot): a metagraph snapshot is one of the many sealed states a single global tick carries, so it
 // wears the plural cube — distinct from SNAPSHOT_ICON (the ONE global block it anchors into).
 export const METASNAP_ICON: LucideIcon = Boxes;
+
+// THE COMMITTED INSTANT's mark (History's cursor card, 2026-09-19): the crosshair — one moment
+// marked across every plane at once, which is exactly what the timeline's cursor draws. Named
+// like ABOUT_ICON/EXPLORE_ICON: a dedicated non-view mark gets a constant here. Deliberately not
+// the view's own ChartSpline (that is the whole measured history) and not a clock (the subject is
+// a place in the data, not a time of day).
+export const INSTANT_ICON: LucideIcon = Crosshair;
 
 // The COUNTRY drill's mark (the geo focus ladder's country rung — card head, ghost, dock tray):
 // a place pin — distinct from VIEW_ICONS.geo (the whole globe) and the node's Globe mark.

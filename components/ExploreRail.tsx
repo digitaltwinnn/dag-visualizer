@@ -7,6 +7,7 @@ import { filterAccent } from "@/src/data/network";
 import GeoExplore from "@/components/GeoExplore";
 import HyperExplore from "@/components/HyperExplore";
 import LedgerPanel from "@/components/LedgerPanel";
+import TrendExplore from "@/components/TrendExplore";
 import AboutView from "@/components/AboutView";
 import { ABOUT } from "@/components/aboutCopy";
 import RailThread from "@/components/RailThread";
@@ -21,8 +22,9 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // top command bar; the selected-subject dossier now lives in the right rail (`ContextCard`).
 // Every view now leads with a collapsed `AboutView` orientation card, above its ONE tool card
 // (if any): Hypergraph → HyperExplore (network → layer shell → node); Geography → GeoExplore
-// (footprint + node browser); Snapshots → LedgerPanel; the scaffolded views have no tool
-// card, just the About card.
+// (footprint + node browser); Snapshots → LedgerPanel; History → TrendExplore (the view's
+// controls plus its roster of chart planes); the scaffolded views have no tool card, just the
+// About card.
 export default function ExploreRail() {
   const bp = useBreakpoint();
   // growIn arming — the Inspector's laneBooted pattern: the tool slot unmounts entirely on
@@ -78,6 +80,7 @@ export default function ExploreRail() {
           {mode === "hyper" ? <HyperExplore defaultCollapsed={bp === "phone"} />
           : mode === "geo" ? <GeoExplore defaultCollapsed={bp === "phone"} />
           : mode === "ledger" ? <LedgerPanel defaultCollapsed={bp === "phone"} />
+          : mode === "trend" ? <TrendExplore defaultCollapsed={bp === "phone"} />
           : null}
         </div>
       </HeightEase>

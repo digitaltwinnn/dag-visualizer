@@ -233,6 +233,10 @@ export const FOCUS_TUNE_DEFAULTS: Readonly<Record<View3D, Readonly<FocusRow>>> =
   hyper: { dim: 0.32, hide: 0, elem: 0.38, back: 0.41, boost: 1.1, grow: 0.28 },
   geo: { dim: 1.0, hide: 1, elem: 0, back: 0.65, boost: 0.7, grow: 0.24 }, // 0.16 → 0.24 (user, 2026-08-30: "same as hyper" — the old value was below noticing in a stack); hyper stays loudest
   ledger: { dim: 0.67, hide: 0, elem: 0, back: 0.55, boost: 0.7, grow: 0.24 }, // dim 0.5 → 0.67 (user export, 2026-08-30): a deeper coloured dim on the other lanes, paired with the DAG core never dimming here at all (Globe._applyDim's ledger rule)
+  // trend: no shared nodes reach this view at all (the fleet parks), so the row is inert in
+  // practice but required to compile — ledger's row COPIED VERBATIM as the starting point
+  // (2026-09-18), same as sceneRig's trend row.
+  trend: { dim: 0.67, hide: 0, elem: 0, back: 0.55, boost: 0.7, grow: 0.24 },
 };
 
 // Measured, not guessed (2026-09-01): the bar rests at 0.12 and the ledger's boost is 0.7, so a
@@ -247,6 +251,7 @@ export const FOCUS_TUNE: Record<View3D, FocusRow> = {
   hyper: { ...FOCUS_TUNE_DEFAULTS.hyper },
   geo: { ...FOCUS_TUNE_DEFAULTS.geo },
   ledger: { ...FOCUS_TUNE_DEFAULTS.ledger },
+  trend: { ...FOCUS_TUNE_DEFAULTS.trend },
 };
 
 export const FOCUS_SHARED: FocusShared = { ...FOCUS_SHARED_DEFAULTS };

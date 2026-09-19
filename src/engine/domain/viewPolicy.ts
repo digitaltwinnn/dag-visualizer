@@ -33,8 +33,14 @@ export interface ViewPolicy {
   //  - globeSurface:   the globe group (shared nodes + earth surface) is visible.
   //  - ledger:         the ledger chamber group is visible (and it keeps the hyper root as its
   //                    metagraph-L0 row).
+  //  - trendGround:    the trends view's GROUND GRID (scene/views/TrendsView) is visible — the one
+  //                    thing that view draws in WebGL, the depth axis its DOM chart planes stand
+  //                    on. A row rather than a `mode === "trend"` in the Engine, because root-group
+  //                    visibility is the Engine's (rule 6) and scene modules are mode-agnostic: the
+  //                    view has to be TOLD it is on, and this allow-list is where a fifth view
+  //                    would answer the same question for itself (convention 7).
   // (There is no skydome/starfield — the scene's solid clear colour + fog are the whole backdrop.)
-  show: { hyperFurniture: boolean; globeSurface: boolean; ledger: boolean };
+  show: { hyperFurniture: boolean; globeSurface: boolean; ledger: boolean; trendGround: boolean };
   // Which mesh pools this view raycasts — resolved to `THREE.Object3D[]` by `Engine._pickablesFor`.
   // Unlisted = pick nothing. Order is immaterial (the raycaster sorts hits by distance).
   pickSources: Array<"globe" | "layers" | "ledger">;
@@ -73,10 +79,23 @@ export interface ViewPolicy {
   // views stay false — numbers beside a `preview` wireframe would be the mixed signal rule 10
   // exists to prevent.
   vitalsLane: boolean;
+  // WHAT the mounted band CONTAINS (2026-09-18). The band is ONE surface with a fixed height and
+  // one set of edges, and `vitalsLane` above says whether it mounts and reserves space — a
+  // question that stays the same. What it HOLDS is a different question, and the trends view
+  // answers it differently: its bottom lane is the shared TIMELINE (the overview track, the brush
+  // that is `trendRange`, the cursor that is `trendCursorMs`, the window pills), not a row of
+  // read-only vitals cells. A row rather than a `mode === "trend"` inside VitalsBand, because
+  // that is the deny-list shape convention 7 exists to prevent: a sixth view would inherit
+  // "vitals" by silence instead of answering for itself. Both presentations (the desktop band and
+  // the phone dock's Vitals sheet) read it through the ONE `ViewCells` dispatch, so a band's
+  // content can never differ between them.
+  bandContent: "vitals" | "timeline";
   // Does this view anchor the SUBJECT CALLOUT (user, 2026-08-15) — the HUD-layer label the Engine
   // positions over the committed subject's projected anchor each frame? Two readers: SceneCallout
   // mounts on it, the Engine's per-frame sync gates on it — one flag, so the label and its
-  // positioning can't disagree. All three 3D views carry it; the flat placeholders stay false.
+  // positioning can't disagree. The three STRUCTURAL 3D views carry it; the flat placeholders stay
+  // false, and so does History — every one of its chart planes already carries its own header
+  // strip, so a floating label over a projected anchor would be a second name for the same thing.
   callout: boolean;
   // Per-view bloom (UnrealBloomPass strength/radius/threshold), applied by the Engine each frame.
   // Hyper/geo run CALMER than ledger on purpose: their dense, bright emitters (the core, hundreds
@@ -96,6 +115,30 @@ export interface ViewPolicy {
   // match the other views without the wash, and the boundary flip becomes a half-step instead of a
   // cliff on chips that are in plain view at the staging grids.
   chipEnv: number;
+  // Does the shared node population get PLACED in this view, or gathered to the staging grids
+  // and faded out? The three structural views place it; the trends view is made of chart planes
+  // and has nowhere honest to put a node, so it reuses the doc overlay's park+fade path
+  // (NodeFabric.tickFleetFade, the DOC_ROLL clock) rather than inventing node poses.
+  fleet: "placed" | "parked";
+  // Which surface the RAW half of the `section` presentation axis shows. `section` is a
+  // PRESENTATION axis — same subject, two presentations — so the answer is per view rather than
+  // one hardcoded surface: the structural views show the records layer, and the trends view
+  // shows the measured-history DOCUMENT, which is its other register (CLAUDE.md convention 12).
+  rawSurface: "records" | "document";
+  // Does this view mount the DOM chart-plane stack (`components/TrendStack.tsx` gates on this —
+  // convention 7: gate on the view a behaviour is FOR, never `mode === "x"`)?
+  chartStack: boolean;
+  // Does the camera idle-ORBIT in this view (OrbitControls.autoRotate)? A row rather than the
+  // `mode !== "geo"` deny-list the Engine carried until 2026-09-18 — which is exactly the shape
+  // convention 7 exists to prevent, and it had already gone wrong: the fourth view inherited
+  // hyper's spin by default and nobody decided it. The question a row makes each view answer is
+  // "is this a thing you LOOK AT, or a thing you READ?" — an idling orbit keeps a structure alive
+  // and shows its far side, and it makes a page of text slide sideways forever.
+  // ⚠️ This is the view's DEFAULT, applied when the destination layout lands. A framing resolver
+  // may still switch the orbit off afterwards for a subject it is aiming at (CameraDirector's
+  // `focusFilter`, the geo node/cohort resolvers) — those are selection state, not view state,
+  // and they are why a row can read `true` while the view's camera is in practice still.
+  autoRotate: boolean;
 }
 
 // The calm bloom the ledger view uses — the reference the design likes (thin lines, sparse
@@ -110,7 +153,7 @@ const FLAT: ViewPolicy = {
   canvas: false,
   morph: "toHyper",
   sims: { arcs: false, hubOrbits: false, globeSpin: false },
-  show: { hyperFurniture: false, globeSurface: false, ledger: false },
+  show: { hyperFurniture: false, globeSurface: false, ledger: false, trendGround: false },
   pickSources: [],
   dofEligible: false,
   countryHover: false,
@@ -119,9 +162,17 @@ const FLAT: ViewPolicy = {
   minPolarAngle: 0.25,
   nodeList: false,
   vitalsLane: false,
+  bandContent: "vitals",
   callout: false,
   bloom: BLOOM_CALM,
   chipEnv: 1,
+  fleet: "placed",
+  rawSurface: "records",
+  chartStack: false,
+  // Never read today — a flat view PARKS the fleet and applies no destination layout, so it is
+  // the only row nothing consults. It keeps the value the old `mode !== "geo"` line would have
+  // given it, so wiring one up later changes nothing by accident.
+  autoRotate: true,
 };
 
 export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
@@ -134,7 +185,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // the unrotated frame) — an idle group spin would rotate the nodes off them. The camera
     // autoRotate provides the motion instead.
     sims: { arcs: false, hubOrbits: true, globeSpin: false },
-    show: { hyperFurniture: true, globeSurface: true, ledger: false },
+    show: { hyperFurniture: true, globeSurface: true, ledger: false, trendGround: false },
     pickSources: ["globe", "layers"],
     // ⚠️ DoF IS BACK (user, 2026-09-13: "add background blur effect again to hyper when a
     // metagraph is selected"). It was dropped on 2026-07-17 because "the bokeh read as FUZZ on
@@ -155,17 +206,27 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // so hyper shares the overview pose with the other views and never needs the pole-crossing relax
     nodeList: true,
     vitalsLane: true,
+    bandContent: "vitals",
     callout: true, // first consumer of the subject callout (rolling out view by view)
     // Calmer than ledger: the core + dense node field piled up an additive bleed on OLED/HDR.
     bloom: { strength: 0.27, radius: 0.32, threshold: 0.14 },
     chipEnv: 1,
+    fleet: "placed",
+    rawSurface: "records",
+    chartStack: false,
+    // TRUE, which is what the old `mode !== "geo"` line gave it — and it stays the row's answer
+    // even though hyper's camera does not in fact idle-orbit today: `CameraDirector.focusFilter`
+    // switches it off for EVERY filter, "all" included, because the structure spins itself
+    // (setHyperSpin) and two rotations over one subject read as neither. The view's default and
+    // the framing's override are different facts and they live in different places.
+    autoRotate: true,
     },
   // Footprint: the holographic globe + travelling packets; picks the globe nodes only.
   geo: {
     canvas: true,
     morph: "toGeo",
     sims: { arcs: true, hubOrbits: false, globeSpin: true },
-    show: { hyperFurniture: true, globeSurface: true, ledger: false },
+    show: { hyperFurniture: true, globeSurface: true, ledger: false, trendGround: false },
     pickSources: ["globe"],
     dofEligible: false,
     countryHover: true, // pointer over a drillable country previews its border (pairs both ways)
@@ -174,11 +235,18 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minPolarAngle: 0.25,
     nodeList: true,
     vitalsLane: true,
+    bandContent: "vitals",
     callout: true, // node > cohort > country anchors; the distributed network rung has none
     // The lowest bloom of the three views: strength drives the "black halo" ring the saturated
     // node/wall hues cast on the globe, and the additive coastal walls read fuzzy under bloom.
     bloom: { strength: 0.20, radius: 0.30, threshold: 0.16 },
     chipEnv: 1,
+    fleet: "placed",
+    rawSurface: "records",
+    chartStack: false,
+    // OFF: the globe does its own spinning (sims.globeSpin) and it turns to face a selection —
+    // a camera orbiting a spinning globe is two rotations fighting over one subject.
+    autoRotate: false,
     },
   // Snapshots: the settlement chamber. Morph frozen (nodes fly into lanes); picks the centred
   // snapshot + the reused producer dots. (The ledger-specific depth-fog recency treatment was
@@ -187,7 +255,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     canvas: true,
     morph: "frozen",
     sims: { arcs: false, hubOrbits: false, globeSpin: false },
-    show: { hyperFurniture: false, globeSurface: true, ledger: true },
+    show: { hyperFurniture: false, globeSurface: true, ledger: true, trendGround: false },
     pickSources: ["ledger", "globe"],
     dofEligible: false,
     countryHover: false,
@@ -197,9 +265,56 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // The Snapshots node browser (LedgerPanel's floor disclosures) reads store.selNodes.
     nodeList: true,
     vitalsLane: true,
+    bandContent: "vitals",
     callout: true, // the pinned snapshot — the lane lead tile, or the global tick's bar
     bloom: BLOOM_CALM, // the reference look the design likes — unchanged
     chipEnv: 0.5, // low, not zero — coplanar trays wash at full sheen, go bland at none (field note)
+    fleet: "placed",
+    rawSurface: "records",
+    chartStack: false,
+    // OFF, and it always was: the chamber's branch in `_applyDestLayout` returns before the
+    // generic line, so `mode !== "geo"` never reached it. The trail reads as a TIME axis running
+    // away from the reader, and an orbit turns that axis into a shape being inspected.
+    autoRotate: false,
+  },
+  // MEASURED HISTORY (2026-09-18) — the charts ARE the scene: DOM planes driven by
+  // TrendStackSync, so almost every engine-side switch here is OFF. The canvas stays on because
+  // TrendsView still owns real WebGL (the shared time cursor and the ground); nothing shared is
+  // shown, nothing is raycast (the planes take DOM clicks and route them through pickActions),
+  // and the fleet parks. No stage light: StagedView is an explicit Extract of the other three,
+  // so claiming one here is a compile error rather than a silent no-op.
+  trend: {
+    canvas: true,
+    morph: "frozen",
+    sims: { arcs: false, hubOrbits: false, globeSpin: false },
+    // The ONE thing shown: the ground grid TrendsView draws, so the DOM chart planes recede over
+    // a visible depth axis instead of floating in a void. Nothing SHARED is shown — no nodes, no
+    // hubs, no chamber.
+    show: { hyperFurniture: false, globeSurface: false, ledger: false, trendGround: true },
+    pickSources: [],
+    dofEligible: false,
+    countryHover: false,
+    minCamDist: 12,
+    minCamAlt: null,
+    minPolarAngle: 0.25,
+    nodeList: false,
+    // The band is MOUNTED but its content is this view's TIMELINE, not the vitals cells — the
+    // reserve it publishes is the same either way, which is why the two are separate rows.
+    vitalsLane: true,
+    bandContent: "timeline",
+    // The planes carry their own headers, so a floating label over a projected anchor would be
+    // a second name for the same thing.
+    callout: false,
+    bloom: BLOOM_CALM,
+    chipEnv: 1,
+    fleet: "parked",
+    rawSurface: "document",
+    chartStack: true,
+    // ⚠️ OFF, and this row is why the field exists (2026-09-18). The planes are TEXT — a chart you
+    // are reading has to hold still, and an idle orbit slid the whole stack sideways forever. It
+    // also defeats `TrendStackSync`'s idle skip outright: a camera that never stops moving means
+    // five DOM style writes every frame, in the one view that already runs five composited layers.
+    autoRotate: false,
   },
   soon: FLAT,
 };

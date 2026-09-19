@@ -305,10 +305,13 @@ export class Globe implements GeoViewHost {
    *  but the shared node pool renders wherever it is parked — which put the fleet grids behind
    *  the document's headline. Sets the FABRIC's own per-frame flag: a one-shot `.visible` write
    *  is overwritten by the cross-fade gating every frame, and the meshes are built lazily, so
-   *  the flag the frame loop folds in is the only write path that holds. The Engine's doc fold
-   *  drives this; picking is already off there (`pickSources: []`). */
-  setFleetVisible(v: boolean): void {
+   *  the flag the frame loop folds in is the only write path that holds. Two requests drive it,
+   *  composed by the Engine's `_fleetFade` (domain/viewTransition.fleetFaded): the doc fold, and a
+   *  view whose policy row PARKS the fleet (2026-09-18). `snap` skips the ease for the boot seed.
+   *  Picking is already off in both cases (`pickSources: []`). */
+  setFleetVisible(v: boolean, snap = false): void {
     this.fabric.fleetTarget = v ? 1 : 0;
+    if (snap) this.fabric.snapFleet();
   }
   private arcs: Arcs;
   private arcSim = new ArcSim();

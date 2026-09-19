@@ -13,6 +13,7 @@ import { createScene, type SceneCtx } from "./scene/SceneContext";
 import { HyperView, type MetaHubRec } from "./scene/views/HyperView";
 import { Globe } from "./scene/Globe";
 import { LedgerView } from "./scene/views/LedgerView";
+import { TrendsView } from "./scene/views/TrendsView";
 import { UNLISTED_KEY } from "./domain/ledgerBands";
 
 // The public catalog's ids — the unknown-lane tile resolver splits listed from unlisted rows.
@@ -27,12 +28,12 @@ import { readSceneColors, type SceneColors, LIGHT_TUNE } from "./sceneColors";
 import { setNodeDimTarget, setNodeEnv } from "./scene/objects/NodeFabric";
 import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme/resolve";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
-import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt } from "./domain/cameraRig";
+import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
-import { ViewTransition, is3D } from "./domain/viewTransition";
-import { gatherBand, type GatherBand } from "./domain/gatherLayout";
+import { ViewTransition, is3D, fleetFaded, fleetHolder, type FleetPlacement } from "./domain/viewTransition";
+import { gatherBand, railGapShiftPx, type GatherBand } from "./domain/gatherLayout";
 import { LADDERS, LEVEL_CARRY, hasLevel, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
 import { metaSnapDeepKey, metaSnapHoverKey } from "@/src/data/types";
@@ -42,6 +43,9 @@ import { snapsAtTick } from "@/src/data/anchorLog";
 import { type Tap, DOUBLE_TAP_SLOP, LONG_PRESS_MS, LONG_PRESS_LINGER_MS, isDoubleTap } from "./domain/tapZoom";
 import { auditInstances, findingKey, type InstanceFinding } from "./scene/instanceAudit";
 import { CalloutSync, type CalloutState } from "./CalloutSync";
+import { TrendStackSync, type TrendStackState } from "./TrendStackSync";
+import { focusDepth, loneShiftPx, windowCount } from "./domain/trendStack";
+import { trendRoster } from "@/src/data/trendScope";
 import { DevTunePanel } from "./DevTunePanel";
 import { CameraDirector } from "./CameraDirector";
 import type { GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
@@ -100,6 +104,10 @@ const resolveGeo = resolveMissing;
 export class Engine {
   /** The subject callout's per-frame placement — see CalloutSync. */
   private callout!: CalloutSync;
+  /** The trend view's chart planes, projected per frame — see TrendStackSync. */
+  private trendStack!: TrendStackSync;
+  /** This frame's clamped delta (slowmo applied) — read by the DOM-side projectors. */
+  private _frameDt = 0;
   /** The dev tuning panel (?tune / the dev switch) — see DevTunePanel. */
   private devTune!: DevTunePanel;
   /** Camera motion — pose tweens and the double-tap dolly. See CameraDirector. */
@@ -108,6 +116,8 @@ export class Engine {
   private layers: HyperView;
   private globe: Globe;
   private ledger: LedgerView;
+  /** The trends view's WebGL half — its ground grid, and nothing else (scene/views/TrendsView). */
+  private trends: TrendsView;
   // THE stage light — one shared SpotLight the focused view CLAIMS per frame (scene/objects/
   // StageLight). Constructed after the scene exists, so it is assigned in the constructor.
   private _stageLight!: StageLight;
@@ -166,6 +176,11 @@ export class Engine {
   // The DOC overlay's deferred bare-stage hide: armed by the doc fold, applied by the frame loop
   // the first frame the transition is past its OUT phase (see the tick site).
   private _docHideArmed = false;
+  // The DOC overlay's half of the fleet fade, once the hide above has actually fired. The other
+  // half is the destination view's `fleet` policy row, and `_fleetFade` below is the one place
+  // the two compose (domain/viewTransition.fleetFaded) — so closing About over a view that PARKS
+  // the fleet can't hand it back, and closing it over one that places it always does.
+  private _docFleetFaded = false;
   // Set when a 3D→3D retarget reverses straight back to its origin mid-OUT (no boundary will
   // fire, so the held camera never replays a mid-flight commit) — re-resolve focus once the
   // transition settles. See _integrateInputs' completion-edge check below.
@@ -502,6 +517,9 @@ export class Engine {
     // config colour ("dag" included — its own brand hue, distinct from structural cyan; see
     // palette/identity.ts). refreshMeta below refreshes/extends both once the live set is known.
     this.ledger = new LedgerView(this.ctx.scene, colors, this._sceneColorMap, this._stageLight);
+    // The trends GROUND — static furniture, built once. It takes no identity map and no stage light:
+    // the view draws no per-network geometry and stages no light (StagedView excludes it).
+    this.trends = new TrendsView(this.ctx.scene, colors);
 
     const engineSelf = this;
     // Bound ONCE (rule 5: nothing per frame). The host carries the stable view refs plus getters
@@ -518,6 +536,25 @@ export class Engine {
       sameSubjectFlight: () => this._sameSubjectFlight,
       calloutAllowed: () => this._policy.callout,
       dofMeta: () => this._dofMeta,
+    });
+    // The trend stack's projector — CalloutSync's sibling, bound the same way (rule 5: the host is
+    // built ONCE, its getters carry the few values that change). It owns no DOM query of its own:
+    // element resolution is this host's, so `querySelector` stays in the one layer that touches the
+    // document and the projector can be tested with no DOM at all.
+    this.trendStack = new TrendStackSync({
+      camera: this.ctx.camera,
+      width: () => this.ctx.renderer.domElement.clientWidth || window.innerWidth,
+      height: () => this.ctx.renderer.domElement.clientHeight || window.innerHeight,
+      dt: () => this._frameDt,
+      plane: (id) => this._planeEl(id),
+      root: () => this._trendRoot(),
+      // Convention 7: the policy flag, never a `mode === "trend"` compare. The second clause is the
+      // callout's own judgement — a view mid-transition has a camera in flight and furniture still
+      // building, so a plane placed against that pose is placed against nothing yet. `furnitureAlpha`
+      // completes on FURN_IN (1s into the IN phase), not at the end of the ~3.9s choreography, so the
+      // stack arrives with the room rather than long after it.
+      active: () =>
+        this._policy.chartStack && is3D(this.mode) && this.transition.furnitureAlpha(this.mode) > 0.999,
     });
     this.cam = new CameraDirector({
       ctx: this.ctx,
@@ -656,6 +693,12 @@ export class Engine {
     this.mode = s.docPage || s.docClosing ? "soon" : s.mode;
     this.filter = s.filter;
     this.cohortSel = s.cohort;
+    // A BOOT straight into a view that parks the fleet seeds the fade rather than easing it: the
+    // node meshes are built lazily, when the first poll lands, so an ease from full would flash a
+    // partly-lit fleet into a view with no poses for it — the very pop the fade exists to remove.
+    // The doc overlay's own cold boot is NOT this case: its bare stage is armed below and applied
+    // by the frame loop, which keeps the ease it has always had.
+    this._fleetFade(null, VIEW_POLICIES[this.mode].fleet, true);
     // A cold doc boot arms the bare-stage hide; the frame loop applies it (no OUT phase runs).
     this._docHideArmed = s.docPage != null;
     // Booting straight into geo (deep link / persisted view): seed morph=1 so the boot layout
@@ -667,7 +710,7 @@ export class Engine {
     // view — user 2026-07-17: accepted as the boot animation, final layout is correct). A
     // flat/"soon" boot parks the fleet at the grids instead; the first 3D view entered later
     // runs step 2 from there — one choreography everywhere.
-    if (this.mode === "hyper" || this.mode === "geo" || this.mode === "ledger") this.transition.settle(this.mode);
+    if (is3D(this.mode)) this.transition.settle(this.mode);
     else this.transition.stageInstant();
     this.unsub.push(
       useStore.subscribe((st, prev) => {
@@ -700,7 +743,10 @@ export class Engine {
             // the fleet's DOC_ROLL fade-in runs concurrently with the doc's own roll-out — both
             // on the one clock — so the grids stand fully lit the moment the document is gone,
             // ready for the entry flight that begins then.
-            this.globe.setFleetVisible(true);
+            this._docFleetFaded = false;
+            // …but only the DOC's half is released: the view underneath may be one that parks
+            // the fleet, and there the reveal never comes (fleetFaded composes the two).
+            this._fleetFade(VIEW_POLICIES[this.mode].fleet, VIEW_POLICIES[st.mode].fleet);
           }
         }
         // The engine learns of a theme flip the one allowed way (spec §3). The CSS has already
@@ -755,6 +801,14 @@ export class Engine {
           if (st.composition) useStore.getState().setComposition(null);
           // A metagraph snapshot belongs to exactly ONE network, so a switch can only orphan it.
           if (st.metaSnap) useStore.getState().setMetaSnap(null);
+          // …and the History view's PLANE FOCUS goes with them (2026-09-18). It is view-local
+          // emphasis rather than a ladder rung, but it is finer than a network by construction —
+          // it names ONE chain's chart — and the filter SCOPES the stack to a single plane, so a
+          // focus left standing either points at a plane that is no longer shown or silently
+          // re-lifts one when the filter clears. Clearing it here is also what keeps the camera to
+          // ONE move: the clear and the filter's own resolve agree on the destination, where a
+          // surviving focus made the roster's later arrival a second, contradicting flight.
+          if (st.trendFocus) useStore.getState().setTrendFocus(null);
           this.applyFilter();
           // (Committing a METAGRAPH in the ledger turns LIVE MODE on for it — the
           // FollowController owns that flow now, 2026-08-07: following flips true and
@@ -785,6 +839,47 @@ export class Engine {
         }
         // The selected node card (geo or hyper) keeps that node's layer shells lit on the globe.
         if (st.inspect !== prev.inspect) this.globe.setSelectedNode(this._pickNodeId(st.inspect));
+        // A PLANE FOCUS is the History view's commit, and the camera answers it like any other
+        // (camera principle 3): the settled pose leans in toward the front of the stack, and
+        // releasing it leans back out. Gated on the policy row for the view the behaviour is FOR
+        // (convention 7) — `chartStack` is the stack's own flag, so a view without planes can
+        // never reach this. Focusing a DIFFERENT plane resolves to the pose already held and is
+        // answered by the nudge, which is what `tweenTo` decides.
+        //
+        // ⚠️ THE TRIGGER IS THE DEPTH **OR** A FOCUS THAT MOVED, and both halves were bugs
+        // (2026-09-18, one found live, one in review). They pull in opposite directions:
+        //
+        //   · Watching `trendFocus` ALONE resolved against state the stack had not caught up with.
+        //     The depth is decided by FOUR channels — the focus, the published ROSTER, the LAYOUT
+        //     and the paging SCROLL — so a filter commit, which scopes the roster one React commit after the store
+        //     write this subscription reads, left the camera leaning toward a plane the scoped
+        //     stack no longer shows (measured: the single plane sat at 1.085× its resting
+        //     projection with nothing lifted).
+        //   · Watching the DEPTH alone silently dropped the commit that needs the NUDGE. Moving a
+        //     focus from plane A to plane B leaves the depth at `FOCUS_LEAN` either way, so the
+        //     guard never fired, `_resolveFocus` never ran, and `tweenTo` — where the nudge is
+        //     decided — was never entered. A click that visibly re-stacked the planes was answered
+        //     by a camera that did not move at all, which is the dead-click reading camera
+        //     principle 3 exists to prevent.
+        //
+        // So: resolve when the depth CHANGED (a real flight in or out), or when a standing focus
+        // MOVED (same pose, hence the nudge). The depth is computed only when one of its four
+        // inputs actually changed.
+        // ⚠️ AND THE SCROLL IS ONE OF THE DEPTH'S INPUTS (2026-09-19). The pager does not clear
+        // the focus, so paging a focused plane out of the visible window leaves the focus standing
+        // with nothing re-dealt — `focusDepth` answers 0 there now, and watching `trendScroll` is
+        // what lets the camera lean back OUT on that page and back IN when the plane returns.
+        // Exactly one resolve each way: with no focus standing both depths are 0 and paging moves
+        // no camera at all.
+        if (
+          (st.trendFocus !== prev.trendFocus || st.trendIds !== prev.trendIds ||
+            st.trendScroll !== prev.trendScroll) &&
+          VIEW_POLICIES[st.mode].chartStack
+        ) {
+          const was = focusDepth(prev.trendIds, prev.trendFocus, prev.trendScroll);
+          const now = focusDepth(st.trendIds, st.trendFocus, st.trendScroll);
+          if (now !== was || (now !== 0 && st.trendFocus !== prev.trendFocus)) this._resolveFocus();
+        }
         // A node commit is answered by the camera in every 3D view (user, 2026-08-13). The pose is
         // the view's own business: geo flies to the node, hyper and the ledger resolve to a pose
         // they may already hold and answer with the NUDGE (_tweenTo). Hyper had no branch here at
@@ -955,6 +1050,10 @@ export class Engine {
     setNodeDimTarget(this._colors);
     this._pushSceneColors();
     for (const m of this._colorConsumers) m.setColors(this._colors);
+    // The trends ground takes the STRUCTURAL palette only and is deliberately NOT a
+    // `_colorConsumers` member: that list's contract is both setters, and the grid names no
+    // network, so a no-op `setSceneColors` would be ceremony standing in for a fact.
+    this.trends.setColors(this._colors);
     this._bloomMul = theme === "light" ? LIGHT_TUNE.bloomMul : 1;
   }
 
@@ -1130,6 +1229,14 @@ export class Engine {
 
   // ---- view + filter (ports ui.setMode / _applyFilter / camera focus) ----
 
+  // The fleet's one visibility write path (domain/viewTransition.fleetFaded decides). `leaving` is
+  // the view being left while it still owns the gathered fleet — null at the boundary, where the
+  // destination has taken it over. Called at exactly two moments per switch plus the doc fold's
+  // two edges, so the doc's bare stage and a parked view's row can never stomp each other.
+  private _fleetFade(leaving: FleetPlacement | null, entering: FleetPlacement, snap = false): void {
+    this.globe.setFleetVisible(!fleetFaded(leaving, entering, this._docFleetFaded), snap);
+  }
+
   setMode(mode: Mode) {
     const prevMode = this.mode; // capture BEFORE the reassignment — the choreography branches on it
     this.mode = mode;
@@ -1214,6 +1321,14 @@ export class Engine {
         this._pendingBoundary = mode;
       }
     }
+    // THE PARKED FLEET, at the switch moment: entering a view with nowhere to put a node starts
+    // the fade NOW, so it completes inside the shorter OUT phase and the group hides over nothing;
+    // leaving one HOLDS the fade, and the reveal waits for the boundary, where the fleet stands at
+    // the grids. Read off the policy rows, never a mode compare (convention 7). AFTER the branch
+    // above, because `fleetHolder` reads the phase the machine settled into: a switch that will
+    // reach no boundary (the reverse-to-origin retarget, place()'s "immediate") releases the hold
+    // here, exactly as its boundary would have, or the hold never lifts.
+    this._fleetFade(fleetHolder(this.transition.phase, VIEW_POLICIES[prevMode].fleet), policy.fleet);
   }
 
   // The boundary-equivalent layout application: morph snapped to the destination's value +
@@ -1227,6 +1342,11 @@ export class Engine {
     // and flips HERE, not at switch time, so the from-view's chips hold their look through the
     // visible OUT phase (the setSimFlags orientation rule).
     this.globe.setChipEnv(VIEW_POLICIES[dest].chipEnv);
+    // …and the fleet's own fade flips on the same frame, for the same reason: the from-view held
+    // it through the visible OUT phase, and from here the DESTINATION's row owns it alone — so a
+    // placed view reveals the fleet at the grids for its entry flight, and a parked one leaves
+    // nothing to pop when the group hides.
+    this._fleetFade(null, VIEW_POLICIES[dest].fleet);
     // ledger snaps nothing — it freezes morph at the source view's value.
     // Bring the DESTINATION's frame state up BEFORE any framing math reads it: the hyper
     // root's scale is still collapsed from geo's morph 1 at this instant (a hub
@@ -1245,7 +1365,7 @@ export class Engine {
   // blocks; the ledger LAYOUT snaps (globe.applyLedgerLayout + layers.setLedger's hard hide) belong
   // at the boundary so the hyper furniture FADES out under the alpha instead of vanishing at switch
   // time, and the camera flies during the IN phase rather than at transition start.
-  // Reached ONLY via _applyBoundary, whose `dest` is always a 3D view (hyper/geo/ledger) —
+  // Reached ONLY via _applyBoundary, whose `dest` is always a 3D view (hyper/geo/ledger/trend) —
   // flat/"soon" views never route here (they PARK the fleet and never apply a destination
   // layout, see setMode's !is3D branch). So there is no flat-view reset case below.
   // The per-view owner of the subject-arrival beat (see _applyDestLayout's note).
@@ -1281,7 +1401,10 @@ export class Engine {
     if (mode === "ledger") {
       this.layers.focusId = null;
       this.globe.focusDensest(false);
-      this.ctx.controls.autoRotate = false;
+      // The same per-view row the generic branch below reads — this branch returns early, so it
+      // needs its own write, but not its own OPINION (the hardcoded `false` here is what the
+      // `mode !== "geo"` line never actually reached; convention 8, one home).
+      this.ctx.controls.autoRotate = VIEW_POLICIES[mode].autoRotate;
       this.globe.setFilter(this.filter); // dim non-selected metagraph columns (no camera move)
       this.ledger.setFilter(ledgerLens(this.filter)); // the chamber's COLOURED dim, through the ledger's lens (dag = the whole chamber)
       this._refreshLedger();
@@ -1291,8 +1414,15 @@ export class Engine {
       this._resolveFocus();
       return;
     }
-    // hyper / geo (ledger returned above; flat views never reach here — see the method note):
-    this.ctx.controls.autoRotate = mode !== "geo";
+    // hyper / geo / trend (ledger returned above; flat views never reach here — see the method
+    // note). trend falls through this generic branch too: applyFilter/_commitViewEntryAncestry
+    // are both gated to hyper/geo internally and no-op for it (no shared nodes to dim or carry
+    // ancestry for), and _resolveFocus still lands the camera correctly — LADDERS.trend has its
+    // own rungs and resolvers, both landing on `FOCI.trend` plus its focus lean.
+    // Convention 7: the per-view row, never a deny-list. `mode !== "geo"` sat here until
+    // 2026-09-18 and had already gone wrong — the trends view inherited hyper's idle spin by
+    // default, which slid a page of charts sideways forever and kept the projector awake.
+    this.ctx.controls.autoRotate = VIEW_POLICIES[mode].autoRotate;
     this.applyFilter(false); // apply the filter's visuals, but leave the camera to _resolveFocus
     // The carried node's ancestry for THIS view (country + provider in geo, the composition
     // group in hyper) — committed before the focus walk, so the finer node rung still wins the
@@ -1495,12 +1625,42 @@ export class Engine {
       this.cam.tweenTo(this.cam.out.pos, this.cam.out.target);
       return true;
     },
+    // The History view has ONE camera POSE, exactly as the Snapshots chamber does — `FOCI.trend`,
+    // the frontal resting pose — with ONE state-keyed variation, the focus LEAN below. The network
+    // rung has no pose of its own and inherits its parent's (camera principle 2): with a filter
+    // committed the stack holds a single plane, which `stackPoses` already CENTRES, so there is
+    // nothing left for a camera to say about it.
+    trendNetwork: () => this._resolvers.trendOverview(),
+    trendOverview: () => {
+      // The lean is keyed on the committed FOCUS, like the ledger's tilt is keyed on the filter, so
+      // both rungs inherit it by delegating here and releasing the focus tweens back out on its own.
+      // ⚠️ LAYOUT DATA (rule 6): `focusDepth` reads the published roster, the committed focus and
+      // the SCROLL — exactly the three things `stackPoses` places the planes from — never a
+      // projected plane or a scene matrix. An off-roster focus answers 0, and so does one the
+      // visible window does not hold (nothing is re-dealt there), which is the resting pose exactly.
+      const st = useStore.getState();
+      const depth = focusDepth(st.trendIds, st.trendFocus, st.trendScroll);
+      if (depth === 0) {
+        this.cam.focus("trend");
+        return true;
+      }
+      const f = FOCI.trend;
+      trendFocusPush(f.pos, f.target, depth, this.cam.out.pos);
+      this.cam.out.target.copy(f.target);
+      // DOLLIED like every resting pose: this pose's target IS its subject — the stack's own front,
+      // which the resting aim was tuned against — so there is no composed look-at to exempt it from
+      // `dollyBack` / `railsLean` / `aspectFit` (the ⚠️ next to CAM_ZOOM). And a commit that lands on
+      // the pose already held — focusing plane B while A is focused — takes the NUDGE, since the
+      // lean is the same wherever the focus points (camera principle 3, applied by `tweenTo`).
+      this.cam.tweenTo(this.cam.out.pos, this.cam.out.target);
+      return true;
+    },
   };
 
 
   // Resolve the camera for the CURRENT selection state by walking the current view's ladder  // (domain/focusLadder.LADDERS) — the one entry point every selection-driven camera flight
   // goes through (a filter/country/cohort/layer/inspect change, a view switch, a transition
-  // boundary). No-ops outside the three 3D views.
+  // boundary). No-ops outside the 3D views.
   //
   // `from` starts the walk at a COARSER rung, skipping the finer ones: the rail's boxed rung asking
   // to be framed (store.focusRung). Same rungs, same resolvers, same poses a row click lands on —
@@ -1515,7 +1675,7 @@ export class Engine {
     this._freeOrbit = false;
     this._sameSubjectFlight = false;
     const st = useStore.getState();
-    if (this.mode !== "hyper" && this.mode !== "geo" && this.mode !== "ledger") return;
+    if (!is3D(this.mode)) return;
     const sel: SelectionSnapshot = {
       inspectIsNode:
         !!st.inspect && (st.inspect.kind === "l0" || st.inspect.kind === "l1" || st.inspect.kind === "metanode"),
@@ -1820,6 +1980,10 @@ export class Engine {
       this.stats?.begin();
       this.clock.update(); // Timer: advance once per frame before reading the delta
       const dt = Math.min(this.clock.getDelta(), 0.05);
+      // Published for the DOM-side projectors, which ease on their own clock rather than through a
+      // phase argument. `?slowmo` divides it exactly as the choreography's tick does, so the debug
+      // flag stretches the stack's travel with everything else instead of leaving it at full speed.
+      this._frameDt = dt / this._slowmo;
       // ---- THE FRAME ORDER CONTRACT (spec C#1) -------------------------------------------
       // Phases run in this order and NOTHING may mutate a pose after the phase that derives
       // from it: inputs/boundary → camera → motion (spin/rotation) → derived frames (staging
@@ -1882,7 +2046,8 @@ export class Engine {
     // fleet mid-flight.
     if (this._docHideArmed && this.transition.phase !== "out") {
       this._docHideArmed = false;
-      this.globe.setFleetVisible(false);
+      this._docFleetFaded = true;
+      this._fleetFade(null, VIEW_POLICIES[this.mode].fleet);
       // The same boundary frame releases the document's entrance (store.docStageReady) — the
       // fleet blinking off and the prose rising are one moment, on the choreography's own clock.
       useStore.getState().setDocStageReady(true);
@@ -2008,6 +2173,30 @@ export class Engine {
     this.layers.setViewAlpha(hyperAlpha);
     const ledgerAlpha = this.transition.furnitureAlpha("ledger");
     this.ledger.setViewAlpha(ledgerAlpha);
+    // The trends ground rides the same channel — it is furniture, so it builds and tears down with
+    // the room like hyper's hoops and the chamber's labels.
+    const trendAlpha = this.transition.furnitureAlpha("trend");
+    this.trends.setViewAlpha(trendAlpha);
+    // The rungs are billboards like the cards above them — re-laid along the camera's right vector
+    // (a no-op while the camera's orientation holds still, and skipped while the view is dark).
+    // One rung per card that is there, and a lone card's rung takes the card's own screen shift.
+    if (trendAlpha > 0.001) {
+      // The published window when there is one; until React publishes (boot, a refetch) the count
+      // the SCOPE will hold — so the room is built around the floor it is about to have, and a
+      // scope with nothing to draw (`dag`, unlisted: `trendRoster` is empty) draws no floor at all
+      // under the sentence that says so.
+      const n = useStore.getState().trendIds.length;
+      if (n === 0 && this._scopeFor !== this.filter) {
+        this._scopeFor = this.filter;
+        this._scopeCount = trendRoster(this.filter).length; // event-time: once per filter, never per frame
+      }
+      const count = windowCount(n > 0 ? n : this._scopeCount);
+      const shift = loneShiftPx(count, railGapShiftPx(window.innerWidth, this.railsHidden));
+      // The canvas height is only read while a shift needs converting — it is a layout read.
+      const viewH = shift !== 0 ? this.ctx.renderer.domElement.clientHeight || window.innerHeight : 0;
+      // `_frameDt`, the projector's own clock (`?slowmo` included), so floor and cards ease as one.
+      this.trends.face(this.ctx.camera, count, shift, viewH, this._frameDt);
+    }
     // The stage light's per-view PRESENCE, published BEFORE the view updates that claim it: a claim
     // is scaled by its view's furniture alpha, so a fading view's light fades with its furniture and
     // a dark view's claim is worth nothing. That is the whole off-switch — not claiming IS off.
@@ -2054,9 +2243,10 @@ export class Engine {
       this.layers.root.visible = show.ledger; // ledger: hubs become the metagraph-L0 row; flat: hidden
       this.layers.coreGroup.visible = false;
     }
-    // True for all three 3D views (the shared nodes never blink out mid-flight); the flat
-    // "soon" views set it false, but the PARKED staging grids live in this group too — the
-    // active/staged machine keeps it visible so the fleet shows above the Blueprint.
+    // True for the three views that PLACE the shared fleet (the nodes never blink out
+    // mid-flight). History PARKS it instead (`viewPolicy.fleet`) and the flat "soon" views set it
+    // false — but the parked staging grids live in this group too, so the active/staged machine
+    // keeps it visible through a transition and the fleet shows above the Blueprint.
     this.globe.group.visible = show.globeSurface || this.transition.active();
     // The geo SURFACE subtree hard-hides as one unit whenever its fades are fully out (settled
     // ledger/hyper/flat) — the structural fix for the invisible-but-depth-writing furniture class
@@ -2070,6 +2260,17 @@ export class Engine {
     const ledgerActive = this.mode === "ledger" ||
       (this.transition.active() && (this.transition.from === "ledger" || this.transition.to === "ledger"));
     this.ledger.group.visible = ledgerActive && ledgerAlpha > 0.001;
+    // The trends ground, on exactly the ledger chamber's rule (and the same two owners: the Engine
+    // writes `visible`, the view owns alpha — rule 6). `show.trendGround` is the policy row, and
+    // BOTH SIDES of the transition read it too (2026-09-19) — the clause said "no mode compare
+    // here" while comparing `from === "trend"` on the very next line, which is convention 7's
+    // deny-list growth in miniature: a second view that drew this ground would have to be
+    // remembered here as well. The clause keeps the grid alive while a switch INTO or OUT OF it is
+    // still animating, or it would blink instead of fading.
+    const groundSide = (m: Mode | null) => m != null && VIEW_POLICIES[m].show.trendGround;
+    const trendActive = this._policy.show.trendGround ||
+      (this.transition.active() && (groundSide(this.transition.from) || groundSide(this.transition.to)));
+    this.trends.group.visible = trendActive && trendAlpha > 0.001;
     if (ledgerActive) {
       if (this._ledgerDirty) this._refreshLedger();
       this.ledger.update(dt);
@@ -2096,6 +2297,9 @@ export class Engine {
     }
 
     this._syncCallout();
+    // The chart planes ride the SETTLED camera, so they are placed here in the scene-write phase —
+    // last, beside the callout, for the same reason: both project this frame's final pose.
+    this._syncTrendStack();
     if (AUDIT_ON) this._auditPass();
   }
   // ---- the instance audit (dev only) -------------------------------------------------------
@@ -2157,6 +2361,48 @@ export class Engine {
     this.callout.sync(c);
   }
 
+  // ---- the trend stack ---------------------------------------------------------------------
+  // The same bridge, for the same reason (see the callout's note above): the Engine reads the store
+  // once and hands the projector the narrow slice it declares. ⚠️ MUTATED, NEVER RE-ALLOCATED —
+  // this runs every frame and `TrendStackSync` copies nothing out of it, so one buffer is safe;
+  // `ids` rides in by REFERENCE, which is the projector's whole change signal (store `trendIds`).
+  /** The scope's own roster size, memoised per filter — what the ground draws before React has
+   *  published a roster (see `_writeScene`). */
+  private _scopeFor: string | null = null;
+  private _scopeCount = 0;
+  private _trendState: TrendStackState = { scroll: 0, focus: null, ids: [], gapShiftPx: 0 };
+  private _syncTrendStack(): void {
+    const st = useStore.getState();
+    const t = this._trendState;
+    t.scroll = st.trendScroll; t.focus = st.trendFocus; t.ids = st.trendIds;
+    t.gapShiftPx = railGapShiftPx(window.innerWidth, this.railsHidden);
+    this.trendStack.sync(t);
+  }
+
+  // The `[data-plane]` anchors, cached per network id. React mounts a plane a COMMIT after the store
+  // change that asks for it and remounts the set when the roster moves, so the cache re-resolves
+  // whenever its element has left the document — the `#callout` getElementById discipline, one level
+  // up because there are five of them. The query itself is event-time, never per frame.
+  // The stack's ROOT, cached the same way and for the same reason. `TrendStackSync` asks for it
+  // whenever its cached one has left the document (a doc overlay unmounts the whole layer), so the
+  // lookup must be a cache miss rather than a per-frame `getElementById`.
+  private _trendRootEl: HTMLElement | null = null;
+  private _trendRoot(): HTMLElement | null {
+    if (this._trendRootEl && this._trendRootEl.isConnected) return this._trendRootEl;
+    this._trendRootEl = document.getElementById("trend-stack"); // event-time
+    return this._trendRootEl;
+  }
+
+  private _planeEls = new Map<string, HTMLElement>();
+  private _planeEl(id: string): HTMLElement | null {
+    const hit = this._planeEls.get(id);
+    if (hit && hit.isConnected) return hit;
+    const el = document.querySelector<HTMLElement>(`#trend-stack [data-plane="${CSS.escape(id)}"]`); // event-time
+    if (el) this._planeEls.set(id, el);
+    else this._planeEls.delete(id);
+    return el;
+  }
+
 
 
 
@@ -2185,6 +2431,7 @@ export class Engine {
     if (useStore.getState().sceneDragging) useStore.getState().setSceneDragging(false);
     if (useStore.getState().cameraFlying) useStore.getState().setCameraFlying(false);
     this.stats?.dom.remove();
+    this.trends.dispose();
     this.devTune.dispose();
     this.unsub.forEach((u) => u());
     cancelAnimationFrame(this.raf);

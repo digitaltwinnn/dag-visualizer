@@ -25,7 +25,7 @@ const BP_SVG = "w-[min(26vw,280px)] h-auto overflow-visible";
 // `preview · in development` eyebrow retired (user, 2026-09-09: the view switch already says
 // "Coming soon").
 // Structural chrome only (blueprint = chrome, not identity); accent/flow lines in cyan. Renders
-// on the empty scene (the canvas hides for the flat view). Not shown for the three 3D views.
+// on the empty scene (the canvas hides for the flat view). Not shown in any 3D view.
 // Each feature keeps the mark it wore as a bar button (Radar / ArrowLeftRight / HandCoins), so
 // the vocabulary survives the consolidation.
 

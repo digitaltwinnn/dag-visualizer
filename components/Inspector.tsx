@@ -27,6 +27,7 @@ import { useTrayActives } from "@/components/useTrayActives";
 import { countryToggleActions, cohortToggleActions, compositionToggleActions } from "@/src/engine/domain/pickActions";
 import { CountryTitle, CountryAside, CountryCard, ProviderTitle, ProviderCard, ProviderAside, CompositionTitle, CompositionCard, CompositionAside } from "@/components/inspector/cards";
 import MetaSnapPane from "@/components/inspector/MetaSnapPane";
+import TrendInstantPane from "@/components/inspector/TrendInstantPane";
 import type { TabSignal } from "@/components/RailDock";
 import type { PickDescriptor } from "@/src/data/types";
 import type { Mode } from "@/src/store/store";
@@ -284,7 +285,7 @@ function CompositionPane({ sel, onClose, collapsed, onToggle }: { sel: Compositi
 // same single source of truth the dock trays read.
 const GHOST_EYEBROW: Record<string, string> = {
   context: "Metagraph", country: "Country", cohort: "Provider", composition: "Composition", node: "Node", snap: "Global snapshot",
-  metaSnap: "Metagraph snapshot",
+  metaSnap: "Metagraph snapshot", instant: "Instant",
 };
 export function GhostCard({ card }: { card: RailCard }) {
   const Icon = card.icon;
@@ -356,8 +357,9 @@ export default function Inspector() {
   // survives the dossier ⇄ nothing swap; the manifest only decides its tray-icon presence.
   const selNodes = useStore((s) => s.selNodes);
   const coarse = usePointerCoarse();
+  const trendCursorMs = useStore((s) => s.trendCursorMs);
   const manifest = detailsCards({
-    mode, filter, inspect, snap, country, cohort, composition, metaSnap, coarse,
+    mode, filter, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs,
     selNodesCount: selNodes.length,
     filterLabel: displayNetwork(filter)?.ticker ?? null, // one lookup — catalog + the unlisted pseudo-network
   });
@@ -441,6 +443,13 @@ export default function Inspector() {
     cohort ? `${cohort.cc}|${cohort.city}|${cohort.isp}` : "",
     composition ? `${composition.netId}|${composition.key}` : "",
     inspect ? hoverKeyOf(inspect) ?? "" : "",
+    // HISTORY'S OWN SUBJECT (2026-09-19). Picking an instant is a new selection moment like any
+    // other, and it has to be IN this key or the mode-entry snapshot below pins the cursor card
+    // shut forever: that snapshot writes `instant: true` on arrival (the slot is not yet present),
+    // and nothing else in this view is a selection change that would drop it. Unguarded on
+    // purpose, unlike the two live-advancing ordinals above — a cursor never advances by itself,
+    // and the timeline writes it at most once per bucket.
+    trendCursorMs ?? "",
     // While FOLLOWING, the auto-advancing ordinals are NOT a new selection moment — the heartbeat
     // must not drop the user's +/− overrides every ~4s (item 8; advanceSnap already keeps the
     // recency stack still for the same reason). Guards BOTH live-advanced cards: the global
@@ -536,6 +545,13 @@ export default function Inspector() {
     ),
     snap: snap ? (
       <CardPane key="snap" pick={snap} eyebrow="Global snapshot" onClose={() => applyClickActions([{ kind: "snapshot", pick: null }])} {...cx("snap")} />
+    ) : null,
+    // History's committed INSTANT: a card slot with no ladder rung, so its × clears its own
+    // channel and nothing cascades. It is NOT a selection write (`setTrendCursor` is deliberately
+    // outside the pickActions table — see selectionBoundary.test.ts's scope note), so it calls
+    // the setter rather than the executor.
+    instant: trendCursorMs != null ? (
+      <TrendInstantPane key="instant" onClose={() => useStore.getState().setTrendCursor(null)} {...cx("instant")} />
     ) : null,
     // The metagraph-snapshot tile: a card slot with no ladder rung (spec §7.1), so its × just
     // clears its own channel — there is no coarser rung for it to step back to.

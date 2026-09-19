@@ -14,7 +14,7 @@ import PresentationToggle from "@/components/topbar/PresentationToggle";
 import SettingsMenu from "@/components/topbar/SettingsMenu";
 import { NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
 import { useBreakpoint } from "@/components/useBreakpoint";
-import { DOC_PAGES, VIEWS, docReadsFilter } from "@/components/views";
+import { DOC_PAGES, VIEWS } from "@/components/views";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import type { Mode } from "@/src/store/store";
 
@@ -39,14 +39,14 @@ export default function TopBar() {
   // closes the doc and lands in the view), theme and network stay — they are the overlay's
   // chrome as much as the app's.
   //
-  // ⚠️ …EXCEPT WHERE THE DOC ITSELF READS THE FILTER (user, 2026-09-14 — Trends is a document
-  // made of per-network charts). The reason the filter hid was that it acted unseen, and over a
-  // scoped doc it does not: it cuts the charts the reader is looking at. So the gate is the
-  // doc's own `scoped` flag (views.ts, which carries the full rationale) and the bar keeps its
-  // ordinary face there. The PRESENTATION pair still stands down under every doc — SCENE and
-  // RAW act on the layer the overlay covers, scoped or not.
+  // ⚠️ THE GATE IS "IS A DOC OPEN", PLAINLY, AND IT IS THE HONEST CONDITION AGAIN (2026-09-18).
+  // It briefly carried an exception for a doc that READ the filter — the Trends document, made
+  // of per-network charts, where the chips cut what the reader was looking at. That document is
+  // the History view's RAW register now, and a raw layer is not an overlay: the bar keeps its
+  // whole ordinary face over it, filter included, exactly as it does over the anchor log. The
+  // exception had no second user, so it left with the doc (views.ts records the flags' removal).
   const doc = useStore((s) => s.docPage);
-  const filterOff = doc != null && !docReadsFilter(doc);
+  const filterOff = doc != null;
   // The presentation pair is VIEW-SCOPED (SCENE⇄HUD and RAW act on the 3D view under the bar),
   // so it stands down wherever there is no such view: a doc overlay, or the flat "soon" view
   // (gated on the policy's own canvas flag, convention 7 — never a mode list).
@@ -65,12 +65,10 @@ export default function TopBar() {
     if (bp === "phone") setStrip(null);
   }, [bp]);
 
-  // A doc overlay opening closes whichever strip is grown — the strip previews the scene the
-  // overlay is about to cover. A SCOPED doc keeps the filter strip open: there the chips act on
-  // the document itself, so the strip is not previewing anything that went away. The PULSE strip
-  // closes under every doc — it reports the feeds behind the live scene.
+  // A doc overlay opening closes whichever strip is grown — both strips describe the scene the
+  // overlay is about to cover (the chips preview a dim; the pulse reports the feeds behind it).
   useEffect(() => {
-    if (doc) setStrip((cur) => (cur === "filter" && docReadsFilter(doc) ? cur : null));
+    if (doc) setStrip(null);
   }, [doc]);
 
   // Consume the NetworkSwitch's one-shot view handoff (see its header): a network switch is a

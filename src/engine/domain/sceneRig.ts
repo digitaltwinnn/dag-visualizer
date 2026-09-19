@@ -86,6 +86,18 @@ export const SCENE_RIG: Record<View3D, RigRow> = {
     rimAz: 2.7, rimEl: 0.5, rimInt: 0.7, rimTemp: -0.9,
     ambInt: 0.42, ambTemp: -1,
   },
+  // trend — NOTHING here is lit. The view's only WebGL object is the ground's hairline
+  // `LineBasicMaterial`, which is unlit by construction, and every chart plane is DOM composited
+  // over the canvas. So this row is inert today and exists to keep the blend well-formed: the rig
+  // blends by view presence, and a missing row would have the gather boundary reading a neighbour's
+  // look. Ledger's row verbatim (2026-09-18) — a low, neutral wash, which is the right shape for
+  // whatever lit geometry this view might gain.
+  trend: {
+    keyAz: 0.8, keyEl: 0.6, keyInt: 1.45, keyTemp: -0.2,
+    fillAz: 0.3, fillEl: 0.15, fillInt: 0.42, fillTemp: -0.95,
+    rimAz: 2.7, rimEl: 0.5, rimInt: 0.7, rimTemp: -0.9,
+    ambInt: 0.42, ambTemp: -1,
+  },
 };
 
 /** THE GROUND'S OWN ANSWER — per-channel multipliers over whichever row won the frame.
@@ -125,6 +137,7 @@ export const SCENE_RIG_DEFAULTS: Readonly<Record<View3D, RigRow>> = {
   hyper: { ...SCENE_RIG.hyper },
   geo: { ...SCENE_RIG.geo },
   ledger: { ...SCENE_RIG.ledger },
+  trend: { ...SCENE_RIG.trend },
 };
 
 export const RIG_PAPER_DEFAULTS: Readonly<RigGround> = { ...RIG_PAPER };

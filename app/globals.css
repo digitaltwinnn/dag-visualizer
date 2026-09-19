@@ -900,6 +900,19 @@
 }
 :root[data-theme="light"] { --ident-l: 0.58; --ident-c: 0.19; }
 
+/* The History planes' area fill — the SAME number exception (an opacity is not a <color>, so
+   light-dark() cannot carry it). It is the gradient's TOP stop, at the line itself; the bottom
+   stop is 0 at the baseline, so the fill reads as light rather than as a slab. Paper is lower
+   because the hue is INK there: the same presence that reads as a quiet tint on the dark card
+   reads as a painted block on the light one (a card's face is `--panel-solid` over the opaque
+   `--scene-ground`). A token rather than a number: the ground's L is that token's to state, and
+   a transcribed one goes stale the next time it is tuned. */
+:root { --trend-fill-top: 0.30; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) { --trend-fill-top: 0.18; }
+}
+:root[data-theme="light"] { --trend-fill-top: 0.18; }
+
 /* Network accent override — stamped on <html> before first paint by the inline script in
    app/layout.tsx. Mainnet has no rule on purpose (byte-identical CSS). --primary-foreground
    is unchanged for all three (contrast verified in the design). */

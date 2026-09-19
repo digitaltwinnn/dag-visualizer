@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ViewTransition, is3D, DUR_OUT, DUR_IN, FURN_IN, STAGGER_SPREAD, DOC_ROLL } from "./viewTransition";
+import { ViewTransition, is3D, fleetFaded, fleetHolder, DUR_OUT, DUR_IN, FURN_IN, STAGGER_SPREAD, DOC_ROLL, type FleetPlacement } from "./viewTransition";
 
 const settled = (v: "hyper" | "geo" | "ledger" = "hyper") => {
   const tr = new ViewTransition();
@@ -286,5 +286,74 @@ describe("settleAlpha (the nodes' own arrival ramp)", () => {
     expect(mid).toBeLessThan(0.8);
     tr.tick(10); // run the IN phase out
     expect(tr.settleAlpha("geo")).toBe(1);
+  });
+});
+
+// THE PARKED FLEET (2026-09-18). A view whose policy parks the fleet has nowhere honest to put a
+// node, so the shared population fades out on the DOC_ROLL clock instead of being placed. These
+// pin the COMPOSITION — the doc overlay's bare stage and a parked view are two requests for the
+// same fade, and neither may stomp the other — and the two moments the Engine applies it at.
+describe("fleetFaded (the parked fleet's one composition point)", () => {
+  // The whole truth table, enumerated: leaving ∈ {placed, parked, null} × entering ∈
+  // {placed, parked} × docFaded ∈ {false, true}. `leaving` is the view still holding the gathered
+  // fleet (the switch moment) and null once the boundary has handed it over.
+  const TABLE: [FleetPlacement | null, FleetPlacement, boolean, boolean, string][] = [
+    ["placed", "placed", false, false, "an ordinary switch never touches the fleet"],
+    ["placed", "parked", false, true, "ENTERING a parked view: fade from the click"],
+    ["parked", "placed", false, true, "leaving one: HOLD the fade, no pop-in at stale poses"],
+    ["parked", "parked", false, true, "parked → parked stays away"],
+    [null, "placed", false, false, "at the boundary a placed view reveals at the grids"],
+    [null, "parked", false, true, "at the boundary a parked view leaves nothing to pop"],
+    ["placed", "placed", true, true, "the doc's bare stage over a placed view"],
+    ["placed", "parked", true, true, "…and it can't un-park a parked destination"],
+    ["parked", "placed", true, true, "the doc wins while a parked view is being left"],
+    ["parked", "parked", true, true, "both halves agree"],
+    [null, "placed", true, true, "the doc holds the fade through a boundary"],
+    [null, "parked", true, true, "both halves agree at the boundary too"],
+  ];
+  for (const [leaving, entering, docFaded, want, why] of TABLE) {
+    it(`${String(leaving)} → ${entering}${docFaded ? " (doc open)" : ""} ⇒ ${want ? "faded" : "shown"} — ${why}`, () => {
+      expect(fleetFaded(leaving, entering, docFaded)).toBe(want);
+    });
+  }
+
+  it("the entering fade completes inside the OUT phase, so nothing is left to pop", () => {
+    // Relation, not numbers: the fade starts at the click and the group hides at the boundary.
+    expect(DOC_ROLL).toBeLessThan(DUR_OUT);
+  });
+});
+
+// A switch that reaches NO boundary must resolve the fleet exactly as its boundary would have —
+// the rule `fleetHolder` states, and the bug it was written for: a reverse-to-origin retarget
+// (Hypergraph → History → Hypergraph mid-gather) flips the machine straight to IN with no boundary
+// tick, so the hold "leaving a parked view" put on the fade was never released and the fleet sat
+// invisible in the view it came back to.
+describe("fleetHolder (who still owns the gathered fleet after a switch)", () => {
+  it("keeps the from-view's hold while the gather is still running", () => {
+    expect(fleetHolder("out", "parked")).toBe("parked");
+    expect(fleetHolder("out", "placed")).toBe("placed");
+  });
+
+  it("keeps it while PARKED at the grids — a flat view fires no boundary by design", () => {
+    expect(fleetHolder("staged", "parked")).toBe("parked");
+    expect(fleetHolder("staged", "placed")).toBe("placed");
+  });
+
+  it("releases it the moment the machine is already dispersing (no boundary will fire)", () => {
+    // Both no-boundary paths land here: the reverse-to-origin retarget and place()'s "immediate".
+    expect(fleetHolder("in", "parked")).toBe(null);
+    expect(fleetHolder("in", "placed")).toBe(null);
+    expect(fleetHolder("idle", "parked")).toBe("parked"); // no switch in flight — nothing to release
+  });
+
+  it("the reversal ends SHOWN when it returns to a view that places the fleet", () => {
+    // The F1 repro, as one statement: hyper → trend (fade held) → hyper mid-OUT.
+    const tr = new ViewTransition();
+    tr.settle("hyper");
+    tr.start("hyper", "trend");
+    tr.tick(DUR_OUT / 2); // mid-gather, no boundary yet
+    tr.start("trend", "hyper"); // …and back to the origin
+    expect(tr.phase).toBe("in"); // the machine skipped the boundary
+    expect(fleetFaded(fleetHolder(tr.phase, "parked"), "placed", false)).toBe(false);
   });
 });

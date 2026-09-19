@@ -1,11 +1,16 @@
 import type { LucideIcon } from "lucide-react";
-import { ABOUT_ICON, EXPLORE_ICON, iconForPick } from "@/components/icons";
+import { ABOUT_ICON, EXPLORE_ICON, INSTANT_ICON, iconForPick } from "@/components/icons";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import type { Mode } from "@/src/store/store";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
 // LADDERS is plain DATA (the domain focus-ladder rung tables) — importing it keeps this module
 // data-only; CohortSel rides along type-only (the store mirrors the same import).
 import { type FocusLevel, type CohortSel, type CompositionSel } from "@/src/engine/domain/focusLadder";
+// The ONE "is this Mode one of the 3D views" predicate, from the module that owns the type it
+// narrows to (convention 8). It is pure arithmetic over a string, so it keeps this module
+// data-only exactly as LADDERS does — and hand-rolling it here is the deny-list growth convention
+// 7 warns about: both copies below had already grown a fourth disjunct for History, in two edits.
+import { is3D } from "@/src/engine/domain/viewTransition";
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 // The RAIL MANIFEST — ONE source of truth for "which cards does each rail host, in what order".
@@ -23,7 +28,7 @@ import { type FocusLevel, type CohortSel, type CompositionSel } from "@/src/engi
 // Hue + active-flag stay with the tray builders (per-rail presentation), not here.
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-export type RailCardKind = "about" | "tool" | "context" | "metaSnap" | "country" | "cohort" | "composition" | "node" | "snap";
+export type RailCardKind = "about" | "tool" | "context" | "instant" | "metaSnap" | "country" | "cohort" | "composition" | "node" | "snap";
 
 // ── The rail LADDER lane (Inspector's descent spine, variant-A redesign 2026-07-19) ──────────
 // Which facts-rail slot stands for each FOCUS-LADDER rung. The lane's ORDER lives in
@@ -86,6 +91,13 @@ const DISPLAY_LANE: Partial<Record<Mode, readonly string[]>> = {
   // (The chamber's storeys are unchanged: geometry still shows ribbons falling INTO the global
   // floor; the rail states the reading order.)
   ledger: ["snap", "context", "metaSnap", "node"],
+  // HISTORY: the network dossier, then the INSTANT (2026-09-19). `instant` is a card slot with no
+  // focus rung — the two snapshot slots' precedent, and `railLadderBoundary.test.ts` asserts
+  // rung → slot rather than the reverse. It sits UNDER the dossier because the lane is a
+  // containment claim read coarse→fine: a network is the subject, and the cursor is one moment of
+  // it. (A focused PLANE gets no card of its own: a plane IS its network's chart, and the dossier
+  // above already stands for the network — which is also why it is no ladder rung.)
+  trend: ["context", "instant"],
 };
 
 export function ladderSlotIds(mode: Mode): string[] {
@@ -96,7 +108,7 @@ export function ladderSlotIds(mode: Mode): string[] {
  *  inputs (which can't change a slot's presence). */
 export type LadderState = Pick<
   RailManifestState,
-  "mode" | "filter" | "inspect" | "snap" | "metaSnap" | "country" | "cohort" | "composition"
+  "mode" | "filter" | "inspect" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "trendCursorMs"
 > & {
   /** The store's selection recency (most-recent-FIRST) — the collapse rule reads it (item 8):
    *  the most recently selected present card is the ACTIVE one; the rest rest collapsed. */
@@ -169,6 +181,13 @@ export interface RailManifestState {
   cohort: CohortSel | null;
   /** The committed composition group — hyper's rung between a network and a node. */
   composition: CompositionSel | null;
+  /** THE COMMITTED TIME CURSOR (History, 2026-09-19) — `store.trendCursorMs`. Optional like
+   *  `metaSnap`: no other view can produce the card, so every existing caller reads unchanged.
+   *  ⚠️ It is the INSTANT, not a stamp, and that is safe as a subject key because the timeline is
+   *  its ONE writer and quantises to the bucket (`sameBucket`, components/TrendTrack.tsx) — two
+   *  pointer positions inside one bucket name the same reading to every surface, so the tray
+   *  highlight and the title roll fire once per bucket rather than once per pointermove. */
+  trendCursorMs?: number | null;
   /** The selected metagraph-snapshot TILE — ledger's own card slot (spec 2026-08-04), not a
    *  ladder rung. Optional: the ladder derivation (`LadderState`) and its callers never carry
    *  this field, so `detailsCards` treats an absent key the same as `null`. */
@@ -184,7 +203,7 @@ const isNodePick = (p: PickDescriptor | null): boolean =>
 // tools: their subjectKeys are constants so they never read as "updated" (the tray stays a quiet
 // legend; view switches ride the separate switch-signal, not a per-card update highlight).
 export function exploreCards(s: Pick<RailManifestState, "mode">): RailCard[] {
-  const hasTool = s.mode === "hyper" || s.mode === "geo" || s.mode === "ledger";
+  const hasTool = is3D(s.mode);
   // The tray shows the tool card's OWN head mark (the ONE standard EXPLORE_ICON) — it used to
   // show VIEW_ICONS[mode], which in ledger put a Layers glyph on the left tab that read as the
   // snapshot card's mark (user bug report); card head and tray icon must agree.
@@ -237,12 +256,11 @@ export function exploreCards(s: Pick<RailManifestState, "mode">): RailCard[] {
 //    the Hypergraph view."). This is an app-wide copy rule, not a ghost-hint one; it applies to every
 //    surface the reader reads (the About cards, the explorer hints, the empty states). Comments and
 //    docs like this one are dev-facing and keep their dashes.
-const IN_3D = (m: Mode) => m === "hyper" || m === "geo" || m === "ledger";
 // The pointer's own verb (2026-09-04): "Click" taught a mouse to a thumb. One helper so no hint
 // can pick its own word.
 const CLICK = (s: RailManifestState) => (s.coarse ? "Tap" : "Click");
 function contextHint(s: RailManifestState): string | null {
-  if (!IN_3D(s.mode)) return null;
+  if (!is3D(s.mode)) return null;
   // No noun at all: the slot label reads "Metagraph" while the app's broader word is "network", and
   // this hint used to put BOTH in one line ("Metagraph — Pick a network…").
   return "Pick one in the top-bar filter.";
@@ -296,6 +314,12 @@ function compositionHint(s: RailManifestState): string | null {
 // A metagraph snapshot is a ledger-only card SLOT (spec 2026-08-04) — not a ladder rung. Naming the
 // STOREY does the work here: the line above it aims at a bar ON the floor, so "a plane above the
 // floor" separates the two subjects and teaches the chamber's two-storey shape in passing.
+// The INSTANT is History's own card slot (2026-09-19) — not a ladder rung. The hint is the
+// GESTURE and nothing else: the band's timeline is the one control that commits an instant, and
+// naming where it is ("below") is the same work the metagraph-snapshot hint's storey does.
+function instantHint(s: RailManifestState): string | null {
+  return s.mode === "trend" ? `${CLICK(s)} the timeline below.` : null;
+}
 function metaSnapHint(s: RailManifestState): string | null {
   return s.mode === "ledger" ? `${CLICK(s)} a tile on a plane above the floor.` : null;
 }
@@ -320,7 +344,7 @@ export function detailsCards(s: RailManifestState): RailCard[] {
   // The SELECTION IS UNTOUCHED: this only stops the view speaking for it, so returning to a 3D view
   // restores the whole pile in place. Gated on the views the facts scope is FOR (convention 7),
   // and it matches what the left rail already does here — About only, no tool card.
-  if (!IN_3D(s.mode)) return [];
+  if (!is3D(s.mode)) return [];
   const context: RailCard = {
     id: "context",
     kind: "context",
@@ -332,6 +356,20 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     // ghost while the card self-nulled).
     present: s.filter !== "all",
     hint: contextHint(s),
+  };
+  const instant: RailCard = {
+    id: "instant",
+    kind: "instant",
+    icon: INSTANT_ICON,
+    subjectKey: s.trendCursorMs ?? null,
+    // ⚠️ VIEW-SCOPED PRESENCE, unlike the pinned snapshot's (2026-09-19). A pinned snapshot is a
+    // subject that keeps meaning wherever you carry it, which is why its card renders in any 3D
+    // view; an instant is a reading OF THIS STACK — outside History there is no chart it names
+    // and no roster it ranks, so a card stating it there would be facts from a view you left.
+    // The cursor itself survives the switch (store `trendCursorMs`, deliberately not view-scoped);
+    // only the card stands down.
+    present: s.mode === "trend" && s.trendCursorMs != null,
+    hint: instantHint(s),
   };
   const metaSnap: RailCard = {
     id: "metaSnap",
@@ -382,7 +420,9 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     hint: snapHint(s),
   };
   // The manifest order drives the tablet/phone flat stack + tray icons and MUST agree with the
-  // desktop lane above: tick → dossier → the tick's own metagraph snapshot → node.
-  return [snap, context, country, cohort, composition, metaSnap, node];
+  // desktop lane above: tick → dossier → the tick's own metagraph snapshot → node. History's
+  // `instant` sits directly under the dossier, which is exactly where its own lane puts it —
+  // every slot between them is unreachable in that view, so the two orders agree.
+  return [snap, context, instant, country, cohort, composition, metaSnap, node];
 }
 

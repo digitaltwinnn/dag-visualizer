@@ -1,24 +1,42 @@
 "use client";
-import { useId, useState } from "react";
+import { useState } from "react";
 import { Panel } from "@/components/docs/AboutDoc";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import useTrendsWindow, { useTrendsRange } from "@/components/useTrendsWindow";
-import { cutRange, leadingTrim, pickRangeTier, sliceWindow, trimNewestPartial } from "@/src/data/trendWindow";
+import useTrendsSlice from "@/components/useTrendsSlice";
+import { type ZoomId } from "@/src/data/trendWindow";
 import TrendChart, { type TrendLine } from "@/components/docs/TrendChart";
+import {
+  TREND_METRICS,
+  type CounterMetric,
+  formatDag as dag,
+  formatMb as mb,
+  formatSeconds as secs,
+  metricSeries,
+  metricUnit,
+  perPhrase,
+  rankByLast,
+  seriesKey,
+  sharedCeiling,
+  tierWord,
+  trimCounterEdges,
+} from "@/src/data/trendSeries";
 import { METAGRAPHS } from "@/src/net/current";
 import { useStore } from "@/src/store/store";
-import { applyClickActions } from "@/src/store/applyClickActions";
-import { filterToggleActions } from "@/src/engine/domain/pickActions";
 import { metagraphById } from "@/src/data/network";
 import { displayNetwork } from "@/src/data/unlisted";
-import { Switch } from "@/components/ui/switch";
+
 import { cn } from "@/lib/utils";
-import { SELECTED_ROW } from "@/components/selection";
+import { PICKER_GROUP, ScaleToggle, ScopeChip, WindowPicker, zoomBtn } from "@/components/trendPickers";
+import { openRecords, spanOfWindow } from "@/components/trendDoors";
+import { scopeEmptyCopy, trendRoster, trendScope } from "@/src/data/trendScope";
 
 // THE TRENDS DOCUMENT (user, 2026-09-06; widened twice since) — the first UI consumer of the
 // trends backend: one daily-resolution chart per stored metric over the /api/trends 1y window,
-// leading-trimmed to where measuring began. It rides the doc-overlay recipe like About and
-// Design (registry entry in views.ts, thin route, footer + info-menu toggles follow).
+// leading-trimmed to where measuring began. It is the History view's RAW REGISTER (2026-09-18):
+// the measured history is ONE rung of the observation ladder read two ways — the 3D stack of
+// chart planes, and this document behind that view's RAW toggle (`viewPolicy.rawSurface`, mounted
+// by datasection/DocumentSurface). It rode the doc-overlay recipe until then, alongside About and
+// Design; a doc overlay cannot host it, because opening one forces `section` back to "scene".
 //
 // HONESTY (rule 10, the trends store's own contract rendered): a null bucket draws as a GAP,
 // never a zero — the copy says so once, up front. The fees/bytes charts carry the FLOOR label
@@ -38,23 +56,6 @@ interface TrendsPayload {
   series: Record<string, (number | null)[]>;
 }
 
-// THE ZOOM (user, 2026-09-07: "can we zoom in?") — the window picker is the tiers made
-// visible: 1H and 24H read the 5-minute buckets (48 h retention), 7D and 30D the hourly tier,
-// 1Y and ALL the daily tier. Same charts, same honesty rules, finer buckets. 1Y and ALL split
-// 2026-09-09 (user — the ranges stay consistent with the vitals rim, which is also where 1H
-// came from the same day): 1Y is the trailing year, ALL is the store's whole depth (the `all`
-// window), both leading-trimmed to where measuring began, so ALL says exactly as much as has
-// been measured. 1H rides the 24h payload, sliced to the newest hour — a window is not always
-// an API window of its own.
-const ZOOMS = [
-  { id: "1h", label: "1H" },
-  { id: "24h", label: "24H" },
-  { id: "7d", label: "7D" },
-  { id: "30d", label: "30D" },
-  { id: "1y", label: "1Y" },
-  { id: "all", label: "All" },
-] as const;
-type ZoomId = (typeof ZOOMS)[number]["id"];
 
 /** The h1's span phrase, from the measured buckets themselves. */
 function spanPhrase(buckets: number[], stepMs: number): string {
@@ -79,30 +80,11 @@ function meanGap(p: TrendsPayload): (number | null)[] {
   return ticks.map((t, i) => (t != null && t > 0 && sum[i] != null ? sum[i]! / t : null));
 }
 
-const stepMsOfMain = (w: { stepMs: number } | undefined): number => w?.stepMs ?? 86400000;
-
 const scale = (points: (number | null)[], k: number): (number | null)[] =>
   points.map((v) => (v == null ? null : v * k));
 
-/** ⚠️ THE PICKERS ARE HAIRLINE GROUPS, NOT FILLED TRACKS (user, 2026-09-14: in light mode they
- *  "all have a gray background which looks a bit off on a nice light clean background"). Measured,
- *  the shadcn track lands about 24 sRGB levels below this document's paper — a grey slab, and the
- *  only slab on a page that is otherwise paper and hairlines.
- *  (The measurement is stated in words on purpose: rule 3's test reads comments too, and a literal
- *  here would be a colour this file does not own.)
- *
- *  `bg-muted` is the primitive's own default, adopted unchanged; it reads acceptably on the dark
- *  face, where everything is low-luminance, and as UI chrome dropped onto a document on the light
- *  one. /trends is explicitly a DOCUMENT (convention 12 — prose, sections, 2D charts), and this
- *  app's document register is a hairline: the card-head rule, the raw layer's search box, and the
- *  file-cabinet tabs DIRECTLY BELOW these pickers all define their groups that way. So the group
- *  keeps its shape and loses its fill — a hairline plus `--wash-faint`, the app's own quiet
- *  surface, which is `light-dark()` by construction and so answers both faces at once.
- *
- *  ONE HOME for all three (topic, window, scale): they were three copies of the same literal, and
- *  a fourth picker would have been a fourth. */
-const PICKER_GROUP =
-  "inline-flex items-center rounded-lg border border-border bg-wash-faint p-[3px] max-[700px]:flex max-[700px]:justify-center max-[700px]:[&>button]:flex-1";
+// The pickers' group + pill classes are `components/trendPickers.tsx` — shared with the History
+// view's band timeline, which wears the same window control (2026-09-18).
 
 function Section({ id, title, lead, children }: { id: string; title: string; lead: string; children: React.ReactNode }) {
   return (
@@ -125,7 +107,25 @@ function Section({ id, title, lead, children }: { id: string; title: string; lea
 }
 
 export default function TrendsDoc() {
-  const [zoom, setZoom] = useState<ZoomId>("all");
+  // ⚠️ THE DOCUMENT OPENS ON WHAT THE SCENE WAS SHOWING (2026-09-19).
+  // Convention 12's ladder says each step down CARRIES ITS CONTEXT, and the two faces of rung 2
+  // are one step apart: a reader who brushed Feb–Jun on the History timeline and pressed RAW was
+  // handed the whole measured span back, which is the same lost-context complaint the per-chart
+  // records door exists to answer one rung further down.
+  //
+  // So the window and the range are SEEDED from the store's own channels — `trendWindow` and
+  // `trendRange`, the ones the stack and the band read — and read ONCE AT MOUNT, exactly like
+  // `initialTab` below and for the same reason: `datasection/DocumentSurface` mounts this
+  // component when the raw register OPENS, so "at mount" is "when the reader asked to read it".
+  //
+  // ⚠️ SEEDED, NOT FOLLOWED, AND NEVER WRITTEN BACK. After mount these are the page's own state:
+  // the document's pickers move them and the stack behind it does not move. A subscription would
+  // make the document a second view of one window rather than a document (and would fight the
+  // reader's own pill the moment the band's cursor wrote), and a write back the other way would
+  // make reading the page silently re-cut the scene you left. The channels are read through
+  // `getState()` for that reason — a one-shot read is what the seed IS, and the adjacent
+  // `filter` read two blocks down is deliberately SUBSCRIBED, so the two must not be confused.
+  const [zoom, setZoom] = useState<ZoomId>(() => useStore.getState().trendWindow);
   // THE RANGE — a drag on any chart (convention 12's zoom). ONE selection for the whole
   // page: the shared-axis column means every chart cuts to it together. Picking a zoom pill
   // clears it (the pill IS a range statement); the chip row beside the pills states it, and
@@ -133,7 +133,13 @@ export default function TrendsDoc() {
   // `metaId` = whose chart the drag was drawn on (user, 2026-09-09: DOR committed, a range
   // dragged on BIOFI's chart, "go to raw: no biofi in the filter" — a range must remember
   // its network, and the standalone records button prefers it over the committed filter).
-  const [range, setRange] = useState<{ fromMs: number; toMs: number; metaId?: string | null } | null>(null);
+  // A range arriving from the SCENE carries no metagraph — the timeline brushes the whole stack,
+  // not one plane — so it seeds `metaId: null` and the records door falls back to the committed
+  // filter, which is exactly what that door does for the global charts already.
+  const [range, setRange] = useState<{ fromMs: number; toMs: number; metaId?: string | null } | null>(() => {
+    const r = useStore.getState().trendRange;
+    return r ? { fromMs: r.fromMs, toMs: r.toMs, metaId: null } : null;
+  });
   // ONE section selection for BOTH drawers (user, 2026-09-09: "have it once drive both
   // tabs") — the two cabinets carry the same four sections, and an uncontrolled pair reset
   // the pick on every drawer switch. The zoom/range already lives at page level; making the
@@ -159,112 +165,68 @@ export default function TrendsDoc() {
   // The peak readout stays each chart's OWN number in both modes (TrendChart's `ownMax`), so a
   // sliver can still say how high it actually got.
   const [scaleMode, setScaleMode] = useState<"own" | "shared">("shared");
-  const scaleId = useId();
-  // AUTO-TIER (map-tile edition, 2026-09-10): a selected range picks the FINEST tier whose
-  // HISTORY FLOOR its start clears (pickRangeTier — since the keep-forever flip, retention
-  // no longer prunes, but the floors record where fine grain begins to exist) and fetches
-  // the few calendar-unit tiles it touches; daily ranges keep riding the one `all` payload.
-  const rangeTier = range ? pickRangeTier(range.fromMs, range.toMs) : null;
-  // ONE fetch path with the band (review, 2026-09-09 — the doc carried its own raw fetch
-  // and a second, divergent leading-trim): the hook brings the shared cache (a rim-to-doc
-  // hop re-uses the band's payload), the pulse-strip health reporting, and the 5-minute
-  // refresh. The hook keeps the previous window's payload until the new one lands, which
-  // preserves the doc's own no-loading-flash rule on zoom changes.
-  const fetched = useTrendsWindow(range ? (rangeTier === "1d" ? "all" : null) : zoom === "1h" ? "24h" : zoom);
-  const rangeTiles = useTrendsRange(
-    range && (rangeTier === "5m" || rangeTier === "1h") ? { tier: rangeTier, fromMs: range.fromMs, toMs: range.toMs } : null,
-  );
+  // THE WINDOW, IN ONE CALL (2026-09-18) — which payloads this zoom (and any committed range)
+  // needs and how each is cut are `planTrendFetch`/`assembleTrendSlice` in src/data/trendWindow,
+  // fetched by `useTrendsSlice`. ONE HOME with the 3D trend stack, which reads the same hook off
+  // the store's own window: this page and that view are two registers of one rung (convention
+  // 12), and they already share the chart primitive and the per-network series maths. The auto-
+  // tiering, the 1H slice, the fleet's hourly payload and the daily readout's 90d window all
+  // moved there with their reasons; the document's zoom and range stay LOCAL state after the
+  // mount SEED above, because the window a reader picks on this page is the page's own.
+  const { p, buckets, stepMs, pF, fBuckets, fStep, fleetPending, daily, error } = useTrendsSlice(zoom, range);
   // ⚠️ THE COMMITTED NETWORK SCOPES EVERY PER-NETWORK COLUMN (user, 2026-09-14: "Trends is a
   // doc-page, but actually it shows data that could benefit from the metagraph filter … hide the
   // other metagraph charts"). ONE roster, read by all three panel builders, so a section cannot
   // answer the filter differently from the section under it — and SUBSCRIBED, unlike the mount-
   // once `initialTab` below: picking a chip in the bar's filter strip must cut the charts under
-  // the reader's eyes, which is the whole reason the bar keeps that strip over this doc
-  // (views.ts `scoped`). "all" is every catalog network, as before.
+  // the reader's eyes — and over a raw layer the command bar keeps its whole ordinary face, so
+  // the strip is simply there. "all" is every catalog network, as before.
   //
   // A filter with no catalog row — the DAG core, the unlisted channels — leaves this EMPTY, and
   // that is honest rather than broken: the trends store keys its series per listed metagraph, so
   // there is genuinely nothing measured here for either. The tab says which case it is and names
   // where the reading does live; see `scopeEmpty`.
   const filter = useStore((s) => s.filter);
-  const roster = METAGRAPHS.filter((m) => m.id && (filter === "all" || m.id === filter));
+  // ONE ROSTER RULE, shared with the History view's stack (`src/data/trendScope.ts`, 2026-09-19):
+  // which chains a filter leaves in scope is a property of the trends store, not of this page.
+  const roster = trendRoster(filter).map((id) => METAGRAPHS.find((m) => m.id === id)!);
 
-  // Opened from a committed metagraph's dossier ("Show the trends", 2026-09-08), the page
-  // opens on that side of the network. Read ONCE at mount (the doc remounts per open): the
-  // Tabs stay uncontrolled, so browsing the tabs afterwards owes the filter nothing. The DAG
-  // core's history is the Hypergraph tab — only a catalog metagraph flips the default.
+  // A committed metagraph opens the document on that side of the network. The THIRD of this
+  // component's mount-once reads, with the window and the range above, and all three answer the
+  // same question — what was the reader looking at when they asked for this page? Read ONCE AT
+  // MOUNT, and the mount is the RAW TOGGLE: `datasection/DocumentSurface` mounts this component when the raw
+  // register OPENS and unmounts it when the recede finishes, so "at mount" is "when the reader
+  // asked to read it" — which is what makes this read the committed filter as it stands right
+  // then. (It was briefly mounted with the VIEW instead, and that latched the answer before the
+  // reader had committed anything; the surface's header carries that history.) The Tabs stay
+  // uncontrolled, so browsing them afterwards owes the filter nothing, while the roster above
+  // stays SUBSCRIBED so a chip picked mid-read still cuts the charts under the reader's eyes. The
+  // DAG core's history is the Hypergraph tab — only a catalog metagraph flips the default.
   const [initialTab] = useState<"hypergraph" | "metagraphs">(() => {
     const f = useStore.getState().filter;
     return f !== "dag" && metagraphById(f) ? "metagraphs" : "hypergraph";
   });
 
-  // THE FLEET RIDES THE HOURLY TIER at fine zooms (user, 2026-09-09: "1H/24H on Nodes says
-  // no data while 7D has it") — the gauges are written hourly+daily only, so the 5m payload
-  // honestly lacks them; instead of gating, the Nodes sections fetch the 7d hourly payload
-  // and slice it to the picked span (the rim's own recipe). Small, shared-cache fetch, made
-  // only while a fine zoom stands.
-  const fleetFine = useTrendsWindow(!range && (zoom === "1h" || zoom === "24h") ? "7d" : null);
-  const fleetTiles = useTrendsRange(
-    range && rangeTier === "5m" ? { tier: "1h", fromMs: range.fromMs, toMs: range.toMs } : null,
-  );
-  // COUNTER READOUTS AT DAY SCALE (user, 2026-09-09: 7D's "latest full hour" answered too
-  // fine a question for a week-wide view): at the hourly zooms the counter charts' head
-  // readout rides the DAILY tier's own newest complete day — the store's exact sums, the
-  // same cached 90d payload the vitals rim already shares. No client re-summing.
-  const daily = useTrendsWindow(zoom === "7d" || zoom === "30d" ? "90d" : null);
-  const raw = fetched.data ?? undefined;
-  // 1H is the 24h payload's newest hour (the rim's own recipe — sliceWindow measures from
-  // the payload's newest bucket, so a cached payload yields a consistent hour). A committed
-  // RANGE replaces the zoom's cut entirely.
-  const windowedRaw =
-    range
-      ? rangeTier === "1d"
-        ? raw && cutRange(raw, range.fromMs, range.toMs)
-        : rangeTiles.data
-          ? cutRange(rangeTiles.data, range.fromMs, range.toMs)
-          : undefined
-      : zoom === "1h" && raw
-        ? sliceWindow(raw, 3_600_000)
-        : raw;
-  // LEADING TRIM (src/data/trendWindow — the one home since the review): the 1y window
-  // reaches further back than measuring does, and months of leading null days would draw as
-  // a long empty runway. The axis begins where history begins and the page widens by itself
-  // as the store grows; interior gaps still draw as gaps — only the unmeasured PREFIX goes.
-  const p: TrendsPayload | undefined = windowedRaw ? leadingTrim(windowedRaw) : undefined;
-  const buckets = p?.buckets ?? [];
-  const stepMs = p?.stepMs ?? 86400000;
-  // COUNTER charts drop partial edge buckets — a partial sum charted whole reads as a crash,
-  // the classic last-bucket lie. Daily windows lose both edges (the cutoff day starts mid-day,
-  // the last IS today, still filling); sub-daily windows lose only the newest bucket (stored
-  // fine buckets are complete once written — only the current slot is still filling). GAUGE
-  // charts keep everything: a point sample is complete the moment it is taken, and trimming
-  // today would hide the fleet's only readings.
-  const fleetRaw =
-    stepMsOfMain(windowedRaw) < 3600000
-      ? range
-        ? fleetTiles.data && cutRange(fleetTiles.data, range.fromMs, range.toMs)
-        : fleetFine.data && sliceWindow(fleetFine.data, zoom === "1h" ? 3_600_000 : 24 * 3_600_000)
-      : undefined;
-  const pF = fleetRaw ?? p;
-  const fBuckets = fleetRaw?.buckets ?? buckets;
-  const fStep = fleetRaw?.stepMs ?? stepMs;
-  const lead = stepMs >= 86400000 ? 1 : 0;
-  const cBuckets = buckets.slice(lead, -1);
-  const trim = (points: (number | null)[]): (number | null)[] => points.slice(lead, -1);
+  // COUNTER charts drop partial edge buckets — a partial sum charted whole reads as a crash, the
+  // classic last-bucket lie. Which edges go is `trimCounterEdges` (src/data/trendSeries.ts), one
+  // home with the 3D stack; the axis and every line are cut by the same call.
+  const cBuckets = trimCounterEdges(buckets, stepMs);
+  const trim = (points: (number | null)[]): (number | null)[] => trimCounterEdges(points, stepMs);
 
   // The unit word follows the tier — an hourly bucket labelled "per day" would misstate every
   // reading by a factor of 24. Prose ("per day"), not the "/day" glyph (user, 2026-09-09:
   // "what is /day?" — the slash form made the head four cryptic fragments; spelled out, the
   // head reads as a sentence: "Global snapshots per day … Sep 8 · 1,863").
-  const per = stepMs >= 86400000 ? "per day" : stepMs >= 3600000 ? "per hour" : "per 5 min";
-  const bucketWord = stepMs >= 86400000 ? "daily" : stepMs >= 3600000 ? "hourly" : "five-minute";
-  const dag = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: v < 10 ? 2 : 0 })}`;
+  const per = perPhrase(stepMs);
+  // The tier in words, from the one table both registers read (`tierWord`): this one is the
+  // ADJECTIVE form, because it lands inside a section's lead sentence, while the cursor card's
+  // aside takes the short label. Two spellings of one vocabulary had grown in the two components.
+  const bucketWord = tierWord(stepMs, "attributive");
   /** The daily tier's newest COMPLETE day for a counter series (yesterday — today still
    *  fills), scaled like the chart it captions; undefined off the hourly zooms. */
   const dayReadout = (name: string, k = 1): { value: number; word: string } | undefined => {
-    if (!daily.data) return undefined;
-    const d = trimNewestPartial(daily.data);
-    const series = d.series[name];
+    if (!daily) return undefined;
+    const series = daily.series[name];
     for (let i = (series?.length ?? 0) - 1; i >= 0; i--) {
       if (series![i] != null) return { value: series![i]! * k, word: "latest full day" };
     }
@@ -274,31 +236,37 @@ export default function TrendsDoc() {
    *  ranked by the LAST measured day, busiest first (per-section — each ranking is its own
    *  reading). The vitals' catalog-order rule guards live charts that reshuffle under the
    *  reader; a document laid out once per visit can rank honestly. */
-  const netPanels = (suffix: string, unit: string, k = 1, fmt?: (v: number) => string) => {
-    const panels = roster
-      .map((m) => {
-        const points = trim(scale(S(p, `m.${m.id}.${suffix}`), k));
-        const last = points.reduce<number | null>((acc, v) => (v != null ? v : acc), null);
-        return { m, points, last };
-      })
-      .sort((a, b) => (b.last ?? -1) - (a.last ?? -1));
+  // COUNTER metrics only — the four that ARE one stored row per network. A gauge needs the fleet
+  // payload (netGaugePanels) and continuity is derived from two rows (netGapPanels), so the type
+  // says which four this builder can actually serve rather than leaving it to the reader.
+  const netPanels = (metric: CounterMetric) => {
+    const spec = TREND_METRICS[metric];
+    // ⚠️ ONE RANKING FUNCTION, ONE CEILING FUNCTION (2026-09-19). `rankByLast` is what "busiest
+    // first" MEANS in this app and `sharedCeiling` is what "same scale" means — the 3D stack reads
+    // both, so writing either out inline here is the two registers of one rung quietly ordering or
+    // scaling the same networks differently. The ceiling's old `Math.max(0, ...flatMap(…))` was
+    // also the spread the stack had already replaced: one argument per measured bucket, which is
+    // the shape that throws `RangeError` the day the store grows past the engine's argument limit.
+    const ptsById = new Map(roster.map((m) => [m.id!, trim(metricSeries(metric, m.id!, p?.series ?? {}).points)]));
+    const nets = new Map(roster.map((m) => [m.id!, m]));
+    const panels = rankByLast([...ptsById.keys()], (id) => ptsById.get(id)!).map((id) => ({
+      m: nets.get(id)!,
+      points: ptsById.get(id)!,
+    }));
     // The shared ceiling is the busiest network's peak ACROSS THIS SECTION — per section, because
     // each section is its own quantity (snapshots, blocks, fees, KB) and a scale shared across
     // units would mean nothing. Undefined in `own` mode, which is TrendChart's "scale yourself".
-    const sharedMax =
-      scaleMode === "shared"
-        ? Math.max(0, ...panels.flatMap((x) => x.points.filter((v): v is number => v != null)))
-        : undefined;
+    const sharedMax = scaleMode === "shared" ? sharedCeiling(panels.map((x) => x.points)) : undefined;
     return panels.map(({ m, points }) => {
       const net = displayNetwork(m.id);
-      const line: TrendLine = { label: suffix, points, hue: net?.hue };
-      return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={unit} readout={dayReadout(`m.${m.id}.${suffix}`, k)} buckets={cBuckets} stepMs={stepMs} format={fmt} lines={[line]} scaleMax={sharedMax} />;
+      const line: TrendLine = { label: metric, points, hue: net?.hue };
+      return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={metricUnit(metric, stepMs)} readout={dayReadout(seriesKey(metric, m.id!), spec.scale)} buckets={cBuckets} stepMs={stepMs} format={spec.format} lines={[line]} scaleMax={sharedMax} />;
     });
   };
   /** Per-network GAUGE panels (fleet): untrimmed — a point sample is complete the moment it
    *  is taken — and null where never sampled (gauges are not zero-filled). */
-  /** Per-network GAUGE panels ride the FLEET payload (hourly at fine zooms — see fleetRaw). */
-  const netGaugePanels = (unit: string) => {
+  /** Per-network GAUGE panels ride the FLEET payload (hourly at fine windows — see `pF`). */
+  const netGaugePanels = () => {
     // The LAYER LINES (user, 2026-09-11: "metagraph nodes don't show the role") — the same
     // three-line treatment the hypergraph tab's Network layers chart wears, per network, in
     // its identity hue: total solid, each layer the fleet chart's own dash. Which layers a
@@ -308,13 +276,11 @@ export default function TrendsDoc() {
     const metaList = useStore.getState().metaList;
     const DASH: Record<string, string | boolean> = { l0: "", cl1: "2 4", dl1: "6 4" };
     const SHORT: Record<string, string> = { l0: "L0", cl1: "cL1", dl1: "dL1" };
-    return roster
-      .map((m) => {
-        const points = S(pF, `f.nodes.${m.id}`);
-        const last = points.reduce<number | null>((acc, v) => (v != null ? v : acc), null);
-        return { m, points, last };
-      })
-      .sort((a, b) => (b.last ?? -1) - (a.last ?? -1))
+    // Ranked through the one ranking function, like every other section (see `netPanels`).
+    const ptsById = new Map(roster.map((m) => [m.id!, metricSeries("nodes", m.id!, pF?.series ?? {}).points]));
+    const nets = new Map(roster.map((m) => [m.id!, m]));
+    return rankByLast([...ptsById.keys()], (id) => ptsById.get(id)!)
+      .map((id) => ({ m: nets.get(id)!, points: ptsById.get(id)! }))
       .map(({ m, points }) => {
         const net = displayNetwork(m.id);
         const roster = metaList.find((x) => x.id === m.id);
@@ -323,7 +289,7 @@ export default function TrendsDoc() {
           { label: "nodes", points, hue: net?.hue },
           ...present.map((r) => ({ label: SHORT[r]!, points: S(pF, `f.layer.${m.id}.${r}`), hue: net?.hue, dash: DASH[r] || true })),
         ];
-        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={unit} buckets={fBuckets} stepMs={fStep} lines={lines} />;
+        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={metricUnit("nodes", fStep)} buckets={fBuckets} stepMs={fStep} lines={lines} />;
       });
   };
   /** Per-network CONTINUITY panels: real measured gap stats (m.{id}.gapSum/gapMax — live
@@ -332,47 +298,31 @@ export default function TrendsDoc() {
    *  Mean = gapSum/snaps per bucket; a day÷snaps approximation was rejected — for a
    *  batching network (DOR: dozens of snapshots in one tick, then idle) it reads as spacing
    *  that never existed. Ranked by the latest reading, most-stalled first. */
-  const netGapPanels = () =>
-    roster
-      .map((m) => {
-        const sum = S(p, `m.${m.id}.gapSum`);
-        const snaps = S(p, `m.${m.id}.snaps`);
-        const gmax = S(p, `m.${m.id}.gapMax`);
-        const points = sum.map((v, i) => (v != null && snaps[i] != null && snaps[i]! > 0 ? v / snaps[i]! : null));
-        const last = points.reduce<number | null>((acc, v) => (v != null ? v : acc), null);
-        return { m, points, last, gmax };
-      })
-      .sort((a, b) => (b.last ?? -1) - (a.last ?? -1))
-      .map(({ m, points, gmax }) => {
+  const netGapPanels = () => {
+    // Ranked through the one ranking function, like every other section (see `netPanels`) —
+    // most-stalled first falls out of it, since the value IS the mean spacing.
+    const seriesById = new Map(roster.map((m) => [m.id!, metricSeries("continuity", m.id!, p?.series ?? {})]));
+    const nets = new Map(roster.map((m) => [m.id!, m]));
+    return rankByLast([...seriesById.keys()], (id) => seriesById.get(id)!.points)
+      .map((id) => ({ m: nets.get(id)!, s: seriesById.get(id)! }))
+      .map(({ m, s }) => {
         const net = displayNetwork(m.id);
-        const line: TrendLine = { label: "mean", points: trim(points), hue: net?.hue };
+        const line: TrendLine = { label: "mean", points: trim(s.points), hue: net?.hue };
         // `sampled` = the chain's own snaps series: amber only where the SAMPLER missed;
         // a null point over a sampled bucket (a quiet stretch — nothing to space) just
         // breaks the line (user, 2026-09-09: DOR's quiet buckets wore outage amber).
-        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit="seconds" buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, `m.${m.id}.snaps`))} gaps={trim(gmax)} lines={[line]} />;
+        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={metricUnit("continuity", stepMs)} buckets={cBuckets} stepMs={stepMs} format={TREND_METRICS.continuity.format} sampled={trim(s.sampled!)} gaps={trim(s.gaps!)} lines={[line]} />;
       });
-  const secs = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}s`;
-  const mb = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 1 })} MB`;
+  };
 
-  // ONE RUNG DOWN THE LADDER (convention 12): hand the selected range to the anchor log's
-  // date search. The network commit rides the pickActions table (rule 2 — the same
-  // filterToggleActions row the explorer uses, guarded so it never toggles OFF); the range
-  // itself travels the one-shot store bridge the log consumes on sight. Closing the doc
-  // before opening the raw layer matters: setDocPage forces section back to "scene".
+  // ONE RUNG DOWN THE LADDER (convention 12) — `components/trendDoors.ts`, shared with the
+  // History view's cursor card since 2026-09-19. The sequence (commit the network through the one
+  // write path, hand the span to the log, land on the view that can show records) lived here and
+  // is now called from two surfaces, so they cannot land a reader in different places.
   const inspectRange = (metaId: string | null) => {
     // No custom range = the WINDOW you are looking at (user, 2026-09-09: "that button can
     // always exist") — the zoom is a range statement too, so the ladder's door is always open.
-    const span =
-      range ?? (buckets.length ? { fromMs: buckets[0], toMs: buckets[buckets.length - 1] + stepMs } : null);
-    if (!span) return;
-    const st = useStore.getState();
-    if (metaId && st.filter !== metaId) applyClickActions(filterToggleActions(metaId, st.filter));
-    st.setLogSeek({ metaId, fromMs: span.fromMs, toMs: span.toMs });
-    st.setDocPage(null);
-    // The anchor log is the LEDGER view's raw projection — the ladder lands on the rung
-    // that can actually show records (mode navigation, not a selection).
-    if (st.mode !== "ledger") st.setMode("ledger");
-    st.setSection("data");
+    openRecords(metaId, range ?? spanOfWindow(buckets, stepMs));
   };
   const onRange = (fromMs: number, toMs: number) => setRange({ fromMs, toMs, metaId: null });
   /** The per-network charts' drag: the range carries the chart's own chain. */
@@ -383,58 +333,18 @@ export default function TrendsDoc() {
     const f = useStore.getState().filter;
     inspectRange(range?.metaId ?? (metagraphById(f) && f !== "dag" ? f : null));
   };
-  const stampRange = (ms: number): string =>
-    new Date(ms).toLocaleString(undefined, {
-      month: "short", day: "numeric",
-      ...(stepMs < 86400000 ? { hour: "2-digit", minute: "2-digit", hour12: false } : {}),
-      timeZone: "UTC",
-    });
-  // The zoom — a filter over every chart at once; it rides each inner section row so it is
-  // always beside the control it composes with. An active RANGE joins the group as one more
-  // (pressed) option (user, 2026-09-09: a chip beside the group read as a second control),
-  // carrying its own × and the ladder's "records" action so the bridge is reachable from any
-  // tab. Compact sizing throughout (h-6/px-2/text-micro — the h-7 pills stopped fitting one
-  // line beside the section tabs once ALL and the range joined, same user note).
-  // The PRESSED register is the RIM'S (user, 2026-09-09: "styled differently in bottom bar
-  // than in the trend view — deliberate?" — no, drift: the rim adopted this picker's register
-  // in 2026-09-08's round, then evolved to SELECTED_ROW while this stayed behind; same
-  // control, one language now). The section pills above deliberately keep the tab register —
-  // a section is furniture, a window is a committed selection.
-  const zoomBtn = (pressed: boolean) =>
-    cn(
-      "h-6 px-1.5 rounded-md text-micro tracking-caps uppercase",
-      pressed ? cn("font-bold text-foreground", SELECTED_ROW) : "text-muted-foreground hover:text-foreground hover:bg-wash-hover",
-    );
+  // THE WINDOW PICKER is `components/trendPickers.tsx`'s `WindowPicker`, shared with the History
+  // view's band timeline (2026-09-18) — same six windows, same range chip, same pressed register.
+  // The doc keeps its zoom in LOCAL state (the window a reader picks while reading the page is the
+  // page's), so it clears its own range where the store's setter does that by itself.
   const zoomPicker = (
-    <div role="group" aria-label="Time window" className={PICKER_GROUP}>
-      {!range && ZOOMS.map((z) => (
-        <button
-          key={z.id}
-          type="button"
-          aria-pressed={!range && zoom === z.id}
-          onClick={() => { setZoom(z.id); setRange(null); }}
-          className={zoomBtn(!range && zoom === z.id)}
-        >
-          {z.label}
-        </button>
-      ))}
-      {range && (
-        <span className={cn("h-6 px-2 inline-flex items-center gap-1.5 rounded-md text-micro font-bold text-foreground whitespace-nowrap", SELECTED_ROW)}>
-          <span className="tabular-nums">
-            {range.metaId ? `${displayNetwork(range.metaId)?.ticker ?? ""} · ` : ""}
-            {stampRange(range.fromMs)}–{stampRange(range.toMs)}
-          </span>
-          <button
-            type="button"
-            onClick={() => setRange(null)}
-            title="Clear the selected range"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            ×
-          </button>
-        </span>
-      )}
-    </div>
+    <WindowPicker
+      zoom={zoom}
+      range={range}
+      stepMs={stepMs}
+      onPick={(id) => { setZoom(id); setRange(null); }}
+      onClearRange={() => setRange(null)}
+    />
   );
   // ⚠️ NO RECORDS BUTTON IN THE TOOLBAR (user, 2026-09-13: "the links are already inside the
   // tabs"). It was the ladder's one standalone control (2026-09-09), added before every chart
@@ -450,72 +360,27 @@ export default function TrendsDoc() {
   // flex-none + a fixed h-8: the primitive's triggers are flex-1 at a %-height, which is what
   // spread them wide and broke when the list WRAPS on phone (the h-auto rows below) — as
   // compact pills they pack left and wrap cleanly (user, 2026-09-08: the tabs overflowed).
-  /* The scale control — a LABEL and an on/off switch (user, 2026-09-14, two rounds: first "should
-     read like a simple toggle", then "make it a label with a simple on/off control"). It is
+  /* The scale control — `trendPickers.tsx`'s shared `ScaleToggle` (extracted 2026-09-19 for the
+     History view's Layers card: the same question about the same charts, and a second copy of a
+     control with this much reasoning in it is the drift that file exists to prevent). It is
      rendered ONLY on the metagraphs tab, because a scale shared across charts is only a question
      where there is a COLUMN of comparable charts; the hypergraph tab's charts each measure a
-     different quantity, and under a commit there is one network left.
-
-     ⚠️ A SWITCH IS NOT THE PRESSED-TOGGLE GRAMMAR, and the difference is the reason this stopped
-     being a pill. The command bar's Scene⇄HUD and RAW name an ACTION the reader presses FOR, with
-     the wash reporting that it is on — right for a control that pushes a surface in and pops it
-     out. This is a SETTING: the reader is not doing something, they are choosing how the column
-     is drawn, and a setting reads as a name plus its state. The two-segment group it replaced was
-     a radio wearing a toggle's clothes; the pill after it was the bar's action grammar on a
-     setting. `components/ui/switch.tsx` is the adopted primitive, restated in this app's tokens.
-
-     The label is the switch's own `<label>`, so the words are a hit target too — the switch alone
-     is 28×16, well under the touch floor the bar's controls keep. */
-  const scaleToggle = (
-    <span className="inline-flex items-center gap-2">
-      <label htmlFor={scaleId} className="text-micro tracking-caps uppercase text-muted-foreground cursor-pointer select-none">
-        Same scale
-      </label>
-      <Switch
-        id={scaleId}
-        checked={scaleMode === "shared"}
-        onCheckedChange={(on) => setScaleMode(on ? "shared" : "own")}
-        title={
-          scaleMode === "shared"
-            ? "Every chart shares the busiest network's scale, so the column compares. Switch off to let each chart scale to its own data."
-            : "Each chart scales to its own data. Switch on to put every chart on the busiest network's scale."
-        }
-      />
-    </span>
-  );
-  /* WHAT IS APPLIED, IN WORDS, AND A WAY TO CLEAR IT — the raw layer's search toolbar rule,
-     which is the same problem: a surface showing a cut of its data must say so on itself, or the
-     reader is left to infer a missing column from a control one zone away. It is the selected-row
-     pill the range chip beside the window picker already wears, so the two scopes on this page
-     read as one species. Clearing goes through `filterToggleActions` (rule 2's one write path) —
-     toggling the committed network OFF is what returns the page to every network, and it commits
-     the same release the explorer row and the scene do. */
-  const scopeNet = filter === "all" ? null : displayNetwork(filter);
-  const scopeChip =
-    filter === "all" ? null : (
-      <span className={cn("h-6 px-2 mr-auto inline-flex items-center gap-1.5 rounded-md text-micro font-bold text-foreground whitespace-nowrap", SELECTED_ROW)}>
-        <span className="inline-block size-2 rounded-full flex-none" style={{ background: scopeNet?.hue ?? "var(--primary)" }} aria-hidden />
-        {scopeNet?.name ?? filter} only
-        <button
-          type="button"
-          onClick={() => applyClickActions(filterToggleActions(filter, filter))}
-          title="Show every network again"
-          className="text-muted-foreground hover:text-foreground"
-        >
-          ×
-        </button>
-      </span>
-    );
+     different quantity, and under a commit there is one network left. */
+  const scaleToggle = <ScaleToggle shared={scaleMode === "shared"} onChange={(on) => setScaleMode(on ? "shared" : "own")} />;
+  // The scope pill and its × are `trendPickers.tsx`'s `ScopeChip`, shared with the History view's
+  // Layers card (2026-09-19) — one statement of "what is applied, and how to clear it".
+  const scopeChip = <ScopeChip filter={filter} className="mr-auto" />;
   /* The scoped tab with nothing to draw. Both cases are real commits a reader can reach from the
      bar, and neither is a failure — the trends store keeps one series set per LISTED metagraph,
      so the DAG core and the unlisted channels have no per-network record here by construction.
-     Each names where its own reading does live (the empty-state rule: name a gesture available on
-     THIS surface — both routes are visible from here, the tab row above and the chip beside it). */
-  const scopeEmpty = (
+     The sentences are `src/data/trendScope.ts`'s, shared since 2026-09-19 with the History view's
+     stack, which meets the same two commits and must not describe them differently: the FACT is
+     the store's and travels verbatim, while the ROUTE names a gesture available on THIS surface
+     (the empty-state rule — here, the tab row above). */
+  const scopeCopy = scopeEmptyCopy(trendScope(filter), "document");
+  const scopeEmpty = scopeCopy && (
     <p className="mt-3 text-label text-muted-foreground max-w-[62ch]">
-      {filter === "dag"
-        ? "The base ledger anchors metagraph snapshots rather than producing them, so it has no chart in this column. Its own history is the Hypergraph tab above."
-        : "These charts are kept per listed metagraph, and the unlisted channels are the ones the catalog does not name — so there is no measured history here for them. The Snapshots view's records still show what they anchored."}
+      {scopeCopy.fact} {scopeCopy.route}
     </p>
   );
   const topicPicker = (
@@ -548,12 +413,12 @@ export default function TrendsDoc() {
         click <em>snapshot records</em> to see the actual snapshots behind it.
       </p>
 
-      {!p && !fetched.error && (
+      {!p && !error && (
         <Panel className="mt-8 py-4 px-5">
           <p className="text-label text-muted-foreground">reading the measured history…</p>
         </Panel>
       )}
-      {!p && fetched.error && (
+      {!p && error && (
         <Panel className="mt-8 py-4 px-5">
           <p className="text-label text-muted-foreground">
             The trends store is unreachable right now. It recovers on its own — reopen this page
@@ -678,7 +543,7 @@ export default function TrendsDoc() {
             title="Total nodes"
             lead="Every node across the whole network — the DAG's own validators and every metagraph's nodes — counted live each hour. The layers split the work: L0 seals a network's own state, currency L1 (cL1) moves its token, data L1 (dL1) takes in what applications write — and one node can run several."
           >
-            {stepMs < 3600000 && !fleetRaw ? (
+            {fleetPending ? (
               /* The gauges are HOURLY instruments; at fine zooms their hourly payload is a
                  separate fetch — this line only stands while it is in flight. */
               <p className="text-label text-muted-foreground">reading the hourly samples…</p>
@@ -730,7 +595,7 @@ export default function TrendsDoc() {
             title="Metagraph snapshots anchored to global"
             lead={`Each network's own ${bucketWord} snapshot count.`}
           >
-            {netPanels("snaps", per)}
+            {netPanels("snapshots")}
           </Section>
           <Section
             id="net-blocks"
@@ -742,7 +607,7 @@ export default function TrendsDoc() {
             // same day — the two-carrier fact, one example each, the zero rule.
             lead="The blocks each network sealed inside its own snapshots. A block carries transactions — a token transfer, or a batch of application records — and it is one of two places a snapshot carries work: the other is its state, and each network decides what goes where. A zero means no blocks, not no activity."
           >
-            {netPanels("blocks", per)}
+            {netPanels("blocks")}
           </Section>
           </>)}
           {sectionTab === "economics" && (<>
@@ -751,7 +616,7 @@ export default function TrendsDoc() {
             title="Fees paid per metagraph"
             lead="What each network paid to anchor into the global ledger."
           >
-            {netPanels("fee", `DAG ${per}`, 1e-8, dag)}
+            {netPanels("fees")}
           </Section>
 
           <Section
@@ -759,7 +624,7 @@ export default function TrendsDoc() {
             title="Data anchored per metagraph"
             lead="How much data each network anchored into the global ledger."
           >
-            {netPanels("kb", per, 1 / 1024, mb)}
+            {netPanels("kb")}
           </Section>
           </>)}
           {sectionTab === "fleet" && (
@@ -768,10 +633,10 @@ export default function TrendsDoc() {
             title="Nodes per metagraph"
             lead="Each network's own node count, sampled live every hour, with a line for each layer it runs: L0 seals its state, cL1 moves its token, dL1 takes in what applications write."
           >
-            {stepMs < 3600000 && !fleetRaw ? (
+            {fleetPending ? (
               <p className="text-label text-muted-foreground">reading the hourly samples…</p>
             ) : (
-              netGaugePanels("nodes")
+              netGaugePanels()
             )}
           </Section>
           )}

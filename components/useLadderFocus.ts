@@ -21,5 +21,8 @@ export function useLadderFocus(): string | null {
   const snap = useStore((s) => s.snap);
   const metaSnap = useStore((s) => s.metaSnap);
   const selStack = useStore((s) => s.selStack);
-  return focusSlotId({ mode, filter, country, cohort, composition, inspect, snap, metaSnap, selStack });
+  // History's own slot: the committed time cursor (`instant`). It is in the lane, so the focus
+  // derivation has to see it or the cursor card can never be the box.
+  const trendCursorMs = useStore((s) => s.trendCursorMs);
+  return focusSlotId({ mode, filter, country, cohort, composition, inspect, snap, metaSnap, trendCursorMs, selStack });
 }

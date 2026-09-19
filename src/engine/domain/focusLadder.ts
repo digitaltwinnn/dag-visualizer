@@ -33,7 +33,8 @@ export interface SelectionSnapshot {
 export type ResolverKey =
   | "geoNode" | "geoCohort" | "geoCountry" | "geoNetwork" | "geoOverview"
   | "hyperNode" | "hyperComposition" | "hyperNetwork" | "hyperOverview"
-  | "ledgerNode" | "ledgerNetwork" | "ledgerOverview";
+  | "ledgerNode" | "ledgerNetwork" | "ledgerOverview"
+  | "trendNetwork" | "trendOverview";
 
 export interface Rung {
   level: FocusLevel;
@@ -67,6 +68,15 @@ export const LADDERS: Record<View3D, Rung[]> = {
     { level: "node",    active: (s) => s.inspectIsNode,    resolver: "ledgerNode" },
     { level: "network", active: (s) => s.filter !== "all", resolver: "ledgerNetwork" },
     { level: "all",     active: () => true,                resolver: "ledgerOverview" },
+  ],
+  // The trends ladder: the committed NETWORK is its one fine rung, over the resting stack. There is
+  // no node rung — a node has no chart of its own — and no PLANE rung either: bringing a plane
+  // forward is view-local emphasis (`trendFocus`), not a committed subject, so it has no ladder
+  // level and no card. The camera answers it all the same, as `trendOverview`'s one state-keyed
+  // lean, which `trendNetwork` inherits by delegating (camera principle 2).
+  trend: [
+    { level: "network", active: (s) => s.filter !== "all", resolver: "trendNetwork" },
+    { level: "all",     active: () => true,                resolver: "trendOverview" },
   ],
 };
 

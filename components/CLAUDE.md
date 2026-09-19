@@ -3,7 +3,7 @@
 The React HUD: the four-zone shell, the card grammar and the Instrument-Glass design system.
 
 Split out of the root `CLAUDE.md` (2026-08-31) so it loads when you work here rather
-than on every session. The root file holds what this is, the eleven rules, run & test,
+than on every session. The root file holds what this is, the twelve rules, run & test,
 the architecture map and the dev workflow; **its rules govern this file too**.
 
 ## Layout — the four-zone HUD over a raw data layer
@@ -101,13 +101,40 @@ every remount silently wiped the landing mark. That mark is an OUTLINE and delib
 the washes are the selection language, and looking something up is not committing it (rule 2 keeps
 one write path).
 
-The scene layer is the four-zone HUD over the 3D canvas; the raw layer is the view's raw-data table —
-*the same data one level down*, not a second page. ⚠️ The store value for that layer is **`"data"`,
+The scene layer is the four-zone HUD over the 3D canvas; the raw layer is *the same subject one level
+down*, not a second page. ⚠️ The store value for that layer is **`"data"`,
 not `"raw"`** — every word the user reads says RAW, so the two registers don't match and grepping for
 `"raw"` finds nothing. The RAW switch runs one GSAP timeline: the HUD
 fades, the scene recedes (still live behind), the raw layer surfaces out of that depth. Back is the
 mirror, with three ways to ask for it — the switch, Escape, the layer's own × — all calling
 `setSection("scene")`. Reduced motion makes it an instant swap.
+
+⚠️ **WHAT THAT LAYER HOLDS IS A POLICY ROW, NOT A FIXED SURFACE** (2026-09-18). `section` is a
+PRESENTATION axis — one subject, two presentations — so `VIEW_POLICIES[mode].rawSurface` is where
+each view says which register it shows: `"records"` for the structural views (the anchor log, the
+node roster) and `"document"` for History, whose RAW is the measured-history DOCUMENT
+(`components/docs/TrendsDoc.tsx`, the view's other register under convention 12). The two live in
+`components/datasection/` as `RecordsSurface` / `DocumentSurface`, and `components/DataSection.tsx`
+is nothing but the keyed dispatch between them — a map, so a third register is a compile error
+rather than a silent fall-through, and gated on the row rather than a mode (convention 7). The mode
+compares that pick WHICH TABLE the records surface draws are records-internal, which is why they sit
+inside that surface and never in the dispatch; `components/rawSurfaceBoundary.test.ts` pins the
+split. The document's chunk is `dynamic()`-loaded — the raw layer mounts in every view — and it is
+set in the shared reading measure (`components/docs/measure.ts`) with no sheet of its own: the
+layer's `.ig-panel` glass IS its sheet, and a plate on a plate flattens both. Everything else about
+RAW is identical there: the toggle shows pressed, Escape and the × return to the scene, and the
+command bar keeps its whole ordinary face, filter included.
+
+⚠️ **AND THE DOCUMENT OPENS ON WHAT THE SCENE WAS SHOWING** (2026-09-19). The step ACROSS the
+rung carries its context exactly as the step DOWN does: `TrendsDoc` seeds its `zoom` from
+`store.trendWindow` and its `range` from `store.trendRange` — a brushed range arrives with
+`metaId: null`, since the timeline brushes the whole stack rather than one plane. These are its
+THIRD and first mount-once reads beside `initialTab`, and `DocumentSurface` remounts the component
+per open, so "at mount" is "when the reader asked to read it". **Seeded, not followed, and never
+written back**: after mount the pickers are the page's own, a subscription would fight the reader's
+own pill on the next cursor write, and a write the other way would make reading the page silently
+re-cut the scene behind it. `components/rawSurfaceBoundary.test.ts` pins all three halves — the
+`getState()` seed, the absent subscription, and the absent setter call.
 
 **The page never scrolls.** The scene wrapper is `position:fixed; inset:0` with an identity transform
 from first paint, which makes it the containing block for every fixed descendant — see CSS trap 2,
@@ -178,6 +205,24 @@ decisions inside them are design, not detail:
   columns don't shift), takes the cursor back to `default` and mutes its words one step — but its
   identity dot stays at full hue, because it did anchor here and identity is not a state.
 
+- **History's tool card is the view's CONTROLS plus its roster** (`components/TrendExplore.tsx`,
+  2026-09-19). It is the first explorer whose card holds an instrument the reader OPERATES rather
+  than a state it reports, and the grammar splits on that: the METRIC is a PICKER — the same
+  hairline group the window pills wear, because a metric is a committed statement about what is on
+  screen — while `Same scale` is a SETTING and reads as a name plus its state
+  (`SettingSwitch`, `components/trendPickers.tsx`; the command bar's pressed-toggle is an ACTION
+  grammar and wrong for a setting, which is the reasoning the scale control was rebuilt on twice).
+  Neither is a selection, so they write their setters directly — `selectionBoundary`'s
+  own scope note says why, and why the plane FOCUS is in the table instead. Below the instrument
+  hairline the LAYERS list is an ordinary browse list: mark, name, last measured reading, and a
+  click that applies the SAME `trendPlaneActions` the plane's header strip runs. Its PAGER is
+  absent unless the roster exceeds `VISIBLE_PLANES` and clamps with the stack's own `clampScroll`,
+  so a chevron can never offer a step the geometry refuses.
+  ⚠️ **The roster is computed ONCE, in `components/useTrendRoster.ts`** — the planes, this list and
+  the cursor card all read it, counter EDGE TRIM included. A surface reading the payload directly
+  is one bucket out of step with the axis, which is exactly how the cursor card briefly quoted
+  yesterday's number; `components/trendRailBoundary.test.ts` pins all three "one home" rules.
+
 **Naming and copy rules:** About states the view's point of view ("How the network is built"); the tool
 card says what you BROWSE ("Nodes by network"). Eyebrows are bare role words, and each explorer's usage
 hint leads its card rather than trailing it. An explorer ROW is a browse target — mark, name, count,
@@ -189,6 +234,71 @@ place.
 dossier, country, provider, composition, then the snapshot chain (global snapshot ABOVE the metagraph
 snapshot it anchors), then node. `components/railCards.ts` is the manifest and
 `components/railCards.test.ts` pins the order, the availability and every hint.
+
+**History's lane is the network dossier, then the INSTANT** (2026-09-19) — the cursor card, a slot
+with NO focus rung, exactly as the two snapshot slots are. Its subject is `trendCursorMs`, which the
+band's timeline writes at most once per BUCKET (`sameBucket`, both gestures since 2026-09-19), so the
+title roll, the edge pulse and the tray highlight fire once per bucket rather than once per
+pointermove. Three rules are worth knowing before touching it:
+
+- **Presence is VIEW-SCOPED, unlike a pinned snapshot's.** A pinned snapshot keeps meaning wherever
+  you carry it, which is why its card renders in any 3D view; an instant is a reading OF THIS STACK,
+  so outside History it names no chart and ranks no roster. The cursor itself survives the switch;
+  only the card stands down.
+- **The cursor takes a place in `selStack`.** Without it the mode-entry collapse snapshot pinned the
+  slot shut and nothing in this view was a selection change that would drop it, so a click on the
+  timeline populated a card that stayed collapsed under its own eyebrow. It is still not a rung: no
+  pose, no deselect step, and the × clears the channel alone (`setTrendCursor`, deliberately outside
+  the pickActions table).
+- **THE TWO EXITS ARE THE CARD'S OWN FOOT CONTROLS, and one of them is shared.** `Snapshot records`
+  and the Trends document's per-chart link call ONE helper (`components/trendDoors.ts`): commit the
+  network through the table (guarded — that builder TOGGLES), hand the span to the log, switch the
+  mode, open the raw layer. Two copies of four ordered steps is how two surfaces start landing a
+  reader in different places. `All charts` is the other REGISTER of the same rung — this view's RAW
+  surface is the document, so it is one `setSection("data")` and no mode step at all.
+
+**The History view has three axes and each has one home** (user, 2026-09-19): left/right on the
+timeline is WHEN, the depth of the stack is WHO, and UP/DOWN is WHAT — the measure. Its control is
+the view's TITLE, centred under the command bar below the view switch (`TrendMeasure`: `∧ SNAPSHOTS
+∨`, riding `--rail-top` + `--topbar-extra` like the rails), plus `↑`/`↓` from inside a card; both
+step `trendMetric` through `METRIC_ORDER` (`src/data/trendSeries.ts`) — the rail picker's own order,
+so the two controls are one list. It is a view-level control because every card steps together (a
+stack whose planes showed different measures would stop being a comparison) — it first rode the
+front card's header as two bare chevrons, which said the measure belonged to that network and
+stepped through a list the reader could not see. The ends go INACTIVE rather than wrapping (the
+plank's rule). A setting, not a selection: it writes its setter directly, as the picker does.
+
+⚠️ **A MEASURE CHANGE IS TWO MOTIONS THAT TAKE TURNS** (`components/useStagedMeasure.ts`, user: "the
+animation is not smooth … load the new chart (smoothly) and then re-order"). The cards show a
+measure that LAGS the picked one: the old plots leave on a CSS transition (compositor-only — nothing
+re-renders), the shown measure swaps WHILE THE PLOTS ARE INVISIBLE (the one expensive render, where
+a hitch cannot be seen), the new plots ease in with the cards still in place, and only then is the
+HELD order released (`holdOrder`) so the projector eases each card to its new rank. The first cut
+remounted five recharts plots inside an enter animation while the stack re-ranked — three things at
+once, and the stutter was exactly that. The roll is ONE attribute on the stack root (`data-roll`,
+`group/stack`), read by every plot's wrapper; the title answers the press at once and the cards
+follow. **A card the reader focused stays in front through the re-rank** (user, 2026-09-19): the
+re-deal holds it at slot 0 whatever its new rank, and where the new order would drop it out of the
+visible window the store pages the window after it in the SAME write that publishes the order
+(`trendStack.scrollToKeep`, inside `setTrendIds`) — one write, so the camera's lean never releases.
+A step taken mid-sequence RETARGETS, never queues; reduced motion skips the sequence (an
+exit with transitions off is a 140ms blank).
+
+⚠️ **A DRAG THAT STARTS ON A CARD IS THE SCENE'S ORBIT** (`components/orbitHandoff.ts`). The header
+strips and the front card are where a hand lands, and a drag begun there used to go nowhere. Past
+the click slop the pointer is handed to the canvas as ONE synthetic `pointerdown` carrying the real
+pointer's id; OrbitControls captures it and the rest of the gesture is native — same damping, same
+limits, same touch handling. No component imports the engine: it is DOM to DOM through
+`canvas.scene-canvas`. Never hand off AT pointerdown — capturing the pointer away retargets its
+pointerup, and with it the click. This is also why the cards carry NO swipe gesture: a vertical
+touch swipe stepped the measure for a few hours, until one gesture had to mean two things.
+
+**Hovering pairs over `hoverFilter`, the app's own network channel** (convention 9). A Layers row, a
+plane's header strip and a cursor-card row are three ends of one pairing, with no channel of their
+own: hovering any of them turns that card's hairline to its network's hue and washes the rows. The
+hairline is the ONLY thing that changes — a preview that re-staggered the stack would read as a
+commit, the cards are opaque so there is no opacity to lift, and `.subject-paired`'s glow is a
+box-shadow, which a transformed plane may not carry.
 
 The chain runs coarse→fine like every other rung: a lane whose committed cards abut as one body reads
 adjacency as containment. (The chamber's storeys are the other way round — ribbons fall INTO the global
@@ -397,7 +507,7 @@ honest variant naming that fact; but "all" with 0 nodes is boot, so that ghost s
 flashing a false invite. A populated card renders in any 3D view; the ghost only appears where the view
 can actually produce the card.
 
-**The placeholder views host NO facts cards at all** — `detailsCards` returns `[]` outside the three 3D
+**The placeholder views host NO facts cards at all** — `detailsCards` returns `[]` outside the 3D
 views (user, 2026-08-10). A live node card, status pill and real ids beside a `preview · in development`
 wireframe is exactly the mixed signal rule 10 exists to prevent, and it arrived half-formed anyway: with
 no ladder for those views every present card fell through to Inspector's trailing non-ladder pass, which
@@ -408,15 +518,19 @@ matches the left rail, which shows About and no tool card there.
 
 **Bottom — the VITALS BAND** (`components/VitalsBand.tsx`, 2026-08-30 — the vitals left the crowded
 command bar; docs/superpowers/plans/2026-08-30-vitals-bottom-band.md is the plan). A slim full-width
-row of **read-only info cards**, one set per 3D view: hyper leads with a composition DONUT (the four
+row of **read-only info cards**, one set per STRUCTURAL 3D view (History's band holds the timeline
+instead — see the `bandContent` rule below): hyper leads with a composition DONUT (the four
 counts are shares of one fleet — the one honest home for a donut) plus its legend; geo shows its
 footprint numbers plus a nodes-by-country micro-bar row; the ledger shows its two rate cards (number +
 sparkline off the live buffers) beside the declicked tick bar-chart. This deliberately widens the old
 snapshots-only rule (2026-08-12): each band is the view's OWN vitals — the numbers the bar's vitals
 region used to show — so nothing generic returned. **The band's plate takes no pointer events**
 (`pointer-events-none` — user: "no clicking etc required"): every route the old strip's clicks served
-survives in the explorer rows and the global card's pager. The ONE exception is the ledger's TRENDS
-RIM (2026-09-08), a fixed SIBLING outside the plate — see the ledger row below. Colour is rule 3's: structural cyan, the
+survives in the explorer rows and the global card's pager. **No exceptions in the structural
+views**: the band carries no link to the History view (user, 2026-09-19 — the command bar's view
+switch opens it at every width, so a tab on the band was a second door to the same room); the
+band's one interactive tenant is the History view's own timeline (`bandContent === "timeline"`).
+Colour is rule 3's: structural cyan, the
 identity hue only under a committed filter — resolved once per band (`useVitalsScope`) and handed to
 every chart as its `accent` prop; the band wears NO filter-scope hairline (user, 2026-08-30 — the
 charts themselves state the scope). Identity is never colour-alone — every donut segment, country bar
@@ -527,6 +641,79 @@ writer, and it clears its own state when the viewport drops below 1100px — bel
 CSS-hidden and SCENE has no meaning, so a stuck `true` would strand the band and the camera's
 rails-lean with no visible way back.
 
+⚠️ **THE BAND'S CONTENT IS A POLICY ROW, AND ITS ONE INTERACTIVE TENANT IS THE TIMELINE**
+(2026-09-18). `vitalsLane` says whether the band MOUNTS and reserves space; `bandContent`
+(`"vitals" | "timeline"`) says what it HOLDS — two questions, two rows, because the History view
+answers them differently: it mounts the same band at the same `--vitals-h` behind the same
+`--bar-margin`, and fills it with `components/TrendTimeline.tsx` instead of read-only cells. The
+dispatch is the ONE `ViewCells` function, so the desktop band and the phone Vitals sheet can never
+hold different things, and the gate is the policy row rather than `mode === "trend"` (convention 7 —
+a sixth view must answer for itself instead of inheriting "vitals" by silence).
+**The plate stays `pointer-events-none`.** "No clicking etc required on any visualization here at
+the bottom" (user, 2026-08-30) is a rule about VITALS, which are readings; a timeline is a control,
+and a track you cannot press is a picture of one. So the timeline re-enables pointer events on ITS
+OWN ROOT and nothing else — every other view's band keeps the charter and the orbit drag keeps
+passing through. The sheets' `sceneCover` clip still governs it: measured, a covered strip hands
+both paint and hit-testing to the sheet above.
+**The gesture split is the decision: a CLICK sets the cursor (`trendCursorMs`), a DRAG brushes the
+range (`trendRange`)** — press inside the span ON SCREEN to pan it, press an edge to resize it, `×`
+or Escape clears it. ⚠️ **What is DRAWN is what is GRABBED** (`drawnSpan`, one function read by both
+the paint and the hit test): the track shows `trendRange` when one stands and otherwise the span the
+window pill implies, and computing those two separately left the visible rectangle ungrabbable in
+five of the six window states. Panning or resizing a window-implied span COMMITS it as a range —
+that is what the gesture means. Both gestures want the whole track and the alternative (a modifier
+for one of them) is unreachable on touch, which is the surface this most needs to work on; TRAVEL is
+the one discriminator every pointer type reports. The cursor is a COMMIT — it persists when the
+pointer leaves, because the rail reads it — while hovering previews a faint line locally and writes
+nothing (rule 9). Every decision a pointer makes is pure and tested in
+`src/data/trendTimeline.ts`; the component is a shell over it, split in two at ~300 lines —
+`TrendTimeline.tsx` is the band TENANT (which payload, the readout, the pills, the honesty
+states) and `TrendTrack.tsx` the INSTRUMENT (the SVG and every gesture), because the track's whole
+subject is a geometry it measures itself and nothing above it has those numbers. The window pills
+are shared with the Trends document through `components/trendPickers.tsx` — the two had already been
+caught drifting once (user, 2026-09-09), so the class strings have one home, and since 2026-09-19
+the METRIC picker, the setting SWITCH and the scope CHIP live there beside them for the same reason.
+
+**THE SCRUB IS THIS VIEW'S PRIMARY GESTURE, AND FOUR SEPARATE MEMO FAILURES MADE IT UNUSABLE.** All
+four were invisible in review and visible only in a frame counter, so they are recorded with their
+measurements — this is the shape the next one will take too.
+
+⚠️ **The scrub writes ONCE PER BUCKET, not per pointermove** (`sameBucket`, both gestures): the whole
+stack subscribes to `trendCursorMs`, so every write re-plans the fetch and repaints five charts,
+while two instants inside one bucket paint the identical frame. Measured on phone, a 300-event
+precise scrub went 271 writes / 1084 slice assemblies / 2.9 FPS → 45 / 0 / 9.8.
+
+⚠️ **A memo is only worth its key.** Two references were being rebuilt on the very renders the
+memos existed for: the shell's `leadingTrim` call (it returns its input unchanged ONLY when there is
+no leading gap, and the live `all` window always has one), and the stack's triple `metricSeries`
+pass. Both are memoised — and instrumenting the scrub turned up a third, a LAYOUT one: the cursor
+readout was content-sized beside a `flex-1` track, so a stamp changing width re-measured the track
+and re-derived its whole x↔ms geometry mid-gesture. A value slot reserves its width (the `NodeStars`
+rule, reaching a committed value). Across a 200-event scrub: `metricSeries` 8262 → **0**,
+`globalSeries`/`trackRuns`/`axisTicks` 306/334/334 → **0**.
+
+⚠️ **The charts themselves were the rest of it — the cursor is DRAWN OUTSIDE the memo** (2026-09-19).
+With the shared cursor as a recharts `ReferenceLine`, a bucket write re-rendered all five planes'
+charts: measured over a 60-step scrub of the `all` window at 1500×1000, **22.1s / 2.7 FPS / 600 plot
+renders → 1.4s / 40.7 FPS / 0**, and the hover sweep over the Layers rows **8.0s / 2.7 FPS / 220 →
+0.44s / 36.5 FPS / 0**. Two halves, both structural: `TrendChart`'s recharts subtree is a
+`React.memo` child (`TrendPlot`) whose props are the SERIES alone, and the cursor is a 1px CSS
+overlay beside it, positioned by `cursorFraction` over the chart's own numeric axis — `calc()` on a
+percentage of the plot box, so it needs no measurement and rides the plane's projected scale for
+free. `components/trendStackBoundary.test.ts` pins both halves, and the plot box they rest on: the
+chart keeps `<YAxis hide` (a shown axis would reserve width) and the one `PLOT_MARGIN` that both the
+plot and the overlay inset by.
+
+⚠️ **A memo is only worth its PROPS, and a hook that composes a fresh view object every render
+defeats one silently.** `useTrendRoster` runs its expensive pass in a `useMemo` and then returns a
+`{…}` built from it — which for one round was a new reference on every render, so a consumer's
+`useMemo([roster])` could not tell content-free churn from a real change, and the first cut of the
+measurement above came back no faster at all. The hook memoises its RETURN as well, on the pass plus
+stable or primitive fields, so `roster` itself holds still and a consumer may depend on it or on
+`roster.rows` alike. Keep it that way: every field it returns has to be the memoised pass, a
+reference its caller holds still, or something derived from a primitive dep — a field computed
+inline in the return would quietly restore the bug for every consumer at once.
+
 ### Boot entrance, routes & the doc overlay (2026-09-04)
 
 **Adding a view is registry-driven — consistency is the default, not a checklist.**
@@ -535,6 +722,13 @@ rails-lean with no visible way back.
   `components/views.ts` (name + slug + desc). The bar button, the route (`app/[view]` +
   sitemap read `ROUTED_VIEWS`), the footer link, the gather/entry choreography, boot staging
   and the URL bridge all follow from those homes.
+  **History proved it** (2026-09-18): a fourth view landed through exactly those registries plus
+  `cameraRig`'s `FOCI`/rest-pose entry and a `sceneRig` row, and the policy row grew six fields
+  rather than the app growing six mode compares — `fleet` (placed or parked), `rawSurface` (which
+  register RAW shows), `chartStack` (does the DOM plane layer mount), `autoRotate` (does the camera
+  idle-orbit; it replaced a `mode !== "geo"` deny-list that had already silently handed the new view
+  hyper's spin), `bandContent` (vitals cells or the timeline) and `show.trendGround`. Each is the
+  same move: a question the app was answering by silence becomes a question every view answers.
 - **The placeholder is ONE view** ("soon", consolidated 2026-09-04 — three modes said the same
   nothing three times): one dimmed "Coming soon" bar entry, one FLAT policy row, and the
   Blueprint GALLERY inside it previews every coming feature (each keeping the mark it wore as a
@@ -548,6 +742,11 @@ rails-lean with no visible way back.
   route file passing `doc`, a footer `DocToggle`. The engine's bare stage, both transition
   signals and the roll grammar follow automatically; the store's `docPage` union is the one
   deliberate duplicate, and tsc flags it the moment the registries disagree.
+  ⚠️ **The registry is for PROSE OVER THE BARE STAGE, and nothing else** (2026-09-18). A document
+  that is a VIEW's second register is not a doc page: it belongs to the raw layer, through that
+  view's `rawSurface` row. The Trends document was a third entry until History became a view, and
+  the two flags it needed there — `scoped` (keep the bar's filter up over it) and `routeless` (no
+  URL of its own) — were removed with it, since RAW gives both for free. Don't reintroduce either.
 
 - **The HUD arrives staged** (`useBootStage` + `BootFade`, wired in `AppShell`): command bar when
   the engine is up (or failed — chrome is controls), rails/dock/footer on first data, vitals band
@@ -1106,7 +1305,10 @@ seam and corner rules select on the same markers the thread measures:
 | `data-depth` / `data-focus` / `data-ghost` | The thread's read — depth dimming and dot state |
 | `.nb-row` | The pairing row-wash selector |
 | `#topbar`, `#metapane`, `#tooltip` | Layout and positioning |
+| `canvas.scene-canvas` | `SceneCanvas` renders it; `orbitHandoff` queries it to hand a card drag to OrbitControls (`trendStackBoundary.test.ts` pins both ends) |
 | `#callout` (+ `data-on`) | The subject callout's 0-size anchor wrapper — `SceneCallout` renders it, `CalloutSync` writes its transform + `data-on` per frame (the Tooltip discipline: position never renders React) |
+| `#trend-stack` (+ `data-on`) | The trend view's chart-plane layer — `TrendStack` renders it, the engine queries it to find the planes. It waits at `opacity: 0` and `TrendStackSync` writes `data-on="1"` once the view has ARRIVED (policy `chartStack` + the trend furniture alpha at full), so the stack fades in with the room rather than riding the camera's flight — the `#callout` `data-on` precedent |
+| `[data-plane]` (the network id) | One chart plane, as an ANCHOR + a CHILD. The anchor is a **0-size box at the layer's top-left with `origin-top-left`**, mounted `invisible`; its one child is the `PLANE_PX_W`-wide plane, centred on it by `-translate-x-1/2 -translate-y-1/2`. **React renders the plane and owns everything inside it** plus the anchor's `opacity` / `zIndex` / `pointer-events` (all from the same `PlanePose`); `TrendStackSync` (engine layer) writes the anchor's `transform` — a `matrix3d` translate + uniform scale, never a rotation — and its `style.visibility` per frame. The anchor's geometry IS that matrix's coordinate system, so don't give it a size, an origin or a transform of its own; `components/trendStackBoundary.test.ts` pins it |
 
 ⚠️ The card query is deliberately **depth-agnostic** (filtered to outermost panels): a `:scope >
 .ig-panel` form silently matches nothing once the ladder lane nests the cards.

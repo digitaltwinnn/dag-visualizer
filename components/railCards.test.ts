@@ -40,6 +40,9 @@ describe("exploreCards — LEFT rail (Explore)", () => {
   it("ledger hosts About + the snapshots-browser tool", () => {
     expect(presentKinds(exploreCards({ mode: "ledger" }))).toEqual(["about", "tool"]);
   });
+  it("History hosts About + the Layers tool — the view's controls and its browse list", () => {
+    expect(presentKinds(exploreCards({ mode: "trend" }))).toEqual(["about", "tool"]);
+  });
   it.each(["soon"] as const)("placeholder %s hosts About only", (mode) => {
     expect(presentKinds(exploreCards({ mode }))).toEqual(["about"]);
   });
@@ -64,7 +67,7 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     // metagraph snapshot → node (user, 2026-09-15). This order also drives the phone flat stack
     // and the tray icons, so the two can never disagree.
     const ids = detailsCards(details({ filter: "dor", inspect: nodePick, snap: snapPick })).map((c) => c.id);
-    expect(ids).toEqual(["snap", "context", "country", "cohort", "composition", "metaSnap", "node"]);
+    expect(ids).toEqual(["snap", "context", "instant", "country", "cohort", "composition", "metaSnap", "node"]);
   });
   it("ledger ghosts: snapshot + context + metaSnap + node invites (nodes pick in the chamber too)", () => {
     expect(ghostIds(detailsCards(details({})))).toEqual(["snap", "context", "metaSnap", "node"]);
@@ -160,6 +163,42 @@ describe("the metagraph snapshot slot", () => {
   });
 });
 
+// ── THE HISTORY VIEW'S CURSOR SLOT (2026-09-19) ─────────────────────────────────────────────
+// `instant` is a card slot with NO focus rung — the two snapshot slots' precedent
+// (`railLadderBoundary` asserts rung → slot, never the reverse). Its subject is the committed
+// time cursor, which the timeline writes once per bucket, so the tray highlight and the title
+// roll fire once per bucket change rather than once per pointermove.
+describe("the instant slot — History's cursor card", () => {
+  const trend = (over: Partial<RailManifestState> = {}) => details({ mode: "trend", ...over });
+
+  it("sits under the network dossier in History's lane, and is not a rung", () => {
+    expect(ladderSlotIds("trend")).toEqual(["context", "instant"]);
+    expect(ladderLevelOfSlot("instant")).toBeNull();
+  });
+
+  it("ghosts with the GESTURE and nothing else while no instant is picked", () => {
+    const c = detailsCards(trend()).find((x) => x.id === "instant")!;
+    expect(c.present).toBe(false);
+    expect(c.hint).toBe("Click the timeline below.");
+  });
+
+  it("is History-scoped — no other view can produce it", () => {
+    for (const mode of ["hyper", "geo", "ledger"] as const) {
+      expect(detailsCards(details({ mode })).find((c) => c.id === "instant")?.hint).toBeNull();
+    }
+  });
+
+  it("populates on a committed cursor, keyed on the instant the timeline wrote", () => {
+    const c = detailsCards(trend({ trendCursorMs: 1_726_704_000_000 })).find((x) => x.id === "instant")!;
+    expect(c.present).toBe(true);
+    expect(c.subjectKey).toBe(1_726_704_000_000);
+  });
+
+  it("History ghosts are exactly the network dossier and the cursor", () => {
+    expect(ghostIds(detailsCards(trend()))).toEqual(["context", "instant"]);
+  });
+});
+
 describe("ladderSlotIds — the descent-spine lane (display order = reversed rung order)", () => {
   it("mirrors focusLadder.LADDERS coarsest→coarsest per 3D view", () => {
     expect(ladderSlotIds("geo")).toEqual(["context", "country", "cohort", "node"]);
@@ -181,7 +220,7 @@ describe("ladderSlotIds — the descent-spine lane (display order = reversed run
   });
   it("every ladder slot id exists in the details manifest (the lane can't invent a slot)", () => {
     const ids = detailsCards(details({ mode: "geo" })).map((c) => c.id);
-    for (const view of ["geo", "hyper", "ledger"] as const)
+    for (const view of ["geo", "hyper", "ledger", "trend"] as const)
       for (const slot of ladderSlotIds(view)) expect(ids).toContain(slot);
   });
 });
@@ -203,10 +242,10 @@ describe("ladderLevelOfSlot — the inverse read (which RUNG does a slot stand f
     expect(ladderLevelOfSlot("tool")).toBeNull();
   });
   it("every lane slot either names a rung or is a known non-rung slot", () => {
-    for (const view of ["geo", "hyper", "ledger"] as const)
+    for (const view of ["geo", "hyper", "ledger", "trend"] as const)
       for (const slot of ladderSlotIds(view)) {
         const level = ladderLevelOfSlot(slot);
-        if (!level) expect(["snap", "metaSnap"]).toContain(slot);
+        if (!level) expect(["snap", "metaSnap", "instant"]).toContain(slot);
         else expect(LADDERS[view].some((r) => r.level === level)).toBe(true);
       }
   });
@@ -265,12 +304,13 @@ describe("focusSlotId — the focus rung both rails read", () => {
 // re-introduced by the very edit that fixed the first version of them, which is why they are here
 // rather than in a comment. The exact wording stays free: only the SHAPE is pinned.
 describe("ghost hints — the copy rule", () => {
-  const VIEWS = ["hyper", "geo", "ledger"] as const;
+  const VIEWS = ["hyper", "geo", "ledger", "trend"] as const;
   // The noun each slot's own eyebrow already carries. A hint that repeats it has spent its one
   // sentence restating the label ("Country — Drill a country on the globe.").
   const OWN_NOUN: Record<string, string> = {
     context: "network", country: "country", cohort: "provider",
     composition: "composition", snap: "snapshot", metaSnap: "snapshot", node: "node",
+    instant: "instant",
   };
   const hintsIn = (mode: (typeof VIEWS)[number]) =>
     detailsCards(details({ mode })).filter((c) => !c.present && c.hint).map((c) => ({ id: c.id, hint: c.hint! }));

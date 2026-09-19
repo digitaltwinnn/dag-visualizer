@@ -43,6 +43,15 @@ export const SHELL_ID = "shell";
 const SCENE_BACK = 0.92;
 const SCENE_DIM = 0.26;
 
+/** How long the raw layer takes to SINK back into the scene, in seconds — the exit's first beat,
+ *  after which the layer is `visibility:hidden` and out of the paint path entirely.
+ *
+ *  Exported because a surface inside the layer may need to outlive the store write that closed it:
+ *  `datasection/DocumentSurface` unmounts the Trends document on close, and unmounting it the
+ *  instant `section` flips would blank the layer while it is still receding. One number, read by
+ *  the timeline below and by whoever has to wait for it — never a second constant that drifts. */
+export const RAW_EXIT_S = 0.3;
+
 export default function SectionShell({
   scene,
   children,
@@ -91,7 +100,7 @@ export default function SectionShell({
             d(0.16),
           );
       } else {
-        t.to(layer, { opacity: 0, scale: 0.96, yPercent: 1, duration: d(0.3), ease: "power2.in" }, 0)
+        t.to(layer, { opacity: 0, scale: 0.96, yPercent: 1, duration: d(RAW_EXIT_S), ease: "power2.in" }, 0)
           .set(layer, { visibility: "hidden" })
           .to(shell, { scale: 1, opacity: 1, duration: d(0.5), ease: "power3.out" }, d(0.1))
           .to(hud, { opacity: 1, duration: d(0.4), ease: "power2.out" }, d(0.2));

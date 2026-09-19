@@ -4,7 +4,7 @@
 // as "no leading gap"; the client clock judging a CDN-cached payload's newest bucket; the
 // leading partial month drawn whole while the trailing one was trimmed).
 import { describe, expect, it } from "vitest";
-import { cutRange, leadingTrim, monthlySum, pickRangeTier, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, type TrendsWindowData } from "./trendWindow";
+import { assembleTrendSlice, bucketAt, cursorFraction, cutRange, leadingTrim, monthlySum, pickRangeTier, planTrendFetch, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, ZOOMS, type TrendsWindowData } from "./trendWindow";
 
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
@@ -155,5 +155,279 @@ describe("stitchWindows", () => {
   });
   it("is empty-safe", () => {
     expect(stitchWindows([]).buckets).toEqual([]);
+  });
+});
+
+// The shared time cursor's bucket lookup (2026-09-18). `store.trendCursorMs` is ONE instant and
+// every chart plane has to mark the bucket that CONTAINS it — a mark placed on the nearest bucket
+// instead would misstate which day the reader is being shown, which is rule 10 in the one place a
+// reader would never catch it. Buckets are ascending START instants, `stepMs` wide, half-open
+// [start, start + stepMs) — the same interval `cutRange` already treats them as. Ascending is a
+// CONTRACT of every TrendsWindowData in the app (the API assembles them in order, `stitchWindows`
+// sorts), so an unsorted array is not a case this is required to answer.
+describe("bucketAt", () => {
+  const B = [0, HOUR, 2 * HOUR];
+
+  it("returns the bucket START of the bucket containing the instant", () => {
+    expect(bucketAt(B, HOUR, HOUR + 1)).toBe(HOUR);
+    expect(bucketAt(B, HOUR, 2 * HOUR + HOUR - 1)).toBe(2 * HOUR);
+  });
+
+  it("is half-open: a bucket's own start is inside it, the next start is not", () => {
+    expect(bucketAt(B, HOUR, HOUR)).toBe(HOUR);
+    expect(bucketAt(B, HOUR, 2 * HOUR)).toBe(2 * HOUR);
+  });
+
+  it("returns null before the first bucket", () => {
+    expect(bucketAt(B, HOUR, -1)).toBe(null);
+  });
+
+  it("returns null at and after the span's exclusive end (last + stepMs)", () => {
+    expect(bucketAt(B, HOUR, 3 * HOUR)).toBe(null);
+    expect(bucketAt(B, HOUR, 3 * HOUR + 1)).toBe(null);
+    expect(bucketAt(B, HOUR, 2 * HOUR + HOUR - 1)).toBe(2 * HOUR); // the last instant inside
+  });
+
+  it("is empty-safe — no buckets is no span, so nothing contains anything", () => {
+    expect(bucketAt([], HOUR, 0)).toBe(null);
+  });
+
+  it("finds a DAILY bucket from an instant partway through it", () => {
+    const days = [Date.UTC(2026, 8, 1), Date.UTC(2026, 8, 2), Date.UTC(2026, 8, 3)];
+    expect(bucketAt(days, DAY, Date.UTC(2026, 8, 2, 13, 47))).toBe(Date.UTC(2026, 8, 2));
+  });
+});
+
+// ---- WHERE THE CURSOR SITS ON THE PLOT (2026-09-19) -------------------------------
+// The shared cursor used to be a recharts `ReferenceLine`, which meant every cursor write
+// re-rendered the whole chart — five of them per bucket, which measured at 3-4 FPS across a
+// scrub. It is a lightweight DOM overlay now, and this is the only maths that move moved out of
+// recharts: WHERE, as a fraction of the plot box, the chart's own numeric XAxis puts a bucket.
+//
+// The axis is `type="number"`, `domain={["dataMin", "dataMax"]}` — so the OLDEST bucket sits at
+// the left edge of the plot box and the NEWEST at the right, linearly between. That is the whole
+// rule, and expressing it as a fraction is what lets the overlay be pure CSS `calc()` over a
+// percentage of that box: no measurement, no ResizeObserver, and it rides the 3D plane's own
+// scale for free.
+//
+// ⚠️ IT TAKES A BUCKET, NOT AN INSTANT. `bucketAt` above is still the containment rule — the
+// overlay marks the bucket that CONTAINS the instant or nothing at all (rule 10) — and this
+// function answers only "where is that bucket". A value that is not one of the axis's own
+// buckets has no place on it and gets `null` rather than an interpolated position.
+describe("cursorFraction", () => {
+  const B = [0, HOUR, 2 * HOUR, 3 * HOUR];
+
+  it("puts the first bucket at the plot's left edge", () => {
+    expect(cursorFraction(B, 0)).toBe(0);
+  });
+
+  it("puts the last bucket at the plot's right edge", () => {
+    expect(cursorFraction(B, 3 * HOUR)).toBe(1);
+  });
+
+  it("is linear in between — the axis is numeric, not categorical", () => {
+    expect(cursorFraction(B, HOUR)).toBeCloseTo(1 / 3, 12);
+    expect(cursorFraction(B, 2 * HOUR)).toBeCloseTo(2 / 3, 12);
+  });
+
+  it("spaces by TIME, not by index — an irregular axis is still linear in ms", () => {
+    expect(cursorFraction([0, HOUR, 4 * HOUR], HOUR)).toBeCloseTo(0.25, 12);
+  });
+
+  it("puts a single-bucket axis at the left edge — dataMin IS dataMax, and 0/0 is not a position", () => {
+    expect(cursorFraction([HOUR], HOUR)).toBe(0);
+    expect(cursorFraction([HOUR], 0)).toBe(null);
+  });
+
+  it("returns null for a bucket the axis does not carry", () => {
+    expect(cursorFraction(B, HOUR + 1)).toBe(null);
+    expect(cursorFraction(B, -HOUR)).toBe(null);
+    expect(cursorFraction(B, 9 * HOUR)).toBe(null);
+  });
+
+  it("returns null for no cursor at all, so the caller needs no second guard", () => {
+    expect(cursorFraction(B, null)).toBe(null);
+  });
+
+  it("is empty-safe — no axis is no position", () => {
+    expect(cursorFraction([], 0)).toBe(null);
+  });
+});
+
+// ---- THE WINDOW/RANGE DATA PATH (2026-09-18) --------------------------------------
+// The document and the 3D stack are TWO REGISTERS OF ONE RUNG, so the decision "which payloads
+// does this window need, and how is each cut" belongs to neither component. These tests ARE that
+// decision: the plan table below is what both surfaces fetch, and the assembler is every honesty
+// cut composed in one order. A divergence here is the bug class the whole task exists to close —
+// two surfaces reading the same rung through different windows.
+describe("planTrendFetch", () => {
+  it("1H rides the 24h payload, sliced to the newest hour — a window is not always an API window", () => {
+    const plan = planTrendFetch("1h", null);
+    expect(plan.main.window).toBe("24h");
+    expect(plan.main.tiles).toBe(null);
+    expect(plan.main.cut).toEqual({ kind: "slice", ms: HOUR });
+  });
+
+  it("every other zoom IS its own API window, uncut", () => {
+    for (const z of ["24h", "7d", "30d", "1y", "all"] as const) {
+      const plan = planTrendFetch(z, null);
+      expect(plan.main.window).toBe(z);
+      expect(plan.main.cut).toEqual({ kind: "none" });
+      expect(plan.main.tiles).toBe(null);
+    }
+  });
+
+  it("the FLEET rides the 7d hourly payload at the two fine zooms, sliced to the picked span", () => {
+    expect(planTrendFetch("1h", null).fleet).toEqual({ window: "7d", tiles: null, cut: { kind: "slice", ms: HOUR } });
+    expect(planTrendFetch("24h", null).fleet).toEqual({ window: "7d", tiles: null, cut: { kind: "slice", ms: 24 * HOUR } });
+  });
+
+  it("the fleet needs no payload of its own at the hourly and daily zooms — the main one carries it", () => {
+    for (const z of ["7d", "30d", "1y", "all"] as const) {
+      expect(planTrendFetch(z, null).fleet).toEqual({ window: null, tiles: null, cut: { kind: "none" } });
+    }
+  });
+
+  it("the DAILY readout payload is the 90d window, and only at the two hourly zooms", () => {
+    expect(planTrendFetch("7d", null).daily).toBe("90d");
+    expect(planTrendFetch("30d", null).daily).toBe("90d");
+    for (const z of ["1h", "24h", "1y", "all"] as const) expect(planTrendFetch(z, null).daily).toBe(null);
+  });
+
+  it("a DAILY-tier range rides the one `all` payload, cut to the range", () => {
+    const from = Date.UTC(2025, 8, 1);
+    const to = Date.UTC(2026, 0, 1);
+    const plan = planTrendFetch("all", { fromMs: from, toMs: to });
+    expect(plan.tier).toBe("1d");
+    expect(plan.main.window).toBe("all");
+    expect(plan.main.tiles).toBe(null);
+    expect(plan.main.cut).toEqual({ kind: "range", fromMs: from, toMs: to });
+  });
+
+  it("a 5m-tier range fetches 5m TILES, and the fleet its own hourly tiles", () => {
+    const from = Date.UTC(2026, 8, 17, 6);
+    const to = Date.UTC(2026, 8, 17, 12);
+    const plan = planTrendFetch("all", { fromMs: from, toMs: to });
+    expect(plan.tier).toBe("5m");
+    expect(plan.main.window).toBe(null);
+    expect(plan.main.tiles).toEqual({ tier: "5m", fromMs: from, toMs: to });
+    expect(plan.fleet.tiles).toEqual({ tier: "1h", fromMs: from, toMs: to });
+    expect(plan.fleet.cut).toEqual({ kind: "range", fromMs: from, toMs: to });
+  });
+
+  it("an HOURLY-tier range fetches hourly tiles and NO fleet leg — those buckets already are hourly", () => {
+    const from = Date.UTC(2026, 7, 1);
+    const to = Date.UTC(2026, 7, 20);
+    const plan = planTrendFetch("all", { fromMs: from, toMs: to });
+    expect(plan.tier).toBe("1h");
+    expect(plan.main.tiles).toEqual({ tier: "1h", fromMs: from, toMs: to });
+    expect(plan.fleet).toEqual({ window: null, tiles: null, cut: { kind: "none" } });
+  });
+
+  it("a range does NOT retire the zoom's daily-readout leg — the readout answers the zoom", () => {
+    const plan = planTrendFetch("7d", { fromMs: Date.UTC(2026, 7, 1), toMs: Date.UTC(2026, 7, 20) });
+    expect(plan.daily).toBe("90d");
+  });
+
+  it("a null zoom fetches NOTHING — the consumer is not showing charts", () => {
+    const plan = planTrendFetch(null, { fromMs: 0, toMs: DAY });
+    expect(plan).toEqual({
+      main: { window: null, tiles: null, cut: { kind: "none" } },
+      fleet: { window: null, tiles: null, cut: { kind: "none" } },
+      daily: null,
+      tier: null,
+    });
+  });
+});
+
+describe("ZOOMS", () => {
+  it("is the one window vocabulary both registers read, coarsest last", () => {
+    expect(ZOOMS.map((z) => z.id)).toEqual(["1h", "24h", "7d", "30d", "1y", "all"]);
+    expect(ZOOMS.map((z) => z.label)).toEqual(["1H", "24H", "7D", "30D", "1Y", "All"]);
+  });
+});
+
+describe("assembleTrendSlice", () => {
+  const fleetWin = (startMs: number, stepMs: number, n: number): TrendsWindowData => ({
+    buckets: Array.from({ length: n }, (_, i) => startMs + i * stepMs),
+    stepMs,
+    series: { "g.ticks": Array.from({ length: n }, () => 1), "f.nodes": Array.from({ length: n }, (_, i) => 100 + i) },
+    now: startMs + n * stepMs,
+  });
+
+  it("cuts, leading-trims and reports the main window", () => {
+    const plan = planTrendFetch("all", null);
+    const s = assembleTrendSlice(plan, { main: win(0, DAY, [null, 1, 2]) });
+    expect(s.buckets).toEqual([DAY, 2 * DAY]);
+    expect(s.stepMs).toBe(DAY);
+    expect(s.p?.series["g.ticks"]).toEqual([1, 2]);
+  });
+
+  it("1H slices the 24h payload to its newest hour", () => {
+    const plan = planTrendFetch("1h", null);
+    const s = assembleTrendSlice(plan, { main: win(0, HOUR / 12, new Array<number>(288).fill(1)) });
+    expect(s.buckets.length).toBe(12);
+    expect(s.stepMs).toBe(HOUR / 12);
+  });
+
+  it("NULLS SURVIVE — an unmeasured bucket is a gap, never a zero", () => {
+    const plan = planTrendFetch("all", null);
+    const s = assembleTrendSlice(plan, { main: win(0, DAY, [1, null, 3]) });
+    expect(s.p?.series["g.ticks"]).toEqual([1, null, 3]);
+    expect(s.p?.series["m.x.snaps"]).toEqual([2, null, 6]);
+  });
+
+  it("an ABSENT main payload yields undefined pieces, not an empty fabricated window", () => {
+    const s = assembleTrendSlice(planTrendFetch("all", null), {});
+    expect(s.p).toBeUndefined();
+    expect(s.pF).toBeUndefined();
+    expect(s.daily).toBeUndefined();
+    expect(s.buckets).toEqual([]);
+    expect(s.stepMs).toBe(DAY);
+    expect(s.fleetPending).toBe(false);
+  });
+
+  it("the FLEET's own hourly payload takes over when the main window is finer than an hour", () => {
+    const plan = planTrendFetch("24h", null);
+    const s = assembleTrendSlice(plan, {
+      main: win(0, HOUR / 12, new Array<number>(288).fill(1)),
+      fleet: fleetWin(0, HOUR, 168),
+    });
+    expect(s.fStep).toBe(HOUR);
+    expect(s.fBuckets.length).toBe(24);
+    expect(s.pF).not.toBe(s.p);
+    expect(s.fleetPending).toBe(false);
+  });
+
+  it("while that payload is in flight the gauges are PENDING, and say so rather than drawing nothing", () => {
+    const plan = planTrendFetch("24h", null);
+    const s = assembleTrendSlice(plan, { main: win(0, HOUR / 12, new Array<number>(288).fill(1)) });
+    expect(s.fleetPending).toBe(true);
+    expect(s.pF).toBe(s.p);
+    expect(s.fStep).toBe(HOUR / 12);
+  });
+
+  it("at an hourly-or-coarser window the gauges ride the MAIN payload and never pend", () => {
+    const plan = planTrendFetch("7d", null);
+    const s = assembleTrendSlice(plan, { main: win(0, HOUR, [1, 2, 3]), fleet: fleetWin(0, HOUR, 168) });
+    expect(s.pF).toBe(s.p);
+    expect(s.fBuckets).toBe(s.buckets);
+    expect(s.fStep).toBe(HOUR);
+    expect(s.fleetPending).toBe(false);
+  });
+
+  it("the daily-readout payload arrives with its still-filling newest day trimmed", () => {
+    const plan = planTrendFetch("7d", null);
+    const daily = win(0, DAY, [1, 2, 3], 2 * DAY + 1);
+    const s = assembleTrendSlice(plan, { main: win(0, HOUR, [1]), daily });
+    expect(s.daily?.buckets).toEqual([0, DAY]);
+  });
+
+  it("a committed range cuts the payload it was planned against", () => {
+    const from = Date.UTC(2025, 8, 3);
+    const to = Date.UTC(2025, 8, 5);
+    const plan = planTrendFetch("all", { fromMs: from, toMs: to });
+    const s = assembleTrendSlice(plan, { main: win(Date.UTC(2025, 8, 1), DAY, [1, 2, 3, 4, 5, 6]) });
+    expect(s.buckets).toEqual([from, Date.UTC(2025, 8, 4), to]);
   });
 });

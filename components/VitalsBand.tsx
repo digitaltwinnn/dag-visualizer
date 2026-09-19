@@ -19,19 +19,20 @@
 // (dataviz discipline).
 
 // ⚠️ THIS FILE IS THE SHELL NOW (2026-09-15). It decides WHICH view's cells are showing, carries
-// the rim and the sheet body, and owns `useVitalsScope` — the one place the accent is resolved and
+// the band and the sheet body, and owns `useVitalsScope` — the one place the accent is resolved and
 // handed down. The cells themselves live in ./vitals/viewCells and the plate + micro-instruments
 // in ./vitals/bandParts; between them the file had grown past 1400 lines holding three unrelated
 // jobs. Splitting it changed no behaviour: the three cell sets were already separate components.
 
 import { useStore, type Mode } from "@/src/store/store";
+import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import RollSwap from "@/components/RollSwap";
 import { filterAccent } from "@/src/data/network";
 import { NoSignalDot } from "@/components/state/StateAtoms";
-import { DOC_ICONS } from "@/components/icons";
 import { useSceneYield } from "@/components/RailShade";
 import { cn } from "@/lib/utils";
 import { HyperCells, GeoCells, LedgerCells } from "@/components/vitals/viewCells";
+import TrendTimeline from "@/components/TrendTimeline";
 
 function useVitalsScope() {
   const mode = useStore((s) => s.mode);
@@ -42,8 +43,17 @@ function useVitalsScope() {
 }
 
 /** The one view→cells dispatch — a cell added or gated here reaches desktop and phone in the
- *  same edit, which is the whole point of extracting it. */
-function ViewCells({ mode, accent, filter, paused = false }: { mode: string; accent: string; filter: string; paused?: boolean }) {
+ *  same edit, which is the whole point of extracting it.
+ *
+ *  ⚠️ IT ALSO DISPATCHES THE BAND'S CONTENT (2026-09-18). The band is ONE mounted surface with a
+ *  fixed height and one set of edges, and `viewPolicy.bandContent` says what it HOLDS — vitals
+ *  cells in the structural views, the shared TIMELINE in the History view. A policy row rather
+ *  than a `mode === "trend"` here, per convention 7: the question is "what is this view's bottom
+ *  lane for", and a view that never answers it would inherit "vitals" by silence. It belongs in
+ *  this dispatch for the same reason the cells do — both presentations render it, so the band and
+ *  the phone sheet can never hold different things. */
+function ViewCells({ mode, accent, filter, paused = false }: { mode: Mode; accent: string; filter: string; paused?: boolean }) {
+  if (VIEW_POLICIES[mode].bandContent === "timeline") return <TrendTimeline />;
   return (
     <>
       {mode === "hyper" && <HyperCells accent={accent} />}
@@ -53,65 +63,13 @@ function ViewCells({ mode, accent, filter, paused = false }: { mode: string; acc
   );
 }
 
-/** The TRENDS LINK — the band's one interactive element (user, 2026-09-08: "some sort of
- *  separate control bar that sets the range + links to the separate trends page"; the range
- *  half retired 2026-09-13). A small tab riding the band's TOP edge in the file-cabinet
- *  vocabulary the Trends page itself uses: the route to the page where the elaborate,
- *  RANGEABLE versions live. It is a fixed SIBLING of the band, not a child — the band's
- *  clip-path would amputate anything protruding past its border box, and the band's
- *  `pointer-events-none` charter stays intact: the cards below remain read-only, and this tab
- *  is the one deliberate exception, OUTSIDE the plate.
- *
- *  ⚠️ UNGATED, IN EVERY VIEW THAT CARRIES THE BAND (user, 2026-09-13). It used to ride
- *  `viewPolicy.vitalsWindows` — right for a range PICKER, whose windowed cells only the ledger
- *  reads, and wrong for the link: /trends is the measured history of the whole network, so the
- *  step down the observation ladder (convention 12) is offered from wherever the band is. It
- *  therefore needs no policy row of its own; the band's own `vitalsLane` gate is its gate. */
-const TrendsMark = DOC_ICONS.trends;
-
-/** The Trends route as a LINK (user, 2026-09-08: "should not be part of the button-group, it
- *  should show as a link") — the site row's own link register: primary ink, normal case, the
- *  page's mark. Shared by both presentations (2026-09-08): the desktop band's floating tab and
- *  the phone Vitals sheet's row render ONE component, so a route renamed reaches both in the
- *  same edit — the ViewCells rule, applied to the control. */
-function TrendsLink({ className }: { className?: string }) {
-  const setDocPage = useStore((s) => s.setDocPage);
-  return (
-    <button
-      type="button"
-      onClick={() => setDocPage("trends")}
-      title="The measured history behind these vitals — open the Trends page."
-      className={cn("inline-flex items-center gap-1.5 rounded-full px-2 text-label text-primary/75 hover:text-primary whitespace-nowrap bg-transparent", className)}
-    >
-      <TrendsMark aria-hidden className="size-3.5" />
-      Trends
-    </button>
-  );
-}
-
-function TrendsRim({ yielding, hidden }: { yielding: boolean; hidden: boolean }) {
-  return (
-    <div
-      style={{ right: "var(--bar-margin)", bottom: "calc(var(--footer-h, 0px) + var(--vitals-h) + 6px)" }}
-      // The tab rides the band's own exit (2026-09-13): it is furniture ON the lane's top edge,
-      // so it leaves through the bottom with it rather than fading on its own account.
-      data-hidden={hidden ? "" : undefined}
-      className={cn(
-        "band-shade",
-        // The pill survived the range group's retirement (user, 2026-09-13) — it is what makes
-        // the link read as a thing you touch rather than a caption over the plate. Its hairline
-        // is PRIMARY-TINTED, not the cards' neutral: cyan is the app's one affordance signal,
-        // so a cyan-edged pill among neutral-edged plates reads as the affordance.
-        "fixed z-10 flex items-stretch h-[26px] p-0.5 rounded-full border border-primary/25",
-        "[background:var(--topbar-glass)] backdrop-blur-sm",
-        "[transition:opacity_300ms_ease,transform_300ms_ease] motion-reduce:!transition-none",
-        yielding && "opacity-40",
-      )}
-    >
-      <TrendsLink />
-    </div>
-  );
-}
+// ⚠️ THE BAND CARRIES NO LINK TO THE HISTORY VIEW (user, 2026-09-19: "remove the 'history' pill
+// from the bottom section, we have topbar navigation now"). A small tab used to ride the band's
+// top edge — first as the route to the standalone trends page (2026-09-08), then to the History
+// view. Once that view took its place in the command bar's view switch the tab was a second door
+// to a room the bar already opens, at every width. The plate is read-only again with no
+// exceptions in the structural views; the timeline (`bandContent === "timeline"`) is the band's
+// one interactive tenant.
 
 /** The band. Mounted by BottomStream (per viewPolicy.vitalsLane + scene pose + rails visible);
  *  this component reads the mode only to pick which view's cells to lay out. */
@@ -140,8 +98,6 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
   const coverL = useStore((s) => s.sceneCoverL);
   const coverR = useStore((s) => s.sceneCoverR);
   return (
-    <>
-      <TrendsRim yielding={yielding} hidden={hidden} />
       <section
       id="vitalsband"
       aria-label="View vitals"
@@ -226,7 +182,6 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
           bare numbers, the band's own charts already wear the identity accent under a filter,
           so the scope is stated by the vitals themselves. */}
     </section>
-    </>
   );
 }
 
@@ -251,12 +206,6 @@ export function VitalsSheetBody() {
       )}
     >
       {!live && <span className="self-center flex-none mb-2"><NoSignalDot /></span>}
-      {/* The link, in the sheet's own register (2026-09-08): an in-flow full-width pill at
-          thumb height above the cards — the sheet is interactive (unlike the band), so it
-          simply sits in the column. Ungated like the desktop tab (2026-09-13). */}
-      <div className="flex items-stretch h-10 p-0.5 mb-2 flex-none rounded-full border border-primary/25 [background:var(--topbar-glass)]">
-        <TrendsLink className="flex-1 justify-center" />
-      </div>
       {/* The no-pop swap — the cell-targeting `[&>*]` rules ride the wrapper for the same
           retargeting reason the band's do (see the desktop section above). */}
       <RollSwap

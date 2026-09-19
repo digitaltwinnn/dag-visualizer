@@ -168,11 +168,13 @@ export class NodeFabric {
   private nodeGroup: THREE.Group;
 
   // THE BARE STAGE (2026-09-04): while a doc overlay is open the scene shows background only,
-  // and the parked fleet is the one geometry the flat policy's show{} gates don't reach. The
+  // and the parked fleet is the one geometry the flat policy's show{} gates don't reach. The same
+  // fade serves a 3D view whose policy row PARKS the fleet (2026-09-18 — History is chart planes,
+  // with nowhere honest to put a node); the Engine composes the two requests. The
   // fleet FADES between the two states rather than blinking (user: "nicely fade out instead of
   // popping"), on the same DOC_ROLL clock the document's text rolls on — the two read as one
   // moment. `fleetTarget` is the requested end state (Globe.setFleetVisible, driven by the
-  // Engine's doc fold at the choreography's boundaries); `tickFleetFade` eases the weight per
+  // Engine's `_fleetFade` at the choreography's boundaries); `tickFleetFade` eases the weight per
   // frame and rides it on the four MATERIALS' opacity (multiplied over each one's captured base
   // — the hex chips are translucent by construction), flipping `transparent` only while below
   // 1 so the resting fleet keeps its opaque pipeline. The per-frame visibility writes below
@@ -181,6 +183,14 @@ export class NodeFabric {
   // only write path that actually holds.
   fleetTarget = 1;
   private _fleetW = 1;
+  /** Adopt the target with NO ease — the BOOT seed only (Engine's `_fleetFade(…, snap)`): a cold
+   *  start in a view that parks the fleet builds its meshes lazily, whenever the first node data
+   *  lands, so a fade from full would flash a partly-lit fleet into a view that has no poses for
+   *  it. The per-frame visibility writes below read `_fleetW`, so a seeded 0 holds even though
+   *  the materials' opacity is only rewritten once the weight next MOVES. */
+  snapFleet(): void {
+    this._fleetW = this.fleetTarget;
+  }
   /** The eased bare-stage weight — the gather-legend labels ride it so they dissolve with the
    *  fleet they name. */
   get fleetW(): number {

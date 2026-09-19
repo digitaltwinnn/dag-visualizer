@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { useStore } from "./store";
 import { applyClickActions } from "./applyClickActions";
 import type { PickDescriptor } from "@/src/data/types";
+import { VISIBLE_PLANES, scrollToShow } from "@/src/engine/domain/trendStack";
 
 // End-to-end for the pick pipeline's LAST hop: a ClickAction always maps to exactly one store
 // effect (the decision tables are tested in domain/pickActions.test.ts; this file pins what
@@ -104,5 +105,76 @@ describe("metaSnap action", () => {
     expect(useStore.getState().metaSnap).toEqual(sel);
     applyClickActions([{ kind: "metaSnap", sel: null }]);
     expect(useStore.getState().metaSnap).toBeNull();
+  });
+});
+
+describe("trendFocus action (the History view's plane click)", () => {
+  const ROSTER = ["a", "b", "c", "d", "e", "f", "g", "h"]; // 8 networks, a 5-wide window
+
+  beforeEach(() => {
+    const st = useStore.getState();
+    st.setTrendIds(ROSTER);
+    st.setTrendScroll(0);
+    st.setTrendFocus(null);
+  });
+
+  it("maps to setTrendFocus — and to NOTHING else, the filter included", () => {
+    useStore.getState().setFilter("dor");
+    applyClickActions([{ kind: "trendFocus", id: "c" }]);
+    const st = useStore.getState();
+    expect(st.trendFocus).toBe("c");
+    expect(st.filter).toBe("dor"); // a plane click never commits a network — it would cut the stack
+    expect(st.inspect).toBeNull();
+    expect(st.snap).toBeNull();
+  });
+
+  it("releases on null", () => {
+    applyClickActions([{ kind: "trendFocus", id: "c" }]);
+    applyClickActions([{ kind: "trendFocus", id: null }]);
+    expect(useStore.getState().trendFocus).toBeNull();
+  });
+
+  it("pages an OFF-WINDOW plane into view, so the focus can be seen", () => {
+    // `stackPoses` lifts nothing for a focus outside the window (its own tested rule), so the
+    // executor — the one place that may read the published roster — brings it in first.
+    applyClickActions([{ kind: "trendFocus", id: "h" }]);
+    const st = useStore.getState();
+    expect(st.trendFocus).toBe("h");
+    expect(st.trendScroll).toBe(scrollToShow(ROSTER, "h", 0));
+    expect(st.trendScroll).toBe(ROSTER.indexOf("h") - VISIBLE_PLANES + 1);
+  });
+
+  it("leaves the scroll alone for a plane already on screen", () => {
+    useStore.getState().setTrendScroll(2);
+    applyClickActions([{ kind: "trendFocus", id: "e" }]);
+    expect(useStore.getState().trendScroll).toBe(2);
+  });
+
+  it("a RELEASE never pages — clearing the focus is not a place to go", () => {
+    useStore.getState().setTrendScroll(2);
+    applyClickActions([{ kind: "trendFocus", id: null }]);
+    expect(useStore.getState().trendScroll).toBe(2);
+  });
+
+  it("with an EMPTY roster (the boot state) the focus still lands and the scroll holds still", () => {
+    // The roster is React's publish, so it is `[]` until the stack has rendered once — and a click
+    // cannot happen before there are planes, but a programmatic caller or a race can still get
+    // here. There is no window to page, so paging must be a no-op rather than a clamp to 0 that
+    // silently discards wherever the reader had scrolled to.
+    const st = useStore.getState();
+    st.setTrendIds([]);
+    st.setTrendScroll(2);
+    applyClickActions([{ kind: "trendFocus", id: "c" }]);
+    expect(useStore.getState().trendFocus).toBe("c");
+    expect(useStore.getState().trendScroll).toBe(2);
+  });
+
+  it("a roster SHORTER than the window never pages — every plane is already on screen", () => {
+    const st = useStore.getState();
+    st.setTrendIds(["a", "b", "c"]);
+    st.setTrendScroll(0);
+    applyClickActions([{ kind: "trendFocus", id: "c" }]);
+    expect(useStore.getState().trendFocus).toBe("c");
+    expect(useStore.getState().trendScroll).toBe(0);
   });
 });

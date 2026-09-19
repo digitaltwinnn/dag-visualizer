@@ -6,11 +6,16 @@ import { join } from "node:path";
 // compiler — not just the sceneViewContract grep — enforces the shared shape. GeoView is exempt
 // (Globe drives its furniture alpha). This test pins the implements-wiring so a refactor can't
 // silently drop it.
+//
+// TrendsView joined the list on 2026-09-18. It draws ONE thing in WebGL — the ground grid the
+// chart planes stand on — and that is exactly why it has to be here: a view whose whole furniture
+// is a handful of hairlines is the one most likely to be written as a loose `new LineSegments`
+// somewhere and never ride the transition's build/teardown alpha.
 const VIEWS = join(import.meta.dirname);
 
 describe("SceneView interface", () => {
-  it("HyperView and LedgerView declare `implements SceneView`", () => {
-    for (const name of ["HyperView.ts", "LedgerView.ts"]) {
+  it("HyperView, LedgerView and TrendsView declare `implements SceneView`", () => {
+    for (const name of ["HyperView.ts", "LedgerView.ts", "TrendsView.ts"]) {
       const src = readFileSync(join(VIEWS, name), "utf8");
       expect(src.includes("implements SceneView"), `${name} must implement SceneView`).toBe(true);
     }

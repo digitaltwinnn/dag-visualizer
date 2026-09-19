@@ -11,8 +11,8 @@ import {
   VIEWS,
 } from "@/components/views";
 
-// The URL↔state bridge (2026-09-04, extended for the doc overlay): the three 3D views AND the
-// two doc pages are real routes (/hypergraph, /geography, /snapshots, /about, /design) so
+// The URL↔state bridge (2026-09-04, extended for the doc overlay): the four 3D views AND the
+// two doc pages are real routes (/hypergraph, /geography, /snapshots, /trends, /about, /design) so
 // analytics see per-surface traffic and links deep-link — but every in-app change stays a pure
 // store write on the ONE persistent canvas. A router navigation would tear down and reboot the
 // WebGL engine, so this bridge uses shallow history writes instead: no navigation, no re-render,

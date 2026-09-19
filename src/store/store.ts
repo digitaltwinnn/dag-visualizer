@@ -6,20 +6,38 @@ import type { HoverSubject } from "@/src/data/hoverSubject";
 // import of a domain type is legal and keeps CohortSel defined in exactly one place.
 import type { CohortSel, CompositionSel, FocusLevel } from "@/src/engine/domain/focusLadder";
 import type { ThemePref, Theme } from "@/src/theme/resolve";
+// Type-only, like the domain imports above: the window vocabulary has ONE home
+// (src/data/trendWindow.ts, read by the document's picker and by the stack), and a type-only
+// import keeps the store from holding a data-layer VALUE.
+import type { ZoomId } from "@/src/data/trendWindow";
+import { scrollToKeep } from "@/src/engine/domain/trendStack";
 
-// The active view. `hyper`/`geo`/`ledger` all drive the 3D scene (every switch among them runs
-// the gather choreography); `soon` is THE one flat placeholder view (consolidated 2026-09-04 —
-// three separate soon modes said the same nothing three times; the Blueprint gallery inside it
-// still previews each coming feature).
-export type Mode = "hyper" | "geo" | "ledger" | "soon";
+// The active view. `hyper`/`geo`/`ledger`/`trend` all drive the 3D scene (every switch among
+// them runs the gather choreography); `soon` is THE one flat placeholder view (consolidated
+// 2026-09-04 — three separate soon modes said the same nothing three times; the Blueprint
+// gallery inside it still previews each coming feature). `trend` (2026-09-18) is the measured
+// history view — chart planes as the scene, convention 12's MEASURED HISTORY rung made a view.
+export type Mode = "hyper" | "geo" | "ledger" | "trend" | "soon";
+
+// The stored metric every trend plane draws — one picker, one column (see `trendMetric` below).
+export type TrendMetric = "snapshots" | "blocks" | "fees" | "kb" | "nodes" | "continuity";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
-export type SelSlot = "network" | "node" | "snap" | "metaSnap" | "country" | "cohort" | "composition";
+export type SelSlot = "network" | "node" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "instant";
 
 // Move `slot` to the FRONT of the recency stack when it becomes active, or drop it when cleared.
+//
+// ⚠️ A NO-OP WRITE IS A NO-OP REFERENCE (2026-09-19). `selStack` is subscribed by `useLadderFocus`,
+// which every explorer row and the whole facts rail read — so rebuilding the array on every call
+// re-rendered both rails for a list that had not moved. That is free for a channel written once per
+// click and it is not free for `setTrendCursor`, which writes at BUCKET frequency during a scrub
+// with `instant` already at the front. Returning the incoming array unchanged when nothing moved
+// costs one comparison over a list that is never longer than the ladder.
 function bumpStack(stack: SelSlot[], slot: SelSlot, active: boolean): SelSlot[] {
   const without = stack.filter((s) => s !== slot);
-  return active ? [slot, ...without] : without;
+  const next = active ? [slot, ...without] : without;
+  if (next.length === stack.length && next.every((s, i) => s === stack[i])) return stack;
+  return next;
 }
 
 // Per-hour rates + per-snapshot series from NetworkData.getActivity(). ONE HOME: this was a
@@ -145,7 +163,7 @@ interface AppState {
   // rebooted the WebGL engine on every footer navigation. A presentation axis like `section`,
   // never a Mode — a document is over the network, not a view of it. While set, the HUD's
   // scene furniture stands down (DocGate) and RouteSync publishes the doc page's own path.
-  docPage: "about" | "design" | "trends" | null;
+  docPage: "about" | "design" | null;
   // ONE-SHOT HANDOFF down the observation ladder (convention 12, 2026-09-09): a /trends chart
   // range handed to the anchor log's search. The trends page writes it as it closes; the log
   // consumes it on sight (prefills the date criteria, seeks when it can) and clears it — a
@@ -255,6 +273,55 @@ interface AppState {
   // fire again, and a fresh reference is what the Engine's `!==` bridge sees.
   focusRung: { level: FocusLevel } | null;
 
+  /** THE SHARED TIME CURSOR (2026-09-18) — one instant, read by every plane and by the right
+   *  rail's "all layers at cursor" list. It is a COMMIT, not a hover: it drives rail content,
+   *  so it survives a pointer leaving the timeline. null = no instant picked, and the rail says
+   *  so rather than inventing one. */
+  trendCursorMs: number | null;
+  /** Which stored metric every plane draws. One picker, one column — the planes are a
+   *  comparison, so a per-plane metric would make the stack meaningless. */
+  trendMetric: TrendMetric;
+  /** How far the stack is scrolled through the roster, in planes. The catalog is longer than the
+   *  visible window, so the stack pages rather than capping at a top-N. */
+  trendScroll: number;
+  /** The plane brought forward (5b). View-scoped: it clears on leaving the view, like the other
+   *  view-scoped ladder levels. */
+  trendFocus: string | null;
+  /** ONE SCALE OR EACH ITS OWN — the Trends document's 2026-09-14 rule, carried into the view.
+   *  A column of per-network charts that each autoscale answers "how did THIS network's week go?"
+   *  beautifully and "which of these is bigger?" with a flat lie: a chain anchoring three a day and
+   *  one anchoring forty draw the same silhouette. A depth STACK is read AS a column before it is
+   *  read one plane at a time, so `shared` is the default and the honest reading needs no gesture;
+   *  `own` is the reader's escape when a small network's own shape is what they want. NOT
+   *  view-scoped — it is how the reader likes their charts drawn, not a rung, so `setMode` leaves
+   *  it alone. */
+  trendScale: "shared" | "own";
+  /** THE STACK'S WINDOW (2026-09-18) — the same vocabulary the Trends document's picker and the
+   *  vitals rim already wear (`ZOOMS`, src/data/trendWindow.ts; user, 2026-09-09: the ranges stay
+   *  consistent across surfaces). The stack and the document are two registers of ONE rung, so a
+   *  window means the same thing in both — but each holds its own: the document's zoom is local
+   *  component state, because the window a reader picks while reading the page is the page's.
+   *  NOT view-scoped: `setMode` leaves it alone, like `trendScale`. */
+  trendWindow: ZoomId;
+  /** THE STACK'S COMMITTED RANGE — a brushed span that replaces the window's cut entirely, and
+   *  auto-tiers to the finest grain its start can honestly carry (`planTrendFetch`). NO `metaId`,
+   *  unlike the document's: the stack's range is the WHOLE stack's, every plane cut to the same
+   *  span, which is the comparison a depth stack exists to make. null = the window stands. */
+  trendRange: { fromMs: number; toMs: number } | null;
+  /** THE RANKED ROSTER — a REACT → ENGINE publish channel (2026-09-18), the fourth.
+   *  Which networks the stack shows, busiest first, is decided from FETCHED trends data that only
+   *  React holds (`rankByLast` over the stored series), and the engine's projector needs exactly
+   *  that list to place one plane per id. One-way and single-publisher by construction:
+   *  `components/TrendStack.tsx` writes it, `TrendStackSync` reads it through the Engine's bridge,
+   *  and nothing writes back — an engine writer would be a feedback loop, re-ranking from the list
+   *  it had just set (`components/publishChannelBoundary.test.ts` makes that executable).
+   *  ⚠️ BRIDGED BY REFERENCE, like `focusRung`: the publisher passes a FRESH array only when the
+   *  list's CONTENT changes, because the Engine's `!==` is the whole change signal. A fresh array
+   *  every render would retarget the ease every frame and the stack would never settle; a mutated
+   *  array would never reach the Engine at all.
+   *  `[]` whenever the stack is not mounted — honest: no planes, nothing to place. */
+  trendIds: readonly string[];
+
   setLive: (live: boolean, lastGoodAt?: number) => void;
   setEngineReady: (v: boolean) => void;
   setSceneReady: (v: boolean) => void;
@@ -264,7 +331,7 @@ interface AppState {
   setLatestSnapshot: (snap: GlobalSnapshot | null) => void;
   setActivity: (activity: Activity | null) => void;
   setMode: (mode: Mode) => void;
-  setDocPage: (docPage: "about" | "design" | "trends" | null) => void;
+  setDocPage: (docPage: "about" | "design" | null) => void;
   setLogSeek: (logSeek: { metaId: string | null; fromMs: number; toMs: number } | null) => void;
   setDocStageReady: (ready: boolean) => void;
   setDocClosing: (closing: boolean) => void;
@@ -313,6 +380,17 @@ interface AppState {
   /** Ask the Engine to frame this ladder rung (see `focusRung`). One-shot; the Engine reads it
    *  on change and never clears it — the value IS the last request, not a pending queue. */
   requestFocusRung: (level: FocusLevel) => void;
+  setTrendCursor: (ms: number | null) => void;
+  setTrendMetric: (metric: TrendMetric) => void;
+  setTrendScroll: (offset: number) => void;
+  setTrendFocus: (id: string | null) => void;
+  setTrendScale: (scale: "shared" | "own") => void;
+  /** Pick the stack's window. It CLEARS any committed range — a window IS a range statement, the
+   *  Trends document's own rule for its zoom pills. */
+  setTrendWindow: (window: ZoomId) => void;
+  setTrendRange: (range: { fromMs: number; toMs: number } | null) => void;
+  /** Publish the ranked roster (see `trendIds`). Pass a fresh array only on a content change. */
+  setTrendIds: (ids: readonly string[]) => void;
   // THEME (light/dark spec §2). Unlike the network (a frozen page parameter), theme is genuine
   // runtime state: the resolved value drives the Engine's colour re-thread and any component
   // that renders theme-conditionally. ONE writer: ThemeController. `theme` boots "dark" (the
@@ -373,6 +451,14 @@ export const useStore = create<AppState>((set) => ({
   railCollapse: {},
   navQuiet: false,
   focusRung: null,
+  trendCursorMs: null,
+  trendMetric: "snapshots",
+  trendScroll: 0,
+  trendFocus: null,
+  trendScale: "shared",
+  trendWindow: "all" as ZoomId,
+  trendRange: null,
+  trendIds: [],
   phoneSheetPx: null,
   sceneCoverL: 0,
   sceneCoverR: 0,
@@ -393,8 +479,10 @@ export const useStore = create<AppState>((set) => ({
   // Closing (either route) arms `docClosing` — the doc's exit animation is its OUT phase, and
   // the engine waits on it before entering the destination view.
   // A view switch is a LOUD navigation (the no-pop rule rolls view-scoped content on arrival),
-  // so it clears any standing quiet mark from a rail gesture.
-  setMode: (mode) => set((s) => ({ mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing })),
+  // so it clears any standing quiet mark from a rail gesture. `trendFocus` clears with it — it's
+  // view-scoped, like the other ladder levels; `trendCursorMs` does NOT (an instant is a
+  // universal subject and carries, the way `node` and `network` do in `LEVEL_CARRY`).
+  setMode: (mode) => set((s) => ({ mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing, trendFocus: null })),
   // Opening a doc also SURFACES THE SCENE POSE: the overlay sits at z-8, under the raw layer's
   // z-9 — a doc opened from the RAW pose rendered beneath the still-interactive table, with the
   // RAW toggle that could exit it hidden by the doc's own control gating (review find,
@@ -551,5 +639,33 @@ export const useStore = create<AppState>((set) => ({
   // A fresh object every call — the request is the EVENT, so re-opening the same rung must reach
   // the Engine's reference-compare bridge again.
   requestFocusRung: (level) => set({ focusRung: { level } }),
+  // THE CURSOR IS A COMMITTED SUBJECT OF ITS VIEW (2026-09-19), so it takes a place in the
+  // recency stack like every other card slot: the facts rail's collapse rule reads `selStack` to
+  // decide which present card is the ACTIVE one, and without a rung here the cursor card would
+  // rest as an entry under a dossier committed minutes earlier — a click on the timeline that
+  // populates a card nobody can see. It is NOT a selection rung (no camera pose, no deselect
+  // step, and `setTrendCursor` deliberately stays outside the pickActions table — clearing it is
+  // the card's × and nothing cascades), and a SCRUB bumps at most once per bucket, because the
+  // timeline is its one writer and quantises there.
+  // `navQuiet: false` for the same reason every ordinary commit clears it: an instant ARRIVING is
+  // exactly the moment the card's title roll and edge pulse exist to announce, and a stale quiet
+  // mark left by an earlier manual expand would swallow the first one.
+  setTrendCursor: (ms) =>
+    set((s) => ({ trendCursorMs: ms, navQuiet: false, selStack: bumpStack(s.selStack, "instant", ms != null) })),
+  setTrendMetric: (metric) => set({ trendMetric: metric }),
+  setTrendScroll: (offset) => set({ trendScroll: offset }),
+  setTrendFocus: (id) => set({ trendFocus: id }),
+  setTrendScale: (scale) => set({ trendScale: scale }),
+  // A window and a range are the SAME statement about what is on screen, so picking one retires
+  // the other (the document's zoom pills do exactly this).
+  setTrendWindow: (trendWindow) => set({ trendWindow, trendRange: null }),
+  setTrendRange: (trendRange) => set({ trendRange }),
+  // Stored BY REFERENCE — the array the publisher hands in is the one the Engine compares with
+  // `!==`. No copy, no sort, no normalising: any of those would mint a fresh reference per call
+  // and turn a no-op publish into a retarget (see the channel note on `trendIds`).
+  // ONE set, so the Engine never sees the new order under the old window: a focus the reader had
+  // in front is kept on screen through a re-rank (`scrollToKeep`), and two writes would release the
+  // camera's lean and re-apply it in the same tick.
+  setTrendIds: (trendIds) => set((s) => ({ trendIds, trendScroll: scrollToKeep(s.trendIds, trendIds, s.trendFocus, s.trendScroll) })),
   setTheme: (pref, resolved) => set({ themePref: pref, theme: resolved }),
 }));

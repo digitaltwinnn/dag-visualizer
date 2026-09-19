@@ -14,6 +14,10 @@ import { cn } from "@/lib/utils";
 // view switch, exactly as their importance is. Rows are the same store toggles the footer's
 // DocToggles are (real hrefs keep middle-click/new-tab honest; a plain click flips the overlay
 // in place, and clicking the open page's row closes it).
+//
+// The section lists the WHOLE registry, and the registry is only prose pages over the bare stage
+// (views.ts). The Trends document is not one of them — it is the History view's RAW register, so
+// its route into the app is that view plus the bar's RAW toggle, not a page row here.
 export default function DocRows({ onDone }: { onDone: () => void }) {
   const doc = useStore((s) => s.docPage);
   const setDocPage = useStore((s) => s.setDocPage);

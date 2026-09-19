@@ -3,7 +3,7 @@
 Engine-wide: live look-tuning under ?tune.
 
 Split out of the root `CLAUDE.md` (2026-08-31) so it loads when you work here rather
-than on every session. The root file holds what this is, the eleven rules, run & test,
+than on every session. The root file holds what this is, the twelve rules, run & test,
 the architecture map and the dev workflow; **its rules govern this file too**.
 
 ## Tuning the look live

@@ -1,6 +1,7 @@
 // src/engine/domain/gatherLayout.test.ts
 import { describe, it, expect } from "vitest";
 import {
+  railGapShiftPx,
   gatherSlots, gatherExtent, gatherBand, gatherSpread, gatherRows,
   GATHER_GUTTER, GATHER_GUTTER_MAX, GATHER_LEGEND_PX,
   type GatherExtent,
@@ -338,5 +339,20 @@ describe("spare width has nowhere to go but the shape", () => {
     expect(gatherExtent(set, scene).w).toBeLessThanOrEqual(61.25 / 0.62);
     // …and the remainder, which the solve leaves because a column is a whole cell, goes to the gaps.
     expect(gatherSpread(61.25 / 0.62, gatherExtent(set, scene))).toBeGreaterThan(0);
+  });
+});
+
+describe("railGapShiftPx — where the gap between the rails is centred", () => {
+  it("sits LEFT of the screen centre, by half the rails' width difference", () => {
+    // --rail-w 264 against --detail-w 320: the right rail reaches 56px further in, so the gap's
+    // centre is 28px left. A subject standing alone in the gap centres THERE.
+    expect(railGapShiftPx(1500, false)).toBe(-28);
+    expect(railGapShiftPx(1100, false)).toBe(-28);
+  });
+
+  it("is ZERO wherever the rails are not inline columns", () => {
+    expect(railGapShiftPx(1500, true)).toBe(0); // scene mode — no rails, the screen is the gap
+    expect(railGapShiftPx(1099, false)).toBe(0); // tablet: the rails are sheets over the canvas
+    expect(railGapShiftPx(390, false)).toBe(0); // phone
   });
 });
