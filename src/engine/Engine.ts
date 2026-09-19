@@ -2177,6 +2177,9 @@ export class Engine {
     // the room like hyper's hoops and the chamber's labels.
     const trendAlpha = this.transition.furnitureAlpha("trend");
     this.trends.setViewAlpha(trendAlpha);
+    // The rungs are billboards like the cards above them — re-laid along the camera's right vector
+    // (a no-op while the camera's orientation holds still, and skipped while the view is dark).
+    if (trendAlpha > 0.001) this.trends.face(this.ctx.camera);
     // The stage light's per-view PRESENCE, published BEFORE the view updates that claim it: a claim
     // is scaled by its view's furniture alpha, so a fading view's light fades with its furniture and
     // a dark view's claim is worth nothing. That is the whole off-switch — not claiming IS off.

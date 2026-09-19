@@ -38,7 +38,7 @@ const AXIS_H = 18;
 // lays this plot area out from exactly three things — the LineChart's own margin, the XAxis's
 // declared height, and the YAxis, which is `hide` and therefore reserves NOTHING (recharts skips
 // a hidden axis when it accumulates the chart offset). So the box is knowable from this file
-// alone: x runs [left, width − right], and the plot's own height is PLOT_H less the vertical
+// alone: x runs [left, width − right], and the plot's own height is its `plotHeight` less the vertical
 // margins, with the axis strip below it. That is what lets the shared cursor be a CSS `calc()`
 // over a percentage of the plate rather than a measured pixel — no ResizeObserver, and it rides
 // the 3D plane's projected scale for free.
@@ -47,8 +47,10 @@ const AXIS_H = 18;
 const PLOT_MARGIN = { top: 10, right: 2, bottom: 4, left: 2 } as const;
 /** The plot box's horizontal inset, both sides together — what a 100% width must give back. */
 const PLOT_INSET_X = PLOT_MARGIN.left + PLOT_MARGIN.right;
-/** The plot box's own height, measured from the top margin: the axis strip sits below it. */
-const PLOT_INNER_H = PLOT_H - PLOT_MARGIN.top - PLOT_MARGIN.bottom;
+/** The plot box's own height for a plot `plotH` tall, measured from the top margin: the axis strip
+ *  sits below it. A function since the plot's height became a prop (`plotHeight`) — the cursor
+ *  overlay and the chart still read the ONE margin. */
+const plotInnerH = (plotH: number): number => plotH - PLOT_MARGIN.top - PLOT_MARGIN.bottom;
 
 /** The default value formatter, hoisted out of the destructuring default so it is ONE reference
  *  for every chart that states no formatter of its own — a default written in the parameter list
@@ -79,6 +81,7 @@ export default function TrendChart({
   scaleMax,
   cursorMs,
   fill,
+  plotHeight = PLOT_H,
   note,
   syncId = "trends",
   className,
@@ -161,6 +164,12 @@ export default function TrendChart({
    *  is filled: a dashed secondary reading is a second channel, and filling both would make the
    *  pair unreadable. */
   fill?: boolean;
+  /** THE PLOT'S HEIGHT IN CSS PX (user, 2026-09-19: the History cards read as "quite horizontal /
+   *  long, give them some more height"). The document's column wants short small-multiples — many
+   *  charts, one shared axis, a dip followed down the page — so its default stands; a card in the
+   *  History stack is ONE chart being read on its own and wants a plot with room in it. A plain
+   *  number, so it holds the plot's memo still. */
+  plotHeight?: number;
   /** AN INSTRUMENT STATE THE SERIES CANNOT SAY (2026-09-18). When the caller knows something the
    *  points don't — most concretely that the payload this chart needs is still IN FLIGHT — it
    *  hands the words here and the plot is replaced by them, in the chart's own empty-state frame.
@@ -367,6 +376,7 @@ export default function TrendChart({
             gaps={gaps}
             onRange={onRange}
             fill={fill}
+            plotH={plotHeight}
           />
           {/* THE SHARED CURSOR, AS AN OVERLAY RATHER THAN A RECHARTS CHILD
               (2026-09-19). It marks the bucket that CONTAINS the instant (`bucketAt`) or nothing at
@@ -390,7 +400,7 @@ export default function TrendChart({
               className="absolute w-px bg-[var(--primary)] pointer-events-none"
               style={{
                 top: PLOT_MARGIN.top,
-                height: PLOT_INNER_H,
+                height: plotInnerH(plotHeight),
                 left: `calc(${PLOT_MARGIN.left}px + ${cursorX} * (100% - ${PLOT_INSET_X}px))`,
               }}
             />
@@ -436,6 +446,7 @@ const TrendPlot = memo(function TrendPlot({
   gaps,
   onRange,
   fill,
+  plotH,
 }: {
   /** See the outer component's prop — a STRING, so it holds the memo still. */
   syncId: string;
@@ -449,6 +460,8 @@ const TrendPlot = memo(function TrendPlot({
   onRange?: (fromMs: number, toMs: number) => void;
   /** See the outer component's prop — a plain boolean, so it holds the memo still. */
   fill?: boolean;
+  /** The plot's height in CSS px (the outer `plotHeight`) — a number, so it holds the memo still. */
+  plotH: number;
 }) {
   const n = buckets.length;
   const hue0 = lines[0]?.hue ?? "var(--primary)";
@@ -612,7 +625,7 @@ const TrendPlot = memo(function TrendPlot({
 
   return (
     <>
-          <ResponsiveContainer width="100%" height={PLOT_H + AXIS_H}>
+          <ResponsiveContainer width="100%" height={plotH + AXIS_H}>
             <Chart data={rows} syncId={syncId} syncMethod="value" margin={PLOT_MARGIN} {...dragProps}>
               {/* THE FILL'S GRADIENT — light, not a slab. It runs from the line's own hue at the
                   area's top edge to nothing at the baseline, so a plane reads as a translucent
@@ -677,7 +690,7 @@ const TrendPlot = memo(function TrendPlot({
                             <line x1="0" y1="0" x2="0" y2="6" stroke="var(--muted-foreground)" strokeWidth="1.5" strokeOpacity="0.3" />
                           </pattern>
                         </defs>
-                        <rect x={x} y={0} width={width} height={PLOT_H + AXIS_H} fill={`url(#${hatchId}-${h.x1})`} />
+                        <rect x={x} y={0} width={width} height={plotH + AXIS_H} fill={`url(#${hatchId}-${h.x1})`} />
                       </g>
                     ) : (
                       <g />
@@ -692,7 +705,7 @@ const TrendPlot = memo(function TrendPlot({
                   x2={h.x2}
                   shape={({ x, width }: { x?: number; width?: number }) =>
                     x != null && width != null ? (
-                      <rect x={x} y={0} width={width} height={PLOT_H + AXIS_H} fill="var(--muted-foreground)" fillOpacity={0.12} />
+                      <rect x={x} y={0} width={width} height={plotH + AXIS_H} fill="var(--muted-foreground)" fillOpacity={0.12} />
                     ) : (
                       <g />
                     )
@@ -706,7 +719,7 @@ const TrendPlot = memo(function TrendPlot({
                   x2={h.x2}
                   shape={({ x, width }: { x?: number; width?: number }) =>
                     x != null && width != null ? (
-                      <rect x={x} y={0} width={width} height={PLOT_H + AXIS_H} fill="var(--warn-soft)" fillOpacity={0.24} />
+                      <rect x={x} y={0} width={width} height={plotH + AXIS_H} fill="var(--warn-soft)" fillOpacity={0.24} />
                     ) : (
                       <g />
                     )

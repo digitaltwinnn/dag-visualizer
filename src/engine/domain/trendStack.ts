@@ -67,43 +67,99 @@ export const PLANE_Y = 2;
 /** Per-slot-index falloff: how much `scale` drops for each step back into the stack. */
 export const SCALE_FALLOFF = 0.03;
 
-/** Per-slot-index falloff: how much `opacity` drops for each step back into the stack. */
-export const OPACITY_FALLOFF = 0.16;
+/** Per-slot-index falloff: how much `opacity` drops for each step back into the stack.
+ *
+ *  ⚠️ ZERO — EVERY PLANE IS AN OPAQUE CARD (user, 2026-09-19: "remove the transparency of the trend
+ *  cards"). It was 0.16 while the planes were translucent sheets, where a fading rear plane was the
+ *  depth cue; on an opaque deck a faded card is just a see-through one, and occlusion, the stagger
+ *  and `SCALE_FALLOFF` carry the depth instead. Kept as a named coefficient rather than deleted so
+ *  the pose still STATES its opacity (the component reads it, never assumes it) and the look can be
+ *  re-opened with one number. */
+export const OPACITY_FALLOFF = 0;
 
 /** THE STAGGER, across. Each slot further back sits this much further RIGHT, so its header strip
  *  clears the plane in front of it. See the header: a covered header is a missing plane. */
 export const PLANE_STEP_X = 3;
 
 /** THE STAGGER, up. Each slot further back sits this much HIGHER — the larger of the two steps,
- *  because a header strip is wide and short: vertical clearance is what actually uncovers it. */
-export const PLANE_STEP_Y = 7.8;
+ *  because a header strip is wide and short: vertical clearance is what actually uncovers it.
+ *  Sized to uncover the HEADER and the peak line under it, not the plot: the rear planes are an
+ *  index of the roster (name, hue, latest reading), and every unit spent showing more of a rear
+ *  plot is a unit the front chart is pushed away from the centre of the view. */
+export const PLANE_STEP_Y = 5.4;
+
+/** WHERE ALONG THE RUN OF SLOTS THE STAGGER IS CENTRED (user, 2026-09-19: "make the front chart
+ *  more at the view center and larger"). `1` centres the BLOCK — the mean of the visible slots sits
+ *  on the pose origin — which is what the first staggered build did, and it parked the front plane
+ *  two whole steps down-and-left of centre: the one chart being read sat in the canvas's bottom-left
+ *  while the view's centre was spent on the faint third plane. `0` would put the FRONT plane dead on
+ *  the origin and hang the whole index off the top-right. The front plane is the subject and the
+ *  planes behind it are its context, so the anchor sits close to the front: the subject lands near
+ *  the view's centre and the index still fits above it. */
+export const STAGGER_ANCHOR = 0.35;
+
+/** The stagger's centre for a window of `n` planes, in SLOT units — the ONE home for it. Both the
+ *  poses and the ground (`scene/views/TrendsView`) read this; two copies is how a floor ends up
+ *  drawn under a stack that has since moved. Scaled by the visible count, so a two-plane window
+ *  keeps the same proportions as a five-plane one. */
+export function staggerCentre(n: number): number {
+  return ((Math.max(1, n) - 1) / 2) * STAGGER_ANCHOR;
+}
 
 /** THE PLANE'S WIDTH IN WORLD UNITS — the one number that ties this pose math to the DOM the
  *  projector scales. The plane's content is `PLANE_PX_W` CSS px wide at scale 1, so the projector
  *  resolves a slot's scale as `PLANE_WORLD_W × pxPerUnit / PLANE_PX_W`: state the plane's size
  *  where the rest of the spatial grammar lives, and the browser number becomes a conversion rather
- *  than a second opinion about how big a plane is. Sized so the front plane is about half the
- *  canvas at the resting pose. */
-export const PLANE_WORLD_W = 52;
+ *  than a second opinion about how big a plane is. Sized so the front plane fills most of the FREE
+ *  canvas between the rails at the resting pose (user, 2026-09-19: "larger"). */
+export const PLANE_WORLD_W = 58;
 
 /** The plane's CSS width at scale 1 — READ BY BOTH SIDES (`components/TrendStack.tsx` sets it on
  *  the element; the projector divides by it). A local literal in either place is a silent drift:
- *  the planes would simply render at the wrong size, with nothing failing. Paired with
- *  `PLANE_WORLD_W` so the CSS scale at the resting pose lands near 1 and the chart's text is
- *  rasterised at roughly its authored size. */
-export const PLANE_PX_W = 720;
+ *  the planes would simply render at the wrong size, with nothing failing.
+ *
+ *  ⚠️ DELIBERATELY NARROWER THAN THE PLANE DRAWS (user, 2026-09-19: "larger"). The chart's HEIGHT
+ *  is a fixed CSS number (a head strip over a 138px plot), so widening the authored plane only ever
+ *  made a longer, flatter strip. Authoring it narrower than its on-screen width puts the front
+ *  plane's CSS scale at ~1.3, and the whole chart grows with it — plot height, line weight and type
+ *  together — which is what "larger" means to a reader. The browser re-rasters a transformed layer
+ *  at its settled scale, so the text stays crisp at rest. */
+export const PLANE_PX_W = 640;
+
+/** THE CARD'S PLOT HEIGHT in CSS px — passed to `TrendChart` as `plotHeight` by
+ *  `components/TrendStack.tsx` (user, 2026-09-19: the cards read as "quite horizontal / long, give
+ *  them some more height"). The document's small-multiples keep the chart's own short default; a
+ *  card in the stack is one chart read on its own, so it gets a plot with room in it — about 2.3:1
+ *  for the whole card, against the 3.4:1 strip it was. Stated HERE, beside the width, because the
+ *  card's height is what the ground's drop and the flat column's pitch are derived from. */
+export const PLANE_PLOT_PX_H = 210;
+
+/** Everything in a card that is NOT plot: the card's padding and hairline, `TrendChart`'s head
+ *  strip and its axis strip (measured 2026-09-19: a 120px plot made a 186px card). */
+const PLANE_CHROME_PX_H = 66;
+
+/** The plane's NOMINAL CSS height at scale 1. A browser number rather than a layout one — the
+ *  plane is content-height — but the ground has to clear the card's bottom edge and the flat
+ *  column has to pitch its rows, and deriving both from the same place as the width is what keeps
+ *  a re-tune of either from driving the floor through a plot or one row into the next. */
+export const PLANE_PX_H = PLANE_PLOT_PX_H + PLANE_CHROME_PX_H;
+
+/** The plane's height in world units, from the two numbers above and its world width. */
+export const PLANE_WORLD_H = (PLANE_WORLD_W * PLANE_PX_H) / PLANE_PX_W;
 
 /** How far in FRONT of slot 0 a focused plane is lifted — half the inter-plane gap, so it clears
  *  the rest of the stack without leaving its own depth register. */
 export const FOCUS_LIFT = PLANE_GAP / 2;
 
-/** `flat`'s uniform scale. Below 1 because five planes have to fit the canvas HEIGHT there, where
- *  the stack spent its room on depth instead. */
-export const FLAT_SCALE = 0.7;
+/** `flat`'s uniform scale. Below 1 because five cards have to fit the canvas HEIGHT there, where
+ *  the stack spent its room on depth instead — sized so a full window's column clears the command
+ *  bar above and the band below at the resting pose. */
+export const FLAT_SCALE = 0.42;
 
-/** World-unit pitch between rows in `flat` — the column's own spacing, large enough that two
- *  neighbouring charts never touch. */
-export const FLAT_STEP_Y = 10.5;
+/** World-unit pitch between rows in `flat`: the card's own height at `FLAT_SCALE` plus a tenth of
+ *  it as the gutter. DERIVED, not typed — it was a free number, and enlarging the cards
+ *  (2026-09-19) silently drove each row 15–19px into the next. */
+export const FLAT_STEP_Y = PLANE_WORLD_H * FLAT_SCALE * 1.1;
 
 /** The two ways the planes can sit. Exported because `focusDepth` takes it: a caller that asks
  *  what the camera should frame has to say which layout it is asking about. */
@@ -171,8 +227,8 @@ export function focusInWindow(ids: readonly string[], scroll: number, focus: str
  * `flat` tiles the same planes as a vertical COLUMN at one depth and one scale, nearest on top.
  *
  * A `focus` naming a plane inside the window lifts that one plane to `FOCUS_LIFT` and carries it
- * half a step further down-and-left than slot 0 — continuing the stagger forward, so the front of
- * the stack reads as one sequence — at full scale and opacity, and marks it the sole interactive
+ * half a step further DOWN than slot 0, on slot 0's own x — it is the view's subject, so it holds
+ * the horizontal centre the front plane holds — at full scale and opacity, and marks it the sole interactive
  * plane. Its neighbours keep exactly the slot pose they would have had with no focus: `n` does not
  * change when a plane is focused, so the lift does not close the gap it leaves. A focus naming a
  * plane OUTSIDE the window lifts nothing — the ONE EXECUTOR pages it into the window first, which
@@ -191,6 +247,9 @@ export function stackPoses(ids: readonly string[], opts: StackOpts): PlanePose[]
   // The stagger's centre. Read from the VISIBLE count, never VISIBLE_PLANES: a short roster (a
   // committed filter, a small network set) would otherwise hang off to one side of the canvas.
   const mid = (visible.length - 1) / 2;
+  // The STACK's centre is anchored toward the front plane (`STAGGER_ANCHOR`); the flat column
+  // below keeps the true `mid` — a column has no subject plane, so it centres as a block.
+  const c = staggerCentre(visible.length);
 
   return visible.map((id, i) => {
     if (layout === "flat") {
@@ -209,8 +268,12 @@ export function stackPoses(ids: readonly string[], opts: StackOpts): PlanePose[]
     if (lifted && id === focus) {
       return {
         id,
-        x: (0 - mid) * PLANE_STEP_X - PLANE_STEP_X / 2,
-        y: PLANE_Y + (0 - mid) * PLANE_STEP_Y - PLANE_STEP_Y / 2,
+        // ON slot 0's x, not half a step further left: the focused plane is the view's subject, so
+        // it holds the horizontal centre the front plane holds (2026-09-19) — drifting left with
+        // the stagger ran its edge under the left rail once the planes grew. It still drops half
+        // a step, which is what separates it from the plane it came forward past.
+        x: (0 - c) * PLANE_STEP_X,
+        y: PLANE_Y + (0 - c) * PLANE_STEP_Y - PLANE_STEP_Y / 2,
         z: FOCUS_LIFT,
         scale: 1,
         opacity: 1,
@@ -219,8 +282,8 @@ export function stackPoses(ids: readonly string[], opts: StackOpts): PlanePose[]
     }
     return {
       id,
-      x: (i - mid) * PLANE_STEP_X,
-      y: PLANE_Y + (i - mid) * PLANE_STEP_Y,
+      x: (i - c) * PLANE_STEP_X,
+      y: PLANE_Y + (i - c) * PLANE_STEP_Y,
       z: -i * PLANE_GAP,
       scale: 1 - SCALE_FALLOFF * i,
       opacity: 1 - OPACITY_FALLOFF * i,

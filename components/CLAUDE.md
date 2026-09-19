@@ -259,8 +259,10 @@ pointermove. Three rules are worth knowing before touching it:
 
 **Hovering pairs over `hoverFilter`, the app's own network channel** (convention 9). A Layers row, a
 plane's header strip and a cursor-card row are three ends of one pairing, with no channel of their
-own: hovering any of them lifts that plane to full opacity and washes the rows. The lift is the ONLY
-thing that moves — a preview that re-staggered the stack would read as a commit.
+own: hovering any of them turns that card's hairline to its network's hue and washes the rows. The
+hairline is the ONLY thing that changes — a preview that re-staggered the stack would read as a
+commit, the cards are opaque so there is no opacity to lift, and `.subject-paired`'s glow is a
+box-shadow, which a transformed plane may not carry.
 
 The chain runs coarse→fine like every other rung: a lane whose committed cards abut as one body reads
 adjacency as containment. (The chamber's storeys are the other way round — ribbons fall INTO the global
@@ -488,11 +490,11 @@ sparkline off the live buffers) beside the declicked tick bar-chart. This delibe
 snapshots-only rule (2026-08-12): each band is the view's OWN vitals — the numbers the bar's vitals
 region used to show — so nothing generic returned. **The band's plate takes no pointer events**
 (`pointer-events-none` — user: "no clicking etc required"): every route the old strip's clicks served
-survives in the explorer rows and the global card's pager. The ONE exception is the TRENDS
-RIM (2026-09-08), a fixed SIBLING outside the plate — since 2026-09-18 it commits the HISTORY VIEW
-through `setMode` (the measured history got a view; the document became that view's RAW register),
-and it stands down inside that view, gated on `bandContent === "timeline"` rather than a mode
-compare. Colour is rule 3's: structural cyan, the
+survives in the explorer rows and the global card's pager. **No exceptions in the structural
+views**: the band carries no link to the History view (user, 2026-09-19 — the command bar's view
+switch opens it at every width, so a tab on the band was a second door to the same room); the
+band's one interactive tenant is the History view's own timeline (`bandContent === "timeline"`).
+Colour is rule 3's: structural cyan, the
 identity hue only under a committed filter — resolved once per band (`useVitalsScope`) and handed to
 every chart as its `accent` prop; the band wears NO filter-scope hairline (user, 2026-08-30 — the
 charts themselves state the scope). Identity is never colour-alone — every donut segment, country bar

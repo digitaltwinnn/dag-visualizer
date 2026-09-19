@@ -903,10 +903,10 @@
 /* The History planes' area fill — the SAME number exception (an opacity is not a <color>, so
    light-dark() cannot carry it). It is the gradient's TOP stop, at the line itself; the bottom
    stop is 0 at the baseline, so the fill reads as light rather than as a slab. Paper is lower
-   because the hue is INK there: the same presence that reads as a translucent sheet over the dark
-   chamber reads as a painted block over the light scene ground (`--scene-ground`), and five of
-   them stop being see-through. A token rather than a number: the ground's L is that token's to
-   state, and a transcribed one goes stale the next time it is tuned. */
+   because the hue is INK there: the same presence that reads as a quiet tint on the dark card
+   reads as a painted block on the light one (a card's face is `--panel-solid` over the opaque
+   `--scene-ground`). A token rather than a number: the ground's L is that token's to state, and
+   a transcribed one goes stale the next time it is tuned. */
 :root { --trend-fill-top: 0.30; }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) { --trend-fill-top: 0.18; }

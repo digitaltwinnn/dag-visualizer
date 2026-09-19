@@ -384,10 +384,13 @@ export function ledgerCommitTilt(pos: THREE.Vector3, target: THREE.Vector3, outP
 // the position slides straight down the axis toward it, which also leaves the pose composable with
 // all three global levers (they scale (pos − target) about the target).
 //
-// The camera closes by the same depth the plane came forward: one lift, taken twice, so the gesture
-// reads as the front of the stack stepping toward the reader rather than as a zoom. Measured at the
-// resting pose that is ~14% apparent growth on the focused plane — noticed, not lurched into.
-export const TREND_FOCUS_PUSH = 1;
+// The camera closes by a QUARTER of the depth the plane came forward. The plane's own lift already
+// carries most of the emphasis (~9% apparent growth); the camera adds a little more so the commit is
+// felt as a move toward the reader rather than as one card sliding. It was a full lift's worth while
+// the planes were small — once the front plane was sized to fill the free canvas (user, 2026-09-19:
+// "larger"), a full push drove the focused plane ~50px under each rail. Emphasis has to fit the
+// room the rails leave it.
+export const TREND_FOCUS_PUSH = 0.25;
 /** Lean the settled trends pose in toward a focused plane. `depth` is `trendStack.focusDepth()`;
  *  0 means no focus and writes `pos` through unchanged. Safe with `outPos === pos`. */
 export function trendFocusPush(pos: THREE.Vector3, target: THREE.Vector3, depth: number, outPos: THREE.Vector3): void {

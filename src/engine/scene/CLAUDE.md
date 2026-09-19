@@ -481,13 +481,13 @@ Four decisions are recorded in the file's header and worth knowing before touchi
 - **It is static furniture.** Built once, re-baked only on a theme flip, with no `update(dt)` at all;
   its one per-frame input is the transition's furniture alpha through the shared `FadeSet`. Its root's
   `visible` is the Engine's, from `viewPolicy.show.trendGround` (rule 6).
-- **THE RUNG FALLOFF IS THE STACK'S OWN, SQUARED, and the square is what DOM forces.** A chart plane
-  composites in front of the canvas whatever the depth buffer says, and it is transparent — so a rear
-  rung that any ordinary scene would hide behind the front plane instead shows THROUGH the plot being
-  read, where a horizontal hairline reads as a gridline. That is a claim about the DATA, which
-  furniture may not make. Measured at the resting pose, slots 2 and back land inside the front chart's
-  plot area and no drop escapes it, so the far rungs fade to almost nothing and the near ones carry
-  the axis. Any new 3D mark in this view meets the same constraint.
+- **THE RUNGS RECEDE ON THEIR OWN FALLOFF, SQUARED** (`RUNG_FALLOFF`). A chart plane composites in
+  front of the canvas whatever the depth buffer says, and the planes are opaque cards — so a rung is
+  only ever seen where no card covers it, beside and below the deck. There it is furniture
+  establishing the depth axis: the far rungs fade to a whisper and the near ones carry it. The
+  floor's drop is DERIVED from the plane's own height (`PLANE_WORLD_H` in `domain/trendStack.ts`),
+  so enlarging a plane can never run the floor through its plot. Any new 3D mark in this view meets
+  the same compositing constraint.
 - **The floor is LEVEL and there are no side rails.** A ramp putting each rung under its own plane
   cannot work (`PLANE_STEP_Y` is smaller than a plane's own height, so the planes overlap and every
   rung lands inside the plot in front of it), and rails joining the rungs' ends drew one hard diagonal

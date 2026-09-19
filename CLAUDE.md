@@ -277,10 +277,11 @@ plain slice from the Engine rather than reading the store, so no second store br
 therefore never triggers a render, and a render never fights the engine for the `transform`.
 
 ⚠️ **The hard limit is compositing: a DOM layer sits WHOLLY in front of the canvas**, whatever the
-depth buffer says. Nothing WebGL can occlude a plane, and a plane is transparent — so the view's one
-WebGL object, `scene/views/TrendsView.ts`'s ground, fades its rear rungs by the stack's own falloff
-SQUARED, or a far rung shows through the front chart's plot and reads as a gridline. Any new 3D mark
-in this view has to answer the same question.
+depth buffer says. Nothing WebGL can occlude a plane or pass between two of them. The planes are
+OPAQUE CARDS (user, 2026-09-19), so the view's one WebGL object — `scene/views/TrendsView.ts`'s
+ground — is only ever seen beside and below the deck, never through it; depth is carried by
+occlusion, the stagger and scale, never by opacity. Any new 3D mark in this view has to answer the
+same compositing question.
 
 The shared node population is not placed here at all: `viewPolicy.fleet` reads `parked`, so the fleet
 gathers to the staging grids and fades on the doc overlay's own clock (`fleetFaded`/`fleetHolder` in

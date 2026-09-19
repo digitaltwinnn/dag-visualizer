@@ -7,16 +7,21 @@ import {
   FOCUS_LIFT,
   OPACITY_FALLOFF,
   PLANE_GAP,
+  PLANE_PLOT_PX_H,
+  PLANE_PX_H,
   PLANE_PX_W,
   PLANE_STEP_X,
   PLANE_STEP_Y,
+  PLANE_WORLD_H,
   PLANE_WORLD_W,
   PLANE_Y,
   SCALE_FALLOFF,
+  STAGGER_ANCHOR,
   VISIBLE_PLANES,
   focusDepth,
   focusInWindow,
   scrollToShow,
+  staggerCentre,
   stackPoses,
 } from "./trendStack";
 
@@ -35,10 +40,13 @@ describe("stackPoses", () => {
     expect(p[0].z - p[1].z).toBeCloseTo(PLANE_GAP);
   });
 
-  it("recedes: further planes are smaller and fainter", () => {
+  it("recedes by SCALE, and every card stays opaque", () => {
     const p = stackPoses(IDS, { layout: "stack", scroll: 0, focus: null });
     expect(p[4].scale).toBeLessThan(p[0].scale);
-    expect(p[4].opacity).toBeLessThan(p[0].opacity);
+    // Opaque cards (user, 2026-09-19): a card faded with depth is a see-through one, so depth is
+    // carried by scale, the stagger and occlusion — never by opacity.
+    expect(p.every((x) => x.opacity === 1)).toBe(true);
+    expect(OPACITY_FALLOFF).toBe(0);
   });
 
   it("falloff matches the named coefficients exactly at slot 4", () => {
@@ -61,16 +69,50 @@ describe("stackPoses", () => {
     expect(PLANE_STEP_Y).toBeGreaterThan(0);
   });
 
-  it("centres the stagger on the VISIBLE count, so a short roster still sits mid-canvas", () => {
-    // Read from VISIBLE_PLANES instead, a two-plane window would hang off to one side.
-    const full = stackPoses(IDS, { layout: "stack", scroll: 0, focus: null });
-    const mean = (a: { x: number; y: number }[], k: "x" | "y") =>
-      a.reduce((t, v) => t + v[k], 0) / a.length;
-    expect(mean(full, "x")).toBeCloseTo(0);
-    expect(mean(full, "y")).toBeCloseTo(PLANE_Y);
-    const two = stackPoses(IDS.slice(0, 2), { layout: "stack", scroll: 0, focus: null });
-    expect(mean(two, "x")).toBeCloseTo(0);
-    expect(mean(two, "y")).toBeCloseTo(PLANE_Y);
+  it("anchors the stagger toward the FRONT plane, so the chart being read sits near the view's centre", () => {
+    // ⚠️ The rule this replaces centred the BLOCK (mean of the slots on the origin), which parked
+    // the front plane two whole steps down-and-left — user, 2026-09-19: "make the front chart more
+    // at the view center". The front plane is the subject; the planes behind it are its index.
+    const p = stackPoses(IDS, { layout: "stack", scroll: 0, focus: null });
+    const c = staggerCentre(p.length);
+    expect(p[0].x).toBeCloseTo(-c * PLANE_STEP_X);
+    expect(p[0].y).toBeCloseTo(PLANE_Y - c * PLANE_STEP_Y);
+    // Nearer the origin than a block-centred stagger would put it — and strictly so.
+    const blockCentred = (p.length - 1) / 2;
+    expect(c).toBeLessThan(blockCentred);
+    expect(Math.abs(p[0].x)).toBeLessThan(blockCentred * PLANE_STEP_X);
+    // …but not ON the origin: the index still has to fit above and beside it.
+    expect(STAGGER_ANCHOR).toBeGreaterThan(0);
+    expect(STAGGER_ANCHOR).toBeLessThan(1);
+  });
+
+  it("scales the stagger's centre with the VISIBLE count, so a short roster keeps its proportions", () => {
+    expect(staggerCentre(5)).toBeCloseTo(2 * STAGGER_ANCHOR);
+    expect(staggerCentre(2)).toBeCloseTo(0.5 * STAGGER_ANCHOR);
+    // One plane — a committed filter — sits exactly on the pose origin…
+    expect(staggerCentre(1)).toBe(0);
+    const one = stackPoses(IDS.slice(0, 1), { layout: "stack", scroll: 0, focus: null });
+    expect(one[0].x).toBeCloseTo(0);
+    expect(one[0].y).toBeCloseTo(PLANE_Y);
+    // …and an empty window cannot produce a negative centre.
+    expect(staggerCentre(0)).toBe(0);
+  });
+
+  it("the FLAT column still centres as a block — it has no subject plane to favour", () => {
+    const f = stackPoses(IDS, { layout: "flat", scroll: 0, focus: null });
+    const meanY = f.reduce((t, v) => t + v.y, 0) / f.length;
+    expect(meanY).toBeCloseTo(PLANE_Y);
+    expect(f.every((v) => v.x === 0)).toBe(true);
+  });
+
+  it("states the plane's height beside its width, so the ground can clear it", () => {
+    // The chart's height is a fixed CSS number, so authoring the plane NARROWER than it draws is
+    // what makes it larger on screen; the world height follows from the same two numbers.
+    expect(PLANE_WORLD_H).toBeCloseTo((PLANE_WORLD_W * PLANE_PX_H) / PLANE_PX_W);
+    // The card is its plot plus fixed chrome (padding, head strip, axis strip) — so a taller plot
+    // is a taller card, one for one.
+    expect(PLANE_PX_H).toBeGreaterThan(PLANE_PLOT_PX_H);
+    expect(PLANE_WORLD_H).toBeGreaterThan(PLANE_STEP_Y); // the planes overlap — see TrendsView's level floor
   });
 
   it("scrolling pages through the roster", () => {
@@ -106,10 +148,11 @@ describe("stackPoses", () => {
     expect(f.interactive).toBe(true);
     expect(f.opacity).toBe(1);
     expect(f.scale).toBe(1);
-    // …and CONTINUES THE STAGGER forward: half a step further down-and-left than slot 0, so the
-    // front of the stack reads as one sequence rather than a plane parked over its own column.
+    // …half a step BELOW slot 0 (what separates it from the plane it came forward past) but on
+    // slot 0's own x: the focused plane is the view's subject and holds the centre the front plane
+    // holds. Drifting left with the stagger ran its edge under the rail once the planes grew.
     const slot0 = p.find((x) => x.id === "dag-l0")!;
-    expect(f.x).toBeCloseTo(slot0.x - PLANE_STEP_X / 2);
+    expect(f.x).toBeCloseTo(slot0.x);
     expect(f.y).toBeCloseTo(slot0.y - PLANE_STEP_Y / 2);
   });
 

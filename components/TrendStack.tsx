@@ -28,16 +28,20 @@
 // row a metric reads, whether it rescales, counter or gauge, the busiest-first rank — is
 // `src/data/trendSeries.ts`, shared with the document for the same reason.
 //
-// ONE HAIRLINE PER PLANE, and it is the CHART'S. The body is fully transparent — no background,
-// no frame of its own — because `TrendChart` already draws a `border-border` box around its plot,
-// and a plane box around that would be a second edge around the same rectangle. So the plane is a
-// width and its content's height, and the only ink it adds is the header strip's plate.
+// A PLANE IS AN OPAQUE CARD (user, 2026-09-19: "remove the transparency of the trend cards" —
+// reversing the first cut, where the body was fully transparent and only the header wore a plate).
+// Transparent sheets let every chart behind the front one draw THROUGH its plot: five series
+// crossing in one rectangle, and the chart being read was the one hardest to read. An opaque face
+// makes the stack a deck — occlusion, the stagger and the scale carry the depth, and each card
+// shows exactly one network. So every plane also sits at FULL opacity: a card faded to a third is
+// still see-through, which is the thing that was asked away. The face is the app's own
+// `--panel-solid` glass composited over the opaque `--scene-ground`, so it is solid on both
+// grounds from tokens alone, framed by the app's hairline.
 //
-// THE COLOUR IS AN AREA UNDER THE LINE, not a fill behind the plane (`fill`, opt-in on the chart
-// and passed nowhere else in the app). A hairline alone floating over the scene reads as a wire;
-// the area is what makes a plane read as a translucent SHEET, which is the whole depth illusion.
-// It is the line's own hue fading to nothing at the baseline, and it carries the line's gaps: an
-// unmeasured bucket is a hole in the fill too, never a bridge and never a drop to zero.
+// THE COLOUR IS STILL AN AREA UNDER THE LINE (`fill`, opt-in on the chart and passed nowhere else
+// in the app): on a solid face it reads as the card's own tint rather than as a translucent sheet.
+// It carries the line's gaps — an unmeasured bucket is a hole in the fill too, never a bridge and
+// never a drop to zero.
 //
 // ⚠️ NO BLUR, NO SHADOW, ANYWHERE ON A PLANE. Each would force the compositor to re-raster a
 // transformed layer every frame, with five planes under a per-frame matrix — the single biggest
@@ -68,7 +72,7 @@ import { cn } from "@/lib/utils";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
 import { sharedCeiling } from "@/src/data/trendSeries";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
-import { PLANE_PX_W, stackPoses } from "@/src/engine/domain/trendStack";
+import { PLANE_PLOT_PX_H, PLANE_PX_W, stackPoses } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -298,10 +302,9 @@ export default function TrendStack() {
             // never fire for one press.
             onClick={pose.interactive ? () => activate(pose.id, false) : undefined}
             style={{
-              // A PREVIEWED PLANE LIFTS TO FULL, AND NOTHING ELSE MOVES (rule 9 — hovers preview,
-              // never commit). The pose is untouched: depth, scale and paint order are what a
-              // COMMIT changes, so a hover that re-staggered the stack would read as one.
-              opacity: pair.paired ? 1 : pose.opacity,
+              // Every card is opaque at every depth (see the header) — `pose.opacity` is 1 across
+              // the stack, read here rather than assumed so the domain stays the one statement.
+              opacity: pose.opacity,
               // PAINT ORDER IS DEPTH, from the pose itself: a nearer plane (larger z) paints over
               // a farther one, so a lifted focus lands in front of the stack it came from and the
               // flat layout's equal z leaves tree order to break the tie. Local to this root,
@@ -309,11 +312,24 @@ export default function TrendStack() {
               zIndex: Math.round(100 + pose.z),
             }}
           >
-            {/* THE PLANE. Centred on the anchor's projected point, and CONTENT-height: the chart's
-                own plot frame IS its one hairline, so a box around it would be a second edge around
-                the same rectangle. Width is the shared `PLANE_PX_W` — the projector divides by the
-                same constant, so the two sides cannot drift about how big a plane is. */}
-            <div className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2" style={{ width: PLANE_PX_W }}>
+            {/* THE PLANE — an opaque card centred on the anchor's projected point, content-height.
+                Width is the shared `PLANE_PX_W`; the projector divides by the same constant, so the
+                two sides cannot drift about how big a plane is.
+                ⚠️ TWO BACKGROUND LAYERS, ONE SHORTHAND: `--panel-solid` is 0.92-alpha glass, so on
+                its own the card would still leak the plane behind it. Laid over the opaque
+                `--scene-ground` it is solid — and both are tokens, so both grounds follow.
+                A PREVIEWED CARD TAKES ITS NETWORK'S HUE ON THE HAIRLINE, and nothing else moves
+                (rule 9 — hovers preview, never commit). It was an opacity lift while the cards
+                were translucent; on an opaque deck there is no opacity left to spend, and the
+                app's `.subject-paired` glow is a box-shadow, which a transformed plane may not
+                carry (see NO BLUR, NO SHADOW above). */}
+            <div
+              className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border p-2 [background:linear-gradient(var(--panel-solid),var(--panel-solid)),var(--scene-ground)] [transition:border-color_0.16s_ease] motion-reduce:!transition-none"
+              style={{
+                width: PLANE_PX_W,
+                borderColor: pair.paired ? `color-mix(in oklch, ${row.hue ?? "var(--primary)"} 60%, transparent)` : undefined,
+              }}
+            >
             {p && (
               <TrendChart
                 name={row.name}
@@ -336,30 +352,20 @@ export default function TrendStack() {
                 lines={linesById.get(pose.id)!}
                 scaleMax={sharedMax}
                 cursorMs={cursorMs}
-                // THE PLANE CARRIES ITS COLOUR AS AN AREA, and only here. A plane's body is fully
-                // transparent, so without the fill a chart is a wire in mid-air and five of them
-                // read as five wires rather than as sheets receding in depth. A plain boolean, so
-                // it holds the plot's memo as still as every other prop on this call.
+                // THE PLANE CARRIES ITS COLOUR AS AN AREA, and only here — on the card's solid face
+                // it reads as the network's own tint. A plain boolean, so it holds the plot's memo
+                // as still as every other prop on this call.
                 fill
+                // A card is ONE chart read on its own, so its plot is taller than the document's
+                // small-multiples. The number is the domain's: the ground's drop and the flat
+                // column's pitch are derived from the card's height.
+                plotHeight={PLANE_PLOT_PX_H}
                 className="w-full"
-                // THE HEAD IS THE PLANE'S HEADER STRIP. The body is fully transparent — the
-                // chart's own hairline and its coloured line are all the ink it has — so this one
-                // row carries a plate, at a presence measured to stay readable over both the dark
-                // scene and the light one. `--panel-solid` is the app's own near-opaque glass and
-                // the only token here; the mix is its presence, not a colour of its own. NO BLUR
-                // (see this file's header) — the plate does the work a backdrop-filter would.
                 // THE HEAD IS THE TARGET, so it reads as one: the pointer's own cursor, the app's
-                // hover wash mixed INTO the plate, and a focus ring for the keyboard. A hover
-                // previews, it never commits (rule 9).
-                // ⚠️ ONE `background` VALUE, in the plate's own shorthand form. A `bg-*` utility
-                // sets background-COLOR and would fight the shorthand this plate is written as
-                // (CSS trap 3's neighbourhood), so the hover state restates the whole value —
-                // and it restates it as a single mix rather than as a wash layered over the
-                // plate, which keeps it one property value to read. Mixing TOWARD `--panel-solid`
-                // (not toward transparent) means the hover lifts the plate as well as tinting it,
-                // so a header strip over a busy chart gains presence exactly when it is the thing
-                // being pointed at.
-                headClassName="pointer-events-auto cursor-pointer px-2 py-1 rounded-md [background:color-mix(in_oklch,var(--panel-solid)_62%,transparent)] hover:[background:color-mix(in_oklch,var(--wash-hover)_35%,var(--panel-solid))] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
+                // hover wash, and a focus ring for the keyboard. It needs no plate of its own any
+                // more — it sits on the card's solid face. A hover previews, it never commits
+                // (rule 9).
+                headClassName="pointer-events-auto cursor-pointer px-2 py-1 rounded-md hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
                 // The pairing's five writers, on the one element of a plane that takes pointer
                 // events at every depth. `onMouseMove` is the swap-under-pointer healer and
                 // `onFocus`/`onBlur` the keyboard mirror — one pair of functions, five props, so
