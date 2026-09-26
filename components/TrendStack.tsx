@@ -114,7 +114,7 @@ export default function TrendStack() {
   // write, for the whole stack, never one plane.
   const setTrendRange = useStore((s) => s.setTrendRange);
   // THE SCENE↔HUD HOVER PAIRING (convention 9), on the network channel every other surface in the
-  // app already pairs a network on: hovering a plane's header previews its Layers row in the rail,
+  // app already pairs a network on: hovering a plane's header previews its Networks row in the rail,
   // and hovering that row previews this plane. A preview is never a commit — the only thing it
   // changes here is the plane's OPACITY, never its pose.
   const hoverFilter = useStore((s) => s.hoverFilter);
@@ -141,7 +141,7 @@ export default function TrendStack() {
 
   // ⚠️ ONE ROSTER PASS, SHARED WITH BOTH RAILS (2026-09-19). Which networks, in what order, drawn
   // against which axis and with what measured — `components/useTrendRoster.ts` is the one answer,
-  // read here, by the Layers card and by the cursor card. Three copies of it would be three
+  // read here, by the Networks card and by the cursor card. Three copies of it would be three
   // chances to disagree about the very ranking these planes are laid out by. It carries the
   // counter EDGE TRIM too, so a rail can never quote a number no chart on screen agrees with.
   const roster = useTrendRoster(slice, filter, shown);
@@ -255,7 +255,7 @@ export default function TrendStack() {
   };
   // UP / DOWN IS THE VIEW'S THIRD AXIS (user, 2026-09-19). Left/right on the timeline is WHEN, the
   // depth of the stack is WHO, and the measure — WHAT — had no gesture on the canvas. The control
-  // is the Layers card's heading control (`ExplorerHeading`, 2026-09-26 — it was the title under the bar) and
+  // is the Networks card's heading control (`ExplorerHeading`, 2026-09-26 — it was the title under the bar) and
   // `↑`/`↓` from inside a card. Every card steps together (a stack whose planes each showed a different
   // measure would stop being a comparison), through the ONE order the picker reads, and the ends
   // go inactive rather than wrapping. A SETTING, not a selection — it writes its setter directly,

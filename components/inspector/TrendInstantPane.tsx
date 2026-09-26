@@ -109,7 +109,7 @@ export default function TrendInstantPane({
   // left holding a subject nothing is pointing at.
   //
   // ⚠️ …AND MUST NOT BE CLEARED WHEN SOMEONE ELSE IS HOLDING IT. This card's roster is the WHOLE
-  // roster, so without ownership its unmount would wipe a Layers row's live hover on the way out:
+  // roster, so without ownership its unmount would wipe a Networks row's live hover on the way out:
   // hover a row here, move onto the rail, close the card. The returned setter is what makes the
   // difference — the hook sees this card's writes and releases nothing else.
   const setHover = useHoverRelease(hoverFilter, ranked, setHoverFilter);

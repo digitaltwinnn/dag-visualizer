@@ -361,14 +361,14 @@ export default function TrendsDoc() {
   // spread them wide and broke when the list WRAPS on phone (the h-auto rows below) — as
   // compact pills they pack left and wrap cleanly (user, 2026-09-08: the tabs overflowed).
   /* The scale control — `trendPickers.tsx`'s shared `ScaleToggle` (extracted 2026-09-19 for the
-     History view's Layers card: the same question about the same charts, and a second copy of a
+     History view's Networks card: the same question about the same charts, and a second copy of a
      control with this much reasoning in it is the drift that file exists to prevent). It is
      rendered ONLY on the metagraphs tab, because a scale shared across charts is only a question
      where there is a COLUMN of comparable charts; the hypergraph tab's charts each measure a
      different quantity, and under a commit there is one network left. */
   const scaleToggle = <ScaleToggle shared={scaleMode === "shared"} onChange={(on) => setScaleMode(on ? "shared" : "own")} />;
   // The scope pill and its × are `trendPickers.tsx`'s `ScopeChip`, shared with the History view's
-  // Layers card (2026-09-19) — one statement of "what is applied, and how to clear it".
+  // Networks card (2026-09-19) — one statement of "what is applied, and how to clear it".
   const scopeChip = <ScopeChip filter={filter} className="mr-auto" />;
   /* The scoped tab with nothing to draw. Both cases are real commits a reader can reach from the
      bar, and neither is a failure — the trends store keeps one series set per LISTED metagraph,

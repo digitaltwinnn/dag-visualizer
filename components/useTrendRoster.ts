@@ -21,7 +21,7 @@ import type { TrendMetric } from "@/src/store/store";
 // ONE ROSTER PASS FOR THE STACK AND BOTH RAILS (2026-09-19).
 //
 // The History view now has three surfaces asking the same question: the chart PLANES, the left
-// rail's Layers list, and the right rail's cursor card. "Which networks, in what order, drawn
+// rail's Networks list, and the right rail's cursor card. "Which networks, in what order, drawn
 // against which axis, and what did each one measure" is one answer, and three copies of it would
 // be three chances to disagree about the ranking the planes are laid out by — a rail row naming a
 // plane that is not there, a value that does not match the chart beside it.
@@ -92,7 +92,7 @@ const NO_SERIES: Readonly<Record<string, (number | null)[]>> = {};
 const PLAIN = (v: number) => v.toLocaleString(undefined, { maximumFractionDigits: 1 });
 
 /** WHAT AN UNMEASURED BUCKET SAYS, in words (rule 10). A gap is not a zero, and every surface that
- *  can show one — the Layers list's last reading, the cursor card's per-network rows — says it the
+ *  can show one — the Networks list's last reading, the cursor card's per-network rows — says it the
  *  same way. */
 export const NO_READING = "no reading";
 

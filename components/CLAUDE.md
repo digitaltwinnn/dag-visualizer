@@ -220,7 +220,7 @@ decisions inside them are design, not detail:
 
 **Naming and copy rules:** About states the view's point of view ("How the network is built"); the tool
 card says what you BROWSE — by the AXIS the rows break the network down along, never by the
-figure they show ("Network breakdown", "Country breakdown", "Snapshot breakdown", "Layer breakdown"
+figure they show ("Network breakdown", "Country breakdown", "Snapshot breakdown", and History's "Network breakdown" too — its rows are networks, "layer" was the stack's word for a plane; 2026-09-26
 — user, 2026-09-26: once every explorer carries the measure STEPPER, a title like "Nodes by
 country" names one measure of three). Eyebrows are bare role words, and each explorer's usage
 hint leads its card rather than trailing it. An explorer ROW is a browse target — mark, name, count,
@@ -275,7 +275,7 @@ through the fade-out. A window pill shows nothing, honestly: the charts redraw b
 
 **The History view has three axes and each has one home** (user, 2026-09-19): left/right on the
 timeline is WHEN, the depth of the stack is WHO, and UP/DOWN is WHAT — the measure. Its control is
-the Layers card's HEADING CONTROL (the explorer's figure heading opening `METRIC_ORDER` as a radio
+the Networks card's HEADING CONTROL (the explorer's figure heading opening `METRIC_ORDER` as a radio
 list with each measure's unit at the current cadence — design 2026-09-26; `Same scale` rides the
 same heading row as the view's other setting. It replaced a `∧ SNAPSHOTS ∨` stepper, which walked a
 list the reader could not see, which itself replaced the six-pill picker no other surface used:
@@ -314,7 +314,7 @@ also landing as a pick. Rear cards keep their bodies inert. This is also why the
 swipe gesture: a vertical touch swipe stepped the measure for a few hours, until one gesture had
 to mean two things.
 
-**Hovering pairs over `hoverFilter`, the app's own network channel** (convention 9). A Layers row, a
+**Hovering pairs over `hoverFilter`, the app's own network channel** (convention 9). A Networks row, a
 plane's header strip and a cursor-card row are three ends of one pairing, with no channel of their
 own: hovering any of them turns that card's hairline to its network's hue and washes the rows. The
 hairline is the ONLY thing that changes — a preview that re-staggered the stack would read as a
@@ -723,7 +723,7 @@ rule, reaching a committed value). Across a 200-event scrub: `metricSeries` 8262
 ⚠️ **The charts themselves were the rest of it — the cursor is DRAWN OUTSIDE the memo** (2026-09-19).
 With the shared cursor as a recharts `ReferenceLine`, a bucket write re-rendered all five planes'
 charts: measured over a 60-step scrub of the `all` window at 1500×1000, **22.1s / 2.7 FPS / 600 plot
-renders → 1.4s / 40.7 FPS / 0**, and the hover sweep over the Layers rows **8.0s / 2.7 FPS / 220 →
+renders → 1.4s / 40.7 FPS / 0**, and the hover sweep over the Networks rows **8.0s / 2.7 FPS / 220 →
 0.44s / 36.5 FPS / 0**. Two halves, both structural: `TrendChart`'s recharts subtree is a
 `React.memo` child (`TrendPlot`) whose props are the SERIES alone, and the cursor is a 1px CSS
 overlay beside it, positioned by `cursorFraction` over the chart's own numeric axis — `calc()` on a
