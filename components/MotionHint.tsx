@@ -133,7 +133,13 @@ export default function MotionHint() {
         // utility per state — twMerge groups them, so a second on the same element would win.
         "opacity-0 transition-opacity duration-200 ease-out",
         "data-[on='1']:opacity-100 data-[on='1']:delay-150",
-        "data-[on='ease']:opacity-0 data-[on='ease']:ease-linear data-[on='ease']:[transition-duration:var(--hint-ease)]",
+        // ⚠️ THE EASE TARGETS 0.02, NOT 0, so the motion's END can cut it (user, 2026-09-26: with
+        // the longer hold "the easing goes way beyond the animation"). A CSS transition only
+        // starts on a CHANGE of computed target: with the ease already heading for 0, flipping to
+        // the OFF state — also 0 — started nothing, and the slow linear fade simply ran on past the
+        // settled scene (measured: 0.46 → 0 over 1.5s after the switch had landed). Two hundredths
+        // is invisible; the change of target is what makes the 200ms cut take over.
+        "data-[on='ease']:opacity-[0.02] data-[on='ease']:ease-linear data-[on='ease']:[transition-duration:var(--hint-ease)]",
         "motion-reduce:!transition-none",
       )}
     >
