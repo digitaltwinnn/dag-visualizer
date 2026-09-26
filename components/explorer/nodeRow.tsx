@@ -5,6 +5,7 @@ import type { CSSProperties } from "react";
 import type { ExplorerRowSpec } from "@/components/explorer/Explorer";
 import { IdentityDot, RoleChips } from "@/components/inspector/parts";
 import { layerCodesOf } from "@/src/data/composition";
+import { shortHash } from "@/src/data/network";
 import { nodeStatus } from "@/src/data/nodeStatus";
 import type { NodeRow } from "@/src/data/types";
 import { midHash } from "@/src/util/format";
@@ -23,7 +24,7 @@ import { midHash } from "@/src/util/format";
 //
 // The state dot is colour, and identity is never colour alone (the design system's rule), so the
 // state's word rides the dot as its accessible name and the row's title spells everything out:
-// the full id, the network, the layers, the state.
+// the id in its short form, the network, the layers, the state.
 
 /** The state as a dot in its bucket colour; the word is the dot's accessible name. */
 export function StateDot({ state }: { state?: string | null }) {
@@ -71,7 +72,9 @@ export function nodeRowSpec(args: {
     ),
     on: args.on,
     hue,
-    title: `${id}${ticker ? ` · ${ticker}` : ""}${codes.length ? ` · ${codes.join(" ")}` : ""} · ${status.label}`,
+    // The hover names the row's facts in words; the id stays in its SHORT form (a full 128-glyph
+    // id was "a very long text" — user, 2026-09-26). The whole id is the Node card's, one click on.
+    title: `${shortHash(id)}${ticker ? ` · ${ticker}` : ""}${codes.length ? ` · ${codes.join(" ")}` : ""} · ${status.label}`,
     onClick: args.onClick,
     pair: args.pair,
   };
