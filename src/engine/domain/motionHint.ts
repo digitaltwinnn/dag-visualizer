@@ -67,9 +67,10 @@ export function motionHint(cause: MotionCause, mode: Mode, names: HintNames, pha
     case "node":
       // A node pick's title is its network and its sub its place: "a Dor Technologies node in
       // Frankfurt, Germany". A node has no name of its own worth saying; where it belongs does.
-      return cause.title === null
-        ? "Stepping back"
-        : `Framing a ${cause.title} node${cause.sub ? ` in ${cause.sub}` : ""}`;
+      // A RELEASE says nothing here: the executor restamps it as the rung the camera lands on
+      // (`landingCause`), so a deselect reads "Framing Dor Technologies" — the select's own words
+      // — never "stepping back" (user, 2026-09-26).
+      return cause.title === null ? null : `Framing a ${cause.title} node${cause.sub ? ` in ${cause.sub}` : ""}`;
     case "snapshot":
       return cause.ordinal === null ? "Back to the live snapshot" : `Framing snapshot ${cause.ordinal.toLocaleString()}`;
     case "metaSnap":
@@ -79,9 +80,9 @@ export function motionHint(cause: MotionCause, mode: Mode, names: HintNames, pha
     case "country":
       return cause.cc === null ? "Back to the whole globe" : `Drilling into ${names.country(cause.cc)}`;
     case "cohort":
-      return cause.on ? "Framing the selected nodes" : "Stepping back";
+      return cause.on ? "Framing the selected nodes" : null;
     case "composition":
-      return cause.on ? "Framing the selection" : "Stepping back";
+      return cause.on ? "Framing the selection" : null;
     case "range":
       return cause.span === null
         ? "Showing the whole window"

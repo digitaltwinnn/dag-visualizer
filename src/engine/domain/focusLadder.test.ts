@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { LADDERS, LEVEL_CARRY, finerLevels, hasLevel, type SelectionSnapshot } from "./focusLadder";
+import { LADDERS, LEVEL_CARRY, finerLevels, finestRung, hasLevel, type SelectionSnapshot } from "./focusLadder";
 
 const sel = (over: Partial<SelectionSnapshot> = {}): SelectionSnapshot => ({
   inspectIsNode: false, cohort: null, composition: null, country: null, filter: "all", ...over,
@@ -78,5 +78,16 @@ describe("focusLadder — the per-view rung tables (spec 2026-07-18)", () => {
     expect(LEVEL_CARRY.cohort).toBe("view-scoped");
     expect(LEVEL_CARRY.composition).toBe("view-scoped");
     expect(LEVEL_CARRY.country).toBe("view-scoped");
+  });
+});
+
+describe("finestRung — where a deselect lands", () => {
+  it("answers the finest active rung, down to the unconditional all", () => {
+    expect(finestRung("hyper", sel({ inspectIsNode: true, filter: "dor" }))).toBe("node");
+    expect(finestRung("hyper", sel({ composition: COMP, filter: "dor" }))).toBe("composition");
+    expect(finestRung("geo", sel({ cohort: COHORT, country: "DE" }))).toBe("cohort");
+    expect(finestRung("geo", sel({ country: "DE" }))).toBe("country");
+    expect(finestRung("ledger", sel({ filter: "dor" }))).toBe("network");
+    expect(finestRung("trend", sel())).toBe("all");
   });
 });

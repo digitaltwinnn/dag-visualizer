@@ -31,7 +31,10 @@ describe("motionHint", () => {
     expect(motionHint({ kind: "country", cc: "DE" }, "geo", NAMES)).toBe("Drilling into Germany");
     expect(motionHint({ kind: "node", title: "Dor Technologies", sub: "Frankfurt, Germany" }, "geo", NAMES)).toBe("Framing a Dor Technologies node in Frankfurt, Germany");
     expect(motionHint({ kind: "node", title: "DAG" }, "hyper", NAMES)).toBe("Framing a DAG node");
-    expect(motionHint({ kind: "node", title: null }, "hyper", NAMES)).toBe("Stepping back");
+    // A release has no sentence of its own — the executor restamps it as the landing rung.
+    expect(motionHint({ kind: "node", title: null }, "hyper", NAMES)).toBeNull();
+    expect(motionHint({ kind: "cohort", on: false }, "geo", NAMES)).toBeNull();
+    expect(motionHint({ kind: "composition", on: false }, "hyper", NAMES)).toBeNull();
   });
 
   it("stamps a range in UTC days and names a window by its label", () => {

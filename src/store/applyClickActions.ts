@@ -4,7 +4,9 @@
 // kinds get their effect HERE (and a test in applyClickActions.test.ts), never inline in a
 // caller.
 import { useStore } from "./store";
+import { finestRung } from "@/src/engine/domain/focusLadder";
 import type { ClickAction } from "@/src/engine/domain/pickActions";
+import { is3D } from "@/src/engine/domain/viewTransition";
 import { scrollToShow } from "@/src/engine/domain/trendStack";
 import type { MotionCause } from "@/src/store/store";
 
@@ -71,7 +73,29 @@ export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boole
   // table's coarse→fine order. Here rather than in the setters because a setter cannot tell a
   // commit from the housekeeping around it (the paging a focus asks for is not the gesture).
   const cause = motionCauseOf(actions);
-  if (cause) st.setMotionCause(cause);
+  if (cause) st.setMotionCause(landingCause(cause, useStore.getState()));
+}
+
+/** A RELEASE names where the camera LANDS, in the same words a select uses (user, 2026-09-26:
+ *  "don't say 'stepping back', use the same language as when stepping in"): deselecting a node
+ *  under a committed network is "Framing Dor Technologies", exactly what the network row says.
+ *  The landing rung is the finest one still active AFTER the writes, so it is read off the store
+ *  here rather than inferred from the actions. Releases that already name their destination
+ *  (a country, a snapshot, a tile) keep their own sentence. */
+function landingCause(cause: MotionCause, st: ReturnType<typeof useStore.getState>): MotionCause {
+  const release =
+    (cause.kind === "node" && cause.title === null) ||
+    (cause.kind === "cohort" && !cause.on) ||
+    (cause.kind === "composition" && !cause.on);
+  if (!release || !is3D(st.mode)) return cause;
+  const level = finestRung(st.mode, {
+    inspectIsNode: !!st.inspect && (st.inspect.kind === "l0" || st.inspect.kind === "l1" || st.inspect.kind === "metanode"),
+    cohort: st.cohort,
+    composition: st.composition,
+    country: st.country,
+    filter: st.filter,
+  });
+  return { kind: "rung", level };
 }
 
 /** The cause the hint names for a click — the finest action's, or null for a click that moves nothing. */
