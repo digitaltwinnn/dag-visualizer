@@ -97,3 +97,9 @@ Recorded deviations from the screens:
 - **The scope mark is the TICKER, not a dot** (user, same day, after the build: "instead of a
   colored pill use the ticker"). Decision 2's dot read as one more pill beside the path's; the
   ticker in the network's hue is the dossier head's own mark, with the × beside it on hover.
+- **The path is ARROW STEPS on one plate** (`path-control.html`, user: C with B's bounding block —
+  the first build's house, pills, `›`s and clause "looks too much like a random collection… I want
+  a uniform control"). Chevron segments whose edges are the separators, the house first, the
+  current level filled last, and the level's clause on the same faint plate beneath — the plate
+  is what makes the clause part of the control. Three washes of one hue: plate faint, ancestors
+  soft, current step hover.

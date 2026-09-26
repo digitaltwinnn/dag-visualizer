@@ -393,7 +393,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           setOpenSnap(null);
         },
       },
-      meaning: "Which networks anchored into this snapshot",
+      meaning: "Networks that anchored into it",
       measure: { options: TICK_NET_MEASURE_OPTIONS, value: netPick, onPick: (id) => setNetPick(id as TickNetMeasure) },
       hasFigure: true,
       nameW: 120,
@@ -467,7 +467,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         ),
         onRelease: () => setOpenSnap(null),
       },
-      meaning: "Each snapshot this network anchored here",
+      meaning: "Its snapshots anchored here",
       measure: { options: SNAP_MEASURE_OPTIONS, value: snapPick, onPick: (id) => setSnapPick(id as SnapLevelMeasure) },
       hasFigure: true,
       figureW: 48,
@@ -517,7 +517,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
       crumb: { label: <span className="tabular-nums">{leaf.ordinal > 0 ? leaf.ordinal.toLocaleString() : `${leaf.metaId.slice(0, 10)}…`}</span> },
       // The cards' own phrase ("Signed by N L0 validators") — the producing layer named before
       // the rows, because the constant count is most puzzling here (3 rows under a 20-node network).
-      meaning: `Signed by ${signers.length} ${SIGNER_GROUPS.proof.who} — the network's whole L0 cluster`,
+      meaning: `Signed by ${signers.length} ${SIGNER_GROUPS.proof.who}, its whole L0 cluster`,
       measure: null,
       hasFigure: false,
       rows: signers.map((sid): ExplorerRowSpec => {

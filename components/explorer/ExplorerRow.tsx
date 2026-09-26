@@ -86,6 +86,17 @@ export default function ExplorerRow({
   useEffect(() => {
     if (on) el.current?.scrollIntoView({ block: "nearest" });
   }, [on]);
+  // A ROW THAT LEAVES UNDER THE POINTER RELEASES ITS HOVER (rule 9's unmount backstop, in the one
+  // row every explorer uses): clicking a row that opens a deeper level unmounts the row while it
+  // is hovered, so its own mouseleave never fires and the pairing channel — a tick, a lane, a
+  // country — stays lit in the scene and previews on the heading. Found live 2026-09-26 as the
+  // PINNED pill wearing its dashed hover-preview after a click.
+  const hovered = useRef(false);
+  const leave = useRef(pair?.onMouseLeave);
+  leave.current = pair?.onMouseLeave;
+  useEffect(() => () => {
+    if (hovered.current) leave.current?.();
+  }, []);
   return (
     <button
       ref={el}
@@ -111,9 +122,15 @@ export default function ExplorerRow({
         ...(on ? selectionHue(hue) : undefined),
         ...pair?.style,
       }}
-      onMouseEnter={pair?.onMouseEnter}
+      onMouseEnter={() => {
+        hovered.current = true;
+        pair?.onMouseEnter();
+      }}
       onMouseMove={pair?.onMouseMove}
-      onMouseLeave={pair?.onMouseLeave}
+      onMouseLeave={() => {
+        hovered.current = false;
+        pair?.onMouseLeave();
+      }}
       onFocus={pair?.onFocus}
       onBlur={pair?.onBlur}
     >

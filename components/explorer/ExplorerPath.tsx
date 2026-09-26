@@ -1,119 +1,99 @@
 "use client";
 
 import { House } from "lucide-react";
-import { Fragment, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "@/components/ui/breadcrumb";
 import { cn } from "@/lib/utils";
 
-// THE EXPLORER'S PATH (design session 2026-09-26, `depth.html` A): depth is a path, not a tree.
-// The card shows ONE level at a time; the ancestry above it is this breadcrumb, each crumb a way
-// back up. Clicking a crumb RELEASES every rung finer than it (through the one executor — the
-// caller wires the action) and shows that crumb's level with the crumb's row washed, so there is
-// never more than one selection wash on screen. THE ROOT IS A HOUSE GLYPH (user, 2026-09-26, two
-// rounds: the root word — "Networks", "Countries", "Snapshots" — restated the card's title and cost
-// the width the crumbs need, so it went; then "I can't go back to the 1st level once I start
-// navigating" — so it is back as the shortest possible entry, an icon whose accessible name is the
-// root's word). It releases everything.
+// THE EXPLORER'S PATH (design session 2026-09-26, `depth.html` A, then `path-control.html` C+B
+// later the same day): depth is a path, not a tree. The card shows ONE level at a time; the
+// ancestry above it is this path, each step a way back up. Clicking a step RELEASES every rung
+// finer than it (through the one executor — the caller wires the action) and shows that step's
+// level with the step's row washed, so there is never more than one selection wash on screen.
 //
-// shadcn's Breadcrumb underneath: the `nav` landmark, the list semantics and `aria-current` on
-// the last crumb come for free; the look is the card's — the crumbs are quiet pills in the wash,
-// the root is bare, the separator is the app's `›`.
+// ONE CONTROL, NOT A COLLECTION (user: the first cut — a house, pills, `›`s and a line of text —
+// "looks too much like a random collection of pills, > and text; I want a uniform control"). The
+// path is ARROW STEPS on one faint plate: each step is a chevron-shaped segment whose own edge is
+// the separator, the house is the first step, the level on screen is the last and the filled one,
+// and the level's one clause of meaning sits on the SAME plate beneath the steps — the plate is
+// what makes the clause part of the control rather than a line under it (the user picked C's
+// steps with B's bounding block). Three washes of one hue carry it: the plate faint, the ancestors
+// soft, the current step the hover wash — a ladder, so "where am I" is the strongest fill.
 //
-// TYPE AND FIT (user, 2026-09-26, two notes): a crumb is a ROW'S NAME moved up, so it is set at
-// the rows' own `text-body`, not the primitive's `text-sm` — 14px over 12.5px rows read as a
-// heading. And the path never wraps: the list is `nowrap` and every crumb is a shrinkable
-// `min-w-0` item that ELLIPSISES, so a long label (a provider, "Frankfurt · Hetzner Online GmbH")
-// gives up width before the path takes a second line, and the full label stays on the crumb's
-// `title`. A label that has a short form uses it (a country crumb is the name alone, not the
-// code and the name). The LAST crumb gives up width first: the crumbs above it are the short
-// names the reader navigates by and never shrink — each is capped at 45% of the path instead, so
-// only a genuinely long one ("Frankfurt Am Main · Hetzner", once its nodes are open) ellipsises —
-// and "Ge… › Frankfurt Am Main · Hetzner" (proportional shrink, tried first) is the wrong one clipped.
+// shadcn's Breadcrumb underneath still: the `nav` landmark, the list semantics and `aria-current`
+// on the last step come for free; its `›` separators are not used, the steps' edges are them.
 //
-// THE HINT IS PART OF THE PATH (user, 2026-09-26: an eyebrow "BY NODE" over "nodes that seal
-// snapshots…" was "very redundant", and a separate row for it read as a third thing between the
-// path and the list). One muted clause of what the level CONTAINS sits snug under the crumbs, in
-// the nav, as the path's own caption — no eyebrow, no total (the parent row's figure is that
-// number and the heading names its unit).
+// TYPE AND FIT: a step is a ROW'S NAME moved up, so it is set at the rows' own `text-body`. The
+// path never wraps: ancestors keep their (short) names, capped at 45% of the plate, and the LAST
+// step ellipsises first, with the full label on its `title`. A label with a short form uses it
+// (a country step is the name alone). THE ROOT IS THE HOUSE GLYPH (two rounds: the root word
+// restated the card's title; then "I can't go back to the 1st level once I start navigating"),
+// its accessible name the root's word, releasing everything.
 
 export interface Crumb {
   key: string;
   label: ReactNode;
-  /** The full label, for the crumb's `title` where the rendered one may be ellipsised. */
+  /** The full label, for the step's `title` where the rendered one may be ellipsised. */
   title?: string;
-  /** Go back up to this rung. Absent on the last crumb, which is where the reader is. */
+  /** Go back up to this rung. Absent on the last step, which is where the reader is. */
   onSelect?: () => void;
   /** The root: rendered as the house glyph, `title` as its accessible name. */
   root?: boolean;
 }
 
+// The chevron: a 7px arrow tip on the right and, past the first step, a 7px notch on the left that
+// the previous step's tip sits in. Steps overlap by 5px, so a 2px seam of the plate's own colour
+// runs between them. (Literal class strings — Tailwind's scanner reads no template.)
+const STEP = "inline-flex h-[24px] min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap";
+const SHAPE_FIRST = "rounded-l-[5px] [clip-path:polygon(0_0,calc(100%-7px)_0,100%_50%,calc(100%-7px)_100%,0_100%)]";
+const SHAPE_MID = "[clip-path:polygon(0_0,calc(100%-7px)_0,100%_50%,calc(100%-7px)_100%,0_100%,7px_50%)]";
+const SHAPE_LAST = "rounded-r-[5px] [clip-path:polygon(0_0,100%_0,100%_100%,0_100%,7px_50%)]";
+
 export default function ExplorerPath({ crumbs, hint, className }: { crumbs: readonly Crumb[]; hint?: string; className?: string }) {
   if (crumbs.length === 0) return null;
   return (
-    <Breadcrumb className={cn("pb-2", className)}>
-      {/* The caption FOLLOWS the list in the DOM so AT reads the path first; visually it sits under it. */}
-      <BreadcrumbList className="flex-nowrap gap-1.5 text-body text-muted-foreground sm:gap-1.5">
+    <Breadcrumb className={cn("mb-2 rounded-md bg-wash-faint p-1", className)}>
+      <BreadcrumbList className="flex-nowrap gap-0 text-body text-muted-foreground sm:gap-0">
         {crumbs.map((c, i) => {
+          const first = i === 0;
           const last = i === crumbs.length - 1;
-          if (c.root && !last)
-            return (
-              <BreadcrumbItem key={c.key} className="min-w-0 gap-1.5">
+          const shape = first && last ? "rounded-[5px]" : first ? SHAPE_FIRST : last ? SHAPE_LAST : SHAPE_MID;
+          // Padding follows the shape: room for the notch on the left, for the tip on the right.
+          const pad = cn(first ? "pl-2" : "pl-[13px]", last ? "pr-2" : "pr-[11px]");
+          return (
+            <BreadcrumbItem
+              key={c.key}
+              className={cn("min-w-0 gap-0", last ? "shrink" : "shrink-0 max-w-[45%]", !first && "-ml-[5px]")}
+            >
+              {last ? (
+                <BreadcrumbPage className={cn(STEP, shape, pad, "bg-wash-hover text-foreground")} title={c.title}>
+                  <span className="min-w-0 truncate [&>*]:align-middle">{c.label}</span>
+                </BreadcrumbPage>
+              ) : (
                 <button
                   type="button"
                   onClick={c.onSelect}
-                  title={c.title ? `${c.title} — back to the start` : "Back to the start"}
-                  aria-label={c.title ?? "Back to the start"}
+                  title={c.root ? `${c.title ?? "Back to the start"} — back to the start` : c.title ? `${c.title} — back up to this level` : "Back up to this level"}
+                  aria-label={c.root ? (c.title ?? "Back to the start") : undefined}
                   className={cn(
-                    "inline-flex flex-none items-center justify-center size-5 -mx-0.5 rounded-sm cursor-pointer text-foreground-dim hover:text-foreground hover:bg-wash-hover",
+                    STEP,
+                    shape,
+                    pad,
+                    "cursor-pointer bg-wash-soft text-foreground-dim hover:bg-wash-hover hover:text-foreground",
                     "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
                   )}
                 >
-                  <House aria-hidden className="size-3.5" />
+                  {c.root ? <House aria-hidden className="size-3.5 flex-none" /> : <span className="min-w-0 truncate [&>*]:align-middle">{c.label}</span>}
                 </button>
-              </BreadcrumbItem>
-            );
-          return (
-            // shadcn's separator is an `li` of its own, so it goes BETWEEN items, never inside one.
-            <Fragment key={c.key}>
-              {i > 0 && <BreadcrumbSeparator className="flex-none text-muted-foreground/60 [&>svg]:size-3">›</BreadcrumbSeparator>}
-              <BreadcrumbItem className={cn("min-w-0 gap-1.5", last ? "shrink" : "shrink-0 max-w-[45%]")}>
-                {last ? (
-                  <BreadcrumbPage
-                    className={cn(
-                      "inline-flex min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap text-foreground",
-                      i > 0 && "rounded-md bg-wash-faint px-2 py-0.5",
-                    )}
-                    title={c.title}
-                  >
-                    <span className="min-w-0 truncate [&>*]:align-middle">{c.label}</span>
-                  </BreadcrumbPage>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={c.onSelect}
-                    title={c.title ? `${c.title} — back up to this level` : "Back up to this level"}
-                    className={cn(
-                      "inline-flex min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap cursor-pointer text-foreground-dim hover:text-foreground",
-                      i > 0 && "rounded-md bg-wash-faint px-2 py-0.5 hover:bg-wash-hover",
-                      "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
-                    )}
-                  >
-                    <span className="min-w-0 truncate [&>*]:align-middle">{c.label}</span>
-                  </button>
-                )}
-              </BreadcrumbItem>
-            </Fragment>
+              )}
+            </BreadcrumbItem>
           );
         })}
       </BreadcrumbList>
-      {hint && <p className="mt-1 pl-0.5 text-label leading-snug text-muted-foreground/80">{hint}</p>}
+      {/* The clause FOLLOWS the list in the DOM so AT reads the path first; on the plate it is
+          the control's own caption. */}
+      {hint && <p className="mt-1 px-1 pb-0.5 text-label leading-snug text-muted-foreground/80">{hint}</p>}
     </Breadcrumb>
   );
 }
