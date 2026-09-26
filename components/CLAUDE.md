@@ -255,7 +255,10 @@ pointermove. Three rules are worth knowing before touching it:
   TOGGLES), hand the span to the log, switch the mode, open the raw layer. Two copies of four
   ordered steps is how two surfaces start landing a reader in different places. The card's
   `All charts` link went the same day: this view's RAW surface is the document, so the command
-  bar's RAW toggle already is that door.
+  bar's RAW toggle already is that door. **And the door remembers where it was** (2026-09-26):
+  `openRecords` records the view it left in `store.rawReturnMode`, and `setSection("scene")` —
+  the toggle, Escape and the layer's × all end there — returns to it and clears it; a view switch
+  made inside the layer clears it too. Closing the log used to strand the reader in Snapshots.
 
 **The motion hint says what the scene is doing while it moves** (user, 2026-09-26 — `MotionHint`,
 one quiet sentence centred under the command bar). Two store channels, and nothing else feeds it.

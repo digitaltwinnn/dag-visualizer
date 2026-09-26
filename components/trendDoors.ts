@@ -54,7 +54,13 @@ export function openRecords(metaId: string | null, span: RecordSpan | null): voi
   const st = useStore.getState();
   if (metaId && st.filter !== metaId) applyClickActions(filterToggleActions(metaId, st.filter));
   st.setLogSeek({ metaId, fromMs: span.fromMs, toMs: span.toMs });
-  if (st.mode !== "ledger") st.setMode("ledger");
+  if (st.mode !== "ledger") {
+    // Remember WHERE THE DOOR WAS (user, 2026-09-26): closing the layer goes back there, not to
+    // Snapshots. Set after the mode step, which clears it.
+    const from = st.mode;
+    st.setMode("ledger");
+    st.setRawReturnMode(from);
+  }
   st.setSection("data");
 }
 

@@ -232,6 +232,12 @@ interface AppState {
   // realizes it. UI state, not selection (the selection boundary rule doesn't apply);
   // session-only, like phoneDock.
   section: "scene" | "data";
+  /** THE VIEW A DOOR LEFT to open the records (2026-09-26; user: closing the raw layer "should
+   *  always go back to wherever opened the page"). `openRecords` switches the mode to Snapshots
+   *  so the raw layer shows the anchor log; when the layer closes, `setSection("scene")` returns
+   *  to this view and clears it. A view switch made while the layer is open clears it too — the
+   *  reader has chosen a view, and there is nothing to return to. */
+  rawReturnMode: Mode | null;
   // DESKTOP ONLY (card-redesign follow-up, 2026-08-08): collapse the HUD's card rails to their
   // THREADS — BOTH rails together (user: the rails are symmetric and the motive, "spotlight the
   // scene", is whole-HUD; one command-bar toggle beats two subtle per-rail chevrons). Cards fade
@@ -418,6 +424,7 @@ interface AppState {
   setDeepWanted: (key: string | null) => void;
   setPhoneDock: (dock: "explore" | "details" | "vitals" | null) => void;
   setSection: (section: "scene" | "data") => void;
+  setRawReturnMode: (mode: Mode | null) => void;
   setRailsHidden: (hidden: boolean) => void;
   setSceneDragging: (dragging: boolean) => void;
   setCameraFlying: (flying: boolean) => void;
@@ -503,6 +510,7 @@ export const useStore = create<AppState>((set) => ({
   deepWanted: null,
   phoneDock: null,
   section: "scene",
+  rawReturnMode: null,
   railsHidden: false,
   sceneDragging: false,
   cameraFlying: false,
@@ -547,7 +555,7 @@ export const useStore = create<AppState>((set) => ({
   // view-scoped, like the other ladder levels; `trendCursorMs` does NOT (an instant is a
   // universal subject and carries, the way `node` and `network` do in `LEVEL_CARRY`).
   // A view switch stamps its own motion cause (the hint says what it builds).
-  setMode: (mode) => set((s) => ({ mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing, trendFocus: null, motionCause: { kind: "view", from: s.mode, to: mode } })),
+  setMode: (mode) => set((s) => ({ mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing, trendFocus: null, rawReturnMode: null, motionCause: { kind: "view", from: s.mode, to: mode } })),
   // Opening a doc also SURFACES THE SCENE POSE: the overlay sits at z-8, under the raw layer's
   // z-9 — a doc opened from the RAW pose rendered beneath the still-interactive table, with the
   // RAW toggle that could exit it hidden by the doc's own control gating (review find,
@@ -665,7 +673,17 @@ export const useStore = create<AppState>((set) => ({
   // Fully closing the dock also drops the drag-chosen sheet height, so the next open starts at
   // the default; switching halves (a non-null → non-null transition) keeps it.
   setPhoneDock: (phoneDock) => set(phoneDock === null ? { phoneDock, phoneSheetPx: null } : { phoneDock }),
-  setSection: (section) => set({ section }),
+  // Closing the raw layer RETURNS to the view a door left (see `rawReturnMode`): the mode step a
+  // door took is undone here, with the same arrival the bar's switch would announce, and the
+  // view's own state (a focus, a range) is left as it was — this is a return, not a new visit.
+  setSection: (section) =>
+    set((s) => {
+      const back = section === "scene" ? s.rawReturnMode : null;
+      return back != null && back !== s.mode
+        ? { section, mode: back, rawReturnMode: null, motionCause: { kind: "view", from: s.mode, to: back } }
+        : { section, rawReturnMode: section === "scene" ? null : s.rawReturnMode };
+    }),
+  setRawReturnMode: (rawReturnMode) => set({ rawReturnMode }),
   setRailsHidden: (railsHidden) => set({ railsHidden }),
   setSceneDragging: (sceneDragging) => set({ sceneDragging }),
   setCameraFlying: (cameraFlying) => set({ cameraFlying }),

@@ -143,3 +143,35 @@ describe("the trends view's channels", () => {
     expect(useStore.getState().trendCursorMs).toBe(1_700_000_000_000);
   });
 });
+
+describe("the raw layer returns to the view a door left (2026-09-26)", () => {
+  it("closing the layer restores the door's view and clears the return", () => {
+    const st = useStore.getState();
+    st.setMode("trend");
+    st.setMode("ledger");
+    st.setRawReturnMode("trend");
+    st.setSection("data");
+    expect(useStore.getState().mode).toBe("ledger");
+    st.setSection("scene");
+    expect(useStore.getState().mode).toBe("trend");
+    expect(useStore.getState().rawReturnMode).toBeNull();
+  });
+
+  it("a view switch while the layer is open forgets the return", () => {
+    const st = useStore.getState();
+    st.setMode("ledger");
+    st.setRawReturnMode("trend");
+    st.setSection("data");
+    st.setMode("geo");
+    st.setSection("scene");
+    expect(useStore.getState().mode).toBe("geo");
+  });
+
+  it("closing a layer nobody door-opened changes nothing", () => {
+    const st = useStore.getState();
+    st.setMode("ledger");
+    st.setSection("data");
+    st.setSection("scene");
+    expect(useStore.getState().mode).toBe("ledger");
+  });
+});
