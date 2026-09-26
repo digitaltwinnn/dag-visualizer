@@ -117,7 +117,7 @@ export default function TrendInstantPane({
   return (
     <RailPane entry={collapsed}>
       <CardHead
-        eyebrow="Instant"
+        eyebrow="Moment"
         // The stamp is the timeline's own (`stampInstant`, src/data/trendTimeline.ts): the DATE at
         // the daily tier — an hour the charts cannot resolve would be invented precision — and the
         // date plus a UTC clock once the buckets are finer.
@@ -173,7 +173,11 @@ export default function TrendInstantPane({
                   IS the ranking the lead states. Each row pairs and clicks exactly like a Layers
                   row: the same channel, the same builder. */}
               {ranked.length > 1 && (
-                <FactGroup className="mt-3">
+                <>
+                  {/* A resting division between the LEAD (the picked reading) and the roster
+                      beneath it (user, 2026-09-26): the card-head rule's hairline. */}
+                  <div aria-hidden className="mt-3 border-t border-border" />
+                  <FactGroup className="mt-1">
                   {orderAt(readings).map((id) => {
                     const row = rows.get(id);
                     if (!row) return null;
@@ -223,6 +227,7 @@ export default function TrendInstantPane({
                     );
                   })}
                 </FactGroup>
+                </>
               )}
 
               {/* ── THE TWO EXITS, as the card's own controls ────────────────────────────────

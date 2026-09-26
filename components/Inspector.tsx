@@ -285,7 +285,7 @@ function CompositionPane({ sel, onClose, collapsed, onToggle }: { sel: Compositi
 // same single source of truth the dock trays read.
 const GHOST_EYEBROW: Record<string, string> = {
   context: "Metagraph", country: "Country", cohort: "Provider", composition: "Composition", node: "Node", snap: "Global snapshot",
-  metaSnap: "Metagraph snapshot", instant: "Instant",
+  metaSnap: "Metagraph snapshot", instant: "Moment",
 };
 export function GhostCard({ card }: { card: RailCard }) {
   const Icon = card.icon;
