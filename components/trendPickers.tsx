@@ -39,8 +39,13 @@ import { applyClickActions } from "@/src/store/applyClickActions";
  *
  *  ONE HOME for every group that wears it (topic, window, scale, and now the band's own window):
  *  they were copies of one literal, and the next picker would have been another. */
+// THE ACCENT, NOT THE GREY WASH (user, 2026-09-26, after the explorer's path took the accent
+// ladder: "get rid of the boring gray background also for those controls"): the group's plate is
+// the accent at 6% under a hairline of the accent at 18%, a pill lifts to 12% on hover, and the
+// pressed pill keeps the committed-selection language — one hue in three strengths, the same
+// ladder the path wears, so every grouped control in the app is one species.
 export const PICKER_GROUP =
-  "inline-flex items-center rounded-lg border border-border bg-wash-faint p-[3px] max-[700px]:flex max-[700px]:justify-center max-[700px]:[&>button]:flex-1";
+  "inline-flex items-center rounded-lg border border-[color-mix(in_oklch,var(--primary)_18%,transparent)] bg-[color-mix(in_oklch,var(--primary)_6%,transparent)] p-[3px] max-[700px]:flex max-[700px]:justify-center max-[700px]:[&>button]:flex-1";
 
 /** ONE PILL. Compact throughout (h-6/px-2/text-micro — the h-7 pills stopped fitting one line
  *  beside the section tabs once ALL and the range joined; user, 2026-09-09), and the PRESSED
@@ -49,7 +54,7 @@ export const PICKER_GROUP =
 export const zoomBtn = (pressed: boolean) =>
   cn(
     "h-6 px-1.5 rounded-md text-micro tracking-caps uppercase",
-    pressed ? cn("font-bold text-foreground", SELECTED_ROW) : "text-muted-foreground hover:text-foreground hover:bg-wash-hover",
+    pressed ? cn("font-bold text-foreground", SELECTED_ROW) : "text-muted-foreground hover:text-foreground hover:bg-[color-mix(in_oklch,var(--primary)_12%,transparent)]",
   );
 
 /** The instant stamps on a range chip — the document's own `stampRange` rule: a date, plus the
