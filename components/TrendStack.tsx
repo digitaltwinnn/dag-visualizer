@@ -105,6 +105,12 @@ export default function TrendStack() {
   // stack is read at ONE moment rather than five. A COMMIT, not a hover (store `trendCursorMs`,
   // written by the band's timeline at most once per BUCKET), and `null` draws nothing anywhere.
   const cursorMs = useStore((s) => s.trendCursorMs);
+  // A click on a plane's PLOT picks the instant under it (user, 2026-09-26 — the cursor acts on
+  // the charts in the scene as well as on the band's timeline). The same setter the timeline
+  // writes, deliberately outside the pickActions table (the cursor is not a rung — see the
+  // cursor card's notes in components/CLAUDE.md); the drag guard below keeps an orbit that
+  // started on the plot from landing as a pick.
+  const setTrendCursor = useStore((s) => s.setTrendCursor);
   // THE SCENE↔HUD HOVER PAIRING (convention 9), on the network channel every other surface in the
   // app already pairs a network on: hovering a plane's header previews its Layers row in the rail,
   // and hovering that row previews this plane. A preview is never a commit — the only thing it
@@ -418,6 +424,9 @@ export default function TrendStack() {
                 lines={linesById.get(pose.id)!}
                 scaleMax={sharedMax}
                 cursorMs={cursorMs}
+                onPick={(ms) => {
+                  if (!dragged.current) setTrendCursor(ms);
+                }}
                 // THE PLANE CARRIES ITS COLOUR AS AN AREA, and only here — on the card's solid face
                 // it reads as the network's own tint. A plain boolean, so it holds the plot's memo
                 // as still as every other prop on this call.

@@ -80,6 +80,7 @@ export default function TrendChart({
   readout,
   scaleMax,
   cursorMs,
+  onPick,
   fill,
   plotHeight = PLOT_H,
   rollClassName,
@@ -100,6 +101,12 @@ export default function TrendChart({
    *  stamps' precision. Daily by default. */
   stepMs?: number;
   format?: (v: number) => string;
+  /** A CLICK ON THE PLOT PICKS THE INSTANT under it (user, 2026-09-26: the cursor "should act
+   *  on the charts in the scene… or maybe on both" — both, the timeline keeps its click). The
+   *  x is the chart's own scale re-expressed from the click's fraction of the plot box, the
+   *  inverse of the cursor overlay's `cursorFraction`, snapped to the bucket that contains it.
+   *  Omitted (the document's charts, which brush ranges instead), a click does nothing. */
+  onPick?: (ms: number) => void;
   /** A y-max imposed from OUTSIDE, so a run of charts can share one scale (TrendsDoc's
    *  per-network panels). Omitted, the chart scales to its own data — which is right for a
    *  chart read on its own and wrong for a column of charts read against each other. */
@@ -371,9 +378,23 @@ export default function TrendChart({
         </div>
       ) : (
         <div
-          className={`relative rounded-md border border-border overflow-hidden${onRange ? " cursor-crosshair select-none touch-pan-y" : ""}`}
+          className={`relative rounded-md border border-border overflow-hidden${onRange ? " cursor-crosshair select-none touch-pan-y" : ""}${onPick ? " cursor-crosshair" : ""}`}
           role="img"
           aria-label={`${name} — ${stepMs >= 86400000 ? "daily" : stepMs >= 3600000 ? "hourly" : "5-minute"} buckets, ${n} of them`}
+          onClick={
+            onPick && n > 0
+              ? (e) => {
+                  // The plot box is PLOT_MARGIN over this plate at any width (the overlay's rule),
+                  // so the fraction needs no measurement beyond the plate's own rect.
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const f = Math.min(1, Math.max(0, (e.clientX - rect.left - PLOT_MARGIN.left) / Math.max(1, rect.width - PLOT_INSET_X)));
+                  const ms = buckets[0]! + f * (buckets[n - 1]! - buckets[0]!);
+                  onPick(bucketAt(buckets, stepMs, ms) ?? ms);
+                  // The plane's own click (a focus toggle) must not fire for the same press.
+                  e.stopPropagation();
+                }
+              : undefined
+          }
         >
           {(() => {
             const plot = (
