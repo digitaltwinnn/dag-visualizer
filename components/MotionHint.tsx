@@ -35,8 +35,12 @@ import { cn } from "@/lib/utils";
 // over the band on every tier rather than at a share of the height that lands differently on a
 // phone. Pointer-inert, and only in a view with a canvas.
 
-/** How long a sentence holds before it starts to fade, whatever the scene is still doing. */
-const HOLD_MS = 1100;
+/** How long a sentence holds at full before its long ease begins. */
+const HOLD_MS = 700;
+/** The long ease's length once the hold is over — sized to what is left of the motion: a pose
+ *  flight runs 1.4s, a view transition ~3.9s, so the line reaches nothing about when the scene
+ *  does. The motion's own end still cuts it short with the ordinary quick fade. */
+const EASE_MS = { flight: 900, transition: 3200 } as const;
 
 /** A stable country name from the browser's own vocabulary; the code where it has none. */
 function countryName(cc: string): string {
@@ -77,31 +81,37 @@ export default function MotionHint() {
   const text = cause ? motionHint(cause, mode, names, phase) : null;
   // The sentence shown — held through the fade-out (see the header).
   const [shown, setShown] = useState<string | null>(null);
-  // THE HOLD IS CAPPED (user: "displayed a bit too long sometimes — start it to fade earlier"):
-  // a flight's last half-second is the ease-out nobody reads as movement, so the line begins its
-  // fade `HOLD_MS` after it appeared, motion or not. A NEW sentence (leaving → entering, a second
-  // gesture) re-arms the hold, so a view switch still says both halves.
-  const [expired, setExpired] = useState(false);
+  // THE HOLD, THEN THE LONG EASE (user, round five: "shows clear for a set time and then, as the
+  // movement continues, eases along gradually till movement is done"). The line sits at full for
+  // `HOLD_MS`, then a slow LINEAR fade begins, sized to the motion's kind (`EASE_MS`) so it runs
+  // out about when the scene settles; if the motion ends first, the ordinary 200ms fade takes
+  // over from wherever the ease has got to (a CSS transition continues from the live value). A
+  // NEW sentence (leaving → entering, a second gesture) re-arms the hold.
+  const [easing, setEasing] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (moving && text) {
       setShown(text);
-      setExpired(false);
+      setEasing(false);
       if (timer.current) clearTimeout(timer.current);
-      timer.current = setTimeout(() => setExpired(true), HOLD_MS);
+      timer.current = setTimeout(() => setEasing(true), HOLD_MS);
     }
     return () => {
       if (timer.current) { clearTimeout(timer.current); timer.current = null; }
     };
   }, [moving, text]);
   if (!VIEW_POLICIES[mode].canvas) return null;
-  const on = moving && text != null && !expired;
+  const on = moving && text != null;
+  const state = !on ? "0" : easing ? "ease" : "1";
   return (
     <div
       role="status"
       aria-live="polite"
-      data-on={on ? "1" : "0"}
-      style={{ bottom: "calc(var(--bottom-reserve, 0px) + 52px)" }}
+      data-on={state}
+      style={{
+        bottom: "calc(var(--bottom-reserve, 0px) + 52px)",
+        ["--hint-ease" as string]: `${phase ? EASE_MS.transition : EASE_MS.flight}ms`,
+      }}
       className={cn(
         "absolute left-1/2 z-[5] -translate-x-1/2 pointer-events-none select-none whitespace-nowrap",
         // 13.5px: between `text-body` and `text-title` on the scale — the title size read a
@@ -110,8 +120,12 @@ export default function MotionHint() {
         "inline-flex items-center gap-2.5 text-[13.5px] leading-none font-normal text-foreground-dim",
         // The entrance: fade + a short rise, delayed a beat on the way IN only. One arbitrary
         // `[transition:…]` rather than two utilities — `transition-*` is a twMerge group.
+        // Three states on one property: OFF (quick fade), ON (quick fade in, a beat late), and
+        // EASE (the long linear fade, its length from `--hint-ease`). One `transition-*`
+        // utility per state — twMerge groups them, so a second on the same element would win.
         "opacity-0 transition-opacity duration-200 ease-out",
         "data-[on='1']:opacity-100 data-[on='1']:delay-150",
+        "data-[on='ease']:opacity-0 data-[on='ease']:ease-linear data-[on='ease']:[transition-duration:var(--hint-ease)]",
         "motion-reduce:!transition-none",
       )}
     >
