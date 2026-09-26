@@ -6,12 +6,14 @@ import ExplorerShell from "@/components/ExplorerShell";
 import { ROW_OUTSET } from "@/components/ExploreRows";
 import { IdentityDot } from "@/components/inspector/parts";
 import { SelectedRowMark, selectedRow, selectionHue } from "@/components/selection";
-import { MetricPicker, ScaleToggle, ScopeChip } from "@/components/trendPickers";
+import TrendMeasure from "@/components/TrendMeasure";
+import { ScaleToggle, ScopeChip } from "@/components/trendPickers";
 import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { cn } from "@/lib/utils";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
+import { stepMetric } from "@/src/data/trendSeries";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { VISIBLE_PLANES, clampScroll, pagerVisible } from "@/src/engine/domain/trendStack";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -24,14 +26,16 @@ import { useStore } from "@/src/store/store";
 // It carries two things, in the order the card grammar puts them (the usage hint LEADS, then the
 // instrument, then the browse list):
 //
-//   · THE CONTROLS this view has lacked. `trendMetric` is a PICKER — a committed choice about what
-//     every chart draws — while `trendScale` is a SETTING: the reader is not
-//     doing something, they are saying how the charts should be drawn, and a setting reads as a
-//     name plus its state (`SettingSwitch`, whose header carries the full reasoning). None of them
-//     is a selection, so they write their setters directly; `selectionBoundary.test.ts`'s scope
-//     note says why the metric and the scroll stay outside the decision table while
-//     the PLANE FOCUS is in it — they are how the reader wants the stack drawn, not what it is
-//     about.
+//   · THE CONTROLS, one row: the measure STEPPER on the left (`TrendMeasure`, `∧ SNAPSHOTS ∨` —
+//     the word says which measure every card is on, the chevrons step it; user, 2026-09-26: it
+//     replaces the six-pill picker that stood here — the document lays its measures out as
+//     sections and never picked) and the
+//     `Same scale` SETTING on the right — the reader is not doing something, they are saying how
+//     the charts should be drawn, and a setting reads as a name plus its state (`SettingSwitch`,
+//     whose header carries the full reasoning). Neither is a selection, so both write their
+//     setters directly; `selectionBoundary.test.ts`'s scope note says why the metric and the
+//     scroll stay outside the decision table while the PLANE FOCUS is in it — they are how the
+//     reader wants the stack drawn, not what it is about.
 //
 //   · THE LAYERS LIST. One row per ranked network: mark, name, its last measured reading. A row is
 //     a BROWSE TARGET and nothing more (the explorer row rule — the prose that explains a subject
@@ -98,12 +102,26 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
       onLeave={() => setHover(null)}
     >
       {/* ── THE CONTROLS ──────────────────────────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-2">
-        <MetricPicker metric={metric} onPick={setTrendMetric} />
+      {/* OUTSET like the rows below it (`ROW_OUTSET`'s 6px each side, without their padding):
+          the stepper and the switch share 247px, measured to the pixel at CONTINUITY. */}
+      <div className="flex items-center justify-between gap-1 w-[calc(100%+12px)] -mx-1.5">
+        <TrendMeasure
+          metric={metric}
+          onStep={(dir) => {
+            // The same step the cards' `↑`/`↓` keys take (`TrendStack.stepMeasure`): one order,
+            // `METRIC_ORDER`, and the ends go inactive rather than wrapping.
+            const next = stepMetric(metric, dir);
+            if (next) setTrendMetric(next);
+          }}
+        />
         {/* Only where there is a COLUMN to compare: with one network in scope there is nothing
             for a shared ceiling to be shared with. */}
         {ranked.length > 1 && (
-          <ScaleToggle shared={scale === "shared"} onChange={(on) => setTrendScale(on ? "shared" : "own")} />
+          <ScaleToggle
+            className="gap-1 whitespace-nowrap"
+            shared={scale === "shared"}
+            onChange={(on) => setTrendScale(on ? "shared" : "own")}
+          />
         )}
       </div>
 

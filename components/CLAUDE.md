@@ -259,14 +259,15 @@ pointermove. Three rules are worth knowing before touching it:
 
 **The History view has three axes and each has one home** (user, 2026-09-19): left/right on the
 timeline is WHEN, the depth of the stack is WHO, and UP/DOWN is WHAT — the measure. Its control is
-the view's TITLE, centred under the command bar below the view switch (`TrendMeasure`: `∧ SNAPSHOTS
-∨`, riding `--rail-top` + `--topbar-extra` like the rails), plus `↑`/`↓` from inside a card; both
-step `trendMetric` through `METRIC_ORDER` (`src/data/trendSeries.ts`) — the rail picker's own order,
-so the two controls are one list. It is a view-level control because every card steps together (a
-stack whose planes showed different measures would stop being a comparison) — it first rode the
-front card's header as two bare chevrons, which said the measure belonged to that network and
-stepped through a list the reader could not see. The ends go INACTIVE rather than wrapping (the
-plank's rule). A setting, not a selection: it writes its setter directly, as the picker does.
+the Layers card's STEPPER (`TrendMeasure`: `∧ SNAPSHOTS ∨`, the card's control row with `Same scale`
+on its right — user, 2026-09-26; it replaced the six-pill picker there, which no other surface used:
+the document lays its measures out as sections), plus `↑`/`↓` from inside a card; both step `trendMetric` through `METRIC_ORDER`
+(`src/data/trendSeries.ts`), so the two controls are one list. It is a view-level control because
+every card steps together (a stack whose planes showed different measures would stop being a
+comparison) — it first rode the front card's header as two bare chevrons, which said the measure
+belonged to that network and stepped through a list the reader could not see; then it was the view's
+title under the command bar, where it collided with the rear card's header. The ends go INACTIVE
+rather than wrapping (the plank's rule). A setting, not a selection: it writes its setter directly.
 
 ⚠️ **A MEASURE CHANGE IS TWO MOTIONS THAT TAKE TURNS** (`components/useStagedMeasure.ts`, user: "the
 animation is not smooth … load the new chart (smoothly) and then re-order"). The cards show a
@@ -655,6 +656,12 @@ and a track you cannot press is a picture of one. So the timeline re-enables poi
 OWN ROOT and nothing else — every other view's band keeps the charter and the orbit drag keeps
 passing through. The sheets' `sceneCover` clip still governs it: measured, a covered strip hands
 both paint and hit-testing to the sheet above.
+**The track takes the whole band and the window pills sit over its top-right corner** (user,
+2026-09-26). The band held three columns — the track, a CURSOR readout with a 16ch reserve, the
+pills — and the two side columns cost the track a third of the lane. The readout is gone: no cursor
+line IS "none picked" (the brush's own rule for ALL), and a picked instant is stamped on the track
+beside its line, low by the handle where the pills cannot cover it, flipping to the line's left near
+the right edge. On the phone arm the pills keep their own row above the track.
 **The gesture split is the decision: a CLICK sets the cursor (`trendCursorMs`), a DRAG brushes the
 range (`trendRange`)** — press inside the span ON SCREEN to pan it, press an edge to resize it, `×`
 or Escape clears it. ⚠️ **What is DRAWN is what is GRABBED** (`drawnSpan`, one function read by both

@@ -2,49 +2,59 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { METRIC_LABELS, stepMetric } from "@/src/data/trendSeries";
 import type { TrendMetric } from "@/src/store/store";
+import { cn } from "@/lib/utils";
 
-// THE HISTORY VIEW'S MEASURE, AS ITS TITLE (user, 2026-09-19: "put the control underneath the bar,
-// and give it a label/title (snapshots, continuity, fees etc)"). It first rode the front card's
-// header as two bare chevrons, which was wrong twice: the measure is the WHOLE stack's — every card
-// steps together — so hanging the control on one card said it belonged to that network; and two
-// chevrons with no word beside them step through a list the reader cannot see.
+// THE HISTORY VIEW'S MEASURE STEPPER — `∧ SNAPSHOTS ∨`, the Layers card's control (user,
+// 2026-09-26: "move the control now at the top of the view and use it to replace the control that
+// sits in the explore card; control left, 'same scale' toggle right"). It has moved twice: it first
+// rode the front card's header as two bare chevrons, which was wrong twice over — the measure is
+// the WHOLE stack's (every card steps together), so hanging it on one card said it belonged to that
+// network, and two chevrons with no word beside them step through a list the reader cannot see.
+// Then it was the view's TITLE, centred under the command bar (2026-09-19) — where it collided with
+// the rear card's header plate and duplicated the six-pill picker in the rail. Now it IS the rail's
+// control: the word says which measure the stack is on, the chevrons are the way to the next, and
+// the picker's six pills are gone (the Trends DOCUMENT never picked — it lays every measure out as
+// a section; a page shows the map, a card steps through it).
 //
-// So it sits where a view's title sits: centred under the command bar, directly below the view
-// switch that named the view. The word IS the title — SNAPSHOTS, FEES, CONTINUITY — and the
-// chevrons either side of it are the up/down axis the arrow keys and the touch swipe already drive.
 // Up/down rather than left/right on purpose, even in a horizontal strip: left/right in this view is
 // TIME (the timeline below), and a second horizontal stepper would read as a second time control.
+// `↑`/`↓` from inside a card step the same axis.
 //
 // An exhausted direction goes INACTIVE rather than vanishing (the rail plank's rule) — a chevron
-// that disappears re-centres the title at each end of the list. The title's slot is a fixed width
-// for the same reason: six words of different lengths would otherwise walk the chevrons about.
+// that disappears would walk the word about at each end of the list. The word is content-sized
+// (it was a fixed 12ch slot as the view's title): in the card's row the left chevron is anchored
+// to the card's edge and only the right one moves with the word, and a fixed slot wide enough for
+// CONTINUITY cost the row the room the switch beside it needs. Untracked caps for the same reason —
+// the row is measured to the pixel.
 //
-// A SETTING, not a selection: `onStep` writes `trendMetric` directly, exactly as the rail's picker
-// does (`selectionBoundary` names it out of scope). The rail's picker stays — it is the map of all
-// six measures; this is the title that says which one you are on, with a way to the next.
+// A SETTING, not a selection: `onStep` writes `trendMetric` directly (`selectionBoundary` names it
+// out of scope). POSITIONLESS — the caller lays it out; it carries no placement of its own.
 
 export default function TrendMeasure({
   metric,
   onStep,
+  className,
 }: {
   metric: TrendMetric;
   onStep: (dir: -1 | 1) => void;
+  className?: string;
 }) {
   const prev = stepMetric(metric, -1);
   const next = stepMetric(metric, 1);
+  // size-5, not the plank's size-6: the stepper shares one 247px row with the `Same scale` switch
+  // (measured 2026-09-26), and the row holds both only at this size. Keyboard and touch keep the
+  // whole group as a target.
   const chevron =
-    "grid size-6 place-items-center rounded-md text-muted-foreground hover:text-foreground hover:bg-wash-hover " +
+    "grid size-5 place-items-center rounded-md text-muted-foreground hover:text-foreground hover:bg-wash-hover " +
     "disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-muted-foreground " +
     "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]";
   return (
     <div
       role="group"
       aria-label="Measure"
-      // Under the bar: `--rail-top` is where the rails begin, and `--topbar-extra` is how far the
-      // bar has grown downward (its filter / pulse strip) — the same two tokens the rails ride, so
-      // the title moves with them. Centred on the VIEWPORT, like the view switch above it.
-      style={{ top: "calc(var(--rail-top) + var(--topbar-extra))" }}
-      className="absolute left-1/2 -translate-x-1/2 pointer-events-auto inline-flex items-center gap-1 rounded-lg border border-border bg-wash-faint p-[3px]"
+      // The picker group's own shape (`PICKER_GROUP`'s hairline + wash), so it sits in the card
+      // as the pills it replaced did.
+      className={cn("inline-flex items-center gap-0.5 rounded-lg border border-border bg-wash-faint p-[3px]", className)}
     >
       <button
         type="button"
@@ -60,7 +70,7 @@ export default function TrendMeasure({
           keyboard or by swipe happens somewhere else entirely. */}
       <span
         aria-live="polite"
-        className="min-w-[12ch] px-1 text-center text-micro font-bold tracking-caps uppercase text-foreground select-none"
+        className="px-0.5 text-center text-micro font-bold uppercase text-foreground select-none whitespace-nowrap"
       >
         {METRIC_LABELS[metric]}
       </span>

@@ -69,7 +69,6 @@ import TrendChart, { type TrendLine } from "@/components/docs/TrendChart";
 import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import useStagedMeasure, { ROLL_CLASS, useHeldOrder } from "@/components/useStagedMeasure";
-import TrendMeasure from "@/components/TrendMeasure";
 import { cn } from "@/lib/utils";
 import { handOrbitToScene } from "@/components/orbitHandoff";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
@@ -247,15 +246,15 @@ export default function TrendStack() {
     dragged.current = dragged.current || (!!d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > DRAG_SLOP);
   };
   // UP / DOWN IS THE VIEW'S THIRD AXIS (user, 2026-09-19). Left/right on the timeline is WHEN, the
-  // depth of the stack is WHO, and the measure — WHAT — had no gesture on the canvas: it lived in
-  // the rail's picker alone. The control is the title under the bar (`TrendMeasure`) and `↑`/`↓`
-  // from inside a card. Every card steps together (a stack whose planes each showed a different
+  // depth of the stack is WHO, and the measure — WHAT — had no gesture on the canvas. The control
+  // is the Layers card's stepper (`TrendMeasure`, 2026-09-26 — it was the title under the bar) and
+  // `↑`/`↓` from inside a card. Every card steps together (a stack whose planes each showed a different
   // measure would stop being a comparison), through the ONE order the picker reads, and the ends
   // go inactive rather than wrapping. A SETTING, not a selection — it writes its setter directly,
   // as the picker does (`selectionBoundary` names it out of scope).
   // ⚠️ THERE IS NO SWIPE. A vertical touch swipe on a card stepped the measure for a few hours —
-  // until a drag on a card became the scene's orbit, and one gesture cannot mean both. The title
-  // under the bar is a finger-sized target, so touch lost nothing.
+  // until a drag on a card became the scene's orbit, and one gesture cannot mean both. The rail's
+  // stepper is a finger-sized target, so touch lost nothing.
   const stepMeasure = (dir: -1 | 1) => {
     const next = stepMetric(useStore.getState().trendMetric, dir);
     if (next) setMetric(next);
@@ -287,8 +286,6 @@ export default function TrendStack() {
   if (empty) {
     return (
       <div id="trend-stack" className="absolute inset-0 pointer-events-none grid place-items-center z-[4]">
-        {/* The measure stays: it is the view's title, and stepping it is still a way forward. */}
-        <TrendMeasure metric={metric} onStep={stepMeasure} />
         <p className="max-w-[46ch] text-center text-label text-muted-foreground">
           {empty.fact} {empty.route}
         </p>
@@ -301,7 +298,6 @@ export default function TrendStack() {
   if (!p && error) {
     return (
       <div id="trend-stack" className="absolute inset-0 pointer-events-none grid place-items-center z-[4]">
-        <TrendMeasure metric={metric} onStep={stepMeasure} />
         <p className="text-label text-muted-foreground">
           The trends store is unreachable right now. It recovers on its own.
         </p>
@@ -331,9 +327,6 @@ export default function TrendStack() {
       }}
       className="group/stack absolute inset-0 pointer-events-none z-[4] opacity-0 [transition:opacity_var(--tempo-nav)_ease] data-[on='1']:opacity-100 motion-reduce:!transition-none"
     >
-      {/* THE MEASURE, UNDER THE BAR — the view's title and its up/down control in one. It reads the
-          PICKED measure, so it answers the press at once while the cards follow. */}
-      <TrendMeasure metric={metric} onStep={stepMeasure} />
       {poses.map((pose) => {
         // The one roster pass the rank, the ceiling and both rails read — already cut by the
         // metric's own edge rule, so a rail can never quote a bucket this plane does not draw.

@@ -5,16 +5,15 @@ import { useId } from "react";
 import { cn } from "@/lib/utils";
 import { SELECTED_ROW } from "@/components/selection";
 import { Switch } from "@/components/ui/switch";
-import { METRIC_LABELS, METRIC_ORDER } from "@/src/data/trendSeries";
 import { displayNetwork } from "@/src/data/unlisted";
 import { ZOOMS, type TrendRange, type ZoomId } from "@/src/data/trendWindow";
 import { filterToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import type { TrendMetric } from "@/src/store/store";
 
-// THE TRENDS CONTROLS, ONE HOME (2026-09-18; widened 2026-09-19) — the window pills, the metric
-// picker and the scale switch, shared by the Trends DOCUMENT, the History view's band TIMELINE
-// and that view's Layers card. They are two registers of one rung
+// THE TRENDS CONTROLS, ONE HOME (2026-09-18; widened 2026-09-19) — the window pills and the scale
+// switch, shared by the Trends DOCUMENT, the History view's band TIMELINE and that view's Layers
+// card. (A six-pill METRIC picker lived here too until 2026-09-26, when the Layers card took the
+// measure STEPPER, `components/TrendMeasure.tsx`, in its place and no surface picked from a map.) They are two registers of one rung
 // (convention 12), and the pair had already been noted drifting once: the vitals rim adopted this
 // register in 2026-09-08's round and then evolved to SELECTED_ROW while the document's copy stayed
 // behind — "styled differently in bottom bar than in the trend view — deliberate?" (user,
@@ -122,42 +121,6 @@ export function WindowPicker({
 }
 
 
-/** THE METRIC PICKER (2026-09-19) — which stored measure every chart draws, in the reader's own
- *  words (`METRIC_LABELS`, src/data/trendSeries.ts). Six pills in the same hairline group the
- *  window wears, because a metric is the same species of statement: a committed choice about what
- *  is on screen, not a tab into another subject.
- *
- *  ⚠️ ONE PICKER, ONE COLUMN. The planes are a COMPARISON, so a per-plane metric would make the
- *  stack meaningless (store `trendMetric`'s own note) — which is why this control lives in the
- *  rail, above the list of layers it governs, rather than on any one of them.
- *
- *  It WRAPS: the rail is ~224–288px wide and six pills do not fit one line there. The group's own
- *  `flex-wrap` plus `justify-start` is the whole answer — the phone arm's `[&>button]:flex-1`
- *  stretch would make a wrapped last row's single pill span the card, so this passes its own
- *  layout rather than the group's default. */
-export function MetricPicker({
-  metric,
-  onPick,
-  className,
-}: {
-  metric: TrendMetric;
-  onPick: (m: TrendMetric) => void;
-  className?: string;
-}) {
-  return (
-    <div
-      role="group"
-      aria-label="Measure"
-      className={cn(PICKER_GROUP, "flex flex-wrap justify-start gap-0.5 max-[700px]:[&>button]:flex-none", className)}
-    >
-      {METRIC_ORDER.map((m) => (
-        <button key={m} type="button" aria-pressed={metric === m} onClick={() => onPick(m)} className={zoomBtn(metric === m)}>
-          {METRIC_LABELS[m]}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 /** ONE SETTING, AS A NAME PLUS ITS STATE (2026-09-19).
  *
