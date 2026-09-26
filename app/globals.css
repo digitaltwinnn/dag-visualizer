@@ -882,11 +882,15 @@
   --secondary: var(--surface-muted);
   --secondary-foreground: var(--foreground);
 
-  /* Accent glass-wash family — the --border RGB (90,140,255) at fill alphas BELOW its .22
-     hairline. One mechanism for every faint accent fill (topbar/vitals/geo hover + open washes). */
-  --wash-faint: light-dark(rgba(30, 60, 140, 0.05), rgba(90, 140, 255, 0.05));
-  --wash-soft:  light-dark(rgba(30, 60, 140, 0.10), rgba(90, 140, 255, 0.10));
-  --wash-hover: light-dark(rgba(30, 60, 140, 0.12), rgba(90, 140, 255, 0.12));
+  /* The wash family — THE ACCENT in four strengths (2026-09-26; user: the blue-grey washes read
+     as "boring gray", on the light ground especially, once the explorer's path took an accent
+     ladder). One mechanism for every faint fill: a resting plate, a soft member, a hover, and the
+     strongest fill for "you are here" (the path's current step, the picker group's hairline, the
+     explorer's spine). `--primary` is light-dark() already, so the four answer both grounds. */
+  --wash-faint:  color-mix(in oklch, var(--primary) 6%, transparent);
+  --wash-soft:   color-mix(in oklch, var(--primary) 12%, transparent);
+  --wash-hover:  color-mix(in oklch, var(--primary) 16%, transparent);
+  --wash-strong: color-mix(in oklch, var(--primary) 22%, transparent);
 }
 
 :root[data-theme="light"] { color-scheme: light; }
@@ -1400,6 +1404,7 @@
   --color-wash-faint: var(--wash-faint);
   --color-wash-soft: var(--wash-soft);
   --color-wash-hover: var(--wash-hover);
+  --color-wash-strong: var(--wash-strong);
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 4px);
   --radius-sm: calc(var(--radius) - 8px);   /* 6px */

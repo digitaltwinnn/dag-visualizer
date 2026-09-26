@@ -461,7 +461,12 @@ export default function TrendsDoc() {
               into the outlined body below, so label and contents read as one drawer. */}
           <TabsList
             variant="line"
-            className="relative flex h-auto flex-none w-full gap-1 rounded-none p-0 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50"
+            // The cabinet in the wash ladder too (user, 2026-09-26: "change the cabinet also"): the
+            // baseline, the active tab's edge and the drawer's outline are the strong wash, the
+            // active tab and the drawer the faint one. The active tab's fill sits on `--panel-solid`
+            // so the baseline hairline cannot show through a translucent wash where the tab
+            // bridges into the drawer.
+            className="relative flex h-auto flex-none w-full gap-1 rounded-none p-0 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-wash-strong"
             aria-label="Which side of the network"
           >
             {(["hypergraph", "metagraphs"] as const).map((id) => (
@@ -476,7 +481,7 @@ export default function TrendsDoc() {
                   "after:hidden focus-visible:ring-0 focus-visible:border-transparent",
                   "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
                   "data-[state=active]:z-[1] data-[state=active]:text-foreground data-[state=active]:shadow-none",
-                  "data-[state=active]:border-border/50! data-[state=active]:bg-[var(--panel-solid)]!",
+                  "data-[state=active]:border-wash-strong! data-[state=active]:[background:linear-gradient(var(--wash-faint),var(--wash-faint))_var(--panel-solid)]!",
                 )}
               >
                 {id === "hypergraph" ? "Hypergraph" : "Metagraphs"}
@@ -485,7 +490,7 @@ export default function TrendsDoc() {
           </TabsList>
           {/* The drawer's own outline — the tab row's baseline hairline is its top edge (the
               channel pane's rule), so the active tab's panel-solid fill bridges into it. */}
-          <div className="border border-t-0 border-border/50 rounded-b-md px-5 pb-8">
+          <div className="border border-t-0 border-wash-strong bg-wash-faint rounded-b-md px-5 pb-8">
 
 
           <TabsContent value="hypergraph" className="pt-5">

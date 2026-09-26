@@ -123,9 +123,9 @@ export default function MotionHint() {
         // touch loud once the ink dimmed (user, round four). No shadow at all: the dim ink over
         // the scene is the whole treatment.
         "inline-flex items-center gap-2.5 text-[13.5px] leading-none font-normal text-foreground-dim",
-        // The plate: the ground's colour at 62%, blurred — `--background` is `light-dark()`, so the
-        // one rule serves both grounds. No border, no shadow: a pill, not a card.
-        "rounded-full px-3.5 py-2 bg-[color-mix(in_oklch,var(--background)_62%,transparent)] backdrop-blur-[6px]",
+        // NO PLATE (user, 2026-09-26, after a round with one: "remove the pill") — the dim ink over
+        // the scene is the whole treatment; the padding stays so the line keeps its place.
+        "px-3.5 py-2",
         // The entrance: fade + a short rise, delayed a beat on the way IN only. One arbitrary
         // `[transition:…]` rather than two utilities — `transition-*` is a twMerge group.
         // Three states on one property: OFF (quick fade), ON (quick fade in, a beat late), and

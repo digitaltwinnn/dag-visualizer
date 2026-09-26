@@ -18,12 +18,12 @@ import { cn } from "@/lib/utils";
 // the separator, the house is the first step, the level on screen is the last and the filled one,
 // and the level's one clause of meaning sits on the SAME plate beneath the steps — the plate is
 // what makes the clause part of the control rather than a line under it (the user picked C's
-// steps with B's bounding block). ONE HUE, THE ACCENT, in three strengths carries it — the plate
-// at 6%, the ancestors at 12%, the current step at 22% with full ink (user, second round: the
-// `--wash-*` ladder read as grey boxes on the light ground, and the current step at 12% against
-// 10% was invisible as "you are here"; it should be, and now it is the strongest fill). The rows
-// beneath hang from the plate on a SPINE in the same accent (`Explorer`), so the level's list
-// visibly belongs to the control that names it.
+// steps with B's bounding block). ONE HUE in the wash ladder's strengths carries it — the plate
+// faint, the ancestors soft, the current step STRONG with full ink (user, second round: the old
+// blue-grey washes read as grey boxes on the light ground, so the `--wash-*` tokens became the
+// accent; and the current step was invisible as "you are here" — it should be, and now it is the
+// strongest fill). The rows beneath hang from the plate on a SPINE in the same wash (`Explorer`),
+// so the level's list visibly belongs to the control that names it.
 //
 // shadcn's Breadcrumb underneath still: the `nav` landmark, the list semantics and `aria-current`
 // on the last step come for free; its `›` separators are not used, the steps' edges are them.
@@ -57,7 +57,7 @@ const SHAPE_LAST = "rounded-r-[5px] [clip-path:polygon(0_0,100%_0,100%_100%,0_10
 export default function ExplorerPath({ crumbs, hint, className }: { crumbs: readonly Crumb[]; hint?: string; className?: string }) {
   if (crumbs.length === 0) return null;
   return (
-    <Breadcrumb className={cn("rounded-md bg-[color-mix(in_oklch,var(--primary)_6%,transparent)] p-1", className)}>
+    <Breadcrumb className={cn("rounded-md bg-wash-faint p-1", className)}>
       <BreadcrumbList className="flex-nowrap gap-0 text-body text-muted-foreground sm:gap-0">
         {crumbs.map((c, i) => {
           const first = i === 0;
@@ -71,7 +71,7 @@ export default function ExplorerPath({ crumbs, hint, className }: { crumbs: read
               className={cn("min-w-0 gap-0", last ? "shrink" : "shrink-0 max-w-[45%]", !first && "-ml-[5px]")}
             >
               {last ? (
-                <BreadcrumbPage className={cn(STEP, shape, pad, "bg-[color-mix(in_oklch,var(--primary)_22%,transparent)] text-foreground")} title={c.title}>
+                <BreadcrumbPage className={cn(STEP, shape, pad, "bg-wash-strong text-foreground")} title={c.title}>
                   <span className="min-w-0 truncate [&>*]:align-middle">{c.label}</span>
                 </BreadcrumbPage>
               ) : (
@@ -84,7 +84,7 @@ export default function ExplorerPath({ crumbs, hint, className }: { crumbs: read
                     STEP,
                     shape,
                     pad,
-                    "cursor-pointer bg-[color-mix(in_oklch,var(--primary)_12%,transparent)] text-foreground-dim hover:bg-[color-mix(in_oklch,var(--primary)_18%,transparent)] hover:text-foreground",
+                    "cursor-pointer bg-wash-soft text-foreground-dim hover:bg-wash-hover hover:text-foreground",
                     "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
                   )}
                 >
