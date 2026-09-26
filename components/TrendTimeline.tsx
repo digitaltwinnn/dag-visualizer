@@ -36,8 +36,10 @@ import { useStore } from "@/src/store/store";
 // "remove the text 'Cursor none picked', position the range bar on top of the bottom bar (right
 // side) and use that extra space for the trends with the window over it"). The band held three
 // columns — track, a CURSOR readout, the pills — and the readout's 16ch reserve plus the pills'
-// column cost the track a third of the lane. Now the track spans the band and the pills float over
-// its top-right corner, a corner that holds the newest buckets' peaks at most; on the phone arm the
+// column cost the track a third of the lane. Now the track spans the band and the pills stand
+// ABOVE the plate's top-right corner, outside it (user, 2026-09-26, second round: over the corner
+// they covered the newest buckets' peaks — "above the bottom section, not directly on top of it";
+// the band's clip leaves its top edge open for exactly this); on the phone arm the
 // pills keep their own row above the track, since six pills over a 390px track would hide a third
 // of it. THE READOUT IS GONE: the absence of a cursor line IS "none picked" (the brush's own rule
 // for ALL — no rectangle, because the absence is the statement), and a picked instant is STAMPED
@@ -95,15 +97,15 @@ export default function TrendTimeline() {
     // THE ONE `pointer-events-auto` (see the header). Everything else in the band stays inert.
     // `relative` is the pills' containing block; the track fills the rest.
     <div className="pointer-events-auto relative flex-1 min-w-0 flex flex-col max-[700px]:gap-1.5">
-      {/* THE PILLS, over the track's top-right corner — first in DOM order so the phone arm, where
-          they are static, puts them ABOVE the track (the document's own stacking idiom: the thumb
-          wants the pills nearer the dock's edge than a full-width scrub target does). */}
+      {/* THE PILLS, standing above the plate's top-right corner — first in DOM order so the phone
+          arm, where they are static, puts them ABOVE the track (the document's own stacking idiom:
+          the thumb wants the pills nearer the dock's edge than a full-width scrub target does). */}
       <div
         // The COMMAND BAR's glass under the pills (same `--topbar-glass`, same blur): the group
-        // floats over the track's ink, and the picker's own hairline-and-wash — right for a group
-        // on a page — let the overview line run straight through the words (seen live). The wash
-        // yields to the plate; the hairline stays.
-        className="absolute top-0 right-0 z-[1] rounded-lg [background:var(--topbar-glass)] backdrop-blur-sm max-[700px]:static max-[700px]:self-stretch max-[700px]:bg-transparent max-[700px]:backdrop-blur-none"
+        // floats over the SCENE now, where the picker's own hairline-and-wash — right for a group
+        // on a page — would let the ground's ink run through the words. `bottom-full` is the
+        // tenant's top; the plate's padding plus `mb-3` clears its edge by a hairline's breath.
+        className="absolute bottom-full right-0 mb-3 z-[1] rounded-lg [background:var(--topbar-glass)] backdrop-blur-sm max-[700px]:static max-[700px]:mb-0 max-[700px]:self-stretch max-[700px]:bg-transparent max-[700px]:backdrop-blur-none"
       >
         <WindowPicker
           className="bg-transparent"
