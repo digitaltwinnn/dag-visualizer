@@ -1,111 +1,113 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { cn } from "@/lib/utils";
-import ExplorerShell from "@/components/ExplorerShell";
-import { SelectedRowMark, selectedRow, selectionHue } from "@/components/selection";
+
+import Explorer, { type ExplorerLevelSpec, type ExplorerRowSpec } from "@/components/explorer/Explorer";
+import TablePager from "@/components/datasection/TablePager";
+import { IdentityDot } from "@/components/inspector/parts";
+import { ensurePage } from "@/components/RawSnapshotBridge";
+import { selectedRow, selectionHue } from "@/components/selection";
+import { NoSignalDot } from "@/components/state/StateAtoms";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
-import { getNetwork, getAnchor, filterAccent, metagraphById, shortHash, resolveSigner, SIGNER_GROUPS, SIGNER_UNKNOWN } from "@/src/data/network";
-import { ledgerLens, storyCount, tickInStory } from "@/src/data/ledgerStory";
-import { displayNetwork, unlistedLog, UNLISTED_ID, UNLISTED_HUE, LISTED_IDS } from "@/src/data/unlisted";
-import type { GlobalSnapshot, NodeRow, SnapshotExact } from "@/src/data/types";
-import { metaSnapHoverKey } from "@/src/data/types";
+import { cn } from "@/lib/utils";
+import { buildAnchorLog, buildChannelLog, type AnchorLogRow } from "@/src/data/anchorLog";
 import { latestRelevant } from "@/src/data/follow";
-import { identityHudCss } from "@/src/palette/identity";
-import { IdentityDot, LayerWho } from "@/components/inspector/parts";
-import { useStore } from "@/src/store/store";
-import { metaSnapSelectActions, snapshotSelectActions, sameMetaSnap, followToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
-import { applyClickActions } from "@/src/store/applyClickActions";
-import { DepthCaption, DisclosureChevron, Disclosure, DisclosurePanel, DisclosureRow, NodePickerRow, ROW_NEST, ROW_NEST_DEEP, ROW_OUTSET } from "@/components/ExploreRows";
-import { CONTENT_EASE } from "@/components/RollSwap";
-import { NoSignalDot } from "@/components/state/StateAtoms";
-import { buildAnchorLog, buildChannelLog, type AnchorLogRow, type ChannelLogRow } from "@/src/data/anchorLog";
+import { hoverKeyOf } from "@/src/data/hoverSubject";
+import {
+  LEDGER_MEASURE_OPTIONS,
+  SNAP_MEASURE_OPTIONS,
+  TICK_NET_MEASURE_OPTIONS,
+  snapMeasure,
+  snapMeasureValue,
+  tickMeasure,
+  tickMeasureValue,
+  tickNetMeasure,
+  type LedgerMeasure,
+  type SnapLevelMeasure,
+  type TickNetMeasure,
+} from "@/src/data/ledgerMeasure";
+import { ledgerLens, storyCount, tickInStory } from "@/src/data/ledgerStory";
+import { filterAccent, getAnchor, getNetwork, metagraphById, resolveSigner, SIGNER_GROUPS, SIGNER_UNKNOWN } from "@/src/data/network";
+import { metaSnapHoverKey, type GlobalSnapshot, type NodeRow, type SnapshotExact } from "@/src/data/types";
+import { displayNetwork, LISTED_IDS, UNLISTED_HUE, UNLISTED_ID, UNLISTED_LABEL, unlistedLog } from "@/src/data/unlisted";
 import { POLL } from "@/src/engine/config";
-import TablePager from "@/components/datasection/TablePager";
-import { ensurePage } from "@/components/RawSnapshotBridge";
-import MeasureStepper from "@/components/MeasureStepper";
-import { LEDGER_MEASURE_LABELS, snapMeasure, stepLedgerMeasure, tickMeasure } from "@/src/data/ledgerMeasure";
+import { filterToggleActions, followToggleActions, metaSnapSelectActions, nodeSelectActions, sameMetaSnap, snapshotSelectActions } from "@/src/engine/domain/pickActions";
+import { identityHudCss } from "@/src/palette/identity";
+import { applyClickActions } from "@/src/store/applyClickActions";
+import { useStore } from "@/src/store/store";
+import { midHash } from "@/src/util/format";
 
-// The Snapshots view's left-rail tool — ONE AXIS: TIME (user, 2026-08-09). A single uniform tree
-// whose DEPTH means exactly one thing everywhere, and where every depth commits its own subject:
+// THE SNAPSHOTS VIEW'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
+// 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
+// decides only what a view may: which levels are open, what each row is and commits, what each
+// level measures, and the words. The layout is the component's.
 //
-//   global tick      → pins that tick (snapshotSelectActions) and discloses its contributors
-//     metagraph      → commits the BAND, the (metagraph, tick) pair, and discloses its snapshots
-//       snapshot id  → commits the metagraph snapshot itself (metaSnapSelectActions)
+// ONE AXIS: TIME (user, 2026-08-09). The path runs coarse→fine the way the chamber, the facts rail
+// and the strip all read:
 //
-// It reads the same direction as everything else speaking about these subjects: the chamber's
-// geometry (a global byte bar ← its bands ← the lane tiles that fed it), the facts rail's chain
-// (global snapshot ABOVE the metagraph snapshot it anchors) and the strip (one bar per tick).
+//   global tick        → pins that tick (snapshotSelectActions) and opens the networks in it
+//     network          → OPENS its snapshots; commits NOTHING (user, 2026-08-10 — a click that
+//                        moved the app-wide filter "will often happen accidentally"), previews the
+//                        lane in the chamber on hover
+//       snapshot       → commits the metagraph snapshot itself (metaSnapSelectActions — tick and
+//                        snapshot, never the filter: design decision 13) and opens its signers
+//         signer       → the node that sealed it, the same node row every explorer ends in
 //
-// The PER-NETWORK axis used to be a SECOND top-level group ("Metagraph snapshots" → metagraph →
-// its ordinals across the whole window). It went (user, 2026-08-09 — "the two dropdown sections
-// have a different dropdown structure, it feels very unintuitive"): the two trees were transposes
-// of each other, so rows meant different things at the same depth, the committing depth flipped
-// between them, and both bottomed out on the same (metagraph, tick) pair from opposite ends. The
-// network axis is the COMMITTED FILTER instead — one home per concern: a filter narrows this list
-// to that network's own story and marks every row in its hue, which is the gesture the view is
-// already built around (live metagraph mode). A metagraph's ordinals only mean anything relative
-// to the tick they anchored into, which the retired tree hid in a tooltip; here that tick is the
-// row above them. Don't grow the second axis back as a tree.
+// The PER-NETWORK axis (network → its ordinals across the window) was a second tree once and was
+// retired the same day the one axis was named: two trees over the same rows made the reader pick
+// an axis before browsing. The network axis is the COMMITTED FILTER — the head's scope dot — which
+// here is a LENS: with a network committed, every tick still lists (they all happened — rule 10
+// doesn't let a lens edit the facts), a tick it anchored into carries its count in the network's
+// hue, one it sat out is stepped back, and inside a tick only the committed network is drillable.
 //
-// Everything selectable routes through the tested pickActions builders + the ONE executor, so an
-// explorer row and a 3D click can never drift. The browse window is the LIVE BUFFER, paged —
-// see the window note at `useSnapshotFeed` below for why it is no longer the 3D trail.
+// WHICH LEVEL IS OPEN is this card's own browse state — with two exceptions that keep the path
+// honest to the store: a metagraph snapshot committed anywhere (a tile, the rail's pager, the raw
+// log) opens the path to it, and a tick pinned elsewhere while a tick is open re-points the path.
+// Deliberately NO auto-open from the root: the newest tick changes every few seconds, and a path
+// that opened itself onto it would fight the heartbeat under the pointer.
+//
+// Rule 9: a tick row previews on `hoverSnapOrd` (a global tick), a network row on `hoverFilter`
+// (its lane in the chamber), a snapshot row on `hoverMetaSnap` (ONE snapshot — a row is a
+// snapshot, not its tick, and the tick channel would light every band of the anchoring global),
+// a signer on `hoverNodeId`. Hovers preview, never commit.
 
 /** How many ticks a page of the explorer shows. Fifteen because the card is a peephole, not the
  *  chain: enough rows that the list reads as a run of history rather than as the last handful
- *  (user, 2026-09-13: "can you do 10-20 by default"), few enough that opening one still leaves
- *  its breakdown on screen in a rail-width card. */
+ *  (user, 2026-09-13: "can you do 10-20 by default"), few enough that one page fits the rail. */
 const TICK_PAGE = 15;
 
 /** A COMMITTED FILTER IS A LENS, and inside a tick the lens decides what is drillable: with a
- *  network committed, every OTHER network's group is preview-only (user, 2026-08-10). The tick still
- *  lists them — rule 10 doesn't let a lens edit the facts, and they really did anchor here — but a
- *  row under a tick must never reach past the filter and change it, which is the same boundary the
- *  card's pager keeps by staying inside this metagraph × this tick. Unfiltered, nothing is out.
- *  Takes the id rather than the group so the unlisted row shares it: one rule, no special case. */
+ *  network committed, every OTHER network's row under a tick opens nothing. */
 function outOfLens(filter: string, id: string): boolean {
-  // Through the ledger's own lens (ledgerStory.ledgerLens): committed DAG reads as the whole
-  // chamber, so nothing is out — every tick belongs to the base ledger (user, 2026-08-13).
   const f = ledgerLens(filter);
   return f !== "all" && f !== id;
 }
 
-/** One metagraph's anchored snapshots inside a window (the whole trail, or one tick). */
+/** One metagraph's anchored snapshots inside one tick. */
 interface MetaGroup {
   id: string;
   name: string;
   hue: string;
-  rows: ChannelLogRow[];
+  rows: AnchorLogRow[];
 }
 
-/** Stable empty — a fresh `[]` per render would be a new prop identity on every tick row. */
-const EMPTY_GROUPS: MetaGroup[] = [];
-
 /** ONE TICK'S ROWS, from both sources, POLLED FIRST. The polled row wins where both hold the same
- *  (metagraph, ordinal) because it carries the metagraph snapshot's own `hash`, which the exact
- *  read does not; the exact read then supplies every anchor the per-network buffer has aged out.
- *  See the call site for why either alone is wrong. */
-function unionRows(
-  polled: readonly AnchorLogRow[],
-  exact: readonly AnchorLogRow[],
-  tickOrdinal: number,
-): AnchorLogRow[] {
+ *  (metaId, ordinal) — it carries the snapshot's own `hash`, which the exact read lacks — and the
+ *  exact read supplies everything the per-network buffer has aged out. ⚠️ THE BREAKDOWN IS THE
+ *  UNION, and only the exact read makes it COMPLETE (user, 2026-09-14: "DED is missing"): the
+ *  polled buffers hold `POLL.metaSnapBuffer` rows PER NETWORK — a depth in rows, not ticks — so a
+ *  busy chain's older ticks lost their busiest contributor while the fee above still counted it. */
+function unionRows(polled: readonly AnchorLogRow[], exact: readonly AnchorLogRow[], tickOrdinal: number): AnchorLogRow[] {
   const mine = polled.filter((r) => r.global.ordinal === tickOrdinal);
   const seen = new Set(mine.map((r) => `${r.metaId}|${r.ordinal}`));
-  const extra = exact.filter(
-    (r) => r.global.ordinal === tickOrdinal && !seen.has(`${r.metaId}|${r.ordinal}`),
-  );
+  const extra = exact.filter((r) => r.global.ordinal === tickOrdinal && !seen.has(`${r.metaId}|${r.ordinal}`));
   return extra.length ? [...mine, ...extra] : mine;
 }
 
 function groupByMeta(rows: readonly AnchorLogRow[]): MetaGroup[] {
   const by = new Map<string, MetaGroup>();
   for (const r of rows) {
-    // A SEAM (a tick that anchored nothing) belongs to no metagraph, so it forms no group. That is
-    // already this explorer's own rule — "affordance follows the data": such a tick keeps its row
-    // and simply doesn't disclose, because a chevron opening onto nothing is a lie about the feed.
     if (r.metaId == null) continue;
     const metaId = r.metaId;
     let g = by.get(metaId);
@@ -119,263 +121,34 @@ function groupByMeta(rows: readonly AnchorLogRow[]): MetaGroup[] {
   return [...by.values()].sort((a, b) => b.rows.length - a.rows.length || a.name.localeCompare(b.name));
 }
 
-/** A leaf row: one snapshot id (a metagraph snapshot, or a global ordinal).
- *
- *  Generic over its PAIRING KEY, because the two depths pair on different subjects: a tick row
- *  pairs on the global ordinal (`hoverSnapOrd`, a number), a metagraph-snapshot row on
- *  `metaSnapHoverKey` (a string). Keying the leaves to their tick lit every sibling that anchored
- *  into it (user, 2026-08-09) — the key type is what keeps the two channels from being confused. */
-function SnapRow<K extends string | number>({
-  label,
-  metric,
-  selected,
-  hoverOrd,
-  pairOrd,
-  setHoverOrd,
-  accent,
-  title,
-  onClick,
-  sub,
-  mark,
-  lensOut,
-  outset,
-  nested,
-  disclose,
-}: {
-  label: string;
-  metric: string;
-  selected: boolean;
-  hoverOrd: K | null;
-  pairOrd: K;
-  setHoverOrd: (v: K | null) => void;
-  accent: string;
-  title: string;
-  onClick: () => void;
-  /** Trailing muted mono marker (the cohort id-row idiom): real per-row info — the unlisted
-   *  rows carry their channel's short ADDRESS here, because the group interleaves several
-   *  channels' independent ordinal sequences and the bare numbers read as out-of-order
-   *  (user, 2026-08-08). */
-  sub?: string;
-  /** The committed network's anchor count in this tick, in its hue — absent = the network is
-   *  not in this tick's story (and clicking would release the filter; user, 2026-08-07). */
-  mark?: { hue: string; count: number } | null;
-  /** THE LENS STEPS A ROW BACK, it never removes it — see the tick list's own note. `opacity-45`
-   *  is the app's existing "present, but not your subject" level (the filter picker's 0-count
-   *  rows, hyper's 0-node networks, the vitals roster's unfiltered dots). Never applied to a
-   *  SELECTED row: a commit outranks a lens. */
-  lensOut?: boolean;
-  /** TOP-LEVEL row (the tick rows, since the axis collapse made them the card's own first level):
-   *  takes the right-edge contract's outset instead of a plain `w-full` — ExploreRows' ROW_OUTSET
-   *  and ROW_NEST are the only two places allowed to own it. */
-  outset?: boolean;
-  /** A row BELOW the top level (a metagraph snapshot under its network under its tick): takes the
-   *  quieter leaf register `NodePickerRow` already wears at the bottom of both explorers — one step
-   *  down the type scale, dimmed rather than full foreground. Depth used to read as INDENT ALONE
-   *  (user, 2026-08-18: "three hierarchical rows with ticks and selection looks a bit messy"),
-   *  because both depths are this one component: a leaf's ordinal rendered at exactly the tick's
-   *  size, weight and colour, and metagraph ordinals are the LONGER numbers (27,338,081 against
-   *  6,777,339), so a leaf read louder than the row containing it.
-   *  Deliberately NOT folded into `outset`, which today is its exact complement: that flag owns the
-   *  right-edge contract (a layout invariant), this one owns the typographic register — two
-   *  questions that only happen to have the same answer at the two depths this tree has today. */
-  nested?: boolean;
-  /** Disclosure affordance: this row also opens a child list, so it ends with the chevron (or the
-   *  ✓ when it holds a selection while closed) instead of a bare reserved slot. */
-  disclose?: { open: boolean; holdsSel?: boolean };
-}) {
-  const pair = subjectPairing(hoverOrd, pairOrd, setHoverOrd, accent);
-  return (
-    <button
-      type="button"
-      title={title}
-      // The row's own text is a bare ordinal beside a bare figure, so the DEFAULT accessible name
-      // concatenates them into "6,777,33985 KB" — two numbers fused into a third that means
-      // nothing. The `title` is already the readable sentence; the metric joins it because it is
-      // real per-row information the sentence doesn't carry (and "—" is the honest no-exact-read
-      // dash, which reads as nothing at all out loud).
-      aria-label={metric === "—" ? title : `${title} · ${metric}`}
-      onClick={onClick}
-      aria-expanded={disclose ? disclose.open : undefined}
-      onMouseEnter={pair.onMouseEnter}
-      onMouseMove={pair.onMouseMove}
-      onMouseLeave={pair.onMouseLeave}
-      onFocus={pair.onFocus}
-      onBlur={pair.onBlur}
-      className={cn(
-        "nb-row group flex items-center gap-2 my-px rounded-sm border border-transparent bg-transparent cursor-pointer text-left transition-colors duration-[140ms] py-1",
-        outset ? ROW_OUTSET : "w-full pl-2 pr-2",
-        "hover:bg-wash-hover",
-        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-        // A row that HOLDS the selection (a group header over the selected snapshot) wears the
-        // wash at ANCESTOR strength — the finest rung is the child below it (user, 2026-08-16:
-        // the header set the hue vars but no wash class, so it stayed uncolored). Its own
-        // selection keeps the full mark.
-        (selected || disclose?.holdsSel) && selectedRow(!!selected),
-        lensOut && !selected && !disclose?.holdsSel && "opacity-45",
-        pair.paired && pair.className,
-      )}
-      // The selection follows the subject's identity (selection.tsx · selectionHue): `accent` is
-      // already the row's own hue — the group's for a leaf, the unlisted gray, the filter accent
-      // for a tick row — so the committed wash/ring and the ✓ speak in it too.
-      style={{ ...((selected || disclose?.holdsSel) ? selectionHue(accent) : undefined), ...pair.style }}
-    >
-      {/* With a `sub`, the LABEL is the row's identity and must never ellipsize — the flexible
-          column is the address instead (it's already an abbreviation, so a further clip still
-          reads as one). Without a sub the label takes the flex, as every other row does. */}
-      <span
-        className={cn(
-          "tabular-nums whitespace-nowrap overflow-hidden text-ellipsis",
-          nested ? "text-label text-foreground-dim" : "text-body text-foreground",
-          sub ? "flex-none" : "flex-1 min-w-0",
-        )}
-      >
-        {label}
-      </span>
-      {sub && (
-        <span className="flex-1 min-w-0 text-right font-mono text-micro text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis">
-          {sub}
-        </span>
-      )}
-      {mark && (
-        <span className="flex-none tabular-nums text-label font-semibold" style={{ color: mark.hue }}>
-          {mark.count}
-        </span>
-      )}
-      {/* The metric drops its bold weight on a nested row: with the label one step smaller, a
-          semibold figure beside it would make the BYTES the loudest thing on a leaf. */}
-      <span className={cn("flex-none tabular-nums text-label text-muted-foreground", !nested && "font-semibold")}>
-        {metric}
-      </span>
-      {/* The trailing slot is ALWAYS reserved (the GeoExplore idiom) so the metric column never
-          shifts when a row gains the selection mark (user, 2026-08-07). A disclosing row spends
-          that same slot on its chevron — one column, one width, every depth. */}
-      <span className="flex-none w-3.5 flex items-center justify-center">
-        {disclose ? (
-          // A row that both SELECTS and DISCLOSES spends the one slot by state — the rule the
-          // `holdsSel` arm already followed, now applied to the row's own selection too (2026-08-09,
-          // when the snapshot leaves gained a signer disclosure): OPEN, the children below state
-          // the selection, so the slot shows the chevron that closes them; CLOSED, the ✓ is the
-          // only trace the selection has left. Without this a leaf that commits AND opens in one
-          // click showed a ✓ and no way to see it was open.
-          (selected || disclose.holdsSel) && !disclose.open ? <SelectedRowMark hue={accent} /> : <DisclosureChevron open={disclose.open} />
-        ) : selected ? (
-          <SelectedRowMark hue={accent} />
-        ) : null}
-      </span>
-    </button>
-  );
-}
-
 const NO_SIGNERS: readonly string[] = [];
 
 /** The signer ids of ONE metagraph snapshot, from the tick's EXACT read — the same source the
- *  metagraph-snapshot card's own signer list falls back to (`ChannelSnapRow.signers`), so the two
- *  can't disagree. No new fetch, and never the ~2.5 MB deep read: the explorer must not turn an
- *  explicit-gesture route into a browse. A tick older than the L0 node's retention has no exact
- *  read at all and yields nothing — the row then simply doesn't disclose (see the leaf), because an
- *  empty dropdown claims a fact we don't have.
- *
- *  The ordinal-0 fallback is the same one the card uses: a payload the quick decoder couldn't read
- *  carries ordinal 0, and the address match still finds its proofs. */
+ *  metagraph-snapshot card's own signer list falls back to, so the two can't disagree. Never the
+ *  ~2.5 MB deep read: the explorer must not turn an explicit-gesture route into a browse. The
+ *  ordinal-0 fallback is the card's own: a payload the quick decoder couldn't read carries
+ *  ordinal 0, and the address match still finds its proofs. */
 function signersOf(ex: SnapshotExact | undefined, metaId: string, ordinal: number): readonly string[] {
   if (!ex) return NO_SIGNERS;
-  const r =
-    ex.rows.find((x) => x.metaId === metaId && x.ordinal === ordinal) ??
-    ex.rows.find((x) => x.metaId === metaId && x.ordinal === 0);
+  const r = ex.rows.find((x) => x.metaId === metaId && x.ordinal === ordinal) ?? ex.rows.find((x) => x.metaId === metaId && x.ordinal === 0);
   return r?.signers ?? NO_SIGNERS;
 }
 
-/** The signing validators of ONE metagraph snapshot — the tree's finest depth (user, 2026-08-09:
- *  "use the 'signed by' information to also add a dropdown row under the metagraph snapshots to
- *  show these nodes"). It is the same machines the metagraph-snapshot CARD lists, reached by
- *  browsing instead of by selecting, so the pair of routes agrees by construction: both resolve a
- *  truncated signer id through `matchSignerRow` (the one home for that prefix match) and both pair
- *  on `hoverNodeId`.
- *
- *  A resolved signer renders as the SHARED `NodePickerRow` every explorer uses for a node, so the
- *  machine that sealed this snapshot looks and behaves exactly like the same machine in geo or
- *  hyper: it glows its chip in the tray on hover, commits the node card on a click (through the
- *  tested table + the one executor), and re-clicking deselects.
- *
- *  An UNRESOLVED signer degrades through the one shared rule (`resolveSigner` + `SIGNER_UNKNOWN` in
- *  src/data/network.ts, which the snapshot card's own signer rows read too): it stays a SIGNATURE
- *  that states what isn't known and offers no affordance, because there is no node to commit — no
- *  IP, no geolocation, no roles, no status, so a card would be a card of ghosts. Every unlisted
- *  channel's signers take that branch by construction; a listed network's can too. */
-function SignerList({
-  ids,
-  metaId,
-  selNodes,
-  filter,
-  selIp,
-  selLayer,
-  hoverNodeId,
-  setHoverNodeId,
-}: {
-  ids: readonly string[];
-  metaId: string;
-  selNodes: NodeRow[];
-  filter: string;
-  selIp: string | null;
-  selLayer: string | null;
-  hoverNodeId: string | null;
-  setHoverNodeId: (id: string | null) => void;
-}) {
-  return (
-    <div className={ROW_NEST_DEEP}>
-      {/* WHICH cluster this list is — the cards' own phrase ("Signed by N L0 validators"), whose
-          words come from the one home SIGNER_GROUPS (user, 2026-08-16 — redesigned from the
-          `label · count · layer` interpunct line into the DepthCaption register). The explorer is
-          where the constant count is most puzzling (DOR discloses 3 rows under a 20-machine
-          network), so the depth names the producing layer before the rows. Only the snapshot PROOF
-          is reachable here: `signersOf` reads the tick's exact read, and the data-block signers
-          exist only in the ~2.5 MB deep read, which browsing must never trigger. */}
-      <DepthCaption title={SIGNER_GROUPS.proof.title}>
-        {/* The count inherits the caption's own quiet voice — a bold foreground number made the
-            caption louder than the rows it introduces (user, 2026-08-16). */}
-        <span>Signed by</span>
-        <span className="tabular-nums">{ids.length}</span>
-        <LayerWho who={SIGNER_GROUPS.proof.who} />
-      </DepthCaption>
-      {ids.map((sid) => {
-        const r = resolveSigner(selNodes, metaId, sid);
-        if (!r.known) {
-          const w = SIGNER_UNKNOWN[r.reason];
-          return (
-            // Not a button: there is no node to commit, so there is no affordance either. Same
-            // columns as the picker row above it, so the list still reads as one column of
-            // signatures — the left cell just states what the right-hand id belongs to.
-            <div
-              key={sid}
-              title={w.title}
-              className="flex items-baseline gap-2 w-full py-1 pl-2 pr-7 my-px text-label text-muted-foreground"
-            >
-              <span className="flex-none italic">{w.label}</span>
-              <span className="min-w-0 flex-1 text-right font-mono tabular-nums overflow-hidden text-ellipsis whitespace-nowrap">
-                {sid}
-              </span>
-            </div>
-          );
-        }
-        const row = r.row;
-        // One machine can hold rows in two layers (a hybrid), so the selection matches on IP AND
-        // layer — geo's rule, because the mark must land on the row that was actually picked.
-        const on = selIp != null && row.layer === selLayer && "node" in row.pick && row.pick.node?.ip === selIp;
-        return (
-          <NodePickerRow
-            key={sid}
-            row={row}
-            selected={on}
-            hoverNodeId={hoverNodeId}
-            setHoverNodeId={setHoverNodeId}
-            onSelect={() =>
-              applyClickActions(nodeSelectActions(row.pick, { mode: "ledger", currentFilter: filter, deselect: on }))
-            }
-          />
-        );
-      })}
-    </div>
-  );
+/** The exact read's per-network fee and size for one row of the network level — a listed
+ *  network's own entry, or the SUM of every uncataloged address for the unlisted row. */
+function perMetaOf(ex: SnapshotExact | undefined, id: string): { fee: number; bytes: number } | undefined {
+  if (!ex) return undefined;
+  if (id !== UNLISTED_ID) return ex.perMeta[id];
+  let fee = 0;
+  let bytes = 0;
+  let any = false;
+  for (const [addr, v] of Object.entries(ex.perMeta)) {
+    if (LISTED_IDS.has(addr)) continue;
+    any = true;
+    fee += v.fee;
+    bytes += v.bytes;
+  }
+  return any ? { fee, bytes } : undefined;
 }
 
 export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: boolean } = {}) {
@@ -383,620 +156,194 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const hoverSnapOrd = useStore((s) => s.hoverSnapOrd);
-  const ledgerMeasure = useStore((s) => s.ledgerMeasure);
-  const setLedgerMeasure = useStore((s) => s.setLedgerMeasure);
   const setHoverSnapOrd = useStore((s) => s.setHoverSnapOrd);
-  // ONE snapshot's own hover channel — the leaves pair on this, the tick rows on hoverSnapOrd.
   const hoverMetaSnap = useStore((s) => s.hoverMetaSnap);
   const setHoverMetaSnap = useStore((s) => s.setHoverMetaSnap);
+  const hoverNodeId = useStore((s) => s.hoverNodeId);
+  const setHoverNodeId = useStore((s) => s.setHoverNodeId);
+  const ledgerMeasure = useStore((s) => s.ledgerMeasure);
+  const setLedgerMeasure = useStore((s) => s.setLedgerMeasure);
   const snap = useStore((s) => s.snap);
   const following = useStore((s) => s.following);
   const latestSnapshot = useStore((s) => s.latestSnapshot);
   const live = useStore((s) => s.live);
   const metaSnap = useStore((s) => s.metaSnap);
   const snapshotExact = useStore((s) => s.snapshotExact);
-  // The signer depth resolves truncated ids against the view's published node list and pairs on
-  // the node channel — the same three reads geo's node rows make, for the same shared row.
   const selNodes = useStore((s) => s.selNodes);
   const inspect = useStore((s) => s.inspect);
-  const hoverNodeId = useStore((s) => s.hoverNodeId);
-  const setHoverNodeId = useStore((s) => s.setHoverNodeId);
+  // The two lower levels' own measures — a level remembers its pick; these are the card's, not
+  // the app's, so they live here rather than in the store (the tick level's is `ledgerMeasure`,
+  // which the chamber's own readouts share).
+  const [netPick, setNetPick] = useState<TickNetMeasure>("snapshots");
+  const [snapPick, setSnapPick] = useState<SnapLevelMeasure>("fee");
+
   const selNode = inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode") ? inspect : null;
   const selIp = selNode?.node?.ip ?? null;
   const selLayer = selNode ? (selNode.kind === "metanode" ? selNode.node?.layer ?? null : selNode.kind) : null;
-  // ⚠️ THE LIST IS NO LONGER THE TRAIL. It used to ask for SLOT_N ticks so "what the list
-  // shows" was exactly "what the 3D scene shows" — a real symmetry, and the wrong trade at nine
-  // rows (user, 2026-09-13: "it shows only few snapshots while actually the number is almost
-  // unlimited; can you do 10-20 by default and add simple <> to move back/forward in the
-  // chain?"). Nine rows made the explorer look like the whole chain rather than a peephole onto
-  // it. It now reads the WHOLE live buffer and pages through it.
-  //
-  // The buffer is the reach, deliberately: `POLL.maxSnapshots` ticks is what the app already
-  // holds, so paging costs no fetch, no loading state and no error state — and the raw layer is
-  // where a walk to genesis belongs (user, same round: "raw will be there for more advanced
-  // search etc"). Convention 12's ladder, unchanged: live scene → this peephole → the records.
-  //
-  // What the decoupling costs: hovering a row older than the trail previews nothing in the
-  // scene, because the scene holds no tile for it. That is an honest no-op — the pairing
-  // channel is a global tick ordinal and the scene simply has no such subject — not a broken
-  // pair to go fixing.
+  const nodeOn = (r: NodeRow) => selIp != null && r.layer === selLayer && "node" in r.pick && r.pick.node?.ip === selIp;
+
+  // ⚠️ THE LIST IS THE LIVE BUFFER, PAGED — not the 3D trail (user, 2026-09-13: nine rows made
+  // the explorer look like the whole chain rather than a peephole onto it). `POLL.maxSnapshots`
+  // ticks is what the app already holds, so paging costs no fetch; the raw layer is where a walk
+  // to genesis belongs. Hovering a row older than the trail previews nothing in the scene, which
+  // is an honest no-op, not a broken pair.
   const { snaps } = useSnapshotFeed(POLL.maxSnapshots);
   const net = getNetwork();
   const visibleTs = new Set(snaps.map((s) => s.timestamp));
-  // Every anchored metagraph snapshot in the window, newest first (rebuilt per event-driven
-  // render, same as the raw layer's AnchorLogTable — the buffers mutate in place).
   const rows = net ? buildAnchorLog(net.metaSnaps, net.globalSnapshots, "all").filter((r) => visibleTs.has(r.ts)) : [];
-  // The UNLISTED channels (user, 2026-08-07 — navigable like any network): the one-home row
-  // source (src/data/unlisted.ts — the exact reads, the only honest source), windowed here.
   const unlistedEntries = unlistedLog([...snaps].reverse(), snapshotExact);
-  // The LISTED half of the same source. `unlistedLog` has always read the exact snapshots for the
-  // uncataloged channels — "the polled buffers only track the public catalog, so the EXACT reads
-  // are the only honest source" — and the catalog's own rows turn out to need it just as much, for
-  // a different reason: the buffers track them, but only 160 rows deep PER NETWORK.
   const exactChannelRows = buildChannelLog([...snaps].reverse(), snapshotExact, (id: string) => LISTED_IDS.has(id));
-  // Under a NETWORK filter the global list shows ONLY that network's story — the ticks it
-  // anchored into, the LiveStrip's filtered idiom (user, 2026-08-07: one mental model, no
-  // two-outcome clicks in the explorer; the scene keeps all ticks and the filter-releases rule
-  // as its safety net). "all"/"dag" list every tick — through the ledger's lens, because
-  // `displayNetwork("dag")` RESOLVES (metagraphById answers for the core through the identity
-  // map, the same trap ledgerStory's own guard notes), which made a committed DAG narrow the
-  // list to a story that can never have members (found live 2026-08-13: "Waiting for
-  // snapshots…" with a full buffer behind it).
+  // Through the ledger's lens: `displayNetwork("dag")` RESOLVES, and a committed DAG must not
+  // narrow the list to a story that can never have members (found live 2026-08-13).
   const filterNet = displayNetwork(ledgerLens(filter));
-  // The ONE story rule (src/data/ledgerStory.ts) — the same membership the strip/scene read.
-  const tickFilterCount = (d: GlobalSnapshot): number =>
-    storyCount(filter, getAnchor(d.timestamp), snapshotExact[d.ordinal]) ?? 0;
-  const [tickPage, setTickPage] = useState(1);
-  // ⚠️ THE LENS DIMS, IT DOES NOT EDIT — the tick list is the BASE LEDGER'S CHAIN (user,
-  // 2026-09-14: "the snapshot explorer now sometimes shows few rows, sometimes several pages,
-  // depending on time/filter etc. This is confusing to a user; how can we keep it consistent?").
-  //
-  // It used to drop every tick the committed network sat out, which made the list's LENGTH — and
-  // therefore its page count — a function of the filter: 52 ticks over 4 pages unfiltered, 29 over
-  // 2 with USDC.dag committed, and a different pair for every network. The same window kept
-  // answering "how much is there?" differently depending on what you were looking through.
-  //
-  // Every global tick happened, whichever network you are looking through, so the list is now
-  // always the whole retained window and the filter is what it is everywhere else in this app: a
-  // LENS. A tick the network anchored into carries its count in the network's hue; one it sat out
-  // is stepped back and carries none. That is also what the tick CHART beside it has always done
-  // under a filter — "its own cadence, with empty ticks as honest gaps" — so the two finally agree,
-  // and the gaps are now readable as the network's rhythm instead of being silently closed up.
+  const tickFilterCount = (d: GlobalSnapshot): number => storyCount(filter, getAnchor(d.timestamp), snapshotExact[d.ordinal]) ?? 0;
+
+  // ⚠️ THE LENS DIMS, IT DOES NOT EDIT — the tick list is always the whole retained window (user,
+  // 2026-09-14: a list whose LENGTH depended on the filter kept answering "how much is there?"
+  // differently). Page 1 is the live page and the only one that moves under the reader.
   const orderedSnaps = [...snaps].reverse(); // newest first, the log convention
   const activeSnapOrd = snap?.data.ordinal ?? null;
-  // ⚠️ PAGE 1 IS THE LIVE PAGE, and it is the only one that moves under the reader — the buffer
-  // is a rolling window, so a deeper page drifts as ticks age out of it. That is the same
-  // contract the raw layer's pager states, arrived at from the other end (it freezes `latest`
-  // off page 1; here the window itself is what slides), so the words are the same: the live tip
-  // is the mutable page.
-  // The page count is now the WINDOW's alone — it no longer moves when the filter does. It still
-  // grows as the retained window fills after a cold load, which is the one honest variable left.
+  const [tickPage, setTickPage] = useState(1);
   const pages = Math.max(1, Math.ceil(orderedSnaps.length / TICK_PAGE));
-  const page = Math.min(tickPage, pages); // a shrinking window must not strand the reader
+  const page = Math.min(tickPage, pages);
   const pagedSnaps = orderedSnaps.slice((page - 1) * TICK_PAGE, page * TICK_PAGE);
-  // ⚠️ A PAGE IN VIEW IS A PAGE IN FOCUS. Exact reads (the fee each row states) are fetched for
-  // the live tick, the selected one and the backfill behind them — about one page's worth — so
-  // paging back used to show a column of honest dashes. The bridge's charter is "the snapshots
-  // currently in focus", and the page the reader is looking at is exactly that; `ensurePage`
-  // walks it at the backfill's own pace, deduped against everything already held or in flight.
+  // A PAGE IN VIEW IS A PAGE IN FOCUS: the exact reads (the figures) are fetched for the page the
+  // reader is looking at, at the backfill's own pace, deduped against everything held or in flight.
   const pagedKey = pagedSnaps.map((d) => d.ordinal).join(",");
   useEffect(() => {
     const ords = pagedKey ? pagedKey.split(",").map(Number) : [];
     return ensurePage(ords);
   }, [pagedKey]);
 
-  // Disclosure state: single-open at each of the two disclosing depths, plain local UI state.
-  // The tick rows are the card's own first level now, so there is no group to open first (user,
-  // 2026-08-09) — the list IS the card body, and the LIVE control above it stays the view's
-  // opening statement.
+  // The path: which tick, which network in it, which snapshot's signers.
   const [openTick, setOpenTick] = useState<number | null>(null);
-  const [openContrib, setOpenContrib] = useState<string | null>(null); // `${tickOrdinal}|${metaId}`
-  // The third disclosing depth: ONE snapshot's signers. Keyed by the full triple, because a
-  // snapshot ordinal alone collides — every undecodable unlisted channel carries ordinal 0.
-  const [openSigners, setOpenSigners] = useState<string | null>(null); // `${tick}|${metaId}|${ord}`
-  // Deliberately NO auto-open here. The retired per-network tree auto-disclosed the committed
-  // filter's row, which was safe because that row was a fixed subject; the equivalent on this
-  // axis would be "open the newest tick", and the newest tick CHANGES every few seconds — an
-  // auto-open would fight the heartbeat, reopening itself under the pointer. The filter's effect
-  // on this list is to narrow it to that network's story, which needs no disclosure.
+  const [openNet, setOpenNet] = useState<string | null>(null);
+  const [openSnap, setOpenSnap] = useState<string | null>(null); // `${metaId}|${ordinal}` — a bare ordinal collides (every undecodable unlisted payload is 0)
+  // A snapshot committed ANYWHERE opens the path to it (the scene's tile, the rail's pager, the
+  // raw log), so the explorer always shows the level the committed subject sits on.
+  const metaSnapKey = metaSnap ? `${metaSnap.globalOrdinal}|${metaSnap.metaId}|${metaSnap.ordinal}` : null;
+  useEffect(() => {
+    if (!metaSnap) return;
+    const netId = LISTED_IDS.has(metaSnap.metaId) ? metaSnap.metaId : UNLISTED_ID;
+    setOpenTick(metaSnap.globalOrdinal);
+    setOpenNet(netId);
+    setOpenSnap((cur) => (cur === `${metaSnap.metaId}|${metaSnap.ordinal}` ? cur : null));
+    const at = orderedSnaps.findIndex((d) => d.ordinal === metaSnap.globalOrdinal);
+    if (at >= 0) setTickPage(Math.floor(at / TICK_PAGE) + 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one sync per committed snapshot
+  }, [metaSnapKey]);
+  // A tick pinned elsewhere (the rail's ‹ › plank) while a tick is open re-points the path.
+  useEffect(() => {
+    if (openTick == null || following || activeSnapOrd == null || activeSnapOrd === openTick) return;
+    setOpenTick(activeSnapOrd);
+    setOpenNet(null);
+    setOpenSnap(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- follows the pin, not the path
+  }, [activeSnapOrd, following]);
 
   const accent = filterAccent(filter);
+  const tick = openTick != null ? orderedSnaps.find((d) => d.ordinal === openTick) ?? null : null;
+  const exact = tick ? snapshotExact[tick.ordinal] : undefined;
 
-  const empty = <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">Waiting for snapshots…</p>;
-
-  return (
-    <ExplorerShell
-      defaultCollapsed={defaultCollapsed}
-      id="ledger-view"
-      title="Snapshot breakdown"
-      // No ordering clause (user, 2026-08-12): the list shows its own order. See the hint-shape
-      // note in GeoExplore.tsx, which is the shared rule.
-      hint="Recent snapshots. Open one for the networks that anchored into it."
-      onLeave={() => {
-        // Container-level hover backstop (the LaneRow lesson, 2026-08-02): leaving the whole card
-        // body clears every hover channel its rows write, regardless of which row set it or
-        // whether that row is still mounted to clear it itself.
-        setHoverFilter(null);
-        setHoverSnapOrd(null);
-        setHoverMetaSnap(null);
-      }}
-    >
-      <div className="flex flex-col gap-0.5">
-        {/* ── the LIVE control (user, 2026-08-07): the ONE explicit way to see and toggle the
-            follow state. LIVE = the beating cyan dot while the chamber follows the heartbeat;
-            PINNED = the pinned ordinal, click to return to live. Hovering ANY snapshot — a row
-            here, a strip bar, a scene tile (the shared hoverSnapOrd channel) — PREVIEWS the
-            pinned state it would enter (dashed frame, hollow dot). The write goes through the
-            tested followToggleActions + the one executor, like every selection. */}
-        {(() => {
-          if (!live)
-            return (
-              <span className="flex items-center gap-2 mb-1 py-1.5 px-2 rounded-sm border border-border text-label text-muted-foreground">
-                <NoSignalDot /> no signal
-              </span>
-            );
-          const liveOrd = latestSnapshot?.ordinal ?? null;
-          const previewOrd = hoverSnapOrd != null && hoverSnapOrd !== liveOrd ? hoverSnapOrd : null;
-          // THREE resting states: FOLLOWING (beating dot), PINNED (a clicked snapshot holds the
-          // front), and IDLE (entering the view follows nothing — live-follow is opt-in,
-          // 2026-08-02). A hover previews the pinned state it would enter, dashed.
-          const pinned = !following && snap != null;
-          const beating = following && previewOrd == null;
-          const label = previewOrd != null ? "Pinned" : following ? "Live" : pinned ? "Pinned" : "Live";
-          // Filtered live mode follows the NETWORK's newest anchored row — the ticker alone
-          // says it (user, 2026-08-16: "just say 'following DOR'" — the word "anchors" restated
-          // what the whole view is about).
-          const liveTicker = displayNetwork(filter)?.ticker ?? null;
-          const sub =
-            previewOrd != null
-              ? previewOrd.toLocaleString()
-              : following
-                ? liveTicker
-                  ? `following ${liveTicker}`
-                  : "following new snapshots"
-                : pinned
-                  ? `${snap!.data.ordinal.toLocaleString()} · click for live`
-                  : "off · click to follow";
-          return (
-            <button
-              type="button"
-              aria-pressed={following}
-              title={
-                following
-                  ? "Following the live snapshot — click to pin the one on screen"
-                  : "Follow the live snapshot"
-              }
-              onClick={() => {
-                // From IDLE there is nothing pinned to hand back — follow the latest instead.
-                const shown =
-                  snap ??
-                  (latestSnapshot
-                    ? ({ kind: "snapshot", title: `Global snapshot #${latestSnapshot.ordinal}`, data: latestSnapshot } as const)
-                    : null);
-                if (shown) applyClickActions(followToggleActions(shown, following));
-              }}
-              className={cn(
-                "nb-row group flex items-center gap-2 w-full mb-1 py-1.5 px-2 rounded-sm border text-left cursor-pointer transition-colors duration-150",
-                "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-                beating && "border-primary/25 bg-wash-faint hover:bg-wash-soft",
-                // PINNED is a COMMITTED state, very much active (user, 2026-08-07 — the plain
-                // grey read as disabled): it wears the one committed-selection language, the
-                // sel wash + ring, like a selected row.
-                pinned && previewOrd == null && cn("border-transparent", selectedRow(true)),
-                !beating && !(pinned && previewOrd == null) && "border-border hover:bg-wash-hover",
-                previewOrd != null && "border-dashed",
-              )}
-              // The pinned mark speaks the committed network's hue (user, 2026-08-13 — the same
-              // rule as every committed row), exactly as its beating-dot sibling already does:
-              // the filter-face idiom, structural cyan under "all".
-              style={pinned && previewOrd == null ? selectionHue(accent) : undefined}
-            >
-              {beating ? (
-                // The beating dot wears the FOLLOWED subject's identity (user, 2026-08-07 — the
-                // filter-face idiom: identity dot beside structural text); cyan on "all".
-                <span
-                  className="flex-none w-2 h-2 rounded-full animate-dot-beat motion-reduce:animate-none"
-                  style={{
-                    background: displayNetwork(filter)?.hue ?? accent,
-                    boxShadow: `0 0 0 3px color-mix(in oklch, ${displayNetwork(filter)?.hue ?? accent} 30%, transparent)`,
-                  }}
-                />
-              ) : (
-                <span className={cn("flex-none w-2 h-2 rounded-full border", pinned && previewOrd == null ? "border-primary/80" : "border-muted-foreground/70")} />
-              )}
-              <span className={cn("text-micro tracking-caps uppercase", beating ? "text-primary" : pinned && previewOrd == null ? "text-foreground" : "text-muted-foreground")}>
-                {label}
-              </span>
-              <span className={cn("ml-auto min-w-0 truncate tabular-nums text-label", pinned && previewOrd == null ? "text-foreground-dim" : "text-muted-foreground")}>{sub}</span>
-            </button>
-          );
-        })()}
-        {/* ── WHAT THE ROWS LEAD WITH (user, 2026-09-26): the measure stepper, the History card's
-            own control, walking `LEDGER_MEASURE_ORDER` — fees, anchors, metagraphs, size. The word
-            is the column's heading; the figure on every tick row below is `tickMeasure`'s answer
-            for it, or the honest dash. A SETTING: it writes its setter directly. */}
-        <div className="flex items-center mb-1">
-          <MeasureStepper
-            word={LEDGER_MEASURE_LABELS[ledgerMeasure]}
-            prev={(() => { const p = stepLedgerMeasure(ledgerMeasure, -1); return p ? LEDGER_MEASURE_LABELS[p] : null; })()}
-            next={(() => { const n = stepLedgerMeasure(ledgerMeasure, 1); return n ? LEDGER_MEASURE_LABELS[n] : null; })()}
-            onStep={(dir) => {
-              const next = stepLedgerMeasure(ledgerMeasure, dir);
-              if (next) setLedgerMeasure(next);
-            }}
+  // ---- the heading's one setting: LIVE / PINNED (user, 2026-08-07 — the ONE explicit way to see
+  // and toggle the follow state; design 2026-09-26 decision 15: it rides the heading as dot + word).
+  // Hovering ANY snapshot — a row, a scene tile — PREVIEWS the pinned state it would enter (hollow
+  // dot, dashed). The write goes through `followToggleActions` + the one executor. ----------------
+  const setting = (() => {
+    if (!live)
+      return (
+        <span className="mr-auto inline-flex items-center gap-1.5 text-micro tracking-caps uppercase text-muted-foreground">
+          <NoSignalDot /> no signal
+        </span>
+      );
+    const liveOrd = latestSnapshot?.ordinal ?? null;
+    const previewOrd = hoverSnapOrd != null && hoverSnapOrd !== liveOrd ? hoverSnapOrd : null;
+    const pinned = !following && snap != null;
+    const beating = following && previewOrd == null;
+    const label = previewOrd != null ? "Pinned" : following ? "Live" : pinned ? "Pinned" : "Live";
+    const dotHue = displayNetwork(filter)?.hue ?? accent;
+    const sub = previewOrd != null ? previewOrd.toLocaleString() : pinned ? snap!.data.ordinal.toLocaleString() : following ? null : "off";
+    return (
+      <button
+        type="button"
+        aria-pressed={following}
+        title={following ? "Following the live snapshot — click to pin the one on screen" : "Follow the live snapshot"}
+        onClick={() => {
+          const shown = snap ?? (latestSnapshot ? ({ kind: "snapshot", title: `Global snapshot #${latestSnapshot.ordinal}`, data: latestSnapshot } as const) : null);
+          if (shown) applyClickActions(followToggleActions(shown, following));
+        }}
+        className={cn(
+          "mr-auto -ml-1 inline-flex items-center gap-1.5 rounded-sm px-1 py-px cursor-pointer select-none border border-transparent",
+          "hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
+          pinned && previewOrd == null && selectedRow(true),
+          previewOrd != null && "border-dashed border-border",
+        )}
+        style={pinned && previewOrd == null ? selectionHue(accent) : undefined}
+      >
+        {beating ? (
+          <span
+            className="flex-none w-2 h-2 rounded-full animate-dot-beat motion-reduce:animate-none"
+            style={{ background: dotHue, boxShadow: `0 0 0 3px color-mix(in oklch, ${dotHue} 30%, transparent)` }}
           />
-        </div>
+        ) : (
+          <span className={cn("flex-none w-2 h-2 rounded-full border", pinned && previewOrd == null ? "border-primary/80" : "border-muted-foreground/70")} />
+        )}
+        <span className={cn("text-micro tracking-caps uppercase", beating ? "text-primary" : pinned && previewOrd == null ? "text-foreground" : "text-muted-foreground")}>{label}</span>
+        {sub && <span className="tabular-nums text-micro text-muted-foreground">{sub}</span>}
+      </button>
+    );
+  })();
 
-        {/* ── the resting division between the INSTRUMENT and the LIST (user, 2026-08-09: the two
-            "sit too close"). The follow control is the view's one instrument — it states and
-            toggles a state, it isn't a browse target — and 6px of gap alone read as if it were
-            the list's first row. One weight for anything simply THERE (the card-head rule's
-            hairline), and inset to the same 16px `--panel-pad-x` that rule uses: the body's own
-            padding is 14px, so the 2px side margin is what LINES THE TWO UP. Space is symmetric
-            (10px each side, counting the button's mb-1 and the container's gap-0.5). */}
-        <div className="border-b border-border mx-[2px] mt-1 mb-2" aria-hidden />
-
-        {/* ── the ONE tree: global tick → the networks that anchored into it → their own
-            snapshots. Every depth COMMITS its own subject through the tested builders, and
-            disclosure rides the same click (the commit-is-disclosure idiom, hyper's composition
-            group one rung up). Coarse→fine, the direction the chamber, the facts rail and the
-            strip all read. */}
-        <div
-          onMouseLeave={() => {
-            setHoverSnapOrd(null);
-            setHoverMetaSnap(null);
-          }}
-          onBlur={() => {
-            setHoverSnapOrd(null);
-            setHoverMetaSnap(null);
-          }}
-        >
-          {orderedSnaps.length === 0
-            ? empty
-            : pagedSnaps.map((d) => {
-                // ⚠️ THE BREAKDOWN IS THE UNION OF BOTH SOURCES, and only the exact read makes it
-                // COMPLETE (user, 2026-09-14: "why it shows 2 rows in the explorer instead of 3 —
-                // DED is missing"). `rows` comes from the polled `metaSnaps` buffers, which hold
-                // POLL.metaSnapBuffer rows PER NETWORK — a depth in ROWS, not in ticks. Measured on
-                // the reported tick: Digital Evidence anchored 46 snapshots into it, so 160 rows is
-                // barely three ticks of that chain and every older tick quietly lost its busiest
-                // contributor — while the fee this very row states, which comes from the exact read,
-                // went on counting it. A breakdown that cannot add up to the number above it is
-                // exactly what rule 10 forbids. (Paging the list from 9 ticks to 52 is what turned
-                // this from rare into normal, which is how it surfaced.)
-                //
-                // The POLLED row wins where both have it, because it carries the metagraph
-                // snapshot's own `hash` and the exact read does not; the exact read then supplies
-                // everything the buffer has aged out. Computed only while the tick is OPEN — it is
-                // the disclosure's content, and building it for all 15 rows of a page was work
-                // nobody could see.
-                const tickCount = tickFilterCount(d);
-                const isOpen = openTick === d.ordinal;
-                const tickGroups = !isOpen ? EMPTY_GROUPS : groupByMeta(unionRows(rows, exactChannelRows, d.ordinal));
-                // The tick's uncataloged anchors: the exact read's authoritative COUNT, and the
-                // per-channel entries that same read yields (identical source, so the entry list
-                // can't disagree with the count).
-                const tickUnlisted = snapshotExact[d.ordinal]?.unlistedCount ?? 0;
-                const tickEntries = unlistedEntries.filter((e) => e.global.ordinal === d.ordinal);
-                const globalPick = {
-                  kind: "snapshot",
-                  title: `Global snapshot #${d.ordinal}`,
-                  data: d,
-                } as const;
-                // The filter releases if ITS network isn't in this tick's story (ledgerStory).
-                const tickHasFilter = tickInStory(filter, getAnchor(d.timestamp), snapshotExact[d.ordinal]);
-                // New ticks arrive at the top as the window advances — each row eases in once
-                // on mount (the no-pop arrival ease; keys are ordinals, so live re-renders
-                // never replay it).
-                return (
-                  // ⚠️ AN OPEN TICK WEARS THE FAINT WASH, like every other explorer (user,
-                  // 2026-09-13: "breakdown for snapshot keeps same background as card while in
-                  // geo and hyper it has a slight effect; keep effect as that I think was
-                  // intentional"). It was: geo and hyper wash the whole open group so the
-                  // disclosed rows read as INSIDE their parent rather than as more rows in the
-                  // card. The ledger's tick was the one explorer that never took it, so its
-                  // breakdown floated on the card's own ground. Same recipe, verbatim.
-                  <div
-                    key={d.ordinal}
-                    className={cn(CONTENT_EASE, isOpen && "bg-wash-faint rounded-btn my-0.5 -mx-1.5 px-1.5")}
-                  >
-                    {/* The tick row SELECTS (pin / live re-follow — the same tested table the
-                        strip's bars run) AND discloses its contributors in the same click. */}
-                    <SnapRow
-                      outset
-                      // The lens's two channels on a tick row: a COUNT in the network's hue where
-                      // it anchored, and a step back where it did not. No "0" mark — a zero in a
-                      // network's own colour reads as a reading about that network, when the
-                      // honest statement is simply that this tick is not part of its story.
-                      mark={filterNet && tickCount > 0 ? { hue: filterNet.hue, count: tickCount } : null}
-                      lensOut={!!filterNet && tickCount === 0}
-                      label={d.ordinal.toLocaleString()}
-                      // ⚠️ THE METRIC IS THE STEPPER'S MEASURE (user, 2026-09-26) — the fee by
-                      // default (2026-09-13: "instead of size in kb show the fees paid in DAG"),
-                      // or the anchors, the distinct metagraphs, the size. Every figure is read
-                      // off the tick by `src/data/ledgerMeasure.ts`, and absent = the dash, never
-                      // a number derived from another (the honesty rule). The fee is the exact
-                      // read's own `totalFee`, which includes the unlisted channels and so matches
-                      // the rows disclosed beneath it.
-                      metric={tickMeasure(ledgerMeasure, d, snapshotExact[d.ordinal])}
-                      selected={d.ordinal === activeSnapOrd}
-                      disclose={{ open: isOpen, holdsSel: metaSnap?.globalOrdinal === d.ordinal }}
-                      hoverOrd={hoverSnapOrd}
-                      pairOrd={d.ordinal}
-                      setHoverOrd={setHoverSnapOrd}
-                      accent={accent}
-                      title={`Global snapshot ${d.ordinal.toLocaleString()} · ${d.metagraphSnapshotCount ?? 0} anchors`}
-                      onClick={() => {
-                        applyClickActions(
-                          snapshotSelectActions(globalPick, latestRelevant("all")?.ordinal === d.ordinal, {
-                            pinnedOrdinal: !following && snap ? snap.data.ordinal : null,
-                            metaSnap,
-                            filter,
-                            tickHasFilter,
-                          }),
-                        );
-                        setOpenTick(isOpen ? null : d.ordinal);
-                      }}
-                    />
-                    {/* ONE RUNG WIDTH for the whole tree: 15px of indent per level, the same
-                        `ml-[7px] pl-2` the level-2+ container below uses. This one used to be
-                        `ml-[9px] pl-3` (21px), so the two steps measured 28px then 16px and the
-                        depths read as unrelated insets rather than one ladder. Only the LEFT
-                        indent changes — ROW_NEST's `-mr-1.5` is the right-edge contract. */}
-                    {isOpen && (
-                      <div className={cn("mb-1.5 ml-[7px] py-0.5 pl-2", ROW_NEST)}>
-                        {/* Depth caption (user, 2026-08-16): the child grouping's one new concept —
-                            these rows are the tick's anchors split BY NETWORK. */}
-                        {(tickGroups.length > 0 || tickUnlisted > 0) && (
-                          <DepthCaption>Snapshots by network</DepthCaption>
-                        )}
-                        {tickGroups.length === 0 && tickUnlisted === 0 ? (
-                          // The polled buffer identified none of this tick's anchors (yet), and
-                          // the exact read counted no uncataloged ones — say so, never fabricate.
-                          <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">
-                            No identified metagraph snapshots in this tick.
-                          </p>
-                        ) : (
-                          tickGroups.map((g) => {
-                            const key = `${d.ordinal}|${g.id}`;
-                            const lensedOut = outOfLens(filter, g.id);
-                            const gOpen = openContrib === key && !lensedOut;
-                            return (
-                              // ⚠️ `onToggle` moves to the Disclosure ROOT but keeps its exact
-                              // body: this header DISCLOSES and PREVIEWS and commits nothing, the
-                              // boundary the long note below records. Radix only pairs the trigger
-                              // to the panel; it never decides what a click means.
-                              <Disclosure key={g.id} open={gOpen} onToggle={() => setOpenContrib(gOpen ? null : key)}>
-                                <DisclosureRow
-                                  open={gOpen}
-                                  // The row itself IS a committed subject when its band is the
-                                  // live selection: this network's filter on this tick, with no
-                                  // finer metagraph snapshot pinned under it.
-                                  on={filter === g.id && activeSnapOrd === d.ordinal && metaSnap == null}
-                                  holdsSel={metaSnap?.metaId === g.id && metaSnap.globalOrdinal === d.ordinal}
-                                  title={`${g.name} · ${g.rows.length} snapshot${g.rows.length === 1 ? "" : "s"} anchored into ${d.ordinal.toLocaleString()}`}
-                                  // A NETWORK UNDER A TICK IS A GROUP HEADER, NOT A COMMIT (user,
-                                  // 2026-08-10: "a click directly changes the filter which I feel
-                                  // will often happen accidentally not purposefully"). It ran
-                                  // `bandSelectActions`, so opening a tick's contributors to see
-                                  // who anchored — the browse this tree exists for — silently
-                                  // re-committed the app-wide filter, dimming every view and
-                                  // outliving the visit. The user's own PAGER rule already says
-                                  // this one surface over: a step must not move a COARSER rung,
-                                  // which is why the card's swipe stays inside this metagraph and
-                                  // this tick. A group header is coarser still.
-                                  //
-                                  // So it opens and it PREVIEWS (`hoverFilter` below still paints
-                                  // the chamber, which is the whole answer to "what is this
-                                  // network's story here" without committing to it). Committing
-                                  // stays with the deliberate clicks: a SNAPSHOT row inside, which
-                                  // filter-firsts through `metaSnapSelectActions`, the byte-bar
-                                  // band in the scene — where there is no disclosure, so a click
-                                  // must mean something — or the top bar's own picker.
-                                  // …and under a COMMITTED FILTER the other networks stop being
-                                  // browsable at all (user, 2026-08-10: "a click here commits and
-                                  // this feels unintended because we lose the metagraph filter").
-                                  // The tick still LISTS them, because they really did anchor here
-                                  // and rule 10 doesn't let the lens edit the facts — but only the
-                                  // committed network is drillable, so nothing under a tick can
-                                  // reach past the filter and change it. That is the same boundary
-                                  // the scene draws with its coloured dim and the pager draws by
-                                  // staying inside this metagraph × this tick. The hover survives
-                                  // untouched: `hoverFilter` below still paints that lane in the
-                                  // chamber, which is the whole "where is it" answer the user
-                                  // called nice, and previewing has never been committing.
-                                  previewOnly={lensedOut}
-                                  // The row's hover IS the network's filter preview, so it takes
-                                  // the identity-hued pairing the hyper explorer's network rows
-                                  // wear (user, 2026-08-13): same channel it always wrote
-                                  // (`hoverFilter` paints the lane in the chamber), now paired,
-                                  // so the row washes in the metagraph's own hue and a scene-side
-                                  // hover of that lane lights this row back.
-                                  groupKey={g.id}
-                                  hoverGroup={hoverFilter}
-                                  setHoverGroup={setHoverFilter}
-                                  hue={g.hue}
-                                >
-                                  <IdentityDot hue={g.hue} />
-                                  <span className="flex-1 min-w-0 text-body whitespace-nowrap overflow-hidden text-ellipsis">
-                                    {g.name}
-                                  </span>
-                                  {/* Labelled, or the row's accessible name fuses the network into
-                                      its count — "Dor Technologies17". */}
-                                  <span
-                                    className="flex-none tabular-nums text-label font-semibold text-muted-foreground"
-                                    aria-label={`${g.rows.length} snapshot${g.rows.length === 1 ? "" : "s"}`}
-                                  >
-                                    {g.rows.length}
-                                  </span>
-                                </DisclosureRow>
-                                {/* Level 2+: INDENT ONLY — re-applying ROW_NEST here would
-                                    compound its negative margin to +12px (the right-edge rule). */}
-                                <DisclosurePanel className={ROW_NEST_DEEP}>
-                                    {g.rows.map((r) => {
-                                      const sel = {
-                                        metaId: r.metaId,
-                                        ordinal: r.ordinal,
-                                        hash: r.hash,
-                                        globalOrdinal: r.global.ordinal,
-                                        ts: r.ts,
-                                      };
-                                      const sKey = `${d.ordinal}|${r.metaId}|${r.ordinal}`;
-                                      const signers = signersOf(snapshotExact[d.ordinal], r.metaId, r.ordinal);
-                                      const sOpen = openSigners === sKey;
-                                      return (
-                                        <div key={r.ordinal}>
-                                          <SnapRow
-                                            nested
-                                            label={r.ordinal.toLocaleString()}
-                                            metric={snapMeasure(ledgerMeasure, r)}
-                                            selected={sameMetaSnap(metaSnap, sel)}
-                                            hoverOrd={hoverMetaSnap}
-                                            pairOrd={metaSnapHoverKey(r.metaId, r.ordinal)}
-                                            setHoverOrd={setHoverMetaSnap}
-                                            accent={g.hue}
-                                            title={`${g.name} snapshot ${r.ordinal.toLocaleString()} · anchored into global ${r.global.ordinal.toLocaleString()}${signers.length ? ` · signed by ${signers.length} ${SIGNER_GROUPS.proof.who}` : ""}`}
-                                            // The AFFORDANCE FOLLOWS THE DATA: no exact read for
-                                            // this tick (pruned, or not yet fetched) means no
-                                            // signers are knowable, so the row simply doesn't
-                                            // disclose. A chevron onto an empty list would claim
-                                            // a fact we don't have.
-                                            disclose={signers.length > 0 ? { open: sOpen } : undefined}
-                                            onClick={() => {
-                                              applyClickActions(
-                                                metaSnapSelectActions(sel, globalPick, { filter, metaSnap, following }),
-                                              );
-                                              if (signers.length > 0) setOpenSigners(sOpen ? null : sKey);
-                                            }}
-                                          />
-                                          {sOpen && signers.length > 0 && (
-                                            <SignerList
-                                              ids={signers}
-                                              metaId={r.metaId}
-                                              selNodes={selNodes}
-                                              filter={filter}
-                                              selIp={selIp}
-                                              selLayer={selLayer}
-                                              hoverNodeId={hoverNodeId}
-                                              setHoverNodeId={setHoverNodeId}
-                                            />
-                                          )}
-                                        </div>
-                                      );
-                                    })}
-                                </DisclosurePanel>
-                              </Disclosure>
-                            );
-                          })
-                        )}
-                        {/* The UNLISTED contributor (one-home design, src/data/unlisted.ts):
-                            neutral gray, because no single identity can speak for a mixed set.
-                            Same depth, same grammar, same band click as the listed rows. */}
-                        {tickUnlisted > 0 && (
-                          <Disclosure
-                            open={openContrib === `${d.ordinal}|${UNLISTED_ID}` && !outOfLens(filter, UNLISTED_ID)}
-                            onToggle={() => {
-                              // Disclose only, like every listed group header above it.
-                              const key = `${d.ordinal}|${UNLISTED_ID}`;
-                              setOpenContrib(openContrib === key ? null : key);
-                            }}
-                          >
-                            <DisclosureRow
-                              open={openContrib === `${d.ordinal}|${UNLISTED_ID}` && !outOfLens(filter, UNLISTED_ID)}
-                              on={filter === UNLISTED_ID && activeSnapOrd === d.ordinal && metaSnap == null}
-                              holdsSel={
-                                metaSnap != null &&
-                                !LISTED_IDS.has(metaSnap.metaId) &&
-                                metaSnap.globalOrdinal === d.ordinal
-                              }
-                              title={`${tickUnlisted} uncataloged snapshot${tickUnlisted === 1 ? "" : "s"} anchored into ${d.ordinal.toLocaleString()}`}
-                              // …and out of the lens under any other committed filter, like them
-                              // too. `unlisted` is a first-class network here as everywhere: the
-                              // one home makes it the common case, never a special case.
-                              previewOnly={outOfLens(filter, UNLISTED_ID)}
-                              onHoverEnter={() => setHoverFilter(UNLISTED_ID)}
-                              onHoverLeave={() => setHoverFilter(null)}
-                            >
-                              <IdentityDot hue={UNLISTED_HUE} />
-                              <span className="flex-1 min-w-0 text-body italic whitespace-nowrap overflow-hidden text-ellipsis">
-                                unlisted
-                              </span>
-                              <span
-                                className="flex-none tabular-nums text-label font-semibold text-muted-foreground"
-                                aria-label={`${tickUnlisted} snapshot${tickUnlisted === 1 ? "" : "s"}`}
-                              >
-                                {tickUnlisted}
-                              </span>
-                            </DisclosureRow>
-                            <DisclosurePanel className={ROW_NEST_DEEP}>
-                                {tickEntries.map((r, i) => {
-                                  const sel = {
-                                    metaId: r.metaId,
-                                    ordinal: r.ordinal,
-                                    hash: "",
-                                    globalOrdinal: r.global.ordinal,
-                                    ts: r.ts,
-                                  };
-                                  const sKey = `${d.ordinal}|${r.metaId}|${r.ordinal}`;
-                                  const signers = signersOf(snapshotExact[d.ordinal], r.metaId, r.ordinal);
-                                  const sOpen = openSigners === sKey;
-                                  return (
-                                    <div key={`${r.metaId}:${i}`}>
-                                      <SnapRow
-                                        nested
-                                        label={r.ordinal > 0 ? r.ordinal.toLocaleString() : `${r.metaId.slice(0, 10)}…`}
-                                        // Each unlisted row's ordinal belongs to ITS OWN channel's
-                                        // sequence — one tick can carry several chains, so the short
-                                        // address says which chain a number counts on (2026-08-08).
-                                        sub={r.ordinal > 0 ? shortHash(r.metaId) : undefined}
-                                        metric={snapMeasure(ledgerMeasure, r)}
-                                        selected={sameMetaSnap(metaSnap, sel)}
-                                        hoverOrd={hoverMetaSnap}
-                                        pairOrd={metaSnapHoverKey(r.metaId, r.ordinal)}
-                                        setHoverOrd={setHoverMetaSnap}
-                                        accent={UNLISTED_HUE}
-                                        title={`Unlisted channel ${r.metaId} · anchored into global ${r.global.ordinal.toLocaleString()}${signers.length ? ` · signed by ${signers.length} ${SIGNER_GROUPS.proof.who}` : ""}`}
-                                        disclose={signers.length > 0 ? { open: sOpen } : undefined}
-                                        onClick={() => {
-                                          applyClickActions(
-                                            metaSnapSelectActions(sel, globalPick, { filter, metaSnap, following }),
-                                          );
-                                          if (signers.length > 0) setOpenSigners(sOpen ? null : sKey);
-                                        }}
-                                      />
-                                      {sOpen && signers.length > 0 && (
-                                        // An unlisted channel's signers resolve to nothing by
-                                        // construction — the live node set only knows the catalog —
-                                        // so every row here takes `resolveSigner`'s `network` arm.
-                                        // Nothing about this list is unlisted-specific: it is the
-                                        // same component with the same rule as the listed one above.
-                                        <SignerList
-                                          ids={signers}
-                                          metaId={r.metaId}
-                                          selNodes={selNodes}
-                                          filter={filter}
-                                          selIp={selIp}
-                                          selLayer={selLayer}
-                                          hoverNodeId={hoverNodeId}
-                                          setHoverNodeId={setHoverNodeId}
-                                        />
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                            </DisclosurePanel>
-                          </Disclosure>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-        </div>
-        {/* The raw layer's OWN pager strip (datasection/TablePager) — one pager in the app, and
-            it already renders nothing for a single page, so a quiet filtered list stays a plain
-            list. Page arithmetic lives with the caller, which is its stated contract. */}
-        {live && orderedSnaps.length > 0 && (
+  // ---- level 0: the ticks, paged, measured by the heading's pick -------------------------------
+  const tickValues = pagedSnaps.map((d) => tickMeasureValue(ledgerMeasure, d, snapshotExact[d.ordinal]));
+  const maxTick = Math.max(1e-9, ...tickValues.map((v) => v ?? 0));
+  const levels: ExplorerLevelSpec[] = [
+    {
+      key: "ticks",
+      crumb: { label: "Snapshots" },
+      measure: { options: LEDGER_MEASURE_OPTIONS, value: ledgerMeasure, onPick: (id) => setLedgerMeasure(id as LedgerMeasure) },
+      hasFigure: true,
+      // A 4-decimal fee ("0.0680") needs the wider figure column; the width holds across the
+      // level's measures so the columns never shift when the heading's pick changes.
+      figureW: 48,
+      empty: "Waiting for snapshots…",
+      rows: pagedSnaps.map((d, i): ExplorerRowSpec => {
+        const count = tickFilterCount(d);
+        const v = tickValues[i];
+        const globalPick = { kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d } as const;
+        const tickHasFilter = tickInStory(filter, getAnchor(d.timestamp), snapshotExact[d.ordinal]);
+        const on = d.ordinal === activeSnapOrd;
+        return {
+          key: String(d.ordinal),
+          name: <span className="tabular-nums">{d.ordinal.toLocaleString()}</span>,
+          // The lens's count in the network's hue where it anchored; no "0" — a zero in a
+          // network's own colour reads as a reading about that network.
+          tag: filterNet && count > 0 ? <span className="tabular-nums" style={{ color: filterNet.hue }}>{count}</span> : undefined,
+          share: v != null ? v / maxTick : undefined,
+          hue: accent,
+          // Absent = the dash, never a number derived from another (rule 10).
+          figure: tickMeasure(ledgerMeasure, d, snapshotExact[d.ordinal]),
+          on,
+          faint: !!filterNet && count === 0 && !on,
+          title: `Global snapshot ${d.ordinal.toLocaleString()} · ${d.metagraphSnapshotCount ?? 0} anchors`,
+          onClick: () => {
+            applyClickActions(
+              snapshotSelectActions(globalPick, latestRelevant("all")?.ordinal === d.ordinal, {
+                pinnedOrdinal: !following && snap ? snap.data.ordinal : null,
+                metaSnap,
+                filter,
+                tickHasFilter,
+              }),
+            );
+            setOpenTick(d.ordinal);
+            setOpenNet(null);
+            setOpenSnap(null);
+          },
+          pair: subjectPairing(hoverSnapOrd, d.ordinal, setHoverSnapOrd, accent),
+        };
+      }),
+      pager:
+        live && orderedSnaps.length > 0 ? (
           <TablePager
             page={page}
             pages={pages}
@@ -1004,29 +351,214 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
             to={Math.min(page * TICK_PAGE, orderedSnaps.length)}
             total={orderedSnaps.length}
             compact
-            // ⚠️ THE WORD IS PLAIN LANGUAGE, AND IT IS THE SAME WORD THE RAW LOG USES (user,
-            // 2026-09-13: "no human understands this, what is held/window?"). It said "held",
-            // which named the MECHANISM — the app is holding these in memory — and a reader
-            // has no reason to know or care that there is a buffer. What they actually need to
-            // know is the one thing the number does not say on its own: it is not the whole
-            // chain. "Recent" says that, and the raw log's pager now says it too, so the
-            // qualifier is learned once and means the same thing in both places. Only the
-            // explanation behind it differs, because the way to see more differs.
+            // "recent", the raw log's own word (user, 2026-09-13: "held"/"window" named a mechanism).
             scope={{
               word: "recent",
               title: `These are the ${POLL.maxSnapshots} most recent global snapshots — the stretch this page follows live. The chain goes back very much further: open the raw data layer to search all of it.`,
             }}
-            onPage={(p) => {
-              setTickPage(p);
-              // A page turn is a new set of rows; a disclosure left open on the page you just
-              // left would reopen against a different tick's ordinal.
-              setOpenTick(null);
-              setOpenContrib(null);
-              setOpenSigners(null);
-            }}
+            onPage={(p) => setTickPage(p)}
           />
-        )}
-      </div>
-    </ExplorerShell>
+        ) : undefined,
+    },
+  ];
+
+  // ---- level 1: the networks that anchored into the open tick ---------------------------------
+  let groups: MetaGroup[] = [];
+  let unlistedCount = 0;
+  if (tick) {
+    groups = groupByMeta(unionRows(rows, exactChannelRows, tick.ordinal));
+    unlistedCount = exact?.unlistedCount ?? 0;
+    const netRows: { id: string; name: string; hue: string; count: number; italic?: boolean }[] = [
+      ...groups.map((g) => ({ id: g.id, name: g.name, hue: g.hue, count: g.rows.length })),
+      ...(unlistedCount > 0 ? [{ id: UNLISTED_ID, name: UNLISTED_LABEL, hue: UNLISTED_HUE, count: unlistedCount, italic: true }] : []),
+    ];
+    const measured = netRows.map((n) => ({ n, m: tickNetMeasure(netPick, n.count, perMetaOf(exact, n.id)) }));
+    const maxNet = Math.max(1e-9, ...measured.map(({ m }) => m.value ?? 0));
+    levels.push({
+      key: "networks",
+      crumb: {
+        label: <span className="tabular-nums">{tick.ordinal.toLocaleString()}</span>,
+        onRelease: () => {
+          setOpenNet(null);
+          setOpenSnap(null);
+        },
+      },
+      axis: "By network",
+      meaning: "Which networks anchored into this snapshot",
+      measure: { options: TICK_NET_MEASURE_OPTIONS, value: netPick, onPick: (id) => setNetPick(id as TickNetMeasure) },
+      hasFigure: true,
+      nameW: 120,
+      figureW: 48,
+      // The polled buffer identified none of this tick's anchors (yet), and the exact read
+      // counted no uncataloged ones — say so, never fabricate.
+      empty: "No identified metagraph snapshots in this snapshot.",
+      rows: measured.map(({ n, m }): ExplorerRowSpec => {
+        const lensedOut = outOfLens(filter, n.id);
+        return {
+          key: n.id,
+          glyph: <IdentityDot hue={n.hue} />,
+          name: n.italic ? <span className="italic">{n.name}</span> : n.name,
+          share: m.value != null ? m.value / maxNet : undefined,
+          hue: n.hue,
+          figure: m.text,
+          // The row IS a committed subject when its band is the live selection: this network's
+          // filter on this tick, with no finer snapshot pinned under it (the byte bar's band click).
+          on: filter === n.id && activeSnapOrd === tick.ordinal && metaSnap == null,
+          // Out of the lens: listed (it really did anchor here), not drillable.
+          faint: lensedOut,
+          title: lensedOut
+            ? `${n.name} · ${n.count} snapshot${n.count === 1 ? "" : "s"} anchored here — outside the committed filter`
+            : `${n.name} · ${n.count} snapshot${n.count === 1 ? "" : "s"} anchored into ${tick.ordinal.toLocaleString()}`,
+          // OPENS, never commits (user, 2026-08-10).
+          onClick: lensedOut
+            ? undefined
+            : () => {
+                setOpenNet(n.id);
+                setOpenSnap(null);
+              },
+          // The row's hover IS the network's lane preview in the chamber (`hoverFilter`), paired
+          // in the network's own hue — a scene-side hover of that lane lights this row back.
+          pair: subjectPairing(hoverFilter, n.id, setHoverFilter, n.hue),
+        };
+      }),
+    });
+  }
+
+  // ---- level 2: one network's snapshots in the open tick ---------------------------------------
+  type SnapLeaf = { metaId: string; ordinal: number; hash: string; ts: string; fee: number; sizeInKB?: number };
+  let leaves: SnapLeaf[] = [];
+  let leafHue = accent;
+  let leafName = "";
+  if (tick && openNet) {
+    const g = groups.find((x) => x.id === openNet) ?? null;
+    if (openNet === UNLISTED_ID && unlistedCount > 0) {
+      leafHue = UNLISTED_HUE;
+      leafName = UNLISTED_LABEL;
+      leaves = unlistedEntries
+        .filter((e) => e.global.ordinal === tick.ordinal)
+        .map((r) => ({ metaId: r.metaId, ordinal: r.ordinal, hash: "", ts: r.ts, fee: r.fee, sizeInKB: r.sizeInKB }));
+    } else if (g) {
+      leafHue = g.hue;
+      leafName = g.name;
+      leaves = g.rows.map((r) => ({ metaId: r.metaId!, ordinal: r.ordinal, hash: r.hash, ts: r.ts, fee: r.fee, sizeInKB: r.sizeInKB }));
+    }
+  }
+  if (tick && openNet && (leaves.length > 0 || openNet === UNLISTED_ID)) {
+    const globalPick = { kind: "snapshot", title: `Global snapshot #${tick.ordinal}`, data: tick } as const;
+    const values = leaves.map((r) => snapMeasureValue(snapPick, r));
+    const maxLeaf = Math.max(1e-9, ...values.map((v) => v ?? 0));
+    levels.push({
+      key: "snapshots",
+      crumb: {
+        label: (
+          <>
+            <IdentityDot hue={leafHue} />
+            <span className={cn(openNet === UNLISTED_ID && "italic")}>{leafName}</span>
+          </>
+        ),
+        onRelease: () => setOpenSnap(null),
+      },
+      axis: "By snapshot",
+      meaning: "Each snapshot this network anchored here",
+      measure: { options: SNAP_MEASURE_OPTIONS, value: snapPick, onPick: (id) => setSnapPick(id as SnapLevelMeasure) },
+      hasFigure: true,
+      figureW: 48,
+      empty: "No snapshots identified for this network here.",
+      rows: leaves.map((r, i): ExplorerRowSpec => {
+        const sel = { metaId: r.metaId, ordinal: r.ordinal, hash: r.hash, globalOrdinal: tick.ordinal, ts: r.ts };
+        const signers = signersOf(exact, r.metaId, r.ordinal);
+        const on = sameMetaSnap(metaSnap, sel);
+        const key = `${r.metaId}|${r.ordinal}`;
+        const isUnlisted = openNet === UNLISTED_ID;
+        return {
+          key: `${key}:${i}`,
+          name: <span className="tabular-nums">{r.ordinal > 0 ? r.ordinal.toLocaleString() : `${r.metaId.slice(0, 10)}…`}</span>,
+          // An unlisted row's ordinal counts on ITS OWN channel's sequence — one tick can carry
+          // several chains, so the short address says which (2026-08-08). A listed row carries
+          // its own hash where the polled buffer knows it.
+          // A hash PREFIX, not the `a…b` short form: the tag home beside a 4-decimal fee holds
+          // seven mono glyphs, and a prefix cut clean reads as a prefix where an ellipsised
+          // short form cut again reads as broken. The row's title carries the full ids.
+          tag: isUnlisted ? (r.ordinal > 0 ? r.metaId.slice(0, 7) : undefined) : r.hash ? r.hash.slice(0, 7) : undefined,
+          share: values[i] != null ? values[i]! / maxLeaf : undefined,
+          hue: leafHue,
+          figure: snapMeasure(snapPick, r),
+          on,
+          title: isUnlisted
+            ? `Unlisted channel ${r.metaId} · anchored into global ${tick.ordinal.toLocaleString()}${signers.length ? ` · signed by ${signers.length} ${SIGNER_GROUPS.proof.who}` : ""}`
+            : `${leafName} snapshot ${r.ordinal.toLocaleString()} · anchored into global ${tick.ordinal.toLocaleString()}${signers.length ? ` · signed by ${signers.length} ${SIGNER_GROUPS.proof.who}` : ""}`,
+          onClick: () => {
+            applyClickActions(metaSnapSelectActions(sel, globalPick, { metaSnap, following }));
+            // The AFFORDANCE FOLLOWS THE DATA: no exact read for this tick means no signers are
+            // knowable, so the row commits and stays — a level onto nothing would claim a fact
+            // we don't have. Re-clicking (the deselect) closes the level with it.
+            setOpenSnap(!on && signers.length > 0 ? key : null);
+          },
+          pair: subjectPairing(hoverMetaSnap, metaSnapHoverKey(r.metaId, r.ordinal), setHoverMetaSnap, leafHue),
+        };
+      }),
+    });
+  }
+
+  // ---- level 3: the signers of the open snapshot — the same node row every explorer ends in ----
+  const leaf = openSnap ? leaves.find((r) => `${r.metaId}|${r.ordinal}` === openSnap) ?? null : null;
+  const signers = leaf ? signersOf(exact, leaf.metaId, leaf.ordinal) : NO_SIGNERS;
+  if (leaf && signers.length > 0) {
+    levels.push({
+      key: "signers",
+      crumb: { label: <span className="tabular-nums">{leaf.ordinal > 0 ? leaf.ordinal.toLocaleString() : `${leaf.metaId.slice(0, 10)}…`}</span> },
+      axis: "By signer",
+      // The cards' own phrase ("Signed by N L0 validators") — the producing layer named before
+      // the rows, because the constant count is most puzzling here (3 rows under a 20-node network).
+      meaning: `Signed by ${signers.length} ${SIGNER_GROUPS.proof.who} — the network's whole L0 cluster`,
+      measure: null,
+      hasFigure: false,
+      rows: signers.map((sid): ExplorerRowSpec => {
+        const r = resolveSigner(selNodes, leaf.metaId, sid);
+        if (!r.known) {
+          // No node to commit, so no affordance: a signature that states what isn't known
+          // (`resolveSigner` + `SIGNER_UNKNOWN`, the one shared rule). Every unlisted channel's
+          // signers take this branch by construction; a listed network's can too.
+          const w = SIGNER_UNKNOWN[r.reason];
+          return { key: sid, name: midHash(sid, 22), nameMono: true, tag: <span className="italic">{w.label}</span>, faint: true, title: w.title };
+        }
+        const row = r.row;
+        const on = nodeOn(row);
+        const id = row.id ?? row.label;
+        const hue = identityHudCss(leaf.metaId);
+        return {
+          key: sid,
+          name: midHash(id, 26),
+          nameMono: true,
+          tag: row.state ? row.state.charAt(0).toUpperCase() + row.state.slice(1) : undefined,
+          on,
+          hue,
+          title: `${row.label} · ${row.state ?? "—"}`,
+          onClick: () => applyClickActions(nodeSelectActions(row.pick, { mode: "ledger", currentFilter: filter, deselect: on })),
+          pair: subjectPairing(hoverNodeId, hoverKeyOf(row.pick), setHoverNodeId, hue),
+        };
+      }),
+    });
+  }
+  // Every level carries the view's one setting on its heading.
+  for (const l of levels) l.setting = setting;
+
+  const scopeNet = filter !== "all" ? displayNetwork(filter) : null;
+  return (
+    <Explorer
+      id="ledger-view"
+      title="Snapshot breakdown"
+      hint="Recent global snapshots. Open one for the networks that anchored into it."
+      scope={scopeNet ? { hue: scopeNet.hue, label: scopeNet.name, onRelease: () => applyClickActions(filterToggleActions(filter, filter)) } : null}
+      levels={levels}
+      defaultCollapsed={defaultCollapsed}
+      onLeave={() => {
+        // Container-level hover backstop: leaving the card clears every channel its rows write.
+        setHoverFilter(null);
+        setHoverSnapOrd(null);
+        setHoverMetaSnap(null);
+        setHoverNodeId(null);
+      }}
+    />
   );
 }

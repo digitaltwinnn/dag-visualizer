@@ -1917,7 +1917,7 @@ export class Engine {
     // A metagraph-snapshot TILE: commit the tile AND pin the global tick it anchored into.
     if (p?.kind === "metaSnap") {
       applyClickActions(
-        metaSnapSelectActions(p.sel, p.global, { filter: st.filter, metaSnap: st.metaSnap, following: st.following }),
+        metaSnapSelectActions(p.sel, p.global, { metaSnap: st.metaSnap, following: st.following }),
       );
       return;
     }

@@ -10,7 +10,8 @@ import { cn } from "@/lib/utils";
 // every row at every depth.
 //
 //   glyph 14px · name (a per-level width, 84px by default) · tag home (flex, takes the rest) ·
-//   bar 36px (24px inside a level) · figure 40px, 5px gaps — measured to the rail's 264px
+//   bar 36px (24px inside a level) · figure 40px (a level may widen it: a 4-decimal fee needs
+//   48), 5px gaps — measured to the rail's 264px
 //   (`--rail-w`): the row is 247px wide
 //   with its outset, so the fixed columns leave the tag home ~45px at the network level and ~70px
 //   where a level narrows its name (compositions are one word). The reference drawings were made
@@ -49,6 +50,8 @@ export interface ExplorerRowProps {
   hasFigure: boolean;
   /** The name column's width for this level (px). Short labels give the tag home the room. */
   nameW?: number;
+  /** The figure column's width for this level; 40 fits a count, a 4-decimal fee needs 48. */
+  figureW?: number;
   /** The committed subject wears the wash, in its hue. */
   on?: boolean;
   hue?: string | null;
@@ -73,7 +76,7 @@ export interface ExplorerRowProps {
 }
 
 export default function ExplorerRow({
-  glyph, name, nameMono, tag, bar, figure, hasFigure, nameW = 84, on, hue, nested, faint, title, onClick, pair, className,
+  glyph, name, nameMono, tag, bar, figure, hasFigure, nameW = 84, figureW = 40, on, hue, nested, faint, title, onClick, pair, className,
 }: ExplorerRowProps) {
   return (
     <button
@@ -95,7 +98,7 @@ export default function ExplorerRow({
         // The grid is data: a level's name width is a prop, so it cannot be a utility class.
         // Inside a level the bar is shorter still: the tag home there carries chips and providers,
         // and the bar is the accent, not the reading.
-        gridTemplateColumns: hasFigure ? `14px ${nameW}px minmax(0,1fr) ${nested ? 24 : 36}px 40px` : "14px minmax(0,1fr) auto",
+        gridTemplateColumns: hasFigure ? `14px ${nameW}px minmax(0,1fr) ${nested ? 24 : 36}px ${figureW}px` : "14px minmax(0,1fr) auto",
         ...(on ? selectionHue(hue) : undefined),
         ...pair?.style,
       }}

@@ -183,27 +183,24 @@ decisions inside them are design, not detail:
   commits and expands it and the disclosure state IS `store.composition`, single-open by construction
   with no local state. The grouping math lives once in `src/data/composition.ts`, shared by the row,
   the card and the Engine's group glow, so a count can't drift.
-- ledger's explorer is **ONE AXIS: TIME** (user, 2026-08-09) — a single uniform tree, tick → network →
-  that network's snapshots in the tick → that snapshot's signers, coarse→fine like every other ladder in
-  the app. The transposed second group (network → its ordinals across the window) was **retired**: two
-  dropdowns over the same rows made the user choose an axis before browsing, and time is the view's own
-  axis. Everything is closed by default and **named alone, with no header count** — a count there would
-  only be the downloaded window, a buffer size, not a network fact. **Affordance follows the data**: a
-  row is only a disclosure if it actually has children (a tick with no identified anchors, a snapshot
-  whose signers aren't resolvable) — a chevron that opens onto nothing is a lie about the feed.
-  Its **network group header DISCLOSES and PREVIEWS but commits nothing** (user, 2026-08-10): it opens
-  the group and its hover still paints that lane in the chamber, but the commit lives one row down on
-  the snapshot itself — a header click that moved the top-bar filter reached past what the row is
-  about, and the pager keeps the same boundary by staying inside this metagraph × this tick.
-  And **a committed filter is a LENS here**: with a network committed, every OTHER network's group
-  under a tick is `previewOnly` (`outOfLens` in `components/LedgerPanel.tsx`). The tick still LISTS
-  them — rule 10 doesn't let a lens edit the facts, and they really did anchor here — they just aren't
-  drillable, the same boundary the chamber's coloured dim draws. Unfiltered, nothing is out.
-  `previewOnly` is `DisclosureRow`'s shared out-of-lens treatment, and it says so AT REST: the chevron
-  is invisible until hover, so an inactive row would otherwise look live right up until you click it.
-  It keeps the hover wash and the scene preview, drops the chevron (keeping its slot, so sibling count
-  columns don't shift), takes the cursor back to `default` and mutes its words one step — but its
-  identity dot stays at full hue, because it did anchor here and identity is not a state.
+- ledger's explorer is **ONE AXIS: TIME** (user, 2026-08-09) — a single path, tick → network →
+  that network's snapshots in the tick → that snapshot's signers, coarse→fine like every other ladder
+  in the app, built as an `Explorer` description since 2026-09-26 (`components/LedgerPanel.tsx`).
+  The transposed second group (network → its ordinals across the window) was **retired**: two trees
+  over the same rows made the user choose an axis before browsing, and time is the view's own axis.
+  Three rules the description keeps: **a network row under a tick OPENS and PREVIEWS but commits
+  nothing** (user, 2026-08-10 — a click that moved the top-bar filter reached past what the row is
+  about), and **a snapshot row commits tick + snapshot, never the filter** (design decision 13,
+  2026-09-26 — `metaSnapSelectActions` lost its filter-first arm); **a committed filter is a LENS**:
+  every tick still lists (they all happened — rule 10 doesn't let a lens edit the facts), a tick the
+  network anchored into carries its count in the network's hue as the row's tag, one it sat out is
+  `faint`, and inside a tick only the committed network's row is drillable (`outOfLens`); **the
+  path follows a commit made elsewhere** (a tile, the rail's ‹ › plank, the raw log) but never
+  auto-opens from the root, because the newest tick changes every few seconds. The LIVE/PINNED
+  control rides the heading row as the view's one setting (design decision 15). Each level has its
+  own measures (ticks fees · anchors · metagraphs · size, a network in a tick snapshots · fees ·
+  size, a snapshot fee · size), figures BARE because the heading names the unit, in a 48px figure
+  column (`figureW` — a 4-decimal fee does not fit the default 40).
 
 - **History's tool card is the view's CONTROLS plus its roster** (`components/TrendExplore.tsx`,
   2026-09-19). It is the first explorer whose card holds an instrument the reader OPERATES rather
@@ -459,10 +456,11 @@ does NOT make the lane pointer-inert (clicks would fall through `#rightcol` to t
 
 **A pager's parent scope is whatever the step must NOT change, which for the metagraph snapshot makes it
 a PAIR — this metagraph × this tick** (user, 2026-08-09). The set is the subject's own `metaId` rows of the
-pinned tick's exact read, ordinal-desc, never every contributor: `metaSnapSelectActions` filter-firsts, so
-a cross-network step would move a COARSER rung and a swipe would silently re-commit the network. The
-explorer still LISTS every network under a tick, but it doesn't commit one either — its group header
-discloses and previews only, so both surfaces keep the same boundary. And the pair is the honest total
+pinned tick's exact read, ordinal-desc, never every contributor: a cross-network step would change WHICH
+NETWORK the card is about, a coarser fact than the swipe names. The explorer still LISTS every network
+under a tick, but it doesn't commit one either — its network rows open and preview only, so both
+surfaces keep the same boundary (and since 2026-09-26 neither surface moves the filter at all —
+`metaSnapSelectActions` lost its filter-first arm, design decision 13). And the pair is the honest total
 — a fast metagraph batches dozens of snapshots
 into one tick (DOR routinely 9-plus), so a tick-wide `N` would contradict the breakdown pills.
 
@@ -1220,10 +1218,9 @@ means changing every chevron with it.
 - **`TopBar`'s two strips** — the grow-downward slot is a LAYOUT PARTICIPANT: TopBar publishes its
   height and the rails and canvas add it to their `top`. A height animation would fight a published
   measurement, and the strip is not hidden content but a resized bar.
-- **`SnapRow`'s signer list** (`LedgerPanel`) — the row's click COMMITS a snapshot and *may* also
-  disclose, depending on whether signers were resolvable at all ("affordance follows the data"). So
-  it is a disclosure only sometimes, over three call sites with three different panels — the
-  preview-only split again, at triple the cost and none of the clarity.
+- **The `Explorer`'s levels** (every explorer since 2026-09-26) — depth there is a PATH, not a
+  tree: one level on screen, the ancestry a breadcrumb, so nothing is ever hidden-when-closed
+  under a trigger. There is no disclosure to migrate.
 - **`Desc`'s show-more** (`inspector/parts.tsx`) — evaluated and rejected on its own merits before
   this sweep: Collapsible's model is hidden-when-closed, this is always-visible-but-CLAMPED.
 - **`ChannelStatePanel`'s raw-JSON well** takes the primitive but NOT `.disclose-panel`: it opens to

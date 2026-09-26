@@ -79,6 +79,8 @@ export interface ExplorerLevelSpec {
   hasFigure: boolean;
   /** The name column's width for this level; short labels give the tag home the room. */
   nameW?: number;
+  /** The figure column's width for this level (40 fits a count; a 4-decimal fee needs 48). */
+  figureW?: number;
   rows: ExplorerRowSpec[];
   /** What to say when there are no rows — an honest instrument state, never fabricated rows. */
   empty?: ReactNode;
@@ -141,6 +143,7 @@ export default function Explorer({ id, title, hint, scope, levels, onLeave, defa
                   key={r.key}
                   hasFigure={current.hasFigure}
                   nameW={current.nameW}
+                  figureW={current.figureW}
                   nested={nested}
                   glyph={r.glyph}
                   name={r.name}

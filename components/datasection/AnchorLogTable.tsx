@@ -780,7 +780,7 @@ export default function AnchorLogTable() {
                   metaSnapSelectActions(
                     { metaId: r.metaId, ordinal: r.ordinal, hash: r.hash, globalOrdinal: r.global.ordinal, ts: r.ts },
                     { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot },
-                    { filter, metaSnap, following },
+                    { metaSnap, following },
                   ),
                 );
               };

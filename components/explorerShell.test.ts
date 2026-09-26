@@ -24,7 +24,7 @@ const EXPLORERS = ["GeoExplore.tsx", "HyperExplore.tsx", "LedgerPanel.tsx", "Tre
 // explorer renders `<Explorer`, and none of them renders the shell or the row primitives
 // directly. `MIGRATING` names the cards still on the old composition while the design lands
 // view by view; each conversion removes its entry, and the set ends empty.
-const MIGRATING = new Set(["LedgerPanel.tsx", "TrendExplore.tsx"]);
+const MIGRATING = new Set(["TrendExplore.tsx"]);
 
 describe("explorer boundary (every tool card is a description handed to the one Explorer)", () => {
   it("every migrated explorer renders <Explorer and never the shell or the row primitives itself", () => {

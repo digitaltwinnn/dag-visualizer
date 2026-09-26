@@ -422,7 +422,7 @@ describe("nodeSelectActions ancestry (spec Part 3 — full-ancestry rule)", () =
 });
 
 describe("metaSnapSelectActions (a tile on the upper floor)", () => {
-  const LISTED = METAGRAPHS[0].id; // the filter-first ancestry only exists for LISTED metagraphs
+  const LISTED = METAGRAPHS[0].id;
   const SEL: MetaSnapSel = { metaId: LISTED, ordinal: 745190, hash: "h1", globalOrdinal: 4200, ts: "t" };
   const GLOBAL = {
     kind: "snapshot" as const,
@@ -430,28 +430,29 @@ describe("metaSnapSelectActions (a tile on the upper floor)", () => {
     title: "Global snapshot #4200",
   };
 
-  it("commits ancestry first and the subject last", () => {
-    const a = metaSnapSelectActions(SEL, GLOBAL, { filter: "all", metaSnap: null });
-    expect(a.map((x) => x.kind)).toEqual(["filter", "snapshot", "metaSnap"]);
-    expect(a[0]).toEqual({ kind: "filter", id: LISTED });
-    expect(a[1]).toEqual({ kind: "snapshot", pick: GLOBAL, follow: false });
-    expect(a[2]).toEqual({ kind: "metaSnap", sel: SEL });
+  it("commits the tick first and the subject last — and NEVER the filter (design 2026-09-26, decision 13)", () => {
+    const a = metaSnapSelectActions(SEL, GLOBAL, { metaSnap: null });
+    expect(a).toEqual([
+      { kind: "snapshot", pick: GLOBAL, follow: false },
+      { kind: "metaSnap", sel: SEL },
+    ]);
+    expect(a.some((x) => x.kind === "filter")).toBe(false);
   });
 
-  it("does not churn the filter when it is already committed", () => {
-    const a = metaSnapSelectActions(SEL, GLOBAL, { filter: LISTED, metaSnap: null });
-    expect(a.map((x) => x.kind)).toEqual(["snapshot", "metaSnap"]);
-  });
-
-  it("an UNKNOWN-lane tile (raw unlisted address) commits NO filter — just the tick + subject", () => {
+  it("an UNKNOWN-lane tile (raw unlisted address) takes the same two actions", () => {
     const un: MetaSnapSel = { metaId: "DAGunlisted123", ordinal: 9, hash: "", globalOrdinal: 4200, ts: "t" };
-    const a = metaSnapSelectActions(un, GLOBAL, { filter: "all", metaSnap: null });
+    const a = metaSnapSelectActions(un, GLOBAL, { metaSnap: null });
     expect(a.map((x) => x.kind)).toEqual(["snapshot", "metaSnap"]);
   });
 
   it("steps back to the tick when the same tile is picked again", () => {
-    const a = metaSnapSelectActions(SEL, GLOBAL, { filter: LISTED, metaSnap: { ...SEL } });
+    const a = metaSnapSelectActions(SEL, GLOBAL, { metaSnap: { ...SEL } });
     expect(a).toEqual([{ kind: "metaSnap", sel: null }]);
+  });
+
+  it("while FOLLOWING, re-picking the auto-selected tile converts it to a pin rather than deselecting", () => {
+    const a = metaSnapSelectActions(SEL, GLOBAL, { metaSnap: { ...SEL }, following: true });
+    expect(a.map((x) => x.kind)).toEqual(["snapshot", "metaSnap"]);
   });
 });
 

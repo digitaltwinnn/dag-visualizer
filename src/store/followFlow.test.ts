@@ -74,7 +74,7 @@ describe("the follow flow decision table", () => {
   it("LIVE → clicking the auto-followed metagraph snapshot CONVERTS it to a pin (never a silent deselect)", () => {
     useStore.setState({ following: true, snap: snapPick(100), metaSnap: child(100), filter: LISTED });
     applyClickActions(
-      metaSnapSelectActions(child(100), snapPick(100), { filter: LISTED, metaSnap: child(100), following: true }),
+      metaSnapSelectActions(child(100), snapPick(100), { metaSnap: child(100), following: true }),
     );
     expect(st().following).toBe(false);
     expect(st().metaSnap?.globalOrdinal).toBe(100);
@@ -84,7 +84,7 @@ describe("the follow flow decision table", () => {
   it("PINNED → re-click the pinned metagraph snapshot: only the finer slot drops (parent stays)", () => {
     useStore.setState({ following: false, snap: snapPick(100), metaSnap: child(100), filter: LISTED });
     applyClickActions(
-      metaSnapSelectActions(child(100), snapPick(100), { filter: LISTED, metaSnap: child(100), following: false }),
+      metaSnapSelectActions(child(100), snapPick(100), { metaSnap: child(100), following: false }),
     );
     expect(st().metaSnap).toBeNull();
     expect(st().snap?.data.ordinal).toBe(100); // the anchoring global holds
@@ -105,15 +105,14 @@ describe("the follow flow decision table", () => {
     expect(st().following).toBe(false);
   });
 
-  it("COMPOSED: a cross-network pin's filter-first does NOT stomp the pin back to live", () => {
-    // The bug the review caught: filter-first inside a pin click used to re-enter live via the
-    // controller's filter-dep effect, replacing the fresh pin. Ordered actions decide now.
+  it("COMPOSED: a pin from another network's snapshot leaves the filter alone and wins over live", () => {
+    // Filter-first is gone from this builder (2026-09-26, decision 13): a snapshot is a record in a
+    // tick, and the filter is a lens only the top bar's picker (and hyper's hubs) may move. The
+    // ordered pin still beats the live follow.
     useStore.setState({ following: true, snap: snapPick(100), filter: "all" });
-    applyClickActions(
-      metaSnapSelectActions(child(100), snapPick(100), { filter: "all", metaSnap: null, following: true }),
-    );
-    expect(st().filter).toBe(LISTED); // filter-first committed
-    expect(st().following).toBe(false); // …and the PIN won the ordered sequence
+    applyClickActions(metaSnapSelectActions(child(100), snapPick(100), { metaSnap: null, following: true }));
+    expect(st().filter).toBe("all");
+    expect(st().following).toBe(false);
     expect(st().metaSnap?.globalOrdinal).toBe(100);
   });
 

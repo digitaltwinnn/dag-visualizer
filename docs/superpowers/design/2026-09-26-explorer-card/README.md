@@ -77,3 +77,10 @@ Recorded deviations from the screens:
   the rail's.
 - **The level line wraps.** Eyebrow and meaning share a line where they fit; in the rail the
   meaning wraps under the eyebrow rather than truncating — a clipped sentence explains nothing.
+- **The figure column is per level too** (`figureW`, Snapshots build): a 4-decimal fee ("0.0680")
+  does not fit the 40px the count-bearing levels use, so the three Snapshots levels take 48 and the
+  tag home gives it up. Figures are BARE everywhere — the heading's list names the unit (decision
+  7), and a size is always in KB, the unit that list states, never switching to MB or B on its own.
+- **A snapshot row's tag is a seven-glyph hash PREFIX**, not the `a…b` short form: beside a 48px
+  figure the tag home holds seven mono glyphs, and a prefix cut clean reads as a prefix where an
+  ellipsised short form cut again reads as broken.
