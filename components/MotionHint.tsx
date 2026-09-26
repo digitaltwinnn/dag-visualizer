@@ -40,7 +40,8 @@ import { cn } from "@/lib/utils";
 // phone. Pointer-inert, and only in a view with a canvas.
 
 /** How long a sentence holds at full before its long ease begins. */
-const HOLD_MS = 700;
+// 700 first; the user read it as fading too soon (2026-09-26, second round on the timing).
+const HOLD_MS = 1400;
 /** The long ease's length once the hold is over — sized to what is left of the motion: a pose
  *  flight runs 1.4s, a view transition ~3.9s, so the line reaches nothing about when the scene
  *  does. The motion's own end still cuts it short with the ordinary quick fade. */
