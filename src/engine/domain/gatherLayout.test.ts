@@ -2,6 +2,7 @@
 import { describe, it, expect } from "vitest";
 import {
   railGapShiftPx,
+  railGapPx,
   gatherSlots, gatherExtent, gatherBand, gatherSpread, gatherRows,
   GATHER_GUTTER, GATHER_GUTTER_MAX, GATHER_LEGEND_PX,
   type GatherExtent,
@@ -354,5 +355,24 @@ describe("railGapShiftPx — where the gap between the rails is centred", () => 
     expect(railGapShiftPx(1500, true)).toBe(0); // scene mode — no rails, the screen is the gap
     expect(railGapShiftPx(1099, false)).toBe(0); // tablet: the rails are sheets over the canvas
     expect(railGapShiftPx(390, false)).toBe(0); // phone
+  });
+});
+
+describe("railGapPx — the width of the free band a card is fitted to", () => {
+  it("is the viewport less both inline rails and their gutters (1500 → 864, measured live 2026-09-26)", () => {
+    expect(railGapPx(1500, false)).toBe(864);
+  });
+
+  it("is the whole viewport where the rails are hidden or are sheets (below the rails tier)", () => {
+    expect(railGapPx(1500, true)).toBe(1500);
+    expect(railGapPx(820, false)).toBe(820);
+    expect(railGapPx(390, false)).toBe(390);
+  });
+
+  it("agrees with railGapShiftPx about whether there is a gap at all", () => {
+    for (const w of [390, 700, 1099, 1100, 1500]) {
+      const railed = railGapPx(w, false) !== w;
+      expect(railGapShiftPx(w, false) !== 0).toBe(railed);
+    }
   });
 });

@@ -361,14 +361,14 @@ export default function TrendsDoc() {
   // spread them wide and broke when the list WRAPS on phone (the h-auto rows below) — as
   // compact pills they pack left and wrap cleanly (user, 2026-09-08: the tabs overflowed).
   /* The scale control — `trendPickers.tsx`'s shared `ScaleToggle` (extracted 2026-09-19 for the
-     History view's Layers card: the same question about the same charts, and a second copy of a
+     History view's Networks card: the same question about the same charts, and a second copy of a
      control with this much reasoning in it is the drift that file exists to prevent). It is
      rendered ONLY on the metagraphs tab, because a scale shared across charts is only a question
      where there is a COLUMN of comparable charts; the hypergraph tab's charts each measure a
      different quantity, and under a commit there is one network left. */
   const scaleToggle = <ScaleToggle shared={scaleMode === "shared"} onChange={(on) => setScaleMode(on ? "shared" : "own")} />;
-  // The scope pill and its × are `trendPickers.tsx`'s `ScopeChip`, shared with the History view's
-  // Layers card (2026-09-19) — one statement of "what is applied, and how to clear it".
+  // The scope pill and its × are `trendPickers.tsx`'s `ScopeChip` (the document's alone since the
+  // explorer lost its scope mark, 2026-09-26) — one statement of "what is applied, and how to clear it".
   const scopeChip = <ScopeChip filter={filter} className="mr-auto" />;
   /* The scoped tab with nothing to draw. Both cases are real commits a reader can reach from the
      bar, and neither is a failure — the trends store keeps one series set per LISTED metagraph,
@@ -461,6 +461,11 @@ export default function TrendsDoc() {
               into the outlined body below, so label and contents read as one drawer. */}
           <TabsList
             variant="line"
+            // THE HAIRLINE REGISTER, like the raw channel pane's cabinet (user, 2026-09-26, two
+            // rounds: it took the wash ladder for an afternoon and was "still too colourful" — a
+            // drawer is a container for records and prose, and in this app a plate that size in
+            // the accent reads as a committed region). The pickers above keep the ladder: they
+            // are controls.
             className="relative flex h-auto flex-none w-full gap-1 rounded-none p-0 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50"
             aria-label="Which side of the network"
           >

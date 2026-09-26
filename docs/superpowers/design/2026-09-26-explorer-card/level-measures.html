@@ -1,0 +1,113 @@
+<style>
+  .xc { background:#0b1020; color:#c7d0ea; border:1px solid #1e2740; border-radius:12px; padding:10px 12px; line-height:1.4; font-family:"Segoe UI",system-ui,sans-serif; }
+  .mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-variant-numeric:tabular-nums; }
+  .g { display:grid; grid-template-columns:16px 100px 1fr 56px 60px; align-items:center; column-gap:8px; padding:4px 6px; margin:0 -6px; border-radius:5px; }
+  .g.on { background:rgba(255,138,76,.13); box-shadow:inset 0 0 0 1px rgba(255,138,76,.35); }
+  .g.on.cyan { background:rgba(125,211,200,.12); box-shadow:inset 0 0 0 1px rgba(125,211,200,.35); }
+  .dot { width:6px; height:6px; border-radius:50%; justify-self:center; }
+  .name { font-size:12.5px; color:#eef1fb; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tag { display:flex; gap:3px; align-items:center; white-space:nowrap; overflow:hidden; font-size:10.5px; color:#8791ad; }
+  .tag.txt { display:block; text-overflow:ellipsis; }
+  .bar { height:5px; background:#161d30; border-radius:3px; overflow:hidden; }
+  .bar i { display:block; height:100%; border-radius:3px; background:#ff8a4c; }
+  .fig { font-size:12.5px; color:#eef1fb; text-align:right; white-space:nowrap; }
+  .lvl { display:flex; align-items:baseline; gap:10px; padding:0 0 6px; }
+  .lvlname { font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:#8791ad; font-weight:700; white-space:nowrap; }
+  .lvlwhat { font-size:11.5px; color:#7c86a6; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .thead { display:flex; justify-content:flex-end; align-items:center; gap:10px; border-bottom:1px solid #1e2740; padding-bottom:5px; margin-bottom:6px; min-height:22px; }
+  .setting { font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:#8791ad; display:flex; align-items:center; gap:5px; }
+  .step { border:1px solid #2a3450; background:#0f1626; border-radius:8px; padding:2px 7px; font-size:10.5px; letter-spacing:.08em; font-weight:700; color:#eef1fb; }
+  .static { font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:#6b7590; padding:2px 0; }
+  .crumbs { display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:11.5px; color:#8791ad; padding:2px 0 8px; }
+  .crumb { display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border-radius:6px; background:#0f1626; color:#c7d0ea; white-space:nowrap; }
+  .crumb.root { background:transparent; padding-left:0; }
+  .sep { color:#525c78; }
+  .steps { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+  @media (max-width:900px){ .steps { grid-template-columns:1fr; } }
+  .cap { font-size:11px; color:#6b7590; margin:0 0 6px; }
+</style>
+
+<h2>The heading row belongs to the level on screen</h2>
+<p class="subtitle">Snapshots, drilled four levels down. What the row above the list says at each step.</p>
+
+<div class="options">
+  <div class="option" data-choice="per-level-stepper" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Each level has its own measures</h3>
+      <p>The stepper is the current list's column heading. A level with several honest figures gets a stepper of its own; a level with one figure gets a static caps label; a level with no figure gets an empty heading row, hairline only.</p>
+      <div class="steps">
+        <div>
+          <div class="cap">Level 0 · ticks</div>
+          <div class="xc">
+            <div class="thead"><span class="setting"><span class="dot" style="background:#2fb4a8;box-shadow:0 0 0 3px rgba(47,180,168,.25)"></span>Live</span><span class="step">∧ FEES ∨</span></div>
+            <div class="g on cyan"><span></span><span class="name mono">6,955,738</span><span></span><span class="bar"><i style="width:60%;background:#2fb4a8"></i></span><span class="fig mono">0.0390</span></div>
+            <div class="g"><span></span><span class="name mono">6,955,737</span><span></span><span class="bar"><i style="width:35%;background:#2fb4a8"></i></span><span class="fig mono">0.0170</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="cap">Level 1 · networks in the tick — snapshots · fees · size</div>
+          <div class="xc">
+            <div class="thead"><span class="step">∧ SNAPSHOTS ∨</span></div>
+            <div class="crumbs"><span class="crumb root">Snapshots</span><span class="sep">›</span><span class="crumb mono">6,955,738</span></div>
+            <div class="lvl"><span class="lvlname">By network</span><span class="lvlwhat">Who anchored into this tick</span></div>
+            <div class="g on"><span class="dot" style="background:#ff8a4c"></span><span class="name">Dor Technologies</span><span></span><span class="bar"><i style="width:80%"></i></span><span class="fig mono">4</span></div>
+            <div class="g"><span class="dot" style="background:#5ab0ff"></span><span class="name">USDC.dag</span><span></span><span class="bar"><i style="width:20%;background:#5ab0ff"></i></span><span class="fig mono">1</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="cap">Level 2 · Dor's snapshots — fee · size</div>
+          <div class="xc">
+            <div class="thead"><span class="step">∧ FEE ∨</span></div>
+            <div class="crumbs"><span class="crumb root">Snapshots</span><span class="sep">›</span><span class="crumb mono">6,955,738</span><span class="sep">›</span><span class="crumb"><span class="dot" style="background:#ff8a4c;display:inline-block"></span>Dor Technologies</span></div>
+            <div class="lvl"><span class="lvlname">By snapshot</span><span class="lvlwhat">Each snapshot Dor anchored here</span></div>
+            <div class="g on"><span></span><span class="name mono">27,338,081</span><span class="tag txt mono">a1f9…c2d4</span><span class="bar"><i style="width:70%"></i></span><span class="fig mono">0.0120</span></div>
+            <div class="g"><span></span><span class="name mono">27,338,080</span><span class="tag txt mono">77be…0e91</span><span class="bar"><i style="width:55%"></i></span><span class="fig mono">0.0100</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="cap">Level 3 · signers — no figure</div>
+          <div class="xc">
+            <div class="thead"></div>
+            <div class="crumbs"><span class="crumb root">Snapshots</span><span class="sep">›</span><span class="crumb mono">6,955,738</span><span class="sep">›</span><span class="crumb"><span class="dot" style="background:#ff8a4c;display:inline-block"></span>Dor</span><span class="sep">›</span><span class="crumb mono">27,338,081</span></div>
+            <div class="lvl"><span class="lvlname">By signer</span><span class="lvlwhat">The validators that sealed it</span></div>
+            <div class="g"><span></span><span class="name mono">1545a38a…fcab7</span><span class="tag txt">Dor L0</span><span></span><span class="fig"></span></div>
+            <div class="g"><span></span><span class="name mono">9c02e7b1…41d0e</span><span class="tag txt">Dor L0</span><span></span><span class="fig"></span></div>
+          </div>
+        </div>
+      </div>
+      <p style="font-size:11.5px;color:#8791ad;margin-top:10px">The measure sets, all from data the rows already carry: ticks fees · anchors · metagraphs · size; networks in a tick snapshots · fees · size; a network's snapshots fee · size; Hypergraph compositions nodes (static); Geography cohorts nodes · metagraphs; node and signer rows none. Each level remembers its own pick.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="root-stepper" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>The stepper is the root's; drilled levels show a fixed figure</h3>
+      <p>Only the top level has a stepper. Drilled levels show their natural figure under a static caps label — SNAPSHOTS, FEE, nothing — and the stepper comes back when the path returns to the root.</p>
+      <div class="steps">
+        <div>
+          <div class="cap">Level 1</div>
+          <div class="xc">
+            <div class="thead"><span class="static">Snapshots</span></div>
+            <div class="crumbs"><span class="crumb root">Snapshots</span><span class="sep">›</span><span class="crumb mono">6,955,738</span></div>
+            <div class="lvl"><span class="lvlname">By network</span><span class="lvlwhat">Who anchored into this tick</span></div>
+            <div class="g on"><span class="dot" style="background:#ff8a4c"></span><span class="name">Dor Technologies</span><span></span><span class="bar"><i style="width:80%"></i></span><span class="fig mono">4</span></div>
+          </div>
+        </div>
+        <div>
+          <div class="cap">Level 2</div>
+          <div class="xc">
+            <div class="thead"><span class="static">Fee</span></div>
+            <div class="crumbs"><span class="crumb root">Snapshots</span><span class="sep">›</span><span class="crumb mono">6,955,738</span><span class="sep">›</span><span class="crumb"><span class="dot" style="background:#ff8a4c;display:inline-block"></span>Dor Technologies</span></div>
+            <div class="lvl"><span class="lvlname">By snapshot</span><span class="lvlwhat">Each snapshot Dor anchored here</span></div>
+            <div class="g on"><span></span><span class="name mono">27,338,081</span><span class="tag txt mono">a1f9…c2d4</span><span class="bar"><i style="width:70%"></i></span><span class="fig mono">0.0120</span></div>
+          </div>
+        </div>
+      </div>
+      <p style="font-size:11.5px;color:#8791ad;margin-top:10px">Less to build and nothing to remember per level, but a drilled list can never be re-measured, and the reader learns that the control sometimes vanishes.</p>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:14px">My recommendation is A: the heading row is one thing everywhere, "what this list's figure is", and it degrades honestly — a stepper, a label, or nothing — instead of naming a measure the rows below don't carry. Click one and say go.</p>

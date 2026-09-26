@@ -3,6 +3,7 @@
 import { netUrl } from "@/src/net/current";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, ChevronRight, Search, X } from "lucide-react";
+import type { CSSProperties } from "react";
 import { useStore } from "@/src/store/store";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { getNetwork, metagraphById } from "@/src/data/network";
@@ -780,7 +781,7 @@ export default function AnchorLogTable() {
                   metaSnapSelectActions(
                     { metaId: r.metaId, ordinal: r.ordinal, hash: r.hash, globalOrdinal: r.global.ordinal, ts: r.ts },
                     { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot },
-                    { filter, metaSnap, following },
+                    { metaSnap, following },
                   ),
                 );
               };
@@ -791,8 +792,12 @@ export default function AnchorLogTable() {
                   // wrong DOM (caught by the Next.js MCP the first time a quiet network was
                   // opened). Its identity is its TICK, which is unique by construction.
                   key={r.metaId == null ? `tick:${r.global.ordinal}` : `${r.metaId}:${r.ordinal}`}
+                  // HOVER IN THE ROW'S OWN HUE (user, 2026-09-26: "the same idea" as the planes and
+                  // the explorer rows — any raw row that belongs to a network previews in that
+                  // network's colour). `--row-hue` is set on the row; a seam has none and takes
+                  // the accent.
                   className={cn(
-                    "text-body hover:bg-wash-faint",
+                    "text-body hover:bg-[color-mix(in_oklch,var(--row-hue,var(--primary))_12%,transparent)]",
                     pending ? "cursor-default" : "cursor-pointer",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                     rowSel && "bg-[var(--sel-bg)] text-foreground",
@@ -810,7 +815,10 @@ export default function AnchorLogTable() {
                   tabIndex={0}
                   title={pending ? "resolving the anchoring tick…" : undefined}
                   // The selection follows the subject's identity (selectionHue).
-                  style={rowSel ? selectionHue(cfg?.hue ?? "var(--core)") : undefined}
+                  style={{
+                    ...(r.metaId ? { "--row-hue": cfg?.hue ?? "var(--core)" } : {}),
+                    ...(rowSel ? selectionHue(cfg?.hue ?? "var(--core)") : {}),
+                  } as CSSProperties}
                   // A seam has no metagraph snapshot to preview, so it writes no hover channel —
                   // the pairing rule is that a surface hovers the subject it would COMMIT.
                   onMouseEnter={() => setHoverMetaSnap(r.metaId ? metaSnapHoverKey(r.metaId, r.ordinal) : null)}

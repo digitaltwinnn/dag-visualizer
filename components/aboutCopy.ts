@@ -326,8 +326,8 @@ export const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string
     title: "The network, over time",
     lines: [
       "Every chain's own record, one chart per network, stacked back through time.",
-      "Pick a measure and a window on the left, then click a layer to bring its chart to the front.",
-      "Click the timeline to mark one moment, and the right rail reads every network at it.",
+      "Pick a measure and a window on the left, then click a network to bring its chart to the front.",
+      "Click a chart or the timeline to mark one moment, and the right rail reads every network at it.",
     ],
   },
   soon: {

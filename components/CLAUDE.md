@@ -183,48 +183,47 @@ decisions inside them are design, not detail:
   commits and expands it and the disclosure state IS `store.composition`, single-open by construction
   with no local state. The grouping math lives once in `src/data/composition.ts`, shared by the row,
   the card and the Engine's group glow, so a count can't drift.
-- ledger's explorer is **ONE AXIS: TIME** (user, 2026-08-09) — a single uniform tree, tick → network →
-  that network's snapshots in the tick → that snapshot's signers, coarse→fine like every other ladder in
-  the app. The transposed second group (network → its ordinals across the window) was **retired**: two
-  dropdowns over the same rows made the user choose an axis before browsing, and time is the view's own
-  axis. Everything is closed by default and **named alone, with no header count** — a count there would
-  only be the downloaded window, a buffer size, not a network fact. **Affordance follows the data**: a
-  row is only a disclosure if it actually has children (a tick with no identified anchors, a snapshot
-  whose signers aren't resolvable) — a chevron that opens onto nothing is a lie about the feed.
-  Its **network group header DISCLOSES and PREVIEWS but commits nothing** (user, 2026-08-10): it opens
-  the group and its hover still paints that lane in the chamber, but the commit lives one row down on
-  the snapshot itself — a header click that moved the top-bar filter reached past what the row is
-  about, and the pager keeps the same boundary by staying inside this metagraph × this tick.
-  And **a committed filter is a LENS here**: with a network committed, every OTHER network's group
-  under a tick is `previewOnly` (`outOfLens` in `components/LedgerPanel.tsx`). The tick still LISTS
-  them — rule 10 doesn't let a lens edit the facts, and they really did anchor here — they just aren't
-  drillable, the same boundary the chamber's coloured dim draws. Unfiltered, nothing is out.
-  `previewOnly` is `DisclosureRow`'s shared out-of-lens treatment, and it says so AT REST: the chevron
-  is invisible until hover, so an inactive row would otherwise look live right up until you click it.
-  It keeps the hover wash and the scene preview, drops the chevron (keeping its slot, so sibling count
-  columns don't shift), takes the cursor back to `default` and mutes its words one step — but its
-  identity dot stays at full hue, because it did anchor here and identity is not a state.
+- ledger's explorer is **ONE AXIS: TIME** (user, 2026-08-09) — a single path, tick → network →
+  that network's snapshots in the tick → that snapshot's signers, coarse→fine like every other ladder
+  in the app, built as an `Explorer` description since 2026-09-26 (`components/LedgerPanel.tsx`).
+  The transposed second group (network → its ordinals across the window) was **retired**: two trees
+  over the same rows made the user choose an axis before browsing, and time is the view's own axis.
+  Three rules the description keeps: **a network row under a tick OPENS and PREVIEWS but commits
+  nothing** (user, 2026-08-10 — a click that moved the top-bar filter reached past what the row is
+  about), and **a snapshot row commits tick + snapshot, never the filter** (design decision 13,
+  2026-09-26 — `metaSnapSelectActions` lost its filter-first arm); **a committed filter is a LENS**:
+  every tick still lists (they all happened — rule 10 doesn't let a lens edit the facts), a tick the
+  network anchored into carries its count in the network's hue as the row's tag, one it sat out is
+  `faint`, and inside a tick only the committed network's row is drillable (`outOfLens`); **the
+  path follows a commit made elsewhere** (a tile, the rail's ‹ › plank, the raw log) but never
+  auto-opens from the root, because the newest tick changes every few seconds. The LIVE/PINNED
+  control rides the heading row as the view's one setting (design decision 15). Each level has its
+  own measures (ticks fees · anchors · metagraphs · size, a network in a tick snapshots · fees ·
+  size, a snapshot fee · size), figures BARE because the heading names the unit, in a 48px figure
+  column (`figureW` — a 4-decimal fee does not fit the default 40).
 
-- **History's tool card is the view's CONTROLS plus its roster** (`components/TrendExplore.tsx`,
-  2026-09-19). It is the first explorer whose card holds an instrument the reader OPERATES rather
-  than a state it reports, and the grammar splits on that: the METRIC is a PICKER — the same
-  hairline group the window pills wear, because a metric is a committed statement about what is on
-  screen — while `Same scale` is a SETTING and reads as a name plus its state
-  (`SettingSwitch`, `components/trendPickers.tsx`; the command bar's pressed-toggle is an ACTION
-  grammar and wrong for a setting, which is the reasoning the scale control was rebuilt on twice).
-  Neither is a selection, so they write their setters directly — `selectionBoundary`'s
-  own scope note says why, and why the plane FOCUS is in the table instead. Below the instrument
-  hairline the LAYERS list is an ordinary browse list: mark, name, last measured reading, and a
-  click that applies the SAME `trendPlaneActions` the plane's header strip runs. Its PAGER is
-  absent unless the roster exceeds `VISIBLE_PLANES` and clamps with the stack's own `clampScroll`,
-  so a chevron can never offer a step the geometry refuses.
+- **History's tool card is its roster, with the view's two settings on its heading**
+  (`components/TrendExplore.tsx`, an `Explorer` description since 2026-09-26). ONE level: the
+  ranked networks, busiest first, each with its last measured reading in the roster's one
+  formatter and a bar of its share. The METRIC is the heading control (the figure column's own
+  heading, a radio list of `METRIC_ORDER` with units at the current cadence) and `Same scale` is
+  the heading's setting — neither is a selection, so both write their setters directly
+  (`selectionBoundary`'s own scope note says why, and why the plane FOCUS is in the table instead).
+  A row click applies the SAME `trendPlaneActions` the plane's header strip runs. No scope mark in
+  the head at all (2026-09-26): the top bar's filter names the committed network and is the one
+  place to clear it. Its PAGER is absent unless the roster
+  exceeds `VISIBLE_PLANES` and clamps with the stack's own `clampScroll`, so a chevron can never
+  offer a step the geometry refuses.
   ⚠️ **The roster is computed ONCE, in `components/useTrendRoster.ts`** — the planes, this list and
   the cursor card all read it, counter EDGE TRIM included. A surface reading the payload directly
   is one bucket out of step with the axis, which is exactly how the cursor card briefly quoted
   yesterday's number; `components/trendRailBoundary.test.ts` pins all three "one home" rules.
 
 **Naming and copy rules:** About states the view's point of view ("How the network is built"); the tool
-card says what you BROWSE ("Nodes by network"). Eyebrows are bare role words, and each explorer's usage
+card says what you BROWSE — by the AXIS the rows break the network down along, never by the
+figure they show ("Network breakdown", "Country breakdown", "Snapshot breakdown", and History's "Network breakdown" too — its rows are networks, "layer" was the stack's word for a plane; 2026-09-26
+— user, 2026-09-26: once every explorer carries the measure HEADING CONTROL, a title like "Nodes by
+country" names one measure of three). Eyebrows are bare role words, and each explorer's usage
 hint leads its card rather than trailing it. An explorer ROW is a browse target — mark, name, count,
 nothing more; **the prose that EXPLAINS a subject belongs to that subject's right-rail card, once**,
 and since a row commits its card in the same click, nothing is lost by keeping the sentence in one
@@ -235,7 +234,7 @@ dossier, country, provider, composition, then the snapshot chain (global snapsho
 snapshot it anchors), then node. `components/railCards.ts` is the manifest and
 `components/railCards.test.ts` pins the order, the availability and every hint.
 
-**History's lane is the network dossier, then the INSTANT** (2026-09-19) — the cursor card, a slot
+**History's lane is the network dossier, then the MOMENT** (2026-09-19; named "Instant" until 2026-09-26) — the cursor card, a slot
 with NO focus rung, exactly as the two snapshot slots are. Its subject is `trendCursorMs`, which the
 band's timeline writes at most once per BUCKET (`sameBucket`, both gestures since 2026-09-19), so the
 title roll, the edge pulse and the tray highlight fire once per bucket rather than once per
@@ -250,23 +249,46 @@ pointermove. Three rules are worth knowing before touching it:
   timeline populated a card that stayed collapsed under its own eyebrow. It is still not a rung: no
   pose, no deselect step, and the × clears the channel alone (`setTrendCursor`, deliberately outside
   the pickActions table).
-- **THE TWO EXITS ARE THE CARD'S OWN FOOT CONTROLS, and one of them is shared.** `Snapshot records`
-  and the Trends document's per-chart link call ONE helper (`components/trendDoors.ts`): commit the
-  network through the table (guarded — that builder TOGGLES), hand the span to the log, switch the
-  mode, open the raw layer. Two copies of four ordered steps is how two surfaces start landing a
-  reader in different places. `All charts` is the other REGISTER of the same rung — this view's RAW
-  surface is the document, so it is one `setSection("data")` and no mode step at all.
+- **THE ONE EXIT IS THE CARD'S FOOT CONTROL, and it is shared.** `Snapshot records` — a full-bleed
+  control on the wash ladder at the card's foot (2026-09-26, `moment-door.html` A; the bare text
+  links read as prose) — and the Trends document's per-chart link call ONE helper
+  (`components/trendDoors.ts`): commit the network through the table (guarded — that builder
+  TOGGLES), hand the span to the log, switch the mode, open the raw layer. Two copies of four
+  ordered steps is how two surfaces start landing a reader in different places. The card's
+  `All charts` link went the same day: this view's RAW surface is the document, so the command
+  bar's RAW toggle already is that door. **And the door remembers where it was** (2026-09-26):
+  `openRecords` records the view it left in `store.rawReturnMode`, and `setSection("scene")` —
+  the toggle, Escape and the layer's × all end there — returns to it and clears it; a view switch
+  made inside the layer clears it too. Closing the log used to strand the reader in Snapshots.
+
+**The motion hint says what the scene is doing while it moves** (user, 2026-09-26 — `MotionHint`,
+one quiet sentence on a low plate, centred just above the bottom band). Two store channels, and nothing else feeds it.
+`sceneMoving` is ENGINE → REACT: the Engine's `_publishMotion` derives it each frame from the four
+structures that already drive motion — `ViewTransition.active()`, `CameraDirector.flying`, the
+controls' `sceneDragging`, and `TrendStackSync.settled()` where the view has a stack — and writes it
+on edges only; there is no second clock. `motionCause` is WHY, stamped once per gesture by whoever
+owns the gesture: the click executor for every selection (its `motionCauseOf`, the FINEST action of
+the click), the store's own setters for the settings that move the scene (view, window, range,
+measure, page), the Engine for a drag. `domain/motionHint.ts` turns a cause into words (tested);
+names are resolved by the component through `HintNames`, so the view vocabulary stays in `views.ts`.
+The line fades in after 150ms (a same-pose NUDGE never flashes it) and holds its last sentence
+through the fade-out. A window pill says "Showing the last …", the range and the measure their own
+sentences; a deselect names the rung it LANDS on in the select's own words (the executor restamps
+a release as `finestRung`), never "stepping back".
 
 **The History view has three axes and each has one home** (user, 2026-09-19): left/right on the
 timeline is WHEN, the depth of the stack is WHO, and UP/DOWN is WHAT — the measure. Its control is
-the view's TITLE, centred under the command bar below the view switch (`TrendMeasure`: `∧ SNAPSHOTS
-∨`, riding `--rail-top` + `--topbar-extra` like the rails), plus `↑`/`↓` from inside a card; both
-step `trendMetric` through `METRIC_ORDER` (`src/data/trendSeries.ts`) — the rail picker's own order,
-so the two controls are one list. It is a view-level control because every card steps together (a
-stack whose planes showed different measures would stop being a comparison) — it first rode the
-front card's header as two bare chevrons, which said the measure belonged to that network and
-stepped through a list the reader could not see. The ends go INACTIVE rather than wrapping (the
-plank's rule). A setting, not a selection: it writes its setter directly, as the picker does.
+the Networks card's HEADING CONTROL (the explorer's figure heading opening `METRIC_ORDER` as a radio
+list with each measure's unit at the current cadence — design 2026-09-26; `Same scale` rides the
+same heading row as the view's other setting. It replaced a `∧ SNAPSHOTS ∨` stepper, which walked a
+list the reader could not see, which itself replaced the six-pill picker no other surface used:
+the document lays its measures out as sections), plus `↑`/`↓` from inside a card; both write
+`trendMetric` from `METRIC_ORDER` (`src/data/trendSeries.ts`), so the two controls are one list. It is a view-level control because
+every card steps together (a stack whose planes showed different measures would stop being a
+comparison) — it first rode the front card's header as two bare chevrons, which said the measure
+belonged to that network and stepped through a list the reader could not see; then it was the view's
+title under the command bar, where it collided with the rear card's header. The ends go INACTIVE
+rather than wrapping (the plank's rule). A setting, not a selection: it writes its setter directly.
 
 ⚠️ **A MEASURE CHANGE IS TWO MOTIONS THAT TAKE TURNS** (`components/useStagedMeasure.ts`, user: "the
 animation is not smooth … load the new chart (smoothly) and then re-order"). The cards show a
@@ -284,16 +306,18 @@ visible window the store pages the window after it in the SAME write that publis
 A step taken mid-sequence RETARGETS, never queues; reduced motion skips the sequence (an
 exit with transitions off is a 140ms blank).
 
-⚠️ **A DRAG THAT STARTS ON A CARD IS THE SCENE'S ORBIT** (`components/orbitHandoff.ts`). The header
-strips and the front card are where a hand lands, and a drag begun there used to go nowhere. Past
-the click slop the pointer is handed to the canvas as ONE synthetic `pointerdown` carrying the real
-pointer's id; OrbitControls captures it and the rest of the gesture is native — same damping, same
-limits, same touch handling. No component imports the engine: it is DOM to DOM through
-`canvas.scene-canvas`. Never hand off AT pointerdown — capturing the pointer away retargets its
-pointerup, and with it the click. This is also why the cards carry NO swipe gesture: a vertical
-touch swipe stepped the measure for a few hours, until one gesture had to mean two things.
+⚠️ **A DRAG ACROSS THE FRONT CHART BRUSHES THE RANGE** (2026-09-26; user: "create a window also
+in the main chart"). It is the document's own `onRange` gesture on `TrendChart`, and it commits
+`trendRange` for the whole stack exactly as the band's timeline does. It replaced the orbit
+handoff (`orbitHandoff.ts`, 2026-09-19, retired): History lost its orbit the same day
+(`viewPolicy.rotate` is false — the cards hold their implied places, a click brings one forward,
+the wheel still zooms), so a drag on a card was free. A click on the plot picks the INSTANT
+(`onPick`); `dragged` in `TrendStack` keeps the click the browser synthesises after a brush from
+also landing as a pick. Rear cards keep their bodies inert. This is also why the cards carry NO
+swipe gesture: a vertical touch swipe stepped the measure for a few hours, until one gesture had
+to mean two things.
 
-**Hovering pairs over `hoverFilter`, the app's own network channel** (convention 9). A Layers row, a
+**Hovering pairs over `hoverFilter`, the app's own network channel** (convention 9). A Networks row, a
 plane's header strip and a cursor-card row are three ends of one pairing, with no channel of their
 own: hovering any of them turns that card's hairline to its network's hue and washes the rows. The
 hairline is the ONLY thing that changes — a preview that re-staggered the stack would read as a
@@ -442,10 +466,11 @@ does NOT make the lane pointer-inert (clicks would fall through `#rightcol` to t
 
 **A pager's parent scope is whatever the step must NOT change, which for the metagraph snapshot makes it
 a PAIR — this metagraph × this tick** (user, 2026-08-09). The set is the subject's own `metaId` rows of the
-pinned tick's exact read, ordinal-desc, never every contributor: `metaSnapSelectActions` filter-firsts, so
-a cross-network step would move a COARSER rung and a swipe would silently re-commit the network. The
-explorer still LISTS every network under a tick, but it doesn't commit one either — its group header
-discloses and previews only, so both surfaces keep the same boundary. And the pair is the honest total
+pinned tick's exact read, ordinal-desc, never every contributor: a cross-network step would change WHICH
+NETWORK the card is about, a coarser fact than the swipe names. The explorer still LISTS every network
+under a tick, but it doesn't commit one either — its network rows open and preview only, so both
+surfaces keep the same boundary (and since 2026-09-26 neither surface moves the filter at all —
+`metaSnapSelectActions` lost its filter-first arm, design decision 13). And the pair is the honest total
 — a fast metagraph batches dozens of snapshots
 into one tick (DOR routinely 9-plus), so a tick-wide `N` would contradict the breakdown pills.
 
@@ -655,6 +680,14 @@ and a track you cannot press is a picture of one. So the timeline re-enables poi
 OWN ROOT and nothing else — every other view's band keeps the charter and the orbit drag keeps
 passing through. The sheets' `sceneCover` clip still governs it: measured, a covered strip hands
 both paint and hit-testing to the sheet above.
+**The track takes the whole band and the window pills stand above its top-right corner** (user,
+2026-09-26, two rounds — first over the corner, then "above the bottom section, not on top of it";
+the band's clip opens its top edge for them, and `BottomStream` reserves their room while the
+band holds the timeline). The band held three columns — the track, a CURSOR readout with a 16ch reserve, the
+pills — and the two side columns cost the track a third of the lane. The readout is gone: no cursor
+line IS "none picked" (the brush's own rule for ALL), and a picked instant is stamped on the track
+beside its line, low by the handle where the pills cannot cover it, flipping to the line's left near
+the right edge. On the phone arm the pills keep their own row above the track.
 **The gesture split is the decision: a CLICK sets the cursor (`trendCursorMs`), a DRAG brushes the
 range (`trendRange`)** — press inside the span ON SCREEN to pan it, press an edge to resize it, `×`
 or Escape clears it. ⚠️ **What is DRAWN is what is GRABBED** (`drawnSpan`, one function read by both
@@ -672,7 +705,8 @@ states) and `TrendTrack.tsx` the INSTRUMENT (the SVG and every gesture), because
 subject is a geometry it measures itself and nothing above it has those numbers. The window pills
 are shared with the Trends document through `components/trendPickers.tsx` — the two had already been
 caught drifting once (user, 2026-09-09), so the class strings have one home, and since 2026-09-19
-the METRIC picker, the setting SWITCH and the scope CHIP live there beside them for the same reason.
+the setting SWITCH and the document's scope CHIP live there beside them for the same reason (the
+METRIC picker left on 2026-09-26 for the explorer's heading control).
 
 **THE SCRUB IS THIS VIEW'S PRIMARY GESTURE, AND FOUR SEPARATE MEMO FAILURES MADE IT UNUSABLE.** All
 four were invisible in review and visible only in a frame counter, so they are recorded with their
@@ -695,7 +729,7 @@ rule, reaching a committed value). Across a 200-event scrub: `metricSeries` 8262
 ⚠️ **The charts themselves were the rest of it — the cursor is DRAWN OUTSIDE the memo** (2026-09-19).
 With the shared cursor as a recharts `ReferenceLine`, a bucket write re-rendered all five planes'
 charts: measured over a 60-step scrub of the `all` window at 1500×1000, **22.1s / 2.7 FPS / 600 plot
-renders → 1.4s / 40.7 FPS / 0**, and the hover sweep over the Layers rows **8.0s / 2.7 FPS / 220 →
+renders → 1.4s / 40.7 FPS / 0**, and the hover sweep over the Networks rows **8.0s / 2.7 FPS / 220 →
 0.44s / 36.5 FPS / 0**. Two halves, both structural: `TrendChart`'s recharts subtree is a
 `React.memo` child (`TrendPlot`) whose props are the SERIES alone, and the cursor is a 1px CSS
 overlay beside it, positioned by `cursorFraction` over the chart's own numeric axis — `calc()` on a
@@ -929,12 +963,14 @@ grammar everywhere: label left, value right, one line.** The stacked micro-upper
 form is retired — it cost two lines per fact and read as a form, not an instrument. Its last survivor was
 the `Composition` label over the dossier's composition table, which outlived the sweep only because that
 table isn't a `Fact`; dropped 2026-08-10, since each row already names its own composition and without it
-the description above reads as the card's lead. **ONE deliberate exception since 2026-09-10: the
-dossier's accounting SCHEDULES** — the `by node composition` / `by node status` / `by archived
-snapshots` caption rows are user-directed disclosure captions over partition tables (the accounting
-form: one control total, labeled partitions beneath), not fact labels — a caption that FOLDS is a
-control, which is what takes it out of this rule's reach. Don't strip them as a regression of the
-2026-08-10 sweep, and don't cite them as precedent for stacking a label over a `Fact`.
+the description above reads as the card's lead. **The dossier's BREAKDOWN is the one place a label leads its value** (2026-09-26,
+`dossier-breakdown.html` A): under the "Online nodes" disclosure, three STACKED BARS — composition
+in the network's hue, status in the bucket colours, archive depth in the neutral — each one bar of
+the same total with the axis word to its left and the parts named beneath (`StackedSchedule`,
+`inspector/parts.tsx`). They replaced three captioned tables under hairlines, which read as three
+sections rather than three cuts of one fleet. A zero-count part draws no segment and is named
+muted; the chips and depth tags ride the parts' titles. "Archive depth", not "archive" — it is how
+far back a node's archive reaches, not a size.
 
 Three weights, and a fact's weight is a claim about what the card is FOR:
 
@@ -1172,18 +1208,14 @@ were reading. Same builder as the anchor-log row, so a read and the equivalent r
 Every collapsible body in the app is `Collapsible` + `.disclose-panel` (2026-09-01). The migration
 off `{open && …}` bought two things `{open && …}` structurally could not: an **animated** body (an
 unmounted node cannot travel, and it also popped into existence under `RailThread`'s measurement)
-and the **trigger↔panel id pairing** AT needs. The explorers share `Disclosure` / `DisclosureRow` /
-`DisclosurePanel` (`components/ExploreRows.tsx`), so a call site cannot forget the recipe.
+and the **trigger↔panel id pairing** AT needs. (The explorers no longer disclose at all: since
+2026-09-26 depth there is a PATH — one level on screen, the ancestry a breadcrumb — so
+`components/ExploreRows.tsx` and its `Disclosure` recipe retired with the old trees.)
 
-⚠️ **RADIX HOLDS THE PAIRING, NEVER THE STATE.** Every explorer row is a selection COMMIT whose
-disclosure is a consequence — a committed filter, country, cohort, composition group — so `open` is
-DERIVED from the store and `onOpenChange` runs the same builder the click always did. Rule 2's one
-write path is untouched; Radix decides nothing about what a click means.
-
-⚠️ **A PREVIEW-ONLY ROW IS NOT A TRIGGER.** Out of the committed lens a row hovers, keeps its wash
-and opens nothing, so it must not carry `aria-expanded` — which Radix's trigger always sets.
-`DisclosureRow` renders a plain `<button>` in that case (`Row = previewOnly ? "button" :
-CollapsibleTrigger`), which is what keeps the promise honest to AT as well as to the eye.
+⚠️ **RADIX HOLDS THE PAIRING, NEVER THE STATE.** A collapsible whose open state is a selection —
+the dossier's Online-nodes schedule is a plain toggle, but a rung-driven one would be — derives
+`open` from the store and runs the same builder the click always did. Rule 2's one write path is
+untouched; Radix decides nothing about what a click means.
 
 ⚠️ **150ms, and it is the CHEVRON's clock.** The arrow already rotates at `duration-150` and the two
 are one gesture; a panel on its own timing reads as two things happening. Changing `.disclose-panel`
@@ -1197,10 +1229,9 @@ means changing every chevron with it.
 - **`TopBar`'s two strips** — the grow-downward slot is a LAYOUT PARTICIPANT: TopBar publishes its
   height and the rails and canvas add it to their `top`. A height animation would fight a published
   measurement, and the strip is not hidden content but a resized bar.
-- **`SnapRow`'s signer list** (`LedgerPanel`) — the row's click COMMITS a snapshot and *may* also
-  disclose, depending on whether signers were resolvable at all ("affordance follows the data"). So
-  it is a disclosure only sometimes, over three call sites with three different panels — the
-  preview-only split again, at triple the cost and none of the clarity.
+- **The `Explorer`'s levels** (every explorer since 2026-09-26) — depth there is a PATH, not a
+  tree: one level on screen, the ancestry a breadcrumb, so nothing is ever hidden-when-closed
+  under a trigger. There is no disclosure to migrate.
 - **`Desc`'s show-more** (`inspector/parts.tsx`) — evaluated and rejected on its own merits before
   this sweep: Collapsible's model is hidden-when-closed, this is always-visible-but-CLAMPED.
 - **`ChannelStatePanel`'s raw-JSON well** takes the primitive but NOT `.disclose-panel`: it opens to
@@ -1305,7 +1336,7 @@ seam and corner rules select on the same markers the thread measures:
 | `data-depth` / `data-focus` / `data-ghost` | The thread's read — depth dimming and dot state |
 | `.nb-row` | The pairing row-wash selector |
 | `#topbar`, `#metapane`, `#tooltip` | Layout and positioning |
-| `canvas.scene-canvas` | `SceneCanvas` renders it; `orbitHandoff` queries it to hand a card drag to OrbitControls (`trendStackBoundary.test.ts` pins both ends) |
+| `canvas.scene-canvas` | `SceneCanvas` renders it; the engine's controls listen on it (the card-drag handoff that once queried it is retired) |
 | `#callout` (+ `data-on`) | The subject callout's 0-size anchor wrapper — `SceneCallout` renders it, `CalloutSync` writes its transform + `data-on` per frame (the Tooltip discipline: position never renders React) |
 | `#trend-stack` (+ `data-on`) | The trend view's chart-plane layer — `TrendStack` renders it, the engine queries it to find the planes. It waits at `opacity: 0` and `TrendStackSync` writes `data-on="1"` once the view has ARRIVED (policy `chartStack` + the trend furniture alpha at full), so the stack fades in with the room rather than riding the camera's flight — the `#callout` `data-on` precedent |
 | `[data-plane]` (the network id) | One chart plane, as an ANCHOR + a CHILD. The anchor is a **0-size box at the layer's top-left with `origin-top-left`**, mounted `invisible`; its one child is the `PLANE_PX_W`-wide plane, centred on it by `-translate-x-1/2 -translate-y-1/2`. **React renders the plane and owns everything inside it** plus the anchor's `opacity` / `zIndex` / `pointer-events` (all from the same `PlanePose`); `TrendStackSync` (engine layer) writes the anchor's `transform` — a `matrix3d` translate + uniform scale, never a rotation — and its `style.visibility` per frame. The anchor's geometry IS that matrix's coordinate system, so don't give it a size, an origin or a transform of its own; `components/trendStackBoundary.test.ts` pins it |

@@ -189,3 +189,23 @@ describe("CSS trap 3 — bg-[var()] only ever carries a colour", () => {
     ).toEqual([]);
   });
 });
+
+// TRAP 11 (2026-09-26) — an adopted shadcn primitive MUST take `cn` from `@/lib/utils`. The
+// generator writes `import { cn } from "cn"` when the components.json alias is unset, and a
+// stray `cn` package resolves it — so the file type-checks and renders, but its twMerge knows
+// none of this app's tokens: `text-label` classifies as a COLOUR and every `text-*` size passed
+// through the primitive is silently dropped. Found live as the explorer's crumbs rendering at
+// 14px over 12.5px rows; the breadcrumb and dropdown primitives had both shipped it.
+describe("CSS trap 11 — every primitive's cn is the app's registered merge", () => {
+  it("no file under components/ui imports cn from anywhere but @/lib/utils", () => {
+    const dir = join(process.cwd(), "components", "ui");
+    const bad: string[] = [];
+    for (const name of readdirSync(dir)) {
+      if (!/\.tsx?$/.test(name)) continue;
+      const src = readFileSync(join(dir, name), "utf8");
+      const m = src.match(/import\s*\{[^}]*\bcn\b[^}]*\}\s*from\s*["']([^"']+)["']/);
+      if (m && m[1] !== "@/lib/utils") bad.push(`${name}: cn from "${m[1]}"`);
+    }
+    expect(bad, "a primitive with a foreign cn drops every custom text/rounded/tracking token").toEqual([]);
+  });
+});

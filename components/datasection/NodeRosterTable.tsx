@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
+import type { CSSProperties } from "react";
 import { useStore } from "@/src/store/store";
 import { metagraphById, filterAccent, shortHash } from "@/src/data/network";
 import { buildRoster, sortRoster, type RosterRow, type RosterSortKey } from "@/src/data/roster";
@@ -181,8 +182,9 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
                 // The committed-selection language, bent to a table: the `--sel-bg` wash + the
                 // shared ✓ mark. (SELECTED_ROW's box-shadow ring is skipped on purpose — a
                 // box-shadow doesn't paint on a border-collapsed table row.)
+                // Hover in the node's network hue (user, 2026-09-26) — the anchor log's recipe.
                 className={cn(
-                  "cursor-pointer text-body hover:bg-wash-faint",
+                  "cursor-pointer text-body hover:bg-[color-mix(in_oklch,var(--row-hue,var(--primary))_12%,transparent)]",
                   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                   selected && "bg-[var(--sel-bg)] text-foreground",
                 )}
@@ -190,7 +192,10 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
                 // same commit the click makes, and focus previews what hover previews.
                 tabIndex={0}
                 // The selection follows the subject's identity (selection.tsx · selectionHue).
-                style={selected && r.netId ? selectionHue(filterAccent(r.netId)) : undefined}
+                style={{
+                  ...(r.netId ? { "--row-hue": filterAccent(r.netId) } : {}),
+                  ...(selected && r.netId ? selectionHue(filterAccent(r.netId)) : {}),
+                } as CSSProperties}
                 onMouseEnter={() => r.node.id && setHoverNodeId(r.node.id)}
                 onMouseLeave={() => setHoverNodeId(null)}
                 onFocus={() => r.node.id && setHoverNodeId(r.node.id)}

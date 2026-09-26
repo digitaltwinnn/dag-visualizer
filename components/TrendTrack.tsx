@@ -69,6 +69,9 @@ import type { ZoomId } from "@/src/data/trendWindow";
 const LABEL_H = 13;
 /** A month label needs about this much room before the next one is a smear. */
 const TICK_GAP_PX = 44;
+/** Within this many px of the track's right edge the cursor's stamp sits to the LEFT of its line,
+ *  so the widest form (a fine-tier stamp with its UTC suffix, ~100px) never runs off the track. */
+const STAMP_FLIP_PX = 110;
 /** The narrowest a brush may DRAW. A one-hour window over a six-year track is a real span and a
  *  sub-pixel rectangle; the mark has to be findable or the band would say nothing about where the
  *  stack is looking. */
@@ -439,7 +442,12 @@ export default function TrendTrack({
         {hoverX != null && (
           <line x1={hoverX} y1={0} x2={hoverX} y2={plotH} stroke="var(--muted-foreground)" strokeWidth={1} opacity={0.35} />
         )}
-        {/* THE CURSOR, in the structural accent, with a grab handle on the baseline. */}
+        {/* THE CURSOR, in the structural accent, with a grab handle on the baseline — and ITS
+            STAMP beside it (2026-09-26): the band's own statement of the picked instant, since the
+            readout column that used to say it is gone. Low, by the handle, so the pills over the
+            top-right corner can never cover it; it flips to the left of the line near the right
+            edge so it stays on the track. Precision follows the stack's grain (`stepMs`), as the
+            `aria-valuetext` above does. No instant, no stamp: the absence is the statement. */}
         {cursorX != null && cursorInSpan && (
           <g>
             <line x1={cursorX} y1={0} x2={cursorX} y2={plotH} stroke="var(--primary)" strokeWidth={1} />
@@ -452,6 +460,14 @@ export default function TrendTrack({
               fill="var(--primary)"
               className="cursor-ew-resize"
             />
+            <text
+              x={cursorX > box.w - STAMP_FLIP_PX ? cursorX - 6 : cursorX + 6}
+              y={plotH - 4}
+              textAnchor={cursorX > box.w - STAMP_FLIP_PX ? "end" : "start"}
+              className="fill-[var(--foreground)] text-[9px] tabular-nums pointer-events-none"
+            >
+              {stampInstant(cursorMs as number, stepMs)}
+            </text>
           </g>
         )}
       </svg>

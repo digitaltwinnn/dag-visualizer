@@ -1,16 +1,19 @@
 "use client";
 
+import { ArrowUpRight, Table2 } from "lucide-react";
+
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { Fact, FactGroup, IdentityDot } from "@/components/inspector/parts";
 import { SELECTED_ROW, selectionHue } from "@/components/selection";
-import { openCharts, openRecords, spanOfWindow } from "@/components/trendDoors";
-import { Button } from "@/components/ui/button";
+import { openRecords, spanOfWindow } from "@/components/trendDoors";
 import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { cn } from "@/lib/utils";
-import { instantNote, orderAt, placeInstant, rankAt, tierWord, valueAt } from "@/src/data/trendSeries";
+import { metagraphById } from "@/src/data/network";
+import { instantNote, orderAt, placeInstant, rankAt, valueAt } from "@/src/data/trendSeries";
+import { ageWords } from "@/src/util/relativeAge";
 import { stampInstant } from "@/src/data/trendTimeline";
 import { bucketAt } from "@/src/data/trendWindow";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
@@ -92,11 +95,8 @@ export default function TrendInstantPane({
   // so a reader who has focused nothing still gets a reading rather than an invitation.
   const globalValue = cursorMs != null && !subject ? valueAt(roster.global, buckets, stepMs, cursorMs) : null;
 
-  // The tier in words — the card's aside, so the body never has to caption its own precision.
-  // ONE TABLE, TWO FORMS (`tierWord`, 2026-09-19): this aside is a short LABEL beside a title,
-  // while the document's section leads take the adjective that reads inside a sentence. They had
-  // grown two spellings of one vocabulary, "5 min" against "five-minute".
-  const tier = tierWord(stepMs, "label");
+  // The tier no longer rides the aside (it said "daily" there until 2026-09-26; the aside is the
+  // moment's AGE now) — the note below still names the precision where a reader needs it.
   const fmt = (v: number | null) => (v != null ? format(v) : NO_READING);
 
   // THE SPAN A DOOR CARRIES: the brushed range if one stands, else the window on screen. One
@@ -109,7 +109,7 @@ export default function TrendInstantPane({
   // left holding a subject nothing is pointing at.
   //
   // ⚠️ …AND MUST NOT BE CLEARED WHEN SOMEONE ELSE IS HOLDING IT. This card's roster is the WHOLE
-  // roster, so without ownership its unmount would wipe a Layers row's live hover on the way out:
+  // roster, so without ownership its unmount would wipe a Networks row's live hover on the way out:
   // hover a row here, move onto the rail, close the card. The returned setter is what makes the
   // difference — the hook sees this card's writes and releases nothing else.
   const setHover = useHoverRelease(hoverFilter, ranked, setHoverFilter);
@@ -117,13 +117,20 @@ export default function TrendInstantPane({
   return (
     <RailPane entry={collapsed}>
       <CardHead
-        eyebrow="Instant"
+        eyebrow="Moment"
         // The stamp is the timeline's own (`stampInstant`, src/data/trendTimeline.ts): the DATE at
         // the daily tier — an hour the charts cannot resolve would be invented precision — and the
         // date plus a UTC clock once the buckets are finer.
         title={cursorMs != null ? stampInstant(cursorMs, stepMs) : "—"}
         titleKey={bucket ?? cursorMs ?? undefined}
-        aside={<span className="text-micro text-muted-foreground">{tier}</span>}
+        // HOW LONG AGO the moment was, not the cadence (user, 2026-09-26): the reader is placing an
+        // instant, and "3 months ago" places it; "daily" only said what the charts are cut in,
+        // which the note below already says where it matters. Measured from the bucket's start.
+        aside={
+          <span className="text-micro text-muted-foreground">
+            {cursorMs != null ? `${ageWords(Date.now() - (bucket ?? cursorMs))} ago` : null}
+          </span>
+        }
         onClose={onClose}
         collapsed={collapsed}
         onToggle={onToggle}
@@ -140,12 +147,17 @@ export default function TrendInstantPane({
               {/* ── LEAD: the one reading this card exists to say ───────────────────────────
                   Merged onto one line with its unit, the lead grammar's own rule (no "Value:"
                   label — the unit carries it), with the rank riding beside it. */}
-              <p className="text-title font-semibold text-foreground">
+              {/* The SCOPE rides the lead's own line, right-aligned (user, 2026-09-26: a row of its
+                  own was one row too many) — the reading left, whose reading it is right. */}
+              <p className="flex items-baseline justify-between gap-3 text-title font-semibold text-foreground">
+                <span className="min-w-0">
                 {subject ? (
                   <>
                     <span className="tabular-nums">{fmt(subjectValue)}</span>
                     {subjectValue != null && unit ? <span className="text-body font-normal text-muted-foreground"> {unit}</span> : null}
-                    {rank && (
+                    {/* The rank only where there is a field to rank in: under a filter the stack is
+                        one network, and "1 of 1" says nothing (user, 2026-09-26). */}
+                    {rank && rank.of > 1 && (
                       <span
                         className="text-body font-normal text-muted-foreground"
                         title={`Ranked among the ${rank.of} network${rank.of === 1 ? "" : "s"} with a reading at this instant`}
@@ -163,17 +175,29 @@ export default function TrendInstantPane({
                     {globalValue != null && unit ? <span className="text-body font-normal text-muted-foreground"> {unit}</span> : null}
                   </>
                 )}
-              </p>
-              <p className="mt-0.5 text-label text-muted-foreground">
-                {subject ? rows.get(subject)?.name : "Across the whole network"}
+                </span>
+                <span
+                  className="min-w-0 truncate text-right text-label font-normal text-muted-foreground"
+                  title={subject ? rows.get(subject)?.name : undefined}
+                  // The ticker in its network's hue (user, 2026-09-26) — the dossier aside's own rule.
+                  style={subject ? { color: rows.get(subject)?.hue } : undefined}
+                >
+                  {/* Under a filter the TICKER alone (user, 2026-09-26): the dossier above already
+                      names the network in full, and the lead line has one line's width. */}
+                  {subject ? (metagraphById(subject)?.ticker || rows.get(subject)?.name) : "Across the whole network"}
+                </span>
               </p>
 
               {/* ── DETAIL: every layer at the cursor ────────────────────────────────────────
                   Ordered by the reading itself (`orderAt` — nulls last, ties stable), so the list
-                  IS the ranking the lead states. Each row pairs and clicks exactly like a Layers
+                  IS the ranking the lead states. Each row pairs and clicks exactly like a Network breakdown
                   row: the same channel, the same builder. */}
               {ranked.length > 1 && (
-                <FactGroup className="mt-3">
+                <>
+                  {/* A resting division between the LEAD (the picked reading) and the roster
+                      beneath it (user, 2026-09-26): the card-head rule's hairline. */}
+                  <div aria-hidden className="mt-3 border-t border-border" />
+                  <FactGroup className="mt-1">
                   {orderAt(readings).map((id) => {
                     const row = rows.get(id);
                     if (!row) return null;
@@ -223,38 +247,47 @@ export default function TrendInstantPane({
                     );
                   })}
                 </FactGroup>
+                </>
               )}
 
-              {/* ── THE TWO EXITS, as the card's own controls ────────────────────────────────
-                  One rung down the ladder and one register across it (convention 12). Both go
-                  through `components/trendDoors.ts`, the shared home the Trends document calls
-                  too, so the records door's four ordered steps are written once. Small text
-                  Buttons — the shadcn boundary's own category for a card-foot control. */}
-              <div className="mt-2 flex flex-wrap items-center gap-x-4">
-                <Button
-                  variant="link"
-                  size="xs"
-                  className="px-0"
-                  disabled={!span}
-                  title={
-                    subject
-                      ? "Opens the anchor log at this span, with this network in the search."
-                      : "Opens the anchor log at this span, across every network."
-                  }
-                  onClick={() => openRecords(subject, span)}
-                >
-                  Snapshot records
-                </Button>
-                <Button
-                  variant="link"
-                  size="xs"
-                  className="px-0"
-                  title="Opens the measured history as a document — the same numbers in prose, with every metric side by side."
-                  onClick={openCharts}
-                >
-                  All charts
-                </Button>
-              </div>
+              {/* ── THE ONE EXIT, as the card's foot control (design 2026-09-26, `moment-door.html`
+                  A). The card marks one instant and its one real door is the anchor log at this
+                  span, through `components/trendDoors.ts` — the shared home the Trends document
+                  calls too, so the records door's four ordered steps are written once. It is a
+                  full-bleed control on the wash ladder every other control wears (user: the bare
+                  text links read as prose). "All charts" went with it: the RAW toggle in the
+                  command bar IS that door. */}
+              <button
+                type="button"
+                disabled={!span}
+                title={
+                  subject && subject !== "dag"
+                    ? "Opens the anchor log at this span, with this network in the search."
+                    : "Opens the anchor log at this span, across every network."
+                }
+                onClick={() => openRecords(subject, span)}
+                className={cn(
+                  "mt-3 flex w-[calc(100%+2*var(--card-pad))] items-center gap-2.5 text-left text-body text-foreground cursor-pointer",
+                  // THE CONTROL ENDS WHERE THE PLANK BEGINS (user, 2026-09-26, two rounds). A boxed
+                  // card under a filter carries the sibling pager's plank at its foot, and the plank
+                  // draws one inset hairline on its top edge; a control bleeding past that line wore
+                  // it as an underline. So the bleed is the card's padding LESS the plank's strip
+                  // (`--foot-mb`, which RailPager sets to 0; the card's padding otherwise), which puts
+                  // the control's bottom edge exactly on the plank's hairline — its bottom border —
+                  // and the corners square there (`--foot-radius`, which RailPager zeroes).
+                  "-mx-[var(--card-pad)] px-[var(--card-pad)] py-2.5",
+                  "mb-[var(--foot-mb,calc(0px-var(--card-pad)))]",
+                  "rounded-b-[var(--foot-radius,calc(var(--radius)-1px))] border-t border-wash-strong bg-wash-faint hover:bg-wash-soft",
+                  "disabled:opacity-45 disabled:pointer-events-none",
+                  "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+                )}
+              >
+                <Table2 aria-hidden className="size-3.5 flex-none text-primary" />
+                Snapshot records
+                {/* The document's own door glyph (↗), not a chevron: › is the sibling pager's
+                    step on the cards below, and one glyph must not mean two things (user). */}
+                <ArrowUpRight aria-hidden className="ml-auto size-3.5 flex-none text-muted-foreground" />
+              </button>
             </>
           )}
         </div>

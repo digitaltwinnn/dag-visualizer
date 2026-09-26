@@ -64,8 +64,16 @@ export interface ViewPolicy {
   // crossing" clamp; the Hypergraph relaxes it so the ring layout can be viewed straight from the
   // TOP (user). Applied by the Engine on a view change.
   minPolarAngle: number;
+  // Does a pointer drag ORBIT the camera here? The stock controls everywhere but History
+  // (user, 2026-09-26: "disable camera control, maybe keep zoom only, and always keep the trend
+  // cards fixed in their implied 3D position — let the clicking of a background card do the
+  // movement work"). Its cards are billboards hosting text: an orbit slid the deck about without
+  // ever showing another side of it, and the one movement that view has a meaning for — a card
+  // coming to the front — is already the focus RE-DEAL. Zoom stays (a dolly toward the front
+  // card, the pose's target). A BOUNDED orbit (±35° / ±11°) was built and removed the same day.
+  rotate: boolean;
   // Does this view publish the selection's flat node list (`store.selNodes`) for its explorer
-  // card? geo (Nodes by country) + hyper (Nodes by layer); elsewhere the list empties so the
+  // card? geo (Country breakdown) + hyper (Network breakdown); elsewhere the list empties so the
   // browsers stay quiet.
   nodeList: boolean;
   // Does the bottom VITALS BAND mount? (2026-08-30 — the vitals leave the crowded command bar
@@ -160,6 +168,7 @@ const FLAT: ViewPolicy = {
   minCamDist: 12,
   minCamAlt: null,
   minPolarAngle: 0.25,
+  rotate: true,
   nodeList: false,
   vitalsLane: false,
   bandContent: "vitals",
@@ -204,6 +213,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minCamAlt: null,
     minPolarAngle: 0.25, // standard clamp: the structure is TILTED (HYPER_TILT), not the camera —
     // so hyper shares the overview pose with the other views and never needs the pole-crossing relax
+    rotate: true,
     nodeList: true,
     vitalsLane: true,
     bandContent: "vitals",
@@ -233,6 +243,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minCamDist: 12,
     minCamAlt: 18, // above the land plateau (R 16 + LAND_H 1.0) + chip stacks — no zooming inside
     minPolarAngle: 0.25,
+    rotate: true,
     nodeList: true,
     vitalsLane: true,
     bandContent: "vitals",
@@ -262,6 +273,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minCamDist: 12,
     minCamAlt: null,
     minPolarAngle: 0.25,
+    rotate: true,
     // The Snapshots node browser (LedgerPanel's floor disclosures) reads store.selNodes.
     nodeList: true,
     vitalsLane: true,
@@ -297,6 +309,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minCamDist: 12,
     minCamAlt: null,
     minPolarAngle: 0.25,
+    rotate: false,
     nodeList: false,
     // The band is MOUNTED but its content is this view's TIMELINE, not the vitals cells — the
     // reserve it publishes is the same either way, which is why the two are separate rows.

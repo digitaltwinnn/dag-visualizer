@@ -80,29 +80,30 @@ describe("clickActions — hub / snapshot", () => {
 });
 
 describe("clickActions — node clicks (the ordering contracts)", () => {
-  it("GEO: filter FIRST, then the node's country + cohort (full-ancestry rule), inspect LAST", () => {
+  it("GEO: NO filter — a node is a place first (user, 2026-09-26): country + cohort (full-ancestry rule), inspect LAST", () => {
     const p = nodePick("DE");
     const acts = clickActions({ mode: "geo", pick: p, countryCc: null, current: state() });
     expect(acts).toEqual([
-      { kind: "filter", id: "dor" },
       { kind: "country", cc: "DE" },
       { kind: "cohort", sel: { cc: "DE", city: null, isp: null } },
       { kind: "inspect", pick: p },
     ]);
   });
-  it("GEO: the filter step is SKIPPED when the node's network is already selected (no drill churn)", () => {
+  it("GEO: the same list whatever the committed filter — a node never changes it", () => {
     const p = nodePick("DE");
     const acts = clickActions({ mode: "geo", pick: p, countryCc: null, current: state({ filter: "dor" }) });
     expect(kinds(acts)).toEqual(["country", "cohort", "inspect"]);
+    const other = clickActions({ mode: "geo", pick: p, countryCc: null, current: state({ filter: "ded" }) });
+    expect(kinds(other)).toEqual(["country", "cohort", "inspect"]);
   });
   it("GEO: a node without a resolvable country skips the drill (no country action)", () => {
     const acts = clickActions({ mode: "geo", pick: nodePick(null), countryCc: null, current: state() });
-    expect(kinds(acts)).toEqual(["filter", "inspect"]);
+    expect(kinds(acts)).toEqual(["inspect"]);
   });
-  it("GEO: a validator drills the DAG core + its country", () => {
+  it("GEO: a validator drills its country, and no more commits the DAG core than a metagraph node commits its network", () => {
     const acts = clickActions({ mode: "geo", pick: validatorPick(), countryCc: null, current: state() });
-    expect(acts[0]).toEqual({ kind: "filter", id: "dag" });
-    expect(acts[1]).toEqual({ kind: "country", cc: "US" });
+    expect(acts[0]).toEqual({ kind: "country", cc: "US" });
+    expect(kinds(acts)).not.toContain("filter");
   });
   it("HYPER: filter + inspect only — no country (a geo concept), no autoRotate stop", () => {
     const p = nodePick("DE");
@@ -391,10 +392,10 @@ describe("nodeSelectActions ancestry (spec Part 3 — full-ancestry rule)", () =
     kind: "metanode", meta: { id: "dor" },
     geo: { cc: "DE", city: "Falkenstein", isp: "Hetzner" },
   } as unknown as PickDescriptor;
-  it("geo: filter → country → cohort → inspect LAST", () => {
+  it("geo: country → cohort → inspect LAST, and never the filter (2026-09-26)", () => {
     const acts = nodeSelectActions(geoPick, { mode: "geo", currentFilter: "all" });
-    expect(acts.map((a) => a.kind)).toEqual(["filter", "country", "cohort", "inspect"]);
-    expect(acts[2]).toEqual({ kind: "cohort", sel: { cc: "DE", city: "Falkenstein", isp: "Hetzner" } });
+    expect(acts.map((a) => a.kind)).toEqual(["country", "cohort", "inspect"]);
+    expect(acts[1]).toEqual({ kind: "cohort", sel: { cc: "DE", city: "Falkenstein", isp: "Hetzner" } });
   });
   it("geo: a pick without isp/city still commits its cohort (nullable fields)", () => {
     const p = { kind: "l0", node: { id: "x" }, geo: { cc: "FI" } } as unknown as PickDescriptor;
@@ -421,7 +422,7 @@ describe("nodeSelectActions ancestry (spec Part 3 — full-ancestry rule)", () =
 });
 
 describe("metaSnapSelectActions (a tile on the upper floor)", () => {
-  const LISTED = METAGRAPHS[0].id; // the filter-first ancestry only exists for LISTED metagraphs
+  const LISTED = METAGRAPHS[0].id;
   const SEL: MetaSnapSel = { metaId: LISTED, ordinal: 745190, hash: "h1", globalOrdinal: 4200, ts: "t" };
   const GLOBAL = {
     kind: "snapshot" as const,
@@ -429,28 +430,29 @@ describe("metaSnapSelectActions (a tile on the upper floor)", () => {
     title: "Global snapshot #4200",
   };
 
-  it("commits ancestry first and the subject last", () => {
-    const a = metaSnapSelectActions(SEL, GLOBAL, { filter: "all", metaSnap: null });
-    expect(a.map((x) => x.kind)).toEqual(["filter", "snapshot", "metaSnap"]);
-    expect(a[0]).toEqual({ kind: "filter", id: LISTED });
-    expect(a[1]).toEqual({ kind: "snapshot", pick: GLOBAL, follow: false });
-    expect(a[2]).toEqual({ kind: "metaSnap", sel: SEL });
+  it("commits the tick first and the subject last — and NEVER the filter (design 2026-09-26, decision 13)", () => {
+    const a = metaSnapSelectActions(SEL, GLOBAL, { metaSnap: null });
+    expect(a).toEqual([
+      { kind: "snapshot", pick: GLOBAL, follow: false },
+      { kind: "metaSnap", sel: SEL },
+    ]);
+    expect(a.some((x) => x.kind === "filter")).toBe(false);
   });
 
-  it("does not churn the filter when it is already committed", () => {
-    const a = metaSnapSelectActions(SEL, GLOBAL, { filter: LISTED, metaSnap: null });
-    expect(a.map((x) => x.kind)).toEqual(["snapshot", "metaSnap"]);
-  });
-
-  it("an UNKNOWN-lane tile (raw unlisted address) commits NO filter — just the tick + subject", () => {
+  it("an UNKNOWN-lane tile (raw unlisted address) takes the same two actions", () => {
     const un: MetaSnapSel = { metaId: "DAGunlisted123", ordinal: 9, hash: "", globalOrdinal: 4200, ts: "t" };
-    const a = metaSnapSelectActions(un, GLOBAL, { filter: "all", metaSnap: null });
+    const a = metaSnapSelectActions(un, GLOBAL, { metaSnap: null });
     expect(a.map((x) => x.kind)).toEqual(["snapshot", "metaSnap"]);
   });
 
   it("steps back to the tick when the same tile is picked again", () => {
-    const a = metaSnapSelectActions(SEL, GLOBAL, { filter: LISTED, metaSnap: { ...SEL } });
+    const a = metaSnapSelectActions(SEL, GLOBAL, { metaSnap: { ...SEL } });
     expect(a).toEqual([{ kind: "metaSnap", sel: null }]);
+  });
+
+  it("while FOLLOWING, re-picking the auto-selected tile converts it to a pin rather than deselecting", () => {
+    const a = metaSnapSelectActions(SEL, GLOBAL, { metaSnap: { ...SEL }, following: true });
+    expect(a.map((x) => x.kind)).toEqual(["snapshot", "metaSnap"]);
   });
 });
 

@@ -348,9 +348,9 @@ export const METRIC_LABELS: Record<TrendMetric, string> = {
   continuity: "Continuity",
 };
 
-/** THE MEASURES' ONE ORDER — the rail picker's left-to-right and the card stepper's up-to-down are
- *  the same sequence, read from here, so stepping down from the third pill always lands on the
- *  fourth. */
+/** THE MEASURES' ONE ORDER — the explorer heading's list top-to-bottom and the cards' ↑/↓ keys
+ *  are the same sequence, read from here, so stepping down from the third entry always lands on
+ *  the fourth. */
 export const METRIC_ORDER = Object.keys(METRIC_LABELS) as TrendMetric[];
 
 /** The measure one step from `metric` (`+1` = the next in `METRIC_ORDER`, `-1` = the previous),

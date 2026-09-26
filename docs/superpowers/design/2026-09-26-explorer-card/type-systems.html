@@ -1,0 +1,164 @@
+<style>
+  .xc { background:#0b1020; color:#c7d0ea; border:1px solid #1e2740; border-radius:12px; padding:12px 14px; line-height:1.4; font-family:"Segoe UI",system-ui,sans-serif; }
+  .mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-variant-numeric:tabular-nums; }
+  .g { display:grid; grid-template-columns:16px 96px 112px 1fr 52px 12px; align-items:center; column-gap:8px; padding:4px 6px; margin:0 -6px; border-radius:5px; }
+  .g.on { background:rgba(255,138,76,.13); box-shadow:inset 0 0 0 1px rgba(255,138,76,.35); }
+  .dot { width:6px; height:6px; border-radius:50%; justify-self:center; }
+  .name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tag { display:flex; gap:3px; align-items:center; white-space:nowrap; overflow:hidden; }
+  .tag.txt { display:block; text-overflow:ellipsis; }
+  .chip { border:1px solid #2a3450; border-radius:3px; padding:0 4px; line-height:14px; }
+  .bar { height:5px; background:#161d30; border-radius:3px; overflow:hidden; }
+  .bar i { display:block; height:100%; border-radius:3px; background:#ff8a4c; }
+  .fig { text-align:right; }
+  .tail { text-align:center; color:#6b7590; }
+  .panel { margin:6px 0; padding:8px 10px; background:#0f1626; border-radius:8px; }
+  .thead { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #1e2740; padding-bottom:5px; margin-bottom:3px; }
+  .step { border:1px solid #2a3450; background:#0f1626; border-radius:8px; padding:2px 7px; }
+  .sw { display:inline-block; width:22px; height:12px; border-radius:6px; background:#2fb4a8; position:relative; vertical-align:middle; }
+  .sw::after { content:""; position:absolute; right:1px; top:1px; width:10px; height:10px; border-radius:50%; background:#0b1020; }
+  .scope { width:8px; height:8px; border-radius:50%; background:#ff8a4c; box-shadow:0 0 0 3px rgba(255,138,76,.22); }
+  .spec { width:100%; border-collapse:collapse; font-size:11.5px; margin-top:8px; }
+  .spec td { padding:3px 8px 3px 0; border-bottom:1px solid #1e2740; vertical-align:top; }
+  .spec td:first-child { color:#8791ad; width:34%; }
+  /* ---- T1: fewer voices ---- */
+  .t1 .eyebrow { font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:#7dd3c8; font-weight:700; display:flex; justify-content:space-between; }
+  .t1 .title { font-size:15px; font-weight:600; color:#eef1fb; display:flex; justify-content:space-between; align-items:center; margin-top:2px; }
+  .t1 .hint { font-size:11.5px; color:#8791ad; margin:8px 0 10px; }
+  .t1 .axis { font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:#6b7590; }
+  .t1 .step { font-size:10.5px; letter-spacing:.08em; font-weight:700; color:#eef1fb; }
+  .t1 .setting { font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:#8791ad; }
+  .t1 .name { font-size:12.5px; color:#eef1fb; }
+  .t1 .fig { font-size:12.5px; font-weight:600; color:#eef1fb; }
+  .t1 .tag { font-size:10.5px; color:#8791ad; }
+  .t1 .lvlname { font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:#8791ad; font-weight:700; }
+  .t1 .lvlwhat { font-size:11.5px; color:#7c86a6; margin:1px 0 6px; }
+  .t1 .lvltotal { font-size:11.5px; color:#8791ad; }
+  .t1 .panel .name { color:#c7d0ea; }
+  .t1 .panel .fig { font-weight:500; color:#c7d0ea; }
+  /* ---- T2: sentence case, quiet numbers ---- */
+  .t2 .eyebrow { font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:#7dd3c8; font-weight:700; display:flex; justify-content:space-between; }
+  .t2 .title { font-size:15px; font-weight:600; color:#eef1fb; display:flex; justify-content:space-between; align-items:center; margin-top:2px; }
+  .t2 .hint { font-size:11.5px; color:#8791ad; margin:8px 0 10px; }
+  .t2 .axis { font-size:11.5px; color:#6b7590; }
+  .t2 .step { font-size:11.5px; font-weight:600; color:#eef1fb; text-transform:none; letter-spacing:0; }
+  .t2 .setting { font-size:11.5px; color:#8791ad; }
+  .t2 .name { font-size:12.5px; color:#dfe4f5; }
+  .t2 .fig { font-size:12.5px; font-weight:400; color:#eef1fb; }
+  .t2 .tag { font-size:11px; color:#7c86a6; }
+  .t2 .lvlname { font-size:11.5px; color:#c7d0ea; font-weight:600; }
+  .t2 .lvlwhat { font-size:11.5px; color:#7c86a6; margin:1px 0 6px; }
+  .t2 .lvltotal { font-size:11.5px; color:#8791ad; }
+  .t2 .panel .name { color:#c7d0ea; }
+  /* ---- T3: dense ---- */
+  .t3 .eyebrow { font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#7dd3c8; font-weight:700; display:flex; justify-content:space-between; }
+  .t3 .title { font-size:14px; font-weight:600; color:#eef1fb; display:flex; justify-content:space-between; align-items:center; margin-top:2px; }
+  .t3 .hint { font-size:11px; color:#8791ad; margin:6px 0 8px; }
+  .t3 .axis { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#6b7590; }
+  .t3 .step { font-size:10px; letter-spacing:.08em; font-weight:700; color:#eef1fb; }
+  .t3 .setting { font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:#8791ad; }
+  .t3 .g { padding:3px 6px; }
+  .t3 .name { font-size:11.5px; color:#dfe4f5; }
+  .t3 .fig { font-size:11.5px; font-weight:700; color:#eef1fb; }
+  .t3 .tag { font-size:10px; color:#8791ad; }
+  .t3 .lvlname { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#8791ad; font-weight:700; }
+  .t3 .lvlwhat { font-size:11px; color:#7c86a6; margin:1px 0 4px; }
+  .t3 .lvltotal { font-size:11px; color:#8791ad; }
+</style>
+
+<h2>The card's type — three systems</h2>
+<p class="subtitle">Same card, same content, the row grid from the last screen with a 112px tag home and a short bar. What differs is size, weight, colour and case. Click the one that reads right.</p>
+
+<div class="options">
+  <div class="option" data-choice="t1" onclick="toggleSelect(this)">
+    <div class="letter">T1</div>
+    <div class="content">
+      <h3>Three voices</h3>
+      <p>Structure speaks in caps eyebrows, subjects in body, figures in mono semibold, everything explanatory a step down and muted. Inside a level the subjects and figures drop half a step so the parent row stays the loudest thing.</p>
+      <div class="xc t1">
+        <div class="eyebrow"><span>Explore</span><span style="color:#6b7590;font-weight:400;letter-spacing:0">–</span></div>
+        <div class="title"><span>Network breakdown</span><span class="scope"></span></div>
+        <div class="hint">Every network on the hypergraph. Open one for the roles its nodes play.</div>
+        <div class="thead"><span class="axis">Network</span><span class="step">∧ NODES ∨</span></div>
+        <div class="g"><span class="dot" style="background:#5ab0ff"></span><span class="name">DAG</span><span></span><span class="bar"><i style="width:100%;background:#5ab0ff"></i></span><span class="fig mono">141</span><span class="tail">›</span></div>
+        <div class="g on"><span class="dot" style="background:#ff8a4c"></span><span class="name">Dor Technologies</span><span></span><span class="bar"><i style="width:14%"></i></span><span class="fig mono">19</span><span class="tail" style="color:#ff8a4c">✓</span></div>
+        <div class="panel">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span class="lvlname">By composition</span><span class="lvltotal mono">19 nodes</span></div>
+          <div class="lvlwhat">Which layers each node runs.</div>
+          <div class="g"><span></span><span class="name">Data</span><span class="tag"><span class="chip">dL1</span></span><span class="bar"><i style="width:84%;opacity:.6"></i></span><span class="fig mono">16</span><span class="tail">›</span></div>
+          <div class="g"><span></span><span class="name">Hybrid</span><span class="tag"><span class="chip">L0</span><span class="chip">cL1</span><span class="chip">dL1</span></span><span class="bar"><i style="width:16%;opacity:.6"></i></span><span class="fig mono">3</span><span class="tail">›</span></div>
+        </div>
+        <div class="g"><span class="dot" style="background:#7ee08a"></span><span class="name">BioFi</span><span></span><span class="bar"><i style="width:2%;background:#7ee08a"></i></span><span class="fig mono">3</span><span class="tail">›</span></div>
+      </div>
+      <table class="spec">
+        <tr><td>Eyebrow · axis · level name</td><td>10.5px caps, tracked, bold; teal for the card's eyebrow, muted for the rest</td></tr>
+        <tr><td>Title</td><td>15px semibold, full ink</td></tr>
+        <tr><td>Row name</td><td>12.5px regular, full ink; in a level 12.5px, dim ink</td></tr>
+        <tr><td>Figure</td><td>12.5px mono semibold, full ink; in a level medium, dim ink</td></tr>
+        <tr><td>Hint · level meaning · tag text</td><td>11.5px / 10.5px, muted</td></tr>
+        <tr><td>Stepper word</td><td>10.5px caps bold, full ink — the one control among the labels</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="option" data-choice="t2" onclick="toggleSelect(this)">
+    <div class="letter">T2</div>
+    <div class="content">
+      <h3>Sentence case, quiet numbers</h3>
+      <p>Only the card's eyebrow keeps caps. The axis label, the stepper word and the level names are sentence case at label size, and figures drop their bold: a ranked list reads by the bars and by order, so the numbers can be plain.</p>
+      <div class="xc t2">
+        <div class="eyebrow"><span>Explore</span><span style="color:#6b7590;font-weight:400;letter-spacing:0">–</span></div>
+        <div class="title"><span>Network breakdown</span><span class="scope"></span></div>
+        <div class="hint">Every network on the hypergraph. Open one for the roles its nodes play.</div>
+        <div class="thead"><span class="axis">Network</span><span class="step">∧ Nodes ∨</span></div>
+        <div class="g"><span class="dot" style="background:#5ab0ff"></span><span class="name">DAG</span><span></span><span class="bar"><i style="width:100%;background:#5ab0ff"></i></span><span class="fig mono">141</span><span class="tail">›</span></div>
+        <div class="g on"><span class="dot" style="background:#ff8a4c"></span><span class="name">Dor Technologies</span><span></span><span class="bar"><i style="width:14%"></i></span><span class="fig mono">19</span><span class="tail" style="color:#ff8a4c">✓</span></div>
+        <div class="panel">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span class="lvlname">By composition</span><span class="lvltotal mono">19 nodes</span></div>
+          <div class="lvlwhat">Which layers each node runs.</div>
+          <div class="g"><span></span><span class="name">Data</span><span class="tag"><span class="chip">dL1</span></span><span class="bar"><i style="width:84%;opacity:.6"></i></span><span class="fig mono">16</span><span class="tail">›</span></div>
+          <div class="g"><span></span><span class="name">Hybrid</span><span class="tag"><span class="chip">L0</span><span class="chip">cL1</span><span class="chip">dL1</span></span><span class="bar"><i style="width:16%;opacity:.6"></i></span><span class="fig mono">3</span><span class="tail">›</span></div>
+        </div>
+        <div class="g"><span class="dot" style="background:#7ee08a"></span><span class="name">BioFi</span><span></span><span class="bar"><i style="width:2%;background:#7ee08a"></i></span><span class="fig mono">3</span><span class="tail">›</span></div>
+      </div>
+      <table class="spec">
+        <tr><td>Eyebrow</td><td>10.5px caps bold teal — the only caps on the card</td></tr>
+        <tr><td>Axis · stepper · level name</td><td>11.5px sentence case; stepper and level name semibold, axis muted</td></tr>
+        <tr><td>Row name</td><td>12.5px regular, near-full ink</td></tr>
+        <tr><td>Figure</td><td>12.5px mono regular, full ink</td></tr>
+        <tr><td>Hint · level meaning · tag text</td><td>11.5px / 11px, muted</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="option" data-choice="t3" onclick="toggleSelect(this)">
+    <div class="letter">T3</div>
+    <div class="content">
+      <h3>Dense instrument</h3>
+      <p>Everything a half step smaller and tighter, figures bold: more rows in view, the card reads as a readout rather than a document. Closest to what the cards do today.</p>
+      <div class="xc t3">
+        <div class="eyebrow"><span>Explore</span><span style="color:#6b7590;font-weight:400;letter-spacing:0">–</span></div>
+        <div class="title"><span>Network breakdown</span><span class="scope"></span></div>
+        <div class="hint">Every network on the hypergraph. Open one for the roles its nodes play.</div>
+        <div class="thead"><span class="axis">Network</span><span class="step">∧ NODES ∨</span></div>
+        <div class="g"><span class="dot" style="background:#5ab0ff"></span><span class="name">DAG</span><span></span><span class="bar"><i style="width:100%;background:#5ab0ff"></i></span><span class="fig mono">141</span><span class="tail">›</span></div>
+        <div class="g on"><span class="dot" style="background:#ff8a4c"></span><span class="name">Dor Technologies</span><span></span><span class="bar"><i style="width:14%"></i></span><span class="fig mono">19</span><span class="tail" style="color:#ff8a4c">✓</span></div>
+        <div class="panel">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span class="lvlname">By composition</span><span class="lvltotal mono">19 nodes</span></div>
+          <div class="lvlwhat">Which layers each node runs.</div>
+          <div class="g"><span></span><span class="name">Data</span><span class="tag"><span class="chip">dL1</span></span><span class="bar"><i style="width:84%;opacity:.6"></i></span><span class="fig mono">16</span><span class="tail">›</span></div>
+          <div class="g"><span></span><span class="name">Hybrid</span><span class="tag"><span class="chip">L0</span><span class="chip">cL1</span><span class="chip">dL1</span></span><span class="bar"><i style="width:16%;opacity:.6"></i></span><span class="fig mono">3</span><span class="tail">›</span></div>
+        </div>
+        <div class="g"><span class="dot" style="background:#7ee08a"></span><span class="name">BioFi</span><span></span><span class="bar"><i style="width:2%;background:#7ee08a"></i></span><span class="fig mono">3</span><span class="tail">›</span></div>
+      </div>
+      <table class="spec">
+        <tr><td>Eyebrow · axis · level name</td><td>10px caps, tracked wider</td></tr>
+        <tr><td>Title</td><td>14px semibold</td></tr>
+        <tr><td>Row name · figure</td><td>11.5px; figure mono bold</td></tr>
+        <tr><td>Hint · level meaning</td><td>11px, muted; rows 2px tighter</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:14px">What I think is off today, for the record: five different caps-and-tracking labels on one card (eyebrow, stepper, scope chip, depth caption, "SAME SCALE"), bold figures at every depth so a child row shouts as loudly as its parent, and names in dim ink while the numbers beside them are full ink — the eye lands on the number before the name. T1 fixes the hierarchy and keeps the app's caps idiom; T2 goes further and gives up caps below the eyebrow. My recommendation is T1. Click one and tell me here.</p>

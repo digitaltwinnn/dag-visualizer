@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { METAGRAPHS } from "@/src/net/current";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
-import { scopeEmptyCopy, trendRoster, trendScope } from "./trendScope";
+import { scopeEmptyCopy, stackRoster, trendRoster, trendScope, viewScope } from "./trendScope";
 
 // WHAT THE COMMITTED FILTER DOES TO THE MEASURED HISTORY (2026-09-19). Two registers read this —
 // the History view's chart planes and the Trends document's per-network columns — and both have
@@ -52,13 +52,14 @@ describe("scopeEmptyCopy — the fact, plus the route THIS surface can offer", (
   });
 
   it("states the same FACT in both registers, and a different route in each", () => {
-    const inView = scopeEmptyCopy("empty-dag", "view")!;
-    const inDoc = scopeEmptyCopy("empty-dag", "document")!;
+    const inView = scopeEmptyCopy("empty-unlisted", "view")!;
+    const inDoc = scopeEmptyCopy("empty-unlisted", "document")!;
     expect(inView.fact).toBe(inDoc.fact);
-    expect(inView.route).not.toBe(inDoc.route);
     // The empty-state rule: each route names a gesture available on the surface saying it.
-    expect(inDoc.route).toMatch(/Hypergraph tab/);
-    expect(inView.route).toMatch(/RAW/);
+    expect(scopeEmptyCopy("empty-dag", "document")!.route).toMatch(/Hypergraph tab/);
+    // The VIEW never has an empty DAG (it draws the hypergraph's own plane — `viewScope`), so it
+    // has no sentence for one.
+    expect(scopeEmptyCopy("empty-dag", "view")).toBeNull();
   });
 
   it("covers the unlisted scope too, and never fabricates a chart", () => {
@@ -74,9 +75,25 @@ describe("scopeEmptyCopy — the fact, plus the route THIS surface can offer", (
   it("carries no dash clause in anything a reader sees", () => {
     for (const scope of ["empty-dag", "empty-unlisted"] as const) {
       for (const surface of ["view", "document"] as const) {
-        const c = scopeEmptyCopy(scope, surface)!;
-        expect(`${c.fact} ${c.route}`).not.toMatch(/[—–]|\s-\s/);
+        const c = scopeEmptyCopy(scope, surface);
+        if (c) expect(`${c.fact} ${c.route}`).not.toMatch(/[—–]|\s-\s/);
       }
     }
+  });
+});
+
+describe("the scene's roster and scope — the hypergraph's own plane under the DAG filter (2026-09-26)", () => {
+  it("draws the one id `dag` under the DAG filter, and the document's roster otherwise", () => {
+    expect(stackRoster("dag")).toEqual(["dag"]);
+    expect(stackRoster("all")).toEqual(trendRoster("all"));
+    expect(stackRoster(catalogIds[0])).toEqual([catalogIds[0]]);
+    expect(stackRoster(UNLISTED_ID)).toEqual([]);
+  });
+
+  it("scopes the DAG as a network in the view, and leaves the document's empty state alone", () => {
+    expect(viewScope("dag")).toBe("network");
+    expect(viewScope("all")).toBe("all");
+    expect(viewScope(UNLISTED_ID)).toBe("empty-unlisted");
+    expect(trendScope("dag")).toBe("empty-dag");
   });
 });

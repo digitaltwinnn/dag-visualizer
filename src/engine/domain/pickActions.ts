@@ -16,7 +16,6 @@
 import type { Mode } from "@/src/store/store";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
 import type { CohortSel, CompositionSel } from "./focusLadder";
-import { METAGRAPHS } from "@/src/net/current";
 import { UNLISTED_KEY } from "./ledgerBands";
 
 export type ClickAction =
@@ -114,7 +113,18 @@ export function compositionToggleActions(
 // Drills the global filter into the node's network (only when it actually changes — no churn),
 // selects the node's full geo ANCESTRY in geo (country + cohort — border/firmer land/expanded
 // explorer rows beneath the selection) or its ledger LAYER ancestry in ledger, and sets inspect
-// LAST so the node camera wins the flight. Full-ancestry rule (spec Part 3): committing every
+// LAST so the node camera wins the flight.
+//
+// ⚠️ NOT THE FILTER IN GEOGRAPHY (user, 2026-09-26: "navigation sets the filter automatically
+// sometimes and that feels unexpected"). A geo node is a PLACE first: clicking a machine in
+// Germany used to empty the globe and the country list down to that machine's network, which
+// is the opposite of the browsing the click was part of. So in geo the ancestry is country →
+// cohort → node and the network is never committed by a node — the top-bar filter and the
+// hub-less scene keep it a deliberate, separate gesture. Hyper keeps filter-first (a node is a
+// bead on its hub's shell; the filter is what dims the other hubs and frames the network, and
+// the node rung inherits that framing), and so does the ledger's NODE (a tray node belongs to
+// the chamber's lens; its SNAPSHOT rows do not — `metaSnapSelectActions`). Full-ancestry rule
+// (spec Part 3): committing every
 // rung above the node means a deselect steps back down the SAME ladder regardless of how the
 // node was reached (scene click, explorer row, or a jump straight from "all"). `deselect` is
 // the row's re-click toggle (one toggle language everywhere — the × on the card does the
@@ -134,7 +144,8 @@ export function nodeSelectActions(
   if (opts.deselect) return [{ kind: "inspect", pick: null }];
   const acts: ClickAction[] = [];
   const netId = pickNetId(p);
-  if (netId && netId !== opts.currentFilter) acts.push({ kind: "filter", id: netId });
+  // Geo never commits the network from a node (see the header); every other view drills first.
+  if (netId && netId !== opts.currentFilter && opts.mode !== "geo") acts.push({ kind: "filter", id: netId });
   acts.push(...nodeAncestryActions(p, opts));
   acts.push({ kind: "inspect", pick: p });
   return acts;
@@ -234,28 +245,30 @@ export function snapshotSelectActions(
 export const sameMetaSnap = (a: MetaSnapSel | null, b: MetaSnapSel | null): boolean =>
   a === b || (!!a && !!b && a.metaId === b.metaId && a.ordinal === b.ordinal);
 
-/** A TILE on the ledger's upper floor (spec §5.3): the metagraph snapshot itself. Filter-first,
- *  then the global tick it anchored into, subject LAST — the same full-ancestry contract a node
- *  select follows, so deselecting the tile steps back to the tick rather than to the network.
- *  `follow: false` because pinning a tile pins its tick; the live heartbeat is the strip's job. */
+/** A TILE on the ledger's upper floor (spec §5.3): the metagraph snapshot itself. The global
+ *  tick it anchored into first, the subject LAST — so deselecting the tile steps back to the
+ *  tick. `follow: false` because pinning a tile pins its tick; the live heartbeat is the strip's job.
+ *
+ *  ⚠️ NOT THE FILTER (design session 2026-09-26, decision 13 — the same rule Geography took the
+ *  same day). It used to filter-first for a listed metagraph, so browsing a tick's anchors in the
+ *  explorer and picking one re-committed the app-wide filter: every other network vanished from
+ *  the chamber, the list and the other views, and the commit outlived the visit (user: "click dor,
+ *  then click the actual dor snapshot: it does filter"). A snapshot is a record in a tick; the
+ *  filter is a lens over the whole app, and only the top bar's picker and the Hypergraph's hub
+ *  and network rows set it now. Full ancestry here is tick → snapshot. */
 export function metaSnapSelectActions(
   sel: MetaSnapSel,
   global: Extract<PickDescriptor, { kind: "snapshot" }>,
-  current: { filter: string; metaSnap: MetaSnapSel | null; following?: boolean },
+  current: { metaSnap: MetaSnapSel | null; following?: boolean },
 ): ClickAction[] {
   // The deselect-toggle applies only to a PINNED selection. While FOLLOWING, the shown subject
   // is auto-selected — clicking it must CONVERT the auto-selection into an explicit pin (the
   // click-scoped decode rule, user 2026-08-07), not silently deselect.
   if (sameMetaSnap(current.metaSnap, sel) && !current.following) return [{ kind: "metaSnap", sel: null }];
-  const out: ClickAction[] = [];
-  // Filter-first only for a LISTED metagraph — an UNKNOWN-lane tile carries a raw state-channel
-  // address (2026-08-07, inspectable tiles): the filter vocabulary doesn't know it, so like the
-  // unlisted band it commits only the tick + the subject.
-  const listed = METAGRAPHS.some((m) => m.id === sel.metaId);
-  if (listed && current.filter !== sel.metaId) out.push({ kind: "filter", id: sel.metaId });
-  out.push({ kind: "snapshot", pick: global, follow: false });
-  out.push({ kind: "metaSnap", sel });
-  return out;
+  return [
+    { kind: "snapshot", pick: global, follow: false },
+    { kind: "metaSnap", sel },
+  ];
 }
 
 /** A PLANE in the History view's stack (2026-09-18) — and it is FOCUS ONLY.
@@ -276,8 +289,8 @@ export function trendPlaneActions(id: string, currentFocus: string | null): Clic
 
 /** The raw layer's ARRIVAL commit — "the layer opens on a subject": with nothing selected the
  *  anchor log commits its own first row when the layer surfaces, so the channel pane opens
- *  populated instead of on an empty state. An arrival is NOT a click, so this deliberately
- *  differs from `metaSnapSelectActions` in one way: it never moves the FILTER — a silently
+ *  populated instead of on an empty state. An arrival is NOT a click, so it has no
+ *  deselect toggle; like `metaSnapSelectActions` it never moves the FILTER — a silently
  *  committed network would re-filter the very log the user just opened, and no gesture named a
  *  network. It still pins the tick (`follow: false`), because the pane's deep read is gated on
  *  not-following (an auto-advancing card must never turn the gesture route into a poll), and

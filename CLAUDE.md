@@ -182,7 +182,10 @@ serving a fresh render, not a state bug. Reload before you debug it.
 restart** — the chunk keeps one filename, so an old body ships under the same URL (found 2026-08-13:
 the phone flight-dim rules were in the source for a day while the served chunk predated them, and
 the "bug" was chased in the state machine first). When a rule is missing from the browser's CSSOM,
-don't debug the cascade: kill the server, `rm -rf .next/dev`, restart.
+don't debug the cascade: kill the server, `rm -rf .next/dev`, restart. **A `:root` token edit is the
+common case** (2026-09-26, twice in one session: the `--wash-*` family, then `--sel-*`): the JSX
+hot-reloads and the token keeps its old value, so a measurement that reads the old colour is the
+cache, not the CSS. Restart before doubting the edit.
 
 `next build` and `next dev` don't conflict (dev outputs to `.next/dev`), so the production check can
 run alongside the dev server. Do it at phase boundaries: the build should be clean;
@@ -292,7 +295,7 @@ gathers to the staging grids and fades on the doc overlay's own clock (`fleetFad
 | Path | Responsibility |
 |---|---|
 | `app/` | Next App Router. `globals.css` is **the one stylesheet**; `[view]/` serves the four routed 3D views (`/trends` is the History VIEW — the measured-history document is that view's RAW register, not a route of its own); `/about` and `/design` are the **DOC OVERLAY** (2026-09-04) — they render AppShell with a scrollable document layer over the live scene (`components/DocLayer.tsx`; content in `components/docs/`, opened/closed by store `docPage` with no engine reboot; /about still server-renders its prose for crawlers and carries the **experimental disclosure** that used to be an always-on banner, retired 2026-08-09: a permanent banner over a live instrument reads as an alarm). The footer's About/Design entries toggle the overlay. `--warn-soft` is /about's amber (shared with the raw layer's JSON booleans and the pulse strip's STALE dot). `api/*` are the server-side data routes. |
-| `components/` | React panels, each reading/writing the store. `SceneCanvas` mounts the engine (dynamic-imported so Three never enters the server bundle). |
+| `components/` | React panels, each reading/writing the store. `SceneCanvas` mounts the engine (dynamic-imported so Three never enters the server bundle). `components/explorer/` is the ONE explorer card (2026-09-26): every view's tool card is a description handed to `Explorer.tsx`, never a layout of its own — the design and its deviations are in `docs/superpowers/design/2026-09-26-explorer-card/`. |
 | `components/ui/` | The adopted shadcn/Radix primitives. |
 | `src/store/store.ts` | The Zustand store — mode, filter, selection, hover channels, `section`, phone UI state. |
 | `src/data/` | The live network data layer (`api.ts`'s typed `NetworkData` singleton, `network.ts`'s accessors), the pure row builders, the display vocabularies. No simulation. |

@@ -57,7 +57,6 @@ export default function MetaSnapPane({
   const deepKey = sel ? metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal) : null;
   const deep = useStore((s) => (deepKey ? s.metaSnapDeep[deepKey] : undefined));
   const following = useStore((s) => s.following);
-  const filter = useStore((s) => s.filter);
   // Rule 9's missing consumer (user, 2026-08-15 — "a gray edge effect even though it's filtered
   // on DOR; happens when I swipe"): this card never paired, so its edge could only ever show
   // the grey whisper — hovering now rides `hoverMetaSnap`, the SAME channel the anchor-log row,
@@ -340,7 +339,7 @@ export default function MetaSnapPane({
                   // not just unnecessary but wrong: `metaSnapSelectActions`' deselect early-return
                   // needs `!current.following`, so re-committing the selected snapshot would CLEAR
                   // it, on a button that says `read this`.
-                  if (following) applyClickActions(metaSnapSelectActions(sel, snap, { filter, metaSnap: sel, following }));
+                  if (following) applyClickActions(metaSnapSelectActions(sel, snap, { metaSnap: sel, following }));
                   setDeepWanted(metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal));
                 }}
               >

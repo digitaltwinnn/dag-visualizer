@@ -102,6 +102,13 @@ export function finerLevels(view: View3D, level: FocusLevel): FocusLevel[] {
 // Does this view's ladder have this rung at all? The allow-list read of "is this subject a thing
 // here" — the ladder table already says which rungs a view carries, so a consumer asking (e.g. the
 // Engine deriving a pick's composition group) reads THAT instead of naming the view.
+/** The rung the camera LANDS on for `sel` — the finest active one, which is what a deselect
+ *  returns to. The motion hint names it in the same words a select uses ("Framing X"; user,
+ *  2026-09-26: "don't say 'stepping back', use the same language as when stepping in"). */
+export function finestRung(view: View3D, sel: SelectionSnapshot): FocusLevel {
+  return LADDERS[view].find((r) => r.active(sel))!.level;
+}
+
 export function hasLevel(view: View3D, level: FocusLevel): boolean {
   return LADDERS[view].some((r) => r.level === level);
 }

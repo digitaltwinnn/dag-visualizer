@@ -65,7 +65,21 @@ export const FOCI = {
   // frontal (measured 2026-09-18 against the staggered stack). It exists because the stack
   // staggers UPWARD: the block's centre of area sits above the plane it is measured from, so
   // aiming at `PLANE_Y` itself parked the whole thing low in the free canvas.
-  trend: { pos: new THREE.Vector3(0, 2.5, 54), target: new THREE.Vector3(0, -1.5, -18) },
+  // ⚠️ THE TARGET IS THE FRONT CARD'S DEPTH, z = 0 (user, 2026-09-26: "the front card should
+  // always be the focus and the background cards are just filling, so should never become
+  // larger"). It sat at z = −18, the middle of a deck that runs z = 0 … −36 — and an orbit about
+  // the MIDDLE of a stack of billboards swings the camera toward the rear cards and away from
+  // the front one: measured, a 220×160px drag took the front card from 522px to 396px and the
+  // rearmost from 299px to 485px. The cards carry no perspective of their own (the projector
+  // writes a translate and a uniform scale), so nothing about their shape said "behind" — the
+  // rear card simply became the biggest thing on screen. Pivoting on the subject holds the front
+  // card's size and place under any drag, and every other card can only ever be smaller and
+  // behind it. The target moved ALONG THE RESTING RAY (t = 54/72 of the way from pos to the old
+  // target lands z = 0 at y = −0.5), so the forward axis, the pitch and the framing are
+  // byte-identical at rest; only the pivot changed. The free ORBIT was then switched off for this
+  // view altogether (`viewPolicy.rotate`, same day), so what the pivot serves now is the ZOOM: a
+  // wheel or a pinch dollies toward the target, and the target is the card being read.
+  trend: { pos: new THREE.Vector3(0, 2.5, 54), target: new THREE.Vector3(0, -0.5, 0) },
 } satisfies Record<string, CameraFraming>;
 /** A pose that exists. Every caller of `focus()` names one of these, checked. */
 export type FocusName = keyof typeof FOCI;
@@ -388,6 +402,22 @@ export function ledgerCommitTilt(pos: THREE.Vector3, target: THREE.Vector3, outP
 // "larger"), a full push drove the focused plane ~50px under each rail. Emphasis has to fit the
 // room the rails leave it.
 export const TREND_FOCUS_PUSH = 0.25;
+
+/** Place the History camera `distance` back from its target along the pose's own axis — the
+ *  WIDTH FIT (2026-09-26). `distance` is `trendStack.fitDistance()`, the one number at which the
+ *  front card spans its share of the free band; the axis is `FOCI.trend`'s, so the pitch and the
+ *  aim are untouched and only how far back the camera stands is decided here. Composed BEFORE
+ *  `trendFocusPush` and flown with `dolly: false`: the three global levers all scale (pos − target)
+ *  about the target, which is exactly what this already decided, so they are exempt for this pose
+ *  — not because its target is a composed look-at (the nodeFraming exemption) but because its
+ *  subject has a pixel width and the fit is exact where the √ aspect law is a compromise.
+ *  Safe with `outPos === pos`. */
+export function trendFit(pos: THREE.Vector3, target: THREE.Vector3, distance: number, outPos: THREE.Vector3): void {
+  _out.subVectors(pos, target); // the backward axis, read BEFORE outPos is written (in-place safe)
+  const d = _out.length();
+  if (d > 1e-6) outPos.copy(target).addScaledVector(_out, distance / d);
+  else outPos.copy(pos);
+}
 /** Lean the settled trends pose in toward a focused plane. `depth` is `trendStack.focusDepth()`;
  *  0 means no focus and writes `pos` through unchanged. Safe with `outPos === pos`. */
 export function trendFocusPush(pos: THREE.Vector3, target: THREE.Vector3, depth: number, outPos: THREE.Vector3): void {

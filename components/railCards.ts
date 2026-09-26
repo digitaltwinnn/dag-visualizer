@@ -318,7 +318,7 @@ function compositionHint(s: RailManifestState): string | null {
 // GESTURE and nothing else: the band's timeline is the one control that commits an instant, and
 // naming where it is ("below") is the same work the metagraph-snapshot hint's storey does.
 function instantHint(s: RailManifestState): string | null {
-  return s.mode === "trend" ? `${CLICK(s)} the timeline below.` : null;
+  return s.mode === "trend" ? `${CLICK(s)} a chart, or the timeline below.` : null;
 }
 function metaSnapHint(s: RailManifestState): string | null {
   return s.mode === "ledger" ? `${CLICK(s)} a tile on a plane above the floor.` : null;

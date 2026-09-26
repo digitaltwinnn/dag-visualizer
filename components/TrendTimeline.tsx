@@ -2,14 +2,12 @@
 
 import { useMemo } from "react";
 
-import { cn } from "@/lib/utils";
 import TrendTrack from "@/components/TrendTrack";
 import { WindowPicker } from "@/components/trendPickers";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import useTrendsWindow from "@/components/useTrendsWindow";
 import { stepFor } from "@/src/data/trendSeries";
 import { leadingTrim } from "@/src/data/trendWindow";
-import { stampInstant } from "@/src/data/trendTimeline";
 import { useStore } from "@/src/store/store";
 
 // THE BAND'S TIMELINE (2026-09-18) — what the vitals band holds in the History view, per the
@@ -34,8 +32,21 @@ import { useStore } from "@/src/store/store";
 //     survives the pointer leaving. Hovering previews a faint line LOCALLY and writes nothing
 //     (rule 9: hovers preview, never commit).
 //
+// THE TRACK TAKES THE WHOLE BAND, AND THE PILLS STAND ABOVE ITS TOP-RIGHT CORNER (user, 2026-09-26:
+// "remove the text 'Cursor none picked', position the range bar on top of the bottom bar (right
+// side) and use that extra space for the trends with the window over it"). The band held three
+// columns — track, a CURSOR readout, the pills — and the readout's 16ch reserve plus the pills'
+// column cost the track a third of the lane. Now the track spans the band and the pills stand
+// ABOVE the plate's top-right corner, outside it (user, 2026-09-26, second round: over the corner
+// they covered the newest buckets' peaks — "above the bottom section, not directly on top of it";
+// the band's clip leaves its top edge open for exactly this); on the phone arm the
+// pills keep their own row above the track, since six pills over a 390px track would hide a third
+// of it. THE READOUT IS GONE: the absence of a cursor line IS "none picked" (the brush's own rule
+// for ALL — no rectangle, because the absence is the statement), and a picked instant is STAMPED
+// on the track beside its line (`TrendTrack`), so the band still says when, in its own paint.
+//
 // ⚠️ THE SHELL AND THE INSTRUMENT ARE TWO FILES (2026-09-18, at ~300 lines). This is the BAND
-// TENANT: which payload, the readout, the window pills, the honesty states. The track — the SVG
+// TENANT: which payload, the window pills, the honesty states. The track — the SVG
 // and every gesture over it — is `components/TrendTrack.tsx`, because its whole subject is a
 // geometry it MEASURES ITSELF and nothing here has those numbers. Every decision a pointer makes
 // is pure and tested in `src/data/trendTimeline.ts`, which is what keeps both halves thin.
@@ -84,11 +95,29 @@ export default function TrendTimeline() {
 
   return (
     // THE ONE `pointer-events-auto` (see the header). Everything else in the band stays inert.
-    <div className="pointer-events-auto flex-1 min-w-0 flex items-stretch gap-3 max-[700px]:flex-col max-[700px]:gap-1.5">
-      {/* THE TRACK's column. `order` only on the phone arm, where the pills take their own row
-          ABOVE it — the document's own stacking idiom, and the thumb wants the pills nearer the
-          dock's edge than a full-width scrub target does. */}
-      <div className="flex-1 min-w-0 flex flex-col justify-center max-[700px]:order-2 max-[700px]:min-h-[54px]">
+    // `relative` is the pills' containing block; the track fills the rest.
+    <div className="pointer-events-auto relative flex-1 min-w-0 flex flex-col max-[700px]:gap-1.5">
+      {/* THE PILLS, standing above the plate's top-right corner — first in DOM order so the phone
+          arm, where they are static, puts them ABOVE the track (the document's own stacking idiom:
+          the thumb wants the pills nearer the dock's edge than a full-width scrub target does). */}
+      <div
+        // The COMMAND BAR's glass under the pills (same `--topbar-glass`, same blur): the group
+        // floats over the SCENE now, where the picker's own hairline-and-wash — right for a group
+        // on a page — would let the ground's ink run through the words. `bottom-full` is the
+        // tenant's top; the plate's padding plus `mb-3` clears its edge by a hairline's breath.
+        className="absolute bottom-full right-0 mb-3 z-[1] rounded-lg [background:var(--topbar-glass)] backdrop-blur-sm max-[700px]:static max-[700px]:mb-0 max-[700px]:self-stretch max-[700px]:[background:none] max-[700px]:backdrop-blur-none"
+      >
+        <WindowPicker
+          className="bg-transparent"
+          zoom={windowId}
+          range={range}
+          stepMs={stepMs}
+          onPick={setTrendWindow}
+          onClearRange={() => setTrendRange(null)}
+        />
+      </div>
+      {/* THE TRACK's column, the whole band wide. */}
+      <div className="flex-1 min-h-0 flex flex-col justify-center max-[700px]:min-h-[54px]">
         {/* HONESTY STATES (rule 10). THREE facts, not two — the third was a review find: an
             ARRIVED payload with nothing measured in it. `leadingTrim` answers that case with a
             ZERO-BUCKET window, which is truthy, so the track used to render a bare axis with
@@ -118,33 +147,6 @@ export default function TrendTimeline() {
             setTrendCursor={setTrendCursor}
           />
         )}
-      </div>
-      {/* THE READOUT AND THE PILLS. On the phone arm this row sits above the track and spreads. */}
-      <div className="flex-none flex items-center gap-2 max-[700px]:order-1 max-[700px]:justify-between">
-        {/* ⚠️ THE READOUT RESERVES ITS SLOT, and this is not tidiness (2026-09-18 round 2, found by
-            instrumenting the scrub). The track is `flex-1` and this column was content-sized, so
-            every time the stamp changed WIDTH — "Dec 26, 2025" to "Sep 18, 13:45 UTC" — the track
-            was re-measured and its whole x↔ms geometry re-derived. Measured: 10 width changes
-            during a single 60-event scrub, which is both the memo invalidation the round was about
-            AND a correctness smell in its own right, since the mapping was shifting under the
-            pointer mid-gesture. It is the `NodeStars` rule reaching a committed value: a slot a
-            changing value lands in reserves its width so nothing around it reflows. 16ch clears
-            the widest form (the fine-tier stamp with its UTC suffix). */}
-        <span className="flex flex-col leading-none gap-1 whitespace-nowrap min-w-[16ch]">
-          <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground">Cursor</span>
-          {/* NO INSTANT IS A STATE, NOT A BLANK (rule 10): the rail reads this channel, so the band
-              says when nothing has been picked rather than showing an empty slot. */}
-          <span className={cn("text-label tabular-nums", cursorMs != null ? "text-foreground" : "text-muted-foreground")}>
-            {cursorMs != null ? stampInstant(cursorMs, stepMs) : "none picked"}
-          </span>
-        </span>
-        <WindowPicker
-          zoom={windowId}
-          range={range}
-          stepMs={stepMs}
-          onPick={setTrendWindow}
-          onClearRange={() => setTrendRange(null)}
-        />
       </div>
     </div>
   );

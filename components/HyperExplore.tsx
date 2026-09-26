@@ -1,36 +1,44 @@
 "use client";
 
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { cn } from "@/lib/utils";
-import { useStore } from "@/src/store/store";
-import ExplorerShell from "@/components/ExplorerShell";
-import { metagraphById } from "@/src/data/network";
-import { compositionGroups, compositionClause } from "@/src/data/composition";
-import { identityHudCss } from "@/src/palette/identity";
-import { IdentityDot, RoleChips } from "@/components/inspector/parts";
-import { SelectedRowMark, selectedRow, selectionHue } from "@/components/selection";
-import { hoverKeyOf } from "@/src/data/hoverSubject";
-import { compositionToggleActions, filterToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
-import { applyClickActions } from "@/src/store/applyClickActions";
-import { subjectPairing } from "@/components/useSubjectPairing";
-import { useLadderFocus } from "@/components/useLadderFocus";
-import { DepthCaption, DisclosureChevron, Disclosure, DisclosurePanel, DisclosureRow, NodePickerRow, ROW_NEST, ROW_NEST_DEEP, ROW_OUTSET } from "@/components/ExploreRows";
-import type { NodeRow } from "@/src/data/types";
+import { useMemo } from "react";
 
-// Hypergraph's single **explore** card — the architectural sibling of GeoExplore: each view's
-// explorer breaks the node set down along the view's OWN dimension (geo = where → country →
-// cohort → node; hyper = who/what → network → composition group → node). The NETWORK rows mirror
-// the filter picker on purpose (clicking one commits the filter through the same tested table a
-// 3D hub click runs — the top-bar filter stays the global scope control, this is the view's
-// browsing surface). The COMPOSITION rows under the drilled network are COMMITTABLE (user
-// reversal, 2026-08-02, of the disclosures-only rule): the make-up group is now a real focus
-// rung with its own right-rail card, geo's provider-cohort idiom bent onto architecture — one
-// click commits AND expands it, so the disclosure state IS the committed composition (single-open
-// by construction). The terminal subject is still a node.
+import Explorer, { type ExplorerLevelSpec } from "@/components/explorer/Explorer";
+import { nodeRowSpec } from "@/components/explorer/nodeRow";
+import { IdentityDot, RoleChips } from "@/components/inspector/parts";
+import { subjectPairing } from "@/components/useSubjectPairing";
+import { compositionClause, compositionGroups } from "@/src/data/composition";
+import { networkOfRow } from "@/src/data/geoMeasure";
+import { hoverKeyOf } from "@/src/data/hoverSubject";
+import { HYPER_MEASURE_OPTIONS, groupMeasure, networkMeasure, type HyperMeasure } from "@/src/data/hyperMeasure";
+import { metagraphById } from "@/src/data/network";
+import type { NodeRow } from "@/src/data/types";
+import { compositionToggleActions, filterToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
+import { identityHudCss } from "@/src/palette/identity";
+import { applyClickActions } from "@/src/store/applyClickActions";
+import { useStore } from "@/src/store/store";
+
+// THE HYPERGRAPH'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
+// 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
+// decides only what a view may: which levels are open, what each row is and commits, what each level
+// measures, and the words. The layout is the component's.
+//
+// THE LEVELS follow the ladder (`domain/focusLadder`): networks → a network's compositions → a
+// composition's nodes. Which level is on screen is READ FROM THE STORE — the committed filter and
+// composition — never from local open/closed state, so a click on the hub in the scene, a row here
+// and a card on the right rail all land the same level (rule 2's one write path, through
+// `applyClickActions`). A crumb click RELEASES every rung finer than it, through the same table.
+//
+// Rule 9 is intact: every row previews on the channel its subject already pairs on (`hoverFilter`
+// for a network, `hoverGroup` + `hoverCohort` for a composition, `hoverNodeId` for a node), and
+// none of them commits.
+
 export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: boolean } = {}) {
   const metaList = useStore((s) => s.metaList);
   const filter = useStore((s) => s.filter);
   const selNodes = useStore((s) => s.selNodes);
+  const allNodes = useStore((s) => s.allNodes);
+  const hyperMeasure = useStore((s) => s.hyperMeasure);
+  const setHyperMeasure = useStore((s) => s.setHyperMeasure);
   const inspect = useStore((s) => s.inspect);
   const composition = useStore((s) => s.composition);
   const hoverFilter = useStore((s) => s.hoverFilter);
@@ -40,15 +48,11 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
   const setHoverCohort = useStore((s) => s.setHoverCohort);
   const hoverGroup = useStore((s) => s.hoverGroup);
   const setHoverGroup = useStore((s) => s.setHoverGroup);
-  // Which rung currently holds the focus — the committed rows COARSER than it wear the
-  // ancestor strength of the selection mark (see components/useLadderFocus.ts).
-  const focus = useLadderFocus();
 
-  // Row selections run the SAME tested decision table as the scene clicks (domain/pickActions)
-  // through the SAME executor (store/applyClickActions) — a network row IS a hub click, a node
-  // row IS a 3D node click; re-clicking the committed network steps back to "all" (the filter
-  // picker's toggle rule), re-clicking the selected node deselects.
+  // The three writes, all through the decision table and the one executor (rule 2).
   const toggleNetwork = (id: string) => applyClickActions(filterToggleActions(id, filter));
+  const toggleComposition = (compKey: string) =>
+    applyClickActions(compositionToggleActions({ netId: filter, key: compKey }, { composition, hasInspect: !!inspect, filter }));
   const selectNode = (pick: NodeRow["pick"], selected: boolean, compKey: string) =>
     applyClickActions(
       nodeSelectActions(pick, {
@@ -56,219 +60,154 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
         currentFilter: filter,
         deselect: selected,
         // FULL-ANCESTRY: a node select commits its parent group too, so a deselect steps back
-        // onto the composition rung (ledger's `ledgerLayerId` twin).
+        // onto the composition rung.
         compositionSel: { netId: filter, key: compKey },
       }),
     );
-  const toggleComposition = (compKey: string) =>
-    applyClickActions(
-      compositionToggleActions({ netId: filter, key: compKey }, { composition, hasInspect: !!inspect, filter }),
-    );
 
-  // The drilled network's nodes grouped by COMPOSITION (user, 2026-07-12 — was by layer
-  // shell): the same make-up vocabulary as the metagraph card's composition table (Hybrid /
-  // Data / …), each group showing WHICH layers it runs as the squared pills. The grouping itself
-  // lives in `src/data/composition.ts` — shared with the composition CARD and the Engine's glow
-  // resolution, so a count can't drift between the row, the card and the 3D highlight.
-  //
-  // The DISCLOSURE state is the COMMITTED composition (store.composition), not local state:
-  // committing and expanding are one click, and single-open falls out for free.
-  const openCompKey = composition && composition.netId === filter ? composition.key : null;
+  const sel = inspect && "node" in inspect ? inspect.node : null;
+  const selIp = sel?.ip ?? null;
 
-  // The selected node, matched by IP alone — the id rows here are MACHINE rows (one per
-  // machine after the dedupe), so the geo browser's ip+layer double-row problem can't occur.
-  const sel =
-    inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode") ? inspect : null;
-  const selIp = sel?.node?.ip ?? null;
+  // ---- level 0: the networks, measured by the heading's pick ----------------------------------
+  const measured = useMemo(() => {
+    const byNet = new Map<string, NodeRow[]>();
+    for (const r of allNodes) {
+      const n = networkOfRow(r);
+      if (n) (byNet.get(n) ?? byNet.set(n, []).get(n)!).push(r);
+    }
+    return metaList
+      .map((m) => ({ m, v: networkMeasure(hyperMeasure, m, byNet.get(m.id) ?? []) }))
+      // Sorted by the measure, fleet size as the tiebreak: the order is what the eye reads off a
+      // ranked list. A selection never re-orders it (design: "selection stays in place").
+      .sort((a, b) => b.v - a.v || b.m.nodes.length - a.m.nodes.length);
+  }, [metaList, allNodes, hyperMeasure]);
+  const maxV = Math.max(1, measured[0]?.v ?? 0);
+
+  const netCfg = filter !== "all" ? metagraphById(filter) : null;
+  const netName = netCfg?.name ?? (filter === "dag" ? "DAG" : filter);
+  const netHue = filter !== "all" ? identityHudCss(filter) : null;
+  const groups = useMemo(() => (filter !== "all" ? compositionGroups(selNodes) : []), [filter, selNodes]);
+  const openGroup = composition && composition.netId === filter ? groups.find((g) => g.key === composition.key) ?? null : null;
+
+  const levels: ExplorerLevelSpec[] = [
+    {
+      key: "networks",
+      crumb: { label: "Networks", onRelease: () => toggleNetwork(filter) },
+      measure: { options: HYPER_MEASURE_OPTIONS, value: hyperMeasure, onPick: (id) => setHyperMeasure(id as HyperMeasure) },
+      hasFigure: true,
+      // No tags at this level, so the name takes the tag home's room (the longest catalog name
+      // fits without an ellipsis).
+      nameW: 128,
+      rows: measured.map(({ m, v }) => {
+        const cfg = metagraphById(m.id);
+        const name = cfg?.name ?? m.id;
+        const hue = identityHudCss(m.id);
+        return {
+          key: m.id,
+          glyph: <IdentityDot hue={hue} />,
+          name,
+          share: v / maxV,
+          hue,
+          figure: v.toLocaleString(),
+          faint: m.nodes.length === 0,
+          title: `${name} · ${m.nodes.length} node${m.nodes.length === 1 ? "" : "s"}`,
+          onClick: () => toggleNetwork(m.id),
+          pair: subjectPairing(hoverFilter, m.id, setHoverFilter, hue),
+        };
+      }),
+    },
+  ];
+
+  if (filter !== "all") {
+    // The network level's pick CARRIES DOWN (user, 2026-09-26): a composition row shows the same
+    // measure over its own rows, so "Countries" stays "Countries" when you step in.
+    const groupValues = groups.map((g) => groupMeasure(hyperMeasure, g.rows));
+    const maxRows = Math.max(1, ...groupValues);
+    levels.push({
+      key: "compositions",
+      crumb: {
+        label: (
+          <>
+            <IdentityDot hue={netHue!} />
+            {netName}
+          </>
+        ),
+        onRelease: () => (openGroup ? toggleComposition(openGroup.key) : undefined),
+      },
+      meaning: "Which layers each node runs",
+      measure: { options: HYPER_MEASURE_OPTIONS, value: hyperMeasure, onPick: (id) => setHyperMeasure(id as HyperMeasure) },
+      hasFigure: true,
+      nameW: 52,
+      // Honest instrument state — mirrors the 3D: a metagraph with no reported nodes renders a
+      // hub and nothing else.
+      empty: "No nodes reported.",
+      rows: groups.map((g, i) => {
+        const key = `${filter}|${g.key}`;
+        const pair = subjectPairing(hoverGroup, key, setHoverGroup, netHue!);
+        const v = groupValues[i]!;
+        return {
+          key: g.key,
+          name: g.label,
+          tag: <RoleChips codes={g.codes} tight />,
+          share: v / maxRows,
+          hue: netHue,
+          figure: v.toLocaleString(),
+          title: `${g.label} · ${g.rows.length} node${g.rows.length === 1 ? "" : "s"}`,
+          onClick: () => toggleComposition(g.key),
+          pair: {
+            ...pair,
+            // The group's members glow in the scene while its row is hovered (rule 9).
+            onMouseEnter: () => {
+              pair.onMouseEnter();
+              setHoverCohort(g.rows.map((r) => hoverKeyOf(r.pick)).filter((k): k is string => !!k));
+            },
+            onMouseLeave: () => {
+              pair.onMouseLeave();
+              setHoverCohort(null);
+            },
+          },
+        };
+      }),
+    });
+  }
+
+  if (openGroup) {
+    const clause = compositionClause(openGroup.codes);
+    levels.push({
+      key: "nodes",
+      crumb: { label: openGroup.label },
+      meaning: clause ? `Nodes that ${clause}` : "Each node running this composition",
+      measure: null,
+      hasFigure: false,
+      // The one node row (`explorer/nodeRow.tsx`); the level is one network, so no ticker.
+      rows: openGroup.rows.map((r, i) => {
+        const on = selIp != null && "node" in r.pick && r.pick.node?.ip === selIp;
+        const hue = identityHudCss(r.pick.kind === "metanode" && r.pick.meta ? r.pick.meta.id : "dag");
+        return nodeRowSpec({
+          key: (r.id ?? r.label) + i,
+          row: r,
+          hue,
+          on,
+          onClick: () => selectNode(r.pick, on, openGroup.key),
+          pair: subjectPairing(hoverNodeId, hoverKeyOf(r.pick), setHoverNodeId, hue),
+        });
+      }),
+    });
+  }
 
   return (
-    // The shell owns the Card frame, CardHead, collapse state, and the padded body — HyperExplore
-    // is the architectural sibling of GeoExplore and shares its chrome exactly (both migrated
-    // onto ExplorerShell together, pixel-neutral).
-    <ExplorerShell
-      defaultCollapsed={defaultCollapsed}
+    <Explorer
       id="hyperexplore"
-      title="Nodes by network"
-      // No ordering clause (user, 2026-08-12): a sorted list states its own order, so "biggest
-      // fleet first" only spent words on what the eye already reads. See the hint-shape note in
-      // GeoExplore.tsx, which is the shared rule.
+      title="Network breakdown"
       hint="Every network on the hypergraph. Open one for the roles its nodes play."
-    >
-      {/* Sorted by fleet size (user, 2026-07-12) — the biggest networks lead. */}
-      {[...metaList].sort((a, b) => b.nodes.length - a.nodes.length).map((m) => {
-              const cfg = metagraphById(m.id);
-              const name = cfg?.name ?? m.id;
-              const hue = identityHudCss(m.id);
-              const open = m.id === filter;
-              // Bidirectional pairing on the SAME channel the 3D hubs and the dossier use:
-              // hovering the row previews the selection dim in the scene, hovering the hub
-              // washes this row.
-              const pair = subjectPairing(hoverFilter, m.id, setHoverFilter, hue);
-              return (
-                // ⚠️ RADIX HOLDS THE PAIRING, NEVER THE STATE. `open` is `m.id === filter` — the
-                // committed FILTER, read from the store — because this row is a selection COMMIT
-                // whose disclosure is a consequence, not a toggle that happens to select. So the
-                // Collapsible is controlled, and `onOpenChange` runs the very same
-                // `toggleNetwork` the button's onClick did: the write still goes through the
-                // decision table and the one executor (rule 2). What is gained is the trigger↔
-                // panel id pairing and a body that animates instead of popping.
-                <Collapsible
-                  key={m.id}
-                  open={open}
-                  onOpenChange={() => toggleNetwork(m.id)}
-                  className={cn(open && "bg-wash-faint rounded-btn my-0.5 -mx-1.5 px-1.5")}
-                >
-                  <CollapsibleTrigger
-                    className={cn(
-                      "nb-row group flex items-center gap-2.5 text-left text-body border border-transparent bg-transparent cursor-pointer py-[5px] rounded-sm transition-[background] duration-150",
-                      ROW_OUTSET,
-                      "hover:bg-wash-hover",
-                      "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-                      // The committed network wears the shared selection language; its state
-                      // cue is the open accordion, not a ✓ (geo's drilled-country rule). At
-                      // ANCESTOR strength once a finer rung (a composition group, a node) is
-                      // committed, so the list keeps one head.
-                      open && selectedRow(focus === "context"),
-                      // 0-node networks dim like the filter picker's 0-count rows
-                      // (opacity-45 there too) — real and clickable, just quiet.
-                      m.nodes.length === 0 && "opacity-45",
-                      pair.paired && pair.className,
-                    )}
-                    // The selection follows the subject's identity (selection.tsx · selectionHue).
-                    style={{ ...(open ? selectionHue(hue) : undefined), ...pair.style }}
-                    title={`${name} · ${m.nodes.length} node${m.nodes.length === 1 ? "" : "s"}`}
-                    onMouseEnter={pair.onMouseEnter}
-      onMouseMove={pair.onMouseMove}
-                    onMouseLeave={pair.onMouseLeave}
-                    onFocus={pair.onFocus}
-                    onBlur={pair.onBlur}
-                  >
-                    <IdentityDot hue={hue} />
-                    <span className="flex-1 min-w-0 text-body text-foreground-dim whitespace-nowrap overflow-hidden text-ellipsis" title={name}>
-                      {name}
-                    </span>
-                    {/* ⚠️ MONO, like every count in this app — `/design`'s sans/mono split names counts as machine
-                        data, and this column had `tabular-nums` without the face it belongs to. It matters here more
-                        than most: this row's body states the same breakdown as the dossier's BY NODE COMPOSITION one
-                        rail over, and the vitals band's MicroBars state it a third time — three surfaces, one set of
-                        numbers, and two of them were already mono (user, 2026-09-14). */}
-                    <span className="flex-none text-right font-mono text-body tabular-nums font-semibold">{m.nodes.length}</span>
-                    {open ? (
-                      <SelectedRowMark className="flex-none" muted={focus !== "context"} hue={hue} />
-                    ) : (
-                      <DisclosureChevron open={open} />
-                    )}
-                  </CollapsibleTrigger>
-
-                  <CollapsibleContent className="disclose-panel">
-                    {/* Leaving the shell list clears the scene hover-glows — by mouse or keyboard. */}
-                    <div
-                      className={cn("mb-1.5 ml-[9px] py-0.5 pl-3", ROW_NEST)}
-                      onMouseLeave={() => {
-                        setHoverNodeId(null);
-                        setHoverCohort(null);
-                        setHoverGroup(null);
-                      }}
-                      onBlur={() => {
-                        setHoverNodeId(null);
-                        setHoverCohort(null);
-                        setHoverGroup(null);
-                      }}
-                    >
-                      {selNodes.length === 0 ? (
-                        // Honest instrument state — mirrors the 3D: a metagraph with no
-                        // reported nodes renders a hub and nothing else.
-                        <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">No nodes reported.</p>
-                      ) : (
-                        (() => {
-                          const groups = compositionGroups(selNodes);
-                          // Depth caption (user, 2026-08-16): this depth's one new concept — the
-                          // network's machines grouped by role make-up.
-                          const caption = <DepthCaption key="caption">Nodes by composition</DepthCaption>;
-                          // The label column sizes to the LONGEST label PRESENT (user — a fixed
-                          // width left dead air when only short words showed): every label span
-                          // stacks an invisible copy of the longest word behind its own text
-                          // (the inline-grid overlap sizer), so the pill column aligns AND hugs.
-                          const longest = groups.reduce((a, g) => (g.label.length > a.length ? g.label : a), "");
-                          return [caption, ...groups.map((g) => {
-                          const key = `${m.id}|${g.key}`;
-                          const isOpen = openCompKey === g.key;
-                          const holdsSel =
-                            selIp != null &&
-                            g.rows.some((r) => "node" in r.pick && r.pick.node?.ip === selIp);
-                          return (
-                            <Disclosure key={key} open={isOpen} onToggle={() => toggleComposition(g.key)}>
-                              {/* The composition-group row — the metagraph card's table
-                                  vocabulary (Hybrid / Data / …) with the layer-code pills.
-                                  COMMITS the group (its own right-rail card + the steady 3D
-                                  group glow) and expands it in the same click; re-clicking
-                                  steps back to the network. */}
-                              <DisclosureRow
-                                open={isOpen}
-                                on={isOpen}
-                                focused={focus === "composition"}
-                                holdsSel={holdsSel}
-                                title={`${g.label} · ${g.rows.length} node${g.rows.length > 1 ? "s" : ""}`}
-                                onHoverEnter={() => setHoverCohort(g.rows.map((r) => hoverKeyOf(r.pick)).filter((k): k is string => !!k))}
-                                onHoverLeave={() => setHoverCohort(null)}
-                                groupKey={key}
-                                hoverGroup={hoverGroup}
-                                setHoverGroup={setHoverGroup}
-                                hue={hue}
-                              >
-                                <span className="inline-grid flex-none text-body text-foreground">
-                                  <span className="col-start-1 row-start-1">{g.label}</span>
-                                  <span className="col-start-1 row-start-1 invisible" aria-hidden>{longest}</span>
-                                </span>
-                                <RoleChips codes={g.codes} />
-                                <span className="ml-auto flex-none font-mono tabular-nums text-body font-semibold">{g.rows.length}</span>
-                              </DisclosureRow>
-
-                              <DisclosurePanel className={ROW_NEST_DEEP}>
-                                  {/* Depth caption (user, 2026-08-16, twice refined — first to the
-                                      group's codes, then past them: "rather than repeating its
-                                      parent, say what it DOES"): the parent row already names the
-                                      label and the chips, so the caption states the FUNCTION —
-                                      "Nodes that seal the network's snapshots" — composed per code
-                                      from compositionClause (one home, src/data/composition.ts).
-                                      A composition with no known clause falls back to the codes'
-                                      "…validators" form rather than saying nothing wrong. */}
-                                  <DepthCaption>
-                                    {compositionClause(g.codes) ? (
-                                      <span>Nodes that {compositionClause(g.codes)}</span>
-                                    ) : (
-                                      <span className="inline-flex items-center gap-1">
-                                        <RoleChips codes={g.codes} />
-                                        <span>validators</span>
-                                      </span>
-                                    )}
-                                  </DepthCaption>
-                                  {g.rows.map((r, i) => {
-                                    const on =
-                                      selIp != null &&
-                                      "node" in r.pick && r.pick.node?.ip === selIp;
-                                    return (
-                                      <NodePickerRow
-                                        key={(r.id ?? r.label) + i}
-                                        row={r}
-                                        selected={on}
-                                        hoverNodeId={hoverNodeId}
-                                        setHoverNodeId={setHoverNodeId}
-                                        onSelect={() => selectNode(r.pick, on, g.key)}
-                                      />
-                                    );
-                                  })}
-                              </DisclosurePanel>
-                            </Disclosure>
-                          );
-                          })];
-                        })()
-                      )}
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              );
-            })}
-    </ExplorerShell>
+      levels={levels}
+      defaultCollapsed={defaultCollapsed}
+      onLeave={() => {
+        setHoverFilter(null);
+        setHoverNodeId(null);
+        setHoverCohort(null);
+        setHoverGroup(null);
+      }}
+    />
   );
 }

@@ -57,11 +57,10 @@
 // committed filter scopes the stack to one plane, so a click would delete the four planes the
 // gesture is about; the decision and its reasoning live in `domain/pickActions.ts`.
 //
-// ⚠️ A DRAG IS NOT A CLICK. These strips sit over a camera you orbit by dragging, and a press that
-// TRAVELS is a drag whatever it started on — so the pointer's travel is measured and a click that
-// moved more than a few px is dropped. (A press that starts on a strip does not reach the canvas
-// at all, so it cannot orbit: the strips swallow that drag, which is the accepted cost of putting
-// a control over the scene. Every pixel that is not a header still orbits.)
+// ⚠️ A DRAG IS NOT A CLICK. A press that TRAVELS is a drag whatever it started on — so the
+// pointer's travel is measured and a click that moved more than a few px is dropped. History has
+// no orbit (2026-09-26; `viewPolicy.rotate` is false): a drag across the FRONT chart's plot is the
+// range BRUSH (`onRange`), and the wheel still zooms through the canvas.
 
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 
@@ -69,9 +68,7 @@ import TrendChart, { type TrendLine } from "@/components/docs/TrendChart";
 import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import useStagedMeasure, { ROLL_CLASS, useHeldOrder } from "@/components/useStagedMeasure";
-import TrendMeasure from "@/components/TrendMeasure";
 import { cn } from "@/lib/utils";
-import { handOrbitToScene } from "@/components/orbitHandoff";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
 import { metricCaption, sharedCeiling, stepMetric } from "@/src/data/trendSeries";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
@@ -86,7 +83,7 @@ import { useStore } from "@/src/store/store";
 const NO_IDS: readonly string[] = [];
 
 /** How far a press may travel and still count as a click, in px. Generous enough for a shaky
- *  finger, tight enough that a deliberate orbit attempt never commits a focus. */
+ *  finger, tight enough that a deliberate brush never commits a focus or a cursor pick. */
 const DRAG_SLOP = 4;
 
 
@@ -106,8 +103,17 @@ export default function TrendStack() {
   // stack is read at ONE moment rather than five. A COMMIT, not a hover (store `trendCursorMs`,
   // written by the band's timeline at most once per BUCKET), and `null` draws nothing anywhere.
   const cursorMs = useStore((s) => s.trendCursorMs);
+  // A click on a plane's PLOT picks the instant under it (user, 2026-09-26 — the cursor acts on
+  // the charts in the scene as well as on the band's timeline). The same setter the timeline
+  // writes, deliberately outside the pickActions table (the cursor is not a rung — see the
+  // cursor card's notes in components/CLAUDE.md); the drag guard below keeps an orbit that
+  // started on the plot from landing as a pick.
+  const setTrendCursor = useStore((s) => s.setTrendCursor);
+  // A drag across a plane's plot brushes the RANGE (see `onPointerMove`): the timeline's own
+  // write, for the whole stack, never one plane.
+  const setTrendRange = useStore((s) => s.setTrendRange);
   // THE SCENE↔HUD HOVER PAIRING (convention 9), on the network channel every other surface in the
-  // app already pairs a network on: hovering a plane's header previews its Layers row in the rail,
+  // app already pairs a network on: hovering a plane's header previews its Networks row in the rail,
   // and hovering that row previews this plane. A preview is never a commit — the only thing it
   // changes here is the plane's OPACITY, never its pose.
   const hoverFilter = useStore((s) => s.hoverFilter);
@@ -134,7 +140,7 @@ export default function TrendStack() {
 
   // ⚠️ ONE ROSTER PASS, SHARED WITH BOTH RAILS (2026-09-19). Which networks, in what order, drawn
   // against which axis and with what measured — `components/useTrendRoster.ts` is the one answer,
-  // read here, by the Layers card and by the cursor card. Three copies of it would be three
+  // read here, by the Networks card and by the cursor card. Three copies of it would be three
   // chances to disagree about the very ranking these planes are laid out by. It carries the
   // counter EDGE TRIM too, so a rail can never quote a number no chart on screen agrees with.
   const roster = useTrendRoster(slice, filter, shown);
@@ -227,19 +233,19 @@ export default function TrendStack() {
     down.current = { x: e.clientX, y: e.clientY };
     dragged.current = false;
   };
-  // A PRESS THAT TRAVELS IS THE SCENE'S ORBIT, NOT THE CARD'S (user, 2026-09-19). The header strips
-  // and the front card are where a hand lands, and a drag begun there used to go nowhere. Past the
-  // click slop the pointer is handed to the canvas (`orbitHandoff`) and the rest of the gesture is
-  // a native OrbitControls drag. `dragged` is raised at the handoff: the pointer is captured away,
-  // so this card never sees its pointerup, and whatever click the browser still synthesises must
-  // not read as a tap.
+  // A PRESS THAT TRAVELS IS A BRUSH, NOT A CLICK (2026-09-26). It used to be handed to the canvas
+  // as the scene's orbit (`orbitHandoff`, 2026-09-19); History has had no orbit since 2026-09-26
+  // (`viewPolicy.rotate` is false — the cards hold their implied places and a click brings one
+  // forward), so the drag was free, and the user asked for the document's own gesture on the
+  // scene's charts: "create a window also in the main chart". The front chart's `onRange` brush
+  // (the same one the document's charts run) commits the range for the whole stack, exactly as
+  // the band's timeline does; `dragged` keeps the click the browser synthesises after the
+  // release from also landing as a cursor pick.
   const onPointerMove = (e: React.PointerEvent) => {
     const d = down.current;
     if (!d || e.buttons === 0) return;
     if (Math.hypot(e.clientX - d.x, e.clientY - d.y) <= DRAG_SLOP) return;
-    down.current = null;
     dragged.current = true;
-    handOrbitToScene(e);
   };
   const onPointerUp = (e: React.PointerEvent) => {
     const d = down.current;
@@ -247,15 +253,16 @@ export default function TrendStack() {
     dragged.current = dragged.current || (!!d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > DRAG_SLOP);
   };
   // UP / DOWN IS THE VIEW'S THIRD AXIS (user, 2026-09-19). Left/right on the timeline is WHEN, the
-  // depth of the stack is WHO, and the measure — WHAT — had no gesture on the canvas: it lived in
-  // the rail's picker alone. The control is the title under the bar (`TrendMeasure`) and `↑`/`↓`
-  // from inside a card. Every card steps together (a stack whose planes each showed a different
+  // depth of the stack is WHO, and the measure — WHAT — had no gesture on the canvas. The control
+  // is the Networks card's heading control (`ExplorerHeading`, 2026-09-26 — it was the title under the bar) and
+  // `↑`/`↓` from inside a card. Every card steps together (a stack whose planes each showed a different
   // measure would stop being a comparison), through the ONE order the picker reads, and the ends
   // go inactive rather than wrapping. A SETTING, not a selection — it writes its setter directly,
   // as the picker does (`selectionBoundary` names it out of scope).
   // ⚠️ THERE IS NO SWIPE. A vertical touch swipe on a card stepped the measure for a few hours —
-  // until a drag on a card became the scene's orbit, and one gesture cannot mean both. The title
-  // under the bar is a finger-sized target, so touch lost nothing.
+  // until a drag on a card became a gesture of its own (the orbit then, the brush now), and one
+  // gesture cannot mean both. The rail's heading control is a finger-sized target, so touch lost
+  // nothing.
   const stepMeasure = (dir: -1 | 1) => {
     const next = stepMetric(useStore.getState().trendMetric, dir);
     if (next) setMetric(next);
@@ -287,8 +294,6 @@ export default function TrendStack() {
   if (empty) {
     return (
       <div id="trend-stack" className="absolute inset-0 pointer-events-none grid place-items-center z-[4]">
-        {/* The measure stays: it is the view's title, and stepping it is still a way forward. */}
-        <TrendMeasure metric={metric} onStep={stepMeasure} />
         <p className="max-w-[46ch] text-center text-label text-muted-foreground">
           {empty.fact} {empty.route}
         </p>
@@ -301,7 +306,6 @@ export default function TrendStack() {
   if (!p && error) {
     return (
       <div id="trend-stack" className="absolute inset-0 pointer-events-none grid place-items-center z-[4]">
-        <TrendMeasure metric={metric} onStep={stepMeasure} />
         <p className="text-label text-muted-foreground">
           The trends store is unreachable right now. It recovers on its own.
         </p>
@@ -331,9 +335,6 @@ export default function TrendStack() {
       }}
       className="group/stack absolute inset-0 pointer-events-none z-[4] opacity-0 [transition:opacity_var(--tempo-nav)_ease] data-[on='1']:opacity-100 motion-reduce:!transition-none"
     >
-      {/* THE MEASURE, UNDER THE BAR — the view's title and its up/down control in one. It reads the
-          PICKED measure, so it answers the press at once while the cards follow. */}
-      <TrendMeasure metric={metric} onStep={stepMeasure} />
       {poses.map((pose) => {
         // The one roster pass the rank, the ceiling and both rails read — already cut by the
         // metric's own edge rule, so a rail can never quote a bucket this plane does not draw.
@@ -348,10 +349,11 @@ export default function TrendStack() {
               // THE ANCHOR: a 0-size box at the layer's origin, hidden until the engine has
               // projected it. `origin-top-left` is what makes the engine's matrix a plain
               // translate — see this file's header.
-              // `touch-none`: a finger that drags a card is orbiting the scene (see `onPointerMove`),
-              // so the browser must not claim the gesture for a pan and cancel the pointer mid-drag.
+              // `touch-none`: a finger that drags the front card is brushing a range (see
+              // `onPointerMove`), so the browser must not claim the gesture for a pan and cancel the
+              // pointer mid-drag.
               "absolute left-0 top-0 origin-top-left invisible touch-none",
-              // The body takes no pointer events — the orbit drag belongs to the canvas beneath.
+              // The body takes no pointer events — the wheel's zoom belongs to the canvas beneath.
               // The one plane the pose marks interactive is the exception, and its header strip
               // re-enables them below whatever the pose says. `pointer-events` inherits, so the
               // 0-size anchor carrying it reaches the plane inside.
@@ -363,8 +365,8 @@ export default function TrendStack() {
             // THE INTERACTIVE PLANE'S WHOLE BODY is a target too — it is the one plane a click
             // cannot be ambiguous about, and asking for the header strip alone on a plane that is
             // already in front reads as a dead surface. Every other plane keeps the body inert, so
-            // the orbit drag passes through it. The header strip stops its own click, so the two
-            // never fire for one press.
+            // the canvas beneath still takes the wheel. The header strip stops its own click, so the
+            // two never fire for one press.
             onClick={pose.interactive ? () => activate(pose.id, false) : undefined}
             // ↑ / ↓ STEP THE MEASURE from anywhere inside a card (its head strip is the focusable
             // part). The default is taken so an arrow never scrolls a rail or the page under it.
@@ -389,16 +391,24 @@ export default function TrendStack() {
                 ⚠️ TWO BACKGROUND LAYERS, ONE SHORTHAND: `--panel-solid` is 0.92-alpha glass, so on
                 its own the card would still leak the plane behind it. Laid over the opaque
                 `--scene-ground` it is solid — and both are tokens, so both grounds follow.
-                A PREVIEWED CARD TAKES ITS NETWORK'S HUE ON THE HAIRLINE, and nothing else moves
-                (rule 9 — hovers preview, never commit). It was an opacity lift while the cards
-                were translucent; on an opaque deck there is no opacity left to spend, and the
+                A PREVIEWED CARD TAKES ITS NETWORK'S HUE ON THE HAIRLINE AND AS A WASH ON ITS FACE
+                (rule 9 — hovers preview, never commit). The wash is the explorer rows' own
+                `.nb-row.subject-paired` recipe — the hue at a low mix — laid as a THIRD background
+                layer over the two below, so the card stays opaque (user, 2026-09-26: the hairline
+                alone did not read as the pairing the rows show). It was an opacity lift while the
+                cards were translucent; on an opaque deck there is no opacity left to spend, and the
                 app's `.subject-paired` glow is a box-shadow, which a transformed plane may not
                 carry (see NO BLUR, NO SHADOW above). */}
             <div
               className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border p-2 [background:linear-gradient(var(--panel-solid),var(--panel-solid)),var(--scene-ground)] [transition:border-color_0.16s_ease] motion-reduce:!transition-none"
               style={{
                 width: PLANE_PX_W,
-                borderColor: pair.paired ? `color-mix(in oklch, ${row.hue ?? "var(--primary)"} 60%, transparent)` : undefined,
+                ...(pair.paired
+                  ? {
+                      borderColor: `color-mix(in oklch, ${row.hue ?? "var(--primary)"} 60%, transparent)`,
+                      background: `linear-gradient(color-mix(in oklch, ${row.hue ?? "var(--primary)"} 12%, transparent), color-mix(in oklch, ${row.hue ?? "var(--primary)"} 12%, transparent)), linear-gradient(var(--panel-solid), var(--panel-solid)), var(--scene-ground)`,
+                    }
+                  : {}),
               }}
             >
             {p && (
@@ -425,6 +435,10 @@ export default function TrendStack() {
                 lines={linesById.get(pose.id)!}
                 scaleMax={sharedMax}
                 cursorMs={cursorMs}
+                onPick={(ms) => {
+                  if (!dragged.current) setTrendCursor(ms);
+                }}
+                onRange={pose.interactive ? (fromMs, toMs) => setTrendRange({ fromMs, toMs }) : undefined}
                 // THE PLANE CARRIES ITS COLOUR AS AN AREA, and only here — on the card's solid face
                 // it reads as the network's own tint. A plain boolean, so it holds the plot's memo
                 // as still as every other prop on this call.

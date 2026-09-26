@@ -179,7 +179,7 @@ describe("the instant slot — History's cursor card", () => {
   it("ghosts with the GESTURE and nothing else while no instant is picked", () => {
     const c = detailsCards(trend()).find((x) => x.id === "instant")!;
     expect(c.present).toBe(false);
-    expect(c.hint).toBe("Click the timeline below.");
+    expect(c.hint).toBe("Click a chart, or the timeline below.");
   });
 
   it("is History-scoped — no other view can produce it", () => {

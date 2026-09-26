@@ -1,0 +1,79 @@
+<h2>The explorer card, made one design</h2>
+<p class="subtitle">Four views, four cards that grew separately. First the inventory of what differs, then three consistent designs to pick from.</p>
+
+<div class="section">
+  <div class="label">Inventory — what each card does today</div>
+  <div class="mockup">
+    <div class="mockup-body" style="padding:12px 16px;font-size:12.5px;line-height:1.5">
+      <table style="border-collapse:collapse;width:100%">
+        <tr style="opacity:.6;font-size:11px;letter-spacing:.08em;text-transform:uppercase">
+          <td style="padding:4px 6px 4px 0;width:22%">Concern</td><td style="padding:4px 6px">Hypergraph</td><td style="padding:4px 6px">Geography</td><td style="padding:4px 6px">Snapshots</td><td style="padding:4px 6px">History</td>
+        </tr>
+        <tr><td style="padding:5px 6px 5px 0;vertical-align:top">Controls row</td><td>stepper</td><td>stepper</td><td>LIVE control <em>above</em> the stepper</td><td>stepper + Same scale beside it</td></tr>
+        <tr><td style="padding:5px 6px 5px 0;vertical-align:top">Committed scope shown</td><td>row wash + ✓ only</td><td style="color:#f0b37e">list is cut, nothing says so</td><td>rows dimmed by a lens, nothing says so</td><td>"Dor only ×" chip</td></tr>
+        <tr><td style="padding:5px 6px 5px 0;vertical-align:top">Row leading glyph</td><td>hue dot</td><td>country code</td><td>none (ordinal)</td><td>hue dot</td></tr>
+        <tr><td style="padding:5px 6px 5px 0;vertical-align:top">Bar for the figure</td><td>no</td><td style="color:#f0b37e">yes</td><td>no</td><td>no</td></tr>
+        <tr><td style="padding:5px 6px 5px 0;vertical-align:top">Row click means</td><td>commit + open</td><td>drill + open</td><td>tick: pin + open · <span style="color:#f0b37e">network row: open only, looks identical to Hypergraph's committing row</span></td><td>focus (no filter)</td></tr>
+        <tr><td style="padding:5px 6px 5px 0;vertical-align:top">Trailing slot</td><td>✓ / chevron, reserved column</td><td>✓ / chevron</td><td>✓ / chevron</td><td style="color:#f0b37e">✓ floated over the value</td></tr>
+        <tr><td style="padding:5px 6px 5px 0;vertical-align:top">Depth caption</td><td>"Nodes by composition"</td><td>"Nodes by city · provider"</td><td>"Snapshots by network"</td><td>— (flat)</td></tr>
+        <tr><td style="padding:5px 6px 5px 0;vertical-align:top">Paging</td><td>none (12 rows)</td><td>none (8 rows)</td><td>15 per page, ‹ ›</td><td>5 per window, ‹ 1–5 of 11 ›</td></tr>
+        <tr><td style="padding:5px 6px 5px 0;vertical-align:top">Deselect</td><td>row again → All</td><td>row again → up one rung</td><td>row again → pin off; <span style="color:#f0b37e">network stays committed</span></td><td>row again → focus off; chip ×</td></tr>
+      </table>
+      <p style="margin:10px 0 0;opacity:.7;font-size:11.5px">Orange = the inconsistencies a reader can feel. Everything else differs by view for a reason and can stay.</p>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>One grammar, top to bottom</h3>
+      <p>Every card is the same five layers: hint · controls row (stepper left, the view's one setting right) · scope line · rows · pager. The scope line is the chip, shown in all four whenever a filter is committed. Every row is <em>glyph · name · bar · figure · trailing slot</em>; the bar comes to all four. The trailing slot has one meaning: ✓ = committed, click again releases; chevron = opens only, never commits.</p>
+      <div class="mockup" style="margin-top:10px"><div class="mockup-body" style="padding:10px 12px;font-size:12px;background:#0b1020;color:#c7d0ea">
+        <div style="opacity:.6;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Network breakdown</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="border:1px solid #2a3450;border-radius:8px;padding:2px 8px;font-size:10.5px;font-weight:700">∧ NODES ∨</span><span style="font-size:10.5px;opacity:.7">SAME SCALE ●</span></div>
+        <div style="display:inline-block;border-radius:6px;padding:2px 8px;font-size:10.5px;font-weight:700;background:#1c2a3f;margin-bottom:6px">● Dor Technologies only ×</div>
+        <div style="display:flex;align-items:center;gap:8px;padding:3px 0"><span style="width:6px;height:6px;border-radius:50%;background:#5ab0ff"></span><span style="width:110px">DAG</span><span style="flex:1;height:5px;background:#1b2338;border-radius:3px"><span style="display:block;width:100%;height:100%;background:#5ab0ff;border-radius:3px"></span></span><span style="font-family:monospace;font-weight:700">141</span><span style="width:12px;opacity:.5">›</span></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:3px 0;background:#2a1d17;border-radius:4px"><span style="width:6px;height:6px;border-radius:50%;background:#ff8a4c"></span><span style="width:110px">Dor Technologies</span><span style="flex:1;height:5px;background:#1b2338;border-radius:3px"><span style="display:block;width:14%;height:100%;background:#ff8a4c;border-radius:3px"></span></span><span style="font-family:monospace;font-weight:700">19</span><span style="width:12px;color:#ff8a4c">✓</span></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:3px 0"><span style="width:6px;height:6px;border-radius:50%;background:#7ee08a"></span><span style="width:110px">BioFi</span><span style="flex:1;height:5px;background:#1b2338;border-radius:3px"><span style="display:block;width:2%;height:100%;background:#7ee08a;border-radius:3px"></span></span><span style="font-family:monospace;font-weight:700">3</span><span style="width:12px;opacity:.5">›</span></div>
+      </div></div>
+      <div class="pros-cons">
+        <div class="pros"><h4>Gains</h4><ul><li>A reader learns one card and knows all four</li><li>The scope is stated where the list is cut or lensed, with its release beside it</li><li>The bar makes every explorer a comparison, which the stepper made them for</li></ul></div>
+        <div class="cons"><h4>Costs</h4><ul><li>Snapshots' network rows must stop looking like committing rows (they open only) — they lose the trailing slot</li><li>Chip + committed-row ✓ say the same thing twice in Hypergraph</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Scope lives in the card head, not in a chip</h3>
+      <p>Same grammar as A, but the committed scope is stated once, in the card's own head: the title takes a hue-dotted suffix, "Network breakdown · Dor Technologies", and the × to release sits in the head's right corner where every rail card already carries its ×. No chip in the body; the rows keep their ✓.</p>
+      <div class="mockup" style="margin-top:10px"><div class="mockup-body" style="padding:10px 12px;font-size:12px;background:#0b1020;color:#c7d0ea">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span><span style="opacity:.6;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase">Country breakdown</span> <span style="font-size:11px;color:#ff8a4c">● Dor Technologies</span></span><span style="opacity:.7">×</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="border:1px solid #2a3450;border-radius:8px;padding:2px 8px;font-size:10.5px;font-weight:700">∧ PROVIDERS ∨</span></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:3px 0"><span style="width:16px;font-family:monospace;font-size:10px;opacity:.6">US</span><span style="width:100px">United States</span><span style="flex:1;height:5px;background:#1b2338;border-radius:3px"><span style="display:block;width:100%;height:100%;background:#ff8a4c;border-radius:3px"></span></span><span style="font-family:monospace;font-weight:700">4</span><span style="width:12px;opacity:.5">›</span></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:3px 0"><span style="width:16px;font-family:monospace;font-size:10px;opacity:.6">DE</span><span style="width:100px">Germany</span><span style="flex:1;height:5px;background:#1b2338;border-radius:3px"><span style="display:block;width:50%;height:100%;background:#ff8a4c;border-radius:3px"></span></span><span style="font-family:monospace;font-weight:700">2</span><span style="width:12px;opacity:.5">›</span></div>
+      </div></div>
+      <div class="pros-cons">
+        <div class="pros"><h4>Gains</h4><ul><li>The scope and its release use the rail's existing head grammar — nothing new to learn</li><li>The body stays rows only; no chip competing with the stepper for the first line</li></ul></div>
+        <div class="cons"><h4>Costs</h4><ul><li>The card head gets longer under a filter; long network names may wrap</li><li>Less noticeable than a chip in the body — the eye reads the rows first</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>The scope is the top bar's job; the card only shows its rows</h3>
+      <p>Same row grammar and controls row, but no scope line anywhere: the FILTER control in the top bar already names the committed network and releases it, and a committed row wears its ✓. The History chip goes. Snapshots' network rows still lose the trailing slot so they read as openers.</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>Gains</h4><ul><li>Quietest card; one place states the filter, the control that sets it</li><li>Fewest elements to keep consistent</li></ul></div>
+        <div class="cons"><h4>Costs</h4><ul><li>Geography's cut list still says nothing about why it shrank; the reader has to look up at the bar</li><li>On the phone the top bar's filter word is small and far from the sheet</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:20px">Common to all three: the Snapshots LIVE control moves into the controls row (stepper left, LIVE right), the History ✓ takes the reserved trailing column, and a network row that only opens never wears a ✓ or a wash. Click one, then tell me here; the filter-gesture question from the previous screen still stands and we can settle it after.</p>

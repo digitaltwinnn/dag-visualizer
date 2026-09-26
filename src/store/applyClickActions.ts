@@ -4,8 +4,11 @@
 // kinds get their effect HERE (and a test in applyClickActions.test.ts), never inline in a
 // caller.
 import { useStore } from "./store";
+import { finestRung } from "@/src/engine/domain/focusLadder";
 import type { ClickAction } from "@/src/engine/domain/pickActions";
+import { is3D } from "@/src/engine/domain/viewTransition";
 import { scrollToShow } from "@/src/engine/domain/trendStack";
+import type { MotionCause } from "@/src/store/store";
 
 export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boolean }): void {
   const st = useStore.getState();
@@ -64,4 +67,51 @@ export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boole
         break;
     }
   }
+  // THE MOTION CAUSE, stamped ONCE per click (2026-09-26): the hint (`domain/motionHint.ts`) says
+  // what the scene is doing while it answers this commit, and a click that carries several
+  // actions (a filter plus the snapshot under it) is about its FINEST one — the last in the
+  // table's coarse→fine order. Here rather than in the setters because a setter cannot tell a
+  // commit from the housekeeping around it (the paging a focus asks for is not the gesture).
+  const cause = motionCauseOf(actions);
+  if (cause) st.setMotionCause(landingCause(cause, useStore.getState()));
+}
+
+/** A RELEASE names where the camera LANDS, in the same words a select uses (user, 2026-09-26:
+ *  "don't say 'stepping back', use the same language as when stepping in"): deselecting a node
+ *  under a committed network is "Framing Dor Technologies", exactly what the network row says.
+ *  The landing rung is the finest one still active AFTER the writes, so it is read off the store
+ *  here rather than inferred from the actions. Releases that already name their destination
+ *  (a country, a snapshot, a tile) keep their own sentence. */
+function landingCause(cause: MotionCause, st: ReturnType<typeof useStore.getState>): MotionCause {
+  const release =
+    (cause.kind === "node" && cause.title === null) ||
+    (cause.kind === "cohort" && !cause.on) ||
+    (cause.kind === "composition" && !cause.on);
+  if (!release || !is3D(st.mode)) return cause;
+  const level = finestRung(st.mode, {
+    inspectIsNode: !!st.inspect && (st.inspect.kind === "l0" || st.inspect.kind === "l1" || st.inspect.kind === "metanode"),
+    cohort: st.cohort,
+    composition: st.composition,
+    country: st.country,
+    filter: st.filter,
+  });
+  return { kind: "rung", level };
+}
+
+/** The cause the hint names for a click — the finest action's, or null for a click that moves nothing. */
+export function motionCauseOf(actions: readonly ClickAction[]): MotionCause | null {
+  for (let i = actions.length - 1; i >= 0; i--) {
+    const a = actions[i]!;
+    switch (a.kind) {
+      case "filter": return { kind: "filter", id: a.id };
+      case "country": return { kind: "country", cc: a.cc };
+      case "cohort": return { kind: "cohort", on: a.sel != null };
+      case "composition": return { kind: "composition", on: a.sel != null };
+      case "inspect": return { kind: "node", title: a.pick?.title ?? null, sub: a.pick?.sub ?? null };
+      case "snapshot": return { kind: "snapshot", ordinal: a.pick?.data.ordinal ?? null };
+      case "metaSnap": return a.sel ? { kind: "metaSnap", metaId: a.sel.metaId, ordinal: a.sel.ordinal } : { kind: "metaSnap", metaId: null };
+      case "trendFocus": return { kind: "focus", id: a.id };
+    }
+  }
+  return null;
 }

@@ -89,7 +89,7 @@ describe("one door to the records", () => {
     expect(code).toMatch(/applyClickActions\(\s*filterToggleActions/);
     // The guard IS the correctness: `filterToggleActions` toggles, so handing it the already
     // committed network would RELEASE the filter on a control whose whole purpose is to scope.
-    expect(code, "the filter commit must be guarded by a difference check").toMatch(/st\.filter\s*!==\s*metaId/);
+    expect(code, "the filter commit must be guarded by a difference check").toMatch(/st\.filter\s*!==\s*scoped/);
   });
 });
 

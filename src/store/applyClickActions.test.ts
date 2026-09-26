@@ -178,3 +178,18 @@ describe("trendFocus action (the History view's plane click)", () => {
     expect(useStore.getState().trendScroll).toBe(0);
   });
 });
+
+describe("the motion cause a click stamps", () => {
+  it("a deselect names the rung it lands on, in the select's own words", () => {
+    const st = useStore.getState();
+    st.setMode("hyper");
+    const titled = { ...(nodePick as object), title: "Dor Technologies", sub: "Frankfurt, Germany" } as unknown as PickDescriptor;
+    applyClickActions([{ kind: "filter", id: "dor" }, { kind: "inspect", pick: titled }]);
+    expect(useStore.getState().motionCause).toEqual({ kind: "node", title: "Dor Technologies", sub: "Frankfurt, Germany" });
+    applyClickActions([{ kind: "inspect", pick: null }]);
+    // Landing on the committed network — "Framing Dor Technologies", never "Stepping back".
+    expect(useStore.getState().motionCause).toEqual({ kind: "rung", level: "network" });
+    applyClickActions([{ kind: "filter", id: "all" }]);
+    expect(useStore.getState().motionCause).toEqual({ kind: "filter", id: "all" });
+  });
+});

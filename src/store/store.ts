@@ -20,6 +20,32 @@ import { scrollToKeep } from "@/src/engine/domain/trendStack";
 export type Mode = "hyper" | "geo" | "ledger" | "trend" | "soon";
 
 // The stored metric every trend plane draws — one picker, one column (see `trendMetric` below).
+import type { LedgerMeasure } from "@/src/data/ledgerMeasure";
+import type { GeoMeasure } from "@/src/data/geoMeasure";
+import type { HyperMeasure } from "@/src/data/hyperMeasure";
+export type { LedgerMeasure };
+// WHY the scene is moving — the motion hint's cause (2026-09-26), stamped by the gesture's owner
+// and read by `components/MotionHint` through `domain/motionHint.ts`, which turns it into words.
+// DATA about the gesture, never copy. Defined here, beside its channel, because the domain module
+// that reads it already imports this file's types and a type import back would close a cycle.
+export type MotionCause =
+  | { kind: "view"; from: Mode; to: Mode }
+  | { kind: "filter"; id: string }
+  | { kind: "focus"; id: string | null }
+  // A node pick's `title` is its NETWORK's name and `sub` its place (Globe builds the pick so).
+  | { kind: "node"; title: string | null; sub?: string | null }
+  | { kind: "snapshot"; ordinal: number | null }
+  | { kind: "metaSnap"; metaId: string | null; ordinal?: number }
+  | { kind: "country"; cc: string | null }
+  | { kind: "cohort"; on: boolean }
+  | { kind: "composition"; on: boolean }
+  | { kind: "range"; span: { fromMs: number; toMs: number } | null }
+  | { kind: "window"; id: ZoomId }
+  | { kind: "measure"; id: TrendMetric }
+  | { kind: "page" }
+  | { kind: "orbit" }
+  // A rail card asking to be framed (`requestFocusRung`): the ladder rung, named by the reader.
+  | { kind: "rung"; level: FocusLevel };
 export type TrendMetric = "snapshots" | "blocks" | "fees" | "kb" | "nodes" | "continuity";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
@@ -129,6 +155,10 @@ interface AppState {
   // Per-country breakdown + distribution score for the active filter (engine-pushed).
   leaderboard: LeaderboardData | null;
   // The active selection's nodes, for the geo node browser (engine-pushed; [] off geo).
+  // EVERY placed node row, across the whole catalog, whatever the filter (2026-09-26) — what the
+  // Hypergraph explorer's per-network countries / providers are counted from. Published by the
+  // Engine beside `selNodes`, from the same `listNodes`, only where the view lists nodes.
+  allNodes: NodeRow[];
   selNodes: NodeRow[];
   // EXACT per-snapshot totals (fee + listed/unlisted), keyed by ordinal — populated by
   // RawSnapshotBridge from /api/snapshot/[ordinal] for the live + selected ticks, so ANY view
@@ -202,6 +232,12 @@ interface AppState {
   // realizes it. UI state, not selection (the selection boundary rule doesn't apply);
   // session-only, like phoneDock.
   section: "scene" | "data";
+  /** THE VIEW A DOOR LEFT to open the records (2026-09-26; user: closing the raw layer "should
+   *  always go back to wherever opened the page"). `openRecords` switches the mode to Snapshots
+   *  so the raw layer shows the anchor log; when the layer closes, `setSection("scene")` returns
+   *  to this view and clears it. A view switch made while the layer is open clears it too — the
+   *  reader has chosen a view, and there is nothing to return to. */
+  rawReturnMode: Mode | null;
   // DESKTOP ONLY (card-redesign follow-up, 2026-08-08): collapse the HUD's card rails to their
   // THREADS — BOTH rails together (user: the rails are symmetric and the motive, "spotlight the
   // scene", is whole-HUD; one command-bar toggle beats two subtle per-rail chevrons). Cards fade
@@ -224,6 +260,17 @@ interface AppState {
   // choreography is its own 3.9s answer to the user's gesture, so a 1.4s dim inside it would read
   // as a blink.
   cameraFlying: boolean;
+  // THE MOTION HINT's two channels (2026-09-26). `sceneMoving` is ENGINE → REACT: derived each
+  // frame from the structures that drive motion (the view transition, the camera flight, the
+  // controls' drag, the trend stack's ease) and written on edges only. `motionCause` is WHY —
+  // stamped once per gesture by whoever owns it: the click executor for every selection, the
+  // setters below for the settings that move the scene, the Engine for a drag. `MotionHint`
+  // turns the pair into one sentence (`domain/motionHint.ts`); nothing else reads them.
+  sceneMoving: boolean;
+  motionCause: MotionCause | null;
+  // The view transition's phase while one runs — OUT is the teardown, IN the build — so a view
+  // switch can say "leaving A" and then "entering B" (user, 2026-09-26). Engine-written, edges only.
+  motionPhase: "out" | "in" | null;
   // Which rail slot is the materialized BOX right now (the expanded card — "context", "node",
   // "snap", …), or null when nothing is boxed. A PRESENTATION channel, written by Inspector
   // from the same state that renders the box, read by the subject callout so the scene label
@@ -281,6 +328,15 @@ interface AppState {
   /** Which stored metric every plane draws. One picker, one column — the planes are a
    *  comparison, so a per-plane metric would make the stack meaningless. */
   trendMetric: TrendMetric;
+  // What the Snapshots explorer's tick rows lead with — fee, anchors, metagraphs or size
+  // (`src/data/ledgerMeasure.ts`). A setting, like `trendMetric`; its control is the card's heading.
+  ledgerMeasure: LedgerMeasure;
+  // What the Geography explorer's country rows count — nodes, metagraphs or providers
+  // (`src/data/geoMeasure.ts`). A setting, like the two above.
+  geoMeasure: GeoMeasure;
+  // What the Hypergraph explorer's network rows count — nodes, countries or providers
+  // (`src/data/hyperMeasure.ts`). A setting, like the two above.
+  hyperMeasure: HyperMeasure;
   /** How far the stack is scrolled through the roster, in planes. The catalog is longer than the
    *  visible window, so the stack pages rather than capping at a top-N. */
   trendScroll: number;
@@ -358,6 +414,7 @@ interface AppState {
   setComposition: (c: CompositionSel | null) => void;
   setLeaderboard: (lb: LeaderboardData | null) => void;
   setSelNodes: (nodes: NodeRow[]) => void;
+  setAllNodes: (rows: NodeRow[]) => void;
   setSnapshotExact: (data: SnapshotExact) => void;
   /** Record a FAILED exact read for this ordinal — the acquiring states' give-up signal. */
   setExactMiss: (ordinal: number) => void;
@@ -367,9 +424,13 @@ interface AppState {
   setDeepWanted: (key: string | null) => void;
   setPhoneDock: (dock: "explore" | "details" | "vitals" | null) => void;
   setSection: (section: "scene" | "data") => void;
+  setRawReturnMode: (mode: Mode | null) => void;
   setRailsHidden: (hidden: boolean) => void;
   setSceneDragging: (dragging: boolean) => void;
   setCameraFlying: (flying: boolean) => void;
+  setSceneMoving: (moving: boolean) => void;
+  setMotionPhase: (phase: "out" | "in" | null) => void;
+  setMotionCause: (cause: MotionCause | null) => void;
   setPhoneSheetPx: (px: number | null) => void;
   /** Publish how many px of the canvas an open rail sheet covers on one side (0 when closed). */
   setSceneCover: (side: "left" | "right", px: number) => void;
@@ -382,6 +443,9 @@ interface AppState {
   requestFocusRung: (level: FocusLevel) => void;
   setTrendCursor: (ms: number | null) => void;
   setTrendMetric: (metric: TrendMetric) => void;
+  setLedgerMeasure: (measure: LedgerMeasure) => void;
+  setGeoMeasure: (measure: GeoMeasure) => void;
+  setHyperMeasure: (measure: HyperMeasure) => void;
   setTrendScroll: (offset: number) => void;
   setTrendFocus: (id: string | null) => void;
   setTrendScale: (scale: "shared" | "own") => void;
@@ -439,20 +503,28 @@ export const useStore = create<AppState>((set) => ({
   composition: null,
   leaderboard: null,
   selNodes: [],
+  allNodes: [],
   snapshotExact: {},
   exactMiss: {},
   metaSnapDeep: {},
   deepWanted: null,
   phoneDock: null,
   section: "scene",
+  rawReturnMode: null,
   railsHidden: false,
   sceneDragging: false,
   cameraFlying: false,
+  sceneMoving: false,
+  motionCause: null,
+  motionPhase: null,
   railCollapse: {},
   navQuiet: false,
   focusRung: null,
   trendCursorMs: null,
   trendMetric: "snapshots",
+  ledgerMeasure: "fee",
+  geoMeasure: "nodes",
+  hyperMeasure: "nodes",
   trendScroll: 0,
   trendFocus: null,
   trendScale: "shared",
@@ -482,7 +554,8 @@ export const useStore = create<AppState>((set) => ({
   // so it clears any standing quiet mark from a rail gesture. `trendFocus` clears with it — it's
   // view-scoped, like the other ladder levels; `trendCursorMs` does NOT (an instant is a
   // universal subject and carries, the way `node` and `network` do in `LEVEL_CARRY`).
-  setMode: (mode) => set((s) => ({ mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing, trendFocus: null })),
+  // A view switch stamps its own motion cause (the hint says what it builds).
+  setMode: (mode) => set((s) => ({ mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing, trendFocus: null, rawReturnMode: null, motionCause: { kind: "view", from: s.mode, to: mode } })),
   // Opening a doc also SURFACES THE SCENE POSE: the overlay sits at z-8, under the raw layer's
   // z-9 — a doc opened from the RAW pose rendered beneath the still-interactive table, with the
   // RAW toggle that could exit it hidden by the doc's own control gating (review find,
@@ -551,6 +624,7 @@ export const useStore = create<AppState>((set) => ({
     set((s) => ({ composition, selStack: bumpStack(s.selStack, "composition", !!composition) })),
   setLeaderboard: (leaderboard) => set({ leaderboard }),
   setSelNodes: (selNodes) => set({ selNodes }),
+  setAllNodes: (allNodes) => set({ allNodes }),
   setSnapshotExact: (data) =>
     set((s) => {
       if (s.snapshotExact[data.ordinal]) return {}; // immutable per ordinal — keep the first
@@ -599,10 +673,23 @@ export const useStore = create<AppState>((set) => ({
   // Fully closing the dock also drops the drag-chosen sheet height, so the next open starts at
   // the default; switching halves (a non-null → non-null transition) keeps it.
   setPhoneDock: (phoneDock) => set(phoneDock === null ? { phoneDock, phoneSheetPx: null } : { phoneDock }),
-  setSection: (section) => set({ section }),
+  // Closing the raw layer RETURNS to the view a door left (see `rawReturnMode`): the mode step a
+  // door took is undone here, with the same arrival the bar's switch would announce, and the
+  // view's own state (a focus, a range) is left as it was — this is a return, not a new visit.
+  setSection: (section) =>
+    set((s) => {
+      const back = section === "scene" ? s.rawReturnMode : null;
+      return back != null && back !== s.mode
+        ? { section, mode: back, rawReturnMode: null, motionCause: { kind: "view", from: s.mode, to: back } }
+        : { section, rawReturnMode: section === "scene" ? null : s.rawReturnMode };
+    }),
+  setRawReturnMode: (rawReturnMode) => set({ rawReturnMode }),
   setRailsHidden: (railsHidden) => set({ railsHidden }),
   setSceneDragging: (sceneDragging) => set({ sceneDragging }),
   setCameraFlying: (cameraFlying) => set({ cameraFlying }),
+  setSceneMoving: (sceneMoving) => set({ sceneMoving }),
+  setMotionPhase: (motionPhase) => set({ motionPhase }),
+  setMotionCause: (motionCause) => set({ motionCause }),
   setNavQuiet: (navQuiet) => set({ navQuiet }),
   setRailCollapse: (id, collapsed) =>
     set((s) => {
@@ -638,7 +725,9 @@ export const useStore = create<AppState>((set) => ({
   setBoxedCard: (boxedCard) => set({ boxedCard }),
   // A fresh object every call — the request is the EVENT, so re-opening the same rung must reach
   // the Engine's reference-compare bridge again.
-  requestFocusRung: (level) => set({ focusRung: { level } }),
+  // A rail card's framing is a camera flight with no click-table action behind it, so the
+  // request stamps its own motion cause — the hint would otherwise show the previous gesture's.
+  requestFocusRung: (level) => set({ focusRung: { level }, motionCause: { kind: "rung", level } }),
   // THE CURSOR IS A COMMITTED SUBJECT OF ITS VIEW (2026-09-19), so it takes a place in the
   // recency stack like every other card slot: the facts rail's collapse rule reads `selStack` to
   // decide which present card is the ACTIVE one, and without a rung here the cursor card would
@@ -652,14 +741,18 @@ export const useStore = create<AppState>((set) => ({
   // mark left by an earlier manual expand would swallow the first one.
   setTrendCursor: (ms) =>
     set((s) => ({ trendCursorMs: ms, navQuiet: false, selStack: bumpStack(s.selStack, "instant", ms != null) })),
-  setTrendMetric: (metric) => set({ trendMetric: metric }),
-  setTrendScroll: (offset) => set({ trendScroll: offset }),
+  // The settings that MOVE the scene stamp their cause (the hint reads it while the stack eases).
+  setTrendMetric: (metric) => set({ trendMetric: metric, motionCause: { kind: "measure", id: metric } }),
+  setLedgerMeasure: (measure) => set({ ledgerMeasure: measure }),
+  setGeoMeasure: (measure) => set({ geoMeasure: measure }),
+  setHyperMeasure: (measure) => set({ hyperMeasure: measure }),
+  setTrendScroll: (offset) => set({ trendScroll: offset, motionCause: { kind: "page" } }),
   setTrendFocus: (id) => set({ trendFocus: id }),
   setTrendScale: (scale) => set({ trendScale: scale }),
   // A window and a range are the SAME statement about what is on screen, so picking one retires
   // the other (the document's zoom pills do exactly this).
-  setTrendWindow: (trendWindow) => set({ trendWindow, trendRange: null }),
-  setTrendRange: (trendRange) => set({ trendRange }),
+  setTrendWindow: (trendWindow) => set({ trendWindow, trendRange: null, motionCause: { kind: "window", id: trendWindow } }),
+  setTrendRange: (trendRange) => set({ trendRange, motionCause: { kind: "range", span: trendRange } }),
   // Stored BY REFERENCE — the array the publisher hands in is the one the Engine compares with
   // `!==`. No copy, no sort, no normalising: any of those would mint a fresh reference per call
   // and turn a no-op publish into a retarget (see the channel note on `trendIds`).

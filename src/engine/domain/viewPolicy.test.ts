@@ -143,6 +143,10 @@ describe("the trends view is registered and inert", () => {
   // line ever ran, and `hyper` is true because that line did run for it — even though its camera
   // does not in fact orbit, `CameraDirector.focusFilter` having switched it off a moment later.
   // Measured in the browser after the change: camera drift over 1.5s idle is 0 in all four views.
+  it("switches the pointer orbit off ONLY in trend — its billboard deck moves by the focus re-deal, and zoom stays", () => {
+    for (const m of MODES) expect(VIEW_POLICIES[m].rotate).toBe(m !== "trend");
+  });
+
   it("says per view whether the camera idles in an orbit", () => {
     expect(VIEW_POLICIES.hyper.autoRotate).toBe(true);
     expect(VIEW_POLICIES.geo.autoRotate).toBe(false);

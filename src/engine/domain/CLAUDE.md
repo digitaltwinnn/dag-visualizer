@@ -89,7 +89,13 @@ the real builders, executor and store).
 The design rules behind the table, which the tests pin but don't explain:
 
 - **Full ancestry.** A node select commits every coarser rung, so deselects step back down predictably.
-  The ledger contributes no ancestry.
+  The ledger contributes no ancestry. **Except the network, in Geography** (user, 2026-09-26): a geo
+  node is a place first, and committing its network from a click emptied the globe and the country
+  list down to one network mid-browse. There the ancestry is country → cohort → node and the filter
+  stays the top bar's own gesture; hyper keeps filter-first, and so does the ledger's node. **The
+  ledger's SNAPSHOT rows never set it either** (design session 2026-09-26, decision 13):
+  `metaSnapSelectActions` is tick → snapshot, so browsing a tick's anchors and picking one no longer
+  re-commits the app-wide filter.
 - **A filter is a story.** Pinning a global tick whose anchors don't include the committed network
   releases the filter back to "all", so a network's dim never shapes a snapshot that has nothing to do
   with it. The membership rule lives in `src/data/ledgerStory.ts`.

@@ -45,6 +45,24 @@ export function trendScope(filter: string): TrendScope {
   return metagraphById(filter) ? "network" : "empty-unlisted";
 }
 
+/** THE SCENE'S ROSTER AND SCOPE (2026-09-26; user: "is the History view the right place to show
+ *  the hypergraph data we have?" — it is). The stack draws the HYPERGRAPH'S OWN plane under the
+ *  DAG filter, from the global series every other surface already reads (the Moment card's
+ *  "across the whole network", the band's overview line, the document's Hypergraph tab), so
+ *  the view's roster under "dag" is the one id `dag` and its scope is a network's. Under "all"
+ *  the roster stays the metagraphs: a global line one order of magnitude taller in front of the
+ *  layers it sums is what the shared scale exists to compare against, not include. The DOCUMENT
+ *  keeps `trendRoster`/`trendScope` as they are — its Metagraphs tab has nothing for the DAG and
+ *  its Hypergraph tab is the same chart's other register. */
+export function stackRoster(filter: string): string[] {
+  return filter === "dag" ? ["dag"] : trendRoster(filter);
+}
+export type ViewScope = Exclude<TrendScope, "empty-dag">;
+export function viewScope(filter: string): ViewScope {
+  // `trendScope` answers "empty-dag" for "dag" alone, which the branch above takes first.
+  return filter === "dag" ? "network" : (trendScope(filter) as ViewScope);
+}
+
 /** THE FACT — why this scope has no chart. Said verbatim in both registers: it is a property of
  *  the trends store, not of the surface asking. */
 const FACT: Record<EmptyScope, string> = {
@@ -58,13 +76,14 @@ const FACT: Record<EmptyScope, string> = {
  *  surface. The document has its own Hypergraph tab; the view reaches the same prose through RAW.
  *  The unlisted route is the same sentence in both, because the answer is the same view either
  *  way and inventing a second phrasing would be drift with extra steps. */
-const ROUTE: Record<"view" | "document", Record<EmptyScope, string>> = {
+const ROUTE: { document: Record<EmptyScope, string>; view: Record<Exclude<EmptyScope, "empty-dag">, string> } = {
   document: {
     "empty-dag": "Its own history is the Hypergraph tab above.",
     "empty-unlisted": "The Snapshots view's records still show what they anchored.",
   },
+  // The VIEW never asks about "empty-dag": `viewScope` scopes the DAG as a network there (its
+  // own plane, 2026-09-26), so that route has no sentence to say.
   view: {
-    "empty-dag": "Its own history is in the document, under RAW.",
     "empty-unlisted": "The Snapshots view's records still show what they anchored.",
   },
 };
@@ -77,5 +96,6 @@ export function scopeEmptyCopy(
   surface: "view" | "document",
 ): { fact: string; route: string } | null {
   if (scope === "all" || scope === "network") return null;
-  return { fact: FACT[scope], route: ROUTE[surface][scope] };
+  if (surface === "view") return scope === "empty-dag" ? null : { fact: FACT[scope], route: ROUTE.view[scope] };
+  return { fact: FACT[scope], route: ROUTE.document[scope] };
 }

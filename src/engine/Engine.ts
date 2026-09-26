@@ -28,12 +28,12 @@ import { readSceneColors, type SceneColors, LIGHT_TUNE } from "./sceneColors";
 import { setNodeDimTarget, setNodeEnv } from "./scene/objects/NodeFabric";
 import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme/resolve";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
-import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush } from "./domain/cameraRig";
+import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush, trendFit } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
 import { ViewTransition, is3D, fleetFaded, fleetHolder, type FleetPlacement } from "./domain/viewTransition";
-import { gatherBand, railGapShiftPx, type GatherBand } from "./domain/gatherLayout";
+import { gatherBand, railGapPx, railGapShiftPx, type GatherBand } from "./domain/gatherLayout";
 import { LADDERS, LEVEL_CARRY, hasLevel, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
 import { metaSnapDeepKey, metaSnapHoverKey } from "@/src/data/types";
@@ -44,12 +44,13 @@ import { type Tap, DOUBLE_TAP_SLOP, LONG_PRESS_MS, LONG_PRESS_LINGER_MS, isDoubl
 import { auditInstances, findingKey, type InstanceFinding } from "./scene/instanceAudit";
 import { CalloutSync, type CalloutState } from "./CalloutSync";
 import { TrendStackSync, type TrendStackState } from "./TrendStackSync";
-import { focusDepth, loneShiftPx, windowCount } from "./domain/trendStack";
-import { trendRoster } from "@/src/data/trendScope";
+import { fitDistance, focusDepth, loneShiftPx, windowCount } from "./domain/trendStack";
+import { stackRoster } from "@/src/data/trendScope";
 import { DevTunePanel } from "./DevTunePanel";
 import { CameraDirector } from "./CameraDirector";
 import type { GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
+import { breakpointOf } from "@/src/data/breakpoint";
 
 
 // View-transition staging plane (the gather grids the nodes fly to at the top of the viewport).
@@ -327,7 +328,11 @@ export class Engine {
     this._freeOrbit = true;
     clearTimeout(this._dragEndT);
     this._dragEndT = undefined;
-    if (!useStore.getState().sceneDragging) useStore.getState().setSceneDragging(true);
+    const st = useStore.getState();
+    if (!st.sceneDragging) {
+      st.setSceneDragging(true);
+      st.setMotionCause({ kind: "orbit" }); // the hint's cause for a drag: the reader's own hand
+    }
   };
   private _onControlsEnd = () => {
     clearTimeout(this._dragEndT);
@@ -1258,7 +1263,9 @@ export class Engine {
     // Polar clamp: globe views keep the "no pole crossing" limit; hyper relaxes it so the ring
     // layout can be viewed straight from the top (viewPolicy.minPolarAngle).
     this.ctx.controls.minPolarAngle = policy.minPolarAngle;
-    this.ctx.controls.enableRotate = true; // the 3D layer stack is meant to be looked around
+    // Rotate: per view (viewPolicy.rotate). The structural views are meant to be looked around;
+    // History's billboard deck is not — there, a drag does nothing and the wheel/pinch still zooms.
+    this.ctx.controls.enableRotate = policy.rotate;
     // View-scoped selections: LEVEL_CARRY names the levels that clear when leaving their view,
     // and the destination LADDER says whether this view is theirs (`hasLevel`) — read from the
     // table, never re-encoded as `mode !== "x"` here (focusLadder's own rule: "a consumer …
@@ -1640,19 +1647,26 @@ export class Engine {
       // visible window does not hold (nothing is re-dealt there), which is the resting pose exactly.
       const st = useStore.getState();
       const depth = focusDepth(st.trendIds, st.trendFocus, st.trendScroll);
-      if (depth === 0) {
-        this.cam.focus("trend");
-        return true;
-      }
       const f = FOCI.trend;
-      trendFocusPush(f.pos, f.target, depth, this.cam.out.pos);
+      // THE WIDTH FIT (2026-09-26): the resting distance is the one at which the front card spans
+      // its share of the free band between the rails (`trendStack.fitDistance`, from the live
+      // canvas box, the camera's lens and `railGapPx`) — the same 92% on every tier, where the √
+      // aspect lever left tablet at 72% and phone clipped. It is this pose's whole dolly, so the
+      // flight is `dolly: false`: the three global levers scale (pos − target) about the target,
+      // which is exactly what the fit decided (see `trendFit`). The focus lean composes on top.
+      const el = this.ctx.renderer.domElement;
+      const dist = fitDistance(
+        railGapPx(window.innerWidth, this.railsHidden),
+        el.clientHeight || window.innerHeight,
+        this.ctx.camera.fov,
+      );
+      trendFit(f.pos, f.target, dist, this.cam.out.pos);
+      trendFocusPush(this.cam.out.pos, f.target, depth, this.cam.out.pos);
       this.cam.out.target.copy(f.target);
-      // DOLLIED like every resting pose: this pose's target IS its subject — the stack's own front,
-      // which the resting aim was tuned against — so there is no composed look-at to exempt it from
-      // `dollyBack` / `railsLean` / `aspectFit` (the ⚠️ next to CAM_ZOOM). And a commit that lands on
-      // the pose already held — focusing plane B while A is focused — takes the NUDGE, since the
-      // lean is the same wherever the focus points (camera principle 3, applied by `tweenTo`).
-      this.cam.tweenTo(this.cam.out.pos, this.cam.out.target);
+      // A commit that lands on the pose already held — focusing plane B while A is focused — takes
+      // the NUDGE, since the lean is the same wherever the focus points (camera principle 3,
+      // applied by `tweenTo`).
+      this.cam.tweenTo(this.cam.out.pos, this.cam.out.target, false);
       return true;
     },
   };
@@ -1713,6 +1727,9 @@ export class Engine {
     // the DAG core, so this must NOT be gated on the validator set (bug: "no nodes reported" while
     // the core was still loading).
     useStore.getState().setSelNodes(VIEW_POLICIES[this.mode].nodeList ? this.globe.listNodes(this.filter) : []);
+    // The whole catalog's placed rows, for the Hypergraph explorer's per-network counts — the
+    // same builder, unfiltered, on the same edges (a filter change, a poll).
+    useStore.getState().setAllNodes(VIEW_POLICIES[this.mode].nodeList ? this.globe.listNodes("all") : []);
     // The per-country leaderboard needs the validator set — skip it until the core has loaded.
     if (!this.globe.nodes?.length) return;
     const countries = this.globe.countryStats(this.filter);
@@ -1900,7 +1917,7 @@ export class Engine {
     // A metagraph-snapshot TILE: commit the tile AND pin the global tick it anchored into.
     if (p?.kind === "metaSnap") {
       applyClickActions(
-        metaSnapSelectActions(p.sel, p.global, { filter: st.filter, metaSnap: st.metaSnap, following: st.following }),
+        metaSnapSelectActions(p.sel, p.global, { metaSnap: st.metaSnap, following: st.following }),
       );
       return;
     }
@@ -1995,6 +2012,7 @@ export class Engine {
       const zoomedIn = this._integrateMotion(dt); // hyper spin/tilt ease + globe rotation (poses final after this)
       this._deriveFrames();        // staging plane from the SETTLED camera + rotation
       this._writeScene(dt, zoomedIn); // morph/alphas/visibility/view updates/DoF — reads only settled state
+      this._publishMotion();       // one boolean for the HUD: is anything above still moving?
       this.ctx.renderFrame();
       if (this._onReady) {
         const cb = this._onReady;
@@ -2084,6 +2102,26 @@ export class Engine {
     if (minAlt != null && this.ctx.camera.position.lengthSq() < minAlt * minAlt) {
       this.ctx.camera.position.setLength(minAlt);
     }
+  }
+
+  /** THE ONE ANSWER TO "IS THE SCENE MOVING" (2026-09-26), for the motion hint. Read off the
+   *  structures that already drive motion — never a second clock: the view transition's phase
+   *  (teardown → build), the camera director's flight (a commit's pose flight, or a nudge over a
+   *  structural move), the controls' drag, and the trend stack's ease (the re-deal, a page, a
+   *  re-rank) where the view has a stack. Written on EDGES only, so the steady state costs a
+   *  boolean compare. */
+  private _publishMotion(): void {
+    const st = useStore.getState();
+    const moving =
+      this.transition.active() ||
+      this.cam.flying ||
+      st.sceneDragging ||
+      (this._policy.chartStack && !this.trendStack.settled());
+    if (moving !== st.sceneMoving) st.setSceneMoving(moving);
+    // The transition's two phases, for the view-switch sentence ("leaving A" → "entering B").
+    const ph = this.transition.phase;
+    const phase = ph === "out" ? "out" : ph === "in" ? "in" : null;
+    if (phase !== st.motionPhase) st.setMotionPhase(phase);
   }
 
   private _integrateMotion(dt: number): boolean {
@@ -2183,19 +2221,19 @@ export class Engine {
     if (trendAlpha > 0.001) {
       // The published window when there is one; until React publishes (boot, a refetch) the count
       // the SCOPE will hold — so the room is built around the floor it is about to have, and a
-      // scope with nothing to draw (`dag`, unlisted: `trendRoster` is empty) draws no floor at all
+      // scope with nothing to draw (unlisted: `stackRoster` is empty) draws no floor at all
       // under the sentence that says so.
       const n = useStore.getState().trendIds.length;
       if (n === 0 && this._scopeFor !== this.filter) {
         this._scopeFor = this.filter;
-        this._scopeCount = trendRoster(this.filter).length; // event-time: once per filter, never per frame
+        this._scopeCount = stackRoster(this.filter).length; // event-time: once per filter, never per frame — the SCENE's roster (the DAG has a plane here)
       }
       const count = windowCount(n > 0 ? n : this._scopeCount);
       const shift = loneShiftPx(count, railGapShiftPx(window.innerWidth, this.railsHidden));
       // The canvas height is only read while a shift needs converting — it is a layout read.
       const viewH = shift !== 0 ? this.ctx.renderer.domElement.clientHeight || window.innerHeight : 0;
       // `_frameDt`, the projector's own clock (`?slowmo` included), so floor and cards ease as one.
-      this.trends.face(this.ctx.camera, count, shift, viewH, this._frameDt);
+      this.trends.face(this.ctx.camera, count, shift, viewH, this._frameDt, breakpointOf(window.innerWidth) !== "desktop");
     }
     // The stage light's per-view PRESENCE, published BEFORE the view updates that claim it: a claim
     // is scaled by its view's furniture alpha, so a fading view's light fades with its furniture and
@@ -2292,8 +2330,10 @@ export class Engine {
       // out-of-focus blur — the ceiling the background core/hubs saturate to. The selected
       // cluster stays crisp regardless (the wide sharp zone comes from the LOW aperture, not
       // this cap — see SceneContext's dofParams note); raised 0.08 → 0.16 (user 2026-07-17:
-      // more background separation while focused).
-      this.ctx.dof.uniforms["maxblur"].value = 0.16 * dofMix;
+      // more background separation while focused), then eased back to 0.10 (user 2026-09-26:
+      // "the blur / focus effect in hyper view is a bit too strong") — the background still
+      // falls off, but a hub behind the focused one stays a hub rather than a smear.
+      this.ctx.dof.uniforms["maxblur"].value = 0.10 * dofMix;
     }
 
     this._syncCallout();
@@ -2370,12 +2410,14 @@ export class Engine {
    *  published a roster (see `_writeScene`). */
   private _scopeFor: string | null = null;
   private _scopeCount = 0;
-  private _trendState: TrendStackState = { scroll: 0, focus: null, ids: [], gapShiftPx: 0 };
+  private _trendState: TrendStackState = { scroll: 0, focus: null, ids: [], gapShiftPx: 0, narrow: false };
   private _syncTrendStack(): void {
     const st = useStore.getState();
     const t = this._trendState;
     t.scroll = st.trendScroll; t.focus = st.trendFocus; t.ids = st.trendIds;
     t.gapShiftPx = railGapShiftPx(window.innerWidth, this.railsHidden);
+    // The canvas TIER decides the stagger (`trendStack.stepX`); the same read the ground makes.
+    t.narrow = breakpointOf(window.innerWidth) !== "desktop";
     this.trendStack.sync(t);
   }
 

@@ -109,10 +109,17 @@ export function HyperCells({ accent }: { accent: string }) {
           label={cfg ? "Metagraph type" : "Network type"}
           lead={
             // SUBTLE on purpose (user): a characteristic is a quiet reading, not a headline —
-            // the number cards keep the bold mono, a word does not.
-            <span className="flex items-center gap-1.5">
-              <TypeGlyph t={singleWord} className="size-3.5" color={accent} />
-              <span className="font-mono text-caption text-foreground whitespace-nowrap">{singleWord}</span>
+            // the number cards keep the bold mono, a word does not. EACH TYPE IS ITS OWN UNIT,
+            // glyph over word (user, 2026-09-26: "don't say a + b — a data icon with 'data' and
+            // a currency icon with 'currency', icon above the text"): a network that is both
+            // shows two units side by side, never a joined phrase under a joined glyph.
+            <span className="flex items-start gap-3">
+              {(singleWord === "data + currency" ? ["data", "currency"] : [singleWord]).map((t) => (
+                <span key={t} className="flex flex-col items-center gap-1">
+                  <TypeGlyph t={t} className="size-4" color={accent} />
+                  <span className="font-mono text-label text-foreground whitespace-nowrap">{t}</span>
+                </span>
+              ))}
             </span>
           }
         >

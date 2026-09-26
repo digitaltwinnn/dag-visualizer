@@ -673,6 +673,14 @@ export function ChannelStatePanel() {
                 // (flex-1) instead of huddling at one end. The COUNTS are gone (user: "at first
                 // I didn't realise they were counts") — each lane's own note and table state its
                 // weight one line later, where the numbers have labels.
+                // ⚠️ THE HAIRLINE REGISTER, NOT THE WASH LADDER (user, 2026-09-26 — this cabinet took the
+                // Trends document's accent plate for an hour and "looks a bit off"). The raw layer is
+                // the RECORDS register: a table whose committed row wears the accent wash, and a
+                // record pane whose ink is hairlines — the search box, the pager, the foot. Here the
+                // wash means COMMITTED, so a drawer-sized accent plate reads as a selected region
+                // competing with the row it belongs to. The document's cabinet keeps the ladder
+                // because it sits among that page's picker groups, which wear it; this one sits
+                // among records.
                 className="relative flex h-auto flex-none w-full gap-1 rounded-none p-0 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50"
                 aria-label="Which part of the snapshot to read"
               >

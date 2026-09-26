@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { shortHash, metagraphById, getNetwork, SIGNER_GROUPS, nodeSigned, coLocatedNetworks, filterAccent } from "@/src/data/network";
@@ -23,7 +23,8 @@ import { useArchive, archiveFactState, archiveSchedule, archiveSummary, fmtSnapC
 import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
 import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
-import { cap, BarCell, CountCell, CountTag, Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark } from "./parts";
+import { cap, Desc, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark, StackedSchedule, partShade, type SchedulePart } from "./parts";
+import { statusItems } from "@/src/data/nodeStatus";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { pickNetId, followToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -419,8 +420,22 @@ function UnlistedMemberFacts({ id, last }: { id: string; last: boolean }) {
 // CLOSED by default (user, round 21) — the captions are the card's index and a breakdown
 // is opened on demand; state is local and plain — folding commits nothing, so the store
 // owns none of it — and survives pager steps, since the group's identity does.
-function ScheduleGroup({ label, children }: { label: string; children: ReactNode }) {
-  const [open, setOpen] = useState(false);
+function ScheduleGroup({
+  label,
+  value,
+  children,
+  defaultOpen = false,
+}: {
+  label: string;
+  /** A FACT-REGISTER header (user, 2026-09-26: "make the 'online nodes' element the one used for
+   *  the breakdown"): the label in the Fact row's body type with this value right-aligned — the
+   *  total the schedules below partition IS the disclosure, so the reader opens the number to
+   *  see what it is made of. Without it the header is the quiet eyebrow-style caption. */
+  value?: ReactNode;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       {/* No default focus ring and no text selection (user, round 22: clicking drew "an
@@ -429,7 +444,7 @@ function ScheduleGroup({ label, children }: { label: string; children: ReactNode
           selects nothing, and focus shows only for the keyboard in CopyButton's own
           focus-visible recipe. */}
       <CollapsibleTrigger className="group mt-2 flex w-full items-center gap-1 cursor-pointer select-none outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]">
-        <span className="text-micro tracking-caps uppercase text-muted-foreground">{label}</span>
+        <span className={value !== undefined ? "text-body text-muted-foreground" : "text-micro tracking-caps uppercase text-muted-foreground"}>{label}</span>
         <ChevronRight
           aria-hidden
           className={cn(
@@ -437,6 +452,7 @@ function ScheduleGroup({ label, children }: { label: string; children: ReactNode
             open && "rotate-90",
           )}
         />
+        {value !== undefined && <span className="ml-auto min-w-0 text-body text-foreground tabular-nums text-right">{value}</span>}
       </CollapsibleTrigger>
       <CollapsibleContent className="disclose-panel">
         <div className="mt-1 pl-2">{children}</div>
@@ -447,64 +463,48 @@ function ScheduleGroup({ label, children }: { label: string; children: ReactNode
 
 // THE "BY ARCHIVAL" GROUP — one renderer for every dossier (user, 2026-09-10: "missing the
 // archival breakdown for DAG / hypergraph; should behave the same"): the census's reaches as
-// merged rows (full-node + kept-snapshot tags), the honest unmeasured remainder, stars while
+// the parts of one stacked bar (2026-09-26), the honest unmeasured remainder, stars while
 // the census is in flight. The metagraph dossiers seat it as the third schedule under Online
 // nodes; the DAG dossier seats the same group standalone (its roster isn't `nodes`).
 function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> }) {
   return (
-    <ScheduleGroup label="by archived snapshots">
-      {sched ? (
-          <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-x-2 gap-y-[7px]">
-            {sched.rows.map((row) => (
-              <Fragment key={`${row.fullCount > 0 ? "full|" : ""}${row.label}`}>
-                {/* EVERY tag rides the right-aligned tag column (user, rounds 8 and 11:
-                    "right aligned, not based on label length", then the full-node tag
-                    too), so the tags share one edge whatever the labels run. A full row's
-                    tag is the bare "full archive" (round 9 — was "full node": the tag
-                    qualifies the ARCHIVE, and completeness got its opposite number,
-                    "incomplete archive", on the holed deep row) — no count in the words,
-                    the row's own count column already says how many (round 4). */}
-                <span
-                  className="text-body text-foreground"
-                  title={row.hint ?? (row.kept != null ? `${fmtSnapCount(row.kept)} snapshots kept` : undefined)}
-                >
-                  {cap(row.label)}
-                </span>
-                {row.fullCount > 0 || row.kept != null ? (
-                  <span className="justify-self-end inline-flex items-center gap-1">
-                    {row.fullCount > 0 && (
-                      <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap">
-                        full
-                      </span>
-                    )}
-                    {row.kept != null && (
-                      <CountTag
-                        title={row.hint ? `${fmtSnapCount(row.kept)} snapshots — ${row.hint}` : `${fmtSnapCount(row.kept)} snapshots kept`}
-                      >
-                        {fmtSnapCount(row.kept)}
-                      </CountTag>
-                    )}
-                  </span>
-                ) : (
-                  <span />
-                )}
-                <BarCell count={row.count} max={Math.max(...sched.rows.map((x) => x.count))} hue="var(--muted-foreground)" />
-                <CountCell>{row.count}</CountCell>
-              </Fragment>
-            ))}
-            {sched.unmeasured > 0 && (
-              <Fragment key="__unmeasured">
-                <span className="text-body text-foreground" title="The probe read nothing from these nodes — what they keep is unknown.">Unknown</span>
-                <span />
-                <span />
-                <CountCell>{sched.unmeasured}</CountCell>
-              </Fragment>
-            )}
-          </div>
-        ) : (
-          <NodeStars count={4} />
-        )}
+    <ScheduleGroup label="by archived snapshots" defaultOpen>
+      {sched ? <StackedSchedule axis="Archive depth" parts={archiveParts(sched)} /> : <ArchivalAcquiring />}
     </ScheduleGroup>
+  );
+}
+
+/** The archive schedule's rows as the parts of one bar: the census's kinds in the neutral hue,
+ *  stepped down per row, each part's title carrying what its tag column used to say. */
+function archiveParts(sched: NonNullable<ReturnType<typeof archiveSchedule>>): SchedulePart[] {
+  const parts: SchedulePart[] = sched.rows.map((row, i) => ({
+    label: cap(row.label),
+    count: row.count,
+    color: partShade("var(--muted-foreground)", i),
+    title:
+      row.hint ??
+      (row.kept != null ? `${fmtSnapCount(row.kept)} snapshots kept${row.fullCount > 0 ? " · full archive" : ""}` : undefined),
+  }));
+  // The honest remainder (an absent probe entry proves nothing about what a node keeps) is a
+  // part of the same bar, last and faintest, so the bar still sums to the fleet.
+  if (sched.unmeasured > 0)
+    parts.push({
+      label: "Unknown",
+      count: sched.unmeasured,
+      color: partShade("var(--muted-foreground)", sched.rows.length + 1),
+      title: "The probe read nothing from these nodes — what they keep is unknown.",
+    });
+  return parts;
+}
+
+/** The archival schedule while the census is IN FLIGHT — stars in the slot the bar will fill.
+ *  (The table this used to draw when the census had landed retired with the stacked bars,
+ *  2026-09-26.) */
+function ArchivalAcquiring() {
+  return (
+    <div className="flex items-center gap-2 py-1.5 text-label text-muted-foreground">
+      <NodeStars count={4} />
+    </div>
   );
 }
 
@@ -547,6 +547,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   // own probed universe (its roster isn't `nodes`); a metagraph counts against its live fleet.
   // Memoized — archiveSchedule walks every census entry with date parsing, and this card
   // re-renders on every poll and hover.
+  const hue = cfg.id === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(cfg.id);
   const archSched = useMemo(
     () =>
       archCensus
@@ -598,34 +599,39 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
               (user, 2026-09-10, round 2: the larger font read as just a big number — the
               DIVIDER is what says "what follows partitions this"). Shown even at 0 for a
               catalog metagraph (an empty fleet is a reading); the schedules below skip then. */}
-          <div className="mt-3">
-            <Fact label="Online nodes">
-              {/* Mono, like the partition counts it totals — `/design`'s sans/mono split puts counts
-                  in the data face, and this row sums the very columns directly below it. The BOLD
-                  stays: this is the total the two tables partition, not one value among peers. */}
-              <b className="font-mono font-bold">{nodes.length}</b>
-            </Fact>
-          </div>
-          {/* The divider announces the partitions that follow, so at 0 nodes — where every
-              schedule skips — it stands down too (review find, 2026-09-11: a dangling rule
-              over an empty region, back-to-back with the site row's own Separator). */}
-          {nodes.length > 0 && <Separator className="my-2" />}
-          {nodes.length > 0 && (
-            <>
-              <ScheduleGroup label="by node composition">
-                <CompositionRows nodes={nodes} />
+          {/* THE TOTAL IS THE DISCLOSURE (user, 2026-09-26, two rounds): the three "by …" rows
+              became one open group, and then the "Online nodes" fact became that group's own
+              header — the total the schedules partition, with the count right-aligned in the
+              Fact grammar, so opening the number shows what it is made of. Mono and bold, like
+              the partition counts it totals (`/design`'s sans/mono split). At 0 nodes there is
+              nothing to partition, so the fact stands alone (an empty fleet is a reading). */}
+          {nodes.length === 0 ? (
+            <div className="mt-3">
+              <Fact label="Online nodes">
+                <b className="font-mono font-bold">0</b>
+              </Fact>
+            </div>
+          ) : (
+            <div className="mt-1">
+              {/* THREE STACKED BARS, ONE PER PARTITION (design 2026-09-26, `dossier-breakdown` A;
+                  the captioned tables under hairlines read as three sections): composition in
+                  the network's hue, status in the bucket colours, archive depth in the neutral —
+                  each one bar of the same total, its parts named beneath. The chips and the
+                  depth tags ride the parts' titles. "Archive depth", not "archive" (user: it is
+                  how far back each node's archive reaches, not a size). */}
+              <ScheduleGroup label="Online nodes" value={<b className="font-mono font-bold">{nodes.length}</b>} defaultOpen>
+                <StackedSchedule
+                  axis="Composition"
+                  parts={compositionRows(nodes).map((r, i) => ({ label: r.label, count: r.count, color: partShade(hue, i), title: r.codes.join(" · ") }))}
+                />
+                <StackedSchedule axis="Status" parts={statusItems(states).map((it) => ({ label: cap(it.label), count: it.count, color: it.color }))} />
+                {archSched != null ? (
+                  <StackedSchedule axis="Archive depth" parts={archiveParts(archSched)} />
+                ) : archAcquiring ? (
+                  <ArchivalAcquiring />
+                ) : null}
               </ScheduleGroup>
-              <ScheduleGroup label="by node status">
-                <StatusBreakdown states={states} />
-              </ScheduleGroup>
-              {/* THIRD SCHEDULE — "by archival" (user, 2026-09-10): the census's own kinds as
-                  rows — the full-chain keepers, then one DYNAMIC row per distinct partial reach
-                  in the age grammar ("~2 months") — and the honest remainder as unmeasured (an
-                  absent probe entry proves nothing about what a node keeps). The deepest reach +
-                  kept-count ride as the group's muted underline; this absorbs the old
-                  divider-separated "Full archive nodes" fact for fleets. */}
-              {(archSched != null || archAcquiring) && <ArchivalGroup sched={archSched} />}
-            </>
+            </div>
           )}
         </>
       )}

@@ -467,8 +467,8 @@ a naive regex counted the prose, which let the test pass with the fix deliberate
 
 ## The History view's ground
 
-`views/TrendsView.ts` is the ONLY thing History draws in WebGL, and it is one `LineSegments`: a level
-floor of horizontal rungs, one per CARD the DOM chart stack is showing — five under a full window,
+`views/TrendsView.ts` is the ONLY thing History draws in WebGL, and it is one `Mesh` of soft SHADOW
+BANDS: a level floor of horizontal rungs, one per CARD the DOM chart stack is showing — five under a full window,
 one under a filtered stack's lone card (which also takes that card's screen shift into the rails'
 gap, `trendStack.loneShiftPx`), so the floor is always the footprint of what stands on it. The view's content is DOM
 (`components/TrendStack.tsx`, placed per frame by the engine's `TrendStackSync`), so the canvas under
@@ -477,6 +477,14 @@ own, so with nothing behind them five planes read as five unrelated cards rather
 receding into history. Each rung is the plane's FOOTPRINT — same depth, same width, same stagger,
 derived from `domain/trendStack.ts`'s own arithmetic rather than eyeballed against a screenshot — so
 re-tuning the stagger re-tunes the ground with it.
+
+**A rung is a shadow, not a line** (user, 2026-09-26). It was an accent hairline, and an accent line
+is a MARK — it reads as a gridline or a reading, and there is nothing to read. Each rung is now a quad
+billboard hanging `SHADOW_H` below the floor line, its alpha rising over a short lip and decaying to
+nothing (`shadowTexture`, a luminance canvas — three reads an alphaMap's green channel, so a canvas
+that varies only in alpha uploads as a solid slab), feathered at both ends, in the NEUTRAL ink
+(`SceneColors.fg`) rather than the accent. Below the desktop tier the rungs stack straight up with
+the deck (`trendStack.stepX`, the `narrow` flag `face()` takes).
 
 Four decisions are recorded in the file's header and worth knowing before touching it:
 

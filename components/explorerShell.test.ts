@@ -14,35 +14,32 @@ import { join } from "node:path";
 
 const COMPONENTS = join(import.meta.dirname, ".");
 
-const EXPLORERS = ["GeoExplore.tsx", "HyperExplore.tsx", "LedgerPanel.tsx"];
+const EXPLORERS = ["GeoExplore.tsx", "HyperExplore.tsx", "LedgerPanel.tsx", "TrendExplore.tsx"];
 
-describe("explorer-chrome boundary (the three tool cards render the shared shell)", () => {
-  it("every explorer renders <ExplorerShell — none hand-rolls its own card chrome", () => {
+// THE RULE MOVED UP A LEVEL ON 2026-09-26 (the explorer-card design session, user: "every view
+// will have an explorer, so I'd like to keep its behaviour consistent by design rather than
+// copy-paste"): an explorer no longer composes the shell, the heading, the path and the rows
+// itself — it hands a DESCRIPTION of its levels to the ONE `components/explorer/Explorer.tsx`,
+// which is the only file that renders `<ExplorerShell`. So the grep is now two-sided: every
+// explorer renders `<Explorer`, and none of them renders the shell or the row primitives
+// directly. (A `MIGRATING` set carried the cards still on the old composition while the design
+// landed view by view; it ended empty on 2026-09-26 and went, with `components/ExploreRows.tsx`.)
+
+describe("explorer boundary (every tool card is a description handed to the one Explorer)", () => {
+  it("every explorer renders <Explorer and never the shell or the row primitives itself", () => {
     const bad: string[] = [];
     for (const name of EXPLORERS) {
       const src = readFileSync(join(COMPONENTS, name), "utf8");
-      if (!src.includes("<ExplorerShell")) bad.push(name);
+      if (!src.includes("<Explorer\n") && !src.includes("<Explorer ")) bad.push(`${name}: must render <Explorer`);
+      for (const forbidden of ["<ExplorerShell", "<ExplorerRow", "<ExplorerHeading", "<ExplorerPath", "<ExplorerLevel"]) {
+        if (src.includes(forbidden)) bad.push(`${name}: renders ${forbidden} itself — that is Explorer.tsx's job`);
+      }
     }
-    expect(bad, "every explorer must render <ExplorerShell — add it instead of hand-rolling chrome").toEqual([]);
+    expect(bad, "the explorer grammar has one home, components/explorer/Explorer.tsx").toEqual([]);
   });
-});
 
-// DISCLOSURE-CHEVRON BOUNDARY (user, 2026-07-18 — set alongside the shared DisclosureChevron
-// extraction): a ledger fix had hand-copied ExploreRows' DisclosureRow chevron treatment and
-// dropped its hover-reveal (always-visible instead), the exact drift the user predicted a shared
-// component would prevent. The cheap backstop: no explorer may import ChevronRight itself — the
-// disclosure affordance comes ONLY from components/ExploreRows.tsx (DisclosureChevron directly,
-// or DisclosureRow which wraps it), so there is nowhere left for a hand-copy to drift from.
-describe("disclosure-chevron boundary (the three explorers never import ChevronRight directly)", () => {
-  it("every explorer gets its disclosure chevron via ExploreRows, not lucide-react directly", () => {
-    const bad: string[] = [];
-    for (const name of EXPLORERS) {
-      const src = readFileSync(join(COMPONENTS, name), "utf8");
-      if (src.includes("ChevronRight")) bad.push(name);
-    }
-    expect(
-      bad,
-      "no explorer may reference ChevronRight — use DisclosureChevron/DisclosureRow from components/ExploreRows.tsx instead",
-    ).toEqual([]);
+  it("only Explorer.tsx renders the shell", () => {
+    const src = readFileSync(join(COMPONENTS, "explorer", "Explorer.tsx"), "utf8");
+    expect(src.includes("<ExplorerShell")).toBe(true);
   });
 });
