@@ -28,12 +28,12 @@ import { readSceneColors, type SceneColors, LIGHT_TUNE } from "./sceneColors";
 import { setNodeDimTarget, setNodeEnv } from "./scene/objects/NodeFabric";
 import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme/resolve";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
-import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush } from "./domain/cameraRig";
+import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush, trendFit } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
 import { ViewTransition, is3D, fleetFaded, fleetHolder, type FleetPlacement } from "./domain/viewTransition";
-import { gatherBand, railGapShiftPx, type GatherBand } from "./domain/gatherLayout";
+import { gatherBand, railGapPx, railGapShiftPx, type GatherBand } from "./domain/gatherLayout";
 import { LADDERS, LEVEL_CARRY, hasLevel, type CohortSel, type CompositionSel, type FocusLevel, type SelectionSnapshot, type ResolverKey } from "./domain/focusLadder";
 import { compositionGroups, compositionKey, compositionRows } from "@/src/data/composition";
 import { metaSnapDeepKey, metaSnapHoverKey } from "@/src/data/types";
@@ -44,12 +44,13 @@ import { type Tap, DOUBLE_TAP_SLOP, LONG_PRESS_MS, LONG_PRESS_LINGER_MS, isDoubl
 import { auditInstances, findingKey, type InstanceFinding } from "./scene/instanceAudit";
 import { CalloutSync, type CalloutState } from "./CalloutSync";
 import { TrendStackSync, type TrendStackState } from "./TrendStackSync";
-import { focusDepth, loneShiftPx, windowCount } from "./domain/trendStack";
+import { fitDistance, focusDepth, loneShiftPx, windowCount } from "./domain/trendStack";
 import { trendRoster } from "@/src/data/trendScope";
 import { DevTunePanel } from "./DevTunePanel";
 import { CameraDirector } from "./CameraDirector";
 import type { GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
+import { breakpointOf } from "@/src/data/breakpoint";
 
 
 // View-transition staging plane (the gather grids the nodes fly to at the top of the viewport).
@@ -1642,19 +1643,26 @@ export class Engine {
       // visible window does not hold (nothing is re-dealt there), which is the resting pose exactly.
       const st = useStore.getState();
       const depth = focusDepth(st.trendIds, st.trendFocus, st.trendScroll);
-      if (depth === 0) {
-        this.cam.focus("trend");
-        return true;
-      }
       const f = FOCI.trend;
-      trendFocusPush(f.pos, f.target, depth, this.cam.out.pos);
+      // THE WIDTH FIT (2026-09-26): the resting distance is the one at which the front card spans
+      // its share of the free band between the rails (`trendStack.fitDistance`, from the live
+      // canvas box, the camera's lens and `railGapPx`) — the same 92% on every tier, where the √
+      // aspect lever left tablet at 72% and phone clipped. It is this pose's whole dolly, so the
+      // flight is `dolly: false`: the three global levers scale (pos − target) about the target,
+      // which is exactly what the fit decided (see `trendFit`). The focus lean composes on top.
+      const el = this.ctx.renderer.domElement;
+      const dist = fitDistance(
+        railGapPx(window.innerWidth, this.railsHidden),
+        el.clientHeight || window.innerHeight,
+        this.ctx.camera.fov,
+      );
+      trendFit(f.pos, f.target, dist, this.cam.out.pos);
+      trendFocusPush(this.cam.out.pos, f.target, depth, this.cam.out.pos);
       this.cam.out.target.copy(f.target);
-      // DOLLIED like every resting pose: this pose's target IS its subject — the stack's own front,
-      // which the resting aim was tuned against — so there is no composed look-at to exempt it from
-      // `dollyBack` / `railsLean` / `aspectFit` (the ⚠️ next to CAM_ZOOM). And a commit that lands on
-      // the pose already held — focusing plane B while A is focused — takes the NUDGE, since the
-      // lean is the same wherever the focus points (camera principle 3, applied by `tweenTo`).
-      this.cam.tweenTo(this.cam.out.pos, this.cam.out.target);
+      // A commit that lands on the pose already held — focusing plane B while A is focused — takes
+      // the NUDGE, since the lean is the same wherever the focus points (camera principle 3,
+      // applied by `tweenTo`).
+      this.cam.tweenTo(this.cam.out.pos, this.cam.out.target, false);
       return true;
     },
   };
@@ -2197,7 +2205,7 @@ export class Engine {
       // The canvas height is only read while a shift needs converting — it is a layout read.
       const viewH = shift !== 0 ? this.ctx.renderer.domElement.clientHeight || window.innerHeight : 0;
       // `_frameDt`, the projector's own clock (`?slowmo` included), so floor and cards ease as one.
-      this.trends.face(this.ctx.camera, count, shift, viewH, this._frameDt);
+      this.trends.face(this.ctx.camera, count, shift, viewH, this._frameDt, breakpointOf(window.innerWidth) !== "desktop");
     }
     // The stage light's per-view PRESENCE, published BEFORE the view updates that claim it: a claim
     // is scaled by its view's furniture alpha, so a fading view's light fades with its furniture and
@@ -2372,12 +2380,14 @@ export class Engine {
    *  published a roster (see `_writeScene`). */
   private _scopeFor: string | null = null;
   private _scopeCount = 0;
-  private _trendState: TrendStackState = { scroll: 0, focus: null, ids: [], gapShiftPx: 0 };
+  private _trendState: TrendStackState = { scroll: 0, focus: null, ids: [], gapShiftPx: 0, narrow: false };
   private _syncTrendStack(): void {
     const st = useStore.getState();
     const t = this._trendState;
     t.scroll = st.trendScroll; t.focus = st.trendFocus; t.ids = st.trendIds;
     t.gapShiftPx = railGapShiftPx(window.innerWidth, this.railsHidden);
+    // The canvas TIER decides the stagger (`trendStack.stepX`); the same read the ground makes.
+    t.narrow = breakpointOf(window.innerWidth) !== "desktop";
     this.trendStack.sync(t);
   }
 

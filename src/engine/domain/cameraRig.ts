@@ -402,6 +402,22 @@ export function ledgerCommitTilt(pos: THREE.Vector3, target: THREE.Vector3, outP
 // "larger"), a full push drove the focused plane ~50px under each rail. Emphasis has to fit the
 // room the rails leave it.
 export const TREND_FOCUS_PUSH = 0.25;
+
+/** Place the History camera `distance` back from its target along the pose's own axis — the
+ *  WIDTH FIT (2026-09-26). `distance` is `trendStack.fitDistance()`, the one number at which the
+ *  front card spans its share of the free band; the axis is `FOCI.trend`'s, so the pitch and the
+ *  aim are untouched and only how far back the camera stands is decided here. Composed BEFORE
+ *  `trendFocusPush` and flown with `dolly: false`: the three global levers all scale (pos − target)
+ *  about the target, which is exactly what this already decided, so they are exempt for this pose
+ *  — not because its target is a composed look-at (the nodeFraming exemption) but because its
+ *  subject has a pixel width and the fit is exact where the √ aspect law is a compromise.
+ *  Safe with `outPos === pos`. */
+export function trendFit(pos: THREE.Vector3, target: THREE.Vector3, distance: number, outPos: THREE.Vector3): void {
+  _out.subVectors(pos, target); // the backward axis, read BEFORE outPos is written (in-place safe)
+  const d = _out.length();
+  if (d > 1e-6) outPos.copy(target).addScaledVector(_out, distance / d);
+  else outPos.copy(pos);
+}
 /** Lean the settled trends pose in toward a focused plane. `depth` is `trendStack.focusDepth()`;
  *  0 means no focus and writes `pos` through unchanged. Safe with `outPos === pos`. */
 export function trendFocusPush(pos: THREE.Vector3, target: THREE.Vector3, depth: number, outPos: THREE.Vector3): void {

@@ -41,7 +41,6 @@
 import * as THREE from "three";
 import {
   PLANE_GAP,
-  PLANE_STEP_X,
   PLANE_STEP_Y,
   PLANE_WORLD_H,
   PLANE_WORLD_W,
@@ -50,6 +49,7 @@ import {
   STACK_EASE_K,
   VISIBLE_PLANES,
   staggerCentre,
+  stepX,
 } from "../../domain/trendStack";
 import { glowBlend, inkMix, isLightGround, type SceneColors } from "../../sceneColors";
 import { FadeSet } from "../objects/FadeSet";
@@ -135,7 +135,7 @@ const slotPresence = (i: number, paper: boolean): number => {
  *  floor drops (see `GROUND_DROP`). One home: re-tune the stagger in `domain/trendStack.ts` and
  *  the ground follows, because it is derived from the same arithmetic rather than eyeballed
  *  against a screenshot of it. */
-const slotX = (i: number, centre: number): number => (i - centre) * PLANE_STEP_X;
+const slotX = (i: number, centre: number, narrow: boolean): number => (i - centre) * stepX(narrow);
 const slotZ = (i: number): number => -i * PLANE_GAP;
 
 /** Half the width of the card standing on rung `i` — the card's world width at ITS slot's scale
@@ -174,6 +174,7 @@ export class TrendsView implements SceneView {
   private _px = NaN;
   private _py = NaN;
   private _pz = NaN;
+  private _narrow = false;
 
   constructor(scene: THREE.Scene, colors: SceneColors) {
     this._colors = colors;
@@ -185,7 +186,7 @@ export class TrendsView implements SceneView {
     // draws, so this is only the buffer's shape.
     for (const i of RUNGS) {
       const c = staggerCentre(VISIBLE_PLANES);
-      pos.push(slotX(i, c) - halfW(i), groundY(c), slotZ(i), slotX(i, c) + halfW(i), groundY(c), slotZ(i));
+      pos.push(slotX(i, c, false) - halfW(i), groundY(c), slotZ(i), slotX(i, c, false) + halfW(i), groundY(c), slotZ(i));
       this._vertSlot.push(i, i);
     }
 
@@ -237,13 +238,15 @@ export class TrendsView implements SceneView {
    *  converted to world units at its own view depth and laid along the camera's right vector, so
    *  the line stays under the card it belongs to. `viewH` is the canvas height that conversion
    *  needs — the Engine passes 0 while no shift is asked for, and the last real one is kept for the
-   *  ease back. `dt` drives the ease of the centre and the shift. All plain data from the Engine.
+   *  ease back. `dt` drives the ease of the centre and the shift. `narrow` is the canvas tier
+   *  (`trendStack.stepX`): below desktop the deck stacks straight up and so do its rungs. All
+   *  plain data from the Engine.
    *
    *  Per-frame, allocation-free (rule 5): two scratch vectors, writes straight into the position
    *  buffer, and skips entirely while nothing it reads has changed — the camera's orientation and
    *  the eased values always, the camera's position too while a shift stands (the px→world
    *  conversion reads the view depth). */
-  face(camera: THREE.PerspectiveCamera, count: number, shiftPx: number, viewH: number, dt: number): void {
+  face(camera: THREE.PerspectiveCamera, count: number, shiftPx: number, viewH: number, dt: number, narrow: boolean): void {
     const centreT = staggerCentre(count);
     let moved = false;
     if (this._fresh) {
@@ -266,13 +269,14 @@ export class TrendsView implements SceneView {
     const q = camera.quaternion;
     const p = camera.position;
     const still =
-      !moved && count === this._count &&
+      !moved && count === this._count && narrow === this._narrow &&
       q.x === this._qx && q.y === this._qy && q.z === this._qz && q.w === this._qw &&
       (this._shift === 0 || (p.x === this._px && p.y === this._py && p.z === this._pz));
     if (still) return;
     this._qx = q.x; this._qy = q.y; this._qz = q.z; this._qw = q.w;
     this._px = p.x; this._py = p.y; this._pz = p.z;
     this._count = count;
+    this._narrow = narrow;
     this._right.set(1, 0, 0).applyQuaternion(q);
     this._fwd.set(0, 0, -1).applyQuaternion(q);
     // px per world unit at one unit of depth — the projector's own expression.
@@ -284,7 +288,7 @@ export class TrendsView implements SceneView {
     for (let r = 0; r < RUNGS.length; r++) {
       const i = RUNGS[r];
       const h = i < count ? halfW(i) : 0;
-      let cx = slotX(i, c), cy = y, cz = slotZ(i);
+      let cx = slotX(i, c, narrow), cy = y, cz = slotZ(i);
       if (shift !== 0 && pxPerUnitAt1 > 0) {
         const d = (cx - p.x) * this._fwd.x + (cy - p.y) * this._fwd.y + (cz - p.z) * this._fwd.z;
         const s = d > 0 ? (shift * d) / pxPerUnitAt1 : 0;

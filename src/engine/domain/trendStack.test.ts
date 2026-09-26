@@ -25,6 +25,9 @@ import {
   scrollToShow,
   staggerCentre,
   stackPoses,
+  stepX,
+  fitDistance,
+  PLANE_FIT,
 } from "./trendStack";
 
 const IDS = ["dag-l0", "pacaswap", "dor-metagraph", "elpaca", "constellation-l1", "ded"];
@@ -473,5 +476,59 @@ describe("STACK_EASE_K — one travel rate for the cards and the floor under the
     expect(STACK_EASE_K).toBeGreaterThan(0);
     expect(travel(12, 0.5)).toBeCloseTo(travel(120, 0.5), 6);
     expect(travel(60, 1)).toBeGreaterThan(0.99); // settles inside a second — a gesture, not a drift
+  });
+});
+
+describe("stepX — the across-stagger is a desktop thing (user, 2026-09-26)", () => {
+  it("keeps PLANE_STEP_X on desktop and drops to 0 on a narrow canvas", () => {
+    expect(stepX(false)).toBe(PLANE_STEP_X);
+    expect(stepX(true)).toBe(0);
+  });
+
+  it("a narrow window stacks straight up: every pose shares x = 0, the rise and depth unchanged", () => {
+    const wide = stackPoses(IDS, { scroll: 0, focus: null });
+    const narrow = stackPoses(IDS, { scroll: 0, focus: null, narrow: true });
+    expect(narrow.length).toBe(wide.length);
+    for (let i = 0; i < wide.length; i++) {
+      expect(narrow[i]!.x + 0).toBe(0); // `+ 0` folds the −0 a negative step times zero leaves
+      expect(narrow[i]!.y).toBe(wide[i]!.y);
+      expect(narrow[i]!.z).toBe(wide[i]!.z);
+      expect(narrow[i]!.scale).toBe(wide[i]!.scale);
+    }
+    // And the default is the desktop stagger, so nothing that never passes the flag moved.
+    expect(wide.some((p) => p.x !== 0)).toBe(true);
+  });
+});
+
+describe("fitDistance — the front card spans PLANE_FIT of the free band", () => {
+  const FOV = 55;
+  const pxPerUnitAt1 = (h: number) => h / (2 * Math.tan((FOV * Math.PI) / 360));
+  const cardPx = (d: number, h: number) => (PLANE_WORLD_W * pxPerUnitAt1(h)) / d;
+
+  it("is the projector's expression inverted: at the answered distance the card is exactly PLANE_FIT × free width", () => {
+    for (const [free, h] of [[864, 1000], [820, 1180], [390, 844]] as const) {
+      const d = fitDistance(free, h, FOV);
+      expect(cardPx(d, h)).toBeCloseTo(PLANE_FIT * free, 6);
+    }
+  });
+
+  it("reproduces the desktop pose the user tuned by eye (798px of an 864px gap at 1500×1000)", () => {
+    const d = fitDistance(864, 1000, FOV);
+    expect(cardPx(d, 1000)).toBeGreaterThan(790);
+    expect(cardPx(d, 1000)).toBeLessThan(806);
+  });
+
+  it("scales with height over width — a portrait canvas stands the camera further back, a wider band closer", () => {
+    // The FOV is vertical: px-per-unit is set by the HEIGHT, so fitting a WIDTH means the distance
+    // rises with viewH / freeW. Phone portrait (390×844) therefore stands further back than desktop.
+    expect(fitDistance(390, 844, FOV)).toBeGreaterThan(fitDistance(864, 1000, FOV));
+    expect(fitDistance(1000, 1000, FOV)).toBeLessThan(fitDistance(864, 1000, FOV));
+    expect(fitDistance(864, 1000, FOV) / fitDistance(432, 1000, FOV)).toBeCloseTo(0.5, 9);
+    expect(fitDistance(1, 1, FOV)).toBeGreaterThan(0.1); // never inside the near plane on a degenerate box
+  });
+
+  it("PLANE_FIT leaves a gutter: under 1 and above the old tablet share", () => {
+    expect(PLANE_FIT).toBeLessThan(1);
+    expect(PLANE_FIT).toBeGreaterThan(0.72);
   });
 });

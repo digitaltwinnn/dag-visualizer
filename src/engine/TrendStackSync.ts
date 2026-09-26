@@ -36,6 +36,9 @@ export interface TrendStackState {
   /** The ranked roster, busiest first — store `trendIds`, the React → Engine publish channel.
    *  Compared BY REFERENCE: React publishes a fresh array only when the content changes. */
   ids: readonly string[];
+  /** A narrow canvas (below the desktop tier, `breakpointOf`): the deck stacks straight up —
+   *  `trendStack.stepX`. The Engine reads the tier; this module only carries it to the poses. */
+  narrow: boolean;
 }
 
 /** One `[data-plane]` anchor, as narrowly as this module needs it — a `style` it writes and a
@@ -115,6 +118,7 @@ export class TrendStackSync {
   private _scroll = -1;
   private _focus: string | null = null;
   private _ids: readonly string[] | null = null;
+  private _narrow: boolean | null = null;
   private _w = -1;
   private _h = -1;
   private _settled = false;
@@ -158,11 +162,13 @@ export class TrendStackSync {
     if (
       st.ids !== this._ids ||
       st.scroll !== this._scroll ||
-      st.focus !== this._focus
+      st.focus !== this._focus ||
+      st.narrow !== this._narrow
     ) {
       this._ids = st.ids;
       this._scroll = st.scroll;
       this._focus = st.focus;
+      this._narrow = st.narrow;
       this._retarget(st);
       retarget = true;
     }
@@ -209,7 +215,7 @@ export class TrendStackSync {
   // runs against plain numbers. A plane SEEN FOR THE FIRST TIME starts AT its target: a fly-in from
   // the origin would make every roster refresh look like an entrance.
   private _retarget(st: TrendStackState): void {
-    const poses = stackPoses(st.ids, { scroll: st.scroll, focus: st.focus }); // event-time
+    const poses = stackPoses(st.ids, { scroll: st.scroll, focus: st.focus, narrow: st.narrow }); // event-time
     this._order.length = 0;
     for (let i = 0; i < poses.length; i++) {
       const p = poses[i]!;

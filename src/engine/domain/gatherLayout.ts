@@ -174,6 +174,20 @@ export function railGapShiftPx(viewW: number, railsHidden: boolean): number {
   return railed ? (LEFT_RAIL_W - RIGHT_RAIL_W) / 2 : 0;
 }
 
+/**
+ * The WIDTH of the free canvas between the rails, in CSS px — the band a subject fitted by width
+ * (History's front card, `trendStack.fitDistance`) is fitted to. Where the rails are inline
+ * columns it is the viewport less both rails and their gutters; where they are hidden, or are
+ * sheets over the canvas (below `RAILS_TIER`), it is the whole viewport, because a sheet is a
+ * transient overlay and a card that resized every time one opened would be a card that never
+ * held still. Same `railed` predicate as `railGapShiftPx`, so the gap's width and its centre can
+ * never disagree about whether there is a gap.
+ */
+export function railGapPx(viewW: number, railsHidden: boolean): number {
+  const railed = !railsHidden && viewW >= RAILS_TIER;
+  return Math.max(1, railed ? viewW - 2 * RAIL_GUTTER - LEFT_RAIL_W - RIGHT_RAIL_W : viewW);
+}
+
 export function gatherBand(viewW: number, viewH: number, railsHidden: boolean, out: GatherBand): GatherBand {
   const railed = !railsHidden && viewW >= RAILS_TIER;
   const reach = railed ? RAIL_GUTTER + Math.max(LEFT_RAIL_W, RIGHT_RAIL_W) : 0;

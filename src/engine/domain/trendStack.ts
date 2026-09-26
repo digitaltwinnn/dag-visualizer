@@ -67,6 +67,16 @@ export const OPACITY_FALLOFF = 0;
  *  clears the plane in front of it. See the header: a covered header is a missing plane. */
 export const PLANE_STEP_X = 3;
 
+/** THE STAGGER ACROSS, PER TIER. On a NARROW canvas (tablet, phone — `breakpointOf` below the
+ *  desktop tier) the across-step is ZERO and the deck stacks straight up: the front card is
+ *  fitted to the canvas width there (`fitDistance`), so every unit of across-stagger would push a
+ *  rear header's right end — its reading — off the edge, and a deck exactly one card wide keeps
+ *  every header whole, stacked above the front card like a list (user, 2026-09-26: "the front
+ *  card should take more width on tablet/phone"). Desktop keeps `PLANE_STEP_X`. */
+export function stepX(narrow: boolean): number {
+  return narrow ? 0 : PLANE_STEP_X;
+}
+
 /** THE STAGGER, up. Each slot further back sits this much HIGHER — the larger of the two steps,
  *  because a header strip is wide and short: vertical clearance is what actually uncovers it.
  *  Sized to uncover the HEADER and the peak line under it, not the plot: the rear planes are an
@@ -158,6 +168,27 @@ export const PLANE_PX_H = PLANE_PLOT_PX_H + PLANE_CHROME_PX_H;
 /** The plane's height in world units, from the two numbers above and its world width. */
 export const PLANE_WORLD_H = (PLANE_WORLD_W * PLANE_PX_H) / PLANE_PX_W;
 
+/** THE FRONT CARD'S SHARE OF THE FREE BAND — the fraction of the canvas width between the rails
+ *  (the whole width where the rails are sheets) the front card spans at rest. Measured off the
+ *  desktop pose the user tuned by eye (2026-09-19, "larger"): 798px of the 864px gap at 1500×1000,
+ *  0.924. Stating it makes every tier the same rule — tablet stood at 0.72 and phone at 0.99 with
+ *  the card's left edge 11px off the canvas, because the global aspect lever is a √ compromise for
+ *  3D volumes and a card has an exact pixel width (user, 2026-09-26). */
+export const PLANE_FIT = 0.92;
+
+/** The camera DISTANCE (along the view axis, to the front card's depth) at which the front card
+ *  spans `PLANE_FIT` of `freeWidthPx`. The projector's own expression, inverted: a card
+ *  `PLANE_WORLD_W` wide at view depth d is `PLANE_WORLD_W × pxPerUnitAt1 / d` px wide, with
+ *  `pxPerUnitAt1 = viewH / (2·tan(fov/2))`. Pure — the Engine hands in the live numbers. This is
+ *  the History pose's ONE lever: it replaces `dollyBack`, `railsLean` and `aspectFit` for that
+ *  pose (the rails' gap and the aspect are its inputs; the global zoom is folded into `PLANE_FIT`),
+ *  because those three scale a pose tuned for a 3D volume and this subject is a DOM card whose
+ *  width is a known number. */
+export function fitDistance(freeWidthPx: number, viewHeightPx: number, fovDeg: number): number {
+  const pxPerUnitAt1 = Math.max(1, viewHeightPx) / (2 * Math.tan((fovDeg * Math.PI) / 360));
+  return (PLANE_WORLD_W * pxPerUnitAt1) / (PLANE_FIT * Math.max(1, freeWidthPx));
+}
+
 /** How far the CAMERA closes on the stack while a plane is focused (`focusDepth`, scaled by
  *  `cameraRig.TREND_FOCUS_PUSH`). It was the focused plane's own lift in front of slot 0 until a
  *  focus became a RE-DEAL (user, 2026-09-19) — the focused card takes first place, so there is no
@@ -168,6 +199,8 @@ export const FOCUS_LEAN = PLANE_GAP / 2;
 interface StackOpts {
   scroll: number;
   focus: string | null;
+  /** A narrow canvas (below the desktop tier): the across-stagger is zero — see `stepX`. */
+  narrow?: boolean;
 }
 
 /** Clamp `scroll` to the roster's own end and floor it to an integer slot — a fractional scroll
@@ -230,7 +263,8 @@ export function focusInWindow(ids: readonly string[], scroll: number, focus: str
  * a plane focus goes through the click table rather than straight to its setter.
  */
 export function stackPoses(ids: readonly string[], opts: StackOpts): PlanePose[] {
-  const { scroll, focus } = opts;
+  const { scroll, focus, narrow = false } = opts;
+  const sx = stepX(narrow);
   const start = clampScroll(ids.length, scroll);
   const visible = ids.slice(start, start + VISIBLE_PLANES);
   // The shared predicate, never a local `visible.includes` — `focusDepth` reads the same answer,
@@ -255,7 +289,7 @@ export function stackPoses(ids: readonly string[], opts: StackOpts): PlanePose[]
     const slot = slotOf(i);
     return {
       id,
-      x: (slot - c) * PLANE_STEP_X,
+      x: (slot - c) * sx,
       y: PLANE_Y + (slot - c) * PLANE_STEP_Y,
       z: -slot * PLANE_GAP,
       scale: 1 - SCALE_FALLOFF * slot,

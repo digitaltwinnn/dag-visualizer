@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
 import { FOCUS_LEAN } from "./trendStack";
-import { FOCI, hubFraming, geoFraming, REST_ASPECT, aspectFit, ledgerCommitTilt, LEDGER_TILT_YAW, LEDGER_TILT_PITCH, LEDGER_TILT_DOLLY, easeInOutQuad, CAM_ZOOM, dollyBack, RAILS_HIDDEN_DOLLY, railsLean, restOrbit, restPitch, nodeFraming, cohortFraming, isSamePose, nudgeMix, NUDGE_AMP, NUDGE_DUR, NUDGE_SAME, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE, trendFocusPush, TREND_FOCUS_PUSH } from "./cameraRig";
+import { FOCI, hubFraming, geoFraming, REST_ASPECT, aspectFit, ledgerCommitTilt, LEDGER_TILT_YAW, LEDGER_TILT_PITCH, LEDGER_TILT_DOLLY, easeInOutQuad, CAM_ZOOM, dollyBack, RAILS_HIDDEN_DOLLY, railsLean, restOrbit, restPitch, nodeFraming, cohortFraming, isSamePose, nudgeMix, NUDGE_AMP, NUDGE_DUR, NUDGE_SAME, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE, trendFocusPush, TREND_FOCUS_PUSH, trendFit } from "./cameraRig";
 
 // NO Snapshots framing is pinned here, because the view HAS none: it owns one pose, `FOCI.ledger`,
 // with one state-keyed variation — `ledgerCommitTilt`, the commit ORBIT, pinned below. Five framings
@@ -469,4 +469,34 @@ describe("FOCI.trend pivots on the FRONT card (user, 2026-09-26)", () => {
     expect(dir.distanceTo(toOld)).toBeLessThan(1e-9);
   });
 
+});
+
+describe("trendFit — the History pose's ONE lever (2026-09-26)", () => {
+  const pos = () => FOCI.trend.pos.clone();
+  const tgt = () => FOCI.trend.target.clone();
+
+  it("stands the camera exactly `distance` from the target", () => {
+    const out = new THREE.Vector3();
+    trendFit(pos(), tgt(), 40, out);
+    expect(out.distanceTo(FOCI.trend.target)).toBeCloseTo(40, 9);
+  });
+
+  it("keeps the pose's own axis — the aim and the pitch are untouched, only the distance", () => {
+    const out = new THREE.Vector3();
+    trendFit(pos(), tgt(), 80, out);
+    const before = new THREE.Vector3().subVectors(FOCI.trend.pos, FOCI.trend.target).normalize();
+    const after = new THREE.Vector3().subVectors(out, FOCI.trend.target).normalize();
+    expect(before.distanceTo(after)).toBeLessThan(1e-9);
+  });
+
+  it("is safe to compose IN PLACE and composes with the focus push after it", () => {
+    const expected = new THREE.Vector3();
+    trendFit(pos(), tgt(), 60, expected);
+    const p = pos();
+    trendFit(p, tgt(), 60, p);
+    expect(p.distanceTo(expected)).toBeLessThan(1e-9);
+    const pushed = new THREE.Vector3();
+    trendFocusPush(p, tgt(), FOCUS_LEAN, pushed);
+    expect(pushed.distanceTo(FOCI.trend.target)).toBeCloseTo(60 - FOCUS_LEAN * TREND_FOCUS_PUSH, 9);
+  });
 });
