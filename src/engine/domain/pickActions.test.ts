@@ -80,29 +80,30 @@ describe("clickActions — hub / snapshot", () => {
 });
 
 describe("clickActions — node clicks (the ordering contracts)", () => {
-  it("GEO: filter FIRST, then the node's country + cohort (full-ancestry rule), inspect LAST", () => {
+  it("GEO: NO filter — a node is a place first (user, 2026-09-26): country + cohort (full-ancestry rule), inspect LAST", () => {
     const p = nodePick("DE");
     const acts = clickActions({ mode: "geo", pick: p, countryCc: null, current: state() });
     expect(acts).toEqual([
-      { kind: "filter", id: "dor" },
       { kind: "country", cc: "DE" },
       { kind: "cohort", sel: { cc: "DE", city: null, isp: null } },
       { kind: "inspect", pick: p },
     ]);
   });
-  it("GEO: the filter step is SKIPPED when the node's network is already selected (no drill churn)", () => {
+  it("GEO: the same list whatever the committed filter — a node never changes it", () => {
     const p = nodePick("DE");
     const acts = clickActions({ mode: "geo", pick: p, countryCc: null, current: state({ filter: "dor" }) });
     expect(kinds(acts)).toEqual(["country", "cohort", "inspect"]);
+    const other = clickActions({ mode: "geo", pick: p, countryCc: null, current: state({ filter: "ded" }) });
+    expect(kinds(other)).toEqual(["country", "cohort", "inspect"]);
   });
   it("GEO: a node without a resolvable country skips the drill (no country action)", () => {
     const acts = clickActions({ mode: "geo", pick: nodePick(null), countryCc: null, current: state() });
-    expect(kinds(acts)).toEqual(["filter", "inspect"]);
+    expect(kinds(acts)).toEqual(["inspect"]);
   });
-  it("GEO: a validator drills the DAG core + its country", () => {
+  it("GEO: a validator drills its country, and no more commits the DAG core than a metagraph node commits its network", () => {
     const acts = clickActions({ mode: "geo", pick: validatorPick(), countryCc: null, current: state() });
-    expect(acts[0]).toEqual({ kind: "filter", id: "dag" });
-    expect(acts[1]).toEqual({ kind: "country", cc: "US" });
+    expect(acts[0]).toEqual({ kind: "country", cc: "US" });
+    expect(kinds(acts)).not.toContain("filter");
   });
   it("HYPER: filter + inspect only — no country (a geo concept), no autoRotate stop", () => {
     const p = nodePick("DE");
@@ -391,10 +392,10 @@ describe("nodeSelectActions ancestry (spec Part 3 — full-ancestry rule)", () =
     kind: "metanode", meta: { id: "dor" },
     geo: { cc: "DE", city: "Falkenstein", isp: "Hetzner" },
   } as unknown as PickDescriptor;
-  it("geo: filter → country → cohort → inspect LAST", () => {
+  it("geo: country → cohort → inspect LAST, and never the filter (2026-09-26)", () => {
     const acts = nodeSelectActions(geoPick, { mode: "geo", currentFilter: "all" });
-    expect(acts.map((a) => a.kind)).toEqual(["filter", "country", "cohort", "inspect"]);
-    expect(acts[2]).toEqual({ kind: "cohort", sel: { cc: "DE", city: "Falkenstein", isp: "Hetzner" } });
+    expect(acts.map((a) => a.kind)).toEqual(["country", "cohort", "inspect"]);
+    expect(acts[1]).toEqual({ kind: "cohort", sel: { cc: "DE", city: "Falkenstein", isp: "Hetzner" } });
   });
   it("geo: a pick without isp/city still commits its cohort (nullable fields)", () => {
     const p = { kind: "l0", node: { id: "x" }, geo: { cc: "FI" } } as unknown as PickDescriptor;
