@@ -328,7 +328,11 @@ export class Engine {
     this._freeOrbit = true;
     clearTimeout(this._dragEndT);
     this._dragEndT = undefined;
-    if (!useStore.getState().sceneDragging) useStore.getState().setSceneDragging(true);
+    const st = useStore.getState();
+    if (!st.sceneDragging) {
+      st.setSceneDragging(true);
+      st.setMotionCause({ kind: "orbit" }); // the hint's cause for a drag: the reader's own hand
+    }
   };
   private _onControlsEnd = () => {
     clearTimeout(this._dragEndT);
@@ -2005,6 +2009,7 @@ export class Engine {
       const zoomedIn = this._integrateMotion(dt); // hyper spin/tilt ease + globe rotation (poses final after this)
       this._deriveFrames();        // staging plane from the SETTLED camera + rotation
       this._writeScene(dt, zoomedIn); // morph/alphas/visibility/view updates/DoF — reads only settled state
+      this._publishMotion();       // one boolean for the HUD: is anything above still moving?
       this.ctx.renderFrame();
       if (this._onReady) {
         const cb = this._onReady;
@@ -2094,6 +2099,22 @@ export class Engine {
     if (minAlt != null && this.ctx.camera.position.lengthSq() < minAlt * minAlt) {
       this.ctx.camera.position.setLength(minAlt);
     }
+  }
+
+  /** THE ONE ANSWER TO "IS THE SCENE MOVING" (2026-09-26), for the motion hint. Read off the
+   *  structures that already drive motion — never a second clock: the view transition's phase
+   *  (teardown → build), the camera director's flight (a commit's pose flight, or a nudge over a
+   *  structural move), the controls' drag, and the trend stack's ease (the re-deal, a page, a
+   *  re-rank) where the view has a stack. Written on EDGES only, so the steady state costs a
+   *  boolean compare. */
+  private _publishMotion(): void {
+    const st = useStore.getState();
+    const moving =
+      this.transition.active() ||
+      this.cam.flying ||
+      st.sceneDragging ||
+      (this._policy.chartStack && !this.trendStack.settled());
+    if (moving !== st.sceneMoving) st.setSceneMoving(moving);
   }
 
   private _integrateMotion(dt: number): boolean {

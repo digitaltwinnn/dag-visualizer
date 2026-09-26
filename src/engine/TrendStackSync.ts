@@ -140,6 +140,12 @@ export class TrendStackSync {
     this.h = host;
   }
 
+  /** Is every card at its asked-for pose? The Engine folds this into `store.sceneMoving`, so the
+   *  motion hint can say "bringing X to the front" for exactly as long as the re-deal eases. */
+  settled(): boolean {
+    return this._settled;
+  }
+
   /** Called once per frame from the Engine's scene-write phase — after the camera has settled,
    *  because every number here is derived from the camera's final pose for this frame. */
   sync(st: TrendStackState): void {

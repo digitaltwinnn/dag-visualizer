@@ -18,6 +18,7 @@ import RawSnapshotBridge from "@/components/RawSnapshotBridge";
 import RouteSync from "@/components/RouteSync";
 import Tooltip from "@/components/Tooltip";
 import HintTips from "@/components/HintTips";
+import MotionHint from "@/components/MotionHint";
 import SceneCallout from "@/components/SceneCallout";
 import TrendStack from "@/components/TrendStack";
 import DevCssCanary from "@/components/DevCssCanary";
@@ -94,6 +95,7 @@ export default function AppShell({ doc }: { doc?: DocPage }) {
               `VIEW_POLICIES[mode].chartStack`, so it costs every other view one null render. */}
           <TrendStack />
           <SceneCallout />
+          <MotionHint />
         </DocGate>
         <BootFade at="data">
           <DocGate>

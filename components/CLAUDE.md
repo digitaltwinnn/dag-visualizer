@@ -257,6 +257,19 @@ pointermove. Three rules are worth knowing before touching it:
   reader in different places. `All charts` is the other REGISTER of the same rung — this view's RAW
   surface is the document, so it is one `setSection("data")` and no mode step at all.
 
+**The motion hint says what the scene is doing while it moves** (user, 2026-09-26 — `MotionHint`,
+one quiet sentence centred under the command bar). Two store channels, and nothing else feeds it.
+`sceneMoving` is ENGINE → REACT: the Engine's `_publishMotion` derives it each frame from the four
+structures that already drive motion — `ViewTransition.active()`, `CameraDirector.flying`, the
+controls' `sceneDragging`, and `TrendStackSync.settled()` where the view has a stack — and writes it
+on edges only; there is no second clock. `motionCause` is WHY, stamped once per gesture by whoever
+owns the gesture: the click executor for every selection (its `motionCauseOf`, the FINEST action of
+the click), the store's own setters for the settings that move the scene (view, window, range,
+measure, page), the Engine for a drag. `domain/motionHint.ts` turns a cause into words (tested);
+names are resolved by the component through `HintNames`, so the view vocabulary stays in `views.ts`.
+The line fades in after 150ms (a same-pose NUDGE never flashes it) and holds its last sentence
+through the fade-out. A window pill shows nothing, honestly: the charts redraw but the scene holds.
+
 **The History view has three axes and each has one home** (user, 2026-09-19): left/right on the
 timeline is WHEN, the depth of the stack is WHO, and UP/DOWN is WHAT — the measure. Its control is
 the Layers card's STEPPER (`MeasureStepper`: `∧ SNAPSHOTS ∨`, the card's control row with `Same scale`

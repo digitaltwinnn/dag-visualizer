@@ -22,6 +22,25 @@ export type Mode = "hyper" | "geo" | "ledger" | "trend" | "soon";
 // The stored metric every trend plane draws — one picker, one column (see `trendMetric` below).
 import type { LedgerMeasure } from "@/src/data/ledgerMeasure";
 export type { LedgerMeasure };
+// WHY the scene is moving — the motion hint's cause (2026-09-26), stamped by the gesture's owner
+// and read by `components/MotionHint` through `domain/motionHint.ts`, which turns it into words.
+// DATA about the gesture, never copy. Defined here, beside its channel, because the domain module
+// that reads it already imports this file's types and a type import back would close a cycle.
+export type MotionCause =
+  | { kind: "view"; to: Mode }
+  | { kind: "filter"; id: string }
+  | { kind: "focus"; id: string | null }
+  | { kind: "node"; title: string | null }
+  | { kind: "snapshot"; ordinal: number | null }
+  | { kind: "metaSnap"; metaId: string | null; ordinal?: number }
+  | { kind: "country"; cc: string | null }
+  | { kind: "cohort"; on: boolean }
+  | { kind: "composition"; on: boolean }
+  | { kind: "range"; span: { fromMs: number; toMs: number } | null }
+  | { kind: "window"; id: ZoomId }
+  | { kind: "measure"; id: TrendMetric }
+  | { kind: "page" }
+  | { kind: "orbit" };
 export type TrendMetric = "snapshots" | "blocks" | "fees" | "kb" | "nodes" | "continuity";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
@@ -226,6 +245,14 @@ interface AppState {
   // choreography is its own 3.9s answer to the user's gesture, so a 1.4s dim inside it would read
   // as a blink.
   cameraFlying: boolean;
+  // THE MOTION HINT's two channels (2026-09-26). `sceneMoving` is ENGINE → REACT: derived each
+  // frame from the structures that drive motion (the view transition, the camera flight, the
+  // controls' drag, the trend stack's ease) and written on edges only. `motionCause` is WHY —
+  // stamped once per gesture by whoever owns it: the click executor for every selection, the
+  // setters below for the settings that move the scene, the Engine for a drag. `MotionHint`
+  // turns the pair into one sentence (`domain/motionHint.ts`); nothing else reads them.
+  sceneMoving: boolean;
+  motionCause: MotionCause | null;
   // Which rail slot is the materialized BOX right now (the expanded card — "context", "node",
   // "snap", …), or null when nothing is boxed. A PRESENTATION channel, written by Inspector
   // from the same state that renders the box, read by the subject callout so the scene label
@@ -375,6 +402,8 @@ interface AppState {
   setRailsHidden: (hidden: boolean) => void;
   setSceneDragging: (dragging: boolean) => void;
   setCameraFlying: (flying: boolean) => void;
+  setSceneMoving: (moving: boolean) => void;
+  setMotionCause: (cause: MotionCause | null) => void;
   setPhoneSheetPx: (px: number | null) => void;
   /** Publish how many px of the canvas an open rail sheet covers on one side (0 when closed). */
   setSceneCover: (side: "left" | "right", px: number) => void;
@@ -454,6 +483,8 @@ export const useStore = create<AppState>((set) => ({
   railsHidden: false,
   sceneDragging: false,
   cameraFlying: false,
+  sceneMoving: false,
+  motionCause: null,
   railCollapse: {},
   navQuiet: false,
   focusRung: null,
@@ -489,7 +520,8 @@ export const useStore = create<AppState>((set) => ({
   // so it clears any standing quiet mark from a rail gesture. `trendFocus` clears with it — it's
   // view-scoped, like the other ladder levels; `trendCursorMs` does NOT (an instant is a
   // universal subject and carries, the way `node` and `network` do in `LEVEL_CARRY`).
-  setMode: (mode) => set((s) => ({ mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing, trendFocus: null })),
+  // A view switch stamps its own motion cause (the hint says what it builds).
+  setMode: (mode) => set((s) => ({ mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing, trendFocus: null, motionCause: { kind: "view", to: mode } })),
   // Opening a doc also SURFACES THE SCENE POSE: the overlay sits at z-8, under the raw layer's
   // z-9 — a doc opened from the RAW pose rendered beneath the still-interactive table, with the
   // RAW toggle that could exit it hidden by the doc's own control gating (review find,
@@ -610,6 +642,8 @@ export const useStore = create<AppState>((set) => ({
   setRailsHidden: (railsHidden) => set({ railsHidden }),
   setSceneDragging: (sceneDragging) => set({ sceneDragging }),
   setCameraFlying: (cameraFlying) => set({ cameraFlying }),
+  setSceneMoving: (sceneMoving) => set({ sceneMoving }),
+  setMotionCause: (motionCause) => set({ motionCause }),
   setNavQuiet: (navQuiet) => set({ navQuiet }),
   setRailCollapse: (id, collapsed) =>
     set((s) => {
@@ -659,15 +693,16 @@ export const useStore = create<AppState>((set) => ({
   // mark left by an earlier manual expand would swallow the first one.
   setTrendCursor: (ms) =>
     set((s) => ({ trendCursorMs: ms, navQuiet: false, selStack: bumpStack(s.selStack, "instant", ms != null) })),
-  setTrendMetric: (metric) => set({ trendMetric: metric }),
+  // The settings that MOVE the scene stamp their cause (the hint reads it while the stack eases).
+  setTrendMetric: (metric) => set({ trendMetric: metric, motionCause: { kind: "measure", id: metric } }),
   setLedgerMeasure: (measure) => set({ ledgerMeasure: measure }),
-  setTrendScroll: (offset) => set({ trendScroll: offset }),
+  setTrendScroll: (offset) => set({ trendScroll: offset, motionCause: { kind: "page" } }),
   setTrendFocus: (id) => set({ trendFocus: id }),
   setTrendScale: (scale) => set({ trendScale: scale }),
   // A window and a range are the SAME statement about what is on screen, so picking one retires
   // the other (the document's zoom pills do exactly this).
-  setTrendWindow: (trendWindow) => set({ trendWindow, trendRange: null }),
-  setTrendRange: (trendRange) => set({ trendRange }),
+  setTrendWindow: (trendWindow) => set({ trendWindow, trendRange: null, motionCause: { kind: "window", id: trendWindow } }),
+  setTrendRange: (trendRange) => set({ trendRange, motionCause: { kind: "range", span: trendRange } }),
   // Stored BY REFERENCE — the array the publisher hands in is the one the Engine compares with
   // `!==`. No copy, no sort, no normalising: any of those would mint a fresh reference per call
   // and turn a no-op publish into a retarget (see the channel note on `trendIds`).
