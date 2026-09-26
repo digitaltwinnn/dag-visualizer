@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Table2 } from "lucide-react";
+import { ArrowUpRight, Table2 } from "lucide-react";
 
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
@@ -11,6 +11,7 @@ import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { cn } from "@/lib/utils";
+import { metagraphById } from "@/src/data/network";
 import { instantNote, orderAt, placeInstant, rankAt, tierWord, valueAt } from "@/src/data/trendSeries";
 import { stampInstant } from "@/src/data/trendTimeline";
 import { bucketAt } from "@/src/data/trendWindow";
@@ -168,8 +169,10 @@ export default function TrendInstantPane({
                   </>
                 )}
                 </span>
-                <span className="min-w-0 truncate text-right text-label font-normal text-muted-foreground">
-                  {subject ? rows.get(subject)?.name : "Across the whole network"}
+                <span className="min-w-0 truncate text-right text-label font-normal text-muted-foreground" title={subject ? rows.get(subject)?.name : undefined}>
+                  {/* Under a filter the TICKER alone (user, 2026-09-26): the dossier above already
+                      names the network in full, and the lead line has one line's width. */}
+                  {subject ? (metagraphById(subject)?.ticker || rows.get(subject)?.name) : "Across the whole network"}
                 </span>
               </p>
 
@@ -261,7 +264,9 @@ export default function TrendInstantPane({
               >
                 <Table2 aria-hidden className="size-3.5 flex-none text-primary" />
                 Snapshot records
-                <ChevronRight aria-hidden className="ml-auto size-3.5 flex-none text-muted-foreground" />
+                {/* The document's own door glyph (↗), not a chevron: › is the sibling pager's
+                    step on the cards below, and one glyph must not mean two things (user). */}
+                <ArrowUpRight aria-hidden className="ml-auto size-3.5 flex-none text-muted-foreground" />
               </button>
             </>
           )}
