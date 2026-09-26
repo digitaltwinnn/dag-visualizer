@@ -182,7 +182,10 @@ serving a fresh render, not a state bug. Reload before you debug it.
 restart** — the chunk keeps one filename, so an old body ships under the same URL (found 2026-08-13:
 the phone flight-dim rules were in the source for a day while the served chunk predated them, and
 the "bug" was chased in the state machine first). When a rule is missing from the browser's CSSOM,
-don't debug the cascade: kill the server, `rm -rf .next/dev`, restart.
+don't debug the cascade: kill the server, `rm -rf .next/dev`, restart. **A `:root` token edit is the
+common case** (2026-09-26, twice in one session: the `--wash-*` family, then `--sel-*`): the JSX
+hot-reloads and the token keeps its old value, so a measurement that reads the old colour is the
+cache, not the CSS. Restart before doubting the edit.
 
 `next build` and `next dev` don't conflict (dev outputs to `.next/dev`), so the production check can
 run alongside the dev server. Do it at phase boundaries: the build should be clean;
