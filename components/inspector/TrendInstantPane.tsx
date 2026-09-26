@@ -150,7 +150,9 @@ export default function TrendInstantPane({
                   <>
                     <span className="tabular-nums">{fmt(subjectValue)}</span>
                     {subjectValue != null && unit ? <span className="text-body font-normal text-muted-foreground"> {unit}</span> : null}
-                    {rank && (
+                    {/* The rank only where there is a field to rank in: under a filter the stack is
+                        one network, and "1 of 1" says nothing (user, 2026-09-26). */}
+                    {rank && rank.of > 1 && (
                       <span
                         className="text-body font-normal text-muted-foreground"
                         title={`Ranked among the ${rank.of} network${rank.of === 1 ? "" : "s"} with a reading at this instant`}
@@ -256,7 +258,11 @@ export default function TrendInstantPane({
                 onClick={() => openRecords(subject, span)}
                 className={cn(
                   "mt-3 flex w-[calc(100%+2*var(--card-pad))] items-center gap-2.5 text-left text-body text-foreground cursor-pointer",
-                  "-mx-[var(--card-pad)] px-[var(--card-pad)] -mb-[var(--card-pad)] py-2.5",
+                  // The Foot's own bleed: under a paged box the pager overrides `--foot-bleed` to
+                  // its strip height so the plank rides ON this plate — an 18px bleed stopped short
+                  // of the plank and its inset divider read as an underline (user, 2026-09-26).
+                  "-mx-[var(--card-pad)] px-[var(--card-pad)] pt-2.5",
+                  "-mb-[var(--foot-bleed,var(--card-pad))] pb-[calc(var(--foot-bleed,var(--card-pad))-var(--card-pad)+10px)]",
                   "rounded-b-[calc(var(--radius)-1px)] border-t border-wash-strong bg-wash-faint hover:bg-wash-soft",
                   "disabled:opacity-45 disabled:pointer-events-none",
                   "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
