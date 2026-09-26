@@ -20,10 +20,14 @@ import { cn } from "@/lib/utils";
 //
 // THE LOOK (user, 2026-09-26, two rounds): first a grey status line, then the scene-glass card
 // the callout wears — "a bit too dominant for a screen hint". What it is now: NO plate at all, the
-// sentence one step up the type scale (`text-title`, 15px) in the DIM foreground — clear, not
-// loud (user, round three: "font should be clear but more subtle") — with one tight shadow in the
-// ground's own colour, just enough to lift it off a lit hub or a paper globe, and a small beating
-// accent dot that says "in motion" the way the LIVE control's dot says "following".
+// sentence a step above body size in the DIM foreground — clear, not loud (user, round three:
+// "font should be clear but more subtle") — on a QUIET PLATE (user, round six: "a subtle
+// background so that it still stands out from the scene it overlays"): a borderless pill in the
+// ground's own colour at low opacity with a light blur, which separates the line from a lit hub
+// or a paper globe without reading as a card. Deliberately NOT `SCENE_GLASS` — that container is
+// for subject labels (the callout, the tooltip) and was tried here and rejected as dominant; this
+// is a status line, and its plate is the least that keeps it legible. And a small beating accent
+// dot that says "in motion" the way the LIVE control's dot says "following".
 // Larger and quieter at once, because it is only ever on screen for the length of a flight. A
 // pure FADE — it first rose a few pixels into place, which read as the line jumping (user).
 //
@@ -118,6 +122,9 @@ export default function MotionHint() {
         // touch loud once the ink dimmed (user, round four). No shadow at all: the dim ink over
         // the scene is the whole treatment.
         "inline-flex items-center gap-2.5 text-[13.5px] leading-none font-normal text-foreground-dim",
+        // The plate: the ground's colour at 62%, blurred — `--background` is `light-dark()`, so the
+        // one rule serves both grounds. No border, no shadow: a pill, not a card.
+        "rounded-full px-3.5 py-2 bg-[color-mix(in_oklch,var(--background)_62%,transparent)] backdrop-blur-[6px]",
         // The entrance: fade + a short rise, delayed a beat on the way IN only. One arbitrary
         // `[transition:…]` rather than two utilities — `transition-*` is a twMerge group.
         // Three states on one property: OFF (quick fade), ON (quick fade in, a beat late), and
