@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useRef } from "react";
 
 import { selectedRow, selectionHue } from "@/components/selection";
 import { cn } from "@/lib/utils";
@@ -78,8 +79,16 @@ export interface ExplorerRowProps {
 export default function ExplorerRow({
   glyph, name, nameMono, tag, bar, figure, hasFigure, nameW = 84, figureW = 40, on, hue, nested, faint, title, onClick, pair, className,
 }: ExplorerRowProps) {
+  const el = useRef<HTMLButtonElement>(null);
+  // SELECTION STAYS IN PLACE (design 2026-09-26, decision 12): the list never re-orders on a
+  // commit; the committed row is scrolled into view instead — `nearest`, so a row already on
+  // screen does not move the rail under the pointer.
+  useEffect(() => {
+    if (on) el.current?.scrollIntoView({ block: "nearest" });
+  }, [on]);
   return (
     <button
+      ref={el}
       type="button"
       title={title}
       aria-pressed={on ? true : undefined}
