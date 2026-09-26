@@ -272,8 +272,11 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           const shown = snap ?? (latestSnapshot ? ({ kind: "snapshot", title: `Global snapshot #${latestSnapshot.ordinal}`, data: latestSnapshot } as const) : null);
           if (shown) applyClickActions(followToggleActions(shown, following));
         }}
+        // One box in every state, so the pill never changes size or place as the state flips:
+        // the padding is there when it is invisible (LIVE, transparent) as when the PINNED wash
+        // makes it a visible chip (user, 2026-09-26: the pinned block "looks ugly, no padding").
         className={cn(
-          "mr-auto -ml-1 inline-flex items-center gap-1.5 rounded-sm px-1 py-px cursor-pointer select-none border border-transparent",
+          "mr-auto -ml-1.5 inline-flex items-center gap-1.5 rounded-sm px-1.5 py-[3px] cursor-pointer select-none border border-transparent",
           "hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
           pinned && previewOrd == null && selectedRow(true),
           previewOrd != null && "border-dashed border-border",

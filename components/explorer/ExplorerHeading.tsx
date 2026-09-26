@@ -10,6 +10,7 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { SELECTED_ROW } from "@/components/selection";
 import { cn } from "@/lib/utils";
 
 // THE EXPLORER'S HEADING ROW (design session 2026-09-26, `docs/superpowers/design/2026-09-26-
@@ -60,9 +61,11 @@ export default function ExplorerHeading({
       {measure && current && measure.options.length > 1 ? (
         <DropdownMenu>
           <DropdownMenuTrigger
+            // The same padded box as the setting beside it (the LIVE/PINNED pill), so the two ends
+            // of the heading row are one control species; the open state takes the wash.
             className={cn(
-              "inline-flex items-center gap-1 rounded-sm px-1 -mx-1 text-micro tracking-caps uppercase text-foreground select-none cursor-pointer",
-              "hover:bg-wash-hover data-[state=open]:bg-wash-hover",
+              "inline-flex items-center gap-1 rounded-sm px-1.5 -mr-1.5 py-[3px] text-micro tracking-caps uppercase text-foreground select-none cursor-pointer",
+              "hover:bg-wash-hover data-[state=open]:bg-wash-soft",
               "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
             )}
             title="What this list's figure is — pick another measure"
@@ -71,10 +74,22 @@ export default function ExplorerHeading({
             {current.label}
             <ChevronDown aria-hidden className="size-3 text-muted-foreground" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" sideOffset={4} className="min-w-[10rem]">
+          {/* The Settings menu's own popover recipe (`topbar/SettingsMenu.tsx`): rows at
+              `text-label`, muted until hovered, and the CURRENT one in the app's one committed-
+              selection language (`SELECTED_ROW`) rather than shadcn's radio bullet — the bullet
+              and its 32px gutter were the stock look the user caught (2026-09-26). */}
+          <DropdownMenuContent align="end" sideOffset={6} className="min-w-[10.5rem] p-1.5">
             <DropdownMenuRadioGroup value={measure.value} onValueChange={measure.onPick}>
               {measure.options.map((o) => (
-                <DropdownMenuRadioItem key={o.id} value={o.id} className="flex items-center justify-between gap-4 text-label">
+                <DropdownMenuRadioItem
+                  key={o.id}
+                  value={o.id}
+                  className={cn(
+                    "flex items-center justify-between gap-4 rounded-md px-2.5 py-1.5 pl-2.5 text-label cursor-pointer",
+                    "text-muted-foreground focus:text-foreground focus:bg-wash-soft [&>span:first-child]:hidden",
+                    o.id === measure.value && SELECTED_ROW,
+                  )}
+                >
                   <span>{o.label}</span>
                   {o.unit && <span className="text-micro text-muted-foreground">{o.unit}</span>}
                 </DropdownMenuRadioItem>
