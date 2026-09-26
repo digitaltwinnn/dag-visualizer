@@ -57,7 +57,10 @@ const SHAPE_LAST = "rounded-r-[5px] [clip-path:polygon(0_0,100%_0,100%_100%,0_10
 export default function ExplorerPath({ crumbs, hint, className }: { crumbs: readonly Crumb[]; hint?: string; className?: string }) {
   if (crumbs.length === 0) return null;
   return (
-    <Breadcrumb className={cn("rounded-md bg-wash-faint p-1", className)}>
+    // The plate takes the ROWS' outset (6px each side, `ExplorerRow`'s box), not the heading's inset:
+    // the rows' wash boxes are what the reader sees the plate against, and 6px of overhang on the
+    // right read as misalignment (user, 2026-09-26).
+    <Breadcrumb className={cn("w-[calc(100%+12px)] -mx-1.5 rounded-md bg-wash-faint p-1", className)}>
       <BreadcrumbList className="flex-nowrap gap-0 text-body text-muted-foreground sm:gap-0">
         {crumbs.map((c, i) => {
           const first = i === 0;

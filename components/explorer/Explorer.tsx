@@ -136,7 +136,7 @@ export default function Explorer({ id, title, hint, levels, onLeave, defaultColl
           {/* Inside a level the list HANGS FROM THE PATH on a spine in the path's own accent (user,
               2026-09-26: "a vertical line on the left side to show that the section underneath
               belongs to it"). The spine starts at the plate's left edge, under the house step. */}
-          <div className={cn("flex flex-col", nested && "mt-1.5 ml-[3px] border-l-2 border-wash-strong pl-2")}>
+          <div className={cn("flex flex-col", nested && "mt-1.5 -ml-0.5 border-l-2 border-wash-strong pl-2.5")}>
             {current.rows.length === 0 ? (
               current.empty != null ? (
                 <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">{current.empty}</p>
