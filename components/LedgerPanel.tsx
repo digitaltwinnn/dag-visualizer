@@ -517,7 +517,8 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
       crumb: { label: <span className="tabular-nums">{leaf.ordinal > 0 ? leaf.ordinal.toLocaleString() : `${leaf.metaId.slice(0, 10)}…`}</span> },
       // The cards' own phrase ("Signed by N L0 validators") — the producing layer named before
       // the rows, because the constant count is most puzzling here (3 rows under a 20-node network).
-      meaning: `Signed by ${signers.length} ${SIGNER_GROUPS.proof.who}, its whole L0 cluster`,
+      // The user's words (2026-09-26); the count is the rows, the layer is the tag beside each.
+      meaning: "Validators that signed",
       measure: null,
       hasFigure: false,
       rows: signers.map((sid): ExplorerRowSpec => {

@@ -7,6 +7,7 @@ import ExplorerHeading, { type MeasureControl } from "@/components/explorer/Expl
 import ExplorerPath, { type Crumb } from "@/components/explorer/ExplorerPath";
 import ExplorerRow from "@/components/explorer/ExplorerRow";
 import ScopeMark from "@/components/explorer/ScopeMark";
+import { cn } from "@/lib/utils";
 
 // THE EXPLORER — one component, four views (design session 2026-09-26; the agreed screens and
 // their README live in `docs/superpowers/design/2026-09-26-explorer-card/`). Every view's explorer
@@ -135,36 +136,41 @@ export default function Explorer({ id, title, hint, scope, levels, onLeave, defa
         <>
           <ExplorerHeading setting={current.setting} measure={measure} />
           <ExplorerPath crumbs={crumbs} hint={current.meaning} />
-          {current.rows.length === 0 ? (
-            current.empty != null ? (
-              <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">{current.empty}</p>
-            ) : null
-          ) : (
-            <div className="flex flex-col gap-0.5">
-              {current.rows.map((r) => (
-                <ExplorerRow
-                  key={r.key}
-                  hasFigure={current.hasFigure}
-                  nameW={current.nameW}
-                  figureW={current.figureW}
-                  nested={nested}
-                  glyph={r.glyph}
-                  name={r.name}
-                  nameMono={r.nameMono}
-                  tag={r.tag}
-                  bar={r.share != null && r.hue ? { share: r.share, hue: r.hue } : undefined}
-                  figure={r.figure}
-                  on={r.on}
-                  hue={r.hue}
-                  faint={r.faint}
-                  title={r.title}
-                  onClick={r.onClick}
-                  pair={r.pair}
-                />
-              ))}
-            </div>
-          )}
-          {current.pager}
+          {/* Inside a level the list HANGS FROM THE PATH on a spine in the path's own accent (user,
+              2026-09-26: "a vertical line on the left side to show that the section underneath
+              belongs to it"). The spine starts at the plate's left edge, under the house step. */}
+          <div className={cn("flex flex-col", nested && "mt-1.5 ml-[3px] border-l-2 border-[color-mix(in_oklch,var(--primary)_30%,transparent)] pl-2")}>
+            {current.rows.length === 0 ? (
+              current.empty != null ? (
+                <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">{current.empty}</p>
+              ) : null
+            ) : (
+              <div className="flex flex-col gap-0.5">
+                {current.rows.map((r) => (
+                  <ExplorerRow
+                    key={r.key}
+                    hasFigure={current.hasFigure}
+                    nameW={current.nameW}
+                    figureW={current.figureW}
+                    nested={nested}
+                    glyph={r.glyph}
+                    name={r.name}
+                    nameMono={r.nameMono}
+                    tag={r.tag}
+                    bar={r.share != null && r.hue ? { share: r.share, hue: r.hue } : undefined}
+                    figure={r.figure}
+                    on={r.on}
+                    hue={r.hue}
+                    faint={r.faint}
+                    title={r.title}
+                    onClick={r.onClick}
+                    pair={r.pair}
+                  />
+                ))}
+              </div>
+            )}
+            {current.pager}
+          </div>
         </>
       )}
     </ExplorerShell>
