@@ -66,10 +66,16 @@ Decisions, in the order they were made, each with the screen that shows it:
 
 Recorded deviations from the screens:
 
-- **No root crumb.** The screens drew "Networks › …"; built, the root word repeated the card's
-  title and cost the width the crumbs need in a 264px rail (user, same day: "do we need 'networks'
-  always at the start of the breadcrumb?"). The path starts at the first opened level; the scope
-  dot's × is the way back to the root.
+- **The root crumb is a house glyph.** The screens drew "Networks › …"; built, the root word
+  repeated the card's title and cost the width the crumbs need in a 264px rail (user, same day:
+  "do we need 'networks' always at the start of the breadcrumb?"), and without any root entry the
+  reader could not get back to the first level (user, same day: "rather than saying a lengthy
+  'networks' can we do something like a 'home' icon"). So the root is the shortest possible entry,
+  a lucide `House` whose accessible name is the root's word, releasing everything.
+- **Crumbs are set at the rows' size and shrink with an ellipsis** (user, same day): a crumb is a
+  row's name moved up, so it is `text-body` like the rows, the path never wraps, and a long label
+  (a provider) ellipsises with its full text on the crumb's title. A country crumb is the name
+  alone, not code + name.
 - **The row grid is re-budgeted to the rail's 264px.** The screens were drawn at ~360px with
   `16 · 100 · flex · 56 · 60`; the rail's row is 247px wide, so the build uses `14 · per-level name
   (128 at a network level with no tags, 52 at a composition level) · flex · 36 (24 inside a level)
@@ -84,3 +90,7 @@ Recorded deviations from the screens:
 - **A snapshot row's tag is a seven-glyph hash PREFIX**, not the `a…b` short form: beside a 48px
   figure the tag home holds seven mono glyphs, and a prefix cut clean reads as a prefix where an
   ellipsised short form cut again reads as broken.
+- **The level line lost its eyebrow and joined the path** (user, same day: "By node" over "nodes
+  that seal snapshots…" was "very redundant", and a separate row for it did not read as part of
+  the breadcrumb). Decision 7's ONE clause of meaning survives as the path's own caption, snug
+  under the crumbs inside the nav; the axis eyebrow is gone.

@@ -300,7 +300,14 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const levels: ExplorerLevelSpec[] = [
     {
       key: "ticks",
-      crumb: { label: "Snapshots" },
+      crumb: {
+        label: "Snapshots",
+        onRelease: () => {
+          setOpenTick(null);
+          setOpenNet(null);
+          setOpenSnap(null);
+        },
+      },
       measure: { options: LEDGER_MEASURE_OPTIONS, value: ledgerMeasure, onPick: (id) => setLedgerMeasure(id as LedgerMeasure) },
       hasFigure: true,
       // A 4-decimal fee ("0.0680") needs the wider figure column; the width holds across the
@@ -383,7 +390,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           setOpenSnap(null);
         },
       },
-      axis: "By network",
       meaning: "Which networks anchored into this snapshot",
       measure: { options: TICK_NET_MEASURE_OPTIONS, value: netPick, onPick: (id) => setNetPick(id as TickNetMeasure) },
       hasFigure: true,
@@ -458,7 +464,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         ),
         onRelease: () => setOpenSnap(null),
       },
-      axis: "By snapshot",
       meaning: "Each snapshot this network anchored here",
       measure: { options: SNAP_MEASURE_OPTIONS, value: snapPick, onPick: (id) => setSnapPick(id as SnapLevelMeasure) },
       hasFigure: true,
@@ -507,7 +512,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
     levels.push({
       key: "signers",
       crumb: { label: <span className="tabular-nums">{leaf.ordinal > 0 ? leaf.ordinal.toLocaleString() : `${leaf.metaId.slice(0, 10)}…`}</span> },
-      axis: "By signer",
       // The cards' own phrase ("Signed by N L0 validators") — the producing layer named before
       // the rows, because the constant count is most puzzling here (3 rows under a 20-node network).
       meaning: `Signed by ${signers.length} ${SIGNER_GROUPS.proof.who} — the network's whole L0 cluster`,

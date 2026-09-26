@@ -131,7 +131,6 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
         ),
         onRelease: () => (openGroup ? toggleComposition(openGroup.key) : undefined),
       },
-      axis: "By composition",
       meaning: "Which layers each node runs",
       measure: { label: "Nodes" },
       hasFigure: true,
@@ -173,8 +172,7 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
     levels.push({
       key: "nodes",
       crumb: { label: openGroup.label },
-      axis: "By node",
-      meaning: clause ? `Nodes that ${clause}` : "Each machine running this composition",
+      meaning: clause ? `Nodes that ${clause}` : "Each node running this composition",
       measure: null,
       hasFigure: false,
       rows: openGroup.rows.map((r, i) => {

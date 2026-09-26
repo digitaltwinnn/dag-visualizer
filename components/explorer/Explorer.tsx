@@ -4,7 +4,6 @@ import type { CSSProperties, ReactNode } from "react";
 
 import ExplorerShell from "@/components/ExplorerShell";
 import ExplorerHeading, { type MeasureControl } from "@/components/explorer/ExplorerHeading";
-import ExplorerLevel from "@/components/explorer/ExplorerLevel";
 import ExplorerPath, { type Crumb } from "@/components/explorer/ExplorerPath";
 import ExplorerRow from "@/components/explorer/ExplorerRow";
 import ScopeDot from "@/components/explorer/ScopeDot";
@@ -21,8 +20,8 @@ import ScopeDot from "@/components/explorer/ScopeDot";
 //   the heading   · the hairline row: the view's one setting, then the figure column's heading —
 //                   a control when the level has several measures, a label when one, nothing
 //                   when none (`ExplorerHeading`)
-//   the path      · the crumbs, one per level above the one on screen (`ExplorerPath`)
-//   the level     · the axis eyebrow + one clause of meaning (`ExplorerLevel`), below the root
+//   the path      · the house, then the crumbs, one per opened level, with the level's one clause
+//                   of meaning snug beneath them as the path's caption (`ExplorerPath`)
 //   the rows      · one grid, glyph · name · tag home · bar · figure (`ExplorerRow`); no ✓, no
 //                   chevron — the wash is the selection and the row is the control
 //   the pager     · where a level pages
@@ -69,9 +68,9 @@ export interface ExplorerLevelSpec {
   /** How this level appears as a crumb once a deeper level is on screen, and the release that
    *  brings the reader back to it — every rung finer than this one goes, through the executor.
    *  The ROOT's crumb is never rendered (the title names the root; the scope dot's × returns to it). */
-  crumb: { label: ReactNode; onRelease?: () => void };
-  /** The level line — absent at the root, whose axis is the card's title. */
-  axis?: string;
+  crumb: { label: ReactNode; title?: string; onRelease?: () => void };
+  /** What this level contains, in one muted clause under the path — absent at the root, whose
+   *  meaning is the card's title and hint. */
   meaning?: string;
   /** The figure column's heading: a control, a single static measure, or null for no figure. */
   measure: MeasureControl | { label: string } | null;
@@ -105,12 +104,17 @@ export interface ExplorerProps {
 export default function Explorer({ id, title, hint, scope, levels, onLeave, defaultCollapsed }: ExplorerProps) {
   const current = levels[levels.length - 1];
   const nested = levels.length > 1;
-  // The crumbs: every OPENED level, the current one last as the page. The root has no crumb
-  // (user, 2026-09-26: "do we need 'networks' always at the start of the breadcrumb?") — the card's
-  // title already names it, and the way back to it is the head's scope dot, whose × releases
-  // everything. So the path starts at the first level a row opened.
+  // The crumbs: the ROOT as the house glyph (its word is the accessible name — the card's title
+  // already says it, and the word cost the width the crumbs need; user, 2026-09-26, two rounds),
+  // then every OPENED level, the current one last as the page.
   const crumbs: Crumb[] = nested
-    ? levels.slice(1).map((l, i, opened) => ({ key: l.key, label: l.crumb.label, ...(i < opened.length - 1 ? { onSelect: l.crumb.onRelease } : {}) }))
+    ? levels.map((l, i) => ({
+        key: l.key,
+        label: l.crumb.label,
+        title: l.crumb.title ?? (typeof l.crumb.label === "string" ? l.crumb.label : undefined),
+        root: i === 0,
+        ...(i < levels.length - 1 ? { onSelect: l.crumb.onRelease } : {}),
+      }))
     : [];
   const measure: MeasureControl | null =
     current && current.measure
@@ -130,8 +134,7 @@ export default function Explorer({ id, title, hint, scope, levels, onLeave, defa
       {current && (
         <>
           <ExplorerHeading setting={current.setting} measure={measure} />
-          <ExplorerPath crumbs={crumbs} />
-          {current.axis && current.meaning && <ExplorerLevel axis={current.axis} meaning={current.meaning} />}
+          <ExplorerPath crumbs={crumbs} hint={current.meaning} />
           {current.rows.length === 0 ? (
             current.empty != null ? (
               <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">{current.empty}</p>

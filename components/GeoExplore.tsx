@@ -129,7 +129,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
   const levels: ExplorerLevelSpec[] = [
     {
       key: "countries",
-      crumb: { label: "Countries" },
+      crumb: { label: "Countries", onRelease: () => (country ? drill(country) : undefined) },
       measure: { options: GEO_MEASURE_OPTIONS, value: geoMeasure, onPick: (id) => setGeoMeasure(id as GeoMeasure) },
       hasFigure: true,
       // No tags at this level, so the name takes the tag home's room.
@@ -163,15 +163,10 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
     levels.push({
       key: "cohorts",
       crumb: {
-        label: (
-          <>
-            <span className="font-mono text-micro text-muted-foreground">{ccMark(drilled.cc)}</span>
-            {drilled.country}
-          </>
-        ),
+        // The name alone (user, 2026-09-26: the crumb "does not need both DE and Germany").
+        label: drilled.country,
         onRelease: () => (openCohort ? commitCohort({ cc: drilled.cc, city: openCohort.city, isp: openCohort.isp }) : undefined),
       },
-      axis: "By city · provider",
       meaning: "Where the nodes sit, and who hosts them",
       measure: { options: COHORT_MEASURE_OPTIONS, value: cohortPick, onPick: (id) => setCohortPick(id as CohortMeasure) },
       hasFigure: true,
@@ -222,9 +217,11 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
   if (drilled && openCohort) {
     levels.push({
       key: "nodes",
-      crumb: { label: `${openCohort.city ?? "Unlocated"}${openCohort.isp ? ` · ${openCohort.isp}` : ""}` },
-      axis: "By node",
-      meaning: "Each machine in this cohort",
+      crumb: {
+        label: `${openCohort.city ?? "Unlocated"}${openCohort.isp ? ` · ${openCohort.isp}` : ""}`,
+        title: `${openCohort.city ?? "Unlocated"}${openCohort.isp ? ` · ${openCohort.isp}` : ""}`,
+      },
+      meaning: "Each node in this cohort",
       measure: null,
       hasFigure: false,
       rows: openCohort.rows.map((r, i) => {
