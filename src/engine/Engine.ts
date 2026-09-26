@@ -27,8 +27,8 @@ import { HYPER_TILT, HYPER_TILT_FOCUS } from "./domain/hyperLayout";
 import { readSceneColors, type SceneColors, LIGHT_TUNE } from "./sceneColors";
 import { setNodeDimTarget, setNodeEnv } from "./scene/objects/NodeFabric";
 import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme/resolve";
-import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
-import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush } from "./domain/cameraRig";
+import { VIEW_POLICIES, POLE_MARGIN, type ViewPolicy } from "./domain/viewPolicy";
+import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush, restAzimuth, restPitch } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
@@ -2075,6 +2075,7 @@ export class Engine {
     // camera by one frame — a visible drift-and-return on the hyper→geo flight (user,
     // 2026-07-17). Tween → roll ease → controls → altitude clamp, THEN the plane.
     this.cam.update(dt);
+    this._applyOrbitBounds(policy);
     this.ctx.controls.update();
     // Altitude clamp (policy.minCamAlt): OrbitControls' minDistance is target-relative, and
     // the geo target is off-centre — so after the controls settle, push the camera back out
@@ -2083,6 +2084,41 @@ export class Engine {
     const minAlt = policy.minCamAlt;
     if (minAlt != null && this.ctx.camera.position.lengthSq() < minAlt * minAlt) {
       this.ctx.camera.position.setLength(minAlt);
+    }
+  }
+
+  /** Whether the controls currently carry a view's `orbitBounds` — the one-bit cache that keeps
+   *  the per-frame composition below from writing four limits the controls already hold. */
+  private _orbitBounded = false;
+  // THE BOUNDED ORBIT (viewPolicy.orbitBounds, 2026-09-26). Composed here, in the camera phase
+  // and BEFORE `controls.update()` applies its clamps, rather than at the view switch where the
+  // polar floor is set — because a limit is only honest once the camera is AT the view's pose. A
+  // view switch flies the camera from another view's pose through every azimuth in between, and
+  // a focus flight inside the view runs down its own axis; OrbitControls clamps the spherical
+  // it reads off the camera on every update, so a bound engaged mid-flight would snap the
+  // camera to the nearest legal angle and the tween would fight it frame by frame. So the bounds
+  // hold exactly while the camera is FREE — no transition, no pose flight — and release the
+  // instant a flight begins. Stated as a half-range about rest in the policy; the absolute limits
+  // are composed from the pose here (`restAzimuth` / `restPitch`), so re-tuning a pose re-tunes
+  // its bounds with it. A view without a row keeps the stock full orbit.
+  private _applyOrbitBounds(policy: ViewPolicy): void {
+    const ob = policy.orbitBounds;
+    const c = this.ctx.controls;
+    const bounded = ob != null && is3D(this.mode) && !this.transition.active() && !this.cam.flying;
+    if (bounded === this._orbitBounded) return;
+    this._orbitBounded = bounded;
+    if (bounded && ob != null && is3D(this.mode)) {
+      const az = restAzimuth(this.mode);
+      const polar = Math.PI / 2 - restPitch(this.mode);
+      c.minAzimuthAngle = az - ob.azimuth;
+      c.maxAzimuthAngle = az + ob.azimuth;
+      c.minPolarAngle = Math.max(policy.minPolarAngle, polar - ob.polar);
+      c.maxPolarAngle = Math.min(Math.PI - POLE_MARGIN, polar + ob.polar);
+    } else {
+      c.minAzimuthAngle = -Infinity;
+      c.maxAzimuthAngle = Infinity;
+      c.minPolarAngle = policy.minPolarAngle;
+      c.maxPolarAngle = Math.PI - POLE_MARGIN;
     }
   }
 

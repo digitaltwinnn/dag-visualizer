@@ -65,7 +65,19 @@ export const FOCI = {
   // frontal (measured 2026-09-18 against the staggered stack). It exists because the stack
   // staggers UPWARD: the block's centre of area sits above the plane it is measured from, so
   // aiming at `PLANE_Y` itself parked the whole thing low in the free canvas.
-  trend: { pos: new THREE.Vector3(0, 2.5, 54), target: new THREE.Vector3(0, -1.5, -18) },
+  // ⚠️ THE TARGET IS THE FRONT CARD'S DEPTH, z = 0 (user, 2026-09-26: "the front card should
+  // always be the focus and the background cards are just filling, so should never become
+  // larger"). It sat at z = −18, the middle of a deck that runs z = 0 … −36 — and an orbit about
+  // the MIDDLE of a stack of billboards swings the camera toward the rear cards and away from
+  // the front one: measured, a 220×160px drag took the front card from 522px to 396px and the
+  // rearmost from 299px to 485px. The cards carry no perspective of their own (the projector
+  // writes a translate and a uniform scale), so nothing about their shape said "behind" — the
+  // rear card simply became the biggest thing on screen. Pivoting on the subject holds the front
+  // card's size and place under any drag, and every other card can only ever be smaller and
+  // behind it. The target moved ALONG THE RESTING RAY (t = 54/72 of the way from pos to the old
+  // target lands z = 0 at y = −0.5), so the forward axis, the pitch and the framing are
+  // byte-identical at rest; only the pivot changed.
+  trend: { pos: new THREE.Vector3(0, 2.5, 54), target: new THREE.Vector3(0, -0.5, 0) },
 } satisfies Record<string, CameraFraming>;
 /** A pose that exists. Every caller of `focus()` names one of these, checked. */
 export type FocusName = keyof typeof FOCI;
@@ -131,6 +143,14 @@ export function restPitch(view: View3D): number {
   const dy = f.pos.y - f.target.y;
   const dx = f.pos.x - f.target.x, dz = f.pos.z - f.target.z;
   return Math.atan2(dy, Math.hypot(dx, dz));
+}
+/** The resting pose's AZIMUTH about its target — OrbitControls' own theta, `atan2(x, z)` of the
+ *  camera's offset — so a view that BOUNDS its free orbit (`viewPolicy.orbitBounds`) can state
+ *  the bounds as a half-range about rest and the Engine composes the absolute limits here. Read
+ *  out of FOCI like `restPitch`, for the same reason: re-tuning the pose re-tunes the limits. */
+export function restAzimuth(view: View3D): number {
+  const f = FOCI[REST_POSE[view]];
+  return Math.atan2(f.pos.x - f.target.x, f.pos.z - f.target.z);
 }
 /** Lean `pos` toward `target`, at full strength only while the pose orbits as wide as its view's
  *  resting one. `restDist <= 0` means "no resting pose to measure against" (a flat view, which has

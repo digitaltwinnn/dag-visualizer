@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Mode } from "@/src/store/store";
-import { VIEW_POLICIES } from "./viewPolicy";
+import { VIEW_POLICIES, POLE_MARGIN } from "./viewPolicy";
 import { is3D } from "./viewTransition";
 
 const MODES: Mode[] = ["hyper", "geo", "ledger", "trend", "soon"];
@@ -143,6 +143,17 @@ describe("the trends view is registered and inert", () => {
   // line ever ran, and `hyper` is true because that line did run for it — even though its camera
   // does not in fact orbit, `CameraDirector.focusFilter` having switched it off a moment later.
   // Measured in the browser after the change: camera drift over 1.5s idle is 0 in all four views.
+  it("bounds the free orbit ONLY in trend, as a half-range about rest inside the pole clamp", () => {
+    // History's cards are billboards pivoting on the front card: past ~35° the rear ones sweep
+    // out from behind it. Every other view keeps the stock full orbit — the allow-list shape.
+    for (const m of MODES) expect(VIEW_POLICIES[m].orbitBounds != null).toBe(m === "trend");
+    const ob = VIEW_POLICIES.trend.orbitBounds!;
+    expect(ob.azimuth).toBeGreaterThan(0);
+    expect(ob.azimuth).toBeLessThan(Math.PI / 4); // under 45°: a rear card never comes alongside
+    expect(ob.polar).toBeGreaterThan(0);
+    expect(ob.polar).toBeLessThan(Math.PI / 2 - POLE_MARGIN); // a polar band that can never reach a pole
+  });
+
   it("says per view whether the camera idles in an orbit", () => {
     expect(VIEW_POLICIES.hyper.autoRotate).toBe(true);
     expect(VIEW_POLICIES.geo.autoRotate).toBe(false);

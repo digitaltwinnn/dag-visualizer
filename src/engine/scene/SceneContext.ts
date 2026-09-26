@@ -11,6 +11,7 @@ import { BokehPass, type BokehPassParameters } from "three/addons/postprocessing
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
 import { isLightGround, LIGHT_TUNE, type SceneColors } from "../sceneColors";
+import { POLE_MARGIN } from "../domain/viewPolicy";
 
 /**
  * THE SELECTIVE-BLOOM LAYER — the day look's answer to a glow pass that cannot select ink.
@@ -254,8 +255,8 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   // the polar angle short of ±90° keeps "over the top" flips impossible, so combined with
   // OrbitControls' no-roll orbiting, north can never point down on screen. Applies in every
   // view (nothing frames from directly above/below).
-  controls.minPolarAngle = 0.25;
-  controls.maxPolarAngle = Math.PI - 0.25;
+  controls.minPolarAngle = POLE_MARGIN;
+  controls.maxPolarAngle = Math.PI - POLE_MARGIN;
   controls.autoRotate = true;
   controls.autoRotateSpeed = 0.35;
 
