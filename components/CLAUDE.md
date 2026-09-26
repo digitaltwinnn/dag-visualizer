@@ -209,8 +209,9 @@ decisions inside them are design, not detail:
   heading, a radio list of `METRIC_ORDER` with units at the current cadence) and `Same scale` is
   the heading's setting — neither is a selection, so both write their setters directly
   (`selectionBoundary`'s own scope note says why, and why the plane FOCUS is in the table instead).
-  A row click applies the SAME `trendPlaneActions` the plane's header strip runs. The committed
-  scope is the head's dot, not a chip (design decision 1). Its PAGER is absent unless the roster
+  A row click applies the SAME `trendPlaneActions` the plane's header strip runs. No scope mark in
+  the head at all (2026-09-26): the top bar's filter names the committed network and is the one
+  place to clear it. Its PAGER is absent unless the roster
   exceeds `VISIBLE_PLANES` and clamps with the stack's own `clampScroll`, so a chevron can never
   offer a step the geometry refuses.
   ⚠️ **The roster is computed ONCE, in `components/useTrendRoster.ts`** — the planes, this list and
@@ -221,7 +222,7 @@ decisions inside them are design, not detail:
 **Naming and copy rules:** About states the view's point of view ("How the network is built"); the tool
 card says what you BROWSE — by the AXIS the rows break the network down along, never by the
 figure they show ("Network breakdown", "Country breakdown", "Snapshot breakdown", and History's "Network breakdown" too — its rows are networks, "layer" was the stack's word for a plane; 2026-09-26
-— user, 2026-09-26: once every explorer carries the measure STEPPER, a title like "Nodes by
+— user, 2026-09-26: once every explorer carries the measure HEADING CONTROL, a title like "Nodes by
 country" names one measure of three). Eyebrows are bare role words, and each explorer's usage
 hint leads its card rather than trailing it. An explorer ROW is a browse target — mark, name, count,
 nothing more; **the prose that EXPLAINS a subject belongs to that subject's right-rail card, once**,
@@ -233,7 +234,7 @@ dossier, country, provider, composition, then the snapshot chain (global snapsho
 snapshot it anchors), then node. `components/railCards.ts` is the manifest and
 `components/railCards.test.ts` pins the order, the availability and every hint.
 
-**History's lane is the network dossier, then the INSTANT** (2026-09-19) — the cursor card, a slot
+**History's lane is the network dossier, then the MOMENT** (2026-09-19; named "Instant" until 2026-09-26) — the cursor card, a slot
 with NO focus rung, exactly as the two snapshot slots are. Its subject is `trendCursorMs`, which the
 band's timeline writes at most once per BUCKET (`sameBucket`, both gestures since 2026-09-19), so the
 title roll, the edge pulse and the tray highlight fire once per bucket rather than once per
@@ -261,7 +262,7 @@ pointermove. Three rules are worth knowing before touching it:
   made inside the layer clears it too. Closing the log used to strand the reader in Snapshots.
 
 **The motion hint says what the scene is doing while it moves** (user, 2026-09-26 — `MotionHint`,
-one quiet sentence centred under the command bar). Two store channels, and nothing else feeds it.
+one quiet sentence on a low plate, centred just above the bottom band). Two store channels, and nothing else feeds it.
 `sceneMoving` is ENGINE → REACT: the Engine's `_publishMotion` derives it each frame from the four
 structures that already drive motion — `ViewTransition.active()`, `CameraDirector.flying`, the
 controls' `sceneDragging`, and `TrendStackSync.settled()` where the view has a stack — and writes it
@@ -271,7 +272,9 @@ the click), the store's own setters for the settings that move the scene (view, 
 measure, page), the Engine for a drag. `domain/motionHint.ts` turns a cause into words (tested);
 names are resolved by the component through `HintNames`, so the view vocabulary stays in `views.ts`.
 The line fades in after 150ms (a same-pose NUDGE never flashes it) and holds its last sentence
-through the fade-out. A window pill shows nothing, honestly: the charts redraw but the scene holds.
+through the fade-out. A window pill says "Showing the last …", the range and the measure their own
+sentences; a deselect names the rung it LANDS on in the select's own words (the executor restamps
+a release as `finestRung`), never "stepping back".
 
 **The History view has three axes and each has one home** (user, 2026-09-19): left/right on the
 timeline is WHEN, the depth of the stack is WHO, and UP/DOWN is WHAT — the measure. Its control is
@@ -677,8 +680,10 @@ and a track you cannot press is a picture of one. So the timeline re-enables poi
 OWN ROOT and nothing else — every other view's band keeps the charter and the orbit drag keeps
 passing through. The sheets' `sceneCover` clip still governs it: measured, a covered strip hands
 both paint and hit-testing to the sheet above.
-**The track takes the whole band and the window pills sit over its top-right corner** (user,
-2026-09-26). The band held three columns — the track, a CURSOR readout with a 16ch reserve, the
+**The track takes the whole band and the window pills stand above its top-right corner** (user,
+2026-09-26, two rounds — first over the corner, then "above the bottom section, not on top of it";
+the band's clip opens its top edge for them, and `BottomStream` reserves their room while the
+band holds the timeline). The band held three columns — the track, a CURSOR readout with a 16ch reserve, the
 pills — and the two side columns cost the track a third of the lane. The readout is gone: no cursor
 line IS "none picked" (the brush's own rule for ALL), and a picked instant is stamped on the track
 beside its line, low by the handle where the pills cannot cover it, flipping to the line's left near
@@ -700,7 +705,8 @@ states) and `TrendTrack.tsx` the INSTRUMENT (the SVG and every gesture), because
 subject is a geometry it measures itself and nothing above it has those numbers. The window pills
 are shared with the Trends document through `components/trendPickers.tsx` — the two had already been
 caught drifting once (user, 2026-09-09), so the class strings have one home, and since 2026-09-19
-the METRIC picker, the setting SWITCH and the scope CHIP live there beside them for the same reason.
+the setting SWITCH and the document's scope CHIP live there beside them for the same reason (the
+METRIC picker left on 2026-09-26 for the explorer's heading control).
 
 **THE SCRUB IS THIS VIEW'S PRIMARY GESTURE, AND FOUR SEPARATE MEMO FAILURES MADE IT UNUSABLE.** All
 four were invisible in review and visible only in a frame counter, so they are recorded with their
@@ -1202,18 +1208,14 @@ were reading. Same builder as the anchor-log row, so a read and the equivalent r
 Every collapsible body in the app is `Collapsible` + `.disclose-panel` (2026-09-01). The migration
 off `{open && …}` bought two things `{open && …}` structurally could not: an **animated** body (an
 unmounted node cannot travel, and it also popped into existence under `RailThread`'s measurement)
-and the **trigger↔panel id pairing** AT needs. The explorers share `Disclosure` / `DisclosureRow` /
-`DisclosurePanel` (`components/ExploreRows.tsx`), so a call site cannot forget the recipe.
+and the **trigger↔panel id pairing** AT needs. (The explorers no longer disclose at all: since
+2026-09-26 depth there is a PATH — one level on screen, the ancestry a breadcrumb — so
+`components/ExploreRows.tsx` and its `Disclosure` recipe retired with the old trees.)
 
-⚠️ **RADIX HOLDS THE PAIRING, NEVER THE STATE.** Every explorer row is a selection COMMIT whose
-disclosure is a consequence — a committed filter, country, cohort, composition group — so `open` is
-DERIVED from the store and `onOpenChange` runs the same builder the click always did. Rule 2's one
-write path is untouched; Radix decides nothing about what a click means.
-
-⚠️ **A PREVIEW-ONLY ROW IS NOT A TRIGGER.** Out of the committed lens a row hovers, keeps its wash
-and opens nothing, so it must not carry `aria-expanded` — which Radix's trigger always sets.
-`DisclosureRow` renders a plain `<button>` in that case (`Row = previewOnly ? "button" :
-CollapsibleTrigger`), which is what keeps the promise honest to AT as well as to the eye.
+⚠️ **RADIX HOLDS THE PAIRING, NEVER THE STATE.** A collapsible whose open state is a selection —
+the dossier's Online-nodes schedule is a plain toggle, but a rung-driven one would be — derives
+`open` from the store and runs the same builder the click always did. Rule 2's one write path is
+untouched; Radix decides nothing about what a click means.
 
 ⚠️ **150ms, and it is the CHEVRON's clock.** The arrow already rotates at `duration-150` and the two
 are one gesture; a panel on its own timing reads as two things happening. Changing `.disclose-panel`

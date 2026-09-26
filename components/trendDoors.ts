@@ -52,8 +52,14 @@ export function spanOfWindow(buckets: readonly number[], stepMs: number): Record
 export function openRecords(metaId: string | null, span: RecordSpan | null): void {
   if (!span) return;
   const st = useStore.getState();
-  if (metaId && st.filter !== metaId) applyClickActions(filterToggleActions(metaId, st.filter));
-  st.setLogSeek({ metaId, fromMs: span.fromMs, toMs: span.toMs });
+  // THE DAG IS UNSCOPED HERE: since the hypergraph has its own plane (2026-09-26) a Moment read
+  // under the DAG filter names "dag" as its subject, but the anchor log's chain search knows only
+  // metagraphs (`searchNets` skips the root) and the ledger lens already treats a committed DAG
+  // as every network. Handing "dag" through left the chain picker empty and the seek waiting
+  // forever (review, 2026-09-26).
+  const scoped = metaId && metaId !== "dag" ? metaId : null;
+  if (scoped && st.filter !== scoped) applyClickActions(filterToggleActions(scoped, st.filter));
+  st.setLogSeek({ metaId: scoped, fromMs: span.fromMs, toMs: span.toMs });
   if (st.mode !== "ledger") {
     // Remember WHERE THE DOOR WAS (user, 2026-09-26): closing the layer goes back there, not to
     // Snapshots. Set after the mode step, which clears it.

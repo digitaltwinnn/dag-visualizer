@@ -17,10 +17,10 @@ import { providerOfRow } from "@/src/data/geoMeasure";
 
 export type HyperMeasure = "nodes" | "countries" | "providers";
 
-/** The stepper's order. Nodes first: the figure the rows have always led with. */
+/** The heading control's order. Nodes first: the figure the rows have always led with. */
 export const HYPER_MEASURE_ORDER: readonly HyperMeasure[] = ["nodes", "countries", "providers"];
 
-/** The word the stepper shows — what every network row's figure IS. */
+/** The word the heading control shows — what every network row's figure IS. */
 export const HYPER_MEASURE_LABELS: Readonly<Record<HyperMeasure, string>> = {
   nodes: "Nodes",
   countries: "Countries",
@@ -34,12 +34,6 @@ export const HYPER_MEASURE_OPTIONS: readonly { id: HyperMeasure; label: string; 
   unit: "count",
 }));
 
-/** The neighbour in the order, or null at an end — the stepper dims that chevron. */
-export function stepHyperMeasure(m: HyperMeasure, dir: -1 | 1): HyperMeasure | null {
-  const i = HYPER_MEASURE_ORDER.indexOf(m);
-  if (i < 0) return null;
-  return HYPER_MEASURE_ORDER[i + dir] ?? null;
-}
 
 /** The figure a network row shows for `m`: its fleet size, or the distinct countries / providers
  *  among its placed rows. `rows` are the network's own placed rows (the caller groups

@@ -59,10 +59,10 @@ orthogonal question and owns one "signature" detail card, so the views never ove
 
 | View | Question | Explore tool (left rail) | Signature (detail) slot |
 |------|----------|--------------------------|-------------------------|
-| **Hypergraph** | *who / what* — architecture + economic weight | nodes-by-network explorer | **Node card**; structure counts live in the bottom vitals band |
-| **Node geography** | *where* — footprint & decentralization | country→nodes explorer (countries → provider cohorts → nodes) | **Node card** (state, roles, location) + country / provider cards |
-| **Snapshots** | *when* — how the ledger advances + cost | settlement-layers explorer (floors disclose each lane's nodes) | **Snapshot card** (DAG position, anchors, fees) |
-| **History** | *how it changed* — the measured past | layers-over-time explorer (the metric, the layout, the roster) | **Instant card** (every network read at one moment) |
+| **Hypergraph** | *who / what* — architecture + economic weight | Network breakdown (networks → compositions → nodes, with a measure heading) | **Node card**; structure counts live in the bottom vitals band |
+| **Node geography** | *where* — footprint & decentralization | Country breakdown (countries → city · provider cohorts → nodes) | **Node card** (state, roles, location) + country / provider cards |
+| **Snapshots** | *when* — how the ledger advances + cost | Snapshot breakdown (global ticks → networks in a tick → their snapshots → signers) | **Snapshot card** (DAG position, anchors, fees) |
+| **History** | *how it changed* — the measured past | Network breakdown (one chart plane per network, the measure as its heading) | **Moment card** (every network read at one instant) |
 
 Visual uniformity is enforced with shared design tokens in one stylesheet (`app/globals.css`):
 one spacing scale, one panel radius, one "selected" treatment (`--sel-bg` / `--sel-border`),

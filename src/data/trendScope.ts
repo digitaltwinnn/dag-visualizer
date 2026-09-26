@@ -76,13 +76,14 @@ const FACT: Record<EmptyScope, string> = {
  *  surface. The document has its own Hypergraph tab; the view reaches the same prose through RAW.
  *  The unlisted route is the same sentence in both, because the answer is the same view either
  *  way and inventing a second phrasing would be drift with extra steps. */
-const ROUTE: Record<"view" | "document", Record<EmptyScope, string>> = {
+const ROUTE: { document: Record<EmptyScope, string>; view: Record<Exclude<EmptyScope, "empty-dag">, string> } = {
   document: {
     "empty-dag": "Its own history is the Hypergraph tab above.",
     "empty-unlisted": "The Snapshots view's records still show what they anchored.",
   },
+  // The VIEW never asks about "empty-dag": `viewScope` scopes the DAG as a network there (its
+  // own plane, 2026-09-26), so that route has no sentence to say.
   view: {
-    "empty-dag": "Its own history is in the document, under RAW.",
     "empty-unlisted": "The Snapshots view's records still show what they anchored.",
   },
 };
@@ -95,5 +96,6 @@ export function scopeEmptyCopy(
   surface: "view" | "document",
 ): { fact: string; route: string } | null {
   if (scope === "all" || scope === "network") return null;
-  return { fact: FACT[scope], route: ROUTE[surface][scope] };
+  if (surface === "view") return scope === "empty-dag" ? null : { fact: FACT[scope], route: ROUTE.view[scope] };
+  return { fact: FACT[scope], route: ROUTE.document[scope] };
 }

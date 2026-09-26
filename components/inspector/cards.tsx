@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { shortHash, metagraphById, getNetwork, SIGNER_GROUPS, nodeSigned, coLocatedNetworks, filterAccent } from "@/src/data/network";
@@ -23,7 +23,7 @@ import { useArchive, archiveFactState, archiveSchedule, archiveSummary, fmtSnapC
 import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
 import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
-import { cap, BarCell, CountCell, CountTag, Desc, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark, StackedSchedule, partShade, type SchedulePart } from "./parts";
+import { cap, Desc, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark, StackedSchedule, partShade, type SchedulePart } from "./parts";
 import { statusItems } from "@/src/data/nodeStatus";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { pickNetId, followToggleActions } from "@/src/engine/domain/pickActions";
@@ -463,13 +463,13 @@ function ScheduleGroup({
 
 // THE "BY ARCHIVAL" GROUP — one renderer for every dossier (user, 2026-09-10: "missing the
 // archival breakdown for DAG / hypergraph; should behave the same"): the census's reaches as
-// merged rows (full-node + kept-snapshot tags), the honest unmeasured remainder, stars while
+// the parts of one stacked bar (2026-09-26), the honest unmeasured remainder, stars while
 // the census is in flight. The metagraph dossiers seat it as the third schedule under Online
 // nodes; the DAG dossier seats the same group standalone (its roster isn't `nodes`).
 function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> }) {
   return (
     <ScheduleGroup label="by archived snapshots" defaultOpen>
-      {sched ? <StackedSchedule axis="Archive depth" parts={archiveParts(sched)} /> : <ArchivalBody sched={sched} />}
+      {sched ? <StackedSchedule axis="Archive depth" parts={archiveParts(sched)} /> : <ArchivalAcquiring />}
     </ScheduleGroup>
   );
 }
@@ -497,63 +497,14 @@ function archiveParts(sched: NonNullable<ReturnType<typeof archiveSchedule>>): S
   return parts;
 }
 
-/** The archival schedule's rows — seated inside the metagraph dossier's grouped BREAKDOWN, and
- *  inside its own group on the DAG dossier (whose roster isn't `nodes`). */
-function ArchivalBody({ sched }: { sched: ReturnType<typeof archiveSchedule> }) {
+/** The archival schedule while the census is IN FLIGHT — stars in the slot the bar will fill.
+ *  (The table this used to draw when the census had landed retired with the stacked bars,
+ *  2026-09-26.) */
+function ArchivalAcquiring() {
   return (
-    <>
-      {sched ? (
-          <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-x-2 gap-y-[7px]">
-            {sched.rows.map((row) => (
-              <Fragment key={`${row.fullCount > 0 ? "full|" : ""}${row.label}`}>
-                {/* EVERY tag rides the right-aligned tag column (user, rounds 8 and 11:
-                    "right aligned, not based on label length", then the full-node tag
-                    too), so the tags share one edge whatever the labels run. A full row's
-                    tag is the bare "full archive" (round 9 — was "full node": the tag
-                    qualifies the ARCHIVE, and completeness got its opposite number,
-                    "incomplete archive", on the holed deep row) — no count in the words,
-                    the row's own count column already says how many (round 4). */}
-                <span
-                  className="text-body text-foreground"
-                  title={row.hint ?? (row.kept != null ? `${fmtSnapCount(row.kept)} snapshots kept` : undefined)}
-                >
-                  {cap(row.label)}
-                </span>
-                {row.fullCount > 0 || row.kept != null ? (
-                  <span className="justify-self-end inline-flex items-center gap-1">
-                    {row.fullCount > 0 && (
-                      <span className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px text-micro leading-none text-muted-foreground whitespace-nowrap">
-                        full
-                      </span>
-                    )}
-                    {row.kept != null && (
-                      <CountTag
-                        title={row.hint ? `${fmtSnapCount(row.kept)} snapshots — ${row.hint}` : `${fmtSnapCount(row.kept)} snapshots kept`}
-                      >
-                        {fmtSnapCount(row.kept)}
-                      </CountTag>
-                    )}
-                  </span>
-                ) : (
-                  <span />
-                )}
-                <BarCell count={row.count} max={Math.max(...sched.rows.map((x) => x.count))} hue="var(--muted-foreground)" />
-                <CountCell>{row.count}</CountCell>
-              </Fragment>
-            ))}
-            {sched.unmeasured > 0 && (
-              <Fragment key="__unmeasured">
-                <span className="text-body text-foreground" title="The probe read nothing from these nodes — what they keep is unknown.">Unknown</span>
-                <span />
-                <span />
-                <CountCell>{sched.unmeasured}</CountCell>
-              </Fragment>
-            )}
-          </div>
-        ) : (
-          <NodeStars count={4} />
-        )}
-    </>
+    <div className="flex items-center gap-2 py-1.5 text-label text-muted-foreground">
+      <NodeStars count={4} />
+    </div>
   );
 }
 
@@ -677,7 +628,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
                 {archSched != null ? (
                   <StackedSchedule axis="Archive depth" parts={archiveParts(archSched)} />
                 ) : archAcquiring ? (
-                  <ArchivalBody sched={null} />
+                  <ArchivalAcquiring />
                 ) : null}
               </ScheduleGroup>
             </div>

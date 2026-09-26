@@ -18,18 +18,17 @@ import { cn } from "@/lib/utils";
 // motion) says WHETHER, `motionCause` (stamped by the gesture's owner) says WHY, and
 // `domain/motionHint.ts` turns the cause into words.
 //
-// THE LOOK (user, 2026-09-26, two rounds): first a grey status line, then the scene-glass card
-// the callout wears — "a bit too dominant for a screen hint". What it is now: NO plate at all, the
-// sentence a step above body size in the DIM foreground — clear, not loud (user, round three:
-// "font should be clear but more subtle") — on a QUIET PLATE (user, round six: "a subtle
-// background so that it still stands out from the scene it overlays"): a borderless pill in the
-// ground's own colour at low opacity with a light blur, which separates the line from a lit hub
-// or a paper globe without reading as a card. Deliberately NOT `SCENE_GLASS` — that container is
-// for subject labels (the callout, the tooltip) and was tried here and rejected as dominant; this
-// is a status line, and its plate is the least that keeps it legible. And a small beating accent
-// dot that says "in motion" the way the LIVE control's dot says "following".
-// Larger and quieter at once, because it is only ever on screen for the length of a flight. A
-// pure FADE — it first rose a few pixels into place, which read as the line jumping (user).
+// THE LOOK (user, 2026-09-26, several rounds): first a grey status line, then the scene-glass card
+// the callout wears — "a bit too dominant for a screen hint". What it is now: the sentence a step
+// above body size in the DIM foreground — clear, not loud (user: "font should be clear but more
+// subtle") — on a QUIET PLATE (user: "a subtle background so that it still stands out from the
+// scene it overlays"): a borderless pill in the ground's own colour at low opacity with a light
+// blur, which separates the line from a lit hub or a paper globe without reading as a card.
+// Deliberately NOT `SCENE_GLASS` — that container is for subject labels (the callout, the
+// tooltip) and was tried here and rejected as dominant; this is a status line, and its plate is
+// the least that keeps it legible. No beating dot (user: "I wanted the globe gone") — the
+// sentence alone. Its entrance is a fade with a short rise; it sits low, just above the band,
+// and never moves once placed.
 //
 // It fades in after a beat (150ms) so a same-pose NUDGE — 0.55s, and deliberately not a "change
 // you can see" — never flashes a sentence, and out the frame the motion ends. The LAST sentence is

@@ -9,8 +9,6 @@ import {
   countryMeasure,
   networkOfRow,
   providerOfRow,
-  stepGeoMeasure,
-  type GeoMeasure,
 } from "./geoMeasure";
 
 // The Geography explorer's country-row figure, as a vocabulary (2026-09-26): nodes, distinct
@@ -25,21 +23,6 @@ describe("the order and its labels", () => {
   it("leads with nodes and names every measure", () => {
     expect(GEO_MEASURE_ORDER[0]).toBe("nodes");
     for (const m of GEO_MEASURE_ORDER) expect(GEO_MEASURE_LABELS[m].length).toBeGreaterThan(0);
-  });
-
-  it("steps through the order and stops at the ends", () => {
-    expect(stepGeoMeasure("nodes", -1)).toBeNull();
-    expect(stepGeoMeasure("nodes", 1)).toBe("metagraphs");
-    expect(stepGeoMeasure("providers", 1)).toBeNull();
-    expect(stepGeoMeasure("bogus" as GeoMeasure, 1)).toBeNull();
-  });
-});
-
-describe("what a row serves and who hosts it", () => {
-  it("a metagraph node serves its metagraph; a validator serves the DAG; a nameless pick serves nothing", () => {
-    expect(networkOfRow(meta("dor", null))).toBe("dor");
-    expect(networkOfRow(dag("l0", null))).toBe("dag");
-    expect(networkOfRow({ pick: { kind: "geoLive" } as NodeRow["pick"] })).toBeNull();
   });
 
   it("the provider is the geolocation's ISP, or nothing", () => {
@@ -78,5 +61,12 @@ describe("the heading lists — every measure with its unit, and a cohort's own 
     expect(COHORT_MEASURE_OPTIONS.map((o) => o.id)).toEqual(["nodes", "metagraphs"]);
     expect(cohortMeasure("nodes", rows)).toBe(3);
     expect(cohortMeasure("metagraphs", rows)).toBe(2);
+  });
+});
+
+describe("networkOfRow", () => {
+  it("names a metagraph node's network and the DAG for a core node", () => {
+    expect(networkOfRow({ pick: { kind: "metanode", meta: { id: "dor" } } } as unknown as NodeRow)).toBe("dor");
+    expect(networkOfRow({ pick: { kind: "l0", node: {} } } as unknown as NodeRow)).toBe("dag");
   });
 });

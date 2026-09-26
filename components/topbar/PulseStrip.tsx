@@ -78,7 +78,7 @@ export default function PulseStrip() {
                   identity) — instead of plain words. No "ago": the ticking value under a
                   liveliness dot carries it. */}
               <span className="flex items-center gap-1.5 whitespace-nowrap">
-                <span className={cn("font-mono font-bold text-caption tabular-nums leading-tight", AGE_INK[status])}>
+                <span className={cn("font-mono font-bold text-label tabular-nums leading-tight", AGE_INK[status])}>
                   {r.lastOkAt != null ? relativeAge(now - r.lastOkAt, true) : status === "failing" ? "failing" : "—"}
                 </span>
                 {/* A touch roomier than RoleChips' full pill (px 5→6, py 2→3) and a 12px glyph:

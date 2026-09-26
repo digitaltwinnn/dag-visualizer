@@ -117,7 +117,7 @@ export function HyperCells({ accent }: { accent: string }) {
               {(singleWord === "data + currency" ? ["data", "currency"] : [singleWord]).map((t) => (
                 <span key={t} className="flex flex-col items-center gap-1">
                   <TypeGlyph t={t} className="size-4" color={accent} />
-                  <span className="font-mono text-caption text-foreground whitespace-nowrap">{t}</span>
+                  <span className="font-mono text-label text-foreground whitespace-nowrap">{t}</span>
                 </span>
               ))}
             </span>

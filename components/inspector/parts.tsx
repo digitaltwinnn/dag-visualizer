@@ -1,14 +1,13 @@
 "use client";
 
-import { Fragment, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Check, Copy, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BAR_EASE } from "@/components/RollSwap";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { NodeInfo } from "@/src/data/types";
-import { nodeStatus, statusItems } from "@/src/data/nodeStatus";
-import { compositionRows } from "@/src/data/composition";
+import { nodeStatus } from "@/src/data/nodeStatus";
 
 // Shared building blocks for the inspector cards (the React port of ui.js _cardBody),
 // split out so each per-kind card reads as its own small file.
@@ -279,88 +278,9 @@ export function StatusMark({ state }: { state?: string | null }) {
  *  proper nouns of a sort ("Hybrid", "Data"), so a bare lowercase state broke the column. */
 export const cap = (w: string): string => w.charAt(0).toUpperCase() + w.slice(1);
 
-export function StatusBreakdown({ states }: { states: (string | null | undefined)[] }) {
-  const items = statusItems(states);
-  // The COMPOSITION table's grammar, applied to the second partition (user, 2026-08-18). It was
-  // an inline run of coloured counts hanging under the Online-nodes total, which wrapped the
-  // moment a fleet was mixed — exactly when it has something to say. The card already asks this
-  // shape of question twice (of N nodes, how many are X): make-up above, state here, both summing
-  // to the same total, so they share one row grammar and their count columns line up. No code
-  // column — a state has no layer — so the grid is three columns to the composition's four; the
-  // count column is right-aligned in both, which is what makes them agree.
-  //   ⚠️ Its placement is load-bearing: it sits ABOVE the Online-nodes total with a Separator
-  // between the two tables. Column-aligned and undivided, the two grids read as ONE table whose
-  // four partitions appear to sum to twice the fleet.
-  return (
-    <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-[7px]">
-      {items.map((it) => (
-        <Fragment key={it.label}>
-          {/* The bucket colour rides the BAR alone (user, 2026-08-18, chips then; bars since
-              2026-09-10) — the word takes the default ink, like the composition labels above
-              it, and the count column stays neutral in both tables. One colour per row, on the
-              one element that is nothing but colour; a hued label as well made the state table
-              read as an alert list beside its plain twin. Capitalized to match those labels,
-              since a bucket word opens a row. */}
-          <span className="text-body text-foreground">{cap(it.label)}</span>
-          <BarCell count={it.count} max={Math.max(...items.map((x) => x.count))} hue={it.color} />
-          <CountCell>{it.count}</CountCell>
-        </Fragment>
-      ))}
-    </div>
-  );
-}
 
-// The miniature bar — the vitals band's micro-bar recipe (one weight, fill only, eased —
-// see MicroBars) as a dossier table cell (user, 2026-09-10: "remove the node chips and use
-// the horizontal bars we already have in many places" — the overlapping-disc ChipStack
-// retired). The track is FIXED and sits right-aligned against the count column, so its left
-// edge is constant per table and every bar grows from one origin; widths are on the table's
-// own max, the caller's business, like MicroBars' row max. A zero draws nothing (rule 10);
-// real counts keep a small visible floor.
-/** The breakdown tables' COUNT column — one home for what was three copies of the same class
- *  string (this file's two tables plus the archival group's two cells), which is how they came to
- *  disagree with the band in the first place.
- *
- *  ⚠️ MONO, BECAUSE A COUNT IS MACHINE DATA. `/design` states the split in one line — a
- *  proportional sans for everything you read, "a monospace for machine data: hashes, counts,
- *  codes, $DAG amounts, snapshot numbers" — and these columns had `tabular-nums` without the face,
- *  so the digits lined up in a typeface that was never meant to carry them. The tell was that the
- *  vitals band renders THE SAME NUMBERS through MicroBars in `font-mono text-micro tabular-nums`:
- *  with a metagraph committed, the band's NODE COMPOSITION and this card's BY NODE COMPOSITION sit
- *  on screen together saying Hybrid 137 / Consensus 8 / Currency 4 in two different faces (user,
- *  2026-09-14: "the font appears wrong for this type of info"). */
-export function CountCell({ children }: { children: React.ReactNode }) {
-  return <span className="font-mono text-body text-foreground tabular-nums min-w-[1.5em] text-right">{children}</span>;
-}
 
-/** …and the same table's TAG column, for a tag whose content is a quantity (the kept-snapshot
- *  reaches: 6.9M, 809k, 90k). The `full` tag beside it is a WORD and keeps the reading face —
- *  the split is by what the tag says, not by which column it sits in. */
-export function CountTag({ children, title }: { children: React.ReactNode; title?: string }) {
-  return (
-    <span
-      title={title}
-      className="inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-px font-mono text-micro tabular-nums leading-none text-muted-foreground whitespace-nowrap"
-    >
-      {children}
-    </span>
-  );
-}
 
-export function BarCell({ count, max, hue }: { count: number; max: number; hue?: string }) {
-  return (
-    <span aria-hidden className="flex items-center justify-self-end w-14 h-[5px]">
-      <span
-        className={cn("h-[5px] rounded-full", BAR_EASE)}
-        style={{
-          background: hue ?? "var(--filter-accent, var(--foreground-dim))",
-          opacity: 0.75,
-          width: count > 0 ? `${Math.max(4, (count / Math.max(1, max)) * 100)}%` : 0,
-        }}
-      />
-    </span>
-  );
-}
 
 // Squared layer-code pills — the ONE rendering for layer codes wherever they appear (the
 // node card's subtitle, the dossier's composition rows). User, 2026-07-12: the joined
@@ -406,32 +326,6 @@ export function RoleChips({ codes, compact, tight }: { codes: string[]; compact?
   );
 }
 
-// One composition row per make-up: role (bright) + code pills + a micro bar (visual
-// scale on the table's max) + the authoritative count. (A per-row status line lived
-// here briefly — reverted: it read too busy; the dossier shows ONE aggregate StatusBreakdown
-// in its STATUS segment instead.)
-export function CompositionRows({ nodes }: { nodes: NodeInfo[] }) {
-  const rows = compositionRows(nodes);
-  // ONE grid for the whole table (not per-row grids): the label column sizes to the WIDEST
-  // label so labels share an edge, and the code pills RIGHT-ALIGN into their own column
-  // (user, 2026-09-10: "same right align" as the archival tags — a tag column keyed to
-  // label length ragged the rows; before that, 2026-07-12, per-row grids let each label
-  // push its own pills around).
-  return (
-    <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-x-2 gap-y-[7px] mt-2">
-      {rows.map((r, i) => (
-        <Fragment key={i}>
-          <span className="text-body text-foreground">{r.label}</span>
-          <span className="justify-self-end">
-            <RoleChips codes={r.codes} />
-          </span>
-          <BarCell count={r.count} max={Math.max(...rows.map((x) => x.count))} />
-          <CountCell>{r.count}</CountCell>
-        </Fragment>
-      ))}
-    </div>
-  );
-}
 
 // One pass over a metagraph's nodes → the facts every card needs to describe it.
 // (Was computed twice — once for the meta card's rows, once for the meta-node blurb.)

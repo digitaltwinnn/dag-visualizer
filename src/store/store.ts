@@ -329,7 +329,7 @@ interface AppState {
    *  comparison, so a per-plane metric would make the stack meaningless. */
   trendMetric: TrendMetric;
   // What the Snapshots explorer's tick rows lead with — fee, anchors, metagraphs or size
-  // (`src/data/ledgerMeasure.ts`). A setting, like `trendMetric`; its stepper is the card's.
+  // (`src/data/ledgerMeasure.ts`). A setting, like `trendMetric`; its control is the card's heading.
   ledgerMeasure: LedgerMeasure;
   // What the Geography explorer's country rows count — nodes, metagraphs or providers
   // (`src/data/geoMeasure.ts`). A setting, like the two above.

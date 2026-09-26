@@ -52,13 +52,14 @@ describe("scopeEmptyCopy — the fact, plus the route THIS surface can offer", (
   });
 
   it("states the same FACT in both registers, and a different route in each", () => {
-    const inView = scopeEmptyCopy("empty-dag", "view")!;
-    const inDoc = scopeEmptyCopy("empty-dag", "document")!;
+    const inView = scopeEmptyCopy("empty-unlisted", "view")!;
+    const inDoc = scopeEmptyCopy("empty-unlisted", "document")!;
     expect(inView.fact).toBe(inDoc.fact);
-    expect(inView.route).not.toBe(inDoc.route);
     // The empty-state rule: each route names a gesture available on the surface saying it.
-    expect(inDoc.route).toMatch(/Hypergraph tab/);
-    expect(inView.route).toMatch(/RAW/);
+    expect(scopeEmptyCopy("empty-dag", "document")!.route).toMatch(/Hypergraph tab/);
+    // The VIEW never has an empty DAG (it draws the hypergraph's own plane — `viewScope`), so it
+    // has no sentence for one.
+    expect(scopeEmptyCopy("empty-dag", "view")).toBeNull();
   });
 
   it("covers the unlisted scope too, and never fabricates a chart", () => {
@@ -74,8 +75,8 @@ describe("scopeEmptyCopy — the fact, plus the route THIS surface can offer", (
   it("carries no dash clause in anything a reader sees", () => {
     for (const scope of ["empty-dag", "empty-unlisted"] as const) {
       for (const surface of ["view", "document"] as const) {
-        const c = scopeEmptyCopy(scope, surface)!;
-        expect(`${c.fact} ${c.route}`).not.toMatch(/[—–]|\s-\s/);
+        const c = scopeEmptyCopy(scope, surface);
+        if (c) expect(`${c.fact} ${c.route}`).not.toMatch(/[—–]|\s-\s/);
       }
     }
   });

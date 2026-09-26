@@ -57,11 +57,10 @@
 // committed filter scopes the stack to one plane, so a click would delete the four planes the
 // gesture is about; the decision and its reasoning live in `domain/pickActions.ts`.
 //
-// ⚠️ A DRAG IS NOT A CLICK. These strips sit over a camera you orbit by dragging, and a press that
-// TRAVELS is a drag whatever it started on — so the pointer's travel is measured and a click that
-// moved more than a few px is dropped. (A press that starts on a strip does not reach the canvas
-// at all, so it cannot orbit: the strips swallow that drag, which is the accepted cost of putting
-// a control over the scene. Every pixel that is not a header still orbits.)
+// ⚠️ A DRAG IS NOT A CLICK. A press that TRAVELS is a drag whatever it started on — so the
+// pointer's travel is measured and a click that moved more than a few px is dropped. History has
+// no orbit (2026-09-26; `viewPolicy.rotate` is false): a drag across the FRONT chart's plot is the
+// range BRUSH (`onRange`), and the wheel still zooms through the canvas.
 
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 
@@ -84,7 +83,7 @@ import { useStore } from "@/src/store/store";
 const NO_IDS: readonly string[] = [];
 
 /** How far a press may travel and still count as a click, in px. Generous enough for a shaky
- *  finger, tight enough that a deliberate orbit attempt never commits a focus. */
+ *  finger, tight enough that a deliberate brush never commits a focus or a cursor pick. */
 const DRAG_SLOP = 4;
 
 
@@ -261,8 +260,9 @@ export default function TrendStack() {
   // go inactive rather than wrapping. A SETTING, not a selection — it writes its setter directly,
   // as the picker does (`selectionBoundary` names it out of scope).
   // ⚠️ THERE IS NO SWIPE. A vertical touch swipe on a card stepped the measure for a few hours —
-  // until a drag on a card became the scene's orbit, and one gesture cannot mean both. The rail's
-  // stepper is a finger-sized target, so touch lost nothing.
+  // until a drag on a card became a gesture of its own (the orbit then, the brush now), and one
+  // gesture cannot mean both. The rail's heading control is a finger-sized target, so touch lost
+  // nothing.
   const stepMeasure = (dir: -1 | 1) => {
     const next = stepMetric(useStore.getState().trendMetric, dir);
     if (next) setMetric(next);
@@ -349,10 +349,11 @@ export default function TrendStack() {
               // THE ANCHOR: a 0-size box at the layer's origin, hidden until the engine has
               // projected it. `origin-top-left` is what makes the engine's matrix a plain
               // translate — see this file's header.
-              // `touch-none`: a finger that drags a card is orbiting the scene (see `onPointerMove`),
-              // so the browser must not claim the gesture for a pan and cancel the pointer mid-drag.
+              // `touch-none`: a finger that drags the front card is brushing a range (see
+              // `onPointerMove`), so the browser must not claim the gesture for a pan and cancel the
+              // pointer mid-drag.
               "absolute left-0 top-0 origin-top-left invisible touch-none",
-              // The body takes no pointer events — the orbit drag belongs to the canvas beneath.
+              // The body takes no pointer events — the wheel's zoom belongs to the canvas beneath.
               // The one plane the pose marks interactive is the exception, and its header strip
               // re-enables them below whatever the pose says. `pointer-events` inherits, so the
               // 0-size anchor carrying it reaches the plane inside.
@@ -364,8 +365,8 @@ export default function TrendStack() {
             // THE INTERACTIVE PLANE'S WHOLE BODY is a target too — it is the one plane a click
             // cannot be ambiguous about, and asking for the header strip alone on a plane that is
             // already in front reads as a dead surface. Every other plane keeps the body inert, so
-            // the orbit drag passes through it. The header strip stops its own click, so the two
-            // never fire for one press.
+            // the canvas beneath still takes the wheel. The header strip stops its own click, so the
+            // two never fire for one press.
             onClick={pose.interactive ? () => activate(pose.id, false) : undefined}
             // ↑ / ↓ STEP THE MEASURE from anywhere inside a card (its head strip is the focusable
             // part). The default is taken so an arrow never scrolls a rail or the page under it.

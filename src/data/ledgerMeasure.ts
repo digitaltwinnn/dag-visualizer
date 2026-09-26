@@ -22,11 +22,11 @@ import { fmtDag } from "@/src/util/format";
 
 export type LedgerMeasure = "fee" | "anchors" | "metagraphs" | "size";
 
-/** The stepper's order — the reader steps through these with the chevrons, ends inactive. Fees
+/** The heading control's order — the reader steps through these with the chevrons, ends inactive. Fees
  *  first: it is the figure the rows have led with since 2026-09-13, so the default is unchanged. */
 export const LEDGER_MEASURE_ORDER: readonly LedgerMeasure[] = ["fee", "anchors", "metagraphs", "size"];
 
-/** The word the stepper shows — what every tick row's figure IS. */
+/** The word the heading control shows — what every tick row's figure IS. */
 export const LEDGER_MEASURE_LABELS: Readonly<Record<LedgerMeasure, string>> = {
   fee: "Fees",
   anchors: "Anchors",
@@ -34,12 +34,6 @@ export const LEDGER_MEASURE_LABELS: Readonly<Record<LedgerMeasure, string>> = {
   size: "Size",
 };
 
-/** The neighbour in the order, or null at an end — the stepper dims that chevron. */
-export function stepLedgerMeasure(m: LedgerMeasure, dir: -1 | 1): LedgerMeasure | null {
-  const i = LEDGER_MEASURE_ORDER.indexOf(m);
-  if (i < 0) return null;
-  return LEDGER_MEASURE_ORDER[i + dir] ?? null;
-}
 
 /** The dash: the exact read is not here, so the figure is not either. Shared with the row's
  *  accessible name, which drops a "—" metric entirely rather than reading it aloud. */
@@ -95,12 +89,12 @@ export function snapMeasure(m: SnapLevelMeasure, row: { fee: number; bytes?: num
 }
 
 /** The heading control's list for the TICK level — each measure with the unit its figure is in. */
-export const LEDGER_MEASURE_OPTIONS: readonly { id: LedgerMeasure; label: string; unit: string }[] = [
-  { id: "fee", label: "Fees", unit: "DAG" },
-  { id: "anchors", label: "Anchors", unit: "count" },
-  { id: "metagraphs", label: "Metagraphs", unit: "count" },
-  { id: "size", label: "Size", unit: "KB" },
-];
+const LEDGER_MEASURE_UNITS: Readonly<Record<LedgerMeasure, string>> = { fee: "DAG", anchors: "count", metagraphs: "count", size: "KB" };
+export const LEDGER_MEASURE_OPTIONS: readonly { id: LedgerMeasure; label: string; unit: string }[] = LEDGER_MEASURE_ORDER.map((id) => ({
+  id,
+  label: LEDGER_MEASURE_LABELS[id],
+  unit: LEDGER_MEASURE_UNITS[id],
+}));
 
 /** The tick's figure as a NUMBER, for the bar — the same reads `tickMeasure` formats, or null
  *  where it would answer the dash. A bar drawn from a number the row does not state is the

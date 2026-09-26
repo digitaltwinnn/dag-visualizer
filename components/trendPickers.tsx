@@ -11,8 +11,8 @@ import { filterToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 
 // THE TRENDS CONTROLS, ONE HOME (2026-09-18; widened 2026-09-19) — the window pills and the scale
-// switch, shared by the Trends DOCUMENT, the History view's band TIMELINE and that view's Layers
-// card. (A six-pill METRIC picker lived here too until 2026-09-26, when the Networks card took the
+// switch, shared by the Trends DOCUMENT, the History view's band TIMELINE and that view's Network
+// breakdown card. (A six-pill METRIC picker lived here too until 2026-09-26, when the Networks card took the
 // explorer's heading control (`components/explorer/ExplorerHeading.tsx`) in its place and no surface picked from a
 // map.) They are two registers of one rung
 // (convention 12), and the pair had already been noted drifting once: the vitals rim adopted this
@@ -167,7 +167,7 @@ export function SettingSwitch({
 }
 
 /** THE SCALE SETTING — shared by the Trends document's metagraphs tab and the History view's
- *  Networks card (2026-09-19): it is the same question about the same charts, and the two would
+ *  Network breakdown card (2026-09-19): it is the same question about the same charts, and the two would
  *  otherwise be the sort of near-copy this file exists to prevent. */
 export function ScaleToggle({
   shared,
@@ -200,8 +200,8 @@ export function ScaleToggle({
  *
  *  Clearing goes through `filterToggleActions` (rule 2's one write path) — toggling the committed
  *  network OFF is what returns the surface to every network, and it commits the same release the
- *  explorer row and the scene do. Shared by the document and the History view's Networks card
- *  (2026-09-19). */
+ *  explorer row and the scene do. The DOCUMENT's alone since 2026-09-26 — the explorer shows no
+ *  scope mark; the top bar's filter is the one place to see and clear it. */
 export function ScopeChip({ filter, className }: { filter: string; className?: string }) {
   if (filter === "all") return null;
   const net = displayNetwork(filter);

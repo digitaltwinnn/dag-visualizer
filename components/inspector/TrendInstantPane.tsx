@@ -190,7 +190,7 @@ export default function TrendInstantPane({
 
               {/* ── DETAIL: every layer at the cursor ────────────────────────────────────────
                   Ordered by the reading itself (`orderAt` — nulls last, ties stable), so the list
-                  IS the ranking the lead states. Each row pairs and clicks exactly like a Layers
+                  IS the ranking the lead states. Each row pairs and clicks exactly like a Network breakdown
                   row: the same channel, the same builder. */}
               {ranked.length > 1 && (
                 <>
@@ -261,7 +261,7 @@ export default function TrendInstantPane({
                 type="button"
                 disabled={!span}
                 title={
-                  subject
+                  subject && subject !== "dag"
                     ? "Opens the anchor log at this span, with this network in the search."
                     : "Opens the anchor log at this span, across every network."
                 }

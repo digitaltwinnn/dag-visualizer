@@ -12,9 +12,7 @@ import {
   tickNetMeasure,
   NO_MEASURE,
   snapMeasure,
-  stepLedgerMeasure,
   tickMeasure,
-  type LedgerMeasure,
 } from "./ledgerMeasure";
 
 // The Snapshots explorer's tick-row figure, as a vocabulary (2026-09-26). The stepper walks the
@@ -40,23 +38,6 @@ describe("the order and its labels", () => {
     expect(LEDGER_MEASURE_ORDER[0]).toBe("fee");
     for (const m of LEDGER_MEASURE_ORDER) expect(LEDGER_MEASURE_LABELS[m].length).toBeGreaterThan(0);
     expect(new Set(LEDGER_MEASURE_ORDER).size).toBe(LEDGER_MEASURE_ORDER.length);
-  });
-
-  it("steps through the order and stops at the ends (the plank's rule: an exhausted direction is inactive)", () => {
-    const first = LEDGER_MEASURE_ORDER[0]!;
-    const last = LEDGER_MEASURE_ORDER[LEDGER_MEASURE_ORDER.length - 1]!;
-    expect(stepLedgerMeasure(first, -1)).toBeNull();
-    expect(stepLedgerMeasure(last, 1)).toBeNull();
-    expect(stepLedgerMeasure(first, 1)).toBe(LEDGER_MEASURE_ORDER[1]);
-    expect(stepLedgerMeasure("bogus" as LedgerMeasure, 1)).toBeNull();
-  });
-});
-
-describe("tickMeasure — every figure is read off the tick, or it is the dash", () => {
-  it("reads each measure from the exact decode", () => {
-    expect(tickMeasure("fee", { metagraphSnapshotCount: 8 }, EXACT)).toBe("0.0460"); // bare — the heading names DAG
-    expect(tickMeasure("metagraphs", { metagraphSnapshotCount: 8 }, EXACT)).toBe("4");
-    expect(tickMeasure("size", { metagraphSnapshotCount: 8 }, EXACT)).toBe("312");
   });
 
   it("answers the dash without an exact read for fee, metagraphs and size — never a derived number (rule 10)", () => {

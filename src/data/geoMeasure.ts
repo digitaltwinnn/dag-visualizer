@@ -17,10 +17,10 @@ import type { NodeRow } from "@/src/data/types";
 
 export type GeoMeasure = "nodes" | "metagraphs" | "providers";
 
-/** The stepper's order. Nodes first: the figure the rows have always led with. */
+/** The heading control's order. Nodes first: the figure the rows have always led with. */
 export const GEO_MEASURE_ORDER: readonly GeoMeasure[] = ["nodes", "metagraphs", "providers"];
 
-/** The word the stepper shows — what every country row's figure and bar ARE. */
+/** The word the heading control shows — what every country row's figure and bar ARE. */
 export const GEO_MEASURE_LABELS: Readonly<Record<GeoMeasure, string>> = {
   nodes: "Nodes",
   metagraphs: "Metagraphs",
@@ -46,12 +46,6 @@ export function cohortMeasure(m: CohortMeasure, rows: readonly Pick<NodeRow, "pi
   return m === "nodes" ? rows.length : countryMeasure("metagraphs", rows.length, rows);
 }
 
-/** The neighbour in the order, or null at an end — the stepper dims that chevron. */
-export function stepGeoMeasure(m: GeoMeasure, dir: -1 | 1): GeoMeasure | null {
-  const i = GEO_MEASURE_ORDER.indexOf(m);
-  if (i < 0) return null;
-  return GEO_MEASURE_ORDER[i + dir] ?? null;
-}
 
 /** The network a placed node serves: its metagraph's id, or `dag` for a base-ledger validator
  *  (a pick of kind l0 / l1 / core is the DAG's own). Null only for a pick that names no node. */

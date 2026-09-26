@@ -17,7 +17,7 @@ import { useStore, type TrendMetric } from "@/src/store/store";
 
 // HISTORY'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session 2026-09-26;
 // read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). The view breaks its
-// subject down along its OWN dimension, the ROSTER OF LAYERS — one chart plane per network — so
+// subject down along its OWN dimension, the ROSTER OF NETWORKS — one chart plane each — so
 // the description is ONE level: the ranked networks, busiest first, each with its last measured
 // reading. A row has no children; clicking it brings its plane to the front.
 //
@@ -82,7 +82,7 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   const maxLast = Math.max(1e-9, ...ranked.map((id) => rows.get(id)?.last ?? 0));
 
   const level: ExplorerLevelSpec = {
-    key: "layers",
+    key: "networks",
     crumb: { label: "Networks" },
     // Only where there is a COLUMN to compare: with one network in scope there is nothing for a
     // shared ceiling to be shared with.

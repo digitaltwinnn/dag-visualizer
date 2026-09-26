@@ -32,7 +32,7 @@ import { useStore } from "@/src/store/store";
 //     survives the pointer leaving. Hovering previews a faint line LOCALLY and writes nothing
 //     (rule 9: hovers preview, never commit).
 //
-// THE TRACK TAKES THE WHOLE BAND, AND THE PILLS SIT ON ITS TOP-RIGHT CORNER (user, 2026-09-26:
+// THE TRACK TAKES THE WHOLE BAND, AND THE PILLS STAND ABOVE ITS TOP-RIGHT CORNER (user, 2026-09-26:
 // "remove the text 'Cursor none picked', position the range bar on top of the bottom bar (right
 // side) and use that extra space for the trends with the window over it"). The band held three
 // columns — track, a CURSOR readout, the pills — and the readout's 16ch reserve plus the pills'
@@ -105,7 +105,7 @@ export default function TrendTimeline() {
         // floats over the SCENE now, where the picker's own hairline-and-wash — right for a group
         // on a page — would let the ground's ink run through the words. `bottom-full` is the
         // tenant's top; the plate's padding plus `mb-3` clears its edge by a hairline's breath.
-        className="absolute bottom-full right-0 mb-3 z-[1] rounded-lg [background:var(--topbar-glass)] backdrop-blur-sm max-[700px]:static max-[700px]:mb-0 max-[700px]:self-stretch max-[700px]:bg-transparent max-[700px]:backdrop-blur-none"
+        className="absolute bottom-full right-0 mb-3 z-[1] rounded-lg [background:var(--topbar-glass)] backdrop-blur-sm max-[700px]:static max-[700px]:mb-0 max-[700px]:self-stretch max-[700px]:[background:none] max-[700px]:backdrop-blur-none"
       >
         <WindowPicker
           className="bg-transparent"

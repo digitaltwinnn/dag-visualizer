@@ -1002,13 +1002,16 @@
                               2026-07-05; moved up 25px with the retired banner, 2026-08-09) */
   --rail-w: 264px;         /* left control rail width */
   --detail-w: 320px;       /* right details rail width */
-  --sel-bg: light-dark(rgba(9, 133, 133, 0.12), rgba(42, 245, 255, 0.12));   /* selected/active fill, reused everywhere */
-  --sel-border: light-dark(rgba(9, 133, 133, 0.55), rgba(42, 245, 255, 0.5));
-  --sel-bg-dim: light-dark(rgba(9, 133, 133, 0.06), rgba(42, 245, 255, 0.05));  /* the same mark at ANCESTOR strength: an explorer row
+  /* THE ACCENT, like the wash ladder (review, 2026-09-26): these were the cyan spelled out, so on
+     a network whose `--primary` is violet or magenta the committed row stayed cyan beside a
+     violet path plate — two accents on one card. `--primary` is light-dark() already. */
+  --sel-bg: color-mix(in oklch, var(--primary) 12%, transparent);   /* selected/active fill, reused everywhere */
+  --sel-border: color-mix(in oklch, var(--primary) 52%, transparent);
+  --sel-bg-dim: color-mix(in oklch, var(--primary) 6%, transparent);  /* the same mark at ANCESTOR strength: an explorer row
                                               whose rung is committed but no longer the focus (a
                                               finer rung is) — same language, half a voice, so one
                                               list can't show three equally loud selections */
-  --sel-border-dim: light-dark(rgba(9, 133, 133, 0.25), rgba(42, 245, 255, 0.22));
+  --sel-border-dim: color-mix(in oklch, var(--primary) 24%, transparent);
   /* THE VITALS BAND'S OWN HEIGHT — fixed, so the lane does not change shape when the view does
      (user, 2026-09-01: "the height of the vitals differs per view; can we make it uniform?").
      Left to its content the band measured 81px in hyper (four bar rows), 72 in geo and 62 in the

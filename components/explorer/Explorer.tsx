@@ -68,7 +68,7 @@ export interface ExplorerLevelSpec {
   key: string;
   /** How this level appears as a crumb once a deeper level is on screen, and the release that
    *  brings the reader back to it — every rung finer than this one goes, through the executor.
-   *  The ROOT's crumb is never rendered (the title names the root; the scope dot's × returns to it). */
+   *  The ROOT's crumb is the house glyph (the title names the root; the house releases everything). */
   crumb: { label: ReactNode; title?: string; onRelease?: () => void };
   /** What this level contains, in one muted clause under the path — absent at the root, whose
    *  meaning is the card's title and hint. */

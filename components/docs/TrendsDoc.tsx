@@ -367,8 +367,8 @@ export default function TrendsDoc() {
      where there is a COLUMN of comparable charts; the hypergraph tab's charts each measure a
      different quantity, and under a commit there is one network left. */
   const scaleToggle = <ScaleToggle shared={scaleMode === "shared"} onChange={(on) => setScaleMode(on ? "shared" : "own")} />;
-  // The scope pill and its × are `trendPickers.tsx`'s `ScopeChip`, shared with the History view's
-  // Networks card (2026-09-19) — one statement of "what is applied, and how to clear it".
+  // The scope pill and its × are `trendPickers.tsx`'s `ScopeChip` (the document's alone since the
+  // explorer lost its scope mark, 2026-09-26) — one statement of "what is applied, and how to clear it".
   const scopeChip = <ScopeChip filter={filter} className="mr-auto" />;
   /* The scoped tab with nothing to draw. Both cases are real commits a reader can reach from the
      bar, and neither is a failure — the trends store keeps one series set per LISTED metagraph,

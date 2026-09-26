@@ -6,8 +6,9 @@ import CardHead from "@/components/CardHead";
 import { Card } from "@/components/ui/card";
 import { EXPLORE_ICON } from "@/components/icons";
 
-// The ONE explorer-card chrome, rendered by all three left-rail tool cards (GeoExplore,
-// HyperExplore, LedgerPanel) — extracted (2026-07-18) because the three had drifted on their
+// The ONE explorer-card chrome, rendered by `components/explorer/Explorer.tsx` alone since
+// 2026-09-26 (every tool card is a description handed to that component; before that the three
+// explorers rendered this directly) — extracted (2026-07-18) because the three had drifted on their
 // own hand-rolled chrome: the ledger card wore a stray bottom separator geo didn't have, and a
 // code review found a stuck-hover bug the chrome should structurally prevent (a row that
 // commits a selection can self-unmount under the pointer, so its own `mouseleave` never fires).
@@ -30,13 +31,13 @@ import { EXPLORE_ICON } from "@/components/icons";
 // backstop every explorer gets for free; a caller with such a hazard passes `onLeave` to
 // clear whatever hover channels its rows set (LedgerPanel is the first — see its own comment).
 // Explorer-SPECIFIC content (rows, groupings, empty states) is the caller's `children`; this
-// file is chrome only — a `components/explorerShell.test.ts` grep asserts all three explorers
-// render `<ExplorerShell`, so a future explorer can't hand-roll its own chrome silently.
+// file is chrome only — a `components/explorerShell.test.ts` grep asserts every explorer renders
+// `<Explorer` and that only `Explorer.tsx` renders this shell, so a future explorer can't
+// hand-roll its own chrome silently.
 export default function ExplorerShell({
   id,
   title,
   hint,
-  scope,
   onLeave,
   defaultCollapsed = false,
   children,
@@ -57,9 +58,6 @@ export default function ExplorerShell({
   // halves are TWO SENTENCES, not a dash clause — the app-wide plain-writing rule (user,
   // 2026-08-12), stated in full on components/railCards.ts's ghost-hint block.
   hint: ReactNode | null;
-  /** The head's aside slot, on the title line's right (2026-09-26). Unused by the explorers since
-   *  the scope mark went — the top bar's filter names the committed network and clears it. */
-  scope?: ReactNode;
   // Container-level hover cleanup — see the file comment. Optional: most explorers' committed
   // rows stay rendered after a click (no self-unmount hazard), so most callers omit it.
   onLeave?: () => void;
@@ -82,7 +80,6 @@ export default function ExplorerShell({
           panel
           icon={EXPLORE_ICON}
           title={title}
-          aside={scope}
           eyebrow="Explore"
           collapsed={collapsed}
           onToggle={() => setCollapsed((c) => !c)}

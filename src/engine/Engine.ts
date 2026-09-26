@@ -45,7 +45,7 @@ import { auditInstances, findingKey, type InstanceFinding } from "./scene/instan
 import { CalloutSync, type CalloutState } from "./CalloutSync";
 import { TrendStackSync, type TrendStackState } from "./TrendStackSync";
 import { fitDistance, focusDepth, loneShiftPx, windowCount } from "./domain/trendStack";
-import { trendRoster } from "@/src/data/trendScope";
+import { stackRoster } from "@/src/data/trendScope";
 import { DevTunePanel } from "./DevTunePanel";
 import { CameraDirector } from "./CameraDirector";
 import type { GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
@@ -2221,12 +2221,12 @@ export class Engine {
     if (trendAlpha > 0.001) {
       // The published window when there is one; until React publishes (boot, a refetch) the count
       // the SCOPE will hold — so the room is built around the floor it is about to have, and a
-      // scope with nothing to draw (`dag`, unlisted: `trendRoster` is empty) draws no floor at all
+      // scope with nothing to draw (unlisted: `stackRoster` is empty) draws no floor at all
       // under the sentence that says so.
       const n = useStore.getState().trendIds.length;
       if (n === 0 && this._scopeFor !== this.filter) {
         this._scopeFor = this.filter;
-        this._scopeCount = trendRoster(this.filter).length; // event-time: once per filter, never per frame
+        this._scopeCount = stackRoster(this.filter).length; // event-time: once per filter, never per frame — the SCENE's roster (the DAG has a plane here)
       }
       const count = windowCount(n > 0 ? n : this._scopeCount);
       const shift = loneShiftPx(count, railGapShiftPx(window.innerWidth, this.railsHidden));

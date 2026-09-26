@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
 // row stays the loudest thing. No ✓ and no chevron (`quieter.html` A): the WASH is the
 // selection, and the row is the control — hover washes it, a click opens or commits it.
 //
-// The ±6px OUTSET is the explorer rows' right-edge contract (ExploreRows' `ROW_OUTSET`): a row
+// The ±6px OUTSET is the explorer rows' right-edge contract (once `ExploreRows`' `ROW_OUTSET`): a row
 // reaches the card's inner edge on both sides so its wash box spans the column edge to edge.
 
 export interface ExplorerRowProps {
@@ -76,6 +76,20 @@ export interface ExplorerRowProps {
   className?: string;
 }
 
+/** WHEN THE READER LAST ACTED — a pointer press or a key — so a commit can tell a gesture from a
+ *  heartbeat. One passive listener pair for the whole document, installed on first use. */
+let lastGestureAt = 0;
+let gestureClock = false;
+function recentGesture(): boolean {
+  if (!gestureClock && typeof window !== "undefined") {
+    gestureClock = true;
+    const mark = () => { lastGestureAt = performance.now(); };
+    window.addEventListener("pointerdown", mark, { passive: true, capture: true });
+    window.addEventListener("keydown", mark, { passive: true, capture: true });
+  }
+  return performance.now() - lastGestureAt < 1500;
+}
+
 export default function ExplorerRow({
   glyph, name, nameMono, tag, bar, figure, hasFigure, nameW = 84, figureW = 40, on, hue, nested, faint, title, onClick, pair, className,
 }: ExplorerRowProps) {
@@ -83,14 +97,19 @@ export default function ExplorerRow({
   // SELECTION STAYS IN PLACE (design 2026-09-26, decision 12): the list never re-orders on a
   // commit; the committed row is scrolled into view instead — `nearest`, so a row already on
   // screen does not move the rail under the pointer.
+  // …and only when a GESTURE committed it: the Snapshots explorer's `on` moves to the newest tick
+  // on every live advance while following, and a scroll on each would yank the rail back under
+  // the pointer every ~30s (review, 2026-09-26). A heartbeat is not a gesture.
   useEffect(() => {
-    if (on) el.current?.scrollIntoView({ block: "nearest" });
+    if (on && recentGesture()) el.current?.scrollIntoView({ block: "nearest" });
   }, [on]);
   // A ROW THAT LEAVES UNDER THE POINTER RELEASES ITS HOVER (rule 9's unmount backstop, in the one
   // row every explorer uses): clicking a row that opens a deeper level unmounts the row while it
   // is hovered, so its own mouseleave never fires and the pairing channel — a tick, a lane, a
   // country — stays lit in the scene and previews on the heading. Found live 2026-09-26 as the
   // PINNED pill wearing its dashed hover-preview after a click.
+  // Keyboard focus previews on the same channel (`pair.onFocus`), and a focused row that
+  // unmounts gets no reliable blur either — so focus counts as hovered here.
   const hovered = useRef(false);
   const leave = useRef(pair?.onMouseLeave);
   leave.current = pair?.onMouseLeave;
@@ -133,8 +152,14 @@ export default function ExplorerRow({
         hovered.current = false;
         pair?.onMouseLeave();
       }}
-      onFocus={pair?.onFocus}
-      onBlur={pair?.onBlur}
+      onFocus={() => {
+        hovered.current = true;
+        pair?.onFocus();
+      }}
+      onBlur={() => {
+        hovered.current = false;
+        pair?.onBlur();
+      }}
     >
       <span className="flex items-center justify-center">{glyph}</span>
       <span

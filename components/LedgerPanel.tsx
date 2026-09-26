@@ -232,9 +232,13 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
     if (at >= 0) setTickPage(Math.floor(at / TICK_PAGE) + 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one sync per committed snapshot
   }, [metaSnapKey]);
-  // A tick pinned elsewhere (the rail's ‹ › plank) while a tick is open re-points the path.
+  // A tick pinned elsewhere (the rail's ‹ › plank) while a tick is open re-points the path — but
+  // NOT when the same commit carried a metagraph snapshot for that tick: the effect above has
+  // just opened the path to the snapshot, and this one, reading the stale `openTick`, would
+  // close it back to the networks level (review, 2026-09-26). The effects run in one commit.
   useEffect(() => {
     if (openTick == null || following || activeSnapOrd == null || activeSnapOrd === openTick) return;
+    if (metaSnap && metaSnap.globalOrdinal === activeSnapOrd) return;
     setOpenTick(activeSnapOrd);
     setOpenNet(null);
     setOpenSnap(null);
@@ -345,7 +349,11 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
                 tickHasFilter,
               }),
             );
-            setOpenTick(d.ordinal);
+            // Re-clicking the PINNED tick releases it (the builder's toggle) — the path closes
+            // with it rather than opening the tick it just let go (review, 2026-09-26); any other
+            // click toggles the tick open, the live tip included.
+            const releasing = on && !following;
+            setOpenTick(releasing || openTick === d.ordinal ? null : d.ordinal);
             setOpenNet(null);
             setOpenSnap(null);
           },

@@ -9,6 +9,7 @@ import { shortHash } from "@/src/data/network";
 import { nodeStatus } from "@/src/data/nodeStatus";
 import type { NodeRow } from "@/src/data/types";
 import { midHash } from "@/src/util/format";
+import { cn } from "@/lib/utils";
 
 // THE ONE NODE ROW (design session 2026-09-26, `node-rows.html` D): a node level is the last step
 // in every explorer — under a composition in Hypergraph, under a city · provider cohort in
@@ -26,16 +27,25 @@ import { midHash } from "@/src/util/format";
 // state's word rides the dot as its accessible name and the row's title spells everything out:
 // the id in its short form, the network, the layers, the state.
 
-/** The state as a dot in its bucket colour; the word is the dot's accessible name. */
+/** The state as a dot in its bucket colour — and in its SHAPE: ready is a filled disc, any other
+ *  state a hollow ring, so the mark is never colour alone (review, 2026-09-26). The word is the
+ *  dot's accessible name and its hover. */
 export function StateDot({ state }: { state?: string | null }) {
   const s = nodeStatus(state);
+  const ready = s.bucket === "ready";
   return (
     <span
       role="img"
       aria-label={s.label}
       title={s.label}
-      className="inline-block size-1.5 flex-none rounded-full"
-      style={{ background: s.color, boxShadow: `0 0 0 2px color-mix(in oklch, ${s.color} 24%, transparent)` } as CSSProperties}
+      className={cn("inline-block size-1.5 flex-none rounded-full", !ready && "border-[1.5px]")}
+      style={
+        {
+          background: ready ? s.color : "transparent",
+          borderColor: ready ? undefined : s.color,
+          boxShadow: `0 0 0 2px color-mix(in oklch, ${s.color} 24%, transparent)`,
+        } as CSSProperties
+      }
     />
   );
 }
