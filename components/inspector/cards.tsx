@@ -419,8 +419,8 @@ function UnlistedMemberFacts({ id, last }: { id: string; last: boolean }) {
 // CLOSED by default (user, round 21) — the captions are the card's index and a breakdown
 // is opened on demand; state is local and plain — folding commits nothing, so the store
 // owns none of it — and survives pager steps, since the group's identity does.
-function ScheduleGroup({ label, children }: { label: string; children: ReactNode }) {
-  const [open, setOpen] = useState(false);
+function ScheduleGroup({ label, children, defaultOpen = false }: { label: string; children: ReactNode; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       {/* No default focus ring and no text selection (user, round 22: clicking drew "an
@@ -450,9 +450,25 @@ function ScheduleGroup({ label, children }: { label: string; children: ReactNode
 // merged rows (full-node + kept-snapshot tags), the honest unmeasured remainder, stars while
 // the census is in flight. The metagraph dossiers seat it as the third schedule under Online
 // nodes; the DAG dossier seats the same group standalone (its roster isn't `nodes`).
+/** A schedule's caption inside the grouped BREAKDOWN — the partition's name, one step quieter
+ *  than the group's own word, with the group's `mt-2` rhythm above it. */
+function ScheduleCaption({ children }: { children: ReactNode }) {
+  return <div className="mt-2 first:mt-0 mb-1 text-micro tracking-caps text-muted-foreground/80">{children}</div>;
+}
+
 function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> }) {
   return (
-    <ScheduleGroup label="by archived snapshots">
+    <ScheduleGroup label="by archived snapshots" defaultOpen>
+      <ArchivalBody sched={sched} />
+    </ScheduleGroup>
+  );
+}
+
+/** The archival schedule's rows — seated inside the metagraph dossier's grouped BREAKDOWN, and
+ *  inside its own group on the DAG dossier (whose roster isn't `nodes`). */
+function ArchivalBody({ sched }: { sched: ReturnType<typeof archiveSchedule> }) {
+  return (
+    <>
       {sched ? (
           <div className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-x-2 gap-y-[7px]">
             {sched.rows.map((row) => (
@@ -504,7 +520,7 @@ function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> })
         ) : (
           <NodeStars count={4} />
         )}
-    </ScheduleGroup>
+    </>
   );
 }
 
@@ -612,19 +628,30 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           {nodes.length > 0 && <Separator className="my-2" />}
           {nodes.length > 0 && (
             <>
-              <ScheduleGroup label="by node composition">
+              {/* ONE DISCLOSURE FOR THE THREE SCHEDULES, OPEN BY DEFAULT (user, 2026-09-26: the
+                  three "by …" rows repeated the same gesture three times; "group those into a
+                  single dropdown with a text that applies to all, expanded by default"). The
+                  group's word is BREAKDOWN — what all three are: the fleet partitioned by
+                  composition, by status, by what it archives — and each schedule keeps its own
+                  caption inside, so a reader still knows which partition a row belongs to. */}
+              <ScheduleGroup label="breakdown" defaultOpen>
+                <ScheduleCaption>Node composition</ScheduleCaption>
                 <CompositionRows nodes={nodes} />
-              </ScheduleGroup>
-              <ScheduleGroup label="by node status">
+                <ScheduleCaption>Node status</ScheduleCaption>
                 <StatusBreakdown states={states} />
+                {/* THIRD SCHEDULE — "by archival" (user, 2026-09-10): the census's own kinds as
+                    rows — the full-chain keepers, then one DYNAMIC row per distinct partial reach
+                    in the age grammar ("~2 months") — and the honest remainder as unmeasured (an
+                    absent probe entry proves nothing about what a node keeps). The deepest reach +
+                    kept-count ride as the group's muted underline; this absorbs the old
+                    divider-separated "Full archive nodes" fact for fleets. */}
+                {(archSched != null || archAcquiring) && (
+                  <>
+                    <ScheduleCaption>Archived snapshots</ScheduleCaption>
+                    <ArchivalBody sched={archSched} />
+                  </>
+                )}
               </ScheduleGroup>
-              {/* THIRD SCHEDULE — "by archival" (user, 2026-09-10): the census's own kinds as
-                  rows — the full-chain keepers, then one DYNAMIC row per distinct partial reach
-                  in the age grammar ("~2 months") — and the honest remainder as unmeasured (an
-                  absent probe entry proves nothing about what a node keeps). The deepest reach +
-                  kept-count ride as the group's muted underline; this absorbs the old
-                  divider-separated "Full archive nodes" fact for fleets. */}
-              {(archSched != null || archAcquiring) && <ArchivalGroup sched={archSched} />}
             </>
           )}
         </>
