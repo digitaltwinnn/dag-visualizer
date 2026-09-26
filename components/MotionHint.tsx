@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { VIEWS } from "@/components/views";
 import { METRIC_LABELS } from "@/src/data/trendSeries";
@@ -34,6 +34,9 @@ import { cn } from "@/lib/utils";
 // bottom band's reserved space (`--bottom-reserve`, published by BottomStream), so it sits just
 // over the band on every tier rather than at a share of the height that lands differently on a
 // phone. Pointer-inert, and only in a view with a canvas.
+
+/** How long a sentence holds before it starts to fade, whatever the scene is still doing. */
+const HOLD_MS = 1100;
 
 /** A stable country name from the browser's own vocabulary; the code where it has none. */
 function countryName(cc: string): string {
@@ -74,23 +77,37 @@ export default function MotionHint() {
   const text = cause ? motionHint(cause, mode, names, phase) : null;
   // The sentence shown — held through the fade-out (see the header).
   const [shown, setShown] = useState<string | null>(null);
+  // THE HOLD IS CAPPED (user: "displayed a bit too long sometimes — start it to fade earlier"):
+  // a flight's last half-second is the ease-out nobody reads as movement, so the line begins its
+  // fade `HOLD_MS` after it appeared, motion or not. A NEW sentence (leaving → entering, a second
+  // gesture) re-arms the hold, so a view switch still says both halves.
+  const [expired, setExpired] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    if (moving && text) setShown(text);
+    if (moving && text) {
+      setShown(text);
+      setExpired(false);
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => setExpired(true), HOLD_MS);
+    }
+    return () => {
+      if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+    };
   }, [moving, text]);
   if (!VIEW_POLICIES[mode].canvas) return null;
-  const on = moving && text != null;
+  const on = moving && text != null && !expired;
   return (
     <div
       role="status"
       aria-live="polite"
       data-on={on ? "1" : "0"}
-      style={{ bottom: "calc(var(--bottom-reserve, 0px) + 32px)" }}
+      style={{ bottom: "calc(var(--bottom-reserve, 0px) + 52px)" }}
       className={cn(
         "absolute left-1/2 z-[5] -translate-x-1/2 pointer-events-none select-none whitespace-nowrap",
-        "inline-flex items-center gap-2.5 text-title font-normal text-foreground-dim",
-        // ONE tight shadow in the ground's own colour: an edge, not a glow — the three-layer halo
-        // read as a plate by other means. `--background` is `light-dark()`, so one rule serves both.
-        "[text-shadow:0_1px_2px_var(--background)]",
+        // 13.5px: between `text-body` and `text-title` on the scale — the title size read a
+        // touch loud once the ink dimmed (user, round four). No shadow at all: the dim ink over
+        // the scene is the whole treatment.
+        "inline-flex items-center gap-2.5 text-[13.5px] leading-none font-normal text-foreground-dim",
         // The entrance: fade + a short rise, delayed a beat on the way IN only. One arbitrary
         // `[transition:…]` rather than two utilities — `transition-*` is a twMerge group.
         "opacity-0 transition-opacity duration-200 ease-out",
