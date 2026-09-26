@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { NodeRow } from "@/src/data/types";
 import {
+  COHORT_MEASURE_OPTIONS,
   GEO_MEASURE_LABELS,
+  GEO_MEASURE_OPTIONS,
   GEO_MEASURE_ORDER,
+  cohortMeasure,
   countryMeasure,
   networkOfRow,
   providerOfRow,
@@ -61,5 +64,19 @@ describe("countryMeasure", () => {
   it("providers counts distinct hosts and skips rows without one", () => {
     expect(countryMeasure("providers", 7, rows)).toBe(2); // Hetzner, OVH
     expect(countryMeasure("providers", 1, [dag("l1", null)])).toBe(0);
+  });
+});
+
+describe("the heading lists — every measure with its unit, and a cohort's own pair", () => {
+  it("lists the country measures in order with their units", () => {
+    expect(GEO_MEASURE_OPTIONS.map((o) => o.id)).toEqual([...GEO_MEASURE_ORDER]);
+    for (const o of GEO_MEASURE_OPTIONS) expect(o.unit.length).toBeGreaterThan(0);
+  });
+
+  it("a cohort counts its nodes or the distinct networks they serve", () => {
+    const rows = [meta("dor", "Hetzner"), meta("dor", "Hetzner"), dag("l0", "Hetzner")];
+    expect(COHORT_MEASURE_OPTIONS.map((o) => o.id)).toEqual(["nodes", "metagraphs"]);
+    expect(cohortMeasure("nodes", rows)).toBe(3);
+    expect(cohortMeasure("metagraphs", rows)).toBe(2);
   });
 });

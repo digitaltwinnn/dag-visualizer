@@ -1,37 +1,54 @@
 "use client";
 
-import { useMemo } from "react";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { cn } from "@/lib/utils";
-import { useStore } from "@/src/store/store";
-import ExplorerShell from "@/components/ExplorerShell";
-import MeasureStepper from "@/components/MeasureStepper";
-import { GEO_MEASURE_LABELS, countryMeasure, stepGeoMeasure } from "@/src/data/geoMeasure";
-import { filterAccent, metagraphById } from "@/src/data/network";
-import { SelectedRowMark, selectedRow, selectionHue } from "@/components/selection";
-import { ccMark } from "@/src/util/format";
-import { hoverKeyOf } from "@/src/data/hoverSubject";
-import { countryToggleActions, nodeSelectActions, cohortToggleActions, sameCohort } from "@/src/engine/domain/pickActions";
-import { applyClickActions } from "@/src/store/applyClickActions";
+import { useMemo, useState } from "react";
+
+import Explorer, { type ExplorerLevelSpec } from "@/components/explorer/Explorer";
+import { IdentityDot } from "@/components/inspector/parts";
 import { subjectPairing } from "@/components/useSubjectPairing";
-import { useLadderFocus } from "@/components/useLadderFocus";
-import { DepthCaption, DisclosureChevron, Disclosure, DisclosurePanel, DisclosureRow, NodePickerRow, ROW_NEST, ROW_NEST_DEEP, ROW_OUTSET } from "@/components/ExploreRows";
+import {
+  COHORT_MEASURE_OPTIONS,
+  GEO_MEASURE_OPTIONS,
+  cohortMeasure,
+  countryMeasure,
+  type CohortMeasure,
+  type GeoMeasure,
+} from "@/src/data/geoMeasure";
+import { hoverKeyOf } from "@/src/data/hoverSubject";
+import { filterAccent, metagraphById } from "@/src/data/network";
 import type { NodeRow } from "@/src/data/types";
 import type { CohortSel } from "@/src/engine/domain/focusLadder";
+import { cohortToggleActions, countryToggleActions, filterToggleActions, nodeSelectActions, sameCohort } from "@/src/engine/domain/pickActions";
+import { identityHudCss } from "@/src/palette/identity";
+import { applyClickActions } from "@/src/store/applyClickActions";
+import { useStore } from "@/src/store/store";
+import { ccMark, midHash } from "@/src/util/format";
 
-// Geography's single **explore** card (one frame, the bare "Explore" eyebrow — the view name
-// was dropped from card eyebrows, user 2026-07-12: the view switch already says where you
-// are — an accordion you click into). The country list IS the
-// node browser: each country is a row showing its share of the footprint (bar + count), and
-// clicking it drills the globe into that country AND expands its nodes inline — master on
-// top, detail nested beneath, then a node row opens its card on the right facts rail.
-// The footprint's headline figures live in the top-bar vitals; this card is purely the accordion.
+// THE GEOGRAPHY'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
+// 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
+// decides only what a view may: which levels are open, what each row is and commits, what each level
+// measures, and the words. The layout is the component's.
+//
+// THE LEVELS follow the ladder: countries → a country's city × provider COHORTS → a cohort's nodes.
+// Which level is on screen is READ FROM THE STORE — the drilled country and the committed cohort —
+// so a click on the land in the scene, a row here and a card on the right rail all land the same
+// level (rule 2, through `applyClickActions`). A crumb click releases every rung finer than it.
+//
+// A node in Geography NEVER commits its network (2026-09-26, `f1fadc1`): a geo node is a place
+// first. The rows' figures follow the committed filter's lens — under a network the list is that
+// network's nodes, and the bars wear the filter's accent since a place has no hue of its own.
+//
+// Rule 9: every row previews on its subject's own channel (`hoverCountry` for a country, `hoverGroup`
+// + `hoverCohort` for a cohort, `hoverNodeId` for a node), and none commits.
+
 export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: boolean } = {}) {
   const lb = useStore((s) => s.leaderboard);
   const country = useStore((s) => s.country);
-  const cohort = useStore((s) => s.cohort); // read-only — the selection WRITE still goes through applyClickActions
+  const cohort = useStore((s) => s.cohort);
   const selNodes = useStore((s) => s.selNodes);
   const inspect = useStore((s) => s.inspect);
+  const filter = useStore((s) => s.filter);
+  const geoMeasure = useStore((s) => s.geoMeasure);
+  const setGeoMeasure = useStore((s) => s.setGeoMeasure);
   const setHoverNodeId = useStore((s) => s.setHoverNodeId);
   const setHoverCountry = useStore((s) => s.setHoverCountry);
   const setHoverCohort = useStore((s) => s.setHoverCohort);
@@ -39,53 +56,33 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
   const hoverGroup = useStore((s) => s.hoverGroup);
   const setHoverGroup = useStore((s) => s.setHoverGroup);
   const hoverNodeId = useStore((s) => s.hoverNodeId);
-  const filter = useStore((s) => s.filter);
-  const geoMeasure = useStore((s) => s.geoMeasure);
-  const setGeoMeasure = useStore((s) => s.setGeoMeasure);
-  // Which rung currently holds the focus — the committed rows COARSER than it wear the
-  // ancestor strength of the selection mark (see components/useLadderFocus.ts).
-  const focus = useLadderFocus();
+  // The cohort level's own measure — a level remembers its pick; this one is the card's, not the
+  // app's, so it lives here rather than in the store.
+  const [cohortPick, setCohortPick] = useState<CohortMeasure>("nodes");
 
-  // Row selections run the SAME tested decision table as the scene clicks (domain/pickActions)
-  // through the SAME executor (store/applyClickActions), so the explorer and the globe can
-  // never drift in semantics (filter-first / node's-country / inspect-last ordering, the
-  // row's re-click deselect, the zoom-level rule).
-  // `selected` = this row is the currently-inspected node — re-clicking it DESELECTS (the same
-  // step-back as the node card's ×, user: one toggle language everywhere).
+  // The selected node, matched by IP AND layer: one machine can sit in both the l0 and l1
+  // clusters (same IP, two rows), so IP alone highlighted both.
+  const sel = inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode") ? inspect : null;
+  const selIp = sel?.node?.ip ?? null;
+  const selLayer = sel ? (sel.kind === "metanode" ? sel.node?.layer ?? null : sel.kind) : null;
+  const nodeOn = (r: NodeRow) => selIp != null && r.layer === selLayer && "node" in r.pick && r.pick.node?.ip === selIp;
+
+  // The writes — the same tested tables the scene clicks run, through the one executor.
+  const drill = (cc: string) => applyClickActions(countryToggleActions(cc, { country, hasInspect: !!sel, cohort }));
+  const commitCohort = (target: CohortSel) => applyClickActions(cohortToggleActions(target, { cohort, hasInspect: !!sel }));
   const selectNode = (pick: NodeRow["pick"], selected: boolean) =>
     applyClickActions(nodeSelectActions(pick, { mode: "geo", currentFilter: filter, deselect: selected }));
 
   const list = lb?.countries ?? [];
-
-  // Quiet-empty: a real metagraph is selected but has 0 locatable nodes, so the country list
-  // (the leaderboard's `countries`, what this accordion renders) is empty — nothing to browse,
-  // but the metagraph is real and still visible in the Hypergraph. "all"/"dag" never hit this
-  // (the whole network / DAG core always has locatable validators).
   const isMetaFilter = filter !== "all" && filter !== "dag";
   const quietEmpty = isMetaFilter && list.length === 0;
-  // The magnitude bar is a distribution leaderboard cue: structural cyan for the whole network /
-  // DAG, but when a single metagraph is filtered the list is ITS nodes, so the bar tints to that
-  // metagraph's identity hue (HUD lane).
-  const barHue = filter !== "all" ? filterAccent(filter) : undefined;
+  const accent = filterAccent(filter);
   const activeCfg = metagraphById(filter);
   const tickerOrName = activeCfg ? activeCfg.ticker || activeCfg.name : "This metagraph";
-  // Click a country: drill the globe into it (store.country) — the drill state doubles as the
-  // accordion's "which row is open", so the globe and the list stay one source of truth. Same
-  // tested table as the scene's empty-click country toggle (zoom-level rule included).
-  const drill = (cc: string) =>
-    applyClickActions(countryToggleActions(cc, { country, hasInspect: !!sel, cohort }));
 
-  // Click a cohort row: commit/clear the city×provider zoom-level rung — same
-  // disclosure-AND-commit-in-one-click idiom as the country row (`drill`), through the same
-  // tested table/executor. `target` carries the enclosing country row's `cc`.
-  const commitCohort = (target: CohortSel) =>
-    applyClickActions(cohortToggleActions(target, { cohort, hasInspect: !!sel }));
-
-  // Selection's nodes grouped by country **name** — the join key both the leaderboard and the
-  // node list derive from `geo.country` (`cc` can be absent, the name can't). Each country's
-  // rows sort ALPHABETICALLY by their displayed primary (the city; the label fallback for
-  // city-less rows), locale-aware, with the node id as a stable tiebreaker so co-located
-  // nodes (same city) keep one deterministic order across refreshes.
+  // The selection's nodes grouped by country NAME — the join key both the leaderboard and the node
+  // list derive from `geo.country` (`cc` can be absent, the name can't); sorted alphabetically by
+  // the displayed primary with the id as the tiebreak, so co-located nodes keep one order.
   const nodesByCountry = useMemo(() => {
     const m = new Map<string, NodeRow[]>();
     for (const r of selNodes) {
@@ -101,330 +98,179 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
     return m;
   }, [selNodes]);
 
-  // THE ROWS' FIGURE IS THE STEPPER'S MEASURE (user, 2026-09-26): nodes (the leaderboard's own
-  // count, the figure of record), distinct metagraphs or distinct providers, each read off the
-  // country's placed rows by `src/data/geoMeasure.ts`. The bar scales to the busiest country BY
-  // THAT MEASURE, and the list re-orders by it — the order is what the eye reads off a sorted
-  // list, so a list sorted by nodes under a providers heading would read as wrong. Ties keep the
-  // leaderboard's node order.
+  // ---- level 0: the countries, measured by the heading's pick ----------------------------------
   const measured = useMemo(() => {
     const valued = list.map((c) => ({ c, v: countryMeasure(geoMeasure, c.count, nodesByCountry.get(c.country) ?? []) }));
+    // Sorted by the measure, node count as the tiebreak: the order is what the eye reads off a
+    // ranked list. A selection never re-orders it.
     valued.sort((a, b) => b.v - a.v || b.c.count - a.c.count);
     return valued;
   }, [list, geoMeasure, nodesByCountry]);
-  const max = Math.max(1, measured[0]?.v ?? 0);
-  const rows = measured;
+  const maxV = Math.max(1, measured[0]?.v ?? 0);
 
-  // COHORT ROWS (user redesign, option C): a country's nodes collapse into one row per
-  // city × provider — so the list repeats nothing (the old rows re-stated the same city
-  // and "ready" dozens of times). A cohort row is a DISCLOSURE: clicking expands its id
-  // rows inline (the pure pickers); everything aggregate already reads on the cohort row
-  // itself. NO status anywhere in the list (user: health belongs to the node CARD + the
-  // future network-health view). NO identity dot either (user, 2026-07-12): network is NOT
-  // in the key — a provider cohort can host many metagraphs, so no single hue can speak for
-  // the row, and splitting per network multiplied groups (the dot went with the split).
+  // ---- the drilled country and its cohorts --------------------------------------------------
+  const drilled = country ? list.find((c) => c.cc === country) ?? null : null;
+  const drilledRows = drilled ? nodesByCountry.get(drilled.country) ?? [] : [];
+  // COHORT ROWS: a country's nodes collapse into one row per city × provider, biggest first.
   type Cohort = { key: string; city: string | null; isp: string | null; rows: NodeRow[] };
-  const cohortsOf = (rows: NodeRow[]): Cohort[] => {
+  const cohorts = useMemo((): Cohort[] => {
     const by = new Map<string, Cohort>();
-    for (const r of rows) {
+    for (const r of drilledRows) {
       const geo = "geo" in r.pick ? r.pick.geo : undefined;
       const city = r.city || null;
       const isp = geo?.isp || null;
       const key = `${city ?? ""}|${isp ?? ""}`;
       (by.get(key) ?? by.set(key, { key, city, isp, rows: [] }).get(key)!).rows.push(r);
     }
-    return [...by.values()].sort(
-      (a, b) =>
-        b.rows.length - a.rows.length ||
-        (a.city ?? "\uffff").localeCompare(b.city ?? "\uffff"),
-    );
-  };
-  // The disclosure state IS the committed cohort (`store.cohort`), the same way hyper's
-  // composition groups are `store.composition` — a cohort row commits AND opens in one click, so
-  // a second source of truth could only disagree with the first. Single-open by construction, and
-  // a node CARRIED into geo (whose ancestry commits its cohort) arrives with its own row already
-  // open instead of a ✓ on a collapsed row nobody expanded.
+    return [...by.values()].sort((a, b) => b.rows.length - a.rows.length || (a.city ?? "￿").localeCompare(b.city ?? "￿"));
+  }, [drilledRows]);
+  const openCohort = drilled && cohort && cohort.cc === drilled.cc ? cohorts.find((ch) => sameCohort(cohort, { cc: drilled.cc, city: ch.city, isp: ch.isp })) ?? null : null;
 
-  // The selected node, matched by IP **and** layer: one machine can sit in both the l0 and
-  // l1 clusters (same IP, two rows), so IP alone highlighted both. `selLayer` is the picked
-  // node's layer (its kind for a validator; its node.layer for a metagraph node).
-  const sel =
-    inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode") ? inspect : null;
-  const selIp = sel?.node?.ip ?? null;
-  const selLayer = sel ? (sel.kind === "metanode" ? sel.node?.layer ?? null : sel.kind) : null;
+  const levels: ExplorerLevelSpec[] = [
+    {
+      key: "countries",
+      crumb: { label: "Countries" },
+      measure: { options: GEO_MEASURE_OPTIONS, value: geoMeasure, onPick: (id) => setGeoMeasure(id as GeoMeasure) },
+      hasFigure: true,
+      // No tags at this level, so the name takes the tag home's room.
+      nameW: 128,
+      // Quiet-empty (a real metagraph with no locatable nodes): one honest message, no rows.
+      empty: quietEmpty ? (
+        <>
+          <span className="block text-body text-foreground">No locatable nodes</span>
+          {tickerOrName} has no nodes we can place on the map right now. It still appears in the Hypergraph.
+        </>
+      ) : undefined,
+      rows: measured.map(({ c, v }) => ({
+        key: c.cc,
+        glyph: <span className="font-mono text-micro text-muted-foreground">{ccMark(c.cc)}</span>,
+        name: c.country,
+        share: v / maxV,
+        hue: accent,
+        figure: v.toLocaleString(),
+        on: c.cc === country,
+        title: `${c.country} · ${c.count} node${c.count === 1 ? "" : "s"}`,
+        onClick: () => drill(c.cc),
+        // The country's border on the globe previews while the row is hovered, and the scene's
+        // own country hover washes this row — one channel, the filter's accent.
+        pair: subjectPairing(hoverCountry, c.cc, setHoverCountry, accent),
+      })),
+    },
+  ];
+
+  if (drilled) {
+    const maxRows = Math.max(1, ...cohorts.map((ch) => cohortMeasure(cohortPick, ch.rows)));
+    levels.push({
+      key: "cohorts",
+      crumb: {
+        label: (
+          <>
+            <span className="font-mono text-micro text-muted-foreground">{ccMark(drilled.cc)}</span>
+            {drilled.country}
+          </>
+        ),
+        onRelease: () => (openCohort ? commitCohort({ cc: drilled.cc, city: openCohort.city, isp: openCohort.isp }) : undefined),
+      },
+      axis: "By city · provider",
+      meaning: "Where the nodes sit, and who hosts them",
+      measure: { options: COHORT_MEASURE_OPTIONS, value: cohortPick, onPick: (id) => setCohortPick(id as CohortMeasure) },
+      hasFigure: true,
+      nameW: 76,
+      empty: "No locatable nodes here yet.",
+      rows: cohorts.map((ch) => {
+        const v = cohortMeasure(cohortPick, ch.rows);
+        const on = sameCohort(cohort, { cc: drilled.cc, city: ch.city, isp: ch.isp });
+        const key = `${drilled.cc}|${ch.city}|${ch.isp}`;
+        const pair = subjectPairing(hoverGroup, key, setHoverGroup, accent);
+        return {
+          key: ch.key,
+          name: ch.city ?? "Unlocated",
+          tag: ch.isp ?? undefined,
+          share: v / maxRows,
+          hue: accent,
+          figure: v.toLocaleString(),
+          on,
+          title: `${ch.city ?? "Unlocated"}${ch.isp ? ` · ${ch.isp}` : ""} · ${ch.rows.length} node${ch.rows.length === 1 ? "" : "s"}`,
+          // A cohort of ONE is its node: the click selects the node outright (full ancestry
+          // commits the cohort with it), so the reader never opens a list of one.
+          onClick: () => {
+            if (ch.rows.length === 1) {
+              const r = ch.rows[0]!;
+              selectNode(r.pick, nodeOn(r) && on);
+            } else {
+              commitCohort({ cc: drilled.cc, city: ch.city, isp: ch.isp });
+            }
+          },
+          pair: {
+            ...pair,
+            onMouseEnter: () => {
+              pair.onMouseEnter();
+              setHoverCohort(ch.rows.map((r) => hoverKeyOf(r.pick)).filter((k): k is string => !!k));
+              setHoverCountry(drilled.cc);
+            },
+            onMouseLeave: () => {
+              pair.onMouseLeave();
+              setHoverCohort(null);
+              setHoverCountry(null);
+            },
+          },
+        };
+      }),
+    });
+  }
+
+  if (drilled && openCohort) {
+    levels.push({
+      key: "nodes",
+      crumb: { label: `${openCohort.city ?? "Unlocated"}${openCohort.isp ? ` · ${openCohort.isp}` : ""}` },
+      axis: "By node",
+      meaning: "Each machine in this cohort",
+      measure: null,
+      hasFigure: false,
+      rows: openCohort.rows.map((r, i) => {
+        const on = nodeOn(r);
+        const id = r.id ?? r.label;
+        const netId = r.pick.kind === "metanode" && r.pick.meta ? r.pick.meta.id : "dag";
+        const hue = identityHudCss(netId);
+        const ticker = metagraphById(netId)?.ticker ?? (netId === "dag" ? "DAG" : netId);
+        return {
+          key: id + i,
+          name: midHash(id, 22),
+          nameMono: true,
+          // A cohort mixes networks, so the tag names the node's: its dot and ticker, then its state.
+          tag: (
+            <>
+              <IdentityDot hue={hue} />
+              {ticker}
+              {r.state ? ` · ${r.state.charAt(0).toUpperCase() + r.state.slice(1)}` : ""}
+            </>
+          ),
+          on,
+          hue,
+          title: `${id} · ${ticker}${r.state ? ` · ${r.state}` : ""}`,
+          onClick: () => selectNode(r.pick, on),
+          pair: subjectPairing(hoverNodeId, hoverKeyOf(r.pick), setHoverNodeId, hue),
+        };
+      }),
+    });
+  }
 
   return (
-    // The shell owns the Card frame, CardHead, collapse state, and the padded body (flex-none +
-    // no inner list overflow: the card grows with its content and the RAIL scrolls — runway +
-    // fade — the old inner-scroll flex card capped the node list in a cramped scrollbox whose
-    // tail was easy to miss, user; rail scrolling matches the tablet sheet). GeoExplore is the
-    // shell's REFERENCE look, so this render is byte-identical to the pre-extraction JSX modulo
-    // the chrome that moved into ExplorerShell.
-    <ExplorerShell
-      defaultCollapsed={defaultCollapsed}
+    <Explorer
       id="geoexplore"
       title="Country breakdown"
-      hint={
-        // The footprint's headline figures (Nodes / Countries / Ready) live in the top-bar
-        // vitals now; this card is purely the country→nodes accordion. The usage hint LEADS
-        // the card (user, 2026-07-12 — a bottom hint read as an afterthought) and says what
-        // the card holds, not just the click. Quiet-empty has nothing to browse — no hint.
-        //
-        // ⚠️ ONE HINT SHAPE ACROSS ALL THREE EXPLORERS (user, 2026-08-12): what the card holds,
-        // then "open one to <what the next level down is about>". Geo was the odd one out — it
-        // named its rows but not what opening one gets you, so the card said less than hyper's
-        // and the ledger's about the same gesture.
-        //
-        // ⚠️ NO ORDERING CLAUSE, AND NO INVENTORY OF THE CHILD ROWS (user, 2026-08-12, same
-        // sweep): "busiest first" described what the eye already reads off a sorted list, and
-        // listing what a country opens onto (cities, providers) spent the sentence on a
-        // breakdown the row itself shows a click later. The second half names the ASPECT the
-        // drill is about — here, location — which stays true as the rows underneath change.
-        quietEmpty
-          ? null
-          : "Every country hosting nodes. Open one to explore where its nodes sit."
-      }
-    >
-      {quietEmpty ? (
-        // Quiet-empty, in the standard LEFT-ALIGNED card/hint typography (the old centered
-        // block — plus a stray absolutely-positioned standby dot that escaped its unsized
-        // wrapper — read as a bolt-on). One message, no jump link (user refinement: the "See
-        // it in the Hypergraph →" link was removed — the explanation already says where the
-        // metagraph still appears).
-        <>
-          <p className="text-body text-foreground m-0 mb-1">No locatable nodes</p>
-          <p className="text-label text-muted-foreground m-0">{tickerOrName} has no nodes we can place on the map right now. It still appears in the Hypergraph.</p>
-        </>
-      ) : (
-        <>
-          {/* ── WHAT THE ROWS COUNT: the measure stepper, the History and Snapshots cards' own
-              control, walking nodes → metagraphs → providers. A SETTING: it writes its setter. */}
-          <div className="flex items-center mb-1.5">
-            <MeasureStepper
-              word={GEO_MEASURE_LABELS[geoMeasure]}
-              prev={(() => { const p = stepGeoMeasure(geoMeasure, -1); return p ? GEO_MEASURE_LABELS[p] : null; })()}
-              next={(() => { const n = stepGeoMeasure(geoMeasure, 1); return n ? GEO_MEASURE_LABELS[n] : null; })()}
-              onStep={(dir) => {
-                const next = stepGeoMeasure(geoMeasure, dir);
-                if (next) setGeoMeasure(next);
-              }}
-            />
-          </div>
-          {rows.map(({ c, v }) => {
-            const open = c.cc === country;
-            const nodes = nodesByCountry.get(c.country) ?? [];
-            // Captured for the cohort rows nested below — their own map's `c` shadows this one.
-            const cc = c.cc;
-            // The open group's wash box gets the SAME ±6px outset as the country button
-            // (px-1.5 -mx-1.5), so the drilled row's hover/selection box and the dropdown group
-            // behind it share edges — the button used to overhang the wash by 6px on both sides
-            // (user: "nodes dropdown not aligned with the parent").
-            // Bidirectional pairing: hovering the row previews the country's border on the
-            // globe, and hovering the COUNTRY IN THE SCENE washes this row (same channel,
-            // same .subject-paired language as the node rows). The hue follows the committed
-            // filter — a place carries no identity of its own, so on "all" this IS structural
-            // cyan; with a network committed the country's numbers are that network's, and
-            // both ends of the pairing (this row and the country card's edge) must light in
-            // the same hue.
-            const pair = subjectPairing(hoverCountry, c.cc, setHoverCountry, filterAccent(filter));
-            return (
-              // Controlled by the STORE (`open` is the drilled country), so `onOpenChange` runs
-              // the same `drill` the click always did — rule 2's one write path is untouched.
-              <Collapsible
-                key={c.cc}
-                open={open}
-                onOpenChange={() => drill(c.cc)}
-                className={cn(open && "bg-wash-faint rounded-btn my-0.5 -mx-1.5 px-1.5")}
-              >
-                <CollapsibleTrigger
-                  className={cn(
-                    // ROW_OUTSET (not w-full): with w-full the right -mx-1.5 was ignored
-                    // (overconstrained box) and the row ended 6px SHORT of the column; the calc width
-                    // bakes both 6px outsets in, so the row box spans the open group's wash box
-                    // edge-to-edge (buttons shrink-to-fit, so an auto width is not an option).
-                    "nb-row group flex items-center gap-2.5 text-left text-body border border-transparent bg-transparent cursor-pointer py-[5px] rounded-sm transition-[background] duration-150",
-                    ROW_OUTSET,
-                    "hover:bg-wash-hover",
-                    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-                    // The drilled country row wears the same shared selection language as the
-                    // picker's committed row — no ✓ though: an open accordion's state cue is its
-                    // ▾ chevron, not a selection check. At ANCESTOR strength once a finer rung
-                    // (a provider cohort, a node) is committed, so the list keeps one head.
-                    open && selectedRow(focus === "country"),
-                    pair.paired && pair.className,
-                  )}
-                  // The selection follows the subject's identity (selection.tsx · selectionHue):
-                  // a country has none of its own, so this is the committed FILTER's hue — under
-                  // a metagraph filter the row's numbers are that network's, exactly like the
-                  // count bar (barHue) beside it; on "all" barHue is undefined and both the wash
-                  // and the ✓ fall through to structural cyan (identity never gets invented).
-                  style={{ ...(open ? selectionHue(barHue) : undefined), ...pair.style }}
-                  onMouseEnter={pair.onMouseEnter}
-      onMouseMove={pair.onMouseMove}
-                  onMouseLeave={pair.onMouseLeave}
-                  onFocus={pair.onFocus}
-                  onBlur={pair.onBlur}
-                >
-                  <span className="w-[17px] text-center flex-none font-mono text-micro text-muted-foreground">{ccMark(c.cc)}</span>
-                  <span className="flex-none w-24 text-body text-foreground-dim whitespace-nowrap overflow-hidden text-ellipsis" title={c.country}>
-                    {c.country}
-                  </span>
-                  <span className="flex-1 h-[7px] rounded-xs bg-white/[0.06] overflow-hidden">
-                    <span
-                      className="block h-full rounded-xs"
-                      style={{
-                        width: `${Math.round((v / max) * 100)}%`,
-                        // ONE colour, both cases: the filtered bar is already flat barHue, and the
-                        // "all" bar is the list's own identity — structural cyan. The old
-                        // --core→--primary gradient was designed on dark, where the two are
-                        // neighbours; on paper --primary reads teal-green against --core's blue
-                        // and the bar split into two colours (user, 2026-08-30).
-                        background: barHue ?? "var(--primary)",
-                        boxShadow: `0 0 6px color-mix(in oklch, ${barHue ?? "var(--primary)"} 40%, transparent)`,
-                      }}
-                    />
-                  </span>
-                  {/* Mono: a count is machine data (`/design`'s sans/mono split) — see HyperExplore's note. */}
-                  <span className="flex-none w-[26px] text-right font-mono text-body tabular-nums font-semibold">{v}</span>
-                  {/* Trailing slot: the drilled country shows the shared selection ✓ (same mark
-                    as the node rows / filter picker — one selection language, user); closed rows
-                    keep the expand-affordance chevron — hidden on a mouse (revealed on row hover/
-                    focus, keeps the list clean) but ALWAYS shown on touch (`@media (hover:none)`)
-                    where there's no hover. Both occupy the same flex-none slot, so the count
-                    column never shifts. */}
-                {open ? (
-                  <SelectedRowMark className="flex-none" muted={focus !== "country"} hue={barHue} />
-                ) : (
-                  <DisclosureChevron open={open} />
-                )}
-                </CollapsibleTrigger>
-
-                <CollapsibleContent className="disclose-panel">
-                  {/* Leaving the node list clears the globe hover-glow — by mouse or by keyboard
-                      (onBlur bubbles like focusout; row-to-row moves re-set the channel right after). */}
-                  <div
-                    className={cn("mb-1.5 ml-[9px] py-0.5 pl-3", ROW_NEST)}
-                    onMouseLeave={() => {
-                      setHoverNodeId(null);
-                      setHoverCountry(null);
-                      setHoverGroup(null);
-                    }}
-                    onBlur={() => {
-                      setHoverNodeId(null);
-                      setHoverCountry(null);
-                      setHoverGroup(null);
-                    }}
-                  >
-                    {nodes.length === 0 ? (
-                      <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">No locatable nodes here yet.</p>
-                    ) : (
-                      <>
-                      {/* Depth caption (user, 2026-08-16): this depth's one new concept — the
-                          country's machines grouped into provider COHORTS. */}
-                      <DepthCaption>Nodes by city · provider</DepthCaption>
-                      {cohortsOf(nodes).map((ch) => {
-                        const holdsSel =
-                          selIp != null &&
-                          ch.rows.some(
-                            (r) => r.layer === selLayer && "node" in r.pick && r.pick.node?.ip === selIp,
-                          );
-                        // Committed cohort: this row IS the cc/city/isp rung applyClickActions
-                        // wrote via the shared table — wins the ✓/SELECTED_ROW over `holdsSel`,
-                        // and IS the disclosure.
-                        const on = sameCohort(cohort, { cc, city: ch.city, isp: ch.isp });
-                        const isOpen = on;
-                        return (
-                            /* The cohort row: one line per city × provider — the honeycomb
-                                as a list row. A DISCLOSURE AND a COMMIT in one click (the
-                                country-row idiom): it opens/closes its id rows AND commits/
-                                clears the cohort zoom-level rung through the same tested
-                                table (`cohortToggleActions`) the scene click and the node's
-                                full-ancestry commit use. */
-                            <Disclosure
-                              key={ch.key}
-                              open={isOpen}
-                              onToggle={() => {
-                                if (ch.rows.length === 1) {
-                                  // A single-node cohort has no further choice — expand AND
-                                  // select its one node in one click; the node's full-ancestry
-                                  // commit (nodeSelectActions) already commits this cohort, so
-                                  // don't ALSO commitCohort here (a double toggle would clear it).
-                                  const r = ch.rows[0];
-                                  const nodeOn =
-                                    selIp != null && r.layer === selLayer && "node" in r.pick && r.pick.node?.ip === selIp;
-                                  selectNode(r.pick, nodeOn && isOpen);
-                                } else {
-                                  commitCohort({ cc, city: ch.city, isp: ch.isp });
-                                }
-                              }}
-                            >
-                            <DisclosureRow
-                              open={isOpen}
-                              on={on}
-                              focused={focus === "cohort"}
-                              holdsSel={holdsSel}
-                              title={`${ch.city ?? "Unlocated"}${ch.isp ? ` · ${ch.isp}` : ""} · ${ch.rows.length} node${ch.rows.length > 1 ? "s" : ""}`}
-                              onHoverEnter={() => {
-                                setHoverCohort(ch.rows.map((r) => hoverKeyOf(r.pick)).filter((k): k is string => !!k));
-                                setHoverCountry(ch.rows[0] && "geo" in ch.rows[0].pick ? ch.rows[0].pick.geo?.cc ?? null : null);
-                              }}
-                              // Clean up BOTH previews this row raised — the border must not
-                              // outlive the cohort hover (moving down into the row's own node
-                              // list would otherwise leave the country lit under a node hover,
-                              // user 2026-08-02: a node hover is the node's signal alone).
-                              onHoverLeave={() => {
-                                setHoverCohort(null);
-                                setHoverCountry(null);
-                              }}
-                              // The provider card's own subject key (`CohortSel` = cc|city|isp),
-                              // so hovering either end lights the other — the cohort row's list
-                              // key is country-SCOPED and can't serve as the shared identity.
-                              // The hue follows the committed filter like its sibling country
-                              // row (cyan on "all"): no single identity hue can speak for a
-                              // cohort — a provider hosts many networks.
-                              groupKey={`${cc}|${ch.city}|${ch.isp}`}
-                              hoverGroup={hoverGroup}
-                              setHoverGroup={setHoverGroup}
-                              hue={filterAccent(filter)}
-                            >
-                              <span className="flex-none text-body whitespace-nowrap">{ch.city ?? "Unlocated"}</span>
-                              {ch.isp && (
-                                <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-label text-muted-foreground">
-                                  {ch.isp}
-                                </span>
-                              )}
-                              <span className="ml-auto flex-none font-mono tabular-nums text-body font-semibold">{ch.rows.length}</span>
-                            </DisclosureRow>
-
-                            <DisclosurePanel className={ROW_NEST_DEEP}>
-                                {ch.rows.map((r, i) => {
-                                  const nodeOn =
-                                    selIp != null && r.layer === selLayer &&
-                                    "node" in r.pick && r.pick.node?.ip === selIp;
-                                  return (
-                                    <NodePickerRow
-                                      key={(r.id ?? r.label) + i}
-                                      row={r}
-                                      selected={nodeOn}
-                                      hoverNodeId={hoverNodeId}
-                                      setHoverNodeId={setHoverNodeId}
-                                      onSelect={() => selectNode(r.pick, nodeOn)}
-                                    />
-                                  );
-                                })}
-                            </DisclosurePanel>
-                            </Disclosure>
-                        );
-                      })}
-                      </>
-                    )}
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-            );
-          })}
-        </>
-      )}
-    </ExplorerShell>
+      hint={quietEmpty ? null : "Every country hosting nodes. Open one to explore where its nodes sit."}
+      // The scope dot releases the FILTER (the top bar's own toggle rule) — the drill and the cohort
+      // are the reader's place and stay.
+      scope={filter !== "all" ? { hue: identityHudCss(filter), label: activeCfg?.name ?? (filter === "dag" ? "DAG" : filter), onRelease: () => applyClickActions(filterToggleActions(filter, filter)) } : null}
+      levels={levels}
+      defaultCollapsed={defaultCollapsed}
+      onLeave={() => {
+        setHoverNodeId(null);
+        setHoverCountry(null);
+        setHoverGroup(null);
+        setHoverCohort(null);
+      }}
+    />
   );
 }

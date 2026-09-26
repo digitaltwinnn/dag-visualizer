@@ -27,6 +27,25 @@ export const GEO_MEASURE_LABELS: Readonly<Record<GeoMeasure, string>> = {
   providers: "Providers",
 };
 
+/** The heading control's list — each measure with the unit its figure is in. */
+export const GEO_MEASURE_OPTIONS: readonly { id: GeoMeasure; label: string; unit: string }[] = GEO_MEASURE_ORDER.map((id) => ({
+  id,
+  label: GEO_MEASURE_LABELS[id],
+  unit: "count",
+}));
+
+/** A COHORT's measures — the second level of the Geography explorer (design 2026-09-26: each
+ *  level has its own measures). A city × provider cohort counts its nodes, or the distinct
+ *  networks they serve; there is no third: every node in a cohort shares one provider. */
+export type CohortMeasure = "nodes" | "metagraphs";
+export const COHORT_MEASURE_OPTIONS: readonly { id: CohortMeasure; label: string; unit: string }[] = [
+  { id: "nodes", label: "Nodes", unit: "count" },
+  { id: "metagraphs", label: "Metagraphs", unit: "count" },
+];
+export function cohortMeasure(m: CohortMeasure, rows: readonly Pick<NodeRow, "pick">[]): number {
+  return m === "nodes" ? rows.length : countryMeasure("metagraphs", rows.length, rows);
+}
+
 /** The neighbour in the order, or null at an end — the stepper dims that chevron. */
 export function stepGeoMeasure(m: GeoMeasure, dir: -1 | 1): GeoMeasure | null {
   const i = GEO_MEASURE_ORDER.indexOf(m);
