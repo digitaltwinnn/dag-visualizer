@@ -14,6 +14,7 @@ import type { NodeRow } from "@/src/data/types";
 import { compositionToggleActions, filterToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
 import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
+import { displayNetwork } from "@/src/data/unlisted";
 import { useStore } from "@/src/store/store";
 import { midHash } from "@/src/util/format";
 
@@ -199,7 +200,7 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
       id="hyperexplore"
       title="Network breakdown"
       hint="Every network on the hypergraph. Open one for the roles its nodes play."
-      scope={netHue ? { hue: netHue, label: netName, onRelease: () => toggleNetwork(filter) } : null}
+      scope={netHue ? { hue: netHue, ticker: displayNetwork(filter)?.ticker ?? netName, label: netName, onRelease: () => toggleNetwork(filter) } : null}
       levels={levels}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => {

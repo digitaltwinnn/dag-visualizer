@@ -6,7 +6,7 @@ import ExplorerShell from "@/components/ExplorerShell";
 import ExplorerHeading, { type MeasureControl } from "@/components/explorer/ExplorerHeading";
 import ExplorerPath, { type Crumb } from "@/components/explorer/ExplorerPath";
 import ExplorerRow from "@/components/explorer/ExplorerRow";
-import ScopeDot from "@/components/explorer/ScopeDot";
+import ScopeMark from "@/components/explorer/ScopeMark";
 
 // THE EXPLORER — one component, four views (design session 2026-09-26; the agreed screens and
 // their README live in `docs/superpowers/design/2026-09-26-explorer-card/`). Every view's explorer
@@ -16,7 +16,7 @@ import ScopeDot from "@/components/explorer/ScopeDot";
 // is the one on screen and the ones before it are the crumbs above it. From that one structure this
 // component renders, in order:
 //
-//   the shell     · title, hint, the committed scope as a hue dot in the head (`ScopeDot`)
+//   the shell     · title, hint, the committed scope as its ticker in the head (`ScopeMark`)
 //   the heading   · the hairline row: the view's one setting, then the figure column's heading —
 //                   a control when the level has several measures, a label when one, nothing
 //                   when none (`ExplorerHeading`)
@@ -93,8 +93,8 @@ export interface ExplorerProps {
   id: string;
   title: string;
   hint: ReactNode | null;
-  /** The committed network's hue and name, with the release, for the head's dot. */
-  scope?: { hue: string; label: string; onRelease: () => void } | null;
+  /** The committed network's hue, ticker and name, with the release, for the head's mark. */
+  scope?: { hue: string; ticker: string; label: string; onRelease: () => void } | null;
   /** The open levels, root first; the last is on screen. */
   levels: readonly ExplorerLevelSpec[];
   onLeave?: () => void;
@@ -127,7 +127,7 @@ export default function Explorer({ id, title, hint, scope, levels, onLeave, defa
       id={id}
       title={title}
       hint={hint}
-      scope={scope ? <ScopeDot hue={scope.hue} label={scope.label} onRelease={scope.onRelease} /> : undefined}
+      scope={scope ? <ScopeMark hue={scope.hue} ticker={scope.ticker} label={scope.label} onRelease={scope.onRelease} /> : undefined}
       onLeave={onLeave}
       defaultCollapsed={defaultCollapsed}
     >

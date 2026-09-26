@@ -94,3 +94,6 @@ Recorded deviations from the screens:
   that seal snapshots…" was "very redundant", and a separate row for it did not read as part of
   the breadcrumb). Decision 7's ONE clause of meaning survives as the path's own caption, snug
   under the crumbs inside the nav; the axis eyebrow is gone.
+- **The scope mark is the TICKER, not a dot** (user, same day, after the build: "instead of a
+  colored pill use the ticker"). Decision 2's dot read as one more pill beside the path's; the
+  ticker in the network's hue is the dossier head's own mark, with the × beside it on hover.

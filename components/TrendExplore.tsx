@@ -169,7 +169,7 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
       hint={empty ? null : "Every network's own chart, busiest first. Pick one to bring its plane to the front."}
       // The committed scope as the head's dot (design decision 1: the "X only ×" chip this card
       // wore is gone); its × releases the filter through the top bar's own toggle rule.
-      scope={filter !== "all" ? { hue: identityHudCss(filter), label: scopeCfg?.name ?? (filter === "dag" ? "DAG" : filter), onRelease: () => applyClickActions(filterToggleActions(filter, filter)) } : null}
+      scope={filter !== "all" ? { hue: identityHudCss(filter), ticker: scopeCfg?.ticker || scopeCfg?.name || filter.toUpperCase(), label: scopeCfg?.name ?? (filter === "dag" ? "DAG" : filter), onRelease: () => applyClickActions(filterToggleActions(filter, filter)) } : null}
       levels={[level]}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => setHover(null)}

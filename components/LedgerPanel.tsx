@@ -556,7 +556,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
       id="ledger-view"
       title="Snapshot breakdown"
       hint="Recent global snapshots. Open one for the networks that anchored into it."
-      scope={scopeNet ? { hue: scopeNet.hue, label: scopeNet.name, onRelease: () => applyClickActions(filterToggleActions(filter, filter)) } : null}
+      scope={scopeNet ? { hue: scopeNet.hue, ticker: scopeNet.ticker, label: scopeNet.name, onRelease: () => applyClickActions(filterToggleActions(filter, filter)) } : null}
       levels={levels}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => {

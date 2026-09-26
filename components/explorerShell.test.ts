@@ -36,7 +36,7 @@ describe("explorer boundary (every tool card is a description handed to the one 
         continue;
       }
       if (!src.includes("<Explorer\n") && !src.includes("<Explorer ")) bad.push(`${name}: must render <Explorer`);
-      for (const forbidden of ["<ExplorerShell", "<ExplorerRow", "<ExplorerHeading", "<ExplorerPath", "<ExplorerLevel", "<ScopeDot"]) {
+      for (const forbidden of ["<ExplorerShell", "<ExplorerRow", "<ExplorerHeading", "<ExplorerPath", "<ExplorerLevel", "<ScopeMark"]) {
         if (src.includes(forbidden)) bad.push(`${name}: renders ${forbidden} itself — that is Explorer.tsx's job`);
       }
     }
