@@ -45,9 +45,17 @@ export function stepHyperMeasure(m: HyperMeasure, dir: -1 | 1): HyperMeasure | n
  *  among its placed rows. `rows` are the network's own placed rows (the caller groups
  *  `allNodes` by network with `geoMeasure.networkOfRow`). */
 export function networkMeasure(m: HyperMeasure, net: Pick<MetaInfo, "nodes">, rows: readonly Pick<NodeRow, "pick" | "cc" | "country">[]): number {
+  return m === "nodes" ? net.nodes.length : groupMeasure(m, rows);
+}
+
+/** The figure a COMPOSITION row shows for `m` — the same three measures over the group's own
+ *  rows, so the pick made at the network level carries down (user, 2026-09-26: "we select
+ *  countries but when we select a composition it starts showing nodes again"). A group's nodes
+ *  are its rows, so `nodes` is their count. */
+export function groupMeasure(m: HyperMeasure, rows: readonly Pick<NodeRow, "pick" | "cc" | "country">[]): number {
   switch (m) {
     case "nodes":
-      return net.nodes.length;
+      return rows.length;
     case "countries": {
       const s = new Set<string>();
       for (const r of rows) { const k = r.cc || r.country; if (k) s.add(k); }

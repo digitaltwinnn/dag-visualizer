@@ -4,6 +4,7 @@ import {
   HYPER_MEASURE_LABELS,
   HYPER_MEASURE_OPTIONS,
   HYPER_MEASURE_ORDER,
+  groupMeasure,
   networkMeasure,
   stepHyperMeasure,
   type HyperMeasure,
@@ -54,5 +55,18 @@ describe("networkMeasure", () => {
   it("providers counts distinct hosts and skips rows without one", () => {
     expect(networkMeasure("providers", net(19), rows)).toBe(2); // Hetzner, OVH
     expect(networkMeasure("providers", net(3), [])).toBe(0);
+  });
+});
+
+describe("groupMeasure — a composition row's figure, the network level's pick carried down", () => {
+  it("counts the group's rows for nodes and distinct places / providers otherwise", () => {
+    const rows = [
+      { pick: { kind: "metanode", geo: { isp: "Hetzner" } }, cc: "DE", country: "Germany" },
+      { pick: { kind: "metanode", geo: { isp: "Hetzner" } }, cc: "DE", country: "Germany" },
+      { pick: { kind: "metanode", geo: { isp: "OVH" } }, cc: "FR", country: "France" },
+    ] as unknown as Parameters<typeof groupMeasure>[1];
+    expect(groupMeasure("nodes", rows)).toBe(3);
+    expect(groupMeasure("countries", rows)).toBe(2);
+    expect(groupMeasure("providers", rows)).toBe(2);
   });
 });

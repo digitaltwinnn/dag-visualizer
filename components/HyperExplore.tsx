@@ -9,13 +9,12 @@ import { subjectPairing } from "@/components/useSubjectPairing";
 import { compositionClause, compositionGroups } from "@/src/data/composition";
 import { networkOfRow } from "@/src/data/geoMeasure";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
-import { HYPER_MEASURE_OPTIONS, networkMeasure, type HyperMeasure } from "@/src/data/hyperMeasure";
+import { HYPER_MEASURE_OPTIONS, groupMeasure, networkMeasure, type HyperMeasure } from "@/src/data/hyperMeasure";
 import { metagraphById } from "@/src/data/network";
 import type { NodeRow } from "@/src/data/types";
 import { compositionToggleActions, filterToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
 import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { displayNetwork } from "@/src/data/unlisted";
 import { useStore } from "@/src/store/store";
 
 // THE HYPERGRAPH'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
@@ -120,7 +119,10 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
   ];
 
   if (filter !== "all") {
-    const maxRows = Math.max(1, ...groups.map((g) => g.rows.length));
+    // The network level's pick CARRIES DOWN (user, 2026-09-26): a composition row shows the same
+    // measure over its own rows, so "Countries" stays "Countries" when you step in.
+    const groupValues = groups.map((g) => groupMeasure(hyperMeasure, g.rows));
+    const maxRows = Math.max(1, ...groupValues);
     levels.push({
       key: "compositions",
       crumb: {
@@ -133,22 +135,23 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
         onRelease: () => (openGroup ? toggleComposition(openGroup.key) : undefined),
       },
       meaning: "Which layers each node runs",
-      measure: { label: "Nodes" },
+      measure: { options: HYPER_MEASURE_OPTIONS, value: hyperMeasure, onPick: (id) => setHyperMeasure(id as HyperMeasure) },
       hasFigure: true,
       nameW: 52,
       // Honest instrument state — mirrors the 3D: a metagraph with no reported nodes renders a
       // hub and nothing else.
       empty: "No nodes reported.",
-      rows: groups.map((g) => {
+      rows: groups.map((g, i) => {
         const key = `${filter}|${g.key}`;
         const pair = subjectPairing(hoverGroup, key, setHoverGroup, netHue!);
+        const v = groupValues[i]!;
         return {
           key: g.key,
           name: g.label,
           tag: <RoleChips codes={g.codes} tight />,
-          share: g.rows.length / maxRows,
+          share: v / maxRows,
           hue: netHue,
-          figure: g.rows.length.toLocaleString(),
+          figure: v.toLocaleString(),
           title: `${g.label} · ${g.rows.length} node${g.rows.length === 1 ? "" : "s"}`,
           onClick: () => toggleComposition(g.key),
           pair: {
@@ -197,7 +200,6 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
       id="hyperexplore"
       title="Network breakdown"
       hint="Every network on the hypergraph. Open one for the roles its nodes play."
-      scope={netHue ? { hue: netHue, ticker: displayNetwork(filter)?.ticker ?? netName, label: netName, onRelease: () => toggleNetwork(filter) } : null}
       levels={levels}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => {
