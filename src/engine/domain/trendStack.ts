@@ -200,6 +200,19 @@ export function fitDistance(freeWidthPx: number, viewHeightPx: number, fovDeg: n
  *  height fired on the desktop pose it was meant to leave alone. */
 export const CARD_FIT_H = 0.36;
 
+/** WHERE A LONE CARD ARRIVES FROM (user, 2026-09-26: "trend view has no animation when we swipe
+ *  the details card left/right — it should be the filter animation, consistent across views").
+ *  A filter commit scopes the stack to ONE card, and the History pose is the same for every
+ *  network, so the camera has nothing to fly and the card simply appeared. Every other view
+ *  answers a filter commit with the structure (the hub flies up, the globe turns, the chamber
+ *  tilts); here the structure's own gesture is the RE-DEAL, a card coming forward — so a card
+ *  that arrives alone starts one slot BACK, at that slot's scale, and eases to the front. Only a
+ *  lone card: a five-card roster refresh starting every card a slot back would be an entrance the
+ *  data never asked for (the projector's own first-seen rule). */
+export function arrivalPose(p: Pick<PlanePose, "z" | "scale">): { z: number; scale: number } {
+  return { z: p.z - PLANE_GAP, scale: p.scale * (1 - SCALE_FALLOFF) };
+}
+
 /** How far the CAMERA closes on the stack while a plane is focused (`focusDepth`, scaled by
  *  `cameraRig.TREND_FOCUS_PUSH`). It was the focused plane's own lift in front of slot 0 until a
  *  focus became a RE-DEAL (user, 2026-09-19) — the focused card takes first place, so there is no

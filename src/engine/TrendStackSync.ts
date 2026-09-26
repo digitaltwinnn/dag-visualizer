@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { PLANE_PX_W, PLANE_WORLD_W, STACK_EASE_K, loneShiftPx, stackPoses } from "./domain/trendStack";
+import { PLANE_PX_W, PLANE_WORLD_W, STACK_EASE_K, arrivalPose, loneShiftPx, stackPoses } from "./domain/trendStack";
 
 // THE TREND STACK'S PER-FRAME PLACEMENT — `CalloutSync`'s sibling, and the second instance of the
 // same mechanism (2026-09-18). React renders one transparent DOM plane per network
@@ -228,7 +228,11 @@ export class TrendStackSync {
       this._order.push(p.id);
       let sl = this._slots.get(p.id);
       if (!sl) {
-        sl = { x: p.x, y: p.y, z: p.z, s: p.scale, tx: 0, ty: 0, tz: 0, ts: 0, el: null, vis: false }; // event-time
+        // A first-seen plane starts AT its target — except a LONE one, which is dealt forward
+        // from one slot back (`arrivalPose`): a filter commit's card, arriving the way the
+        // re-deal moves cards, since the camera has nothing to fly in this view.
+        const from = poses.length === 1 ? arrivalPose(p) : p;
+        sl = { x: p.x, y: p.y, z: from.z, s: from.scale, tx: 0, ty: 0, tz: 0, ts: 0, el: null, vis: false }; // event-time
         this._slots.set(p.id, sl);
       }
       sl.tx = p.x;

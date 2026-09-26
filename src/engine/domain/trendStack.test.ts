@@ -26,6 +26,7 @@ import {
   staggerCentre,
   stackPoses,
   stepX,
+  arrivalPose,
   fitDistance,
   PLANE_FIT,
   CARD_FIT_H,
@@ -543,5 +544,17 @@ describe("fitDistance — the front card spans PLANE_FIT of the free band", () =
   it("PLANE_FIT leaves a gutter: under 1 and above the old tablet share", () => {
     expect(PLANE_FIT).toBeLessThan(1);
     expect(PLANE_FIT).toBeGreaterThan(0.72);
+  });
+});
+
+describe("arrivalPose — a lone card is dealt forward from one slot back", () => {
+  it("starts one PLANE_GAP behind its target at the next slot's scale, x and y untouched by the caller", () => {
+    const front = stackPoses(["only"], { scroll: 0, focus: null })[0]!;
+    const from = arrivalPose(front);
+    expect(from.z).toBeCloseTo(front.z - PLANE_GAP, 9);
+    expect(from.scale).toBeCloseTo(front.scale * (1 - SCALE_FALLOFF), 9);
+    // The same step the deck's own second slot takes — the re-deal's movement, nothing new.
+    const two = stackPoses(["a", "b"], { scroll: 0, focus: null });
+    expect(two[1]!.z - two[0]!.z).toBeCloseTo(from.z - front.z, 9);
   });
 });

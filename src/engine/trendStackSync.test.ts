@@ -304,6 +304,24 @@ describe("TrendStackSync", () => {
     expect(h.els.get("d")!.style.transform, "a newly seen plane must not travel").toBe(dFirst);
   });
 
+  it("deals a LONE first-seen card forward from one slot back — the filter commit's answer in this view", () => {
+    // A filter commit scopes the stack to one card and the camera pose is the same for every
+    // network, so without this the card simply appeared. It starts smaller and further back and
+    // eases to its place; a first-seen card in a fuller roster still starts at its target.
+    const h = fakeHost();
+    const sync = new TrendStackSync(h.host);
+    sync.sync(state({ ids: ["only"] }));
+    const first = scaleOf(h.els.get("only")!.style.transform);
+    for (let i = 0; i < 200; i++) sync.sync(state({ ids: ["only"] }));
+    const settled = scaleOf(h.els.get("only")!.style.transform);
+    expect(first).toBeLessThan(settled);
+    // Swiping to the next network: the previous lone card leaves, the next arrives the same way.
+    sync.sync(state({ ids: ["next"] }));
+    const nextFirst = scaleOf(h.els.get("next")!.style.transform);
+    for (let i = 0; i < 200; i++) sync.sync(state({ ids: ["next"] }));
+    expect(nextFirst).toBeLessThan(scaleOf(h.els.get("next")!.style.transform));
+  });
+
   it("never imports the store as a value", () => {
     // Rule 1: the engine LAYER is the one store bridge, and this module is not it — the Engine reads
     // the slice once per frame and hands it in. `layerBoundaries.test.ts` says the same thing from
