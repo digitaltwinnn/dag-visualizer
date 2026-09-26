@@ -673,11 +673,15 @@ export function ChannelStatePanel() {
                 // (flex-1) instead of huddling at one end. The COUNTS are gone (user: "at first
                 // I didn't realise they were counts") — each lane's own note and table state its
                 // weight one line later, where the numbers have labels.
-                // The cabinet in the wash ladder (user, 2026-09-26 — the Trends document's cabinet took
-                // it first): baseline, active edge and drawer outline are the strong wash, the
-                // active tab and the drawer the faint one, the tab's fill on `--panel-solid` so the
-                // baseline cannot show through where it bridges into the drawer.
-                className="relative flex h-auto flex-none w-full gap-1 rounded-none p-0 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-wash-strong"
+                // ⚠️ THE HAIRLINE REGISTER, NOT THE WASH LADDER (user, 2026-09-26 — this cabinet took the
+                // Trends document's accent plate for an hour and "looks a bit off"). The raw layer is
+                // the RECORDS register: a table whose committed row wears the accent wash, and a
+                // record pane whose ink is hairlines — the search box, the pager, the foot. Here the
+                // wash means COMMITTED, so a drawer-sized accent plate reads as a selected region
+                // competing with the row it belongs to. The document's cabinet keeps the ladder
+                // because it sits among that page's picker groups, which wear it; this one sits
+                // among records.
+                className="relative flex h-auto flex-none w-full gap-1 rounded-none p-0 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50"
                 aria-label="Which part of the snapshot to read"
               >
                 {lanes.map((l) => {
@@ -698,7 +702,7 @@ export function ChannelStatePanel() {
                         "after:hidden focus-visible:ring-0 focus-visible:border-transparent",
                         "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
                         "data-[state=active]:z-[1] data-[state=active]:text-foreground data-[state=active]:shadow-none",
-                        "data-[state=active]:border-wash-strong! data-[state=active]:[background:linear-gradient(var(--wash-faint),var(--wash-faint))_var(--panel-solid)]!",
+                        "data-[state=active]:border-border/50! data-[state=active]:bg-[var(--panel-solid)]!",
                       )}
                     >
                       <LaneIcon aria-hidden className="size-3.5 flex-none" />
@@ -722,7 +726,7 @@ export function ChannelStatePanel() {
                   from the content"), so the active tab visibly opens INTO the bounded panel
                   (its panel-solid fill already bridges the baseline). Same border weight as the
                   tabs' own (border/50); bottom corners pick up the pane radius. */}
-              <div className="min-h-0 flex-1 flex flex-col overflow-hidden border border-t-0 border-wash-strong bg-wash-faint rounded-b-md px-2.5 pt-2 pb-2 max-[700px]:flex-none max-[700px]:overflow-visible">
+              <div className="min-h-0 flex-1 flex flex-col overflow-hidden border border-t-0 border-border/50 rounded-b-md px-2.5 pt-2 pb-2 max-[700px]:flex-none max-[700px]:overflow-visible">
                 {/* ⚠️ EVERY LANE'S PANEL MUST CARRY THE FLEX CHAIN THE PLAIN DIV DID. `TabsContent`
                     inserts a layer between the bordered box and the lane body, so `min-h-0 flex
                     flex-col` has to continue through it — the raw-JSON well below sizes against
