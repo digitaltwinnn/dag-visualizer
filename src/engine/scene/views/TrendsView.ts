@@ -10,6 +10,15 @@
 // plane at — each plane's FOOTPRINT, the shadow it would cast — so the recession is something the
 // eye can follow back instead of something the scale differences have to imply.
 //
+// ⚠️ A RUNG IS A SHADOW, NOT A LINE (user, 2026-09-26: "make the line look more like a nice shadow
+// rather than cyan coloured; it's too distracting and does not present any useful information").
+// It was an accent hairline, and an accent line is a MARK — the eye reads it as a gridline or a
+// reading, and there is nothing to read. So each rung is a soft band hanging from the floor line:
+// a quad billboard `SHADOW_H` tall whose alpha rises over the top `SHADOW_LIP` and decays to
+// nothing at the bottom (`shadowTexture`), in the NEUTRAL ink (`SceneColors.fg`) rather than the
+// accent, with the ends feathered so nothing about it has an edge. Furniture that recedes into the
+// ground it sits on, on both grounds: additive haze on dark, ink on paper.
+//
 // ⚠️ THE TIME CURSOR IS NOT HERE, and that is a decision rather than an omission
 // (2026-09-19). The plan gave this view a WebGL quad spanning the stack's depth at the cursor's
 // instant. With the stagger landed, one quad cannot line up with five differently placed,
@@ -115,7 +124,47 @@ const groundY = (centre: number): number => PLANE_Y - centre * PLANE_STEP_Y - GR
  *  the one it needs is higher than dark's — measured, because the two grounds are genuinely
  *  different instruments (dark adds light to nothing and bloom lifts it further; paper only has
  *  ink, and this ground is a 0.88-L page). */
-const GROUND_PRESENCE = { dark: 0.3, paper: 0.4 } as const;
+const GROUND_PRESENCE = { dark: 0.07, paper: 0.2 } as const;
+
+/** The shadow band's height in world units — how far below the floor line the soft falloff runs.
+ *  A little over a tenth of the card: enough to read as a shadow's spread, not a second card. */
+const SHADOW_H = PLANE_WORLD_H * 0.22;
+/** The band's alpha ramps UP over this fraction of its height before it decays, so the floor line
+ *  itself has no hard edge — a shadow's darkest part is just under the object, not a crease. */
+const SHADOW_LIP = 0.04;
+/** How far in from each end the band feathers (fraction of its width). */
+const SHADOW_FEATHER = 0.08;
+
+/** The band's alpha, as a texture the material samples: a vertical rise-then-decay, feathered at
+ *  both ends. Grayscale on purpose (rule 3 allows luminance) — the COLOUR is the vertex bake's.
+ *  Event-time: built once per ground, at construction. */
+function shadowTexture(): THREE.Texture {
+  const w = 128, h = 64;
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const ctx = c.getContext("2d")!;
+  // ⚠️ LUMINANCE, NOT CANVAS ALPHA. Three reads an alphaMap's GREEN channel, and a canvas whose
+  // pixels vary only in alpha uploads as white everywhere — the band then draws as a solid slab
+  // (seen live, 2026-09-26). So the ramps are black→white→black, and the feather MULTIPLIES in.
+  const v = ctx.createLinearGradient(0, 0, 0, h);
+  v.addColorStop(0, "rgb(0,0,0)");
+  v.addColorStop(SHADOW_LIP, "rgb(255,255,255)");
+  v.addColorStop(1, "rgb(0,0,0)");
+  ctx.fillStyle = v;
+  ctx.fillRect(0, 0, w, h);
+  // Feather the ends: the horizontal ramp multiplies the vertical one.
+  ctx.globalCompositeOperation = "multiply";
+  const u = ctx.createLinearGradient(0, 0, w, 0);
+  u.addColorStop(0, "rgb(0,0,0)");
+  u.addColorStop(SHADOW_FEATHER, "rgb(255,255,255)");
+  u.addColorStop(1 - SHADOW_FEATHER, "rgb(255,255,255)");
+  u.addColorStop(1, "rgb(0,0,0)");
+  ctx.fillStyle = u;
+  ctx.fillRect(0, 0, w, h);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.NoColorSpace; // an alpha map, not a colour
+  return tex;
+}
 
 /** THE FLOOR RECEDES ON ITS OWN FALLOFF, SQUARED (`RUNG_FALLOFF`).
  *
@@ -147,11 +196,12 @@ export class TrendsView implements SceneView {
   /** The view root. ⚠️ Its `visible` is the ENGINE's (rule 6) — never written here. */
   readonly group: THREE.Group;
 
-  private readonly _mat: THREE.LineBasicMaterial;
-  private readonly _lines: THREE.LineSegments;
+  private readonly _mat: THREE.MeshBasicMaterial;
+  private readonly _mesh: THREE.Mesh;
+  private readonly _alpha: THREE.Texture;
   private readonly _fades = new FadeSet();
   private _colors: SceneColors;
-  /** One entry per line VERTEX, in buffer order — the SLOT its colour is baked from. The slot,
+  /** One entry per band VERTEX, in buffer order — the SLOT its colour is baked from. The slot,
    *  not the resolved presence: the presence depends on the ground, so a theme flip re-bakes from
    *  the same geometry rather than rebuilding it. */
   private readonly _vertSlot: number[] = [];
@@ -159,6 +209,7 @@ export class TrendsView implements SceneView {
   private readonly _col = new THREE.Color();
   /** `face()`'s scratch, and the camera orientation it last laid the rungs for (NaN = never). */
   private readonly _right = new THREE.Vector3();
+  private readonly _up = new THREE.Vector3();
   private readonly _fwd = new THREE.Vector3();
   private _qx = NaN;
   private _qy = NaN;
@@ -181,28 +232,45 @@ export class TrendsView implements SceneView {
     this.group = new THREE.Group();
 
     const pos: number[] = [];
-    // A rung, remembering each end's slot so the colour bake can follow. The ends are laid along
-    // world X here; `face()` re-lays them along the camera's right vector before the first frame
-    // draws, so this is only the buffer's shape.
+    const uv: number[] = [];
+    const idx: number[] = [];
+    // A band per rung — four corners (top-left, top-right, bottom-right, bottom-left), each
+    // remembering its slot so the colour bake can follow. Laid along world X here; `face()`
+    // re-lays them along the camera's right and up vectors before the first frame draws, so this
+    // is only the buffer's shape. `v = 1` is the floor line (the texture's opaque lip sits just
+    // under it), `v = 0` the faded foot.
     for (const i of RUNGS) {
       const c = staggerCentre(VISIBLE_PLANES);
-      pos.push(slotX(i, c, false) - halfW(i), groundY(c), slotZ(i), slotX(i, c, false) + halfW(i), groundY(c), slotZ(i));
-      this._vertSlot.push(i, i);
+      const x0 = slotX(i, c, false) - halfW(i), x1 = slotX(i, c, false) + halfW(i);
+      const y = groundY(c), z = slotZ(i);
+      const b = pos.length / 3;
+      pos.push(x0, y, z, x1, y, z, x1, y - SHADOW_H, z, x0, y - SHADOW_H, z);
+      uv.push(0, 1, 1, 1, 1, 0, 0, 0);
+      idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
+      this._vertSlot.push(i, i, i, i);
     }
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
     geo.setAttribute("color", new THREE.Float32BufferAttribute(new Float32Array(this._vertSlot.length * 3), 3));
-    this._mat = new THREE.LineBasicMaterial({
+    geo.setIndex(idx);
+    this._alpha = shadowTexture();
+    this._mat = new THREE.MeshBasicMaterial({
       vertexColors: true,
       transparent: true,
-      // A hairline floor must never occlude — the chart planes composite in FRONT of the canvas
-      // whatever depth says, so a depth-writing floor would only ever hide something else.
+      alphaMap: this._alpha,
+      side: THREE.DoubleSide,
+      // A floor must never occlude — the chart planes composite in FRONT of the canvas whatever
+      // depth says, so a depth-writing floor would only ever hide something else.
       depthWrite: false,
       opacity: 1,
     });
-    this._lines = new THREE.LineSegments(geo, this._mat);
-    this.group.add(this._lines);
+    this._mesh = new THREE.Mesh(geo, this._mat);
+    // Never culled: the bands are re-laid every frame the camera moves and the sphere three would
+    // compute from the constructor's shape is stale the moment `face()` runs.
+    this._mesh.frustumCulled = false;
+    this.group.add(this._mesh);
     scene.add(this.group);
 
     // The one static material: opacity is exactly base × the view alpha, so the floor builds and
@@ -278,24 +346,33 @@ export class TrendsView implements SceneView {
     this._count = count;
     this._narrow = narrow;
     this._right.set(1, 0, 0).applyQuaternion(q);
+    this._up.set(0, 1, 0).applyQuaternion(q);
     this._fwd.set(0, 0, -1).applyQuaternion(q);
     // px per world unit at one unit of depth — the projector's own expression.
     const pxPerUnitAt1 = this._viewH / (2 * Math.tan((camera.fov * Math.PI) / 360));
     const c = this._centre;
     const y = groundY(c);
     const shift = this._shift;
-    const attr = this._lines.geometry.getAttribute("position") as THREE.BufferAttribute;
+    const attr = this._mesh.geometry.getAttribute("position") as THREE.BufferAttribute;
+    const R = this._right, U = this._up;
     for (let r = 0; r < RUNGS.length; r++) {
       const i = RUNGS[r];
+      // A rung past the count collapses to a point, which draws nothing.
       const h = i < count ? halfW(i) : 0;
+      const drop = i < count ? SHADOW_H : 0;
       let cx = slotX(i, c, narrow), cy = y, cz = slotZ(i);
       if (shift !== 0 && pxPerUnitAt1 > 0) {
         const d = (cx - p.x) * this._fwd.x + (cy - p.y) * this._fwd.y + (cz - p.z) * this._fwd.z;
         const s = d > 0 ? (shift * d) / pxPerUnitAt1 : 0;
-        cx += this._right.x * s; cy += this._right.y * s; cz += this._right.z * s;
+        cx += R.x * s; cy += R.y * s; cz += R.z * s;
       }
-      attr.setXYZ(r * 2, cx - this._right.x * h, cy - this._right.y * h, cz - this._right.z * h);
-      attr.setXYZ(r * 2 + 1, cx + this._right.x * h, cy + this._right.y * h, cz + this._right.z * h);
+      const v = r * 4;
+      // The floor line along the camera's right, the band hanging down the camera's up: a
+      // billboard, like the card whose footprint it is (see the header on why the rungs face).
+      attr.setXYZ(v, cx - R.x * h, cy - R.y * h, cz - R.z * h);
+      attr.setXYZ(v + 1, cx + R.x * h, cy + R.y * h, cz + R.z * h);
+      attr.setXYZ(v + 2, cx + R.x * h - U.x * drop, cy + R.y * h - U.y * drop, cz + R.z * h - U.z * drop);
+      attr.setXYZ(v + 3, cx - R.x * h - U.x * drop, cy - R.y * h - U.y * drop, cz - R.z * h - U.z * drop);
     }
     attr.needsUpdate = true;
   }
@@ -317,9 +394,10 @@ export class TrendsView implements SceneView {
    *  the program per blending mode. */
   private _restyle(): void {
     const paper = isLightGround(this._colors);
-    const attr = this._lines.geometry.getAttribute("color") as THREE.BufferAttribute;
+    const attr = this._mesh.geometry.getAttribute("color") as THREE.BufferAttribute;
     for (let v = 0; v < this._vertSlot.length; v++) {
-      this._col.setHex(this._colors.core);
+      // NEUTRAL: the foreground ink, never the accent — a shadow has no hue of its own.
+      this._col.setHex(this._colors.fg);
       inkMix(this._col, slotPresence(this._vertSlot[v], paper), this._colors);
       attr.setXYZ(v, this._col.r, this._col.g, this._col.b);
     }
@@ -329,8 +407,9 @@ export class TrendsView implements SceneView {
   }
 
   dispose(): void {
-    this._lines.geometry.dispose();
+    this._mesh.geometry.dispose();
     this._mat.dispose();
+    this._alpha.dispose();
     this.group.removeFromParent();
   }
 }

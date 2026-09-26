@@ -186,8 +186,19 @@ export const PLANE_FIT = 0.92;
  *  width is a known number. */
 export function fitDistance(freeWidthPx: number, viewHeightPx: number, fovDeg: number): number {
   const pxPerUnitAt1 = Math.max(1, viewHeightPx) / (2 * Math.tan((fovDeg * Math.PI) / 360));
-  return (PLANE_WORLD_W * pxPerUnitAt1) / (PLANE_FIT * Math.max(1, freeWidthPx));
+  const byWidth = (PLANE_WORLD_W * pxPerUnitAt1) / (PLANE_FIT * Math.max(1, freeWidthPx));
+  const byHeight = (PLANE_WORLD_H * pxPerUnitAt1) / (CARD_FIT_H * Math.max(1, viewHeightPx));
+  return Math.max(byWidth, byHeight);
 }
+
+/** The FRONT CARD's share of the canvas HEIGHT the width fit may not exceed. A short, wide window
+ *  (a 1028×606 desktop with the rails hidden, seen live 2026-09-26) fits a card wider than the
+ *  canvas is tall, so the camera stands at whichever is further: the width fit or this. Measured at
+ *  the tuned desktop pose (1500×1000): the front card spans 0.34 of the height there, so the cap is
+ *  inert on the pose the user tuned and only bites on a shorter window. The FRONT card, not the
+ *  deck: the rear cards project smaller than their world rise says, and a cap on the deck's world
+ *  height fired on the desktop pose it was meant to leave alone. */
+export const CARD_FIT_H = 0.36;
 
 /** How far the CAMERA closes on the stack while a plane is focused (`focusDepth`, scaled by
  *  `cameraRig.TREND_FOCUS_PUSH`). It was the focused plane's own lift in front of slot 0 until a

@@ -28,6 +28,7 @@ import {
   stepX,
   fitDistance,
   PLANE_FIT,
+  CARD_FIT_H,
 } from "./trendStack";
 
 const IDS = ["dag-l0", "pacaswap", "dor-metagraph", "elpaca", "constellation-l1", "ded"];
@@ -525,6 +526,18 @@ describe("fitDistance — the front card spans PLANE_FIT of the free band", () =
     expect(fitDistance(1000, 1000, FOV)).toBeLessThan(fitDistance(864, 1000, FOV));
     expect(fitDistance(864, 1000, FOV) / fitDistance(432, 1000, FOV)).toBeCloseTo(0.5, 9);
     expect(fitDistance(1, 1, FOV)).toBeGreaterThan(0.1); // never inside the near plane on a degenerate box
+  });
+
+  it("is CAPPED by the front card's height: on a short, wide window the card spans CARD_FIT_H of the height and less than PLANE_FIT of the width", () => {
+    // 1028×606 with the rails hidden (seen live): a width fit alone stood a card taller than the canvas.
+    const d = fitDistance(1028, 606, FOV);
+    const cardH = (PLANE_WORLD_H * pxPerUnitAt1(606)) / d;
+    expect(cardH).toBeCloseTo(CARD_FIT_H * 606, 6);
+    expect(cardPx(d, 606)).toBeLessThan(PLANE_FIT * 1028);
+    // And inert on the tuned desktop pose: the width fit still decides there.
+    const dd = fitDistance(864, 1000, FOV);
+    expect(cardPx(dd, 1000)).toBeCloseTo(PLANE_FIT * 864, 6);
+    expect((PLANE_WORLD_H * pxPerUnitAt1(1000)) / dd).toBeLessThan(CARD_FIT_H * 1000);
   });
 
   it("PLANE_FIT leaves a gutter: under 1 and above the old tablet share", () => {
