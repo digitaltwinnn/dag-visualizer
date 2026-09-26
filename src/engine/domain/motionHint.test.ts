@@ -21,8 +21,8 @@ describe("motionHint", () => {
   });
 
   it("says what a selection frames, and what its release returns to", () => {
-    expect(motionHint({ kind: "filter", id: "dor" }, "hyper", NAMES)).toBe("Filtering to Dor Technologies");
-    expect(motionHint({ kind: "filter", id: "all" }, "hyper", NAMES)).toBe("Clearing the filter");
+    expect(motionHint({ kind: "filter", id: "dor" }, "hyper", NAMES)).toBe("Filter set to Dor Technologies");
+    expect(motionHint({ kind: "filter", id: "all" }, "hyper", NAMES)).toBe("Filter cleared");
     expect(motionHint({ kind: "focus", id: "dor" }, "trend", NAMES)).toBe("Bringing Dor Technologies to the front");
     expect(motionHint({ kind: "focus", id: null }, "trend", NAMES)).toBe("Returning the stack to its order");
     expect(motionHint({ kind: "snapshot", ordinal: 6955314 }, "ledger", NAMES)).toBe("Framing snapshot 6,955,314");

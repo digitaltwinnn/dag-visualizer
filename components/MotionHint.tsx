@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 
 // THE MOTION HINT (user, 2026-09-26): one quiet sentence, in the scene a little under its centre —
 // where the work is being done — for exactly as long as the scene is moving. "Bringing Dor
-// Technologies to the front", "Building History", "Filtering to USDC.dag". Two store channels and
+// Technologies to the front", "Building History", "Filter set to USDC.dag". Two store channels and
 // nothing else: `sceneMoving` (the Engine's per-frame answer, from the structures that drive
 // motion) says WHETHER, `motionCause` (stamped by the gesture's owner) says WHY, and
 // `domain/motionHint.ts` turns the cause into words.
