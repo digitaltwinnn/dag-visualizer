@@ -27,6 +27,13 @@ export const HYPER_MEASURE_LABELS: Readonly<Record<HyperMeasure, string>> = {
   providers: "Providers",
 };
 
+/** The heading control's list — each measure with the unit its figure is in. */
+export const HYPER_MEASURE_OPTIONS: readonly { id: HyperMeasure; label: string; unit: string }[] = HYPER_MEASURE_ORDER.map((id) => ({
+  id,
+  label: HYPER_MEASURE_LABELS[id],
+  unit: "count",
+}));
+
 /** The neighbour in the order, or null at an end — the stepper dims that chevron. */
 export function stepHyperMeasure(m: HyperMeasure, dir: -1 | 1): HyperMeasure | null {
   const i = HYPER_MEASURE_ORDER.indexOf(m);

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { MetaInfo, NodeRow } from "@/src/data/types";
 import {
   HYPER_MEASURE_LABELS,
+  HYPER_MEASURE_OPTIONS,
   HYPER_MEASURE_ORDER,
   networkMeasure,
   stepHyperMeasure,
@@ -20,6 +21,14 @@ describe("the order and its labels", () => {
   it("leads with nodes and names every measure", () => {
     expect(HYPER_MEASURE_ORDER[0]).toBe("nodes");
     for (const m of HYPER_MEASURE_ORDER) expect(HYPER_MEASURE_LABELS[m].length).toBeGreaterThan(0);
+  });
+
+  it("lists every measure for the heading control, in order, each with its unit", () => {
+    expect(HYPER_MEASURE_OPTIONS.map((o) => o.id)).toEqual([...HYPER_MEASURE_ORDER]);
+    for (const o of HYPER_MEASURE_OPTIONS) {
+      expect(o.label).toBe(HYPER_MEASURE_LABELS[o.id]);
+      expect(o.unit.length).toBeGreaterThan(0);
+    }
   });
 
   it("steps through the order and stops at the ends", () => {

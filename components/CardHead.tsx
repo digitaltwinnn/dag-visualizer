@@ -282,21 +282,32 @@ export default function CardHead({
               </div>
             </div>
           )}
-          <h2 className={cn(TITLE, "inline-flex items-center gap-2 min-w-0")}>
-            {toggleable ? (
-              <button
-                type="button"
-                aria-expanded={!collapsed}
-                title={collapsed ? "Expand" : "Collapse"}
-                onClick={onToggle}
-                className="appearance-none bg-transparent border-0 p-0 m-0 [font:inherit] text-inherit text-left inline-flex items-center gap-2 min-w-0 rounded-sm focus-visible:outline-1 focus-visible:outline-ring/60 after:absolute after:inset-0 after:cursor-pointer after:content-['']"
-              >
-                {titleRow}
-              </button>
-            ) : (
-              titleRow
+          {/* The title row carries the ASIDE on its right (2026-09-26 — the explorer card's scope
+              dot, `components/explorer/ScopeDot`): the panel layout had no aside slot, only the
+              inspector layout below. Same rule as the eyebrow row's cluster: it floats above the
+              title button's stretched pseudo and hands the pointer back only on its own control. */}
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <h2 className={cn(TITLE, "inline-flex items-center gap-2 min-w-0")}>
+              {toggleable ? (
+                <button
+                  type="button"
+                  aria-expanded={!collapsed}
+                  title={collapsed ? "Expand" : "Collapse"}
+                  onClick={onToggle}
+                  className="appearance-none bg-transparent border-0 p-0 m-0 [font:inherit] text-inherit text-left inline-flex items-center gap-2 min-w-0 rounded-sm focus-visible:outline-1 focus-visible:outline-ring/60 after:absolute after:inset-0 after:cursor-pointer after:content-['']"
+                >
+                  {titleRow}
+                </button>
+              ) : (
+                titleRow
+              )}
+            </h2>
+            {aside != null && (
+              <span className="relative z-[1] flex-none flex items-center pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
+                {aside}
+              </span>
             )}
-          </h2>
+          </div>
         </div>
         {/* The head hairline is INSET by the panel's own horizontal padding (user, 2026-08-09) —
             the same weight the slab's resting seam carries, so every division that is simply THERE

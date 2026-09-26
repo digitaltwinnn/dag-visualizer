@@ -381,9 +381,11 @@ export function LayerWho({ who }: { who: string }) {
   );
 }
 
-export function RoleChips({ codes, compact }: { codes: string[]; compact?: boolean }) {
+export function RoleChips({ codes, compact, tight }: { codes: string[]; compact?: boolean; tight?: boolean }) {
   return (
-    <span className="inline-flex items-center gap-1">
+    // `tight` — the explorer row's tag home (2026-09-26): three chips have ~80px there, so the
+    // pills close up by a pixel each side and the gap drops to 3px. Same pill, same vocabulary.
+    <span className={cn("inline-flex items-center", tight ? "gap-[3px]" : "gap-1")}>
       {codes.map((c) => (
         <span
           key={c}
@@ -392,7 +394,8 @@ export function RoleChips({ codes, compact }: { codes: string[]; compact?: boole
           // 2px less pill is what buys justify-evenly its air). Same pill, same vocabulary —
           // only the vertical padding narrows; every roomier surface keeps the full form.
           className={cn(
-            "inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] text-micro leading-none text-muted-foreground",
+            "inline-flex items-center rounded-xs border border-border bg-wash-faint text-micro leading-none text-muted-foreground",
+            tight ? "px-1" : "px-[5px]",
             compact ? "py-px" : "py-[2px]",
           )}
         >

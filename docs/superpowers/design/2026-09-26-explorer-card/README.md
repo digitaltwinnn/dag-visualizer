@@ -64,4 +64,16 @@ Decisions, in the order they were made, each with the screen that shows it:
 16. **Primitives**: shadcn `Breadcrumb` for the path, shadcn `DropdownMenu` (radio group) for the
     heading control, restyled to the card's tokens like the other adopted primitives.
 
-Recorded deviations from the screens: none yet.
+Recorded deviations from the screens:
+
+- **No root crumb.** The screens drew "Networks › …"; built, the root word repeated the card's
+  title and cost the width the crumbs need in a 264px rail (user, same day: "do we need 'networks'
+  always at the start of the breadcrumb?"). The path starts at the first opened level; the scope
+  dot's × is the way back to the root.
+- **The row grid is re-budgeted to the rail's 264px.** The screens were drawn at ~360px with
+  `16 · 100 · flex · 56 · 60`; the rail's row is 247px wide, so the build uses `14 · per-level name
+  (128 at a network level with no tags, 52 at a composition level) · flex · 36 (24 inside a level)
+  · 40` with 5px gaps, and the role chips close up (`RoleChips tight`). Proportions kept, numbers
+  the rail's.
+- **The level line wraps.** Eyebrow and meaning share a line where they fit; in the rail the
+  meaning wraps under the eyebrow rather than truncating — a clipped sentence explains nothing.

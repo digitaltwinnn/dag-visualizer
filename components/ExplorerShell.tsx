@@ -36,6 +36,7 @@ export default function ExplorerShell({
   id,
   title,
   hint,
+  scope,
   onLeave,
   defaultCollapsed = false,
   children,
@@ -56,6 +57,9 @@ export default function ExplorerShell({
   // halves are TWO SENTENCES, not a dash clause — the app-wide plain-writing rule (user,
   // 2026-08-12), stated in full on components/railCards.ts's ghost-hint block.
   hint: ReactNode | null;
+  /** The head's scope mark (design 2026-09-26): the committed network's hue dot with its release.
+   *  Rendered in the head's aside slot, on the title line's right. Absent = nothing committed. */
+  scope?: ReactNode;
   // Container-level hover cleanup — see the file comment. Optional: most explorers' committed
   // rows stay rendered after a click (no self-unmount hazard), so most callers omit it.
   onLeave?: () => void;
@@ -78,6 +82,7 @@ export default function ExplorerShell({
           panel
           icon={EXPLORE_ICON}
           title={title}
+          aside={scope}
           eyebrow="Explore"
           collapsed={collapsed}
           onToggle={() => setCollapsed((c) => !c)}
