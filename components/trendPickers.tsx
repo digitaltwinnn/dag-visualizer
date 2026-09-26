@@ -13,7 +13,7 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 // THE TRENDS CONTROLS, ONE HOME (2026-09-18; widened 2026-09-19) — the window pills and the scale
 // switch, shared by the Trends DOCUMENT, the History view's band TIMELINE and that view's Layers
 // card. (A six-pill METRIC picker lived here too until 2026-09-26, when the Layers card took the
-// measure STEPPER, `components/MeasureStepper.tsx`, in its place and no surface picked from a
+// explorer's heading control (`components/explorer/ExplorerHeading.tsx`) in its place and no surface picked from a
 // map.) They are two registers of one rung
 // (convention 12), and the pair had already been noted drifting once: the vitals rim adopted this
 // register in 2026-09-08's round and then evolved to SELECTED_ROW while the document's copy stayed

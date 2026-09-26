@@ -202,19 +202,17 @@ decisions inside them are design, not detail:
   size, a snapshot fee · size), figures BARE because the heading names the unit, in a 48px figure
   column (`figureW` — a 4-decimal fee does not fit the default 40).
 
-- **History's tool card is the view's CONTROLS plus its roster** (`components/TrendExplore.tsx`,
-  2026-09-19). It is the first explorer whose card holds an instrument the reader OPERATES rather
-  than a state it reports, and the grammar splits on that: the METRIC is a PICKER — the same
-  hairline group the window pills wear, because a metric is a committed statement about what is on
-  screen — while `Same scale` is a SETTING and reads as a name plus its state
-  (`SettingSwitch`, `components/trendPickers.tsx`; the command bar's pressed-toggle is an ACTION
-  grammar and wrong for a setting, which is the reasoning the scale control was rebuilt on twice).
-  Neither is a selection, so they write their setters directly — `selectionBoundary`'s
-  own scope note says why, and why the plane FOCUS is in the table instead. Below the instrument
-  hairline the LAYERS list is an ordinary browse list: mark, name, last measured reading, and a
-  click that applies the SAME `trendPlaneActions` the plane's header strip runs. Its PAGER is
-  absent unless the roster exceeds `VISIBLE_PLANES` and clamps with the stack's own `clampScroll`,
-  so a chevron can never offer a step the geometry refuses.
+- **History's tool card is its roster, with the view's two settings on its heading**
+  (`components/TrendExplore.tsx`, an `Explorer` description since 2026-09-26). ONE level: the
+  ranked networks, busiest first, each with its last measured reading in the roster's one
+  formatter and a bar of its share. The METRIC is the heading control (the figure column's own
+  heading, a radio list of `METRIC_ORDER` with units at the current cadence) and `Same scale` is
+  the heading's setting — neither is a selection, so both write their setters directly
+  (`selectionBoundary`'s own scope note says why, and why the plane FOCUS is in the table instead).
+  A row click applies the SAME `trendPlaneActions` the plane's header strip runs. The committed
+  scope is the head's dot, not a chip (design decision 1). Its PAGER is absent unless the roster
+  exceeds `VISIBLE_PLANES` and clamps with the stack's own `clampScroll`, so a chevron can never
+  offer a step the geometry refuses.
   ⚠️ **The roster is computed ONCE, in `components/useTrendRoster.ts`** — the planes, this list and
   the cursor card all read it, counter EDGE TRIM included. A surface reading the payload directly
   is one bucket out of step with the axis, which is exactly how the cursor card briefly quoted
@@ -272,10 +270,12 @@ through the fade-out. A window pill shows nothing, honestly: the charts redraw b
 
 **The History view has three axes and each has one home** (user, 2026-09-19): left/right on the
 timeline is WHEN, the depth of the stack is WHO, and UP/DOWN is WHAT — the measure. Its control is
-the Layers card's STEPPER (`MeasureStepper`: `∧ SNAPSHOTS ∨`, the card's control row with `Same scale`
-on its right — user, 2026-09-26; it replaced the six-pill picker there, which no other surface used:
-the document lays its measures out as sections), plus `↑`/`↓` from inside a card; both step `trendMetric` through `METRIC_ORDER`
-(`src/data/trendSeries.ts`), so the two controls are one list. It is a view-level control because
+the Layers card's HEADING CONTROL (the explorer's figure heading opening `METRIC_ORDER` as a radio
+list with each measure's unit at the current cadence — design 2026-09-26; `Same scale` rides the
+same heading row as the view's other setting. It replaced a `∧ SNAPSHOTS ∨` stepper, which walked a
+list the reader could not see, which itself replaced the six-pill picker no other surface used:
+the document lays its measures out as sections), plus `↑`/`↓` from inside a card; both write
+`trendMetric` from `METRIC_ORDER` (`src/data/trendSeries.ts`), so the two controls are one list. It is a view-level control because
 every card steps together (a stack whose planes showed different measures would stop being a
 comparison) — it first rode the front card's header as two bare chevrons, which said the measure
 belonged to that network and stepped through a list the reader could not see; then it was the view's

@@ -4,7 +4,7 @@ import { providerOfRow } from "@/src/data/geoMeasure";
 // WHAT A NETWORK ROW COUNTS (user, 2026-09-26: "the hyper view is still missing the new control
 // and we should benefit from it there as well"). The Hypergraph explorer's network rows carried
 // one figure, the fleet size. This module states the choices, their order and how each is read
-// off a network, so the card's stepper (`components/MeasureStepper.tsx`) can walk them — the
+// off a network, so the card's heading control (`components/explorer/ExplorerHeading.tsx`) can list them — the
 // Geography card's vocabulary turned around: there a country counts its networks and providers,
 // here a network counts its countries and providers.
 //

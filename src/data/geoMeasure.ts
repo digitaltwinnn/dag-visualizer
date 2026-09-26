@@ -4,7 +4,7 @@ import type { NodeRow } from "@/src/data/types";
 // control — besides 'nodes' show 'metagraphs', 'providers'"). The Geography explorer's country
 // rows carried one figure, the footprint's node count, with a bar scaled to the busiest country.
 // This module states the choices, their order and how each is read off a country's rows, so the
-// card's stepper (`components/MeasureStepper.tsx`) can walk them and the bar and the figure can
+// card's heading control (`components/explorer/ExplorerHeading.tsx`) can list them and the bar and the figure can
 // never disagree about what they measure.
 //
 // Every measure is a FACT ABOUT THE COUNTRY'S PLACED NODES — the rows the browser already holds

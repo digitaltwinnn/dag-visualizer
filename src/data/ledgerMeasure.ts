@@ -7,7 +7,7 @@ import { fmtDag } from "@/src/util/format";
 // anchors, metagraphs, size (kb)"). The Snapshots explorer's tick rows carried one figure — the fee
 // paid, in DAG (2026-09-13, before that the size) — and the choice of WHICH figure was made once, in
 // the component. This module states the choices, their order and how each is read off a tick, so
-// the explorer's stepper (`components/MeasureStepper.tsx`, the History view's own control) can walk
+// the explorer's heading control (`components/explorer/ExplorerHeading.tsx`) can list
 // them and the row can never show a figure this module does not know how to derive honestly.
 //
 // Every measure is a FACT ABOUT THE TICK, read from the exact per-tick decode (`SnapshotExact`,
