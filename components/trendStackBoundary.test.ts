@@ -118,15 +118,6 @@ describe("trend-stack boundary", () => {
     ).toBe(false);
   });
 
-  it("hands a card drag to the canvas by the class the canvas actually wears", () => {
-    // `orbitHandoff` reaches the scene DOM-to-DOM, through `canvas.scene-canvas`. Rename the class
-    // on either side and a card drag silently stops orbiting — no error, the query just misses.
-    const handoff = stripComments(readFileSync("components/orbitHandoff.ts", "utf8"));
-    const canvas = stripComments(readFileSync("components/SceneCanvas.tsx", "utf8"));
-    expect(handoff).toMatch(/querySelector[^(]*\("canvas\.scene-canvas"\)/);
-    expect(canvas).toMatch(/<canvas[^>]*className=\{?"scene-canvas/);
-  });
-
   it("renders each plane as a 0-size anchor React never positions", () => {
     const src = code();
     // The anchor's own geometry IS the projector's coordinate system — see rule 6 above.

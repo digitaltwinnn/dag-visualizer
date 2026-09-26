@@ -70,7 +70,6 @@ import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import useStagedMeasure, { ROLL_CLASS, useHeldOrder } from "@/components/useStagedMeasure";
 import { cn } from "@/lib/utils";
-import { handOrbitToScene } from "@/components/orbitHandoff";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
 import { metricCaption, sharedCeiling, stepMetric } from "@/src/data/trendSeries";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
@@ -111,6 +110,9 @@ export default function TrendStack() {
   // cursor card's notes in components/CLAUDE.md); the drag guard below keeps an orbit that
   // started on the plot from landing as a pick.
   const setTrendCursor = useStore((s) => s.setTrendCursor);
+  // A drag across a plane's plot brushes the RANGE (see `onPointerMove`): the timeline's own
+  // write, for the whole stack, never one plane.
+  const setTrendRange = useStore((s) => s.setTrendRange);
   // THE SCENE↔HUD HOVER PAIRING (convention 9), on the network channel every other surface in the
   // app already pairs a network on: hovering a plane's header previews its Layers row in the rail,
   // and hovering that row previews this plane. A preview is never a commit — the only thing it
@@ -232,19 +234,19 @@ export default function TrendStack() {
     down.current = { x: e.clientX, y: e.clientY };
     dragged.current = false;
   };
-  // A PRESS THAT TRAVELS IS THE SCENE'S ORBIT, NOT THE CARD'S (user, 2026-09-19). The header strips
-  // and the front card are where a hand lands, and a drag begun there used to go nowhere. Past the
-  // click slop the pointer is handed to the canvas (`orbitHandoff`) and the rest of the gesture is
-  // a native OrbitControls drag. `dragged` is raised at the handoff: the pointer is captured away,
-  // so this card never sees its pointerup, and whatever click the browser still synthesises must
-  // not read as a tap.
+  // A PRESS THAT TRAVELS IS A BRUSH, NOT A CLICK (2026-09-26). It used to be handed to the canvas
+  // as the scene's orbit (`orbitHandoff`, 2026-09-19); History has had no orbit since 2026-09-26
+  // (`viewPolicy.rotate` is false — the cards hold their implied places and a click brings one
+  // forward), so the drag was free, and the user asked for the document's own gesture on the
+  // scene's charts: "create a window also in the main chart". The front chart's `onRange` brush
+  // (the same one the document's charts run) commits the range for the whole stack, exactly as
+  // the band's timeline does; `dragged` keeps the click the browser synthesises after the
+  // release from also landing as a cursor pick.
   const onPointerMove = (e: React.PointerEvent) => {
     const d = down.current;
     if (!d || e.buttons === 0) return;
     if (Math.hypot(e.clientX - d.x, e.clientY - d.y) <= DRAG_SLOP) return;
-    down.current = null;
     dragged.current = true;
-    handOrbitToScene(e);
   };
   const onPointerUp = (e: React.PointerEvent) => {
     const d = down.current;
@@ -427,6 +429,7 @@ export default function TrendStack() {
                 onPick={(ms) => {
                   if (!dragged.current) setTrendCursor(ms);
                 }}
+                onRange={pose.interactive ? (fromMs, toMs) => setTrendRange({ fromMs, toMs }) : undefined}
                 // THE PLANE CARRIES ITS COLOUR AS AN AREA, and only here — on the card's solid face
                 // it reads as the network's own tint. A plain boolean, so it holds the plot's memo
                 // as still as every other prop on this call.

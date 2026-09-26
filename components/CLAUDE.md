@@ -298,14 +298,16 @@ visible window the store pages the window after it in the SAME write that publis
 A step taken mid-sequence RETARGETS, never queues; reduced motion skips the sequence (an
 exit with transitions off is a 140ms blank).
 
-⚠️ **A DRAG THAT STARTS ON A CARD IS THE SCENE'S ORBIT** (`components/orbitHandoff.ts`). The header
-strips and the front card are where a hand lands, and a drag begun there used to go nowhere. Past
-the click slop the pointer is handed to the canvas as ONE synthetic `pointerdown` carrying the real
-pointer's id; OrbitControls captures it and the rest of the gesture is native — same damping, same
-limits, same touch handling. No component imports the engine: it is DOM to DOM through
-`canvas.scene-canvas`. Never hand off AT pointerdown — capturing the pointer away retargets its
-pointerup, and with it the click. This is also why the cards carry NO swipe gesture: a vertical
-touch swipe stepped the measure for a few hours, until one gesture had to mean two things.
+⚠️ **A DRAG ACROSS THE FRONT CHART BRUSHES THE RANGE** (2026-09-26; user: "create a window also
+in the main chart"). It is the document's own `onRange` gesture on `TrendChart`, and it commits
+`trendRange` for the whole stack exactly as the band's timeline does. It replaced the orbit
+handoff (`orbitHandoff.ts`, 2026-09-19, retired): History lost its orbit the same day
+(`viewPolicy.rotate` is false — the cards hold their implied places, a click brings one forward,
+the wheel still zooms), so a drag on a card was free. A click on the plot picks the INSTANT
+(`onPick`); `dragged` in `TrendStack` keeps the click the browser synthesises after a brush from
+also landing as a pick. Rear cards keep their bodies inert. This is also why the cards carry NO
+swipe gesture: a vertical touch swipe stepped the measure for a few hours, until one gesture had
+to mean two things.
 
 **Hovering pairs over `hoverFilter`, the app's own network channel** (convention 9). A Layers row, a
 plane's header strip and a cursor-card row are three ends of one pairing, with no channel of their
@@ -1327,7 +1329,7 @@ seam and corner rules select on the same markers the thread measures:
 | `data-depth` / `data-focus` / `data-ghost` | The thread's read — depth dimming and dot state |
 | `.nb-row` | The pairing row-wash selector |
 | `#topbar`, `#metapane`, `#tooltip` | Layout and positioning |
-| `canvas.scene-canvas` | `SceneCanvas` renders it; `orbitHandoff` queries it to hand a card drag to OrbitControls (`trendStackBoundary.test.ts` pins both ends) |
+| `canvas.scene-canvas` | `SceneCanvas` renders it; the engine's controls listen on it (the card-drag handoff that once queried it is retired) |
 | `#callout` (+ `data-on`) | The subject callout's 0-size anchor wrapper — `SceneCallout` renders it, `CalloutSync` writes its transform + `data-on` per frame (the Tooltip discipline: position never renders React) |
 | `#trend-stack` (+ `data-on`) | The trend view's chart-plane layer — `TrendStack` renders it, the engine queries it to find the planes. It waits at `opacity: 0` and `TrendStackSync` writes `data-on="1"` once the view has ARRIVED (policy `chartStack` + the trend furniture alpha at full), so the stack fades in with the room rather than riding the camera's flight — the `#callout` `data-on` precedent |
 | `[data-plane]` (the network id) | One chart plane, as an ANCHOR + a CHILD. The anchor is a **0-size box at the layer's top-left with `origin-top-left`**, mounted `invisible`; its one child is the `PLANE_PX_W`-wide plane, centred on it by `-translate-x-1/2 -translate-y-1/2`. **React renders the plane and owns everything inside it** plus the anchor's `opacity` / `zIndex` / `pointer-events` (all from the same `PlanePose`); `TrendStackSync` (engine layer) writes the anchor's `transform` — a `matrix3d` translate + uniform scale, never a rotation — and its `style.visibility` per frame. The anchor's geometry IS that matrix's coordinate system, so don't give it a size, an origin or a transform of its own; `components/trendStackBoundary.test.ts` pins it |
