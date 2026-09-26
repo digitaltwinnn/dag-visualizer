@@ -57,7 +57,8 @@ export function motionHint(cause: MotionCause, mode: Mode, names: HintNames, pha
     case "view":
       return phase === "out" ? `Leaving ${names.view(cause.from)}` : `Entering ${names.view(cause.to)}`;
     case "filter":
-      return cause.id === "all" ? "Showing every network" : `Narrowing to ${names.network(cause.id)}`;
+      // The top bar's own word (user, 2026-09-26: "'narrowing' is 'filtering'?" — it is).
+      return cause.id === "all" ? "Clearing the filter" : `Filtering to ${names.network(cause.id)}`;
     case "focus":
       // The re-deal: the focused card takes first place and the cards ahead of it slide back.
       return cause.id === null ? "Returning the stack to its order" : `Bringing ${names.network(cause.id)} to the front`;
