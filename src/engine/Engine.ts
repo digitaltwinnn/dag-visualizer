@@ -2327,8 +2327,10 @@ export class Engine {
       // out-of-focus blur — the ceiling the background core/hubs saturate to. The selected
       // cluster stays crisp regardless (the wide sharp zone comes from the LOW aperture, not
       // this cap — see SceneContext's dofParams note); raised 0.08 → 0.16 (user 2026-07-17:
-      // more background separation while focused).
-      this.ctx.dof.uniforms["maxblur"].value = 0.16 * dofMix;
+      // more background separation while focused), then eased back to 0.10 (user 2026-09-26:
+      // "the blur / focus effect in hyper view is a bit too strong") — the background still
+      // falls off, but a hub behind the focused one stays a hub rather than a smear.
+      this.ctx.dof.uniforms["maxblur"].value = 0.10 * dofMix;
     }
 
     this._syncCallout();

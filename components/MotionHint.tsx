@@ -20,9 +20,10 @@ import { cn } from "@/lib/utils";
 //
 // THE LOOK (user, 2026-09-26, two rounds): first a grey status line, then the scene-glass card
 // the callout wears — "a bit too dominant for a screen hint". What it is now: NO plate at all, the
-// sentence one step up the type scale (`text-title`, 15px) in foreground ink with a soft halo in
-// the ground's own colour so it stays readable over a lit hub or a paper globe, and a small
-// beating accent dot that says "in motion" the way the LIVE control's dot says "following".
+// sentence one step up the type scale (`text-title`, 15px) in the DIM foreground — clear, not
+// loud (user, round three: "font should be clear but more subtle") — with one tight shadow in the
+// ground's own colour, just enough to lift it off a lit hub or a paper globe, and a small beating
+// accent dot that says "in motion" the way the LIVE control's dot says "following".
 // Larger and quieter at once, because it is only ever on screen for the length of a flight. A
 // pure FADE — it first rose a few pixels into place, which read as the line jumping (user).
 //
@@ -86,11 +87,10 @@ export default function MotionHint() {
       style={{ bottom: "calc(var(--bottom-reserve, 0px) + 32px)" }}
       className={cn(
         "absolute left-1/2 z-[5] -translate-x-1/2 pointer-events-none select-none whitespace-nowrap",
-        "inline-flex items-center gap-2.5 text-title text-foreground",
-        // The halo: the ground's own colour, so the line lifts off a lit hub on dark and off the
-        // globe on paper without a plate. Two shadows — a tight one for the edge, a wide one for
-        // the wash. `--background` is `light-dark()` by construction, so one rule serves both.
-        "[text-shadow:0_1px_2px_var(--background),0_0_14px_var(--background),0_0_28px_var(--background)]",
+        "inline-flex items-center gap-2.5 text-title font-normal text-foreground-dim",
+        // ONE tight shadow in the ground's own colour: an edge, not a glow — the three-layer halo
+        // read as a plate by other means. `--background` is `light-dark()`, so one rule serves both.
+        "[text-shadow:0_1px_2px_var(--background)]",
         // The entrance: fade + a short rise, delayed a beat on the way IN only. One arbitrary
         // `[transition:…]` rather than two utilities — `transition-*` is a twMerge group.
         "opacity-0 transition-opacity duration-200 ease-out",
