@@ -543,7 +543,9 @@ export function StackedSchedule({ axis, parts, className }: { axis: string; part
     <div className={cn("grid grid-cols-[92px_minmax(0,1fr)] items-start gap-x-2.5 py-1.5", className)}>
       <span className="text-body text-muted-foreground pt-px">{axis}</span>
       <span className="min-w-0">
-        <span aria-hidden className="flex h-2 w-full overflow-hidden rounded-full bg-wash-faint">
+        {/* 5px, the app's one bar thickness (`BarCell`, the explorer's bars, the band's micro-bars) —
+            an 8px first cut read as a heavier instrument than its neighbours (user, 2026-09-26). */}
+        <span aria-hidden className="flex h-[5px] w-full overflow-hidden rounded-full bg-wash-faint">
           {parts
             .filter((p) => p.count > 0)
             .map((p, i) => (
