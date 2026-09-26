@@ -419,7 +419,21 @@ function UnlistedMemberFacts({ id, last }: { id: string; last: boolean }) {
 // CLOSED by default (user, round 21) — the captions are the card's index and a breakdown
 // is opened on demand; state is local and plain — folding commits nothing, so the store
 // owns none of it — and survives pager steps, since the group's identity does.
-function ScheduleGroup({ label, children, defaultOpen = false }: { label: string; children: ReactNode; defaultOpen?: boolean }) {
+function ScheduleGroup({
+  label,
+  value,
+  children,
+  defaultOpen = false,
+}: {
+  label: string;
+  /** A FACT-REGISTER header (user, 2026-09-26: "make the 'online nodes' element the one used for
+   *  the breakdown"): the label in the Fact row's body type with this value right-aligned — the
+   *  total the schedules below partition IS the disclosure, so the reader opens the number to
+   *  see what it is made of. Without it the header is the quiet eyebrow-style caption. */
+  value?: ReactNode;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -429,7 +443,7 @@ function ScheduleGroup({ label, children, defaultOpen = false }: { label: string
           selects nothing, and focus shows only for the keyboard in CopyButton's own
           focus-visible recipe. */}
       <CollapsibleTrigger className="group mt-2 flex w-full items-center gap-1 cursor-pointer select-none outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]">
-        <span className="text-micro tracking-caps uppercase text-muted-foreground">{label}</span>
+        <span className={value !== undefined ? "text-body text-muted-foreground" : "text-micro tracking-caps uppercase text-muted-foreground"}>{label}</span>
         <ChevronRight
           aria-hidden
           className={cn(
@@ -437,6 +451,7 @@ function ScheduleGroup({ label, children, defaultOpen = false }: { label: string
             open && "rotate-90",
           )}
         />
+        {value !== undefined && <span className="ml-auto min-w-0 text-body text-foreground tabular-nums text-right">{value}</span>}
       </CollapsibleTrigger>
       <CollapsibleContent className="disclose-panel">
         <div className="mt-1 pl-2">{children}</div>
@@ -453,7 +468,14 @@ function ScheduleGroup({ label, children, defaultOpen = false }: { label: string
 /** A schedule's caption inside the grouped BREAKDOWN — the partition's name, one step quieter
  *  than the group's own word, with the group's `mt-2` rhythm above it. */
 function ScheduleCaption({ children }: { children: ReactNode }) {
-  return <div className="mt-2 first:mt-0 mb-1 text-micro tracking-caps text-muted-foreground/80">{children}</div>;
+  // `text-label`, not micro (user, 2026-09-26: "the font-size of the individual sections is too
+  // small"), and a hairline ABOVE every caption but the first — the separator between two
+  // column-aligned tables is what keeps them from reading as one summing to twice the fleet.
+  return (
+    <div className="mt-2.5 pt-2 border-t border-border first:mt-0 first:pt-0 first:border-0 mb-1.5 text-label tracking-caps uppercase text-muted-foreground">
+      {children}
+    </div>
+  );
 }
 
 function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> }) {
@@ -614,27 +636,21 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
               (user, 2026-09-10, round 2: the larger font read as just a big number — the
               DIVIDER is what says "what follows partitions this"). Shown even at 0 for a
               catalog metagraph (an empty fleet is a reading); the schedules below skip then. */}
-          <div className="mt-3">
-            <Fact label="Online nodes">
-              {/* Mono, like the partition counts it totals — `/design`'s sans/mono split puts counts
-                  in the data face, and this row sums the very columns directly below it. The BOLD
-                  stays: this is the total the two tables partition, not one value among peers. */}
-              <b className="font-mono font-bold">{nodes.length}</b>
-            </Fact>
-          </div>
-          {/* The divider announces the partitions that follow, so at 0 nodes — where every
-              schedule skips — it stands down too (review find, 2026-09-11: a dangling rule
-              over an empty region, back-to-back with the site row's own Separator). */}
-          {nodes.length > 0 && <Separator className="my-2" />}
-          {nodes.length > 0 && (
-            <>
-              {/* ONE DISCLOSURE FOR THE THREE SCHEDULES, OPEN BY DEFAULT (user, 2026-09-26: the
-                  three "by …" rows repeated the same gesture three times; "group those into a
-                  single dropdown with a text that applies to all, expanded by default"). The
-                  group's word is BREAKDOWN — what all three are: the fleet partitioned by
-                  composition, by status, by what it archives — and each schedule keeps its own
-                  caption inside, so a reader still knows which partition a row belongs to. */}
-              <ScheduleGroup label="breakdown" defaultOpen>
+          {/* THE TOTAL IS THE DISCLOSURE (user, 2026-09-26, two rounds): the three "by …" rows
+              became one open group, and then the "Online nodes" fact became that group's own
+              header — the total the schedules partition, with the count right-aligned in the
+              Fact grammar, so opening the number shows what it is made of. Mono and bold, like
+              the partition counts it totals (`/design`'s sans/mono split). At 0 nodes there is
+              nothing to partition, so the fact stands alone (an empty fleet is a reading). */}
+          {nodes.length === 0 ? (
+            <div className="mt-3">
+              <Fact label="Online nodes">
+                <b className="font-mono font-bold">0</b>
+              </Fact>
+            </div>
+          ) : (
+            <div className="mt-1">
+              <ScheduleGroup label="Online nodes" value={<b className="font-mono font-bold">{nodes.length}</b>} defaultOpen>
                 <ScheduleCaption>Node composition</ScheduleCaption>
                 <CompositionRows nodes={nodes} />
                 <ScheduleCaption>Node status</ScheduleCaption>
@@ -652,7 +668,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
                   </>
                 )}
               </ScheduleGroup>
-            </>
+            </div>
           )}
         </>
       )}
