@@ -1,0 +1,106 @@
+<style>
+  .xc { background:#0b1020; color:#c7d0ea; border:1px solid #1e2740; border-radius:12px; padding:12px 14px; line-height:1.4; font-family:"Segoe UI",system-ui,sans-serif; }
+  .mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-variant-numeric:tabular-nums; }
+  .g { display:grid; grid-template-columns:16px 100px 1fr 56px 60px; align-items:center; column-gap:8px; padding:4px 6px; margin:0 -6px; border-radius:5px; }
+  .g.on { background:rgba(255,138,76,.13); box-shadow:inset 0 0 0 1px rgba(255,138,76,.35); }
+  .g.on.cyan { background:rgba(125,211,200,.12); box-shadow:inset 0 0 0 1px rgba(125,211,200,.35); }
+  .dot { width:6px; height:6px; border-radius:50%; justify-self:center; }
+  .name { font-size:12.5px; color:#eef1fb; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tag { display:flex; gap:3px; align-items:center; white-space:nowrap; overflow:hidden; font-size:10.5px; color:#8791ad; }
+  .tag.txt { display:block; text-overflow:ellipsis; }
+  .bar { height:5px; background:#161d30; border-radius:3px; overflow:hidden; }
+  .bar i { display:block; height:100%; border-radius:3px; background:#ff8a4c; }
+  .fig { font-size:12.5px; color:#eef1fb; text-align:right; white-space:nowrap; }
+  .lvl { display:flex; align-items:baseline; gap:10px; }
+  .lvlname { font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:#8791ad; font-weight:700; white-space:nowrap; }
+  .lvlwhat { font-size:11.5px; color:#7c86a6; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .eyebrow { font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:#7dd3c8; font-weight:700; display:flex; justify-content:space-between; }
+  .title { font-size:15px; font-weight:600; color:#eef1fb; display:flex; justify-content:space-between; align-items:center; margin-top:2px; }
+  .hint { font-size:11.5px; color:#8791ad; margin:8px 0 10px; }
+  .thead { display:flex; justify-content:flex-end; align-items:center; gap:10px; border-bottom:1px solid #1e2740; padding-bottom:5px; margin-bottom:3px; }
+  .setting { font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:#8791ad; display:flex; align-items:center; gap:5px; }
+  .step { border:1px solid #2a3450; background:#0f1626; border-radius:8px; padding:2px 7px; font-size:10.5px; letter-spacing:.08em; font-weight:700; color:#eef1fb; }
+  .scope { width:8px; height:8px; border-radius:50%; background:#ff8a4c; box-shadow:0 0 0 3px rgba(255,138,76,.22); }
+  .pager { display:flex; justify-content:center; gap:10px; margin-top:8px; font-size:10.5px; color:#6b7590; }
+  /* path */
+  .crumbs { display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:11.5px; color:#8791ad; padding:2px 0 8px; }
+  .crumb { display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border-radius:6px; background:#0f1626; color:#c7d0ea; cursor:pointer; white-space:nowrap; }
+  .crumb.root { background:transparent; padding-left:0; }
+  .sep { color:#525c78; }
+  /* quiet tree */
+  .q1 { margin:4px 0 6px 0; padding:4px 0 2px 0; border-left:2px solid rgba(255,138,76,.55); }
+  .q1 > .g { margin:0; padding-left:20px; padding-right:6px; grid-template-columns:100px 1fr 56px 60px; }
+  .q1 > .lvl { padding:0 6px 4px 20px; }
+  .q2 { margin:4px 0 6px 20px; padding:4px 0 2px 0; border-left:2px solid rgba(255,138,76,.4); }
+  .q2 > .g { margin:0; padding-left:20px; padding-right:6px; grid-template-columns:100px 1fr 56px 60px; }
+  .q2 > .lvl { padding:0 6px 4px 20px; }
+  .q3 { margin:4px 0 6px 20px; padding:4px 0 2px 0; border-left:2px solid rgba(255,138,76,.28); }
+  .q3 > .g { margin:0; padding-left:20px; padding-right:6px; grid-template-columns:100px 1fr 56px 60px; }
+  .q3 > .lvl { padding:0 6px 4px 20px; }
+  .q1 .name, .q2 .name, .q3 .name { color:#b3bcd8; } .q1 .fig, .q2 .fig, .q3 .fig { color:#b3bcd8; }
+</style>
+
+<h2>Depth without the noise</h2>
+<p class="subtitle">The same state in both: tick 6,955,738 → Dor Technologies → snapshot 27,338,081 → its signers. Three levels deep, one selection.</p>
+
+<div class="options">
+  <div class="option" data-choice="path" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>A path, not a tree</h3>
+      <div class="xc">
+        <div class="eyebrow"><span>Explore</span><span style="color:#6b7590;font-weight:400;letter-spacing:0">–</span></div>
+        <div class="title"><span>Snapshot breakdown</span><span class="scope"></span></div>
+        <div class="hint">Recent snapshots. Open one for the networks that anchored into it.</div>
+        <div class="thead"><span class="setting"><span class="dot" style="background:#2fb4a8;box-shadow:0 0 0 3px rgba(47,180,168,.25)"></span>Live</span><span class="step">∧ FEES ∨</span></div>
+        <div class="crumbs"><span class="crumb root">Snapshots</span><span class="sep">›</span><span class="crumb mono">6,955,738</span><span class="sep">›</span><span class="crumb"><span class="dot" style="background:#ff8a4c;display:inline-block"></span>Dor Technologies</span><span class="sep">›</span><span class="crumb mono">27,338,081</span></div>
+        <div class="lvl" style="padding:0 0 6px"><span class="lvlname">By signer</span><span class="lvlwhat">The validators that sealed this snapshot</span></div>
+        <div class="g"><span></span><span class="name mono">1545a38a…fcab7</span><span class="tag txt">Dor L0</span><span></span><span class="fig"></span></div>
+        <div class="g"><span></span><span class="name mono">9c02e7b1…41d0e</span><span class="tag txt">Dor L0</span><span></span><span class="fig"></span></div>
+        <div class="g"><span></span><span class="name mono">e7d3c0a2…88b1f</span><span class="tag txt">Dor L0</span><span></span><span class="fig"></span></div>
+        <p style="font-size:11px;color:#6b7590;margin:12px 0 0">One level at a time. Click a crumb to go back up; the list becomes that level's siblings with the crumb's row washed. The whole card is one wash at most.</p>
+      </div>
+      <div class="pros-cons">
+        <div class="pros"><h4>Gains</h4><ul><li>Every level gets the full width and the full type size — no shrinking with depth</li><li>Ancestry reads as words, once, instead of as three washes</li><li>Works at phone width without change</li></ul></div>
+        <div class="cons"><h4>Costs</h4><ul><li>Upper levels' siblings are out of sight while drilled; the scene and the rail cards still show them</li><li>Going up is a crumb click, not a scroll</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="quiet-tree" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>The tree, with one wash</h3>
+      <div class="xc">
+        <div class="eyebrow"><span>Explore</span><span style="color:#6b7590;font-weight:400;letter-spacing:0">–</span></div>
+        <div class="title"><span>Snapshot breakdown</span><span class="scope"></span></div>
+        <div class="hint">Recent snapshots. Open one for the networks that anchored into it.</div>
+        <div class="thead"><span class="setting"><span class="dot" style="background:#2fb4a8;box-shadow:0 0 0 3px rgba(47,180,168,.25)"></span>Live</span><span class="step">∧ FEES ∨</span></div>
+        <div class="g"><span></span><span class="name mono">6,955,738</span><span></span><span class="bar"><i style="width:60%;background:#2fb4a8"></i></span><span class="fig mono">0.0390</span></div>
+        <div class="q1">
+          <div class="lvl"><span class="lvlname">By network</span><span class="lvlwhat">Who anchored into this tick</span></div>
+          <div class="g"><span class="name"><span class="dot" style="background:#ff8a4c;display:inline-block;margin-right:6px"></span>Dor Technologies</span><span></span><span class="bar"><i style="width:80%;opacity:.6"></i></span><span class="fig mono">4</span></div>
+          <div class="q2">
+            <div class="lvl"><span class="lvlname">By snapshot</span><span class="lvlwhat">Each snapshot Dor anchored here</span></div>
+            <div class="g on"><span class="name mono">27,338,081</span><span class="tag txt mono">a1f9…c2d4</span><span class="bar"><i style="width:70%;opacity:.5"></i></span><span class="fig mono">0.0120</span></div>
+            <div class="q3">
+              <div class="lvl"><span class="lvlname">By signer</span><span class="lvlwhat">The validators that sealed it</span></div>
+              <div class="g"><span class="name mono">1545a38a…fcab7</span><span class="tag txt">Dor L0</span><span></span><span class="fig"></span></div>
+              <div class="g"><span class="name mono">9c02e7b1…41d0e</span><span class="tag txt">Dor L0</span><span></span><span class="fig"></span></div>
+            </div>
+            <div class="g"><span class="name mono">27,338,080</span><span class="tag txt mono">77be…0e91</span><span class="bar"><i style="width:55%;opacity:.5"></i></span><span class="fig mono">0.0100</span></div>
+          </div>
+          <div class="g"><span class="name"><span class="dot" style="background:#5ab0ff;display:inline-block;margin-right:6px"></span>USDC.dag</span><span></span><span class="bar"><i style="width:20%;opacity:.6"></i></span><span class="fig mono">1</span></div>
+        </div>
+        <div class="g"><span></span><span class="name mono">6,955,737</span><span></span><span class="bar"><i style="width:35%;background:#2fb4a8"></i></span><span class="fig mono">0.0170</span></div>
+        <p style="font-size:11px;color:#6b7590;margin:12px 0 0">Only the finest rung is washed. The ancestors are on the path, and the path is a 2px rail in the selection's hue that fades with depth; the wash panels go.</p>
+      </div>
+      <div class="pros-cons">
+        <div class="pros"><h4>Gains</h4><ul><li>Siblings at every level stay in view; the structure is the picture</li><li>No navigation to learn — it is the accordion the cards already have</li></ul></div>
+        <div class="cons"><h4>Costs</h4><ul><li>Three levels still cost three indents; names narrow with depth</li><li>Still the busiest card in the app when fully open</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:14px">My recommendation is A. The rail is a narrow column, the scene already shows the siblings the path hides, and the rail's own cards already form a ladder that reads the same way — the path is that ladder in the explorer. Click one and say go.</p>

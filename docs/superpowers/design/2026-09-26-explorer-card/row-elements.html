@@ -1,0 +1,135 @@
+<style>
+  .xc { background:#0b1020; color:#c7d0ea; border:1px solid #1e2740; border-radius:12px; padding:12px 14px; font-size:12px; line-height:1.4; }
+  .xc .lvlname { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#a3add0; font-weight:700; }
+  .xc .lvlwhat { font-size:11px; color:#7c86a6; margin:1px 0 6px; }
+  .xc .panel { margin:6px 0; padding:8px 10px; background:#0f1626; border-radius:8px; }
+  .xc .g { display:grid; align-items:center; column-gap:8px; padding:4px 6px; margin:0 -6px; border-radius:5px; }
+  .xc .g.on { background:rgba(255,138,76,.13); box-shadow:inset 0 0 0 1px rgba(255,138,76,.35); }
+  .xc .dot { width:6px; height:6px; border-radius:50%; justify-self:center; }
+  .xc .cc { font-family:ui-monospace,monospace; font-size:10px; color:#6b7590; }
+  .xc .name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .xc .mono { font-family:ui-monospace,monospace; }
+  .xc .tag { display:flex; gap:3px; align-items:center; overflow:hidden; white-space:nowrap; }
+  .xc .tag.txt { font-size:10.5px; color:#7c86a6; text-overflow:ellipsis; display:block; }
+  .xc .chip { font-size:9px; border:1px solid #2a3450; border-radius:3px; padding:0 4px; color:#8791ad; line-height:14px; }
+  .xc .bar { height:5px; background:#161d30; border-radius:3px; overflow:hidden; }
+  .xc .bar i { display:block; height:100%; border-radius:3px; background:#ff8a4c; opacity:.6; }
+  .xc .fig { font-family:ui-monospace,monospace; font-weight:700; text-align:right; font-variant-numeric:tabular-nums; }
+  .xc .tail { text-align:center; color:#6b7590; }
+  .xc .sub { grid-column:2 / span 3; font-size:10.5px; color:#7c86a6; margin-top:-2px; padding-bottom:2px; }
+  .xc .head { display:grid; column-gap:8px; padding:0 6px 4px; margin:0 -6px 2px; border-bottom:1px solid #1e2740; font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:#525c78; }
+  .cols6 { grid-template-columns:16px 92px 74px 1fr 46px 12px; }
+  .cols5 { grid-template-columns:16px 92px 1fr 46px 12px; }
+  .cols6r { grid-template-columns:16px 92px 1fr 46px 74px 12px; }
+  .inv { width:100%; border-collapse:collapse; font-size:12px; }
+  .inv td { padding:5px 8px 5px 0; vertical-align:top; border-bottom:1px solid #1e2740; }
+  .inv tr:first-child td { font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; opacity:.6; border-bottom:1px solid #2a3450; }
+</style>
+
+<h2>Where a row's extra elements sit</h2>
+<p class="subtitle">Every row in every explorer is one grid. Six columns, fixed widths but the bar's; a row that has nothing for a column leaves it empty, and the bar never moves.</p>
+
+<div class="section">
+  <div class="label">Inventory — every element a row can carry today</div>
+  <div class="mockup"><div class="mockup-body" style="padding:10px 16px">
+    <table class="inv">
+      <tr><td>Element</td><td>Rows that carry it</td><td>Nature</td></tr>
+      <tr><td>Identity dot</td><td>network rows (all four cards), Snapshots' "by network"</td><td>hue, no words</td></tr>
+      <tr><td>Country code</td><td>Geography country rows</td><td>2 letters, mono</td></tr>
+      <tr><td>Role chips <span class="chip" style="font-size:9px;border:1px solid #2a3450;border-radius:3px;padding:0 4px">L0</span> <span class="chip" style="font-size:9px;border:1px solid #2a3450;border-radius:3px;padding:0 4px">dL1</span></td><td>Hypergraph "by composition" rows</td><td>1–3 short tags</td></tr>
+      <tr><td>Provider name</td><td>Geography "by city · provider" rows</td><td>long text, part of the row's identity</td></tr>
+      <tr><td>Hash / address</td><td>Snapshots' snapshot leaves, unlisted rows</td><td>mono, abbreviated</td></tr>
+      <tr><td>Node id, state</td><td>node rows (Hypergraph, Geography), signer rows</td><td>mono id; "Ready" as a word</td></tr>
+      <tr><td>Count mark in the filter's hue</td><td>Snapshots tick rows under a committed network</td><td>a second small number</td></tr>
+    </table>
+  </div></div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="tagcol" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>A fixed tag column between the name and the bar</h3>
+      <div class="xc" style="border:0;padding:8px 10px">
+        <div class="head cols6"><span></span><span>Name</span><span>Tag</span><span>Bar</span><span style="text-align:right">Fig</span><span></span></div>
+        <div class="g cols6 on"><span class="dot" style="background:#ff8a4c"></span><span class="name">Dor Technologies</span><span></span><span class="bar"><i style="width:14%;opacity:1"></i></span><span class="fig">19</span><span class="tail" style="color:#ff8a4c">✓</span></div>
+        <div class="panel">
+          <div style="display:flex;justify-content:space-between"><span class="lvlname">By composition</span><span class="mono" style="font-size:10.5px;color:#6b7590">19 nodes</span></div>
+          <div class="lvlwhat">Which layers each node runs.</div>
+          <div class="g cols6"><span></span><span class="name">Data</span><span class="tag"><span class="chip">dL1</span></span><span class="bar"><i style="width:84%"></i></span><span class="fig">16</span><span class="tail">›</span></div>
+          <div class="g cols6"><span></span><span class="name">Hybrid</span><span class="tag"><span class="chip">L0</span><span class="chip">cL1</span><span class="chip">dL1</span></span><span class="bar"><i style="width:16%"></i></span><span class="fig">3</span><span class="tail">›</span></div>
+        </div>
+        <div class="panel" style="margin-top:10px">
+          <div style="display:flex;justify-content:space-between"><span class="lvlname">By city · provider</span><span class="mono" style="font-size:10.5px;color:#6b7590">67 nodes</span></div>
+          <div class="lvlwhat">Where the nodes sit, and who hosts them.</div>
+          <div class="g cols6"><span></span><span class="name">Falkenstein</span><span class="tag txt" title="Hetzner Online GmbH">Hetzner Onli…</span><span class="bar"><i style="width:100%"></i></span><span class="fig">33</span><span class="tail">›</span></div>
+          <div class="g cols6"><span></span><span class="name">Essen</span><span class="tag txt">IONOS SE</span><span class="bar"><i style="width:9%"></i></span><span class="fig">3</span><span class="tail">›</span></div>
+        </div>
+        <div class="panel" style="margin-top:10px">
+          <div style="display:flex;justify-content:space-between"><span class="lvlname">By snapshot</span><span class="mono" style="font-size:10.5px;color:#6b7590">4 anchored</span></div>
+          <div class="lvlwhat">Each snapshot Dor Technologies anchored here.</div>
+          <div class="g cols6"><span></span><span class="name mono">27,338,081</span><span class="tag txt mono">a1f9…c2d4</span><span class="bar"><i style="width:70%"></i></span><span class="fig">0.0120</span><span class="tail">›</span></div>
+        </div>
+      </div>
+      <div class="pros-cons">
+        <div class="pros"><h4>Gains</h4><ul><li>The bar starts at one x in every row of every card</li><li>Every extra element has one home; a row without one leaves it blank</li></ul></div>
+        <div class="cons"><h4>Costs</h4><ul><li>74px of tag column costs the bar; long providers truncate ("Hetzner Onli…", full name on hover)</li><li>Three chips fill the column exactly; a fourth role would wrap</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="subline" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Extras on a second line under the name</h3>
+      <div class="xc" style="border:0;padding:8px 10px">
+        <div class="head cols5"><span></span><span>Name</span><span>Bar</span><span style="text-align:right">Fig</span><span></span></div>
+        <div class="g cols5 on"><span class="dot" style="background:#ff8a4c"></span><span class="name">Dor Technologies</span><span class="bar"><i style="width:14%;opacity:1"></i></span><span class="fig">19</span><span class="tail" style="color:#ff8a4c">✓</span></div>
+        <div class="panel">
+          <div style="display:flex;justify-content:space-between"><span class="lvlname">By composition</span><span class="mono" style="font-size:10.5px;color:#6b7590">19 nodes</span></div>
+          <div class="lvlwhat">Which layers each node runs.</div>
+          <div class="g cols5" style="row-gap:0"><span></span><span class="name">Data</span><span class="bar"><i style="width:84%"></i></span><span class="fig">16</span><span class="tail">›</span><span class="sub"><span class="chip">dL1</span></span></div>
+          <div class="g cols5" style="row-gap:0"><span></span><span class="name">Hybrid</span><span class="bar"><i style="width:16%"></i></span><span class="fig">3</span><span class="tail">›</span><span class="sub"><span class="chip">L0</span> <span class="chip">cL1</span> <span class="chip">dL1</span></span></div>
+        </div>
+        <div class="panel" style="margin-top:10px">
+          <div style="display:flex;justify-content:space-between"><span class="lvlname">By city · provider</span><span class="mono" style="font-size:10.5px;color:#6b7590">67 nodes</span></div>
+          <div class="lvlwhat">Where the nodes sit, and who hosts them.</div>
+          <div class="g cols5" style="row-gap:0"><span></span><span class="name">Falkenstein</span><span class="bar"><i style="width:100%"></i></span><span class="fig">33</span><span class="tail">›</span><span class="sub">Hetzner Online GmbH</span></div>
+          <div class="g cols5" style="row-gap:0"><span></span><span class="name">Essen</span><span class="bar"><i style="width:9%"></i></span><span class="fig">3</span><span class="tail">›</span><span class="sub">IONOS SE</span></div>
+        </div>
+      </div>
+      <div class="pros-cons">
+        <div class="pros"><h4>Gains</h4><ul><li>Nothing truncates; the bar keeps the full width</li><li>The extra reads as what it is: a qualifier of the name</li></ul></div>
+        <div class="cons"><h4>Costs</h4><ul><li>Child rows become two lines — a 33-row country doubles in height</li><li>Rows with and without an extra are different heights in one list</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="trail" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Extras trail the figure, before the slot</h3>
+      <div class="xc" style="border:0;padding:8px 10px">
+        <div class="head cols6r"><span></span><span>Name</span><span>Bar</span><span style="text-align:right">Fig</span><span>Tag</span><span></span></div>
+        <div class="g cols6r on"><span class="dot" style="background:#ff8a4c"></span><span class="name">Dor Technologies</span><span class="bar"><i style="width:14%;opacity:1"></i></span><span class="fig">19</span><span></span><span class="tail" style="color:#ff8a4c">✓</span></div>
+        <div class="panel">
+          <div style="display:flex;justify-content:space-between"><span class="lvlname">By composition</span><span class="mono" style="font-size:10.5px;color:#6b7590">19 nodes</span></div>
+          <div class="lvlwhat">Which layers each node runs.</div>
+          <div class="g cols6r"><span></span><span class="name">Data</span><span class="bar"><i style="width:84%"></i></span><span class="fig">16</span><span class="tag"><span class="chip">dL1</span></span><span class="tail">›</span></div>
+          <div class="g cols6r"><span></span><span class="name">Hybrid</span><span class="bar"><i style="width:16%"></i></span><span class="fig">3</span><span class="tag"><span class="chip">L0</span><span class="chip">cL1</span><span class="chip">dL1</span></span><span class="tail">›</span></div>
+        </div>
+        <div class="panel" style="margin-top:10px">
+          <div style="display:flex;justify-content:space-between"><span class="lvlname">By city · provider</span><span class="mono" style="font-size:10.5px;color:#6b7590">67 nodes</span></div>
+          <div class="lvlwhat">Where the nodes sit, and who hosts them.</div>
+          <div class="g cols6r"><span></span><span class="name">Falkenstein</span><span class="bar"><i style="width:100%"></i></span><span class="fig">33</span><span class="tag txt" title="Hetzner Online GmbH">Hetzner Onli…</span><span class="tail">›</span></div>
+        </div>
+      </div>
+      <div class="pros-cons">
+        <div class="pros"><h4>Gains</h4><ul><li>The name and the bar sit together on the left, the way the eye scans a ranked list</li><li>Matches the ledger's existing trailing-marker idiom for hashes</li></ul></div>
+        <div class="cons"><h4>Costs</h4><ul><li>The figure loses the right edge; chips between a number and its ✓ read as noise</li><li>Same truncation as A for long providers</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:14px">Fixed in every option: the glyph column is 16px and holds a dot, a country code, or nothing; the name column is a fixed width and ellipsises; the figure is 46px, right-aligned, tabular; the slot is 12px and holds ✓, ›, or nothing. Node rows put the id in the name column in mono and their state in the tag home. My recommendation is A: one row height everywhere, and truncation only where a provider name is long, with the full name on hover. Click one and tell me here.</p>

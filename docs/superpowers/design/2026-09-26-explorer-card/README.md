@@ -1,0 +1,67 @@
+# The explorer card — the agreed design (2026-09-26)
+
+The `.html` files beside this README are the screens from the live design session, in the order
+they were agreed, and **they are the reference the build is checked against** — not this text.
+Open them in a browser (they are self-contained fragments; the frame CSS they assumed is gone, so
+read them for structure, sizes and inks, not for the page chrome). When a built card and a screen
+disagree, the screen wins unless the deviation is recorded below with its reason.
+
+Decisions, in the order they were made, each with the screen that shows it:
+
+1. **Scope: option B** (`explorer-card.html`). The committed filter is stated in the card HEAD, not
+   as a chip in the body. No chip anywhere; the History card's "X only ×" chip goes.
+2. **The head's scope mark is the hue dot alone** (`option-b-refined.html` 1b): an 8px dot in the
+   committed network's hue with a 3px soft ring at 22% on the title line's right; the × to release
+   appears on hover of the dot, always on touch. No ticker, no name.
+3. **The measure control is the figure column's heading** (`option-b-refined.html` 2a, then
+   `measure-control.html` A): a hairline heading row over the list, the control right-aligned, the
+   view's one setting (Same scale, Live/Pinned) to its left. No axis label (the title names it —
+   `quieter.html`).
+4. **The control is the heading opening its list** (`measure-control.html` A): caps word + caret →
+   a radio menu of THIS LEVEL's measures with their units. With one measure the same word without
+   the caret, muted, not a control. With no figure, the heading row is the hairline alone.
+   Regular weight always (user: "normal") — the control differs from the label by full ink and
+   the caret, never by weight.
+5. **Each level has its own measures** (`level-measures.html` A): ticks fees · anchors ·
+   metagraphs · size; networks in a tick snapshots · fees · size; a network's snapshots fee · size;
+   Hypergraph networks nodes · countries · providers, compositions nodes (static); Geography
+   countries nodes · metagraphs · providers, cohorts nodes · metagraphs; History layers the trend
+   metric; node and signer rows none. Each level remembers its own pick.
+6. **Depth is a PATH, not a tree** (`depth.html` A): one level on screen at a time; the ancestry is
+   a breadcrumb (shadcn Breadcrumb) above the list, each crumb going back up; the list beneath is
+   the current level's siblings at full width. At most ONE selection wash on screen.
+7. **Level line** (`option-b-refined.html` 3a + `build-reference.html`): a caps eyebrow naming the
+   axis ("By composition", "By city · provider", "By network", "By snapshot", "By signer",
+   "By node") and ONE muted sentence of meaning on the SAME line; no total (the parent row's
+   figure is that number and the heading names the unit — `quieter.html`).
+8. **Row grid** (`row-elements.html` A, `aligned.html`, widths from `build-reference.html` and
+   after): `16px glyph · 100px name · tag home (flex, takes the rest) · 56px bar · 60px figure`,
+   8px column gap, 4px/6px row padding, 5px radius. The bar is a short accent, never flex. The
+   tag home holds role chips (10px, hairline border, 3px radius), provider text, a hash, a state —
+   ellipsis with the full text on hover; empty when the row has none. **Per level, not per card:**
+   a level whose rows carry no figure drops the bar and figure columns and the name widens (an id
+   shows a longer middle); a level with a figure but no tags keeps the tag home empty.
+9. **Type: T1** (`type-systems.html`): eyebrow 10.5px caps tracked bold (teal for the card's
+   eyebrow, muted elsewhere); title 15px semibold; hint 11.5px muted; row name 12.5px regular full
+   ink; figure 12.5px mono REGULAR (user: the rail's Fact rows are regular; only a total is bold),
+   right-aligned, tabular, full ink at the top level and dim ink inside a level; tags 10.5px muted;
+   level meaning 11.5px muted.
+10. **No ✓, no chevrons** (`quieter.html` A): the wash is the selection; the row is the control —
+    hover washes it, click opens it. The figure takes the right edge in every row at every depth
+    (`aligned.html`): a level indents on the LEFT only (22px) and keeps the card's right edge.
+11. **Bar**: the figure's share of the level's busiest row, in the row's hue (a network's identity
+    hue, the filter accent for countries and ticks); inside a level the parent's hue at 60%.
+12. **Selection stays in place** (terminal, not a screen): the list never re-orders on selection;
+    a committed row is scrolled into view instead.
+13. **Filter gestures: option B** (`filter-gestures.html`): only the top-bar picker and the
+    Hypergraph hub / network row set the filter. Geography (built 2026-09-26, `f1fadc1`) and
+    Snapshots selections never set it; History already didn't. Snapshots' metagraph snapshot
+    select loses its filter-first arm.
+14. **Snapshots' network rows only open**: no wash, no commit (unchanged rule from 2026-08-10),
+    now visibly different from the committing rows because nothing commits in a path level
+    except a row that IS a subject (a tick, a snapshot).
+15. **Live/Pinned** rides the heading row as dot + word (`final-walkthrough.html`).
+16. **Primitives**: shadcn `Breadcrumb` for the path, shadcn `DropdownMenu` (radio group) for the
+    heading control, restyled to the card's tokens like the other adopted primitives.
+
+Recorded deviations from the screens: none yet.

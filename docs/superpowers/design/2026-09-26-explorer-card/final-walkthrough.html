@@ -1,0 +1,162 @@
+<style>
+  .xc { background:#0b1020; color:#c7d0ea; border:1px solid #1e2740; border-radius:12px; padding:10px 12px; line-height:1.4; font-family:"Segoe UI",system-ui,sans-serif; position:relative; }
+  .mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-variant-numeric:tabular-nums; }
+  .g { display:grid; grid-template-columns:16px 100px 1fr 56px 60px; align-items:center; column-gap:8px; padding:4px 6px; margin:0 -6px; border-radius:5px; }
+  .g.on { background:rgba(255,138,76,.13); box-shadow:inset 0 0 0 1px rgba(255,138,76,.35); }
+  .g.on.cyan { background:rgba(125,211,200,.12); box-shadow:inset 0 0 0 1px rgba(125,211,200,.35); }
+  .dot { width:6px; height:6px; border-radius:50%; justify-self:center; }
+  .name { font-size:12.5px; color:#eef1fb; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tag { display:flex; gap:3px; align-items:center; white-space:nowrap; overflow:hidden; font-size:10.5px; color:#8791ad; }
+  .tag.txt { display:block; text-overflow:ellipsis; }
+  .bar { height:5px; background:#161d30; border-radius:3px; overflow:hidden; }
+  .bar i { display:block; height:100%; border-radius:3px; }
+  .fig { font-size:12.5px; color:#eef1fb; text-align:right; white-space:nowrap; }
+  .eyebrow { font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:#7dd3c8; font-weight:700; display:flex; justify-content:space-between; }
+  .title { font-size:15px; font-weight:600; color:#eef1fb; display:flex; justify-content:space-between; align-items:center; margin-top:2px; }
+  .hint { font-size:11.5px; color:#8791ad; margin:8px 0 10px; }
+  .thead { display:flex; justify-content:flex-end; align-items:center; gap:10px; border-bottom:1px solid #1e2740; padding-bottom:5px; margin-bottom:6px; min-height:22px; }
+  .setting { font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:#8791ad; display:flex; align-items:center; gap:5px; }
+  .menu { display:inline-flex; align-items:center; gap:5px; font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; font-weight:700; color:#eef1fb; padding:2px 4px; }
+  .menu .caret { font-size:9px; color:#8791ad; }
+  .static { font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:#6b7590; padding:2px 4px; }
+  .crumbs { display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:11.5px; color:#8791ad; padding:2px 0 8px; }
+  .crumb { display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border-radius:6px; background:#0f1626; color:#c7d0ea; white-space:nowrap; }
+  .crumb.root { background:transparent; padding-left:0; }
+  .sep { color:#525c78; }
+  .lvl { display:flex; align-items:baseline; gap:10px; padding:0 0 6px; }
+  .lvlname { font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:#8791ad; font-weight:700; white-space:nowrap; }
+  .lvlwhat { font-size:11.5px; color:#7c86a6; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .scope { width:8px; height:8px; border-radius:50%; background:#ff8a4c; box-shadow:0 0 0 3px rgba(255,138,76,.22); }
+  .sw { display:inline-block; width:22px; height:12px; border-radius:6px; background:#2fb4a8; position:relative; }
+  .sw::after { content:""; position:absolute; right:1px; top:1px; width:10px; height:10px; border-radius:50%; background:#0b1020; }
+  .pager { display:flex; justify-content:center; gap:10px; margin-top:8px; font-size:10.5px; color:#6b7590; }
+  .flow { display:grid; grid-template-columns:repeat(2,1fr); gap:14px; }
+  @media (max-width:900px){ .flow { grid-template-columns:1fr; } }
+  .cap { font-size:11px; color:#6b7590; margin:0 0 6px; }
+  .cap b { color:#a3add0; font-weight:600; }
+  h3.sec { margin:26px 0 8px; }
+</style>
+
+<h2>The final design, walked through</h2>
+<p class="subtitle">Snapshots drilled from the tick list to the signers, then the other three cards at rest and one level in. The heading row is read off the list beneath it, every time.</p>
+
+<h3 class="sec">Snapshots — a drill, four screens of the same card</h3>
+<div class="flow">
+  <div>
+    <div class="cap"><b>1 · At rest.</b> The ticks. Four measures, so the heading is a control.</div>
+    <div class="xc">
+      <div class="eyebrow"><span>Explore</span><span style="color:#6b7590;font-weight:400;letter-spacing:0">–</span></div>
+      <div class="title"><span>Snapshot breakdown</span><span></span></div>
+      <div class="hint">Recent snapshots. Open one for the networks that anchored into it.</div>
+      <div class="thead"><span class="setting"><span class="dot" style="background:#2fb4a8;box-shadow:0 0 0 3px rgba(47,180,168,.25)"></span>Live</span><span class="menu">Fees <span class="caret">▾</span></span></div>
+      <div class="g"><span></span><span class="name mono">6,955,738</span><span></span><span class="bar"><i style="width:60%;background:#2fb4a8"></i></span><span class="fig mono">0.0390</span></div>
+      <div class="g"><span></span><span class="name mono">6,955,737</span><span></span><span class="bar"><i style="width:35%;background:#2fb4a8"></i></span><span class="fig mono">0.0170</span></div>
+      <div class="g"><span></span><span class="name mono">6,955,736</span><span></span><span class="bar"><i style="width:48%;background:#2fb4a8"></i></span><span class="fig mono">0.0310</span></div>
+      <div class="g"><span></span><span class="name mono">6,955,735</span><span></span><span class="bar"><i style="width:100%;background:#2fb4a8"></i></span><span class="fig mono">0.0600</span></div>
+      <div class="pager mono">‹ &nbsp;1–15 of 52&nbsp; ›</div>
+    </div>
+  </div>
+  <div>
+    <div class="cap"><b>2 · A tick opened.</b> The list is now the networks in it; the heading is theirs.</div>
+    <div class="xc">
+      <div class="eyebrow"><span>Explore</span><span style="color:#6b7590;font-weight:400;letter-spacing:0">–</span></div>
+      <div class="title"><span>Snapshot breakdown</span><span></span></div>
+      <div class="hint">Recent snapshots. Open one for the networks that anchored into it.</div>
+      <div class="thead"><span class="setting"><span class="dot" style="background:#7dd3c8;box-shadow:0 0 0 3px rgba(125,211,200,.25)"></span>Pinned</span><span class="menu">Snapshots <span class="caret">▾</span></span></div>
+      <div class="crumbs"><span class="crumb root">Snapshots</span><span class="sep">›</span><span class="crumb mono">6,955,738</span></div>
+      <div class="lvl"><span class="lvlname">By network</span><span class="lvlwhat">Who anchored into this tick</span></div>
+      <div class="g"><span class="dot" style="background:#ff8a4c"></span><span class="name">Dor Technologies</span><span></span><span class="bar"><i style="width:100%;background:#ff8a4c"></i></span><span class="fig mono">4</span></div>
+      <div class="g"><span class="dot" style="background:#5ab0ff"></span><span class="name">USDC.dag</span><span></span><span class="bar"><i style="width:25%;background:#5ab0ff"></i></span><span class="fig mono">1</span></div>
+    </div>
+  </div>
+  <div>
+    <div class="cap"><b>3 · A network opened.</b> Its snapshots; two measures, still a control. A snapshot is selected.</div>
+    <div class="xc">
+      <div class="eyebrow"><span>Explore</span><span style="color:#6b7590;font-weight:400;letter-spacing:0">–</span></div>
+      <div class="title"><span>Snapshot breakdown</span><span></span></div>
+      <div class="hint">Recent snapshots. Open one for the networks that anchored into it.</div>
+      <div class="thead"><span class="setting"><span class="dot" style="background:#7dd3c8;box-shadow:0 0 0 3px rgba(125,211,200,.25)"></span>Pinned</span><span class="menu">Fee <span class="caret">▾</span></span></div>
+      <div class="crumbs"><span class="crumb root">Snapshots</span><span class="sep">›</span><span class="crumb mono">6,955,738</span><span class="sep">›</span><span class="crumb"><span class="dot" style="background:#ff8a4c;display:inline-block"></span>Dor Technologies</span></div>
+      <div class="lvl"><span class="lvlname">By snapshot</span><span class="lvlwhat">Each snapshot Dor Technologies anchored here</span></div>
+      <div class="g on"><span></span><span class="name mono">27,338,081</span><span class="tag txt mono">a1f9…c2d4</span><span class="bar"><i style="width:100%;background:#ff8a4c"></i></span><span class="fig mono">0.0120</span></div>
+      <div class="g"><span></span><span class="name mono">27,338,080</span><span class="tag txt mono">77be…0e91</span><span class="bar"><i style="width:83%;background:#ff8a4c"></i></span><span class="fig mono">0.0100</span></div>
+      <div class="g"><span></span><span class="name mono">27,338,079</span><span class="tag txt mono">c0de…19aa</span><span class="bar"><i style="width:75%;background:#ff8a4c"></i></span><span class="fig mono">0.0090</span></div>
+      <div class="g"><span></span><span class="name mono">27,338,078</span><span class="tag txt mono">5e5e…b7c3</span><span class="bar"><i style="width:83%;background:#ff8a4c"></i></span><span class="fig mono">0.0100</span></div>
+    </div>
+  </div>
+  <div>
+    <div class="cap"><b>4 · The snapshot opened.</b> Its signers carry no figure: the heading row is a hairline.</div>
+    <div class="xc">
+      <div class="eyebrow"><span>Explore</span><span style="color:#6b7590;font-weight:400;letter-spacing:0">–</span></div>
+      <div class="title"><span>Snapshot breakdown</span><span></span></div>
+      <div class="hint">Recent snapshots. Open one for the networks that anchored into it.</div>
+      <div class="thead"><span class="setting"><span class="dot" style="background:#7dd3c8;box-shadow:0 0 0 3px rgba(125,211,200,.25)"></span>Pinned</span></div>
+      <div class="crumbs"><span class="crumb root">Snapshots</span><span class="sep">›</span><span class="crumb mono">6,955,738</span><span class="sep">›</span><span class="crumb"><span class="dot" style="background:#ff8a4c;display:inline-block"></span>Dor</span><span class="sep">›</span><span class="crumb mono">27,338,081</span></div>
+      <div class="lvl"><span class="lvlname">By signer</span><span class="lvlwhat">The validators that sealed it</span></div>
+      <div class="g"><span></span><span class="name mono">1545a38a…fcab7</span><span class="tag txt">Dor L0</span><span></span><span class="fig"></span></div>
+      <div class="g"><span></span><span class="name mono">9c02e7b1…41d0e</span><span class="tag txt">Dor L0</span><span></span><span class="fig"></span></div>
+      <div class="g"><span></span><span class="name mono">e7d3c0a2…88b1f</span><span class="tag txt">Dor L0</span><span></span><span class="fig"></span></div>
+    </div>
+  </div>
+</div>
+
+<h3 class="sec">The other three — at rest, and one level in</h3>
+<div class="flow">
+  <div>
+    <div class="cap"><b>Hypergraph, at rest</b> — three measures.</div>
+    <div class="xc">
+      <div class="eyebrow"><span>Explore</span><span style="color:#6b7590;font-weight:400;letter-spacing:0">–</span></div>
+      <div class="title"><span>Network breakdown</span><span class="scope"></span></div>
+      <div class="hint">Every network on the hypergraph. Open one for the roles its nodes play.</div>
+      <div class="thead"><span class="menu">Nodes <span class="caret">▾</span></span></div>
+      <div class="g"><span class="dot" style="background:#5ab0ff"></span><span class="name">DAG</span><span></span><span class="bar"><i style="width:100%;background:#5ab0ff"></i></span><span class="fig mono">141</span></div>
+      <div class="g on"><span class="dot" style="background:#ff8a4c"></span><span class="name">Dor Technologies</span><span></span><span class="bar"><i style="width:14%;background:#ff8a4c"></i></span><span class="fig mono">19</span></div>
+      <div class="g"><span class="dot" style="background:#7ee08a"></span><span class="name">BioFi</span><span></span><span class="bar"><i style="width:2%;background:#7ee08a"></i></span><span class="fig mono">3</span></div>
+      <div class="g"><span class="dot" style="background:#5ab0ff"></span><span class="name">Digital Evidence</span><span></span><span class="bar"><i style="width:2%;background:#5ab0ff"></i></span><span class="fig mono">3</span></div>
+    </div>
+  </div>
+  <div>
+    <div class="cap"><b>Hypergraph, Dor opened</b> — compositions have one measure: a label, not a control.</div>
+    <div class="xc">
+      <div class="eyebrow"><span>Explore</span><span style="color:#6b7590;font-weight:400;letter-spacing:0">–</span></div>
+      <div class="title"><span>Network breakdown</span><span class="scope"></span></div>
+      <div class="hint">Every network on the hypergraph. Open one for the roles its nodes play.</div>
+      <div class="thead"><span class="static">Nodes</span></div>
+      <div class="crumbs"><span class="crumb root">Networks</span><span class="sep">›</span><span class="crumb"><span class="dot" style="background:#ff8a4c;display:inline-block"></span>Dor Technologies</span></div>
+      <div class="lvl"><span class="lvlname">By composition</span><span class="lvlwhat">Which layers each node runs</span></div>
+      <div class="g"><span></span><span class="name">Data</span><span class="tag"><span style="border:1px solid #2a3450;border-radius:3px;padding:0 4px;font-size:10px">dL1</span></span><span class="bar"><i style="width:100%;background:#ff8a4c"></i></span><span class="fig mono">16</span></div>
+      <div class="g"><span></span><span class="name">Hybrid</span><span class="tag"><span style="border:1px solid #2a3450;border-radius:3px;padding:0 4px;font-size:10px">L0</span><span style="border:1px solid #2a3450;border-radius:3px;padding:0 4px;font-size:10px">cL1</span><span style="border:1px solid #2a3450;border-radius:3px;padding:0 4px;font-size:10px">dL1</span></span><span class="bar"><i style="width:19%;background:#ff8a4c"></i></span><span class="fig mono">3</span></div>
+    </div>
+  </div>
+  <div>
+    <div class="cap"><b>Geography, Germany opened</b> — cohorts have two measures.</div>
+    <div class="xc">
+      <div class="eyebrow"><span>Explore</span><span style="color:#6b7590;font-weight:400;letter-spacing:0">–</span></div>
+      <div class="title"><span>Country breakdown</span><span></span></div>
+      <div class="hint">Every country hosting nodes. Open one to explore where its nodes sit.</div>
+      <div class="thead"><span class="menu">Nodes <span class="caret">▾</span></span></div>
+      <div class="crumbs"><span class="crumb root">Countries</span><span class="sep">›</span><span class="crumb">Germany</span></div>
+      <div class="lvl"><span class="lvlname">By city · provider</span><span class="lvlwhat">Where the nodes sit, and who hosts them</span></div>
+      <div class="g"><span></span><span class="name">Falkenstein</span><span class="tag txt">Hetzner Online GmbH</span><span class="bar"><i style="width:100%;background:#7dd3c8"></i></span><span class="fig mono">33</span></div>
+      <div class="g"><span></span><span class="name">Nuremberg</span><span class="tag txt">Hetzner Online GmbH</span><span class="bar"><i style="width:52%;background:#7dd3c8"></i></span><span class="fig mono">17</span></div>
+      <div class="g"><span></span><span class="name">Gunzenhausen</span><span class="tag txt">Hetzner Online GmbH</span><span class="bar"><i style="width:15%;background:#7dd3c8"></i></span><span class="fig mono">5</span></div>
+      <div class="g"><span></span><span class="name">Essen</span><span class="tag txt">IONOS SE</span><span class="bar"><i style="width:9%;background:#7dd3c8"></i></span><span class="fig mono">3</span></div>
+    </div>
+  </div>
+  <div>
+    <div class="cap"><b>History, at rest</b> — flat; nothing opens, so no path ever appears.</div>
+    <div class="xc">
+      <div class="eyebrow"><span>Explore</span><span style="color:#6b7590;font-weight:400;letter-spacing:0">–</span></div>
+      <div class="title"><span>Layer breakdown</span><span></span></div>
+      <div class="hint">Every network's own chart, busiest first. Pick one to bring its plane to the front.</div>
+      <div class="thead"><span class="setting">Same scale <span class="sw"></span></span><span class="menu">Snapshots <span class="caret">▾</span></span></div>
+      <div class="g on"><span class="dot" style="background:#ff8a4c"></span><span class="name">Dor Technologies</span><span></span><span class="bar"><i style="width:100%;background:#ff8a4c"></i></span><span class="fig mono">31,488</span></div>
+      <div class="g"><span class="dot" style="background:#5ab0ff"></span><span class="name">Digital Evidence</span><span></span><span class="bar"><i style="width:42%;background:#5ab0ff"></i></span><span class="fig mono">13,317</span></div>
+      <div class="g"><span class="dot" style="background:#ffb04c"></span><span class="name">The Upsider AI</span><span></span><span class="bar"><i style="width:6%;background:#ffb04c"></i></span><span class="fig mono">1,980</span></div>
+      <div class="g"><span class="dot" style="background:#5ab0ff"></span><span class="name">USDC.dag</span><span></span><span class="bar"><i style="width:6%;background:#5ab0ff"></i></span><span class="fig mono">1,946</span></div>
+      <div class="pager mono">‹ &nbsp;1–5 of 11&nbsp; ›</div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:16px">Read down the Snapshots column: Fees ▾ → Snapshots ▾ → Fee ▾ → nothing. At no screen does the heading name a figure the rows below don't carry, because it is computed from those rows. The scope dot appears only where a network is committed (the Hypergraph pair here); Snapshots' Live becomes Pinned once a tick is pinned. Say go, or name what still reads wrong.</p>

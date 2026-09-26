@@ -1,0 +1,85 @@
+<style>
+  .xc { background:#0b1020; color:#c7d0ea; border:1px solid #1e2740; border-radius:12px; padding:12px 14px; line-height:1.4; font-family:"Segoe UI",system-ui,sans-serif; }
+  .mono { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-variant-numeric:tabular-nums; }
+  .g { display:grid; align-items:center; column-gap:8px; padding:4px 6px; margin:0 -6px; border-radius:5px; }
+  .c6 { grid-template-columns:16px 100px 1fr 56px 56px 12px; }
+  .c5 { grid-template-columns:16px 100px 1fr 56px 56px; }
+  .g.on { background:rgba(255,138,76,.13); box-shadow:inset 0 0 0 1px rgba(255,138,76,.35); }
+  .g.hover { background:rgba(255,255,255,.04); }
+  .dot { width:6px; height:6px; border-radius:50%; justify-self:center; }
+  .name { font-size:12.5px; color:#eef1fb; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tag { display:flex; gap:3px; align-items:center; white-space:nowrap; overflow:hidden; font-size:10.5px; color:#8791ad; }
+  .chip { border:1px solid #2a3450; border-radius:3px; padding:0 4px; line-height:14px; font-size:10px; }
+  .bar { height:5px; background:#161d30; border-radius:3px; overflow:hidden; }
+  .bar i { display:block; height:100%; border-radius:3px; background:#ff8a4c; }
+  .fig { font-size:12.5px; font-weight:600; color:#eef1fb; text-align:right; }
+  .tail { text-align:center; color:#6b7590; font-size:11px; }
+  .panel { margin:6px 0; padding:8px 10px; background:#0f1626; border-radius:8px; }
+  .panel.flush { padding:8px 0; }
+  .panel.flush .g { margin:0; padding-left:16px; padding-right:6px; }
+  .panel.flush .lvl { padding:0 6px 0 16px; }
+  .panel .name { color:#c7d0ea; }
+  .panel .fig { font-weight:500; color:#c7d0ea; }
+  .lvl { display:flex; align-items:baseline; gap:10px; margin-bottom:6px; }
+  .lvlname { font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:#8791ad; font-weight:700; white-space:nowrap; }
+  .lvlwhat { font-size:11.5px; color:#7c86a6; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .eyebrow { font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; color:#7dd3c8; font-weight:700; display:flex; justify-content:space-between; }
+  .title { font-size:15px; font-weight:600; color:#eef1fb; display:flex; justify-content:space-between; align-items:center; margin-top:2px; }
+  .hint { font-size:11.5px; color:#8791ad; margin:8px 0 10px; }
+  .thead { display:flex; justify-content:flex-end; align-items:center; gap:10px; border-bottom:1px solid #1e2740; padding-bottom:5px; margin-bottom:3px; }
+  .step { border:1px solid #2a3450; background:#0f1626; border-radius:8px; padding:2px 7px; font-size:10.5px; letter-spacing:.08em; font-weight:700; color:#eef1fb; }
+  .scope { width:8px; height:8px; border-radius:50%; background:#ff8a4c; box-shadow:0 0 0 3px rgba(255,138,76,.22); }
+</style>
+
+<h2>Quieter: no ✓, no axis label, no level total — and the chevron</h2>
+<p class="subtitle">Both cards below already carry the three removals. They differ only in what the row's last column does.</p>
+
+<div class="options">
+  <div class="option" data-choice="chev-none" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>No chevron at all</h3>
+      <div class="xc">
+        <div class="eyebrow"><span>Explore</span><span style="color:#6b7590;font-weight:400;letter-spacing:0">–</span></div>
+        <div class="title"><span>Network breakdown</span><span class="scope"></span></div>
+        <div class="hint">Every network on the hypergraph. Open one for the roles its nodes play.</div>
+        <div class="thead"><span class="step">∧ NODES ∨</span></div>
+        <div class="g c5"><span class="dot" style="background:#5ab0ff"></span><span class="name">DAG</span><span></span><span class="bar"><i style="width:100%;background:#5ab0ff"></i></span><span class="fig mono">141</span></div>
+        <div class="g c5 on"><span class="dot" style="background:#ff8a4c"></span><span class="name">Dor Technologies</span><span></span><span class="bar"><i style="width:14%"></i></span><span class="fig mono">19</span></div>
+        <div class="panel">
+          <div class="lvl"><span class="lvlname">By composition</span><span class="lvlwhat">Which layers each node runs</span></div>
+          <div class="g c5"><span></span><span class="name">Data</span><span class="tag"><span class="chip">dL1</span></span><span class="bar"><i style="width:84%;opacity:.6"></i></span><span class="fig mono">16</span></div>
+          <div class="g c5 hover"><span></span><span class="name">Hybrid</span><span class="tag"><span class="chip">L0</span><span class="chip">cL1</span><span class="chip">dL1</span></span><span class="bar"><i style="width:16%;opacity:.6"></i></span><span class="fig mono">3</span></div>
+        </div>
+        <div class="g c5"><span class="dot" style="background:#7ee08a"></span><span class="name">BioFi</span><span></span><span class="bar"><i style="width:2%;background:#7ee08a"></i></span><span class="fig mono">3</span></div>
+        <div class="g c5"><span class="dot" style="background:#5ab0ff"></span><span class="name">Digital Evidence</span><span></span><span class="bar"><i style="width:2%;background:#5ab0ff"></i></span><span class="fig mono">3</span></div>
+      </div>
+      <p>The row is the control: hover washes it (shown on Hybrid), a click opens it, the open panel and the selection wash are the state. The figure takes the right edge in every row at every depth. The card's hint already says rows open; the accordion teaches itself on the first click.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="chev-aligned" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>One chevron, one right edge</h3>
+      <div class="xc">
+        <div class="eyebrow"><span>Explore</span><span style="color:#6b7590;font-weight:400;letter-spacing:0">–</span></div>
+        <div class="title"><span>Network breakdown</span><span class="scope"></span></div>
+        <div class="hint">Every network on the hypergraph. Open one for the roles its nodes play.</div>
+        <div class="thead"><span class="step">∧ NODES ∨</span></div>
+        <div class="g c6"><span class="dot" style="background:#5ab0ff"></span><span class="name">DAG</span><span></span><span class="bar"><i style="width:100%;background:#5ab0ff"></i></span><span class="fig mono">141</span><span class="tail">›</span></div>
+        <div class="g c6 on"><span class="dot" style="background:#ff8a4c"></span><span class="name">Dor Technologies</span><span></span><span class="bar"><i style="width:14%"></i></span><span class="fig mono">19</span><span class="tail">⌄</span></div>
+        <div class="panel flush">
+          <div class="lvl"><span class="lvlname">By composition</span><span class="lvlwhat">Which layers each node runs</span></div>
+          <div class="g c6"><span></span><span class="name">Data</span><span class="tag"><span class="chip">dL1</span></span><span class="bar"><i style="width:84%;opacity:.6"></i></span><span class="fig mono">16</span><span class="tail">›</span></div>
+          <div class="g c6"><span></span><span class="name">Hybrid</span><span class="tag"><span class="chip">L0</span><span class="chip">cL1</span><span class="chip">dL1</span></span><span class="bar"><i style="width:16%;opacity:.6"></i></span><span class="fig mono">3</span><span class="tail">›</span></div>
+        </div>
+        <div class="g c6"><span class="dot" style="background:#7ee08a"></span><span class="name">BioFi</span><span></span><span class="bar"><i style="width:2%;background:#7ee08a"></i></span><span class="fig mono">3</span><span class="tail">›</span></div>
+        <div class="g c6"><span class="dot" style="background:#5ab0ff"></span><span class="name">Digital Evidence</span><span></span><span class="bar"><i style="width:2%;background:#5ab0ff"></i></span><span class="fig mono">3</span><span class="tail">›</span></div>
+      </div>
+      <p>The chevron stays as the only trailing mark, › closed and ⌄ open, and the panel's rows run to the card's edge so every chevron shares one right edge at every depth — the misalignment came from the panel's own padding. Rows that never open (History's layers) simply leave the column empty.</p>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:14px">Common to both: no ✓ anywhere (the wash is the selection), no axis label on the heading row (the title names it), no total on the level line (the parent row's figure is that number, and the stepper names the unit). My recommendation is A: the quietest card, and nothing that can drift out of line. Click one and say go.</p>

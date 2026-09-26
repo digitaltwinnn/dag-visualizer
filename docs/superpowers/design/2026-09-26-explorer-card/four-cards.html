@@ -1,0 +1,146 @@
+<style>
+  .xc { background:#0b1020; color:#c7d0ea; border:1px solid #1e2740; border-radius:12px; padding:12px 14px; font-size:12px; line-height:1.4; }
+  .xc .eyebrow { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#7dd3c8; font-weight:700; display:flex; justify-content:space-between; }
+  .xc .eyebrow span:last-child { color:#6b7590; font-weight:400; letter-spacing:0; }
+  .xc .title { display:flex; justify-content:space-between; align-items:center; margin-top:2px; font-size:14.5px; font-weight:600; color:#eef1fb; }
+  .xc .scope { width:8px; height:8px; border-radius:50%; background:#ff8a4c; box-shadow:0 0 0 3px rgba(255,138,76,.22); }
+  .xc .hint { font-size:11.5px; color:#8791ad; margin:8px 0 10px; }
+  .xc .thead { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #1e2740; padding-bottom:5px; margin-bottom:3px; }
+  .xc .axis { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#6b7590; }
+  .xc .right { display:flex; align-items:center; gap:10px; }
+  .xc .setting { font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:#8791ad; display:flex; align-items:center; gap:5px; }
+  .xc .sw { width:22px; height:12px; border-radius:6px; background:#2fb4a8; position:relative; }
+  .xc .sw::after { content:""; position:absolute; right:1px; top:1px; width:10px; height:10px; border-radius:50%; background:#0b1020; }
+  .xc .step { border:1px solid #2a3450; background:#0f1626; border-radius:8px; padding:2px 7px; font-size:10px; font-weight:700; letter-spacing:.08em; }
+  .xc .row { display:flex; align-items:center; gap:8px; padding:4px 6px; margin:0 -6px; border-radius:5px; }
+  .xc .row.on { background:rgba(255,138,76,.13); box-shadow:inset 0 0 0 1px rgba(255,138,76,.35); }
+  .xc .row.on.cyan { background:rgba(125,211,200,.12); box-shadow:inset 0 0 0 1px rgba(125,211,200,.35); }
+  .xc .dot { width:6px; height:6px; border-radius:50%; flex:none; }
+  .xc .cc { width:16px; font-family:ui-monospace,monospace; font-size:10px; color:#6b7590; }
+  .xc .name { width:104px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .xc .bar { flex:1; height:5px; background:#161d30; border-radius:3px; overflow:hidden; }
+  .xc .bar i { display:block; height:100%; border-radius:3px; }
+  .xc .fig { font-family:ui-monospace,monospace; font-weight:700; width:44px; text-align:right; font-variant-numeric:tabular-nums; }
+  .xc .fig.dim { font-weight:400; color:#8791ad; }
+  .xc .tail { width:12px; text-align:center; color:#6b7590; }
+  .xc .tail.on { color:#ff8a4c; }
+  .xc .lvl { margin:6px 0 4px 8px; padding:6px 0 2px 10px; border-left:1px solid #26304a; }
+  .xc .lvl.panel { margin:6px 0 6px 0; padding:8px 10px; border-left:0; background:#0f1626; border-radius:8px; }
+  .xc .lvlhead { display:flex; justify-content:space-between; align-items:baseline; }
+  .xc .lvlname { font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#a3add0; font-weight:700; }
+  .xc .lvltotal { font-size:10.5px; color:#6b7590; font-family:ui-monospace,monospace; }
+  .xc .lvlwhat { font-size:11px; color:#7c86a6; margin:1px 0 6px; }
+  .xc .chip { font-size:9.5px; border:1px solid #2a3450; border-radius:3px; padding:0 4px; color:#8791ad; }
+  .xc .pager { display:flex; justify-content:center; gap:10px; margin-top:8px; font-size:10.5px; color:#6b7590; font-family:ui-monospace,monospace; }
+  .grid4 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width:900px){ .grid4 { grid-template-columns:1fr; } }
+</style>
+
+<h2>The four cards in one grammar</h2>
+<p class="subtitle">1b · 2a · 3a applied to each view, one level opened. Below them, two polish treatments for the level block — the part that still needed work.</p>
+
+<div class="grid4">
+  <div class="xc">
+    <div class="eyebrow"><span>Explore</span><span>–</span></div>
+    <div class="title"><span>Network breakdown</span><span class="scope"></span></div>
+    <div class="hint">Every network on the hypergraph. Open one for the roles its nodes play.</div>
+    <div class="thead"><span class="axis">Network</span><span class="right"><span class="step">∧ NODES ∨</span></span></div>
+    <div class="row"><span class="dot" style="background:#5ab0ff"></span><span class="name">DAG</span><span class="bar"><i style="width:100%;background:#5ab0ff"></i></span><span class="fig">141</span><span class="tail">›</span></div>
+    <div class="row on"><span class="dot" style="background:#ff8a4c"></span><span class="name">Dor Technologies</span><span class="bar"><i style="width:14%;background:#ff8a4c"></i></span><span class="fig">19</span><span class="tail on">✓</span></div>
+    <div class="lvl">
+      <div class="lvlhead"><span class="lvlname">By composition</span><span class="lvltotal">19 nodes</span></div>
+      <div class="lvlwhat">Which layers each node runs.</div>
+      <div class="row"><span class="name" style="width:70px">Data</span><span class="chip">dL1</span><span class="bar"><i style="width:84%;background:#ff8a4c;opacity:.6"></i></span><span class="fig">16</span><span class="tail">›</span></div>
+      <div class="row"><span class="name" style="width:70px">Hybrid</span><span class="chip">L0 cL1 dL1</span><span class="bar"><i style="width:16%;background:#ff8a4c;opacity:.6"></i></span><span class="fig">3</span><span class="tail">›</span></div>
+    </div>
+    <div class="row"><span class="dot" style="background:#7ee08a"></span><span class="name">BioFi</span><span class="bar"><i style="width:2%;background:#7ee08a"></i></span><span class="fig">3</span><span class="tail">›</span></div>
+    <div class="row"><span class="dot" style="background:#5ab0ff"></span><span class="name">Digital Evidence</span><span class="bar"><i style="width:2%;background:#5ab0ff"></i></span><span class="fig">3</span><span class="tail">›</span></div>
+  </div>
+
+  <div class="xc">
+    <div class="eyebrow"><span>Explore</span><span>–</span></div>
+    <div class="title"><span>Country breakdown</span><span class="scope"></span></div>
+    <div class="hint">Every country hosting nodes. Open one to explore where its nodes sit.</div>
+    <div class="thead"><span class="axis">Country</span><span class="right"><span class="step">∧ PROVIDERS ∨</span></span></div>
+    <div class="row on"><span class="cc">DE</span><span class="name">Germany</span><span class="bar"><i style="width:100%;background:#ff8a4c"></i></span><span class="fig">5</span><span class="tail on">✓</span></div>
+    <div class="lvl">
+      <div class="lvlhead"><span class="lvlname">By city · provider</span><span class="lvltotal">67 nodes</span></div>
+      <div class="lvlwhat">Where the nodes sit, and who hosts them.</div>
+      <div class="row"><span class="name" style="width:86px">Falkenstein</span><span class="fig dim" style="width:auto;text-align:left;flex:1;font-family:inherit;font-size:11px">Hetzner Online GmbH</span><span class="fig">33</span><span class="tail">›</span></div>
+      <div class="row"><span class="name" style="width:86px">Nuremberg</span><span class="fig dim" style="width:auto;text-align:left;flex:1;font-family:inherit;font-size:11px">Hetzner Online GmbH</span><span class="fig">17</span><span class="tail">›</span></div>
+      <div class="row"><span class="name" style="width:86px">Essen</span><span class="fig dim" style="width:auto;text-align:left;flex:1;font-family:inherit;font-size:11px">IONOS SE</span><span class="fig">3</span><span class="tail">›</span></div>
+    </div>
+    <div class="row"><span class="cc">US</span><span class="name">United States</span><span class="bar"><i style="width:80%;background:#ff8a4c"></i></span><span class="fig">4</span><span class="tail">›</span></div>
+    <div class="row"><span class="cc">FI</span><span class="name">Finland</span><span class="bar"><i style="width:40%;background:#ff8a4c"></i></span><span class="fig">2</span><span class="tail">›</span></div>
+  </div>
+
+  <div class="xc">
+    <div class="eyebrow"><span>Explore</span><span>–</span></div>
+    <div class="title"><span>Snapshot breakdown</span><span class="scope"></span></div>
+    <div class="hint">Recent snapshots. Open one for the networks that anchored into it.</div>
+    <div class="thead"><span class="axis">Snapshot</span><span class="right"><span class="setting"><span class="dot" style="background:#2fb4a8;box-shadow:0 0 0 3px rgba(47,180,168,.25)"></span>Live</span><span class="step">∧ FEES ∨</span></span></div>
+    <div class="row on cyan"><span class="name" style="width:auto;font-family:ui-monospace,monospace">6,955,738</span><span class="bar"><i style="width:60%;background:#2fb4a8"></i></span><span class="fig">0.0390 DAG</span><span class="tail" style="color:#7dd3c8">✓</span></div>
+    <div class="lvl">
+      <div class="lvlhead"><span class="lvlname">By network</span><span class="lvltotal">5 anchors</span></div>
+      <div class="lvlwhat">Who anchored into this tick, and how much.</div>
+      <div class="row"><span class="dot" style="background:#ff8a4c"></span><span class="name">Dor Technologies</span><span class="bar"><i style="width:80%;background:#ff8a4c;opacity:.6"></i></span><span class="fig">4</span><span class="tail">›</span></div>
+      <div class="row"><span class="dot" style="background:#5ab0ff"></span><span class="name">USDC.dag</span><span class="bar"><i style="width:20%;background:#5ab0ff;opacity:.6"></i></span><span class="fig">1</span><span class="tail">›</span></div>
+    </div>
+    <div class="row"><span class="name" style="width:auto;font-family:ui-monospace,monospace">6,955,737</span><span class="bar"><i style="width:35%;background:#2fb4a8"></i></span><span class="fig">0.0170 DAG</span><span class="tail">›</span></div>
+    <div class="row"><span class="name" style="width:auto;font-family:ui-monospace,monospace">6,955,736</span><span class="bar"><i style="width:48%;background:#2fb4a8"></i></span><span class="fig">0.0310 DAG</span><span class="tail">›</span></div>
+    <div class="pager">‹ &nbsp;1–15 of 52&nbsp; ›</div>
+  </div>
+
+  <div class="xc">
+    <div class="eyebrow"><span>Explore</span><span>–</span></div>
+    <div class="title"><span>Layer breakdown</span><span class="scope"></span></div>
+    <div class="hint">Every network's own chart, busiest first. Pick one to bring its plane to the front.</div>
+    <div class="thead"><span class="axis">Layer</span><span class="right"><span class="setting">Same scale <span class="sw"></span></span><span class="step">∧ SNAPSHOTS ∨</span></span></div>
+    <div class="row on"><span class="dot" style="background:#ff8a4c"></span><span class="name">Dor Technologies</span><span class="bar"><i style="width:100%;background:#ff8a4c"></i></span><span class="fig">31,488</span><span class="tail on">✓</span></div>
+    <div class="row"><span class="dot" style="background:#5ab0ff"></span><span class="name">Digital Evidence</span><span class="bar"><i style="width:42%;background:#5ab0ff"></i></span><span class="fig">13,317</span><span class="tail"></span></div>
+    <div class="row"><span class="dot" style="background:#ffb04c"></span><span class="name">The Upsider AI</span><span class="bar"><i style="width:6%;background:#ffb04c"></i></span><span class="fig">1,980</span><span class="tail"></span></div>
+    <div class="row"><span class="dot" style="background:#5ab0ff"></span><span class="name">USDC.dag</span><span class="bar"><i style="width:6%;background:#5ab0ff"></i></span><span class="fig">1,946</span><span class="tail"></span></div>
+    <div class="pager">‹ &nbsp;1–5 of 11&nbsp; ›</div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:22px">
+  <h3>The level block — two polish treatments</h3>
+  <p class="subtitle">Same content: eyebrow, the parent's total, one line of meaning, the rows. Click the one that reads better.</p>
+  <div class="options" data-multiselect>
+    <div class="option" data-choice="lvl-rail" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>Rail</h3>
+        <div class="xc" style="border:0;padding:8px 10px">
+          <div class="row on"><span class="dot" style="background:#ff8a4c"></span><span class="name">Dor Technologies</span><span class="bar"><i style="width:14%;background:#ff8a4c"></i></span><span class="fig">19</span><span class="tail on">✓</span></div>
+          <div class="lvl">
+            <div class="lvlhead"><span class="lvlname">By composition</span><span class="lvltotal">19 nodes</span></div>
+            <div class="lvlwhat">Which layers each node runs.</div>
+            <div class="row"><span class="name" style="width:70px">Data</span><span class="chip">dL1</span><span class="bar"><i style="width:84%;background:#ff8a4c;opacity:.6"></i></span><span class="fig">16</span><span class="tail">›</span></div>
+            <div class="row"><span class="name" style="width:70px">Hybrid</span><span class="chip">L0 cL1 dL1</span><span class="bar"><i style="width:16%;background:#ff8a4c;opacity:.6"></i></span><span class="fig">3</span><span class="tail">›</span></div>
+          </div>
+        </div>
+        <p>A hairline rail down the left carries the level's depth; the block is otherwise the card's own ground. Compact, and a second depth simply adds a second rail.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="lvl-panel" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>Inset panel</h3>
+        <div class="xc" style="border:0;padding:8px 10px">
+          <div class="row on"><span class="dot" style="background:#ff8a4c"></span><span class="name">Dor Technologies</span><span class="bar"><i style="width:14%;background:#ff8a4c"></i></span><span class="fig">19</span><span class="tail on">✓</span></div>
+          <div class="lvl panel">
+            <div class="lvlhead"><span class="lvlname">By composition</span><span class="lvltotal">19 nodes</span></div>
+            <div class="lvlwhat">Which layers each node runs.</div>
+            <div class="row"><span class="name" style="width:70px">Data</span><span class="chip">dL1</span><span class="bar"><i style="width:84%;background:#ff8a4c;opacity:.6"></i></span><span class="fig">16</span><span class="tail">›</span></div>
+            <div class="row"><span class="name" style="width:70px">Hybrid</span><span class="chip">L0 cL1 dL1</span><span class="bar"><i style="width:16%;background:#ff8a4c;opacity:.6"></i></span><span class="fig">3</span><span class="tail">›</span></div>
+          </div>
+        </div>
+        <p>The level sits on a soft inset wash, the way the open group washes today, with the eyebrow as the panel's header. Reads as "inside the row" at a glance; a second depth nests a slightly deeper wash.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:12px">Details already decided into the drawings: the level's bar is the parent's hue at 60%, so a child never outshines its parent; History's rows have no chevron because nothing opens under a layer; Snapshots' tick rows keep their ✓ and its network rows carry only a chevron. Tell me the treatment, and anything in the four cards that still reads wrong, and I start building.</p>
