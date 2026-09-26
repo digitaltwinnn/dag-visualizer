@@ -68,10 +68,13 @@ export default function ExplorerPath({ crumbs, hint, className }: { crumbs: read
           return (
             <BreadcrumbItem
               key={c.key}
-              className={cn("min-w-0 gap-0", last ? "shrink" : "shrink-0 max-w-[45%]", !first && "-ml-[5px]")}
+              // The CURRENT step runs to the plate's edge (user, 2026-09-26: the steps "often stop
+              // half way") — the control is the plate's full width, and the filled last segment
+              // is what carries that; ancestors stay their own width.
+              className={cn("min-w-0 gap-0", last ? "flex-1" : "shrink-0 max-w-[45%]", !first && "-ml-[5px]")}
             >
               {last ? (
-                <BreadcrumbPage className={cn(STEP, shape, pad, "bg-wash-strong text-foreground")} title={c.title}>
+                <BreadcrumbPage className={cn(STEP, shape, pad, "w-full bg-wash-strong text-foreground")} title={c.title}>
                   <span className="min-w-0 truncate [&>*]:align-middle">{c.label}</span>
                 </BreadcrumbPage>
               ) : (
