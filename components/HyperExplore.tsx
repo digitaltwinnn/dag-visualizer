@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 
 import Explorer, { type ExplorerLevelSpec } from "@/components/explorer/Explorer";
+import { nodeRowSpec } from "@/components/explorer/nodeRow";
 import { IdentityDot, RoleChips } from "@/components/inspector/parts";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { compositionClause, compositionGroups } from "@/src/data/composition";
@@ -16,7 +17,6 @@ import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { displayNetwork } from "@/src/data/unlisted";
 import { useStore } from "@/src/store/store";
-import { midHash } from "@/src/util/format";
 
 // THE HYPERGRAPH'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -176,21 +176,18 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
       meaning: clause ? `Nodes that ${clause}` : "Each node running this composition",
       measure: null,
       hasFigure: false,
+      // The one node row (`explorer/nodeRow.tsx`); the level is one network, so no ticker.
       rows: openGroup.rows.map((r, i) => {
         const on = selIp != null && "node" in r.pick && r.pick.node?.ip === selIp;
-        const id = r.id ?? r.label;
         const hue = identityHudCss(r.pick.kind === "metanode" && r.pick.meta ? r.pick.meta.id : "dag");
-        return {
-          key: id + i,
-          name: midHash(id, 26),
-          nameMono: true,
-          tag: r.state ? r.state.charAt(0).toUpperCase() + r.state.slice(1) : undefined,
-          on,
+        return nodeRowSpec({
+          key: (r.id ?? r.label) + i,
+          row: r,
           hue,
-          title: `${id}${r.state ? ` · ${r.state}` : ""}`,
+          on,
           onClick: () => selectNode(r.pick, on, openGroup.key),
           pair: subjectPairing(hoverNodeId, hoverKeyOf(r.pick), setHoverNodeId, hue),
-        };
+        });
       }),
     });
   }

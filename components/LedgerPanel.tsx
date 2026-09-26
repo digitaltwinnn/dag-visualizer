@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import Explorer, { type ExplorerLevelSpec, type ExplorerRowSpec } from "@/components/explorer/Explorer";
+import { nodeRowSpec, unknownNodeRowSpec } from "@/components/explorer/nodeRow";
 import TablePager from "@/components/datasection/TablePager";
 import { IdentityDot } from "@/components/inspector/parts";
 import { ensurePage } from "@/components/RawSnapshotBridge";
@@ -36,7 +37,6 @@ import { filterToggleActions, followToggleActions, metaSnapSelectActions, nodeSe
 import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
-import { midHash } from "@/src/util/format";
 
 // THE SNAPSHOTS VIEW'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -521,6 +521,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
       meaning: "Validators that signed",
       measure: null,
       hasFigure: false,
+      // The one node row (`explorer/nodeRow.tsx`); the level is one network, so no ticker.
       rows: signers.map((sid): ExplorerRowSpec => {
         const r = resolveSigner(selNodes, leaf.metaId, sid);
         if (!r.known) {
@@ -528,23 +529,19 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           // (`resolveSigner` + `SIGNER_UNKNOWN`, the one shared rule). Every unlisted channel's
           // signers take this branch by construction; a listed network's can too.
           const w = SIGNER_UNKNOWN[r.reason];
-          return { key: sid, name: midHash(sid, 22), nameMono: true, tag: <span className="italic">{w.label}</span>, faint: true, title: w.title };
+          return unknownNodeRowSpec({ key: sid, id: sid, label: w.label, title: w.title, hue: UNLISTED_HUE });
         }
         const row = r.row;
         const on = nodeOn(row);
-        const id = row.id ?? row.label;
         const hue = identityHudCss(leaf.metaId);
-        return {
+        return nodeRowSpec({
           key: sid,
-          name: midHash(id, 26),
-          nameMono: true,
-          tag: row.state ? row.state.charAt(0).toUpperCase() + row.state.slice(1) : undefined,
-          on,
+          row,
           hue,
-          title: `${row.label} · ${row.state ?? "—"}`,
+          on,
           onClick: () => applyClickActions(nodeSelectActions(row.pick, { mode: "ledger", currentFilter: filter, deselect: on })),
           pair: subjectPairing(hoverNodeId, hoverKeyOf(row.pick), setHoverNodeId, hue),
-        };
+        });
       }),
     });
   }

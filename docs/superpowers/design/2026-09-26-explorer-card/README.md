@@ -103,3 +103,8 @@ Recorded deviations from the screens:
   current level filled last, and the level's clause on the same faint plate beneath — the plate
   is what makes the clause part of the control. Three washes of one hue: plate faint, ancestors
   soft, current step hover.
+- **One node row, built in one place** (`node-rows.html` D; user: "rows for nodes are shown in
+  Hyper, Geo and Snapshots; ensure they are consistent"). `components/explorer/nodeRow.tsx`:
+  network dot · the id mono at one length · tag = ticker where the level mixes networks, the
+  layer chips, the state as a dot in its bucket colour (its word as the dot's accessible name).
+  An unresolvable signer is the same row, faint, with the honest word as its tag.

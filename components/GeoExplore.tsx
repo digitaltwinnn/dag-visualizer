@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 import Explorer, { type ExplorerLevelSpec } from "@/components/explorer/Explorer";
-import { IdentityDot } from "@/components/inspector/parts";
+import { nodeRowSpec } from "@/components/explorer/nodeRow";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import {
   COHORT_MEASURE_OPTIONS,
@@ -21,7 +21,7 @@ import { cohortToggleActions, countryToggleActions, filterToggleActions, nodeSel
 import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
-import { ccMark, midHash } from "@/src/util/format";
+import { ccMark } from "@/src/util/format";
 
 // THE GEOGRAPHY'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -224,30 +224,20 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
       meaning: "Each node in this cohort",
       measure: null,
       hasFigure: false,
+      // The one node row (`explorer/nodeRow.tsx`); a cohort mixes networks, so the ticker shows.
       rows: openCohort.rows.map((r, i) => {
         const on = nodeOn(r);
-        const id = r.id ?? r.label;
         const netId = r.pick.kind === "metanode" && r.pick.meta ? r.pick.meta.id : "dag";
         const hue = identityHudCss(netId);
-        const ticker = metagraphById(netId)?.ticker ?? (netId === "dag" ? "DAG" : netId);
-        return {
-          key: id + i,
-          name: midHash(id, 22),
-          nameMono: true,
-          // A cohort mixes networks, so the tag names the node's: its dot and ticker, then its state.
-          tag: (
-            <>
-              <IdentityDot hue={hue} />
-              {ticker}
-              {r.state ? ` · ${r.state.charAt(0).toUpperCase() + r.state.slice(1)}` : ""}
-            </>
-          ),
-          on,
+        return nodeRowSpec({
+          key: (r.id ?? r.label) + i,
+          row: r,
           hue,
-          title: `${id} · ${ticker}${r.state ? ` · ${r.state}` : ""}`,
+          ticker: metagraphById(netId)?.ticker ?? (netId === "dag" ? "DAG" : netId),
+          on,
           onClick: () => selectNode(r.pick, on),
           pair: subjectPairing(hoverNodeId, hoverKeyOf(r.pick), setHoverNodeId, hue),
-        };
+        });
       }),
     });
   }
