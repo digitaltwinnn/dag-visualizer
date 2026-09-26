@@ -105,7 +105,9 @@ export default function ExplorerRow({
       aria-pressed={on ? true : undefined}
       onClick={onClick}
       className={cn(
-        "nb-row group grid items-center gap-x-[5px] w-[calc(100%+12px)] -mx-1.5 px-1.5 py-1 rounded-[5px] text-left",
+        // `pr-2.5`, not the symmetric 6px (user, 2026-09-26): the figure — or the state dot where a
+        // row ends in one — sat hard on the wash's right edge and wanted air.
+        "nb-row group grid items-center gap-x-[5px] w-[calc(100%+12px)] -mx-1.5 pl-1.5 pr-2.5 py-1 rounded-[5px] text-left",
         "border border-transparent bg-transparent cursor-pointer transition-[background] duration-150",
         "hover:bg-wash-hover",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
