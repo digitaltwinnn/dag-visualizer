@@ -11,7 +11,9 @@ import OdometerDemo from "@/app/design/OdometerDemo";
 import EcgDemo from "@/app/design/EcgDemo";
 import { NodeStars, NoSignalDot, SonarRing, StandbyHalo } from "@/components/state/StateAtoms";
 import { SELECTED_ROW, SelectedRowMark, SCENE_GLASS } from "@/components/selection";
-import { RoleChips } from "@/components/inspector/parts";
+import { RoleChips, StackedSchedule, partShade } from "@/components/inspector/parts";
+import ExplorerPath from "@/components/explorer/ExplorerPath";
+import { StateDot } from "@/components/explorer/nodeRow";
 
 // THE DESIGN DOCUMENT — rendered inside the app as the DocLayer overlay since 2026-09-04 (the
 // same move /about made: no engine reboot, the live scene as the backdrop); the /design route
@@ -54,7 +56,12 @@ const STRUCTURAL: { name: string; var: string }[] = [
   { name: "core (DAG hypergraph-core blue)", var: "--core" },
   { name: "panel (glass fill)", var: "--panel" },
   { name: "panel-light (dock glass)", var: "--panel-light" },
-  { name: "wash-soft (accent fill)", var: "--wash-soft" },
+  // The wash ladder — the ACCENT at four strengths (2026-09-26): a resting plate, a soft member,
+  // a hover, and the strongest fill for "you are here". The selection tokens ride the same hue.
+  { name: "wash-faint (plate)", var: "--wash-faint" },
+  { name: "wash-soft (member)", var: "--wash-soft" },
+  { name: "wash-hover", var: "--wash-hover" },
+  { name: "wash-strong (current / hairline)", var: "--wash-strong" },
 ];
 
 // The HUD type scale — the four steps every HUD text site snaps to (globals.css `@theme`).
@@ -238,9 +245,19 @@ export default function DesignDoc() {
             <Note>
               A node&apos;s health lands in one of four buckets — ready in green, in progress in
               amber, down in red, unknown in grey — and always appears as the same quiet pill,
-              whether it describes a single node or rolls a whole fleet up into one line.
+              whether it describes a single node or rolls a whole fleet up into one line. In an
+              explorer row the same bucket is a dot: filled when the node is ready, a hollow ring
+              otherwise, so the state is never colour alone.
             </Note>
             <StatusDemo />
+            <div className="flex flex-wrap items-center gap-5 text-label text-muted-foreground">
+              {(["Ready", "WaitingForReady", "Offline", null] as const).map((st, i) => (
+                <span key={i} className="inline-flex items-center gap-2">
+                  <StateDot state={st} />
+                  {st === null ? "unknown" : st === "WaitingForReady" ? "in progress" : st.toLowerCase()}
+                </span>
+              ))}
+            </div>
           </Section>
 
           <Section title="When data is missing">
@@ -269,19 +286,97 @@ export default function DesignDoc() {
           <Section title="Selection">
             <Note>
               Anything you have committed to — a filter, a chosen node, a drilled country —
-              wears the same treatment: a soft wash, a thin ring, and a check mark at the end of
-              the row. One look, everywhere, so you always know what is selected.
+              wears the same treatment: a soft wash and a thin ring, in the network&apos;s own
+              colour where it has one. One look, everywhere, so you always know what is selected.
+              In the explorer cards the wash is the whole mark; the raw layer&apos;s tables add a
+              check mark at the row&apos;s end, since a table row has no other place to say it.
             </Note>
-            <div className="ig-panel p-2 max-w-[320px] flex flex-col gap-0.5">
-              <div className="relative flex items-center gap-2 rounded-sm px-2 py-1.5 pr-7 text-body text-foreground-dim">
-                <span className="w-2 h-2 rounded-full flex-none" style={{ background: "var(--muted-foreground)" }} />
-                Unselected row
+            <div className="flex flex-wrap gap-4">
+              <div className="ig-panel p-2 w-[264px] flex flex-col gap-0.5">
+                <div className="relative flex items-center gap-2 rounded-sm px-2 py-1.5 text-body text-foreground-dim">
+                  <span className="w-2 h-2 rounded-full flex-none" style={{ background: "var(--muted-foreground)" }} />
+                  Explorer row
+                </div>
+                <div className={cn("relative flex items-center gap-2 rounded-sm px-2 py-1.5 text-body text-foreground", SELECTED_ROW)}>
+                  <span className="w-2 h-2 rounded-full flex-none" style={{ background: "var(--primary)" }} />
+                  Selected explorer row
+                </div>
               </div>
-              <div className={cn("relative flex items-center gap-2 rounded-sm px-2 py-1.5 pr-7 text-body text-foreground", SELECTED_ROW)}>
-                <span className="w-2 h-2 rounded-full flex-none" style={{ background: "var(--primary)" }} />
-                Selected row
-                <SelectedRowMark className="absolute right-2" />
+              <div className="ig-panel p-2 w-[264px] flex flex-col gap-0.5">
+                <div className="relative flex items-center gap-2 rounded-sm px-2 py-1.5 pr-7 text-body text-foreground-dim">
+                  Table row
+                </div>
+                <div className={cn("relative flex items-center gap-2 rounded-sm px-2 py-1.5 pr-7 text-body text-foreground", SELECTED_ROW)}>
+                  Selected table row
+                  <SelectedRowMark className="absolute right-2" />
+                </div>
               </div>
+            </div>
+          </Section>
+
+          <Section title="The explorer&apos;s path">
+            <Note>
+              Every explorer card breaks its subject down along one axis, and going deeper is a
+              path, not a tree: one level on screen, the way back drawn as arrow steps on a single
+              plate — the house first, the level you are on filled last — with one line under
+              them saying what the level holds. The rows beneath hang from the plate on a spine.
+              The figure column&apos;s heading is the level&apos;s own measure, and where a level
+              has several it opens as a list.
+            </Note>
+            <div className="ig-panel p-[14px] w-[264px]">
+              <ExplorerPath
+                crumbs={[
+                  { key: "root", label: "Countries", title: "Countries", root: true, onSelect: () => {} },
+                  { key: "de", label: "Germany", title: "Germany", onSelect: () => {} },
+                  { key: "cohort", label: "Frankfurt · Hetzner Online AG", title: "Frankfurt · Hetzner Online AG" },
+                ]}
+                hint="Each node in this cohort"
+              />
+              <div className="mt-1.5 -ml-0.5 border-l-2 border-wash-strong pl-2.5 flex flex-col gap-0.5">
+                <div className="flex items-center gap-2 rounded-[5px] px-1.5 py-1 text-body text-foreground-dim">
+                  <span className="w-1.5 h-1.5 rounded-full flex-none" style={{ background: "var(--core)" }} />
+                  <span className="font-mono">db5fead8…8317f</span>
+                  <span className="ml-auto inline-flex items-center gap-1.5 text-micro text-muted-foreground">DAG <StateDot state="Ready" /></span>
+                </div>
+                <div className="flex items-center gap-2 rounded-[5px] px-1.5 py-1 text-body text-foreground-dim">
+                  <span className="w-1.5 h-1.5 rounded-full flex-none" style={{ background: "var(--core)" }} />
+                  <span className="font-mono">3f0c91ab…0d2a4</span>
+                  <span className="ml-auto inline-flex items-center gap-1.5 text-micro text-muted-foreground">DAG <StateDot state="Offline" /></span>
+                </div>
+              </div>
+            </div>
+          </Section>
+
+          <Section title="Partitions of one total">
+            <Note>
+              When a card cuts one number several ways — a fleet by what its nodes run, by their
+              state, by how far back they keep the chain — each cut is one bar of the same total
+              with its parts named beneath it, so three cuts read as three views of one thing
+              rather than three tables.
+            </Note>
+            <div className="ig-panel p-[18px] w-[320px]">
+              <StackedSchedule
+                axis="Composition"
+                parts={[
+                  { label: "Hybrid", count: 3, color: partShade("var(--core)", 0) },
+                  { label: "Data", count: 16, color: partShade("var(--core)", 1) },
+                ]}
+              />
+              <StackedSchedule
+                axis="Status"
+                parts={[
+                  { label: "Ready", count: 17, color: "var(--success)" },
+                  { label: "Joining", count: 2, color: "var(--warn-soft)" },
+                ]}
+              />
+              <StackedSchedule
+                axis="Archive depth"
+                parts={[
+                  { label: "Full archive", count: 0, color: partShade("var(--muted-foreground)", 0) },
+                  { label: "16 months", count: 3, color: partShade("var(--muted-foreground)", 1) },
+                  { label: "Unknown", count: 16, color: partShade("var(--muted-foreground)", 2) },
+                ]}
+              />
             </div>
           </Section>
 
