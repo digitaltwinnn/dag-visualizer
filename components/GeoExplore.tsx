@@ -5,6 +5,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import ExplorerShell from "@/components/ExplorerShell";
+import MeasureStepper from "@/components/MeasureStepper";
+import { GEO_MEASURE_LABELS, countryMeasure, stepGeoMeasure } from "@/src/data/geoMeasure";
 import { filterAccent, metagraphById } from "@/src/data/network";
 import { SelectedRowMark, selectedRow, selectionHue } from "@/components/selection";
 import { ccMark } from "@/src/util/format";
@@ -38,6 +40,8 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
   const setHoverGroup = useStore((s) => s.setHoverGroup);
   const hoverNodeId = useStore((s) => s.hoverNodeId);
   const filter = useStore((s) => s.filter);
+  const geoMeasure = useStore((s) => s.geoMeasure);
+  const setGeoMeasure = useStore((s) => s.setGeoMeasure);
   // Which rung currently holds the focus — the committed rows COARSER than it wear the
   // ancestor strength of the selection mark (see components/useLadderFocus.ts).
   const focus = useLadderFocus();
@@ -52,8 +56,6 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
     applyClickActions(nodeSelectActions(pick, { mode: "geo", currentFilter: filter, deselect: selected }));
 
   const list = lb?.countries ?? [];
-  const max = list[0]?.count ?? 1;
-  const rows = list;
 
   // Quiet-empty: a real metagraph is selected but has 0 locatable nodes, so the country list
   // (the leaderboard's `countries`, what this accordion renders) is empty — nothing to browse,
@@ -98,6 +100,20 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
       );
     return m;
   }, [selNodes]);
+
+  // THE ROWS' FIGURE IS THE STEPPER'S MEASURE (user, 2026-09-26): nodes (the leaderboard's own
+  // count, the figure of record), distinct metagraphs or distinct providers, each read off the
+  // country's placed rows by `src/data/geoMeasure.ts`. The bar scales to the busiest country BY
+  // THAT MEASURE, and the list re-orders by it — the order is what the eye reads off a sorted
+  // list, so a list sorted by nodes under a providers heading would read as wrong. Ties keep the
+  // leaderboard's node order.
+  const measured = useMemo(() => {
+    const valued = list.map((c) => ({ c, v: countryMeasure(geoMeasure, c.count, nodesByCountry.get(c.country) ?? []) }));
+    valued.sort((a, b) => b.v - a.v || b.c.count - a.c.count);
+    return valued;
+  }, [list, geoMeasure, nodesByCountry]);
+  const max = Math.max(1, measured[0]?.v ?? 0);
+  const rows = measured;
 
   // COHORT ROWS (user redesign, option C): a country's nodes collapse into one row per
   // city × provider — so the list repeats nothing (the old rows re-stated the same city
@@ -181,7 +197,20 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
         </>
       ) : (
         <>
-          {rows.map((c) => {
+          {/* ── WHAT THE ROWS COUNT: the measure stepper, the History and Snapshots cards' own
+              control, walking nodes → metagraphs → providers. A SETTING: it writes its setter. */}
+          <div className="flex items-center mb-1.5">
+            <MeasureStepper
+              word={GEO_MEASURE_LABELS[geoMeasure]}
+              prev={(() => { const p = stepGeoMeasure(geoMeasure, -1); return p ? GEO_MEASURE_LABELS[p] : null; })()}
+              next={(() => { const n = stepGeoMeasure(geoMeasure, 1); return n ? GEO_MEASURE_LABELS[n] : null; })()}
+              onStep={(dir) => {
+                const next = stepGeoMeasure(geoMeasure, dir);
+                if (next) setGeoMeasure(next);
+              }}
+            />
+          </div>
+          {rows.map(({ c, v }) => {
             const open = c.cc === country;
             const nodes = nodesByCountry.get(c.country) ?? [];
             // Captured for the cohort rows nested below — their own map's `c` shadows this one.
@@ -244,7 +273,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
                     <span
                       className="block h-full rounded-xs"
                       style={{
-                        width: `${Math.round((c.count / max) * 100)}%`,
+                        width: `${Math.round((v / max) * 100)}%`,
                         // ONE colour, both cases: the filtered bar is already flat barHue, and the
                         // "all" bar is the list's own identity — structural cyan. The old
                         // --core→--primary gradient was designed on dark, where the two are
@@ -256,7 +285,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
                     />
                   </span>
                   {/* Mono: a count is machine data (`/design`'s sans/mono split) — see HyperExplore's note. */}
-                  <span className="flex-none w-[26px] text-right font-mono text-body tabular-nums font-semibold">{c.count}</span>
+                  <span className="flex-none w-[26px] text-right font-mono text-body tabular-nums font-semibold">{v}</span>
                   {/* Trailing slot: the drilled country shows the shared selection ✓ (same mark
                     as the node rows / filter picker — one selection language, user); closed rows
                     keep the expand-affordance chevron — hidden on a mouse (revealed on row hover/

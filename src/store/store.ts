@@ -21,6 +21,7 @@ export type Mode = "hyper" | "geo" | "ledger" | "trend" | "soon";
 
 // The stored metric every trend plane draws — one picker, one column (see `trendMetric` below).
 import type { LedgerMeasure } from "@/src/data/ledgerMeasure";
+import type { GeoMeasure } from "@/src/data/geoMeasure";
 export type { LedgerMeasure };
 // WHY the scene is moving — the motion hint's cause (2026-09-26), stamped by the gesture's owner
 // and read by `components/MotionHint` through `domain/motionHint.ts`, which turns it into words.
@@ -319,6 +320,9 @@ interface AppState {
   // What the Snapshots explorer's tick rows lead with — fee, anchors, metagraphs or size
   // (`src/data/ledgerMeasure.ts`). A setting, like `trendMetric`; its stepper is the card's.
   ledgerMeasure: LedgerMeasure;
+  // What the Geography explorer's country rows count — nodes, metagraphs or providers
+  // (`src/data/geoMeasure.ts`). A setting, like the two above.
+  geoMeasure: GeoMeasure;
   /** How far the stack is scrolled through the roster, in planes. The catalog is longer than the
    *  visible window, so the stack pages rather than capping at a top-N. */
   trendScroll: number;
@@ -424,6 +428,7 @@ interface AppState {
   setTrendCursor: (ms: number | null) => void;
   setTrendMetric: (metric: TrendMetric) => void;
   setLedgerMeasure: (measure: LedgerMeasure) => void;
+  setGeoMeasure: (measure: GeoMeasure) => void;
   setTrendScroll: (offset: number) => void;
   setTrendFocus: (id: string | null) => void;
   setTrendScale: (scale: "shared" | "own") => void;
@@ -499,6 +504,7 @@ export const useStore = create<AppState>((set) => ({
   trendCursorMs: null,
   trendMetric: "snapshots",
   ledgerMeasure: "fee",
+  geoMeasure: "nodes",
   trendScroll: 0,
   trendFocus: null,
   trendScale: "shared",
@@ -707,6 +713,7 @@ export const useStore = create<AppState>((set) => ({
   // The settings that MOVE the scene stamp their cause (the hint reads it while the stack eases).
   setTrendMetric: (metric) => set({ trendMetric: metric, motionCause: { kind: "measure", id: metric } }),
   setLedgerMeasure: (measure) => set({ ledgerMeasure: measure }),
+  setGeoMeasure: (measure) => set({ geoMeasure: measure }),
   setTrendScroll: (offset) => set({ trendScroll: offset, motionCause: { kind: "page" } }),
   setTrendFocus: (id) => set({ trendFocus: id }),
   setTrendScale: (scale) => set({ trendScale: scale }),
