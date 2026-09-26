@@ -642,7 +642,7 @@ export default function RailPager({
         // ancestors, never to siblings — so crossing off the panel into the bottom strip
         // un-hovered the card and its edge signal blinked off mid-card. This wrapper is what
         // contains both, so it is what "the pointer is on this card" actually means.
-        className="rail-card relative touch-pan-y select-none transition-transform duration-[380ms] ease-[var(--ease-spring)] motion-reduce:transition-none [--pager-strip:36px] [--foot-bleed:var(--pager-strip)] [&>.ig-panel]:pb-[var(--pager-strip)]"
+        className="rail-card relative touch-pan-y select-none transition-transform duration-[380ms] ease-[var(--ease-spring)] motion-reduce:transition-none [--pager-strip:36px] [--foot-bleed:var(--pager-strip)] [--foot-radius:0px] [--foot-mb:0px] [&>.ig-panel]:pb-[var(--pager-strip)]"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}

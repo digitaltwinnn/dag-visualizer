@@ -12,7 +12,8 @@ import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { cn } from "@/lib/utils";
 import { metagraphById } from "@/src/data/network";
-import { instantNote, orderAt, placeInstant, rankAt, tierWord, valueAt } from "@/src/data/trendSeries";
+import { instantNote, orderAt, placeInstant, rankAt, valueAt } from "@/src/data/trendSeries";
+import { ageWords } from "@/src/util/relativeAge";
 import { stampInstant } from "@/src/data/trendTimeline";
 import { bucketAt } from "@/src/data/trendWindow";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
@@ -94,11 +95,8 @@ export default function TrendInstantPane({
   // so a reader who has focused nothing still gets a reading rather than an invitation.
   const globalValue = cursorMs != null && !subject ? valueAt(roster.global, buckets, stepMs, cursorMs) : null;
 
-  // The tier in words — the card's aside, so the body never has to caption its own precision.
-  // ONE TABLE, TWO FORMS (`tierWord`, 2026-09-19): this aside is a short LABEL beside a title,
-  // while the document's section leads take the adjective that reads inside a sentence. They had
-  // grown two spellings of one vocabulary, "5 min" against "five-minute".
-  const tier = tierWord(stepMs, "label");
+  // The tier no longer rides the aside (it said "daily" there until 2026-09-26; the aside is the
+  // moment's AGE now) — the note below still names the precision where a reader needs it.
   const fmt = (v: number | null) => (v != null ? format(v) : NO_READING);
 
   // THE SPAN A DOOR CARRIES: the brushed range if one stands, else the window on screen. One
@@ -125,7 +123,14 @@ export default function TrendInstantPane({
         // date plus a UTC clock once the buckets are finer.
         title={cursorMs != null ? stampInstant(cursorMs, stepMs) : "—"}
         titleKey={bucket ?? cursorMs ?? undefined}
-        aside={<span className="text-micro text-muted-foreground">{tier}</span>}
+        // HOW LONG AGO the moment was, not the cadence (user, 2026-09-26): the reader is placing an
+        // instant, and "3 months ago" places it; "daily" only said what the charts are cut in,
+        // which the note below already says where it matters. Measured from the bucket's start.
+        aside={
+          <span className="text-micro text-muted-foreground">
+            {cursorMs != null ? `${ageWords(Date.now() - (bucket ?? cursorMs))} ago` : null}
+          </span>
+        }
         onClose={onClose}
         collapsed={collapsed}
         onToggle={onToggle}
@@ -171,7 +176,12 @@ export default function TrendInstantPane({
                   </>
                 )}
                 </span>
-                <span className="min-w-0 truncate text-right text-label font-normal text-muted-foreground" title={subject ? rows.get(subject)?.name : undefined}>
+                <span
+                  className="min-w-0 truncate text-right text-label font-normal text-muted-foreground"
+                  title={subject ? rows.get(subject)?.name : undefined}
+                  // The ticker in its network's hue (user, 2026-09-26) — the dossier aside's own rule.
+                  style={subject ? { color: rows.get(subject)?.hue } : undefined}
+                >
                   {/* Under a filter the TICKER alone (user, 2026-09-26): the dossier above already
                       names the network in full, and the lead line has one line's width. */}
                   {subject ? (metagraphById(subject)?.ticker || rows.get(subject)?.name) : "Across the whole network"}
@@ -258,12 +268,16 @@ export default function TrendInstantPane({
                 onClick={() => openRecords(subject, span)}
                 className={cn(
                   "mt-3 flex w-[calc(100%+2*var(--card-pad))] items-center gap-2.5 text-left text-body text-foreground cursor-pointer",
-                  // The Foot's own bleed: under a paged box the pager overrides `--foot-bleed` to
-                  // its strip height so the plank rides ON this plate — an 18px bleed stopped short
-                  // of the plank and its inset divider read as an underline (user, 2026-09-26).
-                  "-mx-[var(--card-pad)] px-[var(--card-pad)] pt-2.5",
-                  "-mb-[var(--foot-bleed,var(--card-pad))] pb-[calc(var(--foot-bleed,var(--card-pad))-var(--card-pad)+10px)]",
-                  "rounded-b-[calc(var(--radius)-1px)] border-t border-wash-strong bg-wash-faint hover:bg-wash-soft",
+                  // THE CONTROL ENDS WHERE THE PLANK BEGINS (user, 2026-09-26, two rounds). A boxed
+                  // card under a filter carries the sibling pager's plank at its foot, and the plank
+                  // draws one inset hairline on its top edge; a control bleeding past that line wore
+                  // it as an underline. So the bleed is the card's padding LESS the plank's strip
+                  // (`--foot-mb`, which RailPager sets to 0; the card's padding otherwise), which puts
+                  // the control's bottom edge exactly on the plank's hairline — its bottom border —
+                  // and the corners square there (`--foot-radius`, which RailPager zeroes).
+                  "-mx-[var(--card-pad)] px-[var(--card-pad)] py-2.5",
+                  "mb-[var(--foot-mb,calc(0px-var(--card-pad)))]",
+                  "rounded-b-[var(--foot-radius,calc(var(--radius)-1px))] border-t border-wash-strong bg-wash-faint hover:bg-wash-soft",
                   "disabled:opacity-45 disabled:pointer-events-none",
                   "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                 )}
