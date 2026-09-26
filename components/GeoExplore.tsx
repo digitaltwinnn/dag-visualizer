@@ -17,7 +17,7 @@ import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { filterAccent, metagraphById } from "@/src/data/network";
 import type { NodeRow } from "@/src/data/types";
 import type { CohortSel } from "@/src/engine/domain/focusLadder";
-import { cohortToggleActions, countryToggleActions, filterToggleActions, nodeSelectActions, sameCohort } from "@/src/engine/domain/pickActions";
+import { cohortToggleActions, countryToggleActions, nodeSelectActions, sameCohort } from "@/src/engine/domain/pickActions";
 import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
@@ -247,9 +247,6 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
       id="geoexplore"
       title="Country breakdown"
       hint={quietEmpty ? null : "Every country hosting nodes. Open one to explore where its nodes sit."}
-      // The scope dot releases the FILTER (the top bar's own toggle rule) — the drill and the cohort
-      // are the reader's place and stay.
-      scope={filter !== "all" ? { hue: identityHudCss(filter), ticker: activeCfg?.ticker || activeCfg?.name || filter.toUpperCase(), label: activeCfg?.name ?? (filter === "dag" ? "DAG" : filter), onRelease: () => applyClickActions(filterToggleActions(filter, filter)) } : null}
       levels={levels}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => {

@@ -6,7 +6,6 @@ import ExplorerShell from "@/components/ExplorerShell";
 import ExplorerHeading, { type MeasureControl } from "@/components/explorer/ExplorerHeading";
 import ExplorerPath, { type Crumb } from "@/components/explorer/ExplorerPath";
 import ExplorerRow from "@/components/explorer/ExplorerRow";
-import ScopeMark from "@/components/explorer/ScopeMark";
 import { cn } from "@/lib/utils";
 
 // THE EXPLORER — one component, four views (design session 2026-09-26; the agreed screens and
@@ -17,7 +16,8 @@ import { cn } from "@/lib/utils";
 // is the one on screen and the ones before it are the crumbs above it. From that one structure this
 // component renders, in order:
 //
-//   the shell     · title, hint, the committed scope as its ticker in the head (`ScopeMark`)
+//   the shell     · title and hint (no scope mark: the top bar's filter already names the
+//                   committed network and is the one place to clear it — user, 2026-09-26)
 //   the heading   · the hairline row: the view's one setting, then the figure column's heading —
 //                   a control when the level has several measures, a label when one, nothing
 //                   when none (`ExplorerHeading`)
@@ -94,15 +94,13 @@ export interface ExplorerProps {
   id: string;
   title: string;
   hint: ReactNode | null;
-  /** The committed network's hue, ticker and name, with the release, for the head's mark. */
-  scope?: { hue: string; ticker: string; label: string; onRelease: () => void } | null;
   /** The open levels, root first; the last is on screen. */
   levels: readonly ExplorerLevelSpec[];
   onLeave?: () => void;
   defaultCollapsed?: boolean;
 }
 
-export default function Explorer({ id, title, hint, scope, levels, onLeave, defaultCollapsed }: ExplorerProps) {
+export default function Explorer({ id, title, hint, levels, onLeave, defaultCollapsed }: ExplorerProps) {
   const current = levels[levels.length - 1];
   const nested = levels.length > 1;
   // The crumbs: the ROOT as the house glyph (its word is the accessible name — the card's title
@@ -128,7 +126,6 @@ export default function Explorer({ id, title, hint, scope, levels, onLeave, defa
       id={id}
       title={title}
       hint={hint}
-      scope={scope ? <ScopeMark hue={scope.hue} ticker={scope.ticker} label={scope.label} onRelease={scope.onRelease} /> : undefined}
       onLeave={onLeave}
       defaultCollapsed={defaultCollapsed}
     >

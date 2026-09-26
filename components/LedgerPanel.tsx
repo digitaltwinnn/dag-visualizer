@@ -33,7 +33,7 @@ import { filterAccent, getAnchor, getNetwork, metagraphById, resolveSigner, SIGN
 import { metaSnapHoverKey, type GlobalSnapshot, type NodeRow, type SnapshotExact } from "@/src/data/types";
 import { displayNetwork, LISTED_IDS, UNLISTED_HUE, UNLISTED_ID, UNLISTED_LABEL, unlistedLog } from "@/src/data/unlisted";
 import { POLL } from "@/src/engine/config";
-import { filterToggleActions, followToggleActions, metaSnapSelectActions, nodeSelectActions, sameMetaSnap, snapshotSelectActions } from "@/src/engine/domain/pickActions";
+import { followToggleActions, metaSnapSelectActions, nodeSelectActions, sameMetaSnap, snapshotSelectActions } from "@/src/engine/domain/pickActions";
 import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
@@ -56,7 +56,7 @@ import { useStore } from "@/src/store/store";
 //
 // The PER-NETWORK axis (network → its ordinals across the window) was a second tree once and was
 // retired the same day the one axis was named: two trees over the same rows made the reader pick
-// an axis before browsing. The network axis is the COMMITTED FILTER — the head's scope dot — which
+// an axis before browsing. The network axis is the COMMITTED FILTER — the top bar's — which
 // here is a LENS: with a network committed, every tick still lists (they all happened — rule 10
 // doesn't let a lens edit the facts), a tick it anchored into carries its count in the network's
 // hue, one it sat out is stepped back, and inside a tick only the committed network is drillable.
@@ -548,13 +548,11 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // Every level carries the view's one setting on its heading.
   for (const l of levels) l.setting = setting;
 
-  const scopeNet = filter !== "all" ? displayNetwork(filter) : null;
   return (
     <Explorer
       id="ledger-view"
       title="Snapshot breakdown"
       hint="Recent global snapshots. Open one for the networks that anchored into it."
-      scope={scopeNet ? { hue: scopeNet.hue, ticker: scopeNet.ticker, label: scopeNet.name, onRelease: () => applyClickActions(filterToggleActions(filter, filter)) } : null}
       levels={levels}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => {

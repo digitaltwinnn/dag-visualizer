@@ -8,12 +8,10 @@ import { ScaleToggle } from "@/components/trendPickers";
 import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
-import { metagraphById } from "@/src/data/network";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
 import { METRIC_LABELS, METRIC_ORDER, metricUnit } from "@/src/data/trendSeries";
-import { filterToggleActions, trendPlaneActions } from "@/src/engine/domain/pickActions";
+import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { VISIBLE_PLANES, clampScroll, pagerVisible } from "@/src/engine/domain/trendStack";
-import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore, type TrendMetric } from "@/src/store/store";
 
@@ -157,7 +155,6 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
     ) : undefined,
   };
 
-  const scopeCfg = filter !== "all" ? metagraphById(filter) : null;
   return (
     <Explorer
       id="trendexplore"
@@ -167,9 +164,6 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
       // "Open one for…" is the other explorers' second half and would be a lie here — a layer row
       // has no children, it brings its plane forward.
       hint={empty ? null : "Every network's own chart, busiest first. Pick one to bring its plane to the front."}
-      // The committed scope as the head's dot (design decision 1: the "X only ×" chip this card
-      // wore is gone); its × releases the filter through the top bar's own toggle rule.
-      scope={filter !== "all" ? { hue: identityHudCss(filter), ticker: scopeCfg?.ticker || scopeCfg?.name || filter.toUpperCase(), label: scopeCfg?.name ?? (filter === "dag" ? "DAG" : filter), onRelease: () => applyClickActions(filterToggleActions(filter, filter)) } : null}
       levels={[level]}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => setHover(null)}

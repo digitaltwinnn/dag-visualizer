@@ -108,3 +108,7 @@ Recorded deviations from the screens:
   network dot · the id mono at one length · tag = ticker where the level mixes networks, the
   layer chips, the state as a dot in its bucket colour (its word as the dot's accessible name).
   An unresolvable signer is the same row, faint, with the honest word as its tag.
+- **No scope mark in the head at all** (user, same day, one round after the ticker: "remove the
+  ticker from the explore section; if we want to remove a filter we'll use the existing top bar").
+  Decisions 1–2 reduce to: the committed filter is stated by the top bar alone, and the explorer
+  shows its effect (the lens, the bars' hue) rather than restating it.

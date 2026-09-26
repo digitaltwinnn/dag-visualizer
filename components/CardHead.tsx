@@ -282,9 +282,9 @@ export default function CardHead({
               </div>
             </div>
           )}
-          {/* The title row carries the ASIDE on its right (2026-09-26 — the explorer card's scope
-              dot, `components/explorer/ScopeDot`): the panel layout had no aside slot, only the
-              inspector layout below. Same rule as the eyebrow row's cluster: it floats above the
+          {/* The title row carries the ASIDE on its right (2026-09-26 — built for the explorer
+              card's scope mark, since retired; the slot stays): the panel layout had no aside
+              slot, only the inspector layout below. Same rule as the eyebrow row's cluster: it floats above the
               title button's stretched pseudo and hands the pointer back only on its own control. */}
           <div className="flex items-center justify-between gap-2 min-w-0">
             <h2 className={cn(TITLE, "inline-flex items-center gap-2 min-w-0")}>
