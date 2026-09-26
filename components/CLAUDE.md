@@ -248,12 +248,14 @@ pointermove. Three rules are worth knowing before touching it:
   timeline populated a card that stayed collapsed under its own eyebrow. It is still not a rung: no
   pose, no deselect step, and the × clears the channel alone (`setTrendCursor`, deliberately outside
   the pickActions table).
-- **THE TWO EXITS ARE THE CARD'S OWN FOOT CONTROLS, and one of them is shared.** `Snapshot records`
-  and the Trends document's per-chart link call ONE helper (`components/trendDoors.ts`): commit the
-  network through the table (guarded — that builder TOGGLES), hand the span to the log, switch the
-  mode, open the raw layer. Two copies of four ordered steps is how two surfaces start landing a
-  reader in different places. `All charts` is the other REGISTER of the same rung — this view's RAW
-  surface is the document, so it is one `setSection("data")` and no mode step at all.
+- **THE ONE EXIT IS THE CARD'S FOOT CONTROL, and it is shared.** `Snapshot records` — a full-bleed
+  control on the wash ladder at the card's foot (2026-09-26, `moment-door.html` A; the bare text
+  links read as prose) — and the Trends document's per-chart link call ONE helper
+  (`components/trendDoors.ts`): commit the network through the table (guarded — that builder
+  TOGGLES), hand the span to the log, switch the mode, open the raw layer. Two copies of four
+  ordered steps is how two surfaces start landing a reader in different places. The card's
+  `All charts` link went the same day: this view's RAW surface is the document, so the command
+  bar's RAW toggle already is that door.
 
 **The motion hint says what the scene is doing while it moves** (user, 2026-09-26 — `MotionHint`,
 one quiet sentence centred under the command bar). Two store channels, and nothing else feeds it.

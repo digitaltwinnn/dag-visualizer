@@ -1,11 +1,12 @@
 "use client";
 
+import { ChevronRight, Table2 } from "lucide-react";
+
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { Fact, FactGroup, IdentityDot } from "@/components/inspector/parts";
 import { SELECTED_ROW, selectionHue } from "@/components/selection";
-import { openCharts, openRecords, spanOfWindow } from "@/components/trendDoors";
-import { Button } from "@/components/ui/button";
+import { openRecords, spanOfWindow } from "@/components/trendDoors";
 import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
@@ -140,7 +141,10 @@ export default function TrendInstantPane({
               {/* ── LEAD: the one reading this card exists to say ───────────────────────────
                   Merged onto one line with its unit, the lead grammar's own rule (no "Value:"
                   label — the unit carries it), with the rank riding beside it. */}
-              <p className="text-title font-semibold text-foreground">
+              {/* The SCOPE rides the lead's own line, right-aligned (user, 2026-09-26: a row of its
+                  own was one row too many) — the reading left, whose reading it is right. */}
+              <p className="flex items-baseline justify-between gap-3 text-title font-semibold text-foreground">
+                <span className="min-w-0">
                 {subject ? (
                   <>
                     <span className="tabular-nums">{fmt(subjectValue)}</span>
@@ -163,9 +167,10 @@ export default function TrendInstantPane({
                     {globalValue != null && unit ? <span className="text-body font-normal text-muted-foreground"> {unit}</span> : null}
                   </>
                 )}
-              </p>
-              <p className="mt-0.5 text-label text-muted-foreground">
-                {subject ? rows.get(subject)?.name : "Across the whole network"}
+                </span>
+                <span className="min-w-0 truncate text-right text-label font-normal text-muted-foreground">
+                  {subject ? rows.get(subject)?.name : "Across the whole network"}
+                </span>
               </p>
 
               {/* ── DETAIL: every layer at the cursor ────────────────────────────────────────
@@ -230,36 +235,34 @@ export default function TrendInstantPane({
                 </>
               )}
 
-              {/* ── THE TWO EXITS, as the card's own controls ────────────────────────────────
-                  One rung down the ladder and one register across it (convention 12). Both go
-                  through `components/trendDoors.ts`, the shared home the Trends document calls
-                  too, so the records door's four ordered steps are written once. Small text
-                  Buttons — the shadcn boundary's own category for a card-foot control. */}
-              <div className="mt-2 flex flex-wrap items-center gap-x-4">
-                <Button
-                  variant="link"
-                  size="xs"
-                  className="px-0"
-                  disabled={!span}
-                  title={
-                    subject
-                      ? "Opens the anchor log at this span, with this network in the search."
-                      : "Opens the anchor log at this span, across every network."
-                  }
-                  onClick={() => openRecords(subject, span)}
-                >
-                  Snapshot records
-                </Button>
-                <Button
-                  variant="link"
-                  size="xs"
-                  className="px-0"
-                  title="Opens the measured history as a document — the same numbers in prose, with every metric side by side."
-                  onClick={openCharts}
-                >
-                  All charts
-                </Button>
-              </div>
+              {/* ── THE ONE EXIT, as the card's foot control (design 2026-09-26, `moment-door.html`
+                  A). The card marks one instant and its one real door is the anchor log at this
+                  span, through `components/trendDoors.ts` — the shared home the Trends document
+                  calls too, so the records door's four ordered steps are written once. It is a
+                  full-bleed control on the wash ladder every other control wears (user: the bare
+                  text links read as prose). "All charts" went with it: the RAW toggle in the
+                  command bar IS that door. */}
+              <button
+                type="button"
+                disabled={!span}
+                title={
+                  subject
+                    ? "Opens the anchor log at this span, with this network in the search."
+                    : "Opens the anchor log at this span, across every network."
+                }
+                onClick={() => openRecords(subject, span)}
+                className={cn(
+                  "mt-3 flex w-[calc(100%+2*var(--card-pad))] items-center gap-2.5 text-left text-body text-foreground cursor-pointer",
+                  "-mx-[var(--card-pad)] px-[var(--card-pad)] -mb-[var(--card-pad)] py-2.5",
+                  "rounded-b-[calc(var(--radius)-1px)] border-t border-wash-strong bg-wash-faint hover:bg-wash-soft",
+                  "disabled:opacity-45 disabled:pointer-events-none",
+                  "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+                )}
+              >
+                <Table2 aria-hidden className="size-3.5 flex-none text-primary" />
+                Snapshot records
+                <ChevronRight aria-hidden className="ml-auto size-3.5 flex-none text-muted-foreground" />
+              </button>
             </>
           )}
         </div>

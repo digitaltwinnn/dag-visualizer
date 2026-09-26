@@ -58,9 +58,3 @@ export function openRecords(metaId: string | null, span: RecordSpan | null): voi
   st.setSection("data");
 }
 
-/** THE OTHER REGISTER of this same rung — the measured-history DOCUMENT, which is the History
- *  view's RAW surface (`viewPolicy.rawSurface`). Not a mode step and not a doc page: one subject,
- *  two presentations, so all it takes is the depth change. */
-export function openCharts(): void {
-  useStore.getState().setSection("data");
-}
