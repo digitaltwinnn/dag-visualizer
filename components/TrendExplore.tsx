@@ -6,14 +6,14 @@ import ExplorerShell from "@/components/ExplorerShell";
 import { ROW_OUTSET } from "@/components/ExploreRows";
 import { IdentityDot } from "@/components/inspector/parts";
 import { SelectedRowMark, selectedRow, selectionHue } from "@/components/selection";
-import TrendMeasure from "@/components/TrendMeasure";
+import MeasureStepper from "@/components/MeasureStepper";
 import { ScaleToggle, ScopeChip } from "@/components/trendPickers";
 import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { cn } from "@/lib/utils";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
-import { stepMetric } from "@/src/data/trendSeries";
+import { METRIC_LABELS, stepMetric } from "@/src/data/trendSeries";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { VISIBLE_PLANES, clampScroll, pagerVisible } from "@/src/engine/domain/trendStack";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -26,7 +26,7 @@ import { useStore } from "@/src/store/store";
 // It carries two things, in the order the card grammar puts them (the usage hint LEADS, then the
 // instrument, then the browse list):
 //
-//   · THE CONTROLS, one row: the measure STEPPER on the left (`TrendMeasure`, `∧ SNAPSHOTS ∨` —
+//   · THE CONTROLS, one row: the measure STEPPER on the left (`MeasureStepper`, `∧ SNAPSHOTS ∨` —
 //     the word says which measure every card is on, the chevrons step it; user, 2026-09-26: it
 //     replaces the six-pill picker that stood here — the document lays its measures out as
 //     sections and never picked) and the
@@ -105,8 +105,10 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
       {/* OUTSET like the rows below it (`ROW_OUTSET`'s 6px each side, without their padding):
           the stepper and the switch share 247px, measured to the pixel at CONTINUITY. */}
       <div className="flex items-center justify-between gap-1 w-[calc(100%+12px)] -mx-1.5">
-        <TrendMeasure
-          metric={metric}
+        <MeasureStepper
+          word={METRIC_LABELS[metric]}
+          prev={(() => { const p = stepMetric(metric, -1); return p ? METRIC_LABELS[p] : null; })()}
+          next={(() => { const n = stepMetric(metric, 1); return n ? METRIC_LABELS[n] : null; })()}
           onStep={(dir) => {
             // The same step the cards' `↑`/`↓` keys take (`TrendStack.stepMeasure`): one order,
             // `METRIC_ORDER`, and the ends go inactive rather than wrapping.

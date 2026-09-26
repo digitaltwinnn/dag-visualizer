@@ -1,10 +1,15 @@
 "use client";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { METRIC_LABELS, stepMetric } from "@/src/data/trendSeries";
-import type { TrendMetric } from "@/src/store/store";
 import { cn } from "@/lib/utils";
 
-// THE HISTORY VIEW'S MEASURE STEPPER — `∧ SNAPSHOTS ∨`, the Layers card's control (user,
+// THE MEASURE STEPPER — `∧ SNAPSHOTS ∨`: a WORD that says which measure a list is on, between two
+// chevrons that step it. GENERIC over the vocabulary (2026-09-26): it was the History view's alone
+// (`TrendMeasure`), and the Snapshots explorer took the same control for what its tick rows lead
+// with (`src/data/ledgerMeasure.ts`) — one shape for "the figure this column shows", so the two
+// cards read as one instrument. The caller hands in the word and its two neighbours' names (null
+// at an end); this component knows no order of its own.
+//
+// It was the History view's Layers card control first (user,
 // 2026-09-26: "move the control now at the top of the view and use it to replace the control that
 // sits in the explore card; control left, 'same scale' toggle right"). It has moved twice: it first
 // rode the front card's header as two bare chevrons, which was wrong twice over — the measure is
@@ -30,17 +35,21 @@ import { cn } from "@/lib/utils";
 // A SETTING, not a selection: `onStep` writes `trendMetric` directly (`selectionBoundary` names it
 // out of scope). POSITIONLESS — the caller lays it out; it carries no placement of its own.
 
-export default function TrendMeasure({
-  metric,
+export default function MeasureStepper({
+  word,
+  prev,
+  next,
   onStep,
   className,
 }: {
-  metric: TrendMetric;
+  /** The current measure's name, shown as the word. */
+  word: string;
+  /** The previous / next measure's name, or null at an end (that chevron goes inactive). */
+  prev: string | null;
+  next: string | null;
   onStep: (dir: -1 | 1) => void;
   className?: string;
 }) {
-  const prev = stepMetric(metric, -1);
-  const next = stepMetric(metric, 1);
   // size-5, not the plank's size-6: the stepper shares one 247px row with the `Same scale` switch
   // (measured 2026-09-26), and the row holds both only at this size. Keyboard and touch keep the
   // whole group as a target.
@@ -60,8 +69,8 @@ export default function TrendMeasure({
         type="button"
         disabled={!prev}
         onClick={() => onStep(-1)}
-        title={prev ? `Show ${METRIC_LABELS[prev]}` : "This is the first measure"}
-        aria-label={prev ? `Show ${METRIC_LABELS[prev]}` : "No previous measure"}
+        title={prev ? `Show ${prev}` : "This is the first measure"}
+        aria-label={prev ? `Show ${prev}` : "No previous measure"}
         className={chevron}
       >
         <ChevronUp aria-hidden className="size-3.5" />
@@ -72,14 +81,14 @@ export default function TrendMeasure({
         aria-live="polite"
         className="px-0.5 text-center text-micro font-bold uppercase text-foreground select-none whitespace-nowrap"
       >
-        {METRIC_LABELS[metric]}
+        {word}
       </span>
       <button
         type="button"
         disabled={!next}
         onClick={() => onStep(1)}
-        title={next ? `Show ${METRIC_LABELS[next]}` : "This is the last measure"}
-        aria-label={next ? `Show ${METRIC_LABELS[next]}` : "No next measure"}
+        title={next ? `Show ${next}` : "This is the last measure"}
+        aria-label={next ? `Show ${next}` : "No next measure"}
         className={chevron}
       >
         <ChevronDown aria-hidden className="size-3.5" />

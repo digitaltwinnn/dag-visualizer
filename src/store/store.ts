@@ -20,6 +20,8 @@ import { scrollToKeep } from "@/src/engine/domain/trendStack";
 export type Mode = "hyper" | "geo" | "ledger" | "trend" | "soon";
 
 // The stored metric every trend plane draws — one picker, one column (see `trendMetric` below).
+import type { LedgerMeasure } from "@/src/data/ledgerMeasure";
+export type { LedgerMeasure };
 export type TrendMetric = "snapshots" | "blocks" | "fees" | "kb" | "nodes" | "continuity";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
@@ -281,6 +283,9 @@ interface AppState {
   /** Which stored metric every plane draws. One picker, one column — the planes are a
    *  comparison, so a per-plane metric would make the stack meaningless. */
   trendMetric: TrendMetric;
+  // What the Snapshots explorer's tick rows lead with — fee, anchors, metagraphs or size
+  // (`src/data/ledgerMeasure.ts`). A setting, like `trendMetric`; its stepper is the card's.
+  ledgerMeasure: LedgerMeasure;
   /** How far the stack is scrolled through the roster, in planes. The catalog is longer than the
    *  visible window, so the stack pages rather than capping at a top-N. */
   trendScroll: number;
@@ -382,6 +387,7 @@ interface AppState {
   requestFocusRung: (level: FocusLevel) => void;
   setTrendCursor: (ms: number | null) => void;
   setTrendMetric: (metric: TrendMetric) => void;
+  setLedgerMeasure: (measure: LedgerMeasure) => void;
   setTrendScroll: (offset: number) => void;
   setTrendFocus: (id: string | null) => void;
   setTrendScale: (scale: "shared" | "own") => void;
@@ -453,6 +459,7 @@ export const useStore = create<AppState>((set) => ({
   focusRung: null,
   trendCursorMs: null,
   trendMetric: "snapshots",
+  ledgerMeasure: "fee",
   trendScroll: 0,
   trendFocus: null,
   trendScale: "shared",
@@ -653,6 +660,7 @@ export const useStore = create<AppState>((set) => ({
   setTrendCursor: (ms) =>
     set((s) => ({ trendCursorMs: ms, navQuiet: false, selStack: bumpStack(s.selStack, "instant", ms != null) })),
   setTrendMetric: (metric) => set({ trendMetric: metric }),
+  setLedgerMeasure: (measure) => set({ ledgerMeasure: measure }),
   setTrendScroll: (offset) => set({ trendScroll: offset }),
   setTrendFocus: (id) => set({ trendFocus: id }),
   setTrendScale: (scale) => set({ trendScale: scale }),

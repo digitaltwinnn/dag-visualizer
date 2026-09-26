@@ -24,7 +24,8 @@ import { buildAnchorLog, buildChannelLog, type AnchorLogRow, type ChannelLogRow 
 import { POLL } from "@/src/engine/config";
 import TablePager from "@/components/datasection/TablePager";
 import { ensurePage } from "@/components/RawSnapshotBridge";
-import { fmtDag } from "@/src/util/format";
+import MeasureStepper from "@/components/MeasureStepper";
+import { LEDGER_MEASURE_LABELS, snapMeasure, stepLedgerMeasure, tickMeasure } from "@/src/data/ledgerMeasure";
 
 // The Snapshots view's left-rail tool — ONE AXIS: TIME (user, 2026-08-09). A single uniform tree
 // whose DEPTH means exactly one thing everywhere, and where every depth commits its own subject:
@@ -382,6 +383,8 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const hoverSnapOrd = useStore((s) => s.hoverSnapOrd);
+  const ledgerMeasure = useStore((s) => s.ledgerMeasure);
+  const setLedgerMeasure = useStore((s) => s.setLedgerMeasure);
   const setHoverSnapOrd = useStore((s) => s.setHoverSnapOrd);
   // ONE snapshot's own hover channel — the leaves pair on this, the tick rows on hoverSnapOrd.
   const hoverMetaSnap = useStore((s) => s.hoverMetaSnap);
@@ -608,6 +611,21 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
             </button>
           );
         })()}
+        {/* ── WHAT THE ROWS LEAD WITH (user, 2026-09-26): the measure stepper, the History card's
+            own control, walking `LEDGER_MEASURE_ORDER` — fees, anchors, metagraphs, size. The word
+            is the column's heading; the figure on every tick row below is `tickMeasure`'s answer
+            for it, or the honest dash. A SETTING: it writes its setter directly. */}
+        <div className="flex items-center mb-1">
+          <MeasureStepper
+            word={LEDGER_MEASURE_LABELS[ledgerMeasure]}
+            prev={(() => { const p = stepLedgerMeasure(ledgerMeasure, -1); return p ? LEDGER_MEASURE_LABELS[p] : null; })()}
+            next={(() => { const n = stepLedgerMeasure(ledgerMeasure, 1); return n ? LEDGER_MEASURE_LABELS[n] : null; })()}
+            onStep={(dir) => {
+              const next = stepLedgerMeasure(ledgerMeasure, dir);
+              if (next) setLedgerMeasure(next);
+            }}
+          />
+        </div>
 
         {/* ── the resting division between the INSTRUMENT and the LIST (user, 2026-08-09: the two
             "sit too close"). The follow control is the view's one instrument — it states and
@@ -693,19 +711,14 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
                       mark={filterNet && tickCount > 0 ? { hue: filterNet.hue, count: tickCount } : null}
                       lensOut={!!filterNet && tickCount === 0}
                       label={d.ordinal.toLocaleString()}
-                      // ⚠️ THE METRIC IS THE FEE, NOT THE SIZE (user, 2026-09-13: "instead of size
-                      // in kb show the fees paid in DAG"). Both are exact reads off the same
-                      // fetch, so this is a swap of which fact the row leads with — and the fee
-                      // is the one a reader can act on: it is what anchoring COST, in the unit
-                      // the network charges, where bytes are an implementation detail of the
-                      // payload. `totalFee` is the exact read's own figure and includes the
-                      // unlisted channels, so it matches the rows disclosed beneath it.
-                      // Absent = a dash, never derived from count or size (the honesty rule).
-                      metric={
-                        snapshotExact[d.ordinal]?.totalFee != null
-                          ? `${fmtDag(snapshotExact[d.ordinal]!.totalFee)} DAG`
-                          : "—"
-                      }
+                      // ⚠️ THE METRIC IS THE STEPPER'S MEASURE (user, 2026-09-26) — the fee by
+                      // default (2026-09-13: "instead of size in kb show the fees paid in DAG"),
+                      // or the anchors, the distinct metagraphs, the size. Every figure is read
+                      // off the tick by `src/data/ledgerMeasure.ts`, and absent = the dash, never
+                      // a number derived from another (the honesty rule). The fee is the exact
+                      // read's own `totalFee`, which includes the unlisted channels and so matches
+                      // the rows disclosed beneath it.
+                      metric={tickMeasure(ledgerMeasure, d, snapshotExact[d.ordinal])}
                       selected={d.ordinal === activeSnapOrd}
                       disclose={{ open: isOpen, holdsSel: metaSnap?.globalOrdinal === d.ordinal }}
                       hoverOrd={hoverSnapOrd}
@@ -836,7 +849,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
                                           <SnapRow
                                             nested
                                             label={r.ordinal.toLocaleString()}
-                                            metric={`${fmtDag(r.fee)} DAG`}
+                                            metric={snapMeasure(ledgerMeasure, r)}
                                             selected={sameMetaSnap(metaSnap, sel)}
                                             hoverOrd={hoverMetaSnap}
                                             pairOrd={metaSnapHoverKey(r.metaId, r.ordinal)}
@@ -936,7 +949,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
                                         // sequence — one tick can carry several chains, so the short
                                         // address says which chain a number counts on (2026-08-08).
                                         sub={r.ordinal > 0 ? shortHash(r.metaId) : undefined}
-                                        metric={`${fmtDag(r.fee)} DAG`}
+                                        metric={snapMeasure(ledgerMeasure, r)}
                                         selected={sameMetaSnap(metaSnap, sel)}
                                         hoverOrd={hoverMetaSnap}
                                         pairOrd={metaSnapHoverKey(r.metaId, r.ordinal)}

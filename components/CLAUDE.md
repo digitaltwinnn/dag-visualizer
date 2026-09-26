@@ -259,7 +259,7 @@ pointermove. Three rules are worth knowing before touching it:
 
 **The History view has three axes and each has one home** (user, 2026-09-19): left/right on the
 timeline is WHEN, the depth of the stack is WHO, and UP/DOWN is WHAT — the measure. Its control is
-the Layers card's STEPPER (`TrendMeasure`: `∧ SNAPSHOTS ∨`, the card's control row with `Same scale`
+the Layers card's STEPPER (`MeasureStepper`: `∧ SNAPSHOTS ∨`, the card's control row with `Same scale`
 on its right — user, 2026-09-26; it replaced the six-pill picker there, which no other surface used:
 the document lays its measures out as sections), plus `↑`/`↓` from inside a card; both step `trendMetric` through `METRIC_ORDER`
 (`src/data/trendSeries.ts`), so the two controls are one list. It is a view-level control because

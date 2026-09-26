@@ -247,7 +247,7 @@ export default function TrendStack() {
   };
   // UP / DOWN IS THE VIEW'S THIRD AXIS (user, 2026-09-19). Left/right on the timeline is WHEN, the
   // depth of the stack is WHO, and the measure — WHAT — had no gesture on the canvas. The control
-  // is the Layers card's stepper (`TrendMeasure`, 2026-09-26 — it was the title under the bar) and
+  // is the Layers card's stepper (`MeasureStepper`, 2026-09-26 — it was the title under the bar) and
   // `↑`/`↓` from inside a card. Every card steps together (a stack whose planes each showed a different
   // measure would stop being a comparison), through the ONE order the picker reads, and the ends
   // go inactive rather than wrapping. A SETTING, not a selection — it writes its setter directly,
