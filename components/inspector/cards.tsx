@@ -23,7 +23,8 @@ import { useArchive, archiveFactState, archiveSchedule, archiveSummary, fmtSnapC
 import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
 import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
-import { cap, BarCell, CountCell, CountTag, Desc, StatusMark, CompositionRows, StatusBreakdown, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark } from "./parts";
+import { cap, BarCell, CountCell, CountTag, Desc, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark, StackedSchedule, partShade, type SchedulePart } from "./parts";
+import { statusItems } from "@/src/data/nodeStatus";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { pickNetId, followToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -465,25 +466,35 @@ function ScheduleGroup({
 // merged rows (full-node + kept-snapshot tags), the honest unmeasured remainder, stars while
 // the census is in flight. The metagraph dossiers seat it as the third schedule under Online
 // nodes; the DAG dossier seats the same group standalone (its roster isn't `nodes`).
-/** A schedule's caption inside the grouped BREAKDOWN — the partition's name, one step quieter
- *  than the group's own word, with the group's `mt-2` rhythm above it. */
-function ScheduleCaption({ children }: { children: ReactNode }) {
-  // `text-label`, not micro (user, 2026-09-26: "the font-size of the individual sections is too
-  // small"), and a hairline ABOVE every caption but the first — the separator between two
-  // column-aligned tables is what keeps them from reading as one summing to twice the fleet.
-  return (
-    <div className="mt-2.5 pt-2 border-t border-border first:mt-0 first:pt-0 first:border-0 mb-1.5 text-label tracking-caps uppercase text-muted-foreground">
-      {children}
-    </div>
-  );
-}
-
 function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> }) {
   return (
     <ScheduleGroup label="by archived snapshots" defaultOpen>
-      <ArchivalBody sched={sched} />
+      {sched ? <StackedSchedule axis="Archive depth" parts={archiveParts(sched)} /> : <ArchivalBody sched={sched} />}
     </ScheduleGroup>
   );
+}
+
+/** The archive schedule's rows as the parts of one bar: the census's kinds in the neutral hue,
+ *  stepped down per row, each part's title carrying what its tag column used to say. */
+function archiveParts(sched: NonNullable<ReturnType<typeof archiveSchedule>>): SchedulePart[] {
+  const parts: SchedulePart[] = sched.rows.map((row, i) => ({
+    label: cap(row.label),
+    count: row.count,
+    color: partShade("var(--muted-foreground)", i),
+    title:
+      row.hint ??
+      (row.kept != null ? `${fmtSnapCount(row.kept)} snapshots kept${row.fullCount > 0 ? " · full archive" : ""}` : undefined),
+  }));
+  // The honest remainder (an absent probe entry proves nothing about what a node keeps) is a
+  // part of the same bar, last and faintest, so the bar still sums to the fleet.
+  if (sched.unmeasured > 0)
+    parts.push({
+      label: "Unknown",
+      count: sched.unmeasured,
+      color: partShade("var(--muted-foreground)", sched.rows.length + 1),
+      title: "The probe read nothing from these nodes — what they keep is unknown.",
+    });
+  return parts;
 }
 
 /** The archival schedule's rows — seated inside the metagraph dossier's grouped BREAKDOWN, and
@@ -585,6 +596,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   // own probed universe (its roster isn't `nodes`); a metagraph counts against its live fleet.
   // Memoized — archiveSchedule walks every census entry with date parsing, and this card
   // re-renders on every poll and hover.
+  const hue = cfg.id === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(cfg.id);
   const archSched = useMemo(
     () =>
       archCensus
@@ -650,23 +662,23 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
             </div>
           ) : (
             <div className="mt-1">
+              {/* THREE STACKED BARS, ONE PER PARTITION (design 2026-09-26, `dossier-breakdown` A;
+                  the captioned tables under hairlines read as three sections): composition in
+                  the network's hue, status in the bucket colours, archive depth in the neutral —
+                  each one bar of the same total, its parts named beneath. The chips and the
+                  depth tags ride the parts' titles. "Archive depth", not "archive" (user: it is
+                  how far back each node's archive reaches, not a size). */}
               <ScheduleGroup label="Online nodes" value={<b className="font-mono font-bold">{nodes.length}</b>} defaultOpen>
-                <ScheduleCaption>Node composition</ScheduleCaption>
-                <CompositionRows nodes={nodes} />
-                <ScheduleCaption>Node status</ScheduleCaption>
-                <StatusBreakdown states={states} />
-                {/* THIRD SCHEDULE — "by archival" (user, 2026-09-10): the census's own kinds as
-                    rows — the full-chain keepers, then one DYNAMIC row per distinct partial reach
-                    in the age grammar ("~2 months") — and the honest remainder as unmeasured (an
-                    absent probe entry proves nothing about what a node keeps). The deepest reach +
-                    kept-count ride as the group's muted underline; this absorbs the old
-                    divider-separated "Full archive nodes" fact for fleets. */}
-                {(archSched != null || archAcquiring) && (
-                  <>
-                    <ScheduleCaption>Archived snapshots</ScheduleCaption>
-                    <ArchivalBody sched={archSched} />
-                  </>
-                )}
+                <StackedSchedule
+                  axis="Composition"
+                  parts={compositionRows(nodes).map((r, i) => ({ label: r.label, count: r.count, color: partShade(hue, i), title: r.codes.join(" · ") }))}
+                />
+                <StackedSchedule axis="Status" parts={statusItems(states).map((it) => ({ label: cap(it.label), count: it.count, color: it.color }))} />
+                {archSched != null ? (
+                  <StackedSchedule axis="Archive depth" parts={archiveParts(archSched)} />
+                ) : archAcquiring ? (
+                  <ArchivalBody sched={null} />
+                ) : null}
               </ScheduleGroup>
             </div>
           )}

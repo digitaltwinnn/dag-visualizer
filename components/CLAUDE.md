@@ -950,12 +950,14 @@ grammar everywhere: label left, value right, one line.** The stacked micro-upper
 form is retired — it cost two lines per fact and read as a form, not an instrument. Its last survivor was
 the `Composition` label over the dossier's composition table, which outlived the sweep only because that
 table isn't a `Fact`; dropped 2026-08-10, since each row already names its own composition and without it
-the description above reads as the card's lead. **ONE deliberate exception since 2026-09-10: the
-dossier's accounting SCHEDULES** — the `by node composition` / `by node status` / `by archived
-snapshots` caption rows are user-directed disclosure captions over partition tables (the accounting
-form: one control total, labeled partitions beneath), not fact labels — a caption that FOLDS is a
-control, which is what takes it out of this rule's reach. Don't strip them as a regression of the
-2026-08-10 sweep, and don't cite them as precedent for stacking a label over a `Fact`.
+the description above reads as the card's lead. **The dossier's BREAKDOWN is the one place a label leads its value** (2026-09-26,
+`dossier-breakdown.html` A): under the "Online nodes" disclosure, three STACKED BARS — composition
+in the network's hue, status in the bucket colours, archive depth in the neutral — each one bar of
+the same total with the axis word to its left and the parts named beneath (`StackedSchedule`,
+`inspector/parts.tsx`). They replaced three captioned tables under hairlines, which read as three
+sections rather than three cuts of one fleet. A zero-count part draws no segment and is named
+muted; the chips and depth tags ride the parts' titles. "Archive depth", not "archive" — it is how
+far back a node's archive reaches, not a size.
 
 Three weights, and a fact's weight is a claim about what the card is FOR:
 

@@ -514,3 +514,52 @@ export function Desc({ text }: { text?: string }) {
     </>
   );
 }
+
+// THE STACKED SCHEDULE (design session 2026-09-26, `dossier-breakdown.html` A): a partition of ONE
+// total as one bar cut into its parts, the axis word to its left in the Fact register and the
+// parts named beneath it with their counts. The dossier's three partitions of the fleet —
+// composition, status, archive depth — used to be three captioned tables under hairlines, which
+// read as three sections rather than three cuts of the same 19 nodes; three of these say "the
+// same total, three ways" at half the height. A zero-count part draws no segment (rule 10) and is
+// named muted in the legend, so an absent kind is still stated; the chips and depth tags a table
+// row carried ride each part's `title`.
+export interface SchedulePart {
+  label: string;
+  count: number;
+  color: string;
+  title?: string;
+}
+
+/** A hue stepped down for the i-th part of a partition drawn in one colour (composition in the
+ *  network's hue, archive depth in the neutral): full, then softer with each part. */
+export function partShade(hue: string, i: number): string {
+  const pct = Math.max(30, 100 - i * 30);
+  return pct === 100 ? hue : `color-mix(in oklch, ${hue} ${pct}%, transparent)`;
+}
+
+export function StackedSchedule({ axis, parts, className }: { axis: string; parts: SchedulePart[]; className?: string }) {
+  const total = parts.reduce((n, p) => n + p.count, 0);
+  return (
+    <div className={cn("grid grid-cols-[92px_minmax(0,1fr)] items-start gap-x-2.5 py-1.5", className)}>
+      <span className="text-body text-muted-foreground pt-px">{axis}</span>
+      <span className="min-w-0">
+        <span aria-hidden className="flex h-2 w-full overflow-hidden rounded-full bg-wash-faint">
+          {parts
+            .filter((p) => p.count > 0)
+            .map((p, i) => (
+              <span key={i} className={cn("block h-full", BAR_EASE)} style={{ width: `${(p.count / Math.max(1, total)) * 100}%`, background: p.color }} />
+            ))}
+        </span>
+        <span className="mt-1 flex flex-wrap gap-x-2.5 gap-y-0.5 text-label">
+          {parts.map((p, i) => (
+            <span key={i} className={cn("inline-flex items-center gap-1 whitespace-nowrap", p.count > 0 ? "text-foreground-dim" : "text-muted-foreground/70")} title={p.title}>
+              {p.count > 0 && <span className="size-1.5 rounded-full flex-none" style={{ background: p.color }} />}
+              {p.label}
+              <span className={cn("font-mono tabular-nums", p.count > 0 ? "text-foreground" : "text-muted-foreground/70")}>{p.count}</span>
+            </span>
+          ))}
+        </span>
+      </span>
+    </div>
+  );
+}
