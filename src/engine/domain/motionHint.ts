@@ -1,6 +1,7 @@
 // `MotionCause` is the store's type — it lives beside the channel it is written to, and a type
 // import from here back into the store would close a cycle (`src/data/noImportCycles.test.ts`).
 import type { Mode, MotionCause, TrendMetric } from "@/src/store/store";
+import type { FocusLevel } from "./focusLadder";
 import type { ZoomId } from "@/src/data/trendWindow";
 
 // THE MOTION HINT'S COPY — what the scene is doing while it moves, in one sentence (user,
@@ -31,6 +32,9 @@ export interface HintNames {
   country(cc: string): string;
   window(id: ZoomId): string;
   measure(id: TrendMetric): string;
+  /** The subject a ladder rung frames, named — the committed network, the boxed node, the
+   *  drilled country — as the caller reads it off the selection; a bare level name at worst. */
+  rung(level: FocusLevel): string;
 }
 
 /** A date for a range, in UTC like every stamp the trends surfaces show. */
@@ -42,20 +46,27 @@ function day(ms: number): string {
  * The sentence for `cause` in `mode`, or null where the motion needs no words (a drag is the
  * reader's own hand). Present continuous, one clause, no full stop — it is a status line, not prose.
  *
- * A VIEW switch says only what it builds, never what it leaves: the boot seeds the destination
- * over the store's default, and "leaving Hypergraph" on a cold start into History would be false.
+ * A VIEW switch is two sentences, one per transition phase (user, 2026-09-26): "Leaving A" while
+ * the OUT phase tears the from-view down, "Entering B" while the IN phase builds the destination.
+ * `phase` is the Engine's `motionPhase`; with none running (the boot seeds the destination over
+ * the store's default and flies straight in) only "Entering B" is ever said — "leaving
+ * Hypergraph" on a cold start into History would be false.
  */
-export function motionHint(cause: MotionCause, mode: Mode, names: HintNames): string | null {
+export function motionHint(cause: MotionCause, mode: Mode, names: HintNames, phase: "out" | "in" | null = null): string | null {
   switch (cause.kind) {
     case "view":
-      return `Building ${names.view(cause.to)}`;
+      return phase === "out" ? `Leaving ${names.view(cause.from)}` : `Entering ${names.view(cause.to)}`;
     case "filter":
       return cause.id === "all" ? "Showing every network" : `Narrowing to ${names.network(cause.id)}`;
     case "focus":
       // The re-deal: the focused card takes first place and the cards ahead of it slide back.
       return cause.id === null ? "Returning the stack to its order" : `Bringing ${names.network(cause.id)} to the front`;
     case "node":
-      return cause.title === null ? "Stepping back" : `Framing ${cause.title}`;
+      // A node pick's title is its network and its sub its place: "a Dor Technologies node in
+      // Frankfurt, Germany". A node has no name of its own worth saying; where it belongs does.
+      return cause.title === null
+        ? "Stepping back"
+        : `Framing a ${cause.title} node${cause.sub ? ` in ${cause.sub}` : ""}`;
     case "snapshot":
       return cause.ordinal === null ? "Back to the live snapshot" : `Framing snapshot ${cause.ordinal.toLocaleString()}`;
     case "metaSnap":
@@ -79,6 +90,8 @@ export function motionHint(cause: MotionCause, mode: Mode, names: HintNames): st
       return mode === "trend" ? `Reordering by ${names.measure(cause.id).toLowerCase()}, busiest network first` : null;
     case "page":
       return "Paging the stack";
+    case "rung":
+      return `Framing ${names.rung(cause.level)}`;
     case "orbit":
       return null;
   }

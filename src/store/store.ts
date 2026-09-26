@@ -27,10 +27,11 @@ export type { LedgerMeasure };
 // DATA about the gesture, never copy. Defined here, beside its channel, because the domain module
 // that reads it already imports this file's types and a type import back would close a cycle.
 export type MotionCause =
-  | { kind: "view"; to: Mode }
+  | { kind: "view"; from: Mode; to: Mode }
   | { kind: "filter"; id: string }
   | { kind: "focus"; id: string | null }
-  | { kind: "node"; title: string | null }
+  // A node pick's `title` is its NETWORK's name and `sub` its place (Globe builds the pick so).
+  | { kind: "node"; title: string | null; sub?: string | null }
   | { kind: "snapshot"; ordinal: number | null }
   | { kind: "metaSnap"; metaId: string | null; ordinal?: number }
   | { kind: "country"; cc: string | null }
@@ -40,7 +41,9 @@ export type MotionCause =
   | { kind: "window"; id: ZoomId }
   | { kind: "measure"; id: TrendMetric }
   | { kind: "page" }
-  | { kind: "orbit" };
+  | { kind: "orbit" }
+  // A rail card asking to be framed (`requestFocusRung`): the ladder rung, named by the reader.
+  | { kind: "rung"; level: FocusLevel };
 export type TrendMetric = "snapshots" | "blocks" | "fees" | "kb" | "nodes" | "continuity";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
@@ -253,6 +256,9 @@ interface AppState {
   // turns the pair into one sentence (`domain/motionHint.ts`); nothing else reads them.
   sceneMoving: boolean;
   motionCause: MotionCause | null;
+  // The view transition's phase while one runs — OUT is the teardown, IN the build — so a view
+  // switch can say "leaving A" and then "entering B" (user, 2026-09-26). Engine-written, edges only.
+  motionPhase: "out" | "in" | null;
   // Which rail slot is the materialized BOX right now (the expanded card — "context", "node",
   // "snap", …), or null when nothing is boxed. A PRESENTATION channel, written by Inspector
   // from the same state that renders the box, read by the subject callout so the scene label
@@ -403,6 +409,7 @@ interface AppState {
   setSceneDragging: (dragging: boolean) => void;
   setCameraFlying: (flying: boolean) => void;
   setSceneMoving: (moving: boolean) => void;
+  setMotionPhase: (phase: "out" | "in" | null) => void;
   setMotionCause: (cause: MotionCause | null) => void;
   setPhoneSheetPx: (px: number | null) => void;
   /** Publish how many px of the canvas an open rail sheet covers on one side (0 when closed). */
@@ -485,6 +492,7 @@ export const useStore = create<AppState>((set) => ({
   cameraFlying: false,
   sceneMoving: false,
   motionCause: null,
+  motionPhase: null,
   railCollapse: {},
   navQuiet: false,
   focusRung: null,
@@ -521,7 +529,7 @@ export const useStore = create<AppState>((set) => ({
   // view-scoped, like the other ladder levels; `trendCursorMs` does NOT (an instant is a
   // universal subject and carries, the way `node` and `network` do in `LEVEL_CARRY`).
   // A view switch stamps its own motion cause (the hint says what it builds).
-  setMode: (mode) => set((s) => ({ mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing, trendFocus: null, motionCause: { kind: "view", to: mode } })),
+  setMode: (mode) => set((s) => ({ mode, navQuiet: false, docPage: null, docClosing: s.docPage != null || s.docClosing, trendFocus: null, motionCause: { kind: "view", from: s.mode, to: mode } })),
   // Opening a doc also SURFACES THE SCENE POSE: the overlay sits at z-8, under the raw layer's
   // z-9 — a doc opened from the RAW pose rendered beneath the still-interactive table, with the
   // RAW toggle that could exit it hidden by the doc's own control gating (review find,
@@ -643,6 +651,7 @@ export const useStore = create<AppState>((set) => ({
   setSceneDragging: (sceneDragging) => set({ sceneDragging }),
   setCameraFlying: (cameraFlying) => set({ cameraFlying }),
   setSceneMoving: (sceneMoving) => set({ sceneMoving }),
+  setMotionPhase: (motionPhase) => set({ motionPhase }),
   setMotionCause: (motionCause) => set({ motionCause }),
   setNavQuiet: (navQuiet) => set({ navQuiet }),
   setRailCollapse: (id, collapsed) =>
@@ -679,7 +688,9 @@ export const useStore = create<AppState>((set) => ({
   setBoxedCard: (boxedCard) => set({ boxedCard }),
   // A fresh object every call — the request is the EVENT, so re-opening the same rung must reach
   // the Engine's reference-compare bridge again.
-  requestFocusRung: (level) => set({ focusRung: { level } }),
+  // A rail card's framing is a camera flight with no click-table action behind it, so the
+  // request stamps its own motion cause — the hint would otherwise show the previous gesture's.
+  requestFocusRung: (level) => set({ focusRung: { level }, motionCause: { kind: "rung", level } }),
   // THE CURSOR IS A COMMITTED SUBJECT OF ITS VIEW (2026-09-19), so it takes a place in the
   // recency stack like every other card slot: the facts rail's collapse rule reads `selStack` to
   // decide which present card is the ACTIVE one, and without a rung here the cursor card would

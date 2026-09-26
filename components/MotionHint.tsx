@@ -9,38 +9,68 @@ import { displayNetwork } from "@/src/data/unlisted";
 import { motionHint, type HintNames } from "@/src/engine/domain/motionHint";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { useStore } from "@/src/store/store";
+import { cn } from "@/lib/utils";
 
-// THE MOTION HINT (user, 2026-09-26): one quiet sentence, centred under the command bar, for
-// exactly as long as the scene is moving — "Bringing Dor Technologies to the front", "Building
-// History", "Narrowing to USDC.dag". Two store channels and nothing else: `sceneMoving` (the
-// Engine's per-frame answer, from the structures that drive motion) says WHETHER, `motionCause`
-// (stamped by the gesture's owner) says WHY, and `domain/motionHint.ts` turns the cause into words.
+// THE MOTION HINT (user, 2026-09-26): one quiet sentence, in the scene a little under its centre —
+// where the work is being done — for exactly as long as the scene is moving. "Bringing Dor
+// Technologies to the front", "Building History", "Narrowing to USDC.dag". Two store channels and
+// nothing else: `sceneMoving` (the Engine's per-frame answer, from the structures that drive
+// motion) says WHETHER, `motionCause` (stamped by the gesture's owner) says WHY, and
+// `domain/motionHint.ts` turns the cause into words.
+//
+// THE LOOK (user, 2026-09-26, two rounds): first a grey status line, then the scene-glass card
+// the callout wears — "a bit too dominant for a screen hint". What it is now: NO plate at all, the
+// sentence one step up the type scale (`text-title`, 15px) in foreground ink with a soft halo in
+// the ground's own colour so it stays readable over a lit hub or a paper globe, and a small
+// beating accent dot that says "in motion" the way the LIVE control's dot says "following".
+// Larger and quieter at once, because it is only ever on screen for the length of a flight. A
+// pure FADE — it first rose a few pixels into place, which read as the line jumping (user).
 //
 // It fades in after a beat (150ms) so a same-pose NUDGE — 0.55s, and deliberately not a "change
 // you can see" — never flashes a sentence, and out the frame the motion ends. The LAST sentence is
-// kept through the fade-out, so the words never change under the reader while they vanish. It sits
-// where the History view's measure title used to (`--rail-top` + `--topbar-extra`, the rails' own
-// tokens), pointer-inert, and only in a view with a canvas: a flat page has no scene to move.
+// kept through the fade-out, so the words never change under the reader while they vanish.
+// Placed LOW (user: "more to the bottom of the screen"): anchored a fixed distance above the
+// bottom band's reserved space (`--bottom-reserve`, published by BottomStream), so it sits just
+// over the band on every tier rather than at a share of the height that lands differently on a
+// phone. Pointer-inert, and only in a view with a canvas.
 
-const NAMES: HintNames = {
-  view: (m) => VIEWS.find((v) => v.id === m)?.name ?? m,
-  network: (id) => displayNetwork(id)?.name ?? id,
-  country: (cc) => {
-    try {
-      return new Intl.DisplayNames(undefined, { type: "region" }).of(cc) ?? cc;
-    } catch {
-      return cc;
-    }
-  },
-  window: (id) => ZOOMS.find((z) => z.id === id)?.label ?? id,
-  measure: (id) => METRIC_LABELS[id],
-};
+/** A stable country name from the browser's own vocabulary; the code where it has none. */
+function countryName(cc: string): string {
+  try {
+    return new Intl.DisplayNames(undefined, { type: "region" }).of(cc) ?? cc;
+  } catch {
+    return cc;
+  }
+}
 
 export default function MotionHint() {
   const mode = useStore((s) => s.mode);
   const moving = useStore((s) => s.sceneMoving);
   const cause = useStore((s) => s.motionCause);
-  const text = cause ? motionHint(cause, mode, NAMES) : null;
+  const phase = useStore((s) => s.motionPhase);
+  // The rung names read the selection the rail card stands for — resolved here, at render, so the
+  // domain module stays a function of its arguments.
+  const filter = useStore((s) => s.filter);
+  const inspect = useStore((s) => s.inspect);
+  const country = useStore((s) => s.country);
+  const names: HintNames = {
+    view: (m) => VIEWS.find((v) => v.id === m)?.name ?? m,
+    network: (id) => displayNetwork(id)?.name ?? id,
+    country: countryName,
+    window: (id) => ZOOMS.find((z) => z.id === id)?.label ?? id,
+    measure: (id) => METRIC_LABELS[id],
+    rung: (level) => {
+      switch (level) {
+        case "network": return filter !== "all" ? (displayNetwork(filter)?.name ?? filter) : "every network";
+        case "node": return inspect?.title ?? "the node";
+        case "country": return country ? countryName(country) : "the country";
+        case "cohort": return "the selected nodes";
+        case "composition": return "the selection";
+        case "all": return "the whole network";
+      }
+    },
+  };
+  const text = cause ? motionHint(cause, mode, names, phase) : null;
   // The sentence shown — held through the fade-out (see the header).
   const [shown, setShown] = useState<string | null>(null);
   useEffect(() => {
@@ -53,10 +83,27 @@ export default function MotionHint() {
       role="status"
       aria-live="polite"
       data-on={on ? "1" : "0"}
-      style={{ top: "calc(var(--rail-top) + var(--topbar-extra))" }}
-      className="absolute left-1/2 -translate-x-1/2 z-[5] pointer-events-none select-none whitespace-nowrap text-label text-muted-foreground opacity-0 transition-opacity duration-200 data-[on='1']:opacity-100 data-[on='1']:delay-150 motion-reduce:!transition-none"
+      style={{ bottom: "calc(var(--bottom-reserve, 0px) + 32px)" }}
+      className={cn(
+        "absolute left-1/2 z-[5] -translate-x-1/2 pointer-events-none select-none whitespace-nowrap",
+        "inline-flex items-center gap-2.5 text-title text-foreground",
+        // The halo: the ground's own colour, so the line lifts off a lit hub on dark and off the
+        // globe on paper without a plate. Two shadows — a tight one for the edge, a wide one for
+        // the wash. `--background` is `light-dark()` by construction, so one rule serves both.
+        "[text-shadow:0_1px_2px_var(--background),0_0_14px_var(--background),0_0_28px_var(--background)]",
+        // The entrance: fade + a short rise, delayed a beat on the way IN only. One arbitrary
+        // `[transition:…]` rather than two utilities — `transition-*` is a twMerge group.
+        "opacity-0 transition-opacity duration-200 ease-out",
+        "data-[on='1']:opacity-100 data-[on='1']:delay-150",
+        "motion-reduce:!transition-none",
+      )}
     >
-      {on ? shown : ""}
+      {/* The beating dot: "in motion", in the structural accent — the LIVE control's own idiom. */}
+      <span
+        aria-hidden
+        className="flex-none size-1.5 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_28%,transparent)] animate-dot-beat motion-reduce:animate-none"
+      />
+      <span>{on ? shown : shown ?? ""}</span>
     </div>
   );
 }

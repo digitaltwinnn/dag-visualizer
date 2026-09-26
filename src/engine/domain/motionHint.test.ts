@@ -9,12 +9,15 @@ const NAMES: HintNames = {
   country: (cc) => (cc === "DE" ? "Germany" : cc),
   window: (id) => id.toUpperCase(),
   measure: (id) => ({ snapshots: "Snapshots", blocks: "Blocks", fees: "Fees", kb: "Data", nodes: "Nodes", continuity: "Continuity" })[id],
+  rung: (level) => (level === "network" ? "Dor Technologies" : `the ${level}`),
 };
 
 describe("motionHint", () => {
-  it("names what a view switch BUILDS and never what it leaves (the boot seeds over the default mode)", () => {
-    expect(motionHint({ kind: "view", to: "trend" }, "hyper", NAMES)).toBe("Building History");
-    expect(motionHint({ kind: "view", to: "trend" }, "hyper", NAMES)).not.toMatch(/Leaving/);
+  it("a view switch says LEAVING through the OUT phase and ENTERING through the IN phase — and only entering with no phase (the boot)", () => {
+    const sw = { kind: "view", from: "hyper", to: "trend" } as const;
+    expect(motionHint(sw, "trend", NAMES, "out")).toBe("Leaving Hypergraph");
+    expect(motionHint(sw, "trend", NAMES, "in")).toBe("Entering History");
+    expect(motionHint(sw, "trend", NAMES, null)).toBe("Entering History");
   });
 
   it("says what a selection frames, and what its release returns to", () => {
@@ -26,7 +29,9 @@ describe("motionHint", () => {
     expect(motionHint({ kind: "snapshot", ordinal: null }, "ledger", NAMES)).toBe("Back to the live snapshot");
     expect(motionHint({ kind: "metaSnap", metaId: "dor", ordinal: 12 }, "ledger", NAMES)).toBe("Framing Dor Technologies's snapshot 12");
     expect(motionHint({ kind: "country", cc: "DE" }, "geo", NAMES)).toBe("Drilling into Germany");
-    expect(motionHint({ kind: "node", title: "Node 7f3a" }, "geo", NAMES)).toBe("Framing Node 7f3a");
+    expect(motionHint({ kind: "node", title: "Dor Technologies", sub: "Frankfurt, Germany" }, "geo", NAMES)).toBe("Framing a Dor Technologies node in Frankfurt, Germany");
+    expect(motionHint({ kind: "node", title: "DAG" }, "hyper", NAMES)).toBe("Framing a DAG node");
+    expect(motionHint({ kind: "node", title: null }, "hyper", NAMES)).toBe("Stepping back");
   });
 
   it("stamps a range in UTC days and names a window by its label", () => {
@@ -42,16 +47,22 @@ describe("motionHint", () => {
     expect(motionHint({ kind: "measure", id: "fees" }, "ledger", NAMES)).toBeNull();
   });
 
+  it("a rail card's framing names the rung's subject (the rail click has no click-table action behind it)", () => {
+    expect(motionHint({ kind: "rung", level: "network" }, "hyper", NAMES)).toBe("Framing Dor Technologies");
+    expect(motionHint({ kind: "rung", level: "node" }, "geo", NAMES)).toBe("Framing the node");
+  });
+
   it("a drag is the reader's own hand and needs no words", () => {
     expect(motionHint({ kind: "orbit" }, "hyper", NAMES)).toBeNull();
   });
 
   it("every cause kind answers a string or null, never throws", () => {
     const causes: MotionCause[] = [
-      { kind: "view", to: "geo" }, { kind: "filter", id: "x" }, { kind: "focus", id: null }, { kind: "node", title: null },
+      { kind: "view", from: "hyper", to: "geo" }, { kind: "filter", id: "x" }, { kind: "focus", id: null }, { kind: "node", title: null },
       { kind: "snapshot", ordinal: null }, { kind: "metaSnap", metaId: null }, { kind: "country", cc: null },
       { kind: "cohort", on: true }, { kind: "cohort", on: false }, { kind: "composition", on: true }, { kind: "composition", on: false },
       { kind: "range", span: null }, { kind: "window", id: "1h" }, { kind: "measure", id: "nodes" }, { kind: "page" }, { kind: "orbit" },
+      { kind: "rung", level: "all" },
     ];
     for (const c of causes) {
       const out = motionHint(c, "trend", NAMES);

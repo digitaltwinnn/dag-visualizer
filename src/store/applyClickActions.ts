@@ -83,7 +83,7 @@ export function motionCauseOf(actions: readonly ClickAction[]): MotionCause | nu
       case "country": return { kind: "country", cc: a.cc };
       case "cohort": return { kind: "cohort", on: a.sel != null };
       case "composition": return { kind: "composition", on: a.sel != null };
-      case "inspect": return { kind: "node", title: a.pick?.title ?? null };
+      case "inspect": return { kind: "node", title: a.pick?.title ?? null, sub: a.pick?.sub ?? null };
       case "snapshot": return { kind: "snapshot", ordinal: a.pick?.data.ordinal ?? null };
       case "metaSnap": return a.sel ? { kind: "metaSnap", metaId: a.sel.metaId, ordinal: a.sel.ordinal } : { kind: "metaSnap", metaId: null };
       case "trendFocus": return { kind: "focus", id: a.id };

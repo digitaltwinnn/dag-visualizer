@@ -2115,6 +2115,10 @@ export class Engine {
       st.sceneDragging ||
       (this._policy.chartStack && !this.trendStack.settled());
     if (moving !== st.sceneMoving) st.setSceneMoving(moving);
+    // The transition's two phases, for the view-switch sentence ("leaving A" → "entering B").
+    const ph = this.transition.phase;
+    const phase = ph === "out" ? "out" : ph === "in" ? "in" : null;
+    if (phase !== st.motionPhase) st.setMotionPhase(phase);
   }
 
   private _integrateMotion(dt: number): boolean {
