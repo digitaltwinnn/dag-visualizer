@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
 import { FOCUS_LEAN } from "./trendStack";
-import { FOCI, hubFraming, geoFraming, REST_ASPECT, aspectFit, ledgerCommitTilt, LEDGER_TILT_YAW, LEDGER_TILT_PITCH, LEDGER_TILT_DOLLY, easeInOutQuad, CAM_ZOOM, dollyBack, RAILS_HIDDEN_DOLLY, railsLean, restOrbit, restPitch, nodeFraming, cohortFraming, isSamePose, nudgeMix, NUDGE_AMP, NUDGE_DUR, NUDGE_SAME, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE, trendFocusPush, TREND_FOCUS_PUSH, restAzimuth } from "./cameraRig";
+import { FOCI, hubFraming, geoFraming, REST_ASPECT, aspectFit, ledgerCommitTilt, LEDGER_TILT_YAW, LEDGER_TILT_PITCH, LEDGER_TILT_DOLLY, easeInOutQuad, CAM_ZOOM, dollyBack, RAILS_HIDDEN_DOLLY, railsLean, restOrbit, restPitch, nodeFraming, cohortFraming, isSamePose, nudgeMix, NUDGE_AMP, NUDGE_DUR, NUDGE_SAME, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE, trendFocusPush, TREND_FOCUS_PUSH } from "./cameraRig";
 
 // NO Snapshots framing is pinned here, because the view HAS none: it owns one pose, `FOCI.ledger`,
 // with one state-keyed variation — `ledgerCommitTilt`, the commit ORBIT, pinned below. Five framings
@@ -453,10 +453,9 @@ describe("trendFocusPush (the History view's ONE state-keyed variation, 2026-09-
 });
 
 describe("FOCI.trend pivots on the FRONT card (user, 2026-09-26)", () => {
-  // The free orbit turns about the controls' target. With the target mid-stack the rear
-  // billboards swung toward the camera under a drag and outgrew the front card; the target now
-  // sits at the front slot's depth, so the card being read holds its size and place and every
-  // other card can only ever be smaller and behind it.
+  // The controls' target is what the ZOOM dollies toward (the orbit is off in this view —
+  // `viewPolicy.rotate`). With the target mid-stack a dolly closed on the gap between the cards;
+  // at the front slot's depth it closes on the card being read.
   it("targets z = 0, the front slot's depth", () => {
     expect(FOCI.trend.target.z).toBe(0);
   });
@@ -470,13 +469,4 @@ describe("FOCI.trend pivots on the FRONT card (user, 2026-09-26)", () => {
     expect(dir.distanceTo(toOld)).toBeLessThan(1e-9);
   });
 
-  it("rests at azimuth 0 — frontal, so the bounded orbit is symmetric about the deck", () => {
-    expect(restAzimuth("trend")).toBeCloseTo(0, 12);
-    // And the helper is OrbitControls' theta, atan2(x, z) of the offset — a pose that sits
-    // to the +x side of its target answers a positive azimuth.
-    expect(restAzimuth("geo")).toBeCloseTo(
-      Math.atan2(FOCI.geo.pos.x - FOCI.geo.target.x, FOCI.geo.pos.z - FOCI.geo.target.z),
-      12,
-    );
-  });
 });

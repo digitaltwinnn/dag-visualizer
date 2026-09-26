@@ -76,7 +76,9 @@ export const FOCI = {
   // card's size and place under any drag, and every other card can only ever be smaller and
   // behind it. The target moved ALONG THE RESTING RAY (t = 54/72 of the way from pos to the old
   // target lands z = 0 at y = −0.5), so the forward axis, the pitch and the framing are
-  // byte-identical at rest; only the pivot changed.
+  // byte-identical at rest; only the pivot changed. The free ORBIT was then switched off for this
+  // view altogether (`viewPolicy.rotate`, same day), so what the pivot serves now is the ZOOM: a
+  // wheel or a pinch dollies toward the target, and the target is the card being read.
   trend: { pos: new THREE.Vector3(0, 2.5, 54), target: new THREE.Vector3(0, -0.5, 0) },
 } satisfies Record<string, CameraFraming>;
 /** A pose that exists. Every caller of `focus()` names one of these, checked. */
@@ -143,14 +145,6 @@ export function restPitch(view: View3D): number {
   const dy = f.pos.y - f.target.y;
   const dx = f.pos.x - f.target.x, dz = f.pos.z - f.target.z;
   return Math.atan2(dy, Math.hypot(dx, dz));
-}
-/** The resting pose's AZIMUTH about its target — OrbitControls' own theta, `atan2(x, z)` of the
- *  camera's offset — so a view that BOUNDS its free orbit (`viewPolicy.orbitBounds`) can state
- *  the bounds as a half-range about rest and the Engine composes the absolute limits here. Read
- *  out of FOCI like `restPitch`, for the same reason: re-tuning the pose re-tunes the limits. */
-export function restAzimuth(view: View3D): number {
-  const f = FOCI[REST_POSE[view]];
-  return Math.atan2(f.pos.x - f.target.x, f.pos.z - f.target.z);
 }
 /** Lean `pos` toward `target`, at full strength only while the pose orbits as wide as its view's
  *  resting one. `restDist <= 0` means "no resting pose to measure against" (a flat view, which has

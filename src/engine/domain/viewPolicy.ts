@@ -14,11 +14,6 @@
 // testable and side-effect-free; it only imports the `Mode` string-union TYPE from the store.
 import type { Mode } from "@/src/store/store";
 
-/** The stock pole clamp, radians short of straight up / straight down (`SceneContext` seeds the
- *  controls with it; the Engine restores it when a view's `orbitBounds` release). Globe-UX
- *  convention: the camera never crosses a pole, so north can never point down on screen. */
-export const POLE_MARGIN = 0.25;
-
 export interface ViewPolicy {
   // Is the 3D canvas shown at all? false = a flat placeholder view (Blueprint schematic); the
   // globe group + background mesh hide. (Equivalent to the old `!flat`.)
@@ -69,15 +64,14 @@ export interface ViewPolicy {
   // crossing" clamp; the Hypergraph relaxes it so the ring layout can be viewed straight from the
   // TOP (user). Applied by the Engine on a view change.
   minPolarAngle: number;
-  // Does the FREE orbit stay near the resting pose? A half-range about rest for each axis, in
-  // radians — azimuth about `cameraRig.restAzimuth`, polar about the resting polar angle — or
-  // null for the stock full orbit. Only History bounds it (2026-09-26): its cards are BILLBOARDS
-  // that pivot on the front card, and past ~35° the rear cards sweep out from behind the front
-  // one and the deck stops reading as a deck. Composed by the Engine each frame, released while a
-  // pose flight or a view transition runs (a flight from another view's pose passes through every
-  // azimuth, and a clamp mid-flight would snap it). A view without a row keeps the full orbit —
-  // the allow-list shape of convention 7.
-  orbitBounds: { azimuth: number; polar: number } | null;
+  // Does a pointer drag ORBIT the camera here? The stock controls everywhere but History
+  // (user, 2026-09-26: "disable camera control, maybe keep zoom only, and always keep the trend
+  // cards fixed in their implied 3D position — let the clicking of a background card do the
+  // movement work"). Its cards are billboards hosting text: an orbit slid the deck about without
+  // ever showing another side of it, and the one movement that view has a meaning for — a card
+  // coming to the front — is already the focus RE-DEAL. Zoom stays (a dolly toward the front
+  // card, the pose's target). A BOUNDED orbit (±35° / ±11°) was built and removed the same day.
+  rotate: boolean;
   // Does this view publish the selection's flat node list (`store.selNodes`) for its explorer
   // card? geo (Nodes by country) + hyper (Nodes by layer); elsewhere the list empties so the
   // browsers stay quiet.
@@ -174,7 +168,7 @@ const FLAT: ViewPolicy = {
   minCamDist: 12,
   minCamAlt: null,
   minPolarAngle: 0.25,
-  orbitBounds: null,
+  rotate: true,
   nodeList: false,
   vitalsLane: false,
   bandContent: "vitals",
@@ -219,7 +213,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minCamAlt: null,
     minPolarAngle: 0.25, // standard clamp: the structure is TILTED (HYPER_TILT), not the camera —
     // so hyper shares the overview pose with the other views and never needs the pole-crossing relax
-    orbitBounds: null,
+    rotate: true,
     nodeList: true,
     vitalsLane: true,
     bandContent: "vitals",
@@ -249,7 +243,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minCamDist: 12,
     minCamAlt: 18, // above the land plateau (R 16 + LAND_H 1.0) + chip stacks — no zooming inside
     minPolarAngle: 0.25,
-    orbitBounds: null,
+    rotate: true,
     nodeList: true,
     vitalsLane: true,
     bandContent: "vitals",
@@ -279,7 +273,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minCamDist: 12,
     minCamAlt: null,
     minPolarAngle: 0.25,
-    orbitBounds: null,
+    rotate: true,
     // The Snapshots node browser (LedgerPanel's floor disclosures) reads store.selNodes.
     nodeList: true,
     vitalsLane: true,
@@ -315,12 +309,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     minCamDist: 12,
     minCamAlt: null,
     minPolarAngle: 0.25,
-    // ±35° across, ±11° up and down about the resting pose: enough to look around the deck's
-    // stagger, not enough for a rear billboard to come out from behind the front card. The
-    // vertical band is the tighter one on purpose: the rear cards sit HIGHER as well as further
-    // back (the stagger), so a camera raised over the deck lifts them off the top of the canvas
-    // long before it lifts the front card (measured at ±20°: the rearmost header under the bar).
-    orbitBounds: { azimuth: 0.6, polar: 0.2 },
+    rotate: false,
     nodeList: false,
     // The band is MOUNTED but its content is this view's TIMELINE, not the vitals cells — the
     // reserve it publishes is the same either way, which is why the two are separate rows.
