@@ -391,16 +391,24 @@ export default function TrendStack() {
                 ⚠️ TWO BACKGROUND LAYERS, ONE SHORTHAND: `--panel-solid` is 0.92-alpha glass, so on
                 its own the card would still leak the plane behind it. Laid over the opaque
                 `--scene-ground` it is solid — and both are tokens, so both grounds follow.
-                A PREVIEWED CARD TAKES ITS NETWORK'S HUE ON THE HAIRLINE, and nothing else moves
-                (rule 9 — hovers preview, never commit). It was an opacity lift while the cards
-                were translucent; on an opaque deck there is no opacity left to spend, and the
+                A PREVIEWED CARD TAKES ITS NETWORK'S HUE ON THE HAIRLINE AND AS A WASH ON ITS FACE
+                (rule 9 — hovers preview, never commit). The wash is the explorer rows' own
+                `.nb-row.subject-paired` recipe — the hue at a low mix — laid as a THIRD background
+                layer over the two below, so the card stays opaque (user, 2026-09-26: the hairline
+                alone did not read as the pairing the rows show). It was an opacity lift while the
+                cards were translucent; on an opaque deck there is no opacity left to spend, and the
                 app's `.subject-paired` glow is a box-shadow, which a transformed plane may not
                 carry (see NO BLUR, NO SHADOW above). */}
             <div
               className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border p-2 [background:linear-gradient(var(--panel-solid),var(--panel-solid)),var(--scene-ground)] [transition:border-color_0.16s_ease] motion-reduce:!transition-none"
               style={{
                 width: PLANE_PX_W,
-                borderColor: pair.paired ? `color-mix(in oklch, ${row.hue ?? "var(--primary)"} 60%, transparent)` : undefined,
+                ...(pair.paired
+                  ? {
+                      borderColor: `color-mix(in oklch, ${row.hue ?? "var(--primary)"} 60%, transparent)`,
+                      background: `linear-gradient(color-mix(in oklch, ${row.hue ?? "var(--primary)"} 12%, transparent), color-mix(in oklch, ${row.hue ?? "var(--primary)"} 12%, transparent)), linear-gradient(var(--panel-solid), var(--panel-solid)), var(--scene-ground)`,
+                    }
+                  : {}),
               }}
             >
             {p && (
