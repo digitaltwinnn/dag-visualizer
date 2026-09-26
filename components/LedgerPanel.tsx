@@ -508,7 +508,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
     <ExplorerShell
       defaultCollapsed={defaultCollapsed}
       id="ledger-view"
-      title="Snapshots"
+      title="Snapshot breakdown"
       // No ordering clause (user, 2026-08-12): the list shows its own order. See the hint-shape
       // note in GeoExplore.tsx, which is the shared rule.
       hint="Recent snapshots. Open one for the networks that anchored into it."

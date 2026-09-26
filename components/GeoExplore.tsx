@@ -163,7 +163,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
     <ExplorerShell
       defaultCollapsed={defaultCollapsed}
       id="geoexplore"
-      title="Nodes by country"
+      title="Country breakdown"
       hint={
         // The footprint's headline figures (Nodes / Countries / Ready) live in the top-bar
         // vitals now; this card is purely the country→nodes accordion. The usage hint LEADS

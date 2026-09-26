@@ -1727,6 +1727,9 @@ export class Engine {
     // the DAG core, so this must NOT be gated on the validator set (bug: "no nodes reported" while
     // the core was still loading).
     useStore.getState().setSelNodes(VIEW_POLICIES[this.mode].nodeList ? this.globe.listNodes(this.filter) : []);
+    // The whole catalog's placed rows, for the Hypergraph explorer's per-network counts — the
+    // same builder, unfiltered, on the same edges (a filter change, a poll).
+    useStore.getState().setAllNodes(VIEW_POLICIES[this.mode].nodeList ? this.globe.listNodes("all") : []);
     // The per-country leaderboard needs the validator set — skip it until the core has loaded.
     if (!this.globe.nodes?.length) return;
     const countries = this.globe.countryStats(this.filter);

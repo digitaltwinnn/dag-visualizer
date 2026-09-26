@@ -92,7 +92,7 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
       id="trendexplore"
       // The tool card says what you BROWSE (the naming rule): the planes, which the About card
       // above and the view's own copy both call LAYERS.
-      title="Layers over time"
+      title="Layer breakdown"
       // The shell's hint shape: what the card holds and its ordering, then what the click does.
       // "Open one for…" is the other explorers' second half and would be a lie here — a layer row
       // has no children, it brings its plane forward.

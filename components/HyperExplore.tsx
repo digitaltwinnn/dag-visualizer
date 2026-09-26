@@ -1,8 +1,13 @@
 "use client";
 
+import { useMemo } from "react";
+
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
+import MeasureStepper from "@/components/MeasureStepper";
+import { networkOfRow } from "@/src/data/geoMeasure";
+import { HYPER_MEASURE_LABELS, networkMeasure, stepHyperMeasure } from "@/src/data/hyperMeasure";
 import ExplorerShell from "@/components/ExplorerShell";
 import { metagraphById } from "@/src/data/network";
 import { compositionGroups, compositionClause } from "@/src/data/composition";
@@ -31,6 +36,9 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
   const metaList = useStore((s) => s.metaList);
   const filter = useStore((s) => s.filter);
   const selNodes = useStore((s) => s.selNodes);
+  const allNodes = useStore((s) => s.allNodes);
+  const hyperMeasure = useStore((s) => s.hyperMeasure);
+  const setHyperMeasure = useStore((s) => s.setHyperMeasure);
   const inspect = useStore((s) => s.inspect);
   const composition = useStore((s) => s.composition);
   const hoverFilter = useStore((s) => s.hoverFilter);
@@ -81,6 +89,19 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
     inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode") ? inspect : null;
   const selIp = sel?.node?.ip ?? null;
 
+  // The rows' figure is the stepper's measure: the fleet, or the distinct countries / providers
+  // among the network's placed rows (`allNodes`, grouped by the network each row serves).
+  const measured = useMemo(() => {
+    const byNet = new Map<string, NodeRow[]>();
+    for (const r of allNodes) {
+      const n = networkOfRow(r);
+      if (n) (byNet.get(n) ?? byNet.set(n, []).get(n)!).push(r);
+    }
+    return metaList
+      .map((m) => ({ m, v: networkMeasure(hyperMeasure, m, byNet.get(m.id) ?? []) }))
+      .sort((a, b) => b.v - a.v || b.m.nodes.length - a.m.nodes.length);
+  }, [metaList, allNodes, hyperMeasure]);
+
   return (
     // The shell owns the Card frame, CardHead, collapse state, and the padded body — HyperExplore
     // is the architectural sibling of GeoExplore and shares its chrome exactly (both migrated
@@ -88,14 +109,28 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
     <ExplorerShell
       defaultCollapsed={defaultCollapsed}
       id="hyperexplore"
-      title="Nodes by network"
+      title="Network breakdown"
       // No ordering clause (user, 2026-08-12): a sorted list states its own order, so "biggest
       // fleet first" only spent words on what the eye already reads. See the hint-shape note in
       // GeoExplore.tsx, which is the shared rule.
       hint="Every network on the hypergraph. Open one for the roles its nodes play."
     >
-      {/* Sorted by fleet size (user, 2026-07-12) — the biggest networks lead. */}
-      {[...metaList].sort((a, b) => b.nodes.length - a.nodes.length).map((m) => {
+      {/* ── WHAT THE ROWS COUNT (user, 2026-09-26): the measure stepper, the other explorers' own
+          control — nodes, countries, providers (`src/data/hyperMeasure.ts`). A SETTING. */}
+      <div className="flex items-center mb-1.5">
+        <MeasureStepper
+          word={HYPER_MEASURE_LABELS[hyperMeasure]}
+          prev={(() => { const p = stepHyperMeasure(hyperMeasure, -1); return p ? HYPER_MEASURE_LABELS[p] : null; })()}
+          next={(() => { const n = stepHyperMeasure(hyperMeasure, 1); return n ? HYPER_MEASURE_LABELS[n] : null; })()}
+          onStep={(dir) => {
+            const next = stepHyperMeasure(hyperMeasure, dir);
+            if (next) setHyperMeasure(next);
+          }}
+        />
+      </div>
+      {/* Sorted by the chosen measure, fleet size as the tiebreak (user, 2026-07-12: the biggest
+          networks lead) — the order is what the eye reads off a sorted list. */}
+      {measured.map(({ m, v }) => {
               const cfg = metagraphById(m.id);
               const name = cfg?.name ?? m.id;
               const hue = identityHudCss(m.id);
@@ -152,7 +187,7 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
                         than most: this row's body states the same breakdown as the dossier's BY NODE COMPOSITION one
                         rail over, and the vitals band's MicroBars state it a third time — three surfaces, one set of
                         numbers, and two of them were already mono (user, 2026-09-14). */}
-                    <span className="flex-none text-right font-mono text-body tabular-nums font-semibold">{m.nodes.length}</span>
+                    <span className="flex-none text-right font-mono text-body tabular-nums font-semibold">{v}</span>
                     {open ? (
                       <SelectedRowMark className="flex-none" muted={focus !== "context"} hue={hue} />
                     ) : (

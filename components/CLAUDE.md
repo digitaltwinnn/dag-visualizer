@@ -224,7 +224,10 @@ decisions inside them are design, not detail:
   yesterday's number; `components/trendRailBoundary.test.ts` pins all three "one home" rules.
 
 **Naming and copy rules:** About states the view's point of view ("How the network is built"); the tool
-card says what you BROWSE ("Nodes by network"). Eyebrows are bare role words, and each explorer's usage
+card says what you BROWSE — by the AXIS the rows break the network down along, never by the
+figure they show ("Network breakdown", "Country breakdown", "Snapshot breakdown", "Layer breakdown"
+— user, 2026-09-26: once every explorer carries the measure STEPPER, a title like "Nodes by
+country" names one measure of three). Eyebrows are bare role words, and each explorer's usage
 hint leads its card rather than trailing it. An explorer ROW is a browse target — mark, name, count,
 nothing more; **the prose that EXPLAINS a subject belongs to that subject's right-rail card, once**,
 and since a row commits its card in the same click, nothing is lost by keeping the sentence in one

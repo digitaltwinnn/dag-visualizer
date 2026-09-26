@@ -73,7 +73,7 @@ export interface ViewPolicy {
   // card, the pose's target). A BOUNDED orbit (±35° / ±11°) was built and removed the same day.
   rotate: boolean;
   // Does this view publish the selection's flat node list (`store.selNodes`) for its explorer
-  // card? geo (Nodes by country) + hyper (Nodes by layer); elsewhere the list empties so the
+  // card? geo (Country breakdown) + hyper (Network breakdown); elsewhere the list empties so the
   // browsers stay quiet.
   nodeList: boolean;
   // Does the bottom VITALS BAND mount? (2026-08-30 — the vitals leave the crowded command bar

@@ -22,6 +22,7 @@ export type Mode = "hyper" | "geo" | "ledger" | "trend" | "soon";
 // The stored metric every trend plane draws — one picker, one column (see `trendMetric` below).
 import type { LedgerMeasure } from "@/src/data/ledgerMeasure";
 import type { GeoMeasure } from "@/src/data/geoMeasure";
+import type { HyperMeasure } from "@/src/data/hyperMeasure";
 export type { LedgerMeasure };
 // WHY the scene is moving — the motion hint's cause (2026-09-26), stamped by the gesture's owner
 // and read by `components/MotionHint` through `domain/motionHint.ts`, which turns it into words.
@@ -154,6 +155,10 @@ interface AppState {
   // Per-country breakdown + distribution score for the active filter (engine-pushed).
   leaderboard: LeaderboardData | null;
   // The active selection's nodes, for the geo node browser (engine-pushed; [] off geo).
+  // EVERY placed node row, across the whole catalog, whatever the filter (2026-09-26) — what the
+  // Hypergraph explorer's per-network countries / providers are counted from. Published by the
+  // Engine beside `selNodes`, from the same `listNodes`, only where the view lists nodes.
+  allNodes: NodeRow[];
   selNodes: NodeRow[];
   // EXACT per-snapshot totals (fee + listed/unlisted), keyed by ordinal — populated by
   // RawSnapshotBridge from /api/snapshot/[ordinal] for the live + selected ticks, so ANY view
@@ -323,6 +328,9 @@ interface AppState {
   // What the Geography explorer's country rows count — nodes, metagraphs or providers
   // (`src/data/geoMeasure.ts`). A setting, like the two above.
   geoMeasure: GeoMeasure;
+  // What the Hypergraph explorer's network rows count — nodes, countries or providers
+  // (`src/data/hyperMeasure.ts`). A setting, like the two above.
+  hyperMeasure: HyperMeasure;
   /** How far the stack is scrolled through the roster, in planes. The catalog is longer than the
    *  visible window, so the stack pages rather than capping at a top-N. */
   trendScroll: number;
@@ -400,6 +408,7 @@ interface AppState {
   setComposition: (c: CompositionSel | null) => void;
   setLeaderboard: (lb: LeaderboardData | null) => void;
   setSelNodes: (nodes: NodeRow[]) => void;
+  setAllNodes: (rows: NodeRow[]) => void;
   setSnapshotExact: (data: SnapshotExact) => void;
   /** Record a FAILED exact read for this ordinal — the acquiring states' give-up signal. */
   setExactMiss: (ordinal: number) => void;
@@ -429,6 +438,7 @@ interface AppState {
   setTrendMetric: (metric: TrendMetric) => void;
   setLedgerMeasure: (measure: LedgerMeasure) => void;
   setGeoMeasure: (measure: GeoMeasure) => void;
+  setHyperMeasure: (measure: HyperMeasure) => void;
   setTrendScroll: (offset: number) => void;
   setTrendFocus: (id: string | null) => void;
   setTrendScale: (scale: "shared" | "own") => void;
@@ -486,6 +496,7 @@ export const useStore = create<AppState>((set) => ({
   composition: null,
   leaderboard: null,
   selNodes: [],
+  allNodes: [],
   snapshotExact: {},
   exactMiss: {},
   metaSnapDeep: {},
@@ -505,6 +516,7 @@ export const useStore = create<AppState>((set) => ({
   trendMetric: "snapshots",
   ledgerMeasure: "fee",
   geoMeasure: "nodes",
+  hyperMeasure: "nodes",
   trendScroll: 0,
   trendFocus: null,
   trendScale: "shared",
@@ -604,6 +616,7 @@ export const useStore = create<AppState>((set) => ({
     set((s) => ({ composition, selStack: bumpStack(s.selStack, "composition", !!composition) })),
   setLeaderboard: (leaderboard) => set({ leaderboard }),
   setSelNodes: (selNodes) => set({ selNodes }),
+  setAllNodes: (allNodes) => set({ allNodes }),
   setSnapshotExact: (data) =>
     set((s) => {
       if (s.snapshotExact[data.ordinal]) return {}; // immutable per ordinal — keep the first
@@ -714,6 +727,7 @@ export const useStore = create<AppState>((set) => ({
   setTrendMetric: (metric) => set({ trendMetric: metric, motionCause: { kind: "measure", id: metric } }),
   setLedgerMeasure: (measure) => set({ ledgerMeasure: measure }),
   setGeoMeasure: (measure) => set({ geoMeasure: measure }),
+  setHyperMeasure: (measure) => set({ hyperMeasure: measure }),
   setTrendScroll: (offset) => set({ trendScroll: offset, motionCause: { kind: "page" } }),
   setTrendFocus: (id) => set({ trendFocus: id }),
   setTrendScale: (scale) => set({ trendScale: scale }),
