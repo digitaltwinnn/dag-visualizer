@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { METAGRAPHS } from "@/src/net/current";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
-import { scopeEmptyCopy, trendRoster, trendScope } from "./trendScope";
+import { scopeEmptyCopy, stackRoster, trendRoster, trendScope, viewScope } from "./trendScope";
 
 // WHAT THE COMMITTED FILTER DOES TO THE MEASURED HISTORY (2026-09-19). Two registers read this —
 // the History view's chart planes and the Trends document's per-network columns — and both have
@@ -78,5 +78,21 @@ describe("scopeEmptyCopy — the fact, plus the route THIS surface can offer", (
         expect(`${c.fact} ${c.route}`).not.toMatch(/[—–]|\s-\s/);
       }
     }
+  });
+});
+
+describe("the scene's roster and scope — the hypergraph's own plane under the DAG filter (2026-09-26)", () => {
+  it("draws the one id `dag` under the DAG filter, and the document's roster otherwise", () => {
+    expect(stackRoster("dag")).toEqual(["dag"]);
+    expect(stackRoster("all")).toEqual(trendRoster("all"));
+    expect(stackRoster(catalogIds[0])).toEqual([catalogIds[0]]);
+    expect(stackRoster(UNLISTED_ID)).toEqual([]);
+  });
+
+  it("scopes the DAG as a network in the view, and leaves the document's empty state alone", () => {
+    expect(viewScope("dag")).toBe("network");
+    expect(viewScope("all")).toBe("all");
+    expect(viewScope(UNLISTED_ID)).toBe("empty-unlisted");
+    expect(trendScope("dag")).toBe("empty-dag");
   });
 });

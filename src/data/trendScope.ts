@@ -45,6 +45,24 @@ export function trendScope(filter: string): TrendScope {
   return metagraphById(filter) ? "network" : "empty-unlisted";
 }
 
+/** THE SCENE'S ROSTER AND SCOPE (2026-09-26; user: "is the History view the right place to show
+ *  the hypergraph data we have?" — it is). The stack draws the HYPERGRAPH'S OWN plane under the
+ *  DAG filter, from the global series every other surface already reads (the Moment card's
+ *  "across the whole network", the band's overview line, the document's Hypergraph tab), so
+ *  the view's roster under "dag" is the one id `dag` and its scope is a network's. Under "all"
+ *  the roster stays the metagraphs: a global line one order of magnitude taller in front of the
+ *  layers it sums is what the shared scale exists to compare against, not include. The DOCUMENT
+ *  keeps `trendRoster`/`trendScope` as they are — its Metagraphs tab has nothing for the DAG and
+ *  its Hypergraph tab is the same chart's other register. */
+export function stackRoster(filter: string): string[] {
+  return filter === "dag" ? ["dag"] : trendRoster(filter);
+}
+export type ViewScope = Exclude<TrendScope, "empty-dag">;
+export function viewScope(filter: string): ViewScope {
+  // `trendScope` answers "empty-dag" for "dag" alone, which the branch above takes first.
+  return filter === "dag" ? "network" : (trendScope(filter) as ViewScope);
+}
+
 /** THE FACT — why this scope has no chart. Said verbatim in both registers: it is a property of
  *  the trends store, not of the surface asking. */
 const FACT: Record<EmptyScope, string> = {

@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 
 import type { TrendsSlice } from "@/components/useTrendsSlice";
-import { trendRoster, trendScope, type TrendScope } from "@/src/data/trendScope";
+import { stackRoster, viewScope, type TrendScope } from "@/src/data/trendScope";
 import {
   TREND_METRICS,
   globalSeries,
@@ -114,16 +114,20 @@ export default function useTrendRoster(
   // same question, and a second copy of this ternary is how the band came to quantise at five
   // minutes over charts drawn in hours (2026-09-19).
   const stepMs = stepFor(slice, metric);
-  const scope = trendScope(filter);
+  // The SCENE's scope: the DAG is a network here (its own plane), not the document's empty state.
+  const scope = viewScope(filter);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `spec` is TREND_METRICS[metric]
   const pass = useMemo(() => {
     const counter = spec.kind === "counter";
     const cut = <T,>(a: readonly T[]): T[] => (counter ? trimCounterEdges(a, stepMs) : a.slice());
-    const ids = trendRoster(filter);
+    const ids = stackRoster(filter);
     const rows = new Map<string, TrendRosterRow>();
     for (const id of ids) {
-      const s = metricSeries(metric, id, series);
+      // THE HYPERGRAPH'S OWN SERIES is the global one (`globalSeries` — the same read the Moment
+      // card's whole-network lead and the band's overview make), with no sampling or gap marks:
+      // those are per-metagraph facts. Every other id reads its own `m.<id>.*` rows.
+      const s = id === "dag" ? { points: globalSeries(metric, series), sampled: undefined, gaps: undefined } : metricSeries(metric, id, series);
       const net = displayNetwork(id);
       const points = cut(s.points);
       rows.set(id, {
