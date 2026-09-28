@@ -70,11 +70,20 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   const start = clampScroll(ranked.length, scroll);
   const last = Math.min(start + VISIBLE_PLANES, ranked.length);
   const maxScroll = Math.max(0, ranked.length - VISIBLE_PLANES);
+  // THE ROWS ARE THE PLANES, ONE TO ONE (user, 2026-09-28: "isn't the list always directly
+  // controlling the 3D space? if needed we should page those items, not page something directly
+  // in the view"). The list used to show the WHOLE roster over a pager that moved only the
+  // stack's five-plane window, so "3–7 of 11" sat under eleven visible rows and read as broken
+  // pagination. Now the list IS the window: the five rows on stage, in stage order, and paging
+  // the list is what moves the stage — one `trendScroll`, read by both, so they cannot disagree.
+  // The share bars still scale against the whole roster's busiest (`maxLast` below), so a bar
+  // means the same thing on every page.
+  const staged = ranked.slice(start, last);
 
   // The unmount backstop for the pairing — a row that leaves the roster under a stationary pointer
   // (a filter commit, a re-rank) never fires its own leave. Every write goes through the RETURNED
   // setter, so the hook releases only hovers this card set.
-  const setHover = useHoverRelease(hoverFilter, ranked, setHoverFilter);
+  const setHover = useHoverRelease(hoverFilter, staged, setHoverFilter);
 
   // The bar: each network's last reading as a share of the busiest — the ranking the stack's depth
   // already carries, made visible in the list.
@@ -98,7 +107,7 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
     empty: empty ? `${empty.fact} ${empty.route}` : "Waiting for the measured history…",
     rows: empty
       ? []
-      : ranked.flatMap((id) => {
+      : staged.flatMap((id) => {
           const row = rows.get(id);
           if (!row) return [];
           const on = focus === id;
@@ -117,16 +126,16 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
             },
           ];
         }),
-    // THE PAGER — ABSENT unless there is something to navigate, and the predicate is the DOMAIN's
-    // (`pagerVisible`, beside the clamp): presence and the end stops are the same question asked
-    // twice. An EXHAUSTED direction is inactive rather than gone, so the row never re-composes at
-    // the ends.
+    // THE PAGER — pages the rows above, and with them the stage (the note on `staged`). ABSENT
+    // unless there is something to navigate, and the predicate is the DOMAIN's (`pagerVisible`,
+    // beside the clamp): presence and the end stops are the same question asked twice. An
+    // EXHAUSTED direction is inactive rather than gone, so the row never re-composes at the ends.
     pager: pagerVisible(ranked.length) ? (
       <div className="mt-1.5 flex items-center justify-center gap-2">
         <button
           type="button"
           disabled={start <= 0}
-          aria-label="Show the planes before these"
+          aria-label="Show the networks before these"
           onClick={() => setTrendScroll(clampScroll(ranked.length, start - 1))}
           className="inline-flex items-center justify-center size-6 rounded-sm text-muted-foreground hover:text-foreground hover:bg-wash-hover disabled:opacity-35 disabled:pointer-events-none"
         >
@@ -138,7 +147,7 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
         <button
           type="button"
           disabled={start >= maxScroll}
-          aria-label="Show the planes after these"
+          aria-label="Show the networks after these"
           onClick={() => setTrendScroll(clampScroll(ranked.length, start + 1))}
           className="inline-flex items-center justify-center size-6 rounded-sm text-muted-foreground hover:text-foreground hover:bg-wash-hover disabled:opacity-35 disabled:pointer-events-none"
         >

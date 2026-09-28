@@ -191,8 +191,11 @@ export default function RailDock({
   // DRAG-chosen height alone, and a drag wins over the fit until the sheet fully closes
   // (`phoneSheetPx` resets there, so every open re-fits). Height changes ride the sheet's own
   // 380ms spring transition below, so growth eases; the FIRST measure lands in a layout effect
-  // before paint, so opening never plays a 60vh→fit settle. Ceiling at the 60vh default —
-  // taller content scrolls, exactly as before.
+  // before paint, so opening never plays a 60vh→fit settle. CEILING AT THE EXPANDED SNAP
+  // (user, 2026-09-28: "for explore it's much smaller than the card") — the same
+  // viewport-minus-140 cap the drag's expanded detent uses, so a card fits whole whenever it
+  // can without covering the top bar, and only a card taller than that scrolls. The 60vh
+  // ceiling it replaced dated from the two-head chooser, when the sheet had little to show.
   // ⚠️ A CALLBACK REF AS STATE, not a ref — the same portal trap the canvas-cover publisher
   // below records: the sheet's content mounts a commit LATER than the `open` that reveals it,
   // so an effect keyed on `open` alone runs against null and fits nothing (measured: the sheet
@@ -256,8 +259,8 @@ export default function RailDock({
     // number, and its excess showed up as a band of dead glass under the last card).
     const CHROME = 46;
     const apply = () => {
-      const def = Math.round(window.innerHeight * 0.6);
-      setFitPx(Math.min(def, Math.max(170, fitEl.offsetHeight + CHROME)));
+      const cap = Math.min(Math.round(window.innerHeight * 0.8), window.innerHeight - 140); // = expandedPx
+      setFitPx(Math.min(cap, Math.max(170, fitEl.offsetHeight + CHROME)));
     };
     apply();
     // Release the grow only after a zero frame has PAINTED (double-rAF) — releasing in this same
