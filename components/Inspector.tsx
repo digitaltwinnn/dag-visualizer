@@ -344,6 +344,9 @@ export default function Inspector() {
   const setPhoneDock = useStore((s) => s.setPhoneDock);
   const phoneSheetPx = useStore((s) => s.phoneSheetPx);
   const setSceneCover = useStore((s) => s.setSceneCover);
+  // The other docks' published heights — the seed an exchange starts this sheet from.
+  const coverExplore = useStore((s) => s.sceneCoverBExplore);
+  const coverVitals = useStore((s) => s.sceneCoverBVitals);
   const setPhoneSheetPx = useStore((s) => s.setPhoneSheetPx);
 
   const accent = { ["--filter-accent"]: filterAccent(filter) } as CSSProperties;
@@ -799,6 +802,9 @@ export default function Inspector() {
         onTrayOpenChange(next);
         setPhoneDock(next ? "details" : null);
       }}
+      // ONE motion on a section switch — see ExploreRail's matching arm.
+      seedPx={Math.max(coverExplore, coverVitals)}
+      exchange={phoneDock !== null && phoneDock !== "details"}
       // The sheet's HEIGHT off the canvas — see ExploreRail's matching arm.
       onCoverPx={(px) => setSceneCover("details", px)}
     >

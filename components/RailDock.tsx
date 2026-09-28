@@ -112,6 +112,8 @@ export default function RailDock({
   open: openProp,
   sheetPx,
   onSheetPx,
+  seedPx,
+  exchange,
   signalKey,
   onCoverPx,
 }: {
@@ -143,6 +145,15 @@ export default function RailDock({
   // stays store-free — it just reads/writes through these props.
   sheetPx?: number | null;
   onSheetPx?: (px: number | null) => void;
+  // AN EXCHANGE (phone, 2026-09-28 — user: "when I switch from explore to vitals it fully
+  // collapses and then expands again; take the new section's height into account"): the two
+  // props that turn two sheets' entry-and-exit into ONE height motion. `seedPx` is the height
+  // the entry STARTS from — the caller passes the other docks' published covers, so a sheet
+  // opening while another was up begins at that sheet's height and eases to its own fit instead
+  // of growing from the dock. `exchange` says another dock is taking over, so the closing sheet
+  // unmounts at once rather than playing its 420ms shrink underneath the arriving one.
+  seedPx?: number | null;
+  exchange?: boolean;
   // TABLET switch-signal carrier: RailThread (the desktop view/filter-switch pulse's home) is
   // desktop-only, so below 1100px the switch had no visible carrier. The caller passes the SAME
   // subject key RailThread uses (`${mode}|${filter}`) and RailDock plays the SAME travelling
@@ -221,9 +232,27 @@ export default function RailDock({
   // the ref callback was tried between the two: an inline arrow ref refires every render and
   // clobbers React's own style writes — state is the only clean owner of this height.)
   const [entry, setEntry] = useState<null | "pre" | "grow">(null);
+  const entryRef = useRef(entry);
+  entryRef.current = entry;
+  // ⚠️ THE SEED IS CAPTURED ON THE OPEN FLIP, in this layout effect's own closure. The closing
+  // dock publishes its cover as 0 in the SAME commit's passive effects, so by the time this
+  // sheet's content renders the store already reads 0 and a seed taken then starts the entry
+  // from the dock (measured: 427 → 25 → 257). The render that flips `open` still saw the other
+  // dock's height, and that is the value the entry starts from.
+  const seedRef = useRef(0);
   useLayoutEffect(() => {
-    if (isBarHalf && open) setEntry("pre");
+    if (isBarHalf && open) {
+      seedRef.current = seedPx ?? 0;
+      setEntry("pre");
+    }
+    // `seedPx` is read on the flip only, on purpose (the note above).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, isBarHalf]);
+  // The content-follow flag (see `apply` in the fit effect below).
+  const [tracking, setTracking] = useState(false);
+  const trackT = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTick = useRef(0);
+  useEffect(() => () => { if (trackT.current) clearTimeout(trackT.current); }, []);
   // THE EXIT MIRRORS THE ENTRY (user, 2026-09-03: "appears nicely but disappears immediately"):
   // the sheet shrinks back into the dock, then unmounts. It has to be a LAGGED unmount rather
   // than a close-side animation, because a close can arrive from outside this component's own
@@ -241,7 +270,9 @@ export default function RailDock({
   const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
-    if (isBarHalf && !open) setExiting(true);
+    // An EXCHANGE skips the shrink: the arriving sheet starts at this one's height (`seedPx`
+    // on its side), so the exit would only ever play hidden behind it.
+    if (isBarHalf && !open && !exchange) setExiting(true);
     if (open) setExiting(false);
   }
   useEffect(() => {
@@ -261,6 +292,22 @@ export default function RailDock({
     const apply = () => {
       const cap = Math.min(Math.round(window.innerHeight * 0.8), window.innerHeight - 140); // = expandedPx
       setFitPx(Math.min(cap, Math.max(170, fitEl.offsetHeight + CHROME)));
+      // CONTENT THAT IS ITSELF ANIMATING IS FOLLOWED, NOT EASED (user, 2026-09-28: the card's
+      // collapse "doesn't animate properly"). A card collapsing runs HeightEase's 650ms, and the
+      // observer fires every frame of it; each tick re-targeted the sheet's own 380ms transition,
+      // so the glass lagged and stuttered behind the card. Two ticks inside one short window mean
+      // the content is moving on a clock of its own, and the sheet then tracks it frame by frame
+      // with its transition suspended (`tracking` → `!transition-none`, the drag's own device),
+      // releasing a beat after the ticks stop. A one-shot change (a drill swapping the list) is a
+      // single tick and keeps the eased transition. Ticks during the entry never count — the
+      // observer's own first notification would otherwise cancel the grow.
+      const now = performance.now();
+      if (entryRef.current === null && now - lastTick.current < 120) {
+        setTracking(true);
+        if (trackT.current) clearTimeout(trackT.current);
+        trackT.current = setTimeout(() => setTracking(false), 160);
+      }
+      lastTick.current = now;
     };
     apply();
     // Release the grow only after a zero frame has PAINTED (double-rAF) — releasing in this same
@@ -279,8 +326,9 @@ export default function RailDock({
       setEntry(null);
     };
   }, [open, isBarHalf, fitEl]);
-  // Drag beats fit; fit beats the CSS default; the entry's and the exit's zeros beat both.
-  const heightPx = isBarHalf ? (entry === "pre" || exiting ? 0 : sheetPx ?? fitPx) : null;
+  // Drag beats fit; fit beats the CSS default; the exit's zero beats both, and the entry starts
+  // from the seed (another dock's height on an exchange, else the dock's own zero).
+  const heightPx = isBarHalf ? (exiting ? 0 : entry === "pre" ? seedRef.current : sheetPx ?? fitPx) : null;
   const handleOpenChangeRef = useRef(handleOpenChange);
   handleOpenChangeRef.current = handleOpenChange;
 
@@ -415,7 +463,7 @@ export default function RailDock({
   const defaultPx = () => Math.round(window.innerHeight * 0.6); // = the CSS h-[60vh]
   const MIN_PX = 90;
   // Rubber-band past the detent range (user, 2026-08-15 — the native "final touches"): beyond
-  // [MIN_PX, expanded] the height keeps following with progressive resistance toward a short
+  // [MIN_PX, expanded] the height keeps tracking with progressive resistance toward a short
   // asymptote instead of hard-clamping, and the release snap pulls it back on the spring. Same
   // curve as RailPager's — identity-sloped at 0, never reaching the asymptote.
   const RUBBER_PX = 36;
@@ -715,7 +763,7 @@ export default function RailDock({
                   // grow above ('!': the animate utility is a (0,2,0) variant, the documented
                   // escape). Reduced motion collapses the grow too (transition-none).
                   "!animate-none",
-                  dragging
+                  dragging || tracking
                     ? "!transition-none"
                     : cn(
                         "motion-reduce:!transition-none",

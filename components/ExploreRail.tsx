@@ -45,6 +45,9 @@ export default function ExploreRail() {
   const phoneSheetPx = useStore((s) => s.phoneSheetPx);
   const setPhoneSheetPx = useStore((s) => s.setPhoneSheetPx);
   const setSceneCover = useStore((s) => s.setSceneCover);
+  // The other docks' published heights — the seed an exchange starts this sheet from.
+  const coverDetails = useStore((s) => s.sceneCoverBDetails);
+  const coverVitals = useStore((s) => s.sceneCoverBVitals);
   // Theme every card's bullet to the current selection (the explore card is always
   // specific to the active filter).
   const accent = { ["--filter-accent"]: filterAccent(filter) } as CSSProperties;
@@ -169,6 +172,9 @@ export default function ExploreRail() {
       sheetPx={phoneSheetPx}
       onSheetPx={setPhoneSheetPx}
       onOpenChange={(next) => setPhoneDock(next ? "explore" : null)}
+      // ONE motion on a section switch (RailDock's `seedPx`/`exchange` note).
+      seedPx={Math.max(coverDetails, coverVitals)}
+      exchange={phoneDock !== null && phoneDock !== "explore"}
       // The sheet's HEIGHT off the canvas — the Engine shifts the scene up into the band above it
       // (store `sceneCoverBExplore`; `domain/sheetShift.ts` has the design).
       onCoverPx={(px) => setSceneCover("explore", px)}
