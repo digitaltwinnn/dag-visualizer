@@ -144,8 +144,11 @@ export const focusGrow = (c: DimContext): number => viewMix(c, "grow");
 // our app"): a committed cohort of 31 co-located DAG chips each took nearly half the primary
 // boost on top of the on-filter resting glow, and the stack summed its halos into one white
 // column. A member still lifts — the rung has no 3D object of its own, lit members are how it
-// appears — but at a share that keeps a dense group inside the hue range.
-export const GROUP_FOCUS = 0.30; // share of focusBoost a group member gets (FOCUS_SHARED's default)
+// appears — but at a share that keeps a dense group inside the hue range. A second step,
+// 0.30 → 0.20, the same day (user: "the focus of the whole stack when selecting a provider also
+// adds to the brightness, reduce the focus effect a bit"): the primary subject keeps the whole
+// boost, so a node picked out of the group still stands clear of it.
+export const GROUP_FOCUS = 0.20; // share of focusBoost a group member gets (FOCUS_SHARED's default)
 export const focusWeightOf = (primary: boolean, group: boolean): number =>
   primary ? 1 : group ? FOCUS_SHARED.groupShare : 0;
 
