@@ -65,7 +65,7 @@ export const OPACITY_FALLOFF = 0;
 
 /** THE STAGGER, across. Each slot further back sits this much further RIGHT, so its header strip
  *  clears the plane in front of it. See the header: a covered header is a missing plane. */
-export const PLANE_STEP_X = 3;
+export const PLANE_STEP_X = 2.4;
 
 /** THE STAGGER ACROSS, PER TIER. On a NARROW canvas (tablet, phone — `breakpointOf` below the
  *  desktop tier) the across-step is ZERO and the deck stacks straight up: the front card is
@@ -79,10 +79,14 @@ export function stepX(narrow: boolean): number {
 
 /** THE STAGGER, up. Each slot further back sits this much HIGHER — the larger of the two steps,
  *  because a header strip is wide and short: vertical clearance is what actually uncovers it.
- *  Sized to uncover the HEADER and the peak line under it, not the plot: the rear planes are an
- *  index of the roster (name, hue, latest reading), and every unit spent showing more of a rear
- *  plot is a unit the front chart is pushed away from the centre of the view. */
-export const PLANE_STEP_Y = 5.4;
+ *  Sized to uncover the HEADER ALONE (user, 2026-09-28: "closer to each other so that only the
+ *  headers are (partially) shown and readable" — it was 5.4, which also showed the peak line and
+ *  the top of each rear plot): the rear planes are an index of the roster (name, hue, latest
+ *  reading), and every unit spent showing more of a rear card is a unit the front chart is pushed
+ *  away from the centre of the view. Measured at the desktop pose, 4.3 leaves the front gap at
+ *  about a header's height and the rearmost headers clipped by a few pixels, which is the
+ *  "partially" the user asked for. */
+export const PLANE_STEP_Y = 4.3;
 
 /** WHERE ALONG THE RUN OF SLOTS THE STAGGER IS CENTRED (user, 2026-09-19: "make the front chart
  *  more at the view center and larger"). `1` centres the BLOCK — the mean of the visible slots sits
