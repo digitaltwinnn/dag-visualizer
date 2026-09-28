@@ -165,6 +165,7 @@ export default function Explorer({ id, title, hint, levels, onLeave, defaultColl
                     nameW={current.nameW}
                     figureW={current.figureW}
                     nested={nested}
+                    wideBar={!current.rows.some((x) => x.tag != null && x.tag !== false)}
                     glyph={r.glyph}
                     name={r.name}
                     nameMono={r.nameMono}
