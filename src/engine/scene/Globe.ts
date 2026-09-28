@@ -34,6 +34,7 @@ import type { StageLight } from "./objects/StageLight";
 import { STAGE_LIGHTS } from "../domain/stageLight";
 import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
 import { makeTextLabel, disposeTextLabel } from "./objects/TextLabel";
+import { joinOverlay } from "./SceneContext";
 import { closeness, NODE_RAISE } from "../domain/cameraRig";
 import type { CohortSel } from "../domain/focusLadder";
 import { ancestryGlow } from "../domain/dimModel";
@@ -599,12 +600,13 @@ export class Globe implements GeoViewHost {
         if (s.u < uMin) uMin = s.u;
         if (s.u > uMax) uMax = s.u;
       }
-      // 1.4 → 2.2 cells (user, 2026-09-28: "ticker text has bloom and is a bit too small"):
-      // at 1.4 the dark ground's whole-frame bloom ate the glyphs; at 2.2 the halo sits around
-      // letters that still read. The bloom itself stays — it is the dark look, and only paper
-      // runs a pass that can pick marks; a bloom-free legend means a DOM legend (the callout's
-      // half of the split), which is a different piece of work.
-      const mesh = makeTextLabel(ink, ticker, GATHER_CELL * 2.2, 500);
+      // 1.7 cells, and OUT OF THE BLOOM (user, 2026-09-28, two rounds: 1.4 was "a bit too small"
+      // with the halo eating it, 2.2 "too large" and still blooming — "I don't want the text to
+      // bloom"). The legend joins the OVERLAY_LAYER (SceneContext): drawn after the composer, onto
+      // the finished frame, so the glyphs stay crisp and a size just above the old one reads.
+      const mesh = makeTextLabel(ink, ticker, GATHER_CELL * 1.7, 500);
+      (mesh.material as THREE.MeshBasicMaterial).toneMapped = false;
+      joinOverlay(mesh);
       grp.add(mesh);
       this._gatherLabels.push({ mesh, uMid: (uMin + uMax) / 2, gs: ss[0]!.gs });
     }
