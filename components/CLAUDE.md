@@ -225,12 +225,13 @@ decisions inside them are design, not detail:
   (`selectionBoundary`'s own scope note says why, and why the plane FOCUS is in the table instead).
   A row click applies the SAME `trendPlaneActions` the plane's header strip runs. No scope mark in
   the head at all (2026-09-26): the top bar's filter names the committed network and is the one
-  place to clear it. **The rows ARE the planes, one to one** (user, 2026-09-28): the list shows
-  the `VISIBLE_PLANES` networks on stage, in stage order, and its PAGER pages the list — which is
-  what moves the stage, one `trendScroll` read by both. (It showed the whole roster over a pager
-  that moved only the stack's window, and "3–7 of 11" under eleven rows read as broken
-  pagination.) The pager is absent unless the roster exceeds `VISIBLE_PLANES` and clamps with the
-  stack's own `clampScroll`, so a chevron can never offer a step the geometry refuses.
+  place to clear it. **The whole roster lists and nothing pages** (user, 2026-09-28: "other
+  views just expand the card; only Snapshots pages, because that number is huge" — a dozen
+  networks is a list, not a chain). The stack still shows `VISIBLE_PLANES` at a time, and the
+  rows drive it: a click brings that plane to the front and the store's `scrollToKeep` pages the
+  window after it, so no control in the card names `trendScroll`. Two pagers came and went the
+  same day — one under all the rows that moved only the stack's window ("3–7 of 11" under eleven
+  rows), then a list cut to the five on stage — and neither is to come back.
   ⚠️ **The roster is computed ONCE, in `components/useTrendRoster.ts`** — the planes, this list and
   the cursor card all read it, counter EDGE TRIM included. A surface reading the payload directly
   is one bucket out of step with the axis, which is exactly how the cursor card briefly quoted

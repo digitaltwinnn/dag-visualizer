@@ -1,7 +1,5 @@
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
-
 import Explorer, { type ExplorerLevelSpec } from "@/components/explorer/Explorer";
 import { IdentityDot } from "@/components/inspector/parts";
 import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
@@ -10,7 +8,6 @@ import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing"
 import { scopeEmptyCopy } from "@/src/data/trendScope";
 import { METRIC_LABELS, METRIC_ORDER, metricUnit } from "@/src/data/trendSeries";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
-import { VISIBLE_PLANES, clampScroll, pagerVisible } from "@/src/engine/domain/trendStack";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore, type TrendMetric } from "@/src/store/store";
 
@@ -51,39 +48,31 @@ import { useStore, type TrendMetric } from "@/src/store/store";
 export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: boolean } = {}) {
   const filter = useStore((s) => s.filter);
   const metric = useStore((s) => s.trendMetric);
-  const scroll = useStore((s) => s.trendScroll);
   const focus = useStore((s) => s.trendFocus);
   const windowId = useStore((s) => s.trendWindow);
   const range = useStore((s) => s.trendRange);
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const setTrendMetric = useStore((s) => s.setTrendMetric);
-  const setTrendScroll = useStore((s) => s.setTrendScroll);
 
   const roster = useTrendRoster(useTrendsSlice(windowId, range), filter, metric);
   const { ranked, rows, unit, format, stepMs } = roster;
   const empty = scopeEmptyCopy(roster.scope, "view");
 
-  // THE PAGER'S WINDOW, clamped by the stack's OWN rule (`clampScroll`, domain/trendStack.ts) —
-  // the control and the geometry must agree about where the ends are, or a chevron dims a step
-  // early or offers a step the stack will refuse.
-  const start = clampScroll(ranked.length, scroll);
-  const last = Math.min(start + VISIBLE_PLANES, ranked.length);
-  const maxScroll = Math.max(0, ranked.length - VISIBLE_PLANES);
-  // THE ROWS ARE THE PLANES, ONE TO ONE (user, 2026-09-28: "isn't the list always directly
-  // controlling the 3D space? if needed we should page those items, not page something directly
-  // in the view"). The list used to show the WHOLE roster over a pager that moved only the
-  // stack's five-plane window, so "3–7 of 11" sat under eleven visible rows and read as broken
-  // pagination. Now the list IS the window: the five rows on stage, in stage order, and paging
-  // the list is what moves the stage — one `trendScroll`, read by both, so they cannot disagree.
-  // The share bars still scale against the whole roster's busiest (`maxLast` below), so a bar
-  // means the same thing on every page.
-  const staged = ranked.slice(start, last);
+  // THE WHOLE ROSTER, NO PAGER (user, 2026-09-28, two rounds). The card paged for nine days — first
+  // a pager under all eleven rows that moved only the stack's five-plane window ("3–7 of 11" under
+  // eleven rows read as broken pagination), then a list cut to the five on stage — and the second
+  // was the tell: "other views just expand the card; only Snapshots pages, because that number is
+  // huge; metagraphs are not paged". A dozen networks is a list, not a chain. So every network
+  // lists, busiest first, like the Hypergraph card's, and the STAGE is driven by the rows alone: a
+  // click brings that plane to the front, and the store pages the stack's window to keep it on
+  // stage (`scrollToKeep`, inside `setTrendIds`/the focus write). `trendScroll` is read by the
+  // stack and written by that keep — no control here names it.
 
   // The unmount backstop for the pairing — a row that leaves the roster under a stationary pointer
   // (a filter commit, a re-rank) never fires its own leave. Every write goes through the RETURNED
   // setter, so the hook releases only hovers this card set.
-  const setHover = useHoverRelease(hoverFilter, staged, setHoverFilter);
+  const setHover = useHoverRelease(hoverFilter, ranked, setHoverFilter);
 
   // The bar: each network's last reading as a share of the busiest — the ranking the stack's depth
   // already carries, made visible in the list.
@@ -107,7 +96,7 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
     empty: empty ? `${empty.fact} ${empty.route}` : "Waiting for the measured history…",
     rows: empty
       ? []
-      : staged.flatMap((id) => {
+      : ranked.flatMap((id) => {
           const row = rows.get(id);
           if (!row) return [];
           const on = focus === id;
@@ -126,35 +115,6 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
             },
           ];
         }),
-    // THE PAGER — pages the rows above, and with them the stage (the note on `staged`). ABSENT
-    // unless there is something to navigate, and the predicate is the DOMAIN's (`pagerVisible`,
-    // beside the clamp): presence and the end stops are the same question asked twice. An
-    // EXHAUSTED direction is inactive rather than gone, so the row never re-composes at the ends.
-    pager: pagerVisible(ranked.length) ? (
-      <div className="mt-1.5 flex items-center justify-center gap-2">
-        <button
-          type="button"
-          disabled={start <= 0}
-          aria-label="Show the networks before these"
-          onClick={() => setTrendScroll(clampScroll(ranked.length, start - 1))}
-          className="inline-flex items-center justify-center size-6 rounded-sm text-muted-foreground hover:text-foreground hover:bg-wash-hover disabled:opacity-35 disabled:pointer-events-none"
-        >
-          <ChevronLeft aria-hidden className="size-3.5" />
-        </button>
-        <span className="font-mono text-micro tabular-nums text-muted-foreground">
-          {start + 1}–{last} of {ranked.length}
-        </span>
-        <button
-          type="button"
-          disabled={start >= maxScroll}
-          aria-label="Show the networks after these"
-          onClick={() => setTrendScroll(clampScroll(ranked.length, start + 1))}
-          className="inline-flex items-center justify-center size-6 rounded-sm text-muted-foreground hover:text-foreground hover:bg-wash-hover disabled:opacity-35 disabled:pointer-events-none"
-        >
-          <ChevronRight aria-hidden className="size-3.5" />
-        </button>
-      </div>
-    ) : undefined,
   };
 
   return (

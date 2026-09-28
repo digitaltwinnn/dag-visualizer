@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   clampScroll,
-  pagerVisible,
   FOCUS_LEAN,
   OPACITY_FALLOFF,
   PLANE_GAP,
@@ -390,27 +389,6 @@ describe("clampScroll — one rule for the stack and its pager", () => {
     const start = clampScroll(ids.length, 99);
     const poses = stackPoses(ids, { scroll: 99, focus: null });
     expect(poses.map((p) => p.id)).toEqual(ids.slice(start, start + VISIBLE_PLANES));
-  });
-});
-
-// ⚠️ THE PAGER'S VISIBILITY IS THE PLANK'S RULE, NOT A JSX PREDICATE (2026-09-19):
-// "an axis with nothing to navigate is ABSENT, not disabled". It lives here beside the clamp so
-// the control and the geometry agree about both questions, and so the two boundaries — exactly a
-// full window, and one plane past it — are pinned rather than eyeballed in a component.
-describe("pagerVisible — an axis with nothing to navigate is absent", () => {
-  it("is absent for a roster that fits, INCLUDING exactly one full window", () => {
-    for (const n of [0, 1, VISIBLE_PLANES - 1, VISIBLE_PLANES]) expect(pagerVisible(n)).toBe(false);
-  });
-
-  it("appears the moment one plane does not fit", () => {
-    expect(pagerVisible(VISIBLE_PLANES + 1)).toBe(true);
-    expect(pagerVisible(VISIBLE_PLANES + 6)).toBe(true);
-  });
-
-  it("agrees with the clamp about whether there is anywhere to go", () => {
-    for (const n of [0, 1, VISIBLE_PLANES, VISIBLE_PLANES + 1, VISIBLE_PLANES + 4]) {
-      expect(pagerVisible(n)).toBe(clampScroll(n, Number.MAX_SAFE_INTEGER) > 0);
-    }
   });
 });
 

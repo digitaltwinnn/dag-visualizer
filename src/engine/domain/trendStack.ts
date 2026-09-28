@@ -239,18 +239,6 @@ export function clampScroll(count: number, scroll: number): number {
   return Math.min(max, Math.max(0, Math.floor(scroll)));
 }
 
-/** Whether the roster has anywhere to page TO.
- *
- *  The rail plank's rule, stated where the geometry is (2026-09-19): "an exhausted direction is
- *  INACTIVE while an axis with nothing to ever navigate is ABSENT". A roster that fits the window
- *  — exactly `VISIBLE_PLANES` included — has one legal scroll and therefore no axis at all, so its
- *  pager is not a disabled control, it is no control. Living beside `clampScroll` is the point:
- *  presence and the end stops are the same question asked twice, and a component predicate could
- *  drift from the clamp by one plane with nothing failing. */
-export function pagerVisible(count: number): boolean {
-  return count > VISIBLE_PLANES;
-}
-
 /** Is `focus` one of the planes the window currently holds?
  *
  *  ⚠️ ONE PREDICATE, TWO READERS (2026-09-19). `stackPoses` lifts a focused plane only while it is
