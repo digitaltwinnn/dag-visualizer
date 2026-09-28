@@ -140,7 +140,12 @@ export const focusGrow = (c: DimContext): number => viewMix(c, "grow");
 // hovered composition or cluster group) takes a FRACTION of the boost; the PRIMARY subject —
 // the one hovered or selected node — always takes all of it, so it stands out from its own
 // group. `focusWeightOf` is the one place that ranking lives; the node loops call it per node.
-export const GROUP_FOCUS = 0.45; // share of focusBoost a group member gets (FOCUS_SHARED's default)
+// 0.45 → 0.30 (2026-09-28, user: "geo, DAG, Falkenstein provider — the brightest place in all of
+// our app"): a committed cohort of 31 co-located DAG chips each took nearly half the primary
+// boost on top of the on-filter resting glow, and the stack summed its halos into one white
+// column. A member still lifts — the rung has no 3D object of its own, lit members are how it
+// appears — but at a share that keeps a dense group inside the hue range.
+export const GROUP_FOCUS = 0.30; // share of focusBoost a group member gets (FOCUS_SHARED's default)
 export const focusWeightOf = (primary: boolean, group: boolean): number =>
   primary ? 1 : group ? FOCUS_SHARED.groupShare : 0;
 

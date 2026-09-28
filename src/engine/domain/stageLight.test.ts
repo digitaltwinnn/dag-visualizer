@@ -27,9 +27,9 @@ describe("STAGE_LIGHTS", () => {
     expect(STAGE_LIGHT_DEFAULTS.hyper.angleNode!).toBeLessThan(STAGE_LIGHT_DEFAULTS.hyper.angle);
   });
 
-  it("pins geo's row (moved verbatim from Globe.ts)", () => {
+  it("pins geo's row (moved verbatim from Globe.ts; intensity and height retuned 2026-09-28)", () => {
     expect(STAGE_LIGHT_DEFAULTS.geo).toEqual({
-      angle: 0.36, distance: 22, intensity: 1.5, intensityPaper: 3.4, height: 6,
+      angle: 0.36, distance: 22, intensity: 0.9, intensityPaper: 3.4, height: 8,
     });
   });
 
