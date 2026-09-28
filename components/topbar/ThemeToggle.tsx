@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Monitor, Moon, Sun } from "lucide-react";
+import { Monitor, Moon, Sun } from "lucide-react";
 import { SELECTED_ROW } from "@/components/selection";
 import { useStore } from "@/src/store/store";
 import { applyThemePref } from "@/components/ThemeController";
@@ -50,11 +50,12 @@ export default function ThemeRows({ onDone }: { onDone: () => void }) {
             <RowIcon aria-hidden className="size-4 flex-none opacity-80" />
             <span className="flex-1 text-left">{r.name}</span>
             {/* System states its resolution — the row that would otherwise read as a dead
-                click says what picking it means right now. */}
+                click says what picking it means right now. No trailing ✓ (user, 2026-09-28): the
+                Network section beside it marks its pick with the selected-row wash alone, and one
+                menu speaks one selection language. */}
             {r.id === "system" && (
               <span className="text-micro tracking-caps uppercase opacity-60">{sysTheme}</span>
             )}
-            {r.id === pref && <Check aria-hidden className="size-3.5 flex-none opacity-70" />}
           </button>
         );
       })}
