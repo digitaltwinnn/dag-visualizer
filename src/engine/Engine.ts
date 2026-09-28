@@ -2173,9 +2173,10 @@ export class Engine {
     // and _applyBoundary already asserts it there, with the nodes gathered and both furnitures
     // dark. Same rule as the camera hold (viewTransition.holdCamera), one phase later than `mode`.
     if (this.mode === "hyper" && this.transition.phase !== "out") {
-      // 0.06 → 0.12 rad/s (user, 2026-09-28: "the hyper view as well" — too slow): one turn in
-      // ~52s rather than ~1m45s.
-      if (this.filter === "all" && !zoomedIn) this._hyperSpinY += dt * 0.12;
+      // 0.06 → 0.12 → 0.08 rad/s (user, 2026-09-28, two rounds: "too slow", then "slower the
+      // hyper rotation; the node rings can be a bit faster" — the rings' own orbit took the speed,
+      // see HyperView's m.orbit): one turn in ~78s.
+      if (this.filter === "all" && !zoomedIn) this._hyperSpinY += dt * 0.08;
       // Ease the shared structure tilt: near-flat while a metagraph is committed so its discs
       // read horizontal from the plain side-on hub framing (user, 2026-07-17 — the structure
       // moves, not the camera); back to the resting overview tilt otherwise.
