@@ -1801,7 +1801,9 @@ export class Globe implements GeoViewHost {
         this.group.rotation.x = (s.fromX || 0) + ((s.toX || 0) - (s.fromX || 0)) * e;
       }
     } else if (this.simSpin) {
-      this.group.rotation.y += dt * 0.03; // idle spin (gated by the view policy's globeSpin)
+      // Idle spin (gated by the view policy's globeSpin). 0.03 → 0.06 rad/s (user, 2026-09-28:
+      // "the globe is rotating too slow"): one turn in ~1m45s rather than ~3m30s.
+      this.group.rotation.y += dt * 0.06;
       // Ease any focus tilt back to level when idling.
       if (this.group.rotation.x) this.group.rotation.x += (0 - this.group.rotation.x) * Math.min(1, dt * 2.2);
     }
