@@ -75,12 +75,14 @@ import { useStore } from "@/src/store/store";
 // snapshot, not its tick, and the tick channel would light every band of the anchoring global),
 // a signer on `hoverNodeId`. Hovers preview, never commit.
 
-/** How many ticks a page of the explorer shows OFF THE DESKTOP (and before the first measure on
- *  it): on the desktop rail the page FILLS to the rail's bottom (`useFitRows`, 2026-09-28 — user:
+/** How many ticks a page of the explorer shows before the first measure: on the desktop rail and
+ *  the tablet sheet the page FILLS to its host's bottom (`useFitRows`, 2026-09-28 — user:
  *  "always fill the rows till the bottom of the view"). Fifteen because the card is a peephole, not the
  *  chain: enough rows that the list reads as a run of history rather than as the last handful
  *  (user, 2026-09-13: "can you do 10-20 by default"), few enough that one page fits the rail. */
 const TICK_PAGE = 15;
+/** The phone's page — shorter, since its bottom sheet takes the lower half of a small screen. */
+const TICK_PAGE_PHONE = 10;
 
 /** A COMMITTED FILTER IS A LENS, and inside a tick the lens decides what is drillable: with a
  *  network committed, every OTHER network's row under a tick opens nothing. */
@@ -216,7 +218,9 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // the one on screen, and when it changes the reader keeps their place — the page holding the
   // row that was first on screen (`pageKeepingRow`), so a resize never throws them to page 1.
   const bp = useBreakpoint();
-  const pageSize = useFitRows("ledger-view", bp === "desktop", openTick == null, TICK_PAGE);
+  // Phone keeps a fixed, shorter page (its sheet sizes to content): 10, not the old 15 (user,
+  // 2026-09-28). Desktop and tablet fill their host.
+  const pageSize = useFitRows("ledger-view", bp !== "phone", openTick == null, bp === "phone" ? TICK_PAGE_PHONE : TICK_PAGE);
   const lastSize = useRef(pageSize);
   useEffect(() => {
     if (lastSize.current === pageSize) return;
