@@ -72,9 +72,9 @@ export default function ExplorerShell({
    *  (Radix portals the sheet content on open), so the initializer is stable for the one
    *  instance that takes it. */
   defaultCollapsed?: boolean;
-  /** Passed to the head's EYEBROW row, left of the collapse indicator (CardHead's `caption`
-   *  slot): the title row is too narrow in a 262px rail to share with a control — "Snapshot
-   *  breakdown" wrapped to two lines beside the LIVE pill (2026-09-28). */
+  /** Passed to the head's TITLE row, right-aligned (CardHead's panel `aside`) — where the right
+   *  rail's cards put theirs. It rode the eyebrow row for a round while the titles were
+   *  "X breakdown" and too wide to share the row (2026-09-28). */
   aside?: ReactNode;
   children: ReactNode;
 }) {
@@ -90,7 +90,7 @@ export default function ExplorerShell({
           icon={EXPLORE_ICON}
           title={title}
           eyebrow="Explore"
-          caption={aside}
+          aside={aside}
           collapsed={collapsed}
           onToggle={() => setCollapsed((c) => !c)}
         />

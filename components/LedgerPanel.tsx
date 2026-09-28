@@ -338,11 +338,10 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         ) : (
           <span className={cn("flex-none w-2 h-2 rounded-full border", pinned && previewOrd == null ? "border-primary/80" : "border-muted-foreground/70")} />
         )}
-        {/* THE RIGHT RAIL CARD'S OWN VOICE (user, 2026-09-28: "in the card the live is next to the
-            subtitle, in the explorer next to the title"): lowercase `live · 5s ago` at the card
-            aside's text size, so the two read as ONE control in two places. The position differs
-            by width alone — the explorer's title row has ~54px free beside "Snapshot breakdown",
-            the control needs ~85, so it rides the eyebrow row there. */}
+        {/* THE RIGHT RAIL CARD'S OWN VOICE AND PLACE (user, 2026-09-28): lowercase `live · 5s ago`
+            at the card aside's text size, on the TITLE row — the card's own position, which fits
+            since the title became "Snapshots" (it rode the eyebrow row while "Snapshot breakdown"
+            left ~54px beside it). */}
         <span className={cn("text-label", pinned && previewOrd == null ? "text-foreground" : "text-muted-foreground")}>{label.toLowerCase()}</span>
         {sub && <span className="tabular-nums text-label text-muted-foreground">{sub}</span>}
       </button>
@@ -610,7 +609,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   return (
     <Explorer
       id="ledger-view"
-      title="Snapshot breakdown"
+      title="Snapshots"
       hint="Recent global snapshots. Open one for the networks that anchored into it."
       levels={levels}
       aside={liveControl}

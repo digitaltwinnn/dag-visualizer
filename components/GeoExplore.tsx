@@ -245,7 +245,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
   return (
     <Explorer
       id="geoexplore"
-      title="Country breakdown"
+      title="Countries"
       hint={quietEmpty ? null : "Every country hosting nodes. Open one to explore where its nodes sit."}
       levels={levels}
       defaultCollapsed={defaultCollapsed}

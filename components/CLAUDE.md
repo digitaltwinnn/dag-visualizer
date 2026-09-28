@@ -246,7 +246,9 @@ decisions inside them are design, not detail:
 
 **Naming and copy rules:** the ABOUT row states the view's point of view ("How the network is built"); the tool
 card says what you BROWSE — by the AXIS the rows break the network down along, never by the
-figure they show ("Network breakdown", "Country breakdown", "Snapshot breakdown", and History's "Network breakdown" too — its rows are networks, "layer" was the stack's word for a plane; 2026-09-26
+figure they show, as a PLURAL NOUN ("Networks", "Countries", "Snapshots", and History's "Networks" —
+2026-09-28, user: "every explorer card has 'breakdown', perhaps it's redundant?" — the EXPLORE eyebrow
+already says what the card is; they were "X breakdown" from 2026-09-26, and History's rows are networks, "layer" was the stack's word for a plane; 2026-09-26
 — user, 2026-09-26: once every explorer carries the measure HEADING CONTROL, a title like "Nodes by
 country" names one measure of three). Eyebrows are bare role words, and each explorer's usage
 hint leads its card rather than trailing it. An explorer ROW is a browse target — mark, name, count,

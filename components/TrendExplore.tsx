@@ -123,7 +123,7 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
       // The tool card says what you BROWSE (the naming rule), by the AXIS the rows break the network
       // down along — NETWORKS, the Hypergraph card's own word (user, 2026-09-26: "should be
       // 'network breakdown' like in hyper"); "layer" was the stack's word for a plane, not the rows'.
-      title="Network breakdown"
+      title="Networks"
       // "Open one for…" is the other explorers' second half and would be a lie here — a layer row
       // has no children, it brings its plane forward.
       hint={empty ? null : "Every network's own chart, busiest first. Pick one to bring its plane to the front."}
