@@ -2120,7 +2120,7 @@ export class Engine {
       const el = this.ctx.renderer.domElement;
       const w = el.clientWidth || window.innerWidth;
       const h = el.clientHeight || window.innerHeight;
-      const target = sheetShiftPx(Math.max(st.sceneCoverBExplore, st.sceneCoverBDetails), h);
+      const target = sheetShiftPx(Math.max(st.sceneCoverBExplore, st.sceneCoverBDetails, st.sceneCoverBVitals), h);
       const d = target - this._sheetShift;
       this._sheetShift = Math.abs(d) < 0.25 ? target : this._sheetShift + d * (1 - Math.exp(-SHEET_SHIFT_K * dt));
       if (this._sheetShift !== this._sheetShiftApplied || w !== this._sheetShiftW || h !== this._sheetShiftH) {

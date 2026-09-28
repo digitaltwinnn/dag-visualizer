@@ -875,7 +875,7 @@ vitals band, which CLIPS its paint by their published `sceneCover`, see the band
 vitals lane, halves elsewhere (`barGeom`; the icon trays compact to one unseen-update dot at
 thirds) — and ONE sheet at a time, with grabber drag-resize and flick-dismiss. **An open sheet
 shifts the scene up into the band above it** (2026-09-28): the dock publishes its target height as
-a bottom cover (`sceneCoverBExplore` / `sceneCoverBDetails`, one per dock because their exits lag)
+a bottom cover (`sceneCoverBExplore` / `sceneCoverBDetails` / `sceneCoverBVitals`, one per dock because their exits lag)
 and the Engine eases a projection offset — `camera.setViewOffset`, never a camera move, so every
 pose, the callout, the chart planes and picking follow — by half the cover
 (`domain/sheetShift.ts`). Shift only, no zoom. The sheet GROWS out

@@ -28,6 +28,7 @@ export default function VitalsDock() {
   const setPhoneDock = useStore((s) => s.setPhoneDock);
   const phoneSheetPx = useStore((s) => s.phoneSheetPx);
   const setPhoneSheetPx = useStore((s) => s.setPhoneSheetPx);
+  const setSceneCover = useStore((s) => s.setSceneCover);
   if (bp !== "phone" || !VIEW_POLICIES[mode].vitalsLane) return null;
   return (
     <RailDock
@@ -43,6 +44,8 @@ export default function VitalsDock() {
       sheetPx={phoneSheetPx}
       onSheetPx={setPhoneSheetPx}
       onOpenChange={(next) => setPhoneDock(next ? "vitals" : null)}
+      // The sheet's HEIGHT off the canvas — see ExploreRail's matching arm.
+      onCoverPx={(px) => setSceneCover("vitals", px)}
     >
       <VitalsSheetBody />
     </RailDock>

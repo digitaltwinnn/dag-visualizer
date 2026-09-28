@@ -304,9 +304,11 @@ interface AppState {
   // offset, never a camera move). TWO SCALARS, one per dock, for the same reason the sides are:
   // the docks are mutually exclusive but their exits LAG (a closing sheet shrinks for 420ms and
   // publishes 0 when it unmounts), so one shared scalar would let the closing dock clobber the
-  // opening one. Always 0 on desktop and tablet.
+  // opening one. Always 0 on desktop and tablet. Three docks, three scalars (the Vitals sheet
+  // was missed on the first cut — user: "for vitals it's a bit too close to the bottom section").
   sceneCoverBExplore: number;
   sceneCoverBDetails: number;
+  sceneCoverBVitals: number;
   // Per-slot rail-card collapse OVERRIDES (slot id → collapsed), written by a user's +/− toggle
   // or the rail-top minimize/expand-all controls. A slot with NO entry falls back to the rail's
   // AUTO default (Inspector: ladder ancestors of the focused rung rest collapsed) — so `null`
@@ -444,7 +446,7 @@ interface AppState {
   setMotionCause: (cause: MotionCause | null) => void;
   setPhoneSheetPx: (px: number | null) => void;
   /** Publish how many px of the canvas an open rail sheet covers on one side (0 when closed). */
-  setSceneCover: (side: "left" | "right" | "explore" | "details", px: number) => void;
+  setSceneCover: (side: "left" | "right" | "explore" | "details" | "vitals", px: number) => void;
   setBoxedCard: (id: string | null) => void;
   setRailCollapse: (id: string, collapsed: boolean | null) => void;
   setNavQuiet: (navQuiet: boolean) => void;
@@ -547,6 +549,7 @@ export const useStore = create<AppState>((set) => ({
   sceneCoverR: 0,
   sceneCoverBExplore: 0,
   sceneCoverBDetails: 0,
+  sceneCoverBVitals: 0,
   boxedCard: null,
   themePref: "system" as ThemePref,
   theme: "dark" as Theme,
@@ -728,7 +731,11 @@ export const useStore = create<AppState>((set) => ({
   setSceneCover: (side, px) =>
     set((s) => {
       const key =
-        side === "left" ? "sceneCoverL" : side === "right" ? "sceneCoverR" : side === "explore" ? "sceneCoverBExplore" : "sceneCoverBDetails";
+        side === "left" ? "sceneCoverL"
+        : side === "right" ? "sceneCoverR"
+        : side === "explore" ? "sceneCoverBExplore"
+        : side === "details" ? "sceneCoverBDetails"
+        : "sceneCoverBVitals";
       return s[key] === px ? s : { [key]: px };
     }),
   setBoxedCard: (boxedCard) => set({ boxedCard }),

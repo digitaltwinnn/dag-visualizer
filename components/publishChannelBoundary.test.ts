@@ -113,9 +113,16 @@ describe("sceneCover is measured by the dock and sided by the caller", () => {
     expect(/setSceneCover|sceneCoverL|sceneCoverR/.test(dock), "RailDock must stay store-free about the cover").toBe(false);
   });
 
-  it("exactly the two rails publish a side", () => {
+  it("exactly the rails and the vitals dock publish a cover — the two sides, and the three phone bottoms", () => {
+    // The bottom covers joined 2026-09-28 (the phone sheet shifts the scene up into the band it
+    // leaves free): each phone dock publishes its own height under its own key, so the Vitals
+    // dock is a publisher too. Still no one else — RailDock reports, the owner sides it.
     const callers = callersOf("setSceneCover", ["app", "components", "src"]);
-    expect(callers).toEqual([join("components", "ExploreRail.tsx"), join("components", "Inspector.tsx")]);
+    expect(callers).toEqual([
+      join("components", "ExploreRail.tsx"),
+      join("components", "Inspector.tsx"),
+      join("components", "VitalsDock.tsx"),
+    ]);
   });
 
   it("the measurement is keyed on the ELEMENT, not on `open`", () => {
