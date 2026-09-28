@@ -4,6 +4,7 @@ import { useMemo } from "react";
 
 import TrendTrack from "@/components/TrendTrack";
 import { ScaleToggle, WindowPicker } from "@/components/trendPickers";
+import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import useTrendsWindow from "@/components/useTrendsWindow";
 import { stepFor } from "@/src/data/trendSeries";
@@ -61,9 +62,8 @@ export default function TrendTimeline() {
   // would say it belongs to that plane, and five copies is not a control) and it never changed a
   // row of the explorer it used to head. The group above the band already holds the stack's other
   // stack-wide settings, the window and the range; this is the same species and sits beside them.
-  // Only where there is a COLUMN to compare: under a committed filter the stack is one plane and
-  // a shared ceiling has nothing to be shared with, so the switch stands down (the explorer's own
-  // `ranked.length > 1` gate, stated from the filter, which is what decides the roster's width).
+  // Only where there is a COLUMN to compare: a stack of one plane has nothing for a shared ceiling
+  // to be shared with, so the switch stands down (`multiPlane` below).
   const filter = useStore((s) => s.filter);
   const scale = useStore((s) => s.trendScale);
   const setTrendScale = useStore((s) => s.setTrendScale);
@@ -100,6 +100,11 @@ export default function TrendTimeline() {
   // nothing visible and the band's stamp disagreed with the card's title.
   const slice = useTrendsSlice(windowId, range);
   const stepMs = stepFor(slice, metric);
+  // The Same scale gate reads the ROSTER'S width (review, 2026-09-28): the switch is for a column
+  // of planes to share one ceiling, so it shows exactly when the stack holds more than one — the
+  // shared roster pass (`useTrendRoster`), never a second count, and not the filter alone, which
+  // under "all" can still leave a single network in scope.
+  const multiPlane = useTrendRoster(slice, filter, metric).ranked.length > 1;
   // AN ARRIVED-BUT-EMPTY PAYLOAD IS NOT A LOADING ONE. `leadingTrim` cuts a window with no
   // measured bucket at all to EMPTY (its own documented rule), and an empty window is still an
   // object — so presence alone cannot be the gate for drawing a track.
@@ -119,7 +124,7 @@ export default function TrendTimeline() {
         // tenant's top; the plate's padding plus `mb-3` clears its edge by a hairline's breath.
         className="absolute bottom-full right-0 mb-3 z-[1] flex items-center gap-3 rounded-lg [background:var(--topbar-glass)] backdrop-blur-sm max-[700px]:static max-[700px]:mb-0 max-[700px]:self-stretch max-[700px]:flex-col max-[700px]:items-stretch max-[700px]:gap-1.5 max-[700px]:[background:none] max-[700px]:backdrop-blur-none"
       >
-        {filter === "all" && (
+        {multiPlane && (
           <ScaleToggle
             className="pl-2.5 gap-1.5 whitespace-nowrap max-[700px]:pl-0 max-[700px]:self-end"
             shared={scale === "shared"}

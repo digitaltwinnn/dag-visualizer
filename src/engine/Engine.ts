@@ -387,6 +387,9 @@ export class Engine {
   /** THE PHONE SHEET'S SHIFT (`domain/sheetShift.ts`): the eased offset, in px, and what the camera
    *  was last given — so the projection is rewritten only when the shift, or the canvas, moved. */
   private _sheetShift = 0;
+  /** Read per frame (a MediaQueryList's `matches` is live and allocation-free). */
+  private _reduceMotion: MediaQueryList =
+    typeof window !== "undefined" ? window.matchMedia("(prefers-reduced-motion: reduce)") : ({ matches: false } as MediaQueryList);
   private _sheetShiftApplied = 0;
   private _sheetShiftW = 0;
   private _sheetShiftH = 0;
@@ -2122,7 +2125,13 @@ export class Engine {
       const h = el.clientHeight || window.innerHeight;
       const target = sheetShiftPx(Math.max(st.sceneCoverBExplore, st.sceneCoverBDetails, st.sceneCoverBVitals), h);
       const d = target - this._sheetShift;
-      this._sheetShift = Math.abs(d) < 0.25 ? target : this._sheetShift + d * (1 - Math.exp(-SHEET_SHIFT_K * dt));
+      // REDUCED MOTION SNAPS (review, 2026-09-28): a whole-scene slide of up to half the viewport,
+      // riding a sheet, is exactly the large-area motion the setting exists to remove. The sheet
+      // itself is already instant there (its transition is motion-reduce:transition-none).
+      this._sheetShift =
+        this._reduceMotion.matches || Math.abs(d) < 0.25
+          ? target
+          : this._sheetShift + d * (1 - Math.exp(-SHEET_SHIFT_K * dt));
       if (this._sheetShift !== this._sheetShiftApplied || w !== this._sheetShiftW || h !== this._sheetShiftH) {
         const cam = this.ctx.camera;
         if (this._sheetShift === 0) cam.clearViewOffset();

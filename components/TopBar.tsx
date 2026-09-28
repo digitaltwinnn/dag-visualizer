@@ -65,6 +65,14 @@ export default function TopBar() {
   // control for it would be a row the reader cannot close from where it came from).
   const [strip, setStrip] = useState<null | "filter" | "pulse" | "views" | "about">(null);
   const open = strip != null;
+  // THE CLOSING ROW KEEPS ITS TENANT (review, 2026-09-28): the slot collapses on a grid-rows
+  // transition, and with `strip` already null the content used to fall back to the filter chips —
+  // so a tall About or pulse row snapped to the filter row's height before the collapse began.
+  // The last open tenant stays rendered (invisible, aria-hidden) until the row has folded; the
+  // next open replaces it. Derived during render from state, never a ref, so it is pure.
+  const [lastStrip, setLastStrip] = useState<"filter" | "pulse" | "views" | "about">("filter");
+  if (strip != null && strip !== lastStrip) setLastStrip(strip);
+  const shownStrip = strip ?? lastStrip;
 
   const bp = useBreakpoint();
   useEffect(() => {
@@ -486,11 +494,11 @@ export default function TopBar() {
       >
         <div className={cn("overflow-hidden min-h-0", !open && "invisible")}>
           <div ref={stripInner}>
-            {strip === "pulse" ? (
+            {shownStrip === "pulse" ? (
               <PulseStrip />
-            ) : strip === "views" ? (
+            ) : shownStrip === "views" ? (
               <ViewPicker onPicked={() => setStrip(null)} />
-            ) : strip === "about" ? (
+            ) : shownStrip === "about" ? (
               <AboutStrip />
             ) : (
               <FilterPicker onPicked={() => setStrip(null)} />
