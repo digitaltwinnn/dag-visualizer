@@ -4,7 +4,6 @@ import {
   Layers,
   Layers2,
   CircleDashed,
-  SwatchBook,
   Info,
   Telescope,
   Box,
@@ -27,7 +26,6 @@ import {
 } from "lucide-react";
 import type { NetworkId } from "@/src/engine/config";
 import type { Mode } from "@/src/store/store";
-import type { DocPage } from "@/components/views";
 import type { PickDescriptor } from "@/src/data/types";
 
 // ONE source of truth for the interface's VOCABULARY glyphs — each view kind → its lucide icon.
@@ -55,15 +53,6 @@ export const VIEW_ICONS: Record<Mode, LucideIcon> = {
 // the open book reads as noise; the circled i is the universal "about" mark and stays crisp).
 // Used in the left dock tray and anywhere the About card kind needs an icon.
 export const ABOUT_ICON: LucideIcon = Info;
-
-/** The DOC PAGES' marks (the bar's InfoMenu + anywhere a doc page needs a glyph): About wears
- *  the ABOUT card's own circled-i — one concept, one mark — and Design the swatch book (the
- *  token-reference metaphor; deliberately not Palette, whose paint-dab reads artist rather than
- *  system). */
-export const DOC_ICONS: Record<DocPage, LucideIcon> = {
-  about: Info,
-  design: SwatchBook,
-};
 
 // The left-rail TOOL cards' ONE mark (GeoExplore, LedgerPanel — user decision: the SAME standard
 // icon in every view; an earlier per-view icon split read as neither exploring nor

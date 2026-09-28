@@ -147,11 +147,12 @@ and its contents are view-specific examples that keep changing.
 
 **Top — the command bar.** One full-width glass bar, edges aligned with the rail columns: the ECG +
 wordmark + filter on the left, the view switch centered, and on the right the view-scoped pair
-(SCENE⇄HUD + RAW) followed by ONE settings gear (2026-09-08 — the theme/pages/network trio folded
-into `topbar/SettingsMenu.tsx`, three labeled sections of one popover; their files are rows-only
-modules now. Two states survive on the trigger by rule: the network CODE in the live accent off
-mainnet — "which chain am I looking at" never goes missing — and the doc-open primary tint. One
-mount at every width; the filter strip's second row, the trio's old phone home, retired with it). The bar has **one grow-downward slot with four tenants** (a which-strip enum makes
+(SCENE⇄HUD + RAW + ABOUT) followed by ONE settings gear (2026-09-08 — the theme/pages/network trio
+folded into `topbar/SettingsMenu.tsx`, labeled sections of one popover; their files are rows-only
+modules now. **The pages section left on 2026-09-28** — user: "doc pages are not settings"; the
+footer's About · Design row is their one door. One state survives on the trigger by rule: the
+network CODE in the live accent off mainnet — "which chain am I looking at" never goes missing.
+One mount at every width; the filter strip's second row, the trio's old phone home, retired with it). The bar has **one grow-downward slot with four tenants** (a which-strip enum makes
 them mutually exclusive by construction): the FILTER button opens the network-chip strip (hovering
 previews the dim, picking closes it), **on phone the view switch is ONE face — the current view's
 icon and name — that opens the view list as a strip tenant** (`topbar/ViewPicker.tsx`, 2026-09-28: a
@@ -789,10 +790,10 @@ inline in the return would quietly restore the bug for every consumer at once.
   nothing three times): one dimmed "Coming soon" bar entry, one FLAT policy row, and the
   Blueprint GALLERY inside it previews every coming feature (each keeping the mark it wore as a
   bar button). A future placeholder is a gallery entry, not a Mode.
-- **The doc pages' bar home is the SettingsMenu's Pages section** (2026-09-08; `InfoMenu.tsx`
-  is the rows-only module `DocRows` now) — one rank below the view switch on purpose ("views,
-  but not at the same level of importance"); rows are the footer DocToggles' own store toggles,
-  `DOC_ICONS` in icons.tsx their marks. The footer row remains the always-visible route.
+- **The doc pages' one door is the footer's About · Design row** (2026-09-28 — user: "doc pages
+  are not settings"; they rode the SettingsMenu as a Pages section from 2026-09-08 until then,
+  and `InfoMenu.tsx` retired with it). The in-view ABOUT row in the bar is orientation for the
+  current view, not a doc page.
 - A **doc page**: one `DOC_PAGES` entry (everything derives: type, paths, titles, docForPath),
   its component in `components/docs/` + one line in DocLayer's `DOC_COMPONENTS` map, a thin
   route file passing `doc`, a footer `DocToggle`. The engine's bare stage, both transition
