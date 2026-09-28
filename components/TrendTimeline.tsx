@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 
 import TrendTrack from "@/components/TrendTrack";
-import { ScaleToggle, WindowPicker } from "@/components/trendPickers";
+import { ScalePill, WindowPicker } from "@/components/trendPickers";
 import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import useTrendsWindow from "@/components/useTrendsWindow";
@@ -122,15 +122,8 @@ export default function TrendTimeline() {
         // floats over the SCENE now, where the picker's own hairline-and-wash — right for a group
         // on a page — would let the ground's ink run through the words. `bottom-full` is the
         // tenant's top; the plate's padding plus `mb-3` clears its edge by a hairline's breath.
-        className="absolute bottom-full right-0 mb-3 z-[1] flex items-center gap-3 rounded-lg [background:var(--topbar-glass)] backdrop-blur-sm max-[700px]:static max-[700px]:mb-0 max-[700px]:self-stretch max-[700px]:flex-col max-[700px]:items-stretch max-[700px]:gap-1.5 max-[700px]:[background:none] max-[700px]:backdrop-blur-none"
+        className="absolute bottom-full right-0 mb-3 z-[1] rounded-lg [background:var(--topbar-glass)] backdrop-blur-sm max-[700px]:static max-[700px]:mb-0 max-[700px]:self-stretch max-[700px]:[background:none] max-[700px]:backdrop-blur-none"
       >
-        {multiPlane && (
-          <ScaleToggle
-            className="pl-2.5 gap-1.5 whitespace-nowrap max-[700px]:pl-0 max-[700px]:self-end"
-            shared={scale === "shared"}
-            onChange={(on) => setTrendScale(on ? "shared" : "own")}
-          />
-        )}
         <WindowPicker
           className="bg-transparent"
           zoom={windowId}
@@ -138,6 +131,7 @@ export default function TrendTimeline() {
           stepMs={stepMs}
           onPick={setTrendWindow}
           onClearRange={() => setTrendRange(null)}
+          trailing={multiPlane ? <ScalePill shared={scale === "shared"} onChange={(on) => setTrendScale(on ? "shared" : "own")} /> : undefined}
         />
       </div>
       {/* THE TRACK's column, the whole band wide. */}

@@ -126,7 +126,8 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
       title="Networks"
       // "Open one for…" is the other explorers' second half and would be a lie here — a layer row
       // has no children, it brings its plane forward.
-      hint={empty ? null : "Every network's own chart, busiest first. Pick one to bring its plane to the front."}
+      // As short as the other explorers' hints (user, 2026-09-28: "way too verbose").
+      hint={empty ? null : "Every network, busiest first. Pick one to bring its chart forward."}
       levels={[level]}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => setHover(null)}
