@@ -4,7 +4,6 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import Explorer, { type ExplorerLevelSpec } from "@/components/explorer/Explorer";
 import { IdentityDot } from "@/components/inspector/parts";
-import { ScaleToggle } from "@/components/trendPickers";
 import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
@@ -27,10 +26,12 @@ import { useStore, type TrendMetric } from "@/src/store/store";
 //     (`METRIC_ORDER`, with each measure's unit at the current cadence). It is a view-level
 //     setting because every card steps together (a stack whose planes showed different measures
 //     would stop being a comparison), so it writes `setTrendMetric` directly, the same write the
-//     cards' `↑`/`↓` keys make. `Same scale` is the view's other SETTING and rides the heading row
-//     beside it — a reader saying how the charts should be drawn, not what they are about.
-//     `selectionBoundary.test.ts`'s scope note says why the metric and the scroll stay outside
-//     the decision table while the PLANE FOCUS is in it.
+//     cards' `↑`/`↓` keys make. It is the heading's ONLY setting since 2026-09-28: `Same scale`
+//     rode beside it for nine days and never changed a row of this list — it draws the PLANES —
+//     so it moved to the band's pill group with the stack's other drawing settings (user: "does
+//     not belong in the explorer as it doesn't affect anything there"; TrendTimeline has the
+//     argument). `selectionBoundary.test.ts`'s scope note says why the metric and the scroll
+//     stay outside the decision table while the PLANE FOCUS is in it.
 //
 //   · THE ROWS commit through `trendPlaneActions` and the one executor — the SAME builder the
 //     plane's own header strip runs (rule 2), so a row click and a plane click cannot drift. The
@@ -50,7 +51,6 @@ import { useStore, type TrendMetric } from "@/src/store/store";
 export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: boolean } = {}) {
   const filter = useStore((s) => s.filter);
   const metric = useStore((s) => s.trendMetric);
-  const scale = useStore((s) => s.trendScale);
   const scroll = useStore((s) => s.trendScroll);
   const focus = useStore((s) => s.trendFocus);
   const windowId = useStore((s) => s.trendWindow);
@@ -58,7 +58,6 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const setTrendMetric = useStore((s) => s.setTrendMetric);
-  const setTrendScale = useStore((s) => s.setTrendScale);
   const setTrendScroll = useStore((s) => s.setTrendScroll);
 
   const roster = useTrendRoster(useTrendsSlice(windowId, range), filter, metric);
@@ -84,12 +83,6 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   const level: ExplorerLevelSpec = {
     key: "networks",
     crumb: { label: "Networks" },
-    // Only where there is a COLUMN to compare: with one network in scope there is nothing for a
-    // shared ceiling to be shared with.
-    setting:
-      ranked.length > 1 ? (
-        <ScaleToggle className="mr-auto gap-1.5 whitespace-nowrap" shared={scale === "shared"} onChange={(on) => setTrendScale(on ? "shared" : "own")} />
-      ) : undefined,
     measure: {
       options: METRIC_ORDER.map((m) => ({ id: m, label: METRIC_LABELS[m], unit: metricUnit(m, stepMs) })),
       value: metric,

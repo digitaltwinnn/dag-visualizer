@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 
 import TrendTrack from "@/components/TrendTrack";
-import { WindowPicker } from "@/components/trendPickers";
+import { ScaleToggle, WindowPicker } from "@/components/trendPickers";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import useTrendsWindow from "@/components/useTrendsWindow";
 import { stepFor } from "@/src/data/trendSeries";
@@ -55,6 +55,18 @@ export default function TrendTimeline() {
   const metric = useStore((s) => s.trendMetric);
   const windowId = useStore((s) => s.trendWindow);
   const range = useStore((s) => s.trendRange);
+  // SAME SCALE RIDES THE PILL GROUP (user, 2026-09-28: "we have a control 'same scale' which does
+  // not belong in the explorer as it doesn't affect anything there; where to move it to?"). It is
+  // a STACK-WIDE drawing setting — one ceiling for every plane — so it cannot sit on a chart (that
+  // would say it belongs to that plane, and five copies is not a control) and it never changed a
+  // row of the explorer it used to head. The group above the band already holds the stack's other
+  // stack-wide settings, the window and the range; this is the same species and sits beside them.
+  // Only where there is a COLUMN to compare: under a committed filter the stack is one plane and
+  // a shared ceiling has nothing to be shared with, so the switch stands down (the explorer's own
+  // `ranked.length > 1` gate, stated from the filter, which is what decides the roster's width).
+  const filter = useStore((s) => s.filter);
+  const scale = useStore((s) => s.trendScale);
+  const setTrendScale = useStore((s) => s.setTrendScale);
   const cursorMs = useStore((s) => s.trendCursorMs);
   const setTrendWindow = useStore((s) => s.setTrendWindow);
   const setTrendRange = useStore((s) => s.setTrendRange);
@@ -105,8 +117,15 @@ export default function TrendTimeline() {
         // floats over the SCENE now, where the picker's own hairline-and-wash — right for a group
         // on a page — would let the ground's ink run through the words. `bottom-full` is the
         // tenant's top; the plate's padding plus `mb-3` clears its edge by a hairline's breath.
-        className="absolute bottom-full right-0 mb-3 z-[1] rounded-lg [background:var(--topbar-glass)] backdrop-blur-sm max-[700px]:static max-[700px]:mb-0 max-[700px]:self-stretch max-[700px]:[background:none] max-[700px]:backdrop-blur-none"
+        className="absolute bottom-full right-0 mb-3 z-[1] flex items-center gap-3 rounded-lg [background:var(--topbar-glass)] backdrop-blur-sm max-[700px]:static max-[700px]:mb-0 max-[700px]:self-stretch max-[700px]:flex-col max-[700px]:items-stretch max-[700px]:gap-1.5 max-[700px]:[background:none] max-[700px]:backdrop-blur-none"
       >
+        {filter === "all" && (
+          <ScaleToggle
+            className="pl-2.5 gap-1.5 whitespace-nowrap max-[700px]:pl-0 max-[700px]:self-end"
+            shared={scale === "shared"}
+            onChange={(on) => setTrendScale(on ? "shared" : "own")}
+          />
+        )}
         <WindowPicker
           className="bg-transparent"
           zoom={windowId}

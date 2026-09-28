@@ -167,8 +167,9 @@ export function SettingSwitch({
 }
 
 /** THE SCALE SETTING — shared by the Trends document's metagraphs tab and the History view's
- *  Network breakdown card (2026-09-19): it is the same question about the same charts, and the two would
- *  otherwise be the sort of near-copy this file exists to prevent. */
+ *  band, beside the window pills (2026-09-19; on the explorer's heading until 2026-09-28): it is
+ *  the same question about the same charts, and the two would otherwise be the sort of near-copy
+ *  this file exists to prevent. */
 export function ScaleToggle({
   shared,
   onChange,

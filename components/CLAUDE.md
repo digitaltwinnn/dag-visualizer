@@ -213,12 +213,15 @@ decisions inside them are design, not detail:
   size, a snapshot fee · size), figures BARE because the heading names the unit, in a 48px figure
   column (`figureW` — a 4-decimal fee does not fit the default 40).
 
-- **History's tool card is its roster, with the view's two settings on its heading**
+- **History's tool card is its roster, with the MEASURE on its heading**
   (`components/TrendExplore.tsx`, an `Explorer` description since 2026-09-26). ONE level: the
   ranked networks, busiest first, each with its last measured reading in the roster's one
   formatter and a bar of its share. The METRIC is the heading control (the figure column's own
-  heading, a radio list of `METRIC_ORDER` with units at the current cadence) and `Same scale` is
-  the heading's setting — neither is a selection, so both write their setters directly
+  heading, a radio list of `METRIC_ORDER` with units at the current cadence); `Same scale` left
+  the heading on 2026-09-28 for the band's pill group — it draws the planes and never changed a
+  row here (user), so it sits with the stack's other stack-wide settings, the window and the
+  range, and stands down under a committed filter where the stack is one plane. Neither the
+  metric nor the scale is a selection, so both write their setters directly
   (`selectionBoundary`'s own scope note says why, and why the plane FOCUS is in the table instead).
   A row click applies the SAME `trendPlaneActions` the plane's header strip runs. No scope mark in
   the head at all (2026-09-26): the top bar's filter names the committed network and is the one
@@ -290,8 +293,8 @@ a release as `finestRung`), never "stepping back".
 **The History view has three axes and each has one home** (user, 2026-09-19): left/right on the
 timeline is WHEN, the depth of the stack is WHO, and UP/DOWN is WHAT — the measure. Its control is
 the Networks card's HEADING CONTROL (the explorer's figure heading opening `METRIC_ORDER` as a radio
-list with each measure's unit at the current cadence — design 2026-09-26; `Same scale` rides the
-same heading row as the view's other setting. It replaced a `∧ SNAPSHOTS ∨` stepper, which walked a
+list with each measure's unit at the current cadence — design 2026-09-26; `Same scale` rode the
+same heading row until 2026-09-28, when it moved to the band's pill group). It replaced a `∧ SNAPSHOTS ∨` stepper, which walked a
 list the reader could not see, which itself replaced the six-pill picker no other surface used:
 the document lays its measures out as sections), plus `↑`/`↓` from inside a card; both write
 `trendMetric` from `METRIC_ORDER` (`src/data/trendSeries.ts`), so the two controls are one list. It is a view-level control because
