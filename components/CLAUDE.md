@@ -151,9 +151,14 @@ wordmark + filter on the left, the view switch centered, and on the right the vi
 into `topbar/SettingsMenu.tsx`, three labeled sections of one popover; their files are rows-only
 modules now. Two states survive on the trigger by rule: the network CODE in the live accent off
 mainnet — "which chain am I looking at" never goes missing — and the doc-open primary tint. One
-mount at every width; the filter strip's second row, the trio's old phone home, retired with it). The bar has **one grow-downward slot with two tenants** (a which-strip enum makes
+mount at every width; the filter strip's second row, the trio's old phone home, retired with it). The bar has **one grow-downward slot with three tenants** (a which-strip enum makes
 them mutually exclusive by construction): the FILTER button opens the network-chip strip (hovering
-previews the dim, picking closes it), and the ECG opens the **pulse strip** — one read-only cell
+previews the dim, picking closes it), **on phone the view switch is ONE face — the current view's
+icon and name — that opens the view list as a strip tenant** (`topbar/ViewPicker.tsx`, 2026-09-28: a
+row of 44px icons cannot scale with the view count — History made it five and the filter ran under
+the first tab — and hiding entries per tier is a patch the next view undoes; the segmented switch
+stays from 700px up, both presentations live in the DOM and CSS picks, and the hanging caption
+stands down on phone because the face already prints the name), and the ECG opens the **pulse strip** — one read-only cell
 per data FEED from the poll-health registry (`src/data/api.ts` `reportPoll`/`pollHealthRows`; the
 five real fetch sites report their own outcomes), each with a derived status dot (ok / stale past
 ~2.5× its own cadence / error — never fabricated, rule 10), the last success ticking, the cadence

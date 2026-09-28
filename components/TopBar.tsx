@@ -12,6 +12,7 @@ import PulseStrip from "@/components/topbar/PulseStrip";
 import EcgMark from "@/components/topbar/EcgMark";
 import PresentationToggle from "@/components/topbar/PresentationToggle";
 import SettingsMenu from "@/components/topbar/SettingsMenu";
+import ViewPicker from "@/components/topbar/ViewPicker";
 import { NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { DOC_PAGES, VIEWS } from "@/components/views";
@@ -52,17 +53,20 @@ export default function TopBar() {
   // (gated on the policy's own canvas flag, convention 7 — never a mode list).
   const viewControls = doc == null && VIEW_POLICIES[mode].canvas;
 
-  // The bar's ONE grow-downward slot, two tenants (2026-08-30 — the PULSE strip joined the
-  // filter strip): `strip` names which row is open, null = closed. One slot makes them mutually
-  // exclusive by construction — the ECG toggles "pulse", the FILTER button "filter", Escape and
-  // a picked chip close whichever is open. The phone effect below still force-closes on a
-  // viewport change to phone-width.
-  const [strip, setStrip] = useState<null | "filter" | "pulse">(null);
+  // The bar's ONE grow-downward slot, three tenants (2026-08-30 — the PULSE strip joined the
+  // filter strip; 2026-09-28 — the phone's VIEW LIST joined both, see topbar/ViewPicker.tsx):
+  // `strip` names which row is open, null = closed. One slot makes them mutually exclusive by
+  // construction — the ECG toggles "pulse", the FILTER button "filter", the phone's view face
+  // "views", Escape and a picked chip close whichever is open. The tier effect below still
+  // force-closes on a viewport change to phone-width — and closes the VIEWS tenant on any tier
+  // change, since its trigger exists only on the phone arm (a strip left open under a bar with no
+  // control for it would be a row the reader cannot close from where it came from).
+  const [strip, setStrip] = useState<null | "filter" | "pulse" | "views">(null);
   const open = strip != null;
 
   const bp = useBreakpoint();
   useEffect(() => {
-    if (bp === "phone") setStrip(null);
+    setStrip((cur) => (bp === "phone" || cur === "views" ? null : cur));
   }, [bp]);
 
   // A doc overlay opening closes whichever strip is grown — both strips describe the scene the
@@ -295,19 +299,54 @@ export default function TopBar() {
         </button>
         </div>
 
-        {/* View switch — structural. On phone there's no room for the three non-functional
-            "soon" placeholders (Network/Transactions/Staking) — they're dimmed dead weight
-            that helped overflow the bar, so phone shows only the 3 working views. Tablet +
-            desktop keep all six. */}
+        {/* View switch — structural. ONE grid cell, TWO presentations by tier (2026-09-28): the
+            segmented switch from 700px up, and below it ONE face — the current view's icon and
+            name — that opens the view list in the strip (topbar/ViewPicker.tsx has the argument:
+            a row of 44px icons cannot scale with the view count, and per-tier hides are a patch).
+            Both stay in the DOM and CSS picks, so SSR and the first client render agree (the
+            useBreakpoint-at-first-render hydration trap, AboutView's note). The wrapper is a plain
+            flex box, not `contents`, so the grid still sees one middle item. */}
+        <div className="flex justify-center min-w-0">
+        <button
+          type="button"
+          aria-expanded={strip === "views"}
+          aria-controls="filter-strip"
+          title="Switch view"
+          onClick={() => setStrip((cur) => (cur === "views" ? null : "views"))}
+          onKeyDown={(e) => { if (e.key === "Escape") setStrip(null); }}
+          className={cn(
+            // The filter face's own recipe — a name plus its open-state wash — so the bar's two
+            // "opens a strip" faces speak one language; the chevron stays here because the
+            // slot has the width the filter's column never did.
+            "hidden max-[700px]:flex items-center gap-1.5 py-1.5 px-2 rounded-btn",
+            "bg-transparent border-0 cursor-pointer whitespace-nowrap min-w-0",
+            "hover:bg-wash-soft pointer-coarse:min-h-11",
+            strip === "views" && "bg-wash-soft",
+            "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
+          )}
+        >
+          {(() => {
+            const Icon = VIEW_ICONS[mode];
+            return <Icon aria-hidden className="size-4 flex-none text-primary" />;
+          })()}
+          <span className="text-body text-foreground truncate">{VIEWS.find((v) => v.id === mode)?.name}</span>
+          <ChevronDown
+            aria-hidden
+            className={cn(
+              "size-3.5 flex-none text-muted-foreground transition-transform motion-reduce:transition-none",
+              strip === "views" && "rotate-180",
+            )}
+          />
+        </button>
         <ToggleGroup
           type="single"
           value={mode}
           onValueChange={(v) => { if (v) setMode(v as Mode); }}
-          className="flex gap-0.5 max-[700px]:gap-0"
+          className="flex gap-0.5 max-[700px]:hidden"
         >
-          {/* Phone shows ALL views since the soon consolidation (user, 2026-09-04): the three
-              dead placeholders it used to drop are one dimmed entry now, and four icon buttons
-              fit the phone switch. */}
+          {/* Every view at every width the switch shows (the soon consolidation, user,
+              2026-09-04, made the placeholders one dimmed entry); the phone reads the same list
+              in the strip. */}
           {VIEWS.map((v) => {
             const Icon = VIEW_ICONS[v.id as Mode];
             return (
@@ -329,10 +368,6 @@ export default function TopBar() {
                 "data-[state=on]:shadow-[inset_0_0_0_1px_var(--sel-border)]",
                 "pointer-coarse:min-h-11 pointer-coarse:min-w-11 max-[1299px]:justify-center",
                 "max-[1120px]:px-2 max-[1120px]:py-1.5 max-[1120px]:text-label",
-                // Phone keeps the ≥44px touch WIDTH (the min-w-11 above still applies — the old
-                // `max-[700px]:min-w-0` override made the icon-only radios too narrow to press);
-                // only the padding condenses. Room is fine: phone shows just the 3 working views.
-                "max-[700px]:p-1.5",
                 // The three "soon" placeholders also stand down on a NARROW TABLET (700–859px):
                 // measured, the six-icon switch needs 771px and the bar is clipped below that, so
                 // the first thing sacrificed is the dead weight — same argument the phone makes,
@@ -352,6 +387,7 @@ export default function TopBar() {
           );
           })}
         </ToggleGroup>
+        </div>
 
         {/* RIGHT zone: presentation + theme + network. The vitals LEFT the bar (2026-08-30 —
             the bottom VitalsBand is their home now; docs/superpowers/plans/
@@ -405,7 +441,13 @@ export default function TopBar() {
       >
         <div className={cn("overflow-hidden min-h-0", !open && "invisible")}>
           <div ref={stripInner}>
-            {strip === "pulse" ? <PulseStrip /> : <FilterPicker onPicked={() => setStrip(null)} />}
+            {strip === "pulse" ? (
+              <PulseStrip />
+            ) : strip === "views" ? (
+              <ViewPicker onPicked={() => setStrip(null)} />
+            ) : (
+              <FilterPicker onPicked={() => setStrip(null)} />
+            )}
             {/* PHONE: the vitals ride the SAME strip as a second row (user, 2026-08-15) — one
                 dropdown control on the filter face instead of a separate 44px toggle starving
                 the bar row. Inside `stripInner`, so the published `--topbar-extra` height and
@@ -432,7 +474,9 @@ export default function TopBar() {
           pointer-events-none passes scene clicks through the caption strip). */}
       {/* While a DOC covers the scene the caption says the DOC (review find, 2026-09-05: it
           kept naming the hidden view underneath — an honest label names what is on screen). */}
-      <div className="hidden max-[1299px]:flex justify-end pr-2.5 mt-1.5" aria-hidden>
+      {/* And NOT on phone (2026-09-28): the switch's phone face prints the view's name inside the
+          bar, and the same word 20px under it would be the redundancy the caption exists to avoid. */}
+      <div className="hidden max-[1299px]:flex max-[700px]:hidden justify-end pr-2.5 mt-1.5" aria-hidden>
         <span key={doc ?? mode} className="roll-in text-micro tracking-caps uppercase text-muted-foreground leading-none">
           {doc ? DOC_PAGES[doc].label : VIEWS.find((v) => v.id === mode)?.name}
         </span>
