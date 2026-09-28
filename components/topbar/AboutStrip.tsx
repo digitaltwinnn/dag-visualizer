@@ -26,10 +26,11 @@ import { useStore } from "@/src/store/store";
 export default function AboutStrip() {
   const mode = useStore((s) => s.mode);
   const { title, lines, caption } = ABOUT[mode];
-  // THE EYEBROW IS THE VIEW'S NAME, NOT "ABOUT" (user, 2026-09-28): the button that opened the row
-  // already says About, and what the row is about is the view — so the eyebrow names it, the
-  // same word the switch and the phone face print. The copy's own `eyebrow` stays for /about.
-  const eyebrow = VIEWS.find((v) => v.id === mode)?.name ?? "";
+  // THE EYEBROW IS "<THE VIEW'S NAME> VIEW", NOT "ABOUT" (user, 2026-09-28, two rounds): the
+  // button that opened the row already says About, and what the row is about is the view — so
+  // the eyebrow names it, the switch's own word plus "view" so it reads as a place rather than a
+  // bare label. The copy's own `eyebrow` stays for /about.
+  const eyebrow = `${VIEWS.find((v) => v.id === mode)?.name ?? ""} view`;
   const Icon = ABOUT_ICON;
   return (
     <div

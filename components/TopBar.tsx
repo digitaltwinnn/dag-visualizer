@@ -181,12 +181,16 @@ export default function TopBar() {
           // switch is TRULY centred in the bar. Flex spacers only centre it when the side
           // clusters are equal-width — they never are (the phone measured the symptom first:
           // ECG + filter ≈ 100px vs a 44px toggle pushed the switch ~28px right of centre) —
-          // and the NetworkSwitch made the right zone heavier still. `1fr auto 1fr`
-          // (minmax(auto,1fr)) keeps the sides equal while both fit and degrades as flex did
-          // past that: a long ticker shifts the switch instead of overlapping it; the dev
-          // overflow alarm below arbitrates. Promoted from the phone tier 2026-08-21 — the
-          // zone wrappers were already in the DOM as `display: contents` above 700px.
-          "grid grid-cols-[1fr_auto_1fr] items-center gap-3 py-2 px-3.5",
+          // and the NetworkSwitch made the right zone heavier still. THE SIDES ARE
+          // `minmax(0,1fr)`, NOT `1fr` (user, 2026-09-28: "the view control must always be
+          // centered by design"): a bare `1fr` is minmax(auto,1fr), which lets a heavier side
+          // grow past its share and shove the switch off centre — the phone showed it the day
+          // the island gained its third control, 16px left of centre. With a 0 minimum the
+          // sides are equal by construction and it is the SIDE that gives (the left zone's
+          // ticker truncates, and the dev overflow alarm below reports a zone crushed below its
+          // content), never the centre. Promoted from the phone tier 2026-08-21 — the zone
+          // wrappers were already in the DOM as `display: contents` above 700px.
+          "grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 py-2 px-3.5",
           "max-[1260px]:gap-2.5",
           "max-[940px]:gap-2 max-[940px]:px-2.5 max-[940px]:py-2",
           "max-[700px]:gap-1.5 max-[700px]:p-2",
@@ -308,9 +312,13 @@ export default function TopBar() {
         </div>
 
         {/* View switch — structural. ONE grid cell, TWO presentations by tier (2026-09-28): the
-            segmented switch from 700px up, and below it ONE face — the current view's icon and
-            name — that opens the view list in the strip (topbar/ViewPicker.tsx has the argument:
-            a row of 44px icons cannot scale with the view count, and per-tier hides are a patch).
+            segmented switch from 700px up, and below it ONE face — the current view's icon with
+            a chevron — that opens the view list in the strip (topbar/ViewPicker.tsx has the
+            argument: a row of 44px icons cannot scale with the view count, and per-tier hides
+            are a patch). The face carried the view's NAME for a round; it went the same day,
+            because the switch must stay CENTRED (the grid note above) and the phone's side zones
+            each need 128px, which leaves the middle 74 — the icon-only face fits it with slack and
+            the caption under the bar names the view, exactly as it does for every icon-only tier.
             Both stay in the DOM and CSS picks, so SSR and the first client render agree (the
             useBreakpoint-at-first-render hydration trap, ExplorerShell's note). The wrapper is a plain
             flex box, not `contents`, so the grid still sees one middle item. */}
@@ -323,12 +331,10 @@ export default function TopBar() {
           onClick={() => setStrip((cur) => (cur === "views" ? null : "views"))}
           onKeyDown={(e) => { if (e.key === "Escape") setStrip(null); }}
           className={cn(
-            // The filter face's own recipe — a name plus its open-state wash, no chevron (the
-            // phone filter face dropped its own for width, and this face pays the same: measured,
-            // the chevron's 20px is what the island's third control costs the row).
-            "hidden max-[700px]:flex items-center gap-1.5 py-1.5 px-2 rounded-btn",
-            "bg-transparent border-0 cursor-pointer whitespace-nowrap min-w-0",
-            "hover:bg-wash-soft pointer-coarse:min-h-11",
+            // The filter face's own recipe — a face plus its open-state wash — at the touch floor.
+            "hidden max-[700px]:flex items-center justify-center gap-1 py-1.5 px-2 rounded-btn",
+            "bg-transparent border-0 cursor-pointer whitespace-nowrap",
+            "hover:bg-wash-soft pointer-coarse:min-h-11 pointer-coarse:min-w-11",
             strip === "views" && "bg-wash-soft",
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
           )}
@@ -337,7 +343,14 @@ export default function TopBar() {
             const Icon = VIEW_ICONS[mode];
             return <Icon aria-hidden className="size-4 flex-none text-primary" />;
           })()}
-          <span className="text-body text-foreground truncate">{VIEWS.find((v) => v.id === mode)?.name}</span>
+          <span className="sr-only">{VIEWS.find((v) => v.id === mode)?.name}</span>
+          <ChevronDown
+            aria-hidden
+            className={cn(
+              "size-3.5 flex-none text-muted-foreground transition-transform motion-reduce:transition-none",
+              strip === "views" && "rotate-180",
+            )}
+          />
         </button>
         <ToggleGroup
           type="single"
@@ -494,9 +507,9 @@ export default function TopBar() {
           pointer-events-none passes scene clicks through the caption strip). */}
       {/* While a DOC covers the scene the caption says the DOC (review find, 2026-09-05: it
           kept naming the hidden view underneath — an honest label names what is on screen). */}
-      {/* And NOT on phone (2026-09-28): the switch's phone face prints the view's name inside the
-          bar, and the same word 20px under it would be the redundancy the caption exists to avoid. */}
-      <div className="hidden max-[1299px]:flex max-[700px]:hidden justify-end pr-2.5 mt-1.5" aria-hidden>
+      {/* The phone rides this too (2026-09-28): its face is the view's icon alone, so the caption is
+          where the view's name lives there, as on every icon-only tier. */}
+      <div className="hidden max-[1299px]:flex justify-end pr-2.5 mt-1.5" aria-hidden>
         <span key={doc ?? mode} className="roll-in text-micro tracking-caps uppercase text-muted-foreground leading-none">
           {doc ? DOC_PAGES[doc].label : VIEWS.find((v) => v.id === mode)?.name}
         </span>
