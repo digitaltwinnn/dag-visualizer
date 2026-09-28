@@ -339,7 +339,7 @@ export default function TopBar() {
           onKeyDown={(e) => { if (e.key === "Escape") setStrip(null); }}
           className={cn(
             // The filter face's own recipe — a face plus its open-state wash — at the touch floor.
-            "hidden max-[700px]:flex items-center justify-center gap-1 h-9 py-1.5 px-2 rounded-btn",
+            "hidden max-[700px]:flex items-center justify-center gap-1.5 h-9 py-1.5 px-2 rounded-btn",
             "bg-transparent border-0 cursor-pointer whitespace-nowrap",
             "hover:bg-wash-soft pointer-coarse:min-h-11 pointer-coarse:min-w-11",
             strip === "views" && "bg-wash-soft",
@@ -350,14 +350,21 @@ export default function TopBar() {
             const Icon = VIEW_ICONS[mode];
             return <Icon aria-hidden className="size-4 flex-none text-primary" />;
           })()}
-          <span className="sr-only">{VIEWS.find((v) => v.id === mode)?.name}</span>
-          <ChevronDown
-            aria-hidden
+          {/* THE FACE SAYS WHAT IT IS (user, 2026-09-28: "only an icon; it does not say it's a
+              view"): the control's ROLE in the desktop filter face's own micro-caps ("FILTER"),
+              which fits the 74px the centred cell has where the view's name (107px) did not.
+              WHICH view stays the caption's under the bar. The chevron went for the room, the
+              phone filter face's own precedent; the open state reads from the wash and
+              `aria-expanded`. Accent while open, like the FILTER word. */}
+          <span
             className={cn(
-              "size-3.5 flex-none text-muted-foreground transition-transform motion-reduce:transition-none",
-              strip === "views" && "rotate-180",
+              "text-micro tracking-caps uppercase transition-colors duration-150 motion-reduce:transition-none",
+              strip === "views" ? "text-primary" : "text-muted-foreground",
             )}
-          />
+          >
+            View
+          </span>
+          <span className="sr-only">: {VIEWS.find((v) => v.id === mode)?.name}</span>
         </button>
         <ToggleGroup
           type="single"
