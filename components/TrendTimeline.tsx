@@ -124,15 +124,17 @@ export default function TrendTimeline() {
         // tenant's top; the plate's padding plus `mb-3` clears its edge by a hairline's breath.
         className="absolute bottom-full right-0 mb-3 z-[1] rounded-lg [background:var(--topbar-glass)] backdrop-blur-sm max-[700px]:static max-[700px]:mb-0 max-[700px]:self-stretch max-[700px]:[background:none] max-[700px]:backdrop-blur-none"
       >
+        <div className="flex items-center gap-1.5">
         <WindowPicker
-          className="bg-transparent"
+          className="bg-transparent max-[700px]:flex-1"
           zoom={windowId}
           range={range}
           stepMs={stepMs}
           onPick={setTrendWindow}
           onClearRange={() => setTrendRange(null)}
-          trailing={multiPlane ? <ScalePill shared={scale === "shared"} onChange={(on) => setTrendScale(on ? "shared" : "own")} /> : undefined}
         />
+        {multiPlane && <ScalePill shared={scale === "shared"} onChange={(on) => setTrendScale(on ? "shared" : "own")} />}
+        </div>
       </div>
       {/* THE TRACK's column, the whole band wide. */}
       <div className="flex-1 min-h-0 flex flex-col justify-center max-[700px]:min-h-[54px]">

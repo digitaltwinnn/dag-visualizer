@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, type ReactNode } from "react";
+import { useId } from "react";
 import { AlignEndHorizontal } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -83,7 +83,6 @@ export function WindowPicker({
   onPick,
   onClearRange,
   className,
-  trailing,
 }: {
   zoom: ZoomId;
   range: TrendRange | null;
@@ -92,9 +91,6 @@ export function WindowPicker({
   onPick: (id: ZoomId) => void;
   onClearRange: () => void;
   className?: string;
-  /** A control that rides INSIDE the group after a hairline (the band's scale pill, 2026-09-28).
-   *  Wrapped in a span so the phone arm's `[&>button]:flex-1` spreads the windows, not it. */
-  trailing?: ReactNode;
 }) {
   return (
     <div role="group" aria-label="Time window" className={cn(PICKER_GROUP, className)}>
@@ -126,21 +122,21 @@ export function WindowPicker({
           </button>
         </span>
       )}
-      {trailing}
     </div>
   );
 }
 
 /** THE SCALE PILL — History's band (user, 2026-09-28, option A of four in the companion, icon
- *  picked there: "aligned bars"): the Same scale setting as ONE icon segment at the end of the
- *  window group, after a hairline, in the group's own pressed language. Two bars on one baseline
- *  say "compared on one footing". It replaced a label + switch that took its own line on phone
- *  and read unfinished beside the pills; the tooltip carries the words, in both states. The Trends
+ *  picked there: "aligned bars"): the Same scale setting as ONE icon toggle in its OWN small group
+ *  box beside the window group, in the same frame and pressed language. Its own box, not a
+ *  segment of the windows' (user, same day: "pills or a button group?"): a segmented control
+ *  holds mutually exclusive options, and an independent on/off inside it read as a seventh
+ *  window. Two bars on one baseline say "compared on one footing"; the tooltip carries the words
+ *  in both states. It replaced a label + switch that took its own line on phone. The Trends
  *  DOCUMENT keeps its `ScaleToggle` switch, where a page has room for the name. */
 export function ScalePill({ shared, onChange }: { shared: boolean; onChange: (shared: boolean) => void }) {
   return (
-    <span className="inline-flex items-center">
-      <span aria-hidden className="w-px self-stretch my-1 mx-1 bg-wash-strong" />
+    <div role="group" aria-label="Chart scale" className={cn(PICKER_GROUP, "flex-none bg-transparent max-[700px]:flex-none")}>
       <button
         type="button"
         aria-pressed={shared}
@@ -155,7 +151,7 @@ export function ScalePill({ shared, onChange }: { shared: boolean; onChange: (sh
       >
         <AlignEndHorizontal aria-hidden className="size-3.5" />
       </button>
-    </span>
+    </div>
   );
 }
 
