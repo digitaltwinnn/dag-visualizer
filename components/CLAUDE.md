@@ -973,7 +973,7 @@ In one line: **thread = resting identity cue; card edge = purely transient signa
 - **Sheets stay calm**: inside sheet content the whisper and pairing edges are suppressed, because the
   sheet's own edge spine is its single identity cue. The subject-change pulse still plays.
 - **Dock icon trays** show a quiet legend of the cards the sheet hosts. A card updating while the sheet
-  is closed goes vivid in its identity hue with a heartbeat until the sheet opens — purely visual, it
+  is closed goes vivid in its identity hue, still — colour alone since 2026-09-28 — until the sheet opens — purely visual, it
   **never opens the sheet**, and a pure deselect announces nothing.
 - **Calm tempo.** The heartbeat family beats at 1.5s and transient signals run around 1.2s, debounced
   so a 4s-tick live feed never reads as a strobe. **Navigation moves on its own, slower clock** — the

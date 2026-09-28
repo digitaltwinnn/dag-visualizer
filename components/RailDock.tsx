@@ -15,7 +15,7 @@ import { useSceneYield } from "@/components/RailShade";
 // dot↔glyph morph, on the edge tabs AND the phone dock halves): the tray is a quiet LEGEND of the
 // cards the sheet currently hosts — one `VIEW_ICONS`/`ABOUT_ICON` mark per hosted card, muted at
 // rest. `active` marks a card that updated while the sheet was closed (unseen): its icon goes
-// bold/vivid in the card's identity `hue` and breathes on the shared dot-beat heartbeat until the
+// bold/vivid in the card's identity `hue` — colour alone, no beat (2026-09-28) — until the
 // sheet opens (the caller clears the actives on open; the icons themselves stay — they are the
 // legend, not the alert).
 export type TabSignal = { id: string; icon: LucideIcon; hue?: string; active?: boolean };
@@ -56,7 +56,7 @@ export function usePulseWindow(key: unknown): { pulse: number; live: boolean } {
 // `signals`: the dock's icon TRAY (see `TabSignal` above) — a quiet legend of the hosted cards
 // (muted icons at rest, on the edge tab as a vertical stack under the chevron, on the phone dock
 // half as a horizontal row after the label), with `active` entries vivid/identity-hued and
-// breathing (`dot-beat`; reduced motion → static vivid, no beat). PURELY visual: never opens the
+// still (the beat they breathed on went 2026-09-28 — colour is the whole cue). PURELY visual: never opens the
 // sheet itself (Global Constraint — no auto-open on a pick; the user always taps the trigger).
 // Presentation-only data (icon component + a CSS colour + the active flag), so RailDock stays
 // generic — each caller owns its card→icon/hue mapping and its seen-tracking (clearing actives
@@ -559,8 +559,9 @@ export default function RailDock({
     );
 
   // The icon TRAY (see the `signals` prop doc): the hosted cards' legend. Muted at rest; an
-  // `active` (updated-unseen) icon goes vivid in its identity hue + breathes on the shared
-  // dot-beat heartbeat (reduced motion → static vivid). Vertical stack on the edge tab,
+  // `active` (updated-unseen) icon goes vivid in its identity hue and STAYS STILL (user,
+  // 2026-09-28, tablet and phone: "colour AND movement when they are updated; only colour is
+  // enough" — the dot-beat heartbeat it breathed on is gone, the compact dot's too). Vertical stack on the edge tab,
   // horizontal row on the phone dock half. The frame is FIXED-SIZE for 3 icons (user refinement:
   // the two edge trays mirror each other's geometry exactly and never grow/shrink as hosted
   // cards change — fewer icons = empty slots), sized 3 × 14px icons + 2 gaps. Renders whenever
@@ -571,7 +572,7 @@ export default function RailDock({
     firstActive ? (
       <span
         aria-hidden="true"
-        className="size-1.5 flex-none rounded-full animate-dot-beat motion-reduce:animate-none"
+        className="size-1.5 flex-none rounded-full"
         style={{ background: firstActive.hue ?? "var(--primary)" }}
       />
     ) : null
@@ -590,7 +591,7 @@ export default function RailDock({
           className={cn(
             "size-3.5 flex-none",
             active
-              ? "animate-dot-beat motion-reduce:animate-none drop-shadow-[0_0_4px_currentColor]"
+              ? "drop-shadow-[0_0_4px_currentColor]"
               : "text-muted-foreground opacity-60",
           )}
           style={active ? { color: hue ?? "var(--primary)" } : undefined}
