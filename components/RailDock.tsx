@@ -6,7 +6,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { ListTree, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, X, type LucideIcon } from "lucide-react";
+import { ListTree, ChevronLeft, ChevronRight, X, type LucideIcon } from "lucide-react";
 import { EXPLORE_ICON } from "@/components/icons";
 import { useStore } from "@/src/store/store";
 import { useSceneYield } from "@/components/RailShade";
@@ -664,15 +664,12 @@ export default function RailDock({
           >
             {barIcon ?? (side === "left" ? <EXPLORE_ICON size={18} strokeWidth={1.75} aria-hidden="true" /> : <ListTree size={18} strokeWidth={1.75} aria-hidden="true" />)}
             <span>{label}</span>
-            {/* [icons legend] | [open control]: the tray, then the hairline, then the trailing
-                open/collapse chevron (up = opens a sheet above; down while open = collapses). */}
+            {/* [icons legend], and NO trailing chevron (user, 2026-09-28): the icon and the word
+                already read as a button, the open half says so with its wash and top accent, and
+                the sheet's own grabber says it drags. The ∧/∨ restated the open state and cost the
+                tray its width. */}
             {tray}
             {trayRule}
-            {open ? (
-              <ChevronDown size={16} className="flex-none opacity-70" aria-hidden />
-            ) : (
-              <ChevronUp size={16} className="flex-none opacity-70" aria-hidden />
-            )}
             {/* Hosted-card UPDATE signal only: a travelling pulse along the half's TOP edge — the
                 shared vertical recipe rotated onto the horizontal edge (the mask/geometry live in
                 the carrier's local coords, so the soft tips + sweep rotate with it), sweeping from
