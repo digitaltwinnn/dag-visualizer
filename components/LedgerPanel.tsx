@@ -338,8 +338,13 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         ) : (
           <span className={cn("flex-none w-2 h-2 rounded-full border", pinned && previewOrd == null ? "border-primary/80" : "border-muted-foreground/70")} />
         )}
-        <span className={cn("text-micro tracking-caps uppercase", beating ? "text-primary" : pinned && previewOrd == null ? "text-foreground" : "text-muted-foreground")}>{label}</span>
-        {sub && <span className="tabular-nums text-micro text-muted-foreground">{sub}</span>}
+        {/* THE RIGHT RAIL CARD'S OWN VOICE (user, 2026-09-28: "in the card the live is next to the
+            subtitle, in the explorer next to the title"): lowercase `live · 5s ago` at the card
+            aside's text size, so the two read as ONE control in two places. The position differs
+            by width alone — the explorer's title row has ~54px free beside "Snapshot breakdown",
+            the control needs ~85, so it rides the eyebrow row there. */}
+        <span className={cn("text-label", pinned && previewOrd == null ? "text-foreground" : "text-muted-foreground")}>{label.toLowerCase()}</span>
+        {sub && <span className="tabular-nums text-label text-muted-foreground">{sub}</span>}
       </button>
     );
   })();
@@ -412,7 +417,8 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
             to={Math.min(page * pageSize, orderedSnaps.length)}
             total={orderedSnaps.length}
             compact
-            // THE SPAN THE ROWS COVER, not a count of a buffer (user, 2026-09-28: "instead of '52
+            // THE SPAN THE ROWS COVER, and nothing else — the compact pager drops its count when a
+            // scope is given (TablePager). THE SPAN, not a count of a buffer (user, 2026-09-28: "instead of '52
             // recent' say something people understand — they are all recent, but why only 52?").
             // The explorer holds the latest POLL.maxSnapshots global snapshots; how much TIME that
             // is — measured from the rows themselves, oldest to newest — is what a reader can use.
