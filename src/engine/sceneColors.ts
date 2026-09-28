@@ -144,8 +144,14 @@ export function glowBlend(c: SceneColors): THREE.Blending {
  * two answers — which is the shape that keeps a call site from inventing a third.
  *
  * Dark answers `c.core` to both, so it is byte-identical by construction whatever a caller asks.
+ *
+ * A THIRD WEIGHT, `hud` (2026-09-28): in-scene text that stands in for a HUD label — the gather
+ * legend's tickers, which name the staged blocks the way a card head names a card — takes the
+ * HUD's own `--foreground` on BOTH grounds (user: "most texts in the HUD are white and not
+ * cyan"). Furniture on the globe (country names) keeps `name`; a reading keeps `readout`.
  */
-export function labelInk(c: SceneColors, weight: "name" | "readout" = "name"): number {
+export function labelInk(c: SceneColors, weight: "name" | "readout" | "hud" = "name"): number {
+  if (weight === "hud") return c.fg;
   if (!isLightGround(c)) return c.core;
   return weight === "readout" ? c.fg : c.muted;
 }

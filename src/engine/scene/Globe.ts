@@ -580,9 +580,11 @@ export class Globe implements GeoViewHost {
     this._gatherLabels.length = 0;
     // NEUTRAL label ink, not the identity hue (user, 2026-09-04: "colour-coded text is too
     // strong — we already have the coloured chips right underneath"): the chips ARE the colour,
-    // the ticker just names them. labelInk is the one home for text-on-ground (the country
-    // labels' own answer).
-    const ink = `#${labelInk(this._colorsRef).toString(16).padStart(6, "0")}`;
+    // the ticker just names them. THE HUD'S OWN WHITE, not the globe's cyan (user, 2026-09-28:
+    // "most texts in the HUD are white and not cyan"): a ticker over a staged block is a label
+    // the way a card head is, so it takes `labelInk`'s `hud` weight — `--foreground` on both
+    // grounds — while the country names on the globe keep the furniture ink.
+    const ink = `#${labelInk(this._colorsRef, "hud").toString(16).padStart(6, "0")}`;
     for (const g of this._gatherGroups) {
       const ss = slots.get(g.id);
       if (!ss || ss.length === 0) continue;
@@ -597,7 +599,12 @@ export class Globe implements GeoViewHost {
         if (s.u < uMin) uMin = s.u;
         if (s.u > uMax) uMax = s.u;
       }
-      const mesh = makeTextLabel(ink, ticker, GATHER_CELL * 1.4, 500);
+      // 1.4 → 2.2 cells (user, 2026-09-28: "ticker text has bloom and is a bit too small"):
+      // at 1.4 the dark ground's whole-frame bloom ate the glyphs; at 2.2 the halo sits around
+      // letters that still read. The bloom itself stays — it is the dark look, and only paper
+      // runs a pass that can pick marks; a bloom-free legend means a DOM legend (the callout's
+      // half of the split), which is a different piece of work.
+      const mesh = makeTextLabel(ink, ticker, GATHER_CELL * 2.2, 500);
       grp.add(mesh);
       this._gatherLabels.push({ mesh, uMid: (uMin + uMax) / 2, gs: ss[0]!.gs });
     }

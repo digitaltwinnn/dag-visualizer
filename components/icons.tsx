@@ -5,7 +5,7 @@ import {
   Layers2,
   CircleDashed,
   Info,
-  Telescope,
+  Compass,
   Box,
   Boxes,
   MapPin,
@@ -56,11 +56,14 @@ export const ABOUT_ICON: LucideIcon = Info;
 
 // The left-rail TOOL cards' ONE mark (GeoExplore, LedgerPanel — user decision: the SAME standard
 // icon in every view; an earlier per-view icon split read as neither exploring nor
-// learning). Telescope: an INSTRUMENT that says explore/investigate — same reasoning as the
-// status view's Radar. A tool card isn't itself a view subject (unlike the detail cards'
-// Globe/Box/Orbit marks), so it doesn't reuse a view icon. Used in the card head, the dock icon
-// trays (railCards.ts), and the phone dock's Explore half — head, tray, and dock must agree.
-export const EXPLORE_ICON: LucideIcon = Telescope;
+// learning). Compass (user's pick, 2026-09-28 — "not sure I like the telescope"; the candidates
+// were Compass, Binoculars, ScanSearch and Waypoints): the plain "explore" glyph, calm at 14px,
+// and it reads as WAYFINDING, which is what a breakdown path is. The Telescope it replaces was
+// an instrument that said investigate. A tool card isn't itself a view subject (unlike the
+// detail cards' Globe/Box/Orbit marks), so it doesn't reuse a view icon. Used in the card head,
+// the dock icon trays (railCards.ts), and the phone dock's Explore half — head, tray, and dock
+// must agree.
+export const EXPLORE_ICON: LucideIcon = Compass;
 
 // A SNAPSHOT's mark (the snapshot detail card + dock tray): a snapshot renders as a solid BLOCK
 // in the settlement chamber, so it wears the cube — deliberately distinct from VIEW_ICONS.ledger
@@ -101,7 +104,7 @@ export const PROVIDER_ICON: LucideIcon = Server;
 export const COMPOSITION_ICON: LucideIcon = Component;
 
 // The ONE size every card-head/title KIND MARK renders at — About's Info, the tool cards'
-// Telescope, the node card's Globe, the snapshot card's Box (CardHead's panel `icon` + the inspector
+// Compass, the node card's Globe, the snapshot card's Box (CardHead's panel `icon` + the inspector
 // titles in inspector/cards.tsx). 16px (`size-4`): the old 14px read timid next to the 15px
 // text-title headline (user follow-up on Task 23). Single-sourced here so the heads can't drift;
 // the dock TRAYS and the top-bar view switch deliberately keep their own sizes (this constant is
