@@ -460,7 +460,9 @@ export default function Inspector() {
   ].join("§");
   // Arms HeightEase's growIn for slots that JOIN the lane after boot (false on the first
   // render pass, true on every later one — a mounting slot's wrapper then eases from 0
-  // instead of shoving the pile in one frame).
+  // instead of shoving the pile in one frame). DESKTOP ONLY, as ExploreRail's (its note has
+  // the measurement): a sheet remounts its whole lane on every open, and every rung growing
+  // from 0 inside a sheet growing to fit them is the staggered double motion the user saw.
   const laneBooted = useRef(false);
   useEffect(() => {
     laneBooted.current = true;
@@ -645,7 +647,7 @@ export default function Inspector() {
                 very animation that resizes the slot. It used to be inferred — CSS keyframes
                 restarting because React swapped `.rail-entry` for `.ig-panel` — which made the
                 arrival an accident of reconciliation and put it on a second clock. */}
-            <HeightEase growIn={laneBooted.current} settleKey={tier}>{wrapped}</HeightEase>
+            <HeightEase growIn={laneBooted.current && bp === "desktop"} settleKey={tier}>{wrapped}</HeightEase>
           </div>
         );
       })}

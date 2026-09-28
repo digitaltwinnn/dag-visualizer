@@ -27,6 +27,13 @@ export default function ExploreRail() {
   const bp = useBreakpoint();
   // growIn arming — the Inspector's laneBooted pattern: the tool slot unmounts entirely on
   // the placeholder view and rejoins on a 3D one; rejoining grows from 0 instead of snapping.
+  // ⚠️ DESKTOP ONLY — the inline rail is the one host that persists across the remount. In a
+  // SHEET (tablet, phone) the content mounts fresh on every open (Radix portals it), so a
+  // growIn there is not a slot joining a lane, it is the card growing from 0 INSIDE a sheet
+  // that is itself growing to fit it: two motions, the second chasing the first (user,
+  // 2026-09-28: "first it opens, then it moves again to take the height of the card"). Measured
+  // at 390×844, the card eased 9 → 469px over ~650ms while the sheet's fit re-targeted three
+  // times behind it. The sheet's own entrance IS the arrival there.
   const booted = useRef(false);
   useEffect(() => {
     booted.current = true;
@@ -62,7 +69,7 @@ export default function ExploreRail() {
     // and that reason left with the About card: a sheet holding one card has nothing to choose
     // between, and a collapsed head there is a tap the reader always pays.
     tool: (
-      <HeightEase className="flex-none" growIn={booted.current}>
+      <HeightEase className="flex-none" growIn={booted.current && bp === "desktop"}>
         {/* ⚠️ TRANSFORM-FREE arrival (user, 2026-09-04: About collapsed + a tall explorer
             still "jumps a bit" at the top — animate-card-in's materialize runs
             translateY(5px) scale(0.985), and 0.985 of a 700px expanded list pulls the TOP
