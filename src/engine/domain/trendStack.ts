@@ -17,11 +17,12 @@
 // is each plane's identity channel** (its network name, its hue, its latest reading). A plane
 // whose header is covered is a plane that is not in the view at all.
 //
-// So a receding slot steps UP and to the RIGHT as well as back: `PLANE_STEP_X` / `PLANE_STEP_Y`
-// per slot, centred on the visible COUNT so the block sits mid-canvas whether it holds five planes
-// or two. Up-and-right is not arbitrary — it puts each header strip in the clear band above and
-// beside the plane in front of it, which is exactly where a reader's eye already runs a list, and
-// it leaves the near plane's plot (the one being read) unobstructed at the bottom-left.
+// So a receding slot steps UP as well as back: `PLANE_STEP_Y` per slot, centred on the visible
+// COUNT so the block sits mid-canvas whether it holds five planes or two. It stepped RIGHT too
+// (`PLANE_STEP_X`, 3) until 2026-09-28: once the vertical step was cut to the header strip alone
+// the across-step no longer cleared anything, and the user read it as the deck sitting off to the
+// right of the chart ("keep it centred, no?") — so the deck stacks straight up at every tier, the
+// way the narrow tiers already did, and the constant stands at 0 with its plumbing intact.
 //
 // ⚠️ A FOCUS THE WINDOW DOES NOT HOLD MOVES NOTHING (2026-09-19).
 // `focusInWindow` is the ONE predicate both halves of this module read: a focus paged, re-ranked
@@ -63,16 +64,18 @@ export const SCALE_FALLOFF = 0.03;
  *  re-opened with one number. */
 export const OPACITY_FALLOFF = 0;
 
-/** THE STAGGER, across. Each slot further back sits this much further RIGHT, so its header strip
- *  clears the plane in front of it. See the header: a covered header is a missing plane. */
-export const PLANE_STEP_X = 2.4;
+/** THE STAGGER, across — ZERO since 2026-09-28 (user: "keep it centred"): the deck stacks straight
+ *  up behind the front chart at every tier. It was 3, then 2.4, while the across-step helped clear
+ *  each header; with the vertical step sized to the header alone it cleared nothing and read as a
+ *  sideways drift. The constant and `stepX` stay so the poses and the ground still share one
+ *  number, and a non-zero value re-opens the look in one edit. */
+export const PLANE_STEP_X = 0;
 
 /** THE STAGGER ACROSS, PER TIER. On a NARROW canvas (tablet, phone — `breakpointOf` below the
- *  desktop tier) the across-step is ZERO and the deck stacks straight up: the front card is
- *  fitted to the canvas width there (`fitDistance`), so every unit of across-stagger would push a
- *  rear header's right end — its reading — off the edge, and a deck exactly one card wide keeps
- *  every header whole, stacked above the front card like a list (user, 2026-09-26: "the front
- *  card should take more width on tablet/phone"). Desktop keeps `PLANE_STEP_X`. */
+ *  desktop tier) the across-step is ZERO regardless of the constant: the front card is fitted to
+ *  the canvas width there (`fitDistance`), so any across-stagger would push a rear header's right
+ *  end — its reading — off the edge (user, 2026-09-26: "the front card should take more width on
+ *  tablet/phone"). Desktop reads `PLANE_STEP_X`, which is 0 too since 2026-09-28 (its note). */
 export function stepX(narrow: boolean): number {
   return narrow ? 0 : PLANE_STEP_X;
 }

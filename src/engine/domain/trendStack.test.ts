@@ -64,17 +64,18 @@ describe("stackPoses", () => {
     expect(p[4].opacity).toBeCloseTo(1 - OPACITY_FALLOFF * 4);
   });
 
-  it("STAGGERS up and to the right, so no header strip is covered", () => {
-    // ⚠️ The rule this replaces (every plane at x = 0, y = PLANE_Y) is what made the built view
-    // read as ONE chart with ghost headers behind it — see the module header. Each receding slot
-    // steps by exactly one PLANE_STEP_X / PLANE_STEP_Y.
+  it("STAGGERS up, so no header strip is covered — and straight up, so the deck stays centred", () => {
+    // ⚠️ The rule this replaces (every plane at y = PLANE_Y) is what made the built view read as
+    // ONE chart with ghost headers behind it — see the module header. Each receding slot steps by
+    // exactly one PLANE_STEP_X / PLANE_STEP_Y, and the across-step is 0 since 2026-09-28 (user:
+    // "keep it centred") — the vertical step alone uncovers the headers.
     const p = stackPoses(IDS, { scroll: 0, focus: null });
     for (let i = 1; i < p.length; i++) {
       expect(p[i].x - p[i - 1].x).toBeCloseTo(PLANE_STEP_X);
       expect(p[i].y - p[i - 1].y).toBeCloseTo(PLANE_STEP_Y);
     }
-    // UP and RIGHT, not down and left: the header band sits above the plane in front of it.
-    expect(PLANE_STEP_X).toBeGreaterThan(0);
+    // UP, not down: the header band sits above the plane in front of it. And not sideways.
+    expect(PLANE_STEP_X).toBe(0);
     expect(PLANE_STEP_Y).toBeGreaterThan(0);
   });
 
@@ -89,7 +90,8 @@ describe("stackPoses", () => {
     // Nearer the origin than a block-centred stagger would put it — and strictly so.
     const blockCentred = (p.length - 1) / 2;
     expect(c).toBeLessThan(blockCentred);
-    expect(Math.abs(p[0].x)).toBeLessThan(blockCentred * PLANE_STEP_X);
+    // (Measured on the rise alone since the across-step went to 0 — the x claim would be 0 < 0.)
+    expect(Math.abs(p[0].y - PLANE_Y)).toBeLessThan(blockCentred * PLANE_STEP_Y);
     // …but not ON the origin: the index still has to fit above and beside it.
     expect(STAGGER_ANCHOR).toBeGreaterThan(0);
     expect(STAGGER_ANCHOR).toBeLessThan(1);
@@ -516,8 +518,9 @@ describe("stepX — the across-stagger is a desktop thing (user, 2026-09-26)", (
       expect(narrow[i]!.z).toBe(wide[i]!.z);
       expect(narrow[i]!.scale).toBe(wide[i]!.scale);
     }
-    // And the default is the desktop stagger, so nothing that never passes the flag moved.
-    expect(wide.some((p) => p.x !== 0)).toBe(true);
+    // The desktop deck stacks straight up too since 2026-09-28 (`PLANE_STEP_X` = 0), so the two
+    // tiers agree on x — the flag now only guards the day the constant is re-opened.
+    for (let i = 0; i < wide.length; i++) expect(wide[i]!.x + 0).toBe(0);
   });
 });
 
