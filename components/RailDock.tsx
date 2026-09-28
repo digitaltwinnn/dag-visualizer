@@ -301,8 +301,10 @@ export default function RailDock({
   const [sheetEl, setSheetEl] = useState<HTMLDivElement | null>(null);
   const onCoverRef = useRef(onCoverPx);
   onCoverRef.current = onCoverPx;
-  const covering = open && shellVisible && (sheetSide ?? side) !== "bottom";
+  const isBottom = (sheetSide ?? side) === "bottom";
+  const covering = open && shellVisible && !isBottom;
   useEffect(() => {
+    if (isBottom) return; // the bottom arm publishes its HEIGHT below, from state
     if (!covering || !sheetEl) {
       onCoverRef.current?.(0);
       return;
@@ -315,7 +317,18 @@ export default function RailDock({
       ro.disconnect();
       onCoverRef.current?.(0);
     };
-  }, [covering, sheetEl]);
+  }, [covering, sheetEl, isBottom]);
+  // ── Canvas cover (phone) — the HEIGHT this bottom sheet takes (2026-09-28) ───────────────
+  // Published from STATE, not measured: `heightPx` is the sheet's target (0 while the grow is
+  // armed and while it exits, the fit or the drag otherwise), and the Engine eases the scene's
+  // shift toward it on its own clock — publishing every ResizeObserver tick of the 550ms grow
+  // would have the projection chase the glass. Same callback as the side arm's width: the dock
+  // reports the dimension it takes, the caller says which cover it is.
+  useEffect(() => {
+    if (!isBottom) return;
+    onCoverRef.current?.(open && shellVisible ? (heightPx ?? 0) : 0);
+  }, [isBottom, open, shellVisible, heightPx]);
+  useEffect(() => () => { if (isBottom) onCoverRef.current?.(0); }, [isBottom]);
 
   // ── Tap-outside dismiss (phone bar-half only, user 2026-08-15) ─────────────────────────────
   // A TAP on the scene collapses the open bottom sheet, the same dismissal the bar-half toggle

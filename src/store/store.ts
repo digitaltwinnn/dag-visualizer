@@ -296,6 +296,17 @@ interface AppState {
   // take height, not width — and the callout declines there outright anyway).
   sceneCoverL: number;
   sceneCoverR: number;
+  // THE BOTTOM COVER, per phone dock (2026-09-28): the height the open bottom sheet takes off the
+  // canvas, published as the sheet's TARGET height (the dock's own `heightPx` — 0 while it arms
+  // its grow and while it exits) so the Engine eases one shift on its own clock rather than
+  // chasing thirty ResizeObserver ticks. The Engine reads the larger of the two and moves the
+  // scene's framing centre up into the band that remains (`domain/sheetShift.ts`, a projection
+  // offset, never a camera move). TWO SCALARS, one per dock, for the same reason the sides are:
+  // the docks are mutually exclusive but their exits LAG (a closing sheet shrinks for 420ms and
+  // publishes 0 when it unmounts), so one shared scalar would let the closing dock clobber the
+  // opening one. Always 0 on desktop and tablet.
+  sceneCoverBExplore: number;
+  sceneCoverBDetails: number;
   // Per-slot rail-card collapse OVERRIDES (slot id → collapsed), written by a user's +/− toggle
   // or the rail-top minimize/expand-all controls. A slot with NO entry falls back to the rail's
   // AUTO default (Inspector: ladder ancestors of the focused rung rest collapsed) — so `null`
@@ -433,7 +444,7 @@ interface AppState {
   setMotionCause: (cause: MotionCause | null) => void;
   setPhoneSheetPx: (px: number | null) => void;
   /** Publish how many px of the canvas an open rail sheet covers on one side (0 when closed). */
-  setSceneCover: (side: "left" | "right", px: number) => void;
+  setSceneCover: (side: "left" | "right" | "explore" | "details", px: number) => void;
   setBoxedCard: (id: string | null) => void;
   setRailCollapse: (id: string, collapsed: boolean | null) => void;
   setNavQuiet: (navQuiet: boolean) => void;
@@ -534,6 +545,8 @@ export const useStore = create<AppState>((set) => ({
   phoneSheetPx: null,
   sceneCoverL: 0,
   sceneCoverR: 0,
+  sceneCoverBExplore: 0,
+  sceneCoverBDetails: 0,
   boxedCard: null,
   themePref: "system" as ThemePref,
   theme: "dark" as Theme,
@@ -713,15 +726,11 @@ export const useStore = create<AppState>((set) => ({
   // Guarded so a re-measure reporting the same width is a no-op — this fires on every sheet
   // open/close and the Engine reads it per frame.
   setSceneCover: (side, px) =>
-    set((s) =>
-      side === "left"
-        ? s.sceneCoverL === px
-          ? s
-          : { sceneCoverL: px }
-        : s.sceneCoverR === px
-          ? s
-          : { sceneCoverR: px },
-    ),
+    set((s) => {
+      const key =
+        side === "left" ? "sceneCoverL" : side === "right" ? "sceneCoverR" : side === "explore" ? "sceneCoverBExplore" : "sceneCoverBDetails";
+      return s[key] === px ? s : { [key]: px };
+    }),
   setBoxedCard: (boxedCard) => set({ boxedCard }),
   // A fresh object every call — the request is the EVENT, so re-opening the same rung must reach
   // the Engine's reference-compare bridge again.

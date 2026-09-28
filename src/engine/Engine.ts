@@ -28,6 +28,7 @@ import { readSceneColors, type SceneColors, LIGHT_TUNE } from "./sceneColors";
 import { setNodeDimTarget, setNodeEnv } from "./scene/objects/NodeFabric";
 import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme/resolve";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
+import { SHEET_SHIFT_K, sheetShiftPx } from "./domain/sheetShift";
 import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush, trendFit } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
@@ -383,6 +384,12 @@ export class Engine {
     }, 250);
   };
   private _resizeReframeT: ReturnType<typeof setTimeout> | undefined;
+  /** THE PHONE SHEET'S SHIFT (`domain/sheetShift.ts`): the eased offset, in px, and what the camera
+   *  was last given — so the projection is rewritten only when the shift, or the canvas, moved. */
+  private _sheetShift = 0;
+  private _sheetShiftApplied = 0;
+  private _sheetShiftW = 0;
+  private _sheetShiftH = 0;
   /** The aspect the current pose was resolved at — seeds from the boot camera, updated per re-frame. */
   private _framedAspect = typeof window !== "undefined" ? window.innerWidth / Math.max(1, window.innerHeight) : 16 / 9;
   // FPS/ms monitor — dev only, or in prod via `?stats`/`#stats` for ad-hoc checks, so
@@ -2101,6 +2108,29 @@ export class Engine {
     const minAlt = policy.minCamAlt;
     if (minAlt != null && this.ctx.camera.position.lengthSq() < minAlt * minAlt) {
       this.ctx.camera.position.setLength(minAlt);
+    }
+    // ---- the phone sheet's shift (domain/sheetShift.ts) ------------------------------------
+    // LAST in the camera phase, after the pose has settled: a projection offset that moves the
+    // framing centre up into the band a bottom sheet leaves free. Eased here on the frame clock
+    // toward the store's target (the larger of the two docks' covers — their exits lag), and
+    // written through `setViewOffset` only when it or the canvas box changed, since that call
+    // rebuilds the projection matrix every projector and the raycaster read this frame.
+    {
+      const st = useStore.getState();
+      const el = this.ctx.renderer.domElement;
+      const w = el.clientWidth || window.innerWidth;
+      const h = el.clientHeight || window.innerHeight;
+      const target = sheetShiftPx(Math.max(st.sceneCoverBExplore, st.sceneCoverBDetails), h);
+      const d = target - this._sheetShift;
+      this._sheetShift = Math.abs(d) < 0.25 ? target : this._sheetShift + d * (1 - Math.exp(-SHEET_SHIFT_K * dt));
+      if (this._sheetShift !== this._sheetShiftApplied || w !== this._sheetShiftW || h !== this._sheetShiftH) {
+        const cam = this.ctx.camera;
+        if (this._sheetShift === 0) cam.clearViewOffset();
+        else cam.setViewOffset(w, h, 0, this._sheetShift, w, h);
+        this._sheetShiftApplied = this._sheetShift;
+        this._sheetShiftW = w;
+        this._sheetShiftH = h;
+      }
     }
   }
 

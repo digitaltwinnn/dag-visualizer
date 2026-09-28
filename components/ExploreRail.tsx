@@ -169,6 +169,9 @@ export default function ExploreRail() {
       sheetPx={phoneSheetPx}
       onSheetPx={setPhoneSheetPx}
       onOpenChange={(next) => setPhoneDock(next ? "explore" : null)}
+      // The sheet's HEIGHT off the canvas — the Engine shifts the scene up into the band above it
+      // (store `sceneCoverBExplore`; `domain/sheetShift.ts` has the design).
+      onCoverPx={(px) => setSceneCover("explore", px)}
     >
       {content}
     </RailDock>

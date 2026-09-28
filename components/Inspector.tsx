@@ -799,6 +799,8 @@ export default function Inspector() {
         onTrayOpenChange(next);
         setPhoneDock(next ? "details" : null);
       }}
+      // The sheet's HEIGHT off the canvas — see ExploreRail's matching arm.
+      onCoverPx={(px) => setSceneCover("details", px)}
     >
       {content}
     </RailDock>
