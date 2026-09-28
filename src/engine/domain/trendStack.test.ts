@@ -25,6 +25,9 @@ import {
   staggerCentre,
   stackPoses,
   stepX,
+  MORE_ID,
+  moreCount,
+  morePose,
   arrivalPose,
   fitDistance,
   PLANE_FIT,
@@ -193,6 +196,44 @@ describe("stackPoses", () => {
 
   it("an empty roster yields no poses rather than throwing", () => {
     expect(stackPoses([], { scroll: 0, focus: null })).toEqual([]);
+  });
+});
+
+// ── THE SIXTH, UNNAMED PLANE (2026-09-28) ────────────────────────────────────────────────────
+// The window is a depth budget; this is the one statement that the roster continues behind it.
+describe("morePose — the hint that the deck continues", () => {
+  it("is absent while the roster fits the window, INCLUDING exactly one full window", () => {
+    for (const n of [0, 1, VISIBLE_PLANES - 1, VISIBLE_PLANES]) {
+      expect(morePose(IDS.slice(0, n), { scroll: 0, focus: null })).toBeNull();
+      expect(moreCount(IDS.slice(0, n), 0)).toBe(0);
+    }
+  });
+  it("appears the moment one plane does not fit, and counts what is behind the deck", () => {
+    expect(morePose(IDS, { scroll: 0, focus: null })).not.toBeNull();
+    expect(moreCount(IDS, 0)).toBe(IDS.length - VISIBLE_PLANES);
+    // Paged to the end, nothing is behind — and the count clamps exactly as the window does.
+    expect(moreCount(IDS, 99)).toBe(0);
+    expect(morePose(IDS, { scroll: 99, focus: null })).toBeNull();
+  });
+  it("sits one slot behind the last visible plane, at the stack's own falloff, and is never interactive", () => {
+    const window = stackPoses(IDS, { scroll: 0, focus: null });
+    const last = window[window.length - 1];
+    const hint = morePose(IDS, { scroll: 0, focus: null })!;
+    expect(hint.id).toBe(MORE_ID);
+    expect(hint.z).toBeCloseTo(last.z - PLANE_GAP);
+    expect(hint.x).toBeCloseTo(last.x + PLANE_STEP_X);
+    expect(hint.y).toBeCloseTo(last.y + PLANE_STEP_Y);
+    expect(hint.scale).toBeCloseTo(last.scale - SCALE_FALLOFF);
+    expect(hint.interactive).toBe(false);
+  });
+  it("holds its slot through a focus re-deal — the deck's cards move, the hint does not", () => {
+    const rest = morePose(IDS, { scroll: 0, focus: null })!;
+    const dealt = morePose(IDS, { scroll: 0, focus: "elpaca" })!;
+    expect(dealt).toEqual(rest);
+  });
+  it("wears an id no network can — and the window's poses never carry it", () => {
+    expect(IDS).not.toContain(MORE_ID);
+    expect(stackPoses(IDS, { scroll: 0, focus: null }).map((p) => p.id)).not.toContain(MORE_ID);
   });
 });
 

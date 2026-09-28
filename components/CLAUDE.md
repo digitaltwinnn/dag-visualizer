@@ -231,7 +231,11 @@ decisions inside them are design, not detail:
   rows drive it: a click brings that plane to the front and the store's `scrollToKeep` pages the
   window after it, so no control in the card names `trendScroll`. Two pagers came and went the
   same day — one under all the rows that moved only the stack's window ("3–7 of 11" under eleven
-  rows), then a list cut to the five on stage — and neither is to come back.
+  rows), then a list cut to the five on stage — and neither is to come back. **The scene says
+  the roster continues**: while networks remain behind the window, a SIXTH, UNNAMED plane sits
+  one slot behind the deck (`trendStack.morePose`, rendered by `TrendStack` and projected like
+  any other anchor) printing only "N more" — no network, no chart, no pointer events; a roster
+  that fits shows no ghost.
   ⚠️ **The roster is computed ONCE, in `components/useTrendRoster.ts`** — the planes, this list and
   the cursor card all read it, counter EDGE TRIM included. A surface reading the payload directly
   is one bucket out of step with the axis, which is exactly how the cursor card briefly quoted

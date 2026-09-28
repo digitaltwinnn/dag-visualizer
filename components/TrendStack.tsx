@@ -72,7 +72,7 @@ import { cn } from "@/lib/utils";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
 import { metricCaption, sharedCeiling, stepMetric } from "@/src/data/trendSeries";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
-import { PLANE_PLOT_PX_H, PLANE_PX_W, stackPoses } from "@/src/engine/domain/trendStack";
+import { MORE_ID, PLANE_PLOT_PX_H, PLANE_PX_H, PLANE_PX_W, moreCount, morePose, stackPoses } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -158,6 +158,11 @@ export default function TrendStack() {
   const empty = scopeEmptyCopy(roster.scope, "view");
 
   const poses = stackPoses(order, { scroll, focus });
+  // THE SIXTH, UNNAMED PLANE (user, 2026-09-28) — the domain's `morePose`, rendered below the
+  // window's cards as one more anchor the projector places like any other. It says only how many
+  // networks the depth budget leaves behind the deck; the rows are the route onto the stage.
+  const more = morePose(order, { scroll, focus });
+  const behind = moreCount(order, scroll);
   // THE UNMOUNT BACKSTOP (convention 9's other half, 2026-09-19). A header strip clears its own
   // pairing on leave — while it is still there to hear one. It often is not: paging drops a plane
   // out of the visible window, a metric switch re-ranks the roster, a filter commit cuts it to one,
@@ -335,6 +340,28 @@ export default function TrendStack() {
       }}
       className="group/stack absolute inset-0 pointer-events-none z-[4] opacity-0 [transition:opacity_var(--tempo-nav)_ease] data-[on='1']:opacity-100 motion-reduce:!transition-none"
     >
+      {more && (
+        // THE HINT CARD: the same anchor contract as every plane (0-size, origin-top-left,
+        // invisible until projected — the projector writes its matrix and visibility), the same
+        // opaque face, no network, no chart, no hue, no pointer events. A count is an honest fact
+        // (rule 10), and it is the only thing printed, so the card can never read as a chart.
+        <div
+          key={MORE_ID}
+          data-plane={MORE_ID}
+          aria-hidden
+          className="absolute left-0 top-0 origin-top-left invisible touch-none pointer-events-none"
+          style={{ opacity: more.opacity, zIndex: Math.round(100 + more.z) }}
+        >
+          <div
+            className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border p-2 [background:linear-gradient(var(--panel-solid),var(--panel-solid)),var(--scene-ground)]"
+            style={{ width: PLANE_PX_W, height: PLANE_PX_H }}
+          >
+            <div className="px-2 py-1 text-label text-muted-foreground select-none">
+              {behind} more
+            </div>
+          </div>
+        </div>
+      )}
       {poses.map((pose) => {
         // The one roster pass the rank, the ceiling and both rails read — already cut by the
         // metric's own edge rule, so a rail can never quote a bucket this plane does not draw.

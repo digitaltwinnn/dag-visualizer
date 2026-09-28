@@ -315,6 +315,48 @@ export function stackPoses(ids: readonly string[], opts: StackOpts): PlanePose[]
   return poses.sort((p, q) => q.z - p.z);
 }
 
+/** The id the HINT plane wears — never a network's (those are DAG addresses). */
+export const MORE_ID = "more";
+
+/** How many networks the window leaves off the stage, at this scroll. */
+export function moreCount(ids: readonly string[], scroll: number): number {
+  const start = clampScroll(ids.length, scroll);
+  return Math.max(0, ids.length - (start + VISIBLE_PLANES));
+}
+
+/**
+ * THE SIXTH, UNNAMED PLANE (user, 2026-09-28: "if there are more, maybe add a 6th unnamed to
+ * hint there are more"). The window is a DEPTH BUDGET — a scene decision, five cards receding —
+ * and once the explorer stopped paging (its rows drive the stage now) nothing in the view said
+ * that a roster of eleven had six more behind the deck. This pose is that statement: one more
+ * card at the slot behind the last visible one, at the stack's own falloff so it reads as the
+ * deck continuing, carrying no network and never interactive — the rows are the one route onto
+ * the stage. `null` whenever the roster fits, so a short roster shows no ghost at all.
+ *
+ * Kept OUT of `stackPoses` on purpose: that function is the window's poses, read by the camera's
+ * `focusDepth` and by every test that says "five"; the hint is a sixth thing both consumers
+ * (the planes and the projector) append. It sits at slot `visible.length` against the SAME
+ * stagger centre the window uses, so the deck does not shift when the hint appears — it simply
+ * has one more card behind it. A focus re-deal moves the window's cards among slots 0…n−1 and
+ * leaves this one where it is.
+ */
+export function morePose(ids: readonly string[], opts: StackOpts): PlanePose | null {
+  if (moreCount(ids, opts.scroll) === 0) return null;
+  const n = windowCount(ids.length);
+  const c = staggerCentre(n);
+  const sx = stepX(opts.narrow ?? false);
+  const slot = n;
+  return {
+    id: MORE_ID,
+    x: (slot - c) * sx,
+    y: PLANE_Y + (slot - c) * PLANE_STEP_Y,
+    z: -slot * PLANE_GAP,
+    scale: 1 - SCALE_FALLOFF * slot,
+    opacity: 1 - OPACITY_FALLOFF * slot,
+    interactive: false,
+  };
+}
+
 /**
  * How far the camera leans in: `FOCUS_LEAN` while a focus has actually RE-DEALT the stack, else
  * `0`. It takes every input the re-deal takes — the roster, the focus and the SCROLL — because the
