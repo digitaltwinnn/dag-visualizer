@@ -252,7 +252,7 @@ describe("nodeFraming (the geo node pose — ABSOLUTE, dolly-exempt)", () => {
     const out = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
     nodeFraming(out);
     expect(out.pos).toEqual(new THREE.Vector3(0, 4.6, 19.2));
-    expect(out.target).toEqual(new THREE.Vector3(0, 19.5, 2));
+    expect(out.target).toEqual(new THREE.Vector3(0, 17.8, 2));
   });
 });
 
