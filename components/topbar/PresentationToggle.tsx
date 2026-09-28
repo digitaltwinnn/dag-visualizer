@@ -19,7 +19,9 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 // 2026-08-08 unification's real complaint was two controls reading unrelated — adjacency keeps
 // the pairing, the split keeps the axes honest). Same sizing/on-state recipe as the view switch;
 // labels condense below 1650px (measured, see the span note).
-const SEG = cn(
+// Exported: the island's ABOUT button (TopBar) wears the same segment so the three read as one
+// group — its on-state is the strip wash rather than aria-pressed, since it opens a row.
+export const SEG = cn(
   "group flex items-center gap-1.5 h-9 py-1.5 px-2.5 rounded-btn!",
   // The 44px touch floor, keyed on the POINTER like the filter button's (its note has the
   // rationale): measured 36×36 on phone, under the floor on both axes.

@@ -31,24 +31,17 @@ const ghostIds = (cards: { id: string; present: boolean; hint: string | null }[]
   cards.filter((c) => !c.present && c.hint != null).map((c) => c.id);
 
 describe("exploreCards — LEFT rail (Explore)", () => {
-  it("hyper hosts About + the Nodes-by-layer tool", () => {
-    expect(presentKinds(exploreCards({ mode: "hyper" }))).toEqual(["about", "tool"]);
+  // The About orientation card left the rail on 2026-09-28 (the command bar's ABOUT row is its
+  // door now), so every 3D view hosts exactly its tool card and the placeholder hosts nothing.
+  it.each(["hyper", "geo", "ledger", "trend"] as const)("%s hosts its one tool card", (mode) => {
+    expect(presentKinds(exploreCards({ mode }))).toEqual(["tool"]);
   });
-  it("geo hosts About + the Nodes-by-country tool", () => {
-    expect(presentKinds(exploreCards({ mode: "geo" }))).toEqual(["about", "tool"]);
-  });
-  it("ledger hosts About + the snapshots-browser tool", () => {
-    expect(presentKinds(exploreCards({ mode: "ledger" }))).toEqual(["about", "tool"]);
-  });
-  it("History hosts About + the Layers tool — the view's controls and its browse list", () => {
-    expect(presentKinds(exploreCards({ mode: "trend" }))).toEqual(["about", "tool"]);
-  });
-  it.each(["soon"] as const)("placeholder %s hosts About only", (mode) => {
-    expect(presentKinds(exploreCards({ mode }))).toEqual(["about"]);
+  it.each(["soon"] as const)("placeholder %s hosts no card", (mode) => {
+    expect(presentKinds(exploreCards({ mode }))).toEqual([]);
   });
   it("left cards carry stable (non-updating) subjectKeys", () => {
     const cards = exploreCards({ mode: "geo" });
-    expect(cards.map((c) => c.subjectKey)).toEqual(["about", "tool"]);
+    expect(cards.map((c) => c.subjectKey)).toEqual(["tool"]);
   });
 });
 
@@ -234,11 +227,10 @@ describe("ladderLevelOfSlot — the inverse read (which RUNG does a slot stand f
     expect(ladderLevelOfSlot("node")).toBe("node");
   });
   it("slots that are NOT rungs answer null — the camera can only be asked for a real pose", () => {
-    // The two snapshot slots ride the lane without being focus rungs, and About/the tool card
-    // aren't in the lane at all. Expanding one of these must not request a camera flight.
+    // The two snapshot slots ride the lane without being focus rungs, and the tool card isn't
+    // in the lane at all. Expanding one of these must not request a camera flight.
     expect(ladderLevelOfSlot("snap")).toBeNull();
     expect(ladderLevelOfSlot("metaSnap")).toBeNull();
-    expect(ladderLevelOfSlot("about")).toBeNull();
     expect(ladderLevelOfSlot("tool")).toBeNull();
   });
   it("every lane slot either names a rung or is a known non-rung slot", () => {

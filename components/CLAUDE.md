@@ -151,14 +151,19 @@ wordmark + filter on the left, the view switch centered, and on the right the vi
 into `topbar/SettingsMenu.tsx`, three labeled sections of one popover; their files are rows-only
 modules now. Two states survive on the trigger by rule: the network CODE in the live accent off
 mainnet — "which chain am I looking at" never goes missing — and the doc-open primary tint. One
-mount at every width; the filter strip's second row, the trio's old phone home, retired with it). The bar has **one grow-downward slot with three tenants** (a which-strip enum makes
+mount at every width; the filter strip's second row, the trio's old phone home, retired with it). The bar has **one grow-downward slot with four tenants** (a which-strip enum makes
 them mutually exclusive by construction): the FILTER button opens the network-chip strip (hovering
 previews the dim, picking closes it), **on phone the view switch is ONE face — the current view's
 icon and name — that opens the view list as a strip tenant** (`topbar/ViewPicker.tsx`, 2026-09-28: a
 row of 44px icons cannot scale with the view count — History made it five and the filter ran under
 the first tab — and hiding entries per tier is a patch the next view undoes; the segmented switch
 stays from 700px up, both presentations live in the DOM and CSS picks, and the hanging caption
-stands down on phone because the face already prints the name), and the ECG opens the **pulse strip** — one read-only cell
+stands down on phone because the face already prints the name), **the view-scoped island's info
+button opens the ABOUT row** (`topbar/AboutStrip.tsx`, 2026-09-28 — the per-view orientation prose
+that used to lead the left rail as a card; user: "the static about card is a bit out-of-place on the
+left column … about belongs where?" — the four zones are instruments and prose is documentation,
+whose one home is /about, so the in-view door sits beside the ECG's "how live is this app" strip,
+closed by default, view-scoped like Scene and Raw), and the ECG opens the **pulse strip** — one read-only cell
 per data FEED from the poll-health registry (`src/data/api.ts` `reportPoll`/`pollHealthRows`; the
 five real fetch sites report their own outcomes), each with a derived status dot (ok / stale past
 ~2.5× its own cadence / error — never fabricated, rule 10), the last success ticking, the cadence
@@ -178,8 +183,9 @@ guessed**: the view-switch labels drop at `max-[1299px]`, the dividers plus the 
 departure is what freed the wordmark). When the labels go, the ACTIVE view's name reappears as a
 caption strip under the bar (`aria-hidden`, non-interactive).
 
-**Left rail — the explore/interact scope.** Every view leads with the **About** orientation card, then
-the view's one tool card if it has one. What each explorer contains is view-specific, but three
+**Left rail — the explore/interact scope.** The view's one tool card, if it has one (the About
+orientation card that led every rail from 2026-08-08 retired on 2026-09-28 into the command bar's
+ABOUT row, above). What each explorer contains is view-specific, but three
 decisions inside them are design, not detail:
 
 - geo's cohort rows carry **no status and no identity dot** — health belongs to the node card, and
@@ -224,7 +230,7 @@ decisions inside them are design, not detail:
   is one bucket out of step with the axis, which is exactly how the cursor card briefly quoted
   yesterday's number; `components/trendRailBoundary.test.ts` pins all three "one home" rules.
 
-**Naming and copy rules:** About states the view's point of view ("How the network is built"); the tool
+**Naming and copy rules:** the ABOUT row states the view's point of view ("How the network is built"); the tool
 card says what you BROWSE — by the AXIS the rows break the network down along, never by the
 figure they show ("Network breakdown", "Country breakdown", "Snapshot breakdown", and History's "Network breakdown" too — its rows are networks, "layer" was the stack's word for a plane; 2026-09-26
 — user, 2026-09-26: once every explorer carries the measure HEADING CONTROL, a title like "Nodes by
@@ -544,7 +550,7 @@ no ladder for those views every present card fell through to Inspector's trailin
 excludes the context card, so the node card rendered with **no network plank above it** — and correctly
 re-grew Country and Hosting, since the pile-dedup rule found no ancestors. It is a view gate, not a
 selection change: the store is untouched, so returning to a 3D view restores the whole pile. This
-matches the left rail, which shows About and no tool card there.
+matches the left rail, which shows no tool card there either.
 
 **Bottom — the VITALS BAND** (`components/VitalsBand.tsx`, 2026-08-30 — the vitals left the crowded
 command bar; docs/superpowers/plans/2026-08-30-vitals-bottom-band.md is the plan). A slim full-width
@@ -836,10 +842,9 @@ inline in the return would quietly restore the bug for every consumer at once.
   vitals cells, both presentations) takes `components/RollSwap.tsx` — out-beat then keyed arrival
   in tw-animate's own vocabulary; render from the KEY, never live state; the vitals' `[&>*]` cell
   rules ride the wrapper or it becomes their subject. A surface with a PERSISTENT resident reads
-  the rule per card: the explore rail keeps its ONE About instance (title rolls, body keyed on the
-  view's title, animating only when the title actually changed — never on a manual expand) and
-  keys only the view-scoped tool card, transform-free (a materialize's scale visibly pulls a tall
-  card's top edge). HEIGHTS ease everywhere via `components/HeightEase.tsx` (every Inspector rung +
+  the rule per card: the explore rail keys only the view-scoped tool card, transform-free (a
+  materialize's scale visibly pulls a tall card's top edge; the About card that once persisted
+  beside it retired 2026-09-28). HEIGHTS ease everywhere via `components/HeightEase.tsx` (every Inspector rung +
   both explore cards): measured content, WAAPI on the roll tokens, the whole chain down to the
   panel stretched so the CARD BORDER rides the ease (one `auto` link parks a percentage height), a
   one-frame re-measure standing down for foreign animators (the pager's pinned slides,

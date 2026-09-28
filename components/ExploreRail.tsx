@@ -8,8 +8,6 @@ import GeoExplore from "@/components/GeoExplore";
 import HyperExplore from "@/components/HyperExplore";
 import LedgerPanel from "@/components/LedgerPanel";
 import TrendExplore from "@/components/TrendExplore";
-import AboutView from "@/components/AboutView";
-import { ABOUT } from "@/components/aboutCopy";
 import RailThread from "@/components/RailThread";
 import { RailShade } from "@/components/RailShade";
 import RailDock, { type TabSignal } from "@/components/RailDock";
@@ -17,14 +15,14 @@ import { exploreCards } from "@/components/railCards";
 import HeightEase from "@/components/HeightEase";
 import { useBreakpoint } from "@/components/useBreakpoint";
 
-// Per-view About copy: ONE home, components/aboutCopy.ts — shared with /about (2026-08-13).
 // Left control rail: the **explore/interact** zone. The global network filter lives in the
 // top command bar; the selected-subject dossier now lives in the right rail (`ContextCard`).
-// Every view now leads with a collapsed `AboutView` orientation card, above its ONE tool card
-// (if any): Hypergraph → HyperExplore (network → layer shell → node); Geography → GeoExplore
-// (footprint + node browser); Snapshots → LedgerPanel; History → TrendExplore (the view's
-// controls plus its roster of chart planes); the scaffolded views have no tool card, just the
-// About card.
+// The rail is the view's ONE tool card (if any): Hypergraph → HyperExplore (network → layer
+// shell → node); Geography → GeoExplore (footprint + node browser); Snapshots → LedgerPanel;
+// History → TrendExplore (the view's controls plus its roster of chart planes); the scaffolded
+// view has no tool card and the rail is empty. The About orientation card that led every rail
+// from 2026-08-08 RETIRED on 2026-09-28: prose is documentation, not interaction, and its one
+// home is /about — the command bar's ABOUT row (topbar/AboutStrip.tsx) is the in-view door.
 export default function ExploreRail() {
   const bp = useBreakpoint();
   // growIn arming — the Inspector's laneBooted pattern: the tool slot unmounts entirely on
@@ -49,12 +47,9 @@ export default function ExploreRail() {
   // hosts. `id` maps to the component to render; the manifest owns presence/order.
   //
   // THE NO-POP RULE READS PER CARD HERE, NOT PER STACK (user, 2026-09-04, second round: a
-  // stack-level RollSwap made "things that always exist disappear and re-appear" — the About
-  // card is one persistent instance across every view). The doc grammar at card scale instead:
-  // the About card's FRAME persists (React keeps the instance — no key), its title rolls and
-  // its body eases per view (AboutView's own keyed body); the TOOL is genuinely view-scoped
-  // (three different explorers, none on "soon"), so it swaps keyed with the house card
-  // materialize — no out-beat, so the slot is never held blank.
+  // stack-level RollSwap made "things that always exist disappear and re-appear"). The TOOL is
+  // genuinely view-scoped (four different explorers, none on "soon"), so it swaps keyed with
+  // the house card materialize — no out-beat, so the slot is never held blank.
   const manifest = exploreCards({ mode });
   // Each card rides its own HeightEase (user, 2026-09-04, second round: "the explorer card
   // still jumps … snaps into its new height"): the wrapper sits OUTSIDE the keyed remount —
@@ -62,12 +57,7 @@ export default function ExploreRail() {
   // old card's to the new one's while the arriving card materializes within it. flex-none on
   // the wrapper is the cards' own rule (the rail scrolls; a card never compresses).
   const renderCard: Record<string, ReactNode> = {
-    about: (
-      <HeightEase className="flex-none" growIn={booted.current}>
-        <AboutView {...ABOUT[mode]} defaultCollapsed={bp === "phone"} />
-      </HeightEase>
-    ),
-    // Phone opens BOTH cards collapsed (user, 2026-09-03): the sheet becomes a compact chooser
+    // Phone opens the card collapsed (user, 2026-09-03): the sheet becomes a compact chooser
     // that the live content-fit sizes down, and one tap opens the list and grows the sheet.
     tool: (
       <HeightEase className="flex-none" growIn={booted.current}>

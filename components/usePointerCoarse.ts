@@ -7,7 +7,7 @@ import { useEffect, useState } from "react";
 // utility in the JSX rides — so copy and touch floors can never disagree about what the pointer
 // is.
 //
-// ⚠️ SSR-FALSE BY DESIGN, resolved in an effect (the AboutView hydration lesson): the desktop
+// ⚠️ SSR-FALSE BY DESIGN, resolved in an effect (the hydration lesson in ExplorerShell's `defaultCollapsed` note): the desktop
 // rail SSRs these strings even when CSS-hidden on phone, so a window read at first render is a
 // text hydration mismatch. The one-frame "Click" a phone could paint before the effect lands is
 // invisible in practice — the phone's ghost cards live in sheets that mount on open, well after

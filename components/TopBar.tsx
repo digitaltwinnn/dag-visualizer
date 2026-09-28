@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { VIEW_ICONS } from "@/components/icons";
+import { ABOUT_ICON as AboutIcon, VIEW_ICONS } from "@/components/icons";
 import { useStore } from "@/src/store/store";
 import { displayNetwork } from "@/src/data/unlisted";
 import { cn } from "@/lib/utils";
@@ -10,7 +10,8 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import FilterPicker from "@/components/topbar/FilterPicker";
 import PulseStrip from "@/components/topbar/PulseStrip";
 import EcgMark from "@/components/topbar/EcgMark";
-import PresentationToggle from "@/components/topbar/PresentationToggle";
+import PresentationToggle, { SEG } from "@/components/topbar/PresentationToggle";
+import AboutStrip from "@/components/topbar/AboutStrip";
 import SettingsMenu from "@/components/topbar/SettingsMenu";
 import ViewPicker from "@/components/topbar/ViewPicker";
 import { NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
@@ -53,15 +54,16 @@ export default function TopBar() {
   // (gated on the policy's own canvas flag, convention 7 — never a mode list).
   const viewControls = doc == null && VIEW_POLICIES[mode].canvas;
 
-  // The bar's ONE grow-downward slot, three tenants (2026-08-30 — the PULSE strip joined the
-  // filter strip; 2026-09-28 — the phone's VIEW LIST joined both, see topbar/ViewPicker.tsx):
-  // `strip` names which row is open, null = closed. One slot makes them mutually exclusive by
-  // construction — the ECG toggles "pulse", the FILTER button "filter", the phone's view face
-  // "views", Escape and a picked chip close whichever is open. The tier effect below still
+  // The bar's ONE grow-downward slot, four tenants (2026-08-30 — the PULSE strip joined the
+  // filter strip; 2026-09-28 — the phone's VIEW LIST and the ABOUT row joined, see
+  // topbar/ViewPicker.tsx and topbar/AboutStrip.tsx): `strip` names which row is open, null =
+  // closed. One slot makes them mutually exclusive by construction — the ECG toggles "pulse",
+  // the FILTER button "filter", the phone's view face "views", the island's info button
+  // "about", Escape and a picked chip close whichever is open. The tier effect below still
   // force-closes on a viewport change to phone-width — and closes the VIEWS tenant on any tier
   // change, since its trigger exists only on the phone arm (a strip left open under a bar with no
   // control for it would be a row the reader cannot close from where it came from).
-  const [strip, setStrip] = useState<null | "filter" | "pulse" | "views">(null);
+  const [strip, setStrip] = useState<null | "filter" | "pulse" | "views" | "about">(null);
   const open = strip != null;
 
   const bp = useBreakpoint();
@@ -74,6 +76,12 @@ export default function TopBar() {
   useEffect(() => {
     if (doc) setStrip(null);
   }, [doc]);
+  // The ABOUT row's trigger lives in the view-scoped island, which stands down on the flat
+  // placeholder view — a row whose control has left is a row the reader cannot close from where
+  // it came from (the views tenant's own rule, one tier up).
+  useEffect(() => {
+    if (!viewControls) setStrip((cur) => (cur === "about" ? null : cur));
+  }, [viewControls]);
 
   // Consume the NetworkSwitch's one-shot view handoff (see its header): a network switch is a
   // hard reload, and the view you were on survives it. Runs once on mount, BEFORE the engine's
@@ -304,7 +312,7 @@ export default function TopBar() {
             name — that opens the view list in the strip (topbar/ViewPicker.tsx has the argument:
             a row of 44px icons cannot scale with the view count, and per-tier hides are a patch).
             Both stay in the DOM and CSS picks, so SSR and the first client render agree (the
-            useBreakpoint-at-first-render hydration trap, AboutView's note). The wrapper is a plain
+            useBreakpoint-at-first-render hydration trap, ExplorerShell's note). The wrapper is a plain
             flex box, not `contents`, so the grid still sees one middle item. */}
         <div className="flex justify-center min-w-0">
         <button
@@ -315,9 +323,9 @@ export default function TopBar() {
           onClick={() => setStrip((cur) => (cur === "views" ? null : "views"))}
           onKeyDown={(e) => { if (e.key === "Escape") setStrip(null); }}
           className={cn(
-            // The filter face's own recipe — a name plus its open-state wash — so the bar's two
-            // "opens a strip" faces speak one language; the chevron stays here because the
-            // slot has the width the filter's column never did.
+            // The filter face's own recipe — a name plus its open-state wash, no chevron (the
+            // phone filter face dropped its own for width, and this face pays the same: measured,
+            // the chevron's 20px is what the island's third control costs the row).
             "hidden max-[700px]:flex items-center gap-1.5 py-1.5 px-2 rounded-btn",
             "bg-transparent border-0 cursor-pointer whitespace-nowrap min-w-0",
             "hover:bg-wash-soft pointer-coarse:min-h-11",
@@ -330,13 +338,6 @@ export default function TopBar() {
             return <Icon aria-hidden className="size-4 flex-none text-primary" />;
           })()}
           <span className="text-body text-foreground truncate">{VIEWS.find((v) => v.id === mode)?.name}</span>
-          <ChevronDown
-            aria-hidden
-            className={cn(
-              "size-3.5 flex-none text-muted-foreground transition-transform motion-reduce:transition-none",
-              strip === "views" && "rotate-180",
-            )}
-          />
         </button>
         <ToggleGroup
           type="single"
@@ -405,6 +406,23 @@ export default function TopBar() {
         <span className={cn("w-px self-stretch bg-border my-1 max-[860px]:hidden", !viewControls && "hidden")} />
         <div className={cn("contents", !viewControls && "hidden")}>
           <PresentationToggle />
+          {/* ABOUT THIS VIEW — the island's third control (2026-09-28; topbar/AboutStrip.tsx has
+              the argument). It is VIEW-SCOPED like its two neighbours — it opens the current
+              view's orientation — so it rides the bracketed island and stands down with it.
+              Same segment recipe as Scene and Raw; the on-state is the strip wash the filter and
+              the ECG wear, because it opens a row rather than pressing a layer in. */}
+          <button
+            type="button"
+            aria-expanded={strip === "about"}
+            aria-controls="filter-strip"
+            title="About this view"
+            onClick={() => setStrip((cur) => (cur === "about" ? null : "about"))}
+            onKeyDown={(e) => { if (e.key === "Escape") setStrip(null); }}
+            className={cn(SEG, strip === "about" && "bg-wash-soft text-foreground")}
+          >
+            <AboutIcon aria-hidden className="size-4" />
+            <span className="sr-only">About this view</span>
+          </button>
         </div>
         <span className={cn("w-px self-stretch bg-border my-1 max-[860px]:hidden", !viewControls && "hidden")} />
 
@@ -445,6 +463,8 @@ export default function TopBar() {
               <PulseStrip />
             ) : strip === "views" ? (
               <ViewPicker onPicked={() => setStrip(null)} />
+            ) : strip === "about" ? (
+              <AboutStrip />
             ) : (
               <FilterPicker onPicked={() => setStrip(null)} />
             )}

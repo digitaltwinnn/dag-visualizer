@@ -333,8 +333,7 @@ describe("siblingSet — global snapshot slot (the OPEN set)", () => {
 });
 
 describe("siblingSet — non-pager slots", () => {
-  it("about/tool never page", () => {
-    expect(siblingSet("about", base({}))).toBeNull();
+  it("the tool card never pages", () => {
     expect(siblingSet("tool", base({}))).toBeNull();
   });
   it("a single-member set is no set (nothing to step to)", () => {

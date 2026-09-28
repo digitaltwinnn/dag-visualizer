@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { ABOUT_ICON, EXPLORE_ICON, INSTANT_ICON, iconForPick } from "@/components/icons";
+import { EXPLORE_ICON, INSTANT_ICON, iconForPick } from "@/components/icons";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import type { Mode } from "@/src/store/store";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
@@ -28,7 +28,7 @@ import { is3D } from "@/src/engine/domain/viewTransition";
 // Hue + active-flag stay with the tray builders (per-rail presentation), not here.
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-export type RailCardKind = "about" | "tool" | "context" | "instant" | "metaSnap" | "country" | "cohort" | "composition" | "node" | "snap";
+export type RailCardKind = "tool" | "context" | "instant" | "metaSnap" | "country" | "cohort" | "composition" | "node" | "snap";
 
 // ── The rail LADDER lane (Inspector's descent spine, variant-A redesign 2026-07-19) ──────────
 // Which facts-rail slot stands for each FOCUS-LADDER rung. The lane's ORDER lives in
@@ -197,18 +197,18 @@ export interface RailManifestState {
 const isNodePick = (p: PickDescriptor | null): boolean =>
   !!p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode");
 
-// LEFT rail (Explore): the "About this view" orientation card in EVERY view, plus — only where the
-// view has one — its single tool card (hyper → HyperExplore, geo → GeoExplore, ledger →
-// LedgerPanel). All are STATIC
-// tools: their subjectKeys are constants so they never read as "updated" (the tray stays a quiet
-// legend; view switches ride the separate switch-signal, not a per-card update highlight).
+// LEFT rail (Explore): the view's single tool card, only where the view has one (hyper →
+// HyperExplore, geo → GeoExplore, ledger → LedgerPanel, trend → TrendExplore). A STATIC tool:
+// its subjectKey is a constant so it never reads as "updated" (the tray stays a quiet legend;
+// view switches ride the separate switch-signal, not a per-card update highlight). The About
+// orientation card that led this manifest until 2026-09-28 moved to the command bar's ABOUT
+// row (topbar/AboutStrip.tsx) — prose is not an instrument, and neither rail is a place for it.
 export function exploreCards(s: Pick<RailManifestState, "mode">): RailCard[] {
   const hasTool = is3D(s.mode);
   // The tray shows the tool card's OWN head mark (the ONE standard EXPLORE_ICON) — it used to
   // show VIEW_ICONS[mode], which in ledger put a Layers glyph on the left tab that read as the
   // snapshot card's mark (user bug report); card head and tray icon must agree.
   return [
-    { id: "about", kind: "about", icon: ABOUT_ICON, subjectKey: "about", present: true, hint: null },
     { id: "tool", kind: "tool", icon: EXPLORE_ICON, subjectKey: "tool", present: hasTool, hint: null },
   ];
 }
@@ -343,7 +343,7 @@ export function detailsCards(s: RailManifestState): RailCard[] {
   // network above it and no ancestry pile — fall-out, not a decision.
   // The SELECTION IS UNTOUCHED: this only stops the view speaking for it, so returning to a 3D view
   // restores the whole pile in place. Gated on the views the facts scope is FOR (convention 7),
-  // and it matches what the left rail already does here — About only, no tool card.
+  // and it matches what the left rail already does here — no tool card, so no card at all.
   if (!is3D(s.mode)) return [];
   const context: RailCard = {
     id: "context",

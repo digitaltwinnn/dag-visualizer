@@ -61,11 +61,15 @@ export default function ExplorerShell({
   // Container-level hover cleanup — see the file comment. Optional: most explorers' committed
   // rows stay rendered after a click (no self-unmount hazard), so most callers omit it.
   onLeave?: () => void;
-  /** Phone starts the explorer collapsed (user, 2026-09-03) — with About collapsed too, the
-   *  Explore sheet opens as a compact two-head chooser and the live content-fit sizes it down;
-   *  one tap opens the browse list and the sheet grows with it. Same per-mount rule and same
-   *  prop-not-window-read reasoning as AboutView's `defaultCollapsed` (its note has the
-   *  hydration lesson). */
+  /** Phone starts the explorer collapsed (user, 2026-09-03): the Explore sheet opens as a
+   *  compact chooser and the live content-fit sizes it down; one tap opens the browse list and
+   *  the sheet grows with it. Passed by ExploreRail's phone branch as a PROP rather than read off
+   *  `window` here — THE HYDRATION LESSON (first paid by the retired About card): this component
+   *  also SSRs in the desktop rail (CSS-hidden on phone, but hydrated), and a window read at
+   *  first render made server and client disagree about which chevron to draw, a real hydration
+   *  error caught live. The phone sheet mounts client-only after `useBreakpoint` has resolved
+   *  (Radix portals the sheet content on open), so the initializer is stable for the one
+   *  instance that takes it. */
   defaultCollapsed?: boolean;
   children: ReactNode;
 }) {
