@@ -58,6 +58,10 @@ export interface ExplorerRowProps {
   hue?: string | null;
   /** Inside a level: one step quieter. */
   nested?: boolean;
+  /** No row in this LEVEL carries a tag, so the bar takes the tag's flexible column (2026-09-28,
+   *  user: "lots of space on their left side — any reason not to use it?"). Decided per level by
+   *  the caller, never per row: bars only compare when every one starts at the same x. */
+  wideBar?: boolean;
   /** A real-but-empty subject (a 0-node network): present, dimmed. */
   faint?: boolean;
   title?: string;
@@ -91,7 +95,7 @@ function recentGesture(): boolean {
 }
 
 export default function ExplorerRow({
-  glyph, name, nameMono, tag, bar, figure, hasFigure, nameW = 84, figureW = 40, on, hue, nested, faint, title, onClick, pair, className,
+  glyph, name, nameMono, tag, bar, figure, hasFigure, nameW = 84, figureW = 40, on, hue, nested, wideBar, faint, title, onClick, pair, className,
 }: ExplorerRowProps) {
   const el = useRef<HTMLButtonElement>(null);
   // SELECTION STAYS IN PLACE (design 2026-09-26, decision 12): the list never re-orders on a
@@ -139,7 +143,13 @@ export default function ExplorerRow({
         // The grid is data: a level's name width is a prop, so it cannot be a utility class.
         // Inside a level the bar is shorter still: the tag home there carries chips and providers,
         // and the bar is the accent, not the reading.
-        gridTemplateColumns: hasFigure ? `14px ${nameW}px minmax(0,1fr) ${nested ? 24 : 36}px ${figureW}px` : "14px minmax(0,1fr) auto",
+        // With no tags in the level the empty tag column collapses to 0 and the bar takes the
+        // rest of the row, so its length reads at a glance instead of in a 36px sliver.
+        gridTemplateColumns: hasFigure
+          ? wideBar
+            ? `14px ${nameW}px 0px minmax(36px,1fr) ${figureW}px`
+            : `14px ${nameW}px minmax(0,1fr) ${nested ? 24 : 36}px ${figureW}px`
+          : "14px minmax(0,1fr) auto",
         ...(on ? selectionHue(hue) : undefined),
         ...pair?.style,
       }}

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { PLANE_PX_W, PLANE_WORLD_W, STACK_EASE_K, arrivalPose, loneShiftPx, stackPoses } from "./domain/trendStack";
+import { PLANE_PX_W, PLANE_WORLD_W, STACK_EASE_K, arrivalPose, loneShiftPx, morePose, stackPoses } from "./domain/trendStack";
 
 // THE TREND STACK'S PER-FRAME PLACEMENT — `CalloutSync`'s sibling, and the second instance of the
 // same mechanism (2026-09-18). React renders one transparent DOM plane per network
@@ -222,6 +222,10 @@ export class TrendStackSync {
   // the origin would make every roster refresh look like an entrance.
   private _retarget(st: TrendStackState): void {
     const poses = stackPoses(st.ids, { scroll: st.scroll, focus: st.focus, narrow: st.narrow }); // event-time
+    // The sixth, unnamed plane rides the same projection (`morePose`): one more anchor, one more
+    // slot, appended behind the window so the deck's own poses stay the window's.
+    const more = morePose(st.ids, { scroll: st.scroll, focus: st.focus, narrow: st.narrow }); // event-time
+    if (more) poses.push(more);
     this._order.length = 0;
     for (let i = 0; i < poses.length; i++) {
       const p = poses[i]!;

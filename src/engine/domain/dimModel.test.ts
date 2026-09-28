@@ -526,12 +526,12 @@ it("a committed filter adds no light to member nodes — nodeEmissive has no fil
 
 describe("nodeGlow (the resting base both pools share)", () => {
   it("is the hyper base at morph=0 and the globe base at morph=1", () => {
-    expect(nodeGlow(ctx({ morph: 0 }), 0)).toBeCloseTo(0.47, 10);
-    expect(nodeGlow(ctx({ morph: 1 }), 0)).toBeCloseTo(0.37, 10);
+    expect(nodeGlow(ctx({ morph: 0 }), 0)).toBeCloseTo(0.40, 10);
+    expect(nodeGlow(ctx({ morph: 1 }), 0)).toBeCloseTo(0.31, 10);
   });
 
   it("suppresses by (1 - d*0.92)", () => {
-    expect(nodeGlow(ctx({ morph: 1 }), 0.5)).toBeCloseTo(0.37 * (1 - 0.5 * 0.92), 10);
+    expect(nodeGlow(ctx({ morph: 1 }), 0.5)).toBeCloseTo(0.31 * (1 - 0.5 * 0.92), 10);
   });
 });
 
@@ -540,28 +540,28 @@ describe("nodeGlow (the resting base both pools share)", () => {
 // from js/globe.js, not a design decision. They unify on the validator's numbers.
 describe("nodeEmissive", () => {
   it("at morph=0, no flash/dim/focus: the hyper base, floored at 0.02", () => {
-    expect(nodeEmissive(ctx({ morph: 0 }), 0, 0, 0, false)).toBeCloseTo(0.47, 10);
+    expect(nodeEmissive(ctx({ morph: 0 }), 0, 0, 0, false)).toBeCloseTo(0.40, 10);
   });
 
   it("at morph=1 with d=0: the globe base", () => {
-    expect(nodeEmissive(ctx({ morph: 1 }), 0, 0, 0, false)).toBeCloseTo(0.37, 10);
+    expect(nodeEmissive(ctx({ morph: 1 }), 0, 0, 0, false)).toBeCloseTo(0.31, 10);
   });
 
   it("suppresses glow by (1 - d*0.92) and adds the morph-scaled flash", () => {
     const c = ctx({ morph: 1 });
     const d = 0.5, flash = 1;
-    expect(nodeEmissive(c, d, flash, 0, false)).toBeCloseTo(0.37 * (1 - d * 0.92) + flash, 10);
+    expect(nodeEmissive(c, d, flash, 0, false)).toBeCloseTo(0.31 * (1 - d * 0.92) + flash, 10);
   });
 
   it("scales the flash by the morph — no flash in hyper", () => {
-    expect(nodeEmissive(ctx({ morph: 0 }), 0, 2, 0, false)).toBeCloseTo(0.47, 10);
+    expect(nodeEmissive(ctx({ morph: 0 }), 0, 2, 0, false)).toBeCloseTo(0.40, 10);
   });
 
   // The 0.02 is a GUARD, not a value the shipped bases reach: d is capped at 1, so the deepest
-  // suppression a node can take is 0.37 * 0.08. It exists so a retuned base can't drive an
+  // suppression a node can take is 0.31 * 0.08. It exists so a retuned base can't drive an
   // emissive to zero and read as a dead node.
   it("bottoms out at the fully-suppressed glow, above its own floor", () => {
-    expect(nodeEmissive(ctx({ morph: 1 }), 1, 0, 0, false)).toBeCloseTo(0.37 * 0.08, 10);
+    expect(nodeEmissive(ctx({ morph: 1 }), 1, 0, 0, false)).toBeCloseTo(0.31 * 0.08, 10);
   });
 
   it("boosts the focused node by hyper's `boost`, ignoring anyFocus", () => {
@@ -577,7 +577,7 @@ describe("nodeEmissive", () => {
   });
 
   it("does nothing extra when there's no focus target at all (isFocus and anyFocus both false)", () => {
-    expect(nodeEmissive(ctx({ morph: 0 }), 0, 0, 0, false)).toBeCloseTo(0.47, 10);
+    expect(nodeEmissive(ctx({ morph: 0 }), 0, 0, 0, false)).toBeCloseTo(0.40, 10);
   });
 });
 

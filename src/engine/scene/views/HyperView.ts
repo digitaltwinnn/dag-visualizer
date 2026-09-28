@@ -746,7 +746,9 @@ export class HyperView implements SceneView {
       // Per-hub eased sweep, staggered so the tethers reach their hubs one after another.
       const tp = Math.min(1, Math.max(0, this._tetherEntryT * 1.35 - hubIdx * 0.045));
       const tSweep = tp * tp * (3 - 2 * tp);
-      if (!frozen) m.orbit += dt * 0.03;
+      // Each network's ring system orbiting the core: 0.03 → 0.05 rad/s (user, 2026-09-28: "the node
+      // rings can be a bit faster", beside a slower whole-structure spin in the Engine).
+      if (!frozen) m.orbit += dt * 0.05;
       const a = m.orbit;
       // Scratch vector reused every frame — this runs for all 10 hubs at 60fps, so a fresh
       // Vector3 here would be ~600 throwaway allocations/sec.

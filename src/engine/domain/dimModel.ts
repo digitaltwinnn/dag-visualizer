@@ -140,7 +140,15 @@ export const focusGrow = (c: DimContext): number => viewMix(c, "grow");
 // hovered composition or cluster group) takes a FRACTION of the boost; the PRIMARY subject —
 // the one hovered or selected node — always takes all of it, so it stands out from its own
 // group. `focusWeightOf` is the one place that ranking lives; the node loops call it per node.
-export const GROUP_FOCUS = 0.45; // share of focusBoost a group member gets (FOCUS_SHARED's default)
+// 0.45 → 0.30 (2026-09-28, user: "geo, DAG, Falkenstein provider — the brightest place in all of
+// our app"): a committed cohort of 31 co-located DAG chips each took nearly half the primary
+// boost on top of the on-filter resting glow, and the stack summed its halos into one white
+// column. A member still lifts — the rung has no 3D object of its own, lit members are how it
+// appears — but at a share that keeps a dense group inside the hue range. A second step,
+// 0.30 → 0.20, the same day (user: "the focus of the whole stack when selecting a provider also
+// adds to the brightness, reduce the focus effect a bit"): the primary subject keeps the whole
+// boost, so a node picked out of the group still stands clear of it.
+export const GROUP_FOCUS = 0.20; // share of focusBoost a group member gets (FOCUS_SHARED's default)
 export const focusWeightOf = (primary: boolean, group: boolean): number =>
   primary ? 1 : group ? FOCUS_SHARED.groupShare : 0;
 
@@ -290,10 +298,14 @@ export function nodeDim(c: DimContext, raw: number, geoCc: string | null): numbe
 
 // The node emissive BASE, hyper → globe: lifted in hyper (nodes read too dim on the flat backdrop)
 // and eased down on the globe (they read too hot against the density light pools, especially the
-// dense DAG stacks) — user. One pair for every node; the metagraph pool's old 0.33 was this same
-// 0.47 with hyper's dim pre-applied (see the file header).
-const BASE_HYPER = 0.47;
-const BASE_GLOBE = 0.37;
+// dense DAG stacks) — user. One pair for every node; the metagraph pool's old 0.33 was the
+// earlier 0.47 with hyper's dim pre-applied (see the file header).
+// EASED DOWN ~15% ON BOTH (2026-09-28, user: "in dark mode the nodes are too bright; I do like the
+// neon/bloom, but the colours feel a bit saturated") — 0.47 → 0.40 and 0.37 → 0.31, beside the
+// scene lane's chroma step in `palette/identity.ts`. The bloom rows are untouched: the halo is
+// the look he likes, and it is the resting emissive feeding it that ran hot.
+const BASE_HYPER = 0.40;
+const BASE_GLOBE = 0.31;
 
 // A node's glow before the floor and the focus terms — the dim's own suppression of the base.
 // Exported for its own spec (the resting base both pools share); nodeEmissive composes on it.

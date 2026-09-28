@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   clampScroll,
-  pagerVisible,
   FOCUS_LEAN,
   OPACITY_FALLOFF,
   PLANE_GAP,
@@ -26,6 +25,9 @@ import {
   staggerCentre,
   stackPoses,
   stepX,
+  MORE_ID,
+  moreCount,
+  morePose,
   arrivalPose,
   fitDistance,
   PLANE_FIT,
@@ -62,17 +64,18 @@ describe("stackPoses", () => {
     expect(p[4].opacity).toBeCloseTo(1 - OPACITY_FALLOFF * 4);
   });
 
-  it("STAGGERS up and to the right, so no header strip is covered", () => {
-    // ⚠️ The rule this replaces (every plane at x = 0, y = PLANE_Y) is what made the built view
-    // read as ONE chart with ghost headers behind it — see the module header. Each receding slot
-    // steps by exactly one PLANE_STEP_X / PLANE_STEP_Y.
+  it("STAGGERS up, so no header strip is covered — and straight up, so the deck stays centred", () => {
+    // ⚠️ The rule this replaces (every plane at y = PLANE_Y) is what made the built view read as
+    // ONE chart with ghost headers behind it — see the module header. Each receding slot steps by
+    // exactly one PLANE_STEP_X / PLANE_STEP_Y, and the across-step is 0 since 2026-09-28 (user:
+    // "keep it centred") — the vertical step alone uncovers the headers.
     const p = stackPoses(IDS, { scroll: 0, focus: null });
     for (let i = 1; i < p.length; i++) {
       expect(p[i].x - p[i - 1].x).toBeCloseTo(PLANE_STEP_X);
       expect(p[i].y - p[i - 1].y).toBeCloseTo(PLANE_STEP_Y);
     }
-    // UP and RIGHT, not down and left: the header band sits above the plane in front of it.
-    expect(PLANE_STEP_X).toBeGreaterThan(0);
+    // UP, not down: the header band sits above the plane in front of it. And not sideways.
+    expect(PLANE_STEP_X).toBe(0);
     expect(PLANE_STEP_Y).toBeGreaterThan(0);
   });
 
@@ -87,7 +90,8 @@ describe("stackPoses", () => {
     // Nearer the origin than a block-centred stagger would put it — and strictly so.
     const blockCentred = (p.length - 1) / 2;
     expect(c).toBeLessThan(blockCentred);
-    expect(Math.abs(p[0].x)).toBeLessThan(blockCentred * PLANE_STEP_X);
+    // (Measured on the rise alone since the across-step went to 0 — the x claim would be 0 < 0.)
+    expect(Math.abs(p[0].y - PLANE_Y)).toBeLessThan(blockCentred * PLANE_STEP_Y);
     // …but not ON the origin: the index still has to fit above and beside it.
     expect(STAGGER_ANCHOR).toBeGreaterThan(0);
     expect(STAGGER_ANCHOR).toBeLessThan(1);
@@ -194,6 +198,44 @@ describe("stackPoses", () => {
 
   it("an empty roster yields no poses rather than throwing", () => {
     expect(stackPoses([], { scroll: 0, focus: null })).toEqual([]);
+  });
+});
+
+// ── THE SIXTH, UNNAMED PLANE (2026-09-28) ────────────────────────────────────────────────────
+// The window is a depth budget; this is the one statement that the roster continues behind it.
+describe("morePose — the hint that the deck continues", () => {
+  it("is absent while the roster fits the window, INCLUDING exactly one full window", () => {
+    for (const n of [0, 1, VISIBLE_PLANES - 1, VISIBLE_PLANES]) {
+      expect(morePose(IDS.slice(0, n), { scroll: 0, focus: null })).toBeNull();
+      expect(moreCount(IDS.slice(0, n), 0)).toBe(0);
+    }
+  });
+  it("appears the moment one plane does not fit, and counts what is behind the deck", () => {
+    expect(morePose(IDS, { scroll: 0, focus: null })).not.toBeNull();
+    expect(moreCount(IDS, 0)).toBe(IDS.length - VISIBLE_PLANES);
+    // Paged to the end, nothing is behind — and the count clamps exactly as the window does.
+    expect(moreCount(IDS, 99)).toBe(0);
+    expect(morePose(IDS, { scroll: 99, focus: null })).toBeNull();
+  });
+  it("sits one slot behind the last visible plane, at the stack's own falloff, and is never interactive", () => {
+    const window = stackPoses(IDS, { scroll: 0, focus: null });
+    const last = window[window.length - 1];
+    const hint = morePose(IDS, { scroll: 0, focus: null })!;
+    expect(hint.id).toBe(MORE_ID);
+    expect(hint.z).toBeCloseTo(last.z - PLANE_GAP);
+    expect(hint.x).toBeCloseTo(last.x + PLANE_STEP_X);
+    expect(hint.y).toBeCloseTo(last.y + PLANE_STEP_Y);
+    expect(hint.scale).toBeCloseTo(last.scale - SCALE_FALLOFF);
+    expect(hint.interactive).toBe(false);
+  });
+  it("holds its slot through a focus re-deal — the deck's cards move, the hint does not", () => {
+    const rest = morePose(IDS, { scroll: 0, focus: null })!;
+    const dealt = morePose(IDS, { scroll: 0, focus: "elpaca" })!;
+    expect(dealt).toEqual(rest);
+  });
+  it("wears an id no network can — and the window's poses never carry it", () => {
+    expect(IDS).not.toContain(MORE_ID);
+    expect(stackPoses(IDS, { scroll: 0, focus: null }).map((p) => p.id)).not.toContain(MORE_ID);
   });
 });
 
@@ -393,27 +435,6 @@ describe("clampScroll — one rule for the stack and its pager", () => {
   });
 });
 
-// ⚠️ THE PAGER'S VISIBILITY IS THE PLANK'S RULE, NOT A JSX PREDICATE (2026-09-19):
-// "an axis with nothing to navigate is ABSENT, not disabled". It lives here beside the clamp so
-// the control and the geometry agree about both questions, and so the two boundaries — exactly a
-// full window, and one plane past it — are pinned rather than eyeballed in a component.
-describe("pagerVisible — an axis with nothing to navigate is absent", () => {
-  it("is absent for a roster that fits, INCLUDING exactly one full window", () => {
-    for (const n of [0, 1, VISIBLE_PLANES - 1, VISIBLE_PLANES]) expect(pagerVisible(n)).toBe(false);
-  });
-
-  it("appears the moment one plane does not fit", () => {
-    expect(pagerVisible(VISIBLE_PLANES + 1)).toBe(true);
-    expect(pagerVisible(VISIBLE_PLANES + 6)).toBe(true);
-  });
-
-  it("agrees with the clamp about whether there is anywhere to go", () => {
-    for (const n of [0, 1, VISIBLE_PLANES, VISIBLE_PLANES + 1, VISIBLE_PLANES + 4]) {
-      expect(pagerVisible(n)).toBe(clampScroll(n, Number.MAX_SAFE_INTEGER) > 0);
-    }
-  });
-});
-
 describe("scrollToKeep — a re-rank may not take away the card the reader put in front", () => {
   const ELEVEN = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"];
   // The same eleven re-ranked by another measure: "b" falls from 2nd to 9th.
@@ -497,8 +518,9 @@ describe("stepX — the across-stagger is a desktop thing (user, 2026-09-26)", (
       expect(narrow[i]!.z).toBe(wide[i]!.z);
       expect(narrow[i]!.scale).toBe(wide[i]!.scale);
     }
-    // And the default is the desktop stagger, so nothing that never passes the flag moved.
-    expect(wide.some((p) => p.x !== 0)).toBe(true);
+    // The desktop deck stacks straight up too since 2026-09-28 (`PLANE_STEP_X` = 0), so the two
+    // tiers agree on x — the flag now only guards the day the constant is re-opened.
+    for (let i = 0; i < wide.length; i++) expect(wide[i]!.x + 0).toBe(0);
   });
 });
 

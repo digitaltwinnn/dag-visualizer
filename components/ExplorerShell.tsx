@@ -40,6 +40,7 @@ export default function ExplorerShell({
   hint,
   onLeave,
   defaultCollapsed = false,
+  aside,
   children,
 }: {
   id: string;
@@ -61,12 +62,20 @@ export default function ExplorerShell({
   // Container-level hover cleanup — see the file comment. Optional: most explorers' committed
   // rows stay rendered after a click (no self-unmount hazard), so most callers omit it.
   onLeave?: () => void;
-  /** Phone starts the explorer collapsed (user, 2026-09-03) — with About collapsed too, the
-   *  Explore sheet opens as a compact two-head chooser and the live content-fit sizes it down;
-   *  one tap opens the browse list and the sheet grows with it. Same per-mount rule and same
-   *  prop-not-window-read reasoning as AboutView's `defaultCollapsed` (its note has the
-   *  hydration lesson). */
+  /** Start collapsed. No caller passes it since 2026-09-28 — the phone opened the explorer
+   *  collapsed from 2026-09-03 so the Explore sheet read as a compact two-head chooser beside the
+   *  About card, and that reason left with the card. It stays a PROP rather than a `window` read
+   *  here — THE HYDRATION LESSON (first paid by the retired About card): this component
+   *  also SSRs in the desktop rail (CSS-hidden on phone, but hydrated), and a window read at
+   *  first render made server and client disagree about which chevron to draw, a real hydration
+   *  error caught live. The phone sheet mounts client-only after `useBreakpoint` has resolved
+   *  (Radix portals the sheet content on open), so the initializer is stable for the one
+   *  instance that takes it. */
   defaultCollapsed?: boolean;
+  /** Passed to the head's TITLE row, right-aligned (CardHead's panel `aside`) — where the right
+   *  rail's cards put theirs. It rode the eyebrow row for a round while the titles were
+   *  "X breakdown" and too wide to share the row (2026-09-28). */
+  aside?: ReactNode;
   children: ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
@@ -81,6 +90,7 @@ export default function ExplorerShell({
           icon={EXPLORE_ICON}
           title={title}
           eyebrow="Explore"
+          aside={aside}
           collapsed={collapsed}
           onToggle={() => setCollapsed((c) => !c)}
         />

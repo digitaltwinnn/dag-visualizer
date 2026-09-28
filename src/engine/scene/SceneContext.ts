@@ -61,6 +61,37 @@ export function joinBloom(o: THREE.Object3D): void {
   o.layers.enable(BLOOM_LAYER);
 }
 
+/**
+ * THE OVERLAY LAYER — scene text that must NOT bloom (2026-09-28, user: "I don't want the text to
+ * bloom", on the gather legend). On the dark ground the bloom is a whole-frame pass, so anything
+ * the main chain draws above the threshold halos, text included. A member of this layer is left
+ * out of every composer pass (`layers.set`, so it leaves layer 0) and drawn by `renderFrame` in one
+ * plain render AFTER the composer, straight onto the finished frame: crisp on both grounds, still
+ * a scene object that rides group transforms and material opacity. It draws over everything —
+ * right for a legend above the staging grids, and the reason membership is opt-in, one mark at a
+ * time. Members should set `toneMapped = false`: the composer's OutputPass tone-maps the scene,
+ * and this render goes around it.
+ */
+export const OVERLAY_LAYER = 2;
+// The members, so the pass can skip itself when none is showing (the legend is visible only
+// through a gather) — a full-scene render every frame to draw nothing is the cost it avoids.
+const overlayMembers = new Set<THREE.Object3D>();
+export function joinOverlay(o: THREE.Object3D): void {
+  o.layers.set(OVERLAY_LAYER);
+  overlayMembers.add(o);
+}
+export function leaveOverlay(o: THREE.Object3D): void {
+  overlayMembers.delete(o);
+}
+function overlayShowing(): boolean {
+  for (const o of overlayMembers) {
+    let n: THREE.Object3D | null = o;
+    while (n && n.visible) n = n.parent;
+    if (n === null) return true; // every ancestor up to the root is visible
+  }
+  return false;
+}
+
 // True only while the selective MARK pass is rendering (paper frames; see renderFrame). A member
 // whose main-pass ink is too dark to halo — the chamber's bands and tiles are ink on paper, where
 // geo's chips get free sub-pass brightness from their env sheen — checks this in onBeforeRender
@@ -365,6 +396,7 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     if (!on) {
       if (sel) sel.mix.enabled = false;
       composer.render();
+      drawOverlay();
       return;
     }
     ensureSel();
@@ -385,6 +417,27 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     scene.background = bg;
 
     composer.render();
+    drawOverlay();
+  }
+
+  // The OVERLAY_LAYER's own render (see its note): one plain pass of that layer alone, onto the
+  // composer's finished frame. No clear (the frame is what it draws over), depth cleared (the
+  // composer's last quad is not scene depth), no background. Every saved field is restored, so
+  // the next frame starts from exactly the state the engine set up.
+  function drawOverlay() {
+    if (!overlayShowing()) return;
+    const mask = camera.layers.mask;
+    const ac = renderer.autoClear;
+    const bg = scene.background;
+    renderer.autoClear = false;
+    scene.background = null;
+    camera.layers.set(OVERLAY_LAYER);
+    renderer.setRenderTarget(null);
+    renderer.clearDepth();
+    renderer.render(scene, camera);
+    camera.layers.mask = mask;
+    scene.background = bg;
+    renderer.autoClear = ac;
   }
 
   // The caller (engine) owns the resize listener so it can be removed on dispose.

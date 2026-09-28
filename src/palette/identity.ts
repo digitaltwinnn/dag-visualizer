@@ -13,7 +13,9 @@ import type { Theme } from "@/src/theme/resolve";
 // values — byte-identical, pinned by identity.test.ts's "theme-lane constants" — every existing
 // caller (identityHudHex, identitySceneHex's default) depends on these never moving.
 export const SCENE_L = 0.68;
-export const SCENE_C = 0.20;
+// 0.20 → 0.17 on 2026-09-28 (user: the dark scene's colours "feel a bit saturated") — a deliberate
+// retune of the pinned dark lane, with the pin in identity.test.ts moved in the same commit.
+export const SCENE_C = 0.17;
 // HUD lane L/C. Lower L + higher C than the original 0.80/0.15 (which read washed-out / pale on the
 // dark glass) — closer to the scene's vividness while staying light enough to be legible as a small
 // dot/chip on the panel surface. Tuned visually. DARK-theme values.

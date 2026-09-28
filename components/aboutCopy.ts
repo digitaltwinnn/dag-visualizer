@@ -1,13 +1,14 @@
 // The per-view "About this view" copy — ONE home (user, 2026-08-13: "can't we re-use the about
-// card?"). Two consumers: the left rail's AboutView card (every view, collapsed by default) and
-// the /about page's "What you can explore" section, which used to carry its own parallel blurbs.
+// card?"). Two consumers: the command bar's ABOUT row (`topbar/AboutStrip.tsx`, since 2026-09-28
+// — before that the left rail's About card) and the /about page's "What you can explore"
+// section, which used to carry its own parallel blurbs.
 // The page's old constraint — plain words a reader who has never seen the app can parse — is
 // carried by the copy rules below, which scrubbed the internal vocabulary out of these lines on
 // 2026-08-12; that is what made the sharing possible.
 import type { Mode } from "@/src/store/store";
 
-// Per-view "About this view" copy — one orientation card at the top of the left rail in every
-// view (collapsed by default). Built views carry no caption; the scaffolded (SOON) views do.
+// Per-view "About this view" copy — the bar's orientation row, one per view. Built views carry
+// no caption; the scaffolded (SOON) view does.
 //
 // COPY RULE (user, 2026-08-12): About says what you can FIND OUT here and why it is worth
 // knowing — never what the view LOOKS like. The user is already looking at it, so a sentence

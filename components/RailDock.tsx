@@ -6,7 +6,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { ListTree, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, X, type LucideIcon } from "lucide-react";
+import { ListTree, ChevronLeft, ChevronRight, X, type LucideIcon } from "lucide-react";
 import { EXPLORE_ICON } from "@/components/icons";
 import { useStore } from "@/src/store/store";
 import { useSceneYield } from "@/components/RailShade";
@@ -15,7 +15,7 @@ import { useSceneYield } from "@/components/RailShade";
 // dot↔glyph morph, on the edge tabs AND the phone dock halves): the tray is a quiet LEGEND of the
 // cards the sheet currently hosts — one `VIEW_ICONS`/`ABOUT_ICON` mark per hosted card, muted at
 // rest. `active` marks a card that updated while the sheet was closed (unseen): its icon goes
-// bold/vivid in the card's identity `hue` and breathes on the shared dot-beat heartbeat until the
+// bold/vivid in the card's identity `hue` — colour alone, no beat (2026-09-28) — until the
 // sheet opens (the caller clears the actives on open; the icons themselves stay — they are the
 // legend, not the alert).
 export type TabSignal = { id: string; icon: LucideIcon; hue?: string; active?: boolean };
@@ -56,7 +56,7 @@ export function usePulseWindow(key: unknown): { pulse: number; live: boolean } {
 // `signals`: the dock's icon TRAY (see `TabSignal` above) — a quiet legend of the hosted cards
 // (muted icons at rest, on the edge tab as a vertical stack under the chevron, on the phone dock
 // half as a horizontal row after the label), with `active` entries vivid/identity-hued and
-// breathing (`dot-beat`; reduced motion → static vivid, no beat). PURELY visual: never opens the
+// still (the beat they breathed on went 2026-09-28 — colour is the whole cue). PURELY visual: never opens the
 // sheet itself (Global Constraint — no auto-open on a pick; the user always taps the trigger).
 // Presentation-only data (icon component + a CSS colour + the active flag), so RailDock stays
 // generic — each caller owns its card→icon/hue mapping and its seen-tracking (clearing actives
@@ -112,6 +112,8 @@ export default function RailDock({
   open: openProp,
   sheetPx,
   onSheetPx,
+  seedPx,
+  exchange,
   signalKey,
   onCoverPx,
 }: {
@@ -143,6 +145,15 @@ export default function RailDock({
   // stays store-free — it just reads/writes through these props.
   sheetPx?: number | null;
   onSheetPx?: (px: number | null) => void;
+  // AN EXCHANGE (phone, 2026-09-28 — user: "when I switch from explore to vitals it fully
+  // collapses and then expands again; take the new section's height into account"): the two
+  // props that turn two sheets' entry-and-exit into ONE height motion. `seedPx` is the height
+  // the entry STARTS from — the caller passes the other docks' published covers, so a sheet
+  // opening while another was up begins at that sheet's height and eases to its own fit instead
+  // of growing from the dock. `exchange` says another dock is taking over, so the closing sheet
+  // unmounts at once rather than playing its 420ms shrink underneath the arriving one.
+  seedPx?: number | null;
+  exchange?: boolean;
   // TABLET switch-signal carrier: RailThread (the desktop view/filter-switch pulse's home) is
   // desktop-only, so below 1100px the switch had no visible carrier. The caller passes the SAME
   // subject key RailThread uses (`${mode}|${filter}`) and RailDock plays the SAME travelling
@@ -191,8 +202,11 @@ export default function RailDock({
   // DRAG-chosen height alone, and a drag wins over the fit until the sheet fully closes
   // (`phoneSheetPx` resets there, so every open re-fits). Height changes ride the sheet's own
   // 380ms spring transition below, so growth eases; the FIRST measure lands in a layout effect
-  // before paint, so opening never plays a 60vh→fit settle. Ceiling at the 60vh default —
-  // taller content scrolls, exactly as before.
+  // before paint, so opening never plays a 60vh→fit settle. CEILING AT THE EXPANDED SNAP
+  // (user, 2026-09-28: "for explore it's much smaller than the card") — the same
+  // viewport-minus-140 cap the drag's expanded detent uses, so a card fits whole whenever it
+  // can without covering the top bar, and only a card taller than that scrolls. The 60vh
+  // ceiling it replaced dated from the two-head chooser, when the sheet had little to show.
   // ⚠️ A CALLBACK REF AS STATE, not a ref — the same portal trap the canvas-cover publisher
   // below records: the sheet's content mounts a commit LATER than the `open` that reveals it,
   // so an effect keyed on `open` alone runs against null and fits nothing (measured: the sheet
@@ -218,9 +232,27 @@ export default function RailDock({
   // the ref callback was tried between the two: an inline arrow ref refires every render and
   // clobbers React's own style writes — state is the only clean owner of this height.)
   const [entry, setEntry] = useState<null | "pre" | "grow">(null);
+  const entryRef = useRef(entry);
+  entryRef.current = entry;
+  // ⚠️ THE SEED IS CAPTURED ON THE OPEN FLIP, in this layout effect's own closure. The closing
+  // dock publishes its cover as 0 in the SAME commit's passive effects, so by the time this
+  // sheet's content renders the store already reads 0 and a seed taken then starts the entry
+  // from the dock (measured: 427 → 25 → 257). The render that flips `open` still saw the other
+  // dock's height, and that is the value the entry starts from.
+  const seedRef = useRef(0);
   useLayoutEffect(() => {
-    if (isBarHalf && open) setEntry("pre");
+    if (isBarHalf && open) {
+      seedRef.current = seedPx ?? 0;
+      setEntry("pre");
+    }
+    // `seedPx` is read on the flip only, on purpose (the note above).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, isBarHalf]);
+  // The content-follow flag (see `apply` in the fit effect below).
+  const [tracking, setTracking] = useState(false);
+  const trackT = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastTick = useRef(0);
+  useEffect(() => () => { if (trackT.current) clearTimeout(trackT.current); }, []);
   // THE EXIT MIRRORS THE ENTRY (user, 2026-09-03: "appears nicely but disappears immediately"):
   // the sheet shrinks back into the dock, then unmounts. It has to be a LAGGED unmount rather
   // than a close-side animation, because a close can arrive from outside this component's own
@@ -238,7 +270,9 @@ export default function RailDock({
   const [prevOpen, setPrevOpen] = useState(open);
   if (open !== prevOpen) {
     setPrevOpen(open);
-    if (isBarHalf && !open) setExiting(true);
+    // An EXCHANGE skips the shrink: the arriving sheet starts at this one's height (`seedPx`
+    // on its side), so the exit would only ever play hidden behind it.
+    if (isBarHalf && !open && !exchange) setExiting(true);
     if (open) setExiting(false);
   }
   useEffect(() => {
@@ -256,8 +290,24 @@ export default function RailDock({
     // number, and its excess showed up as a band of dead glass under the last card).
     const CHROME = 46;
     const apply = () => {
-      const def = Math.round(window.innerHeight * 0.6);
-      setFitPx(Math.min(def, Math.max(170, fitEl.offsetHeight + CHROME)));
+      const cap = Math.min(Math.round(window.innerHeight * 0.8), window.innerHeight - 140); // = expandedPx
+      setFitPx(Math.min(cap, Math.max(170, fitEl.offsetHeight + CHROME)));
+      // CONTENT THAT IS ITSELF ANIMATING IS FOLLOWED, NOT EASED (user, 2026-09-28: the card's
+      // collapse "doesn't animate properly"). A card collapsing runs HeightEase's 650ms, and the
+      // observer fires every frame of it; each tick re-targeted the sheet's own 380ms transition,
+      // so the glass lagged and stuttered behind the card. Two ticks inside one short window mean
+      // the content is moving on a clock of its own, and the sheet then tracks it frame by frame
+      // with its transition suspended (`tracking` → `!transition-none`, the drag's own device),
+      // releasing a beat after the ticks stop. A one-shot change (a drill swapping the list) is a
+      // single tick and keeps the eased transition. Ticks during the entry never count — the
+      // observer's own first notification would otherwise cancel the grow.
+      const now = performance.now();
+      if (entryRef.current === null && now - lastTick.current < 120) {
+        setTracking(true);
+        if (trackT.current) clearTimeout(trackT.current);
+        trackT.current = setTimeout(() => setTracking(false), 160);
+      }
+      lastTick.current = now;
     };
     apply();
     // Release the grow only after a zero frame has PAINTED (double-rAF) — releasing in this same
@@ -276,8 +326,9 @@ export default function RailDock({
       setEntry(null);
     };
   }, [open, isBarHalf, fitEl]);
-  // Drag beats fit; fit beats the CSS default; the entry's and the exit's zeros beat both.
-  const heightPx = isBarHalf ? (entry === "pre" || exiting ? 0 : sheetPx ?? fitPx) : null;
+  // Drag beats fit; fit beats the CSS default; the exit's zero beats both, and the entry starts
+  // from the seed (another dock's height on an exchange, else the dock's own zero).
+  const heightPx = isBarHalf ? (exiting ? 0 : entry === "pre" ? seedRef.current : sheetPx ?? fitPx) : null;
   const handleOpenChangeRef = useRef(handleOpenChange);
   handleOpenChangeRef.current = handleOpenChange;
 
@@ -298,21 +349,49 @@ export default function RailDock({
   const [sheetEl, setSheetEl] = useState<HTMLDivElement | null>(null);
   const onCoverRef = useRef(onCoverPx);
   onCoverRef.current = onCoverPx;
-  const covering = open && shellVisible && (sheetSide ?? side) !== "bottom";
+  const isBottom = (sheetSide ?? side) === "bottom";
+  const covering = open && shellVisible && !isBottom;
   useEffect(() => {
+    if (isBottom) return; // the bottom arm publishes its HEIGHT below, from state
+    // The SIDE arm's publisher, captured for its own release — the bottom arm's note has why: one
+    // RailDock survives the tier step with swapped props, so at cleanup the ref may already hold
+    // the other arm's callback and a zero sent through it lands on the wrong cover.
+    const cover = onCoverRef.current;
     if (!covering || !sheetEl) {
-      onCoverRef.current?.(0);
+      cover?.(0);
       return;
     }
-    const publish = () => onCoverRef.current?.(Math.round(sheetEl.offsetWidth));
+    const publish = () => cover?.(Math.round(sheetEl.offsetWidth));
     publish();
     const ro = new ResizeObserver(publish);
     ro.observe(sheetEl);
     return () => {
       ro.disconnect();
-      onCoverRef.current?.(0);
+      cover?.(0);
     };
-  }, [covering, sheetEl]);
+  }, [covering, sheetEl, isBottom]);
+  // ── Canvas cover (phone) — the HEIGHT this bottom sheet takes (2026-09-28) ───────────────
+  // Published from STATE, not measured: `heightPx` is the sheet's target (0 while the grow is
+  // armed and while it exits, the fit or the drag otherwise), and the Engine eases the scene's
+  // shift toward it on its own clock — publishing every ResizeObserver tick of the 550ms grow
+  // would have the projection chase the glass. Same callback as the side arm's width: the dock
+  // reports the dimension it takes, the caller says which cover it is.
+  useEffect(() => {
+    if (!isBottom) return;
+    onCoverRef.current?.(open && shellVisible ? (heightPx ?? 0) : 0);
+  }, [isBottom, open, shellVisible, heightPx]);
+  // The release must reach the BOTTOM cover's own publisher. ⚠️ Not `onCoverRef.current` at cleanup
+  // time (found 2026-09-28, user: "works for vitals, but not for explorer"): ExploreRail and
+  // Inspector keep ONE RailDock across the phone→tablet step and only swap its props, so when
+  // `isBottom` flips false the ref already holds the TABLET side-sheet callback — the zero went to
+  // the left/right cover and the phone's bottom cover stayed up, holding the scene shifted on a
+  // desktop with no sheet. The Vitals dock unmounts off phone, which is why it never showed.
+  // Captured when the bottom arm starts, released through the same function.
+  useEffect(() => {
+    if (!isBottom) return;
+    const publish = onCoverRef.current;
+    return () => publish?.(0);
+  }, [isBottom]);
 
   // ── Tap-outside dismiss (phone bar-half only, user 2026-08-15) ─────────────────────────────
   // A TAP on the scene collapses the open bottom sheet, the same dismissal the bar-half toggle
@@ -381,12 +460,25 @@ export default function RailDock({
   // today's tap-to-collapse. Reduced motion: the snap is instant (the transition class is
   // motion-reduce-suppressed); the drag itself is direct manipulation and stays.
   const [dragging, setDragging] = useState(false);
+  // THE SPRING IS THE DRAG RELEASE'S ALONE (user, 2026-09-28: "the transition is just too
+  // aggressive" — content re-fits and the entry grow rode the same overshooting curve, so a
+  // drill into a longer list landed 30px past its height and settled back). A finger letting go
+  // wants the detent physics; content arriving does not. `snapping` is true for one snap's
+  // clock after a release, and only then does the height ride `--ease-spring`.
+  const [snapping, setSnapping] = useState(false);
+  const snapT = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const armSnap = () => {
+    setSnapping(true);
+    if (snapT.current) clearTimeout(snapT.current);
+    snapT.current = setTimeout(() => setSnapping(false), 400);
+  };
+  useEffect(() => () => { if (snapT.current) clearTimeout(snapT.current); }, []);
   const drag = useRef<{ startY: number; startH: number; moved: boolean; samples: { t: number; y: number }[]; el: HTMLElement } | null>(null);
   const expandedPx = () => Math.min(Math.round(window.innerHeight * 0.8), window.innerHeight - 140);
   const defaultPx = () => Math.round(window.innerHeight * 0.6); // = the CSS h-[60vh]
   const MIN_PX = 90;
   // Rubber-band past the detent range (user, 2026-08-15 — the native "final touches"): beyond
-  // [MIN_PX, expanded] the height keeps following with progressive resistance toward a short
+  // [MIN_PX, expanded] the height keeps tracking with progressive resistance toward a short
   // asymptote instead of hard-clamping, and the release snap pulls it back on the spring. Same
   // curve as RailPager's — identity-sloped at 0, never reaching the asymptote.
   const RUBBER_PX = 36;
@@ -450,6 +542,7 @@ export default function RailDock({
       return;
     }
     const exp = expandedPx();
+    armSnap();
     onSheetPx?.(Math.abs(hp - def) <= Math.abs(hp - exp) ? def : exp);
   };
   // A completed drag also fires a click on the grabber — swallow it so it doesn't re-collapse.
@@ -481,8 +574,9 @@ export default function RailDock({
     );
 
   // The icon TRAY (see the `signals` prop doc): the hosted cards' legend. Muted at rest; an
-  // `active` (updated-unseen) icon goes vivid in its identity hue + breathes on the shared
-  // dot-beat heartbeat (reduced motion → static vivid). Vertical stack on the edge tab,
+  // `active` (updated-unseen) icon goes vivid in its identity hue and STAYS STILL (user,
+  // 2026-09-28, tablet and phone: "colour AND movement when they are updated; only colour is
+  // enough" — the dot-beat heartbeat it breathed on is gone, the compact dot's too). Vertical stack on the edge tab,
   // horizontal row on the phone dock half. The frame is FIXED-SIZE for 3 icons (user refinement:
   // the two edge trays mirror each other's geometry exactly and never grow/shrink as hosted
   // cards change — fewer icons = empty slots), sized 3 × 14px icons + 2 gaps. Renders whenever
@@ -493,7 +587,7 @@ export default function RailDock({
     firstActive ? (
       <span
         aria-hidden="true"
-        className="size-1.5 flex-none rounded-full animate-dot-beat motion-reduce:animate-none"
+        className="size-1.5 flex-none rounded-full"
         style={{ background: firstActive.hue ?? "var(--primary)" }}
       />
     ) : null
@@ -512,7 +606,7 @@ export default function RailDock({
           className={cn(
             "size-3.5 flex-none",
             active
-              ? "animate-dot-beat motion-reduce:animate-none drop-shadow-[0_0_4px_currentColor]"
+              ? "drop-shadow-[0_0_4px_currentColor]"
               : "text-muted-foreground opacity-60",
           )}
           style={active ? { color: hue ?? "var(--primary)" } : undefined}
@@ -585,15 +679,12 @@ export default function RailDock({
           >
             {barIcon ?? (side === "left" ? <EXPLORE_ICON size={18} strokeWidth={1.75} aria-hidden="true" /> : <ListTree size={18} strokeWidth={1.75} aria-hidden="true" />)}
             <span>{label}</span>
-            {/* [icons legend] | [open control]: the tray, then the hairline, then the trailing
-                open/collapse chevron (up = opens a sheet above; down while open = collapses). */}
+            {/* [icons legend], and NO trailing chevron (user, 2026-09-28): the icon and the word
+                already read as a button, the open half says so with its wash and top accent, and
+                the sheet's own grabber says it drags. The ∧/∨ restated the open state and cost the
+                tray its width. */}
             {tray}
             {trayRule}
-            {open ? (
-              <ChevronDown size={16} className="flex-none opacity-70" aria-hidden />
-            ) : (
-              <ChevronUp size={16} className="flex-none opacity-70" aria-hidden />
-            )}
             {/* Hosted-card UPDATE signal only: a travelling pulse along the half's TOP edge — the
                 shared vertical recipe rotated onto the horizontal edge (the mask/geometry live in
                 the carrier's local coords, so the soft tips + sweep rotate with it), sweeping from
@@ -668,10 +759,12 @@ export default function RailDock({
           data-dim={yielding ? "" : undefined}
           // Phone bar-half variant: the sheet sits DIRECTLY ABOVE the persistent dock bar (never
           // covers it — the bar is its visible header/handle), so offset it up by the bar height.
-          // `!` beats the base `bottom-0` from the bottom-side placement in sheet.tsx. Snapping
-          // animates the height on the shared `--ease-spring` (user, 2026-08-15 — the detent
-          // lands with the same physics as the pager; suspended while the finger drags, instant
-          // under reduced motion).
+          // `!` beats the base `bottom-0` from the bottom-side placement in sheet.tsx. A drag's
+          // release snap animates the height on the shared `--ease-spring` (user, 2026-08-15 —
+          // the detent lands with the same physics as the pager; suspended while the finger
+          // drags, instant under reduced motion). ONLY the snap (2026-09-28, `snapping`): the
+          // entry grow takes the house entrance curve and a content re-fit a plain ease-out,
+          // because a spring overshoots and content arriving is not a finger letting go.
           // `opacity` rides the same list so the scene-yield dim isn't stranded
           // by this element-level `transition-property` — it takes the sheet's own tempo
           // rather than the rails' 0.3s, which is the honest trade for not fighting the cascade.
@@ -683,7 +776,7 @@ export default function RailDock({
                   // grow above ('!': the animate utility is a (0,2,0) variant, the documented
                   // escape). Reduced motion collapses the grow too (transition-none).
                   "!animate-none",
-                  dragging
+                  dragging || tracking
                     ? "!transition-none"
                     : cn(
                         "motion-reduce:!transition-none",
@@ -693,10 +786,11 @@ export default function RailDock({
                         // quicker than the 550ms entry, per standard motion practice.
                         exiting
                           ? "transition-[height,opacity] duration-[420ms] ease-out"
-                          : cn(
-                              "transition-[height,opacity] ease-[var(--ease-spring)]",
-                              entry === "grow" ? "duration-[550ms]" : "duration-[380ms]",
-                            ),
+                          : snapping
+                            ? "transition-[height,opacity] ease-[var(--ease-spring)] duration-[380ms]"
+                            : entry === "grow"
+                              ? "transition-[height,opacity] duration-[550ms] ease-[var(--ease-roll)]"
+                              : "transition-[height,opacity] duration-[380ms] ease-out",
                       ),
                 )
               : undefined

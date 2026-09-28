@@ -61,10 +61,13 @@ export default function TablePager({
     <div className="flex-none pt-1.5">
       <div className="flex items-center justify-between gap-2">
       <span className="min-w-0 truncate text-micro tracking-caps uppercase tabular-nums text-muted-foreground">
-        {compact ? fmtCount(total) : `${from}–${to} of ${fmtCount(total)}`}
+        {/* A compact pager WITH a scope states the scope alone (2026-09-28, user on the snapshot
+            explorer's "52 · last 11 min": "remove the 52 — the time is what matters, 52 has no real
+            meaning here"). The count stays wherever it is the statement (the full pager's range). */}
+        {compact && scope ? null : compact ? fmtCount(total) : `${from}–${to} of ${fmtCount(total)}`}
         {scope ? (
           <>
-            {" · "}
+            {compact ? null : " · "}
             <button
               type="button"
               aria-expanded={explain}

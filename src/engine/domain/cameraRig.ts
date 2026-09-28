@@ -195,12 +195,17 @@ export function aspectFit(pos: THREE.Vector3, target: THREE.Vector3, aspect: num
 // re-solved together.
 export const NODE_RAISE = 0.42;
 // The node pose (iterated live with the user): node ≈ (0, 6.9, 15.5) after the raise; the
-// camera sits slightly above the equator plane ~4.5 units out, and the axis aims ~9° above
-// the node so its GROUND position rides the LOWER-third line (tall co-located stacks grow up
-// from it). ABSOLUTE — deliberately not dollied (see CAM_ZOOM above).
+// camera sits slightly above the equator plane ~4.5 units out, and the axis aims above the
+// node so its GROUND position rides below the frame's centre and the tall co-located stacks
+// grow up from it. ABSOLUTE — deliberately not dollied (see CAM_ZOOM above).
+// AIMED 1.7 LOWER on 2026-09-28 (target y 19.5 → 17.8; user: "those elements sit a bit too low in
+// the view, the camera needs re-orienting a bit"): the ground line rode the lower third with the
+// stacks' mass under the centre and a band of empty sky above them; aiming lower lifts the whole
+// field ~80px on the desktop frame so the stacks straddle the centre. The cohort pose moves the
+// same amount, being one rung wider on the same contract.
 export function nodeFraming(out: CameraFraming): void {
   out.pos.set(0, 4.6, 19.2);
-  out.target.set(0, 19.5, 2);
+  out.target.set(0, 17.8, 2);
 }
 
 // ---- the geo COHORT/provider pose ----------------------------------------------------------
@@ -211,7 +216,7 @@ export function nodeFraming(out: CameraFraming): void {
 // Seed values tuned live against Falkenstein·Hetzner (the tallest stack field).
 export function cohortFraming(out: CameraFraming): void {
   out.pos.set(0, 5.4, 23.5);
-  out.target.set(0, 18.8, 2);
+  out.target.set(0, 17.1, 2);
 }
 
 // ---- the hyper NODE pose: RETIRED (2026-08-13) ------------------------------------------------

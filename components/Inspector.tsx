@@ -344,6 +344,9 @@ export default function Inspector() {
   const setPhoneDock = useStore((s) => s.setPhoneDock);
   const phoneSheetPx = useStore((s) => s.phoneSheetPx);
   const setSceneCover = useStore((s) => s.setSceneCover);
+  // The other docks' published heights — the seed an exchange starts this sheet from.
+  const coverExplore = useStore((s) => s.sceneCoverBExplore);
+  const coverVitals = useStore((s) => s.sceneCoverBVitals);
   const setPhoneSheetPx = useStore((s) => s.setPhoneSheetPx);
 
   const accent = { ["--filter-accent"]: filterAccent(filter) } as CSSProperties;
@@ -460,7 +463,9 @@ export default function Inspector() {
   ].join("§");
   // Arms HeightEase's growIn for slots that JOIN the lane after boot (false on the first
   // render pass, true on every later one — a mounting slot's wrapper then eases from 0
-  // instead of shoving the pile in one frame).
+  // instead of shoving the pile in one frame). DESKTOP ONLY, as ExploreRail's (its note has
+  // the measurement): a sheet remounts its whole lane on every open, and every rung growing
+  // from 0 inside a sheet growing to fit them is the staggered double motion the user saw.
   const laneBooted = useRef(false);
   useEffect(() => {
     laneBooted.current = true;
@@ -645,7 +650,7 @@ export default function Inspector() {
                 very animation that resizes the slot. It used to be inferred — CSS keyframes
                 restarting because React swapped `.rail-entry` for `.ig-panel` — which made the
                 arrival an accident of reconciliation and put it on a second clock. */}
-            <HeightEase growIn={laneBooted.current} settleKey={tier}>{wrapped}</HeightEase>
+            <HeightEase growIn={laneBooted.current && bp === "desktop"} settleKey={tier}>{wrapped}</HeightEase>
           </div>
         );
       })}
@@ -797,6 +802,11 @@ export default function Inspector() {
         onTrayOpenChange(next);
         setPhoneDock(next ? "details" : null);
       }}
+      // ONE motion on a section switch — see ExploreRail's matching arm.
+      seedPx={Math.max(coverExplore, coverVitals)}
+      exchange={phoneDock !== null && phoneDock !== "details"}
+      // The sheet's HEIGHT off the canvas — see ExploreRail's matching arm.
+      onCoverPx={(px) => setSceneCover("details", px)}
     >
       {content}
     </RailDock>

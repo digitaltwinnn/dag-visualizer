@@ -34,6 +34,7 @@ import type { StageLight } from "./objects/StageLight";
 import { STAGE_LIGHTS } from "../domain/stageLight";
 import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
 import { makeTextLabel, disposeTextLabel } from "./objects/TextLabel";
+import { joinOverlay, leaveOverlay } from "./SceneContext";
 import { closeness, NODE_RAISE } from "../domain/cameraRig";
 import type { CohortSel } from "../domain/focusLadder";
 import { ancestryGlow } from "../domain/dimModel";
@@ -575,14 +576,17 @@ export class Globe implements GeoViewHost {
     const grp = this._gatherLabelGroup;
     for (const l of this._gatherLabels) {
       grp.remove(l.mesh);
+      leaveOverlay(l.mesh);
       disposeTextLabel(l.mesh);
     }
     this._gatherLabels.length = 0;
     // NEUTRAL label ink, not the identity hue (user, 2026-09-04: "colour-coded text is too
     // strong — we already have the coloured chips right underneath"): the chips ARE the colour,
-    // the ticker just names them. labelInk is the one home for text-on-ground (the country
-    // labels' own answer).
-    const ink = `#${labelInk(this._colorsRef).toString(16).padStart(6, "0")}`;
+    // the ticker just names them. THE HUD'S OWN WHITE, not the globe's cyan (user, 2026-09-28:
+    // "most texts in the HUD are white and not cyan"): a ticker over a staged block is a label
+    // the way a card head is, so it takes `labelInk`'s `hud` weight — `--foreground` on both
+    // grounds — while the country names on the globe keep the furniture ink.
+    const ink = `#${labelInk(this._colorsRef, "hud").toString(16).padStart(6, "0")}`;
     for (const g of this._gatherGroups) {
       const ss = slots.get(g.id);
       if (!ss || ss.length === 0) continue;
@@ -597,7 +601,13 @@ export class Globe implements GeoViewHost {
         if (s.u < uMin) uMin = s.u;
         if (s.u > uMax) uMax = s.u;
       }
-      const mesh = makeTextLabel(ink, ticker, GATHER_CELL * 1.4, 500);
+      // 1.7 cells, and OUT OF THE BLOOM (user, 2026-09-28, two rounds: 1.4 was "a bit too small"
+      // with the halo eating it, 2.2 "too large" and still blooming — "I don't want the text to
+      // bloom"). The legend joins the OVERLAY_LAYER (SceneContext): drawn after the composer, onto
+      // the finished frame, so the glyphs stay crisp and a size just above the old one reads.
+      const mesh = makeTextLabel(ink, ticker, GATHER_CELL * 1.7, 500);
+      (mesh.material as THREE.MeshBasicMaterial).toneMapped = false;
+      joinOverlay(mesh);
       grp.add(mesh);
       this._gatherLabels.push({ mesh, uMid: (uMin + uMax) / 2, gs: ss[0]!.gs });
     }
@@ -1792,7 +1802,9 @@ export class Globe implements GeoViewHost {
         this.group.rotation.x = (s.fromX || 0) + ((s.toX || 0) - (s.fromX || 0)) * e;
       }
     } else if (this.simSpin) {
-      this.group.rotation.y += dt * 0.03; // idle spin (gated by the view policy's globeSpin)
+      // Idle spin (gated by the view policy's globeSpin). 0.03 → 0.06 rad/s (user, 2026-09-28:
+      // "the globe is rotating too slow"): one turn in ~1m45s rather than ~3m30s.
+      this.group.rotation.y += dt * 0.06;
       // Ease any focus tilt back to level when idling.
       if (this.group.rotation.x) this.group.rotation.x += (0 - this.group.rotation.x) * Math.min(1, dt * 2.2);
     }

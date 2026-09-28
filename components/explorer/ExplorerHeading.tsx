@@ -56,7 +56,9 @@ export default function ExplorerHeading({
 }) {
   const current = measure?.options.find((o) => o.id === measure.value) ?? measure?.options[0];
   return (
-    <div className={cn("flex items-center justify-end gap-2.5 min-h-[22px] border-b border-border pb-[5px] mb-1.5", className)}>
+    // `items-end`: a wrapped hint on the left (2026-09-28) leaves the measure control on its LAST
+    // line, where the eye finishes the sentence and meets the list's figure column below.
+    <div className={cn("flex items-end justify-end gap-2.5 min-h-[22px] border-b border-border pb-[5px] mb-1.5", className)}>
       {setting}
       {measure && current && measure.options.length > 1 ? (
         <DropdownMenu>

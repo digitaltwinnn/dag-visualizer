@@ -28,6 +28,7 @@ import { readSceneColors, type SceneColors, LIGHT_TUNE } from "./sceneColors";
 import { setNodeDimTarget, setNodeEnv } from "./scene/objects/NodeFabric";
 import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme/resolve";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
+import { SHEET_SHIFT_K, sheetShiftPx } from "./domain/sheetShift";
 import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush, trendFit } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
@@ -383,6 +384,15 @@ export class Engine {
     }, 250);
   };
   private _resizeReframeT: ReturnType<typeof setTimeout> | undefined;
+  /** THE PHONE SHEET'S SHIFT (`domain/sheetShift.ts`): the eased offset, in px, and what the camera
+   *  was last given — so the projection is rewritten only when the shift, or the canvas, moved. */
+  private _sheetShift = 0;
+  /** Read per frame (a MediaQueryList's `matches` is live and allocation-free). */
+  private _reduceMotion: MediaQueryList =
+    typeof window !== "undefined" ? window.matchMedia("(prefers-reduced-motion: reduce)") : ({ matches: false } as MediaQueryList);
+  private _sheetShiftApplied = 0;
+  private _sheetShiftW = 0;
+  private _sheetShiftH = 0;
   /** The aspect the current pose was resolved at — seeds from the boot camera, updated per re-frame. */
   private _framedAspect = typeof window !== "undefined" ? window.innerWidth / Math.max(1, window.innerHeight) : 16 / 9;
   // FPS/ms monitor — dev only, or in prod via `?stats`/`#stats` for ad-hoc checks, so
@@ -2102,6 +2112,35 @@ export class Engine {
     if (minAlt != null && this.ctx.camera.position.lengthSq() < minAlt * minAlt) {
       this.ctx.camera.position.setLength(minAlt);
     }
+    // ---- the phone sheet's shift (domain/sheetShift.ts) ------------------------------------
+    // LAST in the camera phase, after the pose has settled: a projection offset that moves the
+    // framing centre up into the band a bottom sheet leaves free. Eased here on the frame clock
+    // toward the store's target (the larger of the two docks' covers — their exits lag), and
+    // written through `setViewOffset` only when it or the canvas box changed, since that call
+    // rebuilds the projection matrix every projector and the raycaster read this frame.
+    {
+      const st = useStore.getState();
+      const el = this.ctx.renderer.domElement;
+      const w = el.clientWidth || window.innerWidth;
+      const h = el.clientHeight || window.innerHeight;
+      const target = sheetShiftPx(Math.max(st.sceneCoverBExplore, st.sceneCoverBDetails, st.sceneCoverBVitals), h);
+      const d = target - this._sheetShift;
+      // REDUCED MOTION SNAPS (review, 2026-09-28): a whole-scene slide of up to half the viewport,
+      // riding a sheet, is exactly the large-area motion the setting exists to remove. The sheet
+      // itself is already instant there (its transition is motion-reduce:transition-none).
+      this._sheetShift =
+        this._reduceMotion.matches || Math.abs(d) < 0.25
+          ? target
+          : this._sheetShift + d * (1 - Math.exp(-SHEET_SHIFT_K * dt));
+      if (this._sheetShift !== this._sheetShiftApplied || w !== this._sheetShiftW || h !== this._sheetShiftH) {
+        const cam = this.ctx.camera;
+        if (this._sheetShift === 0) cam.clearViewOffset();
+        else cam.setViewOffset(w, h, 0, this._sheetShift, w, h);
+        this._sheetShiftApplied = this._sheetShift;
+        this._sheetShiftW = w;
+        this._sheetShiftH = h;
+      }
+    }
   }
 
   /** THE ONE ANSWER TO "IS THE SCENE MOVING" (2026-09-26), for the motion hint. Read off the
@@ -2143,7 +2182,10 @@ export class Engine {
     // and _applyBoundary already asserts it there, with the nodes gathered and both furnitures
     // dark. Same rule as the camera hold (viewTransition.holdCamera), one phase later than `mode`.
     if (this.mode === "hyper" && this.transition.phase !== "out") {
-      if (this.filter === "all" && !zoomedIn) this._hyperSpinY += dt * 0.06;
+      // 0.06 → 0.12 → 0.08 rad/s (user, 2026-09-28, two rounds: "too slow", then "slower the
+      // hyper rotation; the node rings can be a bit faster" — the rings' own orbit took the speed,
+      // see HyperView's m.orbit): one turn in ~78s.
+      if (this.filter === "all" && !zoomedIn) this._hyperSpinY += dt * 0.08;
       // Ease the shared structure tilt: near-flat while a metagraph is committed so its discs
       // read horizontal from the plain side-on hub framing (user, 2026-07-17 — the structure
       // moves, not the camera); back to the resting overview tilt otherwise.

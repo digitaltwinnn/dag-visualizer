@@ -533,3 +533,16 @@ only and stays honest about that limit; don't cite it as enforcing the write rul
 `Globe.auditMeshes()` is the one accessor it uses, deliberately narrow: the audit needs to READ four
 buffers, not to reach `fabric`, and keeping that distinction is what stops a dev-only check from
 becoming a public seam into the node pool.
+
+## The overlay layer — scene text that must not bloom
+
+`SceneContext`'s `OVERLAY_LAYER` (2026-09-28) is the third render path beside the main chain and
+the paper selective-bloom mark pass (`BLOOM_LAYER`). A member joins with `joinOverlay` (and leaves
+with `leaveOverlay` when disposed): `layers.set` takes it off layer 0, so NO composer pass sees it,
+and `renderFrame` draws the layer in one plain render onto the finished frame — no clear, depth
+cleared, background nulled, every field restored — and skips the render when no member is showing.
+It exists because the dark ground's bloom is a whole-frame pass that halos any bright mark, text
+included (user: "I don't want the text to bloom", on the gather legend). Two costs make membership
+opt-in, one mark at a time: a member draws OVER everything (right for a legend above the staging
+grids, wrong for most marks), and it goes around the OutputPass's tone map, so it sets
+`toneMapped = false`. Its one member today is the gather legend (`Globe._rebuildGatherLabels`).

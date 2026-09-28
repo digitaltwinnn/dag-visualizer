@@ -17,11 +17,12 @@
 // is each plane's identity channel** (its network name, its hue, its latest reading). A plane
 // whose header is covered is a plane that is not in the view at all.
 //
-// So a receding slot steps UP and to the RIGHT as well as back: `PLANE_STEP_X` / `PLANE_STEP_Y`
-// per slot, centred on the visible COUNT so the block sits mid-canvas whether it holds five planes
-// or two. Up-and-right is not arbitrary — it puts each header strip in the clear band above and
-// beside the plane in front of it, which is exactly where a reader's eye already runs a list, and
-// it leaves the near plane's plot (the one being read) unobstructed at the bottom-left.
+// So a receding slot steps UP as well as back: `PLANE_STEP_Y` per slot, centred on the visible
+// COUNT so the block sits mid-canvas whether it holds five planes or two. It stepped RIGHT too
+// (`PLANE_STEP_X`, 3) until 2026-09-28: once the vertical step was cut to the header strip alone
+// the across-step no longer cleared anything, and the user read it as the deck sitting off to the
+// right of the chart ("keep it centred, no?") — so the deck stacks straight up at every tier, the
+// way the narrow tiers already did, and the constant stands at 0 with its plumbing intact.
 //
 // ⚠️ A FOCUS THE WINDOW DOES NOT HOLD MOVES NOTHING (2026-09-19).
 // `focusInWindow` is the ONE predicate both halves of this module read: a focus paged, re-ranked
@@ -63,26 +64,32 @@ export const SCALE_FALLOFF = 0.03;
  *  re-opened with one number. */
 export const OPACITY_FALLOFF = 0;
 
-/** THE STAGGER, across. Each slot further back sits this much further RIGHT, so its header strip
- *  clears the plane in front of it. See the header: a covered header is a missing plane. */
-export const PLANE_STEP_X = 3;
+/** THE STAGGER, across — ZERO since 2026-09-28 (user: "keep it centred"): the deck stacks straight
+ *  up behind the front chart at every tier. It was 3, then 2.4, while the across-step helped clear
+ *  each header; with the vertical step sized to the header alone it cleared nothing and read as a
+ *  sideways drift. The constant and `stepX` stay so the poses and the ground still share one
+ *  number, and a non-zero value re-opens the look in one edit. */
+export const PLANE_STEP_X = 0;
 
 /** THE STAGGER ACROSS, PER TIER. On a NARROW canvas (tablet, phone — `breakpointOf` below the
- *  desktop tier) the across-step is ZERO and the deck stacks straight up: the front card is
- *  fitted to the canvas width there (`fitDistance`), so every unit of across-stagger would push a
- *  rear header's right end — its reading — off the edge, and a deck exactly one card wide keeps
- *  every header whole, stacked above the front card like a list (user, 2026-09-26: "the front
- *  card should take more width on tablet/phone"). Desktop keeps `PLANE_STEP_X`. */
+ *  desktop tier) the across-step is ZERO regardless of the constant: the front card is fitted to
+ *  the canvas width there (`fitDistance`), so any across-stagger would push a rear header's right
+ *  end — its reading — off the edge (user, 2026-09-26: "the front card should take more width on
+ *  tablet/phone"). Desktop reads `PLANE_STEP_X`, which is 0 too since 2026-09-28 (its note). */
 export function stepX(narrow: boolean): number {
   return narrow ? 0 : PLANE_STEP_X;
 }
 
 /** THE STAGGER, up. Each slot further back sits this much HIGHER — the larger of the two steps,
  *  because a header strip is wide and short: vertical clearance is what actually uncovers it.
- *  Sized to uncover the HEADER and the peak line under it, not the plot: the rear planes are an
- *  index of the roster (name, hue, latest reading), and every unit spent showing more of a rear
- *  plot is a unit the front chart is pushed away from the centre of the view. */
-export const PLANE_STEP_Y = 5.4;
+ *  Sized to uncover the HEADER ALONE (user, 2026-09-28: "closer to each other so that only the
+ *  headers are (partially) shown and readable" — it was 5.4, which also showed the peak line and
+ *  the top of each rear plot): the rear planes are an index of the roster (name, hue, latest
+ *  reading), and every unit spent showing more of a rear card is a unit the front chart is pushed
+ *  away from the centre of the view. Measured at the desktop pose, 4.3 leaves the front gap at
+ *  about a header's height and the rearmost headers clipped by a few pixels, which is the
+ *  "partially" the user asked for. */
+export const PLANE_STEP_Y = 4.3;
 
 /** WHERE ALONG THE RUN OF SLOTS THE STAGGER IS CENTRED (user, 2026-09-19: "make the front chart
  *  more at the view center and larger"). `1` centres the BLOCK — the mean of the visible slots sits
@@ -239,18 +246,6 @@ export function clampScroll(count: number, scroll: number): number {
   return Math.min(max, Math.max(0, Math.floor(scroll)));
 }
 
-/** Whether the roster has anywhere to page TO.
- *
- *  The rail plank's rule, stated where the geometry is (2026-09-19): "an exhausted direction is
- *  INACTIVE while an axis with nothing to ever navigate is ABSENT". A roster that fits the window
- *  — exactly `VISIBLE_PLANES` included — has one legal scroll and therefore no axis at all, so its
- *  pager is not a disabled control, it is no control. Living beside `clampScroll` is the point:
- *  presence and the end stops are the same question asked twice, and a component predicate could
- *  drift from the clamp by one plane with nothing failing. */
-export function pagerVisible(count: number): boolean {
-  return count > VISIBLE_PLANES;
-}
-
 /** Is `focus` one of the planes the window currently holds?
  *
  *  ⚠️ ONE PREDICATE, TWO READERS (2026-09-19). `stackPoses` lifts a focused plane only while it is
@@ -325,6 +320,48 @@ export function stackPoses(ids: readonly string[], opts: StackOpts): PlanePose[]
   });
   // Ordered by SLOT, nearest first — the contract every consumer reads the array by.
   return poses.sort((p, q) => q.z - p.z);
+}
+
+/** The id the HINT plane wears — never a network's (those are DAG addresses). */
+export const MORE_ID = "more";
+
+/** How many networks the window leaves off the stage, at this scroll. */
+export function moreCount(ids: readonly string[], scroll: number): number {
+  const start = clampScroll(ids.length, scroll);
+  return Math.max(0, ids.length - (start + VISIBLE_PLANES));
+}
+
+/**
+ * THE SIXTH, UNNAMED PLANE (user, 2026-09-28: "if there are more, maybe add a 6th unnamed to
+ * hint there are more"). The window is a DEPTH BUDGET — a scene decision, five cards receding —
+ * and once the explorer stopped paging (its rows drive the stage now) nothing in the view said
+ * that a roster of eleven had six more behind the deck. This pose is that statement: one more
+ * card at the slot behind the last visible one, at the stack's own falloff so it reads as the
+ * deck continuing, carrying no network and never interactive — the rows are the one route onto
+ * the stage. `null` whenever the roster fits, so a short roster shows no ghost at all.
+ *
+ * Kept OUT of `stackPoses` on purpose: that function is the window's poses, read by the camera's
+ * `focusDepth` and by every test that says "five"; the hint is a sixth thing both consumers
+ * (the planes and the projector) append. It sits at slot `visible.length` against the SAME
+ * stagger centre the window uses, so the deck does not shift when the hint appears — it simply
+ * has one more card behind it. A focus re-deal moves the window's cards among slots 0…n−1 and
+ * leaves this one where it is.
+ */
+export function morePose(ids: readonly string[], opts: StackOpts): PlanePose | null {
+  if (moreCount(ids, opts.scroll) === 0) return null;
+  const n = windowCount(ids.length);
+  const c = staggerCentre(n);
+  const sx = stepX(opts.narrow ?? false);
+  const slot = n;
+  return {
+    id: MORE_ID,
+    x: (slot - c) * sx,
+    y: PLANE_Y + (slot - c) * PLANE_STEP_Y,
+    z: -slot * PLANE_GAP,
+    scale: 1 - SCALE_FALLOFF * slot,
+    opacity: 1 - OPACITY_FALLOFF * slot,
+    interactive: false,
+  };
 }
 
 /**

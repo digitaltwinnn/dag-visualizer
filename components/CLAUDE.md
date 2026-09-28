@@ -147,13 +147,24 @@ and its contents are view-specific examples that keep changing.
 
 **Top — the command bar.** One full-width glass bar, edges aligned with the rail columns: the ECG +
 wordmark + filter on the left, the view switch centered, and on the right the view-scoped pair
-(SCENE⇄HUD + RAW) followed by ONE settings gear (2026-09-08 — the theme/pages/network trio folded
-into `topbar/SettingsMenu.tsx`, three labeled sections of one popover; their files are rows-only
-modules now. Two states survive on the trigger by rule: the network CODE in the live accent off
-mainnet — "which chain am I looking at" never goes missing — and the doc-open primary tint. One
-mount at every width; the filter strip's second row, the trio's old phone home, retired with it). The bar has **one grow-downward slot with two tenants** (a which-strip enum makes
+(SCENE⇄HUD + RAW + ABOUT) followed by ONE settings gear (2026-09-08 — the theme/pages/network trio
+folded into `topbar/SettingsMenu.tsx`, labeled sections of one popover; their files are rows-only
+modules now. **The pages section left on 2026-09-28** — user: "doc pages are not settings"; the
+footer's About · Design row is their one door. One state survives on the trigger by rule: the
+network CODE in the live accent off mainnet — "which chain am I looking at" never goes missing.
+One mount at every width; the filter strip's second row, the trio's old phone home, retired with it). The bar has **one grow-downward slot with four tenants** (a which-strip enum makes
 them mutually exclusive by construction): the FILTER button opens the network-chip strip (hovering
-previews the dim, picking closes it), and the ECG opens the **pulse strip** — one read-only cell
+previews the dim, picking closes it), **on phone the view switch is ONE face — the current view's
+icon and name — that opens the view list as a strip tenant** (`topbar/ViewPicker.tsx`, 2026-09-28: a
+row of 44px icons cannot scale with the view count — History made it five and the filter ran under
+the first tab — and hiding entries per tier is a patch the next view undoes; the segmented switch
+stays from 700px up, both presentations live in the DOM and CSS picks, and the hanging caption
+stands down on phone because the face already prints the name), **the view-scoped island's info
+button opens the ABOUT row** (`topbar/AboutStrip.tsx`, 2026-09-28 — the per-view orientation prose
+that used to lead the left rail as a card; user: "the static about card is a bit out-of-place on the
+left column … about belongs where?" — the four zones are instruments and prose is documentation,
+whose one home is /about, so the in-view door sits beside the ECG's "how live is this app" strip,
+closed by default, view-scoped like Scene and Raw), and the ECG opens the **pulse strip** — one read-only cell
 per data FEED from the poll-health registry (`src/data/api.ts` `reportPoll`/`pollHealthRows`; the
 five real fetch sites report their own outcomes), each with a derived status dot (ok / stale past
 ~2.5× its own cadence / error — never fabricated, rule 10), the last success ticking, the cadence
@@ -173,8 +184,9 @@ guessed**: the view-switch labels drop at `max-[1299px]`, the dividers plus the 
 departure is what freed the wordmark). When the labels go, the ACTIVE view's name reappears as a
 caption strip under the bar (`aria-hidden`, non-interactive).
 
-**Left rail — the explore/interact scope.** Every view leads with the **About** orientation card, then
-the view's one tool card if it has one. What each explorer contains is view-specific, but three
+**Left rail — the explore/interact scope.** The view's one tool card, if it has one (the About
+orientation card that led every rail from 2026-08-08 retired on 2026-09-28 into the command bar's
+ABOUT row, above). What each explorer contains is view-specific, but three
 decisions inside them are design, not detail:
 
 - geo's cohort rows carry **no status and no identity dot** — health belongs to the node card, and
@@ -197,31 +209,46 @@ decisions inside them are design, not detail:
   `faint`, and inside a tick only the committed network's row is drillable (`outOfLens`); **the
   path follows a commit made elsewhere** (a tile, the rail's ‹ › plank, the raw log) but never
   auto-opens from the root, because the newest tick changes every few seconds. The LIVE/PINNED
-  control rides the heading row as the view's one setting (design decision 15). Each level has its
+  control rides the CARD HEAD's eyebrow row with the shown snapshot's ticking age (2026-09-28 —
+  it rode the heading row as the level's setting, design decision 15, until then), and the pager
+  states the TIME the rows span ("last 11 min") rather than "52 recent". Each level has its
   own measures (ticks fees · anchors · metagraphs · size, a network in a tick snapshots · fees ·
   size, a snapshot fee · size), figures BARE because the heading names the unit, in a 48px figure
   column (`figureW` — a 4-decimal fee does not fit the default 40).
 
-- **History's tool card is its roster, with the view's two settings on its heading**
+- **History's tool card is its roster, with the MEASURE on its heading**
   (`components/TrendExplore.tsx`, an `Explorer` description since 2026-09-26). ONE level: the
   ranked networks, busiest first, each with its last measured reading in the roster's one
   formatter and a bar of its share. The METRIC is the heading control (the figure column's own
-  heading, a radio list of `METRIC_ORDER` with units at the current cadence) and `Same scale` is
-  the heading's setting — neither is a selection, so both write their setters directly
+  heading, a radio list of `METRIC_ORDER` with units at the current cadence); `Same scale` left
+  the heading on 2026-09-28 for the band's pill group — it draws the planes and never changed a
+  row here (user), so it sits with the stack's other stack-wide settings, the window and the
+  range, and stands down under a committed filter where the stack is one plane. Neither the
+  metric nor the scale is a selection, so both write their setters directly
   (`selectionBoundary`'s own scope note says why, and why the plane FOCUS is in the table instead).
   A row click applies the SAME `trendPlaneActions` the plane's header strip runs. No scope mark in
   the head at all (2026-09-26): the top bar's filter names the committed network and is the one
-  place to clear it. Its PAGER is absent unless the roster
-  exceeds `VISIBLE_PLANES` and clamps with the stack's own `clampScroll`, so a chevron can never
-  offer a step the geometry refuses.
+  place to clear it. **The whole roster lists and nothing pages** (user, 2026-09-28: "other
+  views just expand the card; only Snapshots pages, because that number is huge" — a dozen
+  networks is a list, not a chain). The stack still shows `VISIBLE_PLANES` at a time, and the
+  rows drive it: a click brings that plane to the front and the store's `scrollToKeep` pages the
+  window after it, so no control in the card names `trendScroll`. Two pagers came and went the
+  same day — one under all the rows that moved only the stack's window ("3–7 of 11" under eleven
+  rows), then a list cut to the five on stage — and neither is to come back. **The scene says
+  the roster continues**: while networks remain behind the window, a SIXTH, UNNAMED plane sits
+  one slot behind the deck (`trendStack.morePose`, rendered by `TrendStack` and projected like
+  any other anchor) printing only "N more" — no network, no chart, no pointer events; a roster
+  that fits shows no ghost.
   ⚠️ **The roster is computed ONCE, in `components/useTrendRoster.ts`** — the planes, this list and
   the cursor card all read it, counter EDGE TRIM included. A surface reading the payload directly
   is one bucket out of step with the axis, which is exactly how the cursor card briefly quoted
   yesterday's number; `components/trendRailBoundary.test.ts` pins all three "one home" rules.
 
-**Naming and copy rules:** About states the view's point of view ("How the network is built"); the tool
+**Naming and copy rules:** the ABOUT row states the view's point of view ("How the network is built"); the tool
 card says what you BROWSE — by the AXIS the rows break the network down along, never by the
-figure they show ("Network breakdown", "Country breakdown", "Snapshot breakdown", and History's "Network breakdown" too — its rows are networks, "layer" was the stack's word for a plane; 2026-09-26
+figure they show, as a PLURAL NOUN ("Networks", "Countries", "Snapshots", and History's "Networks" —
+2026-09-28, user: "every explorer card has 'breakdown', perhaps it's redundant?" — the EXPLORE eyebrow
+already says what the card is; they were "X breakdown" from 2026-09-26, and History's rows are networks, "layer" was the stack's word for a plane; 2026-09-26
 — user, 2026-09-26: once every explorer carries the measure HEADING CONTROL, a title like "Nodes by
 country" names one measure of three). Eyebrows are bare role words, and each explorer's usage
 hint leads its card rather than trailing it. An explorer ROW is a browse target — mark, name, count,
@@ -279,8 +306,8 @@ a release as `finestRung`), never "stepping back".
 **The History view has three axes and each has one home** (user, 2026-09-19): left/right on the
 timeline is WHEN, the depth of the stack is WHO, and UP/DOWN is WHAT — the measure. Its control is
 the Networks card's HEADING CONTROL (the explorer's figure heading opening `METRIC_ORDER` as a radio
-list with each measure's unit at the current cadence — design 2026-09-26; `Same scale` rides the
-same heading row as the view's other setting. It replaced a `∧ SNAPSHOTS ∨` stepper, which walked a
+list with each measure's unit at the current cadence — design 2026-09-26; `Same scale` rode the
+same heading row until 2026-09-28, when it moved to the band's pill group). It replaced a `∧ SNAPSHOTS ∨` stepper, which walked a
 list the reader could not see, which itself replaced the six-pill picker no other surface used:
 the document lays its measures out as sections), plus `↑`/`↓` from inside a card; both write
 `trendMetric` from `METRIC_ORDER` (`src/data/trendSeries.ts`), so the two controls are one list. It is a view-level control because
@@ -451,8 +478,8 @@ pair. Permanently dead chrome is not a control.
 
 **Ladder steps are QUIET, and the quiet is PROVENANCE, not a timer** (user, 2026-09-11, four
 rounds ending in "solve it structurally"): `store.navQuiet` records HOW the current state was
-reached — set true by `toggleCollapse` (any manual expand, the About card's own
-never-roll-on-a-manual-expand rule) and by the one executor when a caller passes `quiet` (the
+reached — set true by `toggleCollapse` (any manual expand — the never-roll-on-a-manual-expand
+rule the retired About card first set) and by the one executor when a caller passes `quiet` (the
 plank's first-child ∨); reset false by every ordinary commit, by `setMode`, and by the
 `advanceSnap`/`advanceMetaSnap` heartbeat writes (a new tick IS an arrival — without that
 reset a stale quiet suppressed every later live-advance roll). `CardHead.useRolledTitle`
@@ -539,7 +566,7 @@ no ladder for those views every present card fell through to Inspector's trailin
 excludes the context card, so the node card rendered with **no network plank above it** — and correctly
 re-grew Country and Hosting, since the pile-dedup rule found no ancestors. It is a view gate, not a
 selection change: the store is untouched, so returning to a 3D view restores the whole pile. This
-matches the left rail, which shows About and no tool card there.
+matches the left rail, which shows no tool card there either.
 
 **Bottom — the VITALS BAND** (`components/VitalsBand.tsx`, 2026-08-30 — the vitals left the crowded
 command bar; docs/superpowers/plans/2026-08-30-vitals-bottom-band.md is the plan). A slim full-width
@@ -767,10 +794,10 @@ inline in the return would quietly restore the bug for every consumer at once.
   nothing three times): one dimmed "Coming soon" bar entry, one FLAT policy row, and the
   Blueprint GALLERY inside it previews every coming feature (each keeping the mark it wore as a
   bar button). A future placeholder is a gallery entry, not a Mode.
-- **The doc pages' bar home is the SettingsMenu's Pages section** (2026-09-08; `InfoMenu.tsx`
-  is the rows-only module `DocRows` now) — one rank below the view switch on purpose ("views,
-  but not at the same level of importance"); rows are the footer DocToggles' own store toggles,
-  `DOC_ICONS` in icons.tsx their marks. The footer row remains the always-visible route.
+- **The doc pages' one door is the footer's About · Design row** (2026-09-28 — user: "doc pages
+  are not settings"; they rode the SettingsMenu as a Pages section from 2026-09-08 until then,
+  and `InfoMenu.tsx` retired with it). The in-view ABOUT row in the bar is orientation for the
+  current view, not a doc page.
 - A **doc page**: one `DOC_PAGES` entry (everything derives: type, paths, titles, docForPath),
   its component in `components/docs/` + one line in DocLayer's `DOC_COMPONENTS` map, a thin
   route file passing `doc`, a footer `DocToggle`. The engine's bare stage, both transition
@@ -831,10 +858,9 @@ inline in the return would quietly restore the bug for every consumer at once.
   vitals cells, both presentations) takes `components/RollSwap.tsx` — out-beat then keyed arrival
   in tw-animate's own vocabulary; render from the KEY, never live state; the vitals' `[&>*]` cell
   rules ride the wrapper or it becomes their subject. A surface with a PERSISTENT resident reads
-  the rule per card: the explore rail keeps its ONE About instance (title rolls, body keyed on the
-  view's title, animating only when the title actually changed — never on a manual expand) and
-  keys only the view-scoped tool card, transform-free (a materialize's scale visibly pulls a tall
-  card's top edge). HEIGHTS ease everywhere via `components/HeightEase.tsx` (every Inspector rung +
+  the rule per card: the explore rail keys only the view-scoped tool card, transform-free (a
+  materialize's scale visibly pulls a tall card's top edge; the About card that once persisted
+  beside it retired 2026-09-28). HEIGHTS ease everywhere via `components/HeightEase.tsx` (every Inspector rung +
   both explore cards): measured content, WAAPI on the roll tokens, the whole chain down to the
   panel stretched so the CARD BORDER rides the ease (one `auto` link parks a percentage height), a
   one-frame re-measure standing down for foreign animators (the pager's pinned slides,
@@ -852,13 +878,19 @@ inline with their `RailThread` siblings; tablet (700–1099px) collapses them to
 vitals band, which CLIPS its paint by their published `sceneCover`, see the band bullet); phone
 (<700px) has a persistent bottom bar — Explore | Vitals | Details thirds where the view has a
 vitals lane, halves elsewhere (`barGeom`; the icon trays compact to one unseen-update dot at
-thirds) — and ONE sheet at a time, with grabber drag-resize and flick-dismiss. The sheet GROWS out
+thirds) — and ONE sheet at a time, with grabber drag-resize and flick-dismiss. **An open sheet
+shifts the scene up into the band above it** (2026-09-28): the dock publishes its target height as
+a bottom cover (`sceneCoverBExplore` / `sceneCoverBDetails` / `sceneCoverBVitals`, one per dock because their exits lag)
+and the Engine eases a projection offset — `camera.setViewOffset`, never a camera move, so every
+pose, the callout, the chart planes and picking follow — by half the cover
+(`domain/sheetShift.ts`). Shift only, no zoom. The sheet GROWS out
 of the dock (a height transition from a zero armed on the open flip — the content mounts a commit
 later, the portal trap), fits its content live (drag wins until close), and shrinks back on a
 render-phase-derived exit. Dismissing a sheet only collapses it — it does not clear the selection.
-On phone both Explore cards open COLLAPSED (a compact chooser that grows), and the teaching copy
-says the pointer's own word (`usePointerCoarse` — Tap/Click, one home; geo's node ghost alone
-advertises the long-press preview).
+On phone the Explore card opens EXPANDED like everywhere else (2026-09-28 — it opened collapsed
+while the About card shared the sheet, as a two-head chooser; one card has nothing to choose
+between), and the teaching copy says the pointer's own word (`usePointerCoarse` — Tap/Click, one
+home; geo's node ghost alone advertises the long-press preview).
 
 **No auto-open, ever** (global): a pick never opens a sheet or dock. The dock's icon tray announces it;
 the user always taps the trigger.
@@ -945,7 +977,7 @@ In one line: **thread = resting identity cue; card edge = purely transient signa
 - **Sheets stay calm**: inside sheet content the whisper and pairing edges are suppressed, because the
   sheet's own edge spine is its single identity cue. The subject-change pulse still plays.
 - **Dock icon trays** show a quiet legend of the cards the sheet hosts. A card updating while the sheet
-  is closed goes vivid in its identity hue with a heartbeat until the sheet opens — purely visual, it
+  is closed goes vivid in its identity hue, still — colour alone since 2026-09-28 — until the sheet opens — purely visual, it
   **never opens the sheet**, and a pure deselect announces nothing.
 - **Calm tempo.** The heartbeat family beats at 1.5s and transient signals run around 1.2s, debounced
   so a 4s-tick live feed never reads as a strobe. **Navigation moves on its own, slower clock** — the

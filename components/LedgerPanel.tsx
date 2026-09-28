@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import Explorer, { type ExplorerLevelSpec, type ExplorerRowSpec } from "@/components/explorer/Explorer";
 import { nodeRowSpec, unknownNodeRowSpec } from "@/components/explorer/nodeRow";
 import TablePager from "@/components/datasection/TablePager";
+import { pageKeepingRow } from "@/components/explorer/fitRows";
+import useFitRows from "@/components/explorer/useFitRows";
+import { useBreakpoint } from "@/components/useBreakpoint";
 import { IdentityDot } from "@/components/inspector/parts";
 import { ensurePage } from "@/components/RawSnapshotBridge";
 import { selectedRow, selectionHue } from "@/components/selection";
@@ -12,6 +15,8 @@ import { NoSignalDot } from "@/components/state/StateAtoms";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { cn } from "@/lib/utils";
+import { useNowTick } from "@/components/useNowTick";
+import { relativeAge } from "@/src/util/relativeAge";
 import { buildAnchorLog, buildChannelLog, type AnchorLogRow } from "@/src/data/anchorLog";
 import { latestRelevant } from "@/src/data/follow";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -72,10 +77,14 @@ import { useStore } from "@/src/store/store";
 // snapshot, not its tick, and the tick channel would light every band of the anchoring global),
 // a signer on `hoverNodeId`. Hovers preview, never commit.
 
-/** How many ticks a page of the explorer shows. Fifteen because the card is a peephole, not the
+/** How many ticks a page of the explorer shows before the first measure: on the desktop rail and
+ *  the tablet sheet the page FILLS to its host's bottom (`useFitRows`, 2026-09-28 — user:
+ *  "always fill the rows till the bottom of the view"). Fifteen because the card is a peephole, not the
  *  chain: enough rows that the list reads as a run of history rather than as the last handful
  *  (user, 2026-09-13: "can you do 10-20 by default"), few enough that one page fits the rail. */
 const TICK_PAGE = 15;
+/** The phone's page — shorter, since its bottom sheet takes the lower half of a small screen. */
+const TICK_PAGE_PHONE = 10;
 
 /** A COMMITTED FILTER IS A LENS, and inside a tick the lens decides what is drillable: with a
  *  network committed, every OTHER network's row under a tick opens nothing. */
@@ -151,6 +160,23 @@ function perMetaOf(ex: SnapshotExact | undefined, id: string): { fee: number; by
   return any ? { fee, bytes } : undefined;
 }
 
+/** `· 5s ago` — the shown snapshot's age, ticking. Its own component so the per-second clock
+ *  re-renders this span alone rather than the whole explorer. */
+function LiveAge({ ts }: { ts: string }) {
+  const now = useNowTick(1000);
+  const age = relativeAge(now - Date.parse(ts));
+  return age ? <>· {age}</> : null;
+}
+
+/** "last 12 min" / "last 2 h" — the time the listed snapshots span, newest back to oldest. */
+function spanWords(ordered: readonly GlobalSnapshot[]): string {
+  if (ordered.length < 2) return "latest";
+  const ms = Date.parse(ordered[0]!.timestamp) - Date.parse(ordered[ordered.length - 1]!.timestamp);
+  if (!(ms > 0)) return "latest";
+  const min = Math.max(1, Math.round(ms / 60_000));
+  return min < 90 ? `last ${min} min` : `last ${Math.round(min / 60)} h`;
+}
+
 export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: boolean } = {}) {
   const filter = useStore((s) => s.filter);
   const hoverFilter = useStore((s) => s.hoverFilter);
@@ -204,9 +230,28 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const orderedSnaps = [...snaps].reverse(); // newest first, the log convention
   const activeSnapOrd = snap?.data.ordinal ?? null;
   const [tickPage, setTickPage] = useState(1);
-  const pages = Math.max(1, Math.ceil(orderedSnaps.length / TICK_PAGE));
+  // The path's first step, declared here because the page size reads it: the fit measures only
+  // while the tick level (no tick open) is the one on screen.
+  const [openTick, setOpenTick] = useState<number | null>(null);
+  // THE PAGE SIZE FILLS THE RAIL on desktop (`useFitRows`): measured only while the tick level is
+  // the one on screen, and when it changes the reader keeps their place — the page holding the
+  // row that was first on screen (`pageKeepingRow`), so a resize never throws them to page 1.
+  const bp = useBreakpoint();
+  // Phone keeps a fixed, shorter page (its sheet sizes to content): 10, not the old 15 (user,
+  // 2026-09-28). Desktop and tablet fill their host.
+  const pageSize = useFitRows("ledger-view", bp !== "phone", openTick == null, bp === "phone" ? TICK_PAGE_PHONE : TICK_PAGE);
+  const lastSize = useRef(pageSize);
+  useEffect(() => {
+    if (lastSize.current === pageSize) return;
+    // Read the OLD size before overwriting it: an updater runs lazily when another update is
+    // pending on this fiber (the feed re-renders it often), and by then the ref would say new.
+    const prev = lastSize.current;
+    lastSize.current = pageSize;
+    setTickPage((p) => pageKeepingRow(p, prev, pageSize));
+  }, [pageSize]);
+  const pages = Math.max(1, Math.ceil(orderedSnaps.length / pageSize));
   const page = Math.min(tickPage, pages);
-  const pagedSnaps = orderedSnaps.slice((page - 1) * TICK_PAGE, page * TICK_PAGE);
+  const pagedSnaps = orderedSnaps.slice((page - 1) * pageSize, page * pageSize);
   // A PAGE IN VIEW IS A PAGE IN FOCUS: the exact reads (the figures) are fetched for the page the
   // reader is looking at, at the backfill's own pace, deduped against everything held or in flight.
   const pagedKey = pagedSnaps.map((d) => d.ordinal).join(",");
@@ -216,7 +261,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   }, [pagedKey]);
 
   // The path: which tick, which network in it, which snapshot's signers.
-  const [openTick, setOpenTick] = useState<number | null>(null);
   const [openNet, setOpenNet] = useState<string | null>(null);
   const [openSnap, setOpenSnap] = useState<string | null>(null); // `${metaId}|${ordinal}` — a bare ordinal collides (every undecodable unlisted payload is 0)
   // A snapshot committed ANYWHERE opens the path to it (the scene's tile, the rail's pager, the
@@ -229,7 +273,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
     setOpenNet(netId);
     setOpenSnap((cur) => (cur === `${metaSnap.metaId}|${metaSnap.ordinal}` ? cur : null));
     const at = orderedSnaps.findIndex((d) => d.ordinal === metaSnap.globalOrdinal);
-    if (at >= 0) setTickPage(Math.floor(at / TICK_PAGE) + 1);
+    if (at >= 0) setTickPage(Math.floor(at / pageSize) + 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one sync per committed snapshot
   }, [metaSnapKey]);
   // A tick pinned elsewhere (the rail's ‹ › plank) while a tick is open re-points the path — but
@@ -249,14 +293,18 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const tick = openTick != null ? orderedSnaps.find((d) => d.ordinal === openTick) ?? null : null;
   const exact = tick ? snapshotExact[tick.ordinal] : undefined;
 
-  // ---- the heading's one setting: LIVE / PINNED (user, 2026-08-07 — the ONE explicit way to see
-  // and toggle the follow state; design 2026-09-26 decision 15: it rides the heading as dot + word).
+  // ---- the card's LIVE / PINNED state (user, 2026-08-07 — the ONE explicit way to see and toggle
+  // the follow state). It rode the list's heading row as the level's setting (design 2026-09-26,
+  // decision 15) until 2026-09-28, when it moved to the CARD HEAD's aside WITH ITS AGE (user: "move
+  // it to the header and show age also, just like the snapshot card on the right rail"): it is a
+  // state of the whole card on every level, and the age says how fresh "live" is — the right
+  // rail's `live · 8s` counter, ticking, so the two surfaces speak one clock.
   // Hovering ANY snapshot — a row, a scene tile — PREVIEWS the pinned state it would enter (hollow
   // dot, dashed). The write goes through `followToggleActions` + the one executor. ----------------
-  const setting = (() => {
+  const liveControl = (() => {
     if (!live)
       return (
-        <span className="mr-auto inline-flex items-center gap-1.5 text-micro tracking-caps uppercase text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5 text-micro tracking-caps uppercase text-muted-foreground">
           <NoSignalDot /> no signal
         </span>
       );
@@ -266,7 +314,20 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
     const beating = following && previewOrd == null;
     const label = previewOrd != null ? "Pinned" : following ? "Live" : pinned ? "Pinned" : "Live";
     const dotHue = displayNetwork(filter)?.hue ?? accent;
-    const sub = previewOrd != null ? previewOrd.toLocaleString() : pinned ? snap!.data.ordinal.toLocaleString() : following ? null : "off";
+    // The AGE of the snapshot on screen — the live tip while following, the pinned one otherwise —
+    // in the right rail's own words (`relativeAge`, ticking every second). A hover preview names
+    // the ordinal it would pin instead, since that is what the preview is about.
+    // The age ticks in its own child (`LiveAge`), so the per-second clock re-renders one span,
+    // not the whole explorer. Following off with nothing pinned says "off" — the state is not
+    // live, and an age beside the word would read as if it were.
+    const shown = pinned ? snap!.data : latestSnapshot;
+    const sub = previewOrd != null
+      ? previewOrd.toLocaleString()
+      : !following && !pinned
+        ? "· off"
+        : shown
+          ? <LiveAge ts={shown.timestamp} />
+          : null;
     return (
       <button
         type="button"
@@ -280,7 +341,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         // the padding is there when it is invisible (LIVE, transparent) as when the PINNED wash
         // makes it a visible chip (user, 2026-09-26: the pinned block "looks ugly, no padding").
         className={cn(
-          "mr-auto -ml-1.5 inline-flex items-center gap-1.5 rounded-sm px-1.5 py-[3px] cursor-pointer select-none border border-transparent",
+          "-mr-1.5 inline-flex items-center gap-1.5 rounded-sm px-1.5 py-[3px] cursor-pointer select-none border border-transparent whitespace-nowrap",
           "hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
           pinned && previewOrd == null && selectedRow(true),
           previewOrd != null && "border-dashed border-border",
@@ -295,8 +356,12 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         ) : (
           <span className={cn("flex-none w-2 h-2 rounded-full border", pinned && previewOrd == null ? "border-primary/80" : "border-muted-foreground/70")} />
         )}
-        <span className={cn("text-micro tracking-caps uppercase", beating ? "text-primary" : pinned && previewOrd == null ? "text-foreground" : "text-muted-foreground")}>{label}</span>
-        {sub && <span className="tabular-nums text-micro text-muted-foreground">{sub}</span>}
+        {/* THE RIGHT RAIL CARD'S OWN VOICE AND PLACE (user, 2026-09-28): lowercase `live · 5s ago`
+            at the card aside's text size, on the TITLE row — the card's own position, which fits
+            since the title became "Snapshots" (it rode the eyebrow row while "Snapshot breakdown"
+            left ~54px beside it). */}
+        <span className={cn("text-label", pinned && previewOrd == null ? "text-foreground" : "text-muted-foreground")}>{label.toLowerCase()}</span>
+        {sub && <span className="tabular-nums text-label text-muted-foreground">{sub}</span>}
       </button>
     );
   })();
@@ -365,14 +430,19 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           <TablePager
             page={page}
             pages={pages}
-            from={(page - 1) * TICK_PAGE + 1}
-            to={Math.min(page * TICK_PAGE, orderedSnaps.length)}
+            from={(page - 1) * pageSize + 1}
+            to={Math.min(page * pageSize, orderedSnaps.length)}
             total={orderedSnaps.length}
             compact
-            // "recent", the raw log's own word (user, 2026-09-13: "held"/"window" named a mechanism).
+            // THE SPAN THE ROWS COVER, and nothing else — the compact pager drops its count when a
+            // scope is given (TablePager). THE SPAN, not a count of a buffer (user, 2026-09-28: "instead of '52
+            // recent' say something people understand — they are all recent, but why only 52?").
+            // The explorer holds the latest POLL.maxSnapshots global snapshots; how much TIME that
+            // is — measured from the rows themselves, oldest to newest — is what a reader can use.
+            // It was "recent" (the raw log's word, 2026-09-13), which answered neither question.
             scope={{
-              word: "recent",
-              title: `These are the ${POLL.maxSnapshots} most recent global snapshots — the stretch this page follows live. The chain goes back very much further: open the raw data layer to search all of it.`,
+              word: spanWords(orderedSnaps),
+              title: `The explorer keeps the latest ${POLL.maxSnapshots} global snapshots, the stretch it follows live. For anything older, open the raw data layer and search the whole chain.`,
             }}
             onPage={(p) => setTickPage(p)}
           />
@@ -553,15 +623,14 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
       }),
     });
   }
-  // Every level carries the view's one setting on its heading.
-  for (const l of levels) l.setting = setting;
 
   return (
     <Explorer
       id="ledger-view"
-      title="Snapshot breakdown"
+      title="Snapshots"
       hint="Recent global snapshots. Open one for the networks that anchored into it."
       levels={levels}
+      aside={liveControl}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => {
         // Container-level hover backstop: leaving the card clears every channel its rows write.

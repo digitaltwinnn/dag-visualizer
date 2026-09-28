@@ -55,7 +55,13 @@ export const STAGE_LIGHTS: Record<StagedView, StageLightRow> = {
     angle: 0.9, distance: 40, intensity: 2.4, intensityPaper: 5.5, penumbra: 0.25,
     height: 9, heightDag: 17, heightNode: 3.2, angleNode: 0.5,
   },
-  geo: { angle: 0.36, distance: 22, intensity: 1.5, intensityPaper: 3.4, height: 6 },
+  // geo: intensity 1.5 → 0.9 and height 6 → 8 (2026-09-28, user: "geo, DAG, Falkenstein provider
+  // is the brightest place in all of our app … what about the spotlight? too much light, too
+  // close?"). A committed cohort claims the lobe onto ONE dense stack of 31 co-located chips, and
+  // at 1.5 from 6 units the lit caps and the emissive together clipped to a white column. Dimmer
+  // and a step higher, the lobe still says "this stack" and the chips keep their blue. Paper's
+  // level holds — its ink lane runs the other way (the lamp rule in CLAUDE.md).
+  geo: { angle: 0.36, distance: 22, intensity: 0.9, intensityPaper: 3.4, height: 8 },
   // ledger: the day glass's movable highlight. `height` stages it above the chamber's own GLOBAL
   // FLOOR, and it is low on purpose — a specular highlight sits where the light's mirror image is
   // seen, and from the ledger's resting pose (a low camera looking down the trail) a lamp staged

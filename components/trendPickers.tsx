@@ -1,6 +1,7 @@
 "use client";
 
 import { useId } from "react";
+import { AlignEndHorizontal } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { SELECTED_ROW } from "@/components/selection";
@@ -125,6 +126,35 @@ export function WindowPicker({
   );
 }
 
+/** THE SCALE PILL — History's band (user, 2026-09-28, option A of four in the companion, icon
+ *  picked there: "aligned bars"): the Same scale setting as ONE icon toggle in its OWN small group
+ *  box beside the window group, in the same frame and pressed language. Its own box, not a
+ *  segment of the windows' (user, same day: "pills or a button group?"): a segmented control
+ *  holds mutually exclusive options, and an independent on/off inside it read as a seventh
+ *  window. Two bars on one baseline say "compared on one footing"; the tooltip carries the words
+ *  in both states. It replaced a label + switch that took its own line on phone. The Trends
+ *  DOCUMENT keeps its `ScaleToggle` switch, where a page has room for the name. */
+export function ScalePill({ shared, onChange }: { shared: boolean; onChange: (shared: boolean) => void }) {
+  return (
+    <div role="group" aria-label="Chart scale" className={cn(PICKER_GROUP, "flex-none bg-transparent max-[700px]:flex-none")}>
+      <button
+        type="button"
+        aria-pressed={shared}
+        aria-label="Same scale"
+        title={
+          shared
+            ? "Same scale: every chart shares the busiest network's scale, so the column compares. Click to let each chart scale to its own data."
+            : "Own scale: each chart scales to its own data. Click to put every chart on the busiest network's scale."
+        }
+        onClick={() => onChange(!shared)}
+        className={cn(zoomBtn(shared), "inline-flex items-center justify-center w-7 px-0", shared && "text-primary")}
+      >
+        <AlignEndHorizontal aria-hidden className="size-3.5" />
+      </button>
+    </div>
+  );
+}
+
 
 
 /** ONE SETTING, AS A NAME PLUS ITS STATE (2026-09-19).
@@ -167,8 +197,9 @@ export function SettingSwitch({
 }
 
 /** THE SCALE SETTING — shared by the Trends document's metagraphs tab and the History view's
- *  Network breakdown card (2026-09-19): it is the same question about the same charts, and the two would
- *  otherwise be the sort of near-copy this file exists to prevent. */
+ *  band, beside the window pills (2026-09-19; on the explorer's heading until 2026-09-28): it is
+ *  the same question about the same charts, and the two would otherwise be the sort of near-copy
+ *  this file exists to prevent. */
 export function ScaleToggle({
   shared,
   onChange,

@@ -251,7 +251,15 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // The lowest bloom of the three views: strength drives the "black halo" ring the saturated
     // node/wall hues cast on the globe, and the additive coastal walls read fuzzy under bloom.
     bloom: { strength: 0.20, radius: 0.30, threshold: 0.16 },
-    chipEnv: 1,
+    // 1 → 0.55 (2026-09-28, user: "geo, DAG, Falkenstein provider — the brightest place in all of
+    // our app"): measured on that stack, the studio reflection on 31 co-located caps was the one
+    // term that moved the column's colour — the lamp and the rig each bought a point or two,
+    // halving the env took the red channel 139 → 114. The ledger's own argument, one view over:
+    // dense stacks mirror the env in unison and wash at full sheen. Then 0.55 → 0.35 the same
+    // day ("it's also a bit too shiny still"): below the ledger's half now — a co-located stack
+    // of thirty caps is denser than a tray — and the test ranks the two dense-chip views low
+    // together rather than the ledger alone.
+    chipEnv: 0.35,
     fleet: "placed",
     rawSurface: "records",
     chartStack: false,

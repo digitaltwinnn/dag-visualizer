@@ -4,9 +4,8 @@ import {
   Layers,
   Layers2,
   CircleDashed,
-  SwatchBook,
   Info,
-  Telescope,
+  Compass,
   Box,
   Boxes,
   MapPin,
@@ -27,7 +26,6 @@ import {
 } from "lucide-react";
 import type { NetworkId } from "@/src/engine/config";
 import type { Mode } from "@/src/store/store";
-import type { DocPage } from "@/components/views";
 import type { PickDescriptor } from "@/src/data/types";
 
 // ONE source of truth for the interface's VOCABULARY glyphs — each view kind → its lucide icon.
@@ -50,28 +48,22 @@ export const VIEW_ICONS: Record<Mode, LucideIcon> = {
   soon: CircleDashed,
 };
 
-// The view explainer ("About") card's own mark (user-confirmed): it is not a view SUBJECT, so it
-// gets a dedicated icon rather than borrowing a view's. Info (not BookOpen — at the tray's 14px
-// the open book reads as noise; the circled i is the universal "about" mark and stays crisp).
-// Used in the left dock tray and anywhere the About card kind needs an icon.
+// The view explainer's mark (user-confirmed): it is not a view SUBJECT, so it gets a dedicated
+// icon rather than borrowing a view's. Info (not BookOpen — at 14px the open book reads as noise;
+// the circled i is the universal "about" mark and stays crisp). Used by the command bar's ABOUT
+// button and the About row it opens (the left-rail About card it first marked retired 2026-09-28).
 export const ABOUT_ICON: LucideIcon = Info;
-
-/** The DOC PAGES' marks (the bar's InfoMenu + anywhere a doc page needs a glyph): About wears
- *  the ABOUT card's own circled-i — one concept, one mark — and Design the swatch book (the
- *  token-reference metaphor; deliberately not Palette, whose paint-dab reads artist rather than
- *  system). */
-export const DOC_ICONS: Record<DocPage, LucideIcon> = {
-  about: Info,
-  design: SwatchBook,
-};
 
 // The left-rail TOOL cards' ONE mark (GeoExplore, LedgerPanel — user decision: the SAME standard
 // icon in every view; an earlier per-view icon split read as neither exploring nor
-// learning). Telescope: an INSTRUMENT that says explore/investigate — same reasoning as the
-// status view's Radar. A tool card isn't itself a view subject (unlike the detail cards'
-// Globe/Box/Orbit marks), so it doesn't reuse a view icon. Used in the card head, the dock icon
-// trays (railCards.ts), and the phone dock's Explore half — head, tray, and dock must agree.
-export const EXPLORE_ICON: LucideIcon = Telescope;
+// learning). Compass (user's pick, 2026-09-28 — "not sure I like the telescope"; the candidates
+// were Compass, Binoculars, ScanSearch and Waypoints): the plain "explore" glyph, calm at 14px,
+// and it reads as WAYFINDING, which is what a breakdown path is. The Telescope it replaces was
+// an instrument that said investigate. A tool card isn't itself a view subject (unlike the
+// detail cards' Globe/Box/Orbit marks), so it doesn't reuse a view icon. Used in the card head,
+// the dock icon trays (railCards.ts), and the phone dock's Explore half — head, tray, and dock
+// must agree.
+export const EXPLORE_ICON: LucideIcon = Compass;
 
 // A SNAPSHOT's mark (the snapshot detail card + dock tray): a snapshot renders as a solid BLOCK
 // in the settlement chamber, so it wears the cube — deliberately distinct from VIEW_ICONS.ledger
@@ -112,7 +104,7 @@ export const PROVIDER_ICON: LucideIcon = Server;
 export const COMPOSITION_ICON: LucideIcon = Component;
 
 // The ONE size every card-head/title KIND MARK renders at — About's Info, the tool cards'
-// Telescope, the node card's Globe, the snapshot card's Box (CardHead's panel `icon` + the inspector
+// Compass, the node card's Globe, the snapshot card's Box (CardHead's panel `icon` + the inspector
 // titles in inspector/cards.tsx). 16px (`size-4`): the old 14px read timid next to the 15px
 // text-title headline (user follow-up on Task 23). Single-sourced here so the heads can't drift;
 // the dock TRAYS and the top-bar view switch deliberately keep their own sizes (this constant is
