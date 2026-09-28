@@ -57,8 +57,10 @@ export default function ExploreRail() {
   // old card's to the new one's while the arriving card materializes within it. flex-none on
   // the wrapper is the cards' own rule (the rail scrolls; a card never compresses).
   const renderCard: Record<string, ReactNode> = {
-    // Phone opens the card collapsed (user, 2026-09-03): the sheet becomes a compact chooser
-    // that the live content-fit sizes down, and one tap opens the list and grows the sheet.
+    // The card opens EXPANDED on every tier (user, 2026-09-28). Phone opened it collapsed from
+    // 2026-09-03 so the sheet read as a compact two-head chooser — About's head and this one —
+    // and that reason left with the About card: a sheet holding one card has nothing to choose
+    // between, and a collapsed head there is a tap the reader always pays.
     tool: (
       <HeightEase className="flex-none" growIn={booted.current}>
         {/* ⚠️ TRANSFORM-FREE arrival (user, 2026-09-04: About collapsed + a tall explorer
@@ -67,10 +69,10 @@ export default function ExploreRail() {
             edge visibly). The keyed card fades on the roll clock; the height ease and the
             head's title roll carry the rest of the arrival. */}
         <div key={`tool-${mode}`} className="animate-in fade-in duration-(--tempo-doc-rise) ease-(--ease-roll) delay-(--tempo-roll-lag) fill-mode-both motion-reduce:animate-none">
-          {mode === "hyper" ? <HyperExplore defaultCollapsed={bp === "phone"} />
-          : mode === "geo" ? <GeoExplore defaultCollapsed={bp === "phone"} />
-          : mode === "ledger" ? <LedgerPanel defaultCollapsed={bp === "phone"} />
-          : mode === "trend" ? <TrendExplore defaultCollapsed={bp === "phone"} />
+          {mode === "hyper" ? <HyperExplore />
+          : mode === "geo" ? <GeoExplore />
+          : mode === "ledger" ? <LedgerPanel />
+          : mode === "trend" ? <TrendExplore />
           : null}
         </div>
       </HeightEase>

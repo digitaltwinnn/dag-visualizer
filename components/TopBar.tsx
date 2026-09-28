@@ -227,7 +227,13 @@ export default function TopBar() {
           onKeyDown={(e) => { if (e.key === "Escape") setStrip(null); }}
           className={cn(
             "flex items-center gap-3 max-[1260px]:gap-2.5 max-[940px]:gap-2 max-[700px]:gap-1",
-            "rounded-btn -mx-1 px-1 py-0.5 bg-transparent border-0 cursor-pointer text-left",
+            // ONE CONTROL HEIGHT IN THE BAR (user, 2026-09-28: at phone width with a fine pointer
+            // "the right buttons are higher than the left and mid buttons"): the switch, the
+            // island and the gear are `h-9`, and this face and the filter's sat at their content
+            // height (28 and 30) beside them. Every bar control is 36 on a fine pointer and the
+            // 44 touch floor on a coarse one — controls of different heights read as controls of
+            // different rank.
+            "h-9 rounded-btn -mx-1 px-1 py-0.5 bg-transparent border-0 cursor-pointer text-left",
             // The same pointer-keyed 44px touch floor as the filter button beside it (its note
             // has the rationale) — the ECG mark alone measured 42×28 on phone.
             "pointer-coarse:min-h-11 pointer-coarse:min-w-11",
@@ -257,7 +263,8 @@ export default function TopBar() {
           onClick={() => setStrip((cur) => (cur === "filter" ? null : "filter"))}
           onKeyDown={(e) => { if (e.key === "Escape") setStrip(null); }}
           className={cn(
-            "flex items-center gap-[7px] bg-transparent border-0 cursor-pointer py-1.5 px-2 rounded-btn",
+            // `h-9`: the bar's one control height (the brand button's note).
+            "flex items-center gap-[7px] h-9 bg-transparent border-0 cursor-pointer py-1.5 px-2 rounded-btn",
             "hover:bg-wash-soft",
             strip === "filter" && "bg-wash-soft",
             filterOff && "hidden",
@@ -332,7 +339,7 @@ export default function TopBar() {
           onKeyDown={(e) => { if (e.key === "Escape") setStrip(null); }}
           className={cn(
             // The filter face's own recipe — a face plus its open-state wash — at the touch floor.
-            "hidden max-[700px]:flex items-center justify-center gap-1 py-1.5 px-2 rounded-btn",
+            "hidden max-[700px]:flex items-center justify-center gap-1 h-9 py-1.5 px-2 rounded-btn",
             "bg-transparent border-0 cursor-pointer whitespace-nowrap",
             "hover:bg-wash-soft pointer-coarse:min-h-11 pointer-coarse:min-w-11",
             strip === "views" && "bg-wash-soft",

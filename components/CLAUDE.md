@@ -869,9 +869,10 @@ thirds) — and ONE sheet at a time, with grabber drag-resize and flick-dismiss.
 of the dock (a height transition from a zero armed on the open flip — the content mounts a commit
 later, the portal trap), fits its content live (drag wins until close), and shrinks back on a
 render-phase-derived exit. Dismissing a sheet only collapses it — it does not clear the selection.
-On phone both Explore cards open COLLAPSED (a compact chooser that grows), and the teaching copy
-says the pointer's own word (`usePointerCoarse` — Tap/Click, one home; geo's node ghost alone
-advertises the long-press preview).
+On phone the Explore card opens EXPANDED like everywhere else (2026-09-28 — it opened collapsed
+while the About card shared the sheet, as a two-head chooser; one card has nothing to choose
+between), and the teaching copy says the pointer's own word (`usePointerCoarse` — Tap/Click, one
+home; geo's node ghost alone advertises the long-press preview).
 
 **No auto-open, ever** (global): a pick never opens a sheet or dock. The dock's icon tray announces it;
 the user always taps the trigger.

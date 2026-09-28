@@ -61,10 +61,10 @@ export default function ExplorerShell({
   // Container-level hover cleanup — see the file comment. Optional: most explorers' committed
   // rows stay rendered after a click (no self-unmount hazard), so most callers omit it.
   onLeave?: () => void;
-  /** Phone starts the explorer collapsed (user, 2026-09-03): the Explore sheet opens as a
-   *  compact chooser and the live content-fit sizes it down; one tap opens the browse list and
-   *  the sheet grows with it. Passed by ExploreRail's phone branch as a PROP rather than read off
-   *  `window` here — THE HYDRATION LESSON (first paid by the retired About card): this component
+  /** Start collapsed. No caller passes it since 2026-09-28 — the phone opened the explorer
+   *  collapsed from 2026-09-03 so the Explore sheet read as a compact two-head chooser beside the
+   *  About card, and that reason left with the card. It stays a PROP rather than a `window` read
+   *  here — THE HYDRATION LESSON (first paid by the retired About card): this component
    *  also SSRs in the desktop rail (CSS-hidden on phone, but hydrated), and a window read at
    *  first render made server and client disagree about which chevron to draw, a real hydration
    *  error caught live. The phone sheet mounts client-only after `useBreakpoint` has resolved
