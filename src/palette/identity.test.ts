@@ -82,7 +82,7 @@ describe("theme-lane constants", () => {
     expect(HUD_L).toBe(0.74);
     expect(HUD_C).toBe(0.19);
     expect(SCENE_L).toBe(0.68);
-    expect(SCENE_C).toBe(0.20);
+    expect(SCENE_C).toBe(0.17); // 0.20 until 2026-09-28 — a deliberate retune, moved with the constant
   });
 });
 

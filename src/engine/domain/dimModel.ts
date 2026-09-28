@@ -290,10 +290,14 @@ export function nodeDim(c: DimContext, raw: number, geoCc: string | null): numbe
 
 // The node emissive BASE, hyper → globe: lifted in hyper (nodes read too dim on the flat backdrop)
 // and eased down on the globe (they read too hot against the density light pools, especially the
-// dense DAG stacks) — user. One pair for every node; the metagraph pool's old 0.33 was this same
-// 0.47 with hyper's dim pre-applied (see the file header).
-const BASE_HYPER = 0.47;
-const BASE_GLOBE = 0.37;
+// dense DAG stacks) — user. One pair for every node; the metagraph pool's old 0.33 was the
+// earlier 0.47 with hyper's dim pre-applied (see the file header).
+// EASED DOWN ~15% ON BOTH (2026-09-28, user: "in dark mode the nodes are too bright; I do like the
+// neon/bloom, but the colours feel a bit saturated") — 0.47 → 0.40 and 0.37 → 0.31, beside the
+// scene lane's chroma step in `palette/identity.ts`. The bloom rows are untouched: the halo is
+// the look he likes, and it is the resting emissive feeding it that ran hot.
+const BASE_HYPER = 0.40;
+const BASE_GLOBE = 0.31;
 
 // A node's glow before the floor and the focus terms — the dim's own suppression of the base.
 // Exported for its own spec (the resting base both pools share); nodeEmissive composes on it.
