@@ -40,6 +40,7 @@ export default function ExplorerShell({
   hint,
   onLeave,
   defaultCollapsed = false,
+  aside,
   children,
 }: {
   id: string;
@@ -71,6 +72,10 @@ export default function ExplorerShell({
    *  (Radix portals the sheet content on open), so the initializer is stable for the one
    *  instance that takes it. */
   defaultCollapsed?: boolean;
+  /** Passed to the head's EYEBROW row, left of the collapse indicator (CardHead's `caption`
+   *  slot): the title row is too narrow in a 262px rail to share with a control — "Snapshot
+   *  breakdown" wrapped to two lines beside the LIVE pill (2026-09-28). */
+  aside?: ReactNode;
   children: ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
@@ -85,6 +90,7 @@ export default function ExplorerShell({
           icon={EXPLORE_ICON}
           title={title}
           eyebrow="Explore"
+          caption={aside}
           collapsed={collapsed}
           onToggle={() => setCollapsed((c) => !c)}
         />

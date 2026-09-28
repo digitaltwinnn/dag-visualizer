@@ -98,9 +98,12 @@ export interface ExplorerProps {
   levels: readonly ExplorerLevelSpec[];
   onLeave?: () => void;
   defaultCollapsed?: boolean;
+  /** The card head's right-aligned slot — a CARD-level state that holds on every level (the
+   *  snapshot explorer's LIVE/PINNED, since 2026-09-28), as opposed to a level's own `setting`. */
+  aside?: ReactNode;
 }
 
-export default function Explorer({ id, title, hint, levels, onLeave, defaultCollapsed }: ExplorerProps) {
+export default function Explorer({ id, title, hint, levels, onLeave, defaultCollapsed, aside }: ExplorerProps) {
   const current = levels[levels.length - 1];
   const nested = levels.length > 1;
   // The crumbs: the ROOT as the house glyph (its word is the accessible name — the card's title
@@ -125,13 +128,25 @@ export default function Explorer({ id, title, hint, levels, onLeave, defaultColl
     <ExplorerShell
       id={id}
       title={title}
-      hint={hint}
+      // THE HINT RIDES THE HEADING ROW (user, 2026-09-28: "can the hint be on the same line as the
+      // dropdown? No need for 2 rows"): beside the measure control, left of it, wherever a level
+      // is on screen. The shell's own hint line stays only for the no-level case.
+      hint={current ? null : hint}
       onLeave={onLeave}
       defaultCollapsed={defaultCollapsed}
+      aside={aside}
     >
       {current && (
         <>
-          <ExplorerHeading setting={current.setting} measure={measure} />
+          <ExplorerHeading
+            setting={
+              <>
+                {hint != null && <p className="m-0 mr-auto min-w-0 text-label text-muted-foreground">{hint}</p>}
+                {current.setting}
+              </>
+            }
+            measure={measure}
+          />
           <ExplorerPath crumbs={crumbs} hint={current.meaning} />
           {/* Inside a level the list HANGS FROM THE PATH on a spine in the path's own accent (user,
               2026-09-26: "a vertical line on the left side to show that the section underneath

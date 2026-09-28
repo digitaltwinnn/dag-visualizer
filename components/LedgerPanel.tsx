@@ -15,6 +15,8 @@ import { NoSignalDot } from "@/components/state/StateAtoms";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { cn } from "@/lib/utils";
+import { useNowTick } from "@/components/useNowTick";
+import { relativeAge } from "@/src/util/relativeAge";
 import { buildAnchorLog, buildChannelLog, type AnchorLogRow } from "@/src/data/anchorLog";
 import { latestRelevant } from "@/src/data/follow";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -158,6 +160,15 @@ function perMetaOf(ex: SnapshotExact | undefined, id: string): { fee: number; by
   return any ? { fee, bytes } : undefined;
 }
 
+/** "last 12 min" / "last 2 h" — the time the listed snapshots span, newest back to oldest. */
+function spanWords(ordered: readonly GlobalSnapshot[]): string {
+  if (ordered.length < 2) return "latest";
+  const ms = Date.parse(ordered[0]!.timestamp) - Date.parse(ordered[ordered.length - 1]!.timestamp);
+  if (!(ms > 0)) return "latest";
+  const min = Math.max(1, Math.round(ms / 60_000));
+  return min < 90 ? `last ${min} min` : `last ${Math.round(min / 60)} h`;
+}
+
 export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: boolean } = {}) {
   const filter = useStore((s) => s.filter);
   const hoverFilter = useStore((s) => s.hoverFilter);
@@ -271,14 +282,19 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const tick = openTick != null ? orderedSnaps.find((d) => d.ordinal === openTick) ?? null : null;
   const exact = tick ? snapshotExact[tick.ordinal] : undefined;
 
-  // ---- the heading's one setting: LIVE / PINNED (user, 2026-08-07 — the ONE explicit way to see
-  // and toggle the follow state; design 2026-09-26 decision 15: it rides the heading as dot + word).
+  // ---- the card's LIVE / PINNED state (user, 2026-08-07 — the ONE explicit way to see and toggle
+  // the follow state). It rode the list's heading row as the level's setting (design 2026-09-26,
+  // decision 15) until 2026-09-28, when it moved to the CARD HEAD's aside WITH ITS AGE (user: "move
+  // it to the header and show age also, just like the snapshot card on the right rail"): it is a
+  // state of the whole card on every level, and the age says how fresh "live" is — the right
+  // rail's `live · 8s` counter, ticking, so the two surfaces speak one clock.
   // Hovering ANY snapshot — a row, a scene tile — PREVIEWS the pinned state it would enter (hollow
   // dot, dashed). The write goes through `followToggleActions` + the one executor. ----------------
-  const setting = (() => {
+  const nowTick = useNowTick(1000);
+  const liveControl = (() => {
     if (!live)
       return (
-        <span className="mr-auto inline-flex items-center gap-1.5 text-micro tracking-caps uppercase text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5 text-micro tracking-caps uppercase text-muted-foreground">
           <NoSignalDot /> no signal
         </span>
       );
@@ -288,7 +304,12 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
     const beating = following && previewOrd == null;
     const label = previewOrd != null ? "Pinned" : following ? "Live" : pinned ? "Pinned" : "Live";
     const dotHue = displayNetwork(filter)?.hue ?? accent;
-    const sub = previewOrd != null ? previewOrd.toLocaleString() : pinned ? snap!.data.ordinal.toLocaleString() : following ? null : "off";
+    // The AGE of the snapshot on screen — the live tip while following, the pinned one otherwise —
+    // in the right rail's own words (`relativeAge`, ticking every second). A hover preview names
+    // the ordinal it would pin instead, since that is what the preview is about.
+    const shown = pinned ? snap!.data : latestSnapshot;
+    const age = shown ? relativeAge(nowTick - Date.parse(shown.timestamp)) : "";
+    const sub = previewOrd != null ? previewOrd.toLocaleString() : age ? `· ${age}` : null;
     return (
       <button
         type="button"
@@ -302,7 +323,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         // the padding is there when it is invisible (LIVE, transparent) as when the PINNED wash
         // makes it a visible chip (user, 2026-09-26: the pinned block "looks ugly, no padding").
         className={cn(
-          "mr-auto -ml-1.5 inline-flex items-center gap-1.5 rounded-sm px-1.5 py-[3px] cursor-pointer select-none border border-transparent",
+          "-mr-1.5 inline-flex items-center gap-1.5 rounded-sm px-1.5 py-[3px] cursor-pointer select-none border border-transparent whitespace-nowrap",
           "hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
           pinned && previewOrd == null && selectedRow(true),
           previewOrd != null && "border-dashed border-border",
@@ -391,10 +412,14 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
             to={Math.min(page * pageSize, orderedSnaps.length)}
             total={orderedSnaps.length}
             compact
-            // "recent", the raw log's own word (user, 2026-09-13: "held"/"window" named a mechanism).
+            // THE SPAN THE ROWS COVER, not a count of a buffer (user, 2026-09-28: "instead of '52
+            // recent' say something people understand — they are all recent, but why only 52?").
+            // The explorer holds the latest POLL.maxSnapshots global snapshots; how much TIME that
+            // is — measured from the rows themselves, oldest to newest — is what a reader can use.
+            // It was "recent" (the raw log's word, 2026-09-13), which answered neither question.
             scope={{
-              word: "recent",
-              title: `These are the ${POLL.maxSnapshots} most recent global snapshots — the stretch this page follows live. The chain goes back very much further: open the raw data layer to search all of it.`,
+              word: spanWords(orderedSnaps),
+              title: `The explorer keeps the latest ${POLL.maxSnapshots} global snapshots, the stretch it follows live. For anything older, open the raw data layer and search the whole chain.`,
             }}
             onPage={(p) => setTickPage(p)}
           />
@@ -575,8 +600,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
       }),
     });
   }
-  // Every level carries the view's one setting on its heading.
-  for (const l of levels) l.setting = setting;
 
   return (
     <Explorer
@@ -584,6 +607,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
       title="Snapshot breakdown"
       hint="Recent global snapshots. Open one for the networks that anchored into it."
       levels={levels}
+      aside={liveControl}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => {
         // Container-level hover backstop: leaving the card clears every channel its rows write.

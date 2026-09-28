@@ -209,7 +209,9 @@ decisions inside them are design, not detail:
   `faint`, and inside a tick only the committed network's row is drillable (`outOfLens`); **the
   path follows a commit made elsewhere** (a tile, the rail's ‹ › plank, the raw log) but never
   auto-opens from the root, because the newest tick changes every few seconds. The LIVE/PINNED
-  control rides the heading row as the view's one setting (design decision 15). Each level has its
+  control rides the CARD HEAD's eyebrow row with the shown snapshot's ticking age (2026-09-28 —
+  it rode the heading row as the level's setting, design decision 15, until then), and the pager
+  states the TIME the rows span ("last 11 min") rather than "52 recent". Each level has its
   own measures (ticks fees · anchors · metagraphs · size, a network in a tick snapshots · fees ·
   size, a snapshot fee · size), figures BARE because the heading names the unit, in a 48px figure
   column (`figureW` — a 4-decimal fee does not fit the default 40).
