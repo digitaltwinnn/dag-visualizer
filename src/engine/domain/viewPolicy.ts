@@ -255,9 +255,11 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // our app"): measured on that stack, the studio reflection on 31 co-located caps was the one
     // term that moved the column's colour — the lamp and the rig each bought a point or two,
     // halving the env took the red channel 139 → 114. The ledger's own argument, one view over:
-    // dense stacks mirror the env in unison and wash at full sheen. Kept a shade above the
-    // ledger's half so the two rows still rank (the test pins the ledger as the lowest).
-    chipEnv: 0.55,
+    // dense stacks mirror the env in unison and wash at full sheen. Then 0.55 → 0.35 the same
+    // day ("it's also a bit too shiny still"): below the ledger's half now — a co-located stack
+    // of thirty caps is denser than a tray — and the test ranks the two dense-chip views low
+    // together rather than the ledger alone.
+    chipEnv: 0.35,
     fleet: "placed",
     rawSurface: "records",
     chartStack: false,

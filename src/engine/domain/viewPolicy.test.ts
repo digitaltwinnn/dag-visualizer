@@ -95,11 +95,15 @@ describe("VIEW_POLICIES", () => {
   // resting pose full sheen mirrors on every chip at once and washes the tray toward white — but
   // NOT zero: zero went bland and dropped the parked grids' bloom in one visible step at the
   // transition boundary (user, 2026-08-30, both directions the same day).
-  it("keeps the ledger's chip env sheen lowest but above zero", () => {
-    const ledger = VIEW_POLICIES.ledger.chipEnv;
-    expect(ledger).toBeGreaterThan(0);
+  // …and geo joined it low on 2026-09-28 (a co-located stack of thirty caps is denser than a
+  // tray, and read as "too shiny" at the ledger's half): the two DENSE-chip views run below the
+  // rest, both above zero. Hyper's spheres skip the env and its row states the full gain.
+  it("keeps the two dense-chip views' sheen low but above zero, below every other view", () => {
+    const dense = ["ledger", "geo"] as const;
+    for (const d of dense) expect(VIEW_POLICIES[d].chipEnv).toBeGreaterThan(0);
+    const ceiling = Math.max(...dense.map((d) => VIEW_POLICIES[d].chipEnv));
     for (const m of MODES) {
-      if (m !== "ledger") expect(VIEW_POLICIES[m].chipEnv).toBeGreaterThan(ledger);
+      if (!(dense as readonly string[]).includes(m)) expect(VIEW_POLICIES[m].chipEnv).toBeGreaterThan(ceiling);
     }
   });
 });
