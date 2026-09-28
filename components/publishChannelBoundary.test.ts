@@ -3,7 +3,10 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 // The four REACT → ENGINE publish channels (2026-08-19; the fourth 2026-09-18): `boxedCard`,
-// `sceneCoverL`/`sceneCoverR`, `focusRung` and `trendIds`. Each carries a fact only React can know
+// the `sceneCover*` family, `focusRung` and `trendIds`. The cover family is five scalars since
+// 2026-09-28: `sceneCoverL`/`R` (a tablet side sheet's MEASURED width) and `sceneCoverBExplore`/
+// `BDetails`/`BVitals` (each phone dock's bottom height, published from the dock's own target-height
+// STATE, so the scene shift eases once rather than chasing a grow). Each carries a fact only React can know
 // — which card is the box, how many px of canvas a sheet covers, which rung a card just asked to
 // be framed, and which networks the trend stack shows in which order (the busiest-first rank over
 // FETCHED trends data, which lives in React's cache and nowhere the engine can reach) — into an

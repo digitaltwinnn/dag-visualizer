@@ -353,17 +353,21 @@ export default function RailDock({
   const covering = open && shellVisible && !isBottom;
   useEffect(() => {
     if (isBottom) return; // the bottom arm publishes its HEIGHT below, from state
+    // The SIDE arm's publisher, captured for its own release — the bottom arm's note has why: one
+    // RailDock survives the tier step with swapped props, so at cleanup the ref may already hold
+    // the other arm's callback and a zero sent through it lands on the wrong cover.
+    const cover = onCoverRef.current;
     if (!covering || !sheetEl) {
-      onCoverRef.current?.(0);
+      cover?.(0);
       return;
     }
-    const publish = () => onCoverRef.current?.(Math.round(sheetEl.offsetWidth));
+    const publish = () => cover?.(Math.round(sheetEl.offsetWidth));
     publish();
     const ro = new ResizeObserver(publish);
     ro.observe(sheetEl);
     return () => {
       ro.disconnect();
-      onCoverRef.current?.(0);
+      cover?.(0);
     };
   }, [covering, sheetEl, isBottom]);
   // ── Canvas cover (phone) — the HEIGHT this bottom sheet takes (2026-09-28) ───────────────
@@ -376,7 +380,18 @@ export default function RailDock({
     if (!isBottom) return;
     onCoverRef.current?.(open && shellVisible ? (heightPx ?? 0) : 0);
   }, [isBottom, open, shellVisible, heightPx]);
-  useEffect(() => () => { if (isBottom) onCoverRef.current?.(0); }, [isBottom]);
+  // The release must reach the BOTTOM cover's own publisher. ⚠️ Not `onCoverRef.current` at cleanup
+  // time (found 2026-09-28, user: "works for vitals, but not for explorer"): ExploreRail and
+  // Inspector keep ONE RailDock across the phone→tablet step and only swap its props, so when
+  // `isBottom` flips false the ref already holds the TABLET side-sheet callback — the zero went to
+  // the left/right cover and the phone's bottom cover stayed up, holding the scene shifted on a
+  // desktop with no sheet. The Vitals dock unmounts off phone, which is why it never showed.
+  // Captured when the bottom arm starts, released through the same function.
+  useEffect(() => {
+    if (!isBottom) return;
+    const publish = onCoverRef.current;
+    return () => publish?.(0);
+  }, [isBottom]);
 
   // ── Tap-outside dismiss (phone bar-half only, user 2026-08-15) ─────────────────────────────
   // A TAP on the scene collapses the open bottom sheet, the same dismissal the bar-half toggle

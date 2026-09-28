@@ -48,10 +48,10 @@ export const VIEW_ICONS: Record<Mode, LucideIcon> = {
   soon: CircleDashed,
 };
 
-// The view explainer ("About") card's own mark (user-confirmed): it is not a view SUBJECT, so it
-// gets a dedicated icon rather than borrowing a view's. Info (not BookOpen — at the tray's 14px
-// the open book reads as noise; the circled i is the universal "about" mark and stays crisp).
-// Used in the left dock tray and anywhere the About card kind needs an icon.
+// The view explainer's mark (user-confirmed): it is not a view SUBJECT, so it gets a dedicated
+// icon rather than borrowing a view's. Info (not BookOpen — at 14px the open book reads as noise;
+// the circled i is the universal "about" mark and stays crisp). Used by the command bar's ABOUT
+// button and the About row it opens (the left-rail About card it first marked retired 2026-09-28).
 export const ABOUT_ICON: LucideIcon = Info;
 
 // The left-rail TOOL cards' ONE mark (GeoExplore, LedgerPanel — user decision: the SAME standard

@@ -478,8 +478,8 @@ pair. Permanently dead chrome is not a control.
 
 **Ladder steps are QUIET, and the quiet is PROVENANCE, not a timer** (user, 2026-09-11, four
 rounds ending in "solve it structurally"): `store.navQuiet` records HOW the current state was
-reached — set true by `toggleCollapse` (any manual expand, the About card's own
-never-roll-on-a-manual-expand rule) and by the one executor when a caller passes `quiet` (the
+reached — set true by `toggleCollapse` (any manual expand — the never-roll-on-a-manual-expand
+rule the retired About card first set) and by the one executor when a caller passes `quiet` (the
 plank's first-child ∨); reset false by every ordinary commit, by `setMode`, and by the
 `advanceSnap`/`advanceMetaSnap` heartbeat writes (a new tick IS an arrival — without that
 reset a stale quiet suppressed every later live-advance roll). `CardHead.useRolledTitle`

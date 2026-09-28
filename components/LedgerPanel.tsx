@@ -160,6 +160,14 @@ function perMetaOf(ex: SnapshotExact | undefined, id: string): { fee: number; by
   return any ? { fee, bytes } : undefined;
 }
 
+/** `· 5s ago` — the shown snapshot's age, ticking. Its own component so the per-second clock
+ *  re-renders this span alone rather than the whole explorer. */
+function LiveAge({ ts }: { ts: string }) {
+  const now = useNowTick(1000);
+  const age = relativeAge(now - Date.parse(ts));
+  return age ? <>· {age}</> : null;
+}
+
 /** "last 12 min" / "last 2 h" — the time the listed snapshots span, newest back to oldest. */
 function spanWords(ordered: readonly GlobalSnapshot[]): string {
   if (ordered.length < 2) return "latest";
@@ -235,8 +243,11 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const lastSize = useRef(pageSize);
   useEffect(() => {
     if (lastSize.current === pageSize) return;
-    setTickPage((p) => pageKeepingRow(p, lastSize.current, pageSize));
+    // Read the OLD size before overwriting it: an updater runs lazily when another update is
+    // pending on this fiber (the feed re-renders it often), and by then the ref would say new.
+    const prev = lastSize.current;
     lastSize.current = pageSize;
+    setTickPage((p) => pageKeepingRow(p, prev, pageSize));
   }, [pageSize]);
   const pages = Math.max(1, Math.ceil(orderedSnaps.length / pageSize));
   const page = Math.min(tickPage, pages);
@@ -290,7 +301,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // rail's `live · 8s` counter, ticking, so the two surfaces speak one clock.
   // Hovering ANY snapshot — a row, a scene tile — PREVIEWS the pinned state it would enter (hollow
   // dot, dashed). The write goes through `followToggleActions` + the one executor. ----------------
-  const nowTick = useNowTick(1000);
   const liveControl = (() => {
     if (!live)
       return (
@@ -307,9 +317,17 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
     // The AGE of the snapshot on screen — the live tip while following, the pinned one otherwise —
     // in the right rail's own words (`relativeAge`, ticking every second). A hover preview names
     // the ordinal it would pin instead, since that is what the preview is about.
+    // The age ticks in its own child (`LiveAge`), so the per-second clock re-renders one span,
+    // not the whole explorer. Following off with nothing pinned says "off" — the state is not
+    // live, and an age beside the word would read as if it were.
     const shown = pinned ? snap!.data : latestSnapshot;
-    const age = shown ? relativeAge(nowTick - Date.parse(shown.timestamp)) : "";
-    const sub = previewOrd != null ? previewOrd.toLocaleString() : age ? `· ${age}` : null;
+    const sub = previewOrd != null
+      ? previewOrd.toLocaleString()
+      : !following && !pinned
+        ? "· off"
+        : shown
+          ? <LiveAge ts={shown.timestamp} />
+          : null;
     return (
       <button
         type="button"

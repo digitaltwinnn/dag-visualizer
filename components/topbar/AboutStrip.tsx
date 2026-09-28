@@ -41,6 +41,7 @@ export default function AboutStrip() {
     // collapses to one column, lead first, and the rule turns horizontal.
     <div
       className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] gap-x-8 gap-y-3 mx-2 px-2.5 pb-3 pt-2.5 border-t border-border/60 max-[700px]:grid-cols-1 max-[700px]:max-h-[45vh] max-[700px]:overflow-y-auto max-[700px]:overscroll-contain slim-scroll"
+      role="region"
       aria-label={`${eyebrow}: ${title}`}
     >
       <div className="flex flex-col gap-2 min-w-0 pr-8 border-r border-border/60 max-[700px]:pr-0 max-[700px]:border-r-0 max-[700px]:pb-3 max-[700px]:border-b">

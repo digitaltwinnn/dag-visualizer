@@ -34,7 +34,7 @@ import type { StageLight } from "./objects/StageLight";
 import { STAGE_LIGHTS } from "../domain/stageLight";
 import { ccToNumeric, countryCcAt, countryLean, geometryRings, mainPolygonRings, ringsAngularRadius, ringsCentroid, type Ring } from "../domain/countryShape";
 import { makeTextLabel, disposeTextLabel } from "./objects/TextLabel";
-import { joinOverlay } from "./SceneContext";
+import { joinOverlay, leaveOverlay } from "./SceneContext";
 import { closeness, NODE_RAISE } from "../domain/cameraRig";
 import type { CohortSel } from "../domain/focusLadder";
 import { ancestryGlow } from "../domain/dimModel";
@@ -576,6 +576,7 @@ export class Globe implements GeoViewHost {
     const grp = this._gatherLabelGroup;
     for (const l of this._gatherLabels) {
       grp.remove(l.mesh);
+      leaveOverlay(l.mesh);
       disposeTextLabel(l.mesh);
     }
     this._gatherLabels.length = 0;

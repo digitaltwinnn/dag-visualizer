@@ -73,8 +73,23 @@ export function joinBloom(o: THREE.Object3D): void {
  * and this render goes around it.
  */
 export const OVERLAY_LAYER = 2;
+// The members, so the pass can skip itself when none is showing (the legend is visible only
+// through a gather) — a full-scene render every frame to draw nothing is the cost it avoids.
+const overlayMembers = new Set<THREE.Object3D>();
 export function joinOverlay(o: THREE.Object3D): void {
   o.layers.set(OVERLAY_LAYER);
+  overlayMembers.add(o);
+}
+export function leaveOverlay(o: THREE.Object3D): void {
+  overlayMembers.delete(o);
+}
+function overlayShowing(): boolean {
+  for (const o of overlayMembers) {
+    let n: THREE.Object3D | null = o;
+    while (n && n.visible) n = n.parent;
+    if (n === null) return true; // every ancestor up to the root is visible
+  }
+  return false;
 }
 
 // True only while the selective MARK pass is rendering (paper frames; see renderFrame). A member
@@ -410,6 +425,7 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   // composer's last quad is not scene depth), no background. Every saved field is restored, so
   // the next frame starts from exactly the state the engine set up.
   function drawOverlay() {
+    if (!overlayShowing()) return;
     const mask = camera.layers.mask;
     const ac = renderer.autoClear;
     const bg = scene.background;

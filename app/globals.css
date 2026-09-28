@@ -238,8 +238,8 @@
    stays, since it is the materialize preview and answers a different question ("this will open").
    Tighter 5px end insets than the panel's 10px: an entry is one short row, and the panel's insets
    would eat most of the line. MUST precede the hover/pairing rules below — same (0,2,1)
-   specificity, so source order is what lets them win. LEFT-rail entries (AboutView collapsed) need
-   nothing: `.sig-right::after` already carries its own geometry. */
+   specificity, so source order is what lets them win. LEFT-rail entries need nothing:
+   `.sig-right::after` already carries its own geometry. */
 .rail-entry.sig-left::before {
   content: "";
   position: absolute;
