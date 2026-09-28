@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import Explorer, { type ExplorerLevelSpec, type ExplorerRowSpec } from "@/components/explorer/Explorer";
 import { nodeRowSpec, unknownNodeRowSpec } from "@/components/explorer/nodeRow";
 import TablePager from "@/components/datasection/TablePager";
+import { pageKeepingRow } from "@/components/explorer/fitRows";
+import useFitRows from "@/components/explorer/useFitRows";
+import { useBreakpoint } from "@/components/useBreakpoint";
 import { IdentityDot } from "@/components/inspector/parts";
 import { ensurePage } from "@/components/RawSnapshotBridge";
 import { selectedRow, selectionHue } from "@/components/selection";
@@ -72,7 +75,9 @@ import { useStore } from "@/src/store/store";
 // snapshot, not its tick, and the tick channel would light every band of the anchoring global),
 // a signer on `hoverNodeId`. Hovers preview, never commit.
 
-/** How many ticks a page of the explorer shows. Fifteen because the card is a peephole, not the
+/** How many ticks a page of the explorer shows OFF THE DESKTOP (and before the first measure on
+ *  it): on the desktop rail the page FILLS to the rail's bottom (`useFitRows`, 2026-09-28 — user:
+ *  "always fill the rows till the bottom of the view"). Fifteen because the card is a peephole, not the
  *  chain: enough rows that the list reads as a run of history rather than as the last handful
  *  (user, 2026-09-13: "can you do 10-20 by default"), few enough that one page fits the rail. */
 const TICK_PAGE = 15;
@@ -204,9 +209,23 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const orderedSnaps = [...snaps].reverse(); // newest first, the log convention
   const activeSnapOrd = snap?.data.ordinal ?? null;
   const [tickPage, setTickPage] = useState(1);
-  const pages = Math.max(1, Math.ceil(orderedSnaps.length / TICK_PAGE));
+  // The path's first step, declared here because the page size reads it: the fit measures only
+  // while the tick level (no tick open) is the one on screen.
+  const [openTick, setOpenTick] = useState<number | null>(null);
+  // THE PAGE SIZE FILLS THE RAIL on desktop (`useFitRows`): measured only while the tick level is
+  // the one on screen, and when it changes the reader keeps their place — the page holding the
+  // row that was first on screen (`pageKeepingRow`), so a resize never throws them to page 1.
+  const bp = useBreakpoint();
+  const pageSize = useFitRows("ledger-view", bp === "desktop", openTick == null, TICK_PAGE);
+  const lastSize = useRef(pageSize);
+  useEffect(() => {
+    if (lastSize.current === pageSize) return;
+    setTickPage((p) => pageKeepingRow(p, lastSize.current, pageSize));
+    lastSize.current = pageSize;
+  }, [pageSize]);
+  const pages = Math.max(1, Math.ceil(orderedSnaps.length / pageSize));
   const page = Math.min(tickPage, pages);
-  const pagedSnaps = orderedSnaps.slice((page - 1) * TICK_PAGE, page * TICK_PAGE);
+  const pagedSnaps = orderedSnaps.slice((page - 1) * pageSize, page * pageSize);
   // A PAGE IN VIEW IS A PAGE IN FOCUS: the exact reads (the figures) are fetched for the page the
   // reader is looking at, at the backfill's own pace, deduped against everything held or in flight.
   const pagedKey = pagedSnaps.map((d) => d.ordinal).join(",");
@@ -216,7 +235,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   }, [pagedKey]);
 
   // The path: which tick, which network in it, which snapshot's signers.
-  const [openTick, setOpenTick] = useState<number | null>(null);
   const [openNet, setOpenNet] = useState<string | null>(null);
   const [openSnap, setOpenSnap] = useState<string | null>(null); // `${metaId}|${ordinal}` — a bare ordinal collides (every undecodable unlisted payload is 0)
   // A snapshot committed ANYWHERE opens the path to it (the scene's tile, the rail's pager, the
@@ -229,7 +247,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
     setOpenNet(netId);
     setOpenSnap((cur) => (cur === `${metaSnap.metaId}|${metaSnap.ordinal}` ? cur : null));
     const at = orderedSnaps.findIndex((d) => d.ordinal === metaSnap.globalOrdinal);
-    if (at >= 0) setTickPage(Math.floor(at / TICK_PAGE) + 1);
+    if (at >= 0) setTickPage(Math.floor(at / pageSize) + 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- one sync per committed snapshot
   }, [metaSnapKey]);
   // A tick pinned elsewhere (the rail's ‹ › plank) while a tick is open re-points the path — but
@@ -365,8 +383,8 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           <TablePager
             page={page}
             pages={pages}
-            from={(page - 1) * TICK_PAGE + 1}
-            to={Math.min(page * TICK_PAGE, orderedSnaps.length)}
+            from={(page - 1) * pageSize + 1}
+            to={Math.min(page * pageSize, orderedSnaps.length)}
             total={orderedSnaps.length}
             compact
             // "recent", the raw log's own word (user, 2026-09-13: "held"/"window" named a mechanism).
