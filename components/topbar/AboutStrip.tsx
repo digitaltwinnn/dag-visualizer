@@ -20,7 +20,7 @@ import { useStore } from "@/src/store/store";
 // retired card's, which /about's own lead set: the lead at full `--foreground` and medium weight
 // (two channels, so the distinction survives either face), a hairline dividing it from the
 // secondary paragraphs, and those in the muted ink. Prose wants a MEASURE, not the bar's width —
-// the block caps at a reading width and sits beside the title on desktop, under it on phone —
+// the right column caps at a reading width (layout B below has the split) —
 // and on phone the row caps its height and scrolls (the filter strip's own rule), so the
 // three-paragraph hyper card never takes the screen.
 export default function AboutStrip() {
@@ -33,29 +33,34 @@ export default function AboutStrip() {
   const eyebrow = `${VIEWS.find((v) => v.id === mode)?.name ?? ""} view`;
   const Icon = ABOUT_ICON;
   return (
+    // LAYOUT B (user's pick, 2026-09-28 — "it feels a bit unbalanced: left has little text, right a
+    // lot"; the companion showed three layouts): TWO columns, each carrying a paragraph's weight.
+    // The LEFT holds the head AND the lead — eyebrow, title, standfirst — so the orientation reads
+    // as one block; the RIGHT holds the secondary paragraphs, divided from it by a hairline. The
+    // standfirst's own hairline goes: the column rule now does that job. On phone the grid
+    // collapses to one column, lead first, and the rule turns horizontal.
     <div
-      className="flex flex-wrap gap-x-8 gap-y-3 mx-2 px-2.5 pb-3 pt-2.5 border-t border-border/60 max-[700px]:max-h-[45vh] max-[700px]:overflow-y-auto max-[700px]:overscroll-contain slim-scroll"
+      className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] gap-x-8 gap-y-3 mx-2 px-2.5 pb-3 pt-2.5 border-t border-border/60 max-[700px]:grid-cols-1 max-[700px]:max-h-[45vh] max-[700px]:overflow-y-auto max-[700px]:overscroll-contain slim-scroll"
       aria-label={`${eyebrow}: ${title}`}
     >
-      {/* THE TITLE BLOCK — the card head's eyebrow-over-title, as the row's first column. */}
-      <div className="flex flex-col gap-1 w-[220px] flex-none max-[700px]:w-full">
+      <div className="flex flex-col gap-2 min-w-0 pr-8 border-r border-border/60 max-[700px]:pr-0 max-[700px]:border-r-0 max-[700px]:pb-3 max-[700px]:border-b">
         <span className="flex items-center gap-2 text-micro tracking-caps uppercase text-muted-foreground">
           <Icon aria-hidden className="size-3.5 text-[var(--filter-accent,var(--primary))]" />
           {eyebrow}
           {caption && <span className="ml-auto text-muted-foreground/70">{caption}</span>}
         </span>
         <span className="text-title font-semibold tracking-[-0.01em] text-foreground">{title}</span>
-      </div>
-      {/* THE PROSE — lead, hairline, body, at a reading measure. */}
-      <div className="flex flex-col gap-2 flex-1 min-w-0 max-w-[68ch]">
         {lines[0] != null && <p className="m-0 text-body text-foreground font-medium">{lines[0]}</p>}
-        {lines.length > 1 && <div className="border-b border-border" aria-hidden />}
-        {lines.slice(1).map((l, i) => (
-          <p key={i} className="m-0 text-body text-muted-foreground">
-            {l}
-          </p>
-        ))}
       </div>
+      {lines.length > 1 && (
+        <div className="flex flex-col gap-2 min-w-0 max-w-[72ch]">
+          {lines.slice(1).map((l, i) => (
+            <p key={i} className="m-0 text-body text-muted-foreground">
+              {l}
+            </p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
