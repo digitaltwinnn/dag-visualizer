@@ -397,6 +397,19 @@ export default function RailDock({
   // today's tap-to-collapse. Reduced motion: the snap is instant (the transition class is
   // motion-reduce-suppressed); the drag itself is direct manipulation and stays.
   const [dragging, setDragging] = useState(false);
+  // THE SPRING IS THE DRAG RELEASE'S ALONE (user, 2026-09-28: "the transition is just too
+  // aggressive" — content re-fits and the entry grow rode the same overshooting curve, so a
+  // drill into a longer list landed 30px past its height and settled back). A finger letting go
+  // wants the detent physics; content arriving does not. `snapping` is true for one snap's
+  // clock after a release, and only then does the height ride `--ease-spring`.
+  const [snapping, setSnapping] = useState(false);
+  const snapT = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const armSnap = () => {
+    setSnapping(true);
+    if (snapT.current) clearTimeout(snapT.current);
+    snapT.current = setTimeout(() => setSnapping(false), 400);
+  };
+  useEffect(() => () => { if (snapT.current) clearTimeout(snapT.current); }, []);
   const drag = useRef<{ startY: number; startH: number; moved: boolean; samples: { t: number; y: number }[]; el: HTMLElement } | null>(null);
   const expandedPx = () => Math.min(Math.round(window.innerHeight * 0.8), window.innerHeight - 140);
   const defaultPx = () => Math.round(window.innerHeight * 0.6); // = the CSS h-[60vh]
@@ -466,6 +479,7 @@ export default function RailDock({
       return;
     }
     const exp = expandedPx();
+    armSnap();
     onSheetPx?.(Math.abs(hp - def) <= Math.abs(hp - exp) ? def : exp);
   };
   // A completed drag also fires a click on the grabber — swallow it so it doesn't re-collapse.
@@ -684,10 +698,12 @@ export default function RailDock({
           data-dim={yielding ? "" : undefined}
           // Phone bar-half variant: the sheet sits DIRECTLY ABOVE the persistent dock bar (never
           // covers it — the bar is its visible header/handle), so offset it up by the bar height.
-          // `!` beats the base `bottom-0` from the bottom-side placement in sheet.tsx. Snapping
-          // animates the height on the shared `--ease-spring` (user, 2026-08-15 — the detent
-          // lands with the same physics as the pager; suspended while the finger drags, instant
-          // under reduced motion).
+          // `!` beats the base `bottom-0` from the bottom-side placement in sheet.tsx. A drag's
+          // release snap animates the height on the shared `--ease-spring` (user, 2026-08-15 —
+          // the detent lands with the same physics as the pager; suspended while the finger
+          // drags, instant under reduced motion). ONLY the snap (2026-09-28, `snapping`): the
+          // entry grow takes the house entrance curve and a content re-fit a plain ease-out,
+          // because a spring overshoots and content arriving is not a finger letting go.
           // `opacity` rides the same list so the scene-yield dim isn't stranded
           // by this element-level `transition-property` — it takes the sheet's own tempo
           // rather than the rails' 0.3s, which is the honest trade for not fighting the cascade.
@@ -709,10 +725,11 @@ export default function RailDock({
                         // quicker than the 550ms entry, per standard motion practice.
                         exiting
                           ? "transition-[height,opacity] duration-[420ms] ease-out"
-                          : cn(
-                              "transition-[height,opacity] ease-[var(--ease-spring)]",
-                              entry === "grow" ? "duration-[550ms]" : "duration-[380ms]",
-                            ),
+                          : snapping
+                            ? "transition-[height,opacity] ease-[var(--ease-spring)] duration-[380ms]"
+                            : entry === "grow"
+                              ? "transition-[height,opacity] duration-[550ms] ease-[var(--ease-roll)]"
+                              : "transition-[height,opacity] duration-[380ms] ease-out",
                       ),
                 )
               : undefined
