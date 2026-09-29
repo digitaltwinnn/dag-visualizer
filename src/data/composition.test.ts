@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { compositionRows, nodeCompositionLabel, compositionKey, parseCompositionKey, compositionClause, ROLE_SHORT, layerCodesOf, compositionGroups, machineKey } from "./composition";
+import { roleKey, roleKeyLabel, compositionRows, nodeCompositionLabel, compositionKey, parseCompositionKey, compositionClause, ROLE_SHORT, layerCodesOf, compositionGroups, machineKey } from "./composition";
 import type { NodeInfo, NodeRow } from "@/src/data/types";
 
 const n = (roles: string[]): NodeInfo => ({ ip: "x", state: "Ready", layer: roles[0], roles }) as NodeInfo;
@@ -131,5 +131,18 @@ describe("machineKey", () => {
     expect(machineKey(undefined, "peerid")).toBe("peerid");
     expect(machineKey(null, "peerid")).toBe("peerid");
     expect(machineKey("", "peerid")).toBe("peerid");
+  });
+});
+
+describe("roleKey / roleKeyLabel", () => {
+  it("a node's type is its roles in vocabulary order — one key per make-up, whatever the input order", () => {
+    expect(roleKey({ roles: ["dl1", "l0", "cl1"] })).toBe("l0+cl1+dl1");
+    expect(roleKey({ roles: [], layer: "dl1" })).toBe("dl1");
+    expect(roleKey({})).toBe("none");
+  });
+  it("reads back in the composition vocabulary", () => {
+    expect(roleKeyLabel("l0+cl1")).toEqual({ label: "Hybrid", codes: ["L0", "cL1"] });
+    expect(roleKeyLabel("dl1")).toEqual({ label: "Data", codes: ["dL1"] });
+    expect(roleKeyLabel("none")).toEqual({ label: "Unknown", codes: [] });
   });
 });

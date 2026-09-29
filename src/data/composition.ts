@@ -19,6 +19,26 @@ const DEDICATED_LABEL: Record<string, string> = { l0: "Consensus", cl1: "Currenc
 const codesFor = (roles: string[]) =>
   ROLE_ORDER.filter((r) => roles.includes(r)).map((r) => ROLE_SHORT[r]);
 
+/** A node's TYPE as a storable key (2026-09-29, the History node-type stack): its roles in the
+ *  vocabulary order joined by "+" — "l0+cl1", "dl1" — or "none" when it states no role. Unlike the
+ *  per-ROLE tallies (a hybrid counts once for every layer it runs, so they overlap), types
+ *  PARTITION a network's nodes: each node has exactly one, so their counts sum to the total. The
+ *  sampler writes `f.type.{id}.{key}` with this and the chart reads it back through
+ *  `roleKeyLabel`, so the two can never name a type two ways. */
+export function roleKey(node: { roles?: string[]; layer?: string | null }): string {
+  const roles = node.roles && node.roles.length ? node.roles : node.layer ? [node.layer] : [];
+  return ROLE_ORDER.filter((r) => roles.includes(r)).join("+") || "none";
+}
+
+/** A stored type key in the composition vocabulary — the same label and codes the hypergraph's
+ *  composition rows wear ("Hybrid" L0 cL1, "Data" dL1). */
+export function roleKeyLabel(key: string): { label: string; codes: string[] } {
+  if (key === "none") return { label: "Unknown", codes: [] };
+  const roles = key.split("+");
+  const row = compositionRows([{ roles, layer: roles[0] } as NodeInfo])[0];
+  return row ? { label: row.label, codes: row.codes } : { label: key, codes: [] };
+}
+
 /** The layer codes present across a set of role lists, in the fixed vocabulary order — the
  *  subject callout's lead-line read, and the one aggregate over ROLE_SHORT. */
 export function layerCodesOf(nodes: ReadonlyArray<{ roles?: string[] }>): string[] {

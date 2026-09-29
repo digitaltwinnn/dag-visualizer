@@ -6,6 +6,7 @@ import { getLiveGeo } from "@/app/api/geo/live";
 import { runSample } from "../runSample";
 import { writeStore } from "../store";
 import type { FleetCounts, GlobalRec, MetaRec } from "../bucketing";
+import { roleKey } from "@/src/data/composition";
 import type { ChainPage } from "../fetchSince";
 
 // The trends SAMPLER — Vercel Cron hits this every 15 min (vercel.json). It pages the tiny
@@ -60,16 +61,24 @@ async function fleetCounts(net: ReturnType<typeof netOf>): Promise<FleetCounts |
     // f.layer.{id}.{role} is the same tally kept per network (2026-09-11 — the /trends
     // per-network node panels draw the layer lines the hypergraph tab already has).
     const perNetLayers: Record<string, Record<string, number>> = {};
+    // f.type.{id}.{key}: the same nodes by TYPE (2026-09-29) — each node counted ONCE, under its
+    // exact make-up, so a network's types sum to its total where its role tallies overlap.
+    const perNetTypes: Record<string, Record<string, number>> = {};
     for (const m of metagraphs) {
       perNet[m.id] = m.nodes.length;
       total += m.nodes.length;
       const mine: Record<string, number> = (perNetLayers[m.id] = {});
+      const types: Record<string, number> = (perNetTypes[m.id] = {});
+      for (const n of m.nodes) {
+        const k = roleKey(n);
+        types[k] = (types[k] || 0) + 1;
+      }
       for (const n of m.nodes) for (const role of n.roles) {
         layers[role] = (layers[role] || 0) + 1;
         mine[role] = (mine[role] || 0) + 1;
       }
     }
-    return total > 0 ? { total, perNet, layers, perNetLayers, countries } : null;
+    return total > 0 ? { total, perNet, layers, perNetLayers, perNetTypes, countries } : null;
   } catch {
     return null;
   }
