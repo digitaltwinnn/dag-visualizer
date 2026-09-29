@@ -5,8 +5,7 @@ import type { Mode } from "@/src/store/store";
 import type { CameraFraming } from "./domain/cameraRig";
 import {
   FOCI, type FocusName, aspectFit, dollyBack, geoFraming, hubFraming, railsLean,
-  isSamePose, nudgeMix, restOrbit, NUDGE_DUR, easeInOutQuad,
-} from "./domain/cameraRig";
+  isSamePose, nudgeMix, restOrbit, NUDGE_DUR, easeInOutQuad, orbitLerp, clampPose } from "./domain/cameraRig";
 import { HYPER_TILT_FOCUS } from "./domain/hyperLayout";
 import { TAP_ZOOM_DUR, tapZoomAround, tapZoomDistance } from "./domain/tapZoom";
 import { is3D } from "./domain/viewTransition";
@@ -39,7 +38,7 @@ export interface CameraHost {
   transition: ViewTransition;
   mode: Mode;
   /** Only `canvas` is read: the flat placeholder views are inert (convention 7). */
-  policy(): { canvas: boolean };
+  policy(): { canvas: boolean; minCamAlt: number | null };
   railsHidden(): boolean;
   slowmo(): number;
   /** The camera-flying dim. Routed through the Engine rather than written here: rule 1 keeps
@@ -123,6 +122,11 @@ export class CameraDirector {
     // Same `dolly` gate, same reason as both siblings; the live camera's aspect is the parameter
     // so the domain stays pure. In place (outPos===pos safe, like railsLean).
     if (dolly) aspectFit(tw.toPos, tw.toTgt, this.h.ctx.camera.aspect, tw.toPos);
+    // THE HONEST DESTINATION (2026-09-29): the clamps the frame loop applies after the tween —
+    // the controls' distance floor/ceiling, then the view's altitude floor — resolved here first,
+    // so the flight ends where the camera will be held instead of being caught mid-flight and
+    // pushed back out. Last of the destination levers, so it clamps what they produced.
+    clampPose(tw.toPos, tw.toTgt, this.h.ctx.controls.minDistance, this.h.ctx.controls.maxDistance, this.h.policy().minCamAlt);
     // THE COMMIT NUDGE (user, 2026-08-13): "we always animate the position but a 'nudge' is allowed
     // which means the new pos will be same as old pos". Every rung answers a click, including the
     // ones whose pose is their parent's — hyper's node and composition rungs resolve to the network
@@ -252,8 +256,8 @@ export class CameraDirector {
     // click while settled — no transition running) stays full speed under ?slowmo.
     tw.t = Math.min(1, tw.t + dt / (tw.dur * (this.h.transition.active() ? this.h.slowmo() : 1)));
     const e = easeInOutQuad(tw.t);
-    this.h.ctx.camera.position.lerpVectors(tw.fromPos, tw.toPos, e);
-    this.h.ctx.controls.target.lerpVectors(tw.fromTgt, tw.toTgt, e);
+    // The ORBIT flies, not two straight lines (see orbitLerp): an even turn, a one-way zoom.
+    orbitLerp(tw.fromPos, tw.fromTgt, tw.toPos, tw.toTgt, e, this.h.ctx.camera.position, this.h.ctx.controls.target);
     // The nudge rides ON TOP of what is otherwise a zero-length flight: a soft push toward the
     // pose's own target and back out, contributing exactly 0 at t=1 so the tween still lands on
     // the committed pose to the pixel.

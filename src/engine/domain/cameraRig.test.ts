@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
 import { FOCUS_LEAN } from "./trendStack";
-import { FOCI, hubFraming, geoFraming, REST_ASPECT, aspectFit, ledgerCommitTilt, LEDGER_TILT_YAW, LEDGER_TILT_PITCH, LEDGER_TILT_DOLLY, easeInOutQuad, CAM_ZOOM, dollyBack, RAILS_HIDDEN_DOLLY, railsLean, restOrbit, restPitch, nodeFraming, cohortFraming, isSamePose, nudgeMix, NUDGE_AMP, NUDGE_DUR, NUDGE_SAME, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE, trendFocusPush, TREND_FOCUS_PUSH, trendFit } from "./cameraRig";
+import { FOCI, hubFraming, geoFraming, REST_ASPECT, aspectFit, ledgerCommitTilt, LEDGER_TILT_YAW, LEDGER_TILT_PITCH, LEDGER_TILT_DOLLY, easeInOutQuad, CAM_ZOOM, dollyBack, RAILS_HIDDEN_DOLLY, railsLean, restOrbit, restPitch, nodeFraming, cohortFraming, isSamePose, nudgeMix, NUDGE_AMP, NUDGE_DUR, NUDGE_SAME, closeness, CLOSE_FAR_ALT, CLOSE_NEAR_ALT, NODE_RAISE, orbitLerp, clampPose, trendFocusPush, TREND_FOCUS_PUSH, trendFit } from "./cameraRig";
 
 // NO Snapshots framing is pinned here, because the view HAS none: it owns one pose, `FOCI.ledger`,
 // with one state-keyed variation — `ledgerCommitTilt`, the commit ORBIT, pinned below. Five framings
@@ -498,5 +498,118 @@ describe("trendFit — the History pose's ONE lever (2026-09-26)", () => {
     const pushed = new THREE.Vector3();
     trendFocusPush(p, tgt(), FOCUS_LEAN, pushed);
     expect(pushed.distanceTo(FOCI.trend.target)).toBeCloseTo(60 - FOCUS_LEAN * TREND_FOCUS_PUSH, 9);
+  });
+});
+
+// THE FLIGHT PATH (user, 2026-09-29: a country click "has a sharp curve", and provider → country
+// "first goes in the opposite direction before zooming out"). Both came from lerping the camera
+// POSITION and the TARGET as two straight lines: the view axis swung mostly at the end of the
+// flight, and the distance could fall and rise within one move. `orbitLerp` flies the ORBIT
+// instead — direction slerped, distance geometric, the target paced by the distance.
+describe("orbitLerp — the camera flies its orbit, never two straight lines", () => {
+  const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+  // An overview → country-shaped flight: far and centred, to close and off to one side.
+  const fromPos = V(0, 16, 52), fromTgt = V(0, 0, 0);
+  const toPos = V(0, 8.5, 19.1), toTgt = V(0, 8.6, 14.6);
+  const pos = new THREE.Vector3(), tgt = new THREE.Vector3();
+  const at = (e: number, a = fromPos, b = fromTgt, c = toPos, d = toTgt) => {
+    orbitLerp(a, b, c, d, e, pos, tgt);
+    return { pos: pos.clone(), tgt: tgt.clone(), r: pos.distanceTo(tgt), dir: pos.clone().sub(tgt).normalize() };
+  };
+
+  it("lands exactly on both endpoints", () => {
+    const a = at(0), b = at(1);
+    expect(a.pos.distanceTo(fromPos)).toBeLessThan(1e-9);
+    expect(a.tgt.distanceTo(fromTgt)).toBeLessThan(1e-9);
+    expect(b.pos.distanceTo(toPos)).toBeLessThan(1e-9);
+    expect(b.tgt.distanceTo(toTgt)).toBeLessThan(1e-9);
+  });
+
+  it("moves the distance ONE way only, geometric — never in then out", () => {
+    const r0 = fromPos.distanceTo(fromTgt), r1 = toPos.distanceTo(toTgt);
+    let prev = r0;
+    for (let i = 1; i <= 40; i++) {
+      const { r } = at(i / 40);
+      expect(r).toBeLessThanOrEqual(prev + 1e-9);
+      prev = r;
+    }
+    expect(at(0.5).r).toBeCloseTo(Math.sqrt(r0 * r1), 9);
+    // …and the same holds zooming OUT (the provider → country step back).
+    let prevOut = r1;
+    for (let i = 1; i <= 40; i++) {
+      const { r } = at(i / 40, toPos, toTgt, fromPos, fromTgt);
+      expect(r).toBeGreaterThanOrEqual(prevOut - 1e-9);
+      prevOut = r;
+    }
+  });
+
+  it("swings the view direction at an even rate, not end-loaded", () => {
+    const u0 = at(0).dir, u1 = at(1).dir;
+    const total = u0.angleTo(u1);
+    for (const e of [0.25, 0.5, 0.75]) expect(u0.angleTo(at(e).dir)).toBeCloseTo(total * e, 6);
+  });
+
+  it("paces the target by the distance: it travels while the camera is far, so the pan is even on screen", () => {
+    const r0 = fromPos.distanceTo(fromTgt), r1 = toPos.distanceTo(toTgt);
+    const span = fromTgt.distanceTo(toTgt);
+    for (const e of [0.2, 0.5, 0.8]) {
+      const s = at(e).tgt.distanceTo(fromTgt) / span;
+      expect(s).toBeCloseTo((at(e).r - r0) / (r1 - r0), 9);
+    }
+  });
+
+  it("holds a same-distance flight to an even pace, and a same pose still", () => {
+    const b = V(10, 0, 0), bt = V(10, 0, -fromPos.distanceTo(fromTgt));
+    const mid = at(0.5, fromPos, fromTgt, b, bt);
+    expect(mid.tgt.distanceTo(fromTgt.clone().lerp(bt, 0.5))).toBeLessThan(1e-9);
+    const still = at(0.37, fromPos, fromTgt, fromPos, fromTgt);
+    expect(still.pos.distanceTo(fromPos)).toBeLessThan(1e-9);
+    expect(still.tgt.distanceTo(fromTgt)).toBeLessThan(1e-9);
+  });
+
+  it("survives a half-turn (opposite directions) without NaN, keeping the distance", () => {
+    const m = at(0.5, V(0, 0, 10), V(0, 0, 0), V(0, 0, -10), V(0, 0, 0));
+    expect(Number.isFinite(m.pos.x + m.pos.y + m.pos.z)).toBe(true);
+    expect(m.r).toBeCloseTo(10, 9);
+  });
+});
+
+// THE HONEST DESTINATION (user, 2026-09-29: provider → country "first goes in the opposite
+// direction"). Measured live on Germany: the country pose asked for a camera→target distance under
+// the controls' floor (12), so the flight dived until OrbitControls caught it at 12 mid-flight and
+// geo's altitude clamp pushed it back out — altitude 24.1 → 24.6 → 24.4 → 27.9, a hard stop and a
+// reversal. `clampPose` resolves a destination through the SAME clamps, in the SAME order, the
+// frame loop applies after it, so the flight lands exactly where the camera will be held.
+describe("clampPose — a flight's destination passes the clamps the frame loop would apply", () => {
+  const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
+
+  it("raises a too-close pose to the distance floor along its own view axis", () => {
+    const tgt = V(0, 8.6, 14.6);
+    const pos = V(0, 8.5, 19.1); // ~4.5 from the target
+    const dir = pos.clone().sub(tgt).normalize();
+    clampPose(pos, tgt, 12, Infinity, null);
+    expect(pos.distanceTo(tgt)).toBeCloseTo(12, 9);
+    expect(pos.clone().sub(tgt).normalize().distanceTo(dir)).toBeLessThan(1e-9);
+  });
+
+  it("then applies the altitude floor from the origin, as the Engine does after the controls", () => {
+    const tgt = V(0, 0, 16);
+    const pos = V(0, 0, 17); // inside both floors
+    clampPose(pos, tgt, 12, Infinity, 18);
+    // distance first: (0,0,28), already above 18 — the altitude clamp leaves it
+    expect(pos.z).toBeCloseTo(28, 9);
+    const low = V(0, 0, 10), lowTgt = V(0, 0, 0); // 10 from target, 10 from origin
+    clampPose(low, lowTgt, 12, Infinity, 18);
+    expect(low.length()).toBeCloseTo(18, 9);
+  });
+
+  it("caps the far side at the distance ceiling, and leaves a legal pose untouched", () => {
+    const far = V(0, 0, 500), tgt = V(0, 0, 0);
+    clampPose(far, tgt, 12, 200, null);
+    expect(far.z).toBeCloseTo(200, 9);
+    const ok = V(3, 20, 40), okTgt = V(0, 0, 0);
+    const before = ok.clone();
+    clampPose(ok, okTgt, 12, 200, 18);
+    expect(ok.distanceTo(before)).toBe(0);
   });
 });
