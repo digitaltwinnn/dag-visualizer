@@ -145,10 +145,16 @@ export default function ExplorerRow({
         // and the bar is the accent, not the reading.
         // With no tags in the level the empty tag column collapses to 0 and the bar takes the
         // rest of the row, so its length reads at a glance instead of in a 36px sliver.
+        // ⚠️ THE NAME COLUMN MAY SHRINK (user, 2026-09-29: with a snapshot open, the network rows
+        // ran past the card's right edge). Its width was a fixed `nameW`, and a NESTED level loses
+        // the tree indent from the row, so name + bar minimum + figure outgrew the card and the
+        // grid overflowed instead of yielding. `minmax(0, nameW)` keeps nameW wherever it fits and
+        // truncates the name (it already ellipsises) where it doesn't; the wide bar's floor is the
+        // nested level's own 24px.
         gridTemplateColumns: hasFigure
           ? wideBar
-            ? `14px ${nameW}px 0px minmax(36px,1fr) ${figureW}px`
-            : `14px ${nameW}px minmax(0,1fr) ${nested ? 24 : 36}px ${figureW}px`
+            ? `14px minmax(0,${nameW}px) 0px minmax(${nested ? 24 : 36}px,1fr) ${figureW}px`
+            : `14px minmax(0,${nameW}px) minmax(0,1fr) ${nested ? 24 : 36}px ${figureW}px`
           : "14px minmax(0,1fr) auto",
         ...(on ? selectionHue(hue) : undefined),
         ...pair?.style,
