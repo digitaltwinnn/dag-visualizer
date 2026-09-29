@@ -290,6 +290,17 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // ---- level 0: the ticks, paged, measured by the heading's pick -------------------------------
   const tickValues = pagedSnaps.map((d) => tickMeasureValue(ledgerMeasure, d, snapshotExact[d.ordinal]));
   const maxTick = Math.max(1e-9, ...tickValues.map((v) => v ?? 0));
+  // THE SPAN THE EXPLORER HOLDS — stated on EVERY level (user, 2026-09-29: "even if there is no
+  // pager you should still indicate the size of the cache, e.g. 'last 11 min'"). The deeper levels
+  // have nothing to page, so they carry the same footer with the span alone.
+  const spanScope = {
+    word: spanWords(orderedSnaps),
+    title: `The explorer keeps the latest ${POLL.maxSnapshots} global snapshots, the stretch it follows live. For anything older, open the raw data layer and search the whole chain.`,
+  };
+  const spanFooter =
+    live && orderedSnaps.length > 0 ? (
+      <TablePager page={1} pages={1} from={1} to={orderedSnaps.length} total={orderedSnaps.length} compact scope={spanScope} onPage={() => {}} />
+    ) : undefined;
   const levels: ExplorerLevelSpec[] = [
     {
       key: "ticks",
@@ -361,10 +372,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
             // The explorer holds the latest POLL.maxSnapshots global snapshots; how much TIME that
             // is — measured from the rows themselves, oldest to newest — is what a reader can use.
             // It was "recent" (the raw log's word, 2026-09-13), which answered neither question.
-            scope={{
-              word: spanWords(orderedSnaps),
-              title: `The explorer keeps the latest ${POLL.maxSnapshots} global snapshots, the stretch it follows live. For anything older, open the raw data layer and search the whole chain.`,
-            }}
+            scope={spanScope}
             onPage={(p) => setTickPage(p)}
           />
         ) : undefined,
@@ -384,6 +392,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
     const measured = netRows.map((n) => ({ n, m: tickNetMeasure(netPick, n.count, perMetaOf(exact, n.id)) }));
     const maxNet = Math.max(1e-9, ...measured.map(({ m }) => m.value ?? 0));
     levels.push({
+      pager: spanFooter,
       key: "networks",
       crumb: {
         label: <span className="tabular-nums">{tick.ordinal.toLocaleString()}</span>,
@@ -456,6 +465,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
     const values = leaves.map((r) => snapMeasureValue(snapPick, r));
     const maxLeaf = Math.max(1e-9, ...values.map((v) => v ?? 0));
     levels.push({
+      pager: spanFooter,
       key: "snapshots",
       crumb: {
         label: (
@@ -512,6 +522,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const signers = signersOf(leaf ? exact : undefined, leaf?.metaId ?? "", leaf?.ordinal ?? 0); // no leaf → the shared empty list
   if (leaf && signers.length > 0) {
     levels.push({
+      pager: spanFooter,
       key: "signers",
       crumb: { label: <span className="tabular-nums">{leaf.ordinal > 0 ? leaf.ordinal.toLocaleString() : `${leaf.metaId.slice(0, 10)}…`}</span> },
       // The cards' own phrase ("Signed by N L0 validators") — the producing layer named before

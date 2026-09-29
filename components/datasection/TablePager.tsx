@@ -80,6 +80,9 @@ export default function TablePager({
           </>
         ) : null}
       </span>
+      {/* A single page has nothing to navigate, so the cluster is ABSENT rather than a dead
+          ‹ 1 / 1 › (the plank's rule: permanently dead chrome is not a control); the span stays. */}
+      {pages > 1 && (
       <span className="inline-flex flex-none items-center gap-1">
         {/* First/last jumps (user, 2026-08-14 — "I want to see the genesis block; now I have to
             go page by page"): the standard « ‹ › » cluster. The last page IS genesis in the
@@ -104,6 +107,7 @@ export default function TablePager({
           </button>
         )}
       </span>
+      )}
       </div>
       {explain && scope && (
         <p className="m-0 pt-1 text-micro text-muted-foreground max-w-[52ch]">{scope.title}</p>
