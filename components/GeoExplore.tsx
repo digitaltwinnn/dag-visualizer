@@ -230,7 +230,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
       meaning: "Each node in this cohort",
       measure: null,
       hasFigure: false,
-      // The one node row (`explorer/nodeRow.tsx`); a cohort mixes networks, so the ticker shows.
+      // The one node row (`explorer/nodeRow.tsx`), ticker included, as in every explorer.
       rows: openCohort.rows.map((r, i) => {
         const on = nodeOn(r);
         const netId = r.pick.kind === "metanode" && r.pick.meta ? r.pick.meta.id : "dag";
@@ -239,7 +239,6 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
           key: (r.id ?? r.label) + i,
           row: r,
           hue,
-          ticker: metagraphById(netId)?.ticker ?? (netId === "dag" ? "DAG" : netId),
           on,
           onClick: () => selectNode(r.pick, on),
           pair: subjectPairing(hoverNodeId, hoverKeyOf(r.pick), setHoverNodeId, hue),

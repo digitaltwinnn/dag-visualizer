@@ -5,7 +5,7 @@ import type { CSSProperties } from "react";
 import type { ExplorerRowSpec } from "@/components/explorer/Explorer";
 import { IdentityDot, RoleChips } from "@/components/inspector/parts";
 import { layerCodesOf } from "@/src/data/composition";
-import { shortHash } from "@/src/data/network";
+import { metagraphById, shortHash } from "@/src/data/network";
 import { nodeStatus } from "@/src/data/nodeStatus";
 import type { NodeRow } from "@/src/data/types";
 import { midHash } from "@/src/util/format";
@@ -19,7 +19,9 @@ import { cn } from "@/lib/utils";
 //
 //   glyph   · the node's network, as its hue dot
 //   name    · the node id, mono, ONE length everywhere
-//   tag     · the network's TICKER where the level mixes networks (a cohort), then the node's
+//   tag     · the network's TICKER — on EVERY node row (user, 2026-09-29: "hypergraph node rows and
+//             snapshot node rows don't show the ticker while geo does"; it was shown only where the
+//             level mixes networks, which made the one row read three ways), then the node's
 //             LAYER chips (the same `RoleChips` the composition rows wear), then its STATE as a
 //             small dot in the state's bucket colour
 //
@@ -57,14 +59,15 @@ export const NODE_ID_GLYPHS = 14;
 export function nodeRowSpec(args: {
   key: string;
   row: NodeRow;
-  /** The row's network: its hue, and the ticker where the level shows one. */
+  /** The row's network hue. The ticker is derived from the row itself, so no caller can leave it out. */
   hue: string;
-  ticker?: string;
   on: boolean;
   onClick: () => void;
   pair: ExplorerRowSpec["pair"];
 }): ExplorerRowSpec {
-  const { row, hue, ticker } = args;
+  const { row, hue } = args;
+  const netId = row.pick.kind === "metanode" && row.pick.meta ? row.pick.meta.id : "dag";
+  const ticker = metagraphById(netId)?.ticker ?? (netId === "dag" ? "DAG" : netId);
   const id = row.id ?? row.label;
   const codes = layerCodesOf([row]);
   const status = nodeStatus(row.state);

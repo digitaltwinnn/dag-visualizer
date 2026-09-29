@@ -491,12 +491,10 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           key: `${key}:${i}`,
           name: <span className="tabular-nums">{r.ordinal > 0 ? r.ordinal.toLocaleString() : `${r.metaId.slice(0, 10)}…`}</span>,
           // An unlisted row's ordinal counts on ITS OWN channel's sequence — one tick can carry
-          // several chains, so the short address says which (2026-08-08). A listed row carries
-          // its own hash where the polled buffer knows it.
-          // A hash PREFIX, not the `a…b` short form: the tag home beside a 4-decimal fee holds
-          // seven mono glyphs, and a prefix cut clean reads as a prefix where an ellipsised
-          // short form cut again reads as broken. The row's title carries the full ids.
-          tag: isUnlisted ? (r.ordinal > 0 ? r.metaId.slice(0, 7) : undefined) : r.hash ? r.hash.slice(0, 7) : undefined,
+          // several chains, so the short address says which (2026-08-08). A listed row shows NO
+          // hash (user, 2026-09-29: "don't show the actual snapshot hash in the explorer") — the
+          // row's network is its level, its ordinal its name, and the hash is the card's foot.
+          tag: isUnlisted && r.ordinal > 0 ? r.metaId.slice(0, 7) : undefined,
           share: values[i] != null ? values[i]! / maxLeaf : undefined,
           hue: leafHue,
           figure: snapMeasure(snapPick, r),
@@ -531,7 +529,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
       meaning: "Validators that signed",
       measure: null,
       hasFigure: false,
-      // The one node row (`explorer/nodeRow.tsx`); the level is one network, so no ticker.
+      // The one node row (`explorer/nodeRow.tsx`), ticker included, as in every explorer.
       rows: signers.map((sid): ExplorerRowSpec => {
         const r = resolveSigner(selNodes, leaf.metaId, sid);
         if (!r.known) {
