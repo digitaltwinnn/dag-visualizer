@@ -121,7 +121,7 @@ function cohortsOf(rows: NodeRow[]): CohortGroup[] {
 }
 
 const cohortLabel = (c: { city: string | null; isp: string | null }): string =>
-  [c.city, c.isp].filter(Boolean).join(" · ") || "Unknown";
+  [c.isp, c.city].filter(Boolean).join(" · ") || "Unknown"; // provider first, like the explorer row
 
 // GeoExplore's within-country node order: city (falling back to label) then id.
 const nodeSort = (a: NodeRow, b: NodeRow) =>

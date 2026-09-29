@@ -28,6 +28,7 @@ import { compositionGroups, compositionRows, nodeCompositionLabel, parseComposit
 import { pickNetId } from "@/src/engine/domain/pickActions";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 import FollowControl from "@/components/FollowControl";
+import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
 
@@ -142,10 +143,6 @@ function useSignedSelected(node: { id?: string | null; ids?: string[] } | undefi
   return nodeSigned(node, deep?.signers ?? row?.signers ?? null) ? metaSnap.ordinal : null;
 }
 
-function nodeCity(node: NonNullable<ReturnType<typeof inspectedNode>>): string {
-  return node.geo?.city ?? "";
-}
-
 // Node title: the Geography view mark (Globe — the Geography view's top-bar icon, same view-glyph
 // vocabulary as the snapshot head's Layers; identity-hued) + the node's CITY — user-agreed:
 // where the node sits is the headline; its hash is bookkeeping, demoted to the subtitle below.
@@ -156,15 +153,18 @@ export function GeoLiveTitle() {
   const inspect = useStore((s) => s.inspect);
   const node = inspectedNode(inspect);
   if (!node) return null;
+  // TITLED BY THE NODE, NOT ITS CITY (user, 2026-09-29): the explorer's node row names a node by
+  // its id, and under a committed provider the city is the card above's own title — the pile rule
+  // says a card never restates an ancestor. The id, shown exactly as the row shows it, is what
+  // tells a node from its siblings; the city is a body fact that yields to the provider card.
   const id = node.node?.id;
-  const city = nodeCity(node);
-  const title = city || (id ? shortHash(id) : node.node?.ip || "Node");
+  const title = id ? midHash(id, NODE_ID_GLYPHS) : node.node?.ip || "Node";
   const color = node.kind === "metanode" ? (node.meta ? identityHudCss(node.meta.id) : undefined) : identityHudCss("dag");
   const Mark = VIEW_ICONS.geo;
   return (
     <span className="inline-flex items-center gap-2 min-w-0">
       {color && <Mark className={KIND_MARK_CLASS} style={{ color }} aria-hidden />}
-      <span key={id ?? title} className={cn("min-w-0 roll-in", !city && "font-mono tabular-nums break-all")}>{title}</span>
+      <span key={id ?? title} className="min-w-0 roll-in font-mono tabular-nums">{title}</span>
     </span>
   );
 }
@@ -885,6 +885,9 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
         {/* COUNTRY — the half of the place the head no longer carries (user, 2026-08-02). The
             country CODE suffix is gone (2026-08-10): it restated the name it sat beside.
             Yields to the country card's own title once that rung is drilled. */}
+        {/* CITY — the place word the head carried until 2026-09-29 (the title is the node's id
+            now). Yields to the provider card, whose rung is city × provider. */}
+        {cohort == null && geo?.city && <Fact label="City">{geo.city}</Fact>}
         {country == null && geo?.country && <Fact label="Country">{geo.country}</Fact>}
         {/* COMPOSITION — the node's role in the network, a labelled fact like the rest (user,
             2026-08-02: it used to ride the head as a subtitle, which made the head carry three

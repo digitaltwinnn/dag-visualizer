@@ -182,13 +182,16 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
         const pair = subjectPairing(hoverGroup, key, setHoverGroup, accent);
         return {
           key: ch.key,
-          name: ch.city ?? "Unlocated",
-          tag: ch.isp ?? undefined,
+          // PROVIDER FIRST (user, 2026-09-29): the rung, its card and its eyebrow are all
+          // "Provider", so the row names the provider and the city tells two of one provider
+          // apart within the country. Same order in the crumb, the rail's pager and the card.
+          name: ch.isp ?? "Unknown provider",
+          tag: ch.city ?? "Unlocated",
           share: v / maxRows,
           hue: accent,
           figure: v.toLocaleString(),
           on,
-          title: `${ch.city ?? "Unlocated"}${ch.isp ? ` · ${ch.isp}` : ""} · ${ch.rows.length} node${ch.rows.length === 1 ? "" : "s"}`,
+          title: `${ch.isp ?? "Unknown provider"} · ${ch.city ?? "Unlocated"} · ${ch.rows.length} node${ch.rows.length === 1 ? "" : "s"}`,
           // A cohort of ONE is its node: the click selects the node outright (full ancestry
           // commits the cohort with it), so the reader never opens a list of one.
           onClick: () => {
@@ -221,8 +224,8 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
     levels.push({
       key: "nodes",
       crumb: {
-        label: `${openCohort.city ?? "Unlocated"}${openCohort.isp ? ` · ${openCohort.isp}` : ""}`,
-        title: `${openCohort.city ?? "Unlocated"}${openCohort.isp ? ` · ${openCohort.isp}` : ""}`,
+        label: `${openCohort.isp ?? "Unknown provider"} · ${openCohort.city ?? "Unlocated"}`,
+        title: `${openCohort.isp ?? "Unknown provider"} · ${openCohort.city ?? "Unlocated"}`,
       },
       meaning: "Each node in this cohort",
       measure: null,

@@ -1116,9 +1116,10 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
   its ghost state, with no breadcrumb grammar. The provider card's user-facing word is **provider**
   while every internal identifier stays `cohort` — one concept, two registers.
 - The **title** is one standard, with `titleKey` keying the roll-in remount on a subject change. Panel
-  titles carry a leading identity dot on the shared beat. The node card is city-first with a
-  subtitle-less head, and its body puts **NODE ID last** — the unique reference sits where references
-  sit.
+  titles carry a leading identity dot on the shared beat. The node card is titled by the node's
+  id (2026-09-29 — it was city-first), shown exactly as the explorer's node row shows it, with a
+  City fact in the body that yields to the provider card; the foot still carries the full NODE ID.
+  A provider reads provider-first everywhere ("Hetzner · Falkenstein" — row, crumb, pager, card).
 - **Card-head kind marks tint with the ACTIVE FILTER's identity** via
   `text-[var(--filter-accent,var(--primary))]`. Hardcoding a mark to cyan is a recurring bug; node
   marks use their node's own hue inline.

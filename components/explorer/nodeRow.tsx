@@ -12,7 +12,7 @@ import { midHash } from "@/src/util/format";
 import { cn } from "@/lib/utils";
 
 // THE ONE NODE ROW (design session 2026-09-26, `node-rows.html` D): a node level is the last step
-// in every explorer — under a composition in Hypergraph, under a city · provider cohort in
+// in every explorer — under a composition in Hypergraph, under a provider · city cohort in
 // Geography, under a snapshot in Snapshots (its signers) — and the three used to differ in id
 // length, in what the tag said and in whether there was a glyph. Every one of them now builds its
 // rows here, so they agree by construction (user: "ensure they are consistent").
