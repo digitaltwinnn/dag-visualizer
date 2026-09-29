@@ -52,6 +52,7 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 import { relativeAge } from "@/src/util/relativeAge";
 import { CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET } from "@/src/engine/domain/calloutPlacement";
 import type { GeoInfo } from "@/src/data/types";
+import LiveDot from "@/components/LiveDot";
 
 // The panel's standoff from the anchor lives in `src/engine/domain/calloutPlacement.ts`, with the
 // reach thresholds derived from it and the placement rules that read them. It used to be a local
@@ -126,7 +127,7 @@ export function CalloutPanel({ m, className }: { m: CalloutModel; className?: st
             style={m.aside.hue ? { color: m.aside.hue } : undefined}
           >
             {m.aside.live && (
-              <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-dot-beat motion-reduce:animate-none" />
+              <LiveDot />
             )}
             {m.aside.text}
           </span>

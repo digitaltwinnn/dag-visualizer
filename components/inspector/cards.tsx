@@ -29,6 +29,7 @@ import { compositionGroups, compositionRows, nodeCompositionLabel, parseComposit
 import { pickNetId, followToggleActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
+import LiveDot from "@/components/LiveDot";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
 
@@ -84,7 +85,7 @@ export function SnapshotAside({ data: d }: { data: GlobalSnapshot }) {
     >
       {following ? (
         <>
-          <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-dot-beat motion-reduce:animate-none" />
+          <LiveDot />
           {/* The tip state counts up from the last heartbeat and resets as the next lands (user,
               2026-08-08 — replacing the static "live now"; the label still never overstates: the
               counter IS the shown snapshot's age in both branches). relativeAge returns "" for a

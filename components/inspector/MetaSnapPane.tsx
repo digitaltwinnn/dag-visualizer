@@ -31,6 +31,7 @@ import { METASNAP_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { followToggleActions, metaSnapSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { cn } from "@/lib/utils";
+import LiveDot from "@/components/LiveDot";
 
 // The body's row grammar and its three weights live in ./parts (`Fact` / `FactGroup` / `Foot`)
 // — shared with every other rail card, so this one can't drift into a dialect of its own. The
@@ -170,7 +171,7 @@ export default function MetaSnapPane({
       {/* The beating dot rides `following` on its own, so the card still FEELS live in the
           `anchored` state — the heartbeat-on-closed-cards rule doesn't depend on the number. */}
       {following && (
-        <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-dot-beat motion-reduce:animate-none" />
+        <LiveDot />
       )}
       {sameTick ? `anchored to ${anchor}` : following ? <>{rel ? `live · ${rel}` : "live"} → {anchor}</> : <>◷ {rel} → {anchor}</>}
     </button>

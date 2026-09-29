@@ -42,6 +42,7 @@ import { followToggleActions, metaSnapSelectActions, nodeSelectActions, sameMeta
 import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
+import LiveDot from "@/components/LiveDot";
 
 // THE SNAPSHOTS VIEW'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -313,7 +314,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
     const pinned = !following && snap != null;
     const beating = following && previewOrd == null;
     const label = previewOrd != null ? "Pinned" : following ? "Live" : pinned ? "Pinned" : "Live";
-    const dotHue = displayNetwork(filter)?.hue ?? accent;
     // The AGE of the snapshot on screen — the live tip while following, the pinned one otherwise —
     // in the right rail's own words (`relativeAge`, ticking every second). A hover preview names
     // the ordinal it would pin instead, since that is what the preview is about.
@@ -349,10 +349,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         style={pinned && previewOrd == null ? selectionHue(accent) : undefined}
       >
         {beating ? (
-          <span
-            className="flex-none w-2 h-2 rounded-full animate-dot-beat motion-reduce:animate-none"
-            style={{ background: dotHue, boxShadow: `0 0 0 3px color-mix(in oklch, ${dotHue} 30%, transparent)` }}
-          />
+          <LiveDot />
         ) : (
           <span className={cn("flex-none w-2 h-2 rounded-full border", pinned && previewOrd == null ? "border-primary/80" : "border-muted-foreground/70")} />
         )}
