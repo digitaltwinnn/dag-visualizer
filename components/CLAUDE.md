@@ -641,8 +641,10 @@ detail-only). Three rules keep the row from going ragged, and all three answer t
   `md` card grows to whatever the viewport gives it, and at 1600px three of them each held ~500px
   with a void between lead and breakdown. Past the ceilings the row centres; below them the cards
   still span margin to margin, so the centring is a no-op wherever width is scarce.
-- **`MicroBars`' track is proportional but CAPPED** (`BAR_TRACK_MAX`), and each row is `justify-end`,
-  so value columns line up on the card's right edge and the slack collects behind the block. The
+- **`MicroBars`' track is proportional but CAPPED** (`BAR_TRACK_MAX`), and the block is sized to
+  what its rows can spend and marked `data-fit`, so `BandCard` shrinks the detail to it and CENTRES
+  the whole body — lead, hairline, breakdown — in the card's share (user, 2026-09-29: "centered in
+  their allocated space"). The phone sheet's uncapped column keeps filling (its own tier). The
   original 72px constant made every bar row intrinsically sized, which is where the dangling white
   space came from; an uncapped track is the opposite failure — a bar running the width of a 1600px
   row stops reading as a quantity.
