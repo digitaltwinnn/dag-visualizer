@@ -487,17 +487,15 @@ export default function TrendStack() {
                 // THE CARD NAMES ITS MEASURE, not just its unit — it can be stepped from right here,
                 // so the card has to say what it turned into.
                 unit={caption}
-                // THE HEADLINE IS THE DAY (user, 2026-09-29: "day should be the standard always") —
-                // the roster's `day`, read from the daily tier through this plane's own series.
-                // Where the plane is already daily its own last point IS the day, so no readout.
                 // THE HEADLINE IS THE ROSTER'S `head` (user, 2026-09-29: "keep it consistent") —
                 // the same number the Networks list states: the span's average per day over a
                 // window of a day or more, the latest full day under one.
                 readout={{
-                  value: row.head,
+                  // A held window's head is the PREVIOUS span's — it waits for the new one.
+                  value: slice.stale ? null : row.head,
                   word: headWord(metric, roster.headKind),
                   title: roster.headKind === "span" ? "The average per day over the window on screen" : undefined,
-                  pending: roster.headKind === "day" ? roster.dayPending : roster.pending,
+                  pending: slice.stale || (roster.headKind === "day" ? roster.dayPending : roster.pending),
                 }}
                 format={roster.format}
                 note={pending ? "reading the hourly samples…" : undefined}

@@ -547,6 +547,11 @@ describe("the ledger's node rung under a metagraph snapshot", () => {
     expect(set.items.length).toBe(2);
     expect(set.index).toBe(1);
   });
+  it("a node that did NOT sign pages its network, not the signers (the snapshot is not its parent)", () => {
+    const set = siblingSet("node", { ...s, inspect: other.pick })!;
+    expect(set).not.toBeNull();
+    expect(set.items.length).toBe(3);
+  });
   it("no signer known → no ∨", () => {
     expect(childStep("metaSnap", { ...s, selNodes: [other] })).toBeNull();
   });

@@ -38,6 +38,8 @@ describe("buildRoster", () => {
     expect(rows[0].netId).toBe("up");
     expect(rows[0].nets).toEqual(["up", "dag"]);
     expect(rows[0].ids).toEqual(["m1"]);
+    // Both records stay reachable — a selection of the DAG record is this row's too.
+    expect(rows[0].recs).toEqual([upRec, dagRec]);
     expect(rows[0].roles.sort()).toEqual(["cl1", "dl1", "l0"]);
     expect(rows[1].nets).toEqual(["dag"]);
   });
@@ -70,8 +72,6 @@ describe("sortRoster", () => {
       row({ pick: { kind: "metanode", meta: { id: dor } as never }, id: "a" }),
       row({ pick: { kind: "metanode", meta: { id: biofi } as never }, id: "b" }),
     ]);
-    const shown = sortRoster(rows, "net", 1).map((r) => r.netName!);
-    expect(shown).toEqual([...shown].sort((a, b) => a.localeCompare(b)));
-    expect(shown.every((t) => !t.startsWith("DAG0") && !t.startsWith("DAG2"))).toBe(true);
+    expect(sortRoster(rows, "net", 1).map((r) => r.netName)).toEqual(["BIOFI", "DOR"]);
   });
 });

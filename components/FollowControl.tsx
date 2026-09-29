@@ -50,7 +50,11 @@ export default function FollowControl({ preview = false, className }: { preview?
   const pinned = !following && snap != null;
   const washed = pinned && previewOrd == null;
   const label = previewOrd != null || pinned ? "pinned" : "live";
-  const shown = pinned ? snap!.data : latestSnapshot;
+  // The age is the SHOWN snapshot's — the committed one whether pinned or following. Under a
+  // metagraph filter, following lands on the newest tick THAT network anchored into
+  // (`followLatest`), which may be minutes behind the global tip; the tip's age there would read
+  // "live · 3s" beside a four-minute-old snapshot (rule 10: the label never overstates).
+  const shown = snap?.data ?? latestSnapshot;
   const sub =
     previewOrd != null ? previewOrd.toLocaleString() : !following && !pinned ? "· off" : shown ? <Age ts={shown.timestamp} /> : null;
 

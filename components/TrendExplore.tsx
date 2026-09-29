@@ -34,7 +34,7 @@ import { NodeStars } from "@/components/state/StateAtoms";
 //
 //   · THE ROWS commit through `trendPlaneActions` and the one executor — the SAME builder the
 //     plane's own header strip runs (rule 2), so a row click and a plane click cannot drift. The
-//     figure is the last measured reading in the roster's ONE formatter; an unmeasured chain says
+//     figure is the roster's `head` reading in its ONE formatter; an unmeasured chain says
 //     so in words rather than showing a 0.
 //
 // ⚠️ THE ROSTER IS NOT COMPUTED HERE. `useTrendRoster` is the one pass the planes, this list and
@@ -57,9 +57,10 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const setTrendMetric = useStore((s) => s.setTrendMetric);
 
-  const roster = useTrendRoster(useTrendsSlice(windowId, range), filter, metric);
+  const slice = useTrendsSlice(windowId, range);
+  const roster = useTrendRoster(slice, filter, metric);
   // THE LIST FOLLOWS THE RANGE (design A, 2026-09-29 — "it is not clear that the explorer is a
-  // fixed value based on today"). Each figure is the network's `span` reading over the window on
+  // fixed value based on today"). Each figure is the network's `head` — its `span` reading over the window on
   // screen — an average per day for a rate — and the hint names that span, so the list and the
   // range selector visibly answer one question, while the Moment card states one INSTANT. It used
   // to state the latest full day, which read as a second, unlabelled copy of the Moment's list.
@@ -122,9 +123,11 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
               share: row.head != null ? row.head / maxLast : undefined,
               hue: row.hue,
               figure:
-                // A dash with the words on hover: "no reading" truncated to "no rea…" in the 48px
+                // A dash with the words on hover: "no reading" truncated to "no rea…" in the
                 // figure column (a quiet network may have measured nothing in the span).
-                row.head != null ? format(row.head) : roster.pending || (roster.headKind === "day" && roster.dayPending) ? <NodeStars count={3} /> : <span className="text-muted-foreground" title={NO_READING}>—</span>,
+                // A HELD window's figures are the previous span's, under a hint naming the new one —
+                // so they wait (stars) until the new window lands rather than state the wrong span.
+                slice.stale ? <NodeStars count={3} /> : row.head != null ? format(row.head) : roster.pending || (roster.headKind === "day" && roster.dayPending) ? <NodeStars count={3} /> : <span className="text-muted-foreground" title={NO_READING}>—</span>,
               on,
               title: `${row.name} · ${row.head != null ? `${format(row.head)}${unit ? ` ${unit}` : ""} · ${headWord(metric, roster.headKind)}` : NO_READING}`,
               onClick: () => applyClickActions(trendPlaneActions(id, focus)),

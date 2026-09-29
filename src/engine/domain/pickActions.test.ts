@@ -216,6 +216,8 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
       { kind: "filter", id: "all" },
       { kind: "snapshot", pick: null, follow: true },
     ]);
+    // A validator opened under the snapshot (∨) is the finest rung: it clears first.
+    expect(snapshotClearActions({ metaSnap: child, filter: "dor", hasInspect: true })[0]).toEqual({ kind: "inspect", pick: null });
     // Only what is there: a bare tick clears alone.
     expect(snapshotClearActions({ metaSnap: null, filter: "all" })).toEqual([{ kind: "snapshot", pick: null, follow: true }]);
     // The DAG's card is the rung under a tick too (the base ledger's lens).

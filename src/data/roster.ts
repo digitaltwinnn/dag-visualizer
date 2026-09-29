@@ -8,6 +8,8 @@ import { coLocatedNetworks, metagraphById } from "@/src/data/network";
 export interface RosterRow {
   key: string; // stable render key — the MACHINE (its IP), or the record where no IP is known
   node: NodeRow; // the row's PRIMARY record — what a click commits and a hover glows
+  /** Every record merged into this row, primary first — a selection of ANY of them is this row's. */
+  recs: NodeRow[];
   netId: string | null; // the primary network ("dag" | metagraph id)
   netName: string | null; // the DISPLAYED primary ticker — what the Network column sorts on
   /** EVERY network on this machine, primary first: the records merged into this row, then any
@@ -76,6 +78,7 @@ export function buildRoster(selNodes: readonly NodeRow[], metaList: readonly Met
     return {
       key,
       node,
+      recs: [node, ...recs.filter((r) => r !== node)],
       netId,
       // Resolved HERE, once per row, because the sort must order what the column SHOWS. Sorting
       // on the raw netId ordered the state-channel ADDRESSES — hidden hex, so "Network ↑" came

@@ -87,15 +87,33 @@ export default function TrendTether() {
       if (performance.now() < until) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    const onResize = () => requestAnimationFrame(measure);
+    let resizeRaf = 0;
+    const onResize = () => {
+      cancelAnimationFrame(resizeRaf);
+      resizeRaf = requestAnimationFrame(measure);
+    };
     window.addEventListener("resize", onResize);
     // A DRAG on the band moves the brush through the track's LOCAL preview, which writes no store
     // value until release — so the track's own attribute changes are the signal while it happens.
-    const track = document.querySelector("[data-brush]")?.closest("[role=slider]") ?? document.querySelector("[aria-label='Time cursor over the measured history']");
-    const mo = track ? new MutationObserver(() => requestAnimationFrame(measure)) : null;
-    if (track) mo!.observe(track, { attributes: true, subtree: true, childList: true });
+    // ⚠️ The track may not EXIST yet (a cold load: the overview lands after this effect's settle,
+    // with no dep change between), so attaching is retried until it takes — and the first sight of
+    // the track is itself a change to draw.
+    let mo: MutationObserver | null = null;
+    const attach = () => {
+      const track = document.querySelector("[aria-label='Time cursor over the measured history']");
+      if (!track) return false;
+      mo = new MutationObserver(() => requestAnimationFrame(measure));
+      mo.observe(track, { attributes: true, subtree: true, childList: true });
+      measure();
+      return true;
+    };
+    const retry = attach() ? 0 : window.setInterval(() => {
+      if (attach()) window.clearInterval(retry);
+    }, 500);
     return () => {
       cancelAnimationFrame(raf);
+      cancelAnimationFrame(resizeRaf);
+      window.clearInterval(retry);
       window.removeEventListener("resize", onResize);
       mo?.disconnect();
     };

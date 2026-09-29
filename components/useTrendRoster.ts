@@ -55,14 +55,12 @@ export interface TrendRosterRow {
   series: MetricSeries;
   /** The newest MEASURED value, which is not the newest bucket (`lastMeasured`). */
   last: number | null;
-  /** THE HEAD READING — the newest complete DAY (`latestDay`; user, 2026-09-29: "day should be the
-   *  standard always"). The card's headline, the Networks list's figure and the rank all read
-   *  it. Null while the daily tier is still in flight. */
+  /** The newest complete DAY (`latestDay`; user, 2026-09-29: "day should be the standard always")
+   *  — the `head` under a window shorter than a day. Null while the daily tier is in flight. */
   day: number | null;
   /** THE SPAN READING (`spanAverage`; design A, 2026-09-29 — "the explorer follows the range"):
-   *  this network over the whole window on screen, an average per day for a rate. The Networks
-   *  list states it and the rank follows it, so a new range re-ranks the list AND the stack. The
-   *  card headline keeps `day` — the chart's own "now". */
+   *  this network over the whole window on screen, an average per day for a rate — the `head`
+   *  over a window of a day or more, so a new range re-ranks the list AND the stack. */
   span: number | null;
   /** THE HEAD READING — the ONE number every surface states for this network: the Networks list's
    *  figure, the plane's headline and the rank (user, 2026-09-29: "didn't we agree to keep it
@@ -210,7 +208,9 @@ export default function useTrendRoster(
   // invisible: the numbers are right, the frame rate is not. Every field below is either the
   // memoised pass, a stable slice reference, or derived from a primitive dep.
   const pending = gauge && slice.fleetPending;
-  const dayPending = stepMs < 86_400_000 && !slice.daily;
+  // Acquiring only while the read can still land: a failed daily leg is no reading (rule 10's
+  // give-up path — stars that never resolve are a fabricated state).
+  const dayPending = stepMs < 86_400_000 && !slice.daily && !slice.dailyError;
   const unit = metricUnit(metric, stepMs);
   const format = spec.format ?? PLAIN;
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `format` is TREND_METRICS[metric]'s

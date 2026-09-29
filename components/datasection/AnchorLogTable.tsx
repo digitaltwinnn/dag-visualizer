@@ -179,6 +179,11 @@ export default function AnchorLogTable() {
   const inFlight = useRef(new Set<string>());
   const [version, setVersion] = useState(0);
   const [histErr, setHistErr] = useState(false);
+  // A failed chain read is an answer as well: the hold must not hide the message (and the pager)
+  // that says the read failed and how to retry it (rule 10 — a hold with no give-up path).
+  useEffect(() => {
+    if (histErr) setArriving(false);
+  }, [histErr]);
 
   // The network's newest ordinal — the lifetime total (ordinals are sequential and gapless).
   // The live buffer leads; the explorer's first page seeds it for a quiet network whose window
@@ -594,6 +599,11 @@ export default function AnchorLogTable() {
       setSearchMeta(logSeek.metaId);
       pendingSeek.current = true;
       setArriving(true);
+      // A PREVIOUS search's landing would satisfy the hold's release at once (a marked row, page 1
+      // cached) and flash the live page before this seek runs — the double-load the hold exists
+      // to prevent.
+      setMarked(null);
+      setJumpMiss(null);
     } else {
       // ⚠️ AN ARRIVAL THAT CANNOT RUN MUST SAY SO. A global chart's range names no chain, so the
       // dates land prefilled and the seek waits — and with nothing on screen to explain it, the
@@ -679,6 +689,9 @@ export default function AnchorLogTable() {
   const clearSearch = () => {
     setQSnapshot(""); setQTick(""); setQFrom(""); setQTo("");
     setMarked(null); setJumpMiss(null);
+    // Clearing the arrival's search cancels it: nothing is being found any more.
+    pendingSeek.current = false;
+    setArriving(false);
   };
 
   /** THE TABLE'S TOOLBAR — the researched home for a table search (2026-09-01). The controls stay

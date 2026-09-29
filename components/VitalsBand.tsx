@@ -142,10 +142,10 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
         // as a bar and a scattering of chips (user, 2026-09-01: "the bottom bar should be the same
         // exactly as the top bar").
         "rounded-lg border border-border/60 [background:var(--topbar-glass)] backdrop-blur-sm",
-        // The TOP inset is NEGATIVE so a tenant may stand something just ABOVE the plate (the History
-        // timeline's window pills, user 2026-09-26: "above the bottom section, not on top of it");
-        // the clip exists for the SIDE covers and never needed the top edge.
-        "[clip-path:inset(-48px_max(0px,calc(var(--cover-r)-var(--bar-margin)))_0_max(0px,calc(var(--cover-l)-var(--bar-margin))))]",
+        // The clip exists for the SIDE covers only. (Its top edge stood open for the History
+        // timeline's window pills while they stood above the plate; they live inside it since
+        // 2026-09-29, so nothing may paint above the band now.)
+        "[clip-path:inset(0_max(0px,calc(var(--cover-r)-var(--bar-margin)))_0_max(0px,calc(var(--cover-l)-var(--bar-margin))))]",
         // ⚠️ The cell-targeting rules (card flattening, section dividers) moved ONTO the
         // RollSwap wrapper below (2026-09-04, the no-pop swap): they are `[&>*]` selectors, and
         // the wrapper between this section and the cells would otherwise be their new subject.

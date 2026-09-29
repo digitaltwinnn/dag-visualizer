@@ -120,8 +120,11 @@ function cohortsOf(rows: NodeRow[]): CohortGroup[] {
   );
 }
 
-const cohortLabel = (c: { city: string | null; isp: string | null }): string =>
-  [c.isp, c.city].filter(Boolean).join(" · ") || "Unknown"; // provider first, like the explorer row
+/** A provider cohort's one label — PROVIDER FIRST (user, 2026-09-29), with the unknowns NAMED
+ *  rather than dropped. The rail's pager and the Geography explorer's crumb both read this, so a
+ *  cohort can never be "Berlin" in one and "Unknown provider · Berlin" in the other. */
+export const cohortLabel = (c: { city: string | null; isp: string | null }): string =>
+  `${c.isp ?? "Unknown provider"} · ${c.city ?? "Unlocated"}`;
 
 // GeoExplore's within-country node order: city (falling back to label) then id.
 const nodeSort = (a: NodeRow, b: NodeRow) =>
@@ -239,6 +242,9 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       // networks (`tickNetworks` — the set the tick's ∨ opens the first of), never the catalog;
       // and a pinned tick stays pinned, since a filter commit in the ledger otherwise re-enters
       // live (the executor's rule) and a swipe would move the PARENT. Live stays live.
+      // ⚠️ The DAG's own card has NO siblings here, deliberately: the base ledger is what the
+      // tick IS, not one of the networks that anchored into it, so it is never in that set and
+      // stepping from it to a metagraph would change the parent's meaning, not its child.
       if (s.mode === "ledger") {
         const nets = tickNetworks(s);
         if (!nets) return null;
@@ -308,10 +314,16 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         parent = s.composition
           ? (scoped[0]?.label ?? networkLabel(s))
           : networkLabel(s);
-      } else if (s.mode === "ledger" && s.metaSnap) {
+      } else if (
+        s.mode === "ledger" &&
+        s.metaSnap &&
+        snapshotSignerRows(s.selNodes, s.exactRows, s.metaSnap).some((r) => hoverKeyOf(r.pick) === curKey)
+      ) {
         // UNDER A METAGRAPH SNAPSHOT the node's parent is that snapshot, so the pager steps the
         // nodes that SIGNED it (user, 2026-09-29: "filtered based who actually was the validators,
         // like explorer shows") — `snapshotSignerRows`, the explorer's own list, in its order.
+        // Only when this node IS one of them: a tray node that did not sign is still committable,
+        // and for it the snapshot is not its parent — it pages its network, as it always did.
         rows = snapshotSignerRows(s.selNodes, s.exactRows, s.metaSnap);
         parent = "Validators that signed";
       } else {

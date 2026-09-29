@@ -37,6 +37,9 @@ export interface TrendsSlice extends TrendSlice {
   error: boolean;
   /** The charts are showing the PREVIOUS window while the new one loads (see the hold below). */
   stale: boolean;
+  /** The DAILY leg (the head readings' source) failed and nothing cached answers — the give-up
+   *  path of every "latest full day" slot, so a failed read ends in a dash, never stars forever. */
+  dailyError: boolean;
 }
 
 /** The window on screen for one zoom (and an optional committed range), fetched and cut.
@@ -88,5 +91,5 @@ export default function useTrendsSlice(zoom: ZoomId | null, range: TrendRange | 
   if (slice.p) lastGood.current = slice;
   // Only while a window IS asked for: a null zoom means the consumer isn't showing charts at all.
   const held = zoom != null && !slice.p && !error && lastGood.current != null;
-  return { ...(held ? lastGood.current! : slice), error, stale: held };
+  return { ...(held ? lastGood.current! : slice), error, stale: held, dailyError: plan.daily != null && !daily.data && daily.error };
 }

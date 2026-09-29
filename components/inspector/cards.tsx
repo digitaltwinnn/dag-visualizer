@@ -64,8 +64,8 @@ export function SnapshotTitle({ data: d }: { data: GlobalSnapshot }) {
 // age rides alongside "live" rather than being replaced by it, so the label never overstates.
 export function SnapshotAside(_: { data: GlobalSnapshot }) {
   // The same LIVE / PINNED switch the Snapshots explorer wears (user, 2026-09-29: a pin read as
-  // pinned there and as a bare "◷ 12s" here). It reads the shown snapshot itself — the pinned one,
-  // else the live tip, which is what this card shows.
+  // pinned there and as a bare "◷ 12s" here). It reads the committed snapshot — the one this card
+  // shows — else the live tip.
   return <FollowControl />;
 }
 

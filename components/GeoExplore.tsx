@@ -1,5 +1,6 @@
 "use client";
 
+import { cohortLabel } from "@/components/railSiblings";
 import { useMemo } from "react";
 
 import Explorer, { type ExplorerLevelSpec } from "@/components/explorer/Explorer";
@@ -192,7 +193,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
           hue: accent,
           figure: v.toLocaleString(),
           on,
-          title: `${ch.isp ?? "Unknown provider"} · ${ch.city ?? "Unlocated"} · ${ch.rows.length} node${ch.rows.length === 1 ? "" : "s"}`,
+          title: `${cohortLabel(ch)} · ${ch.rows.length} node${ch.rows.length === 1 ? "" : "s"}`,
           // A cohort of ONE is its node: the click selects the node outright (full ancestry
           // commits the cohort with it), so the reader never opens a list of one.
           onClick: () => {
@@ -225,8 +226,8 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
     levels.push({
       key: "nodes",
       crumb: {
-        label: `${openCohort.isp ?? "Unknown provider"} · ${openCohort.city ?? "Unlocated"}`,
-        title: `${openCohort.isp ?? "Unknown provider"} · ${openCohort.city ?? "Unlocated"}`,
+        label: cohortLabel(openCohort),
+        title: cohortLabel(openCohort),
       },
       meaning: "Each node in this cohort",
       glyphW: NODE_GLYPH_W,

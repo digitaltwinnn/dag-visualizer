@@ -208,8 +208,12 @@ export function filterToggleActions(id: string, currentFilter: string): ClickAct
  *  metaSnap: with a metagraph committed, live follow RE-GROWS that network's newest snapshot card
  *  on the next beat (`followLatest`'s live metagraph mode), which is how the × used to leave the
  *  children standing. Only what is there right now is cleared. */
-export function snapshotClearActions(current: { metaSnap: MetaSnapSel | null; filter: string }): ClickAction[] {
+export function snapshotClearActions(current: { metaSnap: MetaSnapSel | null; filter: string; hasInspect?: boolean }): ClickAction[] {
   const out: ClickAction[] = [];
+  // The NODE is the ledger ladder's finest rung (a metagraph snapshot's validator, `∨`), so a node
+  // card left standing under a cleared tick would hang from nothing — and its pager, losing the
+  // signer set, would fall back to walking every node.
+  if (current.hasInspect) out.push({ kind: "inspect", pick: null });
   if (current.metaSnap) out.push({ kind: "metaSnap", sel: null });
   if (current.filter !== "all") out.push({ kind: "filter", id: "all" });
   out.push({ kind: "snapshot", pick: null, follow: true });
@@ -228,6 +232,7 @@ export function snapshotSelectActions(
      *  shaping a snapshot that has nothing to do with it. Omitted = the filter holds. */
     filter?: string;
     tickHasFilter?: boolean;
+    hasInspect?: boolean;
   },
 ): ClickAction[] {
   // RE-CLICKING the pinned tick DESELECTS (2026-08-07 — the toggle every other rung already
@@ -235,7 +240,7 @@ export function snapshotSelectActions(
   // default until something is clicked — the FollowController repopulates the card chain and
   // the trail slides back to the live front).
   if (!isLiveTip && current && current.pinnedOrdinal != null && current.pinnedOrdinal === p.data.ordinal) {
-    return snapshotClearActions({ metaSnap: current.metaSnap, filter: current.filter ?? "all" });
+    return snapshotClearActions({ metaSnap: current.metaSnap, filter: current.filter ?? "all", hasInspect: current.hasInspect });
   }
   const out: ClickAction[] = [];
   if (
@@ -396,6 +401,7 @@ export function clickActions(input: {
       metaSnap: current.metaSnap ?? null,
       filter: current.filter,
       tickHasFilter: current.tickHasFilter,
+      hasInspect: current.hasInspect,
     });
 
   // A node, in any view. (No autoRotate action: geo disables the controls' rotation at mode

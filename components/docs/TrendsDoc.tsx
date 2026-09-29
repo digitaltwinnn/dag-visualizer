@@ -175,7 +175,7 @@ export default function TrendsDoc() {
   // tiering, the 1H slice, the fleet's hourly payload and the daily readout's 90d window all
   // moved there with their reasons; the document's zoom and range stay LOCAL state after the
   // mount SEED above, because the window a reader picks on this page is the page's own.
-  const { p, buckets, stepMs, pF, fBuckets, fStep, fleetPending, daily, error } = useTrendsSlice(zoom, range);
+  const { p, buckets, stepMs, pF, fBuckets, fStep, fleetPending, daily, error, stale, dailyError } = useTrendsSlice(zoom, range);
   // ⚠️ THE COMMITTED NETWORK SCOPES EVERY PER-NETWORK COLUMN (user, 2026-09-14: "Trends is a
   // doc-page, but actually it shows data that could benefit from the metagraph filter … hide the
   // other metagraph charts"). ONE roster, read by all three panel builders, so a section cannot
@@ -235,10 +235,13 @@ export default function TrendsDoc() {
     fromDaily: (s: Readonly<Record<string, (number | null)[]>>) => readonly (number | null)[],
     chartStep: number,
     k = 1,
-  ): { value: number | null; word: string } | undefined => {
+  ): { value: number | null; word: string; pending: boolean } | undefined => {
     if (chartStep >= 86400000) return undefined;
     const v = daily ? lastMeasured(fromDaily(daily.series)) : null;
-    return { value: v == null ? null : v * k, word: "latest full day" };
+    // Acquiring only while the daily tier is in flight — landed with no complete day, or failed,
+    // is no reading, and says so with a dash (rule 10's give-up path). A HELD window is not the
+    // one on the pickers, so its readings wait too.
+    return { value: v == null || stale ? null : v * k, word: "latest full day", pending: stale || (!daily && !dailyError) };
   };
   const dayReadout = (name: string, k = 1) => dayRead((s) => s[name] ?? [], stepMs, k);
   /** The Metagraphs tab's panel list: one chart per catalog network for one stored metric,
@@ -490,7 +493,9 @@ export default function TrendsDoc() {
           </TabsList>
           {/* The drawer's own outline — the tab row's baseline hairline is its top edge (the
               channel pane's rule), so the active tab's panel-solid fill bridges into it. */}
-          <div className={cn(CABINET_BODY, "px-5 pb-8")}>
+          {/* QUIET WHILE HELD: the previous window stands in until the new one lands
+              (`useTrendsSlice`'s hold) — dimmed, so it never reads as the window the pickers name. */}
+          <div className={cn(CABINET_BODY, "px-5 pb-8 [transition:opacity_200ms_ease] motion-reduce:!transition-none", stale && "opacity-45")}>
 
 
           <TabsContent value="hypergraph" className="pt-5">

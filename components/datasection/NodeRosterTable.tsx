@@ -172,10 +172,15 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
         </TableHeader>
         <TableBody>
           {rows.map((r) => {
-            const key = hoverKeyOf(r.node.pick);
-            const selected = key != null && hoverKeyOf(inspect) === key;
+            // A MERGED row is selected when ANY of its records is (a DAG bead committed in the scene
+            // is this row as much as the metagraph record leading it), and its click then acts on
+            // THAT record — so the re-click deselects what is committed rather than committing the
+            // primary on top of it.
+            const inspected = hoverKeyOf(inspect);
+            const hit = inspected == null ? undefined : r.recs.find((x) => hoverKeyOf(x.pick) === inspected);
+            const selected = hit != null;
             const commit = () =>
-              applyClickActions(nodeSelectActions(r.node.pick, { mode, currentFilter: filter, deselect: selected }));
+              applyClickActions(nodeSelectActions((hit ?? r.node).pick, { mode, currentFilter: filter, deselect: selected }));
             return (
               <TableRow
                 key={r.key}

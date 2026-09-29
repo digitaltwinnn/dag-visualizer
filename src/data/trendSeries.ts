@@ -206,9 +206,6 @@ export function lastMeasured(points: readonly (number | null)[]): number | null 
   return points.reduce<number | null>((acc, v) => (v != null ? v : acc), null);
 }
 
-/** BUSIEST FIRST, by each id's last measured value; nothing measured sorts last, and ties keep
- *  the order they came in. The vitals band's catalog-order rule guards LIVE charts that would
- *  reshuffle under the reader — a ranking laid out once per reading can be honest instead. */
 /** THE HEAD READING: a plane's newest complete DAY (user, 2026-09-29: "a latest 5 min is less
  *  easy to understand than a last day … day should be the standard always"). Read through the SAME
  *  `metricSeries` / `globalSeries` the plane is drawn from, so a counter, a gauge and continuity
@@ -227,8 +224,8 @@ export function latestDay(
   return lastMeasured(id === "dag" ? globalSeries(metric, daily) : metricSeries(metric, id, daily).points);
 }
 
-/** THE SPAN READING — what the Networks list states (user, 2026-09-29, design A: "the explorer
- *  follows the range"). One number per network for the whole window on screen, so the list and
+/** THE SPAN READING — the roster's `head` over a window of a day or more (user, 2026-09-29,
+ *  design A: "the explorer follows the range"). One number per network for the whole window on screen, so the list and
  *  the range selector answer the same question:
  *    · a COUNTER (a per-bucket sum) → its AVERAGE PER DAY: the mean of the MEASURED buckets,
  *      scaled from the bucket to a day. Unmeasured buckets are left out, never counted as zeros;
@@ -281,6 +278,9 @@ export function spanWord(metric: TrendMetric): string {
   return TREND_METRICS[metric].kind === "counter" && metric !== "continuity" ? "Average per day" : "Average";
 }
 
+/** BUSIEST FIRST, by each id's last measured value; nothing measured sorts last, and ties keep
+ *  the order they came in. The vitals band's catalog-order rule guards LIVE charts that would
+ *  reshuffle under the reader — a ranking laid out once per reading can be honest instead. */
 export function rankByLast(
   ids: readonly string[],
   seriesOf: (id: string) => readonly (number | null)[],
