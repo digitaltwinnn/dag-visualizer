@@ -244,6 +244,12 @@ export default function TrendsDoc() {
     return { value: v == null || stale ? null : v * k, word: "latest full day", pending: stale || (!daily && !dailyError) };
   };
   const dayReadout = (name: string, k = 1) => dayRead((s) => s[name] ?? [], stepMs, k);
+  /** THE TOTAL AS THE HEADLINE of a chart that also draws its parts (the per-network Nodes panels:
+   *  the total plus a dashed line per layer — user, 2026-09-29). The layer lines OVERLAP (a hybrid
+   *  node counts once per role it runs), so they are not a partition and never sum to it; the head
+   *  names the one line it reads. A daily chart states its own last total. */
+  const totalRead = (r: ReturnType<typeof dayRead>, points: readonly (number | null)[]) =>
+    r ? { ...r, word: `total · ${r.word}` } : { value: lastMeasured(points), word: "total · latest full day", pending: false };
   /** The Metagraphs tab's panel list: one chart per catalog network for one stored metric,
    *  ranked by the LAST measured day, busiest first (per-section — each ranking is its own
    *  reading). The vitals' catalog-order rule guards live charts that reshuffle under the
@@ -301,7 +307,7 @@ export default function TrendsDoc() {
           { label: "nodes", points, hue: net?.hue },
           ...present.map((r) => ({ label: SHORT[r]!, points: S(pF, `f.layer.${m.id}.${r}`), hue: net?.hue, dash: DASH[r] || true })),
         ];
-        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={metricUnit("nodes", fStep)} readout={dayRead((d) => metricSeries("nodes", m.id!, d).points, fStep)} buckets={fBuckets} stepMs={fStep} lines={lines} />;
+        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={metricUnit("nodes", fStep)} readout={totalRead(dayRead((d) => metricSeries("nodes", m.id!, d).points, fStep), points)} buckets={fBuckets} stepMs={fStep} lines={lines} />;
       });
   };
   /** Per-network CONTINUITY panels: real measured gap stats (m.{id}.gapSum/gapMax — live

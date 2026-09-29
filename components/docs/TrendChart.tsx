@@ -426,7 +426,10 @@ export default function TrendChart({
             ))}
           </span>
         )}
-        {lines.length === 1 && last != null && (
+        {/* One line states its own reading; a MULTI-line chart only a reading its caller names
+            (the per-network Nodes panels' total, 2026-09-29) — which line a bare number
+            belonged to would otherwise be a guess. */}
+        {(lines.length === 1 || readout != null) && last != null && (
           // The readout NAMES ITS RELATION to the window (user, 2026-09-09, third round of
           // this head: a number and a time still read as two facts — the words now say what
           // the number IS, "latest full day/hour/5 min", and the exact stamp lives on hover.
