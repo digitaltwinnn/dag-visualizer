@@ -1,5 +1,5 @@
 import { useStore } from "@/src/store/store";
-import type { Anchor, GlobalSnapshot, MetaInfo, NodeRow } from "@/src/data/types";
+import type { Anchor, ChannelSnapRow, GlobalSnapshot, MetaInfo, NodeRow } from "@/src/data/types";
 import { NetworkData, shortHash } from "@/src/data/api";
 import { METAGRAPHS } from "@/src/net/current";
 import { COLORS as RAW_COLORS, DEFAULT_META_COLOR as RAW_DEFAULT_META } from "@/src/engine/config";
@@ -189,6 +189,40 @@ export function resolveSigner(selNodes: NodeRow[], metaId: string, signerPrefix:
   const row = matchSignerRow(selNodes, metaId, signerPrefix);
   if (row) return { known: true, row };
   return { known: false, reason: selNodes.some((r) => pickNetId(r.pick) === metaId) ? "node" : "network" };
+}
+
+const NO_SIGNERS: readonly string[] = [];
+
+/** WHO SIGNED ONE METAGRAPH SNAPSHOT — its signer ids from the tick's EXACT read, the one source
+ *  the explorer's signer level, the snapshot card and the node rung under it all read (user,
+ *  2026-09-29: "they should be aligned"). Never the ~2.5 MB deep read: a browse must not become a
+ *  fetch. A payload the quick decoder couldn't read carries ordinal 0, and its network's row still
+ *  carries the proofs — so an exact miss falls back to that row. */
+export function snapshotSigners(
+  rows: readonly ChannelSnapRow[] | null | undefined,
+  metaId: string,
+  ordinal: number,
+): readonly string[] {
+  if (!rows) return NO_SIGNERS;
+  const r = rows.find((x) => x.metaId === metaId && x.ordinal === ordinal) ?? rows.find((x) => x.metaId === metaId && x.ordinal === 0);
+  return r?.signers ?? NO_SIGNERS;
+}
+
+/** …and the NODES behind those signatures: the known ones, in signature order (the explorer's row
+ *  order), each once. A signature no node carries has no node to commit, so it is absent here —
+ *  the explorer still SHOWS it as an unknown row, but a ladder step and a pager can only land on a
+ *  node. */
+export function snapshotSignerRows(
+  selNodes: NodeRow[],
+  rows: readonly ChannelSnapRow[] | null | undefined,
+  sel: { metaId: string; ordinal: number },
+): NodeRow[] {
+  const out: NodeRow[] = [];
+  for (const sid of snapshotSigners(rows, sel.metaId, sel.ordinal)) {
+    const r = resolveSigner(selNodes, sel.metaId, sid);
+    if (r.known && !out.includes(r.row)) out.push(r.row);
+  }
+  return out;
 }
 
 /** The words for an unresolved signer — one home, so the two render sites can't describe the same

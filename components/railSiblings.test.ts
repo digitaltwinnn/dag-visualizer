@@ -526,3 +526,28 @@ describe("siblingSet — context rung under a ledger tick", () => {
     expect(siblingSet("context", { ...s, snap: null })).toBeNull();
   });
 });
+
+// ∨ FROM A METAGRAPH SNAPSHOT OPENS ITS VALIDATORS (user, 2026-09-29), and the node card under it
+// pages ONLY the nodes that signed it — the explorer's signer level, row for row.
+describe("the ledger's node rung under a metagraph snapshot", () => {
+  const signer = (id: string) =>
+    ({ ...deA, id, label: id, pick: { kind: "metanode", meta: { id: "ded" }, node: { id, ip: id, roles: ["l0"] }, geo: {} } } as unknown as NodeRow);
+  const s1 = signer("aa11ffff"), s2 = signer("bb22ffff"), other = signer("cc33ffff");
+  const rows = [{ metaId: "ded", ordinal: 500, signers: ["bb22", "aa11", "zz99"] }] as unknown as SiblingState["exactRows"];
+  const ms = { metaId: "ded", ordinal: 500, hash: "", globalOrdinal: 42, ts: "T" };
+  const s = base({ mode: "ledger", filter: "ded", snap: snapPick, metaSnap: ms, exactRows: rows, selNodes: [s1, s2, other] });
+
+  it("∨ commits the FIRST signer the explorer lists", () => {
+    const step = childStep("metaSnap", s)!;
+    expect(step).not.toBeNull();
+    expect(step.actions).toEqual(nodeSelectActions(s2.pick, { mode: "ledger", currentFilter: "ded" }));
+  });
+  it("the node pager steps the signers only, in signature order", () => {
+    const set = siblingSet("node", { ...s, inspect: s1.pick })!;
+    expect(set.items.length).toBe(2);
+    expect(set.index).toBe(1);
+  });
+  it("no signer known → no ∨", () => {
+    expect(childStep("metaSnap", { ...s, selNodes: [other] })).toBeNull();
+  });
+});

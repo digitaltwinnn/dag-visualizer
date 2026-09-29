@@ -45,6 +45,7 @@ import {
 } from "@/src/engine/domain/pickActions";
 import { compositionGroups, type CompGroup } from "@/src/data/composition";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
+import { snapshotSignerRows } from "@/src/data/network";
 import type { RailCardKind } from "@/components/railCards";
 
 /** Everything the resolver needs, read from the store BY THE CALLER (this module stays pure). */
@@ -307,6 +308,12 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         parent = s.composition
           ? (scoped[0]?.label ?? networkLabel(s))
           : networkLabel(s);
+      } else if (s.mode === "ledger" && s.metaSnap) {
+        // UNDER A METAGRAPH SNAPSHOT the node's parent is that snapshot, so the pager steps the
+        // nodes that SIGNED it (user, 2026-09-29: "filtered based who actually was the validators,
+        // like explorer shows") — `snapshotSignerRows`, the explorer's own list, in its order.
+        rows = snapshotSignerRows(s.selNodes, s.exactRows, s.metaSnap);
+        parent = "Validators that signed";
       } else {
         rows = machineRows(s.selNodes).sort(nodeSort);
         parent = networkLabel(s);
@@ -482,6 +489,16 @@ const firstMetaSnapOfTick = (s: SiblingState): SiblingStep | null => {
   };
 };
 
+/** ledger: a metagraph snapshot's FIRST validator (user, 2026-09-29 — "from the metagraph snapshot
+ *  … click the down button and go to its validators"). The same list and order as the explorer's
+ *  signer level (`snapshotSignerRows`); a signature no known node carries has nothing to open, so
+ *  the step takes the first KNOWN one, and none known dims the control. */
+const firstSignerOfMetaSnap = (s: SiblingState): SiblingStep | null => {
+  if (!s.metaSnap) return null;
+  const r = snapshotSignerRows(s.selNodes, s.exactRows, s.metaSnap)[0];
+  return r ? nodeItem(r, s) : null;
+};
+
 export const CHILD_OF: Partial<Record<Mode, Partial<Record<RailCardKind, ChildEntry>>>> = {
   geo: {
     context: { to: "country", step: firstCountry },
@@ -495,6 +512,7 @@ export const CHILD_OF: Partial<Record<Mode, Partial<Record<RailCardKind, ChildEn
   ledger: {
     snap: { to: "context", step: firstAnchoringNetwork },
     context: { to: "metaSnap", step: firstMetaSnapOfTick },
+    metaSnap: { to: "node", step: firstSignerOfMetaSnap },
   },
 };
 

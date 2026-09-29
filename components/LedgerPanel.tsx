@@ -34,7 +34,7 @@ import {
   type TickNetMeasure,
 } from "@/src/data/ledgerMeasure";
 import { ledgerLens, storyCount, tickInStory } from "@/src/data/ledgerStory";
-import { filterAccent, getAnchor, getNetwork, metagraphById, resolveSigner, SIGNER_GROUPS, SIGNER_UNKNOWN } from "@/src/data/network";
+import { filterAccent, getAnchor, getNetwork, metagraphById, resolveSigner, SIGNER_GROUPS, SIGNER_UNKNOWN, snapshotSigners } from "@/src/data/network";
 import { metaSnapHoverKey, type GlobalSnapshot, type NodeRow, type SnapshotExact } from "@/src/data/types";
 import { displayNetwork, LISTED_IDS, UNLISTED_HUE, UNLISTED_ID, UNLISTED_LABEL, unlistedLog } from "@/src/data/unlisted";
 import { POLL } from "@/src/engine/config";
@@ -131,18 +131,9 @@ function groupByMeta(rows: readonly AnchorLogRow[]): MetaGroup[] {
   return [...by.values()].sort((a, b) => b.rows.length - a.rows.length || a.name.localeCompare(b.name));
 }
 
-const NO_SIGNERS: readonly string[] = [];
-
-/** The signer ids of ONE metagraph snapshot, from the tick's EXACT read — the same source the
- *  metagraph-snapshot card's own signer list falls back to, so the two can't disagree. Never the
- *  ~2.5 MB deep read: the explorer must not turn an explicit-gesture route into a browse. The
- *  ordinal-0 fallback is the card's own: a payload the quick decoder couldn't read carries
- *  ordinal 0, and the address match still finds its proofs. */
-function signersOf(ex: SnapshotExact | undefined, metaId: string, ordinal: number): readonly string[] {
-  if (!ex) return NO_SIGNERS;
-  const r = ex.rows.find((x) => x.metaId === metaId && x.ordinal === ordinal) ?? ex.rows.find((x) => x.metaId === metaId && x.ordinal === 0);
-  return r?.signers ?? NO_SIGNERS;
-}
+// A snapshot's signers: `snapshotSigners` (src/data/network.ts) — one home, shared with the node
+// rung's ∨ step and pager (railSiblings), so the three list the same validators.
+const signersOf = (ex: SnapshotExact | undefined, metaId: string, ordinal: number) => snapshotSigners(ex?.rows, metaId, ordinal);
 
 /** The exact read's per-network fee and size for one row of the network level — a listed
  *  network's own entry, or the SUM of every uncataloged address for the unlisted row. */
@@ -585,7 +576,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
 
   // ---- level 3: the signers of the open snapshot — the same node row every explorer ends in ----
   const leaf = openSnap ? leaves.find((r) => `${r.metaId}|${r.ordinal}` === openSnap) ?? null : null;
-  const signers = leaf ? signersOf(exact, leaf.metaId, leaf.ordinal) : NO_SIGNERS;
+  const signers = signersOf(leaf ? exact : undefined, leaf?.metaId ?? "", leaf?.ordinal ?? 0); // no leaf → the shared empty list
   if (leaf && signers.length > 0) {
     levels.push({
       key: "signers",

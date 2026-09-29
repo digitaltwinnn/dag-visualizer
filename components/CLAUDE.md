@@ -466,8 +466,10 @@ coarser COMMITTED rung and ∨ the next finer one — the accordion's own `toggl
 nothing, with the camera and callout following the box as always — and where nothing finer is
 committed, ∨ falls through to `childStep` (railSiblings.ts, tested) and COMMITS the rung's FIRST
 child in the explorer's own order ("just pick the 1st one"). A rung with no child vocabulary
-(a node, a metagraph snapshot, the ledger's network — its finer subjects belong to the tick axis)
-disables the control. The sibling trio is CENTERED as one cluster with the ladder pair at the
+(a node, the ledger's network — its finer subjects belong to the tick axis) disables the control.
+A metagraph snapshot's ∨ opens its first VALIDATOR (2026-09-29), and the node card under it pages
+only the nodes that signed it — `snapshotSignerRows` (`src/data/network.ts`), the same list and
+order as the explorer's signer level, so the two can't disagree about who signed. The sibling trio is CENTERED as one cluster with the ladder pair at the
 right, a hairline between the axes so they never read as one four-way control — and **an
 exhausted direction is INACTIVE while an axis with nothing to ever navigate is ABSENT** (user,
 2026-09-11, two rounds; supersedes 2026-09-03's invisible rule, which predates the pair): a
