@@ -358,7 +358,13 @@ export default function AnchorLogTable() {
   const windowFirst = (() => {
     if (!net) return null;
     const listed = buildAnchorLog(net.metaSnaps, net.globalSnapshots, filter);
-    return listed[0] ?? null;
+    // ⚠️ THE NEWEST ROW WITH A SNAPSHOT, not the newest row (found 2026-09-29: the pane opened
+    // on "Select a metagraph snapshot…"). The buffer's newest global tick is usually a SEAM while
+    // it settles — its metagraph snapshots are stamped over the seconds AFTER it appears (the tick
+    // lifecycle, src/data/CLAUDE.md) — and a seam commits the tick alone, which leaves the channel
+    // pane on its empty state. The newest row that carries a snapshot is a real row, a few seconds
+    // older, and it is what "opens on a subject" means.
+    return listed.find((r) => r.metaId != null) ?? listed[0] ?? null;
   })();
   useEffect(() => {
     if (section !== "data" || !armed.current || metaSnap || !windowFirst) return;
