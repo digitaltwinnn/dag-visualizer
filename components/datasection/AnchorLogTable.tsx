@@ -2,7 +2,7 @@
 
 import { netUrl } from "@/src/net/current";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, ChevronRight, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, Search, X } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useStore } from "@/src/store/store";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
@@ -607,6 +607,14 @@ export default function AnchorLogTable() {
    *  silently in force with nothing on screen to explain the rows you are looking at. */
   const searchSet = !!(qSnapshot || qTick || qFrom || qTo);
 
+  // A SEARCH THAT LANDS FOLDS THE BAR (design round, 2026-09-29): the landing mark on the row and
+  // the toolbar's applied chip say what is in force, so the fields step aside and the log gets its
+  // height back — on the phone that is the sheet closing onto the answer. A miss keeps the bar
+  // open, since its answer is printed inside it.
+  useEffect(() => {
+    if (marked != null) setSearchOpen(false);
+  }, [marked]);
+
   // Built ONCE and rendered by BOTH branches below — a seek swaps the table into its loading state
   // while a page is fetched, and unmounting the controls mid-seek loses what was typed.
   const search = !searchOpen ? null : (
@@ -656,10 +664,14 @@ export default function AnchorLogTable() {
     // is exactly where SectionShell's absolute close sits — and the phone pane's slimmer padding
     // (pr-4, was the pr-10 tablet gutter) plus the ×'s 44px touch box put the two on top of each
     // other. The reserve is the ×'s own touch width.
-    <div className="flex-none flex items-center justify-end gap-1.5 pb-2 max-[700px]:pr-10">
+    // ⚠️ LEGIBLE CONTROLS (design round, 2026-09-29, desktop A + phone A): the toggle was a 16px
+    // line of micro caps and the applied search a whisper beside a caps "clear". Both are 32px
+    // controls now (44px on touch and phone) on the bar's own type: the toggle a real button that
+    // shows pressed while open, the applied search ONE chip whose × clears it.
+    <div className="flex-none flex items-center justify-end gap-2 pb-2 max-[700px]:pr-10">
       {searchSet && (
-        <>
-          <span className="min-w-0 truncate text-micro text-muted-foreground">
+        <span className="inline-flex min-w-0 items-center gap-1 h-8 pointer-coarse:h-11 max-[700px]:h-11 max-[700px]:flex-1 pl-3 pr-1 rounded-btn border border-border/70 bg-[var(--panel-plate)] text-body text-foreground-dim">
+          <span className="min-w-0 truncate tabular-nums">
             {[qSnapshot && `snapshot ${qSnapshot}`, qTick && `in global ${qTick}`, qFrom && `from ${qFrom}`, qTo && `to ${qTo}`]
               .filter(Boolean)
               .join(" · ")}
@@ -667,33 +679,39 @@ export default function AnchorLogTable() {
           <button
             type="button"
             onClick={clearSearch}
-            className="inline-flex flex-none items-center gap-0.5 rounded-xs px-1 py-0.5 cursor-pointer text-micro uppercase tracking-caps text-muted-foreground hover:text-foreground hover:bg-wash-faint focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
+            aria-label="Clear search"
+            title="Clear search"
+            className="inline-flex flex-none size-6 pointer-coarse:size-9 max-[700px]:size-9 items-center justify-center rounded-xs cursor-pointer text-muted-foreground hover:text-foreground hover:bg-wash-faint focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
           >
-            <X aria-hidden className="size-3" /> clear
+            <X aria-hidden className="size-3.5" />
           </button>
-        </>
+        </span>
       )}
       <button
         type="button"
         aria-expanded={searchOpen}
         onClick={() => setSearchOpen((o) => !o)}
         className={cn(
-          "inline-flex flex-none items-center gap-1 rounded-xs px-1 py-0.5 cursor-pointer",
-          "text-micro uppercase tracking-caps transition-colors hover:bg-wash-faint hover:text-foreground",
+          "inline-flex flex-none items-center gap-2 h-8 pointer-coarse:h-11 max-[700px]:h-11 px-3 rounded-btn border cursor-pointer",
+          "text-body font-medium transition-colors",
           "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
-          searchOpen ? "bg-wash-faint text-foreground" : "text-muted-foreground",
+          searchOpen
+            ? "border-primary/45 bg-wash-soft text-primary"
+            : "border-border/70 text-foreground-dim hover:bg-wash-faint hover:text-foreground",
         )}
       >
-        <Search aria-hidden className="size-3" />
-        search snapshots
-        {/* The disclosure chevron this control was missing (user, 2026-09-01: "the 'search fields'
-            needs a > as well no?") — the app's one expand affordance, on its own 150ms clock, so
-            the button says at rest that there is something behind it. */}
-        <ChevronRight
+        <Search aria-hidden className="size-[15px] text-primary" />
+        {/* The noun is said once, here (the fields name only their axis); the phone's toolbar
+            is narrow, and the sheet it opens carries the full title. */}
+        <span className="max-[700px]:hidden">Search snapshots</span>
+        <span className="min-[700px]:hidden">Search</span>
+        {/* The disclosure chevron (user, 2026-09-01: "needs a > as well") — pointing at where the
+            bar opens, below, on its own 150ms clock. The phone opens a sheet, which needs none. */}
+        <ChevronDown
           aria-hidden
           className={cn(
-            "size-3 transition-transform duration-150 motion-reduce:transition-none",
-            searchOpen && "rotate-90",
+            "size-3.5 max-[700px]:hidden transition-transform duration-150 motion-reduce:transition-none",
+            searchOpen && "rotate-180",
           )}
         />
       </button>
