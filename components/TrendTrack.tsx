@@ -10,6 +10,8 @@ import {
   classifyPress,
   clampCursor,
   drawnSpan,
+  type PressZone,
+  zoneCursor,
   isDrag,
   msAtX,
   panRange,
@@ -173,6 +175,13 @@ export default function TrendTrack({
     setPreview(null);
   }, []);
 
+  /** The pointer's promise, written straight to the element — it changes per move and must not
+   *  cost a render. `zoneCursor` reads the same `classifyPress` the press will. */
+  const pointTo = (el: HTMLElement, zone: PressZone, pressed: boolean) => {
+    const c = zoneCursor(zone, pressed);
+    if (el.style.cursor !== c) el.style.cursor = c;
+  };
+
   const onDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (!buckets.length || box.w <= 0) return;
@@ -201,6 +210,7 @@ export default function TrendTrack({
         span: null,
         wroteMs: cursorMs,
       };
+      pointTo(e.currentTarget, press.current.zone, true);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [buckets.length, box.w, geom, range, windowId, cursorMs, track],
@@ -212,6 +222,7 @@ export default function TrendTrack({
       const p = press.current;
       if (!p) {
         setHoverX(x);
+        if (buckets.length && box.w > 0) pointTo(e.currentTarget, classifyPress(x, geom, drawnSpan(null, range, windowId, geom), cursorMs), false);
         return;
       }
       // ⚠️ A RELEASE THIS ELEMENT NEVER SAW leaves the press armed, and the next hover would
@@ -249,7 +260,7 @@ export default function TrendTrack({
       setPreview(next);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [geom, stepMs, setTrendCursor, onCancel, track],
+    [geom, stepMs, setTrendCursor, onCancel, track, buckets.length, box.w, range, windowId, cursorMs],
   );
 
   const onUp = useCallback(
@@ -257,6 +268,7 @@ export default function TrendTrack({
       const p = press.current;
       press.current = null;
       if (!p) return;
+      pointTo(e.currentTarget as HTMLDivElement, p.zone, false);
       try {
         if ((e.currentTarget as HTMLDivElement).hasPointerCapture?.(p.id)) {
           (e.currentTarget as HTMLDivElement).releasePointerCapture(p.id);

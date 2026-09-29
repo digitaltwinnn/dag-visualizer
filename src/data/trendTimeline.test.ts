@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
+import { zoneCursor,
   DRAG_PX,
   EDGE_PX,
   HANDLE_PX,
@@ -412,5 +412,15 @@ describe("the cursor's readout", () => {
     const s = stampInstant(Date.UTC(2026, 8, 18, 13, 45), HOUR);
     expect(s).toMatch(/13:45/);
     expect(s).toMatch(/UTC$/);
+  });
+});
+
+describe("zoneCursor", () => {
+  it("a hand over the span, closed while carried; resize on edges and the handle; crosshair elsewhere", () => {
+    expect(zoneCursor({ kind: "inside" }, false)).toBe("grab");
+    expect(zoneCursor({ kind: "inside" }, true)).toBe("grabbing");
+    expect(zoneCursor({ kind: "edge", edge: "from" }, false)).toBe("ew-resize");
+    expect(zoneCursor({ kind: "cursor" }, true)).toBe("ew-resize");
+    expect(zoneCursor({ kind: "empty" }, false)).toBe("crosshair");
   });
 });

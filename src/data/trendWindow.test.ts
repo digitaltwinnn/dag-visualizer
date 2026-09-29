@@ -4,7 +4,7 @@
 // as "no leading gap"; the client clock judging a CDN-cached payload's newest bucket; the
 // leading partial month drawn whole while the trailing one was trimmed).
 import { describe, expect, it } from "vitest";
-import { assembleTrendSlice, bucketAt, cursorFraction, cutRange, leadingTrim, monthlySum, pickRangeTier, planTrendFetch, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, ZOOMS, type TrendsWindowData } from "./trendWindow";
+import { assembleTrendSlice, bucketAt, heldZoom, cursorFraction, cutRange, leadingTrim, monthlySum, pickRangeTier, planTrendFetch, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, ZOOMS, type TrendsWindowData } from "./trendWindow";
 
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
@@ -435,5 +435,21 @@ describe("assembleTrendSlice", () => {
     const plan = planTrendFetch("all", { fromMs: from, toMs: to });
     const s = assembleTrendSlice(plan, { main: win(Date.UTC(2025, 8, 1), DAY, [1, 2, 3, 4, 5, 6]) });
     expect(s.buckets).toEqual([from, Date.UTC(2025, 8, 4), to]);
+  });
+});
+
+describe("heldZoom", () => {
+  it("maps the target span over the whole plot", () => {
+    // Axis 0..100, target 75..100 → start at 3/4, stretched 4×.
+    expect(heldZoom(0, 100, { fromMs: 75, toMs: 100 })).toEqual({ f0: 0.75, s: 4 });
+  });
+  it("zooming out shrinks the held plot into its place on the wider axis", () => {
+    expect(heldZoom(50, 100, { fromMs: 0, toMs: 100 })).toEqual({ f0: -1, s: 0.5 });
+  });
+  it("declines a target the held axis never covered, a degenerate span, and a no-op", () => {
+    expect(heldZoom(0, 100, { fromMs: 200, toMs: 300 })).toBeNull();
+    expect(heldZoom(0, 0, { fromMs: 0, toMs: 10 })).toBeNull();
+    expect(heldZoom(0, 100, { fromMs: 5, toMs: 5 })).toBeNull();
+    expect(heldZoom(0, 100, { fromMs: 1, toMs: 101 })).toBeNull();
   });
 });

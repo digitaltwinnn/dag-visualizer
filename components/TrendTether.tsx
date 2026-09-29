@@ -21,7 +21,9 @@ import { useStore } from "@/src/store/store";
 // every frame. A read-and-write loop runs ONLY while something moves — the scene (`sceneMoving`,
 // which covers the stack's ease and the camera) or a store change that moves either end — and
 // stops on the frame after; at rest the tether costs nothing. The DOM is written only on change.
-// Phone declines it: there the timeline lives in the Vitals sheet, far from any chart.
+// The phone draws it too (user, 2026-09-29: "on mobile I don't see the dotted lines"): the
+// timeline lives in the Vitals sheet, which opens directly under the stack, so the lines rise
+// from behind the sheet's top edge — the sheet paints over this layer — to the chart's axis.
 
 export default function TrendTether() {
   const svg = useRef<SVGSVGElement>(null);
@@ -33,9 +35,13 @@ export default function TrendTether() {
   // re-rank moves the planes, which raises `sceneMoving`; paging is the other front-plane change.
   const scroll = useStore((s) => s.trendScroll);
   const moving = useStore((s) => s.sceneMoving);
+  // The phone's timeline lives in the Vitals SHEET, which mounts a commit after it opens and then
+  // grows (and shifts the scene up by half its height), so an open, a close or a drag of the sheet
+  // is a change to both ends.
+  const dock = useStore((s) => s.phoneDock);
+  const sheetPx = useStore((s) => s.phoneSheetPx);
 
   useEffect(() => {
-    if (bp === "phone") return;
     const el = svg.current;
     if (!el) return;
     let last = "";
@@ -73,12 +79,12 @@ export default function TrendTether() {
       c.setAttribute("x1", `${L}`); c.setAttribute("y1", `${y}`); c.setAttribute("x2", `${R}`); c.setAttribute("y2", `${y}`);
       el.style.visibility = "visible";
     };
-    // Two frames after any change (React paints the brush/plane, then the engine projects it), and
-    // every frame for as long as the scene is moving.
-    let frames = moving ? Infinity : 3;
+    // For a short settle after any change (React paints the brush/plane, the engine projects it,
+    // a sheet grows into place), and every frame for as long as the scene is moving.
+    const until = moving ? Infinity : performance.now() + 700;
     const tick = () => {
       measure();
-      if (--frames > 0) raf = requestAnimationFrame(tick);
+      if (performance.now() < until) raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     const onResize = () => requestAnimationFrame(measure);
@@ -93,9 +99,8 @@ export default function TrendTether() {
       window.removeEventListener("resize", onResize);
       mo?.disconnect();
     };
-  }, [bp, range, windowId, focus, scroll, moving]);
+  }, [bp, range, windowId, focus, scroll, moving, dock, sheetPx]);
 
-  if (bp === "phone") return null;
   return (
     <svg ref={svg} aria-hidden className="absolute inset-0 w-full h-full pointer-events-none overflow-visible" style={{ visibility: "hidden" }}>
       <line stroke="var(--primary)" strokeOpacity={0.45} strokeWidth={1} strokeDasharray="3 4" />

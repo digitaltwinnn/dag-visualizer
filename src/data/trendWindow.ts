@@ -450,3 +450,28 @@ export function assembleTrendSlice(plan: TrendFetchPlan, payloads: TrendPayloads
     daily: payloads.daily ? trimNewestPartial(payloads.daily) : undefined,
   };
 }
+
+/** THE HELD PLOT'S ZOOM (user, 2026-09-29: "can't we just reposition the lines, most chart libs
+ *  have that option"). While a new window or range loads, the previous plot stands in (the
+ *  slice's hold), and this answers where that plot has to sit so its OLD buckets land where the
+ *  NEW axis will draw them: the target span's start as a fraction `f0` of the held axis, and the
+ *  horizontal scale `s` that stretches the target span over the whole plot. Nothing is
+ *  interpolated between grains — the old data moves as a picture and is then REPLACED, which is
+ *  the only animation rule 10 allows here (a point-wise morph from hourly to daily buckets would
+ *  draw values nobody measured). Null when there is nothing honest to move: a degenerate axis or
+ *  target, or a target the held axis does not overlap at all. */
+export function heldZoom(
+  axisFromMs: number,
+  axisToMs: number,
+  target: { fromMs: number; toMs: number },
+): { f0: number; s: number } | null {
+  const span = axisToMs - axisFromMs;
+  const want = target.toMs - target.fromMs;
+  if (!(span > 0) || !(want > 0)) return null;
+  if (target.toMs <= axisFromMs || target.fromMs >= axisToMs) return null;
+  const f0 = (target.fromMs - axisFromMs) / span;
+  const s = span / want;
+  // A pill hop within one window (a refresh, the same span a bucket later) is not a zoom.
+  if (Math.abs(s - 1) < 0.02 && Math.abs(f0) < 0.02) return null;
+  return { f0, s };
+}

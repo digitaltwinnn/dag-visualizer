@@ -78,6 +78,7 @@ import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing"
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import TrendTether from "@/components/TrendTether";
+import { WINDOW_MS } from "@/src/data/trendTimeline";
 
 /** The empty roster, as ONE frozen reference. Publishing a fresh `[]` would be a content-free
  *  change the engine's `!==` still has to answer. */
@@ -146,6 +147,19 @@ export default function TrendStack() {
   // counter EDGE TRIM too, so a rail can never quote a number no chart on screen agrees with.
   const roster = useTrendRoster(slice, filter, shown);
   const { ranked, rows, buckets: axis, stepMs: step, pending } = roster;
+  // THE SPAN BEING LOADED, while the previous window stands in (`slice.stale`): every plot zooms
+  // its held picture to it (`TrendChart`'s `zoomTo`), so a range change reads as the SAME lines
+  // moving to their new places, then the new window replacing them. A pill's span runs back from
+  // the held axis's own newest instant — the payload's clock, never the client's — and `all`
+  // names no span, so it only dims.
+  const zoomTo = useMemo(() => {
+    if (!slice.stale) return null;
+    if (range) return { fromMs: range.fromMs, toMs: range.toMs };
+    const ms = WINDOW_MS[windowId];
+    if (ms == null || !axis.length) return null;
+    const toMs = axis[axis.length - 1]! + step;
+    return { fromMs: toMs - ms, toMs };
+  }, [slice.stale, range, windowId, axis, step]);
   // THE ORDER ON SCREEN — the ranking once settled, the HELD order while a measure change is in
   // flight, so the plots land before the cards move. Poses, the hover backstop and the engine's
   // `trendIds` all read THIS, never `ranked`: the projector and React must agree on the order.
@@ -480,6 +494,7 @@ export default function TrendStack() {
                 format={roster.format}
                 note={pending ? "reading the hourly samples…" : undefined}
                 buckets={axis}
+                zoomTo={zoomTo}
                 stepMs={step}
                 sampled={row.series.sampled}
                 gaps={row.series.gaps}
