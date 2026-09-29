@@ -235,9 +235,18 @@ export default function TrendStack() {
   // never re-render five charts.
   const down = useRef<{ x: number; y: number } | null>(null);
   const dragged = useRef(false);
+  // ⚠️ WHETHER THIS PRESS MADE A RANGE — the gate for the plot's pick (user, 2026-09-29: a click on
+  // the chart set the Moment "only when we click the tiny dot"). The pick used to be gated on
+  // `dragged`, a 4px slop, while the brush only commits past ONE BUCKET — so a press that wobbled a
+  // few pixels was neither a range nor a pick and did nothing, which on a trackpad or a finger is
+  // most clicks. The outcome decides now: the click after a press that committed a range is that
+  // range's; after any other press it picks the Moment. (`dragged` still guards the plane's own
+  // bring-forward click, where travel is the right test.)
+  const rangedThisPress = useRef(false);
   const onPointerDown = (e: React.PointerEvent) => {
     down.current = { x: e.clientX, y: e.clientY };
     dragged.current = false;
+    rangedThisPress.current = false;
   };
   // A PRESS THAT TRAVELS IS A BRUSH, NOT A CLICK (2026-09-26). It used to be handed to the canvas
   // as the scene's orbit (`orbitHandoff`, 2026-09-19); History has had no orbit since 2026-09-26
@@ -335,6 +344,9 @@ export default function TrendStack() {
       // charts leave and arrive together without five pieces of state (`ROLL_CLASS` reads it).
       // The two offsets are the direction: the next measure rises into place, the previous drops.
       data-roll={staged.phase}
+      // The previous window standing in while the new one loads (`useTrendsSlice`'s hold): the
+      // plots quiet, so the stale lines never read as the new range's.
+      data-stale={slice.stale ? "" : undefined}
       style={{
         ["--roll-out-y" as string]: staged.dir === "next" ? "-10px" : "10px",
         ["--roll-in-y" as string]: staged.dir === "next" ? "14px" : "-14px",
@@ -444,6 +456,8 @@ export default function TrendStack() {
                   : {}),
               }}
             >
+            {/* QUIET WHILE STALE — the plot only; the header, the card and its pairing hold. */}
+            <div className="[transition:opacity_200ms_ease] group-data-[stale]/stack:opacity-45 motion-reduce:!transition-none">
             {p && (
               <TrendChart
                 name={row.name}
@@ -473,9 +487,17 @@ export default function TrendStack() {
                 scaleMax={sharedMax}
                 cursorMs={cursorMs}
                 onPick={(ms) => {
-                  if (!dragged.current) setTrendCursor(ms);
+                  if (!rangedThisPress.current) setTrendCursor(ms);
+                  rangedThisPress.current = false;
                 }}
-                onRange={pose.interactive ? (fromMs, toMs) => setTrendRange({ fromMs, toMs }) : undefined}
+                onRange={
+                  pose.interactive
+                    ? (fromMs, toMs) => {
+                        rangedThisPress.current = true;
+                        setTrendRange({ fromMs, toMs });
+                      }
+                    : undefined
+                }
                 // THE PLANE CARRIES ITS COLOUR AS AN AREA, and only here — on the card's solid face
                 // it reads as the network's own tint. A plain boolean, so it holds the plot's memo
                 // as still as every other prop on this call.
@@ -519,6 +541,7 @@ export default function TrendStack() {
                 }}
               />
             )}
+            </div>
             </div>
           </div>
         );
