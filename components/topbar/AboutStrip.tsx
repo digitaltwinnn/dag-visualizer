@@ -22,7 +22,10 @@ import { useStore } from "@/src/store/store";
 // LAYOUT D1 (user's pick, 2026-09-29, over the two-column B): the head STACKED above ONE
 // paragraph. The copy became one passage per view in the same round, so there is nothing to split
 // into columns or into a lead and secondaries — one voice at one weight, set to a reading measure
-// (72ch) rather than the bar's width. On phone the row still caps its height and scrolls.
+// (72ch) rather than the bar's width — and that column is CENTRED in the bar (user, 2026-09-29:
+// left-aligned, the bar's right half was empty glass). The text inside stays left-aligned: a
+// ragged-left paragraph reads worse than the space it would fill. On phone the row still caps its
+// height and scrolls.
 export default function AboutStrip() {
   const mode = useStore((s) => s.mode);
   const { title, text, caption } = ABOUT[mode];
@@ -34,10 +37,14 @@ export default function AboutStrip() {
   const Icon = ABOUT_ICON;
   return (
     <div
-      className="flex flex-col gap-2.5 mx-2 px-2.5 pb-3.5 pt-3 border-t border-border/60 max-[700px]:max-h-[45vh] max-[700px]:overflow-y-auto max-[700px]:overscroll-contain slim-scroll"
+      className="flex flex-col items-center mx-2 px-2.5 pb-3.5 pt-3 border-t border-border/60 max-[700px]:max-h-[45vh] max-[700px]:overflow-y-auto max-[700px]:overscroll-contain slim-scroll"
       role="region"
       aria-label={`${eyebrow}: ${title}`}
     >
+      {/* ONE column for head and text, measured in the PARAGRAPH's type (`text-body` here, so the
+          `ch` is the body's): two separately-capped blocks resolved 72ch at two font sizes and
+          centred to different left edges (measured 560 vs 657px). */}
+      <div className="flex flex-col gap-2.5 w-full max-w-[72ch] min-w-0 text-body">
       <div className="flex flex-col gap-1 min-w-0">
         <span className="flex items-center gap-2 text-micro tracking-caps uppercase text-muted-foreground">
           <Icon aria-hidden className="size-3.5 text-[var(--filter-accent,var(--primary))]" />
@@ -46,7 +53,8 @@ export default function AboutStrip() {
         </span>
         <span className="text-title font-semibold tracking-[-0.01em] text-foreground">{title}</span>
       </div>
-      <p className="m-0 max-w-[72ch] text-body leading-relaxed text-foreground-dim">{text}</p>
+      <p className="m-0 leading-relaxed text-foreground-dim">{text}</p>
+      </div>
     </div>
   );
 }

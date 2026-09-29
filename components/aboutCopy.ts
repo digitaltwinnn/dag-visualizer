@@ -306,7 +306,7 @@ export const ABOUT: Record<Mode, { title: string; eyebrow: string; text: string;
     title: "How the network is built",
     eyebrow: "About",
     text:
-      "Its shape is a hypergraph: many independent networks, called metagraphs, linked through one base ledger that keeps a record about each one's data but never the data itself. Every metagraph validates whatever its business runs on, and runs only the layers it needs to do it: L0 seals its state, data L1 takes in what applications write, and currency L1 moves a token. One node can run several of them.",
+      "Its shape is a hypergraph: many independent networks, called metagraphs, linked through one base ledger that keeps a record about each one's data but never the data itself. Every metagraph validates whatever its business runs on, and runs only the layers it needs to do it: L0 agrees on its state and creates its snapshots, data L1 takes in what applications write, and currency L1 moves a token. One node can run several of them.",
   },
   geo: {
     title: "Where the network runs",
@@ -318,7 +318,7 @@ export const ABOUT: Record<Mode, { title: string; eyebrow: string; text: string;
     title: "When the network anchors",
     eyebrow: "About",
     text:
-      "Snapshots happen at two levels. Each network seals its own, on its own schedule and in its own format, and anchors into the global snapshot whatever it wants kept, while the base ledger seals one global snapshot for all of them. Every snapshot arrives already sealed and stays provable, and how often a network anchors, and how much, depends on what it does.",
+      "Snapshots happen at two levels. Each network creates its own, on its own schedule and in its own format, and anchors into the global snapshot whatever it wants kept, while the base ledger creates one global snapshot for all of them. Every snapshot is signed by the validators that created it, so it stays provable, and how often a network anchors, and how much, depends on what it does.",
   },
   trend: {
     eyebrow: "Measured history",

@@ -817,7 +817,7 @@ export function ChannelStatePanel() {
                 // word one screen apart and read as kin). It is a digest, the same species as
                 // its Hash/Parent siblings; the chain field stays calculatedStateProof (internal
                 // identifiers keep their names). The title carries the distinction.
-                <FootRow label="State hash" value={paneHash(deep.stateProof)} title={"The hash of the application state this snapshot results in, covered by the snapshot's own L0 seal — the state's provability. Distinct from the SIGNERS tab's 'snapshot proof', which is the L0 signature set; this is a digest, and the signatures sign over it." + deep.stateProof} copy={deep.stateProof} />
+                <FootRow label="State hash" value={paneHash(deep.stateProof)} title={"The hash of the application state this snapshot results in, covered by the snapshot's L0 signatures — the state's provability. Distinct from the SIGNERS tab's 'snapshot proof', which is the L0 signature set; this is a digest, and the signatures sign over it." + deep.stateProof} copy={deep.stateProof} />
               )}
             </div>
           )}

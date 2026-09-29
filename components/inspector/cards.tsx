@@ -186,7 +186,7 @@ export function GeoLiveAside() {
       // layer detail (the L0 seal) rides the title — the aside states the relation.
       <span
         className="text-label text-muted-foreground whitespace-nowrap"
-        title="This node is among the committed metagraph snapshot's proof signers — a snapshot is sealed by the metagraph's own L0 cluster."
+        title="This node is among the committed metagraph snapshot's proof signers — a snapshot is signed by the metagraph's own L0 validators."
       >
         signed {signed.toLocaleString()}
       </span>

@@ -45,7 +45,7 @@ export const VIEWS: readonly ViewDef[] = [
     name: "Snapshots",
     slug: "snapshots",
     desc:
-      "Live snapshot anchoring in 3D: watch each metagraph seal its ledger and anchor it into " +
+      "Live snapshot anchoring in 3D: watch each metagraph create its snapshots and anchor them into " +
       "the Constellation Network's global snapshots as they happen.",
   },
   {

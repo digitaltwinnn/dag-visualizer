@@ -511,7 +511,7 @@ export default function TrendsDoc() {
             // transactions; no batching-mechanism claim (the state/blocks correction), and
             // no volume commentary either ("most seal none" cut — user: "no opinion of the
             // volume, let charts do the work").
-            lead="The blocks the global snapshots sealed. Here a block carries the DAG ledger's own transactions — a DAG transfer rides as one."
+            lead="The blocks the global snapshots carried. Here a block carries the DAG ledger's own transactions — a DAG transfer rides as one."
           >
             <TrendChart onRange={onRange} inspect={inspectHere} name="Blocks" unit={per} readout={dayReadout("g.blocks")} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "blocks", points: trim(S(p, "g.blocks")) }]} />
           </Section>
@@ -546,7 +546,7 @@ export default function TrendsDoc() {
           <Section
             id="fleet"
             title="Total nodes"
-            lead="Every node across the whole network — the DAG's own validators and every metagraph's nodes — counted live each hour. The layers split the work: L0 seals a network's own state, currency L1 (cL1) moves its token, data L1 (dL1) takes in what applications write — and one node can run several."
+            lead="Every node across the whole network — the DAG's own validators and every metagraph's nodes — counted live each hour. The layers split the work: L0 agrees on a network's state and creates its snapshots, currency L1 (cL1) moves its token, data L1 (dL1) takes in what applications write — and one node can run several."
           >
             {fleetPending ? (
               /* The gauges are HOURLY instruments; at fine zooms their hourly payload is a
@@ -610,7 +610,7 @@ export default function TrendsDoc() {
             // their payload between them differently (DED: state empty, records in blocks;
             // others the reverse), with no crisp delineation we've measured. Simplified the
             // same day — the two-carrier fact, one example each, the zero rule.
-            lead="The blocks each network sealed inside its own snapshots. A block carries transactions — a token transfer, or a batch of application records — and it is one of two places a snapshot carries work: the other is its state, and each network decides what goes where. A zero means no blocks, not no activity."
+            lead="The blocks each network carried inside its own snapshots. A block carries transactions — a token transfer, or a batch of application records — and it is one of two places a snapshot carries work: the other is its state, and each network decides what goes where. A zero means no blocks, not no activity."
           >
             {netPanels("blocks")}
           </Section>
@@ -636,7 +636,7 @@ export default function TrendsDoc() {
           <Section
             id="net-fleet"
             title="Nodes per metagraph"
-            lead="Each network's own node count, sampled live every hour, with a line for each layer it runs: L0 seals its state, cL1 moves its token, dL1 takes in what applications write."
+            lead="Each network's own node count, sampled live every hour, with a line for each layer it runs: L0 agrees on its state and creates its snapshots, cL1 moves its token, dL1 takes in what applications write."
           >
             {fleetPending ? (
               <p className="text-label text-muted-foreground">reading the hourly samples…</p>
