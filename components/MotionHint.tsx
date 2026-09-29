@@ -27,16 +27,20 @@ import { cn } from "@/lib/utils";
 // Deliberately NOT `SCENE_GLASS` — that container is for subject labels (the callout, the
 // tooltip) and was tried here and rejected as dominant; this is a status line, and its plate is
 // the least that keeps it legible. No beating dot (user: "I wanted the globe gone") — the
-// sentence alone. Its entrance is a fade with a short rise; it sits low, just above the band,
-// and never moves once placed.
+// sentence alone. Its entrance is a fade; it sits high, just under the command bar, and never
+// moves once placed.
 //
 // It fades in after a beat (150ms) so a same-pose NUDGE — 0.55s, and deliberately not a "change
 // you can see" — never flashes a sentence, and out the frame the motion ends. The LAST sentence is
 // kept through the fade-out, so the words never change under the reader while they vanish.
-// Placed LOW (user: "more to the bottom of the screen"): anchored a fixed distance above the
-// bottom band's reserved space (`--bottom-reserve`, published by BottomStream), so it sits just
-// over the band on every tier rather than at a share of the height that lands differently on a
-// phone. Pointer-inert, and only in a view with a canvas.
+// Placed HIGH (user, 2026-09-29: moved from the bottom to the top): anchored at the rails' own top
+// line — `--rail-top` plus `--topbar-extra`, the sum every rail uses — so it clears the command
+// bar on every tier and an opened filter strip pushes it down with the rest of the layout rather
+// than covering it. During a VIEW TRANSITION the nodes gather into the staging band on that same
+// line, so there it stands just below the band's measured bottom (`gatherBottom`, Engine-written,
+// canvas-local — hence the same `--topbar-extra` added back); the band is width-solved, so its
+// depth runs from ~4 rows on a desktop to ~18 on a phone and no fixed offset clears both.
+// Pointer-inert, and only in a view with a canvas.
 
 /** How long a sentence holds at full before its long ease begins. */
 // 700 first; the user read it as fading too soon (2026-09-26, second round on the timing).
@@ -45,6 +49,9 @@ const HOLD_MS = 1400;
  *  flight runs 1.4s, a view transition ~3.9s, so the line reaches nothing about when the scene
  *  does. The motion's own end still cuts it short with the ordinary quick fade. */
 const EASE_MS = { flight: 900, transition: 3200 } as const;
+
+/** Clearance between the staging band's last row and the hint's plate. */
+const GATHER_GAP_PX = 16;
 
 /** A stable country name from the browser's own vocabulary; the code where it has none. */
 function countryName(cc: string): string {
@@ -60,6 +67,7 @@ export default function MotionHint() {
   const moving = useStore((s) => s.sceneMoving);
   const cause = useStore((s) => s.motionCause);
   const phase = useStore((s) => s.motionPhase);
+  const gatherBottom = useStore((s) => s.gatherBottom);
   // The rung names read the selection the rail card stands for — resolved here, at render, so the
   // domain module stays a function of its arguments.
   const filter = useStore((s) => s.filter);
@@ -113,7 +121,10 @@ export default function MotionHint() {
       aria-live="polite"
       data-on={state}
       style={{
-        bottom: "calc(var(--bottom-reserve, 0px) + 52px)",
+        top:
+          phase && gatherBottom != null
+            ? `calc(${gatherBottom + GATHER_GAP_PX}px + var(--topbar-extra, 0px))`
+            : "calc(var(--rail-top) + var(--topbar-extra, 0px))",
         ["--hint-ease" as string]: `${phase ? EASE_MS.transition : EASE_MS.flight}ms`,
       }}
       className={cn(
