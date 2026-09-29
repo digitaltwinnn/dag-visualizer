@@ -148,7 +148,10 @@ export default function TrendTimeline() {
         </div>
       </div>
       {/* THE TRACK's column: what its line is, the gesture hint, then the track. */}
-      <div className="flex-1 min-w-0 flex flex-col max-[700px]:min-h-[54px]">
+      {/* ON THE PHONE the track is a TOUCH target in a sheet with room to spare (user, 2026-09-29:
+          "the range selector is too small (height) on the mobile phone" — it measured 42px with its
+          month labels, the plot under 30). 110px gives the brush and its grips a thumb's worth. */}
+      <div className="flex-1 min-w-0 flex flex-col max-[700px]:min-h-[110px]">
         <div className="flex items-baseline justify-between gap-3 pt-0.5 leading-none">
           <span className="text-micro text-muted-foreground truncate">All networks · {metricCaption(metric, 86_400_000)}</span>
           {showHint && (

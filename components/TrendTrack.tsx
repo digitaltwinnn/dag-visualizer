@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 import { globalSeries } from "@/src/data/trendSeries";
@@ -109,6 +109,8 @@ export default function TrendTrack({
   // ref makes the element itself the dependency.
   const [track, setTrack] = useState<HTMLDivElement | null>(null);
   const [box, setBox] = useState({ w: 0, h: 0 });
+  // A React id holds colons, which a `url(#…)` reference would have to escape.
+  const clipId = `span${useId().replace(/:/g, "")}`;
   useEffect(() => {
     if (!track) return;
     const measure = () => setBox({ w: track.clientWidth, h: track.clientHeight });
@@ -368,6 +370,27 @@ export default function TrendTrack({
       <svg width={box.w} height={box.h} className="block" aria-hidden>
         {/* THE BASELINE — the track reads as an axis even where the series is all holes. */}
         <line x1={0} y1={plotH} x2={box.w} y2={plotH} stroke="var(--border)" strokeWidth={1} />
+        {/* ⚠️ OUTSIDE THE BRUSH THE INK DIMS — the INK, never a veil over it (user, 2026-09-29: the
+            selector's chart "has its own background … it does not really blend in with the card
+            it's already on"). Two rects of `--background` at 55% used to cover everything outside
+            the span, and with a 30-day span that is nearly the whole track: a dark panel on the
+            band's glass. Now the ink is drawn once DIM and once more at full strength CLIPPED to the
+            span, so nothing is ever painted behind or over the line — the track is the plate's own
+            ground everywhere, and the span is simply where the line reads bright. */}
+        {brush && box.w > 0 && (
+          <defs>
+            <clipPath id={clipId}>
+              <rect
+                x={xAtMs(brush.fromMs, geom)}
+                y={0}
+                width={Math.max(MIN_BRUSH_PX, xAtMs(brush.toMs, geom) - xAtMs(brush.fromMs, geom))}
+                height={plotH}
+              />
+            </clipPath>
+          </defs>
+        )}
+        {[false, true].map((lit) => (lit && !(brush && box.w > 0) ? null : (
+        <g key={lit ? "lit" : "base"} clipPath={lit ? `url(#${clipId})` : undefined} opacity={!lit && brush && box.w > 0 ? 0.35 : 1}>
         {runs.map((run, i) => (
           <g key={i}>
             {run.length === 1 ? (
@@ -386,26 +409,10 @@ export default function TrendTrack({
             )}
           </g>
         ))}
+        </g>
+        )))}
         {brush && box.w > 0 && (
           <>
-            {/* OUTSIDE THE BRUSH THE TRACK DIMS. Two veils OVER the ink rather than the ink
-                painted twice: one rule, and the gaps stay gaps. */}
-            <rect
-              x={0}
-              y={0}
-              width={Math.max(0, xAtMs(brush.fromMs, geom))}
-              height={plotH}
-              fill="var(--background)"
-              opacity={0.55}
-            />
-            <rect
-              x={xAtMs(brush.toMs, geom)}
-              y={0}
-              width={Math.max(0, box.w - xAtMs(brush.toMs, geom))}
-              height={plotH}
-              fill="var(--background)"
-              opacity={0.55}
-            />
             {/* The brush itself: a hairline FRAME, never a fill — a filled rectangle over a chart
                 states a value it does not have. `MIN_BRUSH_PX` keeps a one-hour window over a
                 six-year track findable. */}
