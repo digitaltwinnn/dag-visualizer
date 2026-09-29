@@ -16,16 +16,16 @@ import { useStore } from "@/src/store/store";
 // already holds the view's name, so "what is this view" belongs under the same glass.
 //
 // The copy is `ABOUT[mode]`, the ONE home shared with /about's "What you can explore" section,
-// read live — a view switch while the strip is open re-orients it in place. The typography is the
-// retired card's, which /about's own lead set: the lead at full `--foreground` and medium weight
-// (two channels, so the distinction survives either face), a hairline dividing it from the
-// secondary paragraphs, and those in the muted ink. Prose wants a MEASURE, not the bar's width —
-// the right column caps at a reading width (layout B below has the split) —
-// and on phone the row caps its height and scrolls (the filter strip's own rule), so the
-// three-paragraph hyper card never takes the screen.
+// read live — a view switch while the strip is open re-orients it in place. Prose wants a MEASURE,
+// not the bar's width, and on phone the row caps its height and scrolls (the filter strip's own
+// rule), so a long paragraph never takes the screen.
+// LAYOUT D1 (user's pick, 2026-09-29, over the two-column B): the head STACKED above ONE
+// paragraph. The copy became one passage per view in the same round, so there is nothing to split
+// into columns or into a lead and secondaries — one voice at one weight, set to a reading measure
+// (72ch) rather than the bar's width. On phone the row still caps its height and scrolls.
 export default function AboutStrip() {
   const mode = useStore((s) => s.mode);
-  const { title, lines, caption } = ABOUT[mode];
+  const { title, text, caption } = ABOUT[mode];
   // THE EYEBROW IS "<THE VIEW'S NAME> VIEW", NOT "ABOUT" (user, 2026-09-28, two rounds): the
   // button that opened the row already says About, and what the row is about is the view — so
   // the eyebrow names it, the switch's own word plus "view" so it reads as a place rather than a
@@ -33,35 +33,20 @@ export default function AboutStrip() {
   const eyebrow = `${VIEWS.find((v) => v.id === mode)?.name ?? ""} view`;
   const Icon = ABOUT_ICON;
   return (
-    // LAYOUT B (user's pick, 2026-09-28 — "it feels a bit unbalanced: left has little text, right a
-    // lot"; the companion showed three layouts): TWO columns, each carrying a paragraph's weight.
-    // The LEFT holds the head AND the lead — eyebrow, title, standfirst — so the orientation reads
-    // as one block; the RIGHT holds the secondary paragraphs, divided from it by a hairline. The
-    // standfirst's own hairline goes: the column rule now does that job. On phone the grid
-    // collapses to one column, lead first, and the rule turns horizontal.
     <div
-      className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)] gap-x-8 gap-y-3 mx-2 px-2.5 pb-3 pt-2.5 border-t border-border/60 max-[700px]:grid-cols-1 max-[700px]:max-h-[45vh] max-[700px]:overflow-y-auto max-[700px]:overscroll-contain slim-scroll"
+      className="flex flex-col gap-2.5 mx-2 px-2.5 pb-3.5 pt-3 border-t border-border/60 max-[700px]:max-h-[45vh] max-[700px]:overflow-y-auto max-[700px]:overscroll-contain slim-scroll"
       role="region"
       aria-label={`${eyebrow}: ${title}`}
     >
-      <div className="flex flex-col gap-2 min-w-0 pr-8 border-r border-border/60 max-[700px]:pr-0 max-[700px]:border-r-0 max-[700px]:pb-3 max-[700px]:border-b">
+      <div className="flex flex-col gap-1 min-w-0">
         <span className="flex items-center gap-2 text-micro tracking-caps uppercase text-muted-foreground">
           <Icon aria-hidden className="size-3.5 text-[var(--filter-accent,var(--primary))]" />
           {eyebrow}
           {caption && <span className="ml-auto text-muted-foreground/70">{caption}</span>}
         </span>
         <span className="text-title font-semibold tracking-[-0.01em] text-foreground">{title}</span>
-        {lines[0] != null && <p className="m-0 text-body text-foreground font-medium">{lines[0]}</p>}
       </div>
-      {lines.length > 1 && (
-        <div className="flex flex-col gap-2 min-w-0 max-w-[72ch]">
-          {lines.slice(1).map((l, i) => (
-            <p key={i} className="m-0 text-body text-muted-foreground">
-              {l}
-            </p>
-          ))}
-        </div>
-      )}
+      <p className="m-0 max-w-[72ch] text-body leading-relaxed text-foreground-dim">{text}</p>
     </div>
   );
 }

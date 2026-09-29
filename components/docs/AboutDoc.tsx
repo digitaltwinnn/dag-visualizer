@@ -38,7 +38,7 @@ export function Panel({ className, children }: { className?: string; children: R
 // A view's card in the "what you can explore" grid. The icon is the view's REAL mark from the
 // app's own vocabulary (components/icons.tsx → VIEW_ICONS), so the three cards here, the command
 // bar's buttons and the footer's view links can't disagree.
-function ViewCard({ icon: Icon, name, about }: { icon: LucideIcon; name: string; about: { title: string; lines: string[] } }) {
+function ViewCard({ icon: Icon, name, about }: { icon: LucideIcon; name: string; about: { title: string; text: string } }) {
   return (
     <Panel className="p-4">
       <div className="flex items-center gap-2">
@@ -46,11 +46,7 @@ function ViewCard({ icon: Icon, name, about }: { icon: LucideIcon; name: string;
         <h3 className="text-title font-semibold text-foreground">{name}</h3>
         <span className="text-label text-muted-foreground">· {about.title}</span>
       </div>
-      <div className="mt-2 space-y-2">
-        {about.lines.map((l, i) => (
-          <p key={i} className="text-label text-foreground-dim leading-relaxed">{l}</p>
-        ))}
-      </div>
+      <p className="mt-2 text-label text-foreground-dim leading-relaxed">{about.text}</p>
     </Panel>
   );
 }

@@ -294,49 +294,42 @@ import type { Mode } from "@/src/store/store";
 // 172px) rather than to a word count, because the lane is what decides. "How healthy the network is"
 // (196px) is the widest of the six and stays: it already sets on one line, and the precision is
 // worth the 6px. Anything new here gets measured against the same lane, not eyeballed.
-export const ABOUT: Record<Mode, { title: string; eyebrow: string; lines: string[]; caption?: string }> = {
+// ⚠️ ONE PARAGRAPH PER VIEW (user, 2026-09-29: "make the text read like one paragraph not multiple
+// … one simple, human-readable paragraph, using our terminology"). The lines were three short
+// paragraphs of one kind, which the strip set as columns and a lead/secondary split — typographic
+// structure for text that has none. Each view now says its piece in ONE passage, in the app's own
+// words: nodes (never machines), snapshots and global snapshots (never ticks), networks and
+// metagraphs, the base ledger. History's copy also loses its gesture sentences, which broke the
+// rule above (the gesture belongs to the hints).
+export const ABOUT: Record<Mode, { title: string; eyebrow: string; text: string; caption?: string }> = {
   hyper: {
     title: "How the network is built",
     eyebrow: "About",
-    lines: [
-      "Its shape is a hypergraph: many independent ledgers, interlinked through one base ledger.",
-      "Each of those ledgers is a metagraph, meta because the base keeps a record about its data, never the data itself. Each validates whatever its business runs on.",
-      "The work is validating what comes in and sealing the result. It splits across layers, and a network runs only the ones it needs: L0 seals its own state, data L1 takes in what applications write, currency L1 moves a token. One node can run several.",
-    ],
+    text:
+      "Its shape is a hypergraph: many independent networks, called metagraphs, linked through one base ledger that keeps a record about each one's data but never the data itself. Every metagraph validates whatever its business runs on, and runs only the layers it needs to do it: L0 seals its state, data L1 takes in what applications write, and currency L1 moves a token. One node can run several of them.",
   },
   geo: {
     title: "Where the network runs",
     eyebrow: "About",
-    lines: [
-      "Every node here is geolocated from its IP address, and whatever else that lookup knows comes with it: the city, the country, the provider hosting it.",
-      "Hosts run from the big clouds down to single regional ISPs, and a network's nodes may sit in one country or spread across many.",
-      "Each network chooses its own placement, on whatever matters to the business it runs: it may want to sit close to the data it serves, some providers are cheaper and some are required, and some networks want to be spread across the globe.",
-    ],
+    text:
+      "Every node is placed by its IP address, and that lookup also tells us its city, its country and the provider hosting it. Hosts range from the big clouds down to single regional providers, and each network chooses its own placement for whatever matters to its business: close to the data it serves, with a provider it prefers or needs, or spread across the globe.",
   },
   ledger: {
     title: "When the network anchors",
     eyebrow: "About",
-    lines: [
-      "Snapshots happen at two levels: each network seals its own, and the base ledger seals one for all of them.",
-      "A network snapshots on its own schedule and schema, holding whatever its business runs on, then anchors into the global snapshot what it wants kept.",
-      "Each arrives already sealed and stays provable. How often a network anchors, and how much, depends on what it does.",
-    ],
+    text:
+      "Snapshots happen at two levels. Each network seals its own, on its own schedule and in its own format, and anchors into the global snapshot whatever it wants kept, while the base ledger seals one global snapshot for all of them. Every snapshot arrives already sealed and stays provable, and how often a network anchors, and how much, depends on what it does.",
   },
   trend: {
     eyebrow: "Measured history",
     title: "The network, over time",
-    lines: [
-      "Every chain's own record, one chart per network, stacked back through time.",
-      "Pick a measure and a window on the left, then click a network to bring its chart to the front.",
-      "Click a chart or the timeline to mark one moment, and the right rail reads every network at it.",
-    ],
+    text:
+      "Every network's own measured record of its snapshots, fees, size and nodes, set out as one chart per network, so you can see how each one has changed and compare them all at the same moment, back to where the record begins.",
   },
   soon: {
     title: "What is coming next",
     eyebrow: "About",
     caption: "SOON",
-    lines: [
-      "Three more views are on the way: network health, transactions between addresses, and delegated staking.",
-    ],
+    text: "Three more views are on the way: network health, transactions between addresses, and delegated staking.",
   },
 };
