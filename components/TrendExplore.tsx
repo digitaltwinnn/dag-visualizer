@@ -6,7 +6,7 @@ import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
-import { METRIC_LABELS, METRIC_ORDER, TREND_METRICS, metricUnit, spanWord } from "@/src/data/trendSeries";
+import { METRIC_LABELS, METRIC_ORDER, headWord, metricUnit, spanWord } from "@/src/data/trendSeries";
 import { spanPhrase } from "@/src/data/trendWindow";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -63,12 +63,13 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   // screen — an average per day for a rate — and the hint names that span, so the list and the
   // range selector visibly answer one question, while the Moment card states one INSTANT. It used
   // to state the latest full day, which read as a second, unlabelled copy of the Moment's list.
-  const { ranked, rows } = roster;
-  // An average of COUNTS is stated as a count — "1,978.7 snapshots a day" is precision the reading
-  // does not have. Metrics with their own formatter (DAG, MB, seconds) keep it.
-  const format = TREND_METRICS[metric].format ?? ((v: number) => Math.round(v).toLocaleString());
+  const { ranked, rows, format } = roster;
   const unit = metricUnit(metric, 86_400_000);
-  const over = `${spanWord(metric)} · ${spanPhrase(windowId, range)}`;
+  // ⚠️ THE FIGURE IS THE ROSTER'S `head` — the very number the plane's headline states (user,
+  // 2026-09-29: "didn't we agree to keep it consistent … like the card"). Over a window of a day
+  // or more that is the span's average per day; under a day (1H, a short brush) there is no
+  // measured day inside the span to average, so both say the latest full day.
+  const over = roster.headKind === "span" ? `${spanWord(metric)} · ${spanPhrase(windowId, range)}` : "Latest full day";
   const empty = scopeEmptyCopy(roster.scope, "view");
 
   // THE WHOLE ROSTER, NO PAGER (user, 2026-09-28, two rounds). The card paged for nine days — first
@@ -88,7 +89,7 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
 
   // The bar: each network's last reading as a share of the busiest — the ranking the stack's depth
   // already carries, made visible in the list.
-  const maxLast = Math.max(1e-9, ...ranked.map((id) => rows.get(id)?.span ?? 0));
+  const maxLast = Math.max(1e-9, ...ranked.map((id) => rows.get(id)?.head ?? 0));
 
   const level: ExplorerLevelSpec = {
     key: "networks",
@@ -118,14 +119,14 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
               key: id,
               glyph: <IdentityDot hue={row.hue} />,
               name: row.name,
-              share: row.span != null ? row.span / maxLast : undefined,
+              share: row.head != null ? row.head / maxLast : undefined,
               hue: row.hue,
               figure:
                 // A dash with the words on hover: "no reading" truncated to "no rea…" in the 48px
                 // figure column (a quiet network may have measured nothing in the span).
-                row.span != null ? format(row.span) : roster.pending ? <NodeStars count={3} /> : <span className="text-muted-foreground" title={NO_READING}>—</span>,
+                row.head != null ? format(row.head) : roster.pending || (roster.headKind === "day" && roster.dayPending) ? <NodeStars count={3} /> : <span className="text-muted-foreground" title={NO_READING}>—</span>,
               on,
-              title: `${row.name} · ${row.span != null ? `${format(row.span)}${unit ? ` ${unit}` : ""} · ${over.toLowerCase()}` : NO_READING}`,
+              title: `${row.name} · ${row.head != null ? `${format(row.head)}${unit ? ` ${unit}` : ""} · ${headWord(metric, roster.headKind)}` : NO_READING}`,
               onClick: () => applyClickActions(trendPlaneActions(id, focus)),
               pair: subjectPairing(hoverFilter, id, setHover, row.hue),
             },

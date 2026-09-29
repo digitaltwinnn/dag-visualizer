@@ -225,7 +225,9 @@ decisions inside them are design, not detail:
   plain average) over the window on screen, `spanAverage` — and a bar of its share. **The list
   follows the range** (user, 2026-09-29, design A): the hint names the span ("Average per day ·
   last 7 days"), a new range re-ranks the list and the stack together, and the planes' headline
-  keeps the latest full day. The Moment card is the one INSTANT — crosshair, time headline, "At
+  states the SAME number — the roster's one `head` (user, same day: "keep it consistent"). Under a
+  day's window (1H, a short brush) there is no measured day to average, so the list and the
+  headline both say the latest full day instead. The Moment card is the one INSTANT — crosshair, time headline, "At
   that moment" over its list — so the two lists never read as copies. The METRIC is the heading control (the figure column's own
   heading, a radio list of `METRIC_ORDER` with units at the current cadence); `Same scale` left
   the heading on 2026-09-28 for the band's pill group — it draws the planes and never changed a

@@ -269,6 +269,13 @@ export function spanAverage(
   return TREND_METRICS[metric].kind === "counter" ? mean * (86_400_000 / stepMs) : mean;
 }
 
+/** The short word beside a HEAD reading, the same on the plane's headline and in the list's
+ *  hover: the latest full day, or the span's average. */
+export function headWord(metric: TrendMetric, kind: "span" | "day"): string {
+  if (kind === "day") return "latest full day";
+  return spanWord(metric) === "Average per day" ? "avg per day" : "average";
+}
+
 /** The words a span reading carries: a rate is an average PER DAY, anything else an average. */
 export function spanWord(metric: TrendMetric): string {
   return TREND_METRICS[metric].kind === "counter" && metric !== "continuity" ? "Average per day" : "Average";

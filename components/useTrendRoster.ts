@@ -64,6 +64,10 @@ export interface TrendRosterRow {
    *  list states it and the rank follows it, so a new range re-ranks the list AND the stack. The
    *  card headline keeps `day` — the chart's own "now". */
   span: number | null;
+  /** THE HEAD READING — the ONE number every surface states for this network: the Networks list's
+   *  figure, the plane's headline and the rank (user, 2026-09-29: "didn't we agree to keep it
+   *  consistent"). `span` where the window holds at least a day, else `day` — see `headKind`. */
+  head: number | null;
 }
 
 export interface TrendRosterView {
@@ -97,13 +101,19 @@ export interface TrendRosterView {
   /** The daily tier behind every row's `day` is still in flight (the charts are finer than a
    *  day and it hasn't landed) — surfaces say "acquiring", never a finer reading or "no reading". */
   dayPending: boolean;
+  /** WHICH reading `head` is. "span": the average per day over a window of at least a day. "day":
+   *  the latest full day, for a window SHORTER than one — averaging an hour "per day" would scale a
+   *  measured hour into a day nobody measured (rule 10), so there the day is the honest reading. */
+  headKind: "span" | "day";
 }
 
 const NO_SERIES: Readonly<Record<string, (number | null)[]>> = {};
 
 /** `TrendChart`'s own default, restated once so the rails format exactly as the charts do for the
  *  metrics that state no formatter of their own (snapshots, blocks, nodes). */
-const PLAIN = (v: number) => v.toLocaleString(undefined, { maximumFractionDigits: 1 });
+// Whole numbers: every metric that falls back to this is a COUNT (snapshots, blocks, nodes), and
+// an average of counts stated to a decimal ("1,978.7 a day") claims precision the reading lacks.
+const PLAIN = (v: number) => Math.round(v).toLocaleString();
 
 /** WHAT AN UNMEASURED BUCKET SAYS, in words (rule 10). A gap is not a zero, and every surface that
  *  can show one — the Networks list's last reading, the cursor card's per-network rows — says it the
@@ -132,6 +142,9 @@ export default function useTrendRoster(
   const stepMs = stepFor(slice, metric);
   // The SCENE's scope: the DAG is a network here (its own plane), not the document's empty state.
   const scope = viewScope(filter);
+  // The window's own span, from the payload's axis before any edge trim. A day's worth of the
+  // finest tier is 288 five-minute buckets; one bucket short of a day still counts as the day.
+  const headKind: "span" | "day" = rawAxis.length * stepMs >= 86_400_000 - stepMs ? "span" : "day";
 
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `spec` is TREND_METRICS[metric]
   const pass = useMemo(() => {
@@ -161,7 +174,10 @@ export default function useTrendRoster(
         last: lastMeasured(points),
         day: latestDay(metric, id, daily, points, stepMs),
         span: spanAverage(metric, points, stepMs, weights),
+        head: null,
       });
+      const r = rows.get(id)!;
+      r.head = headKind === "span" ? r.span : r.day;
     }
     return {
       rows,
@@ -170,12 +186,12 @@ export default function useTrendRoster(
       // span has nothing measured, so a quiet network still sorts by what it last said.
       order: rankByLast(ids, (id) => {
         const r = rows.get(id)!;
-        return [r.span ?? r.day ?? r.last];
+        return [r.head ?? r.day ?? r.last];
       }),
       buckets: cut(rawAxis),
       global: cut(globalSeries(metric, series)),
     };
-  }, [filter, metric, series, rawAxis, stepMs, daily]);
+  }, [filter, metric, series, rawAxis, stepMs, daily, headKind]);
 
   // STABILISED BY CONTENT (the `trendIds` channel's rule, which the stack publishes from this
   // value): the rank is recomputed whenever the memo above is, and the engine's change signal is
@@ -211,7 +227,8 @@ export default function useTrendRoster(
       pending,
       dayPending,
       scope,
+      headKind,
     }),
-    [ranked, pass, rawAxis, stepMs, unit, format, pending, dayPending, scope],
+    [ranked, pass, rawAxis, stepMs, unit, format, pending, dayPending, scope, headKind],
   );
 }

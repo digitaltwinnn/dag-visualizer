@@ -73,36 +73,26 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
 
   const cell = (r: RosterRow, key: RosterSortKey) => {
     switch (key) {
-      case "net": {
-        const cfg = r.netId ? metagraphById(r.netId) : null;
-        // Phone wears the TICKER, the log's own network-column treatment: measured, the full
-        // names held this column at 133px where the tick log's ticker column runs 76 — and the
-        // identity dot plus ticker is the same two-part identity every row and card wears.
-        // A CO-LOCATED MACHINE names its other networks here, as hued tickers after the primary
-        // (user, 2026-09-29 — the explorer's "UP DAG"): one row per machine, so the Co-located
-        // column this replaced had nothing left to say that this cell does not.
-        const others = r.nets.slice(1);
+      case "net":
+        // EVERY NETWORK ON THE MACHINE, EACH AS ITS DOT AND TICKER (user, 2026-09-29: "just show
+        // both tickers, so DAG and UP, both with their coloured bullet, consistently") — the anchor
+        // log's own network-column treatment, so a single-network row reads "● DOR" and a
+        // co-located one "● UP ● DAG", primary first. The full names ride the hover.
         return (
-          <span className="flex items-center gap-2" title={r.nets.map(tickerOf).join(" + ")}>
-            {r.netId && <IdentityDot hue={filterAccent(r.netId)} />}
-            {cfg ? (
-              <>
-                <span className="max-[700px]:hidden">{cfg.name}</span>
-                <span className="min-[700px]:hidden">{cfg.ticker || cfg.name}</span>
-              </>
-            ) : (
-              r.netId ?? "—"
-            )}
-            {others.length > 0 && (
-              <span className="text-micro font-medium">
-                {others.map((id) => (
-                  <span key={id} style={{ color: filterAccent(id) }}> {tickerOf(id)}</span>
+          <span
+            className="flex items-center gap-3"
+            title={r.nets.map((id) => metagraphById(id)?.name ?? (id === "dag" ? "DAG" : id)).join(" + ")}
+          >
+            {r.nets.length === 0
+              ? "—"
+              : r.nets.map((id) => (
+                  <span key={id} className="inline-flex items-center gap-2">
+                    <IdentityDot hue={filterAccent(id)} />
+                    {tickerOf(id)}
+                  </span>
                 ))}
-              </span>
-            )}
           </span>
         );
-      }
       case "id":
         // The SHORT hash, the explorer's `NodePickerRow` treatment (2026-08-02): the full 64-char
         // id is `whitespace-nowrap` in a table cell, so it blew the NODE column — and with it the

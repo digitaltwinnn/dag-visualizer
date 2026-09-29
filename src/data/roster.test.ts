@@ -61,7 +61,7 @@ describe("sortRoster", () => {
     const noCity = buildRoster([row({ pick: { kind: "l1" }, city: null, id: "x" }), validator]);
     expect(sortRoster(noCity, "city", 1).map((r) => r.node.city)).toEqual(["Berlin", null]);
   });
-  it("the Network column sorts the DISPLAYED name, not the hidden id", () => {
+  it("the Network column sorts the DISPLAYED ticker, not the hidden id", () => {
     // A real catalog pair whose two orders disagree: by address Dor (DAG0Cy…) < BioFi (DAG2Ja…),
     // by name BioFi < Dor Technologies. Sorting the id ordered hex nobody sees (2026-08-13).
     const dor = "DAG0CyySf35ftDQDQBnd1bdQ9aPyUdacMghpnCuM";
@@ -70,6 +70,8 @@ describe("sortRoster", () => {
       row({ pick: { kind: "metanode", meta: { id: dor } as never }, id: "a" }),
       row({ pick: { kind: "metanode", meta: { id: biofi } as never }, id: "b" }),
     ]);
-    expect(sortRoster(rows, "net", 1).map((r) => r.netName)).toEqual(["BioFi", "Dor Technologies"]);
+    const shown = sortRoster(rows, "net", 1).map((r) => r.netName!);
+    expect(shown).toEqual([...shown].sort((a, b) => a.localeCompare(b)));
+    expect(shown.every((t) => !t.startsWith("DAG0") && !t.startsWith("DAG2"))).toBe(true);
   });
 });

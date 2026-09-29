@@ -70,7 +70,7 @@ import useTrendsSlice from "@/components/useTrendsSlice";
 import useStagedMeasure, { ROLL_CLASS, useHeldOrder } from "@/components/useStagedMeasure";
 import { cn } from "@/lib/utils";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
-import { metricCaption, sharedCeiling, stepMetric } from "@/src/data/trendSeries";
+import { headWord, metricCaption, sharedCeiling, stepMetric } from "@/src/data/trendSeries";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { MORE_ID, PLANE_PLOT_PX_H, PLANE_PX_H, PLANE_PX_W, moreCount, morePose, stackPoses } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
@@ -490,7 +490,15 @@ export default function TrendStack() {
                 // THE HEADLINE IS THE DAY (user, 2026-09-29: "day should be the standard always") —
                 // the roster's `day`, read from the daily tier through this plane's own series.
                 // Where the plane is already daily its own last point IS the day, so no readout.
-                readout={step < 86_400_000 ? { value: row.day, word: "latest full day" } : undefined}
+                // THE HEADLINE IS THE ROSTER'S `head` (user, 2026-09-29: "keep it consistent") —
+                // the same number the Networks list states: the span's average per day over a
+                // window of a day or more, the latest full day under one.
+                readout={{
+                  value: row.head,
+                  word: headWord(metric, roster.headKind),
+                  title: roster.headKind === "span" ? "The average per day over the window on screen" : undefined,
+                  pending: roster.headKind === "day" ? roster.dayPending : roster.pending,
+                }}
                 format={roster.format}
                 note={pending ? "reading the hourly samples…" : undefined}
                 buckets={axis}

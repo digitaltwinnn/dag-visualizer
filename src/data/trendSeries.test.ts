@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { spanAverage, spanWord,
+import { headWord, spanAverage, spanWord,
   GLOBAL_METRIC_ROWS,
   TREND_METRICS,
   globalSeries,
@@ -591,5 +591,13 @@ describe("spanAverage", () => {
     expect(spanWord("snapshots")).toBe("Average per day");
     expect(spanWord("nodes")).toBe("Average");
     expect(spanWord("continuity")).toBe("Average");
+  });
+});
+
+describe("headWord", () => {
+  it("names the head reading: the day, or the span's average", () => {
+    expect(headWord("snapshots", "day")).toBe("latest full day");
+    expect(headWord("snapshots", "span")).toBe("avg per day");
+    expect(headWord("nodes", "span")).toBe("average");
   });
 });

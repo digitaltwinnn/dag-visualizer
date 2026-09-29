@@ -9,7 +9,7 @@ export interface RosterRow {
   key: string; // stable render key — the MACHINE (its IP), or the record where no IP is known
   node: NodeRow; // the row's PRIMARY record — what a click commits and a hover glows
   netId: string | null; // the primary network ("dag" | metagraph id)
-  netName: string | null; // the DISPLAYED primary name — what the Network column sorts on
+  netName: string | null; // the DISPLAYED primary ticker — what the Network column sorts on
   /** EVERY network on this machine, primary first: the records merged into this row, then any
    *  co-tenant the catalog places at the same IP that the current list does not show (a committed
    *  filter). One home for co-location — `coLocatedNetworks`, the explorer's own rule. */
@@ -80,7 +80,8 @@ export function buildRoster(selNodes: readonly NodeRow[], metaList: readonly Met
       // Resolved HERE, once per row, because the sort must order what the column SHOWS. Sorting
       // on the raw netId ordered the state-channel ADDRESSES — hidden hex, so "Network ↑" came
       // out in an order corresponding to nothing on screen (found live 2026-08-13).
-      netName: netId ? (metagraphById(netId)?.name ?? netId) : null,
+      // The cell shows TICKERS (2026-09-29), so the sort orders tickers.
+      netName: netId ? (metagraphById(netId)?.ticker || metagraphById(netId)?.name || (netId === "dag" ? "DAG" : netId)) : null,
       nets,
       ids,
       roles,
