@@ -227,6 +227,53 @@ export function latestDay(
   return lastMeasured(id === "dag" ? globalSeries(metric, daily) : metricSeries(metric, id, daily).points);
 }
 
+/** THE SPAN READING — what the Networks list states (user, 2026-09-29, design A: "the explorer
+ *  follows the range"). One number per network for the whole window on screen, so the list and
+ *  the range selector answer the same question:
+ *    · a COUNTER (a per-bucket sum) → its AVERAGE PER DAY: the mean of the MEASURED buckets,
+ *      scaled from the bucket to a day. Unmeasured buckets are left out, never counted as zeros;
+ *    · a GAUGE (the fleet) → the plain mean of its measured samples;
+ *    · CONTINUITY (mean spacing) → weighted by the snapshots each bucket's spacing was measured
+ *      over (`weights`), which is Σgaps ÷ Σsnaps over the span. A plain mean of per-bucket means
+ *      would let an hour with two snapshots count as much as one with two hundred.
+ *  Null where nothing in the span was measured (rule 10: no reading is not a zero). */
+export function spanAverage(
+  metric: TrendMetric,
+  points: readonly (number | null)[],
+  stepMs: number,
+  weights?: readonly (number | null)[],
+): number | null {
+  if (metric === "continuity") {
+    let num = 0;
+    let den = 0;
+    for (let i = 0; i < points.length; i++) {
+      const v = points[i];
+      const w = weights?.[i];
+      if (v != null && w != null && w > 0) {
+        num += v * w;
+        den += w;
+      }
+    }
+    return den > 0 ? num / den : null;
+  }
+  let sum = 0;
+  let n = 0;
+  for (const v of points) {
+    if (v != null) {
+      sum += v;
+      n++;
+    }
+  }
+  if (n === 0) return null;
+  const mean = sum / n;
+  return TREND_METRICS[metric].kind === "counter" ? mean * (86_400_000 / stepMs) : mean;
+}
+
+/** The words a span reading carries: a rate is an average PER DAY, anything else an average. */
+export function spanWord(metric: TrendMetric): string {
+  return TREND_METRICS[metric].kind === "counter" && metric !== "continuity" ? "Average per day" : "Average";
+}
+
 export function rankByLast(
   ids: readonly string[],
   seriesOf: (id: string) => readonly (number | null)[],

@@ -4,7 +4,7 @@
 // as "no leading gap"; the client clock judging a CDN-cached payload's newest bucket; the
 // leading partial month drawn whole while the trailing one was trimmed).
 import { describe, expect, it } from "vitest";
-import { assembleTrendSlice, bucketAt, heldZoom, cursorFraction, cutRange, leadingTrim, monthlySum, pickRangeTier, planTrendFetch, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, ZOOMS, type TrendsWindowData } from "./trendWindow";
+import { assembleTrendSlice, bucketAt, heldZoom, spanPhrase, cursorFraction, cutRange, leadingTrim, monthlySum, pickRangeTier, planTrendFetch, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, ZOOMS, type TrendsWindowData } from "./trendWindow";
 
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
@@ -451,5 +451,15 @@ describe("heldZoom", () => {
     expect(heldZoom(0, 0, { fromMs: 0, toMs: 10 })).toBeNull();
     expect(heldZoom(0, 100, { fromMs: 5, toMs: 5 })).toBeNull();
     expect(heldZoom(0, 100, { fromMs: 1, toMs: 101 })).toBeNull();
+  });
+});
+
+describe("spanPhrase", () => {
+  it("a pill says its own span; a brushed range names its UTC days, end exclusive", () => {
+    expect(spanPhrase("7d", null)).toBe("last 7 days");
+    expect(spanPhrase("all", null)).toBe("all measured");
+    const d = (s: string) => Date.parse(s);
+    expect(spanPhrase("30d", { fromMs: d("2026-09-20T00:00Z"), toMs: d("2026-09-27T00:00Z") })).toBe("Sep 20 – Sep 26");
+    expect(spanPhrase("30d", { fromMs: d("2026-09-20T03:00Z"), toMs: d("2026-09-20T09:00Z") })).toBe("Sep 20");
   });
 });

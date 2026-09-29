@@ -6,7 +6,8 @@ import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
-import { METRIC_LABELS, METRIC_ORDER, metricUnit } from "@/src/data/trendSeries";
+import { METRIC_LABELS, METRIC_ORDER, TREND_METRICS, metricUnit, spanWord } from "@/src/data/trendSeries";
+import { spanPhrase } from "@/src/data/trendWindow";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore, type TrendMetric } from "@/src/store/store";
@@ -57,10 +58,17 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   const setTrendMetric = useStore((s) => s.setTrendMetric);
 
   const roster = useTrendRoster(useTrendsSlice(windowId, range), filter, metric);
-  // THE LIST STATES THE DAY (user, 2026-09-29: "day should be the standard always") — the same
-  // `day` the card's headline states, so a row and its card never disagree, in the day's unit.
-  const { ranked, rows, format, dayPending } = roster;
+  // THE LIST FOLLOWS THE RANGE (design A, 2026-09-29 — "it is not clear that the explorer is a
+  // fixed value based on today"). Each figure is the network's `span` reading over the window on
+  // screen — an average per day for a rate — and the hint names that span, so the list and the
+  // range selector visibly answer one question, while the Moment card states one INSTANT. It used
+  // to state the latest full day, which read as a second, unlabelled copy of the Moment's list.
+  const { ranked, rows } = roster;
+  // An average of COUNTS is stated as a count — "1,978.7 snapshots a day" is precision the reading
+  // does not have. Metrics with their own formatter (DAG, MB, seconds) keep it.
+  const format = TREND_METRICS[metric].format ?? ((v: number) => Math.round(v).toLocaleString());
   const unit = metricUnit(metric, 86_400_000);
+  const over = `${spanWord(metric)} · ${spanPhrase(windowId, range)}`;
   const empty = scopeEmptyCopy(roster.scope, "view");
 
   // THE WHOLE ROSTER, NO PAGER (user, 2026-09-28, two rounds). The card paged for nine days — first
@@ -80,7 +88,7 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
 
   // The bar: each network's last reading as a share of the busiest — the ranking the stack's depth
   // already carries, made visible in the list.
-  const maxLast = Math.max(1e-9, ...ranked.map((id) => rows.get(id)?.day ?? 0));
+  const maxLast = Math.max(1e-9, ...ranked.map((id) => rows.get(id)?.span ?? 0));
 
   const level: ExplorerLevelSpec = {
     key: "networks",
@@ -94,7 +102,8 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
     // No tags at this level, so the name takes the tag home's room; the readings run long
     // ("12,345.6"), so the figure column takes the fee width.
     nameW: 112,
-    figureW: 56,
+    // Wide enough for a busy chain's average ("31,643").
+    figureW: 64,
     // No fabricated rows (rule 10): the two commits the trends store keeps nothing for say so in
     // the same sentences the stack and the document say them in.
     empty: empty ? `${empty.fact} ${empty.route}` : "Waiting for the measured history…",
@@ -109,14 +118,14 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
               key: id,
               glyph: <IdentityDot hue={row.hue} />,
               name: row.name,
-              share: row.day != null ? row.day / maxLast : undefined,
+              share: row.span != null ? row.span / maxLast : undefined,
               hue: row.hue,
               figure:
                 // A dash with the words on hover: "no reading" truncated to "no rea…" in the 48px
-                // figure column (the list reads the DAY now, which a quiet network may lack).
-                row.day != null ? format(row.day) : dayPending ? <NodeStars count={3} /> : <span className="text-muted-foreground" title={NO_READING}>—</span>,
+                // figure column (a quiet network may have measured nothing in the span).
+                row.span != null ? format(row.span) : roster.pending ? <NodeStars count={3} /> : <span className="text-muted-foreground" title={NO_READING}>—</span>,
               on,
-              title: `${row.name} · ${row.day != null ? `${format(row.day)}${unit ? ` ${unit}` : ""} · latest full day` : NO_READING}`,
+              title: `${row.name} · ${row.span != null ? `${format(row.span)}${unit ? ` ${unit}` : ""} · ${over.toLowerCase()}` : NO_READING}`,
               onClick: () => applyClickActions(trendPlaneActions(id, focus)),
               pair: subjectPairing(hoverFilter, id, setHover, row.hue),
             },
@@ -134,7 +143,9 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
       // "Open one for…" is the other explorers' second half and would be a lie here — a layer row
       // has no children, it brings its plane forward.
       // As short as the other explorers' hints (user, 2026-09-28: "way too verbose").
-      hint={empty ? null : "Every network, busiest first. Pick one to bring its chart forward."}
+      // The hint NAMES THE SPAN the figures are over (design A) — the one place the list says
+      // which time it is about.
+      hint={empty ? null : `${over}. Pick one to bring it forward.`}
       levels={[level]}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => setHover(null)}

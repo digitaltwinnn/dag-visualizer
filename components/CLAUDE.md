@@ -221,8 +221,12 @@ decisions inside them are design, not detail:
 
 - **History's tool card is its roster, with the MEASURE on its heading**
   (`components/TrendExplore.tsx`, an `Explorer` description since 2026-09-26). ONE level: the
-  ranked networks, busiest first, each with its last measured reading in the roster's one
-  formatter and a bar of its share. The METRIC is the heading control (the figure column's own
+  ranked networks, busiest first, each with its SPAN reading — the average per day (a gauge's
+  plain average) over the window on screen, `spanAverage` — and a bar of its share. **The list
+  follows the range** (user, 2026-09-29, design A): the hint names the span ("Average per day ·
+  last 7 days"), a new range re-ranks the list and the stack together, and the planes' headline
+  keeps the latest full day. The Moment card is the one INSTANT — crosshair, time headline, "At
+  that moment" over its list — so the two lists never read as copies. The METRIC is the heading control (the figure column's own
   heading, a radio list of `METRIC_ORDER` with units at the current cadence); `Same scale` left
   the heading on 2026-09-28 for the band's pill group — it draws the planes and never changed a
   row here (user), so it sits with the stack's other stack-wide settings, the window and the

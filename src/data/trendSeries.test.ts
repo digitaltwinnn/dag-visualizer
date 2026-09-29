@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
+import { spanAverage, spanWord,
   GLOBAL_METRIC_ROWS,
   TREND_METRICS,
   globalSeries,
@@ -568,5 +568,28 @@ describe("latestDay", () => {
   });
   it("is null — never a finer bucket passed off as a day — while the daily tier is still in flight", () => {
     expect(latestDay("snapshots", "dor", undefined, [1, 2, 3], 300_000)).toBeNull();
+  });
+});
+
+describe("spanAverage", () => {
+  it("a counter is its measured mean scaled to a day; holes are left out, not zeros", () => {
+    expect(spanAverage("snapshots", [10, null, 30], 3_600_000)).toBe(20 * 24);
+    expect(spanAverage("snapshots", [100, 200], 86_400_000)).toBe(150);
+  });
+  it("a gauge is its plain mean", () => {
+    expect(spanAverage("nodes", [10, 20, null], 3_600_000)).toBe(15);
+  });
+  it("continuity is weighted by the snapshots behind each bucket", () => {
+    // 60s over 1 snapshot and 10s over 9: Σgaps 150 ÷ Σsnaps 10.
+    expect(spanAverage("continuity", [60, 10, null], 3_600_000, [1, 9, 5])).toBe(15);
+    expect(spanAverage("continuity", [60], 3_600_000)).toBeNull();
+  });
+  it("nothing measured is no reading", () => {
+    expect(spanAverage("fees", [null, null], 3_600_000)).toBeNull();
+  });
+  it("names the average a rate reads as per day, anything else plainly", () => {
+    expect(spanWord("snapshots")).toBe("Average per day");
+    expect(spanWord("nodes")).toBe("Average");
+    expect(spanWord("continuity")).toBe("Average");
   });
 });

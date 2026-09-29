@@ -12,6 +12,7 @@ import {
   metricSeries,
   metricUnit,
   rankByLast,
+  spanAverage,
   stepFor,
   trimCounterEdges,
   type MetricSeries,
@@ -58,6 +59,11 @@ export interface TrendRosterRow {
    *  standard always"). The card's headline, the Networks list's figure and the rank all read
    *  it. Null while the daily tier is still in flight. */
   day: number | null;
+  /** THE SPAN READING (`spanAverage`; design A, 2026-09-29 — "the explorer follows the range"):
+   *  this network over the whole window on screen, an average per day for a rate. The Networks
+   *  list states it and the rank follows it, so a new range re-ranks the list AND the stack. The
+   *  card headline keeps `day` — the chart's own "now". */
+  span: number | null;
 }
 
 export interface TrendRosterView {
@@ -140,6 +146,9 @@ export default function useTrendRoster(
       const s = id === "dag" ? { points: globalSeries(metric, series), sampled: undefined, gaps: undefined } : metricSeries(metric, id, series);
       const net = displayNetwork(id);
       const points = cut(s.points);
+      // Continuity's weights: the snapshots each bucket's spacing was measured over.
+      const weights =
+        metric === "continuity" ? cut(id === "dag" ? globalSeries("snapshots", series) : metricSeries("snapshots", id, series).points) : undefined;
       rows.set(id, {
         id,
         name: net?.name ?? id,
@@ -151,15 +160,17 @@ export default function useTrendRoster(
         },
         last: lastMeasured(points),
         day: latestDay(metric, id, daily, points, stepMs),
+        span: spanAverage(metric, points, stepMs, weights),
       });
     }
     return {
       rows,
-      // Busiest by the DAY the list states; the window's own last reading only until the daily
-      // tier lands, so the order doesn't sit empty — it settles once, on arrival.
+      // Busiest OVER THE SPAN the list states (design A) — the window on screen, so a new range
+      // re-ranks the list and the stack together. The day, then the last reading, only where the
+      // span has nothing measured, so a quiet network still sorts by what it last said.
       order: rankByLast(ids, (id) => {
         const r = rows.get(id)!;
-        return [r.day ?? r.last];
+        return [r.span ?? r.day ?? r.last];
       }),
       buckets: cut(rawAxis),
       global: cut(globalSeries(metric, series)),

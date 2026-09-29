@@ -475,3 +475,23 @@ export function heldZoom(
   if (Math.abs(s - 1) < 0.02 && Math.abs(f0) < 0.02) return null;
   return { f0, s };
 }
+
+const SPAN_WORDS: Record<ZoomId, string> = {
+  "1h": "last hour",
+  "24h": "last 24 hours",
+  "7d": "last 7 days",
+  "30d": "last 30 days",
+  "1y": "last year",
+  all: "all measured",
+};
+
+/** THE SPAN ON SCREEN, IN WORDS — what a span reading is OVER (design A, 2026-09-29): the window
+ *  pill's own phrase, or a brushed range's dates (UTC, the axis's own zone; the range's end is
+ *  exclusive, so the last day named is the one it reaches into). */
+export function spanPhrase(zoom: ZoomId, range: { fromMs: number; toMs: number } | null): string {
+  if (!range) return SPAN_WORDS[zoom];
+  const day = (ms: number) => new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+  const a = day(range.fromMs);
+  const b = day(range.toMs - 1);
+  return a === b ? a : `${a} – ${b}`;
+}
