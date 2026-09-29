@@ -150,6 +150,19 @@ export default function AnchorLogTable() {
   const [qFrom, setQFrom] = useState("");
   const [qTo, setQTo] = useState("");
   const [seeking, setSeeking] = useState(false);
+  // ⚠️ AN ARRIVAL SHOWS ITS SEARCH, NOT THE LIVE PAGE (user, 2026-09-29: coming to the raw page
+  // from History with a network in scope "looks like it's loading something twice"). The door hands
+  // over a date; the log must read page 1 first (it is how the walk learns the chain's newest
+  // ordinal), and it used to SHOW that page — the live tip, seconds old — for the several seconds
+  // the walk took, then jump to the answer a year back. Page 1 still loads underneath; while the
+  // arrival's search is pending the table states that search instead, and the flag drops when the
+  // walk ends either way (landed, or its miss is printed in the bar).
+  const [arriving, setArriving] = useState(false);
+  // Any answer printed in the bar ends an arrival's hold too — every early exit of the walk says
+  // why through `jumpMiss`, so the table can never be left holding a search that already answered.
+  useEffect(() => {
+    if (jumpMiss) setArriving(false);
+  }, [jumpMiss]);
   /** Chain pages fetched by a SEEK, keyed by the `before` ordinal asked for (see loadPage). Cleared
    *  with the walk when the network changes — another network's ordinals mean nothing here. */
   const probes = useRef<Map<number, { ordinal: number; ts: string }[]>>(new Map());
@@ -551,6 +564,8 @@ export default function AnchorLogTable() {
       setJumpMiss("the chain read failed — try again");
     } finally {
       setSeeking(false);
+      // A landed arrival keeps its hold until the answer's ROWS are here (the effect beside the
+      // render below); a miss releases it through `jumpMiss`.
     }
   };
 
@@ -572,6 +587,7 @@ export default function AnchorLogTable() {
     if (logSeek.metaId) {
       setSearchMeta(logSeek.metaId);
       pendingSeek.current = true;
+      setArriving(true);
     } else {
       // ⚠️ AN ARRIVAL THAT CANNOT RUN MUST SAY SO. A global chart's range names no chain, so the
       // dates land prefilled and the seek waits — and with nothing on screen to explain it, the
@@ -733,6 +749,23 @@ export default function AnchorLogTable() {
       </button>
     </div>
   );
+
+  // The hold ends on the ANSWER'S ROWS, not on the walk: the walk lands on a page number and the
+  // page still has to be read, and ending on the walk showed "reading the chain…" in between.
+  useEffect(() => {
+    if (arriving && !seeking && marked != null && rows.length > 0) setArriving(false);
+  });
+
+  if (arriving && histNet)
+    return (
+      <>
+        {toolbar}
+        {search}
+        <p className="m-auto text-label text-muted-foreground">
+          {`Finding the snapshots from ${qFrom || "that date"}…`}
+        </p>
+      </>
+    );
 
   if (rows.length === 0)
     return (
