@@ -66,6 +66,11 @@ const stampOf = (ts: number, stepMs: number): string =>
     ? new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" }) + " UTC"
     : new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
 
+/** The axis's date formatters, built once: `toLocaleDateString` with options constructs a new
+ *  formatter per call, and recharts asks for every candidate tick while it fits the labels. */
+const MONTH_FMT = new Intl.DateTimeFormat(undefined, { month: "short", timeZone: "UTC" });
+const DAY_FMT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+
 /** How far a finger may wander and still be a tap rather than the brush. */
 const TAP_SLOP = 8;
 
@@ -698,10 +703,9 @@ const TrendPlot = memo(function TrendPlot({
     }
   }
   const tickLabel = (ts: number): string => {
-    const d = new Date(ts);
-    if (spanMs > 45 * 86400000) return d.toLocaleDateString(undefined, { month: "short", timeZone: "UTC" });
-    if (spanMs > 2 * 86400000) return d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
-    return `${String(d.getUTCHours()).padStart(2, "0")}:00`;
+    if (spanMs > 45 * 86400000) return MONTH_FMT.format(ts);
+    if (spanMs > 2 * 86400000) return DAY_FMT.format(ts);
+    return `${String(new Date(ts).getUTCHours()).padStart(2, "0")}:00`;
   };
 
   /** An isolated measured point (both neighbours null) gets a dot — no segment can reach it. */
@@ -944,7 +948,10 @@ const TrendPlot = memo(function TrendPlot({
                   strokeDasharray={typeof l.dash === "string" ? l.dash : l.dash ? "4 4" : undefined}
                   connectNulls={false}
                   isAnimationActive={false}
-                  dot={(props: { key?: React.Key | null; index?: number; cx?: number; cy?: number }) => {
+                  // ⚠️ ONLY A LINE THAT HAS ONE gets the dot renderer (measured 2026-09-29: ~300ms of a
+                  // window change). Given a function, recharts builds a dot element for EVERY point —
+                  // 720 hourly buckets × five planes of empty `<g>`s — to draw the rare isolated one.
+                  dot={!l.points.some((_, i) => isolated(l, i)) ? false : (props: { key?: React.Key | null; index?: number; cx?: number; cy?: number }) => {
                     const { key, index, cx, cy } = props;
                     if (index == null || cx == null || cy == null || !isolated(l, index)) return <g key={key ?? undefined} />;
                     return <circle key={key ?? undefined} cx={cx} cy={cy} r={2.5} fill={l.hue ?? hue0} />;
