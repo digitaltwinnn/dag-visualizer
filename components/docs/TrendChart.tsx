@@ -385,6 +385,8 @@ export default function TrendChart({
       ) : (
         <div
           className={`relative rounded-md border border-border overflow-hidden${onRange ? " cursor-crosshair select-none touch-pan-y" : ""}${onPick ? " cursor-crosshair" : ""}`}
+          // `data-plot`: the plot plate — the History tether lands on its bottom edge, the time axis.
+          data-plot=""
           role="img"
           aria-label={`${name} — ${stepMs >= 86400000 ? "daily" : stepMs >= 3600000 ? "hourly" : "5-minute"} buckets, ${n} of them`}
           onClick={

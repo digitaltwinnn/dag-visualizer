@@ -77,6 +77,7 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
+import TrendTether from "@/components/TrendTether";
 
 /** The empty roster, as ONE frozen reference. Publishing a fresh `[]` would be a content-free
  *  change the engine's `!==` still has to answer. */
@@ -340,6 +341,9 @@ export default function TrendStack() {
       }}
       className="group/stack absolute inset-0 pointer-events-none z-[4] opacity-0 [transition:opacity_var(--tempo-nav)_ease] data-[on='1']:opacity-100 motion-reduce:!transition-none"
     >
+      {/* THE TETHER from the band's span to the front chart's time axis — inside this layer so it
+          arrives and leaves with the stack (`data-on`), and is gone wherever the stack is. */}
+      <TrendTether />
       {more && (
         // THE HINT CARD: the same anchor contract as every plane (0-size, origin-top-left,
         // invisible until projected — the projector writes its matrix and visibility), the same
@@ -372,6 +376,8 @@ export default function TrendStack() {
           <div
             key={pose.id}
             data-plane={pose.id}
+            // The FRONT plane — the one a brush and a click act on — which the tether targets.
+            data-front={pose.interactive ? "" : undefined}
             className={cn(
               // THE ANCHOR: a 0-size box at the layer's origin, hidden until the engine has
               // projected it. `origin-top-left` is what makes the engine's matrix a plain

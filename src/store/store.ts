@@ -547,7 +547,9 @@ export const useStore = create<AppState>((set) => ({
   trendScroll: 0,
   trendFocus: null,
   trendScale: "shared",
-  trendWindow: "all" as ZoomId,
+  // 30 days by default (user, 2026-09-29): recent enough to read day by day, long enough to show a
+  // trend. The pills reach back to ALL.
+  trendWindow: "30d" as ZoomId,
   trendRange: null,
   trendIds: [],
   phoneSheetPx: null,

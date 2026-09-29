@@ -410,6 +410,9 @@ export default function TrendTrack({
                 states a value it does not have. `MIN_BRUSH_PX` keeps a one-hour window over a
                 six-year track findable. */}
             <rect
+              // `data-brush`: the History TETHER measures this frame to draw the span up to the
+              // front chart's time axis (`components/TrendTether.tsx`).
+              data-brush=""
               x={xAtMs(brush.fromMs, geom)}
               y={0.5}
               width={Math.max(MIN_BRUSH_PX, xAtMs(brush.toMs, geom) - xAtMs(brush.fromMs, geom))}
@@ -417,8 +420,18 @@ export default function TrendTrack({
               fill="none"
               stroke="var(--primary)"
               strokeWidth={1}
-              opacity={0.7}
+              opacity={0.9}
             />
+            {/* THE GRIPS (design round 2026-09-29, the navigator): the span's two edges are
+                already grabbable (`drawnSpan`'s edge hit-test) — now they LOOK it, so the band
+                reads as a control rather than one more vital. Paint only; the hit test is
+                unchanged. */}
+            {[xAtMs(brush.fromMs, geom), xAtMs(brush.fromMs, geom) + Math.max(MIN_BRUSH_PX, xAtMs(brush.toMs, geom) - xAtMs(brush.fromMs, geom))].map((gx, i) => (
+              <g key={i} className="cursor-ew-resize">
+                <rect x={gx - 3} y={plotH * 0.2} width={6} height={plotH * 0.6} rx={2} fill="var(--primary)" />
+                <line x1={gx} y1={plotH * 0.38} x2={gx} y2={plotH * 0.62} stroke="var(--background)" strokeWidth={1.5} strokeLinecap="round" />
+              </g>
+            ))}
           </>
         )}
         {/* THE MONTH MARKS, the charts' own granularity read at the overview's scale. */}

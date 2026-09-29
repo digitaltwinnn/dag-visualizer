@@ -60,7 +60,7 @@ describe("the trends view's channels", () => {
       trendScroll: 0,
       trendFocus: null,
       trendScale: "shared",
-      trendWindow: "all",
+      trendWindow: "30d",
       trendRange: null,
       trendIds: [],
     });
@@ -76,8 +76,9 @@ describe("the trends view's channels", () => {
     // first, and autoscaled per-plane it says "these are the same size" about networks that are
     // nothing of the kind. The honest reading is the one that needs no gesture.
     expect(s.trendScale).toBe("shared");
-    // The whole measured depth, and no brushed range — the document's own default window.
-    expect(s.trendWindow).toBe("all");
+    // THIRTY DAYS, and no brushed range (user, 2026-09-29: "make 30d the default range") — read
+    // from the store's REAL initial state, since this suite's beforeEach sets its own fixture.
+    expect(useStore.getInitialState().trendWindow).toBe("30d");
     expect(s.trendRange).toBeNull();
     // The ranked roster starts EMPTY — no view is mounted, so there is genuinely nothing to place.
     expect(s.trendIds).toEqual([]);

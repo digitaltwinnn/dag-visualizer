@@ -112,7 +112,9 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
               share: row.day != null ? row.day / maxLast : undefined,
               hue: row.hue,
               figure:
-                row.day != null ? format(row.day) : dayPending ? <NodeStars count={3} /> : <span className="text-muted-foreground">{NO_READING}</span>,
+                // A dash with the words on hover: "no reading" truncated to "no rea…" in the 48px
+                // figure column (the list reads the DAY now, which a quiet network may lack).
+                row.day != null ? format(row.day) : dayPending ? <NodeStars count={3} /> : <span className="text-muted-foreground" title={NO_READING}>—</span>,
               on,
               title: `${row.name} · ${row.day != null ? `${format(row.day)}${unit ? ` ${unit}` : ""} · latest full day` : NO_READING}`,
               onClick: () => applyClickActions(trendPlaneActions(id, focus)),
