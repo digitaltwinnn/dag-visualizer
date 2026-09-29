@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Panel } from "@/components/docs/AboutDoc";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CABINET_BODY, CABINET_LIST, CABINET_TRIGGER } from "@/components/cabinetTabs";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { type ZoomId } from "@/src/data/trendWindow";
 import TrendChart, { type TrendLine } from "@/components/docs/TrendChart";
@@ -474,23 +475,14 @@ export default function TrendsDoc() {
             // drawer is a container for records and prose, and in this app a plate that size in
             // the accent reads as a committed region). The pickers above keep the ladder: they
             // are controls.
-            className="relative flex h-auto flex-none w-full gap-1 rounded-none p-0 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50"
+            className={CABINET_LIST}
             aria-label="Which side of the network"
           >
             {(["hypergraph", "metagraphs"] as const).map((id) => (
               <TabsTrigger
                 key={id}
                 value={id}
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-1.5 h-8 px-2 rounded-t-md! rounded-b-none!",
-                  "text-label tracking-caps uppercase font-normal",
-                  "text-muted-foreground bg-transparent border border-transparent border-b-0",
-                  "hover:text-foreground hover:bg-wash-soft",
-                  "after:hidden focus-visible:ring-0 focus-visible:border-transparent",
-                  "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
-                  "data-[state=active]:z-[1] data-[state=active]:text-foreground data-[state=active]:shadow-none",
-                  "data-[state=active]:border-border/50! data-[state=active]:bg-[var(--panel-solid)]!",
-                )}
+                className={cn(CABINET_TRIGGER, "h-8 text-label")}
               >
                 {id === "hypergraph" ? "Hypergraph" : "Metagraphs"}
               </TabsTrigger>
@@ -498,7 +490,7 @@ export default function TrendsDoc() {
           </TabsList>
           {/* The drawer's own outline — the tab row's baseline hairline is its top edge (the
               channel pane's rule), so the active tab's panel-solid fill bridges into it. */}
-          <div className="border border-t-0 border-border/50 rounded-b-md px-5 pb-8">
+          <div className={cn(CABINET_BODY, "px-5 pb-8")}>
 
 
           <TabsContent value="hypergraph" className="pt-5">
