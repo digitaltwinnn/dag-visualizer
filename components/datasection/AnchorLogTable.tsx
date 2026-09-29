@@ -195,38 +195,54 @@ export default function AnchorLogTable() {
       setVersion((v) => v + 1);
     }
   }, [histNet]);
+  // ⚠️ STALE-WHILE-REVALIDATE (user, 2026-09-29: opening the raw log under a filter "looks like
+  // it's loading something twice"). A new anchor used to DELETE page 1 before refetching it, so
+  // for the length of the request the table had no rows, fell into its "reading the chain…"
+  // branch and painted again — on every anchor, most visibly right after the layer opened on a
+  // page cached while it was away. Page 1 now stays on screen and is REPLACED when the fresh
+  // read lands. A generation counter, not a flag: an anchor arriving mid-refresh must leave the
+  // page stale, or the older refresh would mark it current and the newest anchor would be missed.
+  const liveGen = useRef(0);
+  const liveHave = useRef(0);
   useEffect(() => {
     if (!histNet || page !== 1) return;
-    hist.current.pages.delete(1);
+    liveGen.current += 1;
     setVersion((v) => v + 1);
     // bufferedNewest is the real dependency: a new anchor means a stale live page.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bufferedNewest, histNet]);
 
-  // Fetch the current page if missing. Page 1 is the live tip; every deeper page is the
-  // ordinal-addressed immutable read, so ANY page — a « jump to genesis included — is one
-  // request, no cursor chain.
+  // Fetch the current page if missing (or, for page 1, stale). Page 1 is the live tip; every
+  // deeper page is the ordinal-addressed immutable read, so ANY page — a « jump to genesis
+  // included — is one request, no cursor chain. One request per page at a time: the effect
+  // re-runs on every `version` bump (each resolved ANCHORED INTO cell is one), and cancelling
+  // the read on each of those would starve it.
+  const pageFetch = useRef(new Set<string>());
   useEffect(() => {
-    if (!histNet || hist.current.net !== histNet || hist.current.pages.has(page)) return;
+    if (!histNet || hist.current.net !== histNet) return;
+    const stale = page === 1 && liveHave.current !== liveGen.current;
+    if (hist.current.pages.has(page) && !stale) return;
     const frozen = hist.current.latest;
     if (page !== 1 && frozen === 0) return; // no arithmetic base yet — page 1 seeds it
     const before = frozen - (page - 1) * PAGE;
     if (page !== 1 && before < 1) return;
-    let dead = false;
+    const key = `${histNet}:${page}`;
+    if (pageFetch.current.has(key)) return;
+    pageFetch.current.add(key);
+    const gen = liveGen.current;
     fetch(netUrl(`/api/network/${histNet}/snapshots${page === 1 ? "" : `?before=${before}`}`))
       .then((r) => (r.ok ? (r.json() as Promise<{ rows: HistRow[] }>) : Promise.reject()))
       .then((d) => {
-        if (dead) return;
+        if (hist.current.net !== histNet) return; // the walk moved to another network meanwhile
         hist.current.pages.set(page, d.rows);
+        if (page === 1) liveHave.current = gen;
         setHistErr(false);
         setVersion((v) => v + 1);
       })
       .catch(() => {
-        if (!dead) setHistErr(true);
-      });
-    return () => {
-      dead = true;
-    };
+        if (hist.current.net === histNet) setHistErr(true);
+      })
+      .finally(() => pageFetch.current.delete(key));
   }, [histNet, page, version]);
 
   // Resolve the visible page's ANCHORED INTO ticks: buffer join first (free), the resolver
