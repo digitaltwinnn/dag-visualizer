@@ -10,13 +10,9 @@ import useFitRows from "@/components/explorer/useFitRows";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { IdentityDot } from "@/components/inspector/parts";
 import { ensurePage } from "@/components/RawSnapshotBridge";
-import { selectedRow, selectionHue } from "@/components/selection";
-import { NoSignalDot } from "@/components/state/StateAtoms";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { cn } from "@/lib/utils";
-import { useNowTick } from "@/components/useNowTick";
-import { relativeAge } from "@/src/util/relativeAge";
 import { buildAnchorLog, buildChannelLog, type AnchorLogRow } from "@/src/data/anchorLog";
 import { latestRelevant } from "@/src/data/follow";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -38,12 +34,12 @@ import { filterAccent, getAnchor, getNetwork, metagraphById, resolveSigner, SIGN
 import { metaSnapHoverKey, type GlobalSnapshot, type NodeRow, type SnapshotExact } from "@/src/data/types";
 import { displayNetwork, LISTED_IDS, UNLISTED_HUE, UNLISTED_ID, UNLISTED_LABEL, unlistedLog } from "@/src/data/unlisted";
 import { POLL } from "@/src/engine/config";
-import { followToggleActions, metaSnapSelectActions, nodeSelectActions, sameMetaSnap, snapshotSelectActions } from "@/src/engine/domain/pickActions";
+import { metaSnapSelectActions, nodeSelectActions, sameMetaSnap, snapshotSelectActions } from "@/src/engine/domain/pickActions";
 import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
-import LiveDot from "@/components/LiveDot";
 import { levelMeasure } from "@/src/data/explorerMeasure";
+import FollowControl from "@/components/FollowControl";
 
 // THE SNAPSHOTS VIEW'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -153,14 +149,6 @@ function perMetaOf(ex: SnapshotExact | undefined, id: string): { fee: number; by
   return any ? { fee, bytes } : undefined;
 }
 
-/** `· 5s ago` — the shown snapshot's age, ticking. Its own component so the per-second clock
- *  re-renders this span alone rather than the whole explorer. */
-function LiveAge({ ts }: { ts: string }) {
-  const now = useNowTick(1000);
-  const age = relativeAge(now - Date.parse(ts));
-  return age ? <>· {age}</> : null;
-}
-
 /** "last 12 min" / "last 2 h" — the time the listed snapshots span, newest back to oldest. */
 function spanWords(ordered: readonly GlobalSnapshot[]): string {
   if (ordered.length < 2) return "latest";
@@ -184,7 +172,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const setLedgerMeasure = useStore((s) => s.setLedgerMeasure);
   const snap = useStore((s) => s.snap);
   const following = useStore((s) => s.following);
-  const latestSnapshot = useStore((s) => s.latestSnapshot);
   const live = useStore((s) => s.live);
   const metaSnap = useStore((s) => s.metaSnap);
   const snapshotExact = useStore((s) => s.snapshotExact);
@@ -295,66 +282,10 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // rail's `live · 8s` counter, ticking, so the two surfaces speak one clock.
   // Hovering ANY snapshot — a row, a scene tile — PREVIEWS the pinned state it would enter (hollow
   // dot, dashed). The write goes through `followToggleActions` + the one executor. ----------------
-  const liveControl = (() => {
-    if (!live)
-      return (
-        <span className="inline-flex items-center gap-1.5 text-micro tracking-caps uppercase text-muted-foreground">
-          <NoSignalDot /> no signal
-        </span>
-      );
-    const liveOrd = latestSnapshot?.ordinal ?? null;
-    const previewOrd = hoverSnapOrd != null && hoverSnapOrd !== liveOrd ? hoverSnapOrd : null;
-    const pinned = !following && snap != null;
-    const beating = following && previewOrd == null;
-    const label = previewOrd != null ? "Pinned" : following ? "Live" : pinned ? "Pinned" : "Live";
-    // The AGE of the snapshot on screen — the live tip while following, the pinned one otherwise —
-    // in the right rail's own words (`relativeAge`, ticking every second). A hover preview names
-    // the ordinal it would pin instead, since that is what the preview is about.
-    // The age ticks in its own child (`LiveAge`), so the per-second clock re-renders one span,
-    // not the whole explorer. Following off with nothing pinned says "off" — the state is not
-    // live, and an age beside the word would read as if it were.
-    const shown = pinned ? snap!.data : latestSnapshot;
-    const sub = previewOrd != null
-      ? previewOrd.toLocaleString()
-      : !following && !pinned
-        ? "· off"
-        : shown
-          ? <LiveAge ts={shown.timestamp} />
-          : null;
-    return (
-      <button
-        type="button"
-        aria-pressed={following}
-        title={following ? "Following the live snapshot — click to pin the one on screen" : "Follow the live snapshot"}
-        onClick={() => {
-          const shown = snap ?? (latestSnapshot ? ({ kind: "snapshot", title: `Global snapshot #${latestSnapshot.ordinal}`, data: latestSnapshot } as const) : null);
-          if (shown) applyClickActions(followToggleActions(shown, following));
-        }}
-        // One box in every state, so the pill never changes size or place as the state flips:
-        // the padding is there when it is invisible (LIVE, transparent) as when the PINNED wash
-        // makes it a visible chip (user, 2026-09-26: the pinned block "looks ugly, no padding").
-        className={cn(
-          "-mr-1.5 inline-flex items-center gap-1.5 rounded-sm px-1.5 py-[3px] cursor-pointer select-none border border-transparent whitespace-nowrap",
-          "hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
-          pinned && previewOrd == null && selectedRow(true),
-          previewOrd != null && "border-dashed border-border",
-        )}
-        style={pinned && previewOrd == null ? selectionHue(accent) : undefined}
-      >
-        {beating ? (
-          <LiveDot />
-        ) : (
-          <span className={cn("flex-none w-2 h-2 rounded-full border", pinned && previewOrd == null ? "border-primary/80" : "border-muted-foreground/70")} />
-        )}
-        {/* THE RIGHT RAIL CARD'S OWN VOICE AND PLACE (user, 2026-09-28): lowercase `live · 5s ago`
-            at the card aside's text size, on the TITLE row — the card's own position, which fits
-            since the title became "Snapshots" (it rode the eyebrow row while "Snapshot breakdown"
-            left ~54px beside it). */}
-        <span className={cn("text-label", pinned && previewOrd == null ? "text-foreground" : "text-muted-foreground")}>{label.toLowerCase()}</span>
-        {sub && <span className="tabular-nums text-label text-muted-foreground">{sub}</span>}
-      </button>
-    );
-  })();
+  // The LIVE / PINNED switch — one component with the global snapshot card's aside
+  // (`components/FollowControl.tsx`); the explorer adds the hover preview. `-mr-1.5` hangs the
+  // pill's padding into the head's gutter so its text aligns with the rows' right edge.
+  const liveControl = <FollowControl preview className="-mr-1.5" />;
 
   // ---- level 0: the ticks, paged, measured by the heading's pick -------------------------------
   const tickValues = pagedSnaps.map((d) => tickMeasureValue(ledgerMeasure, d, snapshotExact[d.ordinal]));

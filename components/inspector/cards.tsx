@@ -15,21 +15,19 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import Odometer from "@/components/Odometer";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { SonarRing, NodeStars, NoSignalDot } from "@/components/state/StateAtoms";
+import { SonarRing, NodeStars } from "@/components/state/StateAtoms";
 import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { ChevronRight, ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
 import { useArchive, archiveFactState, archiveSchedule, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
 import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
-import { useNowTick } from "@/components/useNowTick";
 import { POLL } from "@/src/engine/config";
 import { cap, Desc, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark, StackedSchedule, partShade, type SchedulePart } from "./parts";
 import { statusItems } from "@/src/data/nodeStatus";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
-import { pickNetId, followToggleActions } from "@/src/engine/domain/pickActions";
-import { applyClickActions } from "@/src/store/applyClickActions";
+import { pickNetId } from "@/src/engine/domain/pickActions";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
-import LiveDot from "@/components/LiveDot";
+import FollowControl from "@/components/FollowControl";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
 
@@ -63,40 +61,11 @@ export function SnapshotTitle({ data: d }: { data: GlobalSnapshot }) {
 // and off; the write goes through the table + executor like every other selection.
 // While following a metagraph lane, the newest snapshot it anchored into may be minutes old — the
 // age rides alongside "live" rather than being replaced by it, so the label never overstates.
-export function SnapshotAside({ data: d }: { data: GlobalSnapshot }) {
-  const live = useStore((s) => s.live);
-  const following = useStore((s) => s.following);
-  const snap = useStore((s) => s.snap);
-  // Relative recency as a LIVE TICKING counter (user, 2026-08-08 — reversing the old
-  // "coarse freshness, not a ticking clock" choice): the seconds count up between heartbeats
-  // and reset as a new snapshot lands, so a closed snapshot card still FEELS live. Guarded
-  // against an unparseable timestamp (→ no age suffix rather than "NaN").
-  const now = useNowTick(1000);
-  const rel = relativeAge(now - Date.parse(d.timestamp));
-  const cls = "inline-flex items-center gap-1.5 text-label text-muted-foreground whitespace-nowrap";
-  if (!live) return <span className={cls}><NoSignalDot /> no signal</span>;
-  return (
-    <button
-      type="button"
-      aria-pressed={following}
-      title={following ? "Stop following the live snapshot" : "Follow the live snapshot"}
-      className={cn(cls, "rounded-xs hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60")}
-      onClick={() => snap && applyClickActions(followToggleActions(snap, following))}
-    >
-      {following ? (
-        <>
-          <LiveDot />
-          {/* The tip state counts up from the last heartbeat and resets as the next lands (user,
-              2026-08-08 — replacing the static "live now"; the label still never overstates: the
-              counter IS the shown snapshot's age in both branches). relativeAge returns "" for a
-              clock-skewed (future-stamped) timestamp — say "live" alone, no dangling separator. */}
-          {rel ? `live · ${rel}` : "live"}
-        </>
-      ) : (
-        <>◷ {rel}</>
-      )}
-    </button>
-  );
+export function SnapshotAside(_: { data: GlobalSnapshot }) {
+  // The same LIVE / PINNED switch the Snapshots explorer wears (user, 2026-09-29: a pin read as
+  // pinned there and as a bare "◷ 12s" here). It reads the shown snapshot itself — the pinned one,
+  // else the live tip, which is what this card shows.
+  return <FollowControl />;
 }
 
 // Dossier title: the pre-unification header composition (logo avatar ringed in the identity hue
