@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { shouldRelease, subjectPairing } from "./useSubjectPairing";
+import { noteInput, shouldRelease, subjectPairing } from "./useSubjectPairing";
 
 describe("subjectPairing", () => {
   it("is paired when the key matches the active channel value, exposing the hue var", () => {
@@ -74,5 +74,41 @@ describe("shouldRelease — a surface releases only the hover it set", () => {
 
   it("never releases a channel that is already clear", () => {
     expect(shouldRelease({ mine: "dor", active: null, present: [] })).toBe(false);
+  });
+});
+
+// ⚠️ A TAP IS NOT A HOVER (user, 2026-09-29: on a large tablet, tapping a History explorer row
+// brought the chart forward and then left it "selected/hovered"; not on a PC). A tap fires the
+// browser's EMULATED mouseenter and focuses the button, and nothing fires the matching leave or
+// blur until the next tap elsewhere — so the preview channel held the tapped subject. The pairing
+// now asks what the LAST REAL INPUT was: only a mouse previews on enter/move, a tap's focus is not
+// keyboard focus, and the clearing half always runs.
+describe("subjectPairing — input modality", () => {
+  it("a TOUCH's emulated mouseenter/move and its focus do not write the channel", () => {
+    const set = vi.fn();
+    noteInput("touch");
+    const p = subjectPairing<number>(null, 42, set, "#fff");
+    p.onMouseEnter();
+    p.onMouseMove();
+    p.onFocus();
+    expect(set).not.toHaveBeenCalled();
+    noteInput("mouse");
+  });
+  it("…while leave and blur still clear, whatever the input", () => {
+    const set = vi.fn();
+    noteInput("touch");
+    const p = subjectPairing<number>(42, 42, set, "#fff");
+    p.onMouseLeave(); expect(set).toHaveBeenLastCalledWith(null);
+    p.onBlur(); expect(set).toHaveBeenLastCalledWith(null);
+    noteInput("mouse");
+  });
+  it("KEYBOARD focus previews (the pairing language is not mouse-only); a mouse hovers", () => {
+    const set = vi.fn();
+    noteInput("keyboard");
+    subjectPairing<number>(null, 7, set, "#fff").onFocus();
+    expect(set).toHaveBeenLastCalledWith(7);
+    noteInput("mouse");
+    subjectPairing<number>(null, 9, set, "#fff").onMouseEnter();
+    expect(set).toHaveBeenLastCalledWith(9);
   });
 });

@@ -19,6 +19,32 @@ import { useCallback, useEffect, useRef, type CSSProperties } from "react";
 // never hears one, so the pairing stays dead until the pointer leaves and returns. The first
 // pointer move over the element re-arms it; guarded on `active !== key`, so it writes once and
 // every later move over an already-paired subject is a no-op, not a store write per pixel.
+// ⚠️ A TAP IS NOT A HOVER (user, 2026-09-29: on a large tablet a History explorer row, tapped,
+// brought its chart forward and then stayed "selected/hovered"; a PC never showed it). A tap fires
+// the browser's EMULATED mouseenter/mousemove and focuses the button, and nothing fires the
+// matching mouseleave or blur until the next tap lands elsewhere — so the preview channel held
+// the tapped subject indefinitely (convention 9: hovers preview, never commit). A phone rarely
+// showed it because its dock closes on a commit and the unmount releases the channel.
+// So the writers ask what the LAST REAL INPUT was, recorded from pointer events — which every
+// modern browser (Safari included) dispatches BEFORE the compatibility mouse events — and from
+// keydown: enter/move preview only for a MOUSE, focus previews for anything but a TAP (keyboard
+// focus keeps the pairing language keyboard-reachable, and a mouse click's focus is the hover it
+// already made). The clearing half always runs. Module state, not React state: it is a fact about
+// the device's last gesture, shared by every surface.
+type InputKind = "mouse" | "touch" | "keyboard";
+let lastInput: InputKind = "mouse";
+/** Record the last input — the browser listeners below call it; exported for the tests. */
+export function noteInput(kind: InputKind): void {
+  lastInput = kind;
+}
+if (typeof window !== "undefined") {
+  const onPointer = (e: PointerEvent) => noteInput(e.pointerType === "mouse" ? "mouse" : "touch");
+  const opts = { capture: true, passive: true } as const;
+  window.addEventListener("pointerdown", onPointer, opts);
+  window.addEventListener("pointermove", onPointer, opts);
+  window.addEventListener("keydown", () => noteInput("keyboard"), opts);
+}
+
 export function subjectPairing<T extends string | number>(
   active: T | null,
   key: T | null,
@@ -37,16 +63,22 @@ export function subjectPairing<T extends string | number>(
   const paired = key != null && key === active;
   const enter = () => set(key);
   const leave = () => set(null);
+  // See "A TAP IS NOT A HOVER" above: the writers gate on the last real input, the clears never do.
+  const hover = () => {
+    if (lastInput === "mouse") enter();
+  };
   return {
     paired,
     className: paired ? "subject-paired" : "",
     style: paired ? ({ ["--row-hue"]: hue } as CSSProperties) : undefined,
-    onMouseEnter: enter,
+    onMouseEnter: hover,
     onMouseMove: () => {
-      if (active !== key) enter();
+      if (active !== key) hover();
     },
     onMouseLeave: leave,
-    onFocus: enter,
+    onFocus: () => {
+      if (lastInput !== "touch") enter();
+    },
     onBlur: leave,
   };
 }
