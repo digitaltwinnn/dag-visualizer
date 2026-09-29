@@ -211,9 +211,12 @@ decisions inside them are design, not detail:
   auto-opens from the root, because the newest tick changes every few seconds. The LIVE/PINNED
   control rides the CARD HEAD's eyebrow row with the shown snapshot's ticking age (2026-09-28 —
   it rode the heading row as the level's setting, design decision 15, until then), and the pager
-  states the TIME the rows span ("last 11 min") rather than "52 recent". Each level has its
-  own measures (ticks fees · anchors · metagraphs · size, a network in a tick snapshots · fees ·
-  size, a snapshot fee · size), figures BARE because the heading names the unit, in a 48px figure
+  states the TIME the rows span ("last 11 min") rather than "52 recent". Each level shows
+  the ONE vocabulary minus what it cannot state (ticks fees · anchors · metagraphs · size, a network
+  in a tick fees · anchors · size, a snapshot fees · size), and ONE pick serves every level: a level
+  shows it where it applies and its own first measure where it doesn't, without overwriting it
+  (user, 2026-09-29 — `src/data/explorerMeasure.ts`, which Geography's cohort level shares; every
+  explorer follows the rule). Figures are BARE because the heading names the unit, in a 48px figure
   column (`figureW` — a 4-decimal fee does not fit the default 40).
 
 - **History's tool card is its roster, with the MEASURE on its heading**

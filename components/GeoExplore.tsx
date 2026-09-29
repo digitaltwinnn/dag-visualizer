@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import Explorer, { type ExplorerLevelSpec } from "@/components/explorer/Explorer";
 import { nodeRowSpec } from "@/components/explorer/nodeRow";
@@ -9,8 +9,8 @@ import {
   COHORT_MEASURE_OPTIONS,
   GEO_MEASURE_OPTIONS,
   cohortMeasure,
+  COHORT_MEASURES,
   countryMeasure,
-  type CohortMeasure,
   type GeoMeasure,
 } from "@/src/data/geoMeasure";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -22,6 +22,7 @@ import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import { ccMark } from "@/src/util/format";
+import { levelMeasure } from "@/src/data/explorerMeasure";
 
 // THE GEOGRAPHY'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -58,7 +59,9 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
   const hoverNodeId = useStore((s) => s.hoverNodeId);
   // The cohort level's own measure — a level remembers its pick; this one is the card's, not the
   // app's, so it lives here rather than in the store.
-  const [cohortPick, setCohortPick] = useState<CohortMeasure>("nodes");
+  // One pick for both levels (user, 2026-09-29 — `src/data/explorerMeasure.ts`): the cohort level
+  // shows `geoMeasure` where it can state it (Providers it cannot — a cohort IS one provider).
+  const cohortPick = levelMeasure(COHORT_MEASURES, geoMeasure);
 
   // The selected node, matched by IP AND layer: one machine can sit in both the l0 and l1
   // clusters (same IP, two rows), so IP alone highlighted both.
@@ -168,7 +171,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
         onRelease: () => (openCohort ? commitCohort({ cc: drilled.cc, city: openCohort.city, isp: openCohort.isp }) : undefined),
       },
       meaning: "Where the nodes sit, and who hosts them",
-      measure: { options: COHORT_MEASURE_OPTIONS, value: cohortPick, onPick: (id) => setCohortPick(id as CohortMeasure) },
+      measure: { options: COHORT_MEASURE_OPTIONS, value: cohortPick, onPick: (id) => setGeoMeasure(id as GeoMeasure) },
       hasFigure: true,
       nameW: 76,
       empty: "No locatable nodes here yet.",

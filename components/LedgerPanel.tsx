@@ -30,8 +30,8 @@ import {
   tickMeasureValue,
   tickNetMeasure,
   type LedgerMeasure,
-  type SnapLevelMeasure,
-  type TickNetMeasure,
+  SNAP_MEASURES,
+  TICK_NET_MEASURES,
 } from "@/src/data/ledgerMeasure";
 import { ledgerLens, storyCount, tickInStory } from "@/src/data/ledgerStory";
 import { filterAccent, getAnchor, getNetwork, metagraphById, resolveSigner, SIGNER_GROUPS, SIGNER_UNKNOWN, snapshotSigners } from "@/src/data/network";
@@ -43,6 +43,7 @@ import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import LiveDot from "@/components/LiveDot";
+import { levelMeasure } from "@/src/data/explorerMeasure";
 
 // THE SNAPSHOTS VIEW'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -189,11 +190,12 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const snapshotExact = useStore((s) => s.snapshotExact);
   const selNodes = useStore((s) => s.selNodes);
   const inspect = useStore((s) => s.inspect);
-  // The two lower levels' own measures — a level remembers its pick; these are the card's, not
-  // the app's, so they live here rather than in the store (the tick level's is `ledgerMeasure`,
-  // which the chamber's own readouts share).
-  const [netPick, setNetPick] = useState<TickNetMeasure>("snapshots");
-  const [snapPick, setSnapPick] = useState<SnapLevelMeasure>("fee");
+  // ONE PICK FOR EVERY LEVEL (user, 2026-09-29 — `src/data/explorerMeasure.ts`): the lower levels
+  // show the tick level's `ledgerMeasure` where they can state it and their own first measure where
+  // they can't, and a pick at any level writes that one value — so stepping down and back up never
+  // loses what the reader chose.
+  const netPick = levelMeasure(TICK_NET_MEASURES, ledgerMeasure);
+  const snapPick = levelMeasure(SNAP_MEASURES, ledgerMeasure);
 
   const selNode = inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode") ? inspect : null;
   const selIp = selNode?.node?.ip ?? null;
@@ -460,7 +462,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         },
       },
       meaning: "Networks that anchored into it",
-      measure: { options: TICK_NET_MEASURE_OPTIONS, value: netPick, onPick: (id) => setNetPick(id as TickNetMeasure) },
+      measure: { options: TICK_NET_MEASURE_OPTIONS, value: netPick, onPick: (id) => setLedgerMeasure(id as LedgerMeasure) },
       hasFigure: true,
       nameW: 120,
       figureW: 48,
@@ -534,7 +536,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         onRelease: () => setOpenSnap(null),
       },
       meaning: "Its snapshots anchored here",
-      measure: { options: SNAP_MEASURE_OPTIONS, value: snapPick, onPick: (id) => setSnapPick(id as SnapLevelMeasure) },
+      measure: { options: SNAP_MEASURE_OPTIONS, value: snapPick, onPick: (id) => setLedgerMeasure(id as LedgerMeasure) },
       hasFigure: true,
       figureW: 48,
       empty: "No snapshots identified for this network here.",
