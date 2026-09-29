@@ -211,10 +211,40 @@ const ordinalLabel = (r: ChannelSnapRow): string =>
 
 // ---------------------------------------------------------------------------
 
+/** THE CHILDREN OF A LEDGER TICK (2026-09-29) — the networks that anchored into the shown global
+ *  snapshot, busiest first (the order the tick card prints its anchors in). The ONE answer, read by
+ *  the metagraph card's pager and the tick's ∨ step alike, so the two can't disagree about what is
+ *  under a tick (they did: the pager walked the whole catalog). Null without a tick or its exact
+ *  read — no pager then, rather than a guess.
+ *  ⚠️ THE COMMITTABLE ONES ONLY (review find, 2026-09-15): an unlisted channel names no filter, so
+ *  it can never be a step — sorted busiest-first, then filtered to what the filter vocabulary
+ *  knows; a tick led by an unlisted channel still offers its listed networks. */
+function tickNetworks(s: SiblingState): MetaInfo[] | null {
+  if (!s.snap || !s.exactRows?.length) return null;
+  const counts = new Map<string, number>();
+  for (const r of s.exactRows) counts.set(r.metaId, (counts.get(r.metaId) ?? 0) + 1);
+  const nets = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([id]) => s.metaList.find((m) => m.id === id))
+    .filter((m): m is MetaInfo => m != null);
+  return nets.length ? nets : null;
+}
+
 export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | null {
   switch (slot) {
     case "context": {
       if (s.filter === "all") return null;
+      // UNDER A LEDGER TICK the metagraph card is the tick's CHILD, so it steps the tick's own
+      // networks (`tickNetworks` — the set the tick's ∨ opens the first of), never the catalog;
+      // and a pinned tick stays pinned, since a filter commit in the ledger otherwise re-enters
+      // live (the executor's rule) and a swipe would move the PARENT. Live stays live.
+      if (s.mode === "ledger") {
+        const nets = tickNetworks(s);
+        if (!nets) return null;
+        const hold: ClickAction[] = s.following || !s.snap ? [] : [{ kind: "snapshot", pick: s.snap, follow: false }];
+        const items = nets.map((m) => ({ key: m.id, label: m.name, actions: [...filterToggleActions(m.id, s.filter), ...hold] }));
+        return finish(slot, items, nets.findIndex((m) => m.id === s.filter), `Global ${s.snap!.data.ordinal.toLocaleString()}`);
+      }
       // The filter picker's own order: located-desc (0-located rows stay steppable, like the
       // picker keeps them clickable).
       const nets = [...s.metaList].sort((a, b) => (b.located ?? 0) - (a.located ?? 0));
@@ -432,18 +462,8 @@ const firstNodeOfComposition = (s: SiblingState): SiblingStep | null => {
  *  rather than a side effect (user, 2026-09-15); an UNLISTED channel names no filter, so there is
  *  nothing to commit and the control dims. */
 const firstAnchoringNetwork = (s: SiblingState): SiblingStep | null => {
-  if (!s.snap || !s.exactRows?.length || s.filter !== "all") return null;
-  const counts = new Map<string, number>();
-  for (const r of s.exactRows) counts.set(r.metaId, (counts.get(r.metaId) ?? 0) + 1);
-  // ⚠️ THE BUSIEST COMMITTABLE ONE, not simply the busiest (review find, 2026-09-15). An unlisted
-  // channel names no filter, so it can never be the step — but a tick LED by one still has listed
-  // networks under it, and taking only the top row meant the whole control dimmed behind an anchor
-  // the reader could not have acted on anyway. Sorted busiest-first, then the first that the filter
-  // vocabulary knows; all-unlisted still answers null, which is the honest dim.
-  const meta = [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([id]) => s.metaList.find((m) => m.id === id))
-    .find((m) => m != null);
+  if (s.filter !== "all") return null;
+  const meta = tickNetworks(s)?.[0];
   return meta ? { key: meta.id, label: meta.name, actions: filterToggleActions(meta.id, s.filter) } : null;
 };
 /** ledger: the committed network's OWN snapshot in the shown tick — never the tick's first row,

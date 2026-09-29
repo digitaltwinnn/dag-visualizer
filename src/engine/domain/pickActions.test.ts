@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, type ClickAction } from "./pickActions";
+import { viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, snapshotClearActions, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
 import { METAGRAPHS } from "@/src/net/current";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
@@ -203,6 +203,33 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
     expect(snapshotSelectActions(p, true, { pinnedOrdinal: ord, metaSnap: null })).toEqual([
       { kind: "snapshot", pick: p, follow: true },
     ]);
+  });
+
+  // ⚠️ CLEARING A TICK CLEARS WHAT HANGS UNDER IT (user, 2026-09-29: "deleting a snapshot card will
+  // clear the rung that is there at that moment"; live stays the default). The × used to clear the
+  // tick alone, and the re-click dropped only the metaSnap — so a committed metagraph survived,
+  // and with live resuming, `followLatest` re-grew its metagraph-snapshot card on the next beat.
+  it("snapshotClearActions: the tick's rungs present right now clear finest-first, then live resumes", () => {
+    const child = { metaId: "dor", ordinal: 7, hash: "", globalOrdinal: 42, ts: "T" };
+    expect(snapshotClearActions({ metaSnap: child, filter: "dor" })).toEqual([
+      { kind: "metaSnap", sel: null },
+      { kind: "filter", id: "all" },
+      { kind: "snapshot", pick: null, follow: true },
+    ]);
+    // Only what is there: a bare tick clears alone.
+    expect(snapshotClearActions({ metaSnap: null, filter: "all" })).toEqual([{ kind: "snapshot", pick: null, follow: true }]);
+    // The DAG's card is the rung under a tick too (the base ledger's lens).
+    expect(snapshotClearActions({ metaSnap: null, filter: "dag" })).toEqual([
+      { kind: "filter", id: "all" },
+      { kind: "snapshot", pick: null, follow: true },
+    ]);
+  });
+  it("the pinned tick's RE-CLICK is the same clear as its × (one toggle language)", () => {
+    const p = { kind: "snapshot", title: "Global snapshot #42", data: { ordinal: 42 } } as unknown as Parameters<typeof snapshotSelectActions>[0];
+    const child = { metaId: "dor", ordinal: 7, hash: "", globalOrdinal: 42, ts: "T" };
+    expect(snapshotSelectActions(p, false, { pinnedOrdinal: 42, metaSnap: child, filter: "dor" })).toEqual(
+      snapshotClearActions({ metaSnap: child, filter: "dor" }),
+    );
   });
 
   it("snapshotSelectActions: committing a DIFFERENT tick drops the metaSnap it can't contain", () => {

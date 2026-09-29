@@ -484,3 +484,45 @@ describe("childStep — the first-child DOWN step", () => {
     expect(childStep("snap", base({ mode: "ledger", filter: "paca", snap: snapPick, exactRows: rows }))).toBeNull();
   });
 });
+
+// ⚠️ A GLOBAL SNAPSHOT'S CHILDREN ARE THE NETWORKS IT HOLDS (user, 2026-09-29: "I should only be
+// able to swipe the metagraphs that are part of that global snapshot … there must be a
+// parent-child relation that determines what can be swiped"). In the ledger the metagraph card
+// hangs under the tick, so its pager steps the tick's own networks — the same set the tick's ∨
+// opens the first of — and a pinned tick stays pinned across the swipe.
+describe("siblingSet — context rung under a ledger tick", () => {
+  const rows = [
+    { metaId: "dor", ordinal: 1 },
+    { metaId: "unlisted-x", ordinal: 1 },
+    { metaId: "ded", ordinal: 9 },
+    { metaId: "dor", ordinal: 2 },
+    { metaId: "unlisted-x", ordinal: 2 },
+    { metaId: "unlisted-x", ordinal: 3 },
+  ] as unknown as SiblingState["exactRows"];
+  const s = base({ mode: "ledger", filter: "ded", snap: snapPick, exactRows: rows });
+
+  it("steps ONLY the tick's listed networks, busiest first — not the whole catalog", () => {
+    const set = siblingSet("context", s)!;
+    expect(set.items.map((i) => i.key)).toEqual(["dor", "ded"]); // tbc never anchored here
+    expect(set.index).toBe(1);
+  });
+  it("a swipe under a PINNED tick keeps the pin (the parent does not move)", () => {
+    const set = siblingSet("context", s)!;
+    expect(set.items[0]!.actions).toEqual([
+      ...filterToggleActions("dor", "ded"),
+      { kind: "snapshot", pick: snapPick, follow: false },
+    ]);
+  });
+  it("…and under LIVE it stays live (live is the default)", () => {
+    const set = siblingSet("context", { ...s, following: true })!;
+    expect(set.items[0]!.actions).toEqual(filterToggleActions("dor", "ded"));
+  });
+  it("the tick's ∨ opens the FIRST of the same set", () => {
+    const step = childStep("snap", { ...s, filter: "all" })!;
+    expect(step.key).toBe(siblingSet("context", s)!.items[0]!.key);
+  });
+  it("no tick read yet → no pager rather than the catalog", () => {
+    expect(siblingSet("context", { ...s, exactRows: null })).toBeNull();
+    expect(siblingSet("context", { ...s, snap: null })).toBeNull();
+  });
+});

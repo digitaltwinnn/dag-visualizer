@@ -24,7 +24,7 @@ import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { detailsCards, ladderSlotIds, ladderLevelOfSlot, type RailCard } from "@/components/railCards";
 import { useLadderFocus } from "@/components/useLadderFocus";
 import { useTrayActives } from "@/components/useTrayActives";
-import { countryToggleActions, cohortToggleActions, compositionToggleActions } from "@/src/engine/domain/pickActions";
+import { countryToggleActions, cohortToggleActions, compositionToggleActions, snapshotClearActions } from "@/src/engine/domain/pickActions";
 import { CountryTitle, CountryAside, CountryCard, ProviderTitle, ProviderCard, ProviderAside, CompositionTitle, CompositionCard, CompositionAside } from "@/components/inspector/cards";
 import MetaSnapPane from "@/components/inspector/MetaSnapPane";
 import TrendInstantPane from "@/components/inspector/TrendInstantPane";
@@ -549,7 +549,7 @@ export default function Inspector() {
       <CardPane key="node" pick={{ kind: "geoLive" }} eyebrow="Node" onClose={() => applyClickActions([{ kind: "inspect", pick: null }])} {...cx("node")} />
     ),
     snap: snap ? (
-      <CardPane key="snap" pick={snap} eyebrow="Global snapshot" onClose={() => applyClickActions([{ kind: "snapshot", pick: null }])} {...cx("snap")} />
+      <CardPane key="snap" pick={snap} eyebrow="Global snapshot" onClose={() => applyClickActions(snapshotClearActions({ metaSnap, filter }))} {...cx("snap")} />
     ) : null,
     // History's committed INSTANT: a card slot with no ladder rung, so its × clears its own
     // channel and nothing cascades. It is NOT a selection write (`setTrendCursor` is deliberately

@@ -200,6 +200,22 @@ export function filterToggleActions(id: string, currentFilter: string): ClickAct
 // Selecting a SNAPSHOT — shared by the ledger's tile click and LiveStrip's bar click:
 // clicking the LIVE tip (re-)follows the heartbeat; anything older pins that snapshot
 // (the FollowController only auto-advances while following).
+/** CLEARING A GLOBAL SNAPSHOT — its card's × and the pinned tick's re-click, one builder (user,
+ *  2026-09-29: "deleting a snapshot card will clear the rung that is there at that moment"; live
+ *  stays the default). The tick is the ledger rail's PARENT: the metagraph card (the committed
+ *  filter — the DAG's included, the base ledger's lens) and its metagraph snapshot hang under it,
+ *  so they clear with it, finest first, and live resumes. The filter has to go too, not just the
+ *  metaSnap: with a metagraph committed, live follow RE-GROWS that network's newest snapshot card
+ *  on the next beat (`followLatest`'s live metagraph mode), which is how the × used to leave the
+ *  children standing. Only what is there right now is cleared. */
+export function snapshotClearActions(current: { metaSnap: MetaSnapSel | null; filter: string }): ClickAction[] {
+  const out: ClickAction[] = [];
+  if (current.metaSnap) out.push({ kind: "metaSnap", sel: null });
+  if (current.filter !== "all") out.push({ kind: "filter", id: "all" });
+  out.push({ kind: "snapshot", pick: null, follow: true });
+  return out;
+}
+
 export function snapshotSelectActions(
   p: Extract<PickDescriptor, { kind: "snapshot" }>,
   isLiveTip: boolean,
@@ -219,10 +235,7 @@ export function snapshotSelectActions(
   // default until something is clicked — the FollowController repopulates the card chain and
   // the trail slides back to the live front).
   if (!isLiveTip && current && current.pinnedOrdinal != null && current.pinnedOrdinal === p.data.ordinal) {
-    const out: ClickAction[] = [];
-    if (current.metaSnap) out.push({ kind: "metaSnap", sel: null });
-    out.push({ kind: "snapshot", pick: null, follow: true });
-    return out;
+    return snapshotClearActions({ metaSnap: current.metaSnap, filter: current.filter ?? "all" });
   }
   const out: ClickAction[] = [];
   if (
