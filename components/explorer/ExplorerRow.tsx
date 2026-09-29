@@ -53,6 +53,8 @@ export interface ExplorerRowProps {
   nameW?: number;
   /** The figure column's width for this level; 40 fits a count, a 4-decimal fee needs 48. */
   figureW?: number;
+  /** The glyph column's width (see the level's `glyphW`). A wide glyph is LEFT-aligned. */
+  glyphW?: number;
   /** The committed subject wears the wash, in its hue. */
   on?: boolean;
   hue?: string | null;
@@ -95,7 +97,7 @@ function recentGesture(): boolean {
 }
 
 export default function ExplorerRow({
-  glyph, name, nameMono, tag, bar, figure, hasFigure, nameW = 84, figureW = 40, on, hue, nested, wideBar, faint, title, onClick, pair, className,
+  glyph, name, nameMono, tag, bar, figure, hasFigure, nameW = 84, figureW = 40, glyphW = 14, on, hue, nested, wideBar, faint, title, onClick, pair, className,
 }: ExplorerRowProps) {
   const el = useRef<HTMLButtonElement>(null);
   // SELECTION STAYS IN PLACE (design 2026-09-26, decision 12): the list never re-orders on a
@@ -153,9 +155,9 @@ export default function ExplorerRow({
         // nested level's own 24px.
         gridTemplateColumns: hasFigure
           ? wideBar
-            ? `14px minmax(0,${nameW}px) 0px minmax(${nested ? 24 : 36}px,1fr) ${figureW}px`
-            : `14px minmax(0,${nameW}px) minmax(0,1fr) ${nested ? 24 : 36}px ${figureW}px`
-          : "14px minmax(0,1fr) auto",
+            ? `${glyphW}px minmax(0,${nameW}px) 0px minmax(${nested ? 24 : 36}px,1fr) ${figureW}px`
+            : `${glyphW}px minmax(0,${nameW}px) minmax(0,1fr) ${nested ? 24 : 36}px ${figureW}px`
+          : `${glyphW}px minmax(0,1fr) auto`,
         ...(on ? selectionHue(hue) : undefined),
         ...pair?.style,
       }}
@@ -177,7 +179,7 @@ export default function ExplorerRow({
         pair?.onBlur();
       }}
     >
-      <span className="flex items-center justify-center">{glyph}</span>
+      <span className={cn("flex items-center min-w-0", glyphW > 14 ? "justify-start" : "justify-center")}>{glyph}</span>
       <span
         className={cn(
           "min-w-0 truncate text-body",

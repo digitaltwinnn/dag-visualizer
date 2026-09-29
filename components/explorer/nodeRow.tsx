@@ -3,11 +3,12 @@
 import type { CSSProperties } from "react";
 
 import type { ExplorerRowSpec } from "@/components/explorer/Explorer";
-import { IdentityDot, RoleChips } from "@/components/inspector/parts";
+import { RoleChips } from "@/components/inspector/parts";
 import { layerCodesOf } from "@/src/data/composition";
-import { metagraphById, shortHash } from "@/src/data/network";
+import { coLocatedNetworks, metagraphById, shortHash } from "@/src/data/network";
+import { identityHudCss } from "@/src/palette/identity";
 import { nodeStatus } from "@/src/data/nodeStatus";
-import type { NodeRow } from "@/src/data/types";
+import type { MetaInfo, NodeRow } from "@/src/data/types";
 import { midHash } from "@/src/util/format";
 import { cn } from "@/lib/utils";
 
@@ -17,13 +18,16 @@ import { cn } from "@/lib/utils";
 // length, in what the tag said and in whether there was a glyph. Every one of them now builds its
 // rows here, so they agree by construction (user: "ensure they are consistent").
 //
-//   glyph   · the node's network, as its hue dot
+//   glyph   · the network's TICKER in its hue, LEFT-aligned in a widened first column (user,
+//             2026-09-29: "remove the colored bullet … color-code the network ticker"; then "left
+//             align the ticker … maybe even 1st column"). Every node level sets `glyphW:
+//             NODE_GLYPH_W`, so the ids start on one edge whatever the ticker's length.
 //   name    · the node id, mono, ONE length everywhere
-//   tag     · the network's TICKER — on EVERY node row (user, 2026-09-29: "hypergraph node rows and
-//             snapshot node rows don't show the ticker while geo does"; it was shown only where the
-//             level mixes networks, which made the one row read three ways), then the node's
-//             LAYER chips (the same `RoleChips` the composition rows wear), then its STATE as a
-//             small dot in the state's bucket colour
+//             On EVERY node row (user, 2026-09-29: it showed only where a level mixed networks),
+//             and a CO-LOCATED node shows every network at its IP ("UP should show both DAG and
+//             UP") — `coLocatedNetworks`, the one home the node card's Co-located row reads.
+//   tag     · the node's LAYER chips (the same `RoleChips` the composition rows wear), then its
+//             STATE as a small dot in the state's bucket colour
 //
 // The state dot is colour, and identity is never colour alone (the design system's rule), so the
 // state's word rides the dot as its accessible name and the row's title spells everything out:
@@ -52,33 +56,51 @@ export function StateDot({ state }: { state?: string | null }) {
   );
 }
 
+/** The node level's glyph column — room for two short tickers ("DAG UP") or one long one
+ *  ("USDC.dag") at the tag size; anything longer truncates. */
+export const NODE_GLYPH_W = 56;
+
+const tickerOf = (id: string): string => metagraphById(id)?.ticker ?? (id === "dag" ? "DAG" : id);
+
 /** One length for every node id, in every explorer. */
-// Fourteen: beside the widest tag (a ticker or three chips, and the dot) the id still shows whole.
-export const NODE_ID_GLYPHS = 14;
+// Twelve (was 14 until the ticker moved into its own first column, 2026-09-29): beside that column
+// and the widest tag (three chips and the dot) the id still shows whole — cut once, never twice.
+export const NODE_ID_GLYPHS = 12;
 
 export function nodeRowSpec(args: {
   key: string;
   row: NodeRow;
   /** The row's network hue. The ticker is derived from the row itself, so no caller can leave it out. */
   hue: string;
+  /** The full catalog (store `metaList`, the DAG core prepended) — co-location is read against
+   *  ALL of it, never a filtered list, so a committed filter cannot hide a co-tenant. */
+  metaList: readonly MetaInfo[];
   on: boolean;
   onClick: () => void;
   pair: ExplorerRowSpec["pair"];
 }): ExplorerRowSpec {
   const { row, hue } = args;
   const netId = row.pick.kind === "metanode" && row.pick.meta ? row.pick.meta.id : "dag";
-  const ticker = metagraphById(netId)?.ticker ?? (netId === "dag" ? "DAG" : netId);
+  const ticker = tickerOf(netId);
+  const ip = "node" in row.pick ? (row.pick as { node?: { ip?: string | null } }).node?.ip : null;
+  const also = coLocatedNetworks(ip, netId, args.metaList);
   const id = row.id ?? row.label;
   const codes = layerCodesOf([row]);
   const status = nodeStatus(row.state);
   return {
     key: args.key,
-    glyph: <IdentityDot hue={hue} />,
+    glyph: (
+      <span className="min-w-0 truncate text-micro font-medium">
+        <span style={{ color: hue }}>{ticker}</span>
+        {also.map((m) => (
+          <span key={m.id} style={{ color: identityHudCss(m.id) }}> {tickerOf(m.id)}</span>
+        ))}
+      </span>
+    ),
     name: midHash(id, NODE_ID_GLYPHS),
     nameMono: true,
     tag: (
       <>
-        {ticker && <span>{ticker}</span>}
         {codes.length > 0 && <RoleChips codes={codes} tight />}
         <StateDot state={row.state} />
       </>
@@ -87,7 +109,7 @@ export function nodeRowSpec(args: {
     hue,
     // The hover names the row's facts in words; the id stays in its SHORT form (a full 128-glyph
     // id was "a very long text" — user, 2026-09-26). The whole id is the Node card's, one click on.
-    title: `${shortHash(id)}${ticker ? ` · ${ticker}` : ""}${codes.length ? ` · ${codes.join(" ")}` : ""} · ${status.label}`,
+    title: `${shortHash(id)} · ${[ticker, ...also.map((m) => tickerOf(m.id))].join(" + ")}${codes.length ? ` · ${codes.join(" ")}` : ""} · ${status.label}`,
     onClick: args.onClick,
     pair: args.pair,
   };
@@ -98,7 +120,6 @@ export function nodeRowSpec(args: {
 export function unknownNodeRowSpec(args: { key: string; id: string; label: string; title: string; hue: string }): ExplorerRowSpec {
   return {
     key: args.key,
-    glyph: <IdentityDot hue={args.hue} />,
     name: midHash(args.id, NODE_ID_GLYPHS),
     nameMono: true,
     tag: <span className="italic">{args.label}</span>,

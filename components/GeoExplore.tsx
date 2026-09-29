@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 
 import Explorer, { type ExplorerLevelSpec } from "@/components/explorer/Explorer";
-import { nodeRowSpec } from "@/components/explorer/nodeRow";
+import { NODE_GLYPH_W, nodeRowSpec } from "@/components/explorer/nodeRow";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import {
   COHORT_MEASURE_OPTIONS,
@@ -49,6 +49,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
   const inspect = useStore((s) => s.inspect);
   const filter = useStore((s) => s.filter);
   const geoMeasure = useStore((s) => s.geoMeasure);
+  const metaList = useStore((s) => s.metaList); // co-location reads the full catalog (nodeRowSpec)
   const setGeoMeasure = useStore((s) => s.setGeoMeasure);
   const setHoverNodeId = useStore((s) => s.setHoverNodeId);
   const setHoverCountry = useStore((s) => s.setHoverCountry);
@@ -228,6 +229,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
         title: `${openCohort.isp ?? "Unknown provider"} · ${openCohort.city ?? "Unlocated"}`,
       },
       meaning: "Each node in this cohort",
+      glyphW: NODE_GLYPH_W,
       measure: null,
       hasFigure: false,
       // The one node row (`explorer/nodeRow.tsx`), ticker included, as in every explorer.
@@ -236,6 +238,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
         const netId = r.pick.kind === "metanode" && r.pick.meta ? r.pick.meta.id : "dag";
         const hue = identityHudCss(netId);
         return nodeRowSpec({
+          metaList,
           key: (r.id ?? r.label) + i,
           row: r,
           hue,

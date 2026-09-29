@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import Explorer, { type ExplorerLevelSpec, type ExplorerRowSpec } from "@/components/explorer/Explorer";
-import { nodeRowSpec, unknownNodeRowSpec } from "@/components/explorer/nodeRow";
+import { NODE_GLYPH_W, nodeRowSpec, unknownNodeRowSpec } from "@/components/explorer/nodeRow";
 import TablePager from "@/components/datasection/TablePager";
 import { pageKeepingRow } from "@/components/explorer/fitRows";
 import useFitRows from "@/components/explorer/useFitRows";
@@ -176,6 +176,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const metaSnap = useStore((s) => s.metaSnap);
   const snapshotExact = useStore((s) => s.snapshotExact);
   const selNodes = useStore((s) => s.selNodes);
+  const metaList = useStore((s) => s.metaList); // co-location reads the full catalog (nodeRowSpec)
   const inspect = useStore((s) => s.inspect);
   // ONE PICK FOR EVERY LEVEL (user, 2026-09-29 — `src/data/explorerMeasure.ts`): the lower levels
   // show the tick level's `ledgerMeasure` where they can state it and their own first measure where
@@ -527,6 +528,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
       // the rows, because the constant count is most puzzling here (3 rows under a 20-node network).
       // The user's words (2026-09-26); the count is the rows, the layer is the tag beside each.
       meaning: "Validators that signed",
+      glyphW: NODE_GLYPH_W,
       measure: null,
       hasFigure: false,
       // The one node row (`explorer/nodeRow.tsx`), ticker included, as in every explorer.
@@ -543,6 +545,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         const on = nodeOn(row);
         const hue = identityHudCss(leaf.metaId);
         return nodeRowSpec({
+          metaList,
           key: sid,
           row,
           hue,
