@@ -8,6 +8,7 @@ import {
   TREND_METRICS,
   globalSeries,
   lastMeasured,
+  latestDay,
   metricSeries,
   metricUnit,
   rankByLast,
@@ -53,6 +54,10 @@ export interface TrendRosterRow {
   series: MetricSeries;
   /** The newest MEASURED value, which is not the newest bucket (`lastMeasured`). */
   last: number | null;
+  /** THE HEAD READING — the newest complete DAY (`latestDay`; user, 2026-09-29: "day should be the
+   *  standard always"). The card's headline, the Networks list's figure and the rank all read
+   *  it. Null while the daily tier is still in flight. */
+  day: number | null;
 }
 
 export interface TrendRosterView {
@@ -83,6 +88,9 @@ export interface TrendRosterView {
   pending: boolean;
   /** What the committed filter has done to the view (`src/data/trendScope.ts`). */
   scope: TrendScope;
+  /** The daily tier behind every row's `day` is still in flight (the charts are finer than a
+   *  day and it hasn't landed) — surfaces say "acquiring", never a finer reading or "no reading". */
+  dayPending: boolean;
 }
 
 const NO_SERIES: Readonly<Record<string, (number | null)[]>> = {};
@@ -109,6 +117,8 @@ export default function useTrendRoster(
   const gauge = spec.kind === "gauge";
   const src = gauge ? slice.pF : slice.p;
   const series = src?.series ?? NO_SERIES;
+  // The daily tier behind the head reading (`latestDay`); undefined where the chart is already daily.
+  const daily = slice.daily?.series;
   const rawAxis = gauge ? slice.fBuckets : slice.buckets;
   // THE GRAIN, from the one home that decides it (`stepFor`) — the band's timeline asks the very
   // same question, and a second copy of this ternary is how the band came to quantise at five
@@ -140,15 +150,21 @@ export default function useTrendRoster(
           gaps: s.gaps && cut(s.gaps),
         },
         last: lastMeasured(points),
+        day: latestDay(metric, id, daily, points, stepMs),
       });
     }
     return {
       rows,
-      order: rankByLast(ids, (id) => rows.get(id)!.series.points),
+      // Busiest by the DAY the list states; the window's own last reading only until the daily
+      // tier lands, so the order doesn't sit empty — it settles once, on arrival.
+      order: rankByLast(ids, (id) => {
+        const r = rows.get(id)!;
+        return [r.day ?? r.last];
+      }),
       buckets: cut(rawAxis),
       global: cut(globalSeries(metric, series)),
     };
-  }, [filter, metric, series, rawAxis, stepMs]);
+  }, [filter, metric, series, rawAxis, stepMs, daily]);
 
   // STABILISED BY CONTENT (the `trendIds` channel's rule, which the stack publishes from this
   // value): the rank is recomputed whenever the memo above is, and the engine's change signal is
@@ -167,6 +183,7 @@ export default function useTrendRoster(
   // invisible: the numbers are right, the frame rate is not. Every field below is either the
   // memoised pass, a stable slice reference, or derived from a primitive dep.
   const pending = gauge && slice.fleetPending;
+  const dayPending = stepMs < 86_400_000 && !slice.daily;
   const unit = metricUnit(metric, stepMs);
   const format = spec.format ?? PLAIN;
   // eslint-disable-next-line react-hooks/exhaustive-deps -- `format` is TREND_METRICS[metric]'s
@@ -181,8 +198,9 @@ export default function useTrendRoster(
       unit,
       format,
       pending,
+      dayPending,
       scope,
     }),
-    [ranked, pass, rawAxis, stepMs, unit, format, pending, scope],
+    [ranked, pass, rawAxis, stepMs, unit, format, pending, dayPending, scope],
   );
 }

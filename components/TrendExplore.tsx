@@ -10,6 +10,7 @@ import { METRIC_LABELS, METRIC_ORDER, metricUnit } from "@/src/data/trendSeries"
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore, type TrendMetric } from "@/src/store/store";
+import { NodeStars } from "@/components/state/StateAtoms";
 
 // HISTORY'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session 2026-09-26;
 // read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). The view breaks its
@@ -56,7 +57,10 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   const setTrendMetric = useStore((s) => s.setTrendMetric);
 
   const roster = useTrendRoster(useTrendsSlice(windowId, range), filter, metric);
-  const { ranked, rows, unit, format, stepMs } = roster;
+  // THE LIST STATES THE DAY (user, 2026-09-29: "day should be the standard always") — the same
+  // `day` the card's headline states, so a row and its card never disagree, in the day's unit.
+  const { ranked, rows, format, dayPending } = roster;
+  const unit = metricUnit(metric, 86_400_000);
   const empty = scopeEmptyCopy(roster.scope, "view");
 
   // THE WHOLE ROSTER, NO PAGER (user, 2026-09-28, two rounds). The card paged for nine days — first
@@ -76,13 +80,13 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
 
   // The bar: each network's last reading as a share of the busiest — the ranking the stack's depth
   // already carries, made visible in the list.
-  const maxLast = Math.max(1e-9, ...ranked.map((id) => rows.get(id)?.last ?? 0));
+  const maxLast = Math.max(1e-9, ...ranked.map((id) => rows.get(id)?.day ?? 0));
 
   const level: ExplorerLevelSpec = {
     key: "networks",
     crumb: { label: "Networks" },
     measure: {
-      options: METRIC_ORDER.map((m) => ({ id: m, label: METRIC_LABELS[m], unit: metricUnit(m, stepMs) })),
+      options: METRIC_ORDER.map((m) => ({ id: m, label: METRIC_LABELS[m], unit: metricUnit(m, 86_400_000) })),
       value: metric,
       onPick: (id) => setTrendMetric(id as TrendMetric),
     },
@@ -105,11 +109,12 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
               key: id,
               glyph: <IdentityDot hue={row.hue} />,
               name: row.name,
-              share: row.last != null ? row.last / maxLast : undefined,
+              share: row.day != null ? row.day / maxLast : undefined,
               hue: row.hue,
-              figure: row.last != null ? format(row.last) : <span className="text-muted-foreground">{NO_READING}</span>,
+              figure:
+                row.day != null ? format(row.day) : dayPending ? <NodeStars count={3} /> : <span className="text-muted-foreground">{NO_READING}</span>,
               on,
-              title: `${row.name} · ${row.last != null ? `${format(row.last)}${unit ? ` ${unit}` : ""}` : NO_READING}`,
+              title: `${row.name} · ${row.day != null ? `${format(row.day)}${unit ? ` ${unit}` : ""} · latest full day` : NO_READING}`,
               onClick: () => applyClickActions(trendPlaneActions(id, focus)),
               pair: subjectPairing(hoverFilter, id, setHover, row.hue),
             },

@@ -352,9 +352,13 @@ const HOUR_MS = 3_600_000;
  *  conditionally and no other view should pay for this fetch. */
 export function planTrendFetch(zoom: ZoomId | null, range: TrendRange | null): TrendFetchPlan {
   if (!zoom) return { main: NO_LEG, fleet: NO_LEG, daily: null, tier: null };
-  const daily: TrendApiWindow | null = zoom === "7d" || zoom === "30d" ? "90d" : null;
+  // THE DAILY LEG rides wherever the charts' own grain is finer than a day (user, 2026-09-29:
+  // "day should be the standard always" for the head readout) — every zoom but 1Y/ALL, and any
+  // range whose tier is finer than daily. Where the chart IS daily its own last point is the day.
+  const dailyZoom: TrendApiWindow | null = zoom === "1y" || zoom === "all" ? null : "90d";
   if (range) {
     const tier = pickRangeTier(range.fromMs, range.toMs);
+    const daily: TrendApiWindow | null = tier === "1d" ? null : "90d";
     const cut: TrendCut = { kind: "range", fromMs: range.fromMs, toMs: range.toMs };
     return {
       main:
@@ -379,7 +383,7 @@ export function planTrendFetch(zoom: ZoomId | null, range: TrendRange | null): T
       zoom === "1h" || zoom === "24h"
         ? { window: "7d", tiles: null, cut: { kind: "slice", ms: zoom === "1h" ? HOUR_MS : 24 * HOUR_MS } }
         : NO_LEG,
-    daily,
+    daily: dailyZoom,
     tier: null,
   };
 }

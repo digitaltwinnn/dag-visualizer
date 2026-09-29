@@ -288,10 +288,12 @@ describe("planTrendFetch", () => {
     }
   });
 
-  it("the DAILY readout payload is the 90d window, and only at the two hourly zooms", () => {
-    expect(planTrendFetch("7d", null).daily).toBe("90d");
-    expect(planTrendFetch("30d", null).daily).toBe("90d");
-    for (const z of ["1h", "24h", "1y", "all"] as const) expect(planTrendFetch(z, null).daily).toBe(null);
+  // "LATEST FULL DAY" IS THE ONE READOUT (user, 2026-09-29: "a latest 5 min is less easy to
+  // understand than a last day … day should be the standard always"). So the daily tier rides
+  // along wherever the charts' own grain is finer than a day; at 1Y/ALL the chart IS daily.
+  it("the DAILY readout payload is the 90d window wherever the charts are finer than a day", () => {
+    for (const z of ["1h", "24h", "7d", "30d"] as const) expect(planTrendFetch(z, null).daily).toBe("90d");
+    for (const z of ["1y", "all"] as const) expect(planTrendFetch(z, null).daily).toBe(null);
   });
 
   it("a DAILY-tier range rides the one `all` payload, cut to the range", () => {
@@ -324,9 +326,13 @@ describe("planTrendFetch", () => {
     expect(plan.fleet).toEqual({ window: null, tiles: null, cut: { kind: "none" } });
   });
 
-  it("a range does NOT retire the zoom's daily-readout leg — the readout answers the zoom", () => {
-    const plan = planTrendFetch("7d", { fromMs: Date.UTC(2026, 7, 1), toMs: Date.UTC(2026, 7, 20) });
-    expect(plan.daily).toBe("90d");
+  it("a range carries the daily leg exactly when ITS tier is finer than a day", () => {
+    const short = planTrendFetch("all", { fromMs: Date.UTC(2026, 7, 1), toMs: Date.UTC(2026, 7, 1, 6) });
+    expect(short.tier).not.toBe("1d");
+    expect(short.daily).toBe("90d");
+    const long = planTrendFetch("7d", { fromMs: Date.UTC(2025, 7, 1), toMs: Date.UTC(2026, 7, 20) });
+    expect(long.tier).toBe("1d");
+    expect(long.daily).toBe(null);
   });
 
   it("a null zoom fetches NOTHING — the consumer is not showing charts", () => {

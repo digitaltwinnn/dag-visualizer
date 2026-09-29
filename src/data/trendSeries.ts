@@ -209,6 +209,24 @@ export function lastMeasured(points: readonly (number | null)[]): number | null 
 /** BUSIEST FIRST, by each id's last measured value; nothing measured sorts last, and ties keep
  *  the order they came in. The vitals band's catalog-order rule guards LIVE charts that would
  *  reshuffle under the reader — a ranking laid out once per reading can be honest instead. */
+/** THE HEAD READING: a plane's newest complete DAY (user, 2026-09-29: "a latest 5 min is less
+ *  easy to understand than a last day … day should be the standard always"). Read through the SAME
+ *  `metricSeries` / `globalSeries` the plane is drawn from, so a counter, a gauge and continuity
+ *  all answer — over the DAILY tier (`TrendSlice.daily`, still-filling day already trimmed) where
+ *  the charts are finer than a day, or the chart's own last point where it already is daily.
+ *  Null while the daily tier is in flight: a finer bucket is never passed off as a day. */
+export function latestDay(
+  metric: TrendMetric,
+  id: string,
+  daily: Readonly<Record<string, (number | null)[]>> | undefined,
+  chartPoints: readonly (number | null)[],
+  stepMs: number,
+): number | null {
+  if (stepMs >= 86_400_000) return lastMeasured(chartPoints);
+  if (!daily) return null;
+  return lastMeasured(id === "dag" ? globalSeries(metric, daily) : metricSeries(metric, id, daily).points);
+}
+
 export function rankByLast(
   ids: readonly string[],
   seriesOf: (id: string) => readonly (number | null)[],

@@ -11,6 +11,7 @@ import {
   formatDag as dag,
   formatMb as mb,
   formatSeconds as secs,
+  lastMeasured,
   metricSeries,
   metricUnit,
   perPhrase,
@@ -224,14 +225,21 @@ export default function TrendsDoc() {
   const bucketWord = tierWord(stepMs, "attributive");
   /** The daily tier's newest COMPLETE day for a counter series (yesterday — today still
    *  fills), scaled like the chart it captions; undefined off the hourly zooms. */
-  const dayReadout = (name: string, k = 1): { value: number; word: string } | undefined => {
-    if (!daily) return undefined;
-    const series = daily.series[name];
-    for (let i = (series?.length ?? 0) - 1; i >= 0; i--) {
-      if (series![i] != null) return { value: series![i]! * k, word: "latest full day" };
-    }
-    return undefined;
+  // ⚠️ "LATEST FULL DAY" IS THE ONE HEAD READING (user, 2026-09-29: "a latest 5 min is less easy
+  // to understand than a last day … day should be the standard always"). Every single-line chart
+  // finer than a day takes its headline from the DAILY tier through the same read that draws it
+  // (`fromDaily`) — counters, gauges and continuity alike; a chart that is already daily states its
+  // own last point, which IS the day. Null while the daily tier is in flight (acquiring).
+  const dayRead = (
+    fromDaily: (s: Readonly<Record<string, (number | null)[]>>) => readonly (number | null)[],
+    chartStep: number,
+    k = 1,
+  ): { value: number | null; word: string } | undefined => {
+    if (chartStep >= 86400000) return undefined;
+    const v = daily ? lastMeasured(fromDaily(daily.series)) : null;
+    return { value: v == null ? null : v * k, word: "latest full day" };
   };
+  const dayReadout = (name: string, k = 1) => dayRead((s) => s[name] ?? [], stepMs, k);
   /** The Metagraphs tab's panel list: one chart per catalog network for one stored metric,
    *  ranked by the LAST measured day, busiest first (per-section — each ranking is its own
    *  reading). The vitals' catalog-order rule guards live charts that reshuffle under the
@@ -289,7 +297,7 @@ export default function TrendsDoc() {
           { label: "nodes", points, hue: net?.hue },
           ...present.map((r) => ({ label: SHORT[r]!, points: S(pF, `f.layer.${m.id}.${r}`), hue: net?.hue, dash: DASH[r] || true })),
         ];
-        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={metricUnit("nodes", fStep)} buckets={fBuckets} stepMs={fStep} lines={lines} />;
+        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={metricUnit("nodes", fStep)} readout={dayRead((d) => metricSeries("nodes", m.id!, d).points, fStep)} buckets={fBuckets} stepMs={fStep} lines={lines} />;
       });
   };
   /** Per-network CONTINUITY panels: real measured gap stats (m.{id}.gapSum/gapMax — live
@@ -311,7 +319,7 @@ export default function TrendsDoc() {
         // `sampled` = the chain's own snaps series: amber only where the SAMPLER missed;
         // a null point over a sampled bucket (a quiet stretch — nothing to space) just
         // breaks the line (user, 2026-09-09: DOR's quiet buckets wore outage amber).
-        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={metricUnit("continuity", stepMs)} buckets={cBuckets} stepMs={stepMs} format={TREND_METRICS.continuity.format} sampled={trim(s.sampled!)} gaps={trim(s.gaps!)} lines={[line]} />;
+        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={metricUnit("continuity", stepMs)} readout={dayRead((d) => metricSeries("continuity", m.id!, d).points, stepMs)} buckets={cBuckets} stepMs={stepMs} format={TREND_METRICS.continuity.format} sampled={trim(s.sampled!)} gaps={trim(s.gaps!)} lines={[line]} />;
       });
   };
 
@@ -522,8 +530,8 @@ export default function TrendsDoc() {
             title="Global snapshot continuity"
             lead="How regularly the global snapshots were produced, and how long the pauses were. Gray marks a pause that is normal for this network; amber marks one unusually long by its own history; a striped area means this app was not watching at the time."
           >
-            <TrendChart onRange={onRange} inspect={inspectHere} name="Mean gap" unit="seconds" buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} gaps={trim(S(p, "g.gapMax"))} lines={[{ label: "mean", points: trim(meanGap(p)) }]} />
-            <TrendChart onRange={onRange} inspect={inspectHere} name="Longest pause" unit={`seconds · the ${stepMs >= 86400000 ? "day" : "bucket"}'s single widest gap`} buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} gaps={trim(S(p, "g.gapMax"))} lines={[{ label: "max", points: trim(S(p, "g.gapMax")) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Mean gap" unit="seconds" readout={dayRead((d) => meanGap({ series: d } as unknown as TrendsPayload), stepMs)} buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} gaps={trim(S(p, "g.gapMax"))} lines={[{ label: "mean", points: trim(meanGap(p)) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Longest pause" unit={`seconds · the ${stepMs >= 86400000 ? "day" : "bucket"}'s single widest gap`} readout={dayRead((d) => d["g.gapMax"] ?? [], stepMs)} buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} gaps={trim(S(p, "g.gapMax"))} lines={[{ label: "max", points: trim(S(p, "g.gapMax")) }]} />
           </Section>
           )}
           {sectionTab === "economics" && (<>
@@ -554,7 +562,7 @@ export default function TrendsDoc() {
               <p className="text-label text-muted-foreground">reading the hourly samples…</p>
             ) : (
               <>
-                <TrendChart onRange={onRange} inspect={inspectHere} name="Nodes" unit="total" buckets={fBuckets} stepMs={fStep} lines={[{ label: "nodes", points: S(pF, "f.nodes") }]} />
+                <TrendChart onRange={onRange} inspect={inspectHere} name="Nodes" unit="total" readout={dayRead((d) => d["f.nodes"] ?? [], fStep)} buckets={fBuckets} stepMs={fStep} lines={[{ label: "nodes", points: S(pF, "f.nodes") }]} />
                 <TrendChart
                   onRange={onRange}
                   inspect={inspectHere}

@@ -7,6 +7,7 @@ import {
   formatMb,
   formatSeconds,
   lastMeasured,
+  latestDay,
   metricSeries,
   metricUnit,
   perPhrase,
@@ -549,5 +550,23 @@ describe("holdOrder — the stack keeps its order while its plots change", () =>
     holdOrder(held, ranked);
     expect(held).toEqual(["a", "b"]);
     expect(ranked).toEqual(["b", "c"]);
+  });
+});
+
+// THE ONE HEADLINE READING (user, 2026-09-29: "day should be the standard always"): the newest
+// complete DAY of a plane's own series — through the same `metricSeries` / `globalSeries` read
+// that draws it, so counters, gauges and continuity all have one.
+describe("latestDay", () => {
+  const DAY = 86_400_000;
+  const daily = { "m.dor.snaps": [10, 20, null], "g.anchors": [3, 4, null] } as Record<string, (number | null)[]>;
+  it("reads the daily tier when the charts are finer than a day", () => {
+    expect(latestDay("snapshots", "dor", daily, [1, 2, 3], 300_000)).toBe(20);
+    expect(latestDay("snapshots", "dag", daily, [1, 2, 3], 300_000)).toBe(4); // the hypergraph plane reads the global row
+  });
+  it("is the chart's own last point when the chart already IS daily", () => {
+    expect(latestDay("snapshots", "dor", undefined, [4, 5, null], DAY)).toBe(5);
+  });
+  it("is null — never a finer bucket passed off as a day — while the daily tier is still in flight", () => {
+    expect(latestDay("snapshots", "dor", undefined, [1, 2, 3], 300_000)).toBeNull();
   });
 });

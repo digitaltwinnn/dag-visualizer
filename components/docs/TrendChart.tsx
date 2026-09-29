@@ -3,6 +3,7 @@ import { memo, useId, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { Area, CartesianGrid, ComposedChart, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { cn } from "@/lib/utils";
+import { NodeStars } from "@/components/state/StateAtoms";
 import { bucketAt, cursorFraction } from "@/src/data/trendWindow";
 
 // THE TRENDS DOC'S ONE CHART PRIMITIVE — a small-multiple line chart over the /api/trends
@@ -143,7 +144,7 @@ export default function TrendChart({
    *  page hands the DAILY tier's own newest complete day, so no client re-summing invents a
    *  floor rule. Gauges and continuity keep their bucket readout: a gauge's day is not a sum,
    *  and a day-mean of gaps needs the weighting the store already did per bucket. */
-  readout?: { value: number; word: string };
+  readout?: { value: number | null; word: string };
   /** THE SHARED TIME CURSOR (2026-09-18) — `store.trendCursorMs`, one instant every plane of the
    *  3D trend stack marks at once, so a reader comparing five chains is looking at the same
    *  moment on all of them. Drawn as a vertical rule at the bucket that CONTAINS the instant
@@ -365,7 +366,12 @@ export default function TrendChart({
             className="ml-auto inline-flex items-baseline gap-1 whitespace-nowrap"
             title={readout ? "The newest complete measured day, from the daily tier" : `The newest complete measured ${stepMs >= 86400000 ? "day" : stepMs >= 3600000 ? "hour" : "five-minute bucket"} (${stampOf(buckets[lastIdx], stepMs)})`}
           >
-            <span className="text-label text-foreground-dim tabular-nums">{format(readout ? readout.value : last)}</span>
+            {/* A null readout value is ACQUIRING — the daily tier behind "latest full day" is still in
+                flight — so the slot holds its place (NodeStars) rather than show a finer bucket
+                under the day's word, or a number that isn't the day's. */}
+            <span className="text-label text-foreground-dim tabular-nums">
+              {readout ? (readout.value != null ? format(readout.value) : <NodeStars count={3} />) : format(last)}
+            </span>
             <span className="text-micro text-muted-foreground">
               · {readout ? readout.word : `latest full ${stepMs >= 86400000 ? "day" : stepMs >= 3600000 ? "hour" : "5 min"}`}
             </span>

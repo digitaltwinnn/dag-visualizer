@@ -453,6 +453,10 @@ export default function TrendStack() {
                 // THE CARD NAMES ITS MEASURE, not just its unit — it can be stepped from right here,
                 // so the card has to say what it turned into.
                 unit={caption}
+                // THE HEADLINE IS THE DAY (user, 2026-09-29: "day should be the standard always") —
+                // the roster's `day`, read from the daily tier through this plane's own series.
+                // Where the plane is already daily its own last point IS the day, so no readout.
+                readout={step < 86_400_000 ? { value: row.day, word: "latest full day" } : undefined}
                 format={roster.format}
                 note={pending ? "reading the hourly samples…" : undefined}
                 buckets={axis}
