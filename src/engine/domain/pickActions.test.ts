@@ -172,6 +172,13 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
       { kind: "inspect", pick: null },
     ]);
   });
+  it("nodeSelectActions: commitNetwork false never moves the filter, even where the view's policy would", () => {
+    const hyper = nodeSelectActions(nodePick(), { mode: "hyper", currentFilter: "all" });
+    expect(hyper.some((a) => a.kind === "filter")).toBe(true);
+    const raw = nodeSelectActions(nodePick(), { mode: "hyper", currentFilter: "all", commitNetwork: false });
+    expect(raw.some((a) => a.kind === "filter")).toBe(false);
+    expect(raw[raw.length - 1]).toEqual({ kind: "inspect", pick: nodePick() });
+  });
   it("nodeSelectActions: a row select == a scene node click (same ordered actions)", () => {
     const p = nodePick("DE");
     const row = nodeSelectActions(p, { mode: "geo", currentFilter: "all" });

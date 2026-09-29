@@ -142,13 +142,18 @@ export function nodeSelectActions(
      *  group, or the one the Engine derives for a scene click). The caller resolves it, because
      *  the group vocabulary lives in the data layer. */
     compositionSel?: CompositionSel | null;
+    /** A surface that never moves the filter (the RAW node table — user, 2026-09-29: "clicking a
+     *  row on the hyper page sets the filter, that should not happen") passes `false`: the record
+     *  microscope inspects the node it lists, and the top bar stays the one place to commit a
+     *  network. Absent = the view's own policy. */
+    commitNetwork?: boolean;
   },
 ): ClickAction[] {
   if (opts.deselect) return [{ kind: "inspect", pick: null }];
   const acts: ClickAction[] = [];
   const netId = pickNetId(p);
   // Only a view whose row opts in drills the filter first (see the header).
-  if (netId && netId !== opts.currentFilter && VIEW_POLICIES[opts.mode].nodeCommitsNetwork) acts.push({ kind: "filter", id: netId });
+  if (netId && netId !== opts.currentFilter && (opts.commitNetwork ?? VIEW_POLICIES[opts.mode].nodeCommitsNetwork)) acts.push({ kind: "filter", id: netId });
   acts.push(...nodeAncestryActions(p, opts));
   acts.push({ kind: "inspect", pick: p });
   return acts;

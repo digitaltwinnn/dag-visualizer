@@ -20,8 +20,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 // The hyper/geo data table (spec 2026-08-01): the NODE ROSTER — a flat, sortable, denser
 // projection of the same `selNodes` the explorers browse (complementary, not a replacement).
 // Column order is the view's lens: geo leads with location, hyper with network/architecture.
-// A row click = the explorer row click (nodeSelectActions: filter→ancestry→inspect; re-click
-// deselects); it commits silently — flip the RAW switch back to see the card/camera. Row hover
+// A row click commits the NODE (nodeSelectActions: ancestry→inspect; re-click deselects) and
+// NEVER the filter, in any view (user, 2026-09-29) — the top bar is where a network is committed;
+// it commits silently — flip the RAW switch back to see the card/camera. Row hover
 // glows the node's 3D shells (hoverNodeId, outward-only — the cohort-row convention).
 // ⚠️ PHONE STANDS COLUMNS DOWN, BY THE ANCHOR LOG'S OWN RULE (2026-09-02; the log's COLUMNS
 // note has the full argument): measured, this table ran 1017px inside a 390px viewport — three
@@ -180,7 +181,7 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
             const hit = inspected == null ? undefined : r.recs.find((x) => hoverKeyOf(x.pick) === inspected);
             const selected = hit != null;
             const commit = () =>
-              applyClickActions(nodeSelectActions((hit ?? r.node).pick, { mode, currentFilter: filter, deselect: selected }));
+              applyClickActions(nodeSelectActions((hit ?? r.node).pick, { mode, currentFilter: filter, deselect: selected, commitNetwork: false }));
             return (
               <TableRow
                 key={r.key}
