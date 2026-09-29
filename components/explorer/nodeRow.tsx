@@ -60,7 +60,8 @@ export function StateDot({ state }: { state?: string | null }) {
  *  ("USDC.dag") at the tag size; anything longer truncates. */
 export const NODE_GLYPH_W = 56;
 
-const tickerOf = (id: string): string => metagraphById(id)?.ticker ?? (id === "dag" ? "DAG" : id);
+/** A network's ticker — the DAG core's is "DAG". Shared with the raw node roster. */
+export const tickerOf = (id: string): string => metagraphById(id)?.ticker ?? (id === "dag" ? "DAG" : id);
 
 /** One length for every node id, in every explorer. */
 // Twelve (was 14 until the ticker moved into its own first column, 2026-09-29): beside that column
