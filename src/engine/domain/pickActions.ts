@@ -17,6 +17,7 @@ import type { Mode } from "@/src/store/store";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
 import type { CohortSel, CompositionSel } from "./focusLadder";
 import { UNLISTED_KEY } from "./ledgerBands";
+import { VIEW_POLICIES } from "./viewPolicy";
 
 export type ClickAction =
   | { kind: "filter"; id: string }                                             // commit the network filter
@@ -120,10 +121,12 @@ export function compositionToggleActions(
 // Germany used to empty the globe and the country list down to that machine's network, which
 // is the opposite of the browsing the click was part of. So in geo the ancestry is country →
 // cohort → node and the network is never committed by a node — the top-bar filter and the
-// hub-less scene keep it a deliberate, separate gesture. Hyper keeps filter-first (a node is a
-// bead on its hub's shell; the filter is what dims the other hubs and frames the network, and
-// the node rung inherits that framing), and so does the ledger's NODE (a tray node belongs to
-// the chamber's lens; its SNAPSHOT rows do not — `metaSnapSelectActions`). Full-ancestry rule
+// hub-less scene keep it a deliberate, separate gesture. NOR IN THE LEDGER (user, 2026-09-29: the
+// explorer's signer row set the filter): the committed network is the chamber's LENS, and no
+// other row of that explorer moves it (`metaSnapSelectActions`, decision 13). Only hyper keeps
+// filter-first (a node is a bead on its hub's shell; the filter is what dims the other hubs and
+// frames the network, and the node rung inherits that framing) — `viewPolicy.nodeCommitsNetwork`
+// is the allow-list. Full-ancestry rule
 // (spec Part 3): committing every
 // rung above the node means a deselect steps back down the SAME ladder regardless of how the
 // node was reached (scene click, explorer row, or a jump straight from "all"). `deselect` is
@@ -144,8 +147,8 @@ export function nodeSelectActions(
   if (opts.deselect) return [{ kind: "inspect", pick: null }];
   const acts: ClickAction[] = [];
   const netId = pickNetId(p);
-  // Geo never commits the network from a node (see the header); every other view drills first.
-  if (netId && netId !== opts.currentFilter && opts.mode !== "geo") acts.push({ kind: "filter", id: netId });
+  // Only a view whose row opts in drills the filter first (see the header).
+  if (netId && netId !== opts.currentFilter && VIEW_POLICIES[opts.mode].nodeCommitsNetwork) acts.push({ kind: "filter", id: netId });
   acts.push(...nodeAncestryActions(p, opts));
   acts.push({ kind: "inspect", pick: p });
   return acts;

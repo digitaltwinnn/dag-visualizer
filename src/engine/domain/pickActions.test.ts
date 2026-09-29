@@ -112,12 +112,11 @@ describe("clickActions — node clicks (the ordering contracts)", () => {
       "inspect",
     ]);
   });
-  it("LEDGER: filter + inspect — no floor ancestry (layers retired 2026-08-06), no geo drills", () => {
+  it("LEDGER: inspect only — NO filter (user, 2026-09-29: the explorer's signer row set it), no floor ancestry, no geo drills", () => {
     const p = nodePick("DE");
-    expect(kinds(clickActions({ mode: "ledger", pick: p, countryCc: null, current: state() }))).toEqual([
-      "filter",
-      "inspect",
-    ]);
+    expect(kinds(clickActions({ mode: "ledger", pick: p, countryCc: null, current: state() }))).toEqual(["inspect"]);
+    // …whatever the committed filter: a node never moves it here, as in geo.
+    expect(kinds(clickActions({ mode: "ledger", pick: p, countryCc: null, current: state({ filter: "ded" }) }))).toEqual(["inspect"]);
   });
 });
 
@@ -402,7 +401,7 @@ describe("nodeSelectActions ancestry (spec Part 3 — full-ancestry rule)", () =
     const acts = nodeSelectActions(p, { mode: "geo", currentFilter: "dag" });
     expect(acts.find((a) => a.kind === "cohort")).toEqual({ kind: "cohort", sel: { cc: "FI", city: null, isp: null } });
   });
-  it("ledger: no layer ancestry (retired 2026-08-06) — filter (if changed) then inspect", () => {
+  it("ledger: no layer ancestry (retired 2026-08-06) and no filter — inspect only", () => {
     const acts = nodeSelectActions(geoPick, { mode: "ledger", currentFilter: "dor" });
     expect(acts.map((a) => a.kind)).toEqual(["inspect"]);
   });
