@@ -12,6 +12,10 @@ export interface FleetCounts {
   perNet: Record<string, number>;
   /** Per-network per-layer role tallies — f.layer.{id}.{role} (2026-09-11). */
   perNetLayers?: Record<string, Record<string, number>>;
+  /** Per-network node TYPE counts — f.type.{id}.{key} (2026-09-29; key = `roleKey`). Unlike the
+   *  role tallies above these PARTITION the network's nodes (each node has one type), so they sum
+   *  to f.nodes.{id} and can be stacked. */
+  perNetTypes?: Record<string, Record<string, number>>;
   layers: Record<string, number>;
   countries: Record<string, number>;
 }
@@ -106,5 +110,7 @@ export function bucketFleet(inc: IncMap, net: string, tsMs: number, fleet: Fleet
   for (const [layer, n] of Object.entries(fleet.layers)) addInc(inc, net, tsMs, `f.layer.${layer}`, n, tiers);
   for (const [id, roles] of Object.entries(fleet.perNetLayers ?? {}))
     for (const [layer, n] of Object.entries(roles)) addInc(inc, net, tsMs, `f.layer.${id}.${layer}`, n, tiers);
+  for (const [id, types] of Object.entries(fleet.perNetTypes ?? {}))
+    for (const [key, n] of Object.entries(types)) addInc(inc, net, tsMs, `f.type.${id}.${key}`, n, tiers);
   for (const [cc, n] of Object.entries(fleet.countries)) addInc(inc, net, tsMs, `f.cc.${cc}`, n, ["1d"]);
 }

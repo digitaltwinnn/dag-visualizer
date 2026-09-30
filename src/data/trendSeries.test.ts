@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { headWord, spanAverage, spanWord,
+import { headWord, spanAverage, spanWord, typeBands,
   GLOBAL_METRIC_ROWS,
   TREND_METRICS,
   globalSeries,
@@ -599,5 +599,28 @@ describe("headWord", () => {
     expect(headWord("snapshots", "day")).toBe("latest full day");
     expect(headWord("snapshots", "span")).toBe("avg per day");
     expect(headWord("nodes", "span")).toBe("average");
+  });
+});
+
+describe("typeBands", () => {
+  const series = {
+    "f.type.dor.dl1": [null, 15, 14, null],
+    "f.type.dor.l0+cl1+dl1": [null, 3, null, null],
+    "f.type.ded.dl1": [9, 9, 9, 9],
+    "f.nodes.dor": [18, 18, 17, 17],
+  };
+  it("a network's types, richest make-up first, in the composition vocabulary", () => {
+    const b = typeBands("dor", series);
+    expect(b.map((x) => x.key)).toEqual(["l0+cl1+dl1", "dl1"]);
+    expect(b[0]).toMatchObject({ label: "Hybrid", codes: ["L0", "cL1", "dL1"] });
+    expect(b[1]).toMatchObject({ label: "Data", codes: ["dL1"] });
+  });
+  it("a missing type in a RECORDED bucket is 0; an unrecorded bucket is null in every band", () => {
+    const [hyb, data] = typeBands("dor", series);
+    expect(hyb!.points).toEqual([null, 3, 0, null]);
+    expect(data!.points).toEqual([null, 15, 14, null]);
+  });
+  it("no type history at all is no bands, never a fabricated split", () => {
+    expect(typeBands("up", series)).toEqual([]);
   });
 });

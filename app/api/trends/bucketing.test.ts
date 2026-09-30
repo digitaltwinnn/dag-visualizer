@@ -175,6 +175,28 @@ describe("bucketFleet per-network layers", () => {
   });
 });
 
+// Per-network node TYPES (2026-09-29): the partition the History node stack draws — each node
+// counted once under its exact make-up, so the types sum to the network's total.
+describe("bucketFleet per-network types", () => {
+  it("writes f.type.{id}.{key} as hourly and daily gauges, and the types sum to the total", () => {
+    const inc: IncMap = new Map();
+    const t = Date.parse("2026-09-29T10:00:00Z");
+    bucketFleet(inc, "mainnet", t, {
+      total: 18, perNet: { dor: 18 }, layers: {},
+      perNetTypes: { dor: { "l0+cl1+dl1": 3, dl1: 15 } }, countries: {},
+    });
+    for (const tier of ["1h", "1d"] as const) {
+      const k = slotOf("mainnet", tier, t);
+      const h = inc.get(k.key)!;
+      expect(h.get(fieldOf(k.bucket, "f.type.dor.l0+cl1+dl1"))).toBe(3);
+      expect(h.get(fieldOf(k.bucket, "f.type.dor.dl1"))).toBe(15);
+      expect(h.get(fieldOf(k.bucket, "f.type.dor.l0+cl1+dl1"))! + h.get(fieldOf(k.bucket, "f.type.dor.dl1"))!).toBe(h.get(fieldOf(k.bucket, "f.nodes.dor")));
+    }
+    const fine = slotOf("mainnet", "5m", t);
+    expect(inc.get(fine.key)?.get(fieldOf(fine.bucket, "f.type.dor.dl1"))).toBeUndefined();
+  });
+});
+
 // Per-network blocks (2026-09-11): a token transfer rides in a block, so each network's
 // sealed-block count is stored beside its snaps/fee/kb.
 describe("bucketMetas blocks", () => {

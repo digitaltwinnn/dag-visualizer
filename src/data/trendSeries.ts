@@ -1,4 +1,5 @@
 import { bucketAt } from "@/src/data/trendWindow";
+import { roleKeyLabel } from "@/src/data/composition";
 import type { TrendMetric } from "@/src/store/store";
 
 // THE PER-NETWORK SERIES MATHS — one home (2026-09-18, the 3D trends view). What a per-network
@@ -522,4 +523,45 @@ export function instantNote(place: InstantPlace, stepMs: number): string | null 
   return place === "edge-newest"
     ? `The newest ${n} ${is} still filling, so no chart draws ${it} yet.`
     : `The oldest ${n} here ${is} only partly measured, so no chart draws ${it}.`;
+}
+
+/** One node TYPE's band in a network's stacked node chart. */
+export interface TypeBand {
+  /** The stored key (`roleKey`) — stable, so the band keeps its colour step as counts move. */
+  key: string;
+  /** The composition vocabulary's words for it ("Hybrid", ["L0", "cL1"]). */
+  label: string;
+  codes: string[];
+  points: (number | null)[];
+}
+
+/** THE NODE-TYPE STACK for one network (2026-09-29 — user: "if nodes and L0, cL1 etc don't add
+ *  up, what is the best way to present it?"). The role tallies overlap (a hybrid counts once for
+ *  every layer it runs); TYPES partition the nodes, so these bands sum to the network's total.
+ *
+ *  HONESTY (rule 10): the sampler writes only the types PRESENT, so within a bucket that recorded
+ *  ANY type for this network, a missing type is a measured 0 — and a bucket that recorded none
+ *  (every hour before the type sampler existed, or an unsampled hour) is null in every band, so
+ *  the stack leaves a gap there rather than inventing a split. Ordered richest make-up first (most
+ *  layers), then by the vocabulary, so a hybrid sits at the stack's base in every chart. */
+export function typeBands(id: string, series: Readonly<Record<string, (number | null)[]>>): TypeBand[] {
+  const prefix = `f.type.${id}.`;
+  const keys = Object.keys(series)
+    .filter((k) => k.startsWith(prefix))
+    .map((k) => k.slice(prefix.length));
+  if (!keys.length) return [];
+  const order = ["l0", "cl1", "dl1"];
+  const rank = (k: string) => (k === "none" ? [99, 99] : [-k.split("+").length, order.indexOf(k.split("+")[0]!)]);
+  keys.sort((a, b) => {
+    const [a0, a1] = rank(a);
+    const [b0, b1] = rank(b);
+    return a0! - b0! || a1! - b1! || a.localeCompare(b);
+  });
+  const cols = keys.map((k) => series[prefix + k]!);
+  const n = Math.max(...cols.map((c) => c.length));
+  const recorded = Array.from({ length: n }, (_, i) => cols.some((c) => c[i] != null));
+  return keys.map((key, j) => {
+    const { label, codes } = roleKeyLabel(key);
+    return { key, label, codes, points: recorded.map((r, i) => (r ? (cols[j]![i] ?? 0) : null)) };
+  });
 }

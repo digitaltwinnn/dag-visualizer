@@ -14,6 +14,7 @@ import {
   formatSeconds as secs,
   lastMeasured,
   metricSeries,
+  typeBands,
   metricUnit,
   perPhrase,
   rankByLast,
@@ -303,11 +304,21 @@ export default function TrendsDoc() {
         const net = displayNetwork(m.id);
         const roster = metaList.find((x) => x.id === m.id);
         const present = ["l0", "cl1", "dl1"].filter((r) => roster?.nodes.some((n) => (n.roles?.length ? n.roles : [n.layer]).includes(r)));
-        const lines: TrendLine[] = [
-          { label: "nodes", points, hue: net?.hue },
-          ...present.map((r) => ({ label: SHORT[r]!, points: S(pF, `f.layer.${m.id}.${r}`), hue: net?.hue, dash: DASH[r] || true })),
-        ];
-        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={metricUnit("nodes", fStep)} readout={totalRead(dayRead((d) => metricSeries("nodes", m.id!, d).points, fStep), points)} buckets={fBuckets} stepMs={fStep} lines={lines} />;
+        // THE NODE-TYPE STACK (user, 2026-09-29: "if nodes and L0, cL1 etc don't add up, what is
+        // the best way to present it?"). The layer lines OVERLAP — a hybrid counts once for every
+        // layer it runs — so they could never be the total's parts. Node TYPES partition it (each
+        // node once, under its exact make-up), so they stack under the total line and sum to it.
+        // Types are sampled from 2026-09-29 on (`f.type.{id}.{key}`); a window with none recorded
+        // keeps the layer lines, and the stack leaves every unrecorded hour open (`typeBands`).
+        const bands = typeBands(m.id!, pF?.series ?? {});
+        const lines: TrendLine[] = bands.length
+          ? [{ label: "nodes", points, hue: net?.hue }]
+          : [
+              { label: "nodes", points, hue: net?.hue },
+              ...present.map((r) => ({ label: SHORT[r]!, points: S(pF, `f.layer.${m.id}.${r}`), hue: net?.hue, dash: DASH[r] || true })),
+            ];
+        const stack = bands.map((b) => ({ label: [b.label, ...b.codes].join(" "), points: b.points }));
+        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={metricUnit("nodes", fStep)} readout={totalRead(dayRead((d) => metricSeries("nodes", m.id!, d).points, fStep), points)} buckets={fBuckets} stepMs={fStep} lines={lines} stack={stack.length ? stack : undefined} />;
       });
   };
   /** Per-network CONTINUITY panels: real measured gap stats (m.{id}.gapSum/gapMax — live
@@ -647,7 +658,7 @@ export default function TrendsDoc() {
           <Section
             id="net-fleet"
             title="Nodes per metagraph"
-            lead="Each network's own node count, sampled live every hour, with a line for each layer it runs: L0 agrees on its state and creates its snapshots, cL1 moves its token, dL1 takes in what applications write."
+            lead="Each network's own node count, sampled live every hour and split by node type — every node counted once, under the layers it runs: L0 agrees on its state and creates its snapshots, cL1 moves its token, dL1 takes in what applications write. Before types were recorded, a line per layer stands in, and a node running several layers counts in each."
           >
             {fleetPending ? (
               <p className="text-label text-muted-foreground">reading the hourly samples…</p>

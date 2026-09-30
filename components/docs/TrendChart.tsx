@@ -32,6 +32,17 @@ export interface TrendLine {
   hue?: string;
 }
 
+/** One band of a STACKED reading drawn under the lines — parts that PARTITION a whole (a
+ *  network's node types), in the first line's hue. */
+export interface TrendBand {
+  label: string;
+  points: (number | null)[];
+}
+/** A stack is ONE hue, so its bands are told apart by opacity — the donut's own device for
+ *  adjacent parts of one colour — base band strongest. Every band is also NAMED (legend, tooltip),
+ *  so the step is never the only channel. */
+const STACK_STEPS = [0.36, 0.2, 0.11, 0.06, 0.03];
+
 const PLOT_H = 120;
 const AXIS_H = 18;
 
@@ -94,6 +105,7 @@ export default function TrendChart({
   plotHeight = PLOT_H,
   rollClassName,
   zoomTo,
+  stack,
   note,
   syncId = "trends",
   className,
@@ -215,6 +227,10 @@ export default function TrendChart({
    *  cursor stand down while zoomed: stretched text reads as broken, and the cursor is placed on
    *  the new axis's buckets, which this picture is not. */
   zoomTo?: { fromMs: number; toMs: number } | null;
+  /** PARTS OF THE FIRST LINE, STACKED beneath it (2026-09-29, the per-network node chart: its
+   *  types). Only for parts that PARTITION the line — they must sum to it, or the stack claims
+   *  more than exists. A bucket null in every band is left open (not recorded). */
+  stack?: TrendBand[];
   /** AN INSTRUMENT STATE THE SERIES CANNOT SAY (2026-09-18). When the caller knows something the
    *  points don't — most concretely that the payload this chart needs is still IN FLIGHT — it
    *  hands the words here and the plot is replaced by them, in the chart's own empty-state frame.
@@ -414,8 +430,16 @@ export default function TrendChart({
         )}
         {/* The pair legend — only when there IS a pair (one series needs no legend, its name is
             the title). */}
-        {lines.length > 1 && (
+        {(lines.length > 1 || (stack?.length ?? 0) > 0) && (
           <span className="ml-auto inline-flex items-center gap-2 text-micro text-muted-foreground">
+            {stack?.map((b, i) => (
+              <span key={`s:${b.label}`} className="inline-flex items-center gap-1">
+                <svg width="10" height="10" aria-hidden>
+                  <rect x="0.5" y="0.5" width="9" height="9" rx="2" fill={lines[0]?.hue ?? "var(--primary)"} fillOpacity={STACK_STEPS[i % STACK_STEPS.length]} stroke={lines[0]?.hue ?? "var(--primary)"} strokeOpacity={0.5} />
+                </svg>
+                {b.label}
+              </span>
+            ))}
             {lines.map((l) => (
               <span key={l.label} className="inline-flex items-center gap-1">
                 <svg width="14" height="4" aria-hidden>
@@ -506,6 +530,7 @@ export default function TrendChart({
                 gaps={gaps}
                 onRange={onRange}
                 fill={fill}
+                stack={stack}
                 plotH={plotHeight}
               />
             );
@@ -600,6 +625,7 @@ const TrendPlot = memo(function TrendPlot({
   gaps,
   onRange,
   fill,
+  stack,
   plotH,
 }: {
   /** See the outer component's prop — a STRING, so it holds the memo still. */
@@ -614,6 +640,8 @@ const TrendPlot = memo(function TrendPlot({
   onRange?: (fromMs: number, toMs: number) => void;
   /** See the outer component's prop — a plain boolean, so it holds the memo still. */
   fill?: boolean;
+  /** See the outer component's prop. */
+  stack?: TrendBand[];
   /** The plot's height in CSS px (the outer `plotHeight`) — a number, so it holds the memo still. */
   plotH: number;
 }) {
@@ -631,7 +659,7 @@ const TrendPlot = memo(function TrendPlot({
   // `CartesianChart`, same defaults, same tooltip cursor. So the swap is inert for everything
   // below, and it is still made conditionally: with `fill` off the document renders the very
   // element it rendered before, which is a proof rather than a comparison.
-  const Chart = fill ? ComposedChart : LineChart;
+  const Chart = fill || stack?.length ? ComposedChart : LineChart;
   // The in-flight drag, as bucket instants — preview only; the committed range lives on the
   // page (one selection, every chart). Cleared on release or when the pointer leaves.
   const [drag, setDrag] = useState<{ a: number; b: number } | null>(null);
@@ -695,6 +723,7 @@ const TrendPlot = memo(function TrendPlot({
   const rows = buckets.map((ts, i) => {
     const row: Record<string, number | null> = { ts };
     for (const l of lines) row[l.label] = l.points[i];
+    for (const b of stack ?? []) row[`s:${b.label}`] = b.points[i];
     return row;
   });
 
@@ -927,6 +956,27 @@ const TrendPlot = memo(function TrendPlot({
                   tooltipType="none"
                 />
               )}
+              {/* THE STACK, under everything else: bands that partition the first line, each in
+                  its hue at one opacity step with a faint edge, no dots, gaps kept open. */}
+              {stack?.map((b, i) => (
+                <Area
+                  key={`s:${b.label}`}
+                  dataKey={`s:${b.label}`}
+                  stackId="parts"
+                  type="linear"
+                  stroke={hue0}
+                  strokeOpacity={0.45}
+                  strokeWidth={1}
+                  fill={hue0}
+                  fillOpacity={STACK_STEPS[i % STACK_STEPS.length]}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                  dot={false}
+                  activeDot={false}
+                  legendType="none"
+                  tooltipType="none"
+                />
+              ))}
               <Tooltip
                 isAnimationActive={false}
                 cursor={{ stroke: "var(--primary)", strokeOpacity: 0.4 }}
@@ -942,6 +992,15 @@ const TrendPlot = memo(function TrendPlot({
                             {li > 0 && <span className="text-muted-foreground"> · </span>}
                             {lines.length > 1 && <span className="text-muted-foreground">{l.label} </span>}
                             {v != null ? format(Number(v)) : "—"}
+                          </span>
+                        );
+                      })}
+                      {stack?.map((b) => {
+                        const v = payload.find((e) => e.dataKey === `s:${b.label}`)?.value;
+                        return v == null ? null : (
+                          <span key={`s:${b.label}`}>
+                            <span className="text-muted-foreground"> · {b.label} </span>
+                            {format(Number(v))}
                           </span>
                         );
                       })}
