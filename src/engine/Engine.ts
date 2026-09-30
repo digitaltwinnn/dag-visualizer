@@ -2229,6 +2229,13 @@ export class Engine {
       // depends on the presentation any more.
       const w = h * this.ctx.camera.aspect * 2;
       this.globe.setGatherFit(w * band.halfWidthFrac, h * band.heightFrac);
+      // The band's BOTTOM edge in canvas-local px, for the motion hint to stand below (2026-09-29):
+      // the top edge's pixel row plus the pack's depth as a share of the half-frustum. On change
+      // only — the band moves on a resize, a rails toggle or a data re-pack, not per frame.
+      const halfH = window.innerHeight / 2;
+      const bottom = Math.round(halfH * (1 - band.topFrac) + halfH * (this.globe.gatherDepth() / h));
+      const st = useStore.getState();
+      if (bottom !== st.gatherBottom) st.setGatherBottom(bottom);
     }
   }
 

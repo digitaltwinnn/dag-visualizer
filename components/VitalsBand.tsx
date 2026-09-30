@@ -142,10 +142,10 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
         // as a bar and a scattering of chips (user, 2026-09-01: "the bottom bar should be the same
         // exactly as the top bar").
         "rounded-lg border border-border/60 [background:var(--topbar-glass)] backdrop-blur-sm",
-        // The TOP inset is NEGATIVE so a tenant may stand something just ABOVE the plate (the History
-        // timeline's window pills, user 2026-09-26: "above the bottom section, not on top of it");
-        // the clip exists for the SIDE covers and never needed the top edge.
-        "[clip-path:inset(-48px_max(0px,calc(var(--cover-r)-var(--bar-margin)))_0_max(0px,calc(var(--cover-l)-var(--bar-margin))))]",
+        // The clip exists for the SIDE covers only. (Its top edge stood open for the History
+        // timeline's window pills while they stood above the plate; they live inside it since
+        // 2026-09-29, so nothing may paint above the band now.)
+        "[clip-path:inset(0_max(0px,calc(var(--cover-r)-var(--bar-margin)))_0_max(0px,calc(var(--cover-l)-var(--bar-margin))))]",
         // ⚠️ The cell-targeting rules (card flattening, section dividers) moved ONTO the
         // RollSwap wrapper below (2026-09-04, the no-pop swap): they are `[&>*]` selectors, and
         // the wrapper between this section and the cells would otherwise be their new subject.
@@ -163,6 +163,12 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
         // single class on stylesheet order alone (CSS trap 4).
         "[transition:opacity_180ms_ease-out,transform_300ms_ease,left_300ms_ease-out,right_300ms_ease-out,clip-path_300ms_ease-out]",
         "motion-reduce:!transition-none",
+        // THE CONTROL STRIP'S FRAME (design round 2026-09-29): when the band holds the History
+        // TIMELINE it is a control, and controls take the accent (the design rule — containers
+        // stay hairlines, so this is the ONE plate that wears it): an accent hairline and a faint
+        // accent lift at its top edge. Keyed on the policy row, never a mode compare.
+        VIEW_POLICIES[mode].bandContent === "timeline" &&
+          "border-primary/40 [background:linear-gradient(color-mix(in_oklch,var(--primary)_7%,transparent),transparent_70%),var(--topbar-glass)]",
         yielding && "opacity-40 duration-300",
         !live && "saturate-[.45]",
       )}

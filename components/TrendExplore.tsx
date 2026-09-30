@@ -6,10 +6,12 @@ import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
-import { METRIC_LABELS, METRIC_ORDER, metricUnit } from "@/src/data/trendSeries";
+import { METRIC_LABELS, METRIC_ORDER, headWord, metricUnit, spanWord } from "@/src/data/trendSeries";
+import { spanPhrase } from "@/src/data/trendWindow";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore, type TrendMetric } from "@/src/store/store";
+import { NodeStars } from "@/components/state/StateAtoms";
 
 // HISTORY'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session 2026-09-26;
 // read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). The view breaks its
@@ -32,7 +34,7 @@ import { useStore, type TrendMetric } from "@/src/store/store";
 //
 //   · THE ROWS commit through `trendPlaneActions` and the one executor — the SAME builder the
 //     plane's own header strip runs (rule 2), so a row click and a plane click cannot drift. The
-//     figure is the last measured reading in the roster's ONE formatter; an unmeasured chain says
+//     figure is the roster's `head` reading in its ONE formatter; an unmeasured chain says
 //     so in words rather than showing a 0.
 //
 // ⚠️ THE ROSTER IS NOT COMPUTED HERE. `useTrendRoster` is the one pass the planes, this list and
@@ -55,8 +57,20 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const setTrendMetric = useStore((s) => s.setTrendMetric);
 
-  const roster = useTrendRoster(useTrendsSlice(windowId, range), filter, metric);
-  const { ranked, rows, unit, format, stepMs } = roster;
+  const slice = useTrendsSlice(windowId, range);
+  const roster = useTrendRoster(slice, filter, metric);
+  // THE LIST FOLLOWS THE RANGE (design A, 2026-09-29 — "it is not clear that the explorer is a
+  // fixed value based on today"). Each figure is the network's `head` — its `span` reading over the window on
+  // screen — an average per day for a rate — and the hint names that span, so the list and the
+  // range selector visibly answer one question, while the Moment card states one INSTANT. It used
+  // to state the latest full day, which read as a second, unlabelled copy of the Moment's list.
+  const { ranked, rows, format } = roster;
+  const unit = metricUnit(metric, 86_400_000);
+  // ⚠️ THE FIGURE IS THE ROSTER'S `head` — the very number the plane's headline states (user,
+  // 2026-09-29: "didn't we agree to keep it consistent … like the card"). Over a window of a day
+  // or more that is the span's average per day; under a day (1H, a short brush) there is no
+  // measured day inside the span to average, so both say the latest full day.
+  const over = roster.headKind === "span" ? `${spanWord(metric)} · ${spanPhrase(windowId, range)}` : "Latest full day";
   const empty = scopeEmptyCopy(roster.scope, "view");
 
   // THE WHOLE ROSTER, NO PAGER (user, 2026-09-28, two rounds). The card paged for nine days — first
@@ -76,13 +90,13 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
 
   // The bar: each network's last reading as a share of the busiest — the ranking the stack's depth
   // already carries, made visible in the list.
-  const maxLast = Math.max(1e-9, ...ranked.map((id) => rows.get(id)?.last ?? 0));
+  const maxLast = Math.max(1e-9, ...ranked.map((id) => rows.get(id)?.head ?? 0));
 
   const level: ExplorerLevelSpec = {
     key: "networks",
     crumb: { label: "Networks" },
     measure: {
-      options: METRIC_ORDER.map((m) => ({ id: m, label: METRIC_LABELS[m], unit: metricUnit(m, stepMs) })),
+      options: METRIC_ORDER.map((m) => ({ id: m, label: METRIC_LABELS[m], unit: metricUnit(m, 86_400_000) })),
       value: metric,
       onPick: (id) => setTrendMetric(id as TrendMetric),
     },
@@ -90,7 +104,8 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
     // No tags at this level, so the name takes the tag home's room; the readings run long
     // ("12,345.6"), so the figure column takes the fee width.
     nameW: 112,
-    figureW: 56,
+    // Wide enough for a busy chain's average ("31,643").
+    figureW: 64,
     // No fabricated rows (rule 10): the two commits the trends store keeps nothing for say so in
     // the same sentences the stack and the document say them in.
     empty: empty ? `${empty.fact} ${empty.route}` : "Waiting for the measured history…",
@@ -105,11 +120,16 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
               key: id,
               glyph: <IdentityDot hue={row.hue} />,
               name: row.name,
-              share: row.last != null ? row.last / maxLast : undefined,
+              share: row.head != null ? row.head / maxLast : undefined,
               hue: row.hue,
-              figure: row.last != null ? format(row.last) : <span className="text-muted-foreground">{NO_READING}</span>,
+              figure:
+                // A dash with the words on hover: "no reading" truncated to "no rea…" in the
+                // figure column (a quiet network may have measured nothing in the span).
+                // A HELD window's figures are the previous span's, under a hint naming the new one —
+                // so they wait (stars) until the new window lands rather than state the wrong span.
+                slice.stale ? <NodeStars count={3} /> : row.head != null ? format(row.head) : roster.pending || (roster.headKind === "day" && roster.dayPending) ? <NodeStars count={3} /> : <span className="text-muted-foreground" title={NO_READING}>—</span>,
               on,
-              title: `${row.name} · ${row.last != null ? `${format(row.last)}${unit ? ` ${unit}` : ""}` : NO_READING}`,
+              title: `${row.name} · ${row.head != null ? `${format(row.head)}${unit ? ` ${unit}` : ""} · ${headWord(metric, roster.headKind)}` : NO_READING}`,
               onClick: () => applyClickActions(trendPlaneActions(id, focus)),
               pair: subjectPairing(hoverFilter, id, setHover, row.hue),
             },
@@ -127,7 +147,9 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
       // "Open one for…" is the other explorers' second half and would be a lie here — a layer row
       // has no children, it brings its plane forward.
       // As short as the other explorers' hints (user, 2026-09-28: "way too verbose").
-      hint={empty ? null : "Every network, busiest first. Pick one to bring its chart forward."}
+      // The hint NAMES THE SPAN the figures are over (design A) — the one place the list says
+      // which time it is about.
+      hint={empty ? null : `${over}. Pick one to bring it forward.`}
       levels={[level]}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => setHover(null)}

@@ -70,13 +70,15 @@ import useTrendsSlice from "@/components/useTrendsSlice";
 import useStagedMeasure, { ROLL_CLASS, useHeldOrder } from "@/components/useStagedMeasure";
 import { cn } from "@/lib/utils";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
-import { metricCaption, sharedCeiling, stepMetric } from "@/src/data/trendSeries";
+import { headWord, metricCaption, sharedCeiling, stepMetric } from "@/src/data/trendSeries";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { MORE_ID, PLANE_PLOT_PX_H, PLANE_PX_H, PLANE_PX_W, moreCount, morePose, stackPoses } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
+import TrendTether from "@/components/TrendTether";
+import { WINDOW_MS } from "@/src/data/trendTimeline";
 
 /** The empty roster, as ONE frozen reference. Publishing a fresh `[]` would be a content-free
  *  change the engine's `!==` still has to answer. */
@@ -145,6 +147,19 @@ export default function TrendStack() {
   // counter EDGE TRIM too, so a rail can never quote a number no chart on screen agrees with.
   const roster = useTrendRoster(slice, filter, shown);
   const { ranked, rows, buckets: axis, stepMs: step, pending } = roster;
+  // THE SPAN BEING LOADED, while the previous window stands in (`slice.stale`): every plot zooms
+  // its held picture to it (`TrendChart`'s `zoomTo`), so a range change reads as the SAME lines
+  // moving to their new places, then the new window replacing them. A pill's span runs back from
+  // the held axis's own newest instant — the payload's clock, never the client's — and `all`
+  // names no span, so it only dims.
+  const zoomTo = useMemo(() => {
+    if (!slice.stale) return null;
+    if (range) return { fromMs: range.fromMs, toMs: range.toMs };
+    const ms = WINDOW_MS[windowId];
+    if (ms == null || !axis.length) return null;
+    const toMs = axis[axis.length - 1]! + step;
+    return { fromMs: toMs - ms, toMs };
+  }, [slice.stale, range, windowId, axis, step]);
   // THE ORDER ON SCREEN — the ranking once settled, the HELD order while a measure change is in
   // flight, so the plots land before the cards move. Poses, the hover backstop and the engine's
   // `trendIds` all read THIS, never `ranked`: the projector and React must agree on the order.
@@ -234,9 +249,18 @@ export default function TrendStack() {
   // never re-render five charts.
   const down = useRef<{ x: number; y: number } | null>(null);
   const dragged = useRef(false);
+  // ⚠️ WHETHER THIS PRESS MADE A RANGE — the gate for the plot's pick (user, 2026-09-29: a click on
+  // the chart set the Moment "only when we click the tiny dot"). The pick used to be gated on
+  // `dragged`, a 4px slop, while the brush only commits past ONE BUCKET — so a press that wobbled a
+  // few pixels was neither a range nor a pick and did nothing, which on a trackpad or a finger is
+  // most clicks. The outcome decides now: the click after a press that committed a range is that
+  // range's; after any other press it picks the Moment. (`dragged` still guards the plane's own
+  // bring-forward click, where travel is the right test.)
+  const rangedThisPress = useRef(false);
   const onPointerDown = (e: React.PointerEvent) => {
     down.current = { x: e.clientX, y: e.clientY };
     dragged.current = false;
+    rangedThisPress.current = false;
   };
   // A PRESS THAT TRAVELS IS A BRUSH, NOT A CLICK (2026-09-26). It used to be handed to the canvas
   // as the scene's orbit (`orbitHandoff`, 2026-09-19); History has had no orbit since 2026-09-26
@@ -334,12 +358,18 @@ export default function TrendStack() {
       // charts leave and arrive together without five pieces of state (`ROLL_CLASS` reads it).
       // The two offsets are the direction: the next measure rises into place, the previous drops.
       data-roll={staged.phase}
+      // The previous window standing in while the new one loads (`useTrendsSlice`'s hold): the
+      // plots quiet, so the stale lines never read as the new range's.
+      data-stale={slice.stale ? "" : undefined}
       style={{
         ["--roll-out-y" as string]: staged.dir === "next" ? "-10px" : "10px",
         ["--roll-in-y" as string]: staged.dir === "next" ? "14px" : "-14px",
       }}
       className="group/stack absolute inset-0 pointer-events-none z-[4] opacity-0 [transition:opacity_var(--tempo-nav)_ease] data-[on='1']:opacity-100 motion-reduce:!transition-none"
     >
+      {/* THE TETHER from the band's span to the front chart's time axis — inside this layer so it
+          arrives and leaves with the stack (`data-on`), and is gone wherever the stack is. */}
+      <TrendTether />
       {more && (
         // THE HINT CARD: the same anchor contract as every plane (0-size, origin-top-left,
         // invisible until projected — the projector writes its matrix and visibility), the same
@@ -372,6 +402,8 @@ export default function TrendStack() {
           <div
             key={pose.id}
             data-plane={pose.id}
+            // The FRONT plane — the one a brush and a click act on — which the tether targets.
+            data-front={pose.interactive ? "" : undefined}
             className={cn(
               // THE ANCHOR: a 0-size box at the layer's origin, hidden until the engine has
               // projected it. `origin-top-left` is what makes the engine's matrix a plain
@@ -438,6 +470,8 @@ export default function TrendStack() {
                   : {}),
               }}
             >
+            {/* QUIET WHILE STALE — the plot only; the header, the card and its pairing hold. */}
+            <div className="[transition:opacity_200ms_ease] group-data-[stale]/stack:opacity-45 motion-reduce:!transition-none">
             {p && (
               <TrendChart
                 name={row.name}
@@ -453,9 +487,20 @@ export default function TrendStack() {
                 // THE CARD NAMES ITS MEASURE, not just its unit — it can be stepped from right here,
                 // so the card has to say what it turned into.
                 unit={caption}
+                // THE HEADLINE IS THE ROSTER'S `head` (user, 2026-09-29: "keep it consistent") —
+                // the same number the Networks list states: the span's average per day over a
+                // window of a day or more, the latest full day under one.
+                readout={{
+                  // A held window's head is the PREVIOUS span's — it waits for the new one.
+                  value: slice.stale ? null : row.head,
+                  word: headWord(metric, roster.headKind),
+                  title: roster.headKind === "span" ? "The average per day over the window on screen" : undefined,
+                  pending: slice.stale || (roster.headKind === "day" ? roster.dayPending : roster.pending),
+                }}
                 format={roster.format}
                 note={pending ? "reading the hourly samples…" : undefined}
                 buckets={axis}
+                zoomTo={zoomTo}
                 stepMs={step}
                 sampled={row.series.sampled}
                 gaps={row.series.gaps}
@@ -463,9 +508,17 @@ export default function TrendStack() {
                 scaleMax={sharedMax}
                 cursorMs={cursorMs}
                 onPick={(ms) => {
-                  if (!dragged.current) setTrendCursor(ms);
+                  if (!rangedThisPress.current) setTrendCursor(ms);
+                  rangedThisPress.current = false;
                 }}
-                onRange={pose.interactive ? (fromMs, toMs) => setTrendRange({ fromMs, toMs }) : undefined}
+                onRange={
+                  pose.interactive
+                    ? (fromMs, toMs) => {
+                        rangedThisPress.current = true;
+                        setTrendRange({ fromMs, toMs });
+                      }
+                    : undefined
+                }
                 // THE PLANE CARRIES ITS COLOUR AS AN AREA, and only here — on the card's solid face
                 // it reads as the network's own tint. A plain boolean, so it holds the plot's memo
                 // as still as every other prop on this call.
@@ -509,6 +562,7 @@ export default function TrendStack() {
                 }}
               />
             )}
+            </div>
             </div>
           </div>
         );

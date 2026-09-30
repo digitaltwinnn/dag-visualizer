@@ -53,6 +53,8 @@ export interface ExplorerRowProps {
   nameW?: number;
   /** The figure column's width for this level; 40 fits a count, a 4-decimal fee needs 48. */
   figureW?: number;
+  /** The glyph column's width (see the level's `glyphW`). A wide glyph is LEFT-aligned. */
+  glyphW?: number;
   /** The committed subject wears the wash, in its hue. */
   on?: boolean;
   hue?: string | null;
@@ -95,7 +97,7 @@ function recentGesture(): boolean {
 }
 
 export default function ExplorerRow({
-  glyph, name, nameMono, tag, bar, figure, hasFigure, nameW = 84, figureW = 40, on, hue, nested, wideBar, faint, title, onClick, pair, className,
+  glyph, name, nameMono, tag, bar, figure, hasFigure, nameW = 84, figureW = 40, glyphW = 14, on, hue, nested, wideBar, faint, title, onClick, pair, className,
 }: ExplorerRowProps) {
   const el = useRef<HTMLButtonElement>(null);
   // SELECTION STAYS IN PLACE (design 2026-09-26, decision 12): the list never re-orders on a
@@ -145,11 +147,17 @@ export default function ExplorerRow({
         // and the bar is the accent, not the reading.
         // With no tags in the level the empty tag column collapses to 0 and the bar takes the
         // rest of the row, so its length reads at a glance instead of in a 36px sliver.
+        // ⚠️ THE NAME COLUMN MAY SHRINK (user, 2026-09-29: with a snapshot open, the network rows
+        // ran past the card's right edge). Its width was a fixed `nameW`, and a NESTED level loses
+        // the tree indent from the row, so name + bar minimum + figure outgrew the card and the
+        // grid overflowed instead of yielding. `minmax(0, nameW)` keeps nameW wherever it fits and
+        // truncates the name (it already ellipsises) where it doesn't; the wide bar's floor is the
+        // nested level's own 24px.
         gridTemplateColumns: hasFigure
           ? wideBar
-            ? `14px ${nameW}px 0px minmax(36px,1fr) ${figureW}px`
-            : `14px ${nameW}px minmax(0,1fr) ${nested ? 24 : 36}px ${figureW}px`
-          : "14px minmax(0,1fr) auto",
+            ? `${glyphW}px minmax(0,${nameW}px) 0px minmax(${nested ? 24 : 36}px,1fr) ${figureW}px`
+            : `${glyphW}px minmax(0,${nameW}px) minmax(0,1fr) ${nested ? 24 : 36}px ${figureW}px`
+          : `${glyphW}px minmax(0,1fr) auto`,
         ...(on ? selectionHue(hue) : undefined),
         ...pair?.style,
       }}
@@ -171,7 +179,7 @@ export default function ExplorerRow({
         pair?.onBlur();
       }}
     >
-      <span className="flex items-center justify-center">{glyph}</span>
+      <span className={cn("flex items-center min-w-0", glyphW > 14 ? "justify-start" : "justify-center")}>{glyph}</span>
       <span
         className={cn(
           "min-w-0 truncate text-body",

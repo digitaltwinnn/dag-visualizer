@@ -124,7 +124,7 @@ describe("siblingSet — cohort (provider) rung", () => {
   const cohort = { cc: "de", city: "Falkenstein", isp: "Hetzner" };
   it("steps the committed country's cohorts, count-desc, other countries excluded", () => {
     const set = siblingSet("cohort", base({ mode: "geo", country: "de", cohort }))!;
-    expect(set.items.map((i) => i.label)).toEqual(["Falkenstein · Hetzner", "Berlin · AWS"]);
+    expect(set.items.map((i) => i.label)).toEqual(["Hetzner · Falkenstein", "AWS · Berlin"]);
     expect(set.index).toBe(0);
     expect(set.parentLabel).toBe("Germany");
   });
@@ -162,7 +162,7 @@ describe("siblingSet — node rung", () => {
     const set = siblingSet("node", s)!;
     expect(set.items.map((i) => i.key)).toEqual(["1.1.1.1", "1.1.1.2"]);
     expect(set.index).toBe(0);
-    expect(set.parentLabel).toBe("Falkenstein · Hetzner");
+    expect(set.parentLabel).toBe("Hetzner · Falkenstein");
     expect(set.items[1]!.actions).toEqual(
       nodeSelectActions(deB.pick, { mode: "geo", currentFilter: "all", deselect: false, compositionSel: undefined }),
     );
@@ -368,7 +368,7 @@ describe("childStep — the first-child DOWN step", () => {
   });
   it("a country opens its first cohort (count-desc then city)", () => {
     const step = childStep("country", base({ country: "de" }))!;
-    expect(step.label).toBe("Falkenstein · Hetzner"); // 2 machines beat Berlin's 1
+    expect(step.label).toBe("Hetzner · Falkenstein"); // 2 machines beat Berlin's 1
     expect(step.actions).toEqual(
       cohortToggleActions({ cc: "de", city: "Falkenstein", isp: "Hetzner" }, { cohort: null, hasInspect: false }),
     );
@@ -482,5 +482,77 @@ describe("childStep — the first-child DOWN step", () => {
     ] as unknown as SiblingState["exactRows"];
     expect(childStep("snap", base({ mode: "ledger", filter: "ded", snap: snapPick, exactRows: rows }))).toBeNull();
     expect(childStep("snap", base({ mode: "ledger", filter: "paca", snap: snapPick, exactRows: rows }))).toBeNull();
+  });
+});
+
+// ⚠️ A GLOBAL SNAPSHOT'S CHILDREN ARE THE NETWORKS IT HOLDS (user, 2026-09-29: "I should only be
+// able to swipe the metagraphs that are part of that global snapshot … there must be a
+// parent-child relation that determines what can be swiped"). In the ledger the metagraph card
+// hangs under the tick, so its pager steps the tick's own networks — the same set the tick's ∨
+// opens the first of — and a pinned tick stays pinned across the swipe.
+describe("siblingSet — context rung under a ledger tick", () => {
+  const rows = [
+    { metaId: "dor", ordinal: 1 },
+    { metaId: "unlisted-x", ordinal: 1 },
+    { metaId: "ded", ordinal: 9 },
+    { metaId: "dor", ordinal: 2 },
+    { metaId: "unlisted-x", ordinal: 2 },
+    { metaId: "unlisted-x", ordinal: 3 },
+  ] as unknown as SiblingState["exactRows"];
+  const s = base({ mode: "ledger", filter: "ded", snap: snapPick, exactRows: rows });
+
+  it("steps ONLY the tick's listed networks, busiest first — not the whole catalog", () => {
+    const set = siblingSet("context", s)!;
+    expect(set.items.map((i) => i.key)).toEqual(["dor", "ded"]); // tbc never anchored here
+    expect(set.index).toBe(1);
+  });
+  it("a swipe under a PINNED tick keeps the pin (the parent does not move)", () => {
+    const set = siblingSet("context", s)!;
+    expect(set.items[0]!.actions).toEqual([
+      ...filterToggleActions("dor", "ded"),
+      { kind: "snapshot", pick: snapPick, follow: false },
+    ]);
+  });
+  it("…and under LIVE it stays live (live is the default)", () => {
+    const set = siblingSet("context", { ...s, following: true })!;
+    expect(set.items[0]!.actions).toEqual(filterToggleActions("dor", "ded"));
+  });
+  it("the tick's ∨ opens the FIRST of the same set", () => {
+    const step = childStep("snap", { ...s, filter: "all" })!;
+    expect(step.key).toBe(siblingSet("context", s)!.items[0]!.key);
+  });
+  it("no tick read yet → no pager rather than the catalog", () => {
+    expect(siblingSet("context", { ...s, exactRows: null })).toBeNull();
+    expect(siblingSet("context", { ...s, snap: null })).toBeNull();
+  });
+});
+
+// ∨ FROM A METAGRAPH SNAPSHOT OPENS ITS VALIDATORS (user, 2026-09-29), and the node card under it
+// pages ONLY the nodes that signed it — the explorer's signer level, row for row.
+describe("the ledger's node rung under a metagraph snapshot", () => {
+  const signer = (id: string) =>
+    ({ ...deA, id, label: id, pick: { kind: "metanode", meta: { id: "ded" }, node: { id, ip: id, roles: ["l0"] }, geo: {} } } as unknown as NodeRow);
+  const s1 = signer("aa11ffff"), s2 = signer("bb22ffff"), other = signer("cc33ffff");
+  const rows = [{ metaId: "ded", ordinal: 500, signers: ["bb22", "aa11", "zz99"] }] as unknown as SiblingState["exactRows"];
+  const ms = { metaId: "ded", ordinal: 500, hash: "", globalOrdinal: 42, ts: "T" };
+  const s = base({ mode: "ledger", filter: "ded", snap: snapPick, metaSnap: ms, exactRows: rows, selNodes: [s1, s2, other] });
+
+  it("∨ commits the FIRST signer the explorer lists", () => {
+    const step = childStep("metaSnap", s)!;
+    expect(step).not.toBeNull();
+    expect(step.actions).toEqual(nodeSelectActions(s2.pick, { mode: "ledger", currentFilter: "ded" }));
+  });
+  it("the node pager steps the signers only, in signature order", () => {
+    const set = siblingSet("node", { ...s, inspect: s1.pick })!;
+    expect(set.items.length).toBe(2);
+    expect(set.index).toBe(1);
+  });
+  it("a node that did NOT sign pages its network, not the signers (the snapshot is not its parent)", () => {
+    const set = siblingSet("node", { ...s, inspect: other.pick })!;
+    expect(set).not.toBeNull();
+    expect(set.items.length).toBe(3);
+  });
+  it("no signer known → no ∨", () => {
+    expect(childStep("metaSnap", { ...s, selNodes: [other] })).toBeNull();
   });
 });

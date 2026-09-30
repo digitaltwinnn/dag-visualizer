@@ -206,6 +206,78 @@ export function lastMeasured(points: readonly (number | null)[]): number | null 
   return points.reduce<number | null>((acc, v) => (v != null ? v : acc), null);
 }
 
+/** THE HEAD READING: a plane's newest complete DAY (user, 2026-09-29: "a latest 5 min is less
+ *  easy to understand than a last day … day should be the standard always"). Read through the SAME
+ *  `metricSeries` / `globalSeries` the plane is drawn from, so a counter, a gauge and continuity
+ *  all answer — over the DAILY tier (`TrendSlice.daily`, still-filling day already trimmed) where
+ *  the charts are finer than a day, or the chart's own last point where it already is daily.
+ *  Null while the daily tier is in flight: a finer bucket is never passed off as a day. */
+export function latestDay(
+  metric: TrendMetric,
+  id: string,
+  daily: Readonly<Record<string, (number | null)[]>> | undefined,
+  chartPoints: readonly (number | null)[],
+  stepMs: number,
+): number | null {
+  if (stepMs >= 86_400_000) return lastMeasured(chartPoints);
+  if (!daily) return null;
+  return lastMeasured(id === "dag" ? globalSeries(metric, daily) : metricSeries(metric, id, daily).points);
+}
+
+/** THE SPAN READING — the roster's `head` over a window of a day or more (user, 2026-09-29,
+ *  design A: "the explorer follows the range"). One number per network for the whole window on screen, so the list and
+ *  the range selector answer the same question:
+ *    · a COUNTER (a per-bucket sum) → its AVERAGE PER DAY: the mean of the MEASURED buckets,
+ *      scaled from the bucket to a day. Unmeasured buckets are left out, never counted as zeros;
+ *    · a GAUGE (the fleet) → the plain mean of its measured samples;
+ *    · CONTINUITY (mean spacing) → weighted by the snapshots each bucket's spacing was measured
+ *      over (`weights`), which is Σgaps ÷ Σsnaps over the span. A plain mean of per-bucket means
+ *      would let an hour with two snapshots count as much as one with two hundred.
+ *  Null where nothing in the span was measured (rule 10: no reading is not a zero). */
+export function spanAverage(
+  metric: TrendMetric,
+  points: readonly (number | null)[],
+  stepMs: number,
+  weights?: readonly (number | null)[],
+): number | null {
+  if (metric === "continuity") {
+    let num = 0;
+    let den = 0;
+    for (let i = 0; i < points.length; i++) {
+      const v = points[i];
+      const w = weights?.[i];
+      if (v != null && w != null && w > 0) {
+        num += v * w;
+        den += w;
+      }
+    }
+    return den > 0 ? num / den : null;
+  }
+  let sum = 0;
+  let n = 0;
+  for (const v of points) {
+    if (v != null) {
+      sum += v;
+      n++;
+    }
+  }
+  if (n === 0) return null;
+  const mean = sum / n;
+  return TREND_METRICS[metric].kind === "counter" ? mean * (86_400_000 / stepMs) : mean;
+}
+
+/** The short word beside a HEAD reading, the same on the plane's headline and in the list's
+ *  hover: the latest full day, or the span's average. */
+export function headWord(metric: TrendMetric, kind: "span" | "day"): string {
+  if (kind === "day") return "latest full day";
+  return spanWord(metric) === "Average per day" ? "avg per day" : "average";
+}
+
+/** The words a span reading carries: a rate is an average PER DAY, anything else an average. */
+export function spanWord(metric: TrendMetric): string {
+  return TREND_METRICS[metric].kind === "counter" && metric !== "continuity" ? "Average per day" : "Average";
+}
+
 /** BUSIEST FIRST, by each id's last measured value; nothing measured sorts last, and ties keep
  *  the order they came in. The vitals band's catalog-order rule guards LIVE charts that would
  *  reshuffle under the reader — a ranking laid out once per reading can be honest instead. */

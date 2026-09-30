@@ -329,3 +329,21 @@ export function stampInstant(ms: number, stepMs: number): string {
     }) + " UTC"
   );
 }
+
+/** WHAT THE POINTER SAYS OVER EACH ZONE (user, 2026-09-29: "when I drag the selector it has a +
+ *  pointer, should be a hand?"). The crosshair belongs to EMPTY track, where a click marks a
+ *  moment and a drag draws a new span. The span itself is a thing you carry, so it is a hand
+ *  (closed while it moves); an edge and the moment's handle resize along one axis. The cursor
+ *  answers the same `classifyPress` the gesture does, so what the pointer promises is what the
+ *  press will do. */
+export function zoneCursor(zone: PressZone, pressed: boolean): string {
+  switch (zone.kind) {
+    case "inside":
+      return pressed ? "grabbing" : "grab";
+    case "edge":
+    case "cursor":
+      return "ew-resize";
+    case "empty":
+      return "crosshair";
+  }
+}

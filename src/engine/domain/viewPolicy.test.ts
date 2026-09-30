@@ -151,6 +151,13 @@ describe("the trends view is registered and inert", () => {
     for (const m of MODES) expect(VIEW_POLICIES[m].rotate).toBe(m !== "trend");
   });
 
+  // ⚠️ A NODE COMMITS ITS NETWORK ONLY IN HYPER (user, 2026-09-26 for geo, 2026-09-29 for the
+  // ledger's explorer signer row). Was a `mode !== "geo"` deny-list in pickActions, which handed
+  // the ledger hyper's filter-first by default.
+  it("lets only hyper's node select commit the network filter", () => {
+    for (const m of MODES) expect(VIEW_POLICIES[m].nodeCommitsNetwork).toBe(m === "hyper");
+  });
+
   it("says per view whether the camera idles in an orbit", () => {
     expect(VIEW_POLICIES.hyper.autoRotate).toBe(true);
     expect(VIEW_POLICIES.geo.autoRotate).toBe(false);

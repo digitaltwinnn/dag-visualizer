@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, type ClickAction } from "./pickActions";
+import { viewEntryActions, clickActions, cohortToggleActions, compositionToggleActions, countryToggleActions, filterToggleActions, followToggleActions, nodeSelectActions, sameCohort, sameComposition, snapshotSelectActions, pickActive, pickNetId, metaSnapSelectActions, metaSnapArrivalActions, bandSelectActions, sameMetaSnap, trendPlaneActions, snapshotClearActions, type ClickAction } from "./pickActions";
 import { finerLevels } from "./focusLadder";
 import { METAGRAPHS } from "@/src/net/current";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
@@ -112,12 +112,11 @@ describe("clickActions — node clicks (the ordering contracts)", () => {
       "inspect",
     ]);
   });
-  it("LEDGER: filter + inspect — no floor ancestry (layers retired 2026-08-06), no geo drills", () => {
+  it("LEDGER: inspect only — NO filter (user, 2026-09-29: the explorer's signer row set it), no floor ancestry, no geo drills", () => {
     const p = nodePick("DE");
-    expect(kinds(clickActions({ mode: "ledger", pick: p, countryCc: null, current: state() }))).toEqual([
-      "filter",
-      "inspect",
-    ]);
+    expect(kinds(clickActions({ mode: "ledger", pick: p, countryCc: null, current: state() }))).toEqual(["inspect"]);
+    // …whatever the committed filter: a node never moves it here, as in geo.
+    expect(kinds(clickActions({ mode: "ledger", pick: p, countryCc: null, current: state({ filter: "ded" }) }))).toEqual(["inspect"]);
   });
 });
 
@@ -173,6 +172,13 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
       { kind: "inspect", pick: null },
     ]);
   });
+  it("nodeSelectActions: commitNetwork false never moves the filter, even where the view's policy would", () => {
+    const hyper = nodeSelectActions(nodePick(), { mode: "hyper", currentFilter: "all" });
+    expect(hyper.some((a) => a.kind === "filter")).toBe(true);
+    const raw = nodeSelectActions(nodePick(), { mode: "hyper", currentFilter: "all", commitNetwork: false });
+    expect(raw.some((a) => a.kind === "filter")).toBe(false);
+    expect(raw[raw.length - 1]).toEqual({ kind: "inspect", pick: nodePick() });
+  });
   it("nodeSelectActions: a row select == a scene node click (same ordered actions)", () => {
     const p = nodePick("DE");
     const row = nodeSelectActions(p, { mode: "geo", currentFilter: "all" });
@@ -204,6 +210,35 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
     expect(snapshotSelectActions(p, true, { pinnedOrdinal: ord, metaSnap: null })).toEqual([
       { kind: "snapshot", pick: p, follow: true },
     ]);
+  });
+
+  // ⚠️ CLEARING A TICK CLEARS WHAT HANGS UNDER IT (user, 2026-09-29: "deleting a snapshot card will
+  // clear the rung that is there at that moment"; live stays the default). The × used to clear the
+  // tick alone, and the re-click dropped only the metaSnap — so a committed metagraph survived,
+  // and with live resuming, `followLatest` re-grew its metagraph-snapshot card on the next beat.
+  it("snapshotClearActions: the tick's rungs present right now clear finest-first, then live resumes", () => {
+    const child = { metaId: "dor", ordinal: 7, hash: "", globalOrdinal: 42, ts: "T" };
+    expect(snapshotClearActions({ metaSnap: child, filter: "dor" })).toEqual([
+      { kind: "metaSnap", sel: null },
+      { kind: "filter", id: "all" },
+      { kind: "snapshot", pick: null, follow: true },
+    ]);
+    // A validator opened under the snapshot (∨) is the finest rung: it clears first.
+    expect(snapshotClearActions({ metaSnap: child, filter: "dor", hasInspect: true })[0]).toEqual({ kind: "inspect", pick: null });
+    // Only what is there: a bare tick clears alone.
+    expect(snapshotClearActions({ metaSnap: null, filter: "all" })).toEqual([{ kind: "snapshot", pick: null, follow: true }]);
+    // The DAG's card is the rung under a tick too (the base ledger's lens).
+    expect(snapshotClearActions({ metaSnap: null, filter: "dag" })).toEqual([
+      { kind: "filter", id: "all" },
+      { kind: "snapshot", pick: null, follow: true },
+    ]);
+  });
+  it("the pinned tick's RE-CLICK is the same clear as its × (one toggle language)", () => {
+    const p = { kind: "snapshot", title: "Global snapshot #42", data: { ordinal: 42 } } as unknown as Parameters<typeof snapshotSelectActions>[0];
+    const child = { metaId: "dor", ordinal: 7, hash: "", globalOrdinal: 42, ts: "T" };
+    expect(snapshotSelectActions(p, false, { pinnedOrdinal: 42, metaSnap: child, filter: "dor" })).toEqual(
+      snapshotClearActions({ metaSnap: child, filter: "dor" }),
+    );
   });
 
   it("snapshotSelectActions: committing a DIFFERENT tick drops the metaSnap it can't contain", () => {
@@ -402,7 +437,7 @@ describe("nodeSelectActions ancestry (spec Part 3 — full-ancestry rule)", () =
     const acts = nodeSelectActions(p, { mode: "geo", currentFilter: "dag" });
     expect(acts.find((a) => a.kind === "cohort")).toEqual({ kind: "cohort", sel: { cc: "FI", city: null, isp: null } });
   });
-  it("ledger: no layer ancestry (retired 2026-08-06) — filter (if changed) then inspect", () => {
+  it("ledger: no layer ancestry (retired 2026-08-06) and no filter — inspect only", () => {
     const acts = nodeSelectActions(geoPick, { mode: "ledger", currentFilter: "dor" });
     expect(acts.map((a) => a.kind)).toEqual(["inspect"]);
   });

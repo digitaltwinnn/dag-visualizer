@@ -31,6 +31,7 @@ import { METASNAP_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { followToggleActions, metaSnapSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { cn } from "@/lib/utils";
+import LiveDot from "@/components/LiveDot";
 
 // The body's row grammar and its three weights live in ./parts (`Fact` / `FactGroup` / `Foot`)
 // — shared with every other rail card, so this one can't drift into a dialect of its own. The
@@ -170,7 +171,7 @@ export default function MetaSnapPane({
       {/* The beating dot rides `following` on its own, so the card still FEELS live in the
           `anchored` state — the heartbeat-on-closed-cards rule doesn't depend on the number. */}
       {following && (
-        <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-dot-beat motion-reduce:animate-none" />
+        <LiveDot />
       )}
       {sameTick ? `anchored to ${anchor}` : following ? <>{rel ? `live · ${rel}` : "live"} → {anchor}</> : <>◷ {rel} → {anchor}</>}
     </button>
@@ -375,7 +376,7 @@ export default function MetaSnapPane({
               {stateProof && (
                 // "State HASH" (user, 2026-08-14 — "state proof" collided with the signers tab's
                 // "snapshot proof", a signature set; this is a DIGEST, kin to Hash/Parent above).
-                <FootRow label="State hash" value={midHash(stateProof, 29)} title={"The hash of the application state this snapshot results in, covered by the snapshot's own L0 seal — the state's provability. Distinct from the SIGNERS tab's 'snapshot proof', which is the L0 signature set; this is a digest, and the signatures sign over it." + stateProof} copy={stateProof} />
+                <FootRow label="State hash" value={midHash(stateProof, 29)} title={"The hash of the application state this snapshot results in, covered by the snapshot's L0 signatures — the state's provability. Distinct from the SIGNERS tab's 'snapshot proof', which is the L0 signature set; this is a digest, and the signatures sign over it." + stateProof} copy={stateProof} />
               )}
             </Foot>
           </div>

@@ -271,6 +271,10 @@ interface AppState {
   // The view transition's phase while one runs — OUT is the teardown, IN the build — so a view
   // switch can say "leaving A" and then "entering B" (user, 2026-09-26). Engine-written, edges only.
   motionPhase: "out" | "in" | null;
+  // Where the view transition's STAGING BAND ends, in canvas-local CSS px from the top (2026-09-29)
+  // — the lowest row of the gathered grids — so the motion hint can stand clear of it while a
+  // switch runs. Engine-written on change only; null until a transition has measured one.
+  gatherBottom: number | null;
   // Which rail slot is the materialized BOX right now (the expanded card — "context", "node",
   // "snap", …), or null when nothing is boxed. A PRESENTATION channel, written by Inspector
   // from the same state that renders the box, read by the subject callout so the scene label
@@ -443,6 +447,7 @@ interface AppState {
   setCameraFlying: (flying: boolean) => void;
   setSceneMoving: (moving: boolean) => void;
   setMotionPhase: (phase: "out" | "in" | null) => void;
+  setGatherBottom: (px: number | null) => void;
   setMotionCause: (cause: MotionCause | null) => void;
   setPhoneSheetPx: (px: number | null) => void;
   /** Publish how many px of the canvas an open rail sheet covers on one side (0 when closed). */
@@ -530,6 +535,7 @@ export const useStore = create<AppState>((set) => ({
   sceneMoving: false,
   motionCause: null,
   motionPhase: null,
+  gatherBottom: null,
   railCollapse: {},
   navQuiet: false,
   focusRung: null,
@@ -541,7 +547,9 @@ export const useStore = create<AppState>((set) => ({
   trendScroll: 0,
   trendFocus: null,
   trendScale: "shared",
-  trendWindow: "all" as ZoomId,
+  // 30 days by default (user, 2026-09-29): recent enough to read day by day, long enough to show a
+  // trend. The pills reach back to ALL.
+  trendWindow: "30d" as ZoomId,
   trendRange: null,
   trendIds: [],
   phoneSheetPx: null,
@@ -705,6 +713,7 @@ export const useStore = create<AppState>((set) => ({
   setCameraFlying: (cameraFlying) => set({ cameraFlying }),
   setSceneMoving: (sceneMoving) => set({ sceneMoving }),
   setMotionPhase: (motionPhase) => set({ motionPhase }),
+  setGatherBottom: (gatherBottom) => set({ gatherBottom }),
   setMotionCause: (motionCause) => set({ motionCause }),
   setNavQuiet: (navQuiet) => set({ navQuiet }),
   setRailCollapse: (id, collapsed) =>

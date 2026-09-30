@@ -2,7 +2,7 @@
 
 import { netUrl } from "@/src/net/current";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, ChevronRight, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, Search, X } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useStore } from "@/src/store/store";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
@@ -150,6 +150,19 @@ export default function AnchorLogTable() {
   const [qFrom, setQFrom] = useState("");
   const [qTo, setQTo] = useState("");
   const [seeking, setSeeking] = useState(false);
+  // ⚠️ AN ARRIVAL SHOWS ITS SEARCH, NOT THE LIVE PAGE (user, 2026-09-29: coming to the raw page
+  // from History with a network in scope "looks like it's loading something twice"). The door hands
+  // over a date; the log must read page 1 first (it is how the walk learns the chain's newest
+  // ordinal), and it used to SHOW that page — the live tip, seconds old — for the several seconds
+  // the walk took, then jump to the answer a year back. Page 1 still loads underneath; while the
+  // arrival's search is pending the table states that search instead, and the flag drops when the
+  // walk ends either way (landed, or its miss is printed in the bar).
+  const [arriving, setArriving] = useState(false);
+  // Any answer printed in the bar ends an arrival's hold too — every early exit of the walk says
+  // why through `jumpMiss`, so the table can never be left holding a search that already answered.
+  useEffect(() => {
+    if (jumpMiss) setArriving(false);
+  }, [jumpMiss]);
   /** Chain pages fetched by a SEEK, keyed by the `before` ordinal asked for (see loadPage). Cleared
    *  with the walk when the network changes — another network's ordinals mean nothing here. */
   const probes = useRef<Map<number, { ordinal: number; ts: string }[]>>(new Map());
@@ -166,6 +179,11 @@ export default function AnchorLogTable() {
   const inFlight = useRef(new Set<string>());
   const [version, setVersion] = useState(0);
   const [histErr, setHistErr] = useState(false);
+  // A failed chain read is an answer as well: the hold must not hide the message (and the pager)
+  // that says the read failed and how to retry it (rule 10 — a hold with no give-up path).
+  useEffect(() => {
+    if (histErr) setArriving(false);
+  }, [histErr]);
 
   // The network's newest ordinal — the lifetime total (ordinals are sequential and gapless).
   // The live buffer leads; the explorer's first page seeds it for a quiet network whose window
@@ -195,38 +213,54 @@ export default function AnchorLogTable() {
       setVersion((v) => v + 1);
     }
   }, [histNet]);
+  // ⚠️ STALE-WHILE-REVALIDATE (user, 2026-09-29: opening the raw log under a filter "looks like
+  // it's loading something twice"). A new anchor used to DELETE page 1 before refetching it, so
+  // for the length of the request the table had no rows, fell into its "reading the chain…"
+  // branch and painted again — on every anchor, most visibly right after the layer opened on a
+  // page cached while it was away. Page 1 now stays on screen and is REPLACED when the fresh
+  // read lands. A generation counter, not a flag: an anchor arriving mid-refresh must leave the
+  // page stale, or the older refresh would mark it current and the newest anchor would be missed.
+  const liveGen = useRef(0);
+  const liveHave = useRef(0);
   useEffect(() => {
     if (!histNet || page !== 1) return;
-    hist.current.pages.delete(1);
+    liveGen.current += 1;
     setVersion((v) => v + 1);
     // bufferedNewest is the real dependency: a new anchor means a stale live page.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bufferedNewest, histNet]);
 
-  // Fetch the current page if missing. Page 1 is the live tip; every deeper page is the
-  // ordinal-addressed immutable read, so ANY page — a « jump to genesis included — is one
-  // request, no cursor chain.
+  // Fetch the current page if missing (or, for page 1, stale). Page 1 is the live tip; every
+  // deeper page is the ordinal-addressed immutable read, so ANY page — a « jump to genesis
+  // included — is one request, no cursor chain. One request per page at a time: the effect
+  // re-runs on every `version` bump (each resolved ANCHORED INTO cell is one), and cancelling
+  // the read on each of those would starve it.
+  const pageFetch = useRef(new Set<string>());
   useEffect(() => {
-    if (!histNet || hist.current.net !== histNet || hist.current.pages.has(page)) return;
+    if (!histNet || hist.current.net !== histNet) return;
+    const stale = page === 1 && liveHave.current !== liveGen.current;
+    if (hist.current.pages.has(page) && !stale) return;
     const frozen = hist.current.latest;
     if (page !== 1 && frozen === 0) return; // no arithmetic base yet — page 1 seeds it
     const before = frozen - (page - 1) * PAGE;
     if (page !== 1 && before < 1) return;
-    let dead = false;
+    const key = `${histNet}:${page}`;
+    if (pageFetch.current.has(key)) return;
+    pageFetch.current.add(key);
+    const gen = liveGen.current;
     fetch(netUrl(`/api/network/${histNet}/snapshots${page === 1 ? "" : `?before=${before}`}`))
       .then((r) => (r.ok ? (r.json() as Promise<{ rows: HistRow[] }>) : Promise.reject()))
       .then((d) => {
-        if (dead) return;
+        if (hist.current.net !== histNet) return; // the walk moved to another network meanwhile
         hist.current.pages.set(page, d.rows);
+        if (page === 1) liveHave.current = gen;
         setHistErr(false);
         setVersion((v) => v + 1);
       })
       .catch(() => {
-        if (!dead) setHistErr(true);
-      });
-    return () => {
-      dead = true;
-    };
+        if (hist.current.net === histNet) setHistErr(true);
+      })
+      .finally(() => pageFetch.current.delete(key));
   }, [histNet, page, version]);
 
   // Resolve the visible page's ANCHORED INTO ticks: buffer join first (free), the resolver
@@ -329,7 +363,13 @@ export default function AnchorLogTable() {
   const windowFirst = (() => {
     if (!net) return null;
     const listed = buildAnchorLog(net.metaSnaps, net.globalSnapshots, filter);
-    return listed[0] ?? null;
+    // ⚠️ THE NEWEST ROW WITH A SNAPSHOT, not the newest row (found 2026-09-29: the pane opened
+    // on "Select a metagraph snapshot…"). The buffer's newest global tick is usually a SEAM while
+    // it settles — its metagraph snapshots are stamped over the seconds AFTER it appears (the tick
+    // lifecycle, src/data/CLAUDE.md) — and a seam commits the tick alone, which leaves the channel
+    // pane on its empty state. The newest row that carries a snapshot is a real row, a few seconds
+    // older, and it is what "opens on a subject" means.
+    return listed.find((r) => r.metaId != null) ?? listed[0] ?? null;
   })();
   useEffect(() => {
     if (section !== "data" || !armed.current || metaSnap || !windowFirst) return;
@@ -535,6 +575,8 @@ export default function AnchorLogTable() {
       setJumpMiss("the chain read failed — try again");
     } finally {
       setSeeking(false);
+      // A landed arrival keeps its hold until the answer's ROWS are here (the effect beside the
+      // render below); a miss releases it through `jumpMiss`.
     }
   };
 
@@ -556,6 +598,12 @@ export default function AnchorLogTable() {
     if (logSeek.metaId) {
       setSearchMeta(logSeek.metaId);
       pendingSeek.current = true;
+      setArriving(true);
+      // A PREVIOUS search's landing would satisfy the hold's release at once (a marked row, page 1
+      // cached) and flash the live page before this seek runs — the double-load the hold exists
+      // to prevent.
+      setMarked(null);
+      setJumpMiss(null);
     } else {
       // ⚠️ AN ARRIVAL THAT CANNOT RUN MUST SAY SO. A global chart's range names no chain, so the
       // dates land prefilled and the seek waits — and with nothing on screen to explain it, the
@@ -607,6 +655,14 @@ export default function AnchorLogTable() {
    *  silently in force with nothing on screen to explain the rows you are looking at. */
   const searchSet = !!(qSnapshot || qTick || qFrom || qTo);
 
+  // A SEARCH THAT LANDS FOLDS THE BAR (design round, 2026-09-29): the landing mark on the row and
+  // the toolbar's applied chip say what is in force, so the fields step aside and the log gets its
+  // height back — on the phone that is the sheet closing onto the answer. A miss keeps the bar
+  // open, since its answer is printed inside it.
+  useEffect(() => {
+    if (marked != null) setSearchOpen(false);
+  }, [marked]);
+
   // Built ONCE and rendered by BOTH branches below — a seek swaps the table into its loading state
   // while a page is fetched, and unmounting the controls mid-seek loses what was typed.
   const search = !searchOpen ? null : (
@@ -633,6 +689,9 @@ export default function AnchorLogTable() {
   const clearSearch = () => {
     setQSnapshot(""); setQTick(""); setQFrom(""); setQTo("");
     setMarked(null); setJumpMiss(null);
+    // Clearing the arrival's search cancels it: nothing is being found any more.
+    pendingSeek.current = false;
+    setArriving(false);
   };
 
   /** THE TABLE'S TOOLBAR — the researched home for a table search (2026-09-01). The controls stay
@@ -656,10 +715,14 @@ export default function AnchorLogTable() {
     // is exactly where SectionShell's absolute close sits — and the phone pane's slimmer padding
     // (pr-4, was the pr-10 tablet gutter) plus the ×'s 44px touch box put the two on top of each
     // other. The reserve is the ×'s own touch width.
-    <div className="flex-none flex items-center justify-end gap-1.5 pb-2 max-[700px]:pr-10">
+    // ⚠️ LEGIBLE CONTROLS (design round, 2026-09-29, desktop A + phone A): the toggle was a 16px
+    // line of micro caps and the applied search a whisper beside a caps "clear". Both are 32px
+    // controls now (44px on touch and phone) on the bar's own type: the toggle a real button that
+    // shows pressed while open, the applied search ONE chip whose × clears it.
+    <div className="flex-none flex items-center justify-end gap-2 pb-2 max-[700px]:pr-10">
       {searchSet && (
-        <>
-          <span className="min-w-0 truncate text-micro text-muted-foreground">
+        <span className="inline-flex min-w-0 items-center gap-1 h-8 pointer-coarse:h-11 max-[700px]:h-11 max-[700px]:flex-1 pl-3 pr-1 rounded-btn border border-border/70 bg-[var(--panel-plate)] text-body text-foreground-dim">
+          <span className="min-w-0 truncate tabular-nums">
             {[qSnapshot && `snapshot ${qSnapshot}`, qTick && `in global ${qTick}`, qFrom && `from ${qFrom}`, qTo && `to ${qTo}`]
               .filter(Boolean)
               .join(" · ")}
@@ -667,38 +730,61 @@ export default function AnchorLogTable() {
           <button
             type="button"
             onClick={clearSearch}
-            className="inline-flex flex-none items-center gap-0.5 rounded-xs px-1 py-0.5 cursor-pointer text-micro uppercase tracking-caps text-muted-foreground hover:text-foreground hover:bg-wash-faint focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
+            aria-label="Clear search"
+            title="Clear search"
+            className="inline-flex flex-none size-6 pointer-coarse:size-9 max-[700px]:size-9 items-center justify-center rounded-xs cursor-pointer text-muted-foreground hover:text-foreground hover:bg-wash-faint focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
           >
-            <X aria-hidden className="size-3" /> clear
+            <X aria-hidden className="size-3.5" />
           </button>
-        </>
+        </span>
       )}
       <button
         type="button"
         aria-expanded={searchOpen}
         onClick={() => setSearchOpen((o) => !o)}
         className={cn(
-          "inline-flex flex-none items-center gap-1 rounded-xs px-1 py-0.5 cursor-pointer",
-          "text-micro uppercase tracking-caps transition-colors hover:bg-wash-faint hover:text-foreground",
+          "inline-flex flex-none items-center gap-2 h-8 pointer-coarse:h-11 max-[700px]:h-11 px-3 rounded-btn border cursor-pointer",
+          "text-body font-medium transition-colors",
           "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
-          searchOpen ? "bg-wash-faint text-foreground" : "text-muted-foreground",
+          searchOpen
+            ? "border-primary/45 bg-wash-soft text-primary"
+            : "border-border/70 text-foreground-dim hover:bg-wash-faint hover:text-foreground",
         )}
       >
-        <Search aria-hidden className="size-3" />
-        search snapshots
-        {/* The disclosure chevron this control was missing (user, 2026-09-01: "the 'search fields'
-            needs a > as well no?") — the app's one expand affordance, on its own 150ms clock, so
-            the button says at rest that there is something behind it. */}
-        <ChevronRight
+        <Search aria-hidden className="size-[15px] text-primary" />
+        {/* The noun is said once, here (the fields name only their axis); the phone's toolbar
+            is narrow, and the sheet it opens carries the full title. */}
+        <span className="max-[700px]:hidden">Search snapshots</span>
+        <span className="min-[700px]:hidden">Search</span>
+        {/* The disclosure chevron (user, 2026-09-01: "needs a > as well") — pointing at where the
+            bar opens, below, on its own 150ms clock. The phone opens a sheet, which needs none. */}
+        <ChevronDown
           aria-hidden
           className={cn(
-            "size-3 transition-transform duration-150 motion-reduce:transition-none",
-            searchOpen && "rotate-90",
+            "size-3.5 max-[700px]:hidden transition-transform duration-150 motion-reduce:transition-none",
+            searchOpen && "rotate-180",
           )}
         />
       </button>
     </div>
   );
+
+  // The hold ends on the ANSWER'S ROWS, not on the walk: the walk lands on a page number and the
+  // page still has to be read, and ending on the walk showed "reading the chain…" in between.
+  useEffect(() => {
+    if (arriving && !seeking && marked != null && rows.length > 0) setArriving(false);
+  });
+
+  if (arriving && histNet)
+    return (
+      <>
+        {toolbar}
+        {search}
+        <p className="m-auto text-label text-muted-foreground">
+          {`Finding the snapshots from ${qFrom || "that date"}…`}
+        </p>
+      </>
+    );
 
   if (rows.length === 0)
     return (

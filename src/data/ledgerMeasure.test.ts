@@ -5,8 +5,10 @@ import {
   LEDGER_MEASURE_OPTIONS,
   LEDGER_MEASURE_ORDER,
   SNAP_MEASURE_OPTIONS,
+  SNAP_MEASURES,
   kbFigure,
   TICK_NET_MEASURE_OPTIONS,
+  TICK_NET_MEASURES,
   snapMeasureValue,
   tickMeasureValue,
   tickNetMeasure,
@@ -84,8 +86,11 @@ describe("the levels' lists and their numbers (design 2026-09-26: each level has
   });
 
   it("a network under a tick counts its snapshots itself and takes fee and size from the exact breakdown", () => {
-    expect(TICK_NET_MEASURE_OPTIONS.map((o) => o.id)).toEqual(["snapshots", "fee", "size"]);
-    expect(tickNetMeasure("snapshots", 4, undefined)).toEqual({ value: 4, text: "4" });
+    // The tick level's own words, minus Metagraphs — a network under a tick IS one metagraph;
+    // its snapshots in the tick are its ANCHORS there (was a separate "Snapshots" word).
+    expect(TICK_NET_MEASURE_OPTIONS.map((o) => o.label)).toEqual(["Fees", "Anchors", "Size"]);
+    expect(TICK_NET_MEASURES).toEqual(["fee", "anchors", "size"]); // the tick's list minus Metagraphs
+    expect(tickNetMeasure("anchors", 4, undefined)).toEqual({ value: 4, text: "4" });
     expect(tickNetMeasure("fee", 4, { fee: 4_600_000, bytes: 20_480 })).toEqual({ value: 4_600_000, text: "0.0460" });
     expect(tickNetMeasure("size", 4, { fee: 0, bytes: 20_480 })).toEqual({ value: 20_480, text: "20" });
     expect(tickNetMeasure("fee", 4, undefined)).toEqual({ value: null, text: NO_MEASURE });
@@ -93,6 +98,8 @@ describe("the levels' lists and their numbers (design 2026-09-26: each level has
 
   it("a snapshot measures its own fee or its own bytes, from either byte field, or nothing", () => {
     expect(SNAP_MEASURE_OPTIONS.map((o) => o.id)).toEqual(["fee", "size"]);
+    expect(SNAP_MEASURES).toEqual(["fee", "size"]); // one anchor of one metagraph: no counts
+    expect(SNAP_MEASURE_OPTIONS.map((o) => o.label)).toEqual(["Fees", "Size"]); // the tick level's words
     expect(snapMeasureValue("fee", { fee: 12 })).toBe(12);
     expect(snapMeasureValue("size", { fee: 0, sizeInKB: 2 })).toBe(2048);
     expect(snapMeasureValue("size", { fee: 0, bytes: 14 })).toBe(14);

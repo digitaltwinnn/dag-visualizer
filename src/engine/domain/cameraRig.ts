@@ -344,6 +344,99 @@ export function nudgeMix(t: number): number {
   return NUDGE_AMP * s * s;
 }
 
+// ---- THE FLIGHT PATH -------------------------------------------------------------------------
+// (user, 2026-09-29: a geo country click "has a sharp curve", and provider → country "first goes
+// in the opposite direction before zooming out … just move the camera where it needs to go".)
+// The tween used to lerp the camera POSITION and the TARGET as two straight lines. Between an
+// overview and a close pose that end-loads the turn — the aim swings by |Δtarget| / distance, and
+// the distance collapses in the last third — and between two close poses with different targets
+// it can bring the camera in and back out within one flight. So a flight moves the ORBIT:
+//   • the DIRECTION (target → camera) slerps, so the view turns at an even rate;
+//   • the DISTANCE is geometric, r0^(1−e)·r1^e — monotone, so a flight zooms ONE way, and even
+//     to the eye, which reads zoom as a ratio;
+//   • the TARGET is paced by the distance, s = (r − r0)/(r1 − r0): its screen speed goes as
+//     Δtarget / r, so it travels while the camera is far out and settles as the camera closes in
+//     (zooming in), or waits for the camera to back out before it moves (zooming out) — the pan
+//     reads even rather than sweeping the ground past a camera already close to it.
+// At e = 0 and e = 1 it is exactly the two poses, so the nudge still composes on top unchanged.
+// Zero allocation: module scratch only, written into the caller's out-vectors.
+const _d0 = new THREE.Vector3();
+const _d1 = new THREE.Vector3();
+const _axis = new THREE.Vector3();
+const _q = new THREE.Quaternion();
+/** Below this relative gap two distances count as equal, and the target falls back to an even pace. */
+const ORBIT_SAME_R = 1e-6;
+
+export function orbitLerp(
+  fromPos: THREE.Vector3,
+  fromTgt: THREE.Vector3,
+  toPos: THREE.Vector3,
+  toTgt: THREE.Vector3,
+  e: number,
+  outPos: THREE.Vector3,
+  outTgt: THREE.Vector3,
+): void {
+  _d0.subVectors(fromPos, fromTgt);
+  _d1.subVectors(toPos, toTgt);
+  const r0 = _d0.length();
+  const r1 = _d1.length();
+  // A degenerate orbit (camera on its target) has no direction to slerp — the straight line is
+  // the only honest path.
+  if (r0 < 1e-9 || r1 < 1e-9) {
+    outTgt.lerpVectors(fromTgt, toTgt, e);
+    outPos.lerpVectors(fromPos, toPos, e);
+    return;
+  }
+  const r = Math.pow(r0, 1 - e) * Math.pow(r1, e);
+  const s = Math.abs(r1 - r0) > ORBIT_SAME_R * Math.max(r0, r1) ? (r - r0) / (r1 - r0) : e;
+  outTgt.lerpVectors(fromTgt, toTgt, s);
+  _d0.divideScalar(r0);
+  _d1.divideScalar(r1);
+  const angle = _d0.angleTo(_d1);
+  _axis.crossVectors(_d0, _d1);
+  if (_axis.lengthSq() < 1e-12) {
+    // Parallel: nothing to turn. Opposite: any axis perpendicular to the direction is a shortest
+    // turn — prefer world-up's, so a half-turn swings over the side rather than through the pole.
+    if (angle > 1e-6) {
+      _axis.crossVectors(_d0, _up);
+      if (_axis.lengthSq() < 1e-12) _axis.set(1, 0, 0).cross(_d0);
+    }
+  }
+  if (angle > 1e-9 && _axis.lengthSq() >= 1e-12) {
+    _q.setFromAxisAngle(_axis.normalize(), angle * e);
+    _d0.applyQuaternion(_q);
+  }
+  outPos.copy(_d0).multiplyScalar(r).add(outTgt);
+}
+
+/**
+ * THE HONEST DESTINATION (user, 2026-09-29: provider → country "first goes in the opposite
+ * direction"). The frame loop clamps the camera AFTER the tween writes it — OrbitControls holds
+ * the camera→target distance inside [min, max] on `update()`, then the Engine holds geo's
+ * altitude from the origin (`viewPolicy.minCamAlt`). A pose past those floors therefore never
+ * lands: the flight dives toward it until a clamp catches the camera mid-flight and pushes it
+ * back out (measured on Germany's country pose: distance walled at 12 halfway through, altitude
+ * 24.1 → 24.6 → 24.4 → 27.9). Resolving the destination through the SAME clamps in the SAME
+ * order first means the flight ends where the camera is held anyway — the settled pose is
+ * byte-identical to before, only the path changes. In place on `pos`.
+ */
+export function clampPose(
+  pos: THREE.Vector3,
+  tgt: THREE.Vector3,
+  minDist: number,
+  maxDist: number,
+  minAlt: number | null,
+): THREE.Vector3 {
+  _d0.subVectors(pos, tgt);
+  const r = _d0.length();
+  if (r > 1e-9 && (r < minDist || r > maxDist)) {
+    _d0.setLength(THREE.MathUtils.clamp(r, minDist, maxDist));
+    pos.copy(tgt).add(_d0);
+  }
+  if (minAlt != null && pos.lengthSq() < minAlt * minAlt) pos.setLength(minAlt);
+  return pos;
+}
+
 // ---- the Snapshots COMMIT ORBIT -------------------------------------------------------------
 // With a metagraph filter committed, the frontal resting pose ORBITS a little into a
 // three-quarter view (user, 2026-08-09: "when there is a filter on a metagraph, tilt the camera a

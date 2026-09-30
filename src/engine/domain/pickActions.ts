@@ -17,6 +17,7 @@ import type { Mode } from "@/src/store/store";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
 import type { CohortSel, CompositionSel } from "./focusLadder";
 import { UNLISTED_KEY } from "./ledgerBands";
+import { VIEW_POLICIES } from "./viewPolicy";
 
 export type ClickAction =
   | { kind: "filter"; id: string }                                             // commit the network filter
@@ -120,10 +121,12 @@ export function compositionToggleActions(
 // Germany used to empty the globe and the country list down to that machine's network, which
 // is the opposite of the browsing the click was part of. So in geo the ancestry is country →
 // cohort → node and the network is never committed by a node — the top-bar filter and the
-// hub-less scene keep it a deliberate, separate gesture. Hyper keeps filter-first (a node is a
-// bead on its hub's shell; the filter is what dims the other hubs and frames the network, and
-// the node rung inherits that framing), and so does the ledger's NODE (a tray node belongs to
-// the chamber's lens; its SNAPSHOT rows do not — `metaSnapSelectActions`). Full-ancestry rule
+// hub-less scene keep it a deliberate, separate gesture. NOR IN THE LEDGER (user, 2026-09-29: the
+// explorer's signer row set the filter): the committed network is the chamber's LENS, and no
+// other row of that explorer moves it (`metaSnapSelectActions`, decision 13). Only hyper keeps
+// filter-first (a node is a bead on its hub's shell; the filter is what dims the other hubs and
+// frames the network, and the node rung inherits that framing) — `viewPolicy.nodeCommitsNetwork`
+// is the allow-list. Full-ancestry rule
 // (spec Part 3): committing every
 // rung above the node means a deselect steps back down the SAME ladder regardless of how the
 // node was reached (scene click, explorer row, or a jump straight from "all"). `deselect` is
@@ -139,13 +142,18 @@ export function nodeSelectActions(
      *  group, or the one the Engine derives for a scene click). The caller resolves it, because
      *  the group vocabulary lives in the data layer. */
     compositionSel?: CompositionSel | null;
+    /** A surface that never moves the filter (the RAW node table — user, 2026-09-29: "clicking a
+     *  row on the hyper page sets the filter, that should not happen") passes `false`: the record
+     *  microscope inspects the node it lists, and the top bar stays the one place to commit a
+     *  network. Absent = the view's own policy. */
+    commitNetwork?: boolean;
   },
 ): ClickAction[] {
   if (opts.deselect) return [{ kind: "inspect", pick: null }];
   const acts: ClickAction[] = [];
   const netId = pickNetId(p);
-  // Geo never commits the network from a node (see the header); every other view drills first.
-  if (netId && netId !== opts.currentFilter && opts.mode !== "geo") acts.push({ kind: "filter", id: netId });
+  // Only a view whose row opts in drills the filter first (see the header).
+  if (netId && netId !== opts.currentFilter && (opts.commitNetwork ?? VIEW_POLICIES[opts.mode].nodeCommitsNetwork)) acts.push({ kind: "filter", id: netId });
   acts.push(...nodeAncestryActions(p, opts));
   acts.push({ kind: "inspect", pick: p });
   return acts;
@@ -197,6 +205,26 @@ export function filterToggleActions(id: string, currentFilter: string): ClickAct
 // Selecting a SNAPSHOT — shared by the ledger's tile click and LiveStrip's bar click:
 // clicking the LIVE tip (re-)follows the heartbeat; anything older pins that snapshot
 // (the FollowController only auto-advances while following).
+/** CLEARING A GLOBAL SNAPSHOT — its card's × and the pinned tick's re-click, one builder (user,
+ *  2026-09-29: "deleting a snapshot card will clear the rung that is there at that moment"; live
+ *  stays the default). The tick is the ledger rail's PARENT: the metagraph card (the committed
+ *  filter — the DAG's included, the base ledger's lens) and its metagraph snapshot hang under it,
+ *  so they clear with it, finest first, and live resumes. The filter has to go too, not just the
+ *  metaSnap: with a metagraph committed, live follow RE-GROWS that network's newest snapshot card
+ *  on the next beat (`followLatest`'s live metagraph mode), which is how the × used to leave the
+ *  children standing. Only what is there right now is cleared. */
+export function snapshotClearActions(current: { metaSnap: MetaSnapSel | null; filter: string; hasInspect?: boolean }): ClickAction[] {
+  const out: ClickAction[] = [];
+  // The NODE is the ledger ladder's finest rung (a metagraph snapshot's validator, `∨`), so a node
+  // card left standing under a cleared tick would hang from nothing — and its pager, losing the
+  // signer set, would fall back to walking every node.
+  if (current.hasInspect) out.push({ kind: "inspect", pick: null });
+  if (current.metaSnap) out.push({ kind: "metaSnap", sel: null });
+  if (current.filter !== "all") out.push({ kind: "filter", id: "all" });
+  out.push({ kind: "snapshot", pick: null, follow: true });
+  return out;
+}
+
 export function snapshotSelectActions(
   p: Extract<PickDescriptor, { kind: "snapshot" }>,
   isLiveTip: boolean,
@@ -209,6 +237,7 @@ export function snapshotSelectActions(
      *  shaping a snapshot that has nothing to do with it. Omitted = the filter holds. */
     filter?: string;
     tickHasFilter?: boolean;
+    hasInspect?: boolean;
   },
 ): ClickAction[] {
   // RE-CLICKING the pinned tick DESELECTS (2026-08-07 — the toggle every other rung already
@@ -216,10 +245,7 @@ export function snapshotSelectActions(
   // default until something is clicked — the FollowController repopulates the card chain and
   // the trail slides back to the live front).
   if (!isLiveTip && current && current.pinnedOrdinal != null && current.pinnedOrdinal === p.data.ordinal) {
-    const out: ClickAction[] = [];
-    if (current.metaSnap) out.push({ kind: "metaSnap", sel: null });
-    out.push({ kind: "snapshot", pick: null, follow: true });
-    return out;
+    return snapshotClearActions({ metaSnap: current.metaSnap, filter: current.filter ?? "all", hasInspect: current.hasInspect });
   }
   const out: ClickAction[] = [];
   if (
@@ -380,6 +406,7 @@ export function clickActions(input: {
       metaSnap: current.metaSnap ?? null,
       filter: current.filter,
       tickHasFilter: current.tickHasFilter,
+      hasInspect: current.hasInspect,
     });
 
   // A node, in any view. (No autoRotate action: geo disables the controls' rotation at mode

@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Loader2, Search, X } from "lucide-react";
 
 import DateRange from "@/components/datasection/DateRange";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -80,9 +80,15 @@ export default function LogSearchBar({
   // controls — three fields, the calendar trigger, the button — take 40px through the same
   // pointer-coarse idiom the top bar uses, so the row can never mix heights again (the exact
   // mistake the 2026-09-01 "standardize" round fixed once at h-6).
+  //
+  // ⚠️ AND LEGIBLE AT REST (user, 2026-09-29: "the search control is tiny, the filter hints as
+  // well" — design round `.superpowers/brainstorm/…/search-options.html`, desktop A + phone A).
+  // 24px fields under 10.5px caps labels read as fine print; the bar is 32px now, 44px on touch
+  // and on the phone, where the inputs also take 16px text — iOS zooms the page into any focused
+  // input set smaller, which on this layer would throw the reader off the log.
   const field =
-    "min-w-0 h-6 pointer-coarse:h-10 px-1.5 py-0 bg-[var(--panel-plate)] border border-border/50 rounded-xs " +
-    "font-mono text-body tabular-nums text-foreground " +
+    "min-w-0 h-8 pointer-coarse:h-11 max-[700px]:h-11 px-2.5 py-0 bg-[var(--panel-plate)] border border-border/70 rounded-xs max-[700px]:rounded-btn " +
+    "font-mono text-body max-[700px]:text-base tabular-nums text-foreground " +
     "hover:border-border focus:border-transparent " +
     "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] transition-colors";
   // ⚠️ AND PHONE ALIGNS THE CRITERIA AS LABELLED ROWS (same user note: "the search fields need
@@ -90,7 +96,13 @@ export default function LogSearchBar({
   // different left edge — a ragged form. Each criterion goes full-width, the label takes one
   // fixed column and the field fills the rest, so the fields share one edge the way Fact values
   // share theirs. Desktop keeps the one-line flow untouched.
-  const label = "flex-none text-micro uppercase tracking-caps text-muted-foreground max-[700px]:w-24";
+  //
+  // The labels are sentence-case body text in the dim ink (they were micro caps in the muted one —
+  // the "filter hints" the user found tiny). On the PHONE they stand ABOVE their fields in the
+  // sheet, so every field takes the full width and no label column eats the ordinal's room (the
+  // ordinal field measured 76px there beside a 96px label column).
+  const label = "flex-none text-body text-foreground-dim";
+  const criterion = "flex flex-none items-center gap-2.5 max-[700px]:w-full max-[700px]:flex-col max-[700px]:items-stretch max-[700px]:gap-2";
 
   // What the one button would actually do. Any typed criterion ENABLES it — including a
   // metagraph ordinal with no chain picked, which the handler answers with "pick which
@@ -100,7 +112,15 @@ export default function LogSearchBar({
   const canGo = !!snapshot || !!tick || !!from;
 
   return (
+    <>
+    {/* THE PHONE SHEET'S VEIL (design round phone A): the bar rises over the log instead of pushing
+        it down — open, it took ~40% of the screen and left the table two rows. A tap on the veil
+        folds it like Escape. Phone only; the raw panel's backdrop-filter makes the panel this
+        `fixed` layer's containing block, so veil and sheet stay inside the log's own glass. */}
+    <div aria-hidden onClick={onClose} className="hidden max-[700px]:block fixed inset-0 z-40 bg-black/50" />
     <div
+      role="search"
+      aria-label="Search snapshots"
       // ⚠️ THE BAR IS ITS OWN BOX (user, 2026-09-01: "can you check the margins? it looks like it's
       // all a bit crammed", then "maybe put the search fields in a subtle outline"). Measured
       // before: the toolbar, this row and the table header sat at 0px from each other, three
@@ -110,7 +130,14 @@ export default function LogSearchBar({
       //
       // OUTLINE ONLY, no fill: the fields inside carry `--panel-plate`, and a plate on a plate
       // would flatten them into the container. Same weight as every other resting division here.
-      className="flex-none flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-border/50 px-3 py-2 mb-2"
+      className={cn(
+        "flex-none flex flex-wrap items-center gap-x-7 gap-y-2 rounded-md border border-border/60 px-3.5 py-3 mb-2",
+        // PHONE: a bottom sheet — hairline top edge, rounded top, the panel's own glass ground.
+        "max-[700px]:fixed max-[700px]:inset-x-0 max-[700px]:bottom-0 max-[700px]:z-50 max-[700px]:mb-0",
+        "max-[700px]:flex-col max-[700px]:flex-nowrap max-[700px]:items-stretch max-[700px]:gap-4",
+        "max-[700px]:rounded-none max-[700px]:rounded-t-[18px] max-[700px]:border-0 max-[700px]:border-t max-[700px]:border-border",
+        "max-[700px]:px-5 max-[700px]:pt-2 max-[700px]:pb-6 max-[700px]:[background:var(--topbar-glass),var(--background)]",
+      )}
       onKeyDown={(e) => {
         if (e.key === "Escape") onClose();
         // Enter anywhere in the bar runs the same search the button runs — implicit submission for
@@ -118,19 +145,32 @@ export default function LogSearchBar({
         if (e.key === "Enter" && canGo) { e.preventDefault(); onSubmit(); }
       }}
     >
+      {/* The sheet's head — grabber and title with its close — phone only. Desktop keeps the
+          toolbar's toggle as the one way in and out. */}
+      <div className="hidden max-[700px]:flex flex-col gap-2">
+        <span aria-hidden className="self-center h-1 w-10 rounded-full bg-foreground-dim/35" />
+        <div className="flex items-center justify-between">
+          <span className="text-title font-semibold">Search snapshots</span>
+          <button type="button" onClick={onClose} aria-label="Close search" className="-mr-3 inline-flex size-11 items-center justify-center rounded-btn text-muted-foreground hover:text-foreground">
+            <X aria-hidden className="size-[18px]" />
+          </button>
+        </div>
+      </div>
+
       {/* ── METAGRAPH SNAPSHOT — the chain, then its ordinal, as one control ─────────────────── */}
-      <span className="flex flex-none items-center gap-1.5 max-[700px]:w-full">
+      <span className={criterion}>
         {/* ⚠️ THE NOUN IS SAID ONCE, BY THE TOGGLE (user, 2026-09-01: "remove 'snapshot' from the
             filter texts? say 'search snapshots' instead?"). "SEARCH SNAPSHOTS" opens the bar, so
             repeating "snapshot" in all three labels only crowded them — each field names the axis
             that distinguishes it and nothing more. The aria-labels stay unabbreviated: a reader
             hears one field at a time, with no toggle above it to carry the noun. */}
-        <span className={label}>metagraph</span>
+        <span className={label}>Metagraph</span>
         {/* ⚠️ The trigger COLLAPSES TO ITS MARK once chosen: an identity bullet and the ticker, the
             same two-part identity every row and card in this app wears (user: "you'll see the
             metagraph coloured bullet with the selected snapshot number in the field"). The two
             halves are JOINED — squared inner corners, no gap — because they are one criterion, and
             a gap between them would read as two. */}
+        <span className="flex min-w-0">
         <Select value={metaId ?? ANY_NET} onValueChange={(v) => setMetaId(v === ANY_NET ? null : v)} disabled={metaLocked}>
           <SelectTrigger
             size="sm"
@@ -139,7 +179,7 @@ export default function LogSearchBar({
             // ⚠️ `h-6!` — CSS trap 4. The primitive sizes itself with `data-[size=sm]:h-8`, an
             // attribute selector at (0,2,0) that beats a plain `h-6` at (0,1,0), so the picker sat
             // 32px tall beside 24px inputs. The important modifier is the documented escape.
-            className="h-6! pointer-coarse:h-10! w-[116px] flex-none rounded-l-xs rounded-r-none border-r-0 border-border/50 bg-[var(--panel-plate)] px-1.5 py-0! text-micro uppercase tracking-caps focus-visible:ring-0 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
+            className="h-8! pointer-coarse:h-11! max-[700px]:h-11! w-[112px] max-[700px]:w-[124px] flex-none rounded-l-xs max-[700px]:rounded-l-btn rounded-r-none border-r-0 border-border/70 bg-[var(--panel-plate)] px-2.5 py-0! text-body max-[700px]:text-base focus-visible:ring-0 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
           >
             <SelectValue placeholder="network" />
           </SelectTrigger>
@@ -165,7 +205,7 @@ export default function LogSearchBar({
                 reason this picker exists at all. The title says so before the press. */}
             <SelectItem
               value={ANY_NET}
-              className="text-micro uppercase tracking-caps"
+              className="text-body"
               title="No chain chosen. A date search reaches any of them; a snapshot number still needs one, since ordinals count per chain."
             >
               <span className="flex items-center gap-1.5">
@@ -174,7 +214,7 @@ export default function LogSearchBar({
               </span>
             </SelectItem>
             {networks.map((n) => (
-              <SelectItem key={n.id} value={n.id} className="text-micro uppercase tracking-caps">
+              <SelectItem key={n.id} value={n.id} className="text-body">
                 <span className="flex items-center gap-1.5">
                   <span
                     aria-hidden
@@ -193,26 +233,27 @@ export default function LogSearchBar({
           value={snapshot}
           aria-label="Metagraph snapshot ordinal"
           onChange={(e) => onSnapshot(e.target.value)}
-          className={cn(field, "w-[124px] max-[700px]:w-auto max-[700px]:flex-1 rounded-l-none text-right")}
+          className={cn(field, "w-[148px] max-[700px]:w-auto max-[700px]:flex-1 rounded-l-none max-[700px]:rounded-l-none text-right")}
         />
+        </span>
       </span>
 
       {/* ── GLOBAL SNAPSHOT — no hint inside the box; the label is the hint ──────────────────── */}
-      <span className="flex flex-none items-center gap-1.5 max-[700px]:w-full">
-        <span className={label}>global</span>
+      <span className={criterion}>
+        <span className={label}>Global</span>
         <input
           type="text"
           inputMode="numeric"
           value={tick}
           aria-label="Global snapshot ordinal"
           onChange={(e) => onTick(e.target.value)}
-          className={cn(field, "w-[124px] max-[700px]:w-auto max-[700px]:flex-1 text-right")}
+          className={cn(field, "w-[148px] max-[700px]:w-full text-right")}
         />
       </span>
 
       {/* ── DATE RANGE — the calendar ───────────────────────────────────────────────────────── */}
-      <span className="flex flex-none items-center gap-1.5 max-[700px]:w-full">
-        <span className={label}>date</span>
+      <span className={criterion}>
+        <span className={label}>Date</span>
         <DateRange from={from} to={to} onFrom={onFrom} onTo={onTo} onSubmit={onSubmit} />
       </span>
 
@@ -228,15 +269,22 @@ export default function LogSearchBar({
           // full-width labelled rows, the button goes full-width too (2026-09-10) — a small
           // control floating right on an empty line read as an afterthought, and the wide press
           // is the touch form the rest of the bar already takes.
-          "ml-auto inline-flex flex-none items-center justify-center gap-1 h-6 pointer-coarse:h-10 px-2.5 pointer-coarse:px-4 rounded-xs cursor-pointer max-[700px]:w-full",
-          "text-micro uppercase tracking-caps transition-colors",
-          "border border-[var(--primary)]/40 bg-[var(--wash-soft)] text-[var(--primary)]",
-          "hover:bg-[var(--wash-hover)] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
-          "disabled:opacity-30 disabled:cursor-default disabled:hover:bg-[var(--wash-soft)]",
+          // ⚠️ FILLED, the bar's one primary action (design round, 2026-09-29): the washed caps
+          // button at 30% disabled read as absent. Disabled keeps the fill at a legible 45%, so
+          // the control says it exists and waits for a criterion.
+          "ml-auto inline-flex flex-none items-center justify-center gap-2 h-8 pointer-coarse:h-11 max-[700px]:h-12 px-4 rounded-btn cursor-pointer max-[700px]:w-full max-[700px]:mt-1",
+          "text-body max-[700px]:text-base font-semibold transition-colors",
+          "bg-primary text-primary-foreground hover:bg-primary/90",
+          "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
+          "disabled:opacity-45 disabled:cursor-default disabled:hover:bg-primary",
         )}
       >
-        {seeking && <Loader2 aria-hidden className="size-3 animate-spin motion-reduce:animate-none" />}
-        search
+        {seeking ? (
+          <Loader2 aria-hidden className="size-[15px] animate-spin motion-reduce:animate-none" />
+        ) : (
+          <Search aria-hidden className="size-[15px]" />
+        )}
+        Search
       </button>
 
       {/* The search's answer, IN the bar (user, 2026-09-09 — see the `miss` prop note): a
@@ -244,8 +292,9 @@ export default function LogSearchBar({
           advisory tone, instead of whispering by the pager a screen below. aria-live so the
           answer is spoken when it changes, not just painted. */}
       {miss && (
-        <p aria-live="polite" className="w-full basis-full text-micro text-[var(--warn-soft)]">{miss}</p>
+        <p aria-live="polite" className="w-full basis-full text-body text-[var(--warn-soft)]">{miss}</p>
       )}
     </div>
+    </>
   );
 }

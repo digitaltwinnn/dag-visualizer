@@ -318,7 +318,7 @@ describe("ghost hints — the copy rule", () => {
       if (hint.includes("has no locatable nodes")) continue;
       // The defect is the noun standing as the hint's OBJECT ("Drill a country…", "Click a node…"),
       // which spends the sentence on what the eyebrow just said. The same word used as a DESCRIPTOR
-      // is fine and sometimes necessary: "Open a city · provider row" names the row's own two
+      // is fine and sometimes necessary: "Open any provider · city row" names the row's own two
       // columns so you can spot it in the list, and the object is the row.
       expect(hint.toLowerCase(), `${mode}/${id}`).not.toMatch(
         new RegExp(`\\b(a|an|the|one)\\s+${OWN_NOUN[id]}\\b`),

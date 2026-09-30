@@ -1689,6 +1689,12 @@ export class Globe implements GeoViewHost {
     this._gatherFitH = availH;
   }
 
+  /** The staged pack's depth in WORLD units at the fitted pitch — the deepest block's rows. The
+   *  Engine turns it into the band's bottom edge on screen for the motion hint. */
+  gatherDepth(): number {
+    return this._gatherExtent.h * this._ctx.gather.cell;
+  }
+
   // -------------------------------------------------- morph between layouts
   // BOUNDARY-applied ledger layout (view-transition choreography): called by the Engine at the
   // invisible mid-transition boundary — nodes are gathered, so the snap can't be seen. ledgerT

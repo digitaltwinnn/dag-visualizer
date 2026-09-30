@@ -28,6 +28,25 @@ describe("buildRoster", () => {
     const rows = buildRoster([validator, sameId]);
     expect(new Set(rows.map((r) => r.key)).size).toBe(2);
   });
+  it("one row per MACHINE: records sharing an IP merge, the metagraph leads, roles unite", () => {
+    const at = (ip: string) => ({ ip }) as never;
+    const dagRec = row({ pick: { kind: "l0", node: at("1.2.3.4") } as never, id: "m1", roles: ["l0", "cl1"] });
+    const upRec = row({ pick: { kind: "metanode", meta: { id: "up" } as never, node: at("1.2.3.4") } as never, id: "m1", roles: ["l0", "dl1"] });
+    const lone = row({ pick: { kind: "l0", node: at("9.9.9.9") } as never, id: "m2" });
+    const rows = buildRoster([dagRec, upRec, lone]);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].netId).toBe("up");
+    expect(rows[0].nets).toEqual(["up", "dag"]);
+    expect(rows[0].ids).toEqual(["m1"]);
+    // Both records stay reachable — a selection of the DAG record is this row's too.
+    expect(rows[0].recs).toEqual([upRec, dagRec]);
+    expect(rows[0].roles.sort()).toEqual(["cl1", "dl1", "l0"]);
+    expect(rows[1].nets).toEqual(["dag"]);
+  });
+  it("no IP is no evidence of shared hardware: a shared id alone does not merge", () => {
+    const sameId = row({ pick: { kind: "metanode", meta: { id: "dor" } as never }, id: "v1" });
+    expect(buildRoster([validator, sameId])).toHaveLength(2);
+  });
   it("a row keeps its key when an EARLIER row leaves the list", () => {
     const other = row({ pick: { kind: "l0" }, id: "v2" });
     const before = buildRoster([validator, other]);
@@ -44,7 +63,7 @@ describe("sortRoster", () => {
     const noCity = buildRoster([row({ pick: { kind: "l1" }, city: null, id: "x" }), validator]);
     expect(sortRoster(noCity, "city", 1).map((r) => r.node.city)).toEqual(["Berlin", null]);
   });
-  it("the Network column sorts the DISPLAYED name, not the hidden id", () => {
+  it("the Network column sorts the DISPLAYED ticker, not the hidden id", () => {
     // A real catalog pair whose two orders disagree: by address Dor (DAG0Cy…) < BioFi (DAG2Ja…),
     // by name BioFi < Dor Technologies. Sorting the id ordered hex nobody sees (2026-08-13).
     const dor = "DAG0CyySf35ftDQDQBnd1bdQ9aPyUdacMghpnCuM";
@@ -53,6 +72,6 @@ describe("sortRoster", () => {
       row({ pick: { kind: "metanode", meta: { id: dor } as never }, id: "a" }),
       row({ pick: { kind: "metanode", meta: { id: biofi } as never }, id: "b" }),
     ]);
-    expect(sortRoster(rows, "net", 1).map((r) => r.netName)).toEqual(["BioFi", "Dor Technologies"]);
+    expect(sortRoster(rows, "net", 1).map((r) => r.netName)).toEqual(["BIOFI", "DOR"]);
   });
 });

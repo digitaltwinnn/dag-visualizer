@@ -147,6 +147,13 @@ export interface ViewPolicy {
   // `focusFilter`, the geo node/cohort resolvers) — those are selection state, not view state,
   // and they are why a row can read `true` while the view's camera is in practice still.
   autoRotate: boolean;
+  // Whether a NODE select commits the node's network as the filter (2026-09-29). Only hyper's does:
+  // a node there is a bead on its hub's shell, and the filter is what frames the network the node
+  // rung inherits. In geo a node is a PLACE (user, 2026-09-26: "navigation sets the filter
+  // automatically sometimes and that feels unexpected"); in the ledger the filter is the chamber's
+  // LENS, which no explorer row may move (user, 2026-09-29: the signer row set it). Was a
+  // `mode !== "geo"` deny-list in `pickActions`, which handed the ledger hyper's answer by default.
+  nodeCommitsNetwork: boolean;
 }
 
 // The calm bloom the ledger view uses — the reference the design likes (thin lines, sparse
@@ -182,6 +189,7 @@ const FLAT: ViewPolicy = {
   // the only row nothing consults. It keeps the value the old `mode !== "geo"` line would have
   // given it, so wiring one up later changes nothing by accident.
   autoRotate: true,
+  nodeCommitsNetwork: false,
 };
 
 export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
@@ -230,6 +238,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // (setHyperSpin) and two rotations over one subject read as neither. The view's default and
     // the framing's override are different facts and they live in different places.
     autoRotate: true,
+    nodeCommitsNetwork: true,
     },
   // Footprint: the holographic globe + travelling packets; picks the globe nodes only.
   geo: {
@@ -266,6 +275,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // OFF: the globe does its own spinning (sims.globeSpin) and it turns to face a selection —
     // a camera orbiting a spinning globe is two rotations fighting over one subject.
     autoRotate: false,
+    nodeCommitsNetwork: false,
     },
   // Snapshots: the settlement chamber. Morph frozen (nodes fly into lanes); picks the centred
   // snapshot + the reused producer dots. (The ledger-specific depth-fog recency treatment was
@@ -296,6 +306,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // generic line, so `mode !== "geo"` never reached it. The trail reads as a TIME axis running
     // away from the reader, and an orbit turns that axis into a shape being inspected.
     autoRotate: false,
+    nodeCommitsNetwork: false,
   },
   // MEASURED HISTORY (2026-09-18) — the charts ARE the scene: DOM planes driven by
   // TrendStackSync, so almost every engine-side switch here is OFF. The canvas stays on because
@@ -336,6 +347,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // also defeats `TrendStackSync`'s idle skip outright: a camera that never stops moving means
     // five DOM style writes every frame, in the one view that already runs five composited layers.
     autoRotate: false,
+    nodeCommitsNetwork: false,
   },
   soon: FLAT,
 };

@@ -211,15 +211,24 @@ decisions inside them are design, not detail:
   auto-opens from the root, because the newest tick changes every few seconds. The LIVE/PINNED
   control rides the CARD HEAD's eyebrow row with the shown snapshot's ticking age (2026-09-28 —
   it rode the heading row as the level's setting, design decision 15, until then), and the pager
-  states the TIME the rows span ("last 11 min") rather than "52 recent". Each level has its
-  own measures (ticks fees · anchors · metagraphs · size, a network in a tick snapshots · fees ·
-  size, a snapshot fee · size), figures BARE because the heading names the unit, in a 48px figure
+  states the TIME the rows span ("last 11 min") rather than "52 recent". Each level shows
+  the ONE vocabulary minus what it cannot state (ticks fees · anchors · metagraphs · size, a network
+  in a tick fees · anchors · size, a snapshot fees · size), and ONE pick serves every level: a level
+  shows it where it applies and its own first measure where it doesn't, without overwriting it
+  (user, 2026-09-29 — `src/data/explorerMeasure.ts`, which Geography's cohort level shares; every
+  explorer follows the rule). Figures are BARE because the heading names the unit, in a 48px figure
   column (`figureW` — a 4-decimal fee does not fit the default 40).
 
 - **History's tool card is its roster, with the MEASURE on its heading**
   (`components/TrendExplore.tsx`, an `Explorer` description since 2026-09-26). ONE level: the
-  ranked networks, busiest first, each with its last measured reading in the roster's one
-  formatter and a bar of its share. The METRIC is the heading control (the figure column's own
+  ranked networks, busiest first, each with its SPAN reading — the average per day (a gauge's
+  plain average) over the window on screen, `spanAverage` — and a bar of its share. **The list
+  follows the range** (user, 2026-09-29, design A): the hint names the span ("Average per day ·
+  last 7 days"), a new range re-ranks the list and the stack together, and the planes' headline
+  states the SAME number — the roster's one `head` (user, same day: "keep it consistent"). Under a
+  day's window (1H, a short brush) there is no measured day to average, so the list and the
+  headline both say the latest full day instead. The Moment card is the one INSTANT — crosshair, time headline, "At
+  that moment" over its list — so the two lists never read as copies. The METRIC is the heading control (the figure column's own
   heading, a radio list of `METRIC_ORDER` with units at the current cadence); `Same scale` left
   the heading on 2026-09-28 for the band's pill group — it draws the planes and never changed a
   row here (user), so it sits with the stack's other stack-wide settings, the window and the
@@ -289,7 +298,7 @@ pointermove. Three rules are worth knowing before touching it:
   made inside the layer clears it too. Closing the log used to strand the reader in Snapshots.
 
 **The motion hint says what the scene is doing while it moves** (user, 2026-09-26 — `MotionHint`,
-one quiet sentence on a low plate, centred just above the bottom band). Two store channels, and nothing else feeds it.
+one quiet sentence on a low plate, centred just under the command bar). Two store channels, and nothing else feeds it.
 `sceneMoving` is ENGINE → REACT: the Engine's `_publishMotion` derives it each frame from the four
 structures that already drive motion — `ViewTransition.active()`, `CameraDirector.flying`, the
 controls' `sceneDragging`, and `TrendStackSync.settled()` where the view has a stack — and writes it
@@ -466,8 +475,10 @@ coarser COMMITTED rung and ∨ the next finer one — the accordion's own `toggl
 nothing, with the camera and callout following the box as always — and where nothing finer is
 committed, ∨ falls through to `childStep` (railSiblings.ts, tested) and COMMITS the rung's FIRST
 child in the explorer's own order ("just pick the 1st one"). A rung with no child vocabulary
-(a node, a metagraph snapshot, the ledger's network — its finer subjects belong to the tick axis)
-disables the control. The sibling trio is CENTERED as one cluster with the ladder pair at the
+(a node, the ledger's network — its finer subjects belong to the tick axis) disables the control.
+A metagraph snapshot's ∨ opens its first VALIDATOR (2026-09-29), and the node card under it pages
+only the nodes that signed it — `snapshotSignerRows` (`src/data/network.ts`), the same list and
+order as the explorer's signer level, so the two can't disagree about who signed. The sibling trio is CENTERED as one cluster with the ladder pair at the
 right, a hairline between the axes so they never read as one four-way control — and **an
 exhausted direction is INACTIVE while an axis with nothing to ever navigate is ABSENT** (user,
 2026-09-11, two rounds; supersedes 2026-09-03's invisible rule, which predates the pair): a
@@ -636,8 +647,10 @@ detail-only). Three rules keep the row from going ragged, and all three answer t
   `md` card grows to whatever the viewport gives it, and at 1600px three of them each held ~500px
   with a void between lead and breakdown. Past the ceilings the row centres; below them the cards
   still span margin to margin, so the centring is a no-op wherever width is scarce.
-- **`MicroBars`' track is proportional but CAPPED** (`BAR_TRACK_MAX`), and each row is `justify-end`,
-  so value columns line up on the card's right edge and the slack collects behind the block. The
+- **`MicroBars`' track is proportional but CAPPED** (`BAR_TRACK_MAX`), and the block is sized to
+  what its rows can spend and marked `data-fit`, so `BandCard` shrinks the detail to it and CENTRES
+  the whole body — lead, hairline, breakdown — in the card's share (user, 2026-09-29: "centered in
+  their allocated space"). The phone sheet's uncapped column keeps filling (its own tier). The
   original 72px constant made every bar row intrinsically sized, which is where the dangling white
   space came from; an uncapped track is the opposite failure — a bar running the width of a 1600px
   row stops reading as a quantity.
@@ -1109,9 +1122,10 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
   its ghost state, with no breadcrumb grammar. The provider card's user-facing word is **provider**
   while every internal identifier stays `cohort` — one concept, two registers.
 - The **title** is one standard, with `titleKey` keying the roll-in remount on a subject change. Panel
-  titles carry a leading identity dot on the shared beat. The node card is city-first with a
-  subtitle-less head, and its body puts **NODE ID last** — the unique reference sits where references
-  sit.
+  titles carry a leading identity dot on the shared beat. The node card is titled by the node's
+  id (2026-09-29 — it was city-first), shown exactly as the explorer's node row shows it, with a
+  City fact in the body that yields to the provider card; the foot still carries the full NODE ID.
+  A provider reads provider-first everywhere ("Hetzner · Falkenstein" — row, crumb, pager, card).
 - **Card-head kind marks tint with the ACTIVE FILTER's identity** via
   `text-[var(--filter-accent,var(--primary))]`. Hardcoding a mark to cyan is a recurring bug; node
   marks use their node's own hue inline.

@@ -163,12 +163,21 @@ export function BandCard({ label, children, className, mark, lead, aside, title 
           and inside the detail the charts stretch while a note keeps its `self-end`. Since the band
           went to a fixed --vitals-h the leftover was showing up as dead bands above and below every
           reading — a taller instrument is also a more legible one. */}
-      <div className="flex items-stretch gap-2 min-h-0 flex-1 min-w-0">
+      {/* ⚠️ CENTRED IN ITS SHARE (user, 2026-09-29: "the vitals have their own section … but are
+          left aligned, they should be centered in their allocated space"). An instrument that can
+          spend width — a sparkline, a bar chart — still fills the detail, so centring changes
+          nothing there; one that cannot (a capped MicroBars list, a donut row) used to sit at the
+          left edge of a wide share with the void beside it, measured ~400px on a 2400px screen.
+          A lone lead centres the same way. */}
+      <div className="flex items-stretch justify-center gap-2 min-h-0 flex-1 min-w-0">
         {lead != null && <span className="flex items-center flex-none">{lead}</span>}
         {lead != null && children != null && (
           <span aria-hidden className="flex-none self-stretch w-px my-0.5 bg-border/60" />
         )}
-        {children != null && <div className="flex items-center gap-2 flex-1 min-w-0">{children}</div>}
+        {/* A detail that FILLS (a sparkline, a bar chart) keeps `flex-1`, so centring is a no-op
+            there; one whose instrument is capped (`data-fit`) shrinks to it on the band (≥700px —
+            the phone sheet's column is uncapped and keeps filling). */}
+        {children != null && <div className="flex items-center gap-2 flex-1 min-[700px]:has-[>[data-fit]]:flex-initial min-w-0">{children}</div>}
       </div>
     </div>
     </div>
@@ -207,7 +216,22 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
     // filled its body, but a two-row one sat as a small block with 15px of dead space above and
     // below. Distributed, the rows breathe into whatever height the card has and a four-row card is
     // left within a pixel of where it was.
-    <div className="flex flex-col justify-evenly self-stretch w-full min-w-0">
+    //
+    // ⚠️ CENTRED IN THE CARD'S SHARE (user, 2026-09-29, reversing 2026-09-01's left alignment:
+    // "they should be centered in their allocated space"). The block is sized to exactly what its
+    // rows can spend — label column + the capped track + the value column + the two gaps — and
+    // says so with `data-fit`, which lets BandCard shrink the detail to it and centre the whole
+    // body (lead, hairline, breakdown) as one group, so a total never drifts away from its parts.
+    // ⚠️ THE PHONE SHEET FILLS, BY TIER. Its track is uncapped (`--bar-track-max: none`), which
+    // makes this calc invalid AT COMPUTED-VALUE TIME — and an invalid width is `auto`, which shrank
+    // the block to its content (measured: 67px bars in a 365px card). A custom property does not
+    // rescue it (it stores the tokens unvalidated), so the sheet's own tier — below 700px, the same
+    // boundary the detail's shrink is gated on — simply takes the full width.
+    <div
+      data-fit
+      className="flex flex-col justify-evenly self-stretch w-[var(--bar-block-w)] max-[700px]:w-full max-w-full min-w-0"
+      style={{ ["--bar-block-w" as string]: `calc(${labelW}px + var(--bar-track-max, ${BAR_TRACK_MAX}px) + 40px + 12px)` }}
+    >
       {rows.map((r) => (
         // LEFT-ALIGNED, so the breakdown starts immediately after the card's hairline (user,
         // 2026-09-01: "some vitals are not correctly left aligned"). Right-pinning was tried first

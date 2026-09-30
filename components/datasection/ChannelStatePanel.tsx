@@ -69,6 +69,7 @@ import { LANE_ICONS } from "@/components/icons";
 import TablePager from "@/components/datasection/TablePager";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CABINET_BODY, CABINET_LIST, CABINET_TRIGGER } from "@/components/cabinetTabs";
 import { cn } from "@/lib/utils";
 
 /** Whether a decoded payload carries anything at all — `{}`, `[]` and `""` do NOT open a lane. */
@@ -669,8 +670,8 @@ export function ChannelStatePanel() {
                 // so the active tab now fuses with its body: an outlined rounded-top tab whose
                 // own fill sits OVER the row's underline (the `after:` hairline at z-0, the
                 // active tab at z-1), notching it open exactly under the chosen lane — the
-                // drawer and its label share one contour. Tabs split the pane's width equally
-                // (flex-1) instead of huddling at one end. The COUNTS are gone (user: "at first
+                // drawer and its label share one contour. The recipe is `components/cabinetTabs.ts`, shared
+                // with the Trends document (2026-09-29: labels hug, the active tab is the accent). The COUNTS are gone (user: "at first
                 // I didn't realise they were counts") — each lane's own note and table state its
                 // weight one line later, where the numbers have labels.
                 // ⚠️ THE HAIRLINE REGISTER, NOT THE WASH LADDER (user, 2026-09-26 — this cabinet took the
@@ -681,7 +682,7 @@ export function ChannelStatePanel() {
                 // competing with the row it belongs to. The document's cabinet keeps the ladder
                 // because it sits among that page's picker groups, which wear it; this one sits
                 // among records.
-                className="relative flex h-auto flex-none w-full gap-1 rounded-none p-0 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50"
+                className={CABINET_LIST}
                 aria-label="Which part of the snapshot to read"
               >
                 {lanes.map((l) => {
@@ -691,19 +692,7 @@ export function ChannelStatePanel() {
                       key={l.id}
                       value={l.id}
                       title={l.title}
-                      className={cn(
-                        "flex-1 flex items-center justify-center gap-1.5 h-7 px-2 rounded-t-md! rounded-b-none!",
-                        "text-micro tracking-caps uppercase font-normal",
-                        "text-muted-foreground bg-transparent border border-transparent border-b-0",
-                        "hover:text-foreground hover:bg-wash-soft",
-                        // The primitive's own active underline and focus ring, both replaced: the
-                        // notch IS the active cue here, and this app's focus language is a 1px
-                        // outline rather than a 3px ring.
-                        "after:hidden focus-visible:ring-0 focus-visible:border-transparent",
-                        "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
-                        "data-[state=active]:z-[1] data-[state=active]:text-foreground data-[state=active]:shadow-none",
-                        "data-[state=active]:border-border/50! data-[state=active]:bg-[var(--panel-solid)]!",
-                      )}
+                      className={cn(CABINET_TRIGGER, "h-7 text-micro")}
                     >
                       <LaneIcon aria-hidden className="size-3.5 flex-none" />
                       {l.name}
@@ -726,7 +715,7 @@ export function ChannelStatePanel() {
                   from the content"), so the active tab visibly opens INTO the bounded panel
                   (its panel-solid fill already bridges the baseline). Same border weight as the
                   tabs' own (border/50); bottom corners pick up the pane radius. */}
-              <div className="min-h-0 flex-1 flex flex-col overflow-hidden border border-t-0 border-border/50 rounded-b-md px-2.5 pt-2 pb-2 max-[700px]:flex-none max-[700px]:overflow-visible">
+              <div className={cn(CABINET_BODY, "min-h-0 flex-1 flex flex-col overflow-hidden px-2.5 pt-2 pb-2 max-[700px]:flex-none max-[700px]:overflow-visible")}>
                 {/* ⚠️ EVERY LANE'S PANEL MUST CARRY THE FLEX CHAIN THE PLAIN DIV DID. `TabsContent`
                     inserts a layer between the bordered box and the lane body, so `min-h-0 flex
                     flex-col` has to continue through it — the raw-JSON well below sizes against
@@ -817,7 +806,7 @@ export function ChannelStatePanel() {
                 // word one screen apart and read as kin). It is a digest, the same species as
                 // its Hash/Parent siblings; the chain field stays calculatedStateProof (internal
                 // identifiers keep their names). The title carries the distinction.
-                <FootRow label="State hash" value={paneHash(deep.stateProof)} title={"The hash of the application state this snapshot results in, covered by the snapshot's own L0 seal — the state's provability. Distinct from the SIGNERS tab's 'snapshot proof', which is the L0 signature set; this is a digest, and the signatures sign over it." + deep.stateProof} copy={deep.stateProof} />
+                <FootRow label="State hash" value={paneHash(deep.stateProof)} title={"The hash of the application state this snapshot results in, covered by the snapshot's L0 signatures — the state's provability. Distinct from the SIGNERS tab's 'snapshot proof', which is the L0 signature set; this is a digest, and the signatures sign over it." + deep.stateProof} copy={deep.stateProof} />
               )}
             </div>
           )}

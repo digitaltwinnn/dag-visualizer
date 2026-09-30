@@ -7,7 +7,8 @@ import { ScalePill, WindowPicker } from "@/components/trendPickers";
 import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import useTrendsWindow from "@/components/useTrendsWindow";
-import { stepFor } from "@/src/data/trendSeries";
+import { usePointerCoarse } from "@/components/usePointerCoarse";
+import { metricCaption, stepFor } from "@/src/data/trendSeries";
 import { leadingTrim } from "@/src/data/trendWindow";
 import { useStore } from "@/src/store/store";
 
@@ -51,6 +52,9 @@ import { useStore } from "@/src/store/store";
 // and every gesture over it — is `components/TrendTrack.tsx`, because its whole subject is a
 // geometry it MEASURES ITSELF and nothing here has those numbers. Every decision a pointer makes
 // is pure and tested in `src/data/trendTimeline.ts`, which is what keeps both halves thin.
+
+/** Whether the gesture hint has done its job this session — a range or a picked moment proves it. */
+let hintSpent = false;
 
 export default function TrendTimeline() {
   const metric = useStore((s) => s.trendMetric);
@@ -110,34 +114,53 @@ export default function TrendTimeline() {
   // object — so presence alone cannot be the gate for drawing a track.
   const measured = overview != null && overview.buckets.length > 0;
 
+  // THE HINT, until the band has been used once this session (design round 2026-09-29, option B —
+  // "one quiet line of instruction … that fades once you've used it"). A range or a picked moment
+  // is proof the gestures are known; the pointer's own word says tap or click.
+  const coarse = usePointerCoarse();
+  if (range != null || cursorMs != null) hintSpent = true;
+  const showHint = !hintSpent;
+
   return (
     // THE ONE `pointer-events-auto` (see the header). Everything else in the band stays inert.
-    // `relative` is the pills' containing block; the track fills the rest.
-    <div className="pointer-events-auto relative flex-1 min-w-0 flex flex-col max-[700px]:gap-1.5">
-      {/* THE PILLS, standing above the plate's top-right corner — first in DOM order so the phone
-          arm, where they are static, puts them ABOVE the track (the document's own stacking idiom:
-          the thumb wants the pills nearer the dock's edge than a full-width scrub target does). */}
-      <div
-        // The COMMAND BAR's glass under the pills (same `--topbar-glass`, same blur): the group
-        // floats over the SCENE now, where the picker's own hairline-and-wash — right for a group
-        // on a page — would let the ground's ink run through the words. `bottom-full` is the
-        // tenant's top; the plate's padding plus `mb-3` clears its edge by a hairline's breath.
-        className="absolute bottom-full right-0 mb-3 z-[1] rounded-lg [background:var(--topbar-glass)] backdrop-blur-sm max-[700px]:static max-[700px]:mb-0 max-[700px]:self-stretch max-[700px]:[background:none] max-[700px]:backdrop-blur-none"
-      >
+    //
+    // ⚠️ THE BAND IS A CONTROL STRIP, NOT A VITAL (design round 2026-09-29, "A + B"; user: the band
+    // "feels a bit disconnected from the scene … unclear that it can be used to actually interact
+    // with the scene (none of the other vitals do)"). So its controls live INSIDE it: the window
+    // pills (and Same scale) as one group on the left under a "Time range" label — they stood
+    // ABOVE the plate's corner, reading as a separate widget — and the track to their right,
+    // labelled with WHAT its line is ("All networks · …": the whole network, the frame the planes
+    // sit in, never the front card zoomed out — the tether to the chart says TIME only), plus the
+    // gesture hint. The plate's accent frame is VitalsBand's, keyed on the same policy row.
+    <div className="pointer-events-auto relative flex-1 min-w-0 flex items-stretch gap-3 px-1.5 max-[700px]:flex-col max-[700px]:gap-1.5 max-[700px]:px-0">
+      <div className="flex-none flex flex-col justify-center gap-1.5 pr-3 border-r border-border/60 max-[700px]:pr-0 max-[700px]:border-r-0">
+        <span className="text-micro tracking-caps uppercase text-muted-foreground leading-none max-[700px]:hidden">Time range</span>
         <div className="flex items-center gap-1.5">
-        <WindowPicker
-          className="bg-transparent max-[700px]:flex-1"
-          zoom={windowId}
-          range={range}
-          stepMs={stepMs}
-          onPick={setTrendWindow}
-          onClearRange={() => setTrendRange(null)}
-        />
-        {multiPlane && <ScalePill shared={scale === "shared"} onChange={(on) => setTrendScale(on ? "shared" : "own")} />}
+          <WindowPicker
+            className="max-[700px]:flex-1"
+            zoom={windowId}
+            range={range}
+            stepMs={stepMs}
+            onPick={setTrendWindow}
+            onClearRange={() => setTrendRange(null)}
+          />
+          {multiPlane && <ScalePill shared={scale === "shared"} onChange={(on) => setTrendScale(on ? "shared" : "own")} />}
         </div>
       </div>
-      {/* THE TRACK's column, the whole band wide. */}
-      <div className="flex-1 min-h-0 flex flex-col justify-center max-[700px]:min-h-[54px]">
+      {/* THE TRACK's column: what its line is, the gesture hint, then the track. */}
+      {/* ON THE PHONE the track is a TOUCH target in a sheet with room to spare (user, 2026-09-29:
+          "the range selector is too small (height) on the mobile phone" — it measured 42px with its
+          month labels, the plot under 30). 110px gives the brush and its grips a thumb's worth. */}
+      <div className="flex-1 min-w-0 flex flex-col max-[700px]:min-h-[110px]">
+        <div className="flex items-baseline justify-between gap-3 pt-0.5 leading-none">
+          <span className="text-micro text-muted-foreground truncate">All networks · {metricCaption(metric, 86_400_000)}</span>
+          {showHint && (
+            <span className="flex-none text-micro text-foreground-dim max-[700px]:hidden">
+              Drag to set a range · {coarse ? "tap" : "click"} to mark a moment
+            </span>
+          )}
+        </div>
+        <div className="flex-1 min-h-0 flex flex-col justify-center">
         {/* HONESTY STATES (rule 10). THREE facts, not two — the third was a review find: an
             ARRIVED payload with nothing measured in it. `leadingTrim` answers that case with a
             ZERO-BUCKET window, which is truthy, so the track used to render a bare axis with
@@ -167,6 +190,7 @@ export default function TrendTimeline() {
             setTrendCursor={setTrendCursor}
           />
         )}
+        </div>
       </div>
     </div>
   );

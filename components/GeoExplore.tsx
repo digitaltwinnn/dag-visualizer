@@ -1,16 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { cohortLabel } from "@/components/railSiblings";
+import { useMemo } from "react";
 
 import Explorer, { type ExplorerLevelSpec } from "@/components/explorer/Explorer";
-import { nodeRowSpec } from "@/components/explorer/nodeRow";
+import { NODE_GLYPH_W, nodeRowSpec } from "@/components/explorer/nodeRow";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import {
   COHORT_MEASURE_OPTIONS,
   GEO_MEASURE_OPTIONS,
   cohortMeasure,
+  COHORT_MEASURES,
   countryMeasure,
-  type CohortMeasure,
   type GeoMeasure,
 } from "@/src/data/geoMeasure";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -22,6 +23,7 @@ import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import { ccMark } from "@/src/util/format";
+import { levelMeasure } from "@/src/data/explorerMeasure";
 
 // THE GEOGRAPHY'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -48,6 +50,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
   const inspect = useStore((s) => s.inspect);
   const filter = useStore((s) => s.filter);
   const geoMeasure = useStore((s) => s.geoMeasure);
+  const metaList = useStore((s) => s.metaList); // co-location reads the full catalog (nodeRowSpec)
   const setGeoMeasure = useStore((s) => s.setGeoMeasure);
   const setHoverNodeId = useStore((s) => s.setHoverNodeId);
   const setHoverCountry = useStore((s) => s.setHoverCountry);
@@ -58,7 +61,9 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
   const hoverNodeId = useStore((s) => s.hoverNodeId);
   // The cohort level's own measure — a level remembers its pick; this one is the card's, not the
   // app's, so it lives here rather than in the store.
-  const [cohortPick, setCohortPick] = useState<CohortMeasure>("nodes");
+  // One pick for both levels (user, 2026-09-29 — `src/data/explorerMeasure.ts`): the cohort level
+  // shows `geoMeasure` where it can state it (Providers it cannot — a cohort IS one provider).
+  const cohortPick = levelMeasure(COHORT_MEASURES, geoMeasure);
 
   // The selected node, matched by IP AND layer: one machine can sit in both the l0 and l1
   // clusters (same IP, two rows), so IP alone highlighted both.
@@ -168,7 +173,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
         onRelease: () => (openCohort ? commitCohort({ cc: drilled.cc, city: openCohort.city, isp: openCohort.isp }) : undefined),
       },
       meaning: "Where the nodes sit, and who hosts them",
-      measure: { options: COHORT_MEASURE_OPTIONS, value: cohortPick, onPick: (id) => setCohortPick(id as CohortMeasure) },
+      measure: { options: COHORT_MEASURE_OPTIONS, value: cohortPick, onPick: (id) => setGeoMeasure(id as GeoMeasure) },
       hasFigure: true,
       nameW: 76,
       empty: "No locatable nodes here yet.",
@@ -179,13 +184,16 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
         const pair = subjectPairing(hoverGroup, key, setHoverGroup, accent);
         return {
           key: ch.key,
-          name: ch.city ?? "Unlocated",
-          tag: ch.isp ?? undefined,
+          // PROVIDER FIRST (user, 2026-09-29): the rung, its card and its eyebrow are all
+          // "Provider", so the row names the provider and the city tells two of one provider
+          // apart within the country. Same order in the crumb, the rail's pager and the card.
+          name: ch.isp ?? "Unknown provider",
+          tag: ch.city ?? "Unlocated",
           share: v / maxRows,
           hue: accent,
           figure: v.toLocaleString(),
           on,
-          title: `${ch.city ?? "Unlocated"}${ch.isp ? ` · ${ch.isp}` : ""} · ${ch.rows.length} node${ch.rows.length === 1 ? "" : "s"}`,
+          title: `${cohortLabel(ch)} · ${ch.rows.length} node${ch.rows.length === 1 ? "" : "s"}`,
           // A cohort of ONE is its node: the click selects the node outright (full ancestry
           // commits the cohort with it), so the reader never opens a list of one.
           onClick: () => {
@@ -218,22 +226,23 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
     levels.push({
       key: "nodes",
       crumb: {
-        label: `${openCohort.city ?? "Unlocated"}${openCohort.isp ? ` · ${openCohort.isp}` : ""}`,
-        title: `${openCohort.city ?? "Unlocated"}${openCohort.isp ? ` · ${openCohort.isp}` : ""}`,
+        label: cohortLabel(openCohort),
+        title: cohortLabel(openCohort),
       },
       meaning: "Each node in this cohort",
+      glyphW: NODE_GLYPH_W,
       measure: null,
       hasFigure: false,
-      // The one node row (`explorer/nodeRow.tsx`); a cohort mixes networks, so the ticker shows.
+      // The one node row (`explorer/nodeRow.tsx`), ticker included, as in every explorer.
       rows: openCohort.rows.map((r, i) => {
         const on = nodeOn(r);
         const netId = r.pick.kind === "metanode" && r.pick.meta ? r.pick.meta.id : "dag";
         const hue = identityHudCss(netId);
         return nodeRowSpec({
+          metaList,
           key: (r.id ?? r.label) + i,
           row: r,
           hue,
-          ticker: metagraphById(netId)?.ticker ?? (netId === "dag" ? "DAG" : netId),
           on,
           onClick: () => selectNode(r.pick, on),
           pair: subjectPairing(hoverNodeId, hoverKeyOf(r.pick), setHoverNodeId, hue),

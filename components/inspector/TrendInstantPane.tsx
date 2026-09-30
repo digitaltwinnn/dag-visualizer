@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowUpRight, Table2 } from "lucide-react";
+import { INSTANT_ICON } from "@/components/icons";
 
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
@@ -121,7 +122,19 @@ export default function TrendInstantPane({
         // The stamp is the timeline's own (`stampInstant`, src/data/trendTimeline.ts): the DATE at
         // the daily tier — an hour the charts cannot resolve would be invented precision — and the
         // date plus a UTC clock once the buckets are finer.
-        title={cursorMs != null ? stampInstant(cursorMs, stepMs) : "—"}
+        // A POINT IN TIME, in the card's own grammar (design A, 2026-09-29): the crosshair — the
+        // slot's own mark — then the instant as the headline. The Networks list states a SPAN;
+        // this card states one moment, and the mark is what tells the two lists apart at a glance.
+        title={
+          cursorMs != null ? (
+            <span className="inline-flex items-center gap-2">
+              <INSTANT_ICON aria-hidden className="size-4 flex-none text-[var(--filter-accent,var(--primary))]" />
+              {stampInstant(cursorMs, stepMs)}
+            </span>
+          ) : (
+            "—"
+          )
+        }
         titleKey={bucket ?? cursorMs ?? undefined}
         // HOW LONG AGO the moment was, not the cadence (user, 2026-09-26): the reader is placing an
         // instant, and "3 months ago" places it; "daily" only said what the charts are cut in,
@@ -197,6 +210,13 @@ export default function TrendInstantPane({
                   {/* A resting division between the LEAD (the picked reading) and the roster
                       beneath it (user, 2026-09-26): the card-head rule's hairline. */}
                   <div aria-hidden className="mt-3 border-t border-border" />
+                  {/* WHAT THE LIST IS ABOUT, said once (design A): these are readings AT THE
+                      INSTANT, in the bucket's own unit — the Networks list beside it averages a
+                      span, and the two looked identical without this line. */}
+                  <p className="mt-2 mb-0 flex items-baseline justify-between text-micro tracking-caps uppercase text-muted-foreground">
+                    <span>At that moment</span>
+                    {unit ? <span className="normal-case tracking-normal">{unit}</span> : null}
+                  </p>
                   <FactGroup className="mt-1">
                   {orderAt(readings).map((id) => {
                     const row = rows.get(id);

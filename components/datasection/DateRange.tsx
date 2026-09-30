@@ -57,7 +57,7 @@ export default function DateRange({
 
   // The trigger's WORDS are the state — a control that reads "any date" is honestly saying the
   // column is unfiltered, which an empty field cannot say without a label beside it.
-  const label = from && to ? `${fmt(from)} – ${fmt(to)}` : from ? `from ${fmt(from)}` : to ? `to ${fmt(to)}` : "any date";
+  const label = from && to ? `${fmt(from)} – ${fmt(to)}` : from ? `from ${fmt(from)}` : to ? `to ${fmt(to)}` : "Any date";
   const title = from && to ? `${fmtFull(from)} to ${fmtFull(to)}` : from ? `from ${fmtFull(from)}` : to ? `up to ${fmtFull(to)}` : "no date range — pick one to jump into the chain";
   const armed = !!(from || to);
 
@@ -79,9 +79,9 @@ export default function DateRange({
           // right; in the search bar it stands beside two boxed inputs, so it takes their box and
           // their 24px height. One recipe, three controls, one line.
           className={cn(
-            // pointer-coarse — the whole bar rises to 40px together on touch (LogSearchBar's note).
-            "flex h-6 pointer-coarse:h-10 min-w-0 max-[700px]:flex-1 items-center gap-1.5 rounded-xs border border-border/50 bg-[var(--panel-plate)] px-1.5 py-0",
-            "text-body font-sans transition-colors hover:border-border",
+            // The bar's one height recipe (LogSearchBar's `FIELD_H`): 32px, 44px on touch and phone.
+            "flex h-8 pointer-coarse:h-11 max-[700px]:h-11 min-w-0 max-[700px]:flex-1 items-center gap-2 rounded-xs max-[700px]:rounded-btn border border-border/70 bg-[var(--panel-plate)] px-2.5 py-0",
+            "text-body max-[700px]:text-base font-sans transition-colors hover:border-border",
             "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
             "data-[state=open]:border-transparent",
             armed ? "text-foreground" : "text-muted-foreground",
@@ -89,7 +89,7 @@ export default function DateRange({
           title={title}
           aria-label={`Date range: ${title}`}
         >
-          <CalendarDays aria-hidden className="size-3 flex-none text-muted-foreground" />
+          <CalendarDays aria-hidden className="size-[15px] flex-none text-muted-foreground" />
           <span className="truncate whitespace-nowrap">{label}</span>
         </PopoverTrigger>
         {/* `w-auto` — the adopted PopoverContent is `w-72` by default, which would leave the grid

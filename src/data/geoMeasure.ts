@@ -1,4 +1,5 @@
 import type { NodeRow } from "@/src/data/types";
+import { levelOptions } from "@/src/data/explorerMeasure";
 
 // WHAT A COUNTRY ROW COUNTS (user, 2026-09-26: "can the geo explorer also benefit from the new
 // control — besides 'nodes' show 'metagraphs', 'providers'"). The Geography explorer's country
@@ -37,11 +38,11 @@ export const GEO_MEASURE_OPTIONS: readonly { id: GeoMeasure; label: string; unit
 /** A COHORT's measures — the second level of the Geography explorer (design 2026-09-26: each
  *  level has its own measures). A city × provider cohort counts its nodes, or the distinct
  *  networks they serve; there is no third: every node in a cohort shares one provider. */
-export type CohortMeasure = "nodes" | "metagraphs";
-export const COHORT_MEASURE_OPTIONS: readonly { id: CohortMeasure; label: string; unit: string }[] = [
-  { id: "nodes", label: "Nodes", unit: "count" },
-  { id: "metagraphs", label: "Metagraphs", unit: "count" },
-];
+//  One vocabulary with the country level (user, 2026-09-29): the same options minus Providers,
+//  and the same store pick, so a level only ever drops what it cannot state.
+export const COHORT_MEASURES = ["nodes", "metagraphs"] as const satisfies readonly GeoMeasure[];
+export type CohortMeasure = (typeof COHORT_MEASURES)[number];
+export const COHORT_MEASURE_OPTIONS = levelOptions(GEO_MEASURE_OPTIONS, COHORT_MEASURES);
 export function cohortMeasure(m: CohortMeasure, rows: readonly Pick<NodeRow, "pick">[]): number {
   return m === "nodes" ? rows.length : countryMeasure("metagraphs", rows.length, rows);
 }

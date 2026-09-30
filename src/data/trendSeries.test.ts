@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
+import { headWord, spanAverage, spanWord,
   GLOBAL_METRIC_ROWS,
   TREND_METRICS,
   globalSeries,
@@ -7,6 +7,7 @@ import {
   formatMb,
   formatSeconds,
   lastMeasured,
+  latestDay,
   metricSeries,
   metricUnit,
   perPhrase,
@@ -549,5 +550,54 @@ describe("holdOrder — the stack keeps its order while its plots change", () =>
     holdOrder(held, ranked);
     expect(held).toEqual(["a", "b"]);
     expect(ranked).toEqual(["b", "c"]);
+  });
+});
+
+// THE ONE HEADLINE READING (user, 2026-09-29: "day should be the standard always"): the newest
+// complete DAY of a plane's own series — through the same `metricSeries` / `globalSeries` read
+// that draws it, so counters, gauges and continuity all have one.
+describe("latestDay", () => {
+  const DAY = 86_400_000;
+  const daily = { "m.dor.snaps": [10, 20, null], "g.anchors": [3, 4, null] } as Record<string, (number | null)[]>;
+  it("reads the daily tier when the charts are finer than a day", () => {
+    expect(latestDay("snapshots", "dor", daily, [1, 2, 3], 300_000)).toBe(20);
+    expect(latestDay("snapshots", "dag", daily, [1, 2, 3], 300_000)).toBe(4); // the hypergraph plane reads the global row
+  });
+  it("is the chart's own last point when the chart already IS daily", () => {
+    expect(latestDay("snapshots", "dor", undefined, [4, 5, null], DAY)).toBe(5);
+  });
+  it("is null — never a finer bucket passed off as a day — while the daily tier is still in flight", () => {
+    expect(latestDay("snapshots", "dor", undefined, [1, 2, 3], 300_000)).toBeNull();
+  });
+});
+
+describe("spanAverage", () => {
+  it("a counter is its measured mean scaled to a day; holes are left out, not zeros", () => {
+    expect(spanAverage("snapshots", [10, null, 30], 3_600_000)).toBe(20 * 24);
+    expect(spanAverage("snapshots", [100, 200], 86_400_000)).toBe(150);
+  });
+  it("a gauge is its plain mean", () => {
+    expect(spanAverage("nodes", [10, 20, null], 3_600_000)).toBe(15);
+  });
+  it("continuity is weighted by the snapshots behind each bucket", () => {
+    // 60s over 1 snapshot and 10s over 9: Σgaps 150 ÷ Σsnaps 10.
+    expect(spanAverage("continuity", [60, 10, null], 3_600_000, [1, 9, 5])).toBe(15);
+    expect(spanAverage("continuity", [60], 3_600_000)).toBeNull();
+  });
+  it("nothing measured is no reading", () => {
+    expect(spanAverage("fees", [null, null], 3_600_000)).toBeNull();
+  });
+  it("names the average a rate reads as per day, anything else plainly", () => {
+    expect(spanWord("snapshots")).toBe("Average per day");
+    expect(spanWord("nodes")).toBe("Average");
+    expect(spanWord("continuity")).toBe("Average");
+  });
+});
+
+describe("headWord", () => {
+  it("names the head reading: the day, or the span's average", () => {
+    expect(headWord("snapshots", "day")).toBe("latest full day");
+    expect(headWord("snapshots", "span")).toBe("avg per day");
+    expect(headWord("nodes", "span")).toBe("average");
   });
 });

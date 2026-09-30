@@ -4,7 +4,7 @@
 // as "no leading gap"; the client clock judging a CDN-cached payload's newest bucket; the
 // leading partial month drawn whole while the trailing one was trimmed).
 import { describe, expect, it } from "vitest";
-import { assembleTrendSlice, bucketAt, cursorFraction, cutRange, leadingTrim, monthlySum, pickRangeTier, planTrendFetch, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, ZOOMS, type TrendsWindowData } from "./trendWindow";
+import { assembleTrendSlice, bucketAt, heldZoom, spanPhrase, cursorFraction, cutRange, leadingTrim, monthlySum, pickRangeTier, planTrendFetch, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, ZOOMS, type TrendsWindowData } from "./trendWindow";
 
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
@@ -288,10 +288,12 @@ describe("planTrendFetch", () => {
     }
   });
 
-  it("the DAILY readout payload is the 90d window, and only at the two hourly zooms", () => {
-    expect(planTrendFetch("7d", null).daily).toBe("90d");
-    expect(planTrendFetch("30d", null).daily).toBe("90d");
-    for (const z of ["1h", "24h", "1y", "all"] as const) expect(planTrendFetch(z, null).daily).toBe(null);
+  // "LATEST FULL DAY" IS THE ONE READOUT (user, 2026-09-29: "a latest 5 min is less easy to
+  // understand than a last day … day should be the standard always"). So the daily tier rides
+  // along wherever the charts' own grain is finer than a day; at 1Y/ALL the chart IS daily.
+  it("the DAILY readout payload is the 90d window wherever the charts are finer than a day", () => {
+    for (const z of ["1h", "24h", "7d", "30d"] as const) expect(planTrendFetch(z, null).daily).toBe("90d");
+    for (const z of ["1y", "all"] as const) expect(planTrendFetch(z, null).daily).toBe(null);
   });
 
   it("a DAILY-tier range rides the one `all` payload, cut to the range", () => {
@@ -324,9 +326,13 @@ describe("planTrendFetch", () => {
     expect(plan.fleet).toEqual({ window: null, tiles: null, cut: { kind: "none" } });
   });
 
-  it("a range does NOT retire the zoom's daily-readout leg — the readout answers the zoom", () => {
-    const plan = planTrendFetch("7d", { fromMs: Date.UTC(2026, 7, 1), toMs: Date.UTC(2026, 7, 20) });
-    expect(plan.daily).toBe("90d");
+  it("a range carries the daily leg exactly when ITS tier is finer than a day", () => {
+    const short = planTrendFetch("all", { fromMs: Date.UTC(2026, 7, 1), toMs: Date.UTC(2026, 7, 1, 6) });
+    expect(short.tier).not.toBe("1d");
+    expect(short.daily).toBe("90d");
+    const long = planTrendFetch("7d", { fromMs: Date.UTC(2025, 7, 1), toMs: Date.UTC(2026, 7, 20) });
+    expect(long.tier).toBe("1d");
+    expect(long.daily).toBe(null);
   });
 
   it("a null zoom fetches NOTHING — the consumer is not showing charts", () => {
@@ -429,5 +435,31 @@ describe("assembleTrendSlice", () => {
     const plan = planTrendFetch("all", { fromMs: from, toMs: to });
     const s = assembleTrendSlice(plan, { main: win(Date.UTC(2025, 8, 1), DAY, [1, 2, 3, 4, 5, 6]) });
     expect(s.buckets).toEqual([from, Date.UTC(2025, 8, 4), to]);
+  });
+});
+
+describe("heldZoom", () => {
+  it("maps the target span over the whole plot", () => {
+    // Axis 0..100, target 75..100 → start at 3/4, stretched 4×.
+    expect(heldZoom(0, 100, { fromMs: 75, toMs: 100 })).toEqual({ f0: 0.75, s: 4 });
+  });
+  it("zooming out shrinks the held plot into its place on the wider axis", () => {
+    expect(heldZoom(50, 100, { fromMs: 0, toMs: 100 })).toEqual({ f0: -1, s: 0.5 });
+  });
+  it("declines a target the held axis never covered, a degenerate span, and a no-op", () => {
+    expect(heldZoom(0, 100, { fromMs: 200, toMs: 300 })).toBeNull();
+    expect(heldZoom(0, 0, { fromMs: 0, toMs: 10 })).toBeNull();
+    expect(heldZoom(0, 100, { fromMs: 5, toMs: 5 })).toBeNull();
+    expect(heldZoom(0, 100, { fromMs: 1, toMs: 101 })).toBeNull();
+  });
+});
+
+describe("spanPhrase", () => {
+  it("a pill says its own span; a brushed range names its UTC days, end exclusive", () => {
+    expect(spanPhrase("7d", null)).toBe("last 7 days");
+    expect(spanPhrase("all", null)).toBe("all measured");
+    const d = (s: string) => Date.parse(s);
+    expect(spanPhrase("30d", { fromMs: d("2026-09-20T00:00Z"), toMs: d("2026-09-27T00:00Z") })).toBe("Sep 20 – Sep 26");
+    expect(spanPhrase("30d", { fromMs: d("2026-09-20T03:00Z"), toMs: d("2026-09-20T09:00Z") })).toBe("Sep 20");
   });
 });

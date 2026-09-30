@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { coLocatedNetworks, matchSignerRow, nodeSigned, resolveSigner, resolveSignerIps, SIGNER_GROUPS, SIGNER_UNKNOWN } from "@/src/data/network";
+import { coLocatedNetworks, matchSignerRow, nodeSigned, resolveSigner, resolveSignerIps, SIGNER_GROUPS, SIGNER_UNKNOWN, snapshotSigners, snapshotSignerRows } from "@/src/data/network";
 import type { MetaInfo, NodeRow } from "@/src/data/types";
 
 const meta = (id: string, nodes: { ip?: string; id?: string; ids?: string[] }[]): MetaInfo => ({
@@ -220,5 +220,31 @@ describe("coLocatedNetworks", () => {
   it("answers empty with no IP — an unlocated machine claims no tenancy", () => {
     expect(coLocatedNetworks(undefined, "dag", list)).toEqual([]);
     expect(coLocatedNetworks(null, "up", list)).toEqual([]);
+  });
+});
+
+// ONE ANSWER TO "WHO SIGNED THIS METAGRAPH SNAPSHOT" (user, 2026-09-29: the node rung under a
+// metagraph snapshot "should be filtered based who actually was the validators (like explorer
+// shows, they should be aligned)"). The explorer's signer level, the snapshot's ∨ step and the node
+// card's pager all read these two, so they list the same nodes in the same order.
+describe("snapshotSigners / snapshotSignerRows", () => {
+  const exRows = [
+    { metaId: "dor", ordinal: 7, signers: ["aa11", "bb22", "zz99"] },
+    { metaId: "dor", ordinal: 8, signers: ["cc33"] },
+    { metaId: "ded", ordinal: 0, signers: ["dd44"] },
+  ] as unknown as Parameters<typeof snapshotSigners>[0];
+  const row = (id: string, net: string) =>
+    ({ id, pick: { kind: "metanode", meta: { id: net }, node: { id } } } as unknown as Parameters<typeof snapshotSignerRows>[0][number]);
+  const sel = [row("bb22ffff", "dor"), row("aa11ffff", "dor"), row("cc33ffff", "dor"), row("aa11ffff", "ded")];
+
+  it("reads the snapshot's own row, falling back to the undecoded (ordinal 0) row of its network", () => {
+    expect(snapshotSigners(exRows, "dor", 7)).toEqual(["aa11", "bb22", "zz99"]);
+    expect(snapshotSigners(exRows, "ded", 12)).toEqual(["dd44"]);
+    expect(snapshotSigners(exRows, "up", 1)).toEqual([]);
+    expect(snapshotSigners(null, "dor", 7)).toEqual([]);
+  });
+  it("resolves to the KNOWN signer nodes, in signature order, never a non-signer of the network", () => {
+    expect(snapshotSignerRows(sel, exRows, { metaId: "dor", ordinal: 7 }).map((r) => r.id)).toEqual(["aa11ffff", "bb22ffff"]);
+    expect(snapshotSignerRows(sel, exRows, { metaId: "dor", ordinal: 8 }).map((r) => r.id)).toEqual(["cc33ffff"]);
   });
 });

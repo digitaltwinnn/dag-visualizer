@@ -11,6 +11,7 @@ import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { nodeSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { IdentityDot, RoleChips } from "@/components/inspector/parts";
+import { tickerOf } from "@/components/explorer/nodeRow";
 import { SelectedRowMark, selectionHue } from "@/components/selection";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -19,8 +20,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 // The hyper/geo data table (spec 2026-08-01): the NODE ROSTER — a flat, sortable, denser
 // projection of the same `selNodes` the explorers browse (complementary, not a replacement).
 // Column order is the view's lens: geo leads with location, hyper with network/architecture.
-// A row click = the explorer row click (nodeSelectActions: filter→ancestry→inspect; re-click
-// deselects); it commits silently — flip the RAW switch back to see the card/camera. Row hover
+// A row click commits the NODE (nodeSelectActions: ancestry→inspect; re-click deselects) and
+// NEVER the filter, in any view (user, 2026-09-29) — the top bar is where a network is committed;
+// it commits silently — flip the RAW switch back to see the card/camera. Row hover
 // glows the node's 3D shells (hoverNodeId, outward-only — the cohort-row convention).
 // ⚠️ PHONE STANDS COLUMNS DOWN, BY THE ANCHOR LOG'S OWN RULE (2026-09-02; the log's COLUMNS
 // note has the full argument): measured, this table ran 1017px inside a 390px viewport — three
@@ -28,7 +30,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 // worse than showing less of each row. What stays is what IDENTIFIES a node under the view's
 // own lens — geo: where it is and which node (country, network, id — city measured 125px and is
 // the country's qualifier, stated on the node card one tap away); hyper: what it is in the
-// architecture (network, id, layer). Provider, co-location and the off-lens locations are facts
+// architecture (network, id, layer). Provider and the off-lens locations are facts
 // ABOUT the node, stated in full on the same card. `phone` is per-view because the lens is:
 // geo's layer is hyper's identity column and vice versa.
 const PHONE_HIDDEN = "max-[700px]:hidden"; // one class on head + body cells, so a column can never half-hide
@@ -40,7 +42,6 @@ const COLS: Record<"hyper" | "geo", { key: RosterSortKey; label: string; phone?:
     { key: "net", label: "Network" },
     { key: "id", label: "Node" },
     { key: "layer", label: "Layer", phone: false },
-    { key: "colo", label: "Co-located", phone: false },
   ],
   hyper: [
     { key: "net", label: "Network" },
@@ -49,7 +50,6 @@ const COLS: Record<"hyper" | "geo", { key: RosterSortKey; label: string; phone?:
     { key: "isp", label: "Provider", phone: false },
     { key: "country", label: "Country", phone: false },
     { key: "city", label: "City", phone: false },
-    { key: "colo", label: "Co-located", phone: false },
   ],
 };
 
@@ -74,25 +74,26 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
 
   const cell = (r: RosterRow, key: RosterSortKey) => {
     switch (key) {
-      case "net": {
-        const cfg = r.netId ? metagraphById(r.netId) : null;
-        // Phone wears the TICKER, the log's own network-column treatment: measured, the full
-        // names held this column at 133px where the tick log's ticker column runs 76 — and the
-        // identity dot plus ticker is the same two-part identity every row and card wears.
+      case "net":
+        // EVERY NETWORK ON THE MACHINE, EACH AS ITS DOT AND TICKER (user, 2026-09-29: "just show
+        // both tickers, so DAG and UP, both with their coloured bullet, consistently") — the anchor
+        // log's own network-column treatment, so a single-network row reads "● DOR" and a
+        // co-located one "● UP ● DAG", primary first. The full names ride the hover.
         return (
-          <span className="flex items-center gap-2">
-            {r.netId && <IdentityDot hue={filterAccent(r.netId)} />}
-            {cfg ? (
-              <>
-                <span className="max-[700px]:hidden">{cfg.name}</span>
-                <span className="min-[700px]:hidden">{cfg.ticker || cfg.name}</span>
-              </>
-            ) : (
-              r.netId ?? "—"
-            )}
+          <span
+            className="flex items-center gap-3"
+            title={r.nets.map((id) => metagraphById(id)?.name ?? (id === "dag" ? "DAG" : id)).join(" + ")}
+          >
+            {r.nets.length === 0
+              ? "—"
+              : r.nets.map((id) => (
+                  <span key={id} className="inline-flex items-center gap-2">
+                    <IdentityDot hue={filterAccent(id)} />
+                    {tickerOf(id)}
+                  </span>
+                ))}
           </span>
         );
-      }
       case "id":
         // The SHORT hash, the explorer's `NodePickerRow` treatment (2026-08-02): the full 64-char
         // id is `whitespace-nowrap` in a table cell, so it blew the NODE column — and with it the
@@ -111,12 +112,17 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
             ) : (
               r.node.label
             )}
+            {/* A machine that reports a different id to each network it serves: the rest are
+                counted, never dropped (the full list rides the title). */}
+            {r.ids.length > 1 && <span className="ml-1.5 text-muted-foreground" title={r.ids.join("\n")}>+{r.ids.length - 1}</span>}
           </span>
         );
       case "layer": {
         // The shared composition vocabulary (the node card's subtitle idiom): the make-up word
         // plus its layer codes as pills — never a raw role array.
-        const comp = compositionRows([{ roles: r.node.roles, layer: r.node.layer }])[0];
+        // The MACHINE's roles — the union across its merged records, so a machine serving two
+        // networks states everything it runs.
+        const comp = compositionRows([{ roles: r.roles, layer: r.node.layer }])[0];
         // The chips stand down on phone (the word stays): the make-up word is the summary this
         // column exists to say, the codes are its detail — and at 150px the pair was the widest
         // cell in hyper's phone roster. Never the inverse: codes without the word would be the
@@ -136,11 +142,6 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
         return r.node.city ?? "—";
       case "isp":
         return r.isp ? `${r.isp}${r.asn ? ` · ${r.asn}` : ""}` : "—";
-      case "colo":
-        // CO-LOCATION (user, 2026-08-16): the machine's other tenant networks — rare (2
-        // machines today), so the column reads as dashes with the exceptions standing out;
-        // sorting it ascending gathers them at the top (nulls sort last).
-        return r.colo ?? "—";
     }
   };
 
@@ -172,10 +173,15 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
         </TableHeader>
         <TableBody>
           {rows.map((r) => {
-            const key = hoverKeyOf(r.node.pick);
-            const selected = key != null && hoverKeyOf(inspect) === key;
+            // A MERGED row is selected when ANY of its records is (a DAG bead committed in the scene
+            // is this row as much as the metagraph record leading it), and its click then acts on
+            // THAT record — so the re-click deselects what is committed rather than committing the
+            // primary on top of it.
+            const inspected = hoverKeyOf(inspect);
+            const hit = inspected == null ? undefined : r.recs.find((x) => hoverKeyOf(x.pick) === inspected);
+            const selected = hit != null;
             const commit = () =>
-              applyClickActions(nodeSelectActions(r.node.pick, { mode, currentFilter: filter, deselect: selected }));
+              applyClickActions(nodeSelectActions((hit ?? r.node).pick, { mode, currentFilter: filter, deselect: selected, commitNetwork: false }));
             return (
               <TableRow
                 key={r.key}

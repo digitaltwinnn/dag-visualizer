@@ -81,6 +81,9 @@ export interface ExplorerLevelSpec {
   nameW?: number;
   /** The figure column's width for this level (40 fits a count; a 4-decimal fee needs 48). */
   figureW?: number;
+  /** The glyph column's width for this level — 14px for a dot or a country code; a node level
+   *  widens it for the network TICKER that leads its rows (`NODE_GLYPH_W`). */
+  glyphW?: number;
   rows: ExplorerRowSpec[];
   /** What to say when there are no rows — an honest instrument state, never fabricated rows. */
   empty?: ReactNode;
@@ -164,6 +167,7 @@ export default function Explorer({ id, title, hint, levels, onLeave, defaultColl
                     hasFigure={current.hasFigure}
                     nameW={current.nameW}
                     figureW={current.figureW}
+                    glyphW={current.glyphW}
                     nested={nested}
                     wideBar={!current.rows.some((x) => x.tag != null && x.tag !== false)}
                     glyph={r.glyph}

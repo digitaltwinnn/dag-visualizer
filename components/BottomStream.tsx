@@ -31,11 +31,8 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 //    the scene takes the 92px back; the vitals stay one rotation away. 500 clears every
 //    landscape phone and touches no tablet (the shortest, an iPad mini landscape, is 744).
 const RESERVE = 92; // 10px gap above the footer + the band's ~66px height + 16px clearance above it
-/** The window pills STAND ABOVE the plate in History (2026-09-26): a 32px group plus its 12px
- *  gap, which the rails must clear too, or a tall right rail's last card sits under them
- *  (review, same day). Reserved only while the band holds the timeline — a policy row, not a
- *  mode compare. */
-const PILLS_ABOVE = 44;
+// (The History pills stood ABOVE the plate from 2026-09-26 and reserved 44px for it; since the
+// 2026-09-29 control-strip round they live INSIDE the band, so the reserve is the band's alone.)
 
 export default function BottomStream() {
   const mode = useStore((s) => s.mode);
@@ -61,7 +58,7 @@ export default function BottomStream() {
   // other gate still unmounts — there is nothing to slide when the lane does not apply.
   const applicable = VIEW_POLICIES[mode].vitalsLane && section === "scene" && bp !== "phone" && !short;
   const lane = applicable && !railsHidden;
-  const reserve = RESERVE + (VIEW_POLICIES[mode].bandContent === "timeline" ? PILLS_ABOVE : 0);
+  const reserve = RESERVE;
   useEffect(() => {
     document.documentElement.style.setProperty("--bottom-reserve", lane ? `${reserve}px` : "0px");
     return () => document.documentElement.style.setProperty("--bottom-reserve", "0px");

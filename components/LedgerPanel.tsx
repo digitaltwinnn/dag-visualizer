@@ -3,20 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 
 import Explorer, { type ExplorerLevelSpec, type ExplorerRowSpec } from "@/components/explorer/Explorer";
-import { nodeRowSpec, unknownNodeRowSpec } from "@/components/explorer/nodeRow";
+import { NODE_GLYPH_W, nodeRowSpec, unknownNodeRowSpec } from "@/components/explorer/nodeRow";
 import TablePager from "@/components/datasection/TablePager";
 import { pageKeepingRow } from "@/components/explorer/fitRows";
 import useFitRows from "@/components/explorer/useFitRows";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { IdentityDot } from "@/components/inspector/parts";
 import { ensurePage } from "@/components/RawSnapshotBridge";
-import { selectedRow, selectionHue } from "@/components/selection";
-import { NoSignalDot } from "@/components/state/StateAtoms";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { cn } from "@/lib/utils";
-import { useNowTick } from "@/components/useNowTick";
-import { relativeAge } from "@/src/util/relativeAge";
 import { buildAnchorLog, buildChannelLog, type AnchorLogRow } from "@/src/data/anchorLog";
 import { latestRelevant } from "@/src/data/follow";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -30,18 +26,20 @@ import {
   tickMeasureValue,
   tickNetMeasure,
   type LedgerMeasure,
-  type SnapLevelMeasure,
-  type TickNetMeasure,
+  SNAP_MEASURES,
+  TICK_NET_MEASURES,
 } from "@/src/data/ledgerMeasure";
 import { ledgerLens, storyCount, tickInStory } from "@/src/data/ledgerStory";
-import { filterAccent, getAnchor, getNetwork, metagraphById, resolveSigner, SIGNER_GROUPS, SIGNER_UNKNOWN } from "@/src/data/network";
+import { filterAccent, getAnchor, getNetwork, metagraphById, resolveSigner, SIGNER_GROUPS, SIGNER_UNKNOWN, snapshotSigners } from "@/src/data/network";
 import { metaSnapHoverKey, type GlobalSnapshot, type NodeRow, type SnapshotExact } from "@/src/data/types";
 import { displayNetwork, LISTED_IDS, UNLISTED_HUE, UNLISTED_ID, UNLISTED_LABEL, unlistedLog } from "@/src/data/unlisted";
 import { POLL } from "@/src/engine/config";
-import { followToggleActions, metaSnapSelectActions, nodeSelectActions, sameMetaSnap, snapshotSelectActions } from "@/src/engine/domain/pickActions";
+import { metaSnapSelectActions, nodeSelectActions, sameMetaSnap, snapshotSelectActions } from "@/src/engine/domain/pickActions";
 import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
+import { levelMeasure } from "@/src/data/explorerMeasure";
+import FollowControl from "@/components/FollowControl";
 
 // THE SNAPSHOTS VIEW'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -130,18 +128,9 @@ function groupByMeta(rows: readonly AnchorLogRow[]): MetaGroup[] {
   return [...by.values()].sort((a, b) => b.rows.length - a.rows.length || a.name.localeCompare(b.name));
 }
 
-const NO_SIGNERS: readonly string[] = [];
-
-/** The signer ids of ONE metagraph snapshot, from the tick's EXACT read — the same source the
- *  metagraph-snapshot card's own signer list falls back to, so the two can't disagree. Never the
- *  ~2.5 MB deep read: the explorer must not turn an explicit-gesture route into a browse. The
- *  ordinal-0 fallback is the card's own: a payload the quick decoder couldn't read carries
- *  ordinal 0, and the address match still finds its proofs. */
-function signersOf(ex: SnapshotExact | undefined, metaId: string, ordinal: number): readonly string[] {
-  if (!ex) return NO_SIGNERS;
-  const r = ex.rows.find((x) => x.metaId === metaId && x.ordinal === ordinal) ?? ex.rows.find((x) => x.metaId === metaId && x.ordinal === 0);
-  return r?.signers ?? NO_SIGNERS;
-}
+// A snapshot's signers: `snapshotSigners` (src/data/network.ts) — one home, shared with the node
+// rung's ∨ step and pager (railSiblings), so the three list the same validators.
+const signersOf = (ex: SnapshotExact | undefined, metaId: string, ordinal: number) => snapshotSigners(ex?.rows, metaId, ordinal);
 
 /** The exact read's per-network fee and size for one row of the network level — a listed
  *  network's own entry, or the SUM of every uncataloged address for the unlisted row. */
@@ -158,14 +147,6 @@ function perMetaOf(ex: SnapshotExact | undefined, id: string): { fee: number; by
     bytes += v.bytes;
   }
   return any ? { fee, bytes } : undefined;
-}
-
-/** `· 5s ago` — the shown snapshot's age, ticking. Its own component so the per-second clock
- *  re-renders this span alone rather than the whole explorer. */
-function LiveAge({ ts }: { ts: string }) {
-  const now = useNowTick(1000);
-  const age = relativeAge(now - Date.parse(ts));
-  return age ? <>· {age}</> : null;
 }
 
 /** "last 12 min" / "last 2 h" — the time the listed snapshots span, newest back to oldest. */
@@ -191,17 +172,18 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const setLedgerMeasure = useStore((s) => s.setLedgerMeasure);
   const snap = useStore((s) => s.snap);
   const following = useStore((s) => s.following);
-  const latestSnapshot = useStore((s) => s.latestSnapshot);
   const live = useStore((s) => s.live);
   const metaSnap = useStore((s) => s.metaSnap);
   const snapshotExact = useStore((s) => s.snapshotExact);
   const selNodes = useStore((s) => s.selNodes);
+  const metaList = useStore((s) => s.metaList); // co-location reads the full catalog (nodeRowSpec)
   const inspect = useStore((s) => s.inspect);
-  // The two lower levels' own measures — a level remembers its pick; these are the card's, not
-  // the app's, so they live here rather than in the store (the tick level's is `ledgerMeasure`,
-  // which the chamber's own readouts share).
-  const [netPick, setNetPick] = useState<TickNetMeasure>("snapshots");
-  const [snapPick, setSnapPick] = useState<SnapLevelMeasure>("fee");
+  // ONE PICK FOR EVERY LEVEL (user, 2026-09-29 — `src/data/explorerMeasure.ts`): the lower levels
+  // show the tick level's `ledgerMeasure` where they can state it and their own first measure where
+  // they can't, and a pick at any level writes that one value — so stepping down and back up never
+  // loses what the reader chose.
+  const netPick = levelMeasure(TICK_NET_MEASURES, ledgerMeasure);
+  const snapPick = levelMeasure(SNAP_MEASURES, ledgerMeasure);
 
   const selNode = inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode") ? inspect : null;
   const selIp = selNode?.node?.ip ?? null;
@@ -301,74 +283,25 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // rail's `live · 8s` counter, ticking, so the two surfaces speak one clock.
   // Hovering ANY snapshot — a row, a scene tile — PREVIEWS the pinned state it would enter (hollow
   // dot, dashed). The write goes through `followToggleActions` + the one executor. ----------------
-  const liveControl = (() => {
-    if (!live)
-      return (
-        <span className="inline-flex items-center gap-1.5 text-micro tracking-caps uppercase text-muted-foreground">
-          <NoSignalDot /> no signal
-        </span>
-      );
-    const liveOrd = latestSnapshot?.ordinal ?? null;
-    const previewOrd = hoverSnapOrd != null && hoverSnapOrd !== liveOrd ? hoverSnapOrd : null;
-    const pinned = !following && snap != null;
-    const beating = following && previewOrd == null;
-    const label = previewOrd != null ? "Pinned" : following ? "Live" : pinned ? "Pinned" : "Live";
-    const dotHue = displayNetwork(filter)?.hue ?? accent;
-    // The AGE of the snapshot on screen — the live tip while following, the pinned one otherwise —
-    // in the right rail's own words (`relativeAge`, ticking every second). A hover preview names
-    // the ordinal it would pin instead, since that is what the preview is about.
-    // The age ticks in its own child (`LiveAge`), so the per-second clock re-renders one span,
-    // not the whole explorer. Following off with nothing pinned says "off" — the state is not
-    // live, and an age beside the word would read as if it were.
-    const shown = pinned ? snap!.data : latestSnapshot;
-    const sub = previewOrd != null
-      ? previewOrd.toLocaleString()
-      : !following && !pinned
-        ? "· off"
-        : shown
-          ? <LiveAge ts={shown.timestamp} />
-          : null;
-    return (
-      <button
-        type="button"
-        aria-pressed={following}
-        title={following ? "Following the live snapshot — click to pin the one on screen" : "Follow the live snapshot"}
-        onClick={() => {
-          const shown = snap ?? (latestSnapshot ? ({ kind: "snapshot", title: `Global snapshot #${latestSnapshot.ordinal}`, data: latestSnapshot } as const) : null);
-          if (shown) applyClickActions(followToggleActions(shown, following));
-        }}
-        // One box in every state, so the pill never changes size or place as the state flips:
-        // the padding is there when it is invisible (LIVE, transparent) as when the PINNED wash
-        // makes it a visible chip (user, 2026-09-26: the pinned block "looks ugly, no padding").
-        className={cn(
-          "-mr-1.5 inline-flex items-center gap-1.5 rounded-sm px-1.5 py-[3px] cursor-pointer select-none border border-transparent whitespace-nowrap",
-          "hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
-          pinned && previewOrd == null && selectedRow(true),
-          previewOrd != null && "border-dashed border-border",
-        )}
-        style={pinned && previewOrd == null ? selectionHue(accent) : undefined}
-      >
-        {beating ? (
-          <span
-            className="flex-none w-2 h-2 rounded-full animate-dot-beat motion-reduce:animate-none"
-            style={{ background: dotHue, boxShadow: `0 0 0 3px color-mix(in oklch, ${dotHue} 30%, transparent)` }}
-          />
-        ) : (
-          <span className={cn("flex-none w-2 h-2 rounded-full border", pinned && previewOrd == null ? "border-primary/80" : "border-muted-foreground/70")} />
-        )}
-        {/* THE RIGHT RAIL CARD'S OWN VOICE AND PLACE (user, 2026-09-28): lowercase `live · 5s ago`
-            at the card aside's text size, on the TITLE row — the card's own position, which fits
-            since the title became "Snapshots" (it rode the eyebrow row while "Snapshot breakdown"
-            left ~54px beside it). */}
-        <span className={cn("text-label", pinned && previewOrd == null ? "text-foreground" : "text-muted-foreground")}>{label.toLowerCase()}</span>
-        {sub && <span className="tabular-nums text-label text-muted-foreground">{sub}</span>}
-      </button>
-    );
-  })();
+  // The LIVE / PINNED switch — one component with the global snapshot card's aside
+  // (`components/FollowControl.tsx`); the explorer adds the hover preview. `-mr-1.5` hangs the
+  // pill's padding into the head's gutter so its text aligns with the rows' right edge.
+  const liveControl = <FollowControl preview className="-mr-1.5" />;
 
   // ---- level 0: the ticks, paged, measured by the heading's pick -------------------------------
   const tickValues = pagedSnaps.map((d) => tickMeasureValue(ledgerMeasure, d, snapshotExact[d.ordinal]));
   const maxTick = Math.max(1e-9, ...tickValues.map((v) => v ?? 0));
+  // THE SPAN THE EXPLORER HOLDS — stated on EVERY level (user, 2026-09-29: "even if there is no
+  // pager you should still indicate the size of the cache, e.g. 'last 11 min'"). The deeper levels
+  // have nothing to page, so they carry the same footer with the span alone.
+  const spanScope = {
+    word: spanWords(orderedSnaps),
+    title: `The explorer keeps the latest ${POLL.maxSnapshots} global snapshots, the stretch it follows live. For anything older, open the raw data layer and search the whole chain.`,
+  };
+  const spanFooter =
+    live && orderedSnaps.length > 0 ? (
+      <TablePager page={1} pages={1} from={1} to={orderedSnaps.length} total={orderedSnaps.length} compact scope={spanScope} onPage={() => {}} />
+    ) : undefined;
   const levels: ExplorerLevelSpec[] = [
     {
       key: "ticks",
@@ -440,10 +373,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
             // The explorer holds the latest POLL.maxSnapshots global snapshots; how much TIME that
             // is — measured from the rows themselves, oldest to newest — is what a reader can use.
             // It was "recent" (the raw log's word, 2026-09-13), which answered neither question.
-            scope={{
-              word: spanWords(orderedSnaps),
-              title: `The explorer keeps the latest ${POLL.maxSnapshots} global snapshots, the stretch it follows live. For anything older, open the raw data layer and search the whole chain.`,
-            }}
+            scope={spanScope}
             onPage={(p) => setTickPage(p)}
           />
         ) : undefined,
@@ -463,6 +393,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
     const measured = netRows.map((n) => ({ n, m: tickNetMeasure(netPick, n.count, perMetaOf(exact, n.id)) }));
     const maxNet = Math.max(1e-9, ...measured.map(({ m }) => m.value ?? 0));
     levels.push({
+      pager: spanFooter,
       key: "networks",
       crumb: {
         label: <span className="tabular-nums">{tick.ordinal.toLocaleString()}</span>,
@@ -472,7 +403,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         },
       },
       meaning: "Networks that anchored into it",
-      measure: { options: TICK_NET_MEASURE_OPTIONS, value: netPick, onPick: (id) => setNetPick(id as TickNetMeasure) },
+      measure: { options: TICK_NET_MEASURE_OPTIONS, value: netPick, onPick: (id) => setLedgerMeasure(id as LedgerMeasure) },
       hasFigure: true,
       nameW: 120,
       figureW: 48,
@@ -535,6 +466,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
     const values = leaves.map((r) => snapMeasureValue(snapPick, r));
     const maxLeaf = Math.max(1e-9, ...values.map((v) => v ?? 0));
     levels.push({
+      pager: spanFooter,
       key: "snapshots",
       crumb: {
         label: (
@@ -546,7 +478,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         onRelease: () => setOpenSnap(null),
       },
       meaning: "Its snapshots anchored here",
-      measure: { options: SNAP_MEASURE_OPTIONS, value: snapPick, onPick: (id) => setSnapPick(id as SnapLevelMeasure) },
+      measure: { options: SNAP_MEASURE_OPTIONS, value: snapPick, onPick: (id) => setLedgerMeasure(id as LedgerMeasure) },
       hasFigure: true,
       figureW: 48,
       empty: "No snapshots identified for this network here.",
@@ -560,12 +492,10 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           key: `${key}:${i}`,
           name: <span className="tabular-nums">{r.ordinal > 0 ? r.ordinal.toLocaleString() : `${r.metaId.slice(0, 10)}…`}</span>,
           // An unlisted row's ordinal counts on ITS OWN channel's sequence — one tick can carry
-          // several chains, so the short address says which (2026-08-08). A listed row carries
-          // its own hash where the polled buffer knows it.
-          // A hash PREFIX, not the `a…b` short form: the tag home beside a 4-decimal fee holds
-          // seven mono glyphs, and a prefix cut clean reads as a prefix where an ellipsised
-          // short form cut again reads as broken. The row's title carries the full ids.
-          tag: isUnlisted ? (r.ordinal > 0 ? r.metaId.slice(0, 7) : undefined) : r.hash ? r.hash.slice(0, 7) : undefined,
+          // several chains, so the short address says which (2026-08-08). A listed row shows NO
+          // hash (user, 2026-09-29: "don't show the actual snapshot hash in the explorer") — the
+          // row's network is its level, its ordinal its name, and the hash is the card's foot.
+          tag: isUnlisted && r.ordinal > 0 ? r.metaId.slice(0, 7) : undefined,
           share: values[i] != null ? values[i]! / maxLeaf : undefined,
           hue: leafHue,
           figure: snapMeasure(snapPick, r),
@@ -588,18 +518,20 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
 
   // ---- level 3: the signers of the open snapshot — the same node row every explorer ends in ----
   const leaf = openSnap ? leaves.find((r) => `${r.metaId}|${r.ordinal}` === openSnap) ?? null : null;
-  const signers = leaf ? signersOf(exact, leaf.metaId, leaf.ordinal) : NO_SIGNERS;
+  const signers = signersOf(leaf ? exact : undefined, leaf?.metaId ?? "", leaf?.ordinal ?? 0); // no leaf → the shared empty list
   if (leaf && signers.length > 0) {
     levels.push({
+      pager: spanFooter,
       key: "signers",
       crumb: { label: <span className="tabular-nums">{leaf.ordinal > 0 ? leaf.ordinal.toLocaleString() : `${leaf.metaId.slice(0, 10)}…`}</span> },
       // The cards' own phrase ("Signed by N L0 validators") — the producing layer named before
       // the rows, because the constant count is most puzzling here (3 rows under a 20-node network).
       // The user's words (2026-09-26); the count is the rows, the layer is the tag beside each.
       meaning: "Validators that signed",
+      glyphW: NODE_GLYPH_W,
       measure: null,
       hasFigure: false,
-      // The one node row (`explorer/nodeRow.tsx`); the level is one network, so no ticker.
+      // The one node row (`explorer/nodeRow.tsx`), ticker included, as in every explorer.
       rows: signers.map((sid): ExplorerRowSpec => {
         const r = resolveSigner(selNodes, leaf.metaId, sid);
         if (!r.known) {
@@ -613,6 +545,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         const on = nodeOn(row);
         const hue = identityHudCss(leaf.metaId);
         return nodeRowSpec({
+          metaList,
           key: sid,
           row,
           hue,

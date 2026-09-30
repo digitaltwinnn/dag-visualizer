@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { Panel } from "@/components/docs/AboutDoc";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CABINET_BODY, CABINET_LIST, CABINET_TRIGGER } from "@/components/cabinetTabs";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { type ZoomId } from "@/src/data/trendWindow";
 import TrendChart, { type TrendLine } from "@/components/docs/TrendChart";
@@ -11,6 +12,7 @@ import {
   formatDag as dag,
   formatMb as mb,
   formatSeconds as secs,
+  lastMeasured,
   metricSeries,
   metricUnit,
   perPhrase,
@@ -173,7 +175,7 @@ export default function TrendsDoc() {
   // tiering, the 1H slice, the fleet's hourly payload and the daily readout's 90d window all
   // moved there with their reasons; the document's zoom and range stay LOCAL state after the
   // mount SEED above, because the window a reader picks on this page is the page's own.
-  const { p, buckets, stepMs, pF, fBuckets, fStep, fleetPending, daily, error } = useTrendsSlice(zoom, range);
+  const { p, buckets, stepMs, pF, fBuckets, fStep, fleetPending, daily, error, stale, dailyError } = useTrendsSlice(zoom, range);
   // ⚠️ THE COMMITTED NETWORK SCOPES EVERY PER-NETWORK COLUMN (user, 2026-09-14: "Trends is a
   // doc-page, but actually it shows data that could benefit from the metagraph filter … hide the
   // other metagraph charts"). ONE roster, read by all three panel builders, so a section cannot
@@ -224,14 +226,30 @@ export default function TrendsDoc() {
   const bucketWord = tierWord(stepMs, "attributive");
   /** The daily tier's newest COMPLETE day for a counter series (yesterday — today still
    *  fills), scaled like the chart it captions; undefined off the hourly zooms. */
-  const dayReadout = (name: string, k = 1): { value: number; word: string } | undefined => {
-    if (!daily) return undefined;
-    const series = daily.series[name];
-    for (let i = (series?.length ?? 0) - 1; i >= 0; i--) {
-      if (series![i] != null) return { value: series![i]! * k, word: "latest full day" };
-    }
-    return undefined;
+  // ⚠️ "LATEST FULL DAY" IS THE ONE HEAD READING (user, 2026-09-29: "a latest 5 min is less easy
+  // to understand than a last day … day should be the standard always"). Every single-line chart
+  // finer than a day takes its headline from the DAILY tier through the same read that draws it
+  // (`fromDaily`) — counters, gauges and continuity alike; a chart that is already daily states its
+  // own last point, which IS the day. Null while the daily tier is in flight (acquiring).
+  const dayRead = (
+    fromDaily: (s: Readonly<Record<string, (number | null)[]>>) => readonly (number | null)[],
+    chartStep: number,
+    k = 1,
+  ): { value: number | null; word: string; pending: boolean } | undefined => {
+    if (chartStep >= 86400000) return undefined;
+    const v = daily ? lastMeasured(fromDaily(daily.series)) : null;
+    // Acquiring only while the daily tier is in flight — landed with no complete day, or failed,
+    // is no reading, and says so with a dash (rule 10's give-up path). A HELD window is not the
+    // one on the pickers, so its readings wait too.
+    return { value: v == null || stale ? null : v * k, word: "latest full day", pending: stale || (!daily && !dailyError) };
   };
+  const dayReadout = (name: string, k = 1) => dayRead((s) => s[name] ?? [], stepMs, k);
+  /** THE TOTAL AS THE HEADLINE of a chart that also draws its parts (the per-network Nodes panels:
+   *  the total plus a dashed line per layer — user, 2026-09-29). The layer lines OVERLAP (a hybrid
+   *  node counts once per role it runs), so they are not a partition and never sum to it; the head
+   *  names the one line it reads. A daily chart states its own last total. */
+  const totalRead = (r: ReturnType<typeof dayRead>, points: readonly (number | null)[]) =>
+    r ? { ...r, word: `total · ${r.word}` } : { value: lastMeasured(points), word: "total · latest full day", pending: false };
   /** The Metagraphs tab's panel list: one chart per catalog network for one stored metric,
    *  ranked by the LAST measured day, busiest first (per-section — each ranking is its own
    *  reading). The vitals' catalog-order rule guards live charts that reshuffle under the
@@ -289,7 +307,7 @@ export default function TrendsDoc() {
           { label: "nodes", points, hue: net?.hue },
           ...present.map((r) => ({ label: SHORT[r]!, points: S(pF, `f.layer.${m.id}.${r}`), hue: net?.hue, dash: DASH[r] || true })),
         ];
-        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={metricUnit("nodes", fStep)} buckets={fBuckets} stepMs={fStep} lines={lines} />;
+        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={metricUnit("nodes", fStep)} readout={totalRead(dayRead((d) => metricSeries("nodes", m.id!, d).points, fStep), points)} buckets={fBuckets} stepMs={fStep} lines={lines} />;
       });
   };
   /** Per-network CONTINUITY panels: real measured gap stats (m.{id}.gapSum/gapMax — live
@@ -311,7 +329,7 @@ export default function TrendsDoc() {
         // `sampled` = the chain's own snaps series: amber only where the SAMPLER missed;
         // a null point over a sampled bucket (a quiet stretch — nothing to space) just
         // breaks the line (user, 2026-09-09: DOR's quiet buckets wore outage amber).
-        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={metricUnit("continuity", stepMs)} buckets={cBuckets} stepMs={stepMs} format={TREND_METRICS.continuity.format} sampled={trim(s.sampled!)} gaps={trim(s.gaps!)} lines={[line]} />;
+        return <TrendChart key={m.id} onRange={onRangeFor(m.id!)} inspect={() => inspectRange(m.id!)} inspectCommits={net?.name ?? m.id!} name={net?.name ?? m.id!} unit={metricUnit("continuity", stepMs)} readout={dayRead((d) => metricSeries("continuity", m.id!, d).points, stepMs)} buckets={cBuckets} stepMs={stepMs} format={TREND_METRICS.continuity.format} sampled={trim(s.sampled!)} gaps={trim(s.gaps!)} lines={[line]} />;
       });
   };
 
@@ -466,23 +484,14 @@ export default function TrendsDoc() {
             // drawer is a container for records and prose, and in this app a plate that size in
             // the accent reads as a committed region). The pickers above keep the ladder: they
             // are controls.
-            className="relative flex h-auto flex-none w-full gap-1 rounded-none p-0 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border/50"
+            className={CABINET_LIST}
             aria-label="Which side of the network"
           >
             {(["hypergraph", "metagraphs"] as const).map((id) => (
               <TabsTrigger
                 key={id}
                 value={id}
-                className={cn(
-                  "flex-1 flex items-center justify-center gap-1.5 h-8 px-2 rounded-t-md! rounded-b-none!",
-                  "text-label tracking-caps uppercase font-normal",
-                  "text-muted-foreground bg-transparent border border-transparent border-b-0",
-                  "hover:text-foreground hover:bg-wash-soft",
-                  "after:hidden focus-visible:ring-0 focus-visible:border-transparent",
-                  "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
-                  "data-[state=active]:z-[1] data-[state=active]:text-foreground data-[state=active]:shadow-none",
-                  "data-[state=active]:border-border/50! data-[state=active]:bg-[var(--panel-solid)]!",
-                )}
+                className={cn(CABINET_TRIGGER, "h-8 text-label")}
               >
                 {id === "hypergraph" ? "Hypergraph" : "Metagraphs"}
               </TabsTrigger>
@@ -490,7 +499,9 @@ export default function TrendsDoc() {
           </TabsList>
           {/* The drawer's own outline — the tab row's baseline hairline is its top edge (the
               channel pane's rule), so the active tab's panel-solid fill bridges into it. */}
-          <div className="border border-t-0 border-border/50 rounded-b-md px-5 pb-8">
+          {/* QUIET WHILE HELD: the previous window stands in until the new one lands
+              (`useTrendsSlice`'s hold) — dimmed, so it never reads as the window the pickers name. */}
+          <div className={cn(CABINET_BODY, "px-5 pb-8 [transition:opacity_200ms_ease] motion-reduce:!transition-none", stale && "opacity-45")}>
 
 
           <TabsContent value="hypergraph" className="pt-5">
@@ -511,7 +522,7 @@ export default function TrendsDoc() {
             // transactions; no batching-mechanism claim (the state/blocks correction), and
             // no volume commentary either ("most seal none" cut — user: "no opinion of the
             // volume, let charts do the work").
-            lead="The blocks the global snapshots sealed. Here a block carries the DAG ledger's own transactions — a DAG transfer rides as one."
+            lead="The blocks the global snapshots carried. Here a block carries the DAG ledger's own transactions — a DAG transfer rides as one."
           >
             <TrendChart onRange={onRange} inspect={inspectHere} name="Blocks" unit={per} readout={dayReadout("g.blocks")} buckets={cBuckets} stepMs={stepMs} lines={[{ label: "blocks", points: trim(S(p, "g.blocks")) }]} />
           </Section>
@@ -522,8 +533,8 @@ export default function TrendsDoc() {
             title="Global snapshot continuity"
             lead="How regularly the global snapshots were produced, and how long the pauses were. Gray marks a pause that is normal for this network; amber marks one unusually long by its own history; a striped area means this app was not watching at the time."
           >
-            <TrendChart onRange={onRange} inspect={inspectHere} name="Mean gap" unit="seconds" buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} gaps={trim(S(p, "g.gapMax"))} lines={[{ label: "mean", points: trim(meanGap(p)) }]} />
-            <TrendChart onRange={onRange} inspect={inspectHere} name="Longest pause" unit={`seconds · the ${stepMs >= 86400000 ? "day" : "bucket"}'s single widest gap`} buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} gaps={trim(S(p, "g.gapMax"))} lines={[{ label: "max", points: trim(S(p, "g.gapMax")) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Mean gap" unit="seconds" readout={dayRead((d) => meanGap({ series: d } as unknown as TrendsPayload), stepMs)} buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} gaps={trim(S(p, "g.gapMax"))} lines={[{ label: "mean", points: trim(meanGap(p)) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Longest pause" unit={`seconds · the ${stepMs >= 86400000 ? "day" : "bucket"}'s single widest gap`} readout={dayRead((d) => d["g.gapMax"] ?? [], stepMs)} buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} gaps={trim(S(p, "g.gapMax"))} lines={[{ label: "max", points: trim(S(p, "g.gapMax")) }]} />
           </Section>
           )}
           {sectionTab === "economics" && (<>
@@ -546,7 +557,7 @@ export default function TrendsDoc() {
           <Section
             id="fleet"
             title="Total nodes"
-            lead="Every node across the whole network — the DAG's own validators and every metagraph's nodes — counted live each hour. The layers split the work: L0 seals a network's own state, currency L1 (cL1) moves its token, data L1 (dL1) takes in what applications write — and one node can run several."
+            lead="Every node across the whole network — the DAG's own validators and every metagraph's nodes — counted live each hour. The layers split the work: L0 agrees on a network's state and creates its snapshots, currency L1 (cL1) moves its token, data L1 (dL1) takes in what applications write — and one node can run several."
           >
             {fleetPending ? (
               /* The gauges are HOURLY instruments; at fine zooms their hourly payload is a
@@ -554,7 +565,7 @@ export default function TrendsDoc() {
               <p className="text-label text-muted-foreground">reading the hourly samples…</p>
             ) : (
               <>
-                <TrendChart onRange={onRange} inspect={inspectHere} name="Nodes" unit="total" buckets={fBuckets} stepMs={fStep} lines={[{ label: "nodes", points: S(pF, "f.nodes") }]} />
+                <TrendChart onRange={onRange} inspect={inspectHere} name="Nodes" unit="total" readout={dayRead((d) => d["f.nodes"] ?? [], fStep)} buckets={fBuckets} stepMs={fStep} lines={[{ label: "nodes", points: S(pF, "f.nodes") }]} />
                 <TrendChart
                   onRange={onRange}
                   inspect={inspectHere}
@@ -610,7 +621,7 @@ export default function TrendsDoc() {
             // their payload between them differently (DED: state empty, records in blocks;
             // others the reverse), with no crisp delineation we've measured. Simplified the
             // same day — the two-carrier fact, one example each, the zero rule.
-            lead="The blocks each network sealed inside its own snapshots. A block carries transactions — a token transfer, or a batch of application records — and it is one of two places a snapshot carries work: the other is its state, and each network decides what goes where. A zero means no blocks, not no activity."
+            lead="The blocks each network carried inside its own snapshots. A block carries transactions — a token transfer, or a batch of application records — and it is one of two places a snapshot carries work: the other is its state, and each network decides what goes where. A zero means no blocks, not no activity."
           >
             {netPanels("blocks")}
           </Section>
@@ -636,7 +647,7 @@ export default function TrendsDoc() {
           <Section
             id="net-fleet"
             title="Nodes per metagraph"
-            lead="Each network's own node count, sampled live every hour, with a line for each layer it runs: L0 seals its state, cL1 moves its token, dL1 takes in what applications write."
+            lead="Each network's own node count, sampled live every hour, with a line for each layer it runs: L0 agrees on its state and creates its snapshots, cL1 moves its token, dL1 takes in what applications write."
           >
             {fleetPending ? (
               <p className="text-label text-muted-foreground">reading the hourly samples…</p>

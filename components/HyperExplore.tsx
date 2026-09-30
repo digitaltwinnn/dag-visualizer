@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 
 import Explorer, { type ExplorerLevelSpec } from "@/components/explorer/Explorer";
-import { nodeRowSpec } from "@/components/explorer/nodeRow";
+import { NODE_GLYPH_W, nodeRowSpec } from "@/components/explorer/nodeRow";
 import { IdentityDot, RoleChips } from "@/components/inspector/parts";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { compositionClause, compositionGroups } from "@/src/data/composition";
@@ -177,13 +177,15 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
       key: "nodes",
       crumb: { label: openGroup.label },
       meaning: clause ? `Nodes that ${clause}` : "Each node running this composition",
+      glyphW: NODE_GLYPH_W,
       measure: null,
       hasFigure: false,
-      // The one node row (`explorer/nodeRow.tsx`); the level is one network, so no ticker.
+      // The one node row (`explorer/nodeRow.tsx`), led by its network's ticker.
       rows: openGroup.rows.map((r, i) => {
         const on = selIp != null && "node" in r.pick && r.pick.node?.ip === selIp;
         const hue = identityHudCss(r.pick.kind === "metanode" && r.pick.meta ? r.pick.meta.id : "dag");
         return nodeRowSpec({
+          metaList,
           key: (r.id ?? r.label) + i,
           row: r,
           hue,

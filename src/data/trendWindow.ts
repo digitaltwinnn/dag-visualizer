@@ -352,9 +352,13 @@ const HOUR_MS = 3_600_000;
  *  conditionally and no other view should pay for this fetch. */
 export function planTrendFetch(zoom: ZoomId | null, range: TrendRange | null): TrendFetchPlan {
   if (!zoom) return { main: NO_LEG, fleet: NO_LEG, daily: null, tier: null };
-  const daily: TrendApiWindow | null = zoom === "7d" || zoom === "30d" ? "90d" : null;
+  // THE DAILY LEG rides wherever the charts' own grain is finer than a day (user, 2026-09-29:
+  // "day should be the standard always" for the head readout) — every zoom but 1Y/ALL, and any
+  // range whose tier is finer than daily. Where the chart IS daily its own last point is the day.
+  const dailyZoom: TrendApiWindow | null = zoom === "1y" || zoom === "all" ? null : "90d";
   if (range) {
     const tier = pickRangeTier(range.fromMs, range.toMs);
+    const daily: TrendApiWindow | null = tier === "1d" ? null : "90d";
     const cut: TrendCut = { kind: "range", fromMs: range.fromMs, toMs: range.toMs };
     return {
       main:
@@ -379,7 +383,7 @@ export function planTrendFetch(zoom: ZoomId | null, range: TrendRange | null): T
       zoom === "1h" || zoom === "24h"
         ? { window: "7d", tiles: null, cut: { kind: "slice", ms: zoom === "1h" ? HOUR_MS : 24 * HOUR_MS } }
         : NO_LEG,
-    daily,
+    daily: dailyZoom,
     tier: null,
   };
 }
@@ -445,4 +449,49 @@ export function assembleTrendSlice(plan: TrendFetchPlan, payloads: TrendPayloads
     fleetPending: fine && !fleet,
     daily: payloads.daily ? trimNewestPartial(payloads.daily) : undefined,
   };
+}
+
+/** THE HELD PLOT'S ZOOM (user, 2026-09-29: "can't we just reposition the lines, most chart libs
+ *  have that option"). While a new window or range loads, the previous plot stands in (the
+ *  slice's hold), and this answers where that plot has to sit so its OLD buckets land where the
+ *  NEW axis will draw them: the target span's start as a fraction `f0` of the held axis, and the
+ *  horizontal scale `s` that stretches the target span over the whole plot. Nothing is
+ *  interpolated between grains — the old data moves as a picture and is then REPLACED, which is
+ *  the only animation rule 10 allows here (a point-wise morph from hourly to daily buckets would
+ *  draw values nobody measured). Null when there is nothing honest to move: a degenerate axis or
+ *  target, or a target the held axis does not overlap at all. */
+export function heldZoom(
+  axisFromMs: number,
+  axisToMs: number,
+  target: { fromMs: number; toMs: number },
+): { f0: number; s: number } | null {
+  const span = axisToMs - axisFromMs;
+  const want = target.toMs - target.fromMs;
+  if (!(span > 0) || !(want > 0)) return null;
+  if (target.toMs <= axisFromMs || target.fromMs >= axisToMs) return null;
+  const f0 = (target.fromMs - axisFromMs) / span;
+  const s = span / want;
+  // A pill hop within one window (a refresh, the same span a bucket later) is not a zoom.
+  if (Math.abs(s - 1) < 0.02 && Math.abs(f0) < 0.02) return null;
+  return { f0, s };
+}
+
+const SPAN_WORDS: Record<ZoomId, string> = {
+  "1h": "last hour",
+  "24h": "last 24 hours",
+  "7d": "last 7 days",
+  "30d": "last 30 days",
+  "1y": "last year",
+  all: "all measured",
+};
+
+/** THE SPAN ON SCREEN, IN WORDS — what a span reading is OVER (design A, 2026-09-29): the window
+ *  pill's own phrase, or a brushed range's dates (UTC, the axis's own zone; the range's end is
+ *  exclusive, so the last day named is the one it reaches into). */
+export function spanPhrase(zoom: ZoomId, range: { fromMs: number; toMs: number } | null): string {
+  if (!range) return SPAN_WORDS[zoom];
+  const day = (ms: number) => new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+  const a = day(range.fromMs);
+  const b = day(range.toMs - 1);
+  return a === b ? a : `${a} – ${b}`;
 }

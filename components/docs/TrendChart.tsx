@@ -1,9 +1,10 @@
 "use client";
-import { memo, useId, useState } from "react";
+import { memo, useId, useLayoutEffect, useRef, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { Area, CartesianGrid, ComposedChart, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { cn } from "@/lib/utils";
-import { bucketAt, cursorFraction } from "@/src/data/trendWindow";
+import { NodeStars } from "@/components/state/StateAtoms";
+import { bucketAt, cursorFraction, heldZoom } from "@/src/data/trendWindow";
 
 // THE TRENDS DOC'S ONE CHART PRIMITIVE — a small-multiple line chart over the /api/trends
 // buckets, on RECHARTS (user, 2026-09-07: "why hand-roll charts if we have a neat library?" —
@@ -65,6 +66,14 @@ const stampOf = (ts: number, stepMs: number): string =>
     ? new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" }) + " UTC"
     : new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
 
+/** The axis's date formatters, built once: `toLocaleDateString` with options constructs a new
+ *  formatter per call, and recharts asks for every candidate tick while it fits the labels. */
+const MONTH_FMT = new Intl.DateTimeFormat(undefined, { month: "short", timeZone: "UTC" });
+const DAY_FMT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+
+/** How far a finger may wander and still be a tap rather than the brush. */
+const TAP_SLOP = 8;
+
 export default function TrendChart({
   name,
   unit,
@@ -84,6 +93,7 @@ export default function TrendChart({
   fill,
   plotHeight = PLOT_H,
   rollClassName,
+  zoomTo,
   note,
   syncId = "trends",
   className,
@@ -143,7 +153,15 @@ export default function TrendChart({
    *  page hands the DAILY tier's own newest complete day, so no client re-summing invents a
    *  floor rule. Gauges and continuity keep their bucket readout: a gauge's day is not a sum,
    *  and a day-mean of gaps needs the weighting the store already did per bucket. */
-  readout?: { value: number; word: string };
+  readout?: {
+    value: number | null;
+    word: string;
+    /** The hover's sentence for what the number is (defaults to the daily tier's newest day). */
+    title?: string;
+    /** A null value is ACQUIRING only while this is true; otherwise it is "no reading" (a dash),
+     *  never stars promising an arrival nothing is fetching. */
+    pending?: boolean;
+  };
   /** THE SHARED TIME CURSOR (2026-09-18) — `store.trendCursorMs`, one instant every plane of the
    *  3D trend stack marks at once, so a reader comparing five chains is looking at the same
    *  moment on all of them. Drawn as a vertical rule at the bucket that CONTAINS the instant
@@ -187,6 +205,16 @@ export default function TrendChart({
    *  and five recharts plots mounting in the animation's first frames WAS the stutter. Absent,
    *  there is no wrapper at all and the document's DOM is what it always was. */
   rollClassName?: string;
+  /** THE HELD PLOT ZOOMS TO THE SPAN BEING LOADED (user, 2026-09-29). While the caller is showing
+   *  a PREVIOUS window in place of one still in flight, it names the span it asked for, and the
+   *  plot slides and scales (`heldZoom`) so the old buckets stand where the new axis will draw
+   *  them; when the new data lands the caller passes `null`, the transform snaps back as the new
+   *  series replaces the old in the same frame, and the caller's own fade is the crossfade.
+   *  `undefined` (the document) renders no wrapper at all. `null` keeps the wrapper at identity,
+   *  which is what lets the NEXT hold animate out of it rather than jump. The axis labels and the
+   *  cursor stand down while zoomed: stretched text reads as broken, and the cursor is placed on
+   *  the new axis's buckets, which this picture is not. */
+  zoomTo?: { fromMs: number; toMs: number } | null;
   /** AN INSTRUMENT STATE THE SERIES CANNOT SAY (2026-09-18). When the caller knows something the
    *  points don't — most concretely that the payload this chart needs is still IN FLIGHT — it
    *  hands the words here and the plot is replaced by them, in the chart's own empty-state frame.
@@ -239,6 +267,50 @@ export default function TrendChart({
 }) {
   const n = buckets.length;
   const measured = lines.some((l) => l.points.some((v) => v != null));
+  // THE AXIS CHANGED WITH NO HOLD IN BETWEEN — a window hop inside one payload (30D → 7D both
+  // read the hourly tier), so the new series lands in the same render and there is no held
+  // picture for `zoomTo` to move. The same motion runs the other way round (FLIP): the NEW plot
+  // starts where the OLD axis would have drawn it and eases to its own. Real data throughout,
+  // only its placement moves. Skipped right after a hold, which already made the move, and
+  // under reduced motion.
+  const zoomEl = useRef<HTMLDivElement>(null);
+  const tapFrom = useRef<{ x: number; y: number } | null>(null);
+  const tapAt = useRef(-Infinity);
+  /** The plot box is PLOT_MARGIN over the plate at any width (the overlay's rule), so the
+   *  fraction needs no measurement beyond the plate's own rect. */
+  const pickAt = (plate: HTMLElement, clientX: number) => {
+    if (!onPick || n === 0) return;
+    const rect = plate.getBoundingClientRect();
+    const f = Math.min(1, Math.max(0, (clientX - rect.left - PLOT_MARGIN.left) / Math.max(1, rect.width - PLOT_INSET_X)));
+    const ms = buckets[0]! + f * (buckets[n - 1]! - buckets[0]!);
+    onPick(bucketAt(buckets, stepMs, ms) ?? ms);
+  };
+  const lastAxis = useRef<{ from: number; to: number; held: boolean } | null>(null);
+  const axisFrom = n ? buckets[0]! : 0;
+  const axisTo = n ? buckets[n - 1]! : 0;
+  useLayoutEffect(() => {
+    const prev = lastAxis.current;
+    lastAxis.current = { from: axisFrom, to: axisTo, held: !!zoomTo };
+    const el = zoomEl.current;
+    if (!el || zoomTo || !prev || prev.held || n < 2) return;
+    if (prev.from === axisFrom && prev.to === axisTo) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const z = heldZoom(axisFrom, axisTo, { fromMs: prev.from, toMs: prev.to });
+    if (!z) return;
+    el.style.transition = "none";
+    el.style.transform = `scaleX(${z.s}) translateX(calc(${-z.f0} * (100% - ${PLOT_INSET_X}px)))`;
+    el.dataset.flip = "";
+    void el.offsetWidth;
+    el.style.transition = "transform 420ms var(--ease-roll)";
+    el.style.transform = "";
+    const done = () => {
+      el.style.transition = "";
+      delete el.dataset.flip;
+    };
+    el.addEventListener("transitionend", done, { once: true });
+    const t = window.setTimeout(done, 600);
+    return () => window.clearTimeout(t);
+  }, [axisFrom, axisTo, zoomTo, n]);
 
   // The cursor's bucket on THIS chart's own axis — the chart owns its scale, so the lookup runs
   // against the buckets it was actually handed (a counter series trims its partial edges, so the
@@ -354,7 +426,10 @@ export default function TrendChart({
             ))}
           </span>
         )}
-        {lines.length === 1 && last != null && (
+        {/* One line states its own reading; a MULTI-line chart only a reading its caller names
+            (the per-network Nodes panels' total, 2026-09-29) — which line a bare number
+            belonged to would otherwise be a guess. */}
+        {(lines.length === 1 || readout != null) && last != null && (
           // The readout NAMES ITS RELATION to the window (user, 2026-09-09, third round of
           // this head: a number and a time still read as two facts — the words now say what
           // the number IS, "latest full day/hour/5 min", and the exact stamp lives on hover.
@@ -363,9 +438,14 @@ export default function TrendChart({
           // stamp and the gray band are what actually say when the reading lags the clock.)
           <span
             className="ml-auto inline-flex items-baseline gap-1 whitespace-nowrap"
-            title={readout ? "The newest complete measured day, from the daily tier" : `The newest complete measured ${stepMs >= 86400000 ? "day" : stepMs >= 3600000 ? "hour" : "five-minute bucket"} (${stampOf(buckets[lastIdx], stepMs)})`}
+            title={readout ? (readout.title ?? "The newest complete measured day, from the daily tier") : `The newest complete measured ${stepMs >= 86400000 ? "day" : stepMs >= 3600000 ? "hour" : "five-minute bucket"} (${stampOf(buckets[lastIdx], stepMs)})`}
           >
-            <span className="text-label text-foreground-dim tabular-nums">{format(readout ? readout.value : last)}</span>
+            {/* A null readout value is ACQUIRING — the daily tier behind "latest full day" is still in
+                flight — so the slot holds its place (NodeStars) rather than show a finer bucket
+                under the day's word, or a number that isn't the day's. */}
+            <span className="text-label text-foreground-dim tabular-nums">
+              {readout ? (readout.value != null ? format(readout.value) : readout.pending === false ? "—" : <NodeStars count={3} />) : format(last)}
+            </span>
             <span className="text-micro text-muted-foreground">
               · {readout ? readout.word : `latest full ${stepMs >= 86400000 ? "day" : stepMs >= 3600000 ? "hour" : "5 min"}`}
             </span>
@@ -379,19 +459,36 @@ export default function TrendChart({
       ) : (
         <div
           className={`relative rounded-md border border-border overflow-hidden${onRange ? " cursor-crosshair select-none touch-pan-y" : ""}${onPick ? " cursor-crosshair" : ""}`}
+          // `data-plot`: the plot plate — the History tether lands on its bottom edge, the time axis.
+          data-plot=""
           role="img"
           aria-label={`${name} — ${stepMs >= 86400000 ? "daily" : stepMs >= 3600000 ? "hourly" : "5-minute"} buckets, ${n} of them`}
+          // ⚠️ A FINGER PICKS ON RELEASE, NOT ON CLICK (user, 2026-09-29: "on mobile, clicking the
+          // chart still has to be on the exact dot"). The brush runs through recharts' TOUCH
+          // handlers, and a handled touch sequence gets no synthesised click — so on a phone only
+          // the active dot's own handler ever answered. A touch or pen press that did not travel
+          // past a tap's slop is a pick, decided at pointerup; a press that travelled is the
+          // brush's. The click a browser may still synthesise afterwards is swallowed so one tap
+          // is one pick.
+          onPointerDown={onPick ? (e) => { tapFrom.current = { x: e.clientX, y: e.clientY }; } : undefined}
+          onPointerUp={
+            onPick && n > 0
+              ? (e) => {
+                  const t = tapFrom.current;
+                  tapFrom.current = null;
+                  if (e.pointerType === "mouse" || !t || Math.hypot(e.clientX - t.x, e.clientY - t.y) > TAP_SLOP) return;
+                  pickAt(e.currentTarget, e.clientX);
+                  tapAt.current = performance.now();
+                }
+              : undefined
+          }
           onClick={
             onPick && n > 0
               ? (e) => {
-                  // The plot box is PLOT_MARGIN over this plate at any width (the overlay's rule),
-                  // so the fraction needs no measurement beyond the plate's own rect.
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const f = Math.min(1, Math.max(0, (e.clientX - rect.left - PLOT_MARGIN.left) / Math.max(1, rect.width - PLOT_INSET_X)));
-                  const ms = buckets[0]! + f * (buckets[n - 1]! - buckets[0]!);
-                  onPick(bucketAt(buckets, stepMs, ms) ?? ms);
                   // The plane's own click (a focus toggle) must not fire for the same press.
                   e.stopPropagation();
+                  if (performance.now() - tapAt.current < 600) return;
+                  pickAt(e.currentTarget, e.clientX);
                 }
               : undefined
           }
@@ -417,7 +514,23 @@ export default function TrendChart({
             // absolute descendants whether it asked to or not. A plain template string, NOT `cn()`:
             // the roll recipe carries several `[transition:…]` values under different variants and
             // twMerge must not be given the chance to "resolve" them.
-            return rollClassName == null ? plot : <div className={`relative ${rollClassName}`}>{plot}</div>;
+            const zoom = zoomTo && n > 1 ? heldZoom(buckets[0]!, buckets[n - 1]!, zoomTo) : null;
+            const framed =
+              zoomTo === undefined ? (
+                plot
+              ) : (
+                <div
+                  ref={zoomEl}
+                  className={`relative ${zoom ? "[transition:transform_420ms_var(--ease-roll)] [&_.recharts-cartesian-axis-tick]:opacity-0 motion-reduce:!transition-none" : "data-[flip]:[&_.recharts-cartesian-axis-tick]:opacity-0"}`}
+                  style={{
+                    transformOrigin: `${PLOT_MARGIN.left}px 0`,
+                    transform: zoom ? `scaleX(${zoom.s}) translateX(calc(${-zoom.f0} * (100% - ${PLOT_INSET_X}px)))` : undefined,
+                  }}
+                >
+                  {plot}
+                </div>
+              );
+            return rollClassName == null ? framed : <div className={`relative ${rollClassName}`}>{framed}</div>;
           })()}
           {/* THE SHARED CURSOR, AS AN OVERLAY RATHER THAN A RECHARTS CHILD
               (2026-09-19). It marks the bucket that CONTAINS the instant (`bucketAt`) or nothing at
@@ -435,7 +548,7 @@ export default function TrendChart({
               what lets it ride the 3D plane's projected scale.
               Structural accent, one hairline, no animation, no pointer events: it is a POSITION,
               and a position that eases in lags the gesture that set it. */}
-          {cursorX != null && (
+          {cursorX != null && !zoomTo && (
             <div
               aria-hidden
               className="absolute w-px bg-[var(--primary)] pointer-events-none"
@@ -601,10 +714,9 @@ const TrendPlot = memo(function TrendPlot({
     }
   }
   const tickLabel = (ts: number): string => {
-    const d = new Date(ts);
-    if (spanMs > 45 * 86400000) return d.toLocaleDateString(undefined, { month: "short", timeZone: "UTC" });
-    if (spanMs > 2 * 86400000) return d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
-    return `${String(d.getUTCHours()).padStart(2, "0")}:00`;
+    if (spanMs > 45 * 86400000) return MONTH_FMT.format(ts);
+    if (spanMs > 2 * 86400000) return DAY_FMT.format(ts);
+    return `${String(new Date(ts).getUTCHours()).padStart(2, "0")}:00`;
   };
 
   /** An isolated measured point (both neighbours null) gets a dot — no segment can reach it. */
@@ -847,7 +959,10 @@ const TrendPlot = memo(function TrendPlot({
                   strokeDasharray={typeof l.dash === "string" ? l.dash : l.dash ? "4 4" : undefined}
                   connectNulls={false}
                   isAnimationActive={false}
-                  dot={(props: { key?: React.Key | null; index?: number; cx?: number; cy?: number }) => {
+                  // ⚠️ ONLY A LINE THAT HAS ONE gets the dot renderer (measured 2026-09-29: ~300ms of a
+                  // window change). Given a function, recharts builds a dot element for EVERY point —
+                  // 720 hourly buckets × five planes of empty `<g>`s — to draw the rare isolated one.
+                  dot={!l.points.some((_, i) => isolated(l, i)) ? false : (props: { key?: React.Key | null; index?: number; cx?: number; cy?: number }) => {
                     const { key, index, cx, cy } = props;
                     if (index == null || cx == null || cy == null || !isolated(l, index)) return <g key={key ?? undefined} />;
                     return <circle key={key ?? undefined} cx={cx} cy={cy} r={2.5} fill={l.hue ?? hue0} />;

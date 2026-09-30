@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 
 import useTrendsWindow, { useTrendsRange } from "@/components/useTrendsWindow";
 import {
@@ -35,6 +35,11 @@ export interface TrendsSlice extends TrendSlice {
    *  promising a number forever (the fetch hooks' "failure is a signal, not a silence" contract).
    *  It reports whichever leg the plan actually asked for: a window, or the range's tiles. */
   error: boolean;
+  /** The charts are showing the PREVIOUS window while the new one loads (see the hold below). */
+  stale: boolean;
+  /** The DAILY leg (the head readings' source) failed and nothing cached answers — the give-up
+   *  path of every "latest full day" slot, so a failed read ends in a dash, never stars forever. */
+  dailyError: boolean;
 }
 
 /** The window on screen for one zoom (and an optional committed range), fetched and cut.
@@ -75,5 +80,16 @@ export default function useTrendsSlice(zoom: ZoomId | null, range: TrendRange | 
       }),
     [zoom, fromMs, toMs, mainData, fleetData, dailyData],
   );
-  return { ...slice, error: plan.main.tiles ? mainTiles.error : main.error };
+  const error = plan.main.tiles ? mainTiles.error : main.error;
+  // ⚠️ NEVER BLANK BETWEEN WINDOWS (user, 2026-09-29: "when we change the range, the chart goes
+  // blank and then rebuilds"). A new window or range asks for a DIFFERENT payload — another tier,
+  // or tiles — and until it lands the slice has no charts, so every plane drew nothing. The last
+  // slice that HAD charts is held and handed back, marked `stale`, until the new one arrives; a
+  // consumer may quiet it, never pretend it is the new window. A failure is not a wait: an error
+  // shows the honest state instead of the old window standing in for an answer.
+  const lastGood = useRef<TrendSlice | null>(null);
+  if (slice.p) lastGood.current = slice;
+  // Only while a window IS asked for: a null zoom means the consumer isn't showing charts at all.
+  const held = zoom != null && !slice.p && !error && lastGood.current != null;
+  return { ...(held ? lastGood.current! : slice), error, stale: held, dailyError: plan.daily != null && !daily.data && daily.error };
 }

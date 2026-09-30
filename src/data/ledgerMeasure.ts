@@ -1,5 +1,6 @@
 import type { GlobalSnapshot, SnapshotExact } from "@/src/data/types";
 import { fmtDag } from "@/src/util/format";
+import { levelOptions } from "@/src/data/explorerMeasure";
 
 // WHAT A TICK ROW LEADS WITH (user, 2026-09-26: "Snapshots view, like the new trends view, could
 // benefit from the control you're moving to the explorer, to switch between different values shown
@@ -112,19 +113,17 @@ export function tickMeasureValue(m: LedgerMeasure, snap: Pick<GlobalSnapshot, "m
   }
 }
 
-/** A NETWORK UNDER A TICK — the Snapshots explorer's second level (design 2026-09-26: each level
- *  has its own measures). How many snapshots it anchored into the tick, what they cost, what they
- *  weighed — the count from the rows the explorer lists, the fee and size from the exact read's
- *  per-metagraph breakdown where it has arrived. */
-export type TickNetMeasure = "snapshots" | "fee" | "size";
-export const TICK_NET_MEASURE_OPTIONS: readonly { id: TickNetMeasure; label: string; unit: string }[] = [
-  { id: "snapshots", label: "Snapshots", unit: "count" },
-  { id: "fee", label: "Fees", unit: "DAG" },
-  { id: "size", label: "Size", unit: "KB" },
-];
+/** A NETWORK UNDER A TICK — the Snapshots explorer's second level. The tick level's own measures
+ *  minus Metagraphs (a network IS one metagraph), in the same words (user, 2026-09-29 — the level
+ *  said "Snapshots" for what the tick level calls Anchors: the snapshots it anchored into the tick
+ *  ARE its anchors there). The count from the rows the explorer lists, the fee and size from the
+ *  exact read's per-metagraph breakdown where it has arrived. */
+export const TICK_NET_MEASURES = ["fee", "anchors", "size"] as const satisfies readonly LedgerMeasure[];
+export type TickNetMeasure = (typeof TICK_NET_MEASURES)[number];
+export const TICK_NET_MEASURE_OPTIONS = levelOptions(LEDGER_MEASURE_OPTIONS, TICK_NET_MEASURES);
 export function tickNetMeasure(m: TickNetMeasure, count: number, per: { fee: number; bytes: number } | undefined): { value: number | null; text: string } {
   switch (m) {
-    case "snapshots":
+    case "anchors":
       return { value: count, text: count.toLocaleString() };
     case "fee":
       return per ? { value: per.fee, text: fmtDag(per.fee) } : { value: null, text: NO_MEASURE };
@@ -133,12 +132,11 @@ export function tickNetMeasure(m: TickNetMeasure, count: number, per: { fee: num
   }
 }
 
-/** A METAGRAPH SNAPSHOT — the third level: its own fee, or its own size. */
-export type SnapLevelMeasure = "fee" | "size";
-export const SNAP_MEASURE_OPTIONS: readonly { id: SnapLevelMeasure; label: string; unit: string }[] = [
-  { id: "fee", label: "Fee", unit: "DAG" },
-  { id: "size", label: "Size", unit: "KB" },
-];
+/** A METAGRAPH SNAPSHOT — the third level: its own fee, or its own size, in the tick level's words.
+ *  It IS one anchor of one metagraph, so the two counts do not apply. */
+export const SNAP_MEASURES = ["fee", "size"] as const satisfies readonly LedgerMeasure[];
+export type SnapLevelMeasure = (typeof SNAP_MEASURES)[number];
+export const SNAP_MEASURE_OPTIONS = levelOptions(LEDGER_MEASURE_OPTIONS, SNAP_MEASURES);
 export function snapMeasureValue(m: SnapLevelMeasure, row: { fee: number; bytes?: number; sizeInKB?: number }): number | null {
   if (m === "fee") return row.fee;
   return row.bytes ?? (row.sizeInKB != null ? row.sizeInKB * 1024 : null);

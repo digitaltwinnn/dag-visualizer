@@ -40,7 +40,9 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { displayNetwork } from "@/src/data/unlisted";
-import { coLocatedNetworks, filterAccent, getAnchor, isAnchorSettling, metagraphById, shortHash } from "@/src/data/network";
+import { coLocatedNetworks, filterAccent, getAnchor, isAnchorSettling, metagraphById } from "@/src/data/network";
+import { midHash } from "@/src/util/format";
+import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
 import { SCENE_GLASS } from "@/components/selection";
 import { RoleChips, StatusMark } from "@/components/inspector/parts";
 // The lead line's codes come from the composition vocabulary's ONE home, rendered by the cards'
@@ -52,6 +54,7 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 import { relativeAge } from "@/src/util/relativeAge";
 import { CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET } from "@/src/engine/domain/calloutPlacement";
 import type { GeoInfo } from "@/src/data/types";
+import LiveDot from "@/components/LiveDot";
 
 // The panel's standoff from the anchor lives in `src/engine/domain/calloutPlacement.ts`, with the
 // reach thresholds derived from it and the placement rules that read them. It used to be a local
@@ -71,6 +74,8 @@ import type { GeoInfo } from "@/src/data/types";
 // `aside.hue` absent = muted (the country card's ISO-code rule: a place carries no identity);
 // `aside.live` prepends the beating live dot (the global card's aside state, mirrored).
 export interface CalloutModel {
+  /** The title is an id (a node's), set in the mono register ids wear everywhere else. */
+  titleMono?: boolean;
   key: string;
   eyebrow: string;
   title: string;
@@ -115,7 +120,7 @@ export function CalloutPanel({ m, className }: { m: CalloutModel; className?: st
       {/* No identity dot here (user, 2026-08-15): the hued aside already carries the identity
           on this row, and the anchor ring is the subject mark at the scene end of the tie. */}
       <div className="flex items-center gap-[7px]">
-        <span className="text-body font-semibold text-foreground">{m.title}</span>
+        <span className={cn("text-body font-semibold text-foreground", m.titleMono && "font-mono tabular-nums")}>{m.title}</span>
         {m.aside && (
           <span
             className={
@@ -126,7 +131,7 @@ export function CalloutPanel({ m, className }: { m: CalloutModel; className?: st
             style={m.aside.hue ? { color: m.aside.hue } : undefined}
           >
             {m.aside.live && (
-              <span className="w-2 h-2 rounded-full bg-primary shadow-[0_0_0_3px_color-mix(in_oklch,var(--primary)_30%,transparent)] animate-dot-beat motion-reduce:animate-none" />
+              <LiveDot />
             )}
             {m.aside.text}
           </span>
@@ -204,10 +209,9 @@ export default function SceneCallout() {
   if (!VIEW_POLICIES[mode].callout || section !== "scene" || bp === "phone") return null;
 
   // The committed NODE's model — shared by hyper and geo (user, 2026-08-15: in hyper too, "the
-  // node does not have its callout — clickable, has a card"). City-first like the node card,
-  // the network ticker as the hued identity aside, composition as the cards' pills; a node
-  // with no place falls back to its short id (mono subjects keep their register elsewhere —
-  // here the name is simply the best handle the node offers).
+  // node does not have its callout — clickable, has a card"). Titled by its id like the node
+  // card (2026-09-29), the network ticker as the hued identity aside, composition as the cards'
+  // pills.
   const nodePick =
     inspect && (inspect.kind === "l0" || inspect.kind === "l1" || inspect.kind === "metanode") ? inspect : null;
   const nodeModel = (): Model | null => {
@@ -232,9 +236,11 @@ export default function SceneCallout() {
     return {
       key: `node|${id ?? `${g?.lat},${g?.lon}`}`,
       eyebrow: "Node",
-      // City-first like the node card (nickname stays a CARD attribute — user, 2026-08-16:
-      // the registry handles are informal, a content fact rather than the subject's name).
-      title: g?.city ?? g?.country ?? (id ? shortHash(id) : "Node"),
+      // Titled by the node's id like the node card and the explorer row (user, 2026-09-29 — it was
+      // city-first). Nickname stays a CARD attribute (user, 2026-08-16: the registry handles are
+      // informal, a content fact rather than the subject's name).
+      title: id ? midHash(id, NODE_ID_GLYPHS) : g?.city ?? "Node",
+      titleMono: !!id,
       aside: nnet ? { text: nnet.ticker, hue: nnet.hue } : undefined,
       ring: nnet?.hue ?? "var(--primary)",
       lead: codes.length || also.length || status ? { codes, status, also } : undefined,
