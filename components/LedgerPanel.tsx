@@ -35,7 +35,9 @@ import { filterAccent, getAnchor, getNetwork, metagraphById, resolveSigner, SIGN
 import { metaSnapHoverKey, type GlobalSnapshot, type NodeRow, type SnapshotExact } from "@/src/data/types";
 import { displayNetwork, LISTED_IDS, UNLISTED_HUE, UNLISTED_ID, UNLISTED_LABEL, unlistedLog } from "@/src/data/unlisted";
 import { POLL } from "@/src/engine/config";
-import { metaSnapSelectActions, nodeSelectActions, sameMetaSnap, snapshotSelectActions } from "@/src/engine/domain/pickActions";
+import { followToggleActions, metaSnapSelectActions, nodeSelectActions, sameMetaSnap, snapshotSelectActions } from "@/src/engine/domain/pickActions";
+import { heldTicks, nextHoldTop } from "@/src/data/ledgerHold";
+import LiveDot from "@/components/LiveDot";
 import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
@@ -211,7 +213,19 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // ⚠️ THE LENS DIMS, IT DOES NOT EDIT — the tick list is always the whole retained window (user,
   // 2026-09-14: a list whose LENGTH depended on the filter kept answering "how much is there?"
   // differently). Page 1 is the live page and the only one that moves under the reader.
-  const orderedSnaps = [...snaps].reverse(); // newest first, the log convention
+  //
+  // ⚠️ …AND IT HOLDS STILL WHILE A TICK IS PINNED (user, 2026-10-02 — `src/data/ledgerHold.ts`).
+  // Newest-first, every live tick pushed each row down a place, so a pinned row walked off the
+  // page while it was being read; the scene already holds its pinned row at the front. The head
+  // freezes at the newest tick on screen at the moment of the pin, the ticks that arrive meanwhile
+  // are COUNTED rather than listed, and one control on the heading row resumes live. The frozen
+  // head is state derived during render, so it lands in the same commit as the pin.
+  const pinnedOrd = !following && snap ? snap.data.ordinal : null;
+  const [holdTop, setHoldTop] = useState<number | null>(null);
+  const wantTop = nextHoldTop(holdTop, pinnedOrd, snaps.length ? snaps[snaps.length - 1].ordinal : null);
+  if (wantTop !== holdTop) setHoldTop(wantTop);
+  const held = heldTicks(snaps, wantTop, pinnedOrd);
+  const orderedSnaps = [...held.ticks].reverse(); // newest first, the log convention
   const activeSnapOrd = snap?.data.ordinal ?? null;
   const [tickPage, setTickPage] = useState(1);
   // The path's first step, declared here because the page size reads it: the fit measures only
@@ -315,6 +329,21 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         },
       },
       measure: { options: LEDGER_MEASURE_OPTIONS, value: ledgerMeasure, onPick: (id) => setLedgerMeasure(id as LedgerMeasure) },
+      // The held list's ONE control: how many ticks arrived behind the pin, and the way back to
+      // them. It is the follow switch (`followToggleActions` through the one executor) — the same
+      // write the card's own pill makes — shown here only while there is something to resume to.
+      setting:
+        held.newer > 0 && snap ? (
+          <button
+            type="button"
+            title={`${held.newer} snapshot${held.newer === 1 ? "" : "s"} arrived since this one was pinned. Follow live again.`}
+            onClick={() => applyClickActions(followToggleActions(snap, false))}
+            className="inline-flex items-center gap-1.5 rounded-sm px-1.5 -mr-1.5 py-[3px] min-h-6 text-label text-foreground whitespace-nowrap cursor-pointer select-none hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
+          >
+            <LiveDot />
+            <span className="tabular-nums">{held.newer}</span> newer
+          </button>
+        ) : undefined,
       hasFigure: true,
       // A 4-decimal fee ("0.0680") needs the wider figure column; the width holds across the
       // level's measures so the columns never shift when the heading's pick changes.
