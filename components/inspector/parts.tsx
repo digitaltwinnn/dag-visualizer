@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { type CSSProperties, useRef, useState, type ReactNode } from "react";
 import { Check, Copy, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BAR_EASE } from "@/components/RollSwap";
@@ -70,6 +70,115 @@ export function Fact({
       <span className="shrink-0 text-body text-muted-foreground">{label}</span>
       <span className="min-w-0 text-body text-foreground tabular-nums text-right">{children}</span>
     </As>
+  );
+}
+
+// ── THE CARD SKELETON'S OTHER SLOTS (2026-10-02, `docs/superpowers/design/2026-10-02-right-rail-
+// cards`) ─────────────────────────────────────────────────────────────────────────────────────
+// Every right-rail card is the same six slots in one order — head · lead · breakdown · facts ·
+// doors · foot + pager — and a card uses the slots it has content for. The eight cards were
+// designed one at a time and diverged in exactly these places: what the card says first, how a
+// section is headed, how an empty value reads, how a way out is drawn. These are the one home for
+// each, beside `Fact` and `Foot`.
+
+/** THE LEAD — the one sentence a card says first, in dim ink, two lines at most: what this subject
+ *  is in relation to its parent ("83% of Dor Technologies' online nodes."). Every card has one. */
+export function Lead({ children, className }: { children: ReactNode; className?: string }) {
+  return <p className={cn("m-0 mb-2.5 text-body leading-snug text-foreground-dim line-clamp-2", className)}>{children}</p>;
+}
+
+/** THE ONE EMPTY VALUE. A dash, muted, with the reason on hover — the cards said "not known",
+ *  "none" and "n/a" for the same thing. Where the reason matters at a glance, the caller writes
+ *  it beside the dash in `text-label`. */
+export function Empty({ why }: { why?: string }) {
+  return (
+    <span className="text-muted-foreground" title={why} aria-label={why ?? "No value"}>
+      —
+    </span>
+  );
+}
+
+/** A SECTION'S LABEL — caps, muted, with the section's one headline figure on the right. The
+ *  breakdown slot's heading: the card's total lives here rather than in a sentence above it. */
+export function SectionLabel({ label, total, unit, className }: { label: ReactNode; total?: ReactNode; unit?: ReactNode; className?: string }) {
+  return (
+    <div className={cn("flex items-baseline justify-between gap-2.5 text-label tracking-caps uppercase text-muted-foreground", className)}>
+      <span className="min-w-0 truncate">{label}</span>
+      {(total != null || unit != null) && (
+        <span className="flex-none inline-flex items-baseline gap-1.5">
+          {unit != null && <span className="normal-case tracking-normal">{unit}</span>}
+          {total != null && <span className="font-mono text-body font-bold normal-case tracking-normal text-foreground tabular-nums">{total}</span>}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** THE HEAD'S QUALIFIER — one hairline chip: a ticker, a country code, a city, a role. The head's
+ *  right slot is either this or a state pill (ready, live / pinned), never bare text, a relation
+ *  or an age (those are the lead's). Same pill as `RoleChips`, one vocabulary. */
+export function QualifierChip({ children, className, style, title }: { children: ReactNode; className?: string; style?: CSSProperties; title?: string }) {
+  return (
+    <span
+      title={title}
+      style={style}
+      className={cn(
+        "inline-flex items-center max-w-full rounded-xs border border-border bg-wash-faint px-[6px] py-[3px] text-label leading-none text-muted-foreground",
+        className,
+      )}
+    >
+      <span className="truncate">{children}</span>
+    </span>
+  );
+}
+
+/** A DOOR — every way out of a card is this one full-bleed row: an optional key, the target, a
+ *  glyph. A link (`href`) or a control (`onClick`); the wash is the hover every row in the app
+ *  wears. It bleeds by the card's own padding, like the foot it sits above. */
+export function Door({
+  label,
+  children,
+  href,
+  onClick,
+  glyph,
+  title,
+  disabled,
+  flushFoot,
+}: {
+  label?: ReactNode;
+  children: ReactNode;
+  href?: string;
+  onClick?: () => void;
+  glyph?: ReactNode;
+  title?: string;
+  disabled?: boolean;
+  /** Sits directly on the foot plate below it (cancels the foot's own top margin). */
+  flushFoot?: boolean;
+}) {
+  const cls = cn(
+    flushFoot && "-mb-3",
+    // The agreed door recipe (design 2026-09-26, `moment-door.html` A — the Moment card's
+    // "Snapshot records" control is its first instance and keeps its own foot geometry): a
+    // full-bleed row on the wash ladder every control wears.
+    "flex items-center gap-2 -mx-[var(--card-pad)] px-[var(--card-pad)] py-2 border-t border-wash-strong bg-wash-faint text-body text-foreground text-left",
+    "hover:bg-wash-soft focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+    disabled && "opacity-65 pointer-events-none",
+  );
+  const inner = (
+    <>
+      {label != null && <span className="flex-none text-muted-foreground">{label}</span>}
+      <span className={cn("min-w-0 truncate", href && "text-primary-ink")}>{children}</span>
+      <span aria-hidden className="ml-auto flex-none text-muted-foreground">{glyph}</span>
+    </>
+  );
+  return href ? (
+    <a href={href} target="_blank" rel="noopener noreferrer" className={cls} title={title}>
+      {inner}
+    </a>
+  ) : (
+    <button type="button" onClick={onClick} disabled={disabled} title={title} className={cn(cls, "w-[calc(100%+2*var(--card-pad))] bg-transparent cursor-pointer")}>
+      {inner}
+    </button>
   );
 }
 
@@ -377,10 +486,12 @@ export function networkKind(id: string, nodes: NodeInfo[]): string {
 export function Desc({ text }: { text?: string }) {
   const [open, setOpen] = useState(false);
   if (!text) return null;
-  if (text.length <= 180) return <p className="text-body text-foreground-dim mb-0">{text}</p>;
+  // THE LEAD, CLAMPED TO TWO LINES (the card skeleton, user 2026-10-02): the description is what
+  // the dossier says first, and four lines of it pushed the breakdown off the top of the card.
+  if (text.length <= 100) return <p className="text-body leading-snug text-foreground-dim mb-0">{text}</p>;
   return (
     <>
-      <p className={cn("text-body text-foreground-dim mb-0", open ? "line-clamp-none" : "line-clamp-3")}>
+      <p className={cn("text-body leading-snug text-foreground-dim mb-0", open ? "line-clamp-none" : "line-clamp-2")}>
         {text}
       </p>
       <Button

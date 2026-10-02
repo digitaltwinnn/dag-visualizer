@@ -16,5 +16,21 @@ and each card redrawn on it. Serve the parent folder: `python3 -m http.server 31
 - **The metagraph keeps its type line** under the title ("data and currency metagraph"); the
   description is the lead.
 
-Still open: chips for every qualifier including the ticker; whether the metagraph's description
-clamps to two lines. Nothing is built yet.
+- **The ticker is a chip** like every other qualifier. **The metagraph's description clamps to two
+  lines** with "Show more".
+
+## Built (2026-10-02)
+
+All eight cards are on the skeleton. Primitives in `components/inspector/parts.tsx`: `Lead`,
+`SectionLabel`, `Empty`, `QualifierChip`, `Door` (beside `Fact` / `Foot`).
+
+Deviations from the drawings, each for a recorded rule:
+- **Metagraph snapshot has NO ticker chip.** The Metagraph card always sits directly above it now
+  (the tick-local network), and a card never restates its ancestor (the pile rule; the ticker left
+  this head on 2026-08-10 for the same reason). Its aside is empty; the relation is the lead.
+- **The node card's lead yields to its ancestors.** Under a committed country and provider the
+  place and host are those cards' titles, so the lead is the "Signed N" relation alone, or absent.
+- **The Moment card keeps its headline line** (the reading at the instant, with its scope) under
+  the new lead; its "Snapshot records" control was already the door recipe and keeps its own foot
+  geometry.
+- **The metagraph card's breakdown is unchanged** pending a pick from `breakdown.html`.

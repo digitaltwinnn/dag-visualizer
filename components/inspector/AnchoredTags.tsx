@@ -12,6 +12,8 @@ import { fmtDag, fmtKB } from "@/src/util/format";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { useMinHold } from "@/components/useMinHold";
 import { CONTENT_EASE } from "@/components/RollSwap";
+import { Lead, SectionLabel } from "@/components/inspector/parts";
+import { Separator } from "@/components/ui/separator";
 
 // The anchored block on the snapshot card: a ranked share-of-total breakdown of the metagraph
 // snapshots this global tick anchored — `dot · ticker · share-bar · count`, sorted desc, ALL of
@@ -73,17 +75,21 @@ export default function AnchoredTags({
 
   // Header (whenever a count exists or is coming): "N snapshots anchored from M metagraphs".
   const countLost = total == null && missed && !resolveHold.show;
+  // THE SKELETON'S LEAD AND SECTION LABEL (2026-10-02): the one sentence "N snapshots anchored from
+  // M metagraphs" was doing two jobs. The RELATION is the lead — who anchored into this tick — and
+  // the COUNT is the breakdown's own headline, on its section label, with a separator between.
   const header = countLost ? null : (
-    <div className="flex items-baseline gap-2 flex-wrap mb-1.5">
-      <span className="text-body text-foreground">
-        {total != null ? (
-          <><b className="font-bold">{total}</b> snapshot{total === 1 ? "" : "s"} anchored</>
-        ) : (
-          <><NodeStars count={3} /> snapshots anchored</>
-        )}
-      </span>
-      {channels != null && !acquiring && <span className="text-label text-muted-foreground">from {channels} metagraph{channels === 1 ? "" : "s"}</span>}
-    </div>
+    <>
+      <Lead>
+        {total === 0
+          ? "No metagraph anchored into this snapshot."
+          : channels != null && !acquiring
+            ? `Anchored by ${channels} metagraph${channels === 1 ? "" : "s"}.`
+            : "Reading which metagraphs anchored into it."}
+      </Lead>
+      <Separator className="mb-2" />
+      <SectionLabel label="Snapshots anchored" total={total != null ? total : <NodeStars count={3} />} className="mb-1.5" />
+    </>
   );
 
   if (acquiring) {

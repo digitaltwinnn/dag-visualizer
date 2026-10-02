@@ -6,11 +6,13 @@
 // Like the global snapshot card this is a card SLOT, not a focus-ladder rung: it has its own
 // store channel (`store.metaSnap`) and a fixed rail slot, and appears in no ladder.
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { Button } from "@/components/ui/button";
 import CardHead, { RailPane } from "@/components/CardHead";
 import { DEEP_GIVE_UP_MS } from "@/components/RawSnapshotBridge";
 import { subjectPairing } from "@/components/useSubjectPairing";
-import { Fact, FactGroup, Foot, FootRow, LayerWho } from "@/components/inspector/parts";
+import { Door, Empty, Fact, FactGroup, Foot, FootRow, LayerWho, Lead } from "@/components/inspector/parts";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CABINET_BODY, CABINET_LIST, CABINET_TRIGGER } from "@/components/cabinetTabs";
+import { ArrowDownToLine, ArrowUpRight } from "lucide-react";
 import { useSnapRecord } from "@/components/useArchive";
 import { Separator } from "@/components/ui/separator";
 import { useStore } from "@/src/store/store";
@@ -28,10 +30,9 @@ import { useNowTick } from "@/components/useNowTick";
 import { identityHudCss } from "@/src/palette/identity";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { METASNAP_ICON, KIND_MARK_CLASS } from "@/components/icons";
-import { followToggleActions, metaSnapSelectActions } from "@/src/engine/domain/pickActions";
+import { metaSnapSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { cn } from "@/lib/utils";
-import LiveDot from "@/components/LiveDot";
 
 // The body's row grammar and its three weights live in ./parts (`Fact` / `FactGroup` / `Foot`)
 // — shared with every other rail card, so this one can't drift into a dialect of its own. The
@@ -159,23 +160,16 @@ export default function MetaSnapPane({
   // the explorer rows, the anchor-log cells — writes it bare. The sigil only ever survived where a
   // number got glued into a sentence (user, 2026-08-10).
   const anchor = sel.globalOrdinal.toLocaleString();
-  const asideCls = "inline-flex items-center gap-1.5 text-label text-muted-foreground whitespace-nowrap";
-  const aside = (
-    <button
-      type="button"
-      aria-pressed={following}
-      title={following ? "Stop following the live snapshot" : "Follow the live snapshot"}
-      className={cn(asideCls, "rounded-xs hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/60")}
-      onClick={() => snap && applyClickActions(followToggleActions(snap, following))}
-    >
-      {/* The beating dot rides `following` on its own, so the card still FEELS live in the
-          `anchored` state — the heartbeat-on-closed-cards rule doesn't depend on the number. */}
-      {following && (
-        <LiveDot />
-      )}
-      {sameTick ? `anchored to ${anchor}` : following ? <>{rel ? `live · ${rel}` : "live"} → {anchor}</> : <>◷ {rel} → {anchor}</>}
-    </button>
-  );
+  // THE RELATION IS THE LEAD (the card skeleton, 2026-10-02). It rode the head's aside as a
+  // follow-toggle button ("anchored to N" / "live · Xs → N" / "◷ Xs → N") — a relation, an age and
+  // a control in the slot that is a qualifier or a state everywhere else. The control is the
+  // GLOBAL snapshot card's alone now (B1: the card that owns the tick owns live / pinned), and
+  // this card says what it is to that tick in its first sentence.
+  // ⚠️ NO TICKER CHIP in the aside, although the proposal drew one: the Metagraph card sits
+  // directly above since the tick-local network landed (`store.tickNet`), and a card never
+  // restates its ancestor (the pile rule — the same reason the ticker left this head on
+  // 2026-08-10).
+  const lead = `${following && !sameTick ? "Following live. " : ""}Anchored to ${anchor}${rel ? ` · ${rel}` : ""}.`;
 
   return (
     <RailPane
@@ -195,11 +189,10 @@ export default function MetaSnapPane({
               {/* A subject-specific mark carries its OWN subject's hue (the node-mark idiom) —
                   this card is about one metagraph even when the filter is "all". */}
               <METASNAP_ICON aria-hidden className={KIND_MARK_CLASS} style={{ color: hue } as CSSProperties} />
-              <span className="truncate">{sel.ordinal.toLocaleString()}</span>
+              <span className="truncate font-mono tabular-nums">{sel.ordinal.toLocaleString()}</span>
             </span>
           }
           titleKey={`${sel.metaId}:${sel.ordinal}`}
-          aside={aside}
           onClose={onClose}
           collapsed={collapsed}
           onToggle={onToggle}
@@ -210,6 +203,8 @@ export default function MetaSnapPane({
                 Two labelled sections, State and Data — the same two payload lanes the raw layer
                 opens one tier down, so the card states their SHAPE and the pane renders them.
                 Both always render, each honest about its own tier. */}
+            <Lead>{lead}</Lead>
+            <Separator className="mb-2" />
             <PayloadBlock row={row} deep={deep ?? null} asked={deepAsked} decodeGaveUp={decodeGaveUp} />
 
             {/* ── DETAIL: the measured facts ─────────────────────────────────────────────── */}
@@ -223,8 +218,10 @@ export default function MetaSnapPane({
                   {/* Fee leads, size rides under it — the global card's own two-line value, so
                       the pair reads identically on both storeys of the chain. */}
                   <Fact label="Fees paid">
+                    <span className="whitespace-nowrap">{fmtDag(row.fee)} DAG</span>
+                  </Fact>
+                  <Fact label="Size">
                     <span className="flex flex-col items-end">
-                      <span className="whitespace-nowrap"><b className="font-bold">{fmtDag(row.fee)}</b> DAG</span>
                       {/* "· compressed" names the BASIS (user, 2026-08-13 — "the state size plus
                           data size does not match… I think user will expect these to add up"):
                           this number is the snapshot's brotli-compressed wire footprint as
@@ -235,7 +232,7 @@ export default function MetaSnapPane({
                       {/* "N KB compressed" (user, 2026-08-14): the head's aside already says "anchored
                           to N", so the word was doing the same work twice — the subline states the
                           wire weight alone, basis included. */}
-                      <span className="text-label text-muted-foreground">{fmtKB(row.bytes / 1024)} compressed</span>
+                      <span className="whitespace-nowrap">{fmtKB(row.bytes / 1024)} compressed</span>
                     </span>
                   </Fact>
                   {/* The L0 seal is a BODY fact again (user's post-read rework, 2026-08-13): it
@@ -257,7 +254,7 @@ export default function MetaSnapPane({
               ) : missedExact && !reading.show ? (
                 // The read failed (transient blip, or outside the served window) — the honest
                 // terminal. Reselecting or the next live tick retries; the miss clears on landing.
-                <Fact label="Exact read">unavailable — read failed</Fact>
+                <Fact label="Exact read"><span className="text-muted-foreground"><Empty why="The exact read of this tick failed; reselecting or the next live tick retries" /> <span className="text-label">read failed</span></span></Fact>
               ) : (
                 <Fact label="Exact read">
                   <span className={cn(reading.fading && "animate-hold-fade-out motion-reduce:animate-none")}>reading…</span>
@@ -325,16 +322,18 @@ export default function MetaSnapPane({
                 (WHY a read is needed at all), and the cost still rides this button's title.
                 "Read"/"decoding" made three word families for one action. */}
             {deep != null ? (
-              <Button variant="link" size="xs" className="mt-1 px-0" onClick={() => setSection("data")}>
-                Show the raw data
-              </Button>
+              <div className="mt-2.5">
+                <Door onClick={() => setSection("data")} glyph={<ArrowUpRight className="size-3.5" />} flushFoot>
+                  Show the raw data
+                </Door>
+              </div>
             ) : !deepAsked && row?.decoded === true && snap && sel ? (
-              <Button
-                variant="link"
-                size="xs"
-                className="mt-1 px-0"
-                title="Decompresses this snapshot's payload — the server pulls the whole ~2.5 MB global to reach this one channel, so it runs only when you ask. Holds the card on this snapshot instead of following the live one."
-                onClick={() => {
+              <div className="mt-2.5">
+                <Door
+                  title="Decompresses this snapshot's payload — the server pulls the whole ~2.5 MB global to reach this one channel, so it runs only when you ask. Holds the card on this snapshot instead of following the live one."
+                  glyph={<ArrowDownToLine className="size-3.5" />}
+                  flushFoot
+                  onClick={() => {
                   // Pin FIRST, and only while following — the read must not answer about a
                   // snapshot the next heartbeat has already replaced. Pinned already, the pin is
                   // not just unnecessary but wrong: `metaSnapSelectActions`' deselect early-return
@@ -343,9 +342,10 @@ export default function MetaSnapPane({
                   if (following) applyClickActions(metaSnapSelectActions(sel, snap, { metaSnap: sel, following }));
                   setDeepWanted(metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal));
                 }}
-              >
-                Decompress this snapshot
-              </Button>
+                >
+                  Decompress this snapshot
+                </Door>
+              </div>
             ) : null}
 
             {/* ── FOOT: the artifact's CHAIN IDENTITY ─────────────────────────────────────
@@ -493,28 +493,39 @@ function PayloadBlock({
           An idle snapshot: it anchored only its envelope and proofs.
         </p>
       )}
-      <PayloadSection
-        name={PAYLOAD_LANES.state.name}
-        title={PAYLOAD_LANES.state.title}
-        rows={stateRows}
-        read={!!deep}
-        pending={pending}
-      />
-      <Separator className="my-2" />
-      <PayloadSection
-        name={PAYLOAD_LANES.data.name}
-        title={PAYLOAD_LANES.data.title}
-        rows={dataRows}
-        read={!!deep}
-        pending={pending}
-        // "Signed by" here as in the body (user, 2026-08-13): the layer word carries the
-        // difference (dL1 vs the body's L0), SIGNER_GROUPS owns the words.
-        signers={
-          deep && deep.dataBlockSigners.length > 0
-            ? { label: "Signed by", title: SIGNER_GROUPS.dataBlocks.title, count: deep.dataBlockSigners.length, who: SIGNER_GROUPS.dataBlocks.who }
-            : null
-        }
-      />
+      {/* STATE AND DATA ARE TABS (user, 2026-10-02, on the card skeleton: "have state & data as
+          tabs instead?") — the cabinet recipe the raw pane's own State / Data / Signers wear, so
+          the card's two payload lanes and the pane one tier down are the same control. They were
+          two stacked caps headers, which read as eyebrows with nothing under them until a read. */}
+      <Tabs defaultValue="state" className="gap-0">
+        <TabsList variant="line" className={CABINET_LIST} aria-label="Which part of the snapshot's payload to read">
+          <TabsTrigger value="state" title={PAYLOAD_LANES.state.title} className={cn(CABINET_TRIGGER, "h-7 text-label")}>
+            {PAYLOAD_LANES.state.name}
+          </TabsTrigger>
+          <TabsTrigger value="data" title={PAYLOAD_LANES.data.title} className={cn(CABINET_TRIGGER, "h-7 text-label")}>
+            {PAYLOAD_LANES.data.name}
+          </TabsTrigger>
+        </TabsList>
+        <div className={cn(CABINET_BODY, "px-2.5 py-2")}>
+          <TabsContent value="state">
+            <PayloadSection rows={stateRows} read={!!deep} pending={pending} />
+          </TabsContent>
+          <TabsContent value="data">
+            <PayloadSection
+              rows={dataRows}
+              read={!!deep}
+              pending={pending}
+              // "Signed by" here as in the body (user, 2026-08-13): the layer word carries the
+              // difference (dL1 vs the body's L0), SIGNER_GROUPS owns the words.
+              signers={
+                deep && deep.dataBlockSigners.length > 0
+                  ? { label: "Signed by", title: SIGNER_GROUPS.dataBlocks.title, count: deep.dataBlockSigners.length, who: SIGNER_GROUPS.dataBlocks.who }
+                  : null
+              }
+            />
+          </TabsContent>
+        </div>
+      </Tabs>
     </div>
   );
 }
@@ -526,15 +537,11 @@ function PayloadBlock({
  *  closes the section at the row weight: the cluster that vouches for this section's contents,
  *  its words from SIGNER_GROUPS (the one home). */
 function PayloadSection({
-  name,
-  title,
   rows,
   read,
   pending,
   signers,
 }: {
-  name: string;
-  title: string;
   rows: { name: string; count: number }[];
   /** The deep read has landed — an empty section may now say `none` as a verified fact; before
    *  it, the bare header claims nothing (a `none` pre-read would be a fabricated reading). */
@@ -545,26 +552,27 @@ function PayloadSection({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex items-start" title={title}>
-        <span className="text-label tracking-caps uppercase text-muted-foreground pt-px">{name}</span>
-      </div>
-      {pending && <p className="pl-2 text-label text-muted-foreground italic">{pending}</p>}
+      {/* The TAB names the section now, so there is no head here. An UNREAD section says so in one
+          muted line — a tab opening onto nothing would read as an empty reading, and "unread and
+          none are different facts". */}
+      {!read && !pending && <p className="m-0 text-label text-muted-foreground">Not read yet. Decompress this snapshot to see its shape.</p>}
+      {pending && <p className="m-0 text-label text-muted-foreground italic">{pending}</p>}
       {read && rows.length === 0 && !signers && (
         // MEASURED empty — the deep read landed and this section carries nothing. A reading,
         // not a state, so it takes the section rows' own register; the italic-muted treatment
         // is `pending`'s (unread / reading…), and "unread and none are different facts".
-        <p className={cn("pl-2 text-label text-foreground-dim", CONTENT_EASE)}>none</p>
+        <p className={cn("m-0 text-label text-foreground-dim", CONTENT_EASE)}>none</p>
       )}
       {/* The shape rows ease in as the read lands (the no-pop arrival ease) — keyed, so they
           play once and never on a re-render. */}
       {rows.map((r) => (
-        <div key={r.name} className={cn("flex items-start justify-between gap-2.5 pl-2", CONTENT_EASE)} title={r.name}>
+        <div key={r.name} className={cn("flex items-start justify-between gap-2.5", CONTENT_EASE)} title={r.name}>
           <span className="min-w-0 truncate text-label text-foreground-dim">{r.name}</span>
           <span className="shrink-0 text-label text-foreground-dim tabular-nums">{r.count.toLocaleString()}</span>
         </div>
       ))}
       {signers && (
-        <div className={cn("flex items-start justify-between gap-2.5 pl-2", CONTENT_EASE)} title={signers.title}>
+        <div className={cn("flex items-start justify-between gap-2.5", CONTENT_EASE)} title={signers.title}>
           <span className="min-w-0 truncate text-label text-muted-foreground">{signers.label}</span>
           <span className="shrink-0 text-label text-foreground-dim tabular-nums">
             <span className="inline-flex items-center gap-1">{signers.count} <LayerWho who={signers.who} /></span>

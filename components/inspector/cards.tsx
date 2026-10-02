@@ -22,7 +22,7 @@ import { useMinHold } from "@/components/useMinHold";
 import { useArchive, archiveFactState, archiveSchedule, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
 import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
 import { POLL } from "@/src/engine/config";
-import { cap, Desc, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark, StackedSchedule, partShade, type SchedulePart } from "./parts";
+import { cap, Desc, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark, StackedSchedule, partShade, Lead, Empty, QualifierChip, Door, type SchedulePart } from "./parts";
 import { statusItems } from "@/src/data/nodeStatus";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { pickNetId } from "@/src/engine/domain/pickActions";
@@ -51,7 +51,7 @@ export function SnapshotTitle({ data: d }: { data: GlobalSnapshot }) {
   return (
     <span className="inline-flex items-center gap-2">
       <Mark aria-hidden className={cn(KIND_MARK_CLASS, "text-[var(--filter-accent,var(--primary))]")} />
-      <Odometer value={d.ordinal} className="text-title font-semibold text-foreground tabular-nums" />
+      <Odometer value={d.ordinal} className="font-mono text-title font-semibold text-foreground tabular-nums" />
     </span>
   );
 }
@@ -178,20 +178,10 @@ export function GeoLiveTitle() {
 export function GeoLiveAside() {
   const inspect = useStore((s) => s.inspect);
   const node = inspectedNode(inspect);
-  const signed = useSignedSelected(node?.node);
   if (!node) return null;
-  if (signed != null)
-    return (
-      // The relation NAMES ITS OBJECT (user, 2026-08-15 — like the snapshot card's "anchored
-      // to N"): the signed metagraph snapshot's own ordinal, bare per the ordinal rule. The
-      // layer detail (the L0 seal) rides the title — the aside states the relation.
-      <span
-        className="text-label text-muted-foreground whitespace-nowrap"
-        title="This node is among the committed metagraph snapshot's proof signers — a snapshot is signed by the metagraph's own L0 validators."
-      >
-        signed {signed.toLocaleString()}
-      </span>
-    );
+  // ALWAYS THE STATE PILL (the card skeleton, 2026-10-02): a head's right slot is a qualifier or a
+  // state, and the "signed N" relation it held since 2026-08-15 is the LEAD's now, where relations
+  // read — so the status no longer has to move into a body row to make room.
   return <StatusMark state={node.node?.state} />;
 }
 
@@ -259,7 +249,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
         <FactGroup>
           <Fact label="Fees paid">
             {missed && !feeHold.show ? (
-              <span className="text-muted-foreground italic">unavailable — read failed</span>
+              <span className="text-muted-foreground"><Empty why="The exact read of this snapshot failed" /> <span className="text-label">read failed</span></span>
             ) : (
               <span className={cn("flex flex-col items-end", feeHold.fading && "animate-hold-fade-out motion-reduce:animate-none")}><NodeStars count={4} /></span>
             )}
@@ -267,17 +257,22 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
         </FactGroup>
       ) : (
         <FactGroup>
+          {/* REGULAR WEIGHT, AND THE SIZE IS A FACT OF ITS OWN (the card skeleton, 2026-10-02): the
+              card's one headline figure sits on the breakdown's section label, and "50 KB
+              anchored" hung under the fee as a note about a different quantity. */}
           {exact.totalFee > 0 && (
             <Fact label="Fees paid">
-              <span className="flex flex-col items-end">
-                <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap"><b className="font-bold">{fmtDag(exact.totalFee)}</b> DAG</span>
-                <span className="text-label text-muted-foreground">{fmtKB(exact.totalSizeKB)} anchored</span>
-              </span>
+              <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap">{fmtDag(exact.totalFee)} DAG</span>
+            </Fact>
+          )}
+          {exact.totalSizeKB > 0 && (
+            <Fact label="Size">
+              <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap">{fmtKB(exact.totalSizeKB)}</span>
             </Fact>
           )}
           {exact.rewardsDatum > 0 && (
             <Fact label="Rewards out">
-              <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap"><b className="font-bold">{fmtDag(exact.rewardsDatum)}</b> DAG</span>
+              <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap">{fmtDag(exact.rewardsDatum)} DAG</span>
             </Fact>
           )}
           {/* The signer count is a FACT about this tick — it reads. Its two hashes don't, so
@@ -415,7 +410,9 @@ function ScheduleGroup({
           selects nothing, and focus shows only for the keyboard in CopyButton's own
           focus-visible recipe. */}
       <CollapsibleTrigger className="group mt-2 flex w-full items-center gap-1 cursor-pointer select-none outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]">
-        <span className={value !== undefined ? "text-body text-muted-foreground" : "text-label tracking-caps uppercase text-muted-foreground"}>{label}</span>
+        {/* A SECTION LABEL in both forms (the card skeleton, 2026-10-02): caps and muted, the
+            total it heads on the right — the breakdown slot's one heading recipe. */}
+        <span className="text-label tracking-caps uppercase text-muted-foreground">{label}</span>
         <ChevronRight
           aria-hidden
           className={cn(
@@ -554,6 +551,8 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
       <Desc key={blurb} text={blurb} />
       {(nodes.length > 0 || (cfg.id !== "dag" && cfg.id !== UNLISTED_ID && metagraphById(cfg.id) != null)) && (
         <>
+          {/* The skeleton's separator between the lead and the breakdown (user, 2026-10-02). */}
+          <Separator className="mt-2.5" />
           {/* THE SCHEDULE FORM (user, 2026-09-10: "both are breakdowns of the same total …
               look at accounting"). Accounting's double-breakdown device is the SCHEDULE: the
               control total LEADS, and each partition follows as a labeled of-which schedule
@@ -629,10 +628,9 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
       ))}
       {/* The site reference LAST, where references sit (the node card's reading order). */}
       {site && (
-        <>
-          <Separator className="my-2" />
-          <MetaSiteRow site={site} />
-        </>
+        <div className="mt-2.5">
+          <MetaSiteRow site={site} flushFoot={!!footId} />
+        </div>
       )}
       {/* FOOT — the network's own chain references (user, 2026-08-13/14): a metagraph's id IS
           its state-channel address, plus the owner and staking addresses its records publish.
@@ -668,33 +666,29 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
 export function MetaTickerAside({ cfg }: { cfg: MetaCfg }) {
   if (!cfg.ticker) return null;
   return (
-    <span
-      className={cn("text-label font-semibold tracking-[0.02em]", IDENT_INK)}
+    // A QUALIFIER CHIP in the network's own ink (the card skeleton, 2026-10-02): the ticker was
+    // bare hued text — one of seven things a head's right slot could be.
+    <QualifierChip
+      className={cn("font-semibold tracking-[0.02em]", IDENT_INK)}
       // Unlisted stays neutral — same guard as MetaTitle above.
       style={{ color: cfg.id === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(cfg.id) }}
     >
       {cfg.ticker}
-    </span>
+    </QualifierChip>
   );
 }
 
 // The dossier's site link as a labelled BODY row (user, 2026-08-08 — the icon-only aside link
 // was never used and the aside slot now carries the ticker). References sit last, where
 // references sit: domain text + the ExternalLink glyph, in the link language (`text-primary`).
-function MetaSiteRow({ site }: { site: string }) {
+function MetaSiteRow({ site, flushFoot }: { site: string; flushFoot?: boolean }) {
   const domain = site.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  // A DOOR (the card skeleton, 2026-10-02): every way out of a card is the one full-bleed row —
+  // it was a fact row holding a link, one of four action forms.
   return (
-    <Fact label="Site">
-      <a
-        href={site}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 text-primary-ink hover:text-primary"
-      >
-        {domain}
-        <ExternalLink aria-hidden className="size-3.5" />
-      </a>
-    </Fact>
+    <Door label="Site" href={site} glyph={<ExternalLink className="size-3.5" />} flushFoot={flushFoot}>
+      {domain}
+    </Door>
   );
 }
 
@@ -767,7 +761,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // The SIGNED relation owns the head aside while it exists (GeoLiveAside) — the status the
   // head normally carries moves down here as the first body row, so no fact is lost, only
   // redistributed (the pile rule's redistribution idea, applied within one card).
-  const signedSel = useSignedSelected(p.node) != null;
+  const signed = useSignedSelected(p.node);
   // The operator's self-registered ALIAS from the delegated-staking registry (user,
   // 2026-08-16 — "those names look informal often": a content attribute, never the title; and
   // "alias" is the user-facing word, "nickname" stays the internal register). The registry
@@ -827,8 +821,25 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   const colo = coloReady ? coLocatedNetworks(p.node?.ip, pickNetId(p), metaList) : null;
   // NB: the hover pairing (synced 3D glow) lives on the OUTER pane (Inspector.CardPane), not here,
   // so the glow lights the card's rounded edge.
+  // THE LEAD (the card skeleton, 2026-10-02): the relation to the chamber's subject when there is
+  // one, then where the node sits and who hosts it — the City / Country / Hosting rows read as one
+  // sentence. Each piece still YIELDS to the ancestor card that states it (the pile rule), so
+  // under a committed country and provider the lead is the relation alone, or nothing: a card
+  // never restates its ancestors to fill a slot.
+  const place = [cohort == null ? geo?.city : null, country == null ? geo?.country : null].filter(Boolean).join(", ");
+  const leadBits = [place, cohort == null ? geo?.isp : null].filter(Boolean).join(" · ");
   return (
     <>
+      {(signed != null || leadBits) && (
+        <Lead>
+          {signed != null && (
+            <span title="This node is among the committed metagraph snapshot's proof signers — a snapshot is signed by the metagraph's own L0 validators.">
+              Signed {signed.toLocaleString()}{leadBits ? ". " : "."}
+            </span>
+          )}
+          {leadBits ? `${leadBits}.` : null}
+        </Lead>
+      )}
       <FactGroup>
         {/* ALIAS — the operator's informal self-registered handle (see the note above). The row
             is ALWAYS stated (user, 2026-08-16: "if it's missing just say so, don't hide the
@@ -839,13 +850,9 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           {nickname ?? (!nickState.settled ? (
             <NodeStars count={4} />
           ) : nickState.names ? (
-            <span className="text-muted-foreground italic" title="No display name is registered for this node's keys in the Global L0's delegated-staking registry.">
-              not known
-            </span>
+            <Empty why="No display name is registered for this node's keys in the Global L0's delegated-staking registry." />
           ) : (
-            <span className="text-muted-foreground italic" title="The delegated-staking registry could not be read — retried on the next visit.">
-              not available
-            </span>
+            <Empty why="The delegated-staking registry could not be read — retried on the next visit." />
           ))}
         </Fact>
         {/* DELEGATED STAKING — the registry's opt-in reading, DIRECTLY under the Alias it
@@ -871,16 +878,8 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
                 {registered ? "Yes" : "No"}
               </span>
             ) : (
-              <span className="text-muted-foreground italic" title="The delegated-staking registry could not be read — retried on the next visit.">
-                not available
-              </span>
+              <Empty why="The delegated-staking registry could not be read — retried on the next visit." />
             )}
-          </Fact>
-        )}
-        {/* STATUS — only while the SIGNED relation holds the head aside (its usual home). */}
-        {signedSel && (
-          <Fact label="Status">
-            <StatusMark state={p.node?.state} />
           </Fact>
         )}
         {/* COUNTRY — the half of the place the head no longer carries (user, 2026-08-02). The
@@ -888,8 +887,6 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
             Yields to the country card's own title once that rung is drilled. */}
         {/* CITY — the place word the head carried until 2026-09-29 (the title is the node's id
             now). Yields to the provider card, whose rung is city × provider. */}
-        {cohort == null && geo?.city && <Fact label="City">{geo.city}</Fact>}
-        {country == null && geo?.country && <Fact label="Country">{geo.country}</Fact>}
         {/* COMPOSITION — the node's role in the network, a labelled fact like the rest (user,
             2026-08-02: it used to ride the head as a subtitle, which made the head carry three
             different registers). Sits second: the reading order is place → role → host →
@@ -906,7 +903,6 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
         )}
         {/* HOSTING — the provider's NAME, then the ASN that is its number. Both yield to the
             provider card, whose title IS the isp and whose body carries the same reference. */}
-        {cohort == null && geo?.isp && <Fact label="Hosting">{geo.isp}</Fact>}
         {asn && <Fact label="ASN"><span className="font-mono">{asn}</span></Fact>}
         {/* CO-LOCATED — the machine's other tenant networks (see the note above). Each name
             keeps its identity dot: a metagraph's hue is the same everywhere it appears. */}
@@ -929,7 +925,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
             // "none" is a MEASURED reading (both cluster sides are live and no co-tenant
             // exists), so it takes the value register like any other fact — muting it made a
             // fact read as an instrument state (user, 2026-08-16).
-            <span title="No other network has a node at this IP.">none</span>
+            <Empty why="No other network has a node at this IP." />
           )}
         </Fact>
         {/* Reading order: place → role → host → SERVICE — what this machine serves sits with
@@ -978,21 +974,15 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
               className="flex flex-col items-end"
               title="A chain's snapshots are served by its L0 validators; this node runs no L0 process, so it keeps no snapshot archive."
             >
-              <span>n/a</span>
-              <span className="inline-flex items-center gap-1 text-label text-muted-foreground">
-                not an <RoleChips codes={["L0"]} /> validator
+              <span className="inline-flex items-center gap-1.5 text-label text-muted-foreground">
+                <span className="text-body">—</span> not an <RoleChips codes={["L0"]} /> validator
               </span>
             </span>
           </Fact>
         )}
         {archState.kind === "unmeasured" && (
           <Fact label="Full archive">
-            <span
-              className="text-muted-foreground"
-              title="The archive census (refreshed every few hours) has no reading for this node — it was unreachable at probe time, not Ready then, or joined the cluster since."
-            >
-              Unmeasured
-            </span>
+            <Empty why="The archive census (refreshed every few hours) has no reading for this node — it was unreachable at probe time, not Ready then, or joined the cluster since." />
           </Fact>
         )}
       </FactGroup>
@@ -1046,11 +1036,9 @@ export function CountryTitle({ cc }: { cc: string }) {
 export function CountryAside({ cc }: { cc: string }) {
   const selNodes = useStore((s) => s.selNodes);
   if (!countryDisplayName(cc, selNodes)) return null;
-  return (
-    <span className="text-label font-semibold tracking-[0.02em] uppercase text-muted-foreground">
-      {cc}
-    </span>
-  );
+  // A QUALIFIER CHIP, like every head's (the card skeleton, 2026-10-02) — still muted, still the
+  // subject's own short form.
+  return <QualifierChip className="uppercase tracking-[0.02em]">{cc}</QualifierChip>;
 }
 
 export function CountryCard({ cc }: { cc: string }) {
@@ -1072,16 +1060,20 @@ export function CountryCard({ cc }: { cc: string }) {
   const share = selNodes.length > 0 ? Math.round((rows.length / selNodes.length) * 100) : 0;
   const facts: { label: string; value: string }[] = [
     { label: "Nodes", value: String(rows.length) },
-    { label: "Share of selection", value: `${share}%` },
     { label: "Cities", value: String(cities.size) },
     { label: "Providers", value: String(providers.size) },
   ];
   return (
-    <FactGroup>
-      {facts.map((f) => (
-        <Fact key={f.label} label={f.label}>{f.value}</Fact>
-      ))}
-    </FactGroup>
+    <>
+      {/* THE LEAD: what this country is to the selection it sits in — it was the "Share of
+          selection" fact, and it is the one thing the card says about its parent. */}
+      <Lead>Hosts {share}% of the selection&apos;s nodes.</Lead>
+      <FactGroup>
+        {facts.map((f) => (
+          <Fact key={f.label} label={f.label}>{f.value}</Fact>
+        ))}
+      </FactGroup>
+    </>
   );
 }
 
@@ -1113,7 +1105,7 @@ export function CompositionTitle({ sel }: { sel: CompositionSel }) {
 // row where every other card puts its subject mark, and they survive a collapse.
 export function CompositionAside({ sel }: { sel: CompositionSel }) {
   const { codes } = parseCompositionKey(sel.key);
-  if (codes.length === 0) return <span className="text-body text-muted-foreground">—</span>;
+  if (codes.length === 0) return <Empty why="This group names no layer codes" />;
   return <RoleChips codes={codes} />;
 }
 
@@ -1125,9 +1117,11 @@ export function CompositionCard({ sel }: { sel: CompositionSel }) {
   const share = total > 0 ? Math.round((members.length / total) * 100) : 0;
   const cfg = metagraphById(sel.netId);
   return (
+    <>
+    {/* THE LEAD: the group's share of its network — the old "Share of network" fact. */}
+    <Lead>{share}% of this network&apos;s online nodes.</Lead>
     <FactGroup>
       <Fact label="Nodes">{members.length}</Fact>
-      <Fact label="Share of network">{share}%</Fact>
       <Fact label="Network">
         <span className="inline-flex items-center gap-1.5 min-w-0">
           <IdentityDot hue={identityHudCss(sel.netId)} />
@@ -1135,6 +1129,7 @@ export function CompositionCard({ sel }: { sel: CompositionSel }) {
         </span>
       </Fact>
     </FactGroup>
+    </>
   );
 }
 
@@ -1164,9 +1159,9 @@ export function ProviderTitle({ sel }: { sel: CohortSel }) {
 // to the provider name rather than crushing it (the aside is `flex-none` in CardHead).
 export function ProviderAside({ sel }: { sel: CohortSel }) {
   return (
-    <span className="max-w-[52%] truncate text-label text-muted-foreground">
-      {sel.city ?? "Unlocated"}
-    </span>
+    // A fixed cap, not a percentage: the head's aside is content-sized, so a percentage of it
+    // resolves against the chip's own width and collapsed "Falkenstein" to "Fal…".
+    <QualifierChip className="max-w-[150px]" title={sel.city ?? undefined}>{sel.city ?? "Unlocated"}</QualifierChip>
   );
 }
 
@@ -1199,18 +1194,25 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
     }
     return null;
   }, [members]);
+  const where = countryDisplayName(sel.cc, selNodes) ?? sel.cc;
   return (
+    <>
+    {/* THE LEAD: how big the cohort is and where — what a provider row is to its country. */}
+    <Lead>
+      {members.length} node{members.length === 1 ? "" : "s"} in {where}
+      {networkIds.length > 0 ? `, on ${networkIds.length === 1 ? "one network" : `${networkIds.length} networks`}` : ""}.
+    </Lead>
     <FactGroup>
       {/* ASN — the provider's REFERENCE, in the slot the city vacated when it moved to the head
           (user, 2026-08-09). The COUNTRY is deliberately absent: the cohort always sits under a
           committed country, whose own card states it one slot up (user, 2026-08-02 — a facts rail
           shouldn't say the same thing twice). */}
-      <Fact label="ASN"><span className="font-mono">{asn ?? "—"}</span></Fact>
+      <Fact label="ASN">{asn ? <span className="font-mono">{asn}</span> : <Empty why="No member of this cohort reports an AS number" />}</Fact>
       <Fact label="Nodes">{members.length}</Fact>
       <Fact label="Networks">
         <span className="flex flex-wrap justify-end items-center gap-x-2 gap-y-1 min-w-0">
           {networkIds.length === 0 ? (
-            <span>—</span>
+            <Empty why="No member of this cohort is on a known network" />
           ) : (
             networkIds.map((id) => {
               const cfg = metagraphById(id);
@@ -1225,5 +1227,6 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
         </span>
       </Fact>
     </FactGroup>
+    </>
   );
 }

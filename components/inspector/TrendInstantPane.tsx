@@ -5,7 +5,8 @@ import { INSTANT_ICON } from "@/components/icons";
 
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { Fact, FactGroup, IdentityDot } from "@/components/inspector/parts";
+import { Lead, Fact, FactGroup, IdentityDot } from "@/components/inspector/parts";
+import { Separator } from "@/components/ui/separator";
 import { SELECTED_ROW, selectionHue } from "@/components/selection";
 import { openRecords, spanOfWindow } from "@/components/trendDoors";
 import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
@@ -139,17 +140,17 @@ export default function TrendInstantPane({
         // HOW LONG AGO the moment was, not the cadence (user, 2026-09-26): the reader is placing an
         // instant, and "3 months ago" places it; "daily" only said what the charts are cut in,
         // which the note below already says where it matters. Measured from the bucket's start.
-        aside={
-          <span className="text-label text-muted-foreground">
-            {cursorMs != null ? `${ageWords(Date.now() - (bucket ?? cursorMs))} ago` : null}
-          </span>
-        }
         onClose={onClose}
         collapsed={collapsed}
         onToggle={onToggle}
       />
       {!collapsed && (
         <div>
+          {/* THE LEAD (the card skeleton, 2026-10-02): how long ago the moment was. It rode the
+              head's aside, which is a qualifier or a state on every card now — an age is what a
+              card SAYS, first. Measured from the bucket's start, as before. */}
+          {cursorMs != null && <Lead>{ageWords(Date.now() - (bucket ?? cursorMs))} ago.</Lead>}
+          {bucket != null && <Separator className="mb-2" />}
           {bucket == null ? (
             // AN HONEST TERMINAL, not an empty card. The sentence is `instantNote`'s: only the
             // out-of-window case offers a route, because only that one has a gesture that answers
