@@ -91,6 +91,8 @@ const HUB_BODY_SOFT = 0.58;
 // Anchor-packet stream tuning: each anchored snapshot launches one packet hub→core; a burst of N
 // streams out staggered, reusing a small pool (which naturally throttles very large bursts).
 const PKT_TRAVEL = 0.85; // seconds hub → core
+/** The committed hub's own emissive, as a share of the resting level — see the hub loop. */
+const HUB_FOCUS_GLOW = 0.5;
 const PKT_STAGGER = 0.07; // seconds between launches within a burst
 const PKT_POOL = 14; // reusable packet meshes per metagraph (caps simultaneous in-flight)
 
@@ -823,7 +825,14 @@ export class HyperView implements SceneView {
         pk.mesh.position.copy(_pos).multiplyScalar(1 - pk.t); // hub (t=0) → core (t=1)
         mat.opacity = Math.sin(pk.t * Math.PI) * 0.9 * metaF * this._fades.alpha;
       }
-      hubMat.emissiveIntensity = (0.72 + m.glow * 0.5) * metaF * glowMul * this._fades.alpha;
+      // THE COMMITTED HUB GLOWS LESS, NOT MORE (user, 2026-10-02: "less light on the metagraph
+      // spheres … when highlighted it's just too much"). Committed, the camera flies in and the
+      // hub fills many times the pixels it does at rest, so the same emissive that reads as a
+      // coloured bead from the overview becomes a large near-white disc that also feeds the bloom
+      // (the "fuzzy focus"). Its emphasis is already carried by the framing, the dim on the other
+      // hubs and the stage light, so its own glow steps DOWN to keep the hue.
+      const focusGlow = m.cfg.id === this.focusId ? HUB_FOCUS_GLOW : 1;
+      hubMat.emissiveIntensity = (0.72 + m.glow * 0.5) * metaF * glowMul * focusGlow * this._fades.alpha;
       // Stash the FOCUSED hub's root-local position for the spotlight block below (the loop's
       // `_pos` scratch is overwritten per hub).
       if (m.cfg.id === this.focusId) this._spotPos.copy(m.group.position);
