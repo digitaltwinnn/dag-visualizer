@@ -13,7 +13,7 @@ import { fmtDag, fmtKB } from "@/src/util/format";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { useMinHold } from "@/components/useMinHold";
 import { CONTENT_EASE } from "@/components/RollSwap";
-import { Lead, SectionLabel, UnitMarks, CUT_ROW, countable } from "@/components/inspector/parts";
+import { Lead, SectionLabel, UnitMarks, CUT_ROW, countable, figWidth } from "@/components/inspector/parts";
 import { Separator } from "@/components/ui/separator";
 
 // The anchored block on the snapshot card: a ranked breakdown of the metagraph snapshots this
@@ -152,7 +152,7 @@ export default function AnchoredTags({
           different members every ~4s — the container mounts fresh at each acquiring→rows flip,
           so the mount entrance is exactly per-reveal. Bar widths carry no transition: the
           remount means there is never an old width to ease from. */}
-      <div className={cn("flex flex-col gap-y-1", CONTENT_EASE)}>
+      <div className={cn("flex flex-col gap-y-1", CONTENT_EASE)} style={figWidth(rows.map((r) => r.n))}>
         {rows.map((r) => {
           const isOpen = open.has(r.id);
           const isSel = r.id === focusId;

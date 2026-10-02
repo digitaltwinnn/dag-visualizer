@@ -618,7 +618,14 @@ export const countable = (total: number) => total <= UNIT_MAX;
 // MARK BEFORE FIGURE (user, 2026-10-02: "should we right-align the number and put the visual in
 // front?"): name · mark · count, the count on the card's right edge — the fact rows' own grammar
 // (label left, value right) and the explorer rows' order (name, bar, figure).
-export const CUT_ROW = "grid grid-cols-[8.6em_minmax(0,1fr)_2.6em] items-start gap-x-2 text-label";
+// THE FIGURE COLUMN IS AS WIDE AS ITS WIDEST FIGURE, no wider (user, 2026-10-02: "quite some space
+// between"): a fixed column right-aligned a "3" a dozen pixels from its squares. `--cut-fig` is set
+// by whoever draws the rows, in `ch` of the mono figure (`figWidth`), so the marks end one small
+// gap before the number on every row and still share one right edge.
+export const CUT_ROW = "grid grid-cols-[8.6em_minmax(0,1fr)_var(--cut-fig,2.6em)] items-start gap-x-1.5 text-label";
+/** The `--cut-fig` style for a set of figures as they will be printed. */
+export const figWidth = (figures: readonly (string | number)[]): CSSProperties =>
+  ({ ["--cut-fig" as string]: `${Math.max(1, ...figures.map((f) => String(f).length)) + 0.6}ch` }) as CSSProperties;
 
 /** ONE CUT OF A TOTAL, AS TABLE ROWS (user, 2026-10-02 — `docs/superpowers/design/2026-10-02-right-
  *  rail-cards/breakdown-2.html`, D2: "what bothers me most is that the legend has those dots in it
@@ -638,10 +645,11 @@ export function ScheduleTable({ axis, axisTitle, parts, className }: { axis?: st
     <div
       className={cn(
         axis != null
-          ? "grid grid-cols-[6em_7.4em_minmax(0,1fr)_2.4em] items-start gap-x-2 gap-y-0.5 py-1.5 text-label border-t border-border first:border-t-0"
+          ? "grid grid-cols-[6em_7.4em_minmax(0,1fr)_var(--cut-fig,2.4em)] items-start gap-x-1.5 gap-y-0.5 py-1.5 text-label border-t border-border first:border-t-0"
           : cn(CUT_ROW, "gap-y-0.5"),
         className,
       )}
+      style={figWidth(parts.map((p) => p.count))}
     >
       {axis != null && (
         <span className="text-muted-foreground" title={axisTitle} style={{ gridRow: `span ${Math.max(1, parts.length)}` }}>

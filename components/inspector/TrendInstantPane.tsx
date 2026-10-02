@@ -5,7 +5,7 @@ import { INSTANT_ICON } from "@/components/icons";
 
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { Lead, FactGroup, UnitMarks, CUT_ROW, TickerChip } from "@/components/inspector/parts";
+import { Lead, FactGroup, UnitMarks, CUT_ROW, TickerChip, figWidth } from "@/components/inspector/parts";
 import { Separator } from "@/components/ui/separator";
 import { SELECTED_ROW, selectionHue } from "@/components/selection";
 import { openRecords, spanOfWindow } from "@/components/trendDoors";
@@ -259,7 +259,7 @@ export default function TrendInstantPane({
                             reading · bar. A reading is a rate, not a countable thing, so the
                             mark is a bar scaled to the busiest network at this instant; the bar
                             carries the hue the leading dot used to. */}
-                        <span className={cn(CUT_ROW, "grid-cols-[8.6em_minmax(0,1fr)_4.6em]")}>
+                        <span className={CUT_ROW} style={figWidth(readings.map((r) => (r.value != null ? format(r.value) : "—")))}>
                           <span className={cn("min-w-0 truncate", v == null ? "text-muted-foreground" : "text-foreground-dim")}>{row.name}</span>
                           <UnitMarks count={0} color={row.hue} units={false} frac={v != null && peak > 0 ? v / peak : 0} />
                           {/* One dash for an absent reading (the skeleton's empty rule); the row's title says "no reading". */}
