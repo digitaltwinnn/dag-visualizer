@@ -130,7 +130,10 @@ function inspectedNode(inspect: ReturnType<typeof useStore.getState>["inspect"])
 // so this reads as the Snapshots view's variant with no view check anywhere. Signers come from
 // the same two sources the Engine's tray glow reads — the deep read when it has landed, else
 // the exact read's shallow row.
-function useSignedSelected(node: { id?: string | null; ids?: string[] } | undefined | null): number | null {
+function useSignedSelected(
+  node: { id?: string | null; ids?: string[] } | undefined | null,
+  netId: string | null,
+): { ordinal: number; signed: boolean; others: number } | null {
   const metaSnap = useStore((s) => s.metaSnap);
   const deepMap = useStore((s) => s.metaSnapDeep);
   const exact = useStore((s) => s.snapshotExact);
@@ -139,9 +142,17 @@ function useSignedSelected(node: { id?: string | null; ids?: string[] } | undefi
   const row = exact[metaSnap.globalOrdinal]?.rows?.find(
     (r) => r.metaId === metaSnap.metaId && r.ordinal === metaSnap.ordinal,
   );
-  // Returns the SIGNED snapshot's ordinal (not a bare boolean): the relation names its object
-  // (user, 2026-08-15 — "say what it signed, like 'anchored to'").
-  return nodeSigned(node, deep?.signers ?? row?.signers ?? null) ? metaSnap.ordinal : null;
+  const signers = deep?.signers ?? row?.signers ?? null;
+  // The relation names its OBJECT (user, 2026-08-15 — "say what it signed, like 'anchored to'"),
+  // and since 2026-10-02 it is stated BOTH ways: a node of the snapshot's own network that is not
+  // among its signers says so. Only once the signer list has been read (an unread list is not a
+  // "did not"), and only for that network's nodes — another network's node has no relation to
+  // this snapshot at all, and a sentence about it would invent one.
+  if (!signers?.length) return null;
+  const signed = nodeSigned(node, signers);
+  const sameNet = !!netId && (metagraphById(netId)?.id ?? netId) === (metagraphById(metaSnap.metaId)?.id ?? metaSnap.metaId);
+  if (!signed && !sameNet) return null;
+  return { ordinal: metaSnap.ordinal, signed, others: Math.max(0, signers.length - 1) };
 }
 
 // Node title: the Geography view mark (Globe — the Geography view's top-bar icon, same view-glyph
@@ -765,7 +776,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // The SIGNED relation owns the head aside while it exists (GeoLiveAside) — the status the
   // head normally carries moves down here as the first body row, so no fact is lost, only
   // redistributed (the pile rule's redistribution idea, applied within one card).
-  const signed = useSignedSelected(p.node);
+  const signed = useSignedSelected(p.node, pickNetId(p));
   // The operator's self-registered ALIAS from the delegated-staking registry (user,
   // 2026-08-16 — "those names look informal often": a content attribute, never the title; and
   // "alias" is the user-facing word, "nickname" stays the internal register). The registry
@@ -822,8 +833,10 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   const ownNet = ownId ? { id: ownId, name: metagraphById(ownId)?.name ?? ownId } : null;
   // NB: the hover pairing (synced 3D glow) lives on the OUTER pane (Inspector.CardPane), not here,
   // so the glow lights the card's rounded edge.
-  // THE LEAD (the card skeleton, 2026-10-02): the relation to the chamber's subject when there is
-  // one, then where the node sits and who hosts it — the City / Country / Hosting rows read as one
+  // THE LEAD IS CONTEXTUAL (user, 2026-10-02 — "in snapshot view it should say something like
+  // 'validated snapshot 123'. This should be the principle for that section"): it opens with what
+  // this node is TO THE SUBJECT ON SCREEN — under a committed metagraph snapshot, whether it signed
+  // it — and only then where the node sits and who hosts it — the City / Country / Hosting rows read as one
   // sentence. Each piece still YIELDS to the ancestor card that states it (the pile rule), so
   // under a committed country and provider the lead is the relation alone, or nothing: a card
   // never restates its ancestors to fill a slot.
@@ -834,8 +847,17 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
       {(signed != null || leadBits) && (
         <Lead>
           {signed != null && (
-            <span title="This node is among the committed metagraph snapshot's proof signers — a snapshot is signed by the metagraph's own L0 validators.">
-              Signed {signed.toLocaleString()}{leadBits ? ". " : "."}
+            <span
+              title={
+                signed.signed
+                  ? "This node is among the committed metagraph snapshot's proof signers — a snapshot is signed by the metagraph's own L0 validators."
+                  : "This node is not among the committed metagraph snapshot's proof signers — a snapshot is signed by the metagraph's own L0 validators that were in that round."
+              }
+            >
+              {signed.signed
+                ? `Signed snapshot ${signed.ordinal.toLocaleString()}${signed.others > 0 ? ` with ${signed.others} other${signed.others === 1 ? "" : "s"}` : ""}`
+                : `Did not sign snapshot ${signed.ordinal.toLocaleString()}`}
+              {leadBits ? ". " : "."}
             </span>
           )}
           {/* A host name may end in its own period ("Amazon.com, Inc.") — never two. */}

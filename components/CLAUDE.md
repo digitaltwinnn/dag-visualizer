@@ -1117,10 +1117,13 @@ to lead with what the present context makes relevant. Three forms, one principle
 
 - **Across cards** — the pile dedup above: a fact moves to whichever plank states it best, never
   duplicated at equal weight.
-- **Within a card** — the node card's SIGNED relation: with a metagraph snapshot committed and the node
-  among its proof signers, the head aside states the relation (`signed` + the L0 chip — the one fact
-  tying the node to the chamber's subject) and the status moves down to the first body row. Nothing
-  lost, redistributed.
+- **Within a card** — the node card's LEAD is contextual (user, 2026-10-02: "in snapshot view it
+  should say something like 'validated snapshot 123'. This should be the principle for that
+  section"): it opens with what the node is TO THE SUBJECT ON SCREEN, then where it sits and who
+  hosts it. With a metagraph snapshot committed and its signer list read, a node of that network
+  reads `Signed snapshot N with 2 others.` or `Did not sign snapshot N.`; another network's node
+  has no relation to it and says nothing. The head aside keeps the status. A new view's relation
+  joins the lead the same way — presence-gated, one sentence, before the place.
 - **Across surfaces** — the subject callout mirrors the BOX (`store.boxedCard`, published by Inspector
   from the same state that renders it): the box is the subject — it already gets the camera — so
   re-boxing an ancestor card steps the scene label up with it.
