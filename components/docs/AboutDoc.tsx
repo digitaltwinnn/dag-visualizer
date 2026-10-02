@@ -46,7 +46,7 @@ function ViewCard({ icon: Icon, name, about }: { icon: LucideIcon; name: string;
         <h3 className="text-title font-semibold text-foreground">{name}</h3>
         <span className="text-label text-muted-foreground">· {about.title}</span>
       </div>
-      <p className="mt-2 text-label text-foreground-dim leading-relaxed">{about.text}</p>
+      <p className="mt-2 text-prose text-foreground-dim">{about.text}</p>
     </Panel>
   );
 }
@@ -56,7 +56,7 @@ function ViewCard({ icon: Icon, name, about }: { icon: LucideIcon; name: string;
 function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
     <section id={id} className="mt-12 scroll-mt-24">
-      <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+      <h2 className="text-xl font-semibold text-foreground">{title}</h2>
       <div className="mt-3 border-t border-border" />
       <div className="mt-4 space-y-4 text-foreground-dim leading-relaxed">{children}</div>
     </section>
@@ -67,10 +67,10 @@ export default function AboutDoc() {
   return (
     <article className="pt-14">
       <Eyebrow>About</Eyebrow>
-      <h1 className="mt-3 text-2xl font-semibold tracking-[-0.01em] leading-tight">
+      <h1 className="mt-3 text-3xl font-semibold tracking-[-0.01em] leading-tight">
         A live 3D map of the Constellation Network
       </h1>
-      <p className="mt-5 text-base text-foreground-dim leading-relaxed">
+      <p className="mt-5 text-lg text-foreground-dim leading-relaxed">
         DAG Visualizer is a free, browser-based visualizer that shows the Constellation
         Network as a living 3D scene. It connects to the network&apos;s public APIs and renders
         what is actually happening right now: real nodes, real locations, real activity.
@@ -82,19 +82,19 @@ export default function AboutDoc() {
           a panel because it is the claim everything else on the page rests on. */}
       <Panel className="mt-6 py-4 px-5">
         <Eyebrow>Live data</Eyebrow>
-        <p className="mt-2 text-base text-foreground leading-relaxed">
+        <p className="mt-2 text-lg text-foreground leading-relaxed">
           Every number on screen is live — read straight from the Constellation Network&apos;s
           own public endpoints, the global snapshot stream, each metagraph&apos;s cluster and
           each node&apos;s status, and drawn as it comes in.
         </p>
-        <p className="mt-2 text-label text-muted-foreground leading-relaxed">
+        <p className="mt-2 text-prose text-muted-foreground">
           Node locations come from their public internet addresses, so they are accurate to a
           city and a hosting provider, not to a street. The only thing stored behind this site
           is the network&apos;s own public history — daily activity totals summed from the chain
           for the History view. Nothing about you: the page keeps a short memory of recent
           snapshots while it is open, and forgets it when you close the tab.
         </p>
-        <p className="mt-2 text-label text-muted-foreground leading-relaxed">
+        <p className="mt-2 text-prose text-muted-foreground">
           When something can&apos;t be reached for a moment, the screen simply says so —
           you&apos;ll see a small label like <span className="font-mono">NO SIGNAL</span> instead
           of a number.
@@ -189,7 +189,7 @@ export default function AboutDoc() {
             official record of the network. For anything that matters, use the official
             sources.
           </p>
-          <p className="mt-3 text-label text-muted-foreground">
+          <p className="mt-3 text-prose text-muted-foreground">
             For the official project, see{" "}
             <a
               href="https://constellationnetwork.io"

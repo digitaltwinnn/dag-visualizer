@@ -101,7 +101,7 @@ function Section({ id, title, lead, children }: { id: string; title: string; lea
     >
       <h2 className="text-lg font-semibold text-foreground">{title}</h2>
       <div className="mt-3 border-t border-border" />
-      <p className="mt-3 text-label text-muted-foreground leading-relaxed">{lead}</p>
+      <p className="mt-3 text-prose text-muted-foreground">{lead}</p>
       {/* ONE COLUMN (user, 2026-09-07): every chart shares the same time axis, so
           stacking aligns the days vertically and a dip can be followed across metrics. */}
       <div className="mt-4 grid gap-y-7">{children}</div>
@@ -408,7 +408,7 @@ export default function TrendsDoc() {
      (the empty-state rule — here, the tab row above). */
   const scopeCopy = scopeEmptyCopy(trendScope(filter), "document");
   const scopeEmpty = scopeCopy && (
-    <p className="mt-3 text-label text-muted-foreground max-w-[62ch]">
+    <p className="mt-3 text-prose text-muted-foreground max-w-[62ch]">
       {scopeCopy.fact} {scopeCopy.route}
     </p>
   );

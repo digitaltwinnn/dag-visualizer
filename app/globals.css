@@ -1419,15 +1419,28 @@
      label = secondary/meta (counts, codes, subtitles, hints); body = rows, descriptions, values;
      title = card titles. Sizes intentionally sit between Tailwind's default text-xs/sm steps —
      that finer granularity is why arbitrary text-[..px] used to sprawl. Line-heights paired per
-     Tailwind v4's fontSize convention so a bare text-* also sets a sane leading. */
-  --text-micro: 10.5px;
+     Tailwind v4's fontSize convention so a bare text-* also sets a sane leading.
+     ⚠️ THE SCALE IS FLUID (design review 2026-10-02: "the fonts are tiny while there is a lot of
+     empty space"). Each step is a clamp(): its floor is the old size plus half a pixel and holds
+     up to a 1440px viewport, the ramp is linear in `vw`, and the ceiling — about 15% up — lands at
+     2560px. Every HUD text site snaps to these four, so the whole HUD grows with the screen while
+     a laptop keeps the sizes the cards were measured at. Line-heights are ratios, so they ride.
+     A `:root` token edit here needs the `.next/dev` purge before the browser shows it. */
+  --text-micro: clamp(11px, 9.07px + 0.134vw, 12.5px);
   --text-micro--line-height: 1;
-  --text-label: 11.5px;
+  --text-label: clamp(12px, 10.07px + 0.134vw, 13.5px);
   --text-label--line-height: 1.45;
-  --text-body: 12.5px;
+  --text-body: clamp(13px, 10.43px + 0.179vw, 15px);
   --text-body--line-height: 1.45;
-  --text-title: 15px;
+  --text-title: clamp(15.5px, 12.29px + 0.223vw, 18px);
   --text-title--line-height: 1.2;
+  /* DOCUMENT PROSE — the fifth step, for the doc overlay's paragraphs only (/about, /design, the
+     History document). A paragraph is read, not scanned: the HUD's label step in a 700px column
+     ran 115 characters a line at 11.5px, which is a footnote, not a page. 15px over a 1.65
+     leading is 85 characters a line in that column. Not for the HUD: a card's description stays
+     `text-body`. */
+  --text-prose: 15px;
+  --text-prose--line-height: 1.65;
 
   /* Uppercase-caps tracking — the merged 0.12/0.13/0.14em eyebrow/label cluster. */
   --tracking-caps: 0.13em;

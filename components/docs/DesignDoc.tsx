@@ -78,7 +78,7 @@ const TYPE_SCALE: { cls: string; role: string }[] = [
 function Section({ title, children }: { title: React.ReactNode; children: React.ReactNode }) {
   return (
     <section className="mt-12">
-      <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+      <h2 className="text-xl font-semibold text-foreground">{title}</h2>
       <div className="mt-3 border-t border-border" />
       <div className="mt-4 space-y-4">{children}</div>
     </section>
@@ -92,7 +92,7 @@ function Section({ title, children }: { title: React.ReactNode; children: React.
 // prohibitions, app/globals.css for the tokens, the section demos' own headers for the code
 // names the titles used to carry.
 function Note({ children }: { children: React.ReactNode }) {
-  return <p className="text-label text-muted-foreground leading-relaxed max-w-2xl">{children}</p>;
+  return <p className="text-prose text-muted-foreground max-w-2xl">{children}</p>;
 }
 
 export default function DesignDoc() {
@@ -106,7 +106,7 @@ export default function DesignDoc() {
   return (
     <article className="pt-14">
           <p className="text-micro tracking-caps uppercase text-muted-foreground">Design</p>
-          <h1 className="mt-3 text-2xl font-semibold tracking-[-0.01em] leading-tight">
+          <h1 className="mt-3 text-3xl font-semibold tracking-[-0.01em] leading-tight">
             Instrument-Glass
           </h1>
           {/* HUMAN VOICE (user, 2026-09-04 — the about-page rule reaches here too: "for humans to
@@ -114,12 +114,12 @@ export default function DesignDoc() {
               live where developers look: app/globals.css is the one token source, the swatches read
               it live, and the specimens below render through the real components — which is exactly
               what the second sentence promises the reader in plain words. */}
-          <p className="mt-5 text-base text-foreground-dim leading-relaxed max-w-2xl">
+          <p className="mt-5 text-lg text-foreground-dim leading-relaxed max-w-2xl">
             This page shows the visual language the visualizer is built from — its colours, its
             type, and the small signature elements you&apos;ll recognise from every corner of the
             app.
           </p>
-          <p className="mt-3 text-label text-muted-foreground leading-relaxed max-w-2xl">
+          <p className="mt-3 text-prose text-muted-foreground max-w-2xl">
             Nothing on it is a mock-up: everything here is drawn by the same styles and components
             the app itself uses, so what you see on this page is always exactly what the app looks
             like right now.
@@ -156,7 +156,7 @@ export default function DesignDoc() {
                     The quick brown fox
                   </span>
                   <code className="font-mono text-label text-primary flex-none">{t.cls}</code>
-                  <span className="text-label text-muted-foreground">{t.role}</span>
+                  <span className="text-body text-muted-foreground">{t.role}</span>
                 </div>
               ))}
             </div>
