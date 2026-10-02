@@ -15,13 +15,15 @@ import { cn } from "@/lib/utils";
 // the explorer but not in the snapshot card; … it should show pinned in both"). The Snapshots
 // explorer's head and the global snapshot card's aside were two builds of the same control: the
 // explorer's said "pinned" on the selection wash, the card's a bare "◷ 12s", so a pin read as
-// pinned on the left and as merely old on the right. Both render this now.
+// pinned on the left and as merely old on the right. Both rendered this for three days;
+// since 2026-10-02 (B1, `docs/superpowers/design/2026-10-02-heading-pin-foot`) THE CARD ALONE
+// owns it and the scene callout mirrors it — with the three statements side by side, two was the
+// call. The explorer's selected-row wash says which tick is pinned.
 //
 // Three states, one box that never changes size: LIVE (the beating dot, the live tip's ticking
 // age), PINNED (a hollow dot on the selection wash in the filter's hue, the pinned snapshot's age),
-// and OFF (following off with nothing pinned — no age, since one would read as live). `preview`
-// is the explorer's extra: hovering any other snapshot shows the PINNED state it would enter,
-// dashed, naming the ordinal. The write goes through `followToggleActions` + the one executor.
+// and OFF (following off with nothing pinned — no age, since one would read as live). The write
+// goes through `followToggleActions` + the one executor.
 
 /** `· 5s ago`, ticking — its own component so the clock re-renders this span alone. */
 function Age({ ts }: { ts: string }) {
@@ -30,12 +32,11 @@ function Age({ ts }: { ts: string }) {
   return age ? <>· {age}</> : null;
 }
 
-export default function FollowControl({ preview = false, className }: { preview?: boolean; className?: string }) {
+export default function FollowControl({ className }: { className?: string }) {
   const live = useStore((s) => s.live);
   const following = useStore((s) => s.following);
   const snap = useStore((s) => s.snap);
   const latestSnapshot = useStore((s) => s.latestSnapshot);
-  const hoverSnapOrd = useStore((s) => s.hoverSnapOrd);
   const filter = useStore((s) => s.filter);
 
   if (!live)
@@ -45,18 +46,16 @@ export default function FollowControl({ preview = false, className }: { preview?
       </span>
     );
 
-  const liveOrd = latestSnapshot?.ordinal ?? null;
-  const previewOrd = preview && hoverSnapOrd != null && hoverSnapOrd !== liveOrd ? hoverSnapOrd : null;
   const pinned = !following && snap != null;
-  const washed = pinned && previewOrd == null;
-  const label = previewOrd != null || pinned ? "pinned" : "live";
+  const washed = pinned;
+  const label = pinned ? "pinned" : "live";
   // The age is the SHOWN snapshot's — the committed one whether pinned or following. Under a
   // metagraph filter, following lands on the newest tick THAT network anchored into
   // (`followLatest`), which may be minutes behind the global tip; the tip's age there would read
   // "live · 3s" beside a four-minute-old snapshot (rule 10: the label never overstates).
   const shown = snap?.data ?? latestSnapshot;
   const sub =
-    previewOrd != null ? previewOrd.toLocaleString() : !following && !pinned ? "· off" : shown ? <Age ts={shown.timestamp} /> : null;
+    !following && !pinned ? "· off" : shown ? <Age ts={shown.timestamp} /> : null;
 
   return (
     <button
@@ -74,12 +73,11 @@ export default function FollowControl({ preview = false, className }: { preview?
         "inline-flex items-center gap-1.5 rounded-sm px-1.5 py-[3px] cursor-pointer select-none border border-transparent whitespace-nowrap",
         "hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
         washed && selectedRow(true),
-        previewOrd != null && "border-dashed border-border",
         className,
       )}
       style={washed ? selectionHue(filterAccent(filter)) : undefined}
     >
-      {following && previewOrd == null ? (
+      {following ? (
         <LiveDot />
       ) : (
         <span className={cn("flex-none w-2 h-2 rounded-full border", washed ? "border-primary/80" : "border-muted-foreground/70")} />
