@@ -817,6 +817,9 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   const metaList = useStore((s) => s.metaList);
   const coloReady = metaList.some((m) => m.isRoot) && metaList.some((m) => !m.isRoot);
   const colo = coloReady ? coLocatedNetworks(p.node?.ip, pickNetId(p), metaList) : null;
+  // The node's OWN network, in the same shape as a co-tenant so one row lists them all.
+  const ownId = pickNetId(p);
+  const ownNet = ownId ? { id: ownId, name: metagraphById(ownId)?.name ?? ownId } : null;
   // NB: the hover pairing (synced 3D glow) lives on the OUTER pane (Inspector.CardPane), not here,
   // so the glow lights the card's rounded edge.
   // THE LEAD (the card skeleton, 2026-10-02): the relation to the chamber's subject when there is
@@ -855,7 +858,12 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           <LayerCells codes={codes} />
         </>
       )}
-      {archState.kind !== "none" && (
+      {/* The Archive section stands only where it can be FILLED (user, 2026-10-02: "the second section
+          is not always filled in"). A node with no L0 keeps no snapshot archive — the Runs cells
+          just above already show its L0 dashed — and a section that was a dash and a sentence on
+          most metagraph nodes read as a card that had failed to load. An L0 node the census has no
+          reading for keeps the section and its dash: that one is a real gap. */}
+      {archState.kind !== "none" && archState.kind !== "na" && (
         <>
           <Separator className="mt-2.5 mb-2" />
           <SectionLabel
@@ -863,9 +871,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
             total={
               <span className="font-sans font-normal">
                 {archState.kind === "value" ? archState.display.value : archState.kind === "acquiring" ? <NodeStars count={4} /> : (
-                  <Empty why={archState.kind === "na"
-                    ? "A chain's snapshots are served by its L0 validators; this node runs no L0, so it keeps no snapshot archive."
-                    : "The archive census (refreshed every few hours) has no reading for this node — it was unreachable at probe time, not Ready then, or joined the cluster since."} />
+                  <Empty why="The archive census (refreshed every few hours) has no reading for this node — it was unreachable at probe time, not Ready then, or joined the cluster since." />
                 )}
               </span>
             }
@@ -896,7 +902,6 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
               {archState.display.note && <span className="mt-1 block text-label text-muted-foreground">{archState.display.note}</span>}
             </div>
           )}
-          {archState.kind === "na" && <span className="block text-label text-muted-foreground">Only an L0 keeps a snapshot archive.</span>}
         </>
       )}
       <Separator className="mt-2.5 mb-2" />
@@ -921,29 +926,26 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
             to read as "has stake delegated", which the data does not say. */}
         {/* The provider's NUMBER — its name is in the lead, or is the provider card's title. */}
         {asn && <Fact label="ASN"><span className="font-mono">{asn}</span></Fact>}
-        {/* CO-LOCATED — the machine's other tenant networks (see the note above). Each name
-            keeps its identity dot: a metagraph's hue is the same everywhere it appears. */}
-        <Fact label="Co-located">
-          {colo == null ? (
-            <NodeStars count={3} />
-          ) : colo.length ? (
-            <span
-              className="inline-flex items-center gap-1.5"
-              title="Another network runs its layers at this node's IP — one host answering in more than one cluster."
-            >
-              {colo.map((c) => (
-                <span key={c.id} className="inline-flex items-center gap-1.5">
-                  <IdentityDot hue={filterAccent(c.id)} />
-                  {c.name}
-                </span>
-              ))}
-            </span>
-          ) : (
-            // "none" is a MEASURED reading (both cluster sides are live and no co-tenant
-            // exists), so it takes the value register like any other fact — muting it made a
-            // fact read as an instrument state (user, 2026-08-16).
-            <Empty why="No other network has a node at this IP." />
-          )}
+        {/* NETWORK(S) — which network this node belongs to, and any other network the same machine
+            also runs (user, 2026-10-02: "it should say which network it belongs to; we can combine
+            that with co-located — just say network(s) and show multiple if it applies"). The
+            node's own network leads; co-tenants follow once both cluster sides are live (before
+            that the list would be a guess, so only the node's own network shows). Each keeps its
+            identity dot. Stated even under a committed network card: here it is the node's fact,
+            and on Geography and Snapshots no card above says it. */}
+        <Fact label={colo && colo.length > 0 ? "Networks" : "Network"}>
+          <span
+            className="inline-flex flex-wrap items-center justify-end gap-x-2.5 gap-y-0.5"
+            title={colo && colo.length > 0 ? "This machine answers in more than one network's cluster at the same IP." : undefined}
+          >
+            {[ownNet, ...(colo ?? [])].filter((c): c is { id: string; name: string } => c != null).map((c) => (
+              <span key={c.id} className="inline-flex items-center gap-1.5">
+                <IdentityDot hue={filterAccent(c.id)} />
+                {c.name}
+              </span>
+            ))}
+            {ownNet == null && (!colo || colo.length === 0) && <Empty why="This node's network is not known." />}
+          </span>
         </Fact>
       </FactGroup>
       {/* The look-up column: this node's own reference, and nothing else — the unique reference
