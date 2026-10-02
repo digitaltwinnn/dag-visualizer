@@ -156,7 +156,7 @@ export default function DesignDoc() {
                   <span className={cn(t.cls, "text-foreground font-semibold w-40 flex-none")}>
                     The quick brown fox
                   </span>
-                  <code className="font-mono text-label text-primary flex-none">{t.cls}</code>
+                  <code className="font-mono text-label text-primary-ink flex-none">{t.cls}</code>
                   <span className="text-body text-muted-foreground">{t.role}</span>
                 </div>
               ))}
@@ -404,7 +404,7 @@ export default function DesignDoc() {
                 </svg>
                 <div className={cn("absolute whitespace-nowrap", SCENE_GLASS)} style={{ left: 62, bottom: 92 }}>
                   <span aria-hidden className="edge-spine opacity-70" style={{ ["--spine" as string]: "#c9824f" }} />
-                  <div className="text-label font-bold tracking-[0.1em] uppercase leading-none text-accent mb-1.5">Metagraph</div>
+                  <div className="text-label font-bold tracking-[0.1em] uppercase leading-none text-primary-ink mb-1.5">Metagraph</div>
                   <div className="flex items-center gap-[7px]">
                     <span className="text-body font-semibold text-foreground">Metagraph name</span>
                     <span className="text-label font-bold ml-1" style={{ color: "#c9824f" }}>TICKER</span>

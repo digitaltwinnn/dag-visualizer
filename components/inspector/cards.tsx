@@ -305,9 +305,9 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
             hashes attached to the label", then "the hash label still has extra room"): the
             value fills its own row toward its label, so a short label buys a longer value —
             head and tail both surviving. Budgets measured at the desktop rail width. */}
-        <FootRow label="Hash" value={midHash(d.hash, 28)} title={d.hash} copy={d.hash} />
+        <FootRow label="Hash" value={midHash(d.hash, 24)} title={d.hash} copy={d.hash} copyName="hash" />
         {d.lastSnapshotHash && (
-          <FootRow label="Previous" value={midHash(d.lastSnapshotHash, 23)} title={d.lastSnapshotHash} copy={d.lastSnapshotHash} />
+          <FootRow label="Previous" value={midHash(d.lastSnapshotHash, 20)} title={d.lastSnapshotHash} copy={d.lastSnapshotHash} copyName="previous hash" />
         )}
       </Foot>
     </div>
@@ -652,11 +652,12 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           {/* The snapshot cards' fill rule (user, 2026-08-14 — "the value takes up most of the
               space and sits against the label"): midHash at per-label budgets, so each address
               fills its own row toward its label. */}
-          <FootRow label="Id" value={midHash(footId, 28)} title={footId} copy={footId} />
+          <FootRow label="Id" value={midHash(footId, 26)} title={footId} copy={footId} copyName="network id" />
           {chainSpan?.owner && (
             <FootRow
               label="Owner"
-              value={midHash(chainSpan.owner, 26)}
+              value={midHash(chainSpan.owner, 23)}
+              copyName="owner address"
               title={`The address that registered and controls this metagraph. ${chainSpan.owner}`}
               copy={chainSpan.owner}
             />
@@ -887,11 +888,8 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
             )}
           </Fact>
         )}
-        {/* COUNTRY — the half of the place the head no longer carries (user, 2026-08-02). The
-            country CODE suffix is gone (2026-08-10): it restated the name it sat beside.
-            Yields to the country card's own title once that rung is drilled. */}
-        {/* CITY — the place word the head carried until 2026-09-29 (the title is the node's id
-            now). Yields to the provider card, whose rung is city × provider. */}
+        {/* Country, city and host are the LEAD's now (the card skeleton, 2026-10-02), each
+            yielding to its ancestor card's title when that rung is committed. */}
         {/* COMPOSITION — the node's role in the network, a labelled fact like the rest (user,
             2026-08-02: it used to ride the head as a subtitle, which made the head carry three
             different registers). Sits second: the reading order is place → role → host →
@@ -906,8 +904,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
             </span>
           </Fact>
         )}
-        {/* HOSTING — the provider's NAME, then the ASN that is its number. Both yield to the
-            provider card, whose title IS the isp and whose body carries the same reference. */}
+        {/* The provider's NUMBER — its name is in the lead, or is the provider card's title. */}
         {asn && <Fact label="ASN"><span className="font-mono">{asn}</span></Fact>}
         {/* CO-LOCATED — the machine's other tenant networks (see the note above). Each name
             keeps its identity dot: a metagraph's hue is the same everywhere it appears. */}
@@ -1019,7 +1016,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           its own. Truncated display, full hash on hover. */}
       {p.node?.id && (
         <Foot>
-          <FootRow label="Node id" value={midHash(p.node.id, 30)} title={p.node.id} copy={p.node.id} />
+          <FootRow label="Node id" value={midHash(p.node.id, 21)} title={p.node.id} copy={p.node.id} copyName="node id" />
         </Foot>
       )}
     </>

@@ -45,32 +45,12 @@ export const ROLE_ORDER = ["l0", "cl1", "dl1"];
 // card would be one gesture too many.
 
 // The one fact row. `title` carries the full value for anything the cell truncates.
-//
-// ⚠️ `as` exists for ONE structural reason (2026-09-19): a fact row that is itself a control. The
-// History cursor card's per-network rows are clickable — they run the same focus builder the Layers
-// rows do — and a `<button>` may only contain PHRASING content, so a `<div>` row inside one is a
-// content-model violation. A `span` carrying `display:flex` is the same box and is phrasing, so the
-// row stays this primitive's to draw rather than being hand-rolled beside it (the grammar rule: the
-// four primitives are the only way a card body draws a fact row). Not a styling hook — the default
-// stands everywhere else.
-export function Fact({
-  label,
-  children,
-  title,
-  className,
-  as: As = "div",
-}: {
-  label: ReactNode;
-  children: ReactNode;
-  title?: string;
-  className?: string;
-  as?: "div" | "span";
-}) {
+export function Fact({ label, children, title, className }: { label: ReactNode; children: ReactNode; title?: string; className?: string }) {
   return (
-    <As className={cn("flex items-start justify-between gap-2.5", className)} title={title}>
+    <div className={cn("flex items-start justify-between gap-2.5", className)} title={title}>
       <span className="shrink-0 text-body text-muted-foreground">{label}</span>
       <span className="min-w-0 text-body text-foreground tabular-nums text-right">{children}</span>
-    </As>
+    </div>
   );
 }
 
@@ -269,7 +249,7 @@ export function CopyButton({ value, subject, always = false, className }: { valu
       title={`Copy ${subject}`}
       className={cn(
         "flex-none size-6 -my-1 rounded-xs text-muted-foreground",
-        always ? "opacity-55 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100" : "opacity-0 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
+        always ? "opacity-75 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100" : "opacity-0 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
         copied && "opacity-100 text-[var(--success)] hover:text-[var(--success)]",
         className,
       )}
@@ -299,12 +279,16 @@ export function FootRow({
   title,
   mono = true,
   copy,
+  copyName,
 }: {
   label: string;
   value: ReactNode;
   title?: string;
   mono?: boolean;
   copy?: string;
+  /** What the copy control is called ("previous hash") — the visible label is cut short to save
+   *  hash characters, and "Copy previous" says too little to a screen reader. */
+  copyName?: string;
 }) {
   // ONE REGISTER (C1, user 2026-10-02, `docs/superpowers/design/2026-10-02-heading-pin-foot`):
   // the label is a caps PREFIX inside the mono value line — still uppercase, still muted — rather
@@ -324,7 +308,7 @@ export function FootRow({
       {/* The control takes its own 24px column: always present, so there is nothing to overlay and
           no tail to cover — the value's `truncate` is the only thing that can shorten it, and the
           callers' middle-cut budgets are sized so it does not. */}
-      {copy && <CopyButton value={copy} subject={label.toLowerCase()} always className="my-0" />}
+      {copy && <CopyButton value={copy} subject={copyName ?? label.toLowerCase()} always className="my-0" />}
     </div>
   );
 }

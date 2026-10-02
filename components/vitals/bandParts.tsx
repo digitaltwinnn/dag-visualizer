@@ -247,7 +247,9 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
               part of the code) and provider names are names; country codes arrive uppercase.
               `0 1 <labelW>px` rather than a hard width: on a narrow card the label SHRINKS into
               its ellipsis instead of pushing the bar track out of the plate. */}
-          <span className="text-label text-muted-foreground truncate leading-none" style={{ flex: `0 1 ${labelW}px` }}>{r.label}</span>
+          <span className="text-label text-muted-foreground truncate leading-none" // `labelW` is px AT THE OLD 10.5px LABEL; stated in em it grows with the fluid step (an 18px
+          // country-code column clipped "GB" to "G…" once the type did).
+          style={{ flex: `0 1 ${(labelW / 10.5).toFixed(2)}em` }}>{r.label}</span>
           {/* THE TRACK IS THE CARD'S OWN WIDTH, never a 72px constant (user, 2026-09-01) — but
               never longer than BAR_TRACK_MAX either. The fixed track made every bar row
               intrinsically sized, so a wide card left its slack dangling to the right of the

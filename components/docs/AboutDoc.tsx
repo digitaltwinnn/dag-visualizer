@@ -155,7 +155,7 @@ export default function AboutDoc() {
           full story, straight from the source, see the official documentation at{" "}
           <a
             href="https://docs.constellationnetwork.io"
-            className="text-primary underline underline-offset-2"
+            className="text-primary-ink underline underline-offset-2"
             rel="noopener"
           >
             docs.constellationnetwork.io
@@ -193,7 +193,7 @@ export default function AboutDoc() {
             For the official project, see{" "}
             <a
               href="https://constellationnetwork.io"
-              className="text-primary underline underline-offset-2"
+              className="text-primary-ink underline underline-offset-2"
               rel="noopener"
             >
               constellationnetwork.io

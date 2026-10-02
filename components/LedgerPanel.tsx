@@ -293,17 +293,9 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const tick = openTick != null ? orderedSnaps.find((d) => d.ordinal === openTick) ?? null : null;
   const exact = tick ? snapshotExact[tick.ordinal] : undefined;
 
-  // ---- the card's LIVE / PINNED state (user, 2026-08-07 — the ONE explicit way to see and toggle
-  // the follow state). It rode the list's heading row as the level's setting (design 2026-09-26,
-  // decision 15) until 2026-09-28, when it moved to the CARD HEAD's aside WITH ITS AGE (user: "move
-  // it to the header and show age also, just like the snapshot card on the right rail"): it is a
-  // state of the whole card on every level, and the age says how fresh "live" is — the right
-  // rail's `live · 8s` counter, ticking, so the two surfaces speak one clock.
-  // Hovering ANY snapshot — a row, a scene tile — PREVIEWS the pinned state it would enter (hollow
-  // dot, dashed). The write goes through `followToggleActions` + the one executor. ----------------
-  // The LIVE / PINNED switch — one component with the global snapshot card's aside
-  // (`components/FollowControl.tsx`); the explorer adds the hover preview. `-mr-1.5` hangs the
-  // pill's padding into the head's gutter so its text aligns with the rows' right edge.
+  // The LIVE / PINNED state is the global snapshot CARD's alone (B1, user 2026-10-02 —
+  // `components/FollowControl.tsx`); the scene callout mirrors it and this explorer no longer
+  // carries the pill or its hover preview.
 
   // ---- level 0: the ticks, paged, measured by the heading's pick -------------------------------
   const tickValues = pagedSnaps.map((d) => tickMeasureValue(ledgerMeasure, d, snapshotExact[d.ordinal]));

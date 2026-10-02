@@ -49,7 +49,7 @@ export default function AboutStrip() {
         <span className="flex items-center gap-2 text-label tracking-caps uppercase text-muted-foreground">
           <Icon aria-hidden className="size-3.5 text-[var(--filter-accent,var(--primary))]" />
           {eyebrow}
-          {caption && <span className="ml-auto text-muted-foreground/70">{caption}</span>}
+          {caption && <span className="ml-auto text-muted-foreground">{caption}</span>}
         </span>
         <span className="text-title font-semibold tracking-[-0.01em] text-foreground">{title}</span>
       </div>

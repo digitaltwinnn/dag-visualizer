@@ -700,7 +700,7 @@ second row was their first phone home and was retired the same day, because ridi
 one grow-downward slot surfaced them under WHICHEVER strip opened, the pulse strip included).
 Presence and
 reserved space can't drift once hydrated; the token's static default in `globals.css` is the band's
-own reserve (**`92px`**), matching the BOOT state (hyper's lane is on, SSR assumes desktop) so the
+own reserve (**`112px`**), matching the BOOT state (hyper's lane is on, SSR assumes desktop) so the
 rails keep clear of the band before the effect runs. The SCENE⇄HUD toggle is the one `railsHidden`
 writer, and it clears its own state when the viewport drops below 1100px — below that the control is
 CSS-hidden and SCENE has no meaning, so a stuck `true` would strand the band and the camera's
@@ -946,7 +946,7 @@ px (ExplorerRow's figure column, the ghost rung's eyebrow column). `text-prose` 
 the doc overlay's paragraphs ONLY; a card's description stays `text-body`. The rail widths (`--rail-w`,
 `--detail-w`) and the vitals band (`--vitals-h`, paired with BottomStream's `RESERVE`) grew with it.
 **The accent is a glow, `--primary-ink` is the accent as TEXT**: links, eyebrows and tickers set in
-the accent take `text-primary-ink` (the accent itself on dark; two-thirds toward black on paper, where
+the accent take `text-primary-ink` (the accent itself on dark; a third toward black on paper, where
 the bare accent measured 2.3–3.1:1). **An identity hue set as TEXT takes `IDENT_INK`** (`components/identInk.ts`): it
 re-points `--ident-l` to `--ident-ink-l` on that element — 0.48 on paper, the lane's own 0.74 on dark —
 because the lane's L is a MARK's lightness and a ticker in it measured 3.2:1. Dots, bars and icons keep
