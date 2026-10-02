@@ -819,6 +819,8 @@ export default function RailDock({
               className={cn(
                 "self-center w-11 h-11 mx-0 -mt-[22px] -mb-[18px] flex items-center justify-center cursor-grab active:cursor-grabbing",
                 "p-0 border-none bg-none [-webkit-tap-highlight-color:transparent] [touch-action:none]",
+                // The app's focus language (a 1px accent outline), not the platform's white box.
+                "outline-none rounded-md focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
                 "before:content-[''] before:w-9 before:h-1 before:rounded-[2px] before:bg-border",
               )}
               aria-label={`Collapse ${label} panel`}

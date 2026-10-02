@@ -229,7 +229,9 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
     // boundary the detail's shrink is gated on — simply takes the full width.
     <div
       data-fit
-      className="flex flex-col justify-evenly self-stretch w-[var(--bar-block-w)] max-[700px]:w-full max-w-full min-w-0"
+      // `max-[700px]:gap-1.5`: in the phone sheet a card is content-height, so `justify-evenly` has
+      // nothing to distribute and the leading-none rows sat on each other.
+      className="flex flex-col justify-evenly self-stretch w-[var(--bar-block-w)] max-[700px]:w-full max-[700px]:gap-1.5 max-w-full min-w-0"
       style={{ ["--bar-block-w" as string]: `calc(${labelW}px + var(--bar-track-max, ${BAR_TRACK_MAX}px) + 40px + 12px)` }}
     >
       {rows.map((r) => (
@@ -249,7 +251,11 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
               its ellipsis instead of pushing the bar track out of the plate. */}
           <span className="text-label text-muted-foreground truncate leading-none" // `labelW` is px AT THE OLD 10.5px LABEL; stated in em it grows with the fluid step (an 18px
           // country-code column clipped "GB" to "G…" once the type did).
-          style={{ flex: `0 1 ${(labelW / 10.5).toFixed(2)}em` }}>{r.label}</span>
+          // ⚠️ THE LABEL HOLDS, THE BAR YIELDS (2026-10-02, the tablet pass): at 820px a card is ~190px
+          // and a shrinking label read "d… c… b… u…" beside four full-length bars — a bar without
+          // its name says nothing. The label keeps its whole COLUMN (one shared width, so the bars still
+          // start on one edge) and the track gives way first (it may reach zero; the numeral still states the count).
+          style={{ flex: `0 0 ${(labelW / 10.5).toFixed(2)}em` }}>{r.label}</span>
           {/* THE TRACK IS THE CARD'S OWN WIDTH, never a 72px constant (user, 2026-09-01) — but
               never longer than BAR_TRACK_MAX either. The fixed track made every bar row
               intrinsically sized, so a wide card left its slack dangling to the right of the
@@ -264,7 +270,7 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
               the phone vitals SHEET sets it to none — there the cards are a 370px full-width
               column, the ceiling's void lands mid-card, and a track that fills the middle is
               what keeps label → bar → value one continuous read (user, 2026-09-03). */}
-          <span aria-hidden className="flex items-center flex-1 min-w-[16px] h-[5px]" style={{ maxWidth: `var(--bar-track-max, ${BAR_TRACK_MAX}px)` }}>
+          <span aria-hidden className="flex items-center flex-1 min-w-0 h-[5px]" style={{ maxWidth: `var(--bar-track-max, ${BAR_TRACK_MAX}px)` }}>
             {/* `hue` — a row that cannot claim the accent: the "unknown"/"unplaced" buckets take
                 the same neutral the tick chart's unattributed segment wears (user, 2026-09-03 —
                 a bucket meaning "nothing to read a type/place from" in the accent reads as one
@@ -353,7 +359,10 @@ export function Donut({ counts, accent, hues }: { counts: Record<string, number>
 export function DonutTotal({ counts, accent, total, className, hues }: { counts: Record<string, number>; accent: string; total: number | null; className?: string; hues?: Record<string, string> }) {
   return (
     <span className={cn("flex items-center gap-2 flex-none", className)}>
-      <Donut counts={counts} accent={accent} hues={hues} />
+      {/* The ring stands down on the TABLET band (700–1100px): four cards share ~790px there, and
+          the ring's 44px is what the breakdown's labels need. The total and its named rows stay —
+          the ring was the redundant encoding of the three. */}
+      <span className="contents min-[700px]:max-[1100px]:hidden"><Donut counts={counts} accent={accent} hues={hues} /></span>
       <span className="font-mono font-bold text-xl text-foreground tabular-nums leading-none">
         <Odometer int value={total || null} />
       </span>

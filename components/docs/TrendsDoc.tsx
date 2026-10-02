@@ -428,7 +428,7 @@ export default function TrendsDoc() {
   return (
     <article className="pt-14">
       <p className="text-label tracking-caps uppercase text-muted-foreground">Trends</p>
-      <h1 className="mt-3 text-3xl font-semibold tracking-[-0.01em] leading-tight">
+      <h1 className="mt-3 text-3xl max-[700px]:text-2xl font-semibold tracking-[-0.01em] leading-tight">
         {buckets.length > 1 ? spanPhrase(buckets, stepMs) : "The network, measured"}
       </h1>
       {/* HUMAN VOICE (user, 2026-09-09 — the /about rule reaches every doc page: say what

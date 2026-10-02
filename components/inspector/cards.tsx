@@ -848,7 +848,9 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           composition card: the cells are this node's own make-up, and the picture is the card. */}
       {codes && codes.length > 0 && (
         <>
-          <Separator className="mb-2" />
+          {/* Only under a LEAD: without one (place and host owned by the cards above) the head's own
+              hairline is the division, and a second rule under it drew two lines an inch apart. */}
+          {(signed != null || leadBits) && <Separator className="mb-2" />}
           <SectionLabel label="Runs" total={<span className="font-sans font-normal">{comp}</span>} className="mb-1.5" />
           <LayerCells codes={codes} />
         </>

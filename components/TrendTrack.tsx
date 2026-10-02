@@ -461,9 +461,10 @@ export default function TrendTrack({
             <g key={t}>
               <line x1={x} y1={plotH} x2={x} y2={plotH + 3} stroke="var(--border)" strokeWidth={1} />
               <text
-                x={x}
+                // A label near either end anchors INTO the track (the phone's last month read "Oc").
+                x={x > box.w - 18 ? box.w : x < 18 ? 0 : x}
                 y={box.h - 2}
-                textAnchor="middle"
+                textAnchor={x > box.w - 18 ? "end" : x < 18 ? "start" : "middle"}
                 className="fill-[var(--muted-foreground)] text-label tracking-caps"
               >
                 {tickLabel(t)}

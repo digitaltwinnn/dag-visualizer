@@ -804,7 +804,10 @@ export default function AnchorLogTable() {
       {toolbar}
       {search}
       <ScrollArea className="flex-1 min-h-0">
-        <Table>
+        {/* PHONE SETS THE LOG AT THE LABEL STEP (2026-10-02, the phone pass): the type scale raised
+            the table's 14px rows with everything else, and the four columns that survive on phone
+            (see COLUMNS) outgrew the pane again — AGE was cut off at the right edge. */}
+        <Table className="max-[700px]:[&_td]:text-label">
           <TableHeader className="sticky top-0 z-10 bg-[var(--panel-solid)] backdrop-blur-md">
             <TableRow className="border-border">
               {COLUMNS.map((c, i) => (
