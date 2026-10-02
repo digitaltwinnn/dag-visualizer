@@ -64,3 +64,8 @@ server down, then verified live the same day (dark 1920 and light 1366, every ca
 errors). The node card's archive REACH bar was approved and built after ("do the archive reach bar
 also"): the share of the chain's ordinals the node still serves, filled from the right. The live
 pass also made the Moment's absent readings a dash ("no reading" wrapped in the figure column).
+
+Later rulings the same day: the archive cut's column reads **"Depth"** ("Archive depth" on hover);
+the **composition card is a plain fact card again** ("of 3 · 1 makes no sense to a human; remove
+the status row" — Nodes and Network are regular rows, the share stays the lead); the dossier's
+**fold mark sits after the total**, the same mark and place as the snapshot card's expandable rows.

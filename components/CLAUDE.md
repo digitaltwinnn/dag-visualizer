@@ -1031,8 +1031,8 @@ a BAR for a rate or a cut above 60 — never both in one cut, no dots, no legend
 cuts (composition in the network's hue, status in the bucket colours, archive depth in the neutral)
 carry the cut's name in a leading column (`ScheduleTable` with an `axis`); a card with ONE cut drops
 that column because its section label names it (`CUT_ROW` — the global snapshot's anchored rows, the
-Moment's readings, a provider's and a country's nodes by network; the composition card lights its
-group inside its network's squares). Rows that are their own controls wear `CUT_ROW` themselves and
+Moment's readings, a provider's and a country's nodes by network; the composition card is a plain
+fact card — its strip and status row were built and removed the same day). Rows that are their own controls wear `CUT_ROW` themselves and
 draw `UnitMarks`, so every card shares the columns. It replaced the stacked bars with a wrapping dot
 legend, the dot · name · track · count rows and the inline network dots — three recipes. A zero part
 is a muted row with no mark. The node card is a record and carries one mark only: the archive REACH
