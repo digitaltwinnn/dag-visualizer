@@ -1033,6 +1033,19 @@ sections rather than three cuts of one fleet. A zero-count part draws no segment
 muted; the chips and depth tags ride the parts' titles. "Archive depth", not "archive" — it is how
 far back a node's archive reaches, not a size.
 
+**Every right-rail card is the same SIX SLOTS in one order** (user, 2026-10-02 — the design and its
+deviations are in `docs/superpowers/design/2026-10-02-right-rail-cards/`): **head · lead · breakdown
+· facts · doors · foot + pager**, and a card uses the slots it has content for. The primitives beside
+`Fact` and `Foot` in `inspector/parts.tsx` are the one way to draw each: `Lead` (the one dim sentence
+a card says first, two lines at most — what the subject is to its parent), `SectionLabel` (a caps
+label with the section's one headline figure on the right), `Empty` (the ONE empty value: a dash,
+the reason on hover — the cards used to say "not known", "none" and "n/a"), `QualifierChip` and
+`Door`. Three rules ride them: **a head's aside is a qualifier chip or a state pill**, never bare
+text, a relation or an age (those are the lead's); **facts are regular weight** (the headline figure
+lives on the section label); **every way out of a card is a `Door`** — a full-bleed row on the wash
+ladder. The lead still obeys the pile rule: a piece an ancestor card states is left out, and a lead
+with nothing left to say is omitted rather than filled.
+
 Three weights, and a fact's weight is a claim about what the card is FOR:
 
 | weight | holds | built from |
