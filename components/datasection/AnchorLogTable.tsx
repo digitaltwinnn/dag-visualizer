@@ -4,6 +4,7 @@ import { netUrl } from "@/src/net/current";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, ChevronDown, Search, X } from "lucide-react";
 import type { CSSProperties } from "react";
+import { useChainSpan } from "@/components/useArchive";
 import { useStore } from "@/src/store/store";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { getNetwork, metagraphById } from "@/src/data/network";
@@ -106,6 +107,14 @@ const Dash = () => (
 // explorer stamps metagraph snapshots with the anchoring global's own timestamp). Until it
 // resolves the cell reads "…" and the row does not commit: a metagraph-snapshot selection IS
 // the (snapshot, tick) pair, and committing half of it would break every downstream consumer.
+/** One chain's label in the toolbar: the current one says so, an earlier one says when it ran —
+ *  its genesis date, read from the chain's own span (the same lookup the dossier uses). */
+function ChainLabel({ address, current }: { address: string; current: boolean }) {
+  const span = useChainSpan(address);
+  const since = span?.genesisTs ? new Date(span.genesisTs).toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : null;
+  return <>{current ? "Current chain" : "Earlier chain"}{since ? <span className="normal-case tracking-normal text-muted-foreground"> · from {since}</span> : null}</>;
+}
+
 export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens the snapshot's own page (RecordsSurface) — see the row's `commit`. */ onOpen?: () => void } = {}) {
   useSnapshotFeed(MAX); // re-render driver: global + anchor events (the buffers below refresh)
   const filter = useStore((s) => s.filter);
@@ -121,6 +130,22 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   const lens = ledgerLens(filter);
   // HISTORY mode: a committed catalog network (the lens already maps DAG → "all").
   const histNet = lens !== "all" && lens !== UNLISTED_ID && metagraphById(lens) ? lens : null;
+  // ⚠️ A NETWORK CAN HAVE MORE THAN ONE CHAIN (user, 2026-10-02: "try also searching the first
+  // BioFi retired chain, it should be able to handle that by design"). A re-registered metagraph
+  // keeps its earlier addresses in the catalog (`formerIds`, `src/net/lineage.ts`), and each is a
+  // chain of its own with its own ordinals — so the pager cannot splice them into one run of
+  // page numbers. `histNet` stays the NETWORK; `histAddr` is the chain being paged: the current
+  // one by default, an earlier one when the reader picks it in the toolbar or a search lands in
+  // it. Newest chain first. Everything below that fetches, caches or does ordinal arithmetic
+  // keys on `histAddr`.
+  const lineage = useMemo(
+    () => (histNet ? [histNet, ...[...(metagraphById(histNet)?.formerIds ?? [])].reverse()] : []),
+    [histNet],
+  );
+  const [chainSel, setChainSel] = useState<{ net: string | null; idx: number }>({ net: null, idx: 0 });
+  const chainIdx = chainSel.net === histNet ? Math.min(chainSel.idx, Math.max(0, lineage.length - 1)) : 0;
+  const histAddr = histNet ? (lineage[chainIdx] ?? histNet) : null;
+  const setChain = (idx: number) => setChainSel({ net: histNet, idx });
 
   const [sort, setSort] = useState<{ key: AnchorLogSortKey; dir: 1 | -1 }>({ key: "age", dir: 1 });
   // THE JUMP'S LANDING MARK. A jump that only changed the page would leave the reader hunting the
@@ -196,15 +221,15 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // The live buffer leads; the explorer's first page seeds it for a quiet network whose window
   // is empty.
   const bufferedNewest = (() => {
-    if (!histNet || !net) return 0;
+    if (!histAddr || !net) return 0;
     let max = 0;
-    for (const r of net.metaSnaps.get(histNet) ?? []) if (r.ordinal > max) max = r.ordinal;
+    for (const r of net.metaSnaps.get(histAddr) ?? []) if (r.ordinal > max) max = r.ordinal;
     return max;
   })();
-  const histFirst = hist.current.net === lens ? (hist.current.pages.get(1)?.[0]?.ordinal ?? 0) : 0;
+  const histFirst = hist.current.net === histAddr ? (hist.current.pages.get(1)?.[0]?.ordinal ?? 0) : 0;
   // The FROZEN latest — page arithmetic must not shift under the reader mid-walk, so it only
   // advances while the reader is ON the live page (or when the walk resets).
-  if (hist.current.net === lens && (page === 1 || hist.current.latest === 0)) {
+  if (hist.current.net === histAddr && (page === 1 || hist.current.latest === 0)) {
     hist.current.latest = Math.max(hist.current.latest, bufferedNewest, histFirst);
   }
   const latest = hist.current.latest || Math.max(bufferedNewest, histFirst);
@@ -212,14 +237,14 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // Reset the walk when the network changes; refresh page 1 when a new anchor lands (the live
   // tip is the only mutable page — ordinal-addressed pages are immutable).
   useEffect(() => {
-    if (!histNet) return;
-    if (hist.current.net !== histNet) {
-      hist.current = { net: histNet, pages: new Map(), latest: 0 };
+    if (!histAddr) return;
+    if (hist.current.net !== histAddr) {
+      hist.current = { net: histAddr, pages: new Map(), latest: 0 };
       probes.current.clear();
       setPageState(1);
       setVersion((v) => v + 1);
     }
-  }, [histNet]);
+  }, [histAddr]);
   // ⚠️ STALE-WHILE-REVALIDATE (user, 2026-09-29: opening the raw log under a filter "looks like
   // it's loading something twice"). A new anchor used to DELETE page 1 before refetching it, so
   // for the length of the request the table had no rows, fell into its "reading the chain…"
@@ -230,12 +255,12 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   const liveGen = useRef(0);
   const liveHave = useRef(0);
   useEffect(() => {
-    if (!histNet || page !== 1) return;
+    if (!histAddr || page !== 1) return;
     liveGen.current += 1;
     setVersion((v) => v + 1);
     // bufferedNewest is the real dependency: a new anchor means a stale live page.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bufferedNewest, histNet]);
+  }, [bufferedNewest, histAddr]);
 
   // Fetch the current page if missing (or, for page 1, stale). Page 1 is the live tip; every
   // deeper page is the ordinal-addressed immutable read, so ANY page — a « jump to genesis
@@ -244,31 +269,31 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // the read on each of those would starve it.
   const pageFetch = useRef(new Set<string>());
   useEffect(() => {
-    if (!histNet || hist.current.net !== histNet) return;
+    if (!histAddr || hist.current.net !== histAddr) return;
     const stale = page === 1 && liveHave.current !== liveGen.current;
     if (hist.current.pages.has(page) && !stale) return;
     const frozen = hist.current.latest;
     if (page !== 1 && frozen === 0) return; // no arithmetic base yet — page 1 seeds it
     const before = frozen - (page - 1) * PAGE;
     if (page !== 1 && before < 1) return;
-    const key = `${histNet}:${page}`;
+    const key = `${histAddr}:${page}`;
     if (pageFetch.current.has(key)) return;
     pageFetch.current.add(key);
     const gen = liveGen.current;
-    fetch(netUrl(`/api/network/${histNet}/snapshots${page === 1 ? "" : `?before=${before}`}`))
+    fetch(netUrl(`/api/network/${histAddr}/snapshots${page === 1 ? "" : `?before=${before}`}`))
       .then((r) => (r.ok ? (r.json() as Promise<{ rows: HistRow[] }>) : Promise.reject()))
       .then((d) => {
-        if (hist.current.net !== histNet) return; // the walk moved to another network meanwhile
+        if (hist.current.net !== histAddr) return; // the walk moved to another chain meanwhile
         hist.current.pages.set(page, d.rows);
         if (page === 1) liveHave.current = gen;
         setHistErr(false);
         setVersion((v) => v + 1);
       })
       .catch(() => {
-        if (hist.current.net === histNet) setHistErr(true);
+        if (hist.current.net === histAddr) setHistErr(true);
       })
       .finally(() => pageFetch.current.delete(key));
-  }, [histNet, page, version]);
+  }, [histAddr, page, version]);
 
   // Resolve the visible page's ANCHORED INTO ticks: buffer join first (free), the resolver
   // route for anything older. Timestamps are immutable, so each resolves at most once.
@@ -327,11 +352,12 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     from = total === 0 ? 0 : (p - 1) * PAGE + 1;
     to = Math.min(p * PAGE, total);
   } else {
-    const raw = hist.current.net === histNet ? (hist.current.pages.get(page) ?? []) : [];
+    const raw = hist.current.net === histAddr ? (hist.current.pages.get(page) ?? []) : [];
     const mapped: ViewRow[] = raw.map((r) => {
       const g = resolved.current.get(r.ts);
       return {
-        metaId: histNet,
+        // The row's own CHAIN address — a retired chain's snapshot is read at that address.
+        metaId: histAddr,
         ordinal: r.ordinal,
         hash: r.hash,
         fee: r.fee,
@@ -399,7 +425,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // ── THE THREE SEEKS ─────────────────────────────────────────────────────────────────────────
   // Each column's control answers with the cheapest mechanism that can reach the WHOLE chain, and
   // the differences between them are the reason only these three have controls at all.
-  const netAddr = histNet;
+  const netAddr = histAddr;
 
   /** The chain pager, as `seekOrdinalByTime` wants it — and it reuses the walk's own page cache, so
    *  a probe already visited costs nothing and a completed seek leaves its landing page warm. */
@@ -528,7 +554,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         return;
       }
       const d = (await res.json()) as { rows?: { metaId: string; ordinal: number }[] };
-      const mine = (d.rows ?? []).filter((r) => r.metaId === histNet);
+      // Any of the network's chains: an old global snapshot holds the address in use at the time.
+      const mine = (d.rows ?? []).filter((r) => lineage.includes(r.metaId));
       if (mine.length === 0) {
         setMarked(null);
         setJumpMiss(`${label} did not anchor into global snapshot ${n.toLocaleString()}`);
@@ -539,6 +566,14 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       // route's marker for a payload it could not decode — excluded, and said if none survive.
       const ordinals = mine.map((r) => r.ordinal).filter((o) => o > 0);
       if (!ordinals.length) { setMarked(null); setJumpMiss("that global snapshot's payload could not be decoded"); return; }
+      // The hit may live in ANOTHER of the network's chains — switch to it and land once its walk
+      // is up (the ordinal means nothing against this chain's numbering).
+      const hitChain = lineage.indexOf(mine[0].metaId);
+      if (hitChain >= 0 && hitChain !== chainIdx) {
+        pendingLand.current = Math.min(...ordinals);
+        setChain(hitChain);
+        return;
+      }
       landOn(Math.min(...ordinals));
     } catch {
       setJumpMiss("the chain read failed — try again");
@@ -583,6 +618,18 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       setJumpMiss(oldest != null && fromMs >= oldest ? "no snapshots in that range" : PICK_A_CHAIN);
       return;
     }
+    // WHICH CHAIN HOLDS THAT DATE. With more than one, the date picks it: the newest chain that
+    // had begun by then (a date before the first chain's genesis takes the first chain, which then
+    // lands on its opening snapshot). A switch re-arms this same seek for when the walk is up.
+    if (lineage.length > 1) {
+      const idx = await chainForDate(fromMs);
+      if (idx != null && idx !== chainIdx) {
+        exactFrom.current = fromMs;
+        pendingSeek.current = true;
+        setChain(idx);
+        return;
+      }
+    }
     if (!latest) { setJumpMiss("still reading the chain"); return; }
     setSeeking(true);
     try {
@@ -612,6 +659,28 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   const logSeek = useStore((st) => st.logSeek);
   const setLogSeek = useStore((st) => st.setLogSeek);
   const pendingSeek = useRef(false);
+  /** An ordinal to land on once ANOTHER of the network's chains has loaded (see `seekTick`). */
+  const pendingLand = useRef<number | null>(null);
+  /** Each chain's genesis instant, read once per address (`/api/network/<addr>/chain`). */
+  const genesisOf = useRef(new Map<string, number | null>());
+  const chainForDate = async (ms: number): Promise<number | null> => {
+    for (let i = 0; i < lineage.length; i++) {
+      const addr = lineage[i];
+      if (!genesisOf.current.has(addr)) {
+        try {
+          const r = await fetch(netUrl(`/api/network/${addr}/chain?v=3`));
+          const j = r.ok ? ((await r.json()) as { genesisTs?: string | null }) : null;
+          const t = j?.genesisTs ? Date.parse(j.genesisTs) : NaN;
+          genesisOf.current.set(addr, Number.isFinite(t) ? t : null);
+        } catch {
+          return null; // unknown — stay on the chain in hand rather than guess
+        }
+      }
+      const g = genesisOf.current.get(addr);
+      if (g != null && g <= ms) return i;
+    }
+    return lineage.length - 1;
+  };
   /** The arriving span's exact start (ms). The fields show a DAY — that is what a reader can type —
    *  but a door from one instant should land AT it, not at that day's midnight (measured: the
    *  Moment card's 02:45 landed 4,700 DOR snapshots early). Consumed by the one seek it arms. */
@@ -647,7 +716,18 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     // handed DOR's 28M tip to BioFi's pager — the tip probe came back empty and the seek
     // honestly reported "could not locate"). The seek may only run once the walk IS the
     // target chain's.
-    if (pendingSeek.current && histNet && hist.current.net === lens && latest && qFrom && !seeking) {
+    // ⚠️ `latest` is a RENDER-time value, and the walk's reset runs in an effect of the same commit
+    // — so on the first pass after a chain switch the guard below sees the NEW chain's name beside
+    // the OLD chain's `latest` (found live: a date search that switched chains paged the earlier
+    // chain with the current one's total, and the other way round asked for an ordinal past the
+    // tip). `walkReady` requires the walk's own frozen base to be set and to be the one in hand.
+    const walkReady = !!histAddr && hist.current.net === histAddr && hist.current.latest > 0 && latest === hist.current.latest;
+    if (pendingLand.current != null && walkReady) {
+      const o = pendingLand.current;
+      pendingLand.current = null;
+      landOn(o);
+    }
+    if (pendingSeek.current && walkReady && qFrom && !seeking) {
       pendingSeek.current = false;
       void seekAge();
     }
@@ -748,6 +828,27 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     // controls now (44px on touch and phone) on the bar's own type: the toggle a real button that
     // shows pressed while open, the applied search ONE chip whose × clears it.
     <div className="flex-none flex items-center justify-end gap-2 pb-2 max-[700px]:pr-10">
+      {/* THE NETWORK'S CHAINS — only where there is more than one (see `lineage`). A plain pair of
+          text buttons on the bar's own type: the pressed one is the chain this table pages. */}
+      {lineage.length > 1 && (
+        <span className="mr-auto inline-flex items-center gap-1 text-label" role="group" aria-label="Which of this network's chains to page">
+          {lineage.map((addr, i) => (
+            <button
+              key={addr}
+              type="button"
+              aria-pressed={i === chainIdx}
+              title={addr}
+              onClick={() => { setMarked(null); setJumpMiss(null); setChain(i); }}
+              className={cn(
+                "h-8 pointer-coarse:h-11 px-2.5 rounded-btn border cursor-pointer tracking-caps uppercase",
+                i === chainIdx ? "border-[var(--sel-border)] bg-[var(--sel-bg)] text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <ChainLabel address={addr} current={i === 0} />
+            </button>
+          ))}
+        </span>
+      )}
       {searchSet && (
         <span className="inline-flex min-w-0 items-center gap-1 h-8 pointer-coarse:h-11 max-[700px]:h-11 max-[700px]:flex-1 pl-3 pr-1 rounded-btn border border-border/70 bg-[var(--panel-plate)] text-body text-foreground-dim">
           <span className="min-w-0 truncate tabular-nums">

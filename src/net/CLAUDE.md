@@ -44,5 +44,14 @@ home** that turns that into answers, and its test is the specification:
 
 When the live directory lists an id the catalog lacks, the Engine warns once in dev. If that id
 is an existing network re-registered: move the old id into `formerIds`, set the new `id`, and
-re-key `data/brand-hues.json`. ⚠️ Not yet lineage-aware: the anchor log's history paging under a
-committed filter pages the CURRENT chain only, so it stops at that chain's genesis.
+re-key `data/brand-hues.json`.
+
+**The raw anchor log pages every chain of the lineage** (`components/datasection/AnchorLogTable.tsx`,
+2026-10-02). Ordinals are PER CHAIN — a re-registered network starts again at 1 — so the chains are
+never spliced into one list: under a committed filter with former addresses the toolbar carries a
+chain picker ("Current chain · from …" / "Earlier chain · from …") and the table pages ONE address
+at a time (`histAddr`). The search crosses chains by itself where the criterion can say which
+chain: a DATE picks the chain whose genesis precedes it, a GLOBAL snapshot the chain whose address
+anchored into it. A metagraph ORDINAL cannot (both chains have a #2), so it searches the chain on
+screen. ⚠️ A chain switch re-reads the tip, and a pending seek must wait for it (`walkReady`) —
+run against the previous chain's `latest` it pages to the wrong place.
