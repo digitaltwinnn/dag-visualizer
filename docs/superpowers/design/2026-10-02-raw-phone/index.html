@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Raw snapshot page on phone — options</title>
+<style>
+:root{--bg:oklch(0.09 0.02 265);--fg:oklch(0.94 0.02 255);--dim:#c7d0ea;--muted:oklch(0.66 0.04 265);--primary:oklch(0.88 0.13 195);
+--border:rgba(90,140,255,.22);--panel:rgba(12,16,32,.96);--plate:rgba(255,255,255,.04);--wash:color-mix(in oklch,var(--primary) 8%,transparent);--wash2:color-mix(in oklch,var(--primary) 16%,transparent);
+--sel-bg:color-mix(in oklch,var(--primary) 12%,transparent);--sel-border:color-mix(in oklch,var(--primary) 52%,transparent);
+--label:12px;--body:14px;--title:16px;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;--or:oklch(0.74 0.19 41);--bl:oklch(0.72 0.16 255);--gr:oklch(0.80 0.15 165)}
+*{box-sizing:border-box}html{color-scheme:dark}
+body{margin:0;background:radial-gradient(1200px 600px at 60% 0%,#0b1230 0%,var(--bg) 60%);color:var(--fg);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:32px 40px 96px}
+h1{font-size:24px;font-weight:600;margin:0 0 6px}h2{font-size:18px;font-weight:600;margin:52px 0 4px;display:flex;gap:10px;align-items:baseline}h2 b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;font-size:12.6px}
+p.lede{color:var(--dim);max-width:86ch;margin:0 0 6px}.note{color:var(--muted);font-size:12.6px;max-width:88ch;margin:4px 0}
+.row{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start;margin-top:14px}.cap{font-size:12.6px;color:var(--muted);margin:0 2px 8px;text-align:center}
+.pc{font-size:12.6px;color:var(--dim);max-width:360px;display:flex;flex-direction:column;gap:10px;align-self:center}.pc b{color:var(--fg)}
+.rec{border:1px solid var(--sel-border);background:var(--sel-bg);border-radius:8px;padding:10px 14px;font-size:12.6px;margin-top:28px;max-width:92ch}.rec b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;font-size:11.6px;margin-right:8px}.rec.q{border-color:var(--border);background:transparent}
+/* phone frame */
+.ph{width:300px;height:600px;border:1px solid var(--border);border-radius:26px;background:#04060f;padding:8px;position:relative;overflow:hidden;font-size:var(--body)}
+.bar{height:36px;border:1px solid var(--border);border-radius:11px;background:rgba(12,16,32,.9);display:flex;align-items:center;gap:8px;padding:0 10px;font-size:var(--label);color:var(--muted)}.bar i{width:7px;height:7px;border-radius:50%;background:var(--primary)}.bar .on{margin-left:auto;border:1px solid var(--sel-border);background:var(--sel-bg);border-radius:7px;padding:3px 7px;color:var(--fg)}
+.pane{position:absolute;left:8px;right:8px;top:52px;bottom:30px;border:1px solid var(--border);border-radius:14px;background:var(--panel);padding:10px 12px;display:flex;flex-direction:column;overflow:hidden}
+.ft{position:absolute;left:0;right:0;bottom:6px;text-align:center;font-size:10.5px;color:var(--muted)}
+.tool{display:flex;align-items:center;gap:8px;margin-bottom:8px}.tool .t{font-size:var(--title);font-weight:600}.tool .sp{flex:1}
+.btn{border:1px solid var(--border);border-radius:9px;padding:6px 10px;font-size:var(--label);color:var(--primary);background:var(--plate);white-space:nowrap}.x{color:var(--muted);font-size:16px;padding:0 4px}
+.th{display:grid;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:6px 4px;border-bottom:1px solid var(--border)}
+.tr{display:grid;align-items:center;padding:7px 4px;border-bottom:1px solid rgba(90,140,255,.1);font-size:var(--label)}.tr.sel{background:color-mix(in oklch,var(--or) 14%,transparent)}
+.c4{grid-template-columns:62px 1fr 78px 34px}.m{font-family:var(--mono)}.r{text-align:right}.d{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px}.mu{color:var(--muted)}
+.pg{display:flex;justify-content:space-between;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:7px 2px}
+.hair{border-top:1px solid var(--border);margin:6px 0}
+.eye{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}.ttl{font:600 var(--title) var(--mono);display:flex;align-items:center;gap:8px}
+.chip{border:1px solid var(--border);border-radius:4px;padding:1px 5px;font:600 var(--label) system-ui;color:var(--or);background:var(--wash)}
+.fact{display:flex;justify-content:space-between;font-size:var(--label);margin:3px 0}.fact span:first-child{color:var(--muted)}
+.tabs{display:flex;gap:14px;border-bottom:1px solid var(--border);margin:8px 0 6px;font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}.tabs span{padding:5px 1px}.tabs .on{color:var(--fg);box-shadow:inset 0 -2px 0 var(--primary)}
+.json{font:11px/1.5 var(--mono);color:var(--dim);background:var(--plate);border-radius:8px;padding:8px;flex:1;overflow:hidden}
+.back{display:flex;align-items:center;gap:6px;color:var(--primary);font-size:var(--label);margin-bottom:8px}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:rgba(14,19,38,.98);border-top:1px solid var(--border);border-radius:16px 16px 0 0;padding:6px 12px 10px;box-shadow:0 -10px 30px rgba(0,0,0,.5)}.grab{width:34px;height:4px;border-radius:2px;background:var(--border);margin:2px auto 8px}
+.two .tr{grid-template-columns:1fr auto;row-gap:1px}.two .l2{grid-column:1/-1;color:var(--muted);font-size:10.5px}
+.acc{background:var(--plate);border-radius:8px;margin:2px 0 6px;padding:8px}
+</style></head><body>
+<h1>The raw snapshot page on phone</h1>
+<p class="lede">Today the phone squeezes the desktop's two columns into one panel: the list on top, the selected snapshot's detail underneath, each with its own scroll. You see seven rows and half a detail pane, and neither has room. The search already opens as a bottom sheet, which works. Four ways to give the list and the detail a full screen each, and one option for the rows.</p>
+<p class="note">Frames are a 300×600 phone. Content is illustrative. Nothing here is built; A is today.</p>
+<div id="out"></div>
+<div class="rec"><b>Recommend</b> C, with the two-line rows from E. The detail becomes a bottom sheet over the full-height list, which is the gesture the rest of the phone app already uses (Explore, Vitals, Details), so there is nothing new to learn, the selected row stays visible behind the sheet, and swiping down returns to the list. B is the standard mobile pattern and the simplest to build, but it hides the list while you read a snapshot. D keeps everything in one scroll but makes long payloads push the list far away.</div>
+<div class="rec q"><b>Your call</b> (a) Which layout. (b) Whether the rows go to two lines (E), which brings fee and size back on phone. (c) Whether the panel gets a title ("Snapshots · 246") in the empty space left of the Search button.</div>
+<script>
+const rows=[['DOR',28649958],['DOR',28649957],['DOR',28649956],['DED',2555412],['DOR',28649955],['BIOFI',2757],['DOR',28649954],['UP',1120890],['DOR',28649953],['DED',2555411],['DOR',28649952],['DOR',28649951]];
+const hue=n=>n==='DOR'||n==='UP'?'var(--or)':n==='BIOFI'?'var(--gr)':'var(--bl)';
+const head=`<div class="th c4"><span>Network</span><span>Snapshot</span><span class="r">Global</span><span class="r">Age</span></div>`;
+const tr=(r,sel)=>`<div class="tr c4 ${sel?'sel':''}"><span><i class="d" style="background:${hue(r[0])}"></i>${r[0]}</span><span class="m">${r[1].toLocaleString()}</span><span class="m r">6,990,611</span><span class="r mu">10s</span></div>`;
+const list=(n,sel=0)=>head+rows.slice(0,n).map((r,i)=>tr(r,i===sel)).join('');
+const pager=`<div class="pg"><span>1–25 of 246 · recent</span><span>« ‹ 1 / 10 › »</span></div>`;
+const tool=(title)=>`<div class="tool">${title?`<span class="t">Snapshots</span><span class="mu" style="font-size:12px">246</span>`:''}<span class="sp"></span><span class="btn">⌕ Search</span><span class="x">×</span></div>`;
+const detail=(full)=>`<div class="eye">Metagraph snapshot</div><div class="ttl"><i class="d" style="background:var(--or);margin:0"></i>28,649,958 <span class="chip">DOR</span></div>
+ <div style="height:6px"></div><div class="fact"><span>Timestamp</span><span>Oct 2 · 18:42:10 UTC</span></div><div class="fact"><span>Fee</span><span>0.0070 DAG</span></div><div class="fact"><span>Size</span><span>3.8 KB compressed</span></div>${full?`<div class="fact"><span>Height · sub</span><span>16,588 · 15,790</span></div>`:''}
+ <div class="tabs"><span class="on">State</span><span>Data</span><span>Signers</span></div><div class="fact"><span class="m" style="color:var(--fg)">› updates</span><span>1</span></div>${full?`<div class="eye" style="margin:8px 0 4px">Raw JSON</div><div class="json">{<br>&nbsp;"updates": [<br>&nbsp;&nbsp;{ "deviceId": "…", "ts": 1790966 }<br>&nbsp;]<br>}</div>`:''}`;
+const frame=(inner)=>`<div class="ph"><div class="bar"><i></i>All<span class="on">▦</span></div><div class="pane">${inner}</div><div class="ft">About · Design · Source code</div></div>`;
+const V={
+ A:()=>[['Today',frame(tool()+list(5)+pager+`<div class="hair"></div>`+detail(false))]],
+ B:()=>[['The list',frame(tool(1)+list(11)+pager)],['Tap a row → its own page',frame(`<div class="back">‹ Snapshots</div>`+detail(true))]],
+ C:()=>[['The list, full height',frame(tool(1)+list(11)+pager)],['Tap a row → a sheet rises over it',frame(tool(1)+list(4)+`<div class="sheet"><div class="grab"></div>${detail(true)}</div>`.replace('class="sheet"','class="sheet" style="top:150px"'))]],
+ D:()=>[['Tap a row → it opens in place',frame(tool(1)+head+tr(rows[0],true)+`<div class="acc">${detail(false)}</div>`+rows.slice(1,7).map(r=>tr(r)).join('')+pager)]],
+ E:()=>[['Two-line rows (works with any layout)',frame(tool(1)+`<div class="two">${rows.slice(0,8).map((r,i)=>`<div class="tr ${i===0?'sel':''}"><span><i class="d" style="background:${hue(r[0])}"></i>${r[0]} <span class="m" style="margin-left:6px">${r[1].toLocaleString()}</span></span><span class="mu">10s</span><span class="l2">into 6,990,611 · 0.0070 DAG · 3.8 KB</span></div>`).join('')}</div>`+pager)]]
+};
+const T={
+ A:['A','Today: list and detail share one panel','Seven rows, then the pager, then the detail in the lower half with a scroll of its own.',['Both visible at once.'],['Neither has room: seven rows of a 246-row log, and a payload read through a 250px window.','Two scrolling areas stacked on one screen.']],
+ B:['B','List, then a page per snapshot','The list takes the whole panel. A tap opens the snapshot as its own page with a "‹ Snapshots" row to go back.',['The standard phone pattern; each view has the full height and one scroll.','Room for the full facts and the raw JSON.'],['The list is hidden while you read; comparing two snapshots means going back and forth.','A second "back" besides the panel\'s own close.']],
+ C:['C','List, with the detail as a bottom sheet','The list takes the whole panel. A tap raises the snapshot as a sheet you can drag taller or flick away, exactly like the Explore and Details sheets.',['One gesture language across the phone app.','The selected row stays visible above the sheet, so you keep your place.','Flick down and you are back in the list at the same scroll position.'],['A sheet inside a panel: needs care so it does not feel like a third layer.','Reuses the dock sheet\'s drag logic, which is the more involved build.']],
+ D:['D','The row opens in place','A tap expands the row into its facts and tabs, pushing the rows below down.',['One scroll, no navigation at all.','Good for a quick look at fee, size and schema.'],['A long payload pushes the rest of the list a long way down.','The raw JSON has no good home inside a row.']],
+ E:['E','Two-line rows','Network and snapshot on the first line with the age on the right; the global snapshot, fee and size on a muted second line.',['Brings fee and size back on phone, which the four-column table had to drop.','No column squeeze: nothing can be cut off at the edge again.'],['About 40% fewer rows per screen.','Sorting by tapping a column header goes away; it would move into a small sort control.']]
+};
+document.getElementById('out').innerHTML=Object.keys(V).map(k=>`<h2><b>${T[k][0]}</b>${T[k][1]}</h2><p class="lede">${T[k][2]}</p><div class="row">${V[k]().map(f=>`<div><div class="cap">${f[0]}</div>${f[1]}</div>`).join('')}<div class="pc"><div><b>For</b> ${T[k][3].join(' ')}</div><div><b>Against</b> ${T[k][4].join(' ')}</div></div></div>`).join('');
+</script></body></html>
