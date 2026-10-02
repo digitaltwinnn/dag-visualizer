@@ -108,6 +108,7 @@ export default function TrendChart({
   stack,
   note,
   syncId = "trends",
+  compact = false,
   className,
   headClassName,
   headAction,
@@ -245,6 +246,11 @@ export default function TrendChart({
    *  the document re-render five hidden plots. The default is the document's own value, so nothing
    *  there changes; the stack passes its own. */
   syncId?: string;
+  /** THE REDUCED REGISTER (design review 2026-10-02): a History plane projected at ≤0.92× scale
+   *  renders its 11px axis at 10px and smaller — a full chart nobody can read. Compact keeps the
+   *  name, the readout and the line, and drops the axis ticks and the peak readout; the axis
+   *  STRIP stays, so the plane's height (a domain constant, `PLANE_PX_H`) does not change. */
+  compact?: boolean;
   className?: string;
   /** Extra classes for the HEAD ROW alone (2026-09-18). The 3D trend stack's planes have no
    *  chrome of their own — the head IS each plane's header strip, the one part of a fully
@@ -520,6 +526,7 @@ export default function TrendChart({
           {(() => {
             const plot = (
               <TrendPlot
+                compact={compact}
                 syncId={syncId}
                 lines={lines}
                 buckets={buckets}
@@ -627,6 +634,7 @@ const TrendPlot = memo(function TrendPlot({
   fill,
   stack,
   plotH,
+  compact = false,
 }: {
   /** See the outer component's prop — a STRING, so it holds the memo still. */
   syncId: string;
@@ -644,6 +652,8 @@ const TrendPlot = memo(function TrendPlot({
   stack?: TrendBand[];
   /** The plot's height in CSS px (the outer `plotHeight`) — a number, so it holds the memo still. */
   plotH: number;
+  /** See the outer component's prop — a plain boolean, so it holds the memo still. */
+  compact?: boolean;
 }) {
   const n = buckets.length;
   const hue0 = lines[0]?.hue ?? "var(--primary)";
@@ -866,7 +876,7 @@ const TrendPlot = memo(function TrendPlot({
                 axisLine={false}
                 tickLine={false}
                 height={AXIS_H}
-                tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                tick={compact ? false : { fill: "var(--muted-foreground)", fontSize: 11 }}
               />
               <YAxis hide domain={[0, max]} />
               {/* Both kinds paint the full tile via the custom shape (plot + axis strip; the
@@ -1033,9 +1043,11 @@ const TrendPlot = memo(function TrendPlot({
           {/* The y scale's one number, with its ROLE said (user, 2026-09-09: a bare number
               top-left beside the head's readout top-right was two unexplained values) — it
               is the window's peak, and the baseline is 0 by construction. */}
-          <span aria-hidden className="absolute top-1 left-1.5 text-micro text-muted-foreground pointer-events-none tabular-nums">
-            peak {format(ownMax)}
-          </span>
+          {!compact && (
+            <span aria-hidden className="absolute top-1 left-1.5 text-micro text-muted-foreground pointer-events-none tabular-nums">
+              peak {format(ownMax)}
+            </span>
+          )}
     </>
   );
 });

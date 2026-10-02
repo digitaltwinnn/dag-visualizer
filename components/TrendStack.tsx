@@ -398,6 +398,12 @@ export default function TrendStack() {
         const row = rows.get(pose.id);
         if (!row) return null;
         const pair = subjectPairing(hoverFilter, pose.id, setHover, row.hue);
+        // THE REAR OF THE DECK READS AS A ROSTER, NOT A CHART (design review 2026-10-02). Depth is
+        // the pose's `z` (nearer = larger); from the fourth slot back a plane projects at ≤0.92×,
+        // where its axis text is 10px and under, so those planes drop their ticks and peak
+        // (`TrendChart`'s `compact`) and keep the name, the headline and the line. The "more" tab
+        // is not a plane and takes no part.
+        const depthRank = poses.reduce((n, q) => n + (q.z > pose.z ? 1 : 0), 0);
         return (
           <div
             key={pose.id}
@@ -482,6 +488,7 @@ export default function TrendStack() {
                 // bucket on its neighbours, which is the whole point of reading a stack at one
                 // instant, and the document's column is untouched.
                 syncId="trend-stack"
+                compact={depthRank >= 3}
                 // The unit word follows the TIER — an hourly bucket labelled "per day" would
                 // misstate every reading by a factor of 24 (the document's own rule).
                 // THE CARD NAMES ITS MEASURE, not just its unit — it can be stepped from right here,
