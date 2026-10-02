@@ -118,8 +118,8 @@ The design rules behind the table, which the tests pin but don't explain:
   of the filtered network; it is retired, because rows reset the top bar while tiles and bands kept
   it. A tick the lens has nothing in is SHOWN as that: the chamber dims, the explorer row is faint,
   and the rail's Metagraph card stands down with a hint saying so (`tickNet.ledgerCardNetwork`) —
-  the global card's ∨ then steps into the tick's own first network. The one thing that clears the
-  filter from the rail is the global snapshot card's ×, which clears everything under the tick.
+  the global card's ∨ then steps into the tick's own first network. The global snapshot card's ×
+  is no exception (same day): it releases the pin and what hangs under the tick, never the filter.
   Membership still lives in `src/data/ledgerStory.ts`.
 - **A committed ancestry rung borrows its members' glow only while it is the FINEST committed rung**
   (user, 2026-08-11). Every other rung has a 3D counterpart you could have clicked — the hub, the

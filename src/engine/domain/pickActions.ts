@@ -211,13 +211,17 @@ export function filterToggleActions(id: string, currentFilter: string): ClickAct
 // (the FollowController only auto-advances while following).
 /** CLEARING A GLOBAL SNAPSHOT — its card's × and the pinned tick's re-click, one builder (user,
  *  2026-09-29: "deleting a snapshot card will clear the rung that is there at that moment"; live
- *  stays the default). The tick is the ledger rail's PARENT: the metagraph card (the committed
- *  filter — the DAG's included, the base ledger's lens) and its metagraph snapshot hang under it,
- *  so they clear with it, finest first, and live resumes. The filter has to go too, not just the
- *  metaSnap: with a metagraph committed, live follow RE-GROWS that network's newest snapshot card
- *  on the next beat (`followLatest`'s live metagraph mode), which is how the × used to leave the
- *  children standing. Only what is there right now is cleared. */
-export function snapshotClearActions(current: { metaSnap: MetaSnapSel | null; filter: string; hasInspect?: boolean; tickNet?: TickNetSel | null }): ClickAction[] {
+ *  stays the default). The tick is the ledger rail's PARENT: the tick-local network, its metagraph
+ *  snapshot and a node under it hang from it, so they clear with it, finest first, and live
+ *  resumes. Only what is there right now is cleared.
+ *
+ *  ⚠️ NOT THE FILTER (user, 2026-10-02: "I want that changed too" — closing the last exception to
+ *  "no selection in Snapshots writes the filter"). It used to clear a committed filter here,
+ *  because with one set, live follow re-grows that network's newest snapshot card on the next
+ *  beat and the × seemed to leave the children standing. That is simply what live means under a
+ *  lens: the × releases the PIN, and the card goes back to following the filtered network's
+ *  newest tick. The filter is cleared where it is set — the top bar. */
+export function snapshotClearActions(current: { metaSnap: MetaSnapSel | null; hasInspect?: boolean; tickNet?: TickNetSel | null }): ClickAction[] {
   const out: ClickAction[] = [];
   // The NODE is the ledger ladder's finest rung (a metagraph snapshot's validator, `∨`), so a node
   // card left standing under a cleared tick would hang from nothing — and its pager, losing the
@@ -226,7 +230,6 @@ export function snapshotClearActions(current: { metaSnap: MetaSnapSel | null; fi
   if (current.metaSnap) out.push({ kind: "metaSnap", sel: null });
   // The network committed INSIDE this tick hangs under it by construction, so it goes with it.
   if (current.tickNet) out.push({ kind: "tickNet", sel: null });
-  if (current.filter !== "all") out.push({ kind: "filter", id: "all" });
   out.push({ kind: "snapshot", pick: null, follow: true });
   return out;
 }
@@ -247,9 +250,7 @@ export function snapshotSelectActions(
   // default until something is clicked — the FollowController repopulates the card chain and
   // the trail slides back to the live front).
   if (!isLiveTip && current && current.pinnedOrdinal != null && current.pinnedOrdinal === p.data.ordinal) {
-    // `filter: "all"` = leave the filter alone: a re-click is a selection gesture, and those never
-    // write the filter (below). Only the card's own × clears it, with everything under the tick.
-    return snapshotClearActions({ metaSnap: current.metaSnap, filter: "all", hasInspect: current.hasInspect, tickNet: current.tickNet });
+    return snapshotClearActions({ metaSnap: current.metaSnap, hasInspect: current.hasInspect, tickNet: current.tickNet });
   }
   const out: ClickAction[] = [];
   // ⚠️ NO SELECTION IN SNAPSHOTS WRITES THE FILTER (user, 2026-10-02: "consistent, and a filter

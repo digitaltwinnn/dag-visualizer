@@ -559,7 +559,7 @@ export default function Inspector() {
       <CardPane key="node" pick={{ kind: "geoLive" }} eyebrow="Node" onClose={() => applyClickActions([{ kind: "inspect", pick: null }])} {...cx("node")} />
     ),
     snap: snap ? (
-      <CardPane key="snap" pick={snap} eyebrow="Global snapshot" onClose={() => applyClickActions(snapshotClearActions({ metaSnap, filter, hasInspect: inspect != null, tickNet }))} {...cx("snap")} />
+      <CardPane key="snap" pick={snap} eyebrow="Global snapshot" onClose={() => applyClickActions(snapshotClearActions({ metaSnap, hasInspect: inspect != null, tickNet }))} {...cx("snap")} />
     ) : null,
     // History's committed INSTANT: a card slot with no ladder rung, so its × clears its own
     // channel and nothing cascades. It is NOT a selection write (`setTrendCursor` is deliberately

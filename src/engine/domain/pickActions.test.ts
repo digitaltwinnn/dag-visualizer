@@ -216,27 +216,23 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
   // clear the rung that is there at that moment"; live stays the default). The × used to clear the
   // tick alone, and the re-click dropped only the metaSnap — so a committed metagraph survived,
   // and with live resuming, `followLatest` re-grew its metagraph-snapshot card on the next beat.
-  it("snapshotClearActions: the tick's rungs present right now clear finest-first, then live resumes", () => {
+  it("snapshotClearActions: the tick's rungs present right now clear finest-first, then live resumes — never the filter", () => {
     const child = { metaId: "dor", ordinal: 7, hash: "", globalOrdinal: 42, ts: "T" };
-    expect(snapshotClearActions({ metaSnap: child, filter: "dor" })).toEqual([
+    const a = snapshotClearActions({ metaSnap: child });
+    expect(a).toEqual([
       { kind: "metaSnap", sel: null },
-      { kind: "filter", id: "all" },
       { kind: "snapshot", pick: null, follow: true },
     ]);
+    expect(a.some((x) => x.kind === "filter")).toBe(false);
     // A validator opened under the snapshot (∨) is the finest rung: it clears first.
-    expect(snapshotClearActions({ metaSnap: child, filter: "dor", hasInspect: true })[0]).toEqual({ kind: "inspect", pick: null });
+    expect(snapshotClearActions({ metaSnap: child, hasInspect: true })[0]).toEqual({ kind: "inspect", pick: null });
     // Only what is there: a bare tick clears alone.
-    expect(snapshotClearActions({ metaSnap: null, filter: "all" })).toEqual([{ kind: "snapshot", pick: null, follow: true }]);
-    // The DAG's card is the rung under a tick too (the base ledger's lens).
-    expect(snapshotClearActions({ metaSnap: null, filter: "dag" })).toEqual([
-      { kind: "filter", id: "all" },
-      { kind: "snapshot", pick: null, follow: true },
-    ]);
+    expect(snapshotClearActions({ metaSnap: null })).toEqual([{ kind: "snapshot", pick: null, follow: true }]);
   });
   it("the pinned tick's RE-CLICK clears what hangs under it and resumes live — and never the filter", () => {
     const p = { kind: "snapshot", title: "Global snapshot #42", data: { ordinal: 42 } } as unknown as Parameters<typeof snapshotSelectActions>[0];
     const child = { metaId: "dor", ordinal: 7, hash: "", globalOrdinal: 42, ts: "T" };
-    // A re-click is a selection gesture; only the card's own × also clears the filter.
+    // The same clear as the card's × — one toggle language.
     expect(snapshotSelectActions(p, false, { pinnedOrdinal: 42, metaSnap: child })).toEqual([
       { kind: "metaSnap", sel: null },
       { kind: "snapshot", pick: null, follow: true },
@@ -602,7 +598,7 @@ describe("the tick-local network (the ledger's Metagraph rung without the filter
   });
 
   it("clearing the tick clears the network inside it", () => {
-    expect(snapshotClearActions({ metaSnap: CHILD, filter: "all", tickNet: NET })).toEqual([
+    expect(snapshotClearActions({ metaSnap: CHILD, tickNet: NET })).toEqual([
       { kind: "metaSnap", sel: null },
       { kind: "tickNet", sel: null },
       { kind: "snapshot", pick: null, follow: true },
