@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Node card — design options</title>
+<style>
+:root{--bg:oklch(0.09 0.02 265);--fg:oklch(0.94 0.02 255);--dim:#c7d0ea;--muted:oklch(0.66 0.04 265);--primary:oklch(0.88 0.13 195);
+--border:rgba(90,140,255,.22);--panel:rgba(12,16,32,.94);--plate:rgba(255,255,255,.035);--radius:14px;--wash-faint:color-mix(in oklch,var(--primary) 6%,transparent);--wash-strong:color-mix(in oklch,var(--primary) 22%,transparent);
+--sel-bg:color-mix(in oklch,var(--primary) 12%,transparent);--sel-border:color-mix(in oklch,var(--primary) 52%,transparent);
+--label:12.6px;--body:14.9px;--title:17.1px;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+--blue:oklch(0.72 0.16 255);--orange:oklch(0.74 0.19 41);--green:oklch(0.80 0.15 165);--amber:oklch(0.80 0.15 75)}
+*{box-sizing:border-box}html{color-scheme:dark}
+body{margin:0;background:radial-gradient(1200px 600px at 60% 0%,#0b1230 0%,var(--bg) 60%);color:var(--fg);font:var(--body)/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:32px 40px 96px}
+h1{font-size:24px;font-weight:600;margin:0 0 6px}h2{font-size:18px;font-weight:600;margin:52px 0 4px;display:flex;gap:10px;align-items:baseline}h2 b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;font-size:var(--label)}
+p.lede{color:var(--dim);max-width:86ch;margin:0 0 6px}.note{color:var(--muted);font-size:var(--label);max-width:88ch;margin:4px 0}
+.row{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start;margin-top:14px}.col{width:346px}.cap{font-size:var(--label);color:var(--muted);margin:0 2px 8px}
+.pc{display:flex;gap:28px;flex-wrap:wrap;font-size:var(--label);color:var(--dim);margin-top:12px;max-width:1080px}.pc div{flex:1;min-width:260px}.pc b{color:var(--fg)}
+.rec{border:1px solid var(--sel-border);background:var(--sel-bg);border-radius:8px;padding:10px 14px;font-size:var(--label);margin-top:28px;max-width:92ch}.rec b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;font-size:11.6px;margin-right:8px}.rec.q{border-color:var(--border);background:transparent}
+.card{width:346px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px 0;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 8px 30px rgba(0,0,0,.35);position:relative;overflow:hidden}
+.x{position:absolute;right:14px;top:10px;color:var(--muted)}
+.eyebrow{font-size:var(--label);letter-spacing:.13em;text-transform:uppercase;color:var(--primary);font-weight:600;margin-bottom:4px}
+.hrow{display:flex;align-items:center;gap:10px}.ico{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--hue,var(--blue));flex:none}
+.ttl{font:600 var(--title) var(--mono)}.aside{margin-left:auto;flex:none;display:inline-flex;gap:6px;align-items:center}
+.pill{display:inline-flex;align-items:center;font-size:var(--label);padding:3px 8px;border-radius:999px;border:1px solid color-mix(in oklch,var(--green) 50%,transparent);color:var(--green)}
+.pill.w{border-color:color-mix(in oklch,var(--amber) 50%,transparent);color:var(--amber)}
+.chip{display:inline-flex;align-items:center;border:1px solid var(--border);background:var(--wash-faint);border-radius:4px;padding:2px 6px;font-size:var(--label);line-height:1.15;color:var(--muted)}
+.chip.t{color:var(--hue);font-weight:600}.chip.on{color:var(--fg)}.chip.off{opacity:.4;background:none}
+.hair{border-top:1px solid var(--border);margin:11px 0 10px}.lead{color:var(--dim);margin:0}
+.fact{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:5px 0}.fact>span:first-child{color:var(--muted);flex:none}.fact .v{text-align:right;min-width:0;display:inline-flex;gap:5px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+.e{color:var(--muted)}.m{font-family:var(--mono)}.d{display:inline-block;width:6px;height:6px;border-radius:50%}
+.sec{display:flex;justify-content:space-between;align-items:baseline;font-size:var(--label);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin:0 0 7px}.sec b{color:var(--fg);font:400 var(--body) system-ui;letter-spacing:0;text-transform:none}
+.bar{height:5px;border-radius:3px;background:var(--wash-strong);position:relative;overflow:hidden;margin:6px 0 5px}.bar i{position:absolute;right:0;top:0;bottom:0;border-radius:3px;background:var(--muted)}.bar i.g{background:var(--green)}
+.sub{font-size:var(--label);color:var(--muted)}
+.foot{margin:12px -18px 0;padding:11px 18px 10px;background:var(--plate)}.frow{display:flex;align-items:center;gap:8px;font:var(--label)/1.4 var(--mono)}.frow .l{letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}.frow .v{color:var(--dim);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.frow .c{color:var(--muted);opacity:.75}
+.pager{display:flex;align-items:center;justify-content:center;gap:6px;color:var(--muted);font-size:var(--label);padding:6px 18px 8px;margin:0 -18px;border-top:1px solid var(--border);background:var(--plate)}.pager .sp{flex:1}.pager span{min-width:20px;text-align:center}
+/* C: layer strip */
+.layers{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:2px 0 4px}.layers div{border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:var(--label);color:var(--muted)}.layers div b{display:block;color:var(--fg);font:600 var(--body) var(--mono)}.layers div.off{opacity:.4;border-style:dashed}.layers div.on{background:var(--wash-faint)}
+/* D: timeline */
+.tl{position:relative;height:26px;margin:6px 0 2px}.tl .track{position:absolute;left:0;right:0;top:9px;height:7px;border-radius:4px;background:var(--wash-strong)}.tl .kept{position:absolute;right:0;top:9px;height:7px;border-radius:4px;background:var(--muted)}.tl .kept.g{background:var(--green)}
+.tl .tick{position:absolute;top:5px;width:1px;height:15px;background:var(--fg);opacity:.7}.ends{display:flex;justify-content:space-between;font-size:11px;color:var(--muted)}
+</style></head><body>
+<h1>Node card — four ways to lay it out</h1>
+<p class="lede">The node card is the one card that is a record of a single thing, so it has no breakdown to lead with: today it is a lead sentence and five plain rows. Each option below is drawn twice, for the two kinds of node the card has to serve: a <b>DAG validator</b> with every fact filled in, and a <b>metagraph data node</b> where several facts are empty.</p>
+<p class="note">All four keep the agreed pieces: id as the title, status pill in the head, one lead sentence, the foot with the node id, the pager, one dash for an empty value. Figures are illustrative. Nothing here is built except A.</p>
+<div id="out"></div>
+<div class="rec"><b>Recommend</b> C. A node's two real questions are "what does it run" and "how much of the chain does it keep", and C answers both as pictures at the top of the card (three layer cells, one archive bar) and leaves the look-up facts as plain rows underneath. It also shows what a node does <i>not</i> run, which the chips in A and B cannot. B is the safest change if you only want the card tidier. D makes the archive the hero, which over-serves one fact on cards where it is empty.</div>
+<div class="rec q"><b>Your call</b> (a) Which layout. (b) Whether an empty row stays as a dash (as agreed for every card) or is left out on this card, since a data node can have three dashes in a row. (c) Whether "Delegated staking" stays a row or becomes a chip beside the status pill.</div>
+
+<script>
+const N={
+ full:{cap:'A DAG validator, everything measured',hue:'var(--blue)',id:'6f74b50…0314',st:'ready',lead:'Helsinki, Finland · Hetzner Online GmbH.',alias:'BlueFarm',staked:true,layers:[1,1,0],comp:'Hybrid',asn:'AS24940',colo:[['DOR','var(--orange)']],arch:{v:'7 months',f:.15,note:'1.0M of 7.0M snapshots'},nid:'6f74b50a9a44…35400314',pg:'61 / 110'},
+ bare:{cap:'A metagraph data node, several facts empty',hue:'var(--orange)',id:'1545a38…ba24',st:'observing',warn:1,lead:'Boardman, United States · Amazon.com, Inc.',alias:null,staked:null,layers:[0,0,1],comp:'Data',asn:'AS16509',colo:[],arch:null,nid:'1545a38af9b71e1f…5dba24',pg:'4 / 15'}
+};
+const dash='<span class="e">—</span>';
+const head=n=>`<span class="x">×</span><div class="eyebrow">Node</div><div class="hrow"><span class="ico" style="--hue:${n.hue}"></span><div class="ttl">${n.id}</div><span class="aside">__ASIDE__<span class="pill ${n.warn?'w':''}">${n.st}</span></span></div><div class="hair"></div>`;
+const foot=n=>`<div class="foot"><div class="frow"><span class="l">Node id</span><span class="v">${n.nid}</span><span class="c">⧉</span></div></div><div class="pager"><span>‹</span>${n.pg}<span>›</span><span class="sp"></span><span>⌃</span><span>⌄</span></div>`;
+const fact=(l,v)=>`<div class="fact"><span>${l}</span><span class="v">${v}</span></div>`;
+const chips=n=>['L0','cL1','dL1'].filter((_,i)=>n.layers[i]).map(c=>`<span class="chip on">${c}</span>`).join('');
+const colo=n=>n.colo.length?n.colo.map(c=>`<span class="d" style="background:${c[1]}"></span>${c[0]}`).join(' '):dash;
+const bar=(a,g)=>`<div class="bar"><i class="${g?'g':''}" style="width:${a.f*100}%"></i></div><div class="sub">${a.note}</div>`;
+const V={
+ A:n=>head(n).replace('__ASIDE__','')+`<p class="lead">${n.lead}</p><div style="height:8px"></div>`
+   +fact('Alias',n.alias??dash)+(n.staked!=null?fact('Delegated staking',n.staked?'✓ Yes':'No'):'')+fact('Composition',`${n.comp} ${chips(n)}`)+fact('ASN',`<span class="m">${n.asn}</span>`)+fact('Co-located',colo(n))
+   +(n.arch?fact('Archive',n.arch.v)+bar(n.arch):fact('Archive',dash))+foot(n),
+ B:n=>head(n).replace('__ASIDE__','')+`<p class="lead">${n.lead}</p><div class="hair"></div>`
+   +`<div class="sec"><span>Runs</span></div>`+fact('Layers',`${n.comp} ${chips(n)}`)+fact('Also on',colo(n))
+   +`<div class="hair"></div><div class="sec"><span>Operator</span></div>`+fact('Alias',n.alias??dash)+fact('Delegated staking',n.staked==null?dash:n.staked?'Yes':'No')+fact('ASN',`<span class="m">${n.asn}</span>`)
+   +`<div class="hair"></div><div class="sec"><span>Archive</span><b>${n.arch?n.arch.v:'—'}</b></div>`+(n.arch?bar(n.arch):'')+foot(n),
+ C:n=>head(n).replace('__ASIDE__',n.staked?'<span class="chip">staked</span>':'')+`<p class="lead">${n.lead}</p><div class="hair"></div>`
+   +`<div class="sec"><span>Runs</span><b>${n.comp}</b></div><div class="layers">${[['L0','seals snapshots'],['cL1','currency'],['dL1','data']].map((l,i)=>`<div class="${n.layers[i]?'on':'off'}"><b>${l[0]}</b>${l[1]}</div>`).join('')}</div>`
+   +`<div class="hair"></div><div class="sec"><span>Archive</span><b>${n.arch?n.arch.v:'—'}</b></div>`+(n.arch?bar(n.arch):`<div class="sub">Only an L0 keeps a snapshot archive.</div>`)
+   +`<div class="hair"></div>`+fact('Alias',n.alias??dash)+fact('ASN',`<span class="m">${n.asn}</span>`)+fact('Co-located',colo(n))+foot(n),
+ D:n=>head(n).replace('__ASIDE__',chips(n))+`<p class="lead">${n.lead}</p><div class="hair"></div>`
+   +`<div class="sec"><span>Keeps</span><b>${n.arch?n.arch.v:'—'}</b></div>`
+   +(n.arch?`<div class="tl"><span class="track"></span><span class="kept" style="width:${n.arch.f*100}%"></span><span class="tick" style="left:${(1-n.arch.f)*100}%"></span></div><div class="ends"><span>first snapshot</span><span>${n.arch.note}</span><span>now</span></div>`:`<div class="tl"><span class="track" style="opacity:.4"></span></div><div class="ends"><span>first snapshot</span><span>no archive on this node</span><span>now</span></div>`)
+   +`<div class="hair"></div>`+fact('Alias',n.alias??dash)+fact('Delegated staking',n.staked==null?dash:n.staked?'Yes':'No')+fact('ASN',`<span class="m">${n.asn}</span>`)+fact('Co-located',colo(n))+foot(n)
+};
+const T={
+ A:['A','As built today','Lead, then plain rows in reading order (who, role, host, service), the archive last with its bar.',['Nothing to learn; it is the fact grammar every card uses.','Shortest when most facts are present.'],['Six rows of equal weight: nothing says which facts matter.','On a sparse node it is mostly dashes.']],
+ B:['B','Three labelled groups','The same facts, grouped under caps labels: what it runs, who operates it, what it keeps. The archive value moves onto its label, like every breakdown total.',['The card gets the same section rhythm as the metagraph and snapshot cards.','Related facts sit together (alias, staking and ASN are all about the operator).'],['Three labels and two more hairlines for six facts: the tallest option.','Groups of two rows can feel like over-filing.']],
+ C:['C','What it runs, drawn','The three layers as three cells, lit when the node runs them, so "Hybrid" is a picture and you also see what it does not run. Archive as its own section. Staking becomes a chip in the head. The look-up facts stay plain rows.',['Answers the two real questions at a glance, on every node.','A data node and a validator look visibly different, not just differently worded.','Shows absence (no L0) without a dash or a sentence.'],['The layer cells repeat the chips in the Composition card above, when that card is open.','A new element on the rail, used on one card only.']],
+ D:['D','The archive as a timeline','The chain as a line from its first snapshot to now, with the part this node keeps filled and its start marked. Layer chips move into the head beside the status.',['The archive reads as a place in time, not just a share.','Compact head: role and health together.'],['Leads with the one fact that is empty for most metagraph nodes.','Three chips plus a pill crowd the head on a hybrid.']]
+};
+document.getElementById('out').innerHTML=Object.keys(V).map(k=>`<h2><b>${T[k][0]}</b>${T[k][1]}</h2><p class="lede">${T[k][2]}</p><div class="row">${['full','bare'].map(s=>`<div class="col"><div class="cap">${N[s].cap}</div><div class="card">${V[k](N[s])}</div></div>`).join('')}</div><div class="pc"><div><b>For</b> ${T[k][3].join(' ')}</div><div><b>Against</b> ${T[k][4].join(' ')}</div></div>`).join('');
+</script></body></html>
