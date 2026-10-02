@@ -5,6 +5,7 @@ import { ChevronRight } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
+import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 import { UNLISTED_ID } from "@/src/data/unlisted";
 import { metagraphById } from "@/src/data/network";
 import { identityHudCss } from "@/src/palette/identity";
@@ -35,7 +36,9 @@ export default function AnchoredTags({
   anchored: number | null;
   awaiting?: boolean;
 }) {
-  const filter = useStore((s) => s.filter);
+  // The highlighted row is the network the chamber resolves against: the one picked INSIDE this
+  // tick, else the filter (`ledgerNetwork`).
+  const filter = useStore((s) => ledgerNetwork({ filter: s.filter, tickNet: s.tickNet, snapOrdinal: ordinal }));
   const exact = useStore((s) => s.snapshotExact[ordinal]);
   const cfg = metagraphById(filter);
   const focusId = cfg?.id ?? null;

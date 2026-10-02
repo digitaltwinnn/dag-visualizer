@@ -552,6 +552,7 @@ export class Engine {
       layers: this.layers,
       get mode() { return engineSelf.mode; },
       get filter() { return engineSelf.filter; },
+      get ledgerNet() { return engineSelf._ledgerNet(); },
       transitionActive: () => this.transition.active(),
       flyingNow: () => useStore.getState().cameraFlying,
       sameSubjectFlight: () => this._sameSubjectFlight,
