@@ -20,9 +20,9 @@ import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICO
 import { ChevronRight, ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
 import { useArchive, archiveFactState, archiveReach, archiveSchedule, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
-import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
+import { useNodeNames, nodeName } from "@/components/useNodeNames";
 import { POLL } from "@/src/engine/config";
-import { cap, Desc, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark, ScheduleTable, partShade, Lead, Empty, QualifierChip, TickerChip, LayerCells, Door, SectionLabel, shareWords, type SchedulePart } from "./parts";
+import { cap, Desc, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, ScheduleTable, partShade, Lead, Empty, QualifierChip, TickerChip, LayerCells, Door, SectionLabel, shareWords, type SchedulePart } from "./parts";
 import { statusItems } from "@/src/data/nodeStatus";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { pickNetId } from "@/src/engine/domain/pickActions";
@@ -772,16 +772,10 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // keys on a PEER ID, so the name names a keypair — and a host that reuses one keypair
   // across networks (the Upsider pattern) carries it on its metagraph record too, which is
   // why the match runs for every node kind (user, 2026-08-16: "keep it actual"). The row is
-  // ALWAYS stated, "not known" when nothing resolves. The registry's other reading, the
-  // delegated-staking OPT-IN, is the ROW RIGHT UNDER IT (user, 2026-09-11: "alias and
-  // delegated staking are directly related, no?" — both are the one registry's readings, the
-  // alias IS its display name, and adjacency is this grammar's relation device; supersedes
-  // the 2026-08-16 service-block placement): Yes/No for DAG validators only — only a Global
-  // L0 validator can register (measured: 31 of 147 live validators haven't).
-  const isDagValidator = p.kind === "l0" || p.kind === "l1";
+  // ALWAYS stated, a dash when nothing resolves. (The registry's other reading — the
+  // delegated-staking opt-in — had a row under it until 2026-10-02; see the note in the body.)
   const nickState = useNodeNames();
   const nickname = nodeName(nickState.names, p.node);
-  const registered = nodeRegistered(nickState.names, p.node);
   // The three ancestor rungs that can own one of this card's facts.
   const country = useStore((s) => s.country);
   const cohort = useStore((s) => s.cohort);
@@ -919,33 +913,10 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
             <Empty why="The delegated-staking registry could not be read — retried on the next visit." />
           ))}
         </Fact>
-        {/* DELEGATED STAKING — the registry's opt-in reading, DIRECTLY under the Alias it
-            shares a registry with (user, 2026-09-11 — see the note above; the adjacency IS
-            the relation statement): whether this validator registered as a candidate DAG
-            holders can delegate to. Validators only — the question doesn't apply to a
-            metagraph machine (the archive row's n/a lesson, taken one further: no row at
-            all). */}
-        {isDagValidator && (
-          <Fact label="Delegated staking">
-            {!nickState.settled ? (
-              <NodeStars count={3} />
-            ) : nickState.names ? (
-              <span
-                className="inline-flex items-center gap-1.5"
-                title={
-                  registered
-                    ? "Registered as a delegated-staking candidate in the Global L0 registry — DAG holders can delegate stake to this L0 validator."
-                    : "Whitelisted to validate but not registered as a delegated-staking candidate — separate, independent gates, which is why a live L0 validator can lack an entry."
-                }
-              >
-                <BoolMark on={registered} />
-                {registered ? "Yes" : "No"}
-              </span>
-            ) : (
-              <Empty why="The delegated-staking registry could not be read — retried on the next visit." />
-            )}
-          </Fact>
-        )}
+        {/* The "Delegated staking · Yes/No" row is REMOVED for now (user, 2026-10-02: "what does it
+            represent? Remove it for now"). It read the Global L0 registry's opt-in — whether the
+            operator REGISTERED as a candidate DAG holders can delegate to — and "Yes" was too easy
+            to read as "has stake delegated", which the data does not say. */}
         {/* The provider's NUMBER — its name is in the lead, or is the provider card's title. */}
         {asn && <Fact label="ASN"><span className="font-mono">{asn}</span></Fact>}
         {/* CO-LOCATED — the machine's other tenant networks (see the note above). Each name
