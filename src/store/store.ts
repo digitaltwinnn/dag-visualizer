@@ -1,5 +1,6 @@
+import { sameTickNet } from "@/src/engine/domain/tickNet";
 import { create } from "zustand";
-import type { GlobalSnapshot, LeaderboardData, MetaInfo, NodeRow, PickDescriptor, SnapshotExact, MetaSnapSel, ChannelSnapDeep } from "@/src/data/types";
+import type { GlobalSnapshot, LeaderboardData, MetaInfo, NodeRow, PickDescriptor, SnapshotExact, MetaSnapSel, TickNetSel, ChannelSnapDeep } from "@/src/data/types";
 import { metaSnapDeepKey } from "@/src/data/types";
 import type { HoverSubject } from "@/src/data/hoverSubject";
 // Type-only — the store may not import domain VALUES (layerBoundaries rule), but a type-only
@@ -107,6 +108,11 @@ interface AppState {
   // The selected METAGRAPH SNAPSHOT (a tile on the ledger's upper floor). LEDGER-SCOPED like
   // `snap`: Engine.setMode clears it on the way out of the view. A selStack slot like `snap`.
   metaSnap: MetaSnapSel | null;
+  // THE NETWORK INSIDE THE PINNED TICK (2026-10-02) — the ledger's Metagraph rung as a commit of
+  // its own, NOT the app filter (`domain/tickNet.ts`). Ledger-scoped like `snap`, and it carries
+  // its tick, so `ledgerNetwork` only honours it while that tick is on screen. It rides the
+  // "network" selStack slot — the same card slot a committed filter fills.
+  tickNet: TickNetSel | null;
   selStack: SelSlot[];
   // Ordinal of the snapshot the cursor is hovering in the LiveStrip bar-chart (transient highlight —
   // the ledger re-colours that snapshot's tiles). null = not hovering.
@@ -414,6 +420,7 @@ interface AppState {
   setSnap: (snap: Extract<PickDescriptor, { kind: "snapshot" }> | null) => void;
   advanceSnap: (snap: Extract<PickDescriptor, { kind: "snapshot" }> | null) => void;
   setMetaSnap: (sel: MetaSnapSel | null) => void;
+  setTickNet: (sel: TickNetSel | null) => void;
   /** The follow system's heartbeat advance for the metagraph-snapshot card — non-bumping, like
    *  advanceSnap: a live tick is never a "new selection" (the card recency/collapse order holds). */
   advanceMetaSnap: (sel: MetaSnapSel | null) => void;
@@ -506,6 +513,7 @@ export const useStore = create<AppState>((set) => ({
   inspect: null,
   snap: null,
   metaSnap: null,
+  tickNet: null,
   selStack: [],
   hoverSnapOrd: null,
   hoverMetaSnap: null,
@@ -596,7 +604,7 @@ export const useStore = create<AppState>((set) => ({
   // Committing a network IS a user gesture (user, 2026-08-14 — changing the filter or paging
   // the dossier left the snapshot card as the box): it bumps the recency stack like every
   // other selection, so the facts rail focuses the metagraph card. "all" clears the entry.
-  setFilter: (filter) => set((s) => ({ filter, selStack: bumpStack(s.selStack, "network", filter !== "all") })),
+  setFilter: (filter) => set((s) => ({ filter, selStack: bumpStack(s.selStack, "network", filter !== "all" || !!s.tickNet) })),
   setMetaList: (metaList) => set({ metaList }),
   setInspect: (inspect) => set((s) => ({ inspect, selStack: bumpStack(s.selStack, "node", !!inspect) })),
   setSnap: (snap) => set((s) => ({ snap, selStack: bumpStack(s.selStack, "snap", !!snap) })),
@@ -619,6 +627,15 @@ export const useStore = create<AppState>((set) => ({
           : [...s.selStack, "snap"],
     })),
   setMetaSnap: (metaSnap) => set((s) => ({ metaSnap, selStack: bumpStack(s.selStack, "metaSnap", !!metaSnap) })),
+  // A NO-OP WRITE IS A NO-OP REFERENCE: the Engine's subscription re-resolves the chamber's lens
+  // and the camera on a change, so re-committing the same network in the same tick (a tile under
+  // an already-open network) must not hand it a fresh object.
+  setTickNet: (tickNet) =>
+    set((s) =>
+      sameTickNet(s.tickNet, tickNet)
+        ? s
+        : { tickNet, selStack: bumpStack(s.selStack, "network", !!tickNet || s.filter !== "all") },
+    ),
   advanceMetaSnap: (metaSnap) =>
     set((s) => ({
       metaSnap,

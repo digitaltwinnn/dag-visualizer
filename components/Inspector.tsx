@@ -341,6 +341,7 @@ export default function Inspector() {
   const inspect = useStore((s) => s.inspect);
   const snap = useStore((s) => s.snap);
   const metaSnap = useStore((s) => s.metaSnap);
+  const tickNet = useStore((s) => s.tickNet);
   const country = useStore((s) => s.country);
   const cohort = useStore((s) => s.cohort);
   const composition = useStore((s) => s.composition);
@@ -369,7 +370,7 @@ export default function Inspector() {
   const coarse = usePointerCoarse();
   const trendCursorMs = useStore((s) => s.trendCursorMs);
   const manifest = detailsCards({
-    mode, filter, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs,
+    mode, filter, tickNet, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs,
     selNodesCount: selNodes.length,
     filterLabel: displayNetwork(filter)?.ticker ?? null, // one lookup — catalog + the unlisted pseudo-network
   });
@@ -556,7 +557,7 @@ export default function Inspector() {
       <CardPane key="node" pick={{ kind: "geoLive" }} eyebrow="Node" onClose={() => applyClickActions([{ kind: "inspect", pick: null }])} {...cx("node")} />
     ),
     snap: snap ? (
-      <CardPane key="snap" pick={snap} eyebrow="Global snapshot" onClose={() => applyClickActions(snapshotClearActions({ metaSnap, filter, hasInspect: inspect != null }))} {...cx("snap")} />
+      <CardPane key="snap" pick={snap} eyebrow="Global snapshot" onClose={() => applyClickActions(snapshotClearActions({ metaSnap, filter, hasInspect: inspect != null, tickNet }))} {...cx("snap")} />
     ) : null,
     // History's committed INSTANT: a card slot with no ladder rung, so its × clears its own
     // channel and nothing cascades. It is NOT a selection write (`setTrendCursor` is deliberately

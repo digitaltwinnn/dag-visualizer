@@ -5,6 +5,7 @@ import {
   compositionToggleActions,
   countryToggleActions,
   metaSnapSelectActions,
+  tickNetSelectActions,
   filterToggleActions,
   nodeSelectActions,
   snapshotSelectActions,
@@ -64,6 +65,7 @@ const tick = (ordinal: number, live = false) => ({
 const base = (over: Partial<SiblingState>): SiblingState => ({
   mode: "geo",
   filter: "all",
+  tickNet: null,
   country: null,
   cohort: null,
   composition: null,
@@ -382,9 +384,13 @@ describe("childStep — the first-child DOWN step", () => {
   // ⚠️ THE TICK'S CHILD IS A NETWORK (user, 2026-09-15 — the lane runs tick → metagraph →
   // metagraph snapshot → node). Under the old lane ∨ skipped the dossier and landed two levels
   // down, dragging the filter along as a SIDE EFFECT of opening a snapshot, which is what made
-  // "go finer" read as "and also filter". Here the filter IS the step, one level, and the tick
-  // card already offers exactly this list.
-  it("the global tick opens the network that anchored most into it", () => {
+  // "go finer" read as "and also filter". The step is one level, and the tick card already
+  // offers exactly this list.
+  // ⚠️ AND IT IS NOT THE FILTER (user, 2026-10-02, reversing 2026-09-15's "the filter IS the step"):
+  // "it correctly filters out the related metagraphs but it should not actually set the metagraph
+  // as the global application filter". The step commits the network INSIDE the tick — the pin
+  // holds, the chamber dims the same, the top bar is never written.
+  it("the global tick opens the network that anchored most into it — inside the tick, never the filter", () => {
     const rows = [
       { metaId: "dor", ordinal: 900, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
       { metaId: "dor", ordinal: 901, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
@@ -393,7 +399,26 @@ describe("childStep — the first-child DOWN step", () => {
     const s = base({ mode: "ledger", snap: snapPick, exactRows: rows });
     const step = childStep("snap", s)!;
     expect(step.key).toBe("dor");
-    expect(step.actions).toEqual(filterToggleActions("dor", "all"));
+    expect(step.actions).toEqual(tickNetSelectActions("dor", snapPick, { metaSnap: null }));
+    expect(step.actions.some((a) => a.kind === "filter")).toBe(false);
+    // The tick stays PINNED through the step (it used to re-enter live: a filter commit does).
+    expect(step.actions).toContainEqual({ kind: "snapshot", pick: snapPick, follow: false });
+  });
+
+  it("a network already committed inside the tick is what the Metagraph card steps — again never the filter", () => {
+    const rows = [
+      { metaId: "dor", ordinal: 900, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
+      { metaId: "ded", ordinal: 500, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
+    ] as unknown as SiblingState["exactRows"];
+    const ord = snapPick.data.ordinal;
+    const s = base({ mode: "ledger", snap: snapPick, exactRows: rows, tickNet: { metaId: "dor", globalOrdinal: ord } });
+    // The tick has its child, so ∨ from the tick has nothing new to open…
+    expect(childStep("snap", s)).toBeNull();
+    // …and the card's own ‹ › move the tick-local commit.
+    const set = siblingSet("context", s)!;
+    expect(set.items.every((i) => i.actions.every((a) => a.kind !== "filter"))).toBe(true);
+    // ∨ from the Metagraph card opens THAT network's own snapshot in this tick.
+    expect(childStep("context", s)!.key).toBe("dor:900");
   });
 
   // ⚠️ THE BUSIEST LISTED ONE, not "the busiest, and give up if it is unlisted" (review find,
@@ -409,7 +434,7 @@ describe("childStep — the first-child DOWN step", () => {
     ] as unknown as SiblingState["exactRows"];
     const step = childStep("snap", base({ mode: "ledger", snap: snapPick, exactRows: rows }))!;
     expect(step.key).toBe("ded");
-    expect(step.actions).toEqual(filterToggleActions("ded", "all"));
+    expect(step.actions).toEqual(tickNetSelectActions("ded", snapPick, { metaSnap: null }));
   });
 
   it("an UNLISTED channel names no filter, so the tick has no child to open", () => {

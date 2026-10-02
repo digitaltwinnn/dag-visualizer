@@ -94,8 +94,23 @@ The design rules behind the table, which the tests pin but don't explain:
   list down to one network mid-browse. There the ancestry is country → cohort → node and the filter
   stays the top bar's own gesture; hyper keeps filter-first, and so does the ledger's node. **The
   ledger's SNAPSHOT rows never set it either** (design session 2026-09-26, decision 13):
-  `metaSnapSelectActions` is tick → snapshot, so browsing a tick's anchors and picking one no longer
-  re-commits the app-wide filter.
+  `metaSnapSelectActions` no longer re-commits the app-wide filter when you browse a tick's anchors
+  and pick one.
+- **The ledger has a network rung of its own: the network INSIDE a tick** (user, 2026-10-02 — "the
+  parent rung is incomplete… it should not actually set the metagraph as the global application
+  filter"). Between a global tick and a metagraph snapshot sits the Metagraph rung, and it used to
+  have no state but the filter — so decision 13 left it EMPTY under a committed snapshot, and the
+  pager's ∨ from the tick still "committed the filter as the step" (2026-09-15), re-scoping the
+  whole app from a card and dropping the pin on the way (a filter commit in the ledger re-enters
+  live). It is `store.tickNet` now — `{ metaId, globalOrdinal }`, carrying its tick so it can never
+  outlive it — and **`domain/tickNet.ledgerNetwork` is the ONE resolver every ledger surface
+  reads**: the rail's Metagraph rung and card, the chamber's coloured dim, the commit tilt, the
+  pager, the explorer row's committed state. The tick-local commit wins inside its tick; elsewhere
+  the filter. Full ancestry there is tick → network → snapshot (`metaSnapSelectActions`,
+  `bandSelectActions`, `tickNetSelectActions`), every one of which PINS the tick. Only the top
+  bar's picker and the Hypergraph's hub and rows set the filter; the ledger's NODE still
+  filter-firsts (untouched, see the row above). A filter switch clears it (same rung, one commit
+  finer), and so does leaving the view.
 - **A filter is a story.** Pinning a global tick whose anchors don't include the committed network
   releases the filter back to "all", so a network's dim never shapes a snapshot that has nothing to do
   with it. The membership rule lives in `src/data/ledgerStory.ts`.

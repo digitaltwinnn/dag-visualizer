@@ -116,6 +116,17 @@ export interface MetaSnapSel {
   ts: string;            // that tick's timestamp — the anchor join
 }
 
+/** THE NETWORK INSIDE A TICK — the ledger's Metagraph rung as a commit of its own (2026-10-02).
+ *  A metagraph committed UNDER a global tick: it fills the rung between the tick and a metagraph
+ *  snapshot, dims the chamber and tilts the camera exactly as a committed network does there — and
+ *  it is NOT the app filter, which stays the top bar's (and the Hypergraph's) gesture. It carries
+ *  the tick it sits in, so it can never outlive that tick: `domain/tickNet.ledgerNetwork` only
+ *  honours it while that tick is the one on screen. */
+export interface TickNetSel {
+  metaId: string;
+  globalOrdinal: number; // the global tick it is committed inside
+}
+
 
 // Per-tick anchor aggregate from NetworkData.anchorIndex (see getAnchor).
 export interface Anchor {

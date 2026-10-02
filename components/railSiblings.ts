@@ -21,6 +21,8 @@
 //   from rivalling the LiveStrip — the strip is the time INSTRUMENT (scale, window, cadence), the
 //   card's plank is a nudge to the adjacent tick.
 import type { Mode } from "@/src/store/store";
+import { ledgerNetwork } from "@/src/engine/domain/tickNet";
+import type { TickNetSel } from "@/src/data/types";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 import type {
   ChannelSnapRow,
@@ -38,6 +40,7 @@ import {
   countryToggleActions,
   filterToggleActions,
   metaSnapSelectActions,
+  tickNetSelectActions,
   nodeSelectActions,
   sameCohort,
   sameMetaSnap,
@@ -57,6 +60,8 @@ export interface SiblingState {
   composition: CompositionSel | null;
   inspect: PickDescriptor | null;
   snap: Extract<PickDescriptor, { kind: "snapshot" }> | null;
+  /** The network committed inside the pinned tick (ledger) — see `domain/tickNet.ts`. */
+  tickNet: TickNetSel | null;
   metaSnap: MetaSnapSel | null;
   selNodes: NodeRow[];
   metaList: MetaInfo[];
@@ -234,10 +239,18 @@ function tickNetworks(s: SiblingState): MetaInfo[] | null {
   return nets.length ? nets : null;
 }
 
+/** The network a ledger card stands on: the one committed inside the pinned tick, else the app
+ *  filter (`domain/tickNet.ledgerNetwork`). Outside the ledger it is the filter. */
+const netOf = (s: SiblingState): string =>
+  s.mode === "ledger" ? ledgerNetwork({ filter: s.filter, tickNet: s.tickNet, snapOrdinal: s.snap?.data.ordinal ?? null }) : s.filter;
+
 export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | null {
   switch (slot) {
     case "context": {
-      if (s.filter === "all") return null;
+      // The card's subject: the app filter — or, in the ledger, the network the chamber resolves
+      // against (the tick-local commit wins inside its tick).
+      const net = netOf(s);
+      if (net === "all") return null;
       // UNDER A LEDGER TICK the metagraph card is the tick's CHILD, so it steps the tick's own
       // networks (`tickNetworks` — the set the tick's ∨ opens the first of), never the catalog;
       // and a pinned tick stays pinned, since a filter commit in the ledger otherwise re-enters
@@ -248,6 +261,15 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       if (s.mode === "ledger") {
         const nets = tickNetworks(s);
         if (!nets) return null;
+        // ⚠️ THE CARD STANDS ON ONE OF TWO COMMITS, and a step moves THAT one (2026-10-02). Opened
+        // from the tick (its ∨, a band, a snapshot row) it is the TICK-LOCAL network, and ‹ › step
+        // that — pinned by construction, and never the app filter (user: "it should not actually
+        // set the metagraph as the global application filter"). Standing on the filter itself
+        // (committed in the top bar, then a tick opened under it) it steps the filter as before.
+        if (net !== s.filter) {
+          const items = nets.map((m) => ({ key: m.id, label: m.name, actions: tickNetSelectActions(m.id, s.snap!, { metaSnap: s.metaSnap }) }));
+          return finish(slot, items, nets.findIndex((m) => m.id === net), `Global ${s.snap!.data.ordinal.toLocaleString()}`);
+        }
         const hold: ClickAction[] = s.following || !s.snap ? [] : [{ kind: "snapshot", pick: s.snap, follow: false }];
         const items = nets.map((m) => ({ key: m.id, label: m.name, actions: [...filterToggleActions(m.id, s.filter), ...hold] }));
         return finish(slot, items, nets.findIndex((m) => m.id === s.filter), `Global ${s.snap!.data.ordinal.toLocaleString()}`);
@@ -400,6 +422,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
             metaSnap: s.metaSnap,
             filter: s.filter,
             tickHasFilter: t.inStory,
+            tickNet: s.tickNet,
           },
         ),
       }));
@@ -477,21 +500,24 @@ const firstNodeOfComposition = (s: SiblingState): SiblingStep | null => {
   return r && g ? nodeItem(r, s, { netId: s.filter, key: g.key }) : null;
 };
 /** ledger: the network that anchored MOST into this tick — the order the tick card prints its
- *  anchors in. Committing it is what opening the metagraph card means, so the filter IS the step
- *  rather than a side effect (user, 2026-09-15); an UNLISTED channel names no filter, so there is
- *  nothing to commit and the control dims. */
+ *  anchors in. Opening the Metagraph card under a tick commits that network INSIDE the tick
+ *  (`tickNetSelectActions`), never the app filter (user, 2026-10-02 — reversing 2026-09-15's "the
+ *  filter IS the step": a card's pager re-scoped the whole app, and it dropped the pin on the way
+ *  because a filter commit in the ledger re-enters live). An UNLISTED channel names no network,
+ *  so there is nothing to commit and the control dims. */
 const firstAnchoringNetwork = (s: SiblingState): SiblingStep | null => {
-  if (s.filter !== "all") return null;
+  if (netOf(s) !== "all" || !s.snap) return null;
   const meta = tickNetworks(s)?.[0];
-  return meta ? { key: meta.id, label: meta.name, actions: filterToggleActions(meta.id, s.filter) } : null;
+  return meta ? { key: meta.id, label: meta.name, actions: tickNetSelectActions(meta.id, s.snap, { metaSnap: s.metaSnap }) } : null;
 };
 /** ledger: the committed network's OWN snapshot in the shown tick — never the tick's first row,
  *  which would re-commit the filter to whichever network leads the exact read and release the
  *  committed story (review find, 2026-09-11). No row → the network did not anchor here, which is
  *  the honest answer, and the control dims. */
 const firstMetaSnapOfTick = (s: SiblingState): SiblingStep | null => {
-  if (s.filter === "all" || !s.snap || !s.exactRows) return null;
-  const r = s.exactRows.find((x) => x.metaId === s.filter);
+  const net = netOf(s);
+  if (net === "all" || !s.snap || !s.exactRows) return null;
+  const r = s.exactRows.find((x) => x.metaId === net);
   if (!r) return null;
   const sel = metaSnapSelOf(r, s.snap.data.ordinal, s.snap.data.timestamp);
   return {

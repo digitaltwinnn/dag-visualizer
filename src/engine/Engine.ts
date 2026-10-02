@@ -32,6 +32,7 @@ import { SHEET_SHIFT_K, sheetShiftPx } from "./domain/sheetShift";
 import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush, trendFit } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
+import { ledgerNetwork } from "./domain/tickNet";
 import { clickActions, pickActive, pickNetId, viewEntryActions, metaSnapSelectActions, bandSelectActions } from "./domain/pickActions";
 import { ViewTransition, is3D, fleetFaded, fleetHolder, type FleetPlacement } from "./domain/viewTransition";
 import { gatherBand, railGapPx, railGapShiftPx, type GatherBand } from "./domain/gatherLayout";
@@ -49,7 +50,7 @@ import { fitDistance, focusDepth, loneShiftPx, windowCount } from "./domain/tren
 import { stackRoster } from "@/src/data/trendScope";
 import { DevTunePanel } from "./DevTunePanel";
 import { CameraDirector } from "./CameraDirector";
-import type { GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
+import type { TickNetSel, GlobalSnapshot, NodeRow, PickDescriptor } from "@/src/data/types";
 import type { ClusterNode, DagCore, GeoMap, RouteMetagraph } from "@/src/data/types";
 import { breakpointOf } from "@/src/data/breakpoint";
 
@@ -149,6 +150,11 @@ export class Engine {
   // read by every later phase this frame — a table-row reference, no allocation.
   private _policy: ViewPolicy = VIEW_POLICIES.hyper;
   private filter = "all";
+  /** The network committed INSIDE the pinned tick, and that tick's ordinal — the two inputs of
+   *  `ledgerNetwork`, bridged from the store so the chamber's lens and the commit tilt resolve
+   *  against the ledger's own network rather than the app filter (2026-10-02). */
+  private tickNet: TickNetSel | null = null;
+  private snapOrd: number | null = null;
   private _hoverFilter: string | null = null; // previewed filter (chip/hub hover); drives the core dim
   private country: string | null = null;
   // Committed cohort (city×provider) selection, mirrored from the store — read by
@@ -707,6 +713,8 @@ export class Engine {
     // nothing. "soon" is the app's one flat placeholder row.
     this.mode = s.docPage || s.docClosing ? "soon" : s.mode;
     this.filter = s.filter;
+    this.tickNet = s.tickNet;
+    this.snapOrd = s.snap?.data?.ordinal ?? null;
     this.cohortSel = s.cohort;
     // A BOOT straight into a view that parks the fleet seeds the fade rather than easing it: the
     // node meshes are built lazily, when the first poll lands, so an ease from full would flash a
@@ -816,6 +824,9 @@ export class Engine {
           if (st.composition) useStore.getState().setComposition(null);
           // A metagraph snapshot belongs to exactly ONE network, so a switch can only orphan it.
           if (st.metaSnap) useStore.getState().setMetaSnap(null);
+          // The network committed inside a tick is the SAME rung as the filter, one commit finer:
+          // a filter switch replaces it rather than standing under it.
+          if (st.tickNet) useStore.getState().setTickNet(null);
           // …and the History view's PLANE FOCUS goes with them (2026-09-18). It is view-local
           // emphasis rather than a ladder rung, but it is finer than a network by construction —
           // it names ONE chain's chart — and the filter SCOPES the stack to a single plane, so a
@@ -901,6 +912,21 @@ export class Engine {
         // all, so a node click there was the one commit the camera never acknowledged. An
         // allow-list, per convention 7 — the flat views have no camera to move.
         if (st.inspect !== prev.inspect && VIEW_POLICIES[st.mode].canvas) this._resolveFocus();
+        // THE LEDGER'S OWN NETWORK (2026-10-02): the one committed inside the pinned tick, else the
+        // filter. It changes when that commit does or when the tick on screen does (the commit is
+        // honoured only in its own tick), and the chamber answers exactly as it does to a filter:
+        // the coloured dim, and the commit tilt through the one ledger pose. Nothing app-wide moves.
+        if (st.tickNet !== prev.tickNet || st.snap !== prev.snap) {
+          const before = this._ledgerNet();
+          this.tickNet = st.tickNet;
+          this.snapOrd = st.snap?.data?.ordinal ?? null;
+          const after = this._ledgerNet();
+          if (after !== before && this.mode === "ledger") {
+            this.globe.setFilter(after);
+            this.ledger.setFilter(ledgerLens(after));
+            this._resolveFocus();
+          }
+        }
         // Ledger: keep the hovered/selected snapshot coloured in the trail (hover wins, then the
         // clicked `snap`); everything else fades to the neutral background tone.
         if (st.hoverSnapOrd !== prev.hoverSnapOrd || st.snap !== prev.snap) {
@@ -1301,6 +1327,8 @@ export class Engine {
     // so its card can't follow the view out. This also drops the signer glow (the store effect
     // below re-fires on the null), so a glow can never outlive its subject.
     if (mode !== "ledger" && st0.metaSnap != null) st0.setMetaSnap(null);
+    // …and so is the network committed inside a tick: it has no meaning outside this view.
+    if (mode !== "ledger" && st0.tickNet != null) st0.setTickNet(null);
 
     if (is3D(prevMode) && is3D(mode) && prevMode !== mode) {
       // 3D → 3D: run the staged gather choreography. The machine handles retargeting (a switch
@@ -1422,8 +1450,8 @@ export class Engine {
       // needs its own write, but not its own OPINION (the hardcoded `false` here is what the
       // `mode !== "geo"` line never actually reached; convention 8, one home).
       this.ctx.controls.autoRotate = VIEW_POLICIES[mode].autoRotate;
-      this.globe.setFilter(this.filter); // dim non-selected metagraph columns (no camera move)
-      this.ledger.setFilter(ledgerLens(this.filter)); // the chamber's COLOURED dim, through the ledger's lens (dag = the whole chamber)
+      this.globe.setFilter(this._ledgerNet()); // dim non-selected metagraph columns (no camera move)
+      this.ledger.setFilter(ledgerLens(this._ledgerNet())); // the chamber's COLOURED dim, through the ledger's lens (dag = the whole chamber)
       this._refreshLedger();
       // Ledger uses the SHARED overview camera — the group transform (config.viewRotY/viewScale)
       // frames the resting pose central/untilted, and it is the view's ONE pose: every rung
@@ -1494,8 +1522,8 @@ export class Engine {
       // never moves and the camera's only answer is the shared commit tilt inside the settled ledger
       // pose — the per-lane and per-node framings were retired (2026-08-09), so the ladder's NETWORK
       // rung resolves to that one pose, not a lane fly-to.
-      this.globe.setFilter(this.filter);
-      this.ledger.setFilter(ledgerLens(this.filter));
+      this.globe.setFilter(this._ledgerNet());
+      this.ledger.setFilter(ledgerLens(this._ledgerNet()));
       if (focusCamera) this._resolveFocus();
     }
     this._publishLeaderboard();
@@ -1633,7 +1661,7 @@ export class Engine {
       // metagraph's lane must be read against the floor. Commit the DAG and there is no lane to
       // separate — the subject IS the floor — so the lean has no work to do.
       const f = FOCI.ledger;
-      if (ledgerLens(this.filter) === "all") {
+      if (ledgerLens(this._ledgerNet()) === "all") {
         this.cam.focus("ledger");
         return true;
       }
@@ -1961,9 +1989,15 @@ export class Engine {
           pinnedOrdinal: !st.following ? st.snap?.data?.ordinal ?? null : null,
           metaSnap: st.metaSnap,
           tickHasFilter: this._tickHasFilter(p, st.filter),
+          tickNet: st.tickNet,
         },
       }),
     );
+  }
+
+  /** The network the LEDGER resolves against — `domain/tickNet.ledgerNetwork`, one home. */
+  private _ledgerNet(): string {
+    return ledgerNetwork({ filter: this.filter, tickNet: this.tickNet, snapOrdinal: this.snapOrd });
   }
 
   // The composition group a PICK belongs to — network + make-up key. null when the pick isn't a

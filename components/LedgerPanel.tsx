@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 
 import Explorer, { type ExplorerLevelSpec, type ExplorerRowSpec } from "@/components/explorer/Explorer";
 import { NODE_GLYPH_W, nodeRowSpec, unknownNodeRowSpec } from "@/components/explorer/nodeRow";
@@ -174,6 +175,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const following = useStore((s) => s.following);
   const live = useStore((s) => s.live);
   const metaSnap = useStore((s) => s.metaSnap);
+  const tickNet = useStore((s) => s.tickNet);
   const snapshotExact = useStore((s) => s.snapshotExact);
   const selNodes = useStore((s) => s.selNodes);
   const metaList = useStore((s) => s.metaList); // co-location reads the full catalog (nodeRowSpec)
@@ -344,6 +346,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
                 metaSnap,
                 filter,
                 tickHasFilter,
+                tickNet,
               }),
             );
             // Re-clicking the PINNED tick releases it (the builder's toggle) — the path closes
@@ -420,7 +423,11 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           figure: m.text,
           // The row IS a committed subject when its band is the live selection: this network's
           // filter on this tick, with no finer snapshot pinned under it (the byte bar's band click).
-          on: filter === n.id && activeSnapOrd === tick.ordinal && metaSnap == null,
+          // …or the network committed INSIDE this tick (the pager's ∨, a band — 2026-10-02).
+          on:
+            ledgerNetwork({ filter, tickNet, snapOrdinal: activeSnapOrd ?? null }) === n.id &&
+            activeSnapOrd === tick.ordinal &&
+            metaSnap == null,
           // Out of the lens: listed (it really did anchor here), not drillable.
           faint: lensedOut,
           title: lensedOut

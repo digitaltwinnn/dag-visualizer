@@ -14,6 +14,7 @@ import { focusSlotId } from "@/components/railCards";
 export function useLadderFocus(): string | null {
   const mode = useStore((s) => s.mode);
   const filter = useStore((s) => s.filter);
+  const tickNet = useStore((s) => s.tickNet);
   const country = useStore((s) => s.country);
   const cohort = useStore((s) => s.cohort);
   const composition = useStore((s) => s.composition);
@@ -24,5 +25,5 @@ export function useLadderFocus(): string | null {
   // History's own slot: the committed time cursor (`instant`). It is in the lane, so the focus
   // derivation has to see it or the cursor card can never be the box.
   const trendCursorMs = useStore((s) => s.trendCursorMs);
-  return focusSlotId({ mode, filter, country, cohort, composition, inspect, snap, metaSnap, trendCursorMs, selStack });
+  return focusSlotId({ mode, filter, tickNet, country, cohort, composition, inspect, snap, metaSnap, trendCursorMs, selStack });
 }

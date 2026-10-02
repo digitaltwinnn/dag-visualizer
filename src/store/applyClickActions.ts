@@ -49,6 +49,12 @@ export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boole
         if (a.follow !== undefined) st.setFollowing(a.follow);
         st.setSnap(a.pick);
         break;
+      case "tickNet":
+        // The network INSIDE the pinned tick — the ledger's Metagraph rung. One store effect, and
+        // deliberately NOT the filter's: it never re-enters live (its builders pin the tick
+        // themselves) and it never leaves the Snapshots view.
+        st.setTickNet(a.sel);
+        break;
       case "metaSnap":
         st.setMetaSnap(a.sel);
         break;
@@ -109,6 +115,9 @@ export function motionCauseOf(actions: readonly ClickAction[]): MotionCause | nu
       case "composition": return { kind: "composition", on: a.sel != null };
       case "inspect": return { kind: "node", title: a.pick?.title ?? null, sub: a.pick?.sub ?? null };
       case "snapshot": return { kind: "snapshot", ordinal: a.pick?.data.ordinal ?? null };
+      // The tick-local network frames the same subject a committed network does, so it speaks
+      // the filter's sentence ("Framing Dor Technologies").
+      case "tickNet": return { kind: "filter", id: a.sel?.metaId ?? "all" };
       case "metaSnap": return a.sel ? { kind: "metaSnap", metaId: a.sel.metaId, ordinal: a.sel.ordinal } : { kind: "metaSnap", metaId: null };
       case "trendFocus": return { kind: "focus", id: a.id };
     }
