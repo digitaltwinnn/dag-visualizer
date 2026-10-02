@@ -3,7 +3,7 @@
 import type { CSSProperties, ReactNode } from "react";
 
 import ExplorerShell from "@/components/ExplorerShell";
-import ExplorerHeading, { type MeasureControl } from "@/components/explorer/ExplorerHeading";
+import ExplorerHeading, { MeasureMenu, type MeasureControl } from "@/components/explorer/ExplorerHeading";
 import ExplorerPath, { type Crumb } from "@/components/explorer/ExplorerPath";
 import ExplorerRow from "@/components/explorer/ExplorerRow";
 import { cn } from "@/lib/utils";
@@ -132,24 +132,26 @@ export default function Explorer({ id, title, hint, levels, onLeave, defaultColl
       id={id}
       title={title}
       // THE HINT RIDES THE HEADING ROW (user, 2026-09-28: "can the hint be on the same line as the
-      // dropdown? No need for 2 rows"): beside the measure control, left of it, wherever a level
-      // is on screen. The shell's own hint line stays only for the no-level case.
+      // dropdown? No need for 2 rows") — and since 2026-10-02 (A2) the dropdown rides the HEAD,
+      // so the hint has the row's full width: at 307px the control left it 199px, three lines
+      // in three of four views. The shell's own hint line stays only for the no-level case.
       hint={current ? null : hint}
       onLeave={onLeave}
       defaultCollapsed={defaultCollapsed}
-      aside={aside}
+      // The card head's aside: a view's card-level state, then THE MEASURE CONTROL (A2) — the
+      // figure column's heading, right of the title where the eye finds the list's one setting.
+      aside={
+        aside != null || measure ? (
+          <span className="inline-flex items-center gap-1.5">
+            {aside}
+            <MeasureMenu measure={measure} />
+          </span>
+        ) : undefined
+      }
     >
       {current && (
         <>
-          <ExplorerHeading
-            setting={
-              <>
-                {hint != null && <p className="m-0 mr-auto min-w-0 text-label text-muted-foreground">{hint}</p>}
-                {current.setting}
-              </>
-            }
-            measure={measure}
-          />
+          <ExplorerHeading hint={hint} setting={current.setting} />
           <ExplorerPath crumbs={crumbs} hint={current.meaning} />
           {/* Inside a level the list HANGS FROM THE PATH on a spine in the path's own accent (user,
               2026-09-26: "a vertical line on the left side to show that the section underneath
