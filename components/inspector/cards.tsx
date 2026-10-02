@@ -437,7 +437,7 @@ function ScheduleGroup({
 function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> }) {
   return (
     <ScheduleGroup label="by archived snapshots" defaultOpen>
-      {sched ? <ScheduleTable axis="Archive depth" parts={archiveParts(sched)} /> : <ArchivalAcquiring />}
+      {sched ? <ScheduleTable axis="Depth" axisTitle="Archive depth — how far back each node's snapshot archive reaches" parts={archiveParts(sched)} /> : <ArchivalAcquiring />}
     </ScheduleGroup>
   );
 }
@@ -590,7 +590,8 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
                   the captioned tables under hairlines read as three sections): composition in
                   the network's hue, status in the bucket colours, archive depth in the neutral —
                   each one bar of the same total, its parts named beneath. The chips and the
-                  depth tags ride the parts' titles. "Archive depth", not "archive" (user: it is
+                  depth tags ride the parts' titles. "Depth" in the column, "Archive depth" on hover (user, 2026-10-02: shorter — the two
+                  words wrapped); never the bare "archive" (user: it is
                   how far back each node's archive reaches, not a size). */}
               <ScheduleGroup label="Online nodes" value={<b className="font-mono font-bold">{nodes.length}</b>} defaultOpen>
                 <ScheduleTable
@@ -599,7 +600,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
                 />
                 <ScheduleTable axis="Status" parts={statusItems(states).map((it) => ({ label: cap(it.label), count: it.count, color: it.color }))} />
                 {archSched != null ? (
-                  <ScheduleTable axis="Archive depth" parts={archiveParts(archSched)} />
+                  <ScheduleTable axis="Depth" axisTitle="Archive depth — how far back each node's snapshot archive reaches" parts={archiveParts(archSched)} />
                 ) : archAcquiring ? (
                   <ArchivalAcquiring />
                 ) : null}

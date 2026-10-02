@@ -580,7 +580,7 @@ export const CUT_ROW = "grid grid-cols-[8.6em_3.4em_minmax(0,1fr)] items-start g
  *  divided by a hairline, which makes the three cuts read as one table. A zero part is a plain
  *  muted row with no squares (it draws nothing, and is still named). Without an `axis` the table
  *  is the three-column `CUT_ROW` form. */
-export function ScheduleTable({ axis, parts, className }: { axis?: string; parts: SchedulePart[]; className?: string }) {
+export function ScheduleTable({ axis, axisTitle, parts, className }: { axis?: string; axisTitle?: string; parts: SchedulePart[]; className?: string }) {
   const total = parts.reduce((n, p) => n + p.count, 0);
   const units = countable(total);
   return (
@@ -593,7 +593,7 @@ export function ScheduleTable({ axis, parts, className }: { axis?: string; parts
       )}
     >
       {axis != null && (
-        <span className="text-muted-foreground" style={{ gridRow: `span ${Math.max(1, parts.length)}` }}>
+        <span className="text-muted-foreground" title={axisTitle} style={{ gridRow: `span ${Math.max(1, parts.length)}` }}>
           {axis}
         </span>
       )}

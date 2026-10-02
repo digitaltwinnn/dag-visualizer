@@ -371,7 +371,7 @@ export default function DesignDoc() {
                 ]}
               />
               <ScheduleTable
-                axis="Archive depth"
+                axis="Depth" axisTitle="Archive depth — how far back each node's snapshot archive reaches"
                 parts={[
                   { label: "Full archive", count: 0, color: partShade("var(--muted-foreground)", 0) },
                   { label: "16 months", count: 3, color: partShade("var(--muted-foreground)", 1) },
