@@ -175,7 +175,7 @@ export function HyperCells({ accent }: { accent: string }) {
           // vocabulary of one that does — a `3` that visibly settles would claim it had just been
           // measured. Plain text says "this is what the protocol IS", and the bars beside it say
           // how the fleet fills it, which is exactly the lead/detail grammar.
-          lead={<span className="font-mono font-bold text-foreground tabular-nums">{layerRows.length}</span>}>
+          lead={<span className="font-mono font-bold text-xl text-foreground tabular-nums">{layerRows.length}</span>}>
           <MicroBars accent={accent} labelW={34} rows={layerRows} />
         </BandCard>
       )}
@@ -241,7 +241,7 @@ export function GeoCells({ accent }: { accent: string }) {
           rings are allowed to differ honestly. `unplaced` reading 0 is itself a reading — the
           fleet is fully drawn — and MicroBars renders no bar for it, only the numeral. */}
       <BandCard label="Nodes"
-        lead={<span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={total || null} /></span>}>
+        lead={<span className="font-mono font-bold text-xl text-foreground tabular-nums"><Odometer int value={total || null} /></span>}>
         {/* "unplaced" takes the neutral, like hyper's "unknown" type bucket: a node the lookup
             could not place claims no location, so its bar should not wear the accent the located
             split does (user, 2026-09-03). */}
@@ -625,7 +625,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
               dash "doesn't say it's working on it") — the acquiring rule's slot form: a
               real number is arriving into this slot, and the stars hold its width; the
               label and unit line already name what is coming. */}
-          <span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap">
+          <span className="font-mono font-bold text-xl text-foreground tabular-nums whitespace-nowrap">
             {spark.value != null ? <Odometer value={spark.value} /> : <NodeStars count={3} />}
           </span>
           <span className="text-label text-muted-foreground leading-none">{spark.unit}</span>
@@ -760,7 +760,7 @@ function AnchoringNetworks({ windowed, snaps, filter }: { windowed: TrendsWindow
     // collects around the roster rather than stretching it.
     <BandCard
       label="Metagraphs anchoring"
-      lead={<span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={list.length || null} /></span>}
+      lead={<span className="font-mono font-bold text-xl text-foreground tabular-nums"><Odometer int value={list.length || null} /></span>}
     >
       {/* ⚠️ THE LENS DIMS, IT DOES NOT EDIT (user, 2026-09-01: "if we filter, should we then also
           dim the filtered bullets?"). Yes — this roster was the one surface in the band ignoring the
@@ -797,7 +797,7 @@ function AnchoringNetworks({ windowed, snaps, filter }: { windowed: TrendsWindow
                   literal has two homes, and this is not one of them). With no name to give, the
                   dot stands alone rather than being captioned with a guess. */}
               {label && (
-                <span className={cn("text-micro truncate", on ? "text-foreground" : "text-muted-foreground")}>
+                <span className={cn("text-label truncate", on ? "text-foreground" : "text-muted-foreground")}>
                   {label}
                 </span>
               )}

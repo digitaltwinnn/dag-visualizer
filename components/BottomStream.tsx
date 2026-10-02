@@ -30,7 +30,7 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 //    the scene 184px — under half the viewport. Below 500px of height the band stands down and
 //    the scene takes the 92px back; the vitals stay one rotation away. 500 clears every
 //    landscape phone and touches no tablet (the shortest, an iPad mini landscape, is 744).
-const RESERVE = 92; // 10px gap above the footer + the band's ~66px height + 16px clearance above it
+const RESERVE = 112; // --vitals-h (104px, globals.css) + 8px clearance above the band — keep the pair in step
 // (The History pills stood ABOVE the plate from 2026-09-26 and reserved 44px for it; since the
 // 2026-09-29 control-strip round they live INSIDE the band, so the reserve is the band's alone.)
 

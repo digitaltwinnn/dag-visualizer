@@ -1000,8 +1000,13 @@
   --rail-top: 90px;        /* top of BOTH side rails — clears the command bar (top 14px + 54px of
                               bar) plus a comfortable breather under it (user refinement
                               2026-07-05; moved up 25px with the retired banner, 2026-08-09) */
-  --rail-w: 264px;         /* left control rail width */
-  --detail-w: 320px;       /* right details rail width */
+  /* THE RAIL WIDTHS ARE FLUID (design review 2026-10-02). Fixed at 264/320 the cards were 14% of
+     a 1920px screen and 10% of a 2560px one, every extra pixel going to the scene and to blank
+     stage beside a card still truncating "Dor Technolog…". The floor is the old width and holds
+     to ~1650px; the ceiling is a third up. The explorer row's name column rides the same token
+     (ExplorerRow.tsx), so the gain untruncates names rather than widening the tag home alone. */
+  --rail-w: clamp(264px, 16vw, 340px);     /* left control rail width */
+  --detail-w: clamp(320px, 18vw, 400px);   /* right details rail width */
   /* THE ACCENT, like the wash ladder (review, 2026-09-26): these were the cyan spelled out, so on
      a network whose `--primary` is violet or magenta the committed row stayed cyan beside a
      violet path plate — two accents on one card. `--primary` is light-dark() already. */
@@ -1019,9 +1024,14 @@
      jumping on every view switch. Sized to the tallest cell — four MicroBars rows plus the eyebrow
      and the plate's padding — with a couple of pixels of headroom, and it must stay under
      --bottom-reserve minus --footer-h or the rails would paint into it (the band sits FLUSH on
-     the footer strip since 2026-09-04 — the old 4px air gap read as noise). */
-  --vitals-h: 84px;
-  --bottom-reserve: 92px;  /* vertical space the bottom VITALS BAND reserves (BottomStream's own
+     the footer strip since 2026-09-04 — the old 4px air gap read as noise).
+     84 → 104 (design review 2026-10-02): the breakdown rows and their values moved up from the
+     micro step to the label step — they are read as copy, and micro is by its own definition
+     not copy — and the headline numeral to 20px, so the tallest cell grew with them; measured
+     at the type scale's 2560px ceiling, where a four-row cell clipped its last row at 96. Keep
+     `RESERVE` in BottomStream.tsx 8px above this. */
+  --vitals-h: 104px;
+  --bottom-reserve: 112px; /* vertical space the bottom VITALS BAND reserves (BottomStream's own
                               RESERVE). The static default matches the BOOT view: the store boots
                               in `hyper`, whose vitalsLane is on, and SSR/first paint assume
                               desktop — so before BottomStream's effect runs the rails already

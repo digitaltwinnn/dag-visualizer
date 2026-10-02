@@ -292,7 +292,7 @@ export default function DesignDoc() {
               check mark at the row&apos;s end, since a table row has no other place to say it.
             </Note>
             <div className="flex flex-wrap gap-4">
-              <div className="ig-panel p-2 w-[264px] flex flex-col gap-0.5">
+              <div className="ig-panel p-2 w-[var(--rail-w)] flex flex-col gap-0.5">
                 <div className="relative flex items-center gap-2 rounded-sm px-2 py-1.5 text-body text-foreground-dim">
                   <span className="w-2 h-2 rounded-full flex-none" style={{ background: "var(--muted-foreground)" }} />
                   Explorer row
@@ -302,7 +302,7 @@ export default function DesignDoc() {
                   Selected explorer row
                 </div>
               </div>
-              <div className="ig-panel p-2 w-[264px] flex flex-col gap-0.5">
+              <div className="ig-panel p-2 w-[var(--rail-w)] flex flex-col gap-0.5">
                 <div className="relative flex items-center gap-2 rounded-sm px-2 py-1.5 pr-7 text-body text-foreground-dim">
                   Table row
                 </div>
@@ -323,7 +323,7 @@ export default function DesignDoc() {
               The figure column&apos;s heading is the level&apos;s own measure, and where a level
               has several it opens as a list.
             </Note>
-            <div className="ig-panel p-[14px] w-[264px]">
+            <div className="ig-panel p-[14px] w-[var(--rail-w)]">
               <ExplorerPath
                 crumbs={[
                   { key: "root", label: "Countries", title: "Countries", root: true, onSelect: () => {} },
@@ -354,7 +354,7 @@ export default function DesignDoc() {
               with its parts named beneath it, so three cuts read as three views of one thing
               rather than three tables.
             </Note>
-            <div className="ig-panel p-[18px] w-[320px]">
+            <div className="ig-panel p-[18px] w-[var(--detail-w)]">
               <StackedSchedule
                 axis="Composition"
                 parts={[

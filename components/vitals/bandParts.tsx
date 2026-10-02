@@ -208,7 +208,7 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
   // Same rule as the sparkline: a breakdown with no rows YET says so rather than rendering an
   // empty block. A row whose count is 0 is a reading and still draws (its numeral, no bar).
   if (rows.length === 0) {
-    return <span className="flex items-center self-stretch text-micro text-muted-foreground">acquiring…</span>;
+    return <span className="flex items-center self-stretch text-label text-muted-foreground">acquiring…</span>;
   }
   const max = Math.max(1, ...rows.map((r) => r.count));
   return (
@@ -247,7 +247,7 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
               part of the code) and provider names are names; country codes arrive uppercase.
               `0 1 <labelW>px` rather than a hard width: on a narrow card the label SHRINKS into
               its ellipsis instead of pushing the bar track out of the plate. */}
-          <span className="text-micro text-muted-foreground truncate leading-none" style={{ flex: `0 1 ${labelW}px` }}>{r.label}</span>
+          <span className="text-label text-muted-foreground truncate leading-none" style={{ flex: `0 1 ${labelW}px` }}>{r.label}</span>
           {/* THE TRACK IS THE CARD'S OWN WIDTH, never a 72px constant (user, 2026-09-01) — but
               never longer than BAR_TRACK_MAX either. The fixed track made every bar row
               intrinsically sized, so a wide card left its slack dangling to the right of the
@@ -280,7 +280,7 @@ export function MicroBars({ rows, accent, labelW = 26, dashZero }: { rows: { key
               column stepped in and out down the card. A right-aligned floor gives them a shared
               column; `tabular-nums` then holds it exactly, and a wider count simply grows the
               column rather than breaking it. */}
-          <span className="font-mono text-micro tabular-nums text-foreground flex-none text-right min-w-[26px]">
+          <span className="font-mono text-label leading-none tabular-nums text-foreground flex-none text-right min-w-[26px]">
             {dashZero && r.count === 0 ? <span className="text-muted-foreground italic opacity-60">—</span> : r.count}
           </span>
         </span>
@@ -352,7 +352,7 @@ export function DonutTotal({ counts, accent, total, className, hues }: { counts:
   return (
     <span className={cn("flex items-center gap-2 flex-none", className)}>
       <Donut counts={counts} accent={accent} hues={hues} />
-      <span className="font-mono font-bold text-foreground tabular-nums leading-none">
+      <span className="font-mono font-bold text-xl text-foreground tabular-nums leading-none">
         <Odometer int value={total || null} />
       </span>
     </span>

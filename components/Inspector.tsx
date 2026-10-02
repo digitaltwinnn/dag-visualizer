@@ -306,8 +306,10 @@ export function GhostCard({ card }: { card: RailCard }) {
           className="size-3.5 flex-none mt-[1px] text-[var(--filter-accent,var(--primary))] opacity-45"
         />
         {/* fixed label column (fits the longest slot name, "METAGRAPH") so the instruction
-            text starts at the SAME x on every ghost card (user) */}
-        <span className="flex-none w-[86px] mt-[2px] text-micro tracking-caps uppercase opacity-80">{label}</span>
+            text starts at the SAME x on every ghost card (user). In em, not px (2026-10-02): the
+            type scale is fluid, and an 86px column that fit 10.5px caps overlapped the hint at
+            12.5px. */}
+        <span className="flex-none w-[8.5em] mt-[2px] text-micro tracking-caps uppercase opacity-80">{label}</span>
         <span className="min-w-0 italic">{card.hint}</span>
       </p>
     </aside>
