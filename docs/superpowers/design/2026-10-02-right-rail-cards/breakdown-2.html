@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Metagraph breakdown — D with a table legend</title>
+<style>
+:root{--bg:oklch(0.09 0.02 265);--fg:oklch(0.94 0.02 255);--dim:#c7d0ea;--muted:oklch(0.66 0.04 265);--primary:oklch(0.88 0.13 195);
+--border:rgba(90,140,255,.22);--panel:rgba(12,16,32,.94);--radius:14px;--wash-faint:color-mix(in oklch,var(--primary) 6%,transparent);
+--sel-bg:color-mix(in oklch,var(--primary) 12%,transparent);--sel-border:color-mix(in oklch,var(--primary) 52%,transparent);
+--label:12.6px;--body:14.9px;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+--hue:oklch(0.74 0.19 41);--hue2:color-mix(in oklch,var(--hue) 60%,transparent);--hue3:color-mix(in oklch,var(--hue) 38%,transparent);--hue4:color-mix(in oklch,var(--hue) 22%,transparent);
+--ok:oklch(0.80 0.15 165);--warn:oklch(0.80 0.15 75);--bad:oklch(0.68 0.2 25);--n1:oklch(0.70 0.03 265);--n2:oklch(0.52 0.03 265);--n3:oklch(0.36 0.03 265)}
+*{box-sizing:border-box}html{color-scheme:dark}
+body{margin:0;background:radial-gradient(1200px 600px at 60% 0%,#0b1230 0%,var(--bg) 60%);color:var(--fg);font:var(--body)/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:32px 40px 96px}
+h1{font-size:24px;font-weight:600;margin:0 0 6px}h2{font-size:18px;font-weight:600;margin:52px 0 4px;display:flex;gap:10px;align-items:baseline}h2 b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;font-size:var(--label)}
+p.lede{color:var(--dim);max-width:82ch;margin:0 0 6px}.note{color:var(--muted);font-size:var(--label);max-width:88ch;margin:4px 0}a{color:var(--primary)}
+.pair{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start;margin-top:14px}.col{width:346px}.cap{font-size:var(--label);color:var(--muted);margin:0 2px 8px}
+.rec{border:1px solid var(--sel-border);background:var(--sel-bg);border-radius:8px;padding:10px 14px;font-size:var(--label);margin-top:18px;max-width:92ch}.rec b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;font-size:11.6px;margin-right:8px}
+.pc{display:flex;gap:28px;flex-wrap:wrap;font-size:var(--label);color:var(--dim);margin-top:10px;max-width:92ch}.pc div{flex:1;min-width:260px}.pc b{color:var(--fg)}
+.card{width:346px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 8px 30px rgba(0,0,0,.35)}
+.sec{display:flex;justify-content:space-between;align-items:baseline;font-size:var(--label);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}.sec b{color:var(--fg);font:700 var(--body) var(--mono);letter-spacing:0}
+.ax{color:var(--muted)}.num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}.z{color:var(--muted)}
+.units{display:flex;flex-wrap:wrap;gap:2px;align-content:flex-start}.units i{display:block;border-radius:2px}.units i:hover{outline:1px solid var(--fg)}
+.u9 i{width:9px;height:9px}.u7 i{width:7px;height:7px;border-radius:1.5px}.u6 i{width:6px;height:6px;border-radius:1.5px}.u5 i{width:5px;height:5px;border-radius:1px}
+table{border-collapse:collapse;width:100%}td{padding:2px 0;vertical-align:top}
+/* D1: strip + table legend beside it */
+.d1 .cut{display:grid;grid-template-columns:1fr 124px;gap:4px 12px;margin:0 0 10px}.d1 .cut .ax{grid-column:1/-1;font-size:var(--label);letter-spacing:.13em;text-transform:uppercase}
+.d1 td.k{width:3px;padding:0}.d1 td.k span{display:block;width:3px;height:14px;border-radius:1px;margin-top:4px}.d1 td.n{padding-left:7px}.d1 td.num{width:34px}
+/* D2: one table, squares are the bars */
+.d2{table-layout:fixed}.d2 td.axis{width:84px;color:var(--muted);padding-top:3px;font-size:var(--label)}.d2 td.n{width:78px;padding-right:6px;font-size:var(--label);padding-top:3px;white-space:nowrap}.d2 td.num{width:28px;padding-right:8px;font-size:var(--label);padding-top:3px}.d2 .units{gap:1.5px}.d2 tr.first td{border-top:1px solid var(--border);padding-top:6px}.d2 tr.last td{padding-bottom:6px}.d2 tr:first-child td{border-top:0}.d2 .units{padding-top:5px}
+/* D3: strip, then names as a column table under it */
+.d3 .cut{margin:0 0 10px}.d3 .hd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}.d3 .cols{display:flex;gap:14px;margin-top:5px;flex-wrap:wrap}.d3 .cols span{border-top:2px solid;padding-top:2px;font-size:var(--label);color:var(--dim);white-space:nowrap}.d3 .cols em{font-style:normal;font-family:var(--mono);color:var(--fg);margin-left:5px}
+/* D4: cross table */
+.d4{table-layout:fixed}.d4 col.c0{width:92px}.d4 col.cs{width:38px}.d4 th{font-size:11px;color:var(--muted);font-weight:500;text-align:right;padding:2px 0 4px 4px;white-space:nowrap}.d4 th.l{text-align:left;padding-left:0}.d4 th.grp{text-align:center;border-bottom:1px solid var(--border)}
+.d4 td{padding:3px 0 3px 4px}.d4 td.l{padding-left:0}.d4 tr.tot td{border-top:1px solid var(--border);color:var(--dim)}.d4 td.sep,.d4 th.sep{border-left:1px solid var(--border)}
+.d4 .mini{display:flex;gap:2px;margin-top:8px}
+</style></head><body>
+<h1>Breakdown, round two — D, with the legend as a table</h1>
+<p class="lede">You liked the unit squares and disliked the dot legend. These four keep "every node a square" and replace the legend with aligned columns: no dots, names and counts in a table, the colour key carried by a thin rule or by the squares themselves. Each is drawn for a small network (live figures) and for the largest one as it will be after the reduction to about 30 nodes, so a square is always exactly one node and nothing is scaled.</p>
+<p class="note">Round one is <a href="./breakdown.html">here</a>; the skeleton page is <a href="./">here</a>. Hover a square for its part. D4's cross-figures are illustrative: the data to compute them exists per node, the split shown is not measured.</p>
+<div id="out"></div>
+<div class="rec"><b>Recommend</b> D2. It is one table, so every name and every count aligns down the card, and the squares in each row are both the bar and the colour key, which is what removes the legend altogether. A row holds about fifteen squares before it wraps, so at 30 nodes the largest part takes a second line and nothing else does. D4 is the one that adds information rather than rearranging it, and is worth it if "which nodes are ready" by composition is a question you want the card to answer.</div>
+
+<script>
+const S={
+ small:{name:'Dor Technologies · 18 nodes',total:18,unit:1,cuts:[
+  {ax:'Composition',parts:[{l:'Hybrid',n:3,c:'var(--hue)'},{l:'Data',n:15,c:'var(--hue2)'}]},
+  {ax:'Status',parts:[{l:'Ready',n:18,c:'var(--ok)'}]},
+  {ax:'Archive depth',parts:[{l:'Full archive',n:0,c:'var(--n1)'},{l:'16 months',n:3,c:'var(--n2)'},{l:'Unknown',n:15,c:'var(--n3)'}]}],
+  cross:{rows:[['Hybrid','var(--hue)',[3],[0,3,0]],['Data','var(--hue2)',[15],[0,0,15]]],status:['Ready'],arch:['Full','16 mo','Unknown']}},
+ large:{name:'The largest network after the reduction · 30 nodes (illustrative split)',total:30,unit:1,cuts:[
+  {ax:'Composition',parts:[{l:'Hybrid',n:22,c:'var(--hue)'},{l:'Data',n:4,c:'var(--hue2)'},{l:'Currency',n:2,c:'var(--hue3)'},{l:'Consensus',n:2,c:'var(--hue4)'}]},
+  {ax:'Status',parts:[{l:'Ready',n:28,c:'var(--ok)'},{l:'Syncing',n:1,c:'var(--warn)'},{l:'Joining',n:1,c:'var(--bad)'}]},
+  {ax:'Archive depth',parts:[{l:'Full archive',n:8,c:'var(--n1)'},{l:'16 months',n:6,c:'var(--n2)'},{l:'Unknown',n:16,c:'var(--n3)'}]}],
+  cross:{rows:[['Hybrid','var(--hue)',[20,1,1],[8,6,8]],['Data','var(--hue2)',[4,0,0],[0,0,4]],['Currency','var(--hue3)',[2,0,0],[0,0,2]],['Consensus','var(--hue4)',[2,0,0],[0,0,2]]],status:['Ready','Sync','Join'],arch:['Full','16 mo','Unknown']}}
+};
+const head=d=>`<div class="sec"><span>Online nodes ⌄</span><b>${d.total}</b></div>`;
+const cells=(p,unit)=>Array.from({length:Math.max(p.n>0?1:0,Math.round(p.n/unit))},()=>`<i title="${p.l}: ${p.n}" style="background:${p.c}"></i>`).join('');
+const size=d=>d.unit>1?'u6':'u9';
+const scaleNote=d=>d.unit>1?`<div class="note" style="margin:6px 0 0">One square is ${d.unit} nodes.</div>`:'';
+const V={
+ D1:d=>head(d)+`<div class="d1">${d.cuts.map(c=>`<div class="cut"><span class="ax">${c.ax}</span><div class="units ${size(d)}">${c.parts.map(p=>cells(p,d.unit)).join('')}</div><table>${c.parts.map(p=>`<tr class="${p.n?'':'z'}"><td class="k"><span style="background:${p.n?p.c:'transparent'}"></span></td><td class="n">${p.l}</td><td class="num">${p.n}</td></tr>`).join('')}</table></div>`).join('')}</div>`+scaleNote(d),
+ D2:d=>head(d)+`<table class="d2">${d.cuts.map(c=>c.parts.map((p,i)=>`<tr class="${i===0?'first':''} ${i===c.parts.length-1?'last':''} ${p.n?'':'z'}">${i===0?`<td class="axis" rowspan="${c.parts.length}">${c.ax}</td>`:''}<td class="n">${p.l}</td><td class="num">${p.n}</td><td><div class="units u6">${cells(p,d.unit)}</div></td></tr>`).join('')).join('')}</table>`+scaleNote(d),
+ D3:d=>head(d)+`<div class="d3">${d.cuts.map(c=>`<div class="cut"><div class="hd"><span class="ax" style="font-size:var(--label);letter-spacing:.13em;text-transform:uppercase">${c.ax}</span></div><div class="units ${size(d)}">${c.parts.map(p=>cells(p,d.unit)).join('')}</div><div class="cols">${c.parts.filter(p=>p.n>0).map(p=>`<span style="border-color:${p.c}">${p.l}<em>${p.n}</em></span>`).join('')}${c.parts.filter(p=>!p.n).map(p=>`<span class="z" style="border-color:transparent">${p.l}<em style="color:var(--muted)">0</em></span>`).join('')}</div></div>`).join('')}</div>`+scaleNote(d),
+ D4:d=>{const x=d.cross;const z=n=>n?n:`<span class="z">·</span>`;
+  const tot=i=>x.rows.reduce((a,r)=>a+r[2][i],0), tota=i=>x.rows.reduce((a,r)=>a+r[3][i],0);
+  return head(d)+`<table class="d4"><colgroup><col class="c0">${x.status.map(()=>'<col class="cs">').join('')}${x.arch.map(()=>'<col>').join('')}</colgroup><tr><th class="l"></th><th class="grp" colspan="${x.status.length}">Status</th><th class="grp sep" colspan="${x.arch.length}">Archive depth</th></tr>
+  <tr><th class="l">Composition</th>${x.status.map(s=>`<th>${s}</th>`).join('')}${x.arch.map((s,i)=>`<th class="${i===0?'sep':''}">${s}</th>`).join('')}</tr>
+  ${x.rows.map(r=>`<tr><td class="l"><span style="display:inline-block;width:3px;height:12px;border-radius:1px;background:${r[1]};margin-right:7px;vertical-align:-1px"></span>${r[0]}</td>${r[2].map(n=>`<td class="num">${z(n)}</td>`).join('')}${r[3].map((n,i)=>`<td class="num ${i===0?'sep':''}">${z(n)}</td>`).join('')}</tr>`).join('')}
+  <tr class="tot"><td class="l">All</td>${x.status.map((_,i)=>`<td class="num">${z(tot(i))}</td>`).join('')}${x.arch.map((_,i)=>`<td class="num ${i===0?'sep':''}">${z(tota(i))}</td>`).join('')}</tr></table>
+  <div class="units ${size(d)} mini">${d.cuts[0].parts.map(p=>cells(p,d.unit)).join('')}</div>`+scaleNote(d)}
+};
+const T={
+ D1:['The strip, with a table beside it','Each cut keeps its strip of squares. The legend is a two-column table to its right: name, count, a thin colour rule as the key. No dots.',['Names and counts align in a column for every cut.','Closest to the D you liked.'],['The table column takes a third of the width, so a 30-node strip wraps to two rows.','Still three separate blocks.']],
+ D2:['One table, where the squares are the bars','Every part is a row: name, count, then its own squares. The cut names sit in the first column across their rows. The squares are the key, so there is no legend at all.',['One alignment down the whole card: names, counts, squares.','No legend to read: a row is its own colour.','Zeros are plain rows with no squares.'],['One row per part, so a four-part cut is four rows.','Parts are compared as lengths rather than as shares of one strip.']],
+ D3:['The strip, with its names as columns underneath','The strip per cut, then the parts in a row under it, each topped by a rule in its colour instead of a dot.',['Keeps each cut to two lines.','The rule reads as an underline of the strip, tying name to segment.'],['A long cut wraps its names to a second line.','Counts sit inline rather than in a column.']],
+ D4:['A cross table','One real table: composition down the side, status and archive depth across. Each cell is how many nodes of that composition are in that state. The totals row is the old three cuts.',['Answers a new question: which kind of node is not ready, which kind keeps the archive.','The most compact of the four, and nothing truncates.','Zeros recede to a mid dot, so the shape of the table is the reading.'],['A table of numbers, not a picture: the squares become one small strip under it.','Needs the per-node cross counts computed, which is new work.']]
+};
+document.getElementById('out').innerHTML=Object.keys(V).map(k=>`<h2><b>${k}</b>${T[k][0]}</h2><p class="lede">${T[k][1]}</p><div class="pair">${['small','large'].map(n=>`<div class="col"><div class="cap">${S[n].name}</div><div class="card">${V[k](S[n])}</div></div>`).join('')}</div><div class="pc"><div><b>For</b> ${T[k][2].join(' ')}</div><div><b>Against</b> ${T[k][3].join(' ')}</div></div>`).join('');
+</script></body></html>

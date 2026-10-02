@@ -34,3 +34,13 @@ Deviations from the drawings, each for a recorded rule:
   the new lead; its "Snapshot records" control was already the door recipe and keeps its own foot
   geometry.
 - **The metagraph card's breakdown is unchanged** pending a pick from `breakdown.html`.
+
+## The metagraph breakdown (open)
+
+`breakdown.html` — five forms (A today · B one line per cut · C say-it · D unit strip · E tiles).
+User, 2026-10-02: the dot legend is what bothers most ("can it be solved with tables?"); D is the
+favourite, E is nice but loses information; and **the largest network will soon be about 30
+nodes**, so a square is always one node and D needs no scaled fallback.
+`breakdown-2.html` — four D variants with the legend as a table and no dots: D1 strip + table
+beside, D2 one table whose squares are the bars (recommended), D3 names as columns under the
+strip, D4 a composition × status / archive cross table. Awaiting his pick; the built card keeps A.
