@@ -64,14 +64,15 @@ const STRUCTURAL: { name: string; var: string }[] = [
   { name: "wash-strong (current / hairline)", var: "--wash-strong" },
 ];
 
-// The HUD type scale — the four steps every HUD text site snaps to (globals.css `@theme`).
-// No hardcoded px: the sample renders at the live `text-*` class, so the size IS the token
-// (the exact px lives in globals.css `--text-*` — the source of truth, not duplicated here).
+// The HUD type scale — the three steps every HUD text site snaps to (globals.css `@theme`), plus
+// the documents' prose step. No hardcoded px: the sample renders at the live `text-*` class, so
+// the size IS the token (the exact px lives in globals.css `--text-*` — the source of truth, not
+// duplicated here). Three, not four (2026-10-02): the old micro step sat a pixel under label.
 const TYPE_SCALE: { cls: string; role: string }[] = [
-  { cls: "text-micro", role: "uppercase eyebrows / tags / axis labels + tiny glyphs" },
-  { cls: "text-label", role: "secondary / meta — counts, codes, subtitles, hints" },
+  { cls: "text-label", role: "eyebrows, tags, chips, axis labels — and counts, codes, subtitles, hints" },
   { cls: "text-body", role: "rows, descriptions, values" },
   { cls: "text-title", role: "card titles" },
+  { cls: "text-prose", role: "document paragraphs (/about, /design, the History document)" },
 ];
 
 // The doc-page section grammar, shared with /about: h2 lead + inset hairline + spaced body.
@@ -105,7 +106,7 @@ export default function DesignDoc() {
 
   return (
     <article className="pt-14">
-          <p className="text-micro tracking-caps uppercase text-muted-foreground">Design</p>
+          <p className="text-label tracking-caps uppercase text-muted-foreground">Design</p>
           <h1 className="mt-3 text-3xl font-semibold tracking-[-0.01em] leading-tight">
             Instrument-Glass
           </h1>
@@ -170,11 +171,11 @@ export default function DesignDoc() {
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 max-w-2xl">
               <div className="ig-panel p-3">
                 <div className="text-title text-foreground">The quick brown fox 0123</div>
-                <div className="text-micro font-mono text-muted-foreground mt-1">sans · system-ui — reading UI (prose, labels)</div>
+                <div className="text-label font-mono text-muted-foreground mt-1">sans · system-ui — reading UI (prose, labels)</div>
               </div>
               <div className="ig-panel p-3">
                 <div className="text-title font-mono tabular-nums text-foreground">DAG · a2be…69a9</div>
-                <div className="text-micro font-mono text-muted-foreground mt-1">mono · font-mono · tabular-nums — data (ids, counts, codes)</div>
+                <div className="text-label font-mono text-muted-foreground mt-1">mono · font-mono · tabular-nums — data (ids, counts, codes)</div>
               </div>
             </div>
           </Section>
@@ -192,7 +193,7 @@ export default function DesignDoc() {
                 <div key={m.ticker} className="ig-panel p-3" style={{ ["--spine" as string]: m.hue?.hudOklch }}>
                   <div className="h-10 rounded-md mb-2" style={{ background: m.hue?.hudOklch }} />
                   <div className="text-label font-mono">{m.ticker}</div>
-                  <div className="text-micro font-mono text-muted-foreground">
+                  <div className="text-label font-mono text-muted-foreground">
                     {m.hue ? `${Math.round(m.hue.hueDeg)}°` : "—"}
                   </div>
                 </div>
@@ -200,7 +201,7 @@ export default function DesignDoc() {
             </div>
           </Section>
 
-          <h2 className="text-micro uppercase tracking-caps text-primary-ink mt-14 mb-4 border-t border-border pt-6">
+          <h2 className="text-label uppercase tracking-caps text-primary-ink mt-14 mb-4 border-t border-border pt-6">
             Signature elements — the bespoke design language
           </h2>
 
@@ -336,12 +337,12 @@ export default function DesignDoc() {
                 <div className="flex items-center gap-2 rounded-[5px] px-1.5 py-1 text-body text-foreground-dim">
                   <span className="w-1.5 h-1.5 rounded-full flex-none" style={{ background: "var(--core)" }} />
                   <span className="font-mono">db5fead8…8317f</span>
-                  <span className="ml-auto inline-flex items-center gap-1.5 text-micro text-muted-foreground">DAG <StateDot state="Ready" /></span>
+                  <span className="ml-auto inline-flex items-center gap-1.5 text-label text-muted-foreground">DAG <StateDot state="Ready" /></span>
                 </div>
                 <div className="flex items-center gap-2 rounded-[5px] px-1.5 py-1 text-body text-foreground-dim">
                   <span className="w-1.5 h-1.5 rounded-full flex-none" style={{ background: "var(--core)" }} />
                   <span className="font-mono">3f0c91ab…0d2a4</span>
-                  <span className="ml-auto inline-flex items-center gap-1.5 text-micro text-muted-foreground">DAG <StateDot state="Offline" /></span>
+                  <span className="ml-auto inline-flex items-center gap-1.5 text-label text-muted-foreground">DAG <StateDot state="Offline" /></span>
                 </div>
               </div>
             </div>
@@ -403,7 +404,7 @@ export default function DesignDoc() {
                 </svg>
                 <div className={cn("absolute whitespace-nowrap", SCENE_GLASS)} style={{ left: 62, bottom: 92 }}>
                   <span aria-hidden className="edge-spine opacity-70" style={{ ["--spine" as string]: "#c9824f" }} />
-                  <div className="text-micro font-bold tracking-[0.1em] uppercase leading-none text-accent mb-1.5">Metagraph</div>
+                  <div className="text-label font-bold tracking-[0.1em] uppercase leading-none text-accent mb-1.5">Metagraph</div>
                   <div className="flex items-center gap-[7px]">
                     <span className="text-body font-semibold text-foreground">Metagraph name</span>
                     <span className="text-label font-bold ml-1" style={{ color: "#c9824f" }}>TICKER</span>
@@ -439,7 +440,7 @@ export default function DesignDoc() {
             </Note>
             <div className="ig-panel p-4 max-w-2xl">
               <div className="h-3 w-full" style={{ background: "var(--axis-hairlines)" }} aria-hidden />
-              <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-micro font-mono text-muted-foreground">
+              <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-label font-mono text-muted-foreground">
                 <span>--thread-tick (minor)</span>
                 <span>--thread-tick-major (every 4th)</span>
                 <span>--thread-tick-pitch (spacing)</span>

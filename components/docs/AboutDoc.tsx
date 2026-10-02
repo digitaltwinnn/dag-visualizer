@@ -15,7 +15,7 @@ import { ABOUT } from "@/components/aboutCopy";
 
 // The house eyebrow: a bare role word in caps micro, the same register every card head uses.
 function Eyebrow({ children }: { children: React.ReactNode }) {
-  return <p className="text-micro tracking-caps uppercase text-muted-foreground">{children}</p>;
+  return <p className="text-label tracking-caps uppercase text-muted-foreground">{children}</p>;
 }
 
 // One glass panel. Not `.ig-panel`: that class carries the rail cards' signal-edge pseudo-element
@@ -173,7 +173,7 @@ export default function AboutDoc() {
         <Panel className="py-4 px-5 border-[color-mix(in_oklch,var(--warn-soft)_30%,transparent)]">
           <div className="flex items-center gap-2">
             <TriangleAlert aria-hidden className="size-3.5 text-warn-soft opacity-85 flex-none" />
-            <h2 className="text-micro tracking-caps uppercase font-bold text-warn-soft">
+            <h2 className="text-label tracking-caps uppercase font-bold text-warn-soft">
               Unofficial, experimental
             </h2>
           </div>

@@ -148,7 +148,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
       ) : undefined,
       rows: measured.map(({ c, v }) => ({
         key: c.cc,
-        glyph: <span className="font-mono text-micro text-muted-foreground">{ccMark(c.cc)}</span>,
+        glyph: <span className="font-mono text-label text-muted-foreground">{ccMark(c.cc)}</span>,
         name: c.country,
         share: v / maxV,
         hue: accent,

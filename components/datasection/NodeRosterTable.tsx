@@ -158,7 +158,7 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
               >
                 <button
                   type="button"
-                  className="flex items-center gap-1 text-micro uppercase tracking-caps text-muted-foreground hover:text-foreground cursor-pointer"
+                  className="flex items-center gap-1 text-label uppercase tracking-caps text-muted-foreground hover:text-foreground cursor-pointer"
                   onClick={() => setSort((s) => ({ key: c.key, dir: s.key === c.key ? ((s.dir * -1) as 1 | -1) : 1 }))}
                 >
                   {c.label}

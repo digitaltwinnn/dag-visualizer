@@ -546,7 +546,7 @@ function PayloadSection({
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-start" title={title}>
-        <span className="text-micro tracking-caps uppercase text-muted-foreground pt-px">{name}</span>
+        <span className="text-label tracking-caps uppercase text-muted-foreground pt-px">{name}</span>
       </div>
       {pending && <p className="pl-2 text-label text-muted-foreground italic">{pending}</p>}
       {read && rows.length === 0 && !signers && (

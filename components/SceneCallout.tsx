@@ -116,7 +116,7 @@ export function CalloutPanel({ m, className }: { m: CalloutModel; className?: st
       <span aria-hidden className="edge-spine opacity-70" style={{ ["--spine" as string]: m.ring }} />
       {/* The card eyebrow's own ink (CardHead: EYEBROW + text-accent), not a muted caption —
           this is the same slot noun the rail card wears (user, 2026-08-15). */}
-      <div className="text-micro font-bold tracking-[0.1em] uppercase leading-none text-accent mb-1.5">{m.eyebrow}</div>
+      <div className="text-label font-bold tracking-[0.1em] uppercase leading-none text-accent mb-1.5">{m.eyebrow}</div>
       {/* No identity dot here (user, 2026-08-15): the hued aside already carries the identity
           on this row, and the anchor ring is the subject mark at the scene end of the tie. */}
       <div className="flex items-center gap-[7px]">

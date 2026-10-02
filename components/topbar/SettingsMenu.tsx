@@ -44,7 +44,7 @@ export default function SettingsMenu() {
         >
           <Settings aria-hidden className="size-4" />
           {net !== "mainnet" && (
-            <span className="text-micro tracking-caps uppercase text-[var(--primary)]">{code}</span>
+            <span className="text-label tracking-caps uppercase text-[var(--primary)]">{code}</span>
           )}
           <ChevronDown aria-hidden className="size-3.5 opacity-70 max-[700px]:hidden" />
         </button>
@@ -63,7 +63,7 @@ export default function SettingsMenu() {
 /** The sections' eyebrow — the card grammar's micro-caps register, muted, never interactive. */
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="px-2.5 pt-2 pb-1 text-micro tracking-caps uppercase text-muted-foreground/80 select-none">
+    <p className="px-2.5 pt-2 pb-1 text-label tracking-caps uppercase text-muted-foreground/80 select-none">
       {children}
     </p>
   );

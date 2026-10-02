@@ -109,7 +109,7 @@ const stampUtc = (ts: string): string => {
 type LaneId = "state" | "data" | "signers";
 type Lane = { id: LaneId; name: string; title: string };
 
-const LANE_HEAD = "text-micro uppercase tracking-caps text-muted-foreground font-normal";
+const LANE_HEAD = "text-label uppercase tracking-caps text-muted-foreground font-normal";
 
 /** Which part of a payload lane owns the scroll (2026-08-18). Exactly one of the lane's two parts
  *  may be a scroller, or the box shows two bars for one overflow. With the tree OPEN the well is
@@ -254,7 +254,7 @@ function SchemaRow({
  *  gesture itself. */
 function FieldChips({ fields }: { fields: string[] }) {
   const chip =
-    "inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-[2px] font-mono text-micro leading-none text-muted-foreground";
+    "inline-flex items-center rounded-xs border border-border bg-wash-faint px-[5px] py-[2px] font-mono text-label leading-none text-muted-foreground";
   return (
     <span className="min-w-0 flex flex-wrap gap-1">
       {fields.map((f) => (
@@ -318,7 +318,7 @@ function RawSection({
         <CollapsibleTrigger
           className={cn(
             "flex w-fit items-center gap-1 py-0.5 pr-1.5 cursor-pointer rounded-xs",
-            "text-micro tracking-caps uppercase text-muted-foreground",
+            "text-label tracking-caps uppercase text-muted-foreground",
             "hover:text-foreground hover:bg-wash-faint",
             "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
           )}
@@ -425,7 +425,7 @@ function SignerGroup({
         <span className={LANE_HEAD}>{g.label}</span>
         {/* "signed by [L0]" (user, 2026-08-14) — the chip alone floated context-free. */}
         <span className="inline-flex items-center gap-1.5">
-          <span className="text-micro text-muted-foreground">signed by</span>
+          <span className="text-label text-muted-foreground">signed by</span>
           <RoleChips codes={[g.who.split(" ")[0]]} />
         </span>
       </div>
@@ -565,7 +565,7 @@ export function ChannelStatePanel() {
     <div className="flex flex-col gap-3 min-h-0 h-full max-[700px]:h-auto max-[700px]:min-h-fit">
       {/* The pane's subject head — same grammar as a card head: eyebrow + identity + ordinal. */}
       <div className="flex flex-col gap-1 flex-none">
-        <span className="text-micro tracking-caps uppercase text-muted-foreground">Metagraph snapshot</span>
+        <span className="text-label tracking-caps uppercase text-muted-foreground">Metagraph snapshot</span>
         <span className="flex items-center gap-2 text-title font-semibold text-foreground">
           <IdentityDot hue={hue} />
           {ticker} <span className="tabular-nums">{sel.ordinal.toLocaleString()}</span>
@@ -692,7 +692,7 @@ export function ChannelStatePanel() {
                       key={l.id}
                       value={l.id}
                       title={l.title}
-                      className={cn(CABINET_TRIGGER, "h-7 text-micro")}
+                      className={cn(CABINET_TRIGGER, "h-7 text-label")}
                     >
                       <LaneIcon aria-hidden className="size-3.5 flex-none" />
                       {l.name}

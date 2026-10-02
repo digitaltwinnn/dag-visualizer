@@ -140,7 +140,7 @@ export default function TrendInstantPane({
         // instant, and "3 months ago" places it; "daily" only said what the charts are cut in,
         // which the note below already says where it matters. Measured from the bucket's start.
         aside={
-          <span className="text-micro text-muted-foreground">
+          <span className="text-label text-muted-foreground">
             {cursorMs != null ? `${ageWords(Date.now() - (bucket ?? cursorMs))} ago` : null}
           </span>
         }
@@ -213,7 +213,7 @@ export default function TrendInstantPane({
                   {/* WHAT THE LIST IS ABOUT, said once (design A): these are readings AT THE
                       INSTANT, in the bucket's own unit — the Networks list beside it averages a
                       span, and the two looked identical without this line. */}
-                  <p className="mt-2 mb-0 flex items-baseline justify-between text-micro tracking-caps uppercase text-muted-foreground">
+                  <p className="mt-2 mb-0 flex items-baseline justify-between text-label tracking-caps uppercase text-muted-foreground">
                     <span>At that moment</span>
                     {unit ? <span className="normal-case tracking-normal">{unit}</span> : null}
                   </p>

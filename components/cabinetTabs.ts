@@ -15,7 +15,7 @@
 //     sides, so label and contents are one contour. The idle tab is muted ink with no outline.
 //
 // Class strings rather than a component: each surface keeps its own sizes (the channel pane's
-// lanes carry icons at `text-micro`) and its own Radix wiring; what cannot drift is the look.
+// lanes carry icons at `text-label`) and its own Radix wiring; what cannot drift is the look.
 
 /** The `TabsList` (variant "line" — the only one without a track behind it). */
 export const CABINET_LIST =

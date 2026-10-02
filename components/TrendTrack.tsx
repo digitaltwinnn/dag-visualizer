@@ -463,7 +463,7 @@ export default function TrendTrack({
                 x={x}
                 y={box.h - 2}
                 textAnchor="middle"
-                className="fill-[var(--muted-foreground)] text-micro tracking-caps"
+                className="fill-[var(--muted-foreground)] text-label tracking-caps"
               >
                 {tickLabel(t)}
               </text>
@@ -496,7 +496,7 @@ export default function TrendTrack({
               x={cursorX > box.w - STAMP_FLIP_PX ? cursorX - 6 : cursorX + 6}
               y={plotH - 4}
               textAnchor={cursorX > box.w - STAMP_FLIP_PX ? "end" : "start"}
-              className="fill-[var(--foreground)] text-micro tabular-nums pointer-events-none"
+              className="fill-[var(--foreground)] text-label tabular-nums pointer-events-none"
             >
               {stampInstant(cursorMs as number, stepMs)}
             </text>

@@ -314,7 +314,7 @@ export function GhostCard({ card }: { card: RailCard }) {
             text starts at the SAME x on every ghost card (user). In em, not px (2026-10-02): the
             type scale is fluid, and an 86px column that fit 10.5px caps overlapped the hint at
             12.5px. */}
-        <span className="flex-none w-[8.5em] mt-[2px] text-micro tracking-caps uppercase">{label}</span>
+        <span className="flex-none w-[8.5em] mt-[2px] text-label tracking-caps uppercase">{label}</span>
         <span className="min-w-0 italic">{card.hint}</span>
       </p>
     </aside>

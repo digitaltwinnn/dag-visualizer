@@ -931,12 +931,14 @@ no aliases**, and component code doesn't re-derive paddings, radii or cyan tints
 mirrors the thread literals in code because an SVG stroke attribute can't resolve `var()` — keep the
 two in sync.
 
-**The HUD type scale is FLUID, and it has a fifth step** (design review 2026-10-02: "the fonts are
-tiny while there is a lot of empty space"). `--text-micro/label/body/title` are `clamp()`s — the old
-size plus half a pixel holds to a 1440px viewport, a linear ramp lands ~15% up at 2560px — so a
-container measured for a 12.5px figure must be stated in `em` or against the token, never in px
-(ExplorerRow's figure column, the ghost rung's eyebrow column). `text-prose` (15px / 1.65) is for the
-doc overlay's paragraphs ONLY; a card's description stays `text-body`. The rail widths (`--rail-w`,
+**The HUD type scale is THREE steps, FLUID, plus the documents' prose step** (2026-10-02, two
+rounds: "the fonts are tiny while there is a lot of empty space", then "the filter text is still
+smaller"). `--text-label/body/title` are `clamp()`s — 12/14/16 hold to a 1440px viewport, a linear
+ramp lands at 13.5/16/18.5 by 2560px — at least 2px apart, because the retired `micro` step sat
+1px under `label` and a pixel is not a hierarchy: an eyebrow is caps + tracking + ink at the label
+step. A container measured for a fixed figure must be stated in `em` or against the token, never in
+px (ExplorerRow's figure column, the ghost rung's eyebrow column). `text-prose` (15px / 1.65) is for
+the doc overlay's paragraphs ONLY; a card's description stays `text-body`. The rail widths (`--rail-w`,
 `--detail-w`) and the vitals band (`--vitals-h`, paired with BottomStream's `RESERVE`) grew with it.
 **The accent is a glow, `--primary-ink` is the accent as TEXT**: links, eyebrows and tickers set in
 the accent take `text-primary-ink` (the accent itself on dark; two-thirds toward black on paper, where

@@ -306,7 +306,7 @@ interface StackSeg { key: string; n: number; color: string }
 
 function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: boolean; filter: string; data: TrendsWindowData | null }) {
   if (!data) {
-    return <span className="flex items-center justify-center w-full self-center text-micro text-muted-foreground" aria-hidden>acquiring…</span>;
+    return <span className="flex items-center justify-center w-full self-center text-label text-muted-foreground" aria-hidden>acquiring…</span>;
   }
   const anchors = data.series["g.anchors"] ?? [];
   const ticks = data.series["g.ticks"] ?? [];
@@ -351,14 +351,14 @@ function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: b
     // DID arrive — the window simply holds no samples, a real outage that can stand for
     // hours. "Acquiring" is the fetch-in-flight word above and quietly promises resolution;
     // a measured silence states itself.
-    return <span className="flex items-center justify-center w-full self-center text-micro text-muted-foreground" aria-hidden>not sampled in this window</span>;
+    return <span className="flex items-center justify-center w-full self-center text-label text-muted-foreground" aria-hidden>not sampled in this window</span>;
   }
   // MONTHLY BARS CARRY A MONTH AXIS (user, 2026-09-09: "a subtle legend at 1Y — jan. feb."):
   // the 1Y window is the one where position-in-window stops being readable as "when" (a bar
   // is a whole calendar month, not a rolling bucket), so each slot names its month below.
   // Detected off monthlySum's own nominal stepMs — no new prop to drift. Every OTHER month,
   // anchored at the newest so the right edge always reads (the /trends right-edge skip rule);
-  // twelve full labels at text-micro collide in the card's ~16px slots. The label row mirrors
+  // twelve full labels at text-label collide in the card's ~16px slots. The label row mirrors
   // the bar row's slot geometry exactly (flex-1 / max-w / gap), so labels sit under their bars.
   const monthly = data.stepMs === 2_592_000_000;
   // A WEEK'S BARS CARRY THEIR WEEKDAYS (user, 2026-09-11 — the month axis's own reasoning one
@@ -374,7 +374,7 @@ function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: b
           their slots to fit, so the justification is a no-op everywhere else; time still
           reads left-old → right-new inside the cluster. */}
       <div className="flex items-end justify-center gap-[2px] flex-1 min-h-0 pb-0.5">
-        {allZero && <span className="text-micro text-muted-foreground self-center">no anchors in this window</span>}
+        {allZero && <span className="text-label text-muted-foreground self-center">no anchors in this window</span>}
         {bars.map((b) => {
           if (b.v == null) {
             // Unmeasured — the neutral stub (see the header). It keeps its flex slot so the
@@ -407,7 +407,7 @@ function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: b
       {(monthly || weekly) && (
         <div className="flex justify-center gap-[2px] leading-none">
           {bars.map((b, i) => (
-            <span key={b.ts} className="flex-1 max-w-[22px] text-center text-micro text-muted-foreground/70 lowercase whitespace-nowrap">
+            <span key={b.ts} className="flex-1 max-w-[22px] text-center text-label text-muted-foreground/70 lowercase whitespace-nowrap">
               {weekly
                 ? new Date(b.ts).toLocaleString("en", { weekday: "short", timeZone: "UTC" })
                 : (bars.length - 1 - i) % 2 === 0
@@ -553,7 +553,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
         </span>
       }
     >
-      <span className="flex items-center self-stretch text-micro text-muted-foreground">{reason}</span>
+      <span className="flex items-center self-stretch text-label text-muted-foreground">{reason}</span>
     </BandCard>
   );
   const rate = (label: string, spark: SparkSpec, note?: string, title?: string) => {
@@ -590,7 +590,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
           {spark.data != null ? (
             line
           ) : (
-            <span className="flex items-center self-stretch text-micro text-muted-foreground">
+            <span className="flex items-center self-stretch text-label text-muted-foreground">
               no snapshots for {ageWords(stale)}
             </span>
           )}

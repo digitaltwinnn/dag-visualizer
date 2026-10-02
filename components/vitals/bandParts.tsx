@@ -145,12 +145,12 @@ export function BandCard({ label, children, className, mark, lead, aside, title 
         {/* TRUNCATE, not `whitespace-nowrap`: at 760px "Metagraphs anchoring" clipped mid-glyph
             with no ellipsis (user, 2026-09-01: "in some screen sizes it overflows"), which reads
             as a rendering fault rather than as a shortened label. */}
-        <span className="text-micro tracking-[0.1em] uppercase text-muted-foreground truncate leading-none">{label}</span>
+        <span className="text-label tracking-[0.1em] uppercase text-muted-foreground truncate leading-none">{label}</span>
         {/* The eyebrow's right-aligned companion — CardHead's aside pattern reaching the band
             (user, 2026-09-08: the rate cards' window words moved here from beside the chart, so
             the line spends the whole body). Muted, natural case (a window is words, not a
             label), flex-none so the LABEL is what truncates when the card is tight. */}
-        {aside != null && <span className="ml-auto flex-none text-micro text-muted-foreground whitespace-nowrap leading-none">{aside}</span>}
+        {aside != null && <span className="ml-auto flex-none text-label text-muted-foreground whitespace-nowrap leading-none">{aside}</span>}
       </span>
       {/* ⚠️ NOT a `@container` (tried and reverted, 2026-09-01). Querying the body's own width to
           drop parts of a cell is the tempting shape, but `container-type: inline-size` also

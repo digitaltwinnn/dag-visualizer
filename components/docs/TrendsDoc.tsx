@@ -427,7 +427,7 @@ export default function TrendsDoc() {
 
   return (
     <article className="pt-14">
-      <p className="text-micro tracking-caps uppercase text-muted-foreground">Trends</p>
+      <p className="text-label tracking-caps uppercase text-muted-foreground">Trends</p>
       <h1 className="mt-3 text-2xl font-semibold tracking-[-0.01em] leading-tight">
         {buckets.length > 1 ? spanPhrase(buckets, stepMs) : "The network, measured"}
       </h1>

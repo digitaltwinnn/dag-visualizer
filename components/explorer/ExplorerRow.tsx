@@ -198,7 +198,7 @@ export default function ExplorerRow({
       >
         {name}
       </span>
-      <span className="min-w-0 truncate flex items-center gap-1 text-micro text-muted-foreground">{tag}</span>
+      <span className="min-w-0 truncate flex items-center gap-1 text-label text-muted-foreground">{tag}</span>
       {hasFigure && (
         <>
           <span className="h-[5px] rounded-[3px] bg-wash-faint overflow-hidden">

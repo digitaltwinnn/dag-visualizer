@@ -91,7 +91,7 @@ export function nodeRowSpec(args: {
   return {
     key: args.key,
     glyph: (
-      <span className="min-w-0 truncate text-micro font-medium">
+      <span className="min-w-0 truncate text-label font-medium">
         <span style={{ color: hue }}>{ticker}</span>
         {also.map((m) => (
           <span key={m.id} style={{ color: identityHudCss(m.id) }}> {tickerOf(m.id)}</span>

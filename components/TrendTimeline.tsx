@@ -134,7 +134,7 @@ export default function TrendTimeline() {
     // gesture hint. The plate's accent frame is VitalsBand's, keyed on the same policy row.
     <div className="pointer-events-auto relative flex-1 min-w-0 flex items-stretch gap-3 px-1.5 max-[700px]:flex-col max-[700px]:gap-1.5 max-[700px]:px-0">
       <div className="flex-none flex flex-col justify-center gap-1.5 pr-3 border-r border-border/60 max-[700px]:pr-0 max-[700px]:border-r-0">
-        <span className="text-micro tracking-caps uppercase text-muted-foreground leading-none max-[700px]:hidden">Time range</span>
+        <span className="text-label tracking-caps uppercase text-muted-foreground leading-none max-[700px]:hidden">Time range</span>
         <div className="flex items-center gap-1.5">
           <WindowPicker
             className="max-[700px]:flex-1"
@@ -153,9 +153,9 @@ export default function TrendTimeline() {
           month labels, the plot under 30). 110px gives the brush and its grips a thumb's worth. */}
       <div className="flex-1 min-w-0 flex flex-col max-[700px]:min-h-[110px]">
         <div className="flex items-baseline justify-between gap-3 pt-0.5 leading-none">
-          <span className="text-micro text-muted-foreground truncate">All networks · {metricCaption(metric, 86_400_000)}</span>
+          <span className="text-label text-muted-foreground truncate">All networks · {metricCaption(metric, 86_400_000)}</span>
           {showHint && (
-            <span className="flex-none text-micro text-foreground-dim max-[700px]:hidden">
+            <span className="flex-none text-label text-foreground-dim max-[700px]:hidden">
               Drag to set a range · {coarse ? "tap" : "click"} to mark a moment
             </span>
           )}
@@ -168,15 +168,15 @@ export default function TrendTimeline() {
             different facts and a reader waiting on the first would wait forever. The pills beside
             all three keep working. */}
         {!overview && !ov.error && (
-          <span className="text-micro text-muted-foreground self-center">acquiring…</span>
+          <span className="text-label text-muted-foreground self-center">acquiring…</span>
         )}
         {!overview && ov.error && (
-          <span className="text-micro text-muted-foreground self-center">
+          <span className="text-label text-muted-foreground self-center">
             The trends store is unreachable right now.
           </span>
         )}
         {overview && !measured && (
-          <span className="text-micro text-muted-foreground self-center">nothing measured yet</span>
+          <span className="text-label text-muted-foreground self-center">nothing measured yet</span>
         )}
         {measured && (
           <TrendTrack

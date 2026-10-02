@@ -209,7 +209,7 @@ export default function SiteFooter() {
             veil; the softening is the caps-micro size and the missing underline, not the
             alpha). Stands down below 860px; the About page carries it there. */}
         <span aria-hidden className="w-px h-3.5 self-center bg-muted-foreground/35 max-[860px]:hidden" />
-        <span className="text-micro tracking-caps uppercase text-primary-ink select-none max-[860px]:hidden">
+        <span className="text-label tracking-caps uppercase text-primary-ink select-none max-[860px]:hidden">
           unofficial community project
         </span>
       </nav>

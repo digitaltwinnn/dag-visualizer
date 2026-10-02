@@ -79,7 +79,7 @@ export default function Sparkline({
     const unsampled = !!data && data.length > 0 && data.every((v) => v == null);
     return (
       <span
-        className={cn("flex items-center justify-center text-micro text-muted-foreground", stretch && "w-full")}
+        className={cn("flex items-center justify-center text-label text-muted-foreground", stretch && "w-full")}
         style={{ height, width: stretch ? undefined : width }}
       >
         {unsampled ? "not sampled" : "acquiring…"}

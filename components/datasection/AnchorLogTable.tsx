@@ -816,7 +816,7 @@ export default function AnchorLogTable() {
                   <button
                     type="button"
                     className={cn(
-                      "items-center gap-1 text-micro uppercase tracking-caps text-muted-foreground hover:text-foreground cursor-pointer",
+                      "items-center gap-1 text-label uppercase tracking-caps text-muted-foreground hover:text-foreground cursor-pointer",
                       i >= 2 ? "inline-flex flex-row-reverse" : "flex",
                     )}
                     onClick={() => setSort((s) => ({ key: c.key, dir: s.key === c.key ? ((s.dir * -1) as 1 | -1) : 1 }))}
@@ -977,7 +977,7 @@ export default function AnchorLogTable() {
           pager-side line remains only for a FOLDED bar, whose applied search would otherwise
           sit unexplained. */}
       {jumpMiss && !searchOpen && (
-        <p className="flex-none pt-1 text-micro text-[var(--warn-soft)]">{jumpMiss}</p>
+        <p className="flex-none pt-1 text-label text-[var(--warn-soft)]">{jumpMiss}</p>
       )}
       <TablePager
         page={histNet ? page : Math.min(page, pages)}

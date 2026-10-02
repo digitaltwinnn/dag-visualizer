@@ -338,7 +338,7 @@ function UnlistedMemberFacts({ id, last }: { id: string; last: boolean }) {
           use the same card as any other metagraph"). */}
       {!last && (
         <div className="flex items-center justify-between gap-2">
-          <span className="text-micro tracking-caps uppercase text-muted-foreground">Network id</span>
+          <span className="text-label tracking-caps uppercase text-muted-foreground">Network id</span>
           <span className="font-mono text-label" title={id}>
             {shortHash(id)}
           </span>
@@ -414,7 +414,7 @@ function ScheduleGroup({
           selects nothing, and focus shows only for the keyboard in CopyButton's own
           focus-visible recipe. */}
       <CollapsibleTrigger className="group mt-2 flex w-full items-center gap-1 cursor-pointer select-none outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]">
-        <span className={value !== undefined ? "text-body text-muted-foreground" : "text-micro tracking-caps uppercase text-muted-foreground"}>{label}</span>
+        <span className={value !== undefined ? "text-body text-muted-foreground" : "text-label tracking-caps uppercase text-muted-foreground"}>{label}</span>
         <ChevronRight
           aria-hidden
           className={cn(
@@ -793,7 +793,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // The node's make-up: the composition word + its layer codes as squared pills (RoleChips — the
   // same rendering the metagraph card's composition rows use; user 2026-07-12: the joined
   // "L0·cL1" text read as one token). Sentence-cased ("Hybrid" / "Currency") to match the
-  // composition rows' label style — text-micro is the UPPERCASE lane (labels), word values at
+  // composition rows' label style — text-label is the UPPERCASE lane (labels), word values at
   // text-body are sentence case.
   const compWord = p.node ? nodeCompositionLabel(p.node) : null;
   const comp = compWord ? compWord.charAt(0).toUpperCase() + compWord.slice(1) : null;

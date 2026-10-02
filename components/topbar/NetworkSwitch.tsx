@@ -58,7 +58,7 @@ export default function NetworkRows() {
               The icon replaces the bare dot (user, 2026-08-30): colour + glyph, one mark. */}
           {(() => { const RowIcon = NET_ICONS[r.id]; return <RowIcon aria-hidden className="size-4 flex-none" style={{ color: `var(--net-${r.id})` }} />; })()}
           <span className="flex-1">{r.name}</span>
-          <span className="text-micro tracking-caps uppercase opacity-60">{r.code}</span>
+          <span className="text-label tracking-caps uppercase opacity-60">{r.code}</span>
         </a>
       ))}
     </>

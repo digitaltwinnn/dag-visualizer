@@ -69,7 +69,7 @@ export default function PresentationToggle() {
         className={cn(SEG, "max-[1099px]:hidden")}
       >
         <Focus aria-hidden className="size-4" />
-        <span className="text-micro tracking-caps uppercase max-[1649px]:hidden">Scene</span>
+        <span className="text-label tracking-caps uppercase max-[1649px]:hidden">Scene</span>
       </button>
       {/* RAW — the layer toggle. aria-pressed, not a radio segment: it pushes a different
           surface in and pops it out, and the pair to its left survives the round trip. */}
@@ -81,7 +81,7 @@ export default function PresentationToggle() {
         className={SEG}
       >
         <Table2 aria-hidden className="size-4" />
-        <span className="text-micro tracking-caps uppercase max-[1649px]:hidden">Raw</span>
+        <span className="text-label tracking-caps uppercase max-[1649px]:hidden">Raw</span>
       </button>
     </div>
   );

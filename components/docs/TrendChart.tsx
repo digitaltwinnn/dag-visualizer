@@ -411,7 +411,7 @@ export default function TrendChart({
         <span className="inline-flex items-baseline gap-2 min-w-0 max-w-full flex-none">
           <span className="inline-block w-2 h-2 rounded-full flex-none" style={{ background: hue0 }} aria-hidden />
           <span className="text-label font-semibold text-foreground truncate">{name}</span>
-          {unit && <span className="text-micro text-muted-foreground whitespace-nowrap">{unit}</span>}
+          {unit && <span className="text-label text-muted-foreground whitespace-nowrap">{unit}</span>}
         </span>
         {/* One rung down the ladder (convention 12): only offered while a range is active,
             because the destination — the anchor log's date search — receives that range. */}
@@ -428,7 +428,7 @@ export default function TrendChart({
             // arrow mark + hover underline — the app's "this goes somewhere" signals. Text
             // FIRST so the flex baseline is the text's (a leading icon was what knocked the
             // earlier cut off the head's baseline).
-            className="inline-flex items-center gap-0.5 text-micro text-primary-ink hover:text-primary hover:underline underline-offset-2 whitespace-nowrap"
+            className="inline-flex items-center gap-0.5 text-label text-primary-ink hover:text-primary hover:underline underline-offset-2 whitespace-nowrap"
           >
             snapshot records
             <ArrowUpRight aria-hidden className="size-3" />
@@ -437,7 +437,7 @@ export default function TrendChart({
         {/* The pair legend — only when there IS a pair (one series needs no legend, its name is
             the title). */}
         {(lines.length > 1 || (stack?.length ?? 0) > 0) && (
-          <span className="ml-auto inline-flex items-center gap-2 text-micro text-muted-foreground">
+          <span className="ml-auto inline-flex items-center gap-2 text-label text-muted-foreground">
             {stack?.map((b, i) => (
               <span key={`s:${b.label}`} className="inline-flex items-center gap-1">
                 <svg width="10" height="10" aria-hidden>
@@ -476,7 +476,7 @@ export default function TrendChart({
             <span className="text-label text-foreground-dim tabular-nums">
               {readout ? (readout.value != null ? format(readout.value) : readout.pending === false ? "—" : <NodeStars count={3} />) : format(last)}
             </span>
-            <span className="text-micro text-muted-foreground">
+            <span className="text-label text-muted-foreground">
               · {readout ? readout.word : `latest full ${stepMs >= 86400000 ? "day" : stepMs >= 3600000 ? "hour" : "5 min"}`}
             </span>
           </span>
@@ -993,7 +993,7 @@ const TrendPlot = memo(function TrendPlot({
                 content={({ active, payload, label }) => {
                   if (!active || !payload?.length) return null;
                   return (
-                    <div className="rounded border border-border bg-[var(--panel)] px-1.5 py-0.5 text-micro text-foreground whitespace-nowrap tabular-nums">
+                    <div className="rounded border border-border bg-[var(--panel)] px-1.5 py-0.5 text-label text-foreground whitespace-nowrap tabular-nums">
                       <span className="text-muted-foreground">{stampOf(Number(label), stepMs)}{" · "}</span>
                       {lines.map((l, li) => {
                         const v = payload.find((e) => e.dataKey === l.label)?.value;
@@ -1044,7 +1044,7 @@ const TrendPlot = memo(function TrendPlot({
               top-left beside the head's readout top-right was two unexplained values) — it
               is the window's peak, and the baseline is 0 by construction. */}
           {!compact && (
-            <span aria-hidden className="absolute top-1 left-1.5 text-micro text-muted-foreground pointer-events-none tabular-nums">
+            <span aria-hidden className="absolute top-1 left-1.5 text-label text-muted-foreground pointer-events-none tabular-nums">
               peak {format(ownMax)}
             </span>
           )}
