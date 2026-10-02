@@ -295,7 +295,8 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
 
   it("followToggleActions: the card's live switch flips following, keeping the shown subject", () => {
     const p = snapPick();
-    expect(followToggleActions(p, false)).toEqual([{ kind: "snapshot", pick: p, follow: true }]);
+    // Resuming live releases the tick-local network first — it names a network in the tick being left.
+    expect(followToggleActions(p, false)).toEqual([{ kind: "tickNet", sel: null }, { kind: "snapshot", pick: p, follow: true }]);
     expect(followToggleActions(p, true)).toEqual([{ kind: "snapshot", pick: p, follow: false }]);
   });
 });
@@ -484,7 +485,12 @@ describe("metaSnapSelectActions (a tile on the upper floor)", () => {
   it("an UNKNOWN-lane tile (raw unlisted address) names no network, so that rung stays empty", () => {
     const un: MetaSnapSel = { metaId: "DAGunlisted123", ordinal: 9, hash: "", globalOrdinal: 4200, ts: "t" };
     const a = metaSnapSelectActions(un, GLOBAL, { metaSnap: null });
-    expect(a.map((x) => x.kind)).toEqual(["snapshot", "metaSnap"]);
+    // …and "empty" is WRITTEN: a network left standing from the previous commit in this tick is cleared.
+    expect(a).toEqual([
+      { kind: "snapshot", pick: GLOBAL, follow: false },
+      { kind: "tickNet", sel: null },
+      { kind: "metaSnap", sel: un },
+    ]);
   });
 
   it("steps back ONE rung — to the network in the tick — when the same tile is picked again", () => {
@@ -512,8 +518,24 @@ describe("metaSnapArrivalActions (the raw layer opens on a subject)", () => {
     const a = metaSnapArrivalActions(SEL, GLOBAL);
     expect(a).toEqual([
       { kind: "snapshot", pick: GLOBAL, follow: false },
+      { kind: "tickNet", sel: { metaId: SEL.metaId, globalOrdinal: GLOBAL.data.ordinal } },
       { kind: "metaSnap", sel: SEL },
     ]);
+    expect(a.some((x) => x.kind === "filter")).toBe(false);
+  });
+
+  it("a seam row (no snapshot) clears the tick-local network with the snapshot", () => {
+    expect(metaSnapArrivalActions(null, GLOBAL)).toEqual([
+      { kind: "snapshot", pick: GLOBAL, follow: false },
+      { kind: "tickNet", sel: null },
+      { kind: "metaSnap", sel: null },
+    ]);
+  });
+
+  it("moving to another network in the tick drops a node committed under the old one", () => {
+    const a = tickNetSelectActions("paca", GLOBAL, { metaSnap: null, hasInspect: true, net: "dor" });
+    expect(a[0]).toEqual({ kind: "inspect", pick: null });
+    expect(tickNetSelectActions("dor", GLOBAL, { metaSnap: null, hasInspect: true, net: "dor" }).some((x) => x.kind === "inspect")).toBe(false);
   });
 
   it("follow is false so the pane's deep read actually fires — the arrival IS the gesture", () => {

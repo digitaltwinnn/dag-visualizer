@@ -18,7 +18,10 @@
  *  steps above it (the pager's › past the held head), and releasing the pin releases it. */
 export function nextHoldTop(current: number | null, pinnedOrdinal: number | null, newestOrdinal: number | null): number | null {
   if (pinnedOrdinal == null) return null;
-  if (current == null) return Math.max(newestOrdinal ?? pinnedOrdinal, pinnedOrdinal);
+  // No list yet (the feed seeds a render after mount): wait rather than freeze at the pin, which
+  // would hide every newer tick the reader had on screen.
+  if (newestOrdinal == null) return current;
+  if (current == null) return Math.max(newestOrdinal, pinnedOrdinal);
   return Math.max(current, pinnedOrdinal);
 }
 

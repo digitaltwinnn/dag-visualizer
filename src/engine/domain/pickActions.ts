@@ -297,9 +297,14 @@ export function snapshotSelectActions(
 export function tickNetSelectActions(
   metaId: string,
   global: Extract<PickDescriptor, { kind: "snapshot" }>,
-  current: { metaSnap: MetaSnapSel | null },
+  current: { metaSnap: MetaSnapSel | null; hasInspect?: boolean; net?: string | null },
 ): ClickAction[] {
   const out: ClickAction[] = [];
+  // A NODE hangs under the network it was opened from, so moving to ANOTHER network drops it —
+  // the filter's own cascade did this while the rung was the filter; a tick-local commit has no
+  // such cascade, and a Dor validator left under "Metagraph Paca" states a membership nobody
+  // committed. Finest first, like every release.
+  if (current.hasInspect && current.net !== metaId) out.push({ kind: "inspect", pick: null });
   if (current.metaSnap && current.metaSnap.metaId !== metaId) out.push({ kind: "metaSnap", sel: null });
   out.push({ kind: "snapshot", pick: global, follow: false });
   out.push({ kind: "tickNet", sel: { metaId, globalOrdinal: global.data.ordinal } });
@@ -315,6 +320,12 @@ export function tickNetClearActions(current: { metaSnap: MetaSnapSel | null; has
   out.push({ kind: "tickNet", sel: null });
   return out;
 }
+
+/** The tick-local network a metagraph snapshot's commit carries: its own network when that is a
+ *  catalogued one, else NULL — and null is WRITTEN, not skipped, so an unlisted channel (or a
+ *  seam row) never sits under a network left standing from the previous commit in the same tick. */
+const tickNetOf = (sel: MetaSnapSel | null, global: Extract<PickDescriptor, { kind: "snapshot" }>): TickNetSel | null =>
+  sel && METAGRAPHS.some((m) => m.id === sel.metaId) ? { metaId: sel.metaId, globalOrdinal: global.data.ordinal } : null;
 
 // Metagraph snapshot identity — metaId + ordinal (the snapshot's own ordinal, not the global one).
 export const sameMetaSnap = (a: MetaSnapSel | null, b: MetaSnapSel | null): boolean =>
@@ -347,7 +358,7 @@ export function metaSnapSelectActions(
   // click-scoped decode rule, user 2026-08-07), not silently deselect.
   if (sameMetaSnap(current.metaSnap, sel) && !current.following) return [{ kind: "metaSnap", sel: null }];
   const out: ClickAction[] = [{ kind: "snapshot", pick: global, follow: false }];
-  if (METAGRAPHS.some((m) => m.id === sel.metaId)) out.push({ kind: "tickNet", sel: { metaId: sel.metaId, globalOrdinal: global.data.ordinal } });
+  out.push({ kind: "tickNet", sel: tickNetOf(sel, global) });
   out.push({ kind: "metaSnap", sel });
   return out;
 }
@@ -389,6 +400,8 @@ export function metaSnapArrivalActions(
 ): ClickAction[] {
   return [
     { kind: "snapshot", pick: global, follow: false },
+    // The full ancestry, as a click builds it — and a stale network from the same tick is replaced.
+    { kind: "tickNet", sel: tickNetOf(sel, global) },
     { kind: "metaSnap", sel },
   ];
 }
@@ -399,10 +412,12 @@ export function metaSnapArrivalActions(
 export function bandSelectActions(
   metaId: string,
   global: Extract<PickDescriptor, { kind: "snapshot" }>,
-  current: { filter: string; metaSnap: MetaSnapSel | null; tickHasFilter?: boolean },
+  current: { filter: string; metaSnap: MetaSnapSel | null; tickHasFilter?: boolean; hasInspect?: boolean; net?: string | null },
 ): ClickAction[] {
   const out: ClickAction[] = [];
   const listed = metaId !== UNLISTED_KEY;
+  // Another network's band drops the node committed under the old one (see `tickNetSelectActions`).
+  if (current.hasInspect && current.net !== metaId) out.push({ kind: "inspect", pick: null });
   // The UNLISTED band names no network, so it carries only the filter's RELEASE rule (2026-08-08,
   // review fix — the unlisted band of an out-of-story tick would leave a stale filter dimming it).
   if (!listed && current.tickHasFilter === false) out.push({ kind: "filter", id: "all" });
@@ -424,7 +439,11 @@ export function followToggleActions(
   shown: Extract<PickDescriptor, { kind: "snapshot" }>,
   following: boolean,
 ): ClickAction[] {
-  return [{ kind: "snapshot", pick: shown, follow: !following }];
+  // Resuming live releases the tick-local network first: it is "this network in THAT tick", and
+  // left standing it kept the chamber dimmed for it until the next beat — and came back from a
+  // plain click on the same tick later.
+  if (!following) return [{ kind: "tickNet", sel: null }, { kind: "snapshot", pick: shown, follow: true }];
+  return [{ kind: "snapshot", pick: shown, follow: false }];
 }
 
 export function clickActions(input: {

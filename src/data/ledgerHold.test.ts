@@ -52,3 +52,10 @@ describe("heldTicks (the rows the explorer lists, and how many newer ones wait)"
     expect(heldTicks(snaps, 110, 105)).toEqual({ ticks: snaps, newer: 0 });
   });
 });
+
+describe("the hold waits for a list", () => {
+  it("does not freeze at the pin before the feed has seeded", () => {
+    expect(nextHoldTop(null, 100, null)).toBeNull();
+    expect(nextHoldTop(null, 100, 140)).toBe(140);
+  });
+});

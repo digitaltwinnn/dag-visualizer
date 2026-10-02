@@ -267,7 +267,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         // set the metagraph as the global application filter"). Standing on the filter itself
         // (committed in the top bar, then a tick opened under it) it steps the filter as before.
         if (net !== s.filter) {
-          const items = nets.map((m) => ({ key: m.id, label: m.name, actions: tickNetSelectActions(m.id, s.snap!, { metaSnap: s.metaSnap }) }));
+          const items = nets.map((m) => ({ key: m.id, label: m.name, actions: tickNetSelectActions(m.id, s.snap!, { metaSnap: s.metaSnap, hasInspect: s.inspect != null, net }) }));
           return finish(slot, items, nets.findIndex((m) => m.id === net), `Global ${s.snap!.data.ordinal.toLocaleString()}`);
         }
         const hold: ClickAction[] = s.following || !s.snap ? [] : [{ kind: "snapshot", pick: s.snap, follow: false }];
@@ -508,7 +508,7 @@ const firstNodeOfComposition = (s: SiblingState): SiblingStep | null => {
 const firstAnchoringNetwork = (s: SiblingState): SiblingStep | null => {
   if (netOf(s) !== "all" || !s.snap) return null;
   const meta = tickNetworks(s)?.[0];
-  return meta ? { key: meta.id, label: meta.name, actions: tickNetSelectActions(meta.id, s.snap, { metaSnap: s.metaSnap }) } : null;
+  return meta ? { key: meta.id, label: meta.name, actions: tickNetSelectActions(meta.id, s.snap, { metaSnap: s.metaSnap, hasInspect: s.inspect != null, net: null }) } : null;
 };
 /** ledger: the committed network's OWN snapshot in the shown tick — never the tick's first row,
  *  which would re-commit the filter to whichever network leads the exact read and release the

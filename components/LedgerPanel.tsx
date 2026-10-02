@@ -220,7 +220,9 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // freezes at the newest tick on screen at the moment of the pin, the ticks that arrive meanwhile
   // are COUNTED rather than listed, and one control on the heading row resumes live. The frozen
   // head is state derived during render, so it lands in the same commit as the pin.
-  const pinnedOrd = !following && snap ? snap.data.ordinal : null;
+  // A pin the rolling buffer has evicted holds nothing (`heldTicks` lets go there), so the frozen
+  // head is released WITH it — kept, a later pin would inherit a stale head and cut the list.
+  const pinnedOrd = !following && snap && snaps.some((x) => x.ordinal === snap.data.ordinal) ? snap.data.ordinal : null;
   const [holdTop, setHoldTop] = useState<number | null>(null);
   const wantTop = nextHoldTop(holdTop, pinnedOrd, snaps.length ? snaps[snaps.length - 1].ordinal : null);
   if (wantTop !== holdTop) setHoldTop(wantTop);

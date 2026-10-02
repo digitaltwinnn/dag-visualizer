@@ -1968,6 +1968,8 @@ export class Engine {
           filter: st.filter,
           metaSnap: st.metaSnap,
           tickHasFilter: this._tickHasFilter(p, st.filter),
+          hasInspect: st.inspect != null,
+          net: this._ledgerNet(),
         }),
       );
       return;
