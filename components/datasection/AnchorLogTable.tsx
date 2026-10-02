@@ -258,9 +258,12 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     if (!histAddr || page !== 1) return;
     liveGen.current += 1;
     setVersion((v) => v + 1);
-    // bufferedNewest is the real dependency: a new anchor means a stale live page.
+    // bufferedNewest is the real dependency: a new anchor means a stale live page. `page` is the
+    // other one (2026-10-02): anchors that land while the reader is on a deeper page return early
+    // above, so COMING BACK to page 1 has to mark it stale itself — it used to show the copy
+    // cached before the walk (minutes old after a search) until the next anchor happened by.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bufferedNewest, histAddr]);
+  }, [bufferedNewest, histAddr, page]);
 
   // Fetch the current page if missing (or, for page 1, stale). Page 1 is the live tip; every
   // deeper page is the ordinal-addressed immutable read, so ANY page — a « jump to genesis
