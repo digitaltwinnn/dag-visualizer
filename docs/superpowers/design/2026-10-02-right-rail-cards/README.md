@@ -69,3 +69,14 @@ Later rulings the same day: the archive cut's column reads **"Depth"** ("Archive
 the **composition card is a plain fact card again** ("of 3 · 1 makes no sense to a human; remove
 the status row" — Nodes and Network are regular rows, the share stays the lead); the dossier's
 **fold mark sits after the total**, the same mark and place as the snapshot card's expandable rows.
+
+More rulings, same day:
+- **The ticker chip** wherever a ticker QUALIFIES A TITLE (card head, scene callout and tooltip,
+  the Moment's headline, the raw pane's head — `TickerChip`); a ticker in a column or a sentence
+  stays plain hued text.
+- **The node card's archive is one value, one bar, one note** ("redesign the full archive section …
+  x-es, ~-es, bold text, subtle text; looks messy"): `Archive · 7 months` / `Full` / `since Nov
+  2023` / a dash, the reach bar under it, then "1.0M of 7.0M snapshots". No check, cross or tilde.
+- **Nothing in Snapshots writes the filter** — not a row, a tile, a band, a pager step or the
+  global card's ×, and not to reset it either. Under a tick the filtered network sat out, the
+  Metagraph card stands down with a hint, and ∨ steps into the tick's own first network.
