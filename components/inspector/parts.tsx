@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, useRef, useState, type ReactNode } from "react";
+import { Fragment, type CSSProperties, useRef, useState, type ReactNode } from "react";
 import { Check, Copy, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BAR_EASE } from "@/components/RollSwap";
@@ -530,35 +530,59 @@ export function partShade(hue: string, i: number): string {
   return pct === 100 ? hue : `color-mix(in oklch, ${hue} ${pct}%, transparent)`;
 }
 
-export function StackedSchedule({ axis, parts, className }: { axis: string; parts: SchedulePart[]; className?: string }) {
+/** Above this many nodes in a cut the squares stop being countable, so a row draws a proportional
+ *  bar instead. The largest fleet is ~30 after the planned reduction, so in practice every cut is
+ *  squares; the bar is the honest fallback for a census total in the hundreds (rule 10: a wall of
+ *  two hundred squares is a texture, not a count). */
+const UNIT_MAX = 60;
+
+/** ONE CUT OF A TOTAL, AS TABLE ROWS (user, 2026-10-02 — `docs/superpowers/design/2026-10-02-right-
+ *  rail-cards/breakdown-2.html`, D2: "what bothers me most is that the legend has those dots in it
+ *  and takes a lot of space; can it be solved with tables?").
+ *
+ *  Every part is a row — name, count, then ITS OWN SQUARES, one per node. The squares are the bar
+ *  and the colour key at once, so there is no legend: it replaced a stacked bar with a wrapping
+ *  dot-legend beneath it. The cut's name sits in the first column across its rows; consecutive
+ *  cuts share the same column template (stated in `em`, so it rides the fluid label step) and are
+ *  divided by a hairline, which makes the three cuts read as one table. A zero part is a plain
+ *  muted row with no squares (it draws nothing, and is still named). */
+export function ScheduleTable({ axis, parts, className }: { axis: string; parts: SchedulePart[]; className?: string }) {
   const total = parts.reduce((n, p) => n + p.count, 0);
+  const units = total <= UNIT_MAX;
   return (
-    <div className={cn("grid grid-cols-[92px_minmax(0,1fr)] items-start gap-x-2.5 py-1.5", className)}>
-      <span className="text-body text-muted-foreground pt-px">{axis}</span>
-      <span className="min-w-0">
-        {/* 5px, the app's one bar thickness (`BarCell`, the explorer's bars, the band's micro-bars) —
-            an 8px first cut read as a heavier instrument than its neighbours (user, 2026-09-26). */}
-        <span aria-hidden className="flex h-[5px] w-full overflow-hidden rounded-full bg-wash-faint">
-          {parts
-            .filter((p) => p.count > 0)
-            .map((p, i) => (
-              <span key={i} className={cn("block h-full", BAR_EASE)} style={{ width: `${(p.count / Math.max(1, total)) * 100}%`, background: p.color }} />
-            ))}
-        </span>
-        {/* The legend at the Fact rows' own size, every part on ONE BASELINE: at `text-label` the
-            mono digits sat visibly lower and smaller than the sans word beside them (user,
-            2026-09-26: "not aligned"). The dot centres on the line; the word and its count share
-            the baseline, the count in the same mono the Fact values use. */}
-        <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-body leading-snug">
-          {parts.map((p, i) => (
-            <span key={i} className={cn("inline-flex items-baseline gap-1.5 whitespace-nowrap", p.count > 0 ? "text-foreground-dim" : "text-muted-foreground")} title={p.title}>
-              {p.count > 0 && <span className="size-1.5 rounded-full flex-none self-center" style={{ background: p.color }} />}
-              <span>{p.label}</span>
-              <span className={cn("font-mono tabular-nums", p.count > 0 ? "text-foreground" : "text-muted-foreground")}>{p.count}</span>
-            </span>
-          ))}
-        </span>
+    <div
+      className={cn(
+        "grid grid-cols-[6.4em_6.2em_2em_minmax(0,1fr)] items-start gap-x-2 gap-y-0.5 py-1.5 text-label",
+        "border-t border-border first:border-t-0",
+        className,
+      )}
+    >
+      <span className="text-muted-foreground" style={{ gridRow: `span ${Math.max(1, parts.length)}` }}>
+        {axis}
       </span>
+      {parts.map((p, i) => (
+        <Fragment key={i}>
+          <span className={cn("min-w-0 truncate", p.count > 0 ? "text-foreground-dim" : "text-muted-foreground")} title={p.title ?? p.label}>
+            {p.label}
+          </span>
+          <span className={cn("font-mono tabular-nums text-right", p.count > 0 ? "text-foreground" : "text-muted-foreground")}>{p.count}</span>
+          <span aria-hidden className="min-w-0 pt-[0.42em]">
+            {units ? (
+              <span className="flex flex-wrap content-start gap-[1.5px]">
+                {Array.from({ length: p.count }, (_, k) => (
+                  <span key={k} className="block size-1.5 rounded-[1.5px]" style={{ background: p.color }} />
+                ))}
+              </span>
+            ) : (
+              p.count > 0 && (
+                <span className="block h-[5px] w-full">
+                  <span className={cn("block h-full rounded-full min-w-[2px]", BAR_EASE)} style={{ width: `${(p.count / Math.max(1, total)) * 100}%`, background: p.color }} />
+                </span>
+              )
+            )}
+          </span>
+        </Fragment>
+      ))}
     </div>
   );
 }

@@ -11,7 +11,7 @@ import OdometerDemo from "@/app/design/OdometerDemo";
 import EcgDemo from "@/app/design/EcgDemo";
 import { NodeStars, NoSignalDot, SonarRing, StandbyHalo } from "@/components/state/StateAtoms";
 import { SELECTED_ROW, SelectedRowMark, SCENE_GLASS } from "@/components/selection";
-import { RoleChips, StackedSchedule, partShade } from "@/components/inspector/parts";
+import { RoleChips, ScheduleTable, partShade } from "@/components/inspector/parts";
 import ExplorerPath from "@/components/explorer/ExplorerPath";
 import { StateDot } from "@/components/explorer/nodeRow";
 
@@ -356,21 +356,21 @@ export default function DesignDoc() {
               rather than three tables.
             </Note>
             <div className="ig-panel p-[18px] w-[var(--detail-w)]">
-              <StackedSchedule
+              <ScheduleTable
                 axis="Composition"
                 parts={[
                   { label: "Hybrid", count: 3, color: partShade("var(--core)", 0) },
                   { label: "Data", count: 16, color: partShade("var(--core)", 1) },
                 ]}
               />
-              <StackedSchedule
+              <ScheduleTable
                 axis="Status"
                 parts={[
                   { label: "Ready", count: 17, color: "var(--success)" },
                   { label: "Joining", count: 2, color: "var(--warn-soft)" },
                 ]}
               />
-              <StackedSchedule
+              <ScheduleTable
                 axis="Archive depth"
                 parts={[
                   { label: "Full archive", count: 0, color: partShade("var(--muted-foreground)", 0) },

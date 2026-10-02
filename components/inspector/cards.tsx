@@ -22,7 +22,7 @@ import { useMinHold } from "@/components/useMinHold";
 import { useArchive, archiveFactState, archiveSchedule, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
 import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
 import { POLL } from "@/src/engine/config";
-import { cap, Desc, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark, StackedSchedule, partShade, Lead, Empty, QualifierChip, Door, type SchedulePart } from "./parts";
+import { cap, Desc, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark, ScheduleTable, partShade, Lead, Empty, QualifierChip, Door, type SchedulePart } from "./parts";
 import { statusItems } from "@/src/data/nodeStatus";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { pickNetId } from "@/src/engine/domain/pickActions";
@@ -437,7 +437,7 @@ function ScheduleGroup({
 function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> }) {
   return (
     <ScheduleGroup label="by archived snapshots" defaultOpen>
-      {sched ? <StackedSchedule axis="Archive depth" parts={archiveParts(sched)} /> : <ArchivalAcquiring />}
+      {sched ? <ScheduleTable axis="Archive depth" parts={archiveParts(sched)} /> : <ArchivalAcquiring />}
     </ScheduleGroup>
   );
 }
@@ -583,20 +583,23 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
             </div>
           ) : (
             <div className="mt-1">
-              {/* THREE STACKED BARS, ONE PER PARTITION (design 2026-09-26, `dossier-breakdown` A;
+              {/* ONE TABLE, THE SQUARES ARE THE BARS (user, 2026-10-02, `breakdown-2.html` D2): each
+                  partition is a group of rows — name, count, one square per node — so the legend
+                  and its dots are gone. It replaced the stacked bars below:
+                  THREE STACKED BARS, ONE PER PARTITION (design 2026-09-26, `dossier-breakdown` A;
                   the captioned tables under hairlines read as three sections): composition in
                   the network's hue, status in the bucket colours, archive depth in the neutral —
                   each one bar of the same total, its parts named beneath. The chips and the
                   depth tags ride the parts' titles. "Archive depth", not "archive" (user: it is
                   how far back each node's archive reaches, not a size). */}
               <ScheduleGroup label="Online nodes" value={<b className="font-mono font-bold">{nodes.length}</b>} defaultOpen>
-                <StackedSchedule
+                <ScheduleTable
                   axis="Composition"
                   parts={compositionRows(nodes).map((r, i) => ({ label: r.label, count: r.count, color: partShade(hue, i), title: r.codes.join(" · ") }))}
                 />
-                <StackedSchedule axis="Status" parts={statusItems(states).map((it) => ({ label: cap(it.label), count: it.count, color: it.color }))} />
+                <ScheduleTable axis="Status" parts={statusItems(states).map((it) => ({ label: cap(it.label), count: it.count, color: it.color }))} />
                 {archSched != null ? (
-                  <StackedSchedule axis="Archive depth" parts={archiveParts(archSched)} />
+                  <ScheduleTable axis="Archive depth" parts={archiveParts(archSched)} />
                 ) : archAcquiring ? (
                   <ArchivalAcquiring />
                 ) : null}
