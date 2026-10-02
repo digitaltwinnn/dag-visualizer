@@ -512,7 +512,7 @@ export default function TrendsDoc() {
               channel pane's rule), so the active tab's panel-solid fill bridges into it. */}
           {/* QUIET WHILE HELD: the previous window stands in until the new one lands
               (`useTrendsSlice`'s hold) — dimmed, so it never reads as the window the pickers name. */}
-          <div className={cn(CABINET_BODY, "px-5 pb-8 [transition:opacity_200ms_ease] motion-reduce:!transition-none", stale && "opacity-45")}>
+          <div className={cn(CABINET_BODY, "pb-8 [transition:opacity_200ms_ease] motion-reduce:!transition-none", stale && "opacity-45")}>
 
 
           <TabsContent value="hypergraph" className="pt-5">

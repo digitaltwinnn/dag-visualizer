@@ -506,7 +506,7 @@ function PayloadBlock({
             {PAYLOAD_LANES.data.name}
           </TabsTrigger>
         </TabsList>
-        <div className={cn(CABINET_BODY, "px-2.5 py-2")}>
+        <div className={cn(CABINET_BODY, "pt-2")}>
           <TabsContent value="state">
             <PayloadSection rows={stateRows} read={!!deep} pending={pending} />
           </TabsContent>

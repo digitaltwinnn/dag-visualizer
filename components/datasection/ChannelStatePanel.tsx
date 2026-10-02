@@ -717,7 +717,7 @@ export function ChannelStatePanel() {
                   from the content"), so the active tab visibly opens INTO the bounded panel
                   (its panel-solid fill already bridges the baseline). Same border weight as the
                   tabs' own (border/50); bottom corners pick up the pane radius. */}
-              <div className={cn(CABINET_BODY, "min-h-0 flex-1 flex flex-col overflow-hidden px-2.5 pt-2 pb-2 max-[700px]:flex-none max-[700px]:overflow-visible")}>
+              <div className={cn(CABINET_BODY, "min-h-0 flex-1 flex flex-col overflow-hidden pt-2 pb-2 max-[700px]:flex-none max-[700px]:overflow-visible")}>
                 {/* ⚠️ EVERY LANE'S PANEL MUST CARRY THE FLEX CHAIN THE PLAIN DIV DID. `TabsContent`
                     inserts a layer between the bordered box and the lane body, so `min-h-0 flex
                     flex-col` has to continue through it — the raw-JSON well below sizes against

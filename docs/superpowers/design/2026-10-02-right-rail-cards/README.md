@@ -80,3 +80,7 @@ More rulings, same day:
 - **Nothing in Snapshots writes the filter** — not a row, a tile, a band, a pager step or the
   global card's ×, and not to reset it either. Under a tick the filtered network sat out, the
   Metagraph card stands down with a hint, and ∨ steps into the tick's own first network.
+- **Tabs are underline tabs** ("I don't like the rounded corners with color — looks like a card,
+  but this is a simple control"): muted labels, the active one in full ink over a 2px accent rule
+  on the row's hairline; no fill, outline or radius, and the body under them has no box
+  (`components/cabinetTabs.ts`, all three tab strips).
