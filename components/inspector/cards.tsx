@@ -22,7 +22,7 @@ import { useMinHold } from "@/components/useMinHold";
 import { useArchive, archiveFactState, archiveReach, archiveSchedule, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
 import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
 import { POLL } from "@/src/engine/config";
-import { cap, Desc, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark, ScheduleTable, partShade, Lead, Empty, QualifierChip, TickerChip, Door, SectionLabel, shareWords, type SchedulePart } from "./parts";
+import { cap, Desc, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark, ScheduleTable, partShade, Lead, Empty, QualifierChip, TickerChip, LayerCells, Door, SectionLabel, shareWords, type SchedulePart } from "./parts";
 import { statusItems } from "@/src/data/nodeStatus";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { pickNetId } from "@/src/engine/domain/pickActions";
@@ -785,7 +785,6 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // The three ancestor rungs that can own one of this card's facts.
   const country = useStore((s) => s.country);
   const cohort = useStore((s) => s.cohort);
-  const composition = useStore((s) => s.composition);
   // Hosting provider from the node's IP lookup (GeoInfo.isp/asn) — Absent = the lookup didn't
   // know; the line simply doesn't render (honesty: no "Unknown" filler in a facts card).
   const geo = "geo" in p ? p.geo : undefined;
@@ -846,6 +845,65 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           {leadBits ? `${leadBits.replace(/\.$/, "")}.` : null}
         </Lead>
       )}
+      {/* WHAT IT RUNS, DRAWN (user, 2026-10-02 — `docs/superpowers/design/2026-10-02-node-card`,
+          option C). The node card was a lead and six rows of equal weight; a node's two real
+          questions are what it runs and how much of its chain it keeps, so those two lead as
+          SECTIONS and the look-up facts follow as plain rows. The three layers are three cells,
+          lit when the node runs them — so a validator and a data node look different, and what a
+          node does NOT run is shown rather than left out. Shown even under a committed
+          composition card: the cells are this node's own make-up, and the picture is the card. */}
+      {codes && codes.length > 0 && (
+        <>
+          <Separator className="mb-2" />
+          <SectionLabel label="Runs" total={<span className="font-sans font-normal">{comp}</span>} className="mb-1.5" />
+          <LayerCells codes={codes} />
+        </>
+      )}
+      {archState.kind !== "none" && (
+        <>
+          <Separator className="mt-2.5 mb-2" />
+          <SectionLabel
+            label="Archive"
+            total={
+              <span className="font-sans font-normal">
+                {archState.kind === "value" ? archState.display.value : archState.kind === "acquiring" ? <NodeStars count={4} /> : (
+                  <Empty why={archState.kind === "na"
+                    ? "A chain's snapshots are served by its L0 validators; this node runs no L0, so it keeps no snapshot archive."
+                    : "The archive census (refreshed every few hours) has no reading for this node — it was unreachable at probe time, not Ready then, or joined the cluster since."} />
+                )}
+              </span>
+            }
+            className="mb-1"
+          />
+          {archState.kind === "value" && archEntry && archive && (
+            <div
+              title={
+                archEntry.kind === "genesis"
+                  ? "Serves its chain's every snapshot, back to the first"
+                  : archEntry.kind === "deep"
+                    ? `Serves global snapshots back to the metagraph era (${archive.since}), with some gaps — one of ${archive.archivalCount} archival L0 validators of ${archive.total} probed`
+                    : `Serves the most recent ${(archEntry.latest - archEntry.floor).toLocaleString()} snapshots of its chain, back to ordinal ${archEntry.floor.toLocaleString()}; older history is discarded`
+              }
+            >
+              {archReach != null && (
+                <span aria-hidden className="block h-[5px] rounded-full bg-wash-strong overflow-hidden">
+                  <span
+                    className="block h-full ml-auto rounded-full min-w-[2px]"
+                    style={{
+                      width: `${archReach * 100}%`,
+                      background: archState.display.genesis ? "var(--success)" : "var(--muted-foreground)",
+                      opacity: archEntry.kind === "deep" ? 0.6 : 1,
+                    }}
+                  />
+                </span>
+              )}
+              {archState.display.note && <span className="mt-1 block text-label text-muted-foreground">{archState.display.note}</span>}
+            </div>
+          )}
+          {archState.kind === "na" && <span className="block text-label text-muted-foreground">Only an L0 keeps a snapshot archive.</span>}
+        </>
+      )}
+      <Separator className="mt-2.5 mb-2" />
       <FactGroup>
         {/* ALIAS — the operator's informal self-registered handle (see the note above). The row
             is ALWAYS stated (user, 2026-08-16: "if it's missing just say so, don't hide the
@@ -888,22 +946,6 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
             )}
           </Fact>
         )}
-        {/* Country, city and host are the LEAD's now (the card skeleton, 2026-10-02), each
-            yielding to its ancestor card's title when that rung is committed. */}
-        {/* COMPOSITION — the node's role in the network, a labelled fact like the rest (user,
-            2026-08-02: it used to ride the head as a subtitle, which made the head carry three
-            different registers). Sits second: the reading order is place → role → host →
-            reference, with health as the head's status pill. Yields to the composition card,
-            which states the same word in its title and the same chips in its aside. The chips
-            STAY on this line — they qualify the word, and a value column can't hold them. */}
-        {composition == null && comp && (
-          <Fact label="Composition">
-            <span className="inline-flex items-center gap-1.5">
-              <span>{comp}</span>
-              {codes && codes.length > 0 && <RoleChips codes={codes} />}
-            </span>
-          </Fact>
-        )}
         {/* The provider's NUMBER — its name is in the lead, or is the provider card's title. */}
         {asn && <Fact label="ASN"><span className="font-mono">{asn}</span></Fact>}
         {/* CO-LOCATED — the machine's other tenant networks (see the note above). Each name
@@ -930,56 +972,6 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
             <Empty why="No other network has a node at this IP." />
           )}
         </Fact>
-        {/* Reading order: place → role → host → SERVICE — what this machine serves sits with
-            the host block, above the reference foot. (Delegated staking moved up beside its
-            registry sibling Alias, 2026-09-11 — see that pair's note.) */}
-        {/* THE ARCHIVE — one fact, one voice in every state (user, 2026-10-02: "redesign the full
-            archive section … x-es, ~-es, bold text, subtle text; looks messy"). The row is always
-            `Archive · value`: how far back this node keeps its chain, or a dash. A measured node
-            adds ONE bar (the chain, the kept part filled from the right) and ONE muted note under
-            it. No check or cross, no tilde, no stacked sublines, no end labels. */}
-        {archState.kind === "value" && archEntry && archive && (
-          <div
-            title={
-              archEntry.kind === "genesis"
-                ? "Serves its chain's every snapshot, back to the first"
-                : archEntry.kind === "deep"
-                  ? `Serves global snapshots back to the metagraph era (${archive.since}), with some gaps — one of ${archive.archivalCount} archival L0 validators of ${archive.total} probed`
-                  : `Serves the most recent ${(archEntry.latest - archEntry.floor).toLocaleString()} snapshots of its chain, back to ordinal ${archEntry.floor.toLocaleString()}; older history is discarded`
-            }
-          >
-            <Fact label="Archive">{archState.display.value}</Fact>
-            {archReach != null && (
-              <span aria-hidden className="mt-1 block h-[5px] rounded-full bg-wash-strong overflow-hidden">
-                <span
-                  className="block h-full ml-auto rounded-full min-w-[2px]"
-                  style={{
-                    width: `${archReach * 100}%`,
-                    background: archState.display.genesis ? "var(--success)" : "var(--muted-foreground)",
-                    opacity: archEntry.kind === "deep" ? 0.6 : 1,
-                  }}
-                />
-              </span>
-            )}
-            {archState.display.note && <span className="mt-1 block text-label text-muted-foreground">{archState.display.note}</span>}
-          </div>
-        )}
-        {archState.kind === "acquiring" && (
-          /* The held slot: a reading for this node is arriving, so the row keeps its place. */
-          <Fact label="Archive">
-            <NodeStars count={4} />
-          </Fact>
-        )}
-        {archState.kind === "na" && (
-          <Fact label="Archive">
-            <Empty why="A chain's snapshots are served by its L0 validators; this node runs no L0, so it keeps no snapshot archive." />
-          </Fact>
-        )}
-        {archState.kind === "unmeasured" && (
-          <Fact label="Archive">
-            <Empty why="The archive census (refreshed every few hours) has no reading for this node — it was unreachable at probe time, not Ready then, or joined the cluster since." />
-          </Fact>
-        )}
       </FactGroup>
       {/* The look-up column: this node's own reference, and nothing else — the unique reference
           LAST, where references sit, which falls out of the grammar rather than being a rule of

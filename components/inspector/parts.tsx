@@ -138,6 +138,39 @@ export function TickerChip({ text, hue, title, className }: { text: string; hue?
   );
 }
 
+/** THE THREE LAYERS, AS CELLS (the node card, option C — user 2026-10-02). A node runs some of
+ *  L0 / cL1 / dL1; each is a cell, lit when this node runs it and dashed when it does not, so the
+ *  make-up is a picture and an ABSENT layer is shown rather than merely unlisted. The codes are
+ *  the app's one layer vocabulary (`RoleChips`); the word under each is what that layer does. */
+const LAYER_CELLS: { code: string; does: string }[] = [
+  { code: "L0", does: "snapshots" },
+  { code: "cL1", does: "currency" },
+  { code: "dL1", does: "data" },
+];
+export function LayerCells({ codes }: { codes: readonly string[] }) {
+  return (
+    <div className="grid grid-cols-3 gap-1.5" role="list" aria-label="Layers this node runs">
+      {LAYER_CELLS.map((l) => {
+        const on = codes.includes(l.code);
+        return (
+          <span
+            key={l.code}
+            role="listitem"
+            aria-label={`${l.code}: ${on ? "runs" : "does not run"}`}
+            className={cn(
+              "flex flex-col rounded-sm border px-2 py-1.5 text-label leading-tight",
+              on ? "border-border bg-wash-faint text-muted-foreground" : "border-dashed border-border text-muted-foreground opacity-45",
+            )}
+          >
+            <span className={cn("font-mono text-body font-semibold", on && "text-foreground")}>{l.code}</span>
+            {l.does}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
 /** A DOOR — every way out of a card is this one full-bleed row: an optional key, the target, a
  *  glyph. A link (`href`) or a control (`onClick`); the wash is the hover every row in the app
  *  wears. It bleeds by the card's own padding, like the foot it sits above. */
