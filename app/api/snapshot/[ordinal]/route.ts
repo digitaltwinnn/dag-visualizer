@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
-import { CATALOG, type NetworkId } from "@/src/engine/config";
+import { type NetworkId } from "@/src/engine/config";
+import { lineageIds } from "@/src/net/lineage";
 import { netOf } from "@/src/net/request";
 import type { SnapshotExact, ChannelSnapRow } from "@/src/data/types";
 import { decodeChannelContent } from "../decodeChannel";
@@ -26,7 +27,7 @@ export const maxDuration = 60;
 type StateChannelSnap = { value?: { fee?: number; content?: unknown[] } };
 
 async function fetchExact(net: NetworkId, ordinal: number): Promise<SnapshotExact> {
-  const LISTED = new Set(CATALOG[net].map((m) => m.id));
+  const LISTED = new Set(lineageIds(net));
   // fetchGlobalJson throws on failure (LB and archival fallback both) so unstable_cache never
   // caches a miss — a momentarily unavailable tick is retried on the next request.
   const j = (await fetchGlobalJson(net, ordinal)) as { value?: Record<string, unknown>; proofs?: unknown } & Record<string, unknown>;

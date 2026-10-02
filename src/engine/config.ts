@@ -75,6 +75,10 @@ export interface MetaConfig {
   ticker: string;
   color: number;
   id: string;
+  /** Addresses this network used BEFORE its current `id`, oldest first. A metagraph's id is its
+   *  state-channel address, and a re-registration gives it a new one; listing the old ones here
+   *  is what keeps it one network with one history (`src/net/lineage.ts`). */
+  formerIds?: string[];
   blurb: string;
 }
 
@@ -105,10 +109,11 @@ export const CATALOG: Record<NetworkId, MetaConfig[]> = {
     // directory lists. With the old id baked here, every surface keyed on the catalog — the
     // Snapshots lanes, the anchor log, the exact-read decode, the trends sampler — read BioFi's
     // snapshots as `unlisted`, while the route-driven surfaces (the filter, the Hypergraph hub)
-    // showed it by name. A re-registered metagraph is a NEW id: re-bake this row and
-    // `data/brand-hues.json` together. The Engine warns in dev when the live directory lists an id
+    // showed it by name. A re-registered metagraph is a NEW id: move the old one to `formerIds`
+    // (so its history stays the network's — `src/net/lineage.ts`) and re-key `data/brand-hues.json`. The Engine warns in dev when the live directory lists an id
     // this catalog does not (`_publishMetaList`).
     { name: "BioFi",               ticker: "BIOFI",    color: 0xed9bf4, id: "DAG6A8Dw78yWv9z8pHqjJ4JVwSqq9V9Ha7CRUQnY",
+      formerIds: ["DAG2JaVh5yYiPCGLLEFi6tfkKk77WA4FzivVdBek"], // its first chain, 2026-07-17 → 2026-08-16
       blurb: "A utility token uniting an ecosystem focused on safeguarding personal data and protecting users from fraud." },
     { name: "Digital Evidence",    ticker: "DED",      color: 0x36e29a, id: "DAG0eQr94qUQSUhmYGNXt6CoBKWu5K6htvRMGC6M",
       blurb: "DoD-vetted data-fingerprinting as a service — immutable proof of data authenticity, anchored to the Global L0." },

@@ -323,7 +323,9 @@ export function tickNetClearActions(current: { metaSnap: MetaSnapSel | null; has
 /** The NETWORK KEY a channel belongs to: its own id when the catalog knows it, else the unlisted
  *  set's (`UNLISTED_KEY`) — every uncatalogued channel is one network as far as the rail's
  *  Metagraph rung goes, exactly as it is one lane in the chamber and one filter in the top bar. */
-export const netKeyOf = (metaId: string): string => (METAGRAPHS.some((m) => m.id === metaId) ? metaId : UNLISTED_KEY);
+export const netKeyOf = (metaId: string): string =>
+  // A former address keys to its network's CURRENT id (the catalog's `formerIds`).
+  METAGRAPHS.find((m) => m.id === metaId || m.formerIds?.includes(metaId) === true)?.id ?? UNLISTED_KEY;
 
 /** The tick-local network a metagraph snapshot's commit carries — and it is ALWAYS written (null
  *  for a seam row), so a snapshot never sits under a network left standing from the previous

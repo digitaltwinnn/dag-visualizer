@@ -5,6 +5,7 @@
 // "not measured". Uncovered bucket = null across every series.
 import { fieldOf, slotsInWindow, stepMsOf, type Tier } from "./keys";
 import { opOf } from "./merge";
+import { foldLineage } from "@/src/net/lineage";
 
 export type WindowId = "24h" | "7d" | "30d" | "90d" | "180d" | "1y" | "all";
 export const WINDOWS: Record<WindowId, { tier: Tier; ms: number }> = {
@@ -87,5 +88,8 @@ export function assembleSpan(
     }
   });
 
-  return { v: 1, net, window, tier, stepMs: stepMsOf(tier), now: nowMs, buckets, series };
+  // ONE HISTORY PER NETWORK: the store keeps each chain under its own address; a re-registered
+  // network's former addresses fold into its current one here, on the read path, so every
+  // consumer of this payload sees the network's whole life (`src/net/lineage.ts`).
+  return { v: 1, net, window, tier, stepMs: stepMsOf(tier), now: nowMs, buckets, series: foldLineage(net, series, opOf) };
 }

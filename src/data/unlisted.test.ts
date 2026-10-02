@@ -54,7 +54,8 @@ describe("the unlisted identity", () => {
 
   it("is never itself listed", () => {
     expect(LISTED_IDS.has(UNLISTED_ID)).toBe(false);
-    expect(LISTED_IDS.size).toBe(METAGRAPHS.length);
+    // Current ids plus every former address (a re-registered network's retired chain is listed too).
+    expect(LISTED_IDS.size).toBe(METAGRAPHS.length + METAGRAPHS.reduce((n, m) => n + (m.formerIds?.length ?? 0), 0));
   });
 
   // The neutral scene tone is a pair, one per theme — `UNLISTED_SCENE_HEX` is the dark value
