@@ -22,7 +22,7 @@ import { useMinHold } from "@/components/useMinHold";
 import { useArchive, archiveFactState, archiveSchedule, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
 import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
 import { POLL } from "@/src/engine/config";
-import { cap, Desc, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark, ScheduleTable, partShade, Lead, Empty, QualifierChip, Door, type SchedulePart } from "./parts";
+import { cap, Desc, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark, ScheduleTable, partShade, countable, Lead, Empty, QualifierChip, Door, SectionLabel, type SchedulePart } from "./parts";
 import { statusItems } from "@/src/data/nodeStatus";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { pickNetId } from "@/src/engine/domain/pickActions";
@@ -1044,6 +1044,24 @@ export function CountryAside({ cc }: { cc: string }) {
   return <QualifierChip className="uppercase tracking-[0.02em]">{cc}</QualifierChip>;
 }
 
+/** A set of node rows cut BY NETWORK, as the breakdown table's parts: each network in its identity
+ *  hue, largest first; rows on no known network roll into one neutral part. One home for the
+ *  country and provider cards, so the two can't count a network differently. */
+function networkParts(rows: { pick: Parameters<typeof pickNetId>[0] }[]): SchedulePart[] {
+  const by = new Map<string, number>();
+  let other = 0;
+  for (const r of rows) {
+    const id = pickNetId(r.pick);
+    if (id) by.set(id, (by.get(id) ?? 0) + 1);
+    else other++;
+  }
+  const parts: SchedulePart[] = [...by.entries()]
+    .sort((x, y) => y[1] - x[1])
+    .map(([id, count]) => ({ label: metagraphById(id)?.name || id, count, color: identityHudCss(id) }));
+  if (other > 0) parts.push({ label: "Other", count: other, color: "var(--muted-foreground)", title: "Nodes on no known network" });
+  return parts;
+}
+
 export function CountryCard({ cc }: { cc: string }) {
   const selNodes = useStore((s) => s.selNodes);
   const rows = useMemo(() => selNodes.filter((r) => r.cc === cc), [selNodes, cc]);
@@ -1060,21 +1078,24 @@ export function CountryCard({ cc }: { cc: string }) {
       ),
     [rows],
   );
+  const parts = useMemo(() => networkParts(rows), [rows]);
   const share = selNodes.length > 0 ? Math.round((rows.length / selNodes.length) * 100) : 0;
-  const facts: { label: string; value: string }[] = [
-    { label: "Nodes", value: String(rows.length) },
-    { label: "Cities", value: String(cities.size) },
-    { label: "Providers", value: String(providers.size) },
-  ];
   return (
     <>
       {/* THE LEAD: what this country is to the selection it sits in — it was the "Share of
           selection" fact, and it is the one thing the card says about its parent. */}
       <Lead>Hosts {share}% of the selection&apos;s nodes.</Lead>
+      {/* THE BREAKDOWN (`visuals.html`, user 2026-10-02): whose nodes these are — the node count is
+          the section's total and the cut is by network, in the dossier's own table. Cities and
+          providers stay counts: the explorer beside the scene lists them, and the card doesn't
+          repeat it. */}
+      <Separator className="mb-2" />
+      <SectionLabel label="Nodes" total={rows.length} className="mb-1.5" />
+      <ScheduleTable parts={parts} />
+      <Separator className="my-2" />
       <FactGroup>
-        {facts.map((f) => (
-          <Fact key={f.label} label={f.label}>{f.value}</Fact>
-        ))}
+        <Fact label="Cities">{cities.size}</Fact>
+        <Fact label="Providers">{providers.size}</Fact>
       </FactGroup>
     </>
   );
@@ -1119,15 +1140,32 @@ export function CompositionCard({ sel }: { sel: CompositionSel }) {
   const total = groups.reduce((n, g) => n + g.rows.length, 0);
   const share = total > 0 ? Math.round((members.length / total) * 100) : 0;
   const cfg = metagraphById(sel.netId);
+  const hue = identityHudCss(sel.netId);
   return (
     <>
     {/* THE LEAD: the group's share of its network — the old "Share of network" fact. */}
     <Lead>{share}% of this network&apos;s online nodes.</Lead>
+    {/* THE BREAKDOWN (`visuals.html`, user 2026-10-02): the network's nodes as the dossier's own
+        squares with THIS group's lit — stepping down a rung reads as "these ones" — then the
+        group's status in the same table the dossier uses. Above the countable limit the strip
+        is dropped rather than scaled (a square is always one node). */}
+    <Separator className="mb-2" />
+    <SectionLabel label="Nodes" unit={`of ${total}`} total={members.length} className="mb-1.5" />
+    {countable(total) && total > 0 && (
+      <span aria-hidden className="mb-1.5 flex flex-wrap gap-[2px]">
+        {Array.from({ length: total }, (_, k) => (
+          <span key={k} className="block size-2 rounded-[2px]" style={{ background: k < members.length ? hue : `color-mix(in oklch, ${hue} 22%, transparent)` }} />
+        ))}
+      </span>
+    )}
+    {members.length > 0 && (
+      <ScheduleTable axis="Status" parts={statusItems(members.map((r) => r.state)).map((it) => ({ label: cap(it.label), count: it.count, color: it.color }))} />
+    )}
+    <Separator className="my-2" />
     <FactGroup>
-      <Fact label="Nodes">{members.length}</Fact>
       <Fact label="Network">
         <span className="inline-flex items-center gap-1.5 min-w-0">
-          <IdentityDot hue={identityHudCss(sel.netId)} />
+          <IdentityDot hue={hue} />
           <span className="truncate">{cfg?.name || sel.netId}</span>
         </span>
       </Fact>
@@ -1178,15 +1216,15 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
       }),
     [selNodes, sel.cc, sel.city, sel.isp],
   );
-  // Distinct networks among the members, first-seen order — "dag" resolves through
-  // metagraphById like every other subject id.
+  // The members cut by network — "dag" resolves through metagraphById like every other id.
+  const parts = useMemo(() => networkParts(members), [members]);
   const networkIds = useMemo(() => {
-    const seen: string[] = [];
+    const seen = new Set<string>();
     for (const r of members) {
       const id = pickNetId(r.pick);
-      if (id && !seen.includes(id)) seen.push(id);
+      if (id) seen.add(id);
     }
-    return seen;
+    return [...seen];
   }, [members]);
   // Members of one city×provider cohort share an AS number, so the first member that reports one
   // speaks for the cohort.
@@ -1200,35 +1238,25 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
   const where = countryDisplayName(sel.cc, selNodes) ?? sel.cc;
   return (
     <>
-    {/* THE LEAD: how big the cohort is and where — what a provider row is to its country. */}
+    {/* THE LEAD: where the cohort is and whose nodes it hosts — the count is the breakdown's. */}
     <Lead>
-      {members.length} node{members.length === 1 ? "" : "s"} in {where}
-      {networkIds.length > 0 ? `, on ${networkIds.length === 1 ? "one network" : `${networkIds.length} networks`}` : ""}.
+      {networkIds.length > 0
+        ? `Hosts nodes of ${networkIds.length === 1 ? "one network" : `${networkIds.length} networks`} in ${where}.`
+        : `In ${where}.`}
     </Lead>
+    {/* THE BREAKDOWN (`visuals.html`, user 2026-10-02): the cohort's nodes cut by network, in the
+        dossier's table. It replaced a "Networks" fact of inline identity dots, which named the
+        networks and hid how many nodes each has here — the rail's third breakdown recipe. */}
+    <Separator className="mb-2" />
+    <SectionLabel label="Nodes" total={members.length} className="mb-1.5" />
+    {parts.length > 0 && <ScheduleTable parts={parts} />}
+    <Separator className="my-2" />
     <FactGroup>
       {/* ASN — the provider's REFERENCE, in the slot the city vacated when it moved to the head
           (user, 2026-08-09). The COUNTRY is deliberately absent: the cohort always sits under a
           committed country, whose own card states it one slot up (user, 2026-08-02 — a facts rail
           shouldn't say the same thing twice). */}
       <Fact label="ASN">{asn ? <span className="font-mono">{asn}</span> : <Empty why="No member of this cohort reports an AS number" />}</Fact>
-      <Fact label="Nodes">{members.length}</Fact>
-      <Fact label="Networks">
-        <span className="flex flex-wrap justify-end items-center gap-x-2 gap-y-1 min-w-0">
-          {networkIds.length === 0 ? (
-            <Empty why="No member of this cohort is on a known network" />
-          ) : (
-            networkIds.map((id) => {
-              const cfg = metagraphById(id);
-              return (
-                <span key={id} className="inline-flex items-center gap-1.5">
-                  <IdentityDot hue={identityHudCss(id)} />
-                  {cfg?.ticker || cfg?.name || id}
-                </span>
-              );
-            })
-          )}
-        </span>
-      </Fact>
     </FactGroup>
     </>
   );

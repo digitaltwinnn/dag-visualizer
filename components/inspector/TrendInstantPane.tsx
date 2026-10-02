@@ -5,7 +5,7 @@ import { INSTANT_ICON } from "@/components/icons";
 
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { Lead, Fact, FactGroup, IdentityDot } from "@/components/inspector/parts";
+import { Lead, FactGroup, UnitMarks, CUT_ROW } from "@/components/inspector/parts";
 import { Separator } from "@/components/ui/separator";
 import { SELECTED_ROW, selectionHue } from "@/components/selection";
 import { openRecords, spanOfWindow } from "@/components/trendDoors";
@@ -90,6 +90,8 @@ export default function TrendInstantPane({
     value: cursorMs != null ? valueAt(rows.get(id)?.series.points ?? [], buckets, stepMs, cursorMs) : null,
   }));
   const valueOf = (id: string) => readings.find((r) => r.id === id)?.value ?? null;
+  // The busiest network's reading at this instant — what a row's bar is a fraction of.
+  const peak = readings.reduce((m, r) => (r.value != null && r.value > m ? r.value : m), 0);
   const subjectValue = subject ? valueOf(subject) : null;
   const rank = rankAt(readings.map((r) => r.value), subjectValue);
   // WITH NO NETWORK AS THE SUBJECT, THE LEAD IS THE WHOLE NETWORK. The global row answers the same
@@ -251,19 +253,15 @@ export default function TrendInstantPane({
                         onFocus={pair.onFocus}
                         onBlur={pair.onBlur}
                       >
-                        <Fact
-                          // PHRASING CONTENT inside a <button> (see `Fact`'s own note): a div row
-                          // here is a content-model violation, and the span is the same box.
-                          as="span"
-                          label={
-                            <span className="inline-flex items-center gap-2">
-                              <IdentityDot hue={row.hue} />
-                              <span className="truncate">{row.name}</span>
-                            </span>
-                          }
-                        >
-                          <span className={cn(v == null && "text-muted-foreground")}>{fmt(v)}</span>
-                        </Fact>
+                        {/* THE BREAKDOWN TABLE'S ROW (`visuals.html`, user 2026-10-02): name ·
+                            reading · bar. A reading is a rate, not a countable thing, so the
+                            mark is a bar scaled to the busiest network at this instant; the bar
+                            carries the hue the leading dot used to. */}
+                        <span className={cn(CUT_ROW, "grid-cols-[8.6em_4.6em_minmax(0,1fr)]")}>
+                          <span className="min-w-0 truncate text-foreground-dim">{row.name}</span>
+                          <span className={cn("font-mono tabular-nums text-right", v == null ? "text-muted-foreground" : "text-foreground")}>{fmt(v)}</span>
+                          <UnitMarks count={0} color={row.hue} units={false} frac={v != null && peak > 0 ? v / peak : 0} />
+                        </span>
                       </button>
                     );
                   })}

@@ -45,11 +45,19 @@ beside, D2 one table whose squares are the bars (recommended), D3 names as colum
 strip, D4 a composition × status / archive cross table. **Picked D2 (user, 2026-10-02) and built** as `ScheduleTable` in `components/inspector/parts.tsx`:
 name · count · one square per node, a proportional bar above 60 nodes.
 
-## Visuals for the other cards (open)
+## Visuals for the other cards (1–5 built, 2026-10-02)
 
 `visuals.html` — which of the other seven cards gain from the D2 table. Proposed: global snapshot
 (one square per anchored snapshot), Moment (bars per network), provider (nodes per network instead
 of inline dots), country (nodes by network), composition (the group lit inside its network's
 strip); the node card gets at most an archive reach bar; the metagraph snapshot stays as built.
 One rule: name · count · mark in the D2 grid, a square for a countable thing and a bar for a rate
-or a count above 60, only in the breakdown slot. Awaiting his call.
+or a count above 60, only in the breakdown slot.
+
+User: "ok" to the recommendation — 1 to 5 built, the metagraph snapshot left alone, the node's
+archive reach bar NOT built (undecided). Shared pieces in `components/inspector/parts.tsx`:
+`UnitMarks`, `CUT_ROW` (the three-column row for a one-cut card), `countable`, and `ScheduleTable`
+with an optional axis. Deviations from the drawing: the Moment card keeps its headline line (it
+carries the subject, unit and rank) and only its rows became table rows; the composition strip is
+dropped above 60 nodes instead of scaled; country shows the network cut only. Built with the dev
+server down: gated by tsc, vitest and a production build, NOT yet seen in the running app.

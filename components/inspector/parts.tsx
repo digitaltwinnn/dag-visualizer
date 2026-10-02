@@ -536,6 +536,39 @@ export function partShade(hue: string, i: number): string {
  *  two hundred squares is a texture, not a count). */
 const UNIT_MAX = 60;
 
+/** A ROW'S MARK in the breakdown table: one square per countable thing, or a bar when the thing
+ *  is a rate/size or the cut is too large to count (`units` false). `frac` is the bar's length,
+ *  0..1 — a share of the total, or of the largest row where rows are compared rather than summed. */
+export function UnitMarks({ count, color, units, frac }: { count: number; color: string; units: boolean; frac: number }) {
+  return (
+    <span aria-hidden className="min-w-0 pt-[0.42em]">
+      {units ? (
+        <span className="flex flex-wrap content-start gap-[1.5px]">
+          {Array.from({ length: count }, (_, k) => (
+            <span key={k} className="block size-1.5 rounded-[1.5px]" style={{ background: color }} />
+          ))}
+        </span>
+      ) : (
+        frac > 0 && (
+          <span className="block h-[5px] w-full">
+            <span className={cn("block h-full rounded-full min-w-[2px]", BAR_EASE)} style={{ width: `${Math.min(1, frac) * 100}%`, background: color }} />
+          </span>
+        )
+      )}
+    </span>
+  );
+}
+
+/** Whether a cut of this size draws squares (countable) or bars. */
+export const countable = (total: number) => total <= UNIT_MAX;
+
+/** THE BREAKDOWN TABLE'S ROW GRID WITHOUT AN AXIS COLUMN — name · figure · mark. For a card with ONE
+ *  cut, whose section label already names it (`visuals.html`, user 2026-10-02): the global
+ *  snapshot's anchored rows, the Moment's readings, a provider's and a country's networks. Rows
+ *  that are their own controls (an accordion trigger, a hover-paired button) wear this class
+ *  themselves, so every card's names, figures and marks sit in the same three columns. */
+export const CUT_ROW = "grid grid-cols-[8.6em_3.4em_minmax(0,1fr)] items-start gap-x-2 text-label";
+
 /** ONE CUT OF A TOTAL, AS TABLE ROWS (user, 2026-10-02 — `docs/superpowers/design/2026-10-02-right-
  *  rail-cards/breakdown-2.html`, D2: "what bothers me most is that the legend has those dots in it
  *  and takes a lot of space; can it be solved with tables?").
@@ -545,42 +578,32 @@ const UNIT_MAX = 60;
  *  dot-legend beneath it. The cut's name sits in the first column across its rows; consecutive
  *  cuts share the same column template (stated in `em`, so it rides the fluid label step) and are
  *  divided by a hairline, which makes the three cuts read as one table. A zero part is a plain
- *  muted row with no squares (it draws nothing, and is still named). */
-export function ScheduleTable({ axis, parts, className }: { axis: string; parts: SchedulePart[]; className?: string }) {
+ *  muted row with no squares (it draws nothing, and is still named). Without an `axis` the table
+ *  is the three-column `CUT_ROW` form. */
+export function ScheduleTable({ axis, parts, className }: { axis?: string; parts: SchedulePart[]; className?: string }) {
   const total = parts.reduce((n, p) => n + p.count, 0);
-  const units = total <= UNIT_MAX;
+  const units = countable(total);
   return (
     <div
       className={cn(
-        "grid grid-cols-[6.4em_6.2em_2em_minmax(0,1fr)] items-start gap-x-2 gap-y-0.5 py-1.5 text-label",
-        "border-t border-border first:border-t-0",
+        axis != null
+          ? "grid grid-cols-[6.4em_6.2em_2em_minmax(0,1fr)] items-start gap-x-2 gap-y-0.5 py-1.5 text-label border-t border-border first:border-t-0"
+          : cn(CUT_ROW, "gap-y-0.5"),
         className,
       )}
     >
-      <span className="text-muted-foreground" style={{ gridRow: `span ${Math.max(1, parts.length)}` }}>
-        {axis}
-      </span>
+      {axis != null && (
+        <span className="text-muted-foreground" style={{ gridRow: `span ${Math.max(1, parts.length)}` }}>
+          {axis}
+        </span>
+      )}
       {parts.map((p, i) => (
         <Fragment key={i}>
           <span className={cn("min-w-0 truncate", p.count > 0 ? "text-foreground-dim" : "text-muted-foreground")} title={p.title ?? p.label}>
             {p.label}
           </span>
           <span className={cn("font-mono tabular-nums text-right", p.count > 0 ? "text-foreground" : "text-muted-foreground")}>{p.count}</span>
-          <span aria-hidden className="min-w-0 pt-[0.42em]">
-            {units ? (
-              <span className="flex flex-wrap content-start gap-[1.5px]">
-                {Array.from({ length: p.count }, (_, k) => (
-                  <span key={k} className="block size-1.5 rounded-[1.5px]" style={{ background: p.color }} />
-                ))}
-              </span>
-            ) : (
-              p.count > 0 && (
-                <span className="block h-[5px] w-full">
-                  <span className={cn("block h-full rounded-full min-w-[2px]", BAR_EASE)} style={{ width: `${(p.count / Math.max(1, total)) * 100}%`, background: p.color }} />
-                </span>
-              )
-            )}
-          </span>
+          <UnitMarks count={p.count} color={p.color} units={units} frac={p.count / Math.max(1, total)} />
         </Fragment>
       ))}
     </div>

@@ -12,11 +12,11 @@ import { fmtDag, fmtKB } from "@/src/util/format";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { useMinHold } from "@/components/useMinHold";
 import { CONTENT_EASE } from "@/components/RollSwap";
-import { Lead, SectionLabel } from "@/components/inspector/parts";
+import { Lead, SectionLabel, UnitMarks, CUT_ROW, countable } from "@/components/inspector/parts";
 import { Separator } from "@/components/ui/separator";
 
-// The anchored block on the snapshot card: a ranked share-of-total breakdown of the metagraph
-// snapshots this global tick anchored — `dot · ticker · share-bar · count`, sorted desc, ALL of
+// The anchored block on the snapshot card: a ranked breakdown of the metagraph snapshots this
+// global tick anchored — the breakdown table's `name · count · squares` rows, sorted desc, ALL of
 // them (no cap; facts), unlisted as a neutral row. Bars = share of the total, so length is
 // comparable across the whole list. Source = the EXACT raw-L0 read only (no polled floor); while
 // it loads we show the header + "reading…".
@@ -117,7 +117,7 @@ export default function AnchoredTags({
   const listed: Row[] = [];
   for (const [addr, { count, fee, bytes }] of Object.entries(exact.perMeta)) {
     const c = metagraphById(addr);
-    if (c) listed.push({ id: addr, label: c.ticker || c.name, hue: identityHudCss(c.id), n: count, fee, bytes });
+    if (c) listed.push({ id: addr, label: c.name || c.ticker, hue: identityHudCss(c.id), n: count, fee, bytes });
   }
   listed.sort((a, b) => b.n - a.n);
 
@@ -135,14 +135,8 @@ export default function AnchoredTags({
   const denom = total ?? exact.anchored;
   const pct = (n: number) => (denom > 0 ? (n / denom) * 100 : 0);
   const pctStr = (n: number) => `${pct(n).toFixed(pct(n) < 10 ? 1 : 0)}%`;
-  const bar = (n: number, hue: string | null) => (
-    <span className="block flex-1 h-1.5 rounded-xs bg-white/[0.06] overflow-hidden">
-      <span
-        className="block h-full rounded-xs min-w-[2px]"
-        style={{ width: `${Math.max(pct(n), n > 0 ? 4 : 0)}%`, background: hue ?? "var(--core)" }}
-      />
-    </span>
-  );
+  // One square per anchored snapshot while the tick's total is countable, a share bar above that.
+  const units = countable(denom);
 
   return (
     <div className="mt-1">
@@ -163,7 +157,7 @@ export default function AnchoredTags({
             <Collapsible key={r.id} open={isOpen} onOpenChange={() => toggle(r.id)}>
               <CollapsibleTrigger
                 className={cn(
-                  "group flex items-center gap-2 w-full text-left border-none cursor-pointer py-[3px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
+                  "group flex items-start gap-2 w-full text-left border-none cursor-pointer py-[3px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
                   isSel ? "bg-transparent" : "bg-transparent hover:bg-wash-hover",
                   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                 )}
@@ -171,21 +165,24 @@ export default function AnchoredTags({
                 // wash (+ the hue ticker below) — reads as "the selection" even while collapsed.
                 style={isSel ? ({ background: `color-mix(in oklch, ${r.hue ?? "var(--primary)"} 16%, transparent)` } as const) : undefined}
               >
-                {/* Unlisted wears the CORE tone (2026-08-07) — the same neutral-blue it carries
-                    on the filter chip, the explorer group and the live dot; grey read as a
-                    different, third language. */}
-                <span className="w-2 h-2 rounded-full flex-none" style={{ background: r.hue ?? "var(--core)" }} />
-                <span
-                  className={cn(
-                    "w-[68px] flex-none text-body truncate",
-                    !r.hue ? "italic text-muted-foreground" : isSel ? "font-semibold" : "text-foreground",
-                  )}
-                  style={isSel && r.hue ? { color: r.hue } : undefined}
-                >
-                  {r.label}
+                {/* THE BREAKDOWN TABLE'S ROW (`visuals.html`, user 2026-10-02): name · count · one
+                    square per anchored snapshot, in the dossier's columns — the leading dot and
+                    the share track are gone, the squares carry the hue. Unlisted wears the CORE
+                    tone (2026-08-07), the same neutral-blue it carries on the filter chip. */}
+                <span className={cn(CUT_ROW, "flex-1 min-w-0")}>
+                  <span
+                    className={cn(
+                      "min-w-0 truncate",
+                      !r.hue ? "italic text-muted-foreground" : isSel ? "font-semibold" : "text-foreground-dim",
+                    )}
+                    style={isSel && r.hue ? { color: r.hue } : undefined}
+                    title={r.label}
+                  >
+                    {r.label}
+                  </span>
+                  <span className="font-mono tabular-nums text-right text-foreground">{r.n}</span>
+                  <UnitMarks count={r.n} color={r.hue ?? "var(--core)"} units={units} frac={pct(r.n) / 100} />
                 </span>
-                {bar(r.n, r.hue)}
-                <span className="w-7 flex-none text-right text-body text-foreground tabular-nums">{r.n}</span>
                 {/* Expand affordance / open-state cue. Open rows show a down chevron. Closed rows:
                     hidden on a mouse (revealed on row hover/focus — keeps the resting list clean),
                     but ALWAYS shown on touch (`@media (hover:none)`), where there's no hover to
@@ -194,7 +191,7 @@ export default function AnchoredTags({
                 <ChevronRight
                   aria-hidden
                   className={cn(
-                    "size-3.5 flex-none transition-[transform,opacity] duration-150 motion-reduce:transition-none",
+                    "mt-[0.15em] size-3.5 flex-none transition-[transform,opacity] duration-150 motion-reduce:transition-none",
                     isOpen
                       ? "rotate-90 text-foreground opacity-100"
                       : "text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
@@ -204,7 +201,7 @@ export default function AnchoredTags({
 
               <CollapsibleContent className="disclose-panel">
                 {/* Revealed stat line: this metagraph's exact detail for the tick. */}
-                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 pl-[16px] pr-1.5 pb-1 pt-0.5 text-label text-muted-foreground tabular-nums">
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 pl-0 pr-1.5 pb-1 pt-0.5 text-label text-muted-foreground tabular-nums">
                   <span>{r.n} snapshot{r.n === 1 ? "" : "s"}</span>
                   <span aria-hidden>·</span>
                   <span>{pctStr(r.n)}</span>
