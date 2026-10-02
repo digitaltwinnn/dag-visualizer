@@ -674,7 +674,7 @@ export class Engine {
       // hairline clearance still clipped the first card's eyebrow. The overflow itself is worth a
       // look — BottomStream is meant to be the one publisher of both — but a dev meter should not
       // be what depends on that being exact.
-      d.style.bottom = "calc(var(--bottom-reserve, 92px) + 24px)";
+      d.style.bottom = "calc(var(--bottom-reserve, 112px) + 24px)";
       document.body.appendChild(d);
     }
 

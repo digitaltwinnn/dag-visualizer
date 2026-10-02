@@ -92,13 +92,13 @@ export default function AnchoredTags({
         {header}
         {missed && !resolveHold.show ? (
           // The honest terminal: the read failed, nothing is in flight. Word, not stars.
-          <div className="mt-1 text-micro tracking-[0.08em] uppercase text-muted-foreground">
+          <div className="mt-1 text-label tracking-[0.08em] uppercase text-muted-foreground">
             exact read failed
           </div>
         ) : (awaiting || resolveHold.show) && (
           <div className={cn("flex items-center gap-2 mt-1", resolveHold.fading && "animate-hold-fade-out motion-reduce:animate-none")}>
             <NodeStars count={4} />
-            <span className="text-micro tracking-[0.08em] uppercase text-muted-foreground">resolving</span>
+            <span className="text-label tracking-[0.08em] uppercase text-muted-foreground">resolving</span>
           </div>
         )}
       </div>

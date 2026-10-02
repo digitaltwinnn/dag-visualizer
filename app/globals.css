@@ -803,7 +803,10 @@
   --box-lift: 0 10px 26px -12px light-dark(rgba(15, 23, 42, 0.32), rgba(0, 0, 0, 0.85)),
     0 -8px 22px -14px light-dark(rgba(15, 23, 42, 0.28), rgba(0, 0, 0, 0.8));
   --foreground: light-dark(oklch(0.21 0.035 265), oklch(0.94 0.02 255));       /* #e8eefc text (dark) */
-  --muted-foreground: light-dark(oklch(0.44 0.035 265), oklch(0.66 0.04 265)); /* #8a96b8 muted (dark) */
+  /* Light's muted ink 0.44 → 0.40 (design review 2026-10-02): the uppercase eyebrows and cell titles
+     are 10.5–12.5px, where WCAG wants 4.5:1, and on paper they measured 3.1:1. 0.40 clears it with the
+     same hue and chroma; dark is untouched (its 0.66 already measures 5+). */
+  --muted-foreground: light-dark(oklch(0.40 0.035 265), oklch(0.66 0.04 265)); /* #8a96b8 muted (dark) */
 
   /* LIGHT IS A LAYERED GROUND, and the order is the point (user, 2026-08-21: "white cards,
      white background white furniture; we're missing proper contrast"). On dark the page is the
@@ -819,6 +822,12 @@
 
   --primary: light-dark(oklch(0.56 0.094 195), oklch(0.88 0.13 195));           /* accent cyan #2af5ff — the sole live/accent signal (dark) */
   --primary-foreground: light-dark(oklch(0.98 0.005 265), oklch(0.14 0.02 265));
+  /* THE ACCENT AS TEXT (design review 2026-10-02). `--primary` is a GLOW: on dark it carries text
+     at 10+:1, on paper its L 0.56 is a lamp, not an ink — the inspector's external link measured
+     2.3:1 and the chart's inspect link under 3. A link or a ticker set in the accent takes this
+     token instead: the same hue mixed two-thirds toward black on paper (L ≈ 0.39, 5+:1), and the
+     accent itself on dark. Stated against `--primary`, so a `[data-net]` re-point carries it. */
+  --primary-ink: light-dark(color-mix(in oklch, var(--primary) 68%, black), var(--primary));
   --ring: light-dark(oklch(0.56 0.094 195), oklch(0.88 0.13 195));
   /* The three network accents — ONE home (multi-network design §2). All three are always
      defined so the NetworkSwitch popover can render every network's dot on any network; the
@@ -898,11 +907,14 @@
 
 /* The identity lanes' L/C (spec §4) — the light-dark() exception: number tokens. Dark values
    are today's HUD lane verbatim (identity.ts pins them); light is the measured ink lane. */
-:root { --ident-l: 0.74; --ident-c: 0.19; }
+/* `--ident-ink-l` is the lane's lightness for an identity hue set as TEXT (components/identInk.ts):
+   the lane's own L on dark, 0.48 on paper — 0.58 is a mark's lightness there and measured 3.2:1
+   as a ticker; 0.48 is the lightest step at which every hue clears 4.5:1 on the light grounds. */
+:root { --ident-l: 0.74; --ident-c: 0.19; --ident-ink-l: 0.74; }
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) { --ident-l: 0.58; --ident-c: 0.19; }
+  :root:not([data-theme="dark"]) { --ident-l: 0.58; --ident-c: 0.19; --ident-ink-l: 0.48; }
 }
-:root[data-theme="light"] { --ident-l: 0.58; --ident-c: 0.19; }
+:root[data-theme="light"] { --ident-l: 0.58; --ident-c: 0.19; --ident-ink-l: 0.48; }
 
 /* The History planes' area fill — the SAME number exception (an opacity is not a <color>, so
    light-dark() cannot carry it). It is the gradient's TOP stop, at the line itself; the bottom
@@ -1000,8 +1012,13 @@
   --rail-top: 90px;        /* top of BOTH side rails — clears the command bar (top 14px + 54px of
                               bar) plus a comfortable breather under it (user refinement
                               2026-07-05; moved up 25px with the retired banner, 2026-08-09) */
-  --rail-w: 264px;         /* left control rail width */
-  --detail-w: 320px;       /* right details rail width */
+  /* THE RAIL WIDTHS ARE FLUID (design review 2026-10-02). Fixed at 264/320 the cards were 14% of
+     a 1920px screen and 10% of a 2560px one, every extra pixel going to the scene and to blank
+     stage beside a card still truncating "Dor Technolog…". The floor is the old width and holds
+     to ~1650px; the ceiling is a third up. The explorer row's name column rides the same token
+     (ExplorerRow.tsx), so the gain untruncates names rather than widening the tag home alone. */
+  --rail-w: clamp(264px, 16vw, 340px);     /* left control rail width */
+  --detail-w: clamp(320px, 18vw, 400px);   /* right details rail width */
   /* THE ACCENT, like the wash ladder (review, 2026-09-26): these were the cyan spelled out, so on
      a network whose `--primary` is violet or magenta the committed row stayed cyan beside a
      violet path plate — two accents on one card. `--primary` is light-dark() already. */
@@ -1019,9 +1036,14 @@
      jumping on every view switch. Sized to the tallest cell — four MicroBars rows plus the eyebrow
      and the plate's padding — with a couple of pixels of headroom, and it must stay under
      --bottom-reserve minus --footer-h or the rails would paint into it (the band sits FLUSH on
-     the footer strip since 2026-09-04 — the old 4px air gap read as noise). */
-  --vitals-h: 84px;
-  --bottom-reserve: 92px;  /* vertical space the bottom VITALS BAND reserves (BottomStream's own
+     the footer strip since 2026-09-04 — the old 4px air gap read as noise).
+     84 → 104 (design review 2026-10-02): the breakdown rows and their values moved up from the
+     micro step to the label step — they are read as copy, and micro is by its own definition
+     not copy — and the headline numeral to 20px, so the tallest cell grew with them; measured
+     at the type scale's 2560px ceiling, where a four-row cell clipped its last row at 96. Keep
+     `RESERVE` in BottomStream.tsx 8px above this. */
+  --vitals-h: 104px;
+  --bottom-reserve: 112px; /* vertical space the bottom VITALS BAND reserves (BottomStream's own
                               RESERVE). The static default matches the BOOT view: the store boots
                               in `hyper`, whose vitalsLane is on, and SSR/first paint assume
                               desktop — so before BottomStream's effect runs the rails already
@@ -1395,6 +1417,7 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-ink: var(--primary-ink);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
@@ -1414,20 +1437,32 @@
   --radius-xs: 4px;                          /* tiny chrome — tags, chips, share-bars, list rows */
   --radius-btn: 8px;                         /* control rounding — view-switch, filter face, tooltips/popovers */
 
-  /* ── HUD type scale (the four steps every HUD text site snaps to) ──────────────────────────
-     micro = uppercase eyebrows / tags / axis labels + tiny UI glyphs (NOT readable body copy);
-     label = secondary/meta (counts, codes, subtitles, hints); body = rows, descriptions, values;
-     title = card titles. Sizes intentionally sit between Tailwind's default text-xs/sm steps —
-     that finer granularity is why arbitrary text-[..px] used to sprawl. Line-heights paired per
-     Tailwind v4's fontSize convention so a bare text-* also sets a sane leading. */
-  --text-micro: 10.5px;
-  --text-micro--line-height: 1;
-  --text-label: 11.5px;
-  --text-label--line-height: 1.45;
-  --text-body: 12.5px;
+  /* ── HUD type scale (THREE steps every HUD text site snaps to) ──────────────────────────────
+     label = eyebrows, tags, chips, axis labels, counts, codes, hints — everything set small, caps
+     or not; body = rows, descriptions, values; title = card titles. Line-heights paired per
+     Tailwind v4's fontSize convention so a bare text-* also sets a sane leading.
+     ⚠️ THREE STEPS, NOT FOUR, AND AT LEAST 2PX APART (user, 2026-10-02: the FILTER eyebrow read
+     smaller than the value beside it — the old `micro` step sat 1px under `label`, and a pixel is
+     not a hierarchy). The former micro sites are label now; what makes an eyebrow an eyebrow is
+     its caps, tracking and ink, not a pixel. Hierarchy is carried by caps, ink and weight.
+     ⚠️ THE SCALE IS FLUID (design review 2026-10-02: "the fonts are tiny while there is a lot of
+     empty space"). Each step is a clamp(): its floor holds to a 1440px viewport, the ramp is
+     linear in `vw`, and the ceiling lands at 2560px. Every HUD text site snaps to these, so the
+     whole HUD grows with the screen while a laptop keeps its sizes. Line-heights are ratios, so
+     they ride. A `:root` token edit here needs the `.next/dev` purge before the browser shows it. */
+  --text-label: clamp(12px, 10.07px + 0.134vw, 13.5px);
+  --text-label--line-height: 1.4;
+  --text-body: clamp(14px, 11.43px + 0.179vw, 16px);
   --text-body--line-height: 1.45;
-  --text-title: 15px;
+  --text-title: clamp(16px, 12.79px + 0.223vw, 18.5px);
   --text-title--line-height: 1.2;
+  /* DOCUMENT PROSE — the fourth step, for the doc overlay's paragraphs only (/about, /design, the
+     History document). A paragraph is read, not scanned: the HUD's label step in a 700px column
+     ran 115 characters a line at 11.5px, which is a footnote, not a page. 15px over a 1.65
+     leading is 85 characters a line in that column. Not for the HUD: a card's description stays
+     `text-body`. */
+  --text-prose: 15px;
+  --text-prose--line-height: 1.65;
 
   /* Uppercase-caps tracking — the merged 0.12/0.13/0.14em eyebrow/label cluster. */
   --tracking-caps: 0.13em;

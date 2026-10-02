@@ -54,7 +54,7 @@ export default function ThemeRows({ onDone }: { onDone: () => void }) {
                 Network section beside it marks its pick with the selected-row wash alone, and one
                 menu speaks one selection language. */}
             {r.id === "system" && (
-              <span className="text-micro tracking-caps uppercase opacity-60">{sysTheme}</span>
+              <span className="text-label tracking-caps uppercase opacity-60">{sysTheme}</span>
             )}
           </button>
         );

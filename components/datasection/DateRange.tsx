@@ -113,7 +113,7 @@ export default function DateRange({
               type="button"
               onClick={clear}
               disabled={!armed}
-              className="inline-flex items-center gap-1 text-micro uppercase tracking-caps text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground"
+              className="inline-flex items-center gap-1 text-label uppercase tracking-caps text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30 disabled:hover:text-muted-foreground"
             >
               <X aria-hidden className="size-3" /> clear
             </button>
@@ -124,7 +124,7 @@ export default function DateRange({
               type="button"
               onClick={() => { setOpen(false); onSubmit(); }}
               disabled={!from}
-              className="text-micro uppercase tracking-caps text-[var(--primary)] transition-opacity hover:opacity-80 disabled:opacity-30"
+              className="text-label uppercase tracking-caps text-[var(--primary)] transition-opacity hover:opacity-80 disabled:opacity-30"
             >
               go to date →
             </button>

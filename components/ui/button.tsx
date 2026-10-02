@@ -16,8 +16,12 @@ const buttonVariants = cva(
           "border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost:
-          "hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50",
+        // THE ICON-CONTROL RECIPE (user, 2026-10-02: "the X buttons don't show a hover effect, the −
+        // does and the chevrons show that effect plus a fill — I expect consistent behavior"). One
+        // hover for every small control: ink to foreground on the app's wash ladder (`wash-hover`,
+        // the explorer rows' own step) — not shadcn's `accent` fill, which here is the live cyan at
+        // half strength and read as a different language from the rest of the HUD.
+        ghost: "hover:bg-wash-hover hover:text-foreground cursor-pointer",
         link: "text-primary underline-offset-4 hover:underline cursor-pointer",
       },
       size: {

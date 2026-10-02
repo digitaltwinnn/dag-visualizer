@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 // shadcn's Table, minus its stock scroll-container `<div>`: the raw data layer wraps the table in our
 // ScrollArea (which owns scrolling + the slim instrument scrollbar), so a second overflow box
 // would nest two scrollers and break the sticky header. Call sites restyle via `cn` — the HUD
-// type scale (text-micro heads / text-body cells) is applied there, not baked in here.
+// type scale (text-label heads / text-body cells) is applied there, not baked in here.
 function Table({ className, ...props }: React.ComponentProps<"table">) {
   return <table data-slot="table" className={cn("w-full caption-bottom text-sm", className)} {...props} />;
 }

@@ -298,7 +298,7 @@ export default function TopBar() {
               two "this control is currently doing something" words, so they speak one language. */}
           <span
             className={cn(
-              "text-micro tracking-caps uppercase max-[940px]:hidden",
+              "text-label tracking-caps uppercase max-[940px]:hidden",
               "transition-colors duration-150 motion-reduce:transition-none",
               strip === "filter" ? "text-primary" : "text-muted-foreground",
             )}
@@ -366,7 +366,7 @@ export default function TopBar() {
               `aria-expanded`. Accent while open, like the FILTER word. */}
           <span
             className={cn(
-              "text-micro tracking-caps uppercase transition-colors duration-150 motion-reduce:transition-none",
+              "text-label tracking-caps uppercase transition-colors duration-150 motion-reduce:transition-none",
               strip === "views" ? "text-primary" : "text-muted-foreground",
             )}
           >
@@ -414,7 +414,7 @@ export default function TopBar() {
                 // The dimmed soon entry STAYS at every width (review find, 2026-09-05: the phone comment
                 // promised all four views but this class still hid it below 860 — and below 700 it has
                 // no other route at all: no slug, and the footer's view links stand down on phone).
-                v.soon && "opacity-45",
+                v.soon && "opacity-65",
               )}
             >
               <Icon aria-hidden className="size-4 group-data-[state=on]:text-primary" />
@@ -532,7 +532,7 @@ export default function TopBar() {
       {/* The phone rides this too (2026-09-28): its face is the view's icon alone, so the caption is
           where the view's name lives there, as on every icon-only tier. */}
       <div className="hidden max-[1299px]:flex justify-end pr-2.5 mt-1.5" aria-hidden>
-        <span key={doc ?? mode} className="roll-in text-micro tracking-caps uppercase text-muted-foreground leading-none">
+        <span key={doc ?? mode} className="roll-in text-label tracking-caps uppercase text-muted-foreground leading-none">
           {doc ? DOC_PAGES[doc].label : VIEWS.find((v) => v.id === mode)?.name}
         </span>
       </div>

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { fmtCount } from "@/src/util/format";
 
@@ -53,14 +55,13 @@ export default function TablePager({
   // hover tooltip and gains the click as a second route; the line dismisses on re-tap.
   const [explain, setExplain] = useState(false);
   if (pages <= 1 && !scope) return null;
-  const btn =
-    "inline-flex items-center justify-center size-5 rounded-xs cursor-pointer text-muted-foreground " +
-    "hover:text-foreground hover:bg-wash-faint disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent " +
-    "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]";
+  // The chevrons are shadcn `Button`s on the ghost recipe — the one hover every icon control shares
+  // (button.tsx) — so this names only what is local: the box and the muted rest ink.
+  const btn = "size-6 rounded-xs text-muted-foreground disabled:opacity-30";
   return (
     <div className="flex-none pt-1.5">
       <div className="flex items-center justify-between gap-2">
-      <span className="min-w-0 truncate text-micro tracking-caps uppercase tabular-nums text-muted-foreground">
+      <span className="min-w-0 truncate text-label tracking-caps uppercase tabular-nums text-muted-foreground">
         {/* A compact pager WITH a scope states the scope alone (2026-09-28, user on the snapshot
             explorer's "52 · last 11 min": "remove the 52 — the time is what matters, 52 has no real
             meaning here"). The count stays wherever it is the statement (the full pager's range). */}
@@ -72,7 +73,7 @@ export default function TablePager({
               type="button"
               aria-expanded={explain}
               onClick={() => setExplain((e) => !e)}
-              className="underline decoration-dotted decoration-border underline-offset-2 cursor-help uppercase tracking-caps text-micro text-muted-foreground hover:text-foreground p-0 bg-transparent border-0"
+              className="inline-flex items-center min-h-6 underline decoration-dotted decoration-border underline-offset-2 cursor-help uppercase tracking-caps text-label text-muted-foreground hover:text-foreground p-0 bg-transparent border-0"
               title={scope.title}
             >
               {scope.word}
@@ -88,29 +89,29 @@ export default function TablePager({
             go page by page"): the standard « ‹ › » cluster. The last page IS genesis in the
             history mode, one jump deep now that pages are ordinal-addressed. */}
         {!compact && (
-          <button type="button" className={btn} aria-label="First page" disabled={page <= 1} onClick={() => onPage(1)}>
-            <ChevronsLeft aria-hidden className="size-3.5" />
-          </button>
+          <Button variant="ghost" size="icon-xs" className={btn} aria-label="First page" disabled={page <= 1} onClick={() => onPage(1)}>
+            <ChevronsLeft aria-hidden className="size-4" />
+          </Button>
         )}
-        <button type="button" className={btn} aria-label="Previous page" disabled={page <= 1} onClick={() => onPage(page - 1)}>
-          <ChevronLeft aria-hidden className="size-3.5" />
-        </button>
-        <span className={cn("text-micro tabular-nums text-muted-foreground whitespace-nowrap")}>
+        <Button variant="ghost" size="icon-xs" className={btn} aria-label="Previous page" disabled={page <= 1} onClick={() => onPage(page - 1)}>
+          <ChevronLeft aria-hidden className="size-4" />
+        </Button>
+        <span className={cn("text-label tabular-nums text-muted-foreground whitespace-nowrap")}>
           {page} / {fmtCount(pages)}
         </span>
-        <button type="button" className={btn} aria-label="Next page" disabled={page >= pages} onClick={() => onPage(page + 1)}>
-          <ChevronRight aria-hidden className="size-3.5" />
-        </button>
+        <Button variant="ghost" size="icon-xs" className={btn} aria-label="Next page" disabled={page >= pages} onClick={() => onPage(page + 1)}>
+          <ChevronRight aria-hidden className="size-4" />
+        </Button>
         {!compact && (
-          <button type="button" className={btn} aria-label="Last page" disabled={page >= pages} onClick={() => onPage(pages)}>
-            <ChevronsRight aria-hidden className="size-3.5" />
-          </button>
+          <Button variant="ghost" size="icon-xs" className={btn} aria-label="Last page" disabled={page >= pages} onClick={() => onPage(pages)}>
+            <ChevronsRight aria-hidden className="size-4" />
+          </Button>
         )}
       </span>
       )}
       </div>
       {explain && scope && (
-        <p className="m-0 pt-1 text-micro text-muted-foreground max-w-[52ch]">{scope.title}</p>
+        <p className="m-0 pt-1 text-label text-muted-foreground max-w-[52ch]">{scope.title}</p>
       )}
     </div>
   );

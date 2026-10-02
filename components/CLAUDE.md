@@ -931,6 +931,22 @@ no aliases**, and component code doesn't re-derive paddings, radii or cyan tints
 mirrors the thread literals in code because an SVG stroke attribute can't resolve `var()` — keep the
 two in sync.
 
+**The HUD type scale is THREE steps, FLUID, plus the documents' prose step** (2026-10-02, two
+rounds: "the fonts are tiny while there is a lot of empty space", then "the filter text is still
+smaller"). `--text-label/body/title` are `clamp()`s — 12/14/16 hold to a 1440px viewport, a linear
+ramp lands at 13.5/16/18.5 by 2560px — at least 2px apart, because the retired `micro` step sat
+1px under `label` and a pixel is not a hierarchy: an eyebrow is caps + tracking + ink at the label
+step. A container measured for a fixed figure must be stated in `em` or against the token, never in
+px (ExplorerRow's figure column, the ghost rung's eyebrow column). `text-prose` (15px / 1.65) is for
+the doc overlay's paragraphs ONLY; a card's description stays `text-body`. The rail widths (`--rail-w`,
+`--detail-w`) and the vitals band (`--vitals-h`, paired with BottomStream's `RESERVE`) grew with it.
+**The accent is a glow, `--primary-ink` is the accent as TEXT**: links, eyebrows and tickers set in
+the accent take `text-primary-ink` (the accent itself on dark; two-thirds toward black on paper, where
+the bare accent measured 2.3–3.1:1). **An identity hue set as TEXT takes `IDENT_INK`** (`components/identInk.ts`): it
+re-points `--ident-l` to `--ident-ink-l` on that element — 0.48 on paper, the lane's own 0.74 on dark —
+because the lane's L is a MARK's lightness and a ticker in it measured 3.2:1. Dots, bars and icons keep
+the lane. The shared "present, not your subject" dim is `opacity-65` (0.55 still measured 3.6:1 on paper).
+
 ### Two colour lanes
 
 `/design` renders both lanes live, including the hue precedence (baked brand > `config.METAGRAPHS`

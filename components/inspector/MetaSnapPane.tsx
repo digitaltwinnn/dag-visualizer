@@ -369,14 +369,14 @@ export default function MetaSnapPane({
                   like `stateProof` does: descriptor first, polled buffer behind it. The em-dash
                   survives for the one case that is genuinely unknown — a snapshot stepped to
                   after it aged out of the retained buffer — where stating the gap is the point. */}
-              {hash && <FootRow label="Hash" value={midHash(hash, 34)} title={hash} copy={hash} />}
+              {hash && <FootRow label="Hash" value={midHash(hash, 28)} title={hash} copy={hash} />}
               {parent && (
-                <FootRow label="Previous hash" value={midHash(parent, 27)} title={parent} copy={parent} />
+                <FootRow label="Previous" value={midHash(parent, 23)} title={parent} copy={parent} />
               )}
               {stateProof && (
                 // "State HASH" (user, 2026-08-14 — "state proof" collided with the signers tab's
                 // "snapshot proof", a signature set; this is a DIGEST, kin to Hash/Parent above).
-                <FootRow label="State hash" value={midHash(stateProof, 29)} title={"The hash of the application state this snapshot results in, covered by the snapshot's L0 signatures — the state's provability. Distinct from the SIGNERS tab's 'snapshot proof', which is the L0 signature set; this is a digest, and the signatures sign over it." + stateProof} copy={stateProof} />
+                <FootRow label="State" value={midHash(stateProof, 27)} title={"The hash of the application state this snapshot results in, covered by the snapshot's L0 signatures — the state's provability. Distinct from the SIGNERS tab's 'snapshot proof', which is the L0 signature set; this is a digest, and the signatures sign over it." + stateProof} copy={stateProof} />
               )}
             </Foot>
           </div>
@@ -546,7 +546,7 @@ function PayloadSection({
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-start" title={title}>
-        <span className="text-micro tracking-caps uppercase text-muted-foreground pt-px">{name}</span>
+        <span className="text-label tracking-caps uppercase text-muted-foreground pt-px">{name}</span>
       </div>
       {pending && <p className="pl-2 text-label text-muted-foreground italic">{pending}</p>}
       {read && rows.length === 0 && !signers && (

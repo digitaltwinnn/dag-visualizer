@@ -47,13 +47,13 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 export const PICKER_GROUP =
   "inline-flex items-center rounded-lg border border-wash-strong bg-wash-faint p-[3px] max-[700px]:flex max-[700px]:justify-center max-[700px]:[&>button]:flex-1";
 
-/** ONE PILL. Compact throughout (h-6/px-2/text-micro — the h-7 pills stopped fitting one line
+/** ONE PILL. Compact throughout (h-6/px-2/text-label — the h-7 pills stopped fitting one line
  *  beside the section tabs once ALL and the range joined; user, 2026-09-09), and the PRESSED
  *  register is the app's own committed-selection language, `SELECTED_ROW`: a window is a
  *  committed selection, not a tab. */
 export const zoomBtn = (pressed: boolean) =>
   cn(
-    "h-6 px-1.5 rounded-md text-micro tracking-caps uppercase",
+    "h-6 px-1.5 rounded-md text-label tracking-caps uppercase",
     pressed ? cn("font-bold text-foreground", SELECTED_ROW) : "text-muted-foreground hover:text-foreground hover:bg-wash-hover",
   );
 
@@ -107,7 +107,7 @@ export function WindowPicker({
           </button>
         ))}
       {range && (
-        <span className={cn("h-6 px-2 inline-flex items-center gap-1.5 rounded-md text-micro font-bold text-foreground whitespace-nowrap", SELECTED_ROW)}>
+        <span className={cn("h-6 px-2 inline-flex items-center gap-1.5 rounded-md text-label font-bold text-foreground whitespace-nowrap", SELECTED_ROW)}>
           <span className="tabular-nums">
             {range.metaId ? `${displayNetwork(range.metaId)?.ticker ?? ""} · ` : ""}
             {stampRange(range.fromMs, stepMs)}–{stampRange(range.toMs, stepMs)}
@@ -188,7 +188,7 @@ export function SettingSwitch({
   const id = useId();
   return (
     <span className={cn("inline-flex items-center gap-2", className)}>
-      <label htmlFor={id} className="text-micro tracking-caps uppercase text-muted-foreground cursor-pointer select-none">
+      <label htmlFor={id} className="text-label tracking-caps uppercase text-muted-foreground cursor-pointer select-none">
         {label}
       </label>
       <Switch id={id} checked={on} onCheckedChange={onChange} title={title} />
@@ -239,7 +239,7 @@ export function ScopeChip({ filter, className }: { filter: string; className?: s
   return (
     <span
       className={cn(
-        "h-6 px-2 inline-flex items-center gap-1.5 rounded-md text-micro font-bold text-foreground whitespace-nowrap",
+        "h-6 px-2 inline-flex items-center gap-1.5 rounded-md text-label font-bold text-foreground whitespace-nowrap",
         SELECTED_ROW,
         className,
       )}

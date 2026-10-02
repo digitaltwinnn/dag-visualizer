@@ -12,8 +12,8 @@ import { cn } from "@/lib/utils";
 //
 //   glyph 14px · name (a per-level width, 84px by default) · tag home (flex, takes the rest) ·
 //   bar 36px (24px inside a level) · figure 40px (a level may widen it: a 4-decimal fee needs
-//   48), 5px gaps — measured to the rail's 264px
-//   (`--rail-w`): the row is 247px wide
+//   48), 5px gaps — measured to the rail's 264px FLOOR
+//   (`--rail-w`, a clamp() since 2026-10-02 — the name column grows with it): the row is 247px wide
 //   with its outset, so the fixed columns leave the tag home ~45px at the network level and ~70px
 //   where a level narrows its name (compositions are one word). The reference drawings were made
 //   at ~360px; the proportions are theirs, the numbers are the rail's.
@@ -122,6 +122,11 @@ export default function ExplorerRow({
   useEffect(() => () => {
     if (hovered.current) leave.current?.();
   }, []);
+  const nameCol = `calc(${nameW}px + (var(--rail-w) - 264px) * 0.6)`;
+  // THE FIGURE COLUMN IS IN EM (2026-10-02): its width was measured for a 12.5px mono figure, and
+  // the body step is fluid now — a 4-decimal fee in a 48px column truncated to "0.02…" at 14px.
+  // The row's own font-size is `text-body` (below), so an em here IS the figure's size.
+  const figureCol = `${(figureW / 12.5).toFixed(2)}em`;
   return (
     <button
       ref={el}
@@ -132,12 +137,12 @@ export default function ExplorerRow({
       className={cn(
         // `pr-2.5`, not the symmetric 6px (user, 2026-09-26): the figure — or the state dot where a
         // row ends in one — sat hard on the wash's right edge and wanted air.
-        "nb-row group grid items-center gap-x-[5px] w-[calc(100%+12px)] -mx-1.5 pl-1.5 pr-2.5 py-1 rounded-[5px] text-left",
+        "nb-row group grid items-center gap-x-[5px] w-[calc(100%+12px)] -mx-1.5 pl-1.5 pr-2.5 py-1 rounded-[5px] text-left text-body",
         "border border-transparent bg-transparent cursor-pointer transition-[background] duration-150",
         "hover:bg-wash-hover",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
         on && selectedRow(true),
-        faint && !on && "opacity-45",
+        faint && !on && "opacity-65",
         pair?.paired && pair.className,
         className,
       )}
@@ -153,10 +158,14 @@ export default function ExplorerRow({
         // grid overflowed instead of yielding. `minmax(0, nameW)` keeps nameW wherever it fits and
         // truncates the name (it already ellipsises) where it doesn't; the wide bar's floor is the
         // nested level's own 24px.
+        // THE NAME COLUMN GROWS WITH THE RAIL (2026-10-02): `--rail-w` is a clamp() now, and the
+        // name takes 60% of whatever the rail gained over its 264px floor — on a 1920px screen
+        // that is +26px, enough to untruncate "Dor Technologies" — while the tag home takes the
+        // rest. Stated against the token, so the grammar's one width stays the stylesheet's.
         gridTemplateColumns: hasFigure
           ? wideBar
-            ? `${glyphW}px minmax(0,${nameW}px) 0px minmax(${nested ? 24 : 36}px,1fr) ${figureW}px`
-            : `${glyphW}px minmax(0,${nameW}px) minmax(0,1fr) ${nested ? 24 : 36}px ${figureW}px`
+            ? `${glyphW}px minmax(0,${nameCol}) 0px minmax(${nested ? 24 : 36}px,1fr) ${figureCol}`
+            : `${glyphW}px minmax(0,${nameCol}) minmax(0,1fr) ${nested ? 24 : 36}px ${figureCol}`
           : `${glyphW}px minmax(0,1fr) auto`,
         ...(on ? selectionHue(hue) : undefined),
         ...pair?.style,
@@ -189,7 +198,7 @@ export default function ExplorerRow({
       >
         {name}
       </span>
-      <span className="min-w-0 truncate flex items-center gap-1 text-micro text-muted-foreground">{tag}</span>
+      <span className="min-w-0 truncate flex items-center gap-1 text-label text-muted-foreground">{tag}</span>
       {hasFigure && (
         <>
           <span className="h-[5px] rounded-[3px] bg-wash-faint overflow-hidden">

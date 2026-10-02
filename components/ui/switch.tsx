@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
 // on an OS-dark machine reading the app in light would get the dark half. Every colour below is
 // therefore one token that already answers both faces.
 //
-// The size is the app's, not the stock 1.15rem: this rides beside `text-micro` labels, so the
+// The size is the app's, not the stock 1.15rem: this rides beside `text-label` labels, so the
 // track matches the pill row's own height. `--tempo-beat`-scale motion is not wanted — a setting
 // flips, it does not animate — so the thumb keeps the primitive's short transform transition and
 // reduced motion drops it.

@@ -29,6 +29,7 @@ import { pickNetId } from "@/src/engine/domain/pickActions";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 import FollowControl from "@/components/FollowControl";
 import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
+import { IDENT_INK } from "@/components/identInk";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
 
@@ -99,7 +100,7 @@ export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
           deliberate trade (all the identity info stays). */}
       <Avatar className="size-[30px] flex-none">
         {iconUrl && <AvatarImage src={iconUrl} alt="" />}
-        <AvatarFallback style={{ color: hue }}>{monogram}</AvatarFallback>
+        <AvatarFallback className={IDENT_INK} style={{ color: hue }}>{monogram}</AvatarFallback>
       </Avatar>
       <span className="flex flex-col gap-px min-w-0">
         <span className="leading-[1.1]">{cfg.name}</span>
@@ -309,9 +310,9 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
             hashes attached to the label", then "the hash label still has extra room"): the
             value fills its own row toward its label, so a short label buys a longer value —
             head and tail both surviving. Budgets measured at the desktop rail width. */}
-        <FootRow label="Hash" value={midHash(d.hash, 34)} title={d.hash} copy={d.hash} />
+        <FootRow label="Hash" value={midHash(d.hash, 28)} title={d.hash} copy={d.hash} />
         {d.lastSnapshotHash && (
-          <FootRow label="Previous hash" value={midHash(d.lastSnapshotHash, 27)} title={d.lastSnapshotHash} copy={d.lastSnapshotHash} />
+          <FootRow label="Previous" value={midHash(d.lastSnapshotHash, 23)} title={d.lastSnapshotHash} copy={d.lastSnapshotHash} />
         )}
       </Foot>
     </div>
@@ -338,7 +339,7 @@ function UnlistedMemberFacts({ id, last }: { id: string; last: boolean }) {
           use the same card as any other metagraph"). */}
       {!last && (
         <div className="flex items-center justify-between gap-2">
-          <span className="text-micro tracking-caps uppercase text-muted-foreground">Network id</span>
+          <span className="text-label tracking-caps uppercase text-muted-foreground">Network id</span>
           <span className="font-mono text-label" title={id}>
             {shortHash(id)}
           </span>
@@ -414,7 +415,7 @@ function ScheduleGroup({
           selects nothing, and focus shows only for the keyboard in CopyButton's own
           focus-visible recipe. */}
       <CollapsibleTrigger className="group mt-2 flex w-full items-center gap-1 cursor-pointer select-none outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]">
-        <span className={value !== undefined ? "text-body text-muted-foreground" : "text-micro tracking-caps uppercase text-muted-foreground"}>{label}</span>
+        <span className={value !== undefined ? "text-body text-muted-foreground" : "text-label tracking-caps uppercase text-muted-foreground"}>{label}</span>
         <ChevronRight
           aria-hidden
           className={cn(
@@ -643,11 +644,11 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           {/* The snapshot cards' fill rule (user, 2026-08-14 — "the value takes up most of the
               space and sits against the label"): midHash at per-label budgets, so each address
               fills its own row toward its label. */}
-          <FootRow label="Network id" value={midHash(footId, 28)} title={footId} copy={footId} />
+          <FootRow label="Id" value={midHash(footId, 28)} title={footId} copy={footId} />
           {chainSpan?.owner && (
             <FootRow
-              label="Owner address"
-              value={midHash(chainSpan.owner, 24)}
+              label="Owner"
+              value={midHash(chainSpan.owner, 26)}
               title={`The address that registered and controls this metagraph. ${chainSpan.owner}`}
               copy={chainSpan.owner}
             />
@@ -668,7 +669,7 @@ export function MetaTickerAside({ cfg }: { cfg: MetaCfg }) {
   if (!cfg.ticker) return null;
   return (
     <span
-      className="text-label font-semibold tracking-[0.02em]"
+      className={cn("text-label font-semibold tracking-[0.02em]", IDENT_INK)}
       // Unlisted stays neutral — same guard as MetaTitle above.
       style={{ color: cfg.id === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(cfg.id) }}
     >
@@ -688,7 +689,7 @@ function MetaSiteRow({ site }: { site: string }) {
         href={site}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 text-primary/75 hover:text-primary"
+        className="inline-flex items-center gap-1.5 text-primary-ink hover:text-primary"
       >
         {domain}
         <ExternalLink aria-hidden className="size-3.5" />
@@ -793,7 +794,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // The node's make-up: the composition word + its layer codes as squared pills (RoleChips — the
   // same rendering the metagraph card's composition rows use; user 2026-07-12: the joined
   // "L0·cL1" text read as one token). Sentence-cased ("Hybrid" / "Currency") to match the
-  // composition rows' label style — text-micro is the UPPERCASE lane (labels), word values at
+  // composition rows' label style — text-label is the UPPERCASE lane (labels), word values at
   // text-body are sentence case.
   const compWord = p.node ? nodeCompositionLabel(p.node) : null;
   const comp = compWord ? compWord.charAt(0).toUpperCase() + compWord.slice(1) : null;

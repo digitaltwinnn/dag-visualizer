@@ -85,7 +85,7 @@ export default function PulseStrip() {
                     at the compact py-px the icon-bearing chip read cramped and the glyph sat
                     optically high beside the 10px text (user, 2026-09-11 — "padding … they look
                     small and text icon alignment feels a bit off"). */}
-                <span className="inline-flex items-center gap-1 rounded-xs border border-border bg-wash-faint px-1.5 py-[3px] text-micro leading-none text-muted-foreground">
+                <span className="inline-flex items-center gap-1 rounded-xs border border-border bg-wash-faint px-1.5 py-[3px] text-label leading-none text-muted-foreground">
                   {r.everyMs != null && <Timer aria-hidden className="size-3 flex-none" />}
                   {cadenceWord(r)}
                 </span>
@@ -104,7 +104,7 @@ export default function PulseStrip() {
                     <span style={{ width: `${(r.ok / Math.max(1, r.ok + r.err)) * 100}%`, background: "var(--success)" }} className={cn("opacity-70", BAR_EASE)} />
                     <span style={{ width: `${(r.err / Math.max(1, r.ok + r.err)) * 100}%`, background: "var(--destructive)" }} className={cn("opacity-80 min-w-[3px]", BAR_EASE)} />
                   </span>
-                  <span className="text-micro tabular-nums text-muted-foreground">
+                  <span className="text-label tabular-nums text-muted-foreground">
                     {r.ok.toLocaleString()} ok · {r.err.toLocaleString()} failed
                   </span>
                 </span>

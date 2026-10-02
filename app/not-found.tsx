@@ -5,7 +5,7 @@ import Link from "next/link";
 export default function NotFound() {
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-background text-foreground">
-      <span aria-hidden className="text-micro tracking-caps uppercase text-muted-foreground">404 · no signal on this route</span>
+      <span aria-hidden className="text-label tracking-caps uppercase text-muted-foreground">404 · no signal on this route</span>
       <div className="flex flex-col items-center gap-1 text-center px-6">
         <p className="m-0 text-title font-semibold">Nothing here</p>
         <p className="m-0 text-label text-muted-foreground max-w-[42ch]">

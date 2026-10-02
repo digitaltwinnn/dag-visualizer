@@ -175,7 +175,7 @@ export function HyperCells({ accent }: { accent: string }) {
           // vocabulary of one that does — a `3` that visibly settles would claim it had just been
           // measured. Plain text says "this is what the protocol IS", and the bars beside it say
           // how the fleet fills it, which is exactly the lead/detail grammar.
-          lead={<span className="font-mono font-bold text-foreground tabular-nums">{layerRows.length}</span>}>
+          lead={<span className="font-mono font-bold text-xl text-foreground tabular-nums">{layerRows.length}</span>}>
           <MicroBars accent={accent} labelW={34} rows={layerRows} />
         </BandCard>
       )}
@@ -241,7 +241,7 @@ export function GeoCells({ accent }: { accent: string }) {
           rings are allowed to differ honestly. `unplaced` reading 0 is itself a reading — the
           fleet is fully drawn — and MicroBars renders no bar for it, only the numeral. */}
       <BandCard label="Nodes"
-        lead={<span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={total || null} /></span>}>
+        lead={<span className="font-mono font-bold text-xl text-foreground tabular-nums"><Odometer int value={total || null} /></span>}>
         {/* "unplaced" takes the neutral, like hyper's "unknown" type bucket: a node the lookup
             could not place claims no location, so its bar should not wear the accent the located
             split does (user, 2026-09-03). */}
@@ -306,7 +306,7 @@ interface StackSeg { key: string; n: number; color: string }
 
 function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: boolean; filter: string; data: TrendsWindowData | null }) {
   if (!data) {
-    return <span className="flex items-center justify-center w-full self-center text-micro text-muted-foreground" aria-hidden>acquiring…</span>;
+    return <span className="flex items-center justify-center w-full self-center text-label text-muted-foreground" aria-hidden>acquiring…</span>;
   }
   const anchors = data.series["g.anchors"] ?? [];
   const ticks = data.series["g.ticks"] ?? [];
@@ -351,14 +351,14 @@ function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: b
     // DID arrive — the window simply holds no samples, a real outage that can stand for
     // hours. "Acquiring" is the fetch-in-flight word above and quietly promises resolution;
     // a measured silence states itself.
-    return <span className="flex items-center justify-center w-full self-center text-micro text-muted-foreground" aria-hidden>not sampled in this window</span>;
+    return <span className="flex items-center justify-center w-full self-center text-label text-muted-foreground" aria-hidden>not sampled in this window</span>;
   }
   // MONTHLY BARS CARRY A MONTH AXIS (user, 2026-09-09: "a subtle legend at 1Y — jan. feb."):
   // the 1Y window is the one where position-in-window stops being readable as "when" (a bar
   // is a whole calendar month, not a rolling bucket), so each slot names its month below.
   // Detected off monthlySum's own nominal stepMs — no new prop to drift. Every OTHER month,
   // anchored at the newest so the right edge always reads (the /trends right-edge skip rule);
-  // twelve full labels at text-micro collide in the card's ~16px slots. The label row mirrors
+  // twelve full labels at text-label collide in the card's ~16px slots. The label row mirrors
   // the bar row's slot geometry exactly (flex-1 / max-w / gap), so labels sit under their bars.
   const monthly = data.stepMs === 2_592_000_000;
   // A WEEK'S BARS CARRY THEIR WEEKDAYS (user, 2026-09-11 — the month axis's own reasoning one
@@ -374,7 +374,7 @@ function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: b
           their slots to fit, so the justification is a no-op everywhere else; time still
           reads left-old → right-new inside the cluster. */}
       <div className="flex items-end justify-center gap-[2px] flex-1 min-h-0 pb-0.5">
-        {allZero && <span className="text-micro text-muted-foreground self-center">no anchors in this window</span>}
+        {allZero && <span className="text-label text-muted-foreground self-center">no anchors in this window</span>}
         {bars.map((b) => {
           if (b.v == null) {
             // Unmeasured — the neutral stub (see the header). It keeps its flex slot so the
@@ -407,7 +407,7 @@ function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: b
       {(monthly || weekly) && (
         <div className="flex justify-center gap-[2px] leading-none">
           {bars.map((b, i) => (
-            <span key={b.ts} className="flex-1 max-w-[22px] text-center text-micro text-muted-foreground/70 lowercase whitespace-nowrap">
+            <span key={b.ts} className="flex-1 max-w-[22px] text-center text-label text-muted-foreground/70 lowercase whitespace-nowrap">
               {weekly
                 ? new Date(b.ts).toLocaleString("en", { weekday: "short", timeZone: "UTC" })
                 : (bars.length - 1 - i) % 2 === 0
@@ -553,7 +553,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
         </span>
       }
     >
-      <span className="flex items-center self-stretch text-micro text-muted-foreground">{reason}</span>
+      <span className="flex items-center self-stretch text-label text-muted-foreground">{reason}</span>
     </BandCard>
   );
   const rate = (label: string, spark: SparkSpec, note?: string, title?: string) => {
@@ -590,7 +590,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
           {spark.data != null ? (
             line
           ) : (
-            <span className="flex items-center self-stretch text-micro text-muted-foreground">
+            <span className="flex items-center self-stretch text-label text-muted-foreground">
               no snapshots for {ageWords(stale)}
             </span>
           )}
@@ -625,7 +625,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
               dash "doesn't say it's working on it") — the acquiring rule's slot form: a
               real number is arriving into this slot, and the stars hold its width; the
               label and unit line already name what is coming. */}
-          <span className="font-mono font-bold text-foreground tabular-nums whitespace-nowrap">
+          <span className="font-mono font-bold text-xl text-foreground tabular-nums whitespace-nowrap">
             {spark.value != null ? <Odometer value={spark.value} /> : <NodeStars count={3} />}
           </span>
           <span className="text-label text-muted-foreground leading-none">{spark.unit}</span>
@@ -760,7 +760,7 @@ function AnchoringNetworks({ windowed, snaps, filter }: { windowed: TrendsWindow
     // collects around the roster rather than stretching it.
     <BandCard
       label="Metagraphs anchoring"
-      lead={<span className="font-mono font-bold text-foreground tabular-nums"><Odometer int value={list.length || null} /></span>}
+      lead={<span className="font-mono font-bold text-xl text-foreground tabular-nums"><Odometer int value={list.length || null} /></span>}
     >
       {/* ⚠️ THE LENS DIMS, IT DOES NOT EDIT (user, 2026-09-01: "if we filter, should we then also
           dim the filtered bullets?"). Yes — this roster was the one surface in the band ignoring the
@@ -769,7 +769,10 @@ function AnchoringNetworks({ windowed, snaps, filter }: { windowed: TrendsWindow
           change that (the explorer draws the same line — a tick still LISTS every contributor under
           a commit, it just makes only one of them drillable). So the number says how many anchored
           and the dim says which one you are looking through.
-          `opacity-45` is the app's existing "present, but not your subject" step — the same one the
+          `opacity-65` is the app's existing "present, but not your subject" step (0.45 → 0.65,
+          design review 2026-10-02: at 0.45 the dimmed text measured 3.9:1 on dark, and paper loses
+          more to dimming than dark does — 0.55 still read 3.6 there; 0.65 measures 4.75 on paper,
+          7.3 on dark, and still reads as stepped back) — the same one the
           filter picker's 0-count rows and hyper's 0-node networks wear. */}
       {/* TWO CHANNELS FOR ONE LENS: the others step back, the subject steps FORWARD (user,
           2026-09-01). Dimming alone left the committed network the same size as the four it was
@@ -790,14 +793,14 @@ function AnchoringNetworks({ windowed, snaps, filter }: { windowed: TrendsWindow
           const on = filter !== "all" && id === filter;
           const label = metagraphById(id)?.ticker ?? displayNetwork(id)?.ticker ?? null;
           return (
-            <span key={id} className={cn("inline-flex items-center gap-1 min-w-0", filter !== "all" && !on && "opacity-45")}>
+            <span key={id} className={cn("inline-flex items-center gap-1 min-w-0", filter !== "all" && !on && "opacity-65")}>
               <IdentityDot hue={identityHudCss(id)} className={on ? "w-3.5 h-3.5" : undefined} />
               {/* No hand-written fallback label — `displayNetwork` is the one home for what an
                   uncatalogued channel is CALLED (unlistedBoundary.test.ts enforces that the id
                   literal has two homes, and this is not one of them). With no name to give, the
                   dot stands alone rather than being captioned with a guess. */}
               {label && (
-                <span className={cn("text-micro truncate", on ? "text-foreground" : "text-muted-foreground")}>
+                <span className={cn("text-label truncate", on ? "text-foreground" : "text-muted-foreground")}>
                   {label}
                 </span>
               )}

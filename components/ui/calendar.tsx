@@ -80,7 +80,7 @@ export function Calendar({
           "transition-colors hover:bg-wash-hover hover:text-foreground disabled:opacity-30",
         month_grid: "w-full border-collapse",
         weekdays: "flex",
-        weekday: "w-7 text-micro uppercase tracking-caps text-muted-foreground/70",
+        weekday: "w-7 text-label uppercase tracking-caps text-muted-foreground/70",
         weeks: "",
         week: "flex w-full",
         // The DAY cell carries the range WASH so the fill runs edge to edge across the week; the

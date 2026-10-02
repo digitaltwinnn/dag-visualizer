@@ -39,7 +39,7 @@ import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import { levelMeasure } from "@/src/data/explorerMeasure";
-import FollowControl from "@/components/FollowControl";
+import { IDENT_INK } from "@/components/identInk";
 
 // THE SNAPSHOTS VIEW'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -286,7 +286,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // The LIVE / PINNED switch — one component with the global snapshot card's aside
   // (`components/FollowControl.tsx`); the explorer adds the hover preview. `-mr-1.5` hangs the
   // pill's padding into the head's gutter so its text aligns with the rows' right edge.
-  const liveControl = <FollowControl preview className="-mr-1.5" />;
 
   // ---- level 0: the ticks, paged, measured by the heading's pick -------------------------------
   const tickValues = pagedSnaps.map((d) => tickMeasureValue(ledgerMeasure, d, snapshotExact[d.ordinal]));
@@ -330,7 +329,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           name: <span className="tabular-nums">{d.ordinal.toLocaleString()}</span>,
           // The lens's count in the network's hue where it anchored; no "0" — a zero in a
           // network's own colour reads as a reading about that network.
-          tag: filterNet && count > 0 ? <span className="tabular-nums" style={{ color: filterNet.hue }}>{count}</span> : undefined,
+          tag: filterNet && count > 0 ? <span className={cn("tabular-nums", IDENT_INK)} style={{ color: filterNet.hue }}>{count}</span> : undefined,
           share: v != null ? v / maxTick : undefined,
           hue: accent,
           // Absent = the dash, never a number derived from another (rule 10).
@@ -563,7 +562,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
       title="Snapshots"
       hint="Recent global snapshots. Open one for the networks that anchored into it."
       levels={levels}
-      aside={liveControl}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => {
         // Container-level hover backstop: leaving the card clears every channel its rows write.

@@ -46,7 +46,7 @@ export default function AboutStrip() {
           centred to different left edges (measured 560 vs 657px). */}
       <div className="flex flex-col gap-2.5 w-full max-w-[72ch] min-w-0 text-body">
       <div className="flex flex-col gap-1 min-w-0">
-        <span className="flex items-center gap-2 text-micro tracking-caps uppercase text-muted-foreground">
+        <span className="flex items-center gap-2 text-label tracking-caps uppercase text-muted-foreground">
           <Icon aria-hidden className="size-3.5 text-[var(--filter-accent,var(--primary))]" />
           {eyebrow}
           {caption && <span className="ml-auto text-muted-foreground/70">{caption}</span>}

@@ -122,6 +122,12 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
               name: row.name,
               share: row.head != null ? row.head / maxLast : undefined,
               hue: row.hue,
+              // A NETWORK WITH NO READING STEPS BACK (design review 2026-10-02): six of eleven rows
+              // said "—" at full ink, and half a list of dashes is noise. The Hypergraph card's own
+              // rule — a 0-node network lists, dimmed — applies here: the row stays (every network
+              // lists, user 2026-09-28), its ink steps back. Not while the figure is still arriving:
+              // a pending row is waiting, not empty.
+              faint: !slice.stale && row.head == null && !(roster.pending || (roster.headKind === "day" && roster.dayPending)),
               figure:
                 // A dash with the words on hover: "no reading" truncated to "no rea…" in the
                 // figure column (a quiet network may have measured nothing in the span).

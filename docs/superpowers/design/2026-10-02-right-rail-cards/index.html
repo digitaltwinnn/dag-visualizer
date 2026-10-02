@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Right rail cards — one skeleton</title>
+<style>
+:root{--bg:oklch(0.09 0.02 265);--fg:oklch(0.94 0.02 255);--dim:#c7d0ea;--muted:oklch(0.66 0.04 265);--primary:oklch(0.88 0.13 195);
+--border:rgba(90,140,255,.22);--panel:rgba(12,16,32,.94);--plate:rgba(255,255,255,.045);--radius:14px;
+--wash-faint:color-mix(in oklch,var(--primary) 6%,transparent);--wash-soft:color-mix(in oklch,var(--primary) 12%,transparent);--wash-hover:color-mix(in oklch,var(--primary) 16%,transparent);
+--sel-bg:color-mix(in oklch,var(--primary) 12%,transparent);--sel-border:color-mix(in oklch,var(--primary) 52%,transparent);
+--label:12.6px;--body:14.9px;--title:16.6px;--orange:oklch(0.74 0.19 41);--blue:oklch(0.74 0.19 235);--green:oklch(0.80 0.15 165);--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+*{box-sizing:border-box}html{color-scheme:dark}
+body{margin:0;background:radial-gradient(1200px 600px at 60% 0%,#0b1230 0%,var(--bg) 60%);color:var(--fg);font:var(--body)/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:32px 40px 96px}
+h1{font-size:24px;font-weight:600;margin:0 0 6px}h2{font-size:18px;font-weight:600;margin:56px 0 4px}
+p.lede{color:var(--dim);max-width:78ch;margin:0 0 6px}.note{color:var(--muted);font-size:var(--label);max-width:86ch}
+.grid{display:flex;flex-wrap:wrap;gap:26px 22px;align-items:flex-start;margin-top:16px}
+.col{width:346px}.col>.cap{font-size:var(--label);color:var(--muted);margin:0 2px 8px;display:flex;gap:8px;align-items:baseline}.col>.cap b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;font-weight:700}
+.col>.why{font-size:var(--label);color:var(--dim);margin:10px 2px 0}
+.pair{display:flex;gap:22px;align-items:flex-start;margin-top:22px;flex-wrap:wrap}
+.arrow{align-self:center;color:var(--muted);font-size:22px}
+.rec{border:1px solid var(--sel-border);background:var(--sel-bg);border-radius:8px;padding:10px 14px;font-size:var(--label);margin-top:18px;max-width:92ch}
+.rec b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;font-size:11.6px;margin-right:8px}
+table{border-collapse:collapse;font-size:var(--label);margin-top:14px}th,td{border-bottom:1px solid var(--border);padding:6px 12px 6px 0;text-align:left;vertical-align:top}th{color:var(--muted);font-weight:500;letter-spacing:.13em;text-transform:uppercase;font-size:11.6px}td.y{color:var(--fg)}td.n{color:var(--muted)}
+/* card */
+.card{width:346px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:18px 18px 0;position:relative;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 8px 30px rgba(0,0,0,.35)}
+.x{position:absolute;right:12px;top:10px;width:24px;height:24px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted)}.x:hover{background:var(--wash-hover);color:var(--fg)}
+.eyebrow{font-size:var(--label);letter-spacing:.1em;text-transform:uppercase;color:var(--primary);font-weight:700;line-height:1}
+.hrow{display:flex;align-items:center;gap:8px;margin-top:8px;min-height:28px}
+.ico{width:16px;height:16px;border:1.5px solid var(--primary);border-radius:4px;flex:none;opacity:.9}.ico.o{border-color:var(--orange)}
+.av{width:28px;height:28px;border-radius:50%;background:var(--orange);flex:none}
+.ttl{font-size:var(--title);font-weight:600;line-height:1.15;min-width:0}.ttl.m{font-family:var(--mono);font-variant-numeric:tabular-nums;font-weight:500}
+.sub{font-size:var(--label);color:var(--muted)}
+.aside{margin-left:auto;flex:none;font-size:var(--label);color:var(--muted);white-space:nowrap}
+.tick{color:var(--orange);font-weight:700}
+.chip{display:inline-flex;align-items:center;border:1px solid var(--border);background:var(--wash-faint);border-radius:4px;padding:2px 6px;font-size:var(--label);line-height:1;color:var(--muted)}.chip.id{color:var(--orange);font-weight:600}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:var(--label);padding:3px 7px;border-radius:999px;border:1px solid color-mix(in oklch,var(--green) 50%,transparent);color:var(--green)}
+.pill.pin{border-radius:4px;border-color:var(--sel-border);background:var(--sel-bg);color:var(--fg)}.pill.pin i{width:8px;height:8px;border-radius:50%;border:1.5px solid var(--primary);display:inline-block}
+.hair{border-top:1px solid var(--border);margin:12px 0 10px}
+.desc{color:var(--dim);margin:0}.lead{color:var(--dim);margin:0}.lead b{color:var(--fg)}.more{color:var(--primary);font-size:var(--label)}
+.fact{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:5px 0}.fact>span:first-child{color:var(--muted);flex:none}.fact .v{text-align:right;min-width:0}.fact .v.b{font-weight:700}.fact .v.i{font-style:italic;color:var(--muted)}.fact .v.e{color:var(--muted)}
+.subn{display:block;text-align:right;font-size:var(--label);color:var(--muted);margin:-3px 0 4px}
+.sec{display:flex;justify-content:space-between;align-items:baseline;font-size:var(--label);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin:12px 0 6px}.sec b{color:var(--fg);font-weight:700;letter-spacing:0;font-size:var(--body);font-family:var(--mono)}.sec .u{letter-spacing:0;text-transform:none}
+.sched{display:grid;grid-template-columns:100px 1fr;gap:4px 10px;margin:8px 0}.sched .ax{color:var(--muted)}.bar{height:4px;border-radius:2px;background:var(--wash-faint);overflow:hidden;display:flex;margin:6px 0 4px}.bar i{display:block;height:100%}
+.parts{display:flex;flex-wrap:wrap;gap:2px 12px}.parts span{white-space:nowrap}.parts span.z{color:var(--muted)}.parts em{font-style:normal;font-family:var(--mono)}.d{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.brow{display:grid;grid-template-columns:14px 78px 1fr 36px;gap:0 8px;align-items:center;margin:6px 0}.brow .t{height:5px;border-radius:3px;background:var(--wash-faint);overflow:hidden}.brow .t i{display:block;height:100%;border-radius:3px}.brow .n{text-align:right;font-family:var(--mono)}
+.disc{display:flex;align-items:center;gap:6px;font-size:var(--label);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);padding:7px 0;border-bottom:1px solid var(--border)}
+.link{color:var(--primary);font-size:var(--label);margin:6px 0 2px;display:block}
+.door{display:flex;align-items:center;gap:8px;margin:0 -18px;padding:8px 18px;border-top:1px solid var(--border);color:var(--fg);font-size:var(--body)}.door:hover{background:var(--wash-hover)}.door .g{margin-left:auto;color:var(--muted)}.door .k{color:var(--muted)}.door .p{color:var(--primary)}
+.foot{margin:12px -18px 0;padding:11px 18px 10px;background:var(--plate);display:flex;flex-direction:column;gap:5px}.foot.only{border-radius:0}
+.frow{display:flex;align-items:center;gap:8px;font:var(--label)/1.4 var(--mono)}.frow .l{letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}.frow .v{color:var(--dim);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.frow .c{color:var(--muted);opacity:.6}
+.pager{display:flex;align-items:center;justify-content:center;gap:6px;color:var(--muted);font-size:var(--label);font-variant-numeric:tabular-nums;padding:6px 0 8px;margin:0 -18px;padding-left:18px;padding-right:18px;border-top:1px solid var(--border);background:var(--plate);border-radius:0 0 13px 13px}
+.pager.plain{background:none}.pager .b{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px}.pager .b:hover{background:var(--wash-hover);color:var(--fg)}.pager .sp{flex:1}
+.pad{height:14px}
+/* anatomy */
+.anat{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start;margin-top:16px}.slots{font-size:var(--label);max-width:60ch}.slots li{margin:0 0 9px;color:var(--dim)}.slots b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;font-size:11.6px;margin-right:6px}
+.tag{position:absolute;left:-30px;font-size:11px;color:var(--primary);font-weight:700;width:22px;text-align:right}
+</style></head><body>
+<h1>The right rail's eight cards — one skeleton</h1>
+<p class="lede">Every card the right rail can show, as it is today at the rail's 346px, then the same eight redrawn on one skeleton. Captured from the running app on 2026-10-02; figures are the live ones where I had them and illustrative for the Moment card's filled state.</p>
+<p class="note">Nothing here is built. The rulings on record are kept: label left and value right on one line, the foot as a ground change for look-up data, the dossier's stacked breakdown, the pager at the card's bottom, hovers never commit.</p>
+
+<h2>1 · Today</h2>
+<p class="lede">The cards share a head, the fact row and the foot. Everything between them was designed card by card, and it shows in five places.</p>
+<div class="grid" id="today"></div>
+<table>
+<tr><th>What differs</th><th>Where</th></tr>
+<tr><td class="y">The head's right slot has seven forms</td><td class="n">bold hued ticker · role chip · status pill · bare code (DE) · bare city · control pill (pinned) · relation text ("anchored to …") · age ("8 months ago")</td></tr>
+<tr><td class="y">What the card says first</td><td class="n">a four-line description (metagraph) · a count sentence (global snapshot) · two caps disclosure rows (metagraph snapshot) · facts straight away (the other five)</td></tr>
+<tr><td class="y">Three breakdown forms</td><td class="n">stacked bars with a label column (metagraph) · dot-name-bar-count rows (global snapshot) · inline dots (provider's Networks)</td></tr>
+<tr><td class="y">Four action forms</td><td class="n">a fact row with a link (Site) · a bare cyan sentence (Decompress) · a full-bleed foot control (Snapshot records) · a fact row with a caret (Online nodes)</td></tr>
+<tr><td class="y">Value emphasis and empties</td><td class="n">bold on some figures (0.0890, 125, 18), regular on others · three words for nothing: <i>not known</i>, none, n/a · sub-notes hang under values ("50 KB anchored", "not an L0 validator")</td></tr>
+</table>
+
+<h2>2 · The skeleton</h2>
+<p class="lede">Six slots in one order. A card uses the slots it has content for and skips the rest, so a short card is the same card with fewer slots, not a different design.</p>
+<div class="anat"><div id="anat"></div>
+<ol class="slots">
+<li><b>1 Head</b> Eyebrow, glyph, title, and ONE aside that is either a <i>qualifier chip</i> (ticker, role, country code, city) or a <i>state pill</i> (ready, live / pinned). Names in sans, machine ids and ordinals in mono. Relations and ages leave the aside.</li>
+<li><b>2 Lead</b> One sentence in dim ink, two lines at most, saying what this is in relation to its parent. The metagraph's subtitle and description merge here, clamped with "more". Relations and ages land here ("Anchored to 6,989,808 · 35s ago").</li>
+<li><b>3 Breakdown</b> A caps section label with its total on the right, then the breakdown. The dossier keeps its stacked bars; a per-network cut uses the bar rows. The label line is where the card's one headline figure lives.</li>
+<li><b>4 Facts</b> Label left, value right, regular weight. One dash for every empty value, with the reason on hover. Sub-notes become their own fact ("Size 50 KB") or join the value line.</li>
+<li><b>5 Doors</b> Every way out of the card is one full-bleed row: label, target, glyph. Site, Decompress, Snapshot records.</li>
+<li><b>6 Foot + pager</b> Identifiers on the plate (as built today), the pager always last.</li>
+</ol></div>
+
+<h2>3 · Proposed — the same eight on the skeleton</h2>
+<p class="lede">Each pair is today on the left, proposed on the right.</p>
+<div id="pairs"></div>
+
+<h2>4 · What each card uses</h2>
+<table id="matrix"></table>
+<div class="rec"><b>Recommend</b> Adopt the skeleton as a whole. The three changes that carry most of it are: one aside rule (chip or pill), a lead line on every card, and one door row. The breakdown and the foot are already close and mostly need the section label.</div>
+<div class="rec" style="border-color:var(--border);background:transparent"><b>Your calls</b> (a) Chips for every qualifier, or keep the ticker as bare hued text and chip only the rest. (b) A lead on every card, or only where one exists today. (c) One dash for empties, or keep the words. (d) Whether the metagraph's description clamps to two lines.</div>
+
+<script>
+const h=(t,c,x)=>`<${t}${c?` class="${c}"`:''}>${x??''}</${t}>`;
+const B={ // block renderers
+ lead:b=>`<p class="lead">${b.t}</p>`, desc:b=>`<p class="desc">${b.t}</p>`, hair:()=>`<div class="hair"></div>`,
+ fact:b=>`<div class="fact"><span>${b.l}</span><span class="v ${b.c||''}">${b.v}</span></div>`+(b.sub?`<span class="subn">${b.sub}</span>`:''),
+ sec:b=>`<div class="sec"><span>${b.l}${b.caret?' ⌄':''}</span><span>${b.u?`<span class="u">${b.u}</span> `:''}${b.n!=null?`<b>${b.n}</b>`:''}</span></div>`,
+ sched:b=>`<div class="sched">${b.rows.map(r=>`<span class="ax">${r.ax}</span><span><div class="bar">${r.parts.filter(p=>p.n>0).map(p=>`<i style="width:${p.n/r.parts.reduce((a,q)=>a+q.n,0)*100}%;background:${p.c}"></i>`).join('')}</div><div class="parts">${r.parts.map(p=>`<span class="${p.n?'':'z'}">${p.n?`<i class="d" style="background:${p.c}"></i>`:''}${p.l} <em>${p.n}</em></span>`).join('')}</div></span>`).join('')}</div>`,
+ bars:b=>b.rows.map(r=>`<div class="brow"><i class="d" style="background:${r.c};margin:auto"></i><span>${r.l}</span><span class="t"><i style="width:${r.n/b.max*100}%;background:${r.c}"></i></span><span class="n">${Number(r.n).toLocaleString()}</span></div>`).join(''),
+ disc:b=>`<div class="disc">${b.l}</div>`, link:b=>`<a class="link">${b.t}</a>`,
+ door:b=>`<div class="door">${b.k?`<span class="k">${b.k}</span>`:''}<span class="${b.p?'p':''}">${b.t}</span><span class="g">${b.g||'↗'}</span></div>`,
+ foot:b=>`<div class="foot">${b.rows.map(r=>`<div class="frow"><span class="l">${r[0]}</span><span class="v">${r[1]}</span><span class="c">⧉</span></div>`).join('')}</div>`,
+ pager:b=>`<div class="pager ${b.plain?'plain':''}"><span class="b">‹</span>${b.t||''}<span class="b">›</span><span class="sp"></span><span class="b">⌃</span><span class="b">⌄</span></div>`,
+ pad:()=>`<div class="pad"></div>`
+};
+const card=c=>`<div class="card"><span class="x">×</span><div class="eyebrow">${c.eye}</div><div class="hrow">${c.av?'<span class="av"></span>':`<span class="ico ${c.io?'o':''}"></span>`}<div style="min-width:0"><div class="ttl ${c.mono?'m':''}">${c.title}</div>${c.sub?`<div class="sub">${c.sub}</div>`:''}</div><span class="aside">${c.aside||''}</span></div><div class="hair"></div>${c.body.map(b=>B[b[0]](b[1]||{})).join('')}</div>`;
+const O='var(--orange)',BL='var(--blue)',G='var(--green)',N='oklch(0.62 0.03 265)';
+const L0='<span class="chip">L0</span>';
+const T={ // TODAY
+ metagraph:{eye:'Metagraph',av:1,title:'Dor Technologies',sub:'data and currency metagraph',aside:'<span class="tick">DOR</span>',body:[
+  ['desc',{t:'Decentralized service used for the distribution, validation, and incentivization of data produced by the Dor Traffic Miner and other future product offerings.'}],
+  ['fact',{l:'Online nodes ⌄',v:'18',c:'b'}],
+  ['sched',{rows:[{ax:'Composition',parts:[{l:'Hybrid',n:3,c:O},{l:'Data',n:15,c:'oklch(0.74 0.12 41)'}]},{ax:'Status',parts:[{l:'Ready',n:18,c:G}]},{ax:'Archive depth',parts:[{l:'Full archive',n:0,c:N},{l:'16 months',n:3,c:N},{l:'Unknown',n:15,c:'oklch(0.45 0.03 265)'}]}]}],
+  ['hair'],['fact',{l:'Site',v:'<span style="color:var(--primary)">explorer.getdor.com ↗</span>'}],
+  ['foot',{rows:[['ID','DAG0CyySf35ftDQDQ…acMghpnCuM'],['OWNER','DAG0o6WSyvc7Xfz…oLYDD6wqnk']]}],['pager',{t:'2 / 12'}]]},
+ composition:{eye:'Composition',io:1,title:'Data validators',aside:'<span class="chip">dL1</span>',body:[
+  ['fact',{l:'Nodes',v:'15'}],['fact',{l:'Share of network',v:'83%'}],['fact',{l:'Network',v:'Dor Technologies'}],['pad'],['pager',{t:'1 / 2',plain:1}]]},
+ node:{eye:'Node',io:1,title:'1545a38…ba24',aside:'<span class="pill">ready</span>',body:[
+  ['fact',{l:'Alias',v:'not known',c:'i'}],['fact',{l:'City',v:'Helsinki'}],['fact',{l:'Country',v:'Finland'}],['fact',{l:'Hosting',v:'Hetzner Online GmbH'}],['fact',{l:'ASN',v:'AS24940'}],['fact',{l:'Co-located',v:'none'}],['fact',{l:'Full archive',v:'n/a',sub:`not an ${L0} validator`}],
+  ['foot',{rows:[['NODE ID','1545a38af9b71e1f35…a4e575dba24']]}],['pager',{t:'1 / 15'}]]},
+ country:{eye:'Country',title:'Germany',aside:'DE',body:[
+  ['fact',{l:'Nodes',v:'62'}],['fact',{l:'Share of selection',v:'37%'}],['fact',{l:'Cities',v:'7'}],['fact',{l:'Providers',v:'6'}],['pad'],['pager',{t:'1 / 7',plain:1}]]},
+ provider:{eye:'Provider',title:'Hetzner Online GmbH',aside:'Falkenstein',body:[
+  ['fact',{l:'ASN',v:'AS24940'}],['fact',{l:'Nodes',v:'31'}],['fact',{l:'Networks',v:`<i class="d" style="background:${BL}"></i>DAG &nbsp;<i class="d" style="background:${O}"></i>DOR`}],['pad'],['pager',{t:'1 / 9',plain:1}]]},
+ snap:{eye:'Global snapshot',title:'6,989,808',aside:'<span class="pill pin"><i></i>pinned · 35s ago</span>',body:[
+  ['lead',{t:'<b>14</b> snapshots anchored &nbsp;<span style="color:var(--muted);font-size:var(--label)">from 4 metagraphs</span>'}],
+  ['bars',{max:11,rows:[{l:'DOR',n:11,c:O},{l:'USDC.dag',n:1,c:BL},{l:'DED',n:1,c:BL},{l:'unlisted',n:1,c:N}]}],
+  ['hair'],['fact',{l:'Fees paid',v:'<b>0.0890</b> DAG',sub:'50 KB anchored'}],['fact',{l:'Signed by',v:`125 ${L0} validators`}],
+  ['foot',{rows:[['HASH','85b020541219469c1…b3614f34ec'],['PREVIOUS','984b5976bc9414…459a4bad']]}],['pager',{}]]},
+ metaSnap:{eye:'Metagraph snapshot',io:1,title:'28,642,671',aside:'anchored to 6,989,808',body:[
+  ['disc',{l:'State'}],['disc',{l:'Data'}],['pad'],['fact',{l:'Fees paid',v:'<b>0.0070</b> DAG',sub:'4.2 KB compressed'}],['fact',{l:'Signed by',v:`3 ${L0} validators`}],['link',{t:'Decompress this snapshot'}],
+  ['foot',{rows:[['HASH','2c34a5f7a6649856e…e11237ff43'],['PREVIOUS','3bc51a3f0488ea…038bb244'],['STATE','c50fb5d76983b54a…74b59c7c6a']]}],['pager',{t:'11 / 11'}]]},
+ moment:{eye:'Moment',title:'Sep 14, 13:00 UTC',aside:'18 days ago',body:[
+  ['fact',{l:'<span style="color:var(--fg);font-size:var(--title);font-weight:600">3,412</span> <span style="font-size:var(--body)">per hour</span>',v:'<span style="color:var(--muted);font-size:var(--label)">all networks</span>'}],
+  ['sec',{l:'At that moment',u:'per hour'}],
+  ['fact',{l:`<i class="d" style="background:${O}"></i><span style="color:var(--fg)">Dor Technologies</span>`,v:'1,717'}],['fact',{l:`<i class="d" style="background:${BL}"></i><span style="color:var(--fg)">Digital Evidence</span>`,v:'1,032'}],['fact',{l:`<i class="d" style="background:${O}"></i><span style="color:var(--fg)">The Upsider AI</span>`,v:'111'}],
+  ['pad'],['door',{t:'▦ &nbsp;Snapshot records'}]]}
+};
+const P={ // PROPOSED
+ metagraph:{eye:'Metagraph',av:1,title:'Dor Technologies',aside:'<span class="chip id">DOR</span>',body:[
+  ['lead',{t:'Data and currency metagraph. Decentralized service used for the distribution, validation, and… <span class="more">more</span>'}],
+  ['sec',{l:'Online nodes',caret:1,n:18}],
+  ['sched',{rows:[{ax:'Composition',parts:[{l:'Hybrid',n:3,c:O},{l:'Data',n:15,c:'oklch(0.74 0.12 41)'}]},{ax:'Status',parts:[{l:'Ready',n:18,c:G}]},{ax:'Archive depth',parts:[{l:'Full archive',n:0,c:N},{l:'16 months',n:3,c:N},{l:'Unknown',n:15,c:'oklch(0.45 0.03 265)'}]}]}],
+  ['pad'],['door',{k:'Site',t:'explorer.getdor.com',p:1}],
+  ['foot',{rows:[['ID','DAG0CyySf35ftDQDQ…acMghpnCuM'],['OWNER','DAG0o6WSyvc7Xfz…oLYDD6wqnk']]}],['pager',{t:'2 / 12'}]]},
+ composition:{eye:'Composition',io:1,title:'Data validators',aside:'<span class="chip">dL1</span>',body:[
+  ['lead',{t:'83% of Dor Technologies’ online nodes.'}],['pad'],
+  ['fact',{l:'Nodes',v:'15'}],['fact',{l:'Network',v:'Dor Technologies'}],['pad'],['pager',{t:'1 / 2',plain:1}]]},
+ node:{eye:'Node',io:1,mono:1,title:'1545a38…ba24',aside:'<span class="pill">ready</span>',body:[
+  ['lead',{t:'Helsinki, Finland · Hetzner Online GmbH.'}],['pad'],
+  ['fact',{l:'Alias',v:'—',c:'e'}],['fact',{l:'ASN',v:'AS24940'}],['fact',{l:'Co-located',v:'—',c:'e'}],['fact',{l:'Full archive',v:'— <span style="font-size:var(--label)">not an L0 validator</span>',c:'e'}],
+  ['foot',{rows:[['NODE ID','1545a38af9b71e1f35…a4e575dba24']]}],['pager',{t:'1 / 15'}]]},
+ country:{eye:'Country',title:'Germany',aside:'<span class="chip">DE</span>',body:[
+  ['lead',{t:'37% of the selection’s nodes.'}],['pad'],
+  ['fact',{l:'Nodes',v:'62'}],['fact',{l:'Cities',v:'7'}],['fact',{l:'Providers',v:'6'}],['pad'],['pager',{t:'1 / 7',plain:1}]]},
+ provider:{eye:'Provider',title:'Hetzner Online GmbH',aside:'<span class="chip">Falkenstein</span>',body:[
+  ['lead',{t:'31 nodes in Germany, on two networks.'}],['pad'],
+  ['fact',{l:'ASN',v:'AS24940'}],['fact',{l:'Nodes',v:'31'}],['fact',{l:'Networks',v:`<i class="d" style="background:${BL}"></i>DAG &nbsp;<i class="d" style="background:${O}"></i>DOR`}],['pad'],['pager',{t:'1 / 9',plain:1}]]},
+ snap:{eye:'Global snapshot',mono:1,title:'6,989,808',aside:'<span class="pill pin"><i></i>pinned · 35s ago</span>',body:[
+  ['lead',{t:'Anchored by 4 metagraphs.'}],
+  ['sec',{l:'Snapshots anchored',n:14}],
+  ['bars',{max:11,rows:[{l:'DOR',n:11,c:O},{l:'USDC.dag',n:1,c:BL},{l:'DED',n:1,c:BL},{l:'unlisted',n:1,c:N}]}],
+  ['hair'],['fact',{l:'Fees paid',v:'0.0890 DAG'}],['fact',{l:'Size',v:'50 KB'}],['fact',{l:'Signed by',v:`125 ${L0} validators`}],
+  ['foot',{rows:[['HASH','85b020541219469c1…b3614f34ec'],['PREVIOUS','984b5976bc9414…459a4bad']]}],['pager',{}]]},
+ metaSnap:{eye:'Metagraph snapshot',io:1,mono:1,title:'28,642,671',aside:'<span class="chip id">DOR</span>',body:[
+  ['lead',{t:'Anchored to 6,989,808 · 35s ago.'}],
+  ['sec',{l:'State',caret:1}],['sec',{l:'Data',caret:1}],
+  ['hair'],['fact',{l:'Fees paid',v:'0.0070 DAG'}],['fact',{l:'Size',v:'4.2 KB compressed'}],['fact',{l:'Signed by',v:`3 ${L0} validators`}],
+  ['pad'],['door',{t:'Decompress this snapshot',g:'⤓'}],
+  ['foot',{rows:[['HASH','2c34a5f7a6649856e…e11237ff43'],['PREVIOUS','3bc51a3f0488ea…038bb244'],['STATE','c50fb5d76983b54a…74b59c7c6a']]}],['pager',{t:'11 / 11'}]]},
+ moment:{eye:'Moment',mono:1,title:'Sep 14, 13:00 UTC',aside:'',body:[
+  ['lead',{t:'18 days ago, inside the window on screen.'}],
+  ['sec',{l:'Snapshots',u:'per hour',n:'3,412'}],
+  ['bars',{max:1717,rows:[{l:'DOR',n:1717,c:O},{l:'DED',n:1032,c:BL},{l:'UP',n:111,c:O}]}],
+  ['pad'],['door',{t:'Snapshot records'}]]}
+};
+const order=[['metagraph','Metagraph'],['composition','Composition'],['node','Node'],['country','Country'],['provider','Provider'],['snap','Global snapshot'],['metaSnap','Metagraph snapshot'],['moment','Moment']];
+document.getElementById('today').innerHTML=order.map(([k,n])=>`<div class="col"><div class="cap"><b>${n}</b></div>${card(T[k])}</div>`).join('');
+const WHY={metagraph:'Subtitle and description merge into a two-line lead. The node total moves onto the section label, so the breakdown has a heading. Site becomes a door row.',composition:'The share becomes the lead: it is the one thing the card says about its parent.',node:'Place and host read as one lead sentence instead of three rows. One dash for the three empty words; the reason stays visible where there is one.',country:'The code is a chip like every other qualifier. The share becomes the lead.',provider:'City as a chip; the count and country say what the cohort is.',snap:'The count sentence splits: the relation is the lead, the total sits on the breakdown’s label. Size is a fact, not a hanging note. Figures are regular weight.',metaSnap:'The relation leaves the aside for the lead, and the aside names the network. State and Data use the section-label form. Decompress is a door.',moment:'The age leaves the aside for the lead. The headline moves onto the section label; the networks use the bar rows the snapshot card uses.'};
+document.getElementById('pairs').innerHTML=order.map(([k,n])=>`<div class="pair"><div class="col"><div class="cap"><b>${n}</b><span>today</span></div>${card(T[k])}</div><div class="arrow">→</div><div class="col"><div class="cap"><b>${n}</b><span>proposed</span></div>${card(P[k])}<p class="why">${WHY[k]}</p></div></div>`).join('');
+// anatomy card with slot numbers
+const A=JSON.parse(JSON.stringify(P.snap));
+document.getElementById('anat').innerHTML=`<div style="position:relative;margin-left:34px"><span class="tag" style="top:36px">1</span><span class="tag" style="top:86px">2</span><span class="tag" style="top:118px">3</span><span class="tag" style="top:262px">4</span><span class="tag" style="top:356px">6</span>${card(A)}<p class="note" style="margin-top:8px">The global snapshot card on the skeleton. Slot 5, a door row, sits between the facts and the foot on the cards that have one.</p></div>`;
+const M={Head:{},Lead:{},Breakdown:{metagraph:1,snap:1,metaSnap:'disclosures',moment:1},Facts:{metagraph:0,moment:0},Doors:{metagraph:'Site',metaSnap:'Decompress',moment:'Records'},Foot:{metagraph:1,node:1,snap:1,metaSnap:1}};
+const def={Head:1,Lead:1,Breakdown:0,Facts:1,Doors:0,Foot:0};
+document.getElementById('matrix').innerHTML=`<tr><th>Slot</th>${order.map(o=>`<th>${o[1]}</th>`).join('')}</tr>`+Object.keys(M).map(s=>`<tr><td class="y">${s}</td>${order.map(([k])=>{const v=k in M[s]?M[s][k]:def[s];return `<td class="${v?'y':'n'}">${v===1?'●':v===0?'–':v}</td>`}).join('')}</tr>`).join('');
+</script>
+</body></html>

@@ -43,7 +43,7 @@ const NETS: { label: string; Icon: LucideIcon }[] = [
 function Row({ title, items }: { title: string; items: { label: string; Icon: LucideIcon }[] }) {
   return (
     <div>
-      <div className="text-micro tracking-caps uppercase text-muted-foreground mb-2">{title}</div>
+      <div className="text-label tracking-caps uppercase text-muted-foreground mb-2">{title}</div>
       <div className="flex flex-wrap gap-2">
         {items.map(({ label, Icon }) => (
           <span key={label} className="ig-panel inline-flex items-center gap-2 px-3 py-2 text-body text-foreground">
@@ -59,7 +59,7 @@ function Row({ title, items }: { title: string; items: { label: string; Icon: Lu
 function MultiRow({ title, items }: { title: string; items: { label: string; icons: LucideIcon[] }[] }) {
   return (
     <div>
-      <div className="text-micro tracking-caps uppercase text-muted-foreground mb-2">{title}</div>
+      <div className="text-label tracking-caps uppercase text-muted-foreground mb-2">{title}</div>
       <div className="flex flex-wrap gap-2">
         {items.map(({ label, icons }) => (
           <span key={label} className="ig-panel inline-flex items-center gap-2 px-3 py-2 text-body text-foreground">

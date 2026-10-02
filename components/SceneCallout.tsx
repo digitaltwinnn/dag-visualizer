@@ -55,6 +55,7 @@ import { relativeAge } from "@/src/util/relativeAge";
 import { CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET } from "@/src/engine/domain/calloutPlacement";
 import type { GeoInfo } from "@/src/data/types";
 import LiveDot from "@/components/LiveDot";
+import { IDENT_INK } from "@/components/identInk";
 
 // The panel's standoff from the anchor lives in `src/engine/domain/calloutPlacement.ts`, with the
 // reach thresholds derived from it and the placement rules that read them. It used to be a local
@@ -114,9 +115,10 @@ export function CalloutPanel({ m, className }: { m: CalloutModel; className?: st
           tips spend themselves in the corner curves rather than stopping abruptly. The
           leader flows into its lower run-off. Static and subtle: a resting identity cue. */}
       <span aria-hidden className="edge-spine opacity-70" style={{ ["--spine" as string]: m.ring }} />
-      {/* The card eyebrow's own ink (CardHead: EYEBROW + text-accent), not a muted caption —
-          this is the same slot noun the rail card wears (user, 2026-08-15). */}
-      <div className="text-micro font-bold tracking-[0.1em] uppercase leading-none text-accent mb-1.5">{m.eyebrow}</div>
+      {/* The card eyebrow's own ink (CardHead: EYEBROW + text-primary-ink), not a muted caption —
+          this is the same slot noun the rail card wears (user, 2026-08-15). It follows the card
+          to the accent's INK (2026-10-02): the bare accent measured 4.2:1 here on paper. */}
+      <div className="text-label font-bold tracking-[0.1em] uppercase leading-none text-primary-ink mb-1.5">{m.eyebrow}</div>
       {/* No identity dot here (user, 2026-08-15): the hued aside already carries the identity
           on this row, and the anchor ring is the subject mark at the scene end of the tie. */}
       <div className="flex items-center gap-[7px]">
@@ -125,7 +127,7 @@ export function CalloutPanel({ m, className }: { m: CalloutModel; className?: st
           <span
             className={
               m.aside.hue
-                ? "text-label font-bold ml-1"
+                ? cn("text-label font-bold ml-1", IDENT_INK)
                 : "inline-flex items-center gap-1.5 text-label text-muted-foreground ml-1"
             }
             style={m.aside.hue ? { color: m.aside.hue } : undefined}
@@ -146,7 +148,7 @@ export function CalloutPanel({ m, className }: { m: CalloutModel; className?: st
       {m.lead && (
         <div className="mt-1.5 pt-1.5 border-t border-border flex items-center gap-1.5 text-label text-muted-foreground">
           {m.lead.ident && (
-            <span className="font-bold" style={{ color: m.lead.ident.hue }}>
+            <span className={cn("font-bold", IDENT_INK)} style={{ color: m.lead.ident.hue }}>
               {m.lead.ident.text}
             </span>
           )}
@@ -169,7 +171,7 @@ export function CalloutPanel({ m, className }: { m: CalloutModel; className?: st
             <span className="inline-flex items-center gap-1.5">
               <span className="opacity-60">+</span>
               {m.lead.also.map((t) => (
-                <span key={t.text} className="font-bold" style={{ color: t.hue }}>
+                <span key={t.text} className={cn("font-bold", IDENT_INK)} style={{ color: t.hue }}>
                   {t.text}
                 </span>
               ))}
@@ -199,8 +201,11 @@ export default function SceneCallout() {
   // apply the SAME preference, so label and anchor step up and down together.
   const boxedCard = useStore((s) => s.boxedCard);
   // The global tick's aside is its AGE, ticking (user, 2026-08-15 — "same as card"):
-  // SnapshotAside's two states mirrored as a label — `live · Xs` with the beating dot while
-  // following, `◷ Xs` on a pin. The card keeps the BUTTON (follow toggle); this is read-only.
+  // The card's two states mirrored as a label — `live · Xs` with the beating dot while
+  // following, `pinned · Xs` on a pin, in the card's own words (2026-10-02, B1: the callout is the
+  // ONE mirror of the state now that the explorer's pill is gone, so it says the word the card
+  // says rather than a bare clock glyph). The card keeps the BUTTON (follow toggle); this is
+  // read-only.
   const now = useNowTick(1000);
   // NOT ON A PHONE (user, 2026-08-18) — the reasoning lives with the Engine's mirrored gate in
   // `_syncCallout`: the label's value is co-location, and under 700px the panel's reach can't
@@ -366,7 +371,7 @@ export default function SceneCallout() {
         key: following ? "gs|live" : `gs|${snap.data.ordinal}`,
         eyebrow: "Global snapshot",
         title: snap.data.ordinal.toLocaleString(),
-        aside: following ? { text: rel ? `live · ${rel}` : "live", live: true } : rel ? { text: `◷ ${rel}` } : undefined,
+        aside: following ? { text: rel ? `live · ${rel}` : "live", live: true } : { text: rel ? `pinned · ${rel}` : "pinned" },
         // Unfiltered the ring marks the whole bar (core cyan); under a filter the anchor
         // points at the committed network's own SEGMENT, so the ring takes its accent
         // (user, 2026-08-16 — "if filter, select the correct segment of the byte bar").
