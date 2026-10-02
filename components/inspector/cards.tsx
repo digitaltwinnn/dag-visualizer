@@ -1046,41 +1046,56 @@ function networkParts(rows: { pick: Parameters<typeof pickNetId>[0] }[]): Schedu
   return parts;
 }
 
+/** A country's nodes cut BY PROVIDER, as the breakdown table's parts: the three largest hosts,
+ *  then everything else as one "N others" row, in the neutral ramp (a host carries no identity
+ *  hue). Nodes whose lookup named no host are counted with the others, so the parts always sum
+ *  to the country's total. */
+function providerParts(rows: { pick: PickDescriptor }[]): SchedulePart[] {
+  const by = new Map<string, number>();
+  let unknown = 0;
+  for (const r of rows) {
+    const isp = "geo" in r.pick ? r.pick.geo?.isp : undefined;
+    if (isp) by.set(isp, (by.get(isp) ?? 0) + 1);
+    else unknown++;
+  }
+  const ranked = [...by.entries()].sort((x, y) => y[1] - x[1]);
+  const top = ranked.slice(0, 3);
+  const rest = ranked.slice(3);
+  const parts: SchedulePart[] = top.map(([label, count], i) => ({ label, count, color: partShade("var(--muted-foreground)", i) }));
+  const restCount = rest.reduce((n, [, c]) => n + c, 0) + unknown;
+  if (restCount > 0)
+    parts.push({
+      label: rest.length === 1 && unknown === 0 ? rest[0][0] : rest.length > 0 ? `${rest.length} others` : "Unknown host",
+      count: restCount,
+      color: partShade("var(--muted-foreground)", 3),
+      title: rest.length > 0 ? rest.map(([l, c]) => `${l} ${c}`).join(" · ") : "The lookup named no host for these nodes",
+    });
+  return parts;
+}
+
 export function CountryCard({ cc }: { cc: string }) {
   const selNodes = useStore((s) => s.selNodes);
   const rows = useMemo(() => selNodes.filter((r) => r.cc === cc), [selNodes, cc]);
-  const cities = useMemo(
-    () => new Set(rows.map((r) => r.city).filter((c): c is string => !!c)),
-    [rows],
-  );
-  const providers = useMemo(
-    () =>
-      new Set(
-        rows
-          .map((r) => ("geo" in r.pick ? r.pick.geo?.isp : undefined))
-          .filter((p): p is string => !!p),
-      ),
-    [rows],
-  );
-  const parts = useMemo(() => networkParts(rows), [rows]);
+  const cities = useMemo(() => new Set(rows.map((r) => r.city).filter((c): c is string => !!c)), [rows]);
+  const parts = useMemo(() => providerParts(rows), [rows]);
   const share = shareWords(rows.length, selNodes.length);
   return (
     <>
-      {/* THE LEAD: what this country is to the selection it sits in — it was the "Share of
-          selection" fact, and it is the one thing the card says about its parent. */}
-      {share && <Lead>Hosts {share} of the selection&apos;s nodes.</Lead>}
-      {/* THE BREAKDOWN (`visuals.html`, user 2026-10-02): whose nodes these are — the node count is
-          the section's total and the cut is by network, in the dossier's own table. Cities and
-          providers stay counts: the explorer beside the scene lists them, and the card doesn't
-          repeat it. */}
+      {/* THE LEAD: what this country is to the selection it sits in, and how spread out it is. */}
+      {share && (
+        <Lead>
+          Hosts {share} of the selection&apos;s nodes{cities.size > 0 ? `, in ${cities.size === 1 ? "one city" : `${cities.size} cities`}` : ""}.
+        </Lead>
+      )}
+      {/* EACH CARD CUTS BY THE NEXT LEVEL DOWN (user, 2026-10-02 — `docs/superpowers/design/
+          2026-10-02-country-provider`, option B: "country and provider cards have the same content …
+          the node part"). Both cards used to cut their nodes by network, so the provider's table was
+          the country's, smaller. The country is cut by PROVIDER now — who hosts here — and the
+          provider card below it by NETWORK — whose nodes these are: place → host → network down
+          the pile, nothing repeated. */}
       <Separator className="mb-2" />
-      <SectionLabel label="Nodes" total={rows.length} className="mb-1.5" />
+      <SectionLabel label="Nodes" unit="by provider" total={rows.length} className="mb-1.5" />
       <ScheduleTable parts={parts} />
-      <Separator className="my-2" />
-      <FactGroup>
-        <Fact label="Cities">{cities.size}</Fact>
-        <Fact label="Providers">{providers.size}</Fact>
-      </FactGroup>
     </>
   );
 }
@@ -1192,14 +1207,6 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
   );
   // The members cut by network — "dag" resolves through metagraphById like every other id.
   const parts = useMemo(() => networkParts(members), [members]);
-  const networkIds = useMemo(() => {
-    const seen = new Set<string>();
-    for (const r of members) {
-      const id = pickNetId(r.pick);
-      if (id) seen.add(id);
-    }
-    return [...seen];
-  }, [members]);
   // Members of one city×provider cohort share an AS number, so the first member that reports one
   // speaks for the cohort.
   const asn = useMemo(() => {
@@ -1210,19 +1217,16 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
     return null;
   }, [members]);
   const where = countryDisplayName(sel.cc, selNodes) ?? sel.cc;
+  const countryShare = shareWords(members.length, selNodes.filter((r) => r.cc === sel.cc).length);
   return (
     <>
-    {/* THE LEAD: where the cohort is and whose nodes it hosts — the count is the breakdown's. */}
-    <Lead>
-      {networkIds.length > 0
-        ? `Hosts nodes of ${networkIds.length === 1 ? "one network" : `${networkIds.length} networks`} in ${where}.`
-        : `In ${where}.`}
-    </Lead>
-    {/* THE BREAKDOWN (`visuals.html`, user 2026-10-02): the cohort's nodes cut by network, in the
-        dossier's table. It replaced a "Networks" fact of inline identity dots, which named the
-        networks and hid how many nodes each has here — the rail's third breakdown recipe. */}
+    {/* THE LEAD: this host's share of its country — the figure neither card showed (option B,
+        2026-10-02). The city is the head's chip, so the lead does not repeat it. */}
+    {countryShare && <Lead>{countryShare[0].toUpperCase() + countryShare.slice(1)} of {where}&apos;s nodes.</Lead>}
+    {/* THE BREAKDOWN: the cohort's nodes cut by NETWORK — whose nodes these are — the level below
+        the country card's cut by provider. */}
     <Separator className="mb-2" />
-    <SectionLabel label="Nodes" total={members.length} className="mb-1.5" />
+    <SectionLabel label="Nodes" unit="by network" total={members.length} className="mb-1.5" />
     {parts.length > 0 && <ScheduleTable parts={parts} />}
     <Separator className="my-2" />
     <FactGroup>
