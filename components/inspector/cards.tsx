@@ -413,14 +413,20 @@ function ScheduleGroup({
         {/* A SECTION LABEL in both forms (the card skeleton, 2026-10-02): caps and muted, the
             total it heads on the right — the breakdown slot's one heading recipe. */}
         <span className="text-label tracking-caps uppercase text-muted-foreground">{label}</span>
+        {value !== undefined && <span className="ml-auto min-w-0 text-body text-foreground tabular-nums text-right">{value}</span>}
+        {/* THE FOLD MARK SITS AT THE ROW'S FAR END, after the total (user, 2026-10-02: "it is on the
+            text; where does it belong?") — the same place and the same glyph as the snapshot card's
+            expandable rows, so the rail has one disclosure mark. It is not the pager's ‹ ›: those
+            STEP to a sibling, this one folds the rows beneath it, which is why it is the smaller
+            muted chevron that turns down when open. */}
         <ChevronRight
           aria-hidden
           className={cn(
             "size-3.5 flex-none text-muted-foreground transition-transform duration-150 motion-reduce:transition-none",
+            value === undefined && "ml-auto",
             open && "rotate-90",
           )}
         />
-        {value !== undefined && <span className="ml-auto min-w-0 text-body text-foreground tabular-nums text-right">{value}</span>}
       </CollapsibleTrigger>
       <CollapsibleContent className="disclose-panel">
         <div className="mt-1 pl-2">{children}</div>
