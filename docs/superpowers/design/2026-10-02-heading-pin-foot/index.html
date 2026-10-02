@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Options — heading, pin, foot</title>
+<style>
+:root{--bg:oklch(0.09 0.02 265);--fg:oklch(0.94 0.02 255);--dim:#c7d0ea;--muted:oklch(0.66 0.04 265);--primary:oklch(0.88 0.13 195);
+--border:rgba(90,140,255,.22);--panel:rgba(12,16,32,.92);--plate:rgba(255,255,255,.045);--radius:14px;
+--wash-faint:color-mix(in oklch,var(--primary) 6%,transparent);--wash-soft:color-mix(in oklch,var(--primary) 12%,transparent);--wash-hover:color-mix(in oklch,var(--primary) 16%,transparent);--wash-strong:color-mix(in oklch,var(--primary) 22%,transparent);
+--sel-bg:color-mix(in oklch,var(--primary) 12%,transparent);--sel-border:color-mix(in oklch,var(--primary) 52%,transparent);
+--label:12.6px;--body:14.9px;--title:16.6px;--orange:#ff8a3d;--blue:#4db3ff;--success:oklch(0.80 0.15 165)}
+*{box-sizing:border-box}html{color-scheme:dark}body{margin:0;background:radial-gradient(1200px 600px at 60% 0%,#0b1230 0%,var(--bg) 60%);color:var(--fg);font:var(--body)/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:32px 40px 80px}
+h1{font-size:24px;font-weight:600;margin:0 0 6px}h2{font-size:18px;font-weight:600;margin:48px 0 4px}h3{font-size:var(--label);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);font-weight:500;margin:0 0 10px}
+p.lede{color:var(--dim);max-width:72ch;margin:0 0 6px}.note{color:var(--muted);font-size:var(--label);max-width:80ch}
+.grid{display:flex;flex-wrap:wrap;gap:28px;align-items:flex-start;margin-top:14px}
+.opt{width:360px}.opt .tag{display:flex;align-items:baseline;gap:8px;margin:0 0 8px}.opt .tag b{font-size:var(--label);letter-spacing:.13em;text-transform:uppercase;color:var(--primary)}
+.opt .tag span{color:var(--muted);font-size:var(--label)}.opt .why{color:var(--dim);font-size:var(--label);margin:10px 2px 0;max-width:46ch}
+.rec{border:1px solid var(--sel-border);background:var(--sel-bg);border-radius:8px;padding:10px 14px;color:var(--fg);font-size:var(--label);margin-top:16px;max-width:80ch}
+.rec b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;font-size:11.6px;margin-right:8px}
+/* card */
+.card{width:307px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px 14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 8px 30px rgba(0,0,0,.35);position:relative}
+.card.detail{width:346px;padding:18px 18px 0}
+.eyebrow{font-size:var(--label);letter-spacing:.13em;text-transform:uppercase;color:var(--primary);font-weight:700;line-height:1}
+.head{display:flex;align-items:flex-start;justify-content:space-between}.head .r{display:flex;align-items:center;gap:6px;color:var(--muted)}
+.title{font-size:var(--title);font-weight:600;line-height:1.2;margin:4px 0 0;display:flex;align-items:center;gap:6px}
+.title i{width:14px;height:14px;border:1.5px solid var(--primary);border-radius:50%;display:inline-block;opacity:.9}
+.hair{border-top:1px solid var(--border);margin:10px 0 6px}
+.blurb{font-size:var(--label);color:var(--muted);margin:0}
+.hrow{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;border-bottom:1px solid var(--border);padding-bottom:5px;margin-bottom:6px;min-height:22px}
+.ctl{display:inline-flex;align-items:center;gap:4px;font-size:var(--label);letter-spacing:.13em;text-transform:uppercase;color:var(--fg);padding:3px 6px;border-radius:4px;min-height:24px;white-space:nowrap}
+.ctl:hover{background:var(--wash-hover)}.ctl svg{width:12px;height:12px;color:var(--muted)}
+.row{display:grid;grid-template-columns:14px minmax(0,110px) minmax(0,1fr) 36px 48px;gap:0 5px;align-items:center;padding:4px 10px 4px 6px;margin:0 -6px;border-radius:5px;font-size:var(--body)}
+.row:hover{background:var(--wash-hover)}.row.on{background:var(--sel-bg);box-shadow:inset 0 0 0 1px var(--sel-border)}
+.row>span:nth-child(2){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.row .dot{width:8px;height:8px;border-radius:50%;background:var(--blue);margin:auto}.row .bar{height:5px;border-radius:3px;background:var(--wash-faint);overflow:hidden}.row .bar i{display:block;height:100%;border-radius:3px;background:var(--blue)}
+.row .fig{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-align:right;font-variant-numeric:tabular-nums}
+.row.faint{opacity:.65}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:var(--label);color:var(--muted);padding:3px 6px;border-radius:4px;border:1px solid transparent;white-space:nowrap}
+.pill.pinned{background:var(--sel-bg);border-color:var(--sel-border);color:var(--fg)}.pill .ld{width:8px;height:8px;border-radius:50%;background:var(--primary);box-shadow:0 0 6px var(--primary)}.pill .hd{width:8px;height:8px;border-radius:50%;border:1.5px solid var(--primary)}
+.tip{display:inline-flex;width:16px;height:16px;border:1px solid var(--muted);border-radius:50%;color:var(--muted);font-size:10px;align-items:center;justify-content:center;font-style:italic;font-family:Georgia,serif}
+/* detail card */
+.dhead{display:flex;align-items:center;gap:10px;margin-top:6px}.dhead .logo{width:28px;height:28px;border-radius:50%;background:var(--orange)}
+.dhead .n{font-size:var(--title);font-weight:600;line-height:1.1}.dhead .s{font-size:var(--label);color:var(--muted)}.dhead .t{margin-left:auto;color:var(--orange);font-weight:700;font-size:var(--label)}
+.fact{display:flex;justify-content:space-between;gap:10px;font-size:var(--body);margin:6px 0}.fact span:first-child{color:var(--muted)}.fact b{font-weight:600}
+.foot{margin:12px -18px 0;padding:11px 18px 10px;background:var(--plate);border-radius:0 0 13px 13px;display:flex;flex-direction:column;gap:4px}
+.frow{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:var(--label)}.frow .l{letter-spacing:.13em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.frow .v{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.frow .cp{width:24px;height:24px;margin:-4px 0;display:inline-flex;align-items:center;justify-content:center;color:var(--muted);border-radius:4px;opacity:.55}.frow:hover .cp{opacity:1;background:var(--wash-hover)}
+.pager{display:flex;align-items:center;justify-content:center;gap:6px;color:var(--muted);font-size:var(--label);font-variant-numeric:tabular-nums;padding:6px 0 2px;border-top:1px solid var(--border);margin-top:6px}
+.pager .b{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px}.pager .b:hover{background:var(--wash-hover);color:var(--fg)}.pager .sp{flex:1}
+.disc{display:flex;align-items:center;gap:6px;font-size:var(--label);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);padding:2px 0;cursor:pointer}.disc:hover{color:var(--fg)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+/* scene callout */
+.scene{position:relative;width:360px;height:120px;border-radius:10px;background:radial-gradient(200px 80px at 55% 60%,#0d2a3a 0%,transparent 70%),#030509;border:1px dashed var(--border);overflow:hidden}
+.callout{position:absolute;left:150px;top:28px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:var(--label);min-width:150px}
+.callout .e{font-size:11.6px;letter-spacing:.13em;text-transform:uppercase;color:var(--primary);font-weight:700}.callout .o{font-size:var(--body);font-weight:600;margin:3px 0 2px;display:flex;gap:8px;align-items:center}
+.callout .x{position:absolute;right:6px;top:6px;width:20px;height:20px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted)}.callout .x:hover{background:var(--wash-hover);color:var(--fg)}
+.tbar{display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:8px 14px;font-size:var(--label);width:360px}.tbar .brand{font-weight:700;font-size:15px}
+svg{display:inline-block}
+</style></head><body>
+<h1>Three open questions, with options</h1>
+<p class="lede">Rendered with the app's tokens at the rail's 1920px widths (explorer 307px, detail card 346px). Hover the controls — the recipes are the app's. Each section ends with a recommendation; every option keeps the rulings on record (one heading row, every network listed, hovers never commit).</p>
+<p class="note">A: the explorer heading. B: where the live / pinned state shows. C: the card foot that carries ids and hashes.</p>
+
+<h2>A · The explorer heading — the hint beside its control</h2>
+<p class="lede">The ruling (2026-09-28): the hint and the measure control share one row. At 307px the control leaves 199px for the hint, so three of four views wrap it to three lines and the sentence ends under the control.</p>
+<div class="grid">
+<div class="opt"><div class="tag"><b>A0</b><span>today, for reference</span></div>
+<div class="card"><div class="head"><div><div class="eyebrow">Explore</div><div class="title"><i></i>Networks</div></div><div class="r">−</div></div><div class="hair"></div>
+<div class="hrow"><p class="blurb">Every network on the hypergraph. Open one for the roles its nodes play.</p><span class="ctl">Nodes <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span></div>
+<div class="row"><span class="dot" style="background:#5aa0ff"></span><span>DAG</span><span></span><span class="bar"><i style="width:100%"></i></span><span class="fig">135</span></div>
+<div class="row"><span class="dot" style="background:var(--orange)"></span><span>Dor Technologies</span><span></span><span class="bar"><i style="width:13%;background:var(--orange)"></i></span><span class="fig">18</span></div></div>
+<p class="why">Three lines at 199px; the control sits inside the paragraph's last line.</p></div>
+
+<div class="opt"><div class="tag"><b>A1</b><span>shorter copy, same row</span></div>
+<div class="card"><div class="head"><div><div class="eyebrow">Explore</div><div class="title"><i></i>Networks</div></div><div class="r">−</div></div><div class="hair"></div>
+<div class="hrow"><p class="blurb">Every network, busiest first. Open one for its node roles.</p><span class="ctl">Nodes <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span></div>
+<div class="row"><span class="dot" style="background:#5aa0ff"></span><span>DAG</span><span></span><span class="bar"><i style="width:100%"></i></span><span class="fig">135</span></div>
+<div class="row"><span class="dot" style="background:var(--orange)"></span><span>Dor Technologies</span><span></span><span class="bar"><i style="width:13%;background:var(--orange)"></i></span><span class="fig">18</span></div></div>
+<p class="why">Keeps the ruling exactly. Two lines, the control still ends the sentence. Each view's hint is rewritten to ≤ 60 characters (Geography: "Every country with nodes. Open one to see where they sit." · Snapshots: "Recent global snapshots. Open one for who anchored into it." · History: "Average per day, last 30 days. Pick one to bring it forward.").</p></div>
+
+<div class="opt"><div class="tag"><b>A2</b><span>control in the head's caption slot</span></div>
+<div class="card"><div class="head"><div><div class="eyebrow">Explore</div><div class="title"><i></i>Networks</div></div><div class="r"><span class="ctl" style="margin-top:6px">Nodes <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span><span style="margin-left:4px">−</span></div></div><div class="hair"></div>
+<p class="blurb" style="margin-bottom:8px">Every network on the hypergraph. Open one for the roles its nodes play.</p>
+<div class="row"><span class="dot" style="background:#5aa0ff"></span><span>DAG</span><span></span><span class="bar"><i style="width:100%"></i></span><span class="fig">135</span></div>
+<div class="row"><span class="dot" style="background:var(--orange)"></span><span>Dor Technologies</span><span></span><span class="bar"><i style="width:13%;background:var(--orange)"></i></span><span class="fig">18</span></div></div>
+<p class="why">Still one row for the hint — the control moves up beside the title, where Snapshots' live pill already lives. The hint runs the full width (two lines, 275px). Cost: in Snapshots the pill and the control would share that slot.</p></div>
+
+<div class="opt"><div class="tag"><b>A3</b><span>hint as a tip, heading row = control</span></div>
+<div class="card"><div class="head"><div><div class="eyebrow">Explore</div><div class="title"><i></i>Networks <span class="tip" title="Every network on the hypergraph. Open one for the roles its nodes play.">i</span></div></div><div class="r">−</div></div><div class="hair"></div>
+<div class="hrow"><span class="blurb" style="letter-spacing:.13em;text-transform:uppercase;font-size:11.6px">By network</span><span class="ctl">Nodes <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></span></div>
+<div class="row"><span class="dot" style="background:#5aa0ff"></span><span>DAG</span><span></span><span class="bar"><i style="width:100%"></i></span><span class="fig">135</span></div>
+<div class="row"><span class="dot" style="background:var(--orange)"></span><span>Dor Technologies</span><span></span><span class="bar"><i style="width:13%;background:var(--orange)"></i></span><span class="fig">18</span></div></div>
+<p class="why">Quietest card, two lines shorter. The teaching sentence is behind an (i) on hover or tap, so a first visit loses the one line that says what to do. Against the app's own rule that the hint teaches the gesture.</p></div>
+</div>
+<div class="rec"><b>Recommend</b> A1. It is the only option that changes no structure, and the copy was the thing that did not fit. A2 is the structural answer if the hint must keep its full wording.</div>
+
+<h2>B · Where the live / pinned state shows</h2>
+<p class="lede">Today the same fact is stated three times on one screen: the explorer head, the snapshot card's head, and the scene callout.</p>
+<div class="grid">
+<div class="opt"><div class="tag"><b>B0</b><span>today — three statements</span></div>
+<div class="card" style="padding-bottom:10px"><div class="head"><div><div class="eyebrow">Explore</div><div class="title"><i></i>Snapshots</div></div><span class="pill pinned"><span class="hd"></span>pinned · 2m ago</span></div></div>
+<div class="card detail" style="margin-top:12px;padding-bottom:12px"><div class="head"><div><div class="eyebrow">Global snapshot</div><div class="title">6,988,911</div></div><span class="pill pinned"><span class="hd"></span>pinned · 2m ago</span></div></div>
+<div class="scene" style="margin-top:12px"><div class="callout"><div class="e">Global snapshot</div><div class="o">6,988,911 <span class="pill pinned" style="padding:1px 5px"><span class="hd"></span>pinned · 2m ago</span></div><div style="color:var(--muted)">6 anchors</div></div></div></div>
+
+<div class="opt"><div class="tag"><b>B1</b><span>the card owns it, the scene mirrors it</span></div>
+<div class="card" style="padding-bottom:10px"><div class="head"><div><div class="eyebrow">Explore</div><div class="title"><i></i>Snapshots</div></div><div class="r">−</div></div>
+<div class="row on" style="margin-top:8px;grid-template-columns:14px 1fr 36px 56px"><span></span><span class="mono">6,988,911</span><span class="bar"><i style="width:60%"></i></span><span class="fig">0.0570</span></div></div>
+<div class="card detail" style="margin-top:12px;padding-bottom:12px"><div class="head"><div><div class="eyebrow">Global snapshot</div><div class="title">6,988,911</div></div><span class="pill pinned"><span class="hd"></span>pinned · 2m ago</span></div></div>
+<div class="scene" style="margin-top:12px"><div class="callout"><div class="e">Global snapshot</div><div class="o">6,988,911 <span class="pill pinned" style="padding:1px 5px"><span class="hd"></span>pinned · 2m ago</span></div><div style="color:var(--muted)">6 anchors</div></div></div>
+<p class="why">The explorer's selected-row wash already says which tick is pinned, so its head pill goes. The control lives on the subject's own card (it pins and unpins that snapshot); the scene callout, which already carries the state, is the one mirror in the scene.</p></div>
+
+<div class="opt"><div class="tag"><b>B2</b><span>on the scene — the callout is the control</span></div>
+<div class="card detail" style="padding-bottom:12px"><div class="head"><div><div class="eyebrow">Global snapshot</div><div class="title">6,988,911</div></div><span class="pill"><span class="hd"></span>2m ago</span></div></div>
+<div class="scene" style="margin-top:12px"><div class="callout"><span class="x">×</span><div class="e">Global snapshot</div><div class="o">6,988,911 <span class="pill pinned" style="padding:1px 5px"><span class="hd"></span>pinned</span></div><div style="color:var(--muted)">2m ago · 6 anchors</div></div></div>
+<p class="why">One statement, at the subject. The × on the callout releases the pin. Cost: the callout is a label container today (it never takes a click — rule: hovers preview, the box commits), so this would make it the one scene label that is a control.</p></div>
+
+<div class="opt"><div class="tag"><b>B3</b><span>global, in the command bar</span></div>
+<div class="tbar"><span class="brand">DAG <span style="font-weight:500;color:var(--muted)">Visualizer</span></span><span class="pill pinned"><span class="hd"></span>pinned 6,988,911 · 2m ago <span style="color:var(--muted);margin-left:2px">×</span></span><span style="margin-left:auto;color:var(--muted)">Hypergraph · Geography · …</span></div>
+<p class="why">The bar's liveliness mark is already the app's "are we live" statement; a pin is the one way the app stops being live, so it belongs beside it and shows in every view. Cost: a Snapshots-only state in a global strip, and the card still needs the control.</p></div>
+</div>
+<div class="rec"><b>Recommend</b> B1. One control where the subject is, one mirror in the scene, nothing in the explorer head. B3 is worth it only if a pin should be visible from the other views.</div>
+
+<h2>C · The card foot — ids and hashes</h2>
+<p class="lede">Every id and hash on a reading card already sits in the card's foot (the plate under the body). The exceptions are the unlisted-network dossier's inner blocks, which show a network id and owner inside the body only when several members share one card. The question is whether the foot reads as too busy: two or three mono rows plus the pager.</p>
+<div class="grid">
+<div class="opt"><div class="tag"><b>C0</b><span>today</span></div>
+<div class="card detail"><div class="eyebrow">Metagraph</div><div class="dhead"><div class="logo"></div><div><div class="n">Dor Technologies</div><div class="s">data and currency metagraph</div></div><div class="t">DOR</div></div>
+<div class="fact" style="margin-top:12px"><span>Online nodes</span><b>18</b></div><div class="fact"><span>Site</span><span style="color:var(--primary)">explorer.getdor.com ↗</span></div>
+<div class="foot"><div class="frow"><span class="l">Network id</span><span class="v">DAG0CyySf35ftDQDQ…acMghpnCuM</span><span class="cp">⧉</span></div><div class="frow"><span class="l">Owner address</span><span class="v">DAG0o6WSyvc7Xf…LYDD6wqnk</span><span class="cp">⧉</span></div>
+<div class="pager"><span class="b">‹</span>2 / 12<span class="b">›</span><span class="sp"></span><span class="b">⌃</span><span class="b">⌄</span></div></div></div>
+<p class="why">Caps label, mono value truncated in the middle, copy on row hover; then the pager under a hairline. Two registers (caps + mono) in two rows, then a third row of controls.</p></div>
+
+<div class="opt"><div class="tag"><b>C1</b><span>one register — the label is a mono prefix</span></div>
+<div class="card detail"><div class="eyebrow">Metagraph</div><div class="dhead"><div class="logo"></div><div><div class="n">Dor Technologies</div><div class="s">data and currency metagraph</div></div><div class="t">DOR</div></div>
+<div class="fact" style="margin-top:12px"><span>Online nodes</span><b>18</b></div><div class="fact"><span>Site</span><span style="color:var(--primary)">explorer.getdor.com ↗</span></div>
+<div class="foot"><div class="frow"><span class="v"><span style="color:var(--muted)">id</span>&nbsp;&nbsp;DAG0CyySf35ftDQDQ…acMghpnCuM</span><span class="cp" style="opacity:.55">⧉</span></div><div class="frow"><span class="v"><span style="color:var(--muted)">owner</span>&nbsp;&nbsp;DAG0o6WSyvc7Xf…LYDD6wqnk</span><span class="cp" style="opacity:.55">⧉</span></div>
+<div class="pager"><span class="b">‹</span>2 / 12<span class="b">›</span><span class="sp"></span><span class="b">⌃</span><span class="b">⌄</span></div></div></div>
+<p class="why">The foot becomes one register: lowercase mono labels inside the value line, so the caps vocabulary stays with the card's eyebrows. The copy glyph is always present at low ink (no hidden control), lit on hover. Same height, fewer voices.</p></div>
+
+<div class="opt"><div class="tag"><b>C2</b><span>folded — one disclosure row</span></div>
+<div class="card detail"><div class="eyebrow">Global snapshot</div><div class="dhead"><div><div class="n">6,988,911</div><div class="s">6 snapshots anchored · from 3 metagraphs</div></div><span class="pill pinned" style="margin-left:auto"><span class="hd"></span>pinned · 2m ago</span></div>
+<div class="fact" style="margin-top:12px"><span>Fees paid</span><b>0.0380 DAG</b></div><div class="fact"><span>Signed by</span><b>124 validators</b></div>
+<div class="foot"><div class="disc"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 6 6 6-6 6"/></svg>Hashes · 3</div>
+<div class="pager"><span class="b">‹</span><span class="sp"></span><span class="b">›</span><span class="sp"></span><span class="b">⌃</span><span class="b">⌄</span></div></div></div>
+<p class="why">For the snapshot cards, which carry three hashes: the foot shows one caps row that opens to the rows (shadcn Collapsible, the app's one disclosure recipe). Quiet by default, the full values one click away, and copy still on-card. Costs a click for anyone who comes for the hash.</p></div>
+
+<div class="opt"><div class="tag"><b>C3</b><span>foot = pager; ids live in the raw register</span></div>
+<div class="card detail"><div class="eyebrow">Metagraph</div><div class="dhead"><div class="logo"></div><div><div class="n">Dor Technologies</div><div class="s">data and currency metagraph</div></div><div class="t">DOR</div></div>
+<div class="fact" style="margin-top:12px"><span>Online nodes</span><b>18</b></div><div class="fact"><span>Site</span><span style="color:var(--primary)">explorer.getdor.com ↗</span></div>
+<div class="foot"><div class="disc" style="color:var(--primary)">Records ↗</div>
+<div class="pager"><span class="b">‹</span>2 / 12<span class="b">›</span><span class="sp"></span><span class="b">⌃</span><span class="b">⌄</span></div></div></div>
+<p class="why">The card stops carrying identifiers at all; the foot is the door to the raw layer, where the full ids already live with their copy controls. Cleanest card, but the id leaves the place people copy it from, and the foot's "look-up data" tier loses its reason to be a plate.</p></div>
+</div>
+<div class="rec"><b>Recommend</b> C1 for the metagraph card (two ids, one register) and C2 for the snapshot cards (three hashes behind one row). Both keep copy on the card. The unlisted dossier's inner-block ids stay where they are: they identify a member, not the card.</div>
+</body></html>
