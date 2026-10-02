@@ -22,7 +22,7 @@ import { useMinHold } from "@/components/useMinHold";
 import { useArchive, archiveFactState, archiveReach, archiveSchedule, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
 import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
 import { POLL } from "@/src/engine/config";
-import { cap, Desc, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark, ScheduleTable, partShade, countable, Lead, Empty, QualifierChip, Door, SectionLabel, type SchedulePart } from "./parts";
+import { cap, Desc, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark, ScheduleTable, partShade, countable, Lead, Empty, QualifierChip, Door, SectionLabel, shareWords, type SchedulePart } from "./parts";
 import { statusItems } from "@/src/data/nodeStatus";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { pickNetId } from "@/src/engine/domain/pickActions";
@@ -1105,12 +1105,12 @@ export function CountryCard({ cc }: { cc: string }) {
     [rows],
   );
   const parts = useMemo(() => networkParts(rows), [rows]);
-  const share = selNodes.length > 0 ? Math.round((rows.length / selNodes.length) * 100) : 0;
+  const share = shareWords(rows.length, selNodes.length);
   return (
     <>
       {/* THE LEAD: what this country is to the selection it sits in — it was the "Share of
           selection" fact, and it is the one thing the card says about its parent. */}
-      <Lead>Hosts {share}% of the selection&apos;s nodes.</Lead>
+      {share && <Lead>Hosts {share} of the selection&apos;s nodes.</Lead>}
       {/* THE BREAKDOWN (`visuals.html`, user 2026-10-02): whose nodes these are — the node count is
           the section's total and the cut is by network, in the dossier's own table. Cities and
           providers stay counts: the explorer beside the scene lists them, and the card doesn't
@@ -1164,13 +1164,13 @@ export function CompositionCard({ sel }: { sel: CompositionSel }) {
   const groups = useMemo(() => compositionGroups(selNodes), [selNodes]);
   const members = groups.find((g) => g.key === sel.key)?.rows ?? [];
   const total = groups.reduce((n, g) => n + g.rows.length, 0);
-  const share = total > 0 ? Math.round((members.length / total) * 100) : 0;
+  const share = shareWords(members.length, total);
   const cfg = metagraphById(sel.netId);
   const hue = identityHudCss(sel.netId);
   return (
     <>
     {/* THE LEAD: the group's share of its network — the old "Share of network" fact. */}
-    <Lead>{share}% of this network&apos;s online nodes.</Lead>
+    {share && <Lead>{share[0].toUpperCase() + share.slice(1)} of this network&apos;s online nodes.</Lead>}
     {/* THE BREAKDOWN (`visuals.html`, user 2026-10-02): the network's nodes as the dossier's own
         squares with THIS group's lit — stepping down a rung reads as "these ones" — then the
         group's status in the same table the dossier uses. Above the countable limit the strip

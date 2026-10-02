@@ -85,7 +85,9 @@ export default function AnchoredTags({
           ? "No metagraph anchored into this snapshot."
           : channels != null && !acquiring
             ? `Anchored by ${channels} metagraph${channels === 1 ? "" : "s"}.`
-            : "Reading which metagraphs anchored into it."}
+            : missed && !resolveHold.show
+              ? "Which metagraphs anchored into it could not be read."
+              : "Reading which metagraphs anchored into it."}
       </Lead>
       <Separator className="mb-2" />
       <SectionLabel label="Snapshots anchored" total={total != null ? total : <NodeStars count={3} />} className="mb-1.5" />

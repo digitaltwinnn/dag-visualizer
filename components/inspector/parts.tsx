@@ -87,12 +87,23 @@ export function Lead({ children, className }: { children: ReactNode; className?:
   return <p className={cn("m-0 mb-2.5 text-body leading-snug text-foreground-dim line-clamp-2", className)}>{children}</p>;
 }
 
+/** A share as the words a lead may say: never "0%" for a part that exists nor "100%" for one that
+ *  is not the whole (rounding would state both), and null when there is no whole to be a share
+ *  of — the caller then says nothing rather than "0%" (rule 10: absent is not zero). */
+export function shareWords(part: number, whole: number): string | null {
+  if (!(whole > 0)) return null;
+  const pct = (part / whole) * 100;
+  if (part > 0 && pct < 1) return "under 1%";
+  if (part < whole && pct > 99) return "over 99%";
+  return `${Math.round(pct)}%`;
+}
+
 /** THE ONE EMPTY VALUE. A dash, muted, with the reason on hover — the cards said "not known",
  *  "none" and "n/a" for the same thing. Where the reason matters at a glance, the caller writes
  *  it beside the dash in `text-label`. */
 export function Empty({ why }: { why?: string }) {
   return (
-    <span className="text-muted-foreground" title={why} aria-label={why ?? "No value"}>
+    <span role="img" className="text-muted-foreground" title={why} aria-label={why ?? "No value"}>
       —
     </span>
   );
@@ -176,7 +187,7 @@ export function Door({
       {inner}
     </a>
   ) : (
-    <button type="button" onClick={onClick} disabled={disabled} title={title} className={cn(cls, "w-[calc(100%+2*var(--card-pad))] bg-transparent cursor-pointer")}>
+    <button type="button" onClick={onClick} disabled={disabled} title={title} className={cn(cls, "w-[calc(100%+2*var(--card-pad))] cursor-pointer")}>
       {inner}
     </button>
   );

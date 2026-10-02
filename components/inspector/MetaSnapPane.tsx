@@ -554,8 +554,9 @@ function PayloadSection({
     <div className="flex flex-col gap-1">
       {/* The TAB names the section now, so there is no head here. An UNREAD section says so in one
           muted line — a tab opening onto nothing would read as an empty reading, and "unread and
-          none are different facts". */}
-      {!read && !pending && <p className="m-0 text-label text-muted-foreground">Not read yet. Decompress this snapshot to see its shape.</p>}
+          none are different facts". It names no control: the Decompress door below shows only
+          when this snapshot can be read, and a sentence pointing at an absent door is a dead end. */}
+      {!read && !pending && <p className="m-0 text-label text-muted-foreground">Not read yet.</p>}
       {pending && <p className="m-0 text-label text-muted-foreground italic">{pending}</p>}
       {read && rows.length === 0 && !signers && (
         // MEASURED empty — the deep read landed and this section carries nothing. A reading,
