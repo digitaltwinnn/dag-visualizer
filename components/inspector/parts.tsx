@@ -579,14 +579,19 @@ export function partShade(hue: string, i: number): string {
  *  two hundred squares is a texture, not a count). */
 const UNIT_MAX = 60;
 
-/** A ROW'S MARK in the breakdown table: one square per countable thing, or a bar when the thing
+/** RIGHT-ALIGNED, AGAINST ITS FIGURE (user, 2026-10-02: "should we right-align the coloured boxes as
+ *  well, so they sit against the numbers?"): a mark and its count are one reading, so three squares
+ *  sit beside their "3" rather than a column's width away. Marks still share one edge — the right
+ *  one — so their lengths compare as before.
+ *
+ *  A ROW'S MARK in the breakdown table: one square per countable thing, or a bar when the thing
  *  is a rate/size or the cut is too large to count (`units` false). `frac` is the bar's length,
  *  0..1 — a share of the total, or of the largest row where rows are compared rather than summed. */
 export function UnitMarks({ count, color, units, frac }: { count: number; color: string; units: boolean; frac: number }) {
   return (
     <span aria-hidden className="min-w-0 pt-[0.42em]">
       {units ? (
-        <span className="flex flex-wrap content-start gap-[1.5px]">
+        <span className="flex flex-wrap content-start justify-end gap-[1.5px]">
           {Array.from({ length: count }, (_, k) => (
             <span key={k} className="block size-1.5 rounded-[1.5px]" style={{ background: color }} />
           ))}
@@ -594,7 +599,7 @@ export function UnitMarks({ count, color, units, frac }: { count: number; color:
       ) : (
         frac > 0 && (
           <span className="block h-[5px] w-full">
-            <span className={cn("block h-full rounded-full min-w-[2px]", BAR_EASE)} style={{ width: `${Math.min(1, frac) * 100}%`, background: color }} />
+            <span className={cn("block h-full ml-auto rounded-full min-w-[2px]", BAR_EASE)} style={{ width: `${Math.min(1, frac) * 100}%`, background: color }} />
           </span>
         )
       )}
@@ -613,7 +618,7 @@ export const countable = (total: number) => total <= UNIT_MAX;
 // MARK BEFORE FIGURE (user, 2026-10-02: "should we right-align the number and put the visual in
 // front?"): name · mark · count, the count on the card's right edge — the fact rows' own grammar
 // (label left, value right) and the explorer rows' order (name, bar, figure).
-export const CUT_ROW = "grid grid-cols-[8.6em_minmax(0,1fr)_3.4em] items-start gap-x-2 text-label";
+export const CUT_ROW = "grid grid-cols-[8.6em_minmax(0,1fr)_2.6em] items-start gap-x-2 text-label";
 
 /** ONE CUT OF A TOTAL, AS TABLE ROWS (user, 2026-10-02 — `docs/superpowers/design/2026-10-02-right-
  *  rail-cards/breakdown-2.html`, D2: "what bothers me most is that the legend has those dots in it
