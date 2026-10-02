@@ -59,7 +59,7 @@ export function StateDot({ state }: { state?: string | null }) {
 
 /** The node level's glyph column — room for two short tickers ("DAG UP") or one long one
  *  ("USDC.dag") at the tag size; anything longer truncates. */
-export const NODE_GLYPH_W = 64; // 56 fit the old 10.5px tag; at the 12px label step "USDC.dag" needs the rest
+export const NODE_GLYPH_W = 56;
 
 /** A network's ticker — the DAG core's is "DAG". Shared with the raw node roster. */
 export const tickerOf = (id: string): string => metagraphById(id)?.ticker ?? (id === "dag" ? "DAG" : id);

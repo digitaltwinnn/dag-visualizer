@@ -39,7 +39,7 @@ describe("archive value", () => {
       latest: 6_768_000,
       floorTs: new Date(now - 78 * 86_400_000).toISOString(),
     };
-    expect(archiveDisplay(win, "Nov 2023")).toEqual({ genesis: false, reach: "~3 months", count: "241k snapshots" });
+    expect(archiveDisplay(win, "Nov 2023")).toEqual({ genesis: false, value: "3 months", note: "241k of 6.8M snapshots" });
   });
 
   it("a genesis node: Yes, the whole chain with its age and size; deep: No, era only", () => {
@@ -47,15 +47,15 @@ describe("archive value", () => {
     const birth = new Date(now - 450 * 86_400_000).toISOString();
     expect(archiveDisplay({ ...base, kind: "genesis", floor: 1, latest: 1_213_930, floorTs: birth }, "Nov 2023")).toEqual({
       genesis: true,
-      reach: "~15 months",
-      count: "1.2M snapshots",
+      value: "Full",
+      note: "all 1.2M snapshots",
     });
-    expect(archiveDisplay({ ...base, kind: "deep" }, "Nov 2023")).toEqual({ genesis: false, reach: "back to Nov 2023" });
+    expect(archiveDisplay({ ...base, kind: "deep" }, "Nov 2023")).toEqual({ genesis: false, value: "since Nov 2023", note: "with some gaps" });
   });
 
   it("keeps the count when the floor date is unknown", () => {
     const win: ArchiveEntry = { ...base, floor: 100, latest: 5_100, floorTs: null };
-    expect(archiveDisplay(win, "Nov 2023")).toEqual({ genesis: false, reach: undefined, count: "5k snapshots" });
+    expect(archiveDisplay(win, "Nov 2023")).toEqual({ genesis: false, value: "5k snapshots", note: "5k of 5k snapshots" });
   });
 });
 
@@ -106,7 +106,7 @@ describe("archive fact state", () => {
   it("a census entry wins whatever the roles say", () => {
     const s = archiveFactState(entry, "Nov 2023", true, ["l0", "dl1"]);
     expect(s.kind).toBe("value");
-    if (s.kind === "value") expect(s.display).toEqual({ genesis: false, reach: "back to Nov 2023" });
+    if (s.kind === "value") expect(s.display).toEqual({ genesis: false, value: "since Nov 2023", note: "with some gaps" });
   });
 
   it("no L0 process answers n/a immediately, census still in flight", () => {

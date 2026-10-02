@@ -933,80 +933,50 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
         {/* Reading order: place → role → host → SERVICE — what this machine serves sits with
             the host block, above the reference foot. (Delegated staking moved up beside its
             registry sibling Alias, 2026-09-11 — see that pair's note.) */}
+        {/* THE ARCHIVE — one fact, one voice in every state (user, 2026-10-02: "redesign the full
+            archive section … x-es, ~-es, bold text, subtle text; looks messy"). The row is always
+            `Archive · value`: how far back this node keeps its chain, or a dash. A measured node
+            adds ONE bar (the chain, the kept part filled from the right) and ONE muted note under
+            it. No check or cross, no tilde, no stacked sublines, no end labels. */}
         {archState.kind === "value" && archEntry && archive && (
-          /* The dossier's settled stacked grammar, machine-scoped (user, 2026-08-14 — "in the
-             node card follow the same thinking; still says 'archive'"): Yes/No against the
-             From genesis label (check in the success hue on Yes), the machine's own reach as
-             the first underline, its kept count as the second. */
-          <Fact label="Full archive">
-            <span
-              className="flex flex-col items-end"
-              title={
-                archEntry.kind === "genesis"
-                  ? `Serves its chain's every snapshot, back to ordinal 1`
-                  : archEntry.kind === "deep"
-                    ? `Serves global snapshots back to the metagraph era (${archive.since}), with some gaps — one of ${archive.archivalCount} archival L0 validators of ${archive.total} probed`
-                    : `Serves ~${(archEntry.latest - archEntry.floor).toLocaleString()} recent snapshots of its own chain, back to ordinal ${archEntry.floor.toLocaleString()}; older history is discarded`
-              }
-            >
-              <span className="inline-flex items-center gap-1.5">
-                <BoolMark on={archState.display.genesis} />
-                {archState.display.genesis ? "Yes" : "No"}
+          <div
+            title={
+              archEntry.kind === "genesis"
+                ? "Serves its chain's every snapshot, back to the first"
+                : archEntry.kind === "deep"
+                  ? `Serves global snapshots back to the metagraph era (${archive.since}), with some gaps — one of ${archive.archivalCount} archival L0 validators of ${archive.total} probed`
+                  : `Serves the most recent ${(archEntry.latest - archEntry.floor).toLocaleString()} snapshots of its chain, back to ordinal ${archEntry.floor.toLocaleString()}; older history is discarded`
+            }
+          >
+            <Fact label="Archive">{archState.display.value}</Fact>
+            {archReach != null && (
+              <span aria-hidden className="mt-1 block h-[5px] rounded-full bg-wash-strong overflow-hidden">
+                <span
+                  className="block h-full ml-auto rounded-full min-w-[2px]"
+                  style={{
+                    width: `${archReach * 100}%`,
+                    background: archState.display.genesis ? "var(--success)" : "var(--muted-foreground)",
+                    opacity: archEntry.kind === "deep" ? 0.6 : 1,
+                  }}
+                />
               </span>
-              {archState.display.reach && <span className="text-label text-muted-foreground">{archState.display.reach}</span>}
-              {archState.display.count && <span className="text-label text-muted-foreground">{archState.display.count}</span>}
-            </span>
-          </Fact>
-        )}
-        {archState.kind === "value" && archEntry && archReach != null && (
-          /* THE REACH BAR (`visuals.html`, user 2026-10-02): the chain from its first snapshot to
-             now, with the part this node still serves filled from the right — the card's one
-             quantity, drawn. A share of the chain's ORDINALS (`archiveReach`), so it is the same
-             claim as the kept count above. The deep archives share gaps, so their fill is the
-             span they reach, drawn softer; the Fact's hover says so. */
-          <div aria-hidden className="-mt-0.5">
-            <span className="block h-[5px] rounded-full bg-wash-strong overflow-hidden">
-              <span
-                className="block h-full ml-auto rounded-full min-w-[2px]"
-                style={{
-                  width: `${archReach * 100}%`,
-                  background: archEntry.kind === "genesis" ? "var(--success)" : "var(--muted-foreground)",
-                  opacity: archEntry.kind === "deep" ? 0.6 : 1,
-                }}
-              />
-            </span>
-            <span className="mt-0.5 flex justify-between text-label text-muted-foreground">
-              <span>first snapshot</span>
-              <span>now</span>
-            </span>
+            )}
+            {archState.display.note && <span className="mt-1 block text-label text-muted-foreground">{archState.display.note}</span>}
           </div>
         )}
         {archState.kind === "acquiring" && (
-          /* The held-slot acquiring form: a reading for this machine is genuinely arriving
-             (the census fetch is in flight), so the row holds its place with the stars rather
-             than popping in when the value lands. */
-          <Fact label="Full archive">
+          /* The held slot: a reading for this node is arriving, so the row keeps its place. */
+          <Fact label="Archive">
             <NodeStars count={4} />
           </Fact>
         )}
         {archState.kind === "na" && (
-          <Fact label="Full archive">
-            {/* The layer wears its chip, the same token the Composition line uses — one layer
-                vocabulary everywhere (user, 2026-08-14: "not an L0 validator, use the L0 chip").
-                "n/a", not "None" (user, 2026-08-15): the machine runs no L0 process, so the
-                question doesn't apply — "None" would claim it could have kept one and didn't. */}
-            <span
-              className="flex flex-col items-end"
-              title="A chain's snapshots are served by its L0 validators; this node runs no L0 process, so it keeps no snapshot archive."
-            >
-              <span className="inline-flex items-center gap-1.5 text-label text-muted-foreground">
-                <span className="text-body">—</span> not an <RoleChips codes={["L0"]} /> validator
-              </span>
-            </span>
+          <Fact label="Archive">
+            <Empty why="A chain's snapshots are served by its L0 validators; this node runs no L0, so it keeps no snapshot archive." />
           </Fact>
         )}
         {archState.kind === "unmeasured" && (
-          <Fact label="Full archive">
+          <Fact label="Archive">
             <Empty why="The archive census (refreshed every few hours) has no reading for this node — it was unreachable at probe time, not Ready then, or joined the cluster since." />
           </Fact>
         )}

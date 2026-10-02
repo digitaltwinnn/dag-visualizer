@@ -49,32 +49,29 @@ export function fmtReach(floorTs: string, now = Date.now()): string | null {
   return ageWords(ms);
 }
 
-// The NODE card's Archive value, in the same stacked grammar the dossier settled on (user,
-// 2026-08-14 — "in the node card follow the same thinking"): a Yes/No main line against the
-// "From genesis" label, the machine's own reach as the first underline, its kept-snapshot
-// count as the second. The holed global deep archives still carry no count.
+// The NODE card's Archive reading, as ONE VALUE AND ONE NOTE (user, 2026-10-02: "redesign the
+// full archive section … it has x-es, ~-es, bold text, subtle text; looks messy"). It was a
+// Yes/No with a check or a cross, a "~" reach under it, a kept count under that, then a bar with
+// two end labels — five registers for one fact. Now the VALUE says how far back the node keeps its
+// chain, in plain words ("Full", "16 months", "since Nov 2023"), and the NOTE under the bar says
+// how much that is. No marks, no tilde: the census's reach is already a rounded span.
 export interface ArchiveNodeDisplay {
+  /** True when the node keeps the whole chain — the bar's colour, nothing else. */
   genesis: boolean;
-  reach?: string;
-  count?: string;
+  value: string;
+  note?: string;
 }
 export function archiveDisplay(e: ArchiveEntry, since: string): ArchiveNodeDisplay {
-  if (e.kind === "genesis") {
-    // No "whole chain" prefix (user, 2026-08-14 — "let the number speak"): Yes already says
-    // completeness, so the underline is just the chain's age.
-    const age = e.floorTs ? fmtReach(e.floorTs) : null;
-    return {
-      genesis: true,
-      reach: age ? `~${age}` : undefined,
-      count: `${fmtSnapCount(e.latest)} snapshots`,
-    };
-  }
-  if (e.kind === "deep") return { genesis: false, reach: `back to ${since}` };
+  if (e.kind === "genesis") return { genesis: true, value: "Full", note: `all ${fmtSnapCount(e.latest)} snapshots` };
+  // The deep global archives share gaps, so they state their era and never a count.
+  if (e.kind === "deep") return { genesis: false, value: `since ${since}`, note: "with some gaps" };
+  const kept = fmtSnapCount(e.latest - e.floor);
   const reach = e.floorTs ? fmtReach(e.floorTs) : null;
   return {
     genesis: false,
-    reach: reach ? `~${reach}` : undefined,
-    count: `${fmtSnapCount(e.latest - e.floor)} snapshots`,
+    // A window under a day has no honest span (see `fmtReach`), so the count is the reading.
+    value: reach ?? `${kept} snapshots`,
+    note: e.latest > 0 ? `${kept} of ${fmtSnapCount(e.latest)} snapshots` : undefined,
   };
 }
 
