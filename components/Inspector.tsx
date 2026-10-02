@@ -300,7 +300,12 @@ export function GhostCard({ card }: { card: RailCard }) {
       aria-label={`${label}: nothing selected yet`}
       className="rail-entry relative block w-auto pointer-events-auto px-[18px] py-2 min-h-0 flex-none"
     >
-      <p className="m-0 flex items-start gap-2.5 text-label text-muted-foreground/80">
+      {/* FULL INK, NO OPACITY (design review 2026-10-02): this line is the only text that says how
+          to reach the next rung, and at 80% muted over the bare scene it measured 3.2:1 on dark and
+          2.7 on paper. The line takes `--foreground-dim`, one step under the cards' own copy (muted
+          at full strength still measured 4.2 on the light scene ground), so it reads as a hint and
+          not as a card. */}
+      <p className="m-0 flex items-start gap-2.5 text-label text-foreground-dim">
         <Icon
           aria-hidden
           className="size-3.5 flex-none mt-[1px] text-[var(--filter-accent,var(--primary))] opacity-45"
@@ -309,7 +314,7 @@ export function GhostCard({ card }: { card: RailCard }) {
             text starts at the SAME x on every ghost card (user). In em, not px (2026-10-02): the
             type scale is fluid, and an 86px column that fit 10.5px caps overlapped the hint at
             12.5px. */}
-        <span className="flex-none w-[8.5em] mt-[2px] text-micro tracking-caps uppercase opacity-80">{label}</span>
+        <span className="flex-none w-[8.5em] mt-[2px] text-micro tracking-caps uppercase">{label}</span>
         <span className="min-w-0 italic">{card.hint}</span>
       </p>
     </aside>

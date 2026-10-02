@@ -452,10 +452,10 @@ export function StackedSchedule({ axis, parts, className }: { axis: string; part
             the baseline, the count in the same mono the Fact values use. */}
         <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-body leading-snug">
           {parts.map((p, i) => (
-            <span key={i} className={cn("inline-flex items-baseline gap-1.5 whitespace-nowrap", p.count > 0 ? "text-foreground-dim" : "text-muted-foreground/70")} title={p.title}>
+            <span key={i} className={cn("inline-flex items-baseline gap-1.5 whitespace-nowrap", p.count > 0 ? "text-foreground-dim" : "text-muted-foreground")} title={p.title}>
               {p.count > 0 && <span className="size-1.5 rounded-full flex-none self-center" style={{ background: p.color }} />}
               <span>{p.label}</span>
-              <span className={cn("font-mono tabular-nums", p.count > 0 ? "text-foreground" : "text-muted-foreground/70")}>{p.count}</span>
+              <span className={cn("font-mono tabular-nums", p.count > 0 ? "text-foreground" : "text-muted-foreground")}>{p.count}</span>
             </span>
           ))}
         </span>

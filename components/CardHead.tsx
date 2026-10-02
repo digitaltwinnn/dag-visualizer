@@ -215,7 +215,10 @@ export default function CardHead({
   eyebrowMuted?: boolean;
 }) {
   const rolled = useRolledTitle(titleKey, title);
-  const eyebrowClass = cn(EYEBROW, eyebrowMuted ? "text-muted-foreground" : "text-accent");
+  // `text-primary-ink`, not `text-accent` (design review 2026-10-02): the eyebrow is 11–12.5px
+  // caps, and the accent on paper measured 3.1:1 — a lamp, not an ink. The ink token IS the
+  // accent on dark, so the dark face is byte-identical.
+  const eyebrowClass = cn(EYEBROW, eyebrowMuted ? "text-muted-foreground" : "text-primary-ink");
 
   if (panel) {
     const Icon = icon;

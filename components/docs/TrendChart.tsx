@@ -428,7 +428,7 @@ export default function TrendChart({
             // arrow mark + hover underline — the app's "this goes somewhere" signals. Text
             // FIRST so the flex baseline is the text's (a leading icon was what knocked the
             // earlier cut off the head's baseline).
-            className="inline-flex items-center gap-0.5 text-micro text-primary/80 hover:text-primary hover:underline underline-offset-2 whitespace-nowrap"
+            className="inline-flex items-center gap-0.5 text-micro text-primary-ink hover:text-primary hover:underline underline-offset-2 whitespace-nowrap"
           >
             snapshot records
             <ArrowUpRight aria-hidden className="size-3" />

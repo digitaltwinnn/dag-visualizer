@@ -200,7 +200,7 @@ export default function DesignDoc() {
             </div>
           </Section>
 
-          <h2 className="text-micro uppercase tracking-caps text-primary/70 mt-14 mb-4 border-t border-border pt-6">
+          <h2 className="text-micro uppercase tracking-caps text-primary-ink mt-14 mb-4 border-t border-border pt-6">
             Signature elements — the bespoke design language
           </h2>
 

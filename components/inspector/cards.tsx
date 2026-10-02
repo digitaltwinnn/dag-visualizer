@@ -688,7 +688,7 @@ function MetaSiteRow({ site }: { site: string }) {
         href={site}
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 text-primary/75 hover:text-primary"
+        className="inline-flex items-center gap-1.5 text-primary-ink hover:text-primary"
       >
         {domain}
         <ExternalLink aria-hidden className="size-3.5" />

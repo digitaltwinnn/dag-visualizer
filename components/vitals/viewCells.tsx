@@ -769,7 +769,9 @@ function AnchoringNetworks({ windowed, snaps, filter }: { windowed: TrendsWindow
           change that (the explorer draws the same line — a tick still LISTS every contributor under
           a commit, it just makes only one of them drillable). So the number says how many anchored
           and the dim says which one you are looking through.
-          `opacity-45` is the app's existing "present, but not your subject" step — the same one the
+          `opacity-55` is the app's existing "present, but not your subject" step (0.45 → 0.55,
+          design review 2026-10-02: at 0.45 the dimmed text measured 3.9:1 on dark; 0.55 clears 4.5
+          and still reads as stepped back) — the same one the
           filter picker's 0-count rows and hyper's 0-node networks wear. */}
       {/* TWO CHANNELS FOR ONE LENS: the others step back, the subject steps FORWARD (user,
           2026-09-01). Dimming alone left the committed network the same size as the four it was
@@ -790,7 +792,7 @@ function AnchoringNetworks({ windowed, snaps, filter }: { windowed: TrendsWindow
           const on = filter !== "all" && id === filter;
           const label = metagraphById(id)?.ticker ?? displayNetwork(id)?.ticker ?? null;
           return (
-            <span key={id} className={cn("inline-flex items-center gap-1 min-w-0", filter !== "all" && !on && "opacity-45")}>
+            <span key={id} className={cn("inline-flex items-center gap-1 min-w-0", filter !== "all" && !on && "opacity-55")}>
               <IdentityDot hue={identityHudCss(id)} className={on ? "w-3.5 h-3.5" : undefined} />
               {/* No hand-written fallback label — `displayNetwork` is the one home for what an
                   uncatalogued channel is CALLED (unlistedBoundary.test.ts enforces that the id

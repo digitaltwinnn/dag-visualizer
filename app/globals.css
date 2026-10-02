@@ -803,7 +803,10 @@
   --box-lift: 0 10px 26px -12px light-dark(rgba(15, 23, 42, 0.32), rgba(0, 0, 0, 0.85)),
     0 -8px 22px -14px light-dark(rgba(15, 23, 42, 0.28), rgba(0, 0, 0, 0.8));
   --foreground: light-dark(oklch(0.21 0.035 265), oklch(0.94 0.02 255));       /* #e8eefc text (dark) */
-  --muted-foreground: light-dark(oklch(0.44 0.035 265), oklch(0.66 0.04 265)); /* #8a96b8 muted (dark) */
+  /* Light's muted ink 0.44 → 0.40 (design review 2026-10-02): the uppercase eyebrows and cell titles
+     are 10.5–12.5px, where WCAG wants 4.5:1, and on paper they measured 3.1:1. 0.40 clears it with the
+     same hue and chroma; dark is untouched (its 0.66 already measures 5+). */
+  --muted-foreground: light-dark(oklch(0.40 0.035 265), oklch(0.66 0.04 265)); /* #8a96b8 muted (dark) */
 
   /* LIGHT IS A LAYERED GROUND, and the order is the point (user, 2026-08-21: "white cards,
      white background white furniture; we're missing proper contrast"). On dark the page is the
@@ -819,6 +822,12 @@
 
   --primary: light-dark(oklch(0.56 0.094 195), oklch(0.88 0.13 195));           /* accent cyan #2af5ff — the sole live/accent signal (dark) */
   --primary-foreground: light-dark(oklch(0.98 0.005 265), oklch(0.14 0.02 265));
+  /* THE ACCENT AS TEXT (design review 2026-10-02). `--primary` is a GLOW: on dark it carries text
+     at 10+:1, on paper its L 0.56 is a lamp, not an ink — the inspector's external link measured
+     2.3:1 and the chart's inspect link under 3. A link or a ticker set in the accent takes this
+     token instead: the same hue mixed two-thirds toward black on paper (L ≈ 0.39, 5+:1), and the
+     accent itself on dark. Stated against `--primary`, so a `[data-net]` re-point carries it. */
+  --primary-ink: light-dark(color-mix(in oklch, var(--primary) 68%, black), var(--primary));
   --ring: light-dark(oklch(0.56 0.094 195), oklch(0.88 0.13 195));
   /* The three network accents — ONE home (multi-network design §2). All three are always
      defined so the NetworkSwitch popover can render every network's dot on any network; the
@@ -1405,6 +1414,7 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-ink: var(--primary-ink);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);

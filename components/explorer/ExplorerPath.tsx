@@ -103,7 +103,7 @@ export default function ExplorerPath({ crumbs, hint, className }: { crumbs: read
       </BreadcrumbList>
       {/* The clause FOLLOWS the list in the DOM so AT reads the path first; on the plate it is
           the control's own caption. */}
-      {hint && <p className="mt-1 px-1 pb-0.5 text-label leading-snug text-muted-foreground/80">{hint}</p>}
+      {hint && <p className="mt-1 px-1 pb-0.5 text-label leading-snug text-muted-foreground">{hint}</p>}
     </Breadcrumb>
   );
 }
