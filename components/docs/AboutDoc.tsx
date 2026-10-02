@@ -36,7 +36,7 @@ export function Panel({ className, children }: { className?: string; children: R
 }
 
 // A view's card in the "what you can explore" grid. The icon is the view's REAL mark from the
-// app's own vocabulary (components/icons.tsx → VIEW_ICONS), so the three cards here, the command
+// app's own vocabulary (components/icons.tsx → VIEW_ICONS), so the cards here, the command
 // bar's buttons and the footer's view links can't disagree.
 function ViewCard({ icon: Icon, name, about }: { icon: LucideIcon; name: string; about: { title: string; text: string } }) {
   return (
@@ -108,8 +108,8 @@ export default function AboutDoc() {
 
       <Section id="explore" title="What you can explore">
         <p>
-          Three views of the same network, each answering a different question: who and what,
-          where, and when.
+          Four views of the same network, each answering a different question: who and what,
+          where, when, and how it has changed.
         </p>
         {/* ONE HOME for the per-view copy (user, 2026-08-13 — "can't we re-use the about
             card?"): these cards render the SAME lines the in-app About cards carry
@@ -121,6 +121,9 @@ export default function AboutDoc() {
           <ViewCard icon={VIEW_ICONS.hyper} name="Hypergraph" about={ABOUT.hyper} />
           <ViewCard icon={VIEW_ICONS.geo} name="Geography" about={ABOUT.geo} />
           <ViewCard icon={VIEW_ICONS.ledger} name="Snapshots" about={ABOUT.ledger} />
+          {/* History was missing here (user, 2026-10-02) — the page still listed the three views
+              it launched with. */}
+          <ViewCard icon={VIEW_ICONS.trend} name="History" about={ABOUT.trend} />
         </div>
         {/* The card-adaptation principle, stated for the reader (user, 2026-08-15) — the same
             text CLAUDE.md and the README carry in their own registers, given the human-voice
