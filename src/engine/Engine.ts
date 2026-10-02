@@ -204,6 +204,7 @@ export class Engine {
   // The focused metagraph's hub record, cached on filter/mode change — kills the per-frame
   // `metas.find` the DoF read used to do every frame (Task 15 allocation fix).
   private _dofMeta: MetaHubRec | null = null;
+  private _warnedUnbaked = false;
 
   private raycaster = new THREE.Raycaster();
   // Land-sphere hit scratch for the scene country hover/click (ray→sphere analytically —
@@ -1202,6 +1203,16 @@ export class Engine {
     const countriesOf = (nodes: { ip: string }[]) =>
       new Set(nodes.map((n) => this.geoMap[n.ip]?.country).filter(Boolean)).size;
     const data: RouteMetagraph[] = this.metaData || [];
+    // REGISTERED BUT NOT BAKED (2026-10-02): the live directory can list a metagraph the catalog
+    // does not — a new one, or one re-registered under a new address (BioFi was). Its snapshots
+    // then read as `unlisted` on every catalog-keyed surface. Say so once, in dev, by name.
+    if (process.env.NODE_ENV !== "production" && !this._warnedUnbaked) {
+      const unbaked = data.filter((m) => !metagraphById(m.id));
+      if (data.length && unbaked.length) {
+        this._warnedUnbaked = true;
+        console.warn(`[catalog] the live directory lists ${unbaked.length} metagraph(s) missing from config CATALOG — bake them: ${unbaked.map((m) => `${m.name} ${m.id}`).join(", ")}`);
+      }
+    }
     const metas = data.map((m) => {
       const nodes = m.nodes || [];
       return {

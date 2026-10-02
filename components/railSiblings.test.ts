@@ -6,7 +6,6 @@ import {
   countryToggleActions,
   metaSnapSelectActions,
   tickNetSelectActions,
-  filterToggleActions,
   nodeSelectActions,
   snapshotSelectActions,
 } from "@/src/engine/domain/pickActions";
@@ -422,7 +421,7 @@ describe("childStep — the first-child DOWN step", () => {
   // 2026-09-15). An unlisted channel names no filter, so it cannot be the step — but a tick LED by
   // one still has committable networks under it, and dimming ∨ there would hide them behind an
   // anchor the reader cannot act on anyway.
-  it("skips an unlisted leader and opens the busiest network that CAN be committed", () => {
+  it("an unlisted leader is a network like any other — the tick opens it", () => {
     const rows = [
       { metaId: "DAG-not-in-catalog", ordinal: 1, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
       { metaId: "DAG-not-in-catalog", ordinal: 2, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
@@ -430,15 +429,19 @@ describe("childStep — the first-child DOWN step", () => {
       { metaId: "ded", ordinal: 500, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
     ] as unknown as SiblingState["exactRows"];
     const step = childStep("snap", base({ mode: "ledger", snap: snapPick, exactRows: rows }))!;
-    expect(step.key).toBe("ded");
-    expect(step.actions).toEqual(tickNetSelectActions("ded", snapPick, { metaSnap: null }));
+    expect(step.key).toBe("unlisted");
+    expect(step.actions).toEqual(tickNetSelectActions("unlisted", snapPick, { metaSnap: null }));
   });
 
-  it("an UNLISTED channel names no filter, so the tick has no child to open", () => {
+  it("a tick holding only an unlisted channel still has a rung to open, and a snapshot under it", () => {
     const rows = [
       { metaId: "DAG-not-in-catalog", ordinal: 7, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
     ] as unknown as SiblingState["exactRows"];
-    expect(childStep("snap", base({ mode: "ledger", snap: snapPick, exactRows: rows }))).toBeNull();
+    const tick = base({ mode: "ledger", snap: snapPick, exactRows: rows });
+    expect(childStep("snap", tick)!.key).toBe("unlisted");
+    // …and from the unlisted card, ∨ opens that channel's snapshot — the rung that used to be skipped.
+    const under = { ...tick, tickNet: { metaId: "unlisted", globalOrdinal: snapPick.data.ordinal } };
+    expect(childStep("context", under)!.key).toBe("DAG-not-in-catalog:7");
   });
 
   // …and the dossier's own child is that network's snapshot in the shown tick — the rung now
@@ -523,21 +526,19 @@ describe("siblingSet — context rung under a ledger tick", () => {
   ] as unknown as SiblingState["exactRows"];
   const s = base({ mode: "ledger", filter: "ded", snap: snapPick, exactRows: rows });
 
-  it("steps ONLY the tick's listed networks, busiest first — not the whole catalog", () => {
+  it("steps the tick's own networks, busiest first — the unlisted set included, never the whole catalog", () => {
     const set = siblingSet("context", s)!;
-    expect(set.items.map((i) => i.key)).toEqual(["dor", "ded"]); // tbc never anchored here
-    expect(set.index).toBe(1);
+    expect(set.items.map((i) => i.key)).toEqual(["unlisted", "dor", "ded"]); // tbc never anchored here
+    expect(set.index).toBe(2);
   });
-  it("a swipe under a PINNED tick keeps the pin (the parent does not move)", () => {
+  it("a swipe commits the neighbour INSIDE the tick and pins it — never the filter", () => {
     const set = siblingSet("context", s)!;
-    expect(set.items[0]!.actions).toEqual([
-      ...filterToggleActions("dor", "ded"),
-      { kind: "snapshot", pick: snapPick, follow: false },
-    ]);
+    expect(set.items[1]!.actions).toEqual(tickNetSelectActions("dor", snapPick, { metaSnap: null, hasInspect: false, net: "ded" }));
+    expect(set.items.every((i) => i.actions.every((a) => a.kind !== "filter"))).toBe(true);
   });
-  it("…and under LIVE it stays live (live is the default)", () => {
+  it("…and from LIVE a swipe pins the tick it steps inside (a network in a tick needs its tick)", () => {
     const set = siblingSet("context", { ...s, following: true })!;
-    expect(set.items[0]!.actions).toEqual(filterToggleActions("dor", "ded"));
+    expect(set.items[1]!.actions).toContainEqual({ kind: "snapshot", pick: snapPick, follow: false });
   });
   it("the tick's ∨ opens the FIRST of the same set", () => {
     const step = childStep("snap", { ...s, filter: "all" })!;

@@ -93,13 +93,22 @@ export const CATALOG: Record<NetworkId, MetaConfig[]> = {
   mainnet: [
     // ⚠️ BioFi was MISSING here while the live route listed it (found 2026-08-12), and the symptom
     // is what "keep this in sync" is guarding: HyperExplore renders `metagraphById(m.id)?.name ?? m.id`,
-    // so its row read as the raw `DAG2JaVh5…` address next to ten real names. `color` is only the SEED
+    // so its row read as a raw address next to ten real names. `color` is only the SEED
     // for `configPins()`, which the baked `data/brand-hues.json` overlay shadows for every listed
     // metagraph (`identityPins()` — brand WINS), so it is inert wherever a bake exists: BioFi's
     // identity is the baked `#00c050`, not this pink, exactly as every other row here diverges from
     // its own brand read. `blurb` is likewise the route's own `description`, the fallback shown only
     // until `/api/metagraphs` answers.
-    { name: "BioFi",               ticker: "BIOFI",    color: 0xed9bf4, id: "DAG2JaVh5yYiPCGLLEFi6tfkKk77WA4FzivVdBek",
+    // ⚠️ …AND THEN ITS ID WENT STALE (found 2026-10-02 — user: "it could be a new metagraph is also
+    // registered but just not 'baked' by us yet"). BioFi's first chain (`DAG2JaVh5…`) stopped on
+    // 2026-08-16 and a NEW chain began on 2026-09-18 under a new address, which is the one the live
+    // directory lists. With the old id baked here, every surface keyed on the catalog — the
+    // Snapshots lanes, the anchor log, the exact-read decode, the trends sampler — read BioFi's
+    // snapshots as `unlisted`, while the route-driven surfaces (the filter, the Hypergraph hub)
+    // showed it by name. A re-registered metagraph is a NEW id: re-bake this row and
+    // `data/brand-hues.json` together. The Engine warns in dev when the live directory lists an id
+    // this catalog does not (`_publishMetaList`).
+    { name: "BioFi",               ticker: "BIOFI",    color: 0xed9bf4, id: "DAG6A8Dw78yWv9z8pHqjJ4JVwSqq9V9Ha7CRUQnY",
       blurb: "A utility token uniting an ecosystem focused on safeguarding personal data and protecting users from fraud." },
     { name: "Digital Evidence",    ticker: "DED",      color: 0x36e29a, id: "DAG0eQr94qUQSUhmYGNXt6CoBKWu5K6htvRMGC6M",
       blurb: "DoD-vetted data-fingerprinting as a service — immutable proof of data authenticity, anchored to the Global L0." },

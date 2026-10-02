@@ -43,12 +43,12 @@ import {
   tickNetSelectActions,
   nodeSelectActions,
   sameCohort,
-  sameMetaSnap,
   snapshotSelectActions,
 } from "@/src/engine/domain/pickActions";
 import { compositionGroups, type CompGroup } from "@/src/data/composition";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { snapshotSignerRows } from "@/src/data/network";
+import { UNLISTED_CFG, UNLISTED_ID } from "@/src/data/unlisted";
 import type { RailCardKind } from "@/components/railCards";
 
 /** Everything the resolver needs, read from the store BY THE CALLER (this module stays pure). */
@@ -65,6 +65,11 @@ export interface SiblingState {
   metaSnap: MetaSnapSel | null;
   selNodes: NodeRow[];
   metaList: MetaInfo[];
+  /** Is this channel a CATALOGUED network? The caller's answer (the app catalog — `LISTED_IDS`),
+   *  because `metaList` is the server route's list and can name a channel the catalog does not:
+   *  found live 2026-10-02, where the unlisted card got no pager because its address was "known".
+   *  Absent (tests), membership in `metaList` stands in. */
+  isListed?: (metaId: string) => boolean;
   /** store.leaderboard?.countries ?? [] — already count-desc, the geo explorer's own order. */
   countries: CountryStat[];
   /** The selected tick's exact-read rows (store.snapshotExact[globalOrdinal]?.rows ?? null). */
@@ -225,17 +230,26 @@ const ordinalLabel = (r: ChannelSnapRow): string =>
  *  the metagraph card's pager and the tick's ∨ step alike, so the two can't disagree about what is
  *  under a tick (they did: the pager walked the whole catalog). Null without a tick or its exact
  *  read — no pager then, rather than a guess.
- *  ⚠️ THE COMMITTABLE ONES ONLY (review find, 2026-09-15): an unlisted channel names no filter, so
- *  it can never be a step — sorted busiest-first, then filtered to what the filter vocabulary
- *  knows; a tick led by an unlisted channel still offers its listed networks. */
-function tickNetworks(s: SiblingState): MetaInfo[] | null {
+ *  ⚠️ THE UNLISTED SET IS ONE OF THEM (user, 2026-10-02: an unregistered metagraph had "no
+ *  corresponding details card", so stepping down "jumps straight to node"). Uncatalogued channels
+ *  were filtered out here because they named no FILTER; the rung is tick-local now and the unlisted
+ *  dossier exists, so every uncatalogued channel in the tick counts toward one `unlisted` entry. */
+/** A channel's NETWORK KEY against the networks this state knows: its own id, else the unlisted
+ *  set's (the pager's twin of the click table's own key rule, read off `metaList` so it stays pure). */
+const keyOf = (s: SiblingState, metaId: string): string =>
+  ((s.isListed ? s.isListed(metaId) : s.metaList.some((m) => m.id === metaId)) ? metaId : UNLISTED_ID);
+
+function tickNetworks(s: SiblingState): { id: string; name: string }[] | null {
   if (!s.snap || !s.exactRows?.length) return null;
   const counts = new Map<string, number>();
-  for (const r of s.exactRows) counts.set(r.metaId, (counts.get(r.metaId) ?? 0) + 1);
+  for (const r of s.exactRows) {
+    const k = keyOf(s, r.metaId);
+    counts.set(k, (counts.get(k) ?? 0) + 1);
+  }
   const nets = [...counts.entries()]
     .sort((a, b) => b[1] - a[1])
-    .map(([id]) => s.metaList.find((m) => m.id === id))
-    .filter((m): m is MetaInfo => m != null);
+    .map(([id]) => (id === UNLISTED_ID ? { id, name: UNLISTED_CFG.name } : s.metaList.find((m) => m.id === id)))
+    .filter((m): m is { id: string; name: string } => m != null);
   return nets.length ? nets : null;
 }
 
@@ -261,18 +275,13 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       if (s.mode === "ledger") {
         const nets = tickNetworks(s);
         if (!nets) return null;
-        // ⚠️ THE CARD STANDS ON ONE OF TWO COMMITS, and a step moves THAT one (2026-10-02). Opened
-        // from the tick (its ∨, a band, a snapshot row) it is the TICK-LOCAL network, and ‹ › step
-        // that — pinned by construction, and never the app filter (user: "it should not actually
-        // set the metagraph as the global application filter"). Standing on the filter itself
-        // (committed in the top bar, then a tick opened under it) it steps the filter as before.
-        if (net !== s.filter) {
-          const items = nets.map((m) => ({ key: m.id, label: m.name, actions: tickNetSelectActions(m.id, s.snap!, { metaSnap: s.metaSnap, hasInspect: s.inspect != null, net }) }));
-          return finish(slot, items, nets.findIndex((m) => m.id === net), `Global ${s.snap!.data.ordinal.toLocaleString()}`);
-        }
-        const hold: ClickAction[] = s.following || !s.snap ? [] : [{ kind: "snapshot", pick: s.snap, follow: false }];
-        const items = nets.map((m) => ({ key: m.id, label: m.name, actions: [...filterToggleActions(m.id, s.filter), ...hold] }));
-        return finish(slot, items, nets.findIndex((m) => m.id === s.filter), `Global ${s.snap!.data.ordinal.toLocaleString()}`);
+        // ⚠️ A STEP IS ALWAYS THE TICK-LOCAL COMMIT (2026-10-02, twice the same day): first for a
+        // card opened from the tick, then for one standing on the top bar's filter too — "a filter
+        // should not be changed from the explorer", and a pager is the same kind of gesture. The
+        // step pins the tick and commits the neighbour INSIDE it; the filter is the reader's lens
+        // and stays what they set.
+        const items = nets.map((m) => ({ key: m.id, label: m.name, actions: tickNetSelectActions(m.id, s.snap!, { metaSnap: s.metaSnap, hasInspect: s.inspect != null, net }) }));
+        return finish(slot, items, nets.findIndex((m) => m.id === net), `Global ${s.snap!.data.ordinal.toLocaleString()}`);
       }
       // The filter picker's own order: located-desc (0-located rows stay steppable, like the
       // picker keeps them clickable).
@@ -382,9 +391,12 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       //
       // The explorer's LIST keeps its newest-first order, which is right for a list and not in
       // conflict: a log reads back from now, a stepper advances.
+      // Under the UNLISTED network the parent is "unlisted × this tick", which can hold several
+      // addresses — so the set is every uncatalogued row, grouped by address then ordinal.
+      const unlisted = keyOf(s, cur.metaId) === UNLISTED_ID;
       const rows = s.exactRows
-        .filter((r) => r.metaId === cur.metaId)
-        .sort((a, b) => a.ordinal - b.ordinal);
+        .filter((r) => (unlisted ? keyOf(s, r.metaId) === UNLISTED_ID : r.metaId === cur.metaId))
+        .sort((a, b) => (a.metaId === b.metaId ? a.ordinal - b.ordinal : a.metaId < b.metaId ? -1 : 1));
       const meta = s.metaList.find((m) => m.id === cur.metaId);
       const who = meta?.symbol || meta?.name || `${cur.metaId.slice(0, 6)}…`;
       const items = rows.map((r, i) => ({
@@ -397,7 +409,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         label: ordinalLabel(r),
         actions: metaSnapSelectActions(metaSnapSelOf(r, cur.globalOrdinal, cur.ts), s.snap!, { metaSnap: cur }),
       }));
-      const index = rows.findIndex((r) => sameMetaSnap(cur, { ...cur, ordinal: r.ordinal }));
+      const index = rows.findIndex((r) => r.metaId === cur.metaId && r.ordinal === cur.ordinal);
       return finish(slot, items, index, `${who} · Global ${cur.globalOrdinal.toLocaleString()}`);
     }
 
@@ -520,7 +532,8 @@ const firstAnchoringNetwork = (s: SiblingState): SiblingStep | null => {
 const firstMetaSnapOfTick = (s: SiblingState): SiblingStep | null => {
   const net = netOf(s);
   if (net === "all" || !s.snap || !s.exactRows) return null;
-  const r = s.exactRows.find((x) => x.metaId === net);
+  // By network KEY: the unlisted network's snapshots carry their own raw addresses.
+  const r = s.exactRows.find((x) => keyOf(s, x.metaId) === net);
   if (!r) return null;
   const sel = metaSnapSelOf(r, s.snap.data.ordinal, s.snap.data.timestamp);
   return {

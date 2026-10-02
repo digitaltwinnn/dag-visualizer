@@ -67,6 +67,7 @@ import { childStep, siblingSet, type SiblingState } from "@/components/railSibli
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { latestRelevant } from "@/src/data/follow";
 import { getAnchor } from "@/src/data/network";
+import { LISTED_IDS } from "@/src/data/unlisted";
 import { tickInStory } from "@/src/data/ledgerStory";
 import { POLL } from "@/src/engine/config";
 import { Button } from "@/components/ui/button";
@@ -254,6 +255,7 @@ export default function RailPager({
       metaSnap,
       selNodes,
       metaList,
+      isListed: (id) => LISTED_IDS.has(id),
       countries: leaderboard?.countries ?? [],
       // The metaSnap pager reads its committed pair's rows; the snap slot's DOWN step (first
       // channel row of the boxed tick) reads its own tick's exact rows.
