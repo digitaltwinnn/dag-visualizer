@@ -103,9 +103,12 @@ export default function TrendInstantPane({
   // moment's AGE now) — the note below still names the precision where a reader needs it.
   const fmt = (v: number | null) => (v != null ? format(v) : NO_READING);
 
-  // THE SPAN A DOOR CARRIES: the brushed range if one stands, else the window on screen. One
-  // helper, shared with the document (`components/trendDoors.ts`).
-  const span = range ?? spanOfWindow(buckets, stepMs);
+  // THE SPAN THIS CARD'S DOOR CARRIES IS THE MOMENT (the search pass, 2026-10-02). It handed the
+  // brushed range, else the whole window on screen — the document's rule, where a chart's link is
+  // about a span. But this card states ONE instant, and its door landed the reader a month away
+  // from it (the 30-day window's first day). The bucket the cursor sits in is the span here; the
+  // window is only the fallback for a cursor with no bucket.
+  const span = bucket != null ? { fromMs: bucket, toMs: bucket + stepMs } : (range ?? spanOfWindow(buckets, stepMs));
 
   // THE UNMOUNT BACKSTOP (convention 9's other half): a row that leaves the roster under a
   // stationary pointer — a filter commit, a re-rank that drops it — never fires its own leave, and
@@ -284,8 +287,8 @@ export default function TrendInstantPane({
                 disabled={!span}
                 title={
                   subject && subject !== "dag"
-                    ? "Opens the anchor log at this span, with this network in the search."
-                    : "Opens the anchor log at this span, across every network."
+                    ? "Opens the snapshot log at this moment, for this network."
+                    : "Opens the snapshot log. To jump to this moment, pick a network in the top bar first."
                 }
                 onClick={() => openRecords(subject, span)}
                 className={cn(

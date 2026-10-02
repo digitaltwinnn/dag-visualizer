@@ -65,6 +65,13 @@ const COLUMNS: { key: AnchorLogSortKey; label: string; phone?: false; phoneLabel
 /** The one class both the header cell and its body cells wear, so a column can never half-hide. */
 const PHONE_HIDDEN = "max-[700px]:hidden";
 
+/** A typed ordinal as the app prints one — digits only, with separators; whatever was typed if
+ *  it holds no number. */
+const fmtOrd = (q: string): string => {
+  const n = Number(q.replace(/[^\d]/g, ""));
+  return Number.isFinite(n) && n > 0 ? n.toLocaleString() : q;
+};
+
 /** The absence mark for a SEAM's metagraph columns. Muted rather than dim, so a scan reads it as
  *  "nothing to say here" instead of as a faint value — and `aria-hidden` with an sr-only word,
  *  because a screen reader announcing "em dash" four times per seam row says nothing at all. */
@@ -489,7 +496,21 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     setJumpMiss(null);
     if (!histNet) {
       const idx = allRows.findIndex((r) => r.global.ordinal === n);
-      if (idx < 0) { setMarked(null); setJumpMiss("not in the retained window — pick a network to page all time"); return; }
+      if (idx < 0) {
+        setMarked(null);
+        // Two different misses, said differently (the search pass, 2026-10-02): an ordinal ABOVE the
+        // newest one does not exist yet, and telling the reader to "page all time" for it sends
+        // them looking for something that is not there. An older one is real but outside the
+        // window this unfiltered log holds — and the route that reaches it is the same one the
+        // network-ordinal miss names, in the same words.
+        const newest = allRows.reduce((m, r) => Math.max(m, r.global.ordinal), 0);
+        setJumpMiss(
+          newest > 0 && n > newest
+            ? `global snapshot ${n.toLocaleString()} does not exist yet — the newest is ${newest.toLocaleString()}`
+            : `global snapshot ${n.toLocaleString()} is not in the retained window — commit a network in the top bar to page all time`,
+        );
+        return;
+      }
       setPageState(Math.floor(idx / PAGE) + 1);
       setMarked(markOf(allRows[idx]));
       return;
@@ -535,7 +556,9 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
 
   /** AGE — the FROM bound is the destination; `to` only bounds which rows the landing marks. */
   const seekAge = async () => {
-    const fromMs = dayStartMs(qFrom);
+    // An ARRIVAL carries its exact instant (the Moment card's door); a typed search is a day.
+    const fromMs = exactFrom.current ?? dayStartMs(qFrom);
+    exactFrom.current = null;
     setJumpMiss(null);
     if (fromMs == null) { setJumpMiss("pick a from-date"); return; }
     if (!histNet) {
@@ -589,6 +612,10 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   const logSeek = useStore((st) => st.logSeek);
   const setLogSeek = useStore((st) => st.setLogSeek);
   const pendingSeek = useRef(false);
+  /** The arriving span's exact start (ms). The fields show a DAY — that is what a reader can type —
+   *  but a door from one instant should land AT it, not at that day's midnight (measured: the
+   *  Moment card's 02:45 landed 4,700 DOR snapshots early). Consumed by the one seek it arms. */
+  const exactFrom = useRef<number | null>(null);
   useEffect(() => {
     if (!logSeek) return;
     const iso = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
@@ -598,6 +625,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     if (logSeek.metaId) {
       setSearchMeta(logSeek.metaId);
       pendingSeek.current = true;
+      exactFrom.current = logSeek.fromMs;
       setArriving(true);
       // A PREVIOUS search's landing would satisfy the hold's release at once (a marked row, page 1
       // cached) and flash the live page before this seek runs — the double-load the hold exists
@@ -723,7 +751,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       {searchSet && (
         <span className="inline-flex min-w-0 items-center gap-1 h-8 pointer-coarse:h-11 max-[700px]:h-11 max-[700px]:flex-1 pl-3 pr-1 rounded-btn border border-border/70 bg-[var(--panel-plate)] text-body text-foreground-dim">
           <span className="min-w-0 truncate tabular-nums">
-            {[qSnapshot && `snapshot ${qSnapshot}`, qTick && `in global ${qTick}`, qFrom && `from ${qFrom}`, qTo && `to ${qTo}`]
+            {/* Ordinals with their separators, as every other surface writes them. */}
+            {[qSnapshot && `snapshot ${fmtOrd(qSnapshot)}`, qTick && `in global ${fmtOrd(qTick)}`, qFrom && `from ${qFrom}`, qTo && `to ${qTo}`]
               .filter(Boolean)
               .join(" · ")}
           </span>
