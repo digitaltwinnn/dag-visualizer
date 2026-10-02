@@ -132,7 +132,7 @@ export function CopyButton({ value, subject, className }: { value: string; subje
       aria-label={`Copy ${subject}`}
       title={`Copy ${subject}`}
       className={cn(
-        "flex-none inline-flex items-center justify-center size-4 -my-0.5 rounded-xs cursor-pointer",
+        "flex-none inline-flex items-center justify-center size-6 -my-1 rounded-xs cursor-pointer",
         "text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
         "opacity-0 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
         copied && "opacity-100 text-[var(--success)] hover:text-[var(--success)]",
@@ -149,7 +149,7 @@ export function CopyButton({ value, subject, className }: { value: string; subje
         );
       }}
     >
-      {copied ? <Check aria-hidden className="size-3" /> : <Copy aria-hidden className="size-3" />}
+      {copied ? <Check aria-hidden className="size-3.5" /> : <Copy aria-hidden className="size-3.5" />}
     </button>
   );
 }
@@ -176,7 +176,7 @@ export function FootRow({
       {/* shrink-0: the label column is exactly its words (user, 2026-08-14 — "State proof"
           wrapped to two rows once the values took the pane's width); the VALUE is the column
           that truncates. */}
-      <span className="shrink-0 whitespace-nowrap text-micro tracking-caps uppercase text-muted-foreground">{label}</span>
+      <span className="shrink-0 whitespace-nowrap text-label tracking-caps uppercase text-muted-foreground">{label}</span>
       {/* The value takes the parent's full width (user, 2026-08-14 — the always-reserved copy
           slot left every row ~22px short of the right edge): the button OVERLAYS the row's end
           on hover instead of reserving a column, on the foot's own plate colour so a long value
@@ -314,7 +314,7 @@ export function RoleChips({ codes, compact, tight }: { codes: string[]; compact?
           // 2px less pill is what buys justify-evenly its air). Same pill, same vocabulary —
           // only the vertical padding narrows; every roomier surface keeps the full form.
           className={cn(
-            "inline-flex items-center rounded-xs border border-border bg-wash-faint text-micro leading-none text-muted-foreground",
+            "inline-flex items-center rounded-xs border border-border bg-wash-faint text-label leading-none text-muted-foreground",
             tight ? "px-1" : "px-[5px]",
             compact ? "py-px" : "py-[2px]",
           )}

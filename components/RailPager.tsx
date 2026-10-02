@@ -693,30 +693,30 @@ export default function RailPager({
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className="size-5 disabled:opacity-30"
+                className="size-6 disabled:opacity-30"
                 disabled={!prev}
                 onClick={() => commitStep(-1)}
                 aria-label={prev ? `Previous: ${prev.label}` : "Previous"}
                 title={prev?.label}
               >
-                <ChevronLeft aria-hidden />
+                <ChevronLeft aria-hidden className="size-4" />
               </Button>
               {/* An OPEN set shows NO position (user, 2026-08-09): the global chain is ongoing,
                   so `n / N` would state a total the window doesn't have. The min-width keeps the
                   chevron spacing identical across the variants. */}
-              <div className="min-w-[3ch] whitespace-nowrap text-center text-micro uppercase tracking-caps text-muted-foreground tabular-nums">
+              <div className="min-w-[3ch] whitespace-nowrap text-center text-label uppercase tracking-caps text-muted-foreground tabular-nums">
                 {set.open ? "" : `${set.index + 1} / ${set.items.length}`}
               </div>
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className="size-5 disabled:opacity-30"
+                className="size-6 disabled:opacity-30"
                 disabled={!next}
                 onClick={() => commitStep(1)}
                 aria-label={next ? `Next: ${next.label}` : "Next"}
                 title={next?.label}
               >
-                <ChevronRight aria-hidden />
+                <ChevronRight aria-hidden className="size-4" />
               </Button>
               <div className="min-w-0 flex-1" />
             </>
@@ -732,24 +732,24 @@ export default function RailPager({
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className="size-5 disabled:opacity-30"
+                className="size-6 disabled:opacity-30"
                 disabled={!up}
                 onClick={() => up?.()}
                 aria-label="Open the coarser card"
                 title="Open the coarser card"
               >
-                <ChevronUp aria-hidden />
+                <ChevronUp aria-hidden className="size-4" />
               </Button>
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className="size-5 disabled:opacity-30"
+                className="size-6 disabled:opacity-30"
                 disabled={!down}
                 onClick={() => down?.run()}
                 aria-label={down?.label ?? "Open the finer card"}
                 title={down?.label}
               >
-                <ChevronDown aria-hidden />
+                <ChevronDown aria-hidden className="size-4" />
               </Button>
             </>
           )}

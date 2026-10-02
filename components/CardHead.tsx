@@ -41,7 +41,7 @@ import { KIND_MARK_CLASS } from "@/components/icons";
 // Still two LAYOUTS, selected by `panel` (kept only for the structural split — padded flex-row
 // head with the collapse toggle vs. block-flow head with the absolute ×; behaviour of both
 // consumer kinds is unchanged). The title recipe + hairline are shared between them.
-const EYEBROW = "text-micro font-bold tracking-[0.1em] uppercase leading-none";
+const EYEBROW = "text-label font-bold tracking-[0.1em] uppercase leading-none";
 // The ONE title standard every card head uses (panel h2 and inspector h3 alike).
 const TITLE = "m-0 text-title font-semibold";
 
@@ -269,12 +269,12 @@ export default function CardHead({
                   title down — the row measures the eyebrow, as it did when they were siblings. */}
               <div className="flex items-center gap-1.5 flex-none -my-[3px] pt-px pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
                 {caption != null && (
-                  <span className="text-micro text-muted-foreground text-right tabular-nums">{caption}</span>
+                  <span className="text-label text-muted-foreground text-right tabular-nums">{caption}</span>
                 )}
                 {toggleable && (
                   <span
                     aria-hidden
-                    className="inline-flex items-center justify-center w-5 h-[18px] leading-none text-muted-foreground group-hover:text-foreground"
+                    className="inline-flex items-center justify-center size-6 -my-[3px] leading-none text-muted-foreground group-hover:text-foreground"
                   >
                     {collapsed ? <Plus className="size-3.5" /> : <Minus className="size-3.5" />}
                   </span>
@@ -374,7 +374,7 @@ function keepFocusOnRung(el: HTMLElement): void {
           title={closeTitle}
           aria-label={closeTitle}
           onClick={onClose}
-          className="absolute top-[10px] right-[10px] z-10 size-auto rounded-md py-0.5 px-2 leading-none cursor-pointer text-muted-foreground hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent"
+          className="absolute top-[8px] right-[10px] z-10 size-auto rounded-md py-1 px-2 leading-none cursor-pointer text-muted-foreground hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent"
         >
           <X aria-hidden className="size-4" />
         </Button>
@@ -409,7 +409,7 @@ function keepFocusOnRung(el: HTMLElement): void {
                 couldn't truncate either. */}
             {caption != null && (
               <div className="flex items-center gap-1.5 flex-none pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
-                <span className="text-micro text-muted-foreground text-right tabular-nums">{caption}</span>
+                <span className="text-label text-muted-foreground text-right tabular-nums">{caption}</span>
               </div>
             )}
           </div>

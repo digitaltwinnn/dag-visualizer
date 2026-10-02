@@ -66,7 +66,7 @@ export default function ExplorerHeading({
             // The same padded box as the setting beside it (the LIVE/PINNED pill), so the two ends
             // of the heading row are one control species; the open state takes the wash.
             className={cn(
-              "inline-flex items-center gap-1 rounded-sm px-1.5 -mr-1.5 py-[3px] text-micro tracking-caps uppercase text-foreground select-none cursor-pointer",
+              "inline-flex items-center gap-1 rounded-sm px-1.5 -mr-1.5 py-[3px] min-h-6 text-label tracking-caps uppercase text-foreground select-none cursor-pointer",
               "hover:bg-wash-hover data-[state=open]:bg-wash-soft",
               "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
             )}
@@ -93,14 +93,14 @@ export default function ExplorerHeading({
                   )}
                 >
                   <span>{o.label}</span>
-                  {o.unit && <span className="text-micro text-muted-foreground">{o.unit}</span>}
+                  {o.unit && <span className="text-label text-muted-foreground">{o.unit}</span>}
                 </DropdownMenuRadioItem>
               ))}
             </DropdownMenuRadioGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       ) : measure && current ? (
-        <span className="text-micro tracking-caps uppercase text-muted-foreground select-none">{current.label}</span>
+        <span className="text-label tracking-caps uppercase text-muted-foreground select-none">{current.label}</span>
       ) : null}
     </div>
   );
