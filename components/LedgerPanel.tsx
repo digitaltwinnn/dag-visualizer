@@ -39,6 +39,7 @@ import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import { levelMeasure } from "@/src/data/explorerMeasure";
+import { IDENT_INK } from "@/components/identInk";
 
 // THE SNAPSHOTS VIEW'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -328,7 +329,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           name: <span className="tabular-nums">{d.ordinal.toLocaleString()}</span>,
           // The lens's count in the network's hue where it anchored; no "0" — a zero in a
           // network's own colour reads as a reading about that network.
-          tag: filterNet && count > 0 ? <span className="tabular-nums" style={{ color: filterNet.hue }}>{count}</span> : undefined,
+          tag: filterNet && count > 0 ? <span className={cn("tabular-nums", IDENT_INK)} style={{ color: filterNet.hue }}>{count}</span> : undefined,
           share: v != null ? v / maxTick : undefined,
           hue: accent,
           // Absent = the dash, never a number derived from another (rule 10).

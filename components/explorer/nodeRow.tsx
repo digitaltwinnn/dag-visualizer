@@ -11,6 +11,7 @@ import { nodeStatus } from "@/src/data/nodeStatus";
 import type { MetaInfo, NodeRow } from "@/src/data/types";
 import { midHash } from "@/src/util/format";
 import { cn } from "@/lib/utils";
+import { IDENT_INK } from "@/components/identInk";
 
 // THE ONE NODE ROW (design session 2026-09-26, `node-rows.html` D): a node level is the last step
 // in every explorer — under a composition in Hypergraph, under a provider · city cohort in
@@ -92,9 +93,9 @@ export function nodeRowSpec(args: {
     key: args.key,
     glyph: (
       <span className="min-w-0 truncate text-label font-medium">
-        <span style={{ color: hue }}>{ticker}</span>
+        <span className={IDENT_INK} style={{ color: hue }}>{ticker}</span>
         {also.map((m) => (
-          <span key={m.id} style={{ color: identityHudCss(m.id) }}> {tickerOf(m.id)}</span>
+          <span key={m.id} className={IDENT_INK} style={{ color: identityHudCss(m.id) }}> {tickerOf(m.id)}</span>
         ))}
       </span>
     ),

@@ -907,11 +907,14 @@
 
 /* The identity lanes' L/C (spec §4) — the light-dark() exception: number tokens. Dark values
    are today's HUD lane verbatim (identity.ts pins them); light is the measured ink lane. */
-:root { --ident-l: 0.74; --ident-c: 0.19; }
+/* `--ident-ink-l` is the lane's lightness for an identity hue set as TEXT (components/identInk.ts):
+   the lane's own L on dark, 0.48 on paper — 0.58 is a mark's lightness there and measured 3.2:1
+   as a ticker; 0.48 is the lightest step at which every hue clears 4.5:1 on the light grounds. */
+:root { --ident-l: 0.74; --ident-c: 0.19; --ident-ink-l: 0.74; }
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) { --ident-l: 0.58; --ident-c: 0.19; }
+  :root:not([data-theme="dark"]) { --ident-l: 0.58; --ident-c: 0.19; --ident-ink-l: 0.48; }
 }
-:root[data-theme="light"] { --ident-l: 0.58; --ident-c: 0.19; }
+:root[data-theme="light"] { --ident-l: 0.58; --ident-c: 0.19; --ident-ink-l: 0.48; }
 
 /* The History planes' area fill — the SAME number exception (an opacity is not a <color>, so
    light-dark() cannot carry it). It is the gradient's TOP stop, at the line itself; the bottom

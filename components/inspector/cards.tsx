@@ -29,6 +29,7 @@ import { pickNetId } from "@/src/engine/domain/pickActions";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 import FollowControl from "@/components/FollowControl";
 import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
+import { IDENT_INK } from "@/components/identInk";
 
 type PickOf<K extends PickDescriptor["kind"]> = Extract<PickDescriptor, { kind: K }>;
 
@@ -99,7 +100,7 @@ export function MetaTitle({ cfg }: { cfg: MetaCfg }) {
           deliberate trade (all the identity info stays). */}
       <Avatar className="size-[30px] flex-none">
         {iconUrl && <AvatarImage src={iconUrl} alt="" />}
-        <AvatarFallback style={{ color: hue }}>{monogram}</AvatarFallback>
+        <AvatarFallback className={IDENT_INK} style={{ color: hue }}>{monogram}</AvatarFallback>
       </Avatar>
       <span className="flex flex-col gap-px min-w-0">
         <span className="leading-[1.1]">{cfg.name}</span>
@@ -668,7 +669,7 @@ export function MetaTickerAside({ cfg }: { cfg: MetaCfg }) {
   if (!cfg.ticker) return null;
   return (
     <span
-      className="text-label font-semibold tracking-[0.02em]"
+      className={cn("text-label font-semibold tracking-[0.02em]", IDENT_INK)}
       // Unlisted stays neutral — same guard as MetaTitle above.
       style={{ color: cfg.id === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(cfg.id) }}
     >
