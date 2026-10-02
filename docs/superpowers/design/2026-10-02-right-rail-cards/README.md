@@ -55,9 +55,12 @@ One rule: name · count · mark in the D2 grid, a square for a countable thing a
 or a count above 60, only in the breakdown slot.
 
 User: "ok" to the recommendation — 1 to 5 built, the metagraph snapshot left alone, the node's
-archive reach bar NOT built (undecided). Shared pieces in `components/inspector/parts.tsx`:
+archive reach bar built later (below). Shared pieces in `components/inspector/parts.tsx`:
 `UnitMarks`, `CUT_ROW` (the three-column row for a one-cut card), `countable`, and `ScheduleTable`
 with an optional axis. Deviations from the drawing: the Moment card keeps its headline line (it
 carries the subject, unit and rank) and only its rows became table rows; the composition strip is
 dropped above 60 nodes instead of scaled; country shows the network cut only. Built with the dev
-server down: gated by tsc, vitest and a production build, NOT yet seen in the running app.
+server down, then verified live the same day (dark 1920 and light 1366, every card, no console
+errors). The node card's archive REACH bar was approved and built after ("do the archive reach bar
+also"): the share of the chain's ordinals the node still serves, filled from the right. The live
+pass also made the Moment's absent readings a dash ("no reading" wrapped in the figure column).

@@ -78,6 +78,18 @@ export function archiveDisplay(e: ArchiveEntry, since: string): ArchiveNodeDispl
   };
 }
 
+// HOW MUCH OF ITS CHAIN A NODE KEEPS, as a fraction of the chain's ordinals (the node card's reach
+// bar, user 2026-10-02): the part from its floor to the tip, over the whole chain from ordinal 1.
+// Ordinals rather than dates on purpose — both ends are in the census entry itself, so the bar
+// needs no chain birth date, and "share of the snapshots" is exactly what the kept count beside it
+// says. A genesis keeper is 1. Null when the entry cannot say (an empty or inverted reading), so
+// the card draws no bar rather than a guessed one.
+export function archiveReach(e: ArchiveEntry): number | null {
+  if (e.kind === "genesis") return 1;
+  if (!(e.latest > 0) || e.floor > e.latest) return null;
+  return Math.min(1, Math.max(0, (e.latest - Math.max(1, e.floor) + 1) / e.latest));
+}
+
 // The node card's Full archive ROW, decided as pure data (user, 2026-08-15 — a separately-loaded
 // fact holds its row rather than popping in once loaded). "na" is immediate — roles are local
 // knowledge, and a machine with no L0 process serves no chain whatever the census says about

@@ -19,7 +19,7 @@ import { SonarRing, NodeStars } from "@/components/state/StateAtoms";
 import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS } from "@/components/icons";
 import { ChevronRight, ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
-import { useArchive, archiveFactState, archiveSchedule, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
+import { useArchive, archiveFactState, archiveReach, archiveSchedule, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
 import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
 import { POLL } from "@/src/engine/config";
 import { cap, Desc, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark, ScheduleTable, partShade, countable, Lead, Empty, QualifierChip, Door, SectionLabel, type SchedulePart } from "./parts";
@@ -810,6 +810,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   const { census: archive, settled: archSettled } = useArchive();
   const archEntry = p.node?.ip ? archive?.entries.get(p.node.ip) : undefined;
   const archState = archiveFactState(archEntry, archive?.since, archSettled, p.node?.roles ?? []);
+  const archReach = archEntry ? archiveReach(archEntry) : null;
   // The host's ASN answers to the provider rung exactly as the Hosting line above it does — one
   // condition, so the two can't disagree about who owns the host.
   const asn = cohort == null ? geo?.asn : null;
@@ -840,7 +841,8 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
               Signed {signed.toLocaleString()}{leadBits ? ". " : "."}
             </span>
           )}
-          {leadBits ? `${leadBits}.` : null}
+          {/* A host name may end in its own period ("Amazon.com, Inc.") — never two. */}
+          {leadBits ? `${leadBits.replace(/\.$/, "")}.` : null}
         </Lead>
       )}
       <FactGroup>
@@ -958,6 +960,29 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
               {archState.display.count && <span className="text-label text-muted-foreground">{archState.display.count}</span>}
             </span>
           </Fact>
+        )}
+        {archState.kind === "value" && archEntry && archReach != null && (
+          /* THE REACH BAR (`visuals.html`, user 2026-10-02): the chain from its first snapshot to
+             now, with the part this node still serves filled from the right — the card's one
+             quantity, drawn. A share of the chain's ORDINALS (`archiveReach`), so it is the same
+             claim as the kept count above. The deep archives share gaps, so their fill is the
+             span they reach, drawn softer; the Fact's hover says so. */
+          <div aria-hidden className="-mt-0.5">
+            <span className="block h-[5px] rounded-full bg-wash-strong overflow-hidden">
+              <span
+                className="block h-full ml-auto rounded-full min-w-[2px]"
+                style={{
+                  width: `${archReach * 100}%`,
+                  background: archEntry.kind === "genesis" ? "var(--success)" : "var(--muted-foreground)",
+                  opacity: archEntry.kind === "deep" ? 0.6 : 1,
+                }}
+              />
+            </span>
+            <span className="mt-0.5 flex justify-between text-label text-muted-foreground">
+              <span>first snapshot</span>
+              <span>now</span>
+            </span>
+          </div>
         )}
         {archState.kind === "acquiring" && (
           /* The held-slot acquiring form: a reading for this machine is genuinely arriving

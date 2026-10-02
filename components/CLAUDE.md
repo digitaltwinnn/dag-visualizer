@@ -1024,14 +1024,19 @@ grammar everywhere: label left, value right, one line.** The stacked micro-upper
 form is retired — it cost two lines per fact and read as a form, not an instrument. Its last survivor was
 the `Composition` label over the dossier's composition table, which outlived the sweep only because that
 table isn't a `Fact`; dropped 2026-08-10, since each row already names its own composition and without it
-the description above reads as the card's lead. **The dossier's BREAKDOWN is the one place a label leads its value** (2026-09-26,
-`dossier-breakdown.html` A): under the "Online nodes" disclosure, three STACKED BARS — composition
-in the network's hue, status in the bucket colours, archive depth in the neutral — each one bar of
-the same total with the axis word to its left and the parts named beneath (`StackedSchedule`,
-`inspector/parts.tsx`). They replaced three captioned tables under hairlines, which read as three
-sections rather than three cuts of one fleet. A zero-count part draws no segment and is named
-muted; the chips and depth tags ride the parts' titles. "Archive depth", not "archive" — it is how
-far back a node's archive reaches, not a size.
+the description above reads as the card's lead. **THE BREAKDOWN IS ONE TABLE, ON EVERY CARD THAT HAS ONE** (user, 2026-10-02 —
+`docs/superpowers/design/2026-10-02-right-rail-cards/`, D2 then `visuals.html`): rows of **name ·
+count · mark**, where the mark is one SQUARE per countable thing (a node, an anchored snapshot) and
+a BAR for a rate or a cut above 60 — never both in one cut, no dots, no legend. The dossier's three
+cuts (composition in the network's hue, status in the bucket colours, archive depth in the neutral)
+carry the cut's name in a leading column (`ScheduleTable` with an `axis`); a card with ONE cut drops
+that column because its section label names it (`CUT_ROW` — the global snapshot's anchored rows, the
+Moment's readings, a provider's and a country's nodes by network; the composition card lights its
+group inside its network's squares). Rows that are their own controls wear `CUT_ROW` themselves and
+draw `UnitMarks`, so every card shares the columns. It replaced the stacked bars with a wrapping dot
+legend, the dot · name · track · count rows and the inline network dots — three recipes. A zero part
+is a muted row with no mark. The node card is a record and carries one mark only: the archive REACH
+bar, the share of its chain's ordinals it still serves (`archiveReach`, `components/useArchive.ts`).
 
 **Every right-rail card is the same SIX SLOTS in one order** (user, 2026-10-02 — the design and its
 deviations are in `docs/superpowers/design/2026-10-02-right-rail-cards/`): **head · lead · breakdown

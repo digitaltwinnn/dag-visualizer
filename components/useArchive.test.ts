@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   archiveDisplay,
+  archiveReach,
   archiveFactState,
   archiveSummary,
   fmtReach,
@@ -177,5 +178,20 @@ describe("archiveSchedule (the dossier's by-archival partition)", () => {
   });
   it("null when the census carries nothing for the chain", () => {
     expect(archiveSchedule(census([]), "x", 3, now)).toBeNull();
+  });
+});
+
+describe("archive reach (the node card's bar)", () => {
+  const e = { ip: "1.1.1.1", chain: "global", floorTs: null };
+  it("a genesis keeper holds the whole chain", () => {
+    expect(archiveReach({ ...e, kind: "genesis", floor: 1, latest: 1000 })).toBe(1);
+  });
+  it("a window is its share of the chain's ordinals", () => {
+    expect(archiveReach({ ...e, kind: "window", floor: 751, latest: 1000 })).toBe(0.25);
+    expect(archiveReach({ ...e, kind: "deep", floor: 501, latest: 1000 })).toBe(0.5);
+  });
+  it("answers null rather than a guess for a reading that cannot say", () => {
+    expect(archiveReach({ ...e, kind: "window", floor: 0, latest: 0 })).toBeNull();
+    expect(archiveReach({ ...e, kind: "window", floor: 20, latest: 10 })).toBeNull();
   });
 });

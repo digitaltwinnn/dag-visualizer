@@ -258,8 +258,9 @@ export default function TrendInstantPane({
                             mark is a bar scaled to the busiest network at this instant; the bar
                             carries the hue the leading dot used to. */}
                         <span className={cn(CUT_ROW, "grid-cols-[8.6em_4.6em_minmax(0,1fr)]")}>
-                          <span className="min-w-0 truncate text-foreground-dim">{row.name}</span>
-                          <span className={cn("font-mono tabular-nums text-right", v == null ? "text-muted-foreground" : "text-foreground")}>{fmt(v)}</span>
+                          <span className={cn("min-w-0 truncate", v == null ? "text-muted-foreground" : "text-foreground-dim")}>{row.name}</span>
+                          {/* One dash for an absent reading (the skeleton's empty rule); the row's title says "no reading". */}
+                          <span className={cn("font-mono tabular-nums text-right", v == null ? "text-muted-foreground" : "text-foreground")}>{v != null ? format(v) : "—"}</span>
                           <UnitMarks count={0} color={row.hue} units={false} frac={v != null && peak > 0 ? v / peak : 0} />
                         </span>
                       </button>
