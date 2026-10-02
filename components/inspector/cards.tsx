@@ -305,9 +305,9 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
             hashes attached to the label", then "the hash label still has extra room"): the
             value fills its own row toward its label, so a short label buys a longer value —
             head and tail both surviving. Budgets measured at the desktop rail width. */}
-        <FootRow label="Hash" value={midHash(d.hash, 24)} title={d.hash} copy={d.hash} copyName="hash" />
+        <FootRow label="Hash" value={midHash(d.hash, 23)} title={d.hash} copy={d.hash} copyName="hash" />
         {d.lastSnapshotHash && (
-          <FootRow label="Previous" value={midHash(d.lastSnapshotHash, 20)} title={d.lastSnapshotHash} copy={d.lastSnapshotHash} copyName="previous hash" />
+          <FootRow label="Previous" value={midHash(d.lastSnapshotHash, 18)} title={d.lastSnapshotHash} copy={d.lastSnapshotHash} copyName="previous hash" />
         )}
       </Foot>
     </div>
@@ -652,11 +652,11 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           {/* The snapshot cards' fill rule (user, 2026-08-14 — "the value takes up most of the
               space and sits against the label"): midHash at per-label budgets, so each address
               fills its own row toward its label. */}
-          <FootRow label="Id" value={midHash(footId, 26)} title={footId} copy={footId} copyName="network id" />
+          <FootRow label="Id" value={midHash(footId, 25)} title={footId} copy={footId} copyName="network id" />
           {chainSpan?.owner && (
             <FootRow
               label="Owner"
-              value={midHash(chainSpan.owner, 23)}
+              value={midHash(chainSpan.owner, 21)}
               copyName="owner address"
               title={`The address that registered and controls this metagraph. ${chainSpan.owner}`}
               copy={chainSpan.owner}
@@ -986,7 +986,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           its own. Truncated display, full hash on hover. */}
       {p.node?.id && (
         <Foot>
-          <FootRow label="Node id" value={midHash(p.node.id, 21)} title={p.node.id} copy={p.node.id} copyName="node id" />
+          <FootRow label="Node id" value={midHash(p.node.id, 20)} title={p.node.id} copy={p.node.id} copyName="node id" />
         </Foot>
       )}
     </>

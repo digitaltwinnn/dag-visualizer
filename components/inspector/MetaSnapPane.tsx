@@ -369,14 +369,14 @@ export default function MetaSnapPane({
                   like `stateProof` does: descriptor first, polled buffer behind it. The em-dash
                   survives for the one case that is genuinely unknown — a snapshot stepped to
                   after it aged out of the retained buffer — where stating the gap is the point. */}
-              {hash && <FootRow label="Hash" value={midHash(hash, 24)} title={hash} copy={hash} copyName="hash" />}
+              {hash && <FootRow label="Hash" value={midHash(hash, 23)} title={hash} copy={hash} copyName="hash" />}
               {parent && (
-                <FootRow label="Previous" value={midHash(parent, 20)} title={parent} copy={parent} copyName="previous hash" />
+                <FootRow label="Previous" value={midHash(parent, 18)} title={parent} copy={parent} copyName="previous hash" />
               )}
               {stateProof && (
                 // "State HASH" (user, 2026-08-14 — "state proof" collided with the signers tab's
                 // "snapshot proof", a signature set; this is a DIGEST, kin to Hash/Parent above).
-                <FootRow label="State" copyName="state hash" value={midHash(stateProof, 23)} title={"The hash of the application state this snapshot results in, covered by the snapshot's L0 signatures — the state's provability. Distinct from the SIGNERS tab's 'snapshot proof', which is the L0 signature set; this is a digest, and the signatures sign over it." + stateProof} copy={stateProof} />
+                <FootRow label="State" copyName="state hash" value={midHash(stateProof, 22)} title={"The hash of the application state this snapshot results in, covered by the snapshot's L0 signatures — the state's provability. Distinct from the SIGNERS tab's 'snapshot proof', which is the L0 signature set; this is a digest, and the signatures sign over it." + stateProof} copy={stateProof} />
               )}
             </Foot>
           </div>
