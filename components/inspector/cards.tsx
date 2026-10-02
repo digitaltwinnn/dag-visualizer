@@ -309,9 +309,9 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
             hashes attached to the label", then "the hash label still has extra room"): the
             value fills its own row toward its label, so a short label buys a longer value —
             head and tail both surviving. Budgets measured at the desktop rail width. */}
-        <FootRow label="Hash" value={midHash(d.hash, 34)} title={d.hash} copy={d.hash} />
+        <FootRow label="Hash" value={midHash(d.hash, 28)} title={d.hash} copy={d.hash} />
         {d.lastSnapshotHash && (
-          <FootRow label="Previous hash" value={midHash(d.lastSnapshotHash, 27)} title={d.lastSnapshotHash} copy={d.lastSnapshotHash} />
+          <FootRow label="Previous" value={midHash(d.lastSnapshotHash, 23)} title={d.lastSnapshotHash} copy={d.lastSnapshotHash} />
         )}
       </Foot>
     </div>
@@ -643,11 +643,11 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           {/* The snapshot cards' fill rule (user, 2026-08-14 — "the value takes up most of the
               space and sits against the label"): midHash at per-label budgets, so each address
               fills its own row toward its label. */}
-          <FootRow label="Network id" value={midHash(footId, 28)} title={footId} copy={footId} />
+          <FootRow label="Id" value={midHash(footId, 28)} title={footId} copy={footId} />
           {chainSpan?.owner && (
             <FootRow
-              label="Owner address"
-              value={midHash(chainSpan.owner, 24)}
+              label="Owner"
+              value={midHash(chainSpan.owner, 26)}
               title={`The address that registered and controls this metagraph. ${chainSpan.owner}`}
               copy={chainSpan.owner}
             />

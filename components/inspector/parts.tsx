@@ -123,7 +123,7 @@ export function Foot({ children, className }: { children: ReactNode; className?:
 // is hovered or focused (the `group/copy` reveal) — but its slot is always reserved, so nothing
 // shifts under the pointer. Monochrome via currentColor; the check takes `--success` (the
 // ready lane), never an identity hue.
-export function CopyButton({ value, subject, className }: { value: string; subject: string; className?: string }) {
+export function CopyButton({ value, subject, always = false, className }: { value: string; subject: string; /** Present at low ink at rest (the foot rows) rather than revealed on the row's hover. */ always?: boolean; className?: string }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   return (
@@ -134,7 +134,7 @@ export function CopyButton({ value, subject, className }: { value: string; subje
       title={`Copy ${subject}`}
       className={cn(
         "flex-none size-6 -my-1 rounded-xs text-muted-foreground",
-        "opacity-0 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
+        always ? "opacity-55 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100" : "opacity-0 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
         copied && "opacity-100 text-[var(--success)] hover:text-[var(--success)]",
         className,
       )}
@@ -171,37 +171,25 @@ export function FootRow({
   mono?: boolean;
   copy?: string;
 }) {
+  // ONE REGISTER (C1, user 2026-10-02, `docs/superpowers/design/2026-10-02-heading-pin-foot`):
+  // the label is a caps PREFIX inside the mono value line — still uppercase, still muted — rather
+  // than a sans column beside it, so the foot has one voice. The copy control is ALWAYS PRESENT at
+  // low ink (no hidden control), lit on the row's hover, in a column of its own: the hover-only
+  // overlay it replaces (with its fade mask) covered the hash's last characters once the glyph
+  // stopped disappearing, and the tail is the part that identifies a hash. The labels are short
+  // for the same reason — the line is one column now, and every label character is a hash
+  // character lost.
   return (
-    <div className="group/copy flex items-baseline justify-between gap-2.5" title={title}>
-      {/* shrink-0: the label column is exactly its words (user, 2026-08-14 — "State proof"
-          wrapped to two rows once the values took the pane's width); the VALUE is the column
-          that truncates. */}
-      <span className="shrink-0 whitespace-nowrap text-label tracking-caps uppercase text-muted-foreground">{label}</span>
-      {/* The value takes the parent's full width (user, 2026-08-14 — the always-reserved copy
-          slot left every row ~22px short of the right edge): the button OVERLAYS the row's end
-          on hover instead of reserving a column, on the foot's own plate colour so a long value
-          is covered, never shifted — the no-shift rule kept by other means. */}
-      <span className={cn("relative inline-flex items-center min-w-0", mono && "font-mono")}>
-        {/* ⚠️ The button's old `bg-[var(--panel-plate)]` cover was a TRANSLUCENT lift (the foot
-            plate is additive by design), so the value's tail showed straight through it — the
-            button read as sitting ON the text (user, 2026-08-30). Nothing can opaquely match a
-            glass ground, so the text FADES OUT beneath the button instead: a mask on the value
-            while the row reveals the control. No layout shift, honest on every ground. */}
-        <span
-          className={cn(
-            "text-label text-foreground-dim tabular-nums truncate",
-            copy && "group-hover/copy:[mask-image:linear-gradient(to_right,#000_calc(100%-46px),transparent_calc(100%-14px))]",
-            copy && "group-focus-within/copy:[mask-image:linear-gradient(to_right,#000_calc(100%-46px),transparent_calc(100%-14px))]",
-          )}
-        >{value}</span>
-        {copy && (
-          <CopyButton
-            value={copy}
-            subject={label.toLowerCase()}
-            className="absolute right-0 top-1/2 -translate-y-1/2 my-0"
-          />
-        )}
+    <div className="group/copy flex items-center gap-2.5" title={title}>
+      <span className="inline-flex items-baseline min-w-0 flex-1 font-mono text-label">
+        <span className="shrink-0 tracking-caps uppercase text-muted-foreground">{label}</span>
+        <span aria-hidden className="shrink-0">&nbsp;&nbsp;</span>
+        <span className={cn("min-w-0 truncate text-foreground-dim tabular-nums", !mono && "font-sans")}>{value}</span>
       </span>
+      {/* The control takes its own 24px column: always present, so there is nothing to overlay and
+          no tail to cover — the value's `truncate` is the only thing that can shorten it, and the
+          callers' middle-cut budgets are sized so it does not. */}
+      {copy && <CopyButton value={copy} subject={label.toLowerCase()} always className="my-0" />}
     </div>
   );
 }
