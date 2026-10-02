@@ -3,6 +3,7 @@
 import { Fragment, type CSSProperties, useRef, useState, type ReactNode } from "react";
 import { Check, Copy, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { IDENT_INK } from "@/components/identInk";
 import { BAR_EASE } from "@/components/RollSwap";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -140,6 +141,20 @@ export function QualifierChip({ children, className, style, title }: { children:
     >
       <span className="truncate">{children}</span>
     </span>
+  );
+}
+
+/** THE TICKER BESIDE A TITLE — one chip, in the network's own ink (user, 2026-10-02: "should we
+ *  apply the ticker-pill consistently? the card header has it but in many other places we show
+ *  just text"). The rule: a ticker that QUALIFIES A TITLE is this chip — the dossier head, the
+ *  scene callout and tooltip, the Moment's headline, the raw pane's head. A ticker in a COLUMN
+ *  (node rows, the anchor log) or inside a SENTENCE stays plain hued text: twenty boxed tickers
+ *  beside the role chips is a wall of boxes, and a chip mid-sentence reads as a button. */
+export function TickerChip({ text, hue, title, className }: { text: string; hue?: string; title?: string; className?: string }) {
+  return (
+    <QualifierChip title={title} className={cn("font-semibold tracking-[0.02em]", IDENT_INK, className)} style={hue ? { color: hue } : undefined}>
+      {text}
+    </QualifierChip>
   );
 }
 

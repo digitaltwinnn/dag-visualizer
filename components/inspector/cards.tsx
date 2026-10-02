@@ -22,7 +22,7 @@ import { useMinHold } from "@/components/useMinHold";
 import { useArchive, archiveFactState, archiveReach, archiveSchedule, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
 import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
 import { POLL } from "@/src/engine/config";
-import { cap, Desc, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark, ScheduleTable, partShade, Lead, Empty, QualifierChip, Door, SectionLabel, shareWords, type SchedulePart } from "./parts";
+import { cap, Desc, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark, ScheduleTable, partShade, Lead, Empty, QualifierChip, TickerChip, Door, SectionLabel, shareWords, type SchedulePart } from "./parts";
 import { statusItems } from "@/src/data/nodeStatus";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { pickNetId } from "@/src/engine/domain/pickActions";
@@ -676,15 +676,8 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
 export function MetaTickerAside({ cfg }: { cfg: MetaCfg }) {
   if (!cfg.ticker) return null;
   return (
-    // A QUALIFIER CHIP in the network's own ink (the card skeleton, 2026-10-02): the ticker was
-    // bare hued text — one of seven things a head's right slot could be.
-    <QualifierChip
-      className={cn("font-semibold tracking-[0.02em]", IDENT_INK)}
-      // Unlisted stays neutral — same guard as MetaTitle above.
-      style={{ color: cfg.id === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(cfg.id) }}
-    >
-      {cfg.ticker}
-    </QualifierChip>
+    // The one ticker chip (`TickerChip`). Unlisted stays neutral — same guard as MetaTitle above.
+    <TickerChip text={cfg.ticker} hue={cfg.id === UNLISTED_ID ? UNLISTED_HUE : identityHudCss(cfg.id)} />
   );
 }
 

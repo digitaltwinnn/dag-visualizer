@@ -44,7 +44,7 @@ import { coLocatedNetworks, filterAccent, getAnchor, isAnchorSettling, metagraph
 import { midHash } from "@/src/util/format";
 import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
 import { SCENE_GLASS } from "@/components/selection";
-import { RoleChips, StatusMark } from "@/components/inspector/parts";
+import { RoleChips, StatusMark, TickerChip } from "@/components/inspector/parts";
 // The lead line's codes come from the composition vocabulary's ONE home, rendered by the cards'
 // own RoleChips (user, 2026-08-15: "look at my cards — square pills").
 import { layerCodesOf } from "@/src/data/composition";
@@ -123,21 +123,16 @@ export function CalloutPanel({ m, className }: { m: CalloutModel; className?: st
           on this row, and the anchor ring is the subject mark at the scene end of the tie. */}
       <div className="flex items-center gap-[7px]">
         <span className={cn("text-body font-semibold text-foreground", m.titleMono && "font-mono tabular-nums")}>{m.title}</span>
-        {m.aside && (
-          <span
-            className={
-              m.aside.hue
-                ? cn("text-label font-bold ml-1", IDENT_INK)
-                : "inline-flex items-center gap-1.5 text-label text-muted-foreground ml-1"
-            }
-            style={m.aside.hue ? { color: m.aside.hue } : undefined}
-          >
-            {m.aside.live && (
-              <LiveDot />
-            )}
+        {/* A hued aside is a TICKER beside a title, so it is the card head's own chip
+            (`TickerChip`, 2026-10-02); the un-hued one is a state line and stays text. */}
+        {m.aside && m.aside.hue ? (
+          <TickerChip text={m.aside.text} hue={m.aside.hue} className="ml-1" />
+        ) : m.aside ? (
+          <span className="inline-flex items-center gap-1.5 text-label text-muted-foreground ml-1">
+            {m.aside.live && <LiveDot />}
             {m.aside.text}
           </span>
-        )}
+        ) : null}
       </div>
       {/* The card grammar's HEAD HAIRLINE at callout scale (user, 2026-08-15 — "cards have an
           underline between header and the rest"): it divides the HEAD (eyebrow + title, whose

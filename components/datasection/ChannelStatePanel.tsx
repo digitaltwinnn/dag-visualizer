@@ -61,7 +61,7 @@ import { snapsAtTick } from "@/src/data/anchorLog";
 import { UNLISTED_HUE } from "@/src/data/unlisted";
 import { PAYLOAD_LANES, parsePayload, payloadKinds, stateSchema, unifyFieldKinds } from "@/src/data/payloadKinds";
 import { identityHudCss } from "@/src/palette/identity";
-import { CopyButton, FootRow, IdentityDot, RoleChips } from "@/components/inspector/parts";
+import { CopyButton, FootRow, IdentityDot, RoleChips, TickerChip } from "@/components/inspector/parts";
 import { fmtDag, fmtKB, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import JsonTree, { type JsonTreeCmd } from "@/components/datasection/JsonTree";
@@ -568,7 +568,9 @@ export function ChannelStatePanel() {
         <span className="text-label tracking-caps uppercase text-muted-foreground">Metagraph snapshot</span>
         <span className="flex items-center gap-2 text-title font-semibold text-foreground">
           <IdentityDot hue={hue} />
-          {ticker} <span className="tabular-nums">{sel.ordinal.toLocaleString()}</span>
+          <span className="tabular-nums">{sel.ordinal.toLocaleString()}</span>
+          {/* The ordinal is the title; the network qualifies it — the one ticker chip. */}
+          <TickerChip text={ticker} hue={hue} />
         </span>
       </div>
 

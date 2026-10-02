@@ -5,8 +5,7 @@ import { INSTANT_ICON } from "@/components/icons";
 
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { Lead, FactGroup, UnitMarks, CUT_ROW } from "@/components/inspector/parts";
-import { IDENT_INK } from "@/components/identInk";
+import { Lead, FactGroup, UnitMarks, CUT_ROW, TickerChip } from "@/components/inspector/parts";
 import { Separator } from "@/components/ui/separator";
 import { SELECTED_ROW, selectionHue } from "@/components/selection";
 import { openRecords, spanOfWindow } from "@/components/trendDoors";
@@ -193,16 +192,18 @@ export default function TrendInstantPane({
                   </>
                 )}
                 </span>
-                <span
-                  className={cn("min-w-0 truncate text-right text-label font-normal text-muted-foreground", subject && IDENT_INK)}
-                  title={subject ? rows.get(subject)?.name : undefined}
-                  // The ticker in its network's hue (user, 2026-09-26) — the dossier aside's own rule.
-                  style={subject ? { color: rows.get(subject)?.hue } : undefined}
-                >
-                  {/* Under a filter the TICKER alone (user, 2026-09-26): the dossier above already
-                      names the network in full, and the lead line has one line's width. */}
-                  {subject ? (metagraphById(subject)?.ticker || rows.get(subject)?.name) : "Across the whole network"}
-                </span>
+                {/* Under a filter the TICKER alone, as the one chip (`TickerChip`, 2026-10-02): the
+                    dossier above names the network in full, and the lead line has one line's width. */}
+                {subject ? (
+                  <TickerChip
+                    text={metagraphById(subject)?.ticker || rows.get(subject)?.name || subject}
+                    hue={rows.get(subject)?.hue}
+                    title={rows.get(subject)?.name}
+                    className="self-center font-normal"
+                  />
+                ) : (
+                  <span className="min-w-0 truncate text-right text-label font-normal text-muted-foreground">Across the whole network</span>
+                )}
               </p>
 
               {/* ── DETAIL: every layer at the cursor ────────────────────────────────────────
