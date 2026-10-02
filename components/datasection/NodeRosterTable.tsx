@@ -146,9 +146,11 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
   };
 
   return (
-    <ScrollArea className="flex-1 min-h-0">
-      <Table>
-        <TableHeader className="sticky top-0 z-10 bg-[var(--panel-solid)] backdrop-blur-md">
+    // `max-[700px]:mt-8`: the phone list has no header row, which is what used to sit beside the
+    // panel's × — without the room the close mark covered the first row's right end.
+    <ScrollArea className="flex-1 min-h-0 max-[700px]:mt-8">
+      <Table className="max-[700px]:block max-[700px]:[&_tbody]:block max-[700px]:[&_tr]:grid">
+        <TableHeader className="sticky top-0 z-10 bg-[var(--panel-solid)] backdrop-blur-md max-[700px]:hidden">
           <TableRow className="border-border">
             {COLS[mode].map((c) => (
               <TableHead
@@ -215,9 +217,31 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
                 onClick={commit}
               >
                 {COLS[mode].map((c) => (
-                  <TableCell key={c.key} className={cn(c.phone === false && PHONE_HIDDEN)}>{cell(r, c.key)}</TableCell>
+                  <TableCell key={c.key} className={PHONE_HIDDEN}>{cell(r, c.key)}</TableCell>
                 ))}
-                <TableCell className="w-7">{selected && <SelectedRowMark hue={r.netId ? filterAccent(r.netId) : undefined} />}</TableCell>
+                <TableCell className={cn("w-7", PHONE_HIDDEN)}>{selected && <SelectedRowMark hue={r.netId ? filterAccent(r.netId) : undefined} />}</TableCell>
+                {/* TWO-LINE ROWS ON PHONE (user, 2026-10-02 — the anchor log's option E, "do E also
+                    for the other raw pages"). The table could only keep two or three columns
+                    there; a row is now WHO (network and node id, with the ✓) over one muted line
+                    of WHERE and WHAT — place, host, make-up — so nothing is stood down and nothing
+                    can be cut off at the edge. One layout for both views: on a phone the lens is
+                    the view the reader came from, not a column order. */}
+                <TableCell className="min-[700px]:hidden pb-0">
+                  <span className="flex items-center gap-3">
+                    {cell(r, "net")}
+                    {cell(r, "id")}
+                    <span className="ml-auto inline-flex w-3.5 flex-none">{selected && <SelectedRowMark hue={r.netId ? filterAccent(r.netId) : undefined} />}</span>
+                  </span>
+                </TableCell>
+                <TableCell className="min-[700px]:hidden pt-0 pb-2 text-label text-muted-foreground whitespace-normal">
+                  {[
+                    [r.node.city, r.node.country].filter(Boolean).join(", "),
+                    r.isp,
+                    compositionRows([{ roles: r.roles, layer: r.node.layer }])[0]?.label,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") || "—"}
+                </TableCell>
               </TableRow>
             );
           })}
