@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { shortHash } from "@/src/data/network";
 import { SCENE_GLASS } from "@/components/selection";
+import { TickerChip } from "@/components/inspector/parts";
 
 // Lean hover tooltip — a LABEL, not a mini-card: `‹name› ‹ticker›` + "click to inspect". Facts
 // live in the card that opens on click. Content comes from the store (engine raycast, set only
@@ -44,7 +45,8 @@ export default function Tooltip() {
       )}
     >
       <span className={cn("text-body font-semibold text-foreground", hover.mono && "font-mono text-label")}>{name}</span>
-      <span className="text-label font-bold" style={{ color: hover.color }}>{hover.ident}</span>
+      {/* The ticker beside a name is the one chip (`TickerChip`) — hover and commit are one species. */}
+      {hover.ident && <TickerChip text={hover.ident} hue={hover.color} className="self-center" />}
       <span className="text-muted-foreground text-label ml-[6px] opacity-75">click to inspect</span>
     </div>
   );

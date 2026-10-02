@@ -376,3 +376,12 @@ describe("railGapPx — the width of the free band a card is fitted to", () => {
     }
   });
 });
+
+describe("the rail mirror is fluid", () => {
+  it("the free gap narrows with the rails on a wide screen", () => {
+    // 2560: rails clamp to 340 + 400, gutters 26 each side.
+    expect(railGapPx(2560, false)).toBe(2560 - 52 - 340 - 400);
+    // 1440: both rails at their floors.
+    expect(railGapPx(1440, false)).toBe(1440 - 52 - 264 - 320);
+  });
+});

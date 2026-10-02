@@ -18,7 +18,7 @@ describe("STAGE_LIGHTS", () => {
   // emphasis on one bead rather than as a wash over its whole shell, so both are pinned.
   it("pins hyper's row, including its per-subject stages (core, hub, node)", () => {
     expect(STAGE_LIGHT_DEFAULTS.hyper).toEqual({
-      angle: 0.9, distance: 40, intensity: 2.4, intensityPaper: 5.5, penumbra: 0.25,
+      angle: 0.9, distance: 40, intensity: 0.6, intensityPaper: 5.5, penumbra: 0.25,
       height: 9, heightDag: 17, heightNode: 3.2, angleNode: 0.5,
     });
     // The ladder in numbers: the finer the subject, the lower and tighter its stage.

@@ -11,7 +11,8 @@ import OdometerDemo from "@/app/design/OdometerDemo";
 import EcgDemo from "@/app/design/EcgDemo";
 import { NodeStars, NoSignalDot, SonarRing, StandbyHalo } from "@/components/state/StateAtoms";
 import { SELECTED_ROW, SelectedRowMark, SCENE_GLASS } from "@/components/selection";
-import { RoleChips, StackedSchedule, partShade } from "@/components/inspector/parts";
+import { RoleChips, ScheduleTable, partShade, Lead, SectionLabel, Fact, FactGroup, Empty, QualifierChip, TickerChip, Door, Foot, FootRow } from "@/components/inspector/parts";
+import { ArrowUpRight } from "lucide-react";
 import ExplorerPath from "@/components/explorer/ExplorerPath";
 import { StateDot } from "@/components/explorer/nodeRow";
 
@@ -50,6 +51,7 @@ const STRUCTURAL: { name: string; var: string }[] = [
   { name: "muted-foreground", var: "--muted-foreground" },
   { name: "foreground-dim (2nd muted tone)", var: "--foreground-dim" },
   { name: "primary / accent (live cyan)", var: "--primary" },
+  { name: "primary-ink (the accent as text)", var: "--primary-ink" },
   { name: "destructive (warn / no-signal)", var: "--destructive" },
   { name: "warn-soft (banner amber)", var: "--warn-soft" },
   { name: "success (ready)", var: "--success" },
@@ -146,9 +148,12 @@ export default function DesignDoc() {
 
           <Section title="Type scale">
             <Note>
-              Four text sizes cover the whole interface — tiny uppercase tags, small labels,
-              body rows, and card titles. Every piece of text snaps to one of them, which is a
-              large part of why the panels read as one calm instrument rather than a collage.
+              Three text sizes cover the whole interface — labels, body rows and card titles —
+              plus one for the paragraphs of documents like this one. The three grow gently with
+              the width of the screen, so a large display gets larger type rather than more empty
+              space, and they stay at least two pixels apart so each step reads as a step. Every
+              piece of text snaps to one of them, which is a large part of why the panels read as
+              one calm instrument rather than a collage.
             </Note>
             <div className="flex flex-col gap-3">
               {TYPE_SCALE.map((t) => (
@@ -156,7 +161,7 @@ export default function DesignDoc() {
                   <span className={cn(t.cls, "text-foreground font-semibold w-40 flex-none")}>
                     The quick brown fox
                   </span>
-                  <code className="font-mono text-label text-primary flex-none">{t.cls}</code>
+                  <code className="font-mono text-label text-primary-ink flex-none">{t.cls}</code>
                   <span className="text-body text-muted-foreground">{t.role}</span>
                 </div>
               ))}
@@ -350,34 +355,103 @@ export default function DesignDoc() {
 
           <Section title="Partitions of one total">
             <Note>
-              When a card cuts one number several ways — a fleet by what its nodes run, by their
-              state, by how far back they keep the chain — each cut is one bar of the same total
-              with its parts named beneath it, so three cuts read as three views of one thing
-              rather than three tables.
+              When a card breaks a number down, it uses one table everywhere: a name, a count,
+              and a mark. The mark is one small square per countable thing — a node, a snapshot —
+              so the squares are both the bar and the colour key, and no legend is needed. A rate,
+              or a count too large to draw as squares, becomes a bar on the same row. A card that
+              cuts one number several ways names each cut in a leading column; a card with a
+              single cut drops that column.
             </Note>
             <div className="ig-panel p-[18px] w-[var(--detail-w)]">
-              <StackedSchedule
+              <ScheduleTable
                 axis="Composition"
                 parts={[
                   { label: "Hybrid", count: 3, color: partShade("var(--core)", 0) },
                   { label: "Data", count: 16, color: partShade("var(--core)", 1) },
                 ]}
               />
-              <StackedSchedule
+              <ScheduleTable
                 axis="Status"
                 parts={[
                   { label: "Ready", count: 17, color: "var(--success)" },
                   { label: "Joining", count: 2, color: "var(--warn-soft)" },
                 ]}
               />
-              <StackedSchedule
-                axis="Archive depth"
+              <ScheduleTable
+                axis="Depth" axisTitle="Archive depth — how far back each node's snapshot archive reaches"
                 parts={[
                   { label: "Full archive", count: 0, color: partShade("var(--muted-foreground)", 0) },
                   { label: "16 months", count: 3, color: partShade("var(--muted-foreground)", 1) },
                   { label: "Unknown", count: 16, color: partShade("var(--muted-foreground)", 2) },
                 ]}
               />
+            </div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 max-w-[calc(2*var(--detail-w)+12px)]">
+              {/* The same table past the countable limit: bars, never scaled squares. */}
+              <div className="ig-panel p-[18px]">
+                <ScheduleTable
+                  axis="Status"
+                  parts={[
+                    { label: "Ready", count: 128, color: "var(--success)" },
+                    { label: "Joining", count: 7, color: "var(--warn-soft)" },
+                  ]}
+                />
+              </div>
+              {/* One cut: the section label names it, so the table has no leading column. */}
+              <div className="ig-panel p-[18px]">
+                <SectionLabel label="Nodes" total={24} className="mb-1.5" />
+                <ScheduleTable
+                  parts={[
+                    { label: "Network one", count: 17, color: partShade("var(--core)", 0) },
+                    { label: "Network two", count: 7, color: "#c9824f" },
+                  ]}
+                />
+              </div>
+            </div>
+          </Section>
+
+          <Section title="Inside a card">
+            <Note>
+              Every card in the right-hand rail is built from the same few pieces, in the same
+              order: a head with one chip or status beside the title, a single sentence that says
+              what the thing is, a breakdown under a small caps label, plain facts with the label
+              on the left and the value on the right, any way out of the card as a full-width
+              row, and the identifiers at the foot. A card uses the pieces it has something to
+              say with and skips the rest. A missing value is always one dash, with the reason on
+              hover. The example is made up.
+            </Note>
+            <div className="ig-panel p-[18px] w-[var(--detail-w)] [--card-pad:18px]">
+              <div className="flex items-center gap-2">
+                <span className="text-title font-semibold text-foreground">Subject name</span>
+                <span className="ml-auto inline-flex items-center gap-1.5">
+                  <QualifierChip>qualifier</QualifierChip>
+                  <TickerChip text="TICKER" hue="#c9824f" />
+                </span>
+              </div>
+              <div className="mt-2 mb-2.5 border-t border-border" />
+              <Lead>One sentence, in dim ink: what this is to the card above it.</Lead>
+              <div className="mb-2 border-t border-border" />
+              <SectionLabel label="Section label" unit="per hour" total={42} className="mb-1.5" />
+              <ScheduleTable
+                parts={[
+                  { label: "A part", count: 30, color: "#c9824f" },
+                  { label: "Another", count: 12, color: partShade("#c9824f", 1) },
+                ]}
+              />
+              <div className="my-2 border-t border-border" />
+              <FactGroup>
+                <Fact label="A fact">its value</Fact>
+                <Fact label="A measured fact"><span className="font-mono">AS00000</span></Fact>
+                <Fact label="Nothing to report"><Empty why="The reason this value is absent" /></Fact>
+              </FactGroup>
+              <div className="mt-2.5">
+                <Door label="Door" onClick={() => {}} glyph={<ArrowUpRight className="size-3.5" />} flushFoot>
+                  a way out of the card
+                </Door>
+              </div>
+              <Foot>
+                <FootRow label="Id" value="0000aaaa0000bbbb…ccccdddd" copy="0000aaaa0000bbbb0000ccccdddd" copyName="id" />
+              </Foot>
             </div>
           </Section>
 
@@ -404,10 +478,10 @@ export default function DesignDoc() {
                 </svg>
                 <div className={cn("absolute whitespace-nowrap", SCENE_GLASS)} style={{ left: 62, bottom: 92 }}>
                   <span aria-hidden className="edge-spine opacity-70" style={{ ["--spine" as string]: "#c9824f" }} />
-                  <div className="text-label font-bold tracking-[0.1em] uppercase leading-none text-accent mb-1.5">Metagraph</div>
+                  <div className="text-label font-bold tracking-[0.1em] uppercase leading-none text-primary-ink mb-1.5">Metagraph</div>
                   <div className="flex items-center gap-[7px]">
                     <span className="text-body font-semibold text-foreground">Metagraph name</span>
-                    <span className="text-label font-bold ml-1" style={{ color: "#c9824f" }}>TICKER</span>
+                    <TickerChip text="TICKER" hue="#c9824f" className="ml-1" />
                   </div>
                   <div className="mt-1.5 pt-1.5 border-t border-border flex items-center gap-1.5 text-label text-muted-foreground">
                     <span>12 nodes</span>

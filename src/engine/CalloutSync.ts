@@ -51,6 +51,9 @@ export interface CalloutHost {
   layers: HyperView;
   mode: Mode;
   filter: string;
+  /** The network the LEDGER resolves against — the tick-local one inside its tick, else the
+   *  filter (`domain/tickNet.ledgerNetwork`). The byte-bar anchor points at ITS band. */
+  ledgerNet: string;
   transitionActive(): boolean;
   /** Is the camera mid-flight to a subject? The callout waits out the whole arrival. */
   flyingNow(): boolean;
@@ -364,7 +367,7 @@ export class CalloutSync {
   // row (user, 2026-08-16 — "the correct segment of the byte bar"); unfiltered, or when the
   // band isn't drawn (unmeasured tick), the bar's lead centre. Chamber-local (caller lifts).
   private _ledgerBarAnchor(v: THREE.Vector3): void {
-    const lens = ledgerLens(this.h.filter);
+    const lens = ledgerLens(this.h.ledgerNet);
     if (lens !== "all" && this.h.ledger.bandAnchor(lens, v)) return;
     this.h.ledger.calloutAnchor(null, v);
   }

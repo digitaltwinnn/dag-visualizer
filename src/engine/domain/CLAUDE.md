@@ -92,13 +92,35 @@ The design rules behind the table, which the tests pin but don't explain:
   The ledger contributes no ancestry. **Except the network, in Geography** (user, 2026-09-26): a geo
   node is a place first, and committing its network from a click emptied the globe and the country
   list down to one network mid-browse. There the ancestry is country → cohort → node and the filter
-  stays the top bar's own gesture; hyper keeps filter-first, and so does the ledger's node. **The
+  stays the top bar's own gesture; hyper keeps filter-first, and it is the ONLY view whose node does
+  (`viewPolicy.nodeCommitsNetwork`, pinned by its test — the ledger's node stopped on 2026-09-29). **The
   ledger's SNAPSHOT rows never set it either** (design session 2026-09-26, decision 13):
-  `metaSnapSelectActions` is tick → snapshot, so browsing a tick's anchors and picking one no longer
-  re-commits the app-wide filter.
-- **A filter is a story.** Pinning a global tick whose anchors don't include the committed network
-  releases the filter back to "all", so a network's dim never shapes a snapshot that has nothing to do
-  with it. The membership rule lives in `src/data/ledgerStory.ts`.
+  `metaSnapSelectActions` no longer re-commits the app-wide filter when you browse a tick's anchors
+  and pick one.
+- **The ledger has a network rung of its own: the network INSIDE a tick** (user, 2026-10-02 — "the
+  parent rung is incomplete… it should not actually set the metagraph as the global application
+  filter"). Between a global tick and a metagraph snapshot sits the Metagraph rung, and it used to
+  have no state but the filter — so decision 13 left it EMPTY under a committed snapshot, and the
+  pager's ∨ from the tick still "committed the filter as the step" (2026-09-15), re-scoping the
+  whole app from a card and dropping the pin on the way (a filter commit in the ledger re-enters
+  live). It is `store.tickNet` now — `{ metaId, globalOrdinal }`, carrying its tick so it can never
+  outlive it — and **`domain/tickNet.ledgerNetwork` is the ONE resolver every ledger surface
+  reads**: the rail's Metagraph rung and card, the chamber's coloured dim, the commit tilt, the
+  pager, the explorer row's committed state. The tick-local commit wins inside its tick; elsewhere
+  the filter. Full ancestry there is tick → network → snapshot (`metaSnapSelectActions`,
+  `bandSelectActions`, `tickNetSelectActions`), every one of which PINS the tick. Only the top
+  bar's picker and the Hypergraph's hub and rows set the filter; a ledger NODE never does
+  (`viewPolicy.nodeCommitsNetwork` is hyper's alone). A filter switch clears it (same rung, one commit
+  finer), and so does leaving the view.
+- **No selection in Snapshots writes the filter — not even to release it** (user, 2026-10-02:
+  "consistent, and a filter should not be changed from the explorer, so no reset also"). The old
+  "a filter is a story" rule (2026-08-07) reset the filter to "all" when a pinned tick held nothing
+  of the filtered network; it is retired, because rows reset the top bar while tiles and bands kept
+  it. A tick the lens has nothing in is SHOWN as that: the chamber dims, the explorer row is faint,
+  and the rail's Metagraph card stands down with a hint saying so (`tickNet.ledgerCardNetwork`) —
+  the global card's ∨ then steps into the tick's own first network. The global snapshot card's ×
+  is no exception (same day): it releases the pin and what hangs under the tick, never the filter.
+  Membership still lives in `src/data/ledgerStory.ts`.
 - **A committed ancestry rung borrows its members' glow only while it is the FINEST committed rung**
   (user, 2026-08-11). Every other rung has a 3D counterpart you could have clicked — the hub, the
   border, the chip; the **group** rungs (geo's provider cohort, hyper's composition group) have none,

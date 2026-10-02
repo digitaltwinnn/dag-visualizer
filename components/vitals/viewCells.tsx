@@ -407,9 +407,9 @@ function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: b
       {(monthly || weekly) && (
         <div className="flex justify-center gap-[2px] leading-none">
           {bars.map((b, i) => (
-            <span key={b.ts} className="flex-1 max-w-[22px] text-center text-label text-muted-foreground/70 lowercase whitespace-nowrap">
+            <span key={b.ts} className="flex-1 max-w-[22px] text-center text-label leading-none text-muted-foreground lowercase whitespace-nowrap">
               {weekly
-                ? new Date(b.ts).toLocaleString("en", { weekday: "short", timeZone: "UTC" })
+                ? new Date(b.ts).toLocaleString("en", { weekday: "short", timeZone: "UTC" }).slice(0, 2)
                 : (bars.length - 1 - i) % 2 === 0
                   ? new Date(b.ts).toLocaleString("en", { month: "short", timeZone: "UTC" })
                   : null}

@@ -27,8 +27,8 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 //    same cards there — VitalsSheetBody).
 //  - SHORT VIEWPORTS yield it too (2026-09-03, the landscape-phone look): a phone held sideways
 //    lands in the tablet tier at ~390px of height, where the bar + caption + band + footer left
-//    the scene 184px — under half the viewport. Below 500px of height the band stands down and
-//    the scene takes the 92px back; the vitals stay one rotation away. 500 clears every
+//    the scene well under half the viewport — under half the viewport. Below 500px of height the band stands down and
+//    the scene takes the band's reserve back; the vitals stay one rotation away. 500 clears every
 //    landscape phone and touches no tablet (the shortest, an iPad mini landscape, is 744).
 const RESERVE = 112; // --vitals-h (104px, globals.css) + 8px clearance above the band — keep the pair in step
 // (The History pills stood ABOVE the plate from 2026-09-26 and reserved 44px for it; since the

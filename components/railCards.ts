@@ -1,4 +1,6 @@
 import type { LucideIcon } from "lucide-react";
+import { ledgerCardNetwork } from "@/src/engine/domain/tickNet";
+import type { TickNetSel } from "@/src/data/types";
 import { EXPLORE_ICON, INSTANT_ICON, iconForPick } from "@/components/icons";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import type { Mode } from "@/src/store/store";
@@ -108,7 +110,7 @@ export function ladderSlotIds(mode: Mode): string[] {
  *  inputs (which can't change a slot's presence). */
 export type LadderState = Pick<
   RailManifestState,
-  "mode" | "filter" | "inspect" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "trendCursorMs"
+  "mode" | "filter" | "tickNet" | "tickHasFilter" | "inspect" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "trendCursorMs"
 > & {
   /** The store's selection recency (most-recent-FIRST) — the collapse rule reads it (item 8):
    *  the most recently selected present card is the ACTIVE one; the rest rest collapsed. */
@@ -169,6 +171,12 @@ export interface RailManifestState {
    *  Optional so every fine-pointer caller and test reads unchanged. */
   coarse?: boolean;
   filter: string;
+  /** The network committed INSIDE the pinned tick (ledger only) — fills the Metagraph rung there
+   *  without being the app filter (`domain/tickNet.ts`). Optional: every other view reads none. */
+  tickNet?: TickNetSel | null;
+  /** Ledger only: whether the FILTERED network anchored into the tick on screen. `false` stands
+   *  the Metagraph card down under that tick (`ledgerCardNetwork`); undefined = unknown. */
+  tickHasFilter?: boolean;
   inspect: PickDescriptor | null;
   snap: Extract<PickDescriptor, { kind: "snapshot" }> | null;
   /** How many nodes the current selection plots in geo (store.selNodes.length). */
@@ -263,6 +271,9 @@ function contextHint(s: RailManifestState): string | null {
   if (!is3D(s.mode)) return null;
   // No noun at all: the slot label reads "Metagraph" while the app's broader word is "network", and
   // this hint used to put BOTH in one line ("Metagraph — Pick a network…").
+  // The filter IS set, and its card stood down: this tick holds nothing of that network.
+  if (s.mode === "ledger" && s.filter !== "all" && s.snap && s.tickHasFilter === false && s.filterLabel)
+    return `${s.filterLabel} did not anchor into this snapshot.`;
   return "Pick one in the top-bar filter.";
 }
 function nodeHint(s: RailManifestState): string | null {
@@ -345,16 +356,24 @@ export function detailsCards(s: RailManifestState): RailCard[] {
   // restores the whole pile in place. Gated on the views the facts scope is FOR (convention 7),
   // and it matches what the left rail already does here — no tool card, so no card at all.
   if (!is3D(s.mode)) return [];
+  // IN THE LEDGER the Metagraph rung is the network the chamber resolves against — the one
+  // committed inside the pinned tick, else the app filter (`ledgerNetwork`; user, 2026-10-02: a
+  // snapshot row left this rung a ghost above its own snapshot card, because the rung had no
+  // state but the filter). Everywhere else it is the filter, as it always was.
+  const net =
+    s.mode === "ledger"
+      ? ledgerCardNetwork({ filter: s.filter, tickNet: s.tickNet ?? null, snapOrdinal: s.snap?.data.ordinal ?? null, tickHasFilter: s.tickHasFilter })
+      : s.filter;
   const context: RailCard = {
     id: "context",
     kind: "context",
     icon: iconForPick("meta"),
-    subjectKey: s.filter,
+    subjectKey: net,
     // Mirrors ContextCard's own branches: every non-"all" filter renders a card — catalog
     // metagraphs + "dag" via the dossier, "unlisted" via its honest pseudo-network pane
     // (2026-08-08; before that pane, unlisted left this slot a hole — present suppressed the
     // ghost while the card self-nulled).
-    present: s.filter !== "all",
+    present: net !== "all",
     hint: contextHint(s),
   };
   const instant: RailCard = {

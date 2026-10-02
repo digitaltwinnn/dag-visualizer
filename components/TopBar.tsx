@@ -300,7 +300,7 @@ export default function TopBar() {
             className={cn(
               "text-label tracking-caps uppercase max-[940px]:hidden",
               "transition-colors duration-150 motion-reduce:transition-none",
-              strip === "filter" ? "text-primary" : "text-muted-foreground",
+              strip === "filter" ? "text-primary-ink" : "text-muted-foreground",
             )}
           >
             Filter
@@ -367,7 +367,7 @@ export default function TopBar() {
           <span
             className={cn(
               "text-label tracking-caps uppercase transition-colors duration-150 motion-reduce:transition-none",
-              strip === "views" ? "text-primary" : "text-muted-foreground",
+              strip === "views" ? "text-primary-ink" : "text-muted-foreground",
             )}
           >
             View

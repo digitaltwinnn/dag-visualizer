@@ -11,6 +11,7 @@ import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { compositionGroups } from "@/src/data/composition";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import CardHead, { RailPane } from "@/components/CardHead";
+import { useTickHasFilter } from "@/components/useTickHasFilter";
 import InspectorCard from "@/components/InspectorCard";
 import ContextCard from "@/components/ContextCard";
 import RailThread from "@/components/RailThread";
@@ -341,6 +342,7 @@ export default function Inspector() {
   const inspect = useStore((s) => s.inspect);
   const snap = useStore((s) => s.snap);
   const metaSnap = useStore((s) => s.metaSnap);
+  const tickNet = useStore((s) => s.tickNet);
   const country = useStore((s) => s.country);
   const cohort = useStore((s) => s.cohort);
   const composition = useStore((s) => s.composition);
@@ -368,8 +370,9 @@ export default function Inspector() {
   const selNodes = useStore((s) => s.selNodes);
   const coarse = usePointerCoarse();
   const trendCursorMs = useStore((s) => s.trendCursorMs);
+  const tickHasFilter = useTickHasFilter();
   const manifest = detailsCards({
-    mode, filter, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs,
+    mode, filter, tickNet, tickHasFilter, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs,
     selNodesCount: selNodes.length,
     filterLabel: displayNetwork(filter)?.ticker ?? null, // one lookup — catalog + the unlisted pseudo-network
   });
@@ -556,7 +559,7 @@ export default function Inspector() {
       <CardPane key="node" pick={{ kind: "geoLive" }} eyebrow="Node" onClose={() => applyClickActions([{ kind: "inspect", pick: null }])} {...cx("node")} />
     ),
     snap: snap ? (
-      <CardPane key="snap" pick={snap} eyebrow="Global snapshot" onClose={() => applyClickActions(snapshotClearActions({ metaSnap, filter, hasInspect: inspect != null }))} {...cx("snap")} />
+      <CardPane key="snap" pick={snap} eyebrow="Global snapshot" onClose={() => applyClickActions(snapshotClearActions({ metaSnap, hasInspect: inspect != null, tickNet }))} {...cx("snap")} />
     ) : null,
     // History's committed INSTANT: a card slot with no ladder rung, so its × clears its own
     // channel and nothing cascades. It is NOT a selection write (`setTrendCursor` is deliberately

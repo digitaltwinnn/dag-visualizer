@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 
 import Explorer, { type ExplorerLevelSpec, type ExplorerRowSpec } from "@/components/explorer/Explorer";
 import { NODE_GLYPH_W, nodeRowSpec, unknownNodeRowSpec } from "@/components/explorer/nodeRow";
@@ -29,12 +30,14 @@ import {
   SNAP_MEASURES,
   TICK_NET_MEASURES,
 } from "@/src/data/ledgerMeasure";
-import { ledgerLens, storyCount, tickInStory } from "@/src/data/ledgerStory";
+import { ledgerLens, storyCount } from "@/src/data/ledgerStory";
 import { filterAccent, getAnchor, getNetwork, metagraphById, resolveSigner, SIGNER_GROUPS, SIGNER_UNKNOWN, snapshotSigners } from "@/src/data/network";
 import { metaSnapHoverKey, type GlobalSnapshot, type NodeRow, type SnapshotExact } from "@/src/data/types";
 import { displayNetwork, LISTED_IDS, UNLISTED_HUE, UNLISTED_ID, UNLISTED_LABEL, unlistedLog } from "@/src/data/unlisted";
 import { POLL } from "@/src/engine/config";
-import { metaSnapSelectActions, nodeSelectActions, sameMetaSnap, snapshotSelectActions } from "@/src/engine/domain/pickActions";
+import { followToggleActions, metaSnapSelectActions, nodeSelectActions, sameMetaSnap, snapshotSelectActions } from "@/src/engine/domain/pickActions";
+import { heldTicks, nextHoldTop } from "@/src/data/ledgerHold";
+import LiveDot from "@/components/LiveDot";
 import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
@@ -174,6 +177,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const following = useStore((s) => s.following);
   const live = useStore((s) => s.live);
   const metaSnap = useStore((s) => s.metaSnap);
+  const tickNet = useStore((s) => s.tickNet);
   const snapshotExact = useStore((s) => s.snapshotExact);
   const selNodes = useStore((s) => s.selNodes);
   const metaList = useStore((s) => s.metaList); // co-location reads the full catalog (nodeRowSpec)
@@ -209,7 +213,21 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // ⚠️ THE LENS DIMS, IT DOES NOT EDIT — the tick list is always the whole retained window (user,
   // 2026-09-14: a list whose LENGTH depended on the filter kept answering "how much is there?"
   // differently). Page 1 is the live page and the only one that moves under the reader.
-  const orderedSnaps = [...snaps].reverse(); // newest first, the log convention
+  //
+  // ⚠️ …AND IT HOLDS STILL WHILE A TICK IS PINNED (user, 2026-10-02 — `src/data/ledgerHold.ts`).
+  // Newest-first, every live tick pushed each row down a place, so a pinned row walked off the
+  // page while it was being read; the scene already holds its pinned row at the front. The head
+  // freezes at the newest tick on screen at the moment of the pin, the ticks that arrive meanwhile
+  // are COUNTED rather than listed, and one control on the heading row resumes live. The frozen
+  // head is state derived during render, so it lands in the same commit as the pin.
+  // A pin the rolling buffer has evicted holds nothing (`heldTicks` lets go there), so the frozen
+  // head is released WITH it — kept, a later pin would inherit a stale head and cut the list.
+  const pinnedOrd = !following && snap && snaps.some((x) => x.ordinal === snap.data.ordinal) ? snap.data.ordinal : null;
+  const [holdTop, setHoldTop] = useState<number | null>(null);
+  const wantTop = nextHoldTop(holdTop, pinnedOrd, snaps.length ? snaps[snaps.length - 1].ordinal : null);
+  if (wantTop !== holdTop) setHoldTop(wantTop);
+  const held = heldTicks(snaps, wantTop, pinnedOrd);
+  const orderedSnaps = [...held.ticks].reverse(); // newest first, the log convention
   const activeSnapOrd = snap?.data.ordinal ?? null;
   const [tickPage, setTickPage] = useState(1);
   // The path's first step, declared here because the page size reads it: the fit measures only
@@ -275,17 +293,9 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const tick = openTick != null ? orderedSnaps.find((d) => d.ordinal === openTick) ?? null : null;
   const exact = tick ? snapshotExact[tick.ordinal] : undefined;
 
-  // ---- the card's LIVE / PINNED state (user, 2026-08-07 — the ONE explicit way to see and toggle
-  // the follow state). It rode the list's heading row as the level's setting (design 2026-09-26,
-  // decision 15) until 2026-09-28, when it moved to the CARD HEAD's aside WITH ITS AGE (user: "move
-  // it to the header and show age also, just like the snapshot card on the right rail"): it is a
-  // state of the whole card on every level, and the age says how fresh "live" is — the right
-  // rail's `live · 8s` counter, ticking, so the two surfaces speak one clock.
-  // Hovering ANY snapshot — a row, a scene tile — PREVIEWS the pinned state it would enter (hollow
-  // dot, dashed). The write goes through `followToggleActions` + the one executor. ----------------
-  // The LIVE / PINNED switch — one component with the global snapshot card's aside
-  // (`components/FollowControl.tsx`); the explorer adds the hover preview. `-mr-1.5` hangs the
-  // pill's padding into the head's gutter so its text aligns with the rows' right edge.
+  // The LIVE / PINNED state is the global snapshot CARD's alone (B1, user 2026-10-02 —
+  // `components/FollowControl.tsx`); the scene callout mirrors it and this explorer no longer
+  // carries the pill or its hover preview.
 
   // ---- level 0: the ticks, paged, measured by the heading's pick -------------------------------
   const tickValues = pagedSnaps.map((d) => tickMeasureValue(ledgerMeasure, d, snapshotExact[d.ordinal]));
@@ -313,6 +323,21 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         },
       },
       measure: { options: LEDGER_MEASURE_OPTIONS, value: ledgerMeasure, onPick: (id) => setLedgerMeasure(id as LedgerMeasure) },
+      // The held list's ONE control: how many ticks arrived behind the pin, and the way back to
+      // them. It is the follow switch (`followToggleActions` through the one executor) — the same
+      // write the card's own pill makes — shown here only while there is something to resume to.
+      setting:
+        held.newer > 0 && snap ? (
+          <button
+            type="button"
+            title={`${held.newer} snapshot${held.newer === 1 ? "" : "s"} arrived since this one was pinned. Follow live again.`}
+            onClick={() => applyClickActions(followToggleActions(snap, false))}
+            className="inline-flex items-center gap-1.5 rounded-sm px-1.5 -mr-1.5 py-[3px] min-h-6 text-label text-foreground whitespace-nowrap cursor-pointer select-none hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
+          >
+            <LiveDot />
+            <span className="tabular-nums">{held.newer}</span> newer
+          </button>
+        ) : undefined,
       hasFigure: true,
       // A 4-decimal fee ("0.0680") needs the wider figure column; the width holds across the
       // level's measures so the columns never shift when the heading's pick changes.
@@ -322,7 +347,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         const count = tickFilterCount(d);
         const v = tickValues[i];
         const globalPick = { kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d } as const;
-        const tickHasFilter = tickInStory(filter, getAnchor(d.timestamp), snapshotExact[d.ordinal]);
         const on = d.ordinal === activeSnapOrd;
         return {
           key: String(d.ordinal),
@@ -342,8 +366,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
               snapshotSelectActions(globalPick, latestRelevant("all")?.ordinal === d.ordinal, {
                 pinnedOrdinal: !following && snap ? snap.data.ordinal : null,
                 metaSnap,
-                filter,
-                tickHasFilter,
+                tickNet,
               }),
             );
             // Re-clicking the PINNED tick releases it (the builder's toggle) — the path closes
@@ -420,7 +443,11 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           figure: m.text,
           // The row IS a committed subject when its band is the live selection: this network's
           // filter on this tick, with no finer snapshot pinned under it (the byte bar's band click).
-          on: filter === n.id && activeSnapOrd === tick.ordinal && metaSnap == null,
+          // …or the network committed INSIDE this tick (the pager's ∨, a band — 2026-10-02).
+          on:
+            ledgerNetwork({ filter, tickNet, snapOrdinal: activeSnapOrd ?? null }) === n.id &&
+            activeSnapOrd === tick.ordinal &&
+            metaSnap == null,
           // Out of the lens: listed (it really did anchor here), not drillable.
           faint: lensedOut,
           title: lensedOut

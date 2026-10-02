@@ -700,7 +700,7 @@ second row was their first phone home and was retired the same day, because ridi
 one grow-downward slot surfaced them under WHICHEVER strip opened, the pulse strip included).
 Presence and
 reserved space can't drift once hydrated; the token's static default in `globals.css` is the band's
-own reserve (**`92px`**), matching the BOOT state (hyper's lane is on, SSR assumes desktop) so the
+own reserve (**`112px`**), matching the BOOT state (hyper's lane is on, SSR assumes desktop) so the
 rails keep clear of the band before the effect runs. The SCENE⇄HUD toggle is the one `railsHidden`
 writer, and it clears its own state when the viewport drops below 1100px — below that the control is
 CSS-hidden and SCENE has no meaning, so a stuck `true` would strand the band and the camera's
@@ -807,6 +807,11 @@ inline in the return would quietly restore the bug for every consumer at once.
   nothing three times): one dimmed "Coming soon" bar entry, one FLAT policy row, and the
   Blueprint GALLERY inside it previews every coming feature (each keeping the mark it wore as a
   bar button). A future placeholder is a gallery entry, not a Mode.
+  **The gallery is DRAWINGS ONLY on a loose table** (user, 2026-10-02 — option B of
+  `docs/superpowers/design/2026-10-02-soon-gallery`): no names, icons or captions, the wireframes
+  at different sizes and slightly turned with empty dashed frames among them, so nothing reads
+  as first — a captioned row was a roadmap. Static, takes no pointer events; a tall arrangement
+  on phone keeps clear of the parked node columns.
 - **The doc pages' one door is the footer's About · Design row** (2026-09-28 — user: "doc pages
   are not settings"; they rode the SettingsMenu as a Pages section from 2026-09-08 until then,
   and `InfoMenu.tsx` retired with it). The in-view ABOUT row in the bar is orientation for the
@@ -941,7 +946,7 @@ px (ExplorerRow's figure column, the ghost rung's eyebrow column). `text-prose` 
 the doc overlay's paragraphs ONLY; a card's description stays `text-body`. The rail widths (`--rail-w`,
 `--detail-w`) and the vitals band (`--vitals-h`, paired with BottomStream's `RESERVE`) grew with it.
 **The accent is a glow, `--primary-ink` is the accent as TEXT**: links, eyebrows and tickers set in
-the accent take `text-primary-ink` (the accent itself on dark; two-thirds toward black on paper, where
+the accent take `text-primary-ink` (the accent itself on dark; a third toward black on paper, where
 the bare accent measured 2.3–3.1:1). **An identity hue set as TEXT takes `IDENT_INK`** (`components/identInk.ts`): it
 re-points `--ident-l` to `--ident-ink-l` on that element — 0.48 on paper, the lane's own 0.74 on dark —
 because the lane's L is a MARK's lightness and a ticker in it measured 3.2:1. Dots, bars and icons keep
@@ -1024,14 +1029,32 @@ grammar everywhere: label left, value right, one line.** The stacked micro-upper
 form is retired — it cost two lines per fact and read as a form, not an instrument. Its last survivor was
 the `Composition` label over the dossier's composition table, which outlived the sweep only because that
 table isn't a `Fact`; dropped 2026-08-10, since each row already names its own composition and without it
-the description above reads as the card's lead. **The dossier's BREAKDOWN is the one place a label leads its value** (2026-09-26,
-`dossier-breakdown.html` A): under the "Online nodes" disclosure, three STACKED BARS — composition
-in the network's hue, status in the bucket colours, archive depth in the neutral — each one bar of
-the same total with the axis word to its left and the parts named beneath (`StackedSchedule`,
-`inspector/parts.tsx`). They replaced three captioned tables under hairlines, which read as three
-sections rather than three cuts of one fleet. A zero-count part draws no segment and is named
-muted; the chips and depth tags ride the parts' titles. "Archive depth", not "archive" — it is how
-far back a node's archive reaches, not a size.
+the description above reads as the card's lead. **THE BREAKDOWN IS ONE TABLE, ON EVERY CARD THAT HAS ONE** (user, 2026-10-02 —
+`docs/superpowers/design/2026-10-02-right-rail-cards/`, D2 then `visuals.html`): rows of **name ·
+count · mark**, where the mark is one SQUARE per countable thing (a node, an anchored snapshot) and
+a BAR for a rate or a cut above 60 — never both in one cut, no dots, no legend. The dossier's three
+cuts (composition in the network's hue, status in the bucket colours, archive depth in the neutral)
+carry the cut's name in a leading column (`ScheduleTable` with an `axis`); a card with ONE cut drops
+that column because its section label names it (`CUT_ROW` — the global snapshot's anchored rows, the
+Moment's readings, a provider's and a country's nodes by network; the composition card is a plain
+fact card — its strip and status row were built and removed the same day). Rows that are their own controls wear `CUT_ROW` themselves and
+draw `UnitMarks`, so every card shares the columns. It replaced the stacked bars with a wrapping dot
+legend, the dot · name · track · count rows and the inline network dots — three recipes. A zero part
+is a muted row with no mark. The node card is a record and carries one mark only: the archive REACH
+bar, the share of its chain's ordinals it still serves (`archiveReach`, `components/useArchive.ts`).
+
+**Every right-rail card is the same SIX SLOTS in one order** (user, 2026-10-02 — the design and its
+deviations are in `docs/superpowers/design/2026-10-02-right-rail-cards/`): **head · lead · breakdown
+· facts · doors · foot + pager**, and a card uses the slots it has content for. The primitives beside
+`Fact` and `Foot` in `inspector/parts.tsx` are the one way to draw each: `Lead` (the one dim sentence
+a card says first, two lines at most — what the subject is to its parent), `SectionLabel` (a caps
+label with the section's one headline figure on the right), `Empty` (the ONE empty value: a dash,
+the reason on hover — the cards used to say "not known", "none" and "n/a"), `QualifierChip` and
+`Door`. Three rules ride them: **a head's aside is a qualifier chip or a state pill**, never bare
+text, a relation or an age (those are the lead's); **facts are regular weight** (the headline figure
+lives on the section label); **every way out of a card is a `Door`** — a full-bleed row on the wash
+ladder. The lead still obeys the pile rule: a piece an ancestor card states is left out, and a lead
+with nothing left to say is omitted rather than filled.
 
 Three weights, and a fact's weight is a claim about what the card is FOR:
 

@@ -98,6 +98,36 @@ describe("applyClickActions", () => {
   });
 });
 
+describe("tickNet action (the network inside a tick)", () => {
+  it("maps to the tickNet channel — and to NOTHING else: never the filter, never the follow state", () => {
+    const st0 = useStore.getState();
+    st0.setFollowing(false);
+    const sel = { metaId: "dor", globalOrdinal: 42 };
+    applyClickActions([{ kind: "tickNet", sel }]);
+    const st = useStore.getState();
+    expect(st.tickNet).toEqual(sel);
+    expect(st.filter).toBe("all");
+    expect(st.following).toBe(false);
+    applyClickActions([{ kind: "tickNet", sel: null }]);
+    expect(useStore.getState().tickNet).toBeNull();
+  });
+
+  it("is the rail's NETWORK slot, like a committed filter (the Metagraph card's recency)", () => {
+    applyClickActions([{ kind: "tickNet", sel: { metaId: "dor", globalOrdinal: 42 } }]);
+    expect(useStore.getState().selStack).toContain("network");
+    applyClickActions([{ kind: "tickNet", sel: null }]);
+    expect(useStore.getState().selStack).not.toContain("network");
+  });
+
+  it("re-committing the same network in the same tick is a no-op reference (no second camera move)", () => {
+    applyClickActions([{ kind: "tickNet", sel: { metaId: "dor", globalOrdinal: 42 } }]);
+    const first = useStore.getState().tickNet;
+    applyClickActions([{ kind: "tickNet", sel: { metaId: "dor", globalOrdinal: 42 } }]);
+    expect(useStore.getState().tickNet).toBe(first);
+    applyClickActions([{ kind: "tickNet", sel: null }]);
+  });
+});
+
 describe("metaSnap action", () => {
   it("applies a metaSnap action to exactly the metaSnap channel", () => {
     const sel = { metaId: "DAG0", ordinal: 7, hash: "h", globalOrdinal: 42, ts: "t" };

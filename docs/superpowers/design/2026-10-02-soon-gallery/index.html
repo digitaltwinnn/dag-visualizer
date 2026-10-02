@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Coming soon — drawings only</title>
+<style>
+:root{--bg:oklch(0.09 0.02 265);--fg:oklch(0.94 0.02 255);--dim:#c7d0ea;--muted:oklch(0.66 0.04 265);--primary:oklch(0.88 0.13 195);
+--border:rgba(90,140,255,.22);--label:12.6px;--body:14.9px;
+--cell:color-mix(in oklch,var(--primary) 40%,var(--border));--flow:color-mix(in oklch,var(--primary) 55%,transparent);--sel-bg:color-mix(in oklch,var(--primary) 12%,transparent);--sel-border:color-mix(in oklch,var(--primary) 52%,transparent)}
+*{box-sizing:border-box}html{color-scheme:dark}
+body{margin:0;background:var(--bg);color:var(--fg);font:var(--body)/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:32px 40px 96px}
+h1{font-size:24px;font-weight:600;margin:0 0 6px}h2{font-size:18px;font-weight:600;margin:48px 0 4px;display:flex;gap:10px;align-items:baseline}h2 b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;font-size:var(--label)}
+p.lede{color:var(--dim);max-width:84ch;margin:0 0 6px}.note{color:var(--muted);font-size:var(--label);max-width:88ch;margin:4px 0}
+.pc{display:flex;gap:28px;flex-wrap:wrap;font-size:var(--label);color:var(--dim);margin-top:10px;max-width:1000px}.pc div{flex:1;min-width:260px}.pc b{color:var(--fg)}
+.rec{border:1px solid var(--sel-border);background:var(--sel-bg);border-radius:8px;padding:10px 14px;font-size:var(--label);margin-top:28px;max-width:92ch}.rec b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;font-size:11.6px;margin-right:8px}
+/* the stage: the app's flat view. The parked node grids hold the top band; the gallery owns the rest. */
+.stage{position:relative;width:1000px;max-width:100%;aspect-ratio:16/9;margin-top:14px;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:radial-gradient(900px 420px at 50% 0%,#0b1230 0%,#04060f 70%)}
+.bar{position:absolute;left:14px;right:14px;top:10px;height:26px;border:1px solid var(--border);border-radius:8px;background:rgba(12,16,32,.8)}
+.foot{position:absolute;left:0;right:0;bottom:0;height:16px;border-top:1px solid var(--border);background:rgba(12,16,32,.6)}
+.fleet{position:absolute;left:8%;right:8%;top:11%;height:22%;opacity:.5;background-image:radial-gradient(circle,rgba(110,170,255,.75) 1.3px,transparent 1.7px);background-size:9px 9px;-webkit-mask:linear-gradient(90deg,#000 0 38%,transparent 38% 42%,#000 42% 58%,transparent 58% 61%,#000 61% 70%,transparent 70% 73%,#000 73% 80%,transparent 80% 83%,#000 83% 100%)}
+.area{position:absolute;left:0;right:0;top:38%;bottom:16px}
+svg.art{overflow:visible}
+.c{fill:none;stroke:var(--cell);stroke-width:1.25}.w{stroke-dasharray:3 3;stroke:var(--flow)}.o{stroke:var(--border);opacity:.5}
+.f{fill:none;stroke:var(--flow);stroke-width:1.25;stroke-dasharray:4 4}.v{fill:none;stroke:color-mix(in oklch,var(--primary) 45%,var(--border));stroke-width:1.5}
+.s{fill:color-mix(in oklch,var(--primary) 45%,transparent)}.d{stroke:var(--border);stroke-width:1}
+.slot{fill:none;stroke:color-mix(in oklch,var(--primary) 38%,var(--border));stroke-width:1.5;stroke-dasharray:5 6}
+/* A — a row, plus empty frames */
+.A{display:flex;align-items:center;justify-content:center;gap:4.5%;height:100%;padding:0 5%}.A>*{flex:0 0 auto;width:17%;opacity:.75}
+/* B — a loose table */
+.B{position:relative;height:100%}.B>*{position:absolute;opacity:.75}
+/* C — a ring */
+.C{position:relative;height:100%}.C .it{position:absolute;width:15%;opacity:.75;transform:translate(-50%,-50%)}
+.C .orbit{position:absolute;left:50%;top:50%;width:68%;height:56%;border:1px dashed var(--border);border-radius:50%;transform:translate(-50%,-50%)}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* D — one at a time, shuffled */
+.D{position:relative;height:100%}.D>*{position:absolute;left:50%;top:50%;width:300px;transform:translate(-50%,-50%);opacity:0;transition:opacity 1.4s ease}.D>.on{opacity:.8}
+.D .dots{left:50%;top:auto;bottom:6%;width:auto;display:flex;gap:9px;opacity:.7;transform:translateX(-50%)}.D .dots i{width:5px;height:5px;border-radius:50%;border:1px solid var(--flow)}
+@media (prefers-reduced-motion:reduce){.D>*{transition:none}}
+</style></head><body>
+<h1>Coming soon — the drawings, no words</h1>
+<p class="lede">Today the view shows three wireframes, each with a name, an icon and a sentence, in a fixed left-to-right order. That reads as a roadmap: three named features, in this order. The goal here is the opposite claim: <b>more is coming, and nothing says what comes first.</b> Four ways to say that with the drawings alone.</p>
+<p class="note">Each frame is the flat view at 16:9: the command bar, the parked node grids in the top band (they stay, as today), and the gallery in the space below. The three drawings are the app's own. Nothing here is built.</p>
+<div id="out"></div>
+<div class="rec"><b>Recommend</b> B, the loose table. It is the only one where the layout itself says "unordered": no row to read left to right, no first position, different sizes that rank nothing. The empty dashed frames say "and more" without naming anything. It is also static, so it costs nothing in motion and needs no reduced-motion variant. C says the same thing with a circle but spends permanent motion on a page whose message is "nothing here yet". D is the calmest, but one drawing at a time hides that there are several.</div>
+<div class="rec" style="border-color:var(--border);background:transparent"><b>Your call</b> (a) Which layout. (b) Whether the empty dashed frames stay: they are what says "more than these three", but they are also the only made-up element. (c) Whether a drawing keeps its hover tooltip with the feature's name, for anyone who wonders what it is, or stays fully silent.</div>
+
+<script>
+const net=()=>{let r='';for(let y=0;y<4;y++)for(let x=0;x<8;x++){const i=y*8+x;r+=`<rect x="${x*26}" y="${y*26}" width="14" height="14" rx="3" class="c ${i==9||i==22?'w':''} ${i==17?'o':''}"/>`}return `<svg class="art" viewBox="-6 -6 208 104">${r}</svg>`};
+const tx=()=>{const n=[[20,30],[120,16],[210,54],[70,96],[168,110],[30,150],[140,168]],e=[[0,1],[1,2],[0,3],[3,4],[4,2],[3,5],[5,6],[6,4]];
+ return `<svg class="art" viewBox="0 0 230 190">${e.map(([a,b])=>`<line x1="${n[a][0]}" y1="${n[a][1]}" x2="${n[b][0]}" y2="${n[b][1]}" class="f"/>`).join('')}${n.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="7" class="c"/>`).join('')}</svg>`};
+const st=()=>{const v=[[70,60,16],[170,120,13]],s=[[14,20,0],[20,96,0],[120,22,0],[220,60,1],[210,170,1],[110,176,1],[60,150,0]];
+ return `<svg class="art" viewBox="0 0 230 190">${s.map(p=>`<line x1="${p[0]}" y1="${p[1]}" x2="${v[p[2]][0]}" y2="${v[p[2]][1]}" class="d"/>`).join('')}${s.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" class="s"/>`).join('')}${v.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="${p[2]}" class="v"/>`).join('')}</svg>`};
+const empty=(w=200,h=130)=>`<svg class="art e" viewBox="0 0 ${w} ${h}"><rect x="1" y="1" width="${w-2}" height="${h-2}" rx="10" class="slot"/></svg>`;
+const wrap=(s,css)=>`<div style="${css}">${s}</div>`;
+const V={
+ A:()=>`<div class="A">${wrap(net(),'')}${wrap(tx(),'')}${wrap(st(),'')}${wrap(empty(),'')}${wrap(empty(),'')}</div>`,
+ B:()=>`<div class="B">
+   ${wrap(tx(),'left:9%;top:10%;width:23%;transform:rotate(-4deg)')}
+   ${wrap(net(),'left:39%;top:36%;width:27%;transform:rotate(2deg)')}
+   ${wrap(st(),'left:71%;top:6%;width:19%;transform:rotate(5deg)')}
+   ${wrap(empty(200,120),'left:22%;top:66%;width:13%;transform:rotate(3deg);opacity:.6')}
+   ${wrap(empty(160,130),'left:74%;top:60%;width:11%;transform:rotate(-6deg);opacity:.6')}
+   ${wrap(empty(150,100),'left:47%;top:4%;width:9%;transform:rotate(-2deg);opacity:.5')}</div>`,
+ C:()=>{const items=[net(),tx(),st(),empty(),empty()];
+   return `<div class="C" data-ring><div class="orbit"></div>${items.map((x,i)=>`<div class="it" style="${i>2?'opacity:.55':''}">${x}</div>`).join('')}</div>`},
+ D:()=>`<div class="D" data-shuffle>${wrap(net(),'')}${wrap(tx(),'')}${wrap(st(),'')}<div class="dots on"><i></i><i></i><i></i><i></i><i></i></div></div>`
+};
+const T={
+ A:['A row, with empty frames','The same three, same size, on one line, with two empty dashed frames after them. The smallest change from today: remove the words, add the frames.',['Closest to what exists.','The empty frames say "more" plainly.'],['Still a row: it reads left to right, so the first drawing still looks first.','The frames at the end read as "later", which is an order.']],
+ B:['B loose table','The drawings laid out like sketches on a table: different sizes, slightly turned, no shared baseline, with a few empty frames among them rather than after them.',['No row and no first place: the layout itself says "not ordered yet".','Sizes differ without ranking anything.','Static.'],['Deliberately untidy, in an app that is otherwise on a grid.','Needs its own arrangement for a narrow screen.']],
+ C:['C ring','The drawings sit on one slow orbit (a turn takes a minute and a half). A circle has no start and no end.',['Says "no order" with a familiar shape, and echoes the Hypergraph view\'s own orbits.','Tidy.'],['Permanent motion on a page with nothing to watch.','The orbit could be read as a scene, as if it were live.','The front position still looks like "next" at any given moment.']],
+ D:['D one at a time','One drawing in the centre, cross-fading to another in random order every few seconds. The row of small rings underneath says there are several without saying which is showing.',['The calmest and the largest drawing.','A random order is literally the message.'],['You see one thing at a time, so "several things are coming" takes a while to land.','The rings underneath look like a carousel control and are not one.']]
+};
+// a mock stage the art sits in
+const stage=k=>`<div class="stage"><div class="bar"></div><div class="fleet"></div><div class="area">${V[k]()}</div><div class="foot"></div></div>`;
+document.getElementById('out').innerHTML=Object.keys(V).map(k=>`<h2><b>${T[k][0].split(' ')[0]}</b>${T[k][0].split(' ').slice(1).join(' ')}</h2><p class="lede">${T[k][1]}</p>${stage(k)}<div class="pc"><div><b>For</b> ${T[k][2].join(' ')}</div><div><b>Against</b> ${T[k][3].join(' ')}</div></div>`).join('');
+// C: the items travel one ellipse, upright; a full turn takes 90s (still under reduced motion)
+document.querySelectorAll('[data-ring]').forEach(el=>{const its=[...el.querySelectorAll('.it')];const still=matchMedia('(prefers-reduced-motion:reduce)').matches;
+ const place=t=>its.forEach((it,i)=>{const a=(i/its.length+t/90000)*Math.PI*2;it.style.left=50+Math.cos(a)*34+'%';it.style.top=50+Math.sin(a)*28+'%'});
+ const tick=t=>{place(t);if(!still)requestAnimationFrame(tick)};tick(0)});
+// D: shuffle
+document.querySelectorAll('[data-shuffle]').forEach(el=>{const items=[...el.children].filter(c=>!c.classList.contains('dots'));let cur=-1;
+ const step=()=>{let n;do{n=Math.floor(Math.random()*items.length)}while(n===cur);items.forEach((c,i)=>c.classList.toggle('on',i===n));cur=n};step();setInterval(step,4200)});
+</script></body></html>

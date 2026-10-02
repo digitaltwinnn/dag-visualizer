@@ -1,6 +1,9 @@
 "use client";
 
 import { CircleHelp } from "lucide-react";
+import { ledgerCardNetwork } from "@/src/engine/domain/tickNet";
+import { useTickHasFilter } from "@/components/useTickHasFilter";
+import { tickNetClearActions } from "@/src/engine/domain/pickActions";
 import { useStore } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { UNLISTED_ID, UNLISTED_CFG, displayNetwork } from "@/src/data/unlisted";
@@ -29,7 +32,27 @@ export default function ContextCard({
   collapsed?: boolean;
   onToggle?: () => void;
 } = {}) {
-  const filter = useStore((s) => s.filter);
+  // THE NETWORK THIS CARD SHOWS. Everywhere but the ledger it is the app filter. In the ledger it
+  // is the chamber's network — the one committed INSIDE the pinned tick, else the filter
+  // (`ledgerNetwork`, 2026-10-02) — so the Metagraph rung under a tick is this same dossier
+  // without the top bar being written. `filter` below is that resolved id.
+  const appFilter = useStore((s) => s.filter);
+  // …and it STANDS DOWN ("all") under a tick the filtered network did not anchor into
+  // (`ledgerCardNetwork`) — the filter itself is left alone.
+  const tickHasFilter = useTickHasFilter();
+  const filter = useStore((s) =>
+    s.mode === "ledger"
+      ? ledgerCardNetwork({ filter: s.filter, tickNet: s.tickNet, snapOrdinal: s.snap?.data.ordinal ?? null, tickHasFilter })
+      : s.filter,
+  );
+  // The × clears what the card STANDS ON: a tick-local network clears itself and what hangs under
+  // it (the tick stays); the filter clears the filter, as it always did.
+  const close = () => {
+    const st = useStore.getState();
+    applyClickActions(
+      filter !== appFilter ? tickNetClearActions({ metaSnap: st.metaSnap, hasInspect: !!st.inspect }) : [{ kind: "filter", id: "all" }],
+    );
+  };
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const mgCfg = metagraphById(filter);
@@ -68,7 +91,7 @@ export default function ContextCard({
             </span>
           }
           titleKey={dn.id}
-          onClose={() => applyClickActions([{ kind: "filter", id: "all" }])}
+          onClose={close}
           collapsed={collapsed}
           onToggle={onToggle}
         />
@@ -104,7 +127,7 @@ export default function ContextCard({
       <InspectorCard
         p={context}
         eyebrow="Metagraph"
-        onClose={() => applyClickActions([{ kind: "filter", id: "all" }])}
+        onClose={close}
         collapsed={collapsed}
         onToggle={onToggle}
       />

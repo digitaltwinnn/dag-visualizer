@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { Fragment, type CSSProperties, useRef, useState, type ReactNode } from "react";
 import { Check, Copy, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { IDENT_INK } from "@/components/identInk";
 import { BAR_EASE } from "@/components/RollSwap";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,32 +45,179 @@ export const ROLE_ORDER = ["l0", "cl1", "dl1"];
 // card would be one gesture too many.
 
 // The one fact row. `title` carries the full value for anything the cell truncates.
-//
-// ⚠️ `as` exists for ONE structural reason (2026-09-19): a fact row that is itself a control. The
-// History cursor card's per-network rows are clickable — they run the same focus builder the Layers
-// rows do — and a `<button>` may only contain PHRASING content, so a `<div>` row inside one is a
-// content-model violation. A `span` carrying `display:flex` is the same box and is phrasing, so the
-// row stays this primitive's to draw rather than being hand-rolled beside it (the grammar rule: the
-// four primitives are the only way a card body draws a fact row). Not a styling hook — the default
-// stands everywhere else.
-export function Fact({
-  label,
-  children,
-  title,
-  className,
-  as: As = "div",
-}: {
-  label: ReactNode;
-  children: ReactNode;
-  title?: string;
-  className?: string;
-  as?: "div" | "span";
-}) {
+export function Fact({ label, children, title, className }: { label: ReactNode; children: ReactNode; title?: string; className?: string }) {
   return (
-    <As className={cn("flex items-start justify-between gap-2.5", className)} title={title}>
+    <div className={cn("flex items-start justify-between gap-2.5", className)} title={title}>
       <span className="shrink-0 text-body text-muted-foreground">{label}</span>
       <span className="min-w-0 text-body text-foreground tabular-nums text-right">{children}</span>
-    </As>
+    </div>
+  );
+}
+
+// ── THE CARD SKELETON'S OTHER SLOTS (2026-10-02, `docs/superpowers/design/2026-10-02-right-rail-
+// cards`) ─────────────────────────────────────────────────────────────────────────────────────
+// Every right-rail card is the same six slots in one order — head · lead · breakdown · facts ·
+// doors · foot + pager — and a card uses the slots it has content for. The eight cards were
+// designed one at a time and diverged in exactly these places: what the card says first, how a
+// section is headed, how an empty value reads, how a way out is drawn. These are the one home for
+// each, beside `Fact` and `Foot`.
+
+/** THE LEAD — the one sentence a card says first, in dim ink, two lines at most: what this subject
+ *  is in relation to its parent ("83% of Dor Technologies' online nodes."). Every card has one. */
+export function Lead({ children, className }: { children: ReactNode; className?: string }) {
+  return <p className={cn("m-0 mb-2.5 text-body leading-snug text-foreground-dim line-clamp-2", className)}>{children}</p>;
+}
+
+/** A share as the words a lead may say: never "0%" for a part that exists nor "100%" for one that
+ *  is not the whole (rounding would state both), and null when there is no whole to be a share
+ *  of — the caller then says nothing rather than "0%" (rule 10: absent is not zero). */
+export function shareWords(part: number, whole: number): string | null {
+  if (!(whole > 0)) return null;
+  const pct = (part / whole) * 100;
+  if (part > 0 && pct < 1) return "under 1%";
+  if (part < whole && pct > 99) return "over 99%";
+  return `${Math.round(pct)}%`;
+}
+
+/** THE ONE EMPTY VALUE. A dash, muted, with the reason on hover — the cards said "not known",
+ *  "none" and "n/a" for the same thing. Where the reason matters at a glance, the caller writes
+ *  it beside the dash in `text-label`. */
+export function Empty({ why }: { why?: string }) {
+  return (
+    <span role="img" className="text-muted-foreground" title={why} aria-label={why ?? "No value"}>
+      —
+    </span>
+  );
+}
+
+/** A SECTION'S LABEL — caps, muted, with the section's one headline figure on the right. The
+ *  breakdown slot's heading: the card's total lives here rather than in a sentence above it. */
+export function SectionLabel({ label, total, unit, className }: { label: ReactNode; total?: ReactNode; unit?: ReactNode; className?: string }) {
+  return (
+    <div className={cn("flex items-baseline justify-between gap-2.5 text-label tracking-caps uppercase text-muted-foreground", className)}>
+      <span className="min-w-0 truncate">{label}</span>
+      {(total != null || unit != null) && (
+        <span className="flex-none inline-flex items-baseline gap-1.5">
+          {unit != null && <span className="normal-case tracking-normal">{unit}</span>}
+          {total != null && <span className="font-mono text-body font-bold normal-case tracking-normal text-foreground tabular-nums">{total}</span>}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** THE HEAD'S QUALIFIER — one hairline chip: a ticker, a country code, a city, a role. The head's
+ *  right slot is either this or a state pill (ready, live / pinned), never bare text, a relation
+ *  or an age (those are the lead's). Same pill as `RoleChips`, one vocabulary. */
+export function QualifierChip({ children, className, style, title }: { children: ReactNode; className?: string; style?: CSSProperties; title?: string }) {
+  return (
+    <span
+      title={title}
+      style={style}
+      className={cn(
+        "inline-flex items-center max-w-full rounded-xs border border-border bg-wash-faint px-[6px] py-[3px] text-label leading-none text-muted-foreground",
+        className,
+      )}
+    >
+      <span className="truncate">{children}</span>
+    </span>
+  );
+}
+
+/** THE TICKER BESIDE A TITLE — one chip, in the network's own ink (user, 2026-10-02: "should we
+ *  apply the ticker-pill consistently? the card header has it but in many other places we show
+ *  just text"). The rule: a ticker that QUALIFIES A TITLE is this chip — the dossier head, the
+ *  scene callout and tooltip, the Moment's headline, the raw pane's head. A ticker in a COLUMN
+ *  (node rows, the anchor log) or inside a SENTENCE stays plain hued text: twenty boxed tickers
+ *  beside the role chips is a wall of boxes, and a chip mid-sentence reads as a button. */
+export function TickerChip({ text, hue, title, className }: { text: string; hue?: string; title?: string; className?: string }) {
+  return (
+    <QualifierChip title={title} className={cn("font-semibold tracking-[0.02em]", IDENT_INK, className)} style={hue ? { color: hue } : undefined}>
+      {text}
+    </QualifierChip>
+  );
+}
+
+/** THE THREE LAYERS, AS CELLS (the node card, option C — user 2026-10-02). A node runs some of
+ *  L0 / cL1 / dL1; each is a cell, lit when this node runs it and dashed when it does not, so the
+ *  make-up is a picture and an ABSENT layer is shown rather than merely unlisted. The codes are
+ *  the app's one layer vocabulary (`RoleChips`); the word under each is what that layer does. */
+const LAYER_CELLS: { code: string; does: string }[] = [
+  { code: "L0", does: "snapshots" },
+  { code: "cL1", does: "currency" },
+  { code: "dL1", does: "data" },
+];
+export function LayerCells({ codes }: { codes: readonly string[] }) {
+  return (
+    <div className="grid grid-cols-3 gap-1.5" role="list" aria-label="Layers this node runs">
+      {LAYER_CELLS.map((l) => {
+        const on = codes.includes(l.code);
+        return (
+          <span
+            key={l.code}
+            role="listitem"
+            aria-label={`${l.code}: ${on ? "runs" : "does not run"}`}
+            className={cn(
+              "flex flex-col rounded-sm border px-2 py-1.5 text-label leading-tight",
+              on ? "border-border bg-wash-faint text-muted-foreground" : "border-dashed border-border text-muted-foreground opacity-45",
+            )}
+          >
+            <span className={cn("font-mono text-body font-semibold", on && "text-foreground")}>{l.code}</span>
+            {l.does}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+/** A DOOR — every way out of a card is this one full-bleed row: an optional key, the target, a
+ *  glyph. A link (`href`) or a control (`onClick`); the wash is the hover every row in the app
+ *  wears. It bleeds by the card's own padding, like the foot it sits above. */
+export function Door({
+  label,
+  children,
+  href,
+  onClick,
+  glyph,
+  title,
+  disabled,
+  flushFoot,
+}: {
+  label?: ReactNode;
+  children: ReactNode;
+  href?: string;
+  onClick?: () => void;
+  glyph?: ReactNode;
+  title?: string;
+  disabled?: boolean;
+  /** Sits directly on the foot plate below it (cancels the foot's own top margin). */
+  flushFoot?: boolean;
+}) {
+  const cls = cn(
+    flushFoot && "-mb-3",
+    // The agreed door recipe (design 2026-09-26, `moment-door.html` A — the Moment card's
+    // "Snapshot records" control is its first instance and keeps its own foot geometry): a
+    // full-bleed row on the wash ladder every control wears.
+    "flex items-center gap-2 -mx-[var(--card-pad)] px-[var(--card-pad)] py-2 border-t border-wash-strong bg-wash-faint text-body text-foreground text-left",
+    "hover:bg-wash-soft focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+    disabled && "opacity-65 pointer-events-none",
+  );
+  const inner = (
+    <>
+      {label != null && <span className="flex-none text-muted-foreground">{label}</span>}
+      <span className={cn("min-w-0 truncate", href && "text-primary-ink")}>{children}</span>
+      <span aria-hidden className="ml-auto flex-none text-muted-foreground">{glyph}</span>
+    </>
+  );
+  return href ? (
+    <a href={href} target="_blank" rel="noopener noreferrer" className={cls} title={title}>
+      {inner}
+    </a>
+  ) : (
+    <button type="button" onClick={onClick} disabled={disabled} title={title} className={cn(cls, "w-[calc(100%+2*var(--card-pad))] cursor-pointer")}>
+      {inner}
+    </button>
   );
 }
 
@@ -134,7 +282,7 @@ export function CopyButton({ value, subject, always = false, className }: { valu
       title={`Copy ${subject}`}
       className={cn(
         "flex-none size-6 -my-1 rounded-xs text-muted-foreground",
-        always ? "opacity-55 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100" : "opacity-0 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
+        always ? "opacity-75 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100" : "opacity-0 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
         copied && "opacity-100 text-[var(--success)] hover:text-[var(--success)]",
         className,
       )}
@@ -164,12 +312,16 @@ export function FootRow({
   title,
   mono = true,
   copy,
+  copyName,
 }: {
   label: string;
   value: ReactNode;
   title?: string;
   mono?: boolean;
   copy?: string;
+  /** What the copy control is called ("previous hash") — the visible label is cut short to save
+   *  hash characters, and "Copy previous" says too little to a screen reader. */
+  copyName?: string;
 }) {
   // ONE REGISTER (C1, user 2026-10-02, `docs/superpowers/design/2026-10-02-heading-pin-foot`):
   // the label is a caps PREFIX inside the mono value line — still uppercase, still muted — rather
@@ -189,7 +341,7 @@ export function FootRow({
       {/* The control takes its own 24px column: always present, so there is nothing to overlay and
           no tail to cover — the value's `truncate` is the only thing that can shorten it, and the
           callers' middle-cut budgets are sized so it does not. */}
-      {copy && <CopyButton value={copy} subject={label.toLowerCase()} always className="my-0" />}
+      {copy && <CopyButton value={copy} subject={copyName ?? label.toLowerCase()} always className="my-0" />}
     </div>
   );
 }
@@ -377,10 +529,12 @@ export function networkKind(id: string, nodes: NodeInfo[]): string {
 export function Desc({ text }: { text?: string }) {
   const [open, setOpen] = useState(false);
   if (!text) return null;
-  if (text.length <= 180) return <p className="text-body text-foreground-dim mb-0">{text}</p>;
+  // THE LEAD, CLAMPED TO TWO LINES (the card skeleton, user 2026-10-02): the description is what
+  // the dossier says first, and four lines of it pushed the breakdown off the top of the card.
+  if (text.length <= 100) return <p className="text-body leading-snug text-foreground-dim mb-0">{text}</p>;
   return (
     <>
-      <p className={cn("text-body text-foreground-dim mb-0", open ? "line-clamp-none" : "line-clamp-3")}>
+      <p className={cn("text-body leading-snug text-foreground-dim mb-0", open ? "line-clamp-none" : "line-clamp-2")}>
         {text}
       </p>
       <Button
@@ -419,35 +573,98 @@ export function partShade(hue: string, i: number): string {
   return pct === 100 ? hue : `color-mix(in oklch, ${hue} ${pct}%, transparent)`;
 }
 
-export function StackedSchedule({ axis, parts, className }: { axis: string; parts: SchedulePart[]; className?: string }) {
-  const total = parts.reduce((n, p) => n + p.count, 0);
+/** Above this many nodes in a cut the squares stop being countable, so a row draws a proportional
+ *  bar instead. The largest fleet is ~30 after the planned reduction, so in practice every cut is
+ *  squares; the bar is the honest fallback for a census total in the hundreds (rule 10: a wall of
+ *  two hundred squares is a texture, not a count). */
+const UNIT_MAX = 60;
+
+/** RIGHT-ALIGNED, AGAINST ITS FIGURE (user, 2026-10-02: "should we right-align the coloured boxes as
+ *  well, so they sit against the numbers?"): a mark and its count are one reading, so three squares
+ *  sit beside their "3" rather than a column's width away. Marks still share one edge — the right
+ *  one — so their lengths compare as before.
+ *
+ *  A ROW'S MARK in the breakdown table: one square per countable thing, or a bar when the thing
+ *  is a rate/size or the cut is too large to count (`units` false). `frac` is the bar's length,
+ *  0..1 — a share of the total, or of the largest row where rows are compared rather than summed. */
+export function UnitMarks({ count, color, units, frac }: { count: number; color: string; units: boolean; frac: number }) {
   return (
-    <div className={cn("grid grid-cols-[92px_minmax(0,1fr)] items-start gap-x-2.5 py-1.5", className)}>
-      <span className="text-body text-muted-foreground pt-px">{axis}</span>
-      <span className="min-w-0">
-        {/* 5px, the app's one bar thickness (`BarCell`, the explorer's bars, the band's micro-bars) —
-            an 8px first cut read as a heavier instrument than its neighbours (user, 2026-09-26). */}
-        <span aria-hidden className="flex h-[5px] w-full overflow-hidden rounded-full bg-wash-faint">
-          {parts
-            .filter((p) => p.count > 0)
-            .map((p, i) => (
-              <span key={i} className={cn("block h-full", BAR_EASE)} style={{ width: `${(p.count / Math.max(1, total)) * 100}%`, background: p.color }} />
-            ))}
-        </span>
-        {/* The legend at the Fact rows' own size, every part on ONE BASELINE: at `text-label` the
-            mono digits sat visibly lower and smaller than the sans word beside them (user,
-            2026-09-26: "not aligned"). The dot centres on the line; the word and its count share
-            the baseline, the count in the same mono the Fact values use. */}
-        <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-body leading-snug">
-          {parts.map((p, i) => (
-            <span key={i} className={cn("inline-flex items-baseline gap-1.5 whitespace-nowrap", p.count > 0 ? "text-foreground-dim" : "text-muted-foreground")} title={p.title}>
-              {p.count > 0 && <span className="size-1.5 rounded-full flex-none self-center" style={{ background: p.color }} />}
-              <span>{p.label}</span>
-              <span className={cn("font-mono tabular-nums", p.count > 0 ? "text-foreground" : "text-muted-foreground")}>{p.count}</span>
-            </span>
+    <span aria-hidden className="min-w-0 pt-[0.42em]">
+      {units ? (
+        <span className="flex flex-wrap content-start justify-end gap-[1.5px]">
+          {Array.from({ length: count }, (_, k) => (
+            <span key={k} className="block size-1.5 rounded-[1.5px]" style={{ background: color }} />
           ))}
         </span>
-      </span>
+      ) : (
+        frac > 0 && (
+          <span className="block h-[5px] w-full">
+            <span className={cn("block h-full ml-auto rounded-full min-w-[2px]", BAR_EASE)} style={{ width: `${Math.min(1, frac) * 100}%`, background: color }} />
+          </span>
+        )
+      )}
+    </span>
+  );
+}
+
+/** Whether a cut of this size draws squares (countable) or bars. */
+export const countable = (total: number) => total <= UNIT_MAX;
+
+/** THE BREAKDOWN TABLE'S ROW GRID WITHOUT AN AXIS COLUMN — name · figure · mark. For a card with ONE
+ *  cut, whose section label already names it (`visuals.html`, user 2026-10-02): the global
+ *  snapshot's anchored rows, the Moment's readings, a provider's and a country's networks. Rows
+ *  that are their own controls (an accordion trigger, a hover-paired button) wear this class
+ *  themselves, so every card's names, figures and marks sit in the same three columns. */
+// MARK BEFORE FIGURE (user, 2026-10-02: "should we right-align the number and put the visual in
+// front?"): name · mark · count, the count on the card's right edge — the fact rows' own grammar
+// (label left, value right) and the explorer rows' order (name, bar, figure).
+// THE FIGURE COLUMN IS AS WIDE AS ITS WIDEST FIGURE, no wider (user, 2026-10-02: "quite some space
+// between"): a fixed column right-aligned a "3" a dozen pixels from its squares. `--cut-fig` is set
+// by whoever draws the rows, in `ch` of the mono figure (`figWidth`), so the marks end one small
+// gap before the number on every row and still share one right edge.
+export const CUT_ROW = "grid grid-cols-[8.6em_minmax(0,1fr)_var(--cut-fig,2.6em)] items-start gap-x-1.5 text-label";
+/** The `--cut-fig` style for a set of figures as they will be printed. */
+export const figWidth = (figures: readonly (string | number)[]): CSSProperties =>
+  ({ ["--cut-fig" as string]: `${Math.max(1, ...figures.map((f) => String(f).length)) + 0.6}ch` }) as CSSProperties;
+
+/** ONE CUT OF A TOTAL, AS TABLE ROWS (user, 2026-10-02 — `docs/superpowers/design/2026-10-02-right-
+ *  rail-cards/breakdown-2.html`, D2: "what bothers me most is that the legend has those dots in it
+ *  and takes a lot of space; can it be solved with tables?").
+ *
+ *  Every part is a row — name, count, then ITS OWN SQUARES, one per node. The squares are the bar
+ *  and the colour key at once, so there is no legend: it replaced a stacked bar with a wrapping
+ *  dot-legend beneath it. The cut's name sits in the first column across its rows; consecutive
+ *  cuts share the same column template (stated in `em`, so it rides the fluid label step) and are
+ *  divided by a hairline, which makes the three cuts read as one table. A zero part is a plain
+ *  muted row with no squares (it draws nothing, and is still named). Without an `axis` the table
+ *  is the three-column `CUT_ROW` form. */
+export function ScheduleTable({ axis, axisTitle, parts, className }: { axis?: string; axisTitle?: string; parts: SchedulePart[]; className?: string }) {
+  const total = parts.reduce((n, p) => n + p.count, 0);
+  const units = countable(total);
+  return (
+    <div
+      className={cn(
+        axis != null
+          ? "grid grid-cols-[6em_7.4em_minmax(0,1fr)_var(--cut-fig,2.4em)] items-start gap-x-1.5 gap-y-0.5 py-1.5 text-label border-t border-border first:border-t-0"
+          : cn(CUT_ROW, "gap-y-0.5"),
+        className,
+      )}
+      style={figWidth(parts.map((p) => p.count))}
+    >
+      {axis != null && (
+        <span className="text-muted-foreground" title={axisTitle} style={{ gridRow: `span ${Math.max(1, parts.length)}` }}>
+          {axis}
+        </span>
+      )}
+      {parts.map((p, i) => (
+        <Fragment key={i}>
+          <span className={cn("min-w-0 truncate", p.count > 0 ? "text-foreground-dim" : "text-muted-foreground")} title={p.title ?? p.label}>
+            {p.label}
+          </span>
+          <UnitMarks count={p.count} color={p.color} units={units} frac={p.count / Math.max(1, total)} />
+          <span className={cn("font-mono tabular-nums text-right", p.count > 0 ? "text-foreground" : "text-muted-foreground")}>{p.count}</span>
+        </Fragment>
+      ))}
     </div>
   );
 }

@@ -124,7 +124,7 @@ export default function DateRange({
               type="button"
               onClick={() => { setOpen(false); onSubmit(); }}
               disabled={!from}
-              className="text-label uppercase tracking-caps text-[var(--primary)] transition-opacity hover:opacity-80 disabled:opacity-30"
+              className="text-label uppercase tracking-caps text-primary-ink transition-opacity hover:opacity-80 disabled:opacity-30"
             >
               go to date →
             </button>

@@ -52,7 +52,13 @@ export const STAGE_LIGHTS: Record<StagedView, StageLightRow> = {
   // the other end of that range: staged low and tight so the pool reads as emphasis on one bead
   // rather than as a searchlight over its neighbours on the same shell.
   hyper: {
-    angle: 0.9, distance: 40, intensity: 2.4, intensityPaper: 5.5, penumbra: 0.25,
+    // intensity 2.4 → 1.1 (user, 2026-10-02: "less light on the metagraph spheres … when I click
+    // another one I actually see better contrast; when highlighted it's just too much. Also the
+    // focus on the sphere is a bit fuzzy"). At 2.4 the white lobe on top of the hub's and beads'
+    // own emissive washed the committed network to peach with near-white caps, and those pixels
+    // cleared the bloom threshold, so every sphere wore a soft halo — the "fuzzy focus". The
+    // same move geo took on 2026-09-28. Paper's level holds (the lamp rule: no bloom there).
+    angle: 0.9, distance: 40, intensity: 0.6, intensityPaper: 5.5, penumbra: 0.25,
     height: 9, heightDag: 17, heightNode: 3.2, angleNode: 0.5,
   },
   // geo: intensity 1.5 → 0.9 and height 6 → 8 (2026-09-28, user: "geo, DAG, Falkenstein provider

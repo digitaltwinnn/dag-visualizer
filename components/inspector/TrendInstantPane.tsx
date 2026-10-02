@@ -5,7 +5,8 @@ import { INSTANT_ICON } from "@/components/icons";
 
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { Fact, FactGroup, IdentityDot } from "@/components/inspector/parts";
+import { Lead, FactGroup, UnitMarks, CUT_ROW, TickerChip, figWidth } from "@/components/inspector/parts";
+import { Separator } from "@/components/ui/separator";
 import { SELECTED_ROW, selectionHue } from "@/components/selection";
 import { openRecords, spanOfWindow } from "@/components/trendDoors";
 import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
@@ -89,6 +90,8 @@ export default function TrendInstantPane({
     value: cursorMs != null ? valueAt(rows.get(id)?.series.points ?? [], buckets, stepMs, cursorMs) : null,
   }));
   const valueOf = (id: string) => readings.find((r) => r.id === id)?.value ?? null;
+  // The busiest network's reading at this instant — what a row's bar is a fraction of.
+  const peak = readings.reduce((m, r) => (r.value != null && r.value > m ? r.value : m), 0);
   const subjectValue = subject ? valueOf(subject) : null;
   const rank = rankAt(readings.map((r) => r.value), subjectValue);
   // WITH NO NETWORK AS THE SUBJECT, THE LEAD IS THE WHOLE NETWORK. The global row answers the same
@@ -139,17 +142,17 @@ export default function TrendInstantPane({
         // HOW LONG AGO the moment was, not the cadence (user, 2026-09-26): the reader is placing an
         // instant, and "3 months ago" places it; "daily" only said what the charts are cut in,
         // which the note below already says where it matters. Measured from the bucket's start.
-        aside={
-          <span className="text-label text-muted-foreground">
-            {cursorMs != null ? `${ageWords(Date.now() - (bucket ?? cursorMs))} ago` : null}
-          </span>
-        }
         onClose={onClose}
         collapsed={collapsed}
         onToggle={onToggle}
       />
       {!collapsed && (
         <div>
+          {/* THE LEAD (the card skeleton, 2026-10-02): how long ago the moment was. It rode the
+              head's aside, which is a qualifier or a state on every card now — an age is what a
+              card SAYS, first. Measured from the bucket's start, as before. */}
+          {cursorMs != null && <Lead>{ageWords(Date.now() - (bucket ?? cursorMs))} ago.</Lead>}
+          {bucket != null && <Separator className="mb-2" />}
           {bucket == null ? (
             // AN HONEST TERMINAL, not an empty card. The sentence is `instantNote`'s: only the
             // out-of-window case offers a route, because only that one has a gesture that answers
@@ -189,16 +192,18 @@ export default function TrendInstantPane({
                   </>
                 )}
                 </span>
-                <span
-                  className="min-w-0 truncate text-right text-label font-normal text-muted-foreground"
-                  title={subject ? rows.get(subject)?.name : undefined}
-                  // The ticker in its network's hue (user, 2026-09-26) — the dossier aside's own rule.
-                  style={subject ? { color: rows.get(subject)?.hue } : undefined}
-                >
-                  {/* Under a filter the TICKER alone (user, 2026-09-26): the dossier above already
-                      names the network in full, and the lead line has one line's width. */}
-                  {subject ? (metagraphById(subject)?.ticker || rows.get(subject)?.name) : "Across the whole network"}
-                </span>
+                {/* Under a filter the TICKER alone, as the one chip (`TickerChip`, 2026-10-02): the
+                    dossier above names the network in full, and the lead line has one line's width. */}
+                {subject ? (
+                  <TickerChip
+                    text={metagraphById(subject)?.ticker || rows.get(subject)?.name || subject}
+                    hue={rows.get(subject)?.hue}
+                    title={rows.get(subject)?.name}
+                    className="self-center font-normal"
+                  />
+                ) : (
+                  <span className="min-w-0 truncate text-right text-label font-normal text-muted-foreground">Across the whole network</span>
+                )}
               </p>
 
               {/* ── DETAIL: every layer at the cursor ────────────────────────────────────────
@@ -250,19 +255,16 @@ export default function TrendInstantPane({
                         onFocus={pair.onFocus}
                         onBlur={pair.onBlur}
                       >
-                        <Fact
-                          // PHRASING CONTENT inside a <button> (see `Fact`'s own note): a div row
-                          // here is a content-model violation, and the span is the same box.
-                          as="span"
-                          label={
-                            <span className="inline-flex items-center gap-2">
-                              <IdentityDot hue={row.hue} />
-                              <span className="truncate">{row.name}</span>
-                            </span>
-                          }
-                        >
-                          <span className={cn(v == null && "text-muted-foreground")}>{fmt(v)}</span>
-                        </Fact>
+                        {/* THE BREAKDOWN TABLE'S ROW (`visuals.html`, user 2026-10-02): name ·
+                            reading · bar. A reading is a rate, not a countable thing, so the
+                            mark is a bar scaled to the busiest network at this instant; the bar
+                            carries the hue the leading dot used to. */}
+                        <span className={CUT_ROW} style={figWidth(readings.map((r) => (r.value != null ? format(r.value) : "—")))}>
+                          <span className={cn("min-w-0 truncate", v == null ? "text-muted-foreground" : "text-foreground-dim")}>{row.name}</span>
+                          <UnitMarks count={0} color={row.hue} units={false} frac={v != null && peak > 0 ? v / peak : 0} />
+                          {/* One dash for an absent reading (the skeleton's empty rule); the row's title says "no reading". */}
+                          <span className={cn("font-mono tabular-nums text-right", v == null ? "text-muted-foreground" : "text-foreground")}>{v != null ? format(v) : "—"}</span>
+                        </span>
                       </button>
                     );
                   })}

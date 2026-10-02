@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Country and provider cards — options</title>
+<style>
+:root{--bg:oklch(0.09 0.02 265);--fg:oklch(0.94 0.02 255);--dim:#c7d0ea;--muted:oklch(0.66 0.04 265);--primary:oklch(0.88 0.13 195);
+--border:rgba(90,140,255,.22);--panel:rgba(12,16,32,.94);--plate:rgba(255,255,255,.035);--radius:14px;--wash-faint:color-mix(in oklch,var(--primary) 6%,transparent);--wash-strong:color-mix(in oklch,var(--primary) 22%,transparent);
+--sel-bg:color-mix(in oklch,var(--primary) 12%,transparent);--sel-border:color-mix(in oklch,var(--primary) 52%,transparent);
+--label:12.6px;--body:14.9px;--title:17.1px;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+--blue:oklch(0.72 0.16 255);--orange:oklch(0.74 0.19 41);--green:oklch(0.80 0.15 165);--n1:oklch(0.70 0.03 265);--n2:oklch(0.55 0.03 265);--n3:oklch(0.42 0.03 265);--n4:oklch(0.32 0.03 265)}
+*{box-sizing:border-box}html{color-scheme:dark}
+body{margin:0;background:radial-gradient(1200px 600px at 60% 0%,#0b1230 0%,var(--bg) 60%);color:var(--fg);font:var(--body)/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:32px 40px 96px}
+h1{font-size:24px;font-weight:600;margin:0 0 6px}h2{font-size:18px;font-weight:600;margin:52px 0 4px;display:flex;gap:10px;align-items:baseline}h2 b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;font-size:var(--label)}
+p.lede{color:var(--dim);max-width:86ch;margin:0 0 6px}.note{color:var(--muted);font-size:var(--label);max-width:88ch;margin:4px 0}
+.row{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start;margin-top:14px}.col{width:346px}.cap{font-size:var(--label);color:var(--muted);margin:0 2px 8px}
+.pc{display:flex;gap:28px;flex-wrap:wrap;font-size:var(--label);color:var(--dim);margin-top:12px;max-width:1080px}.pc div{flex:1;min-width:260px}.pc b{color:var(--fg)}
+.rec{border:1px solid var(--sel-border);background:var(--sel-bg);border-radius:8px;padding:10px 14px;font-size:var(--label);margin-top:28px;max-width:92ch}.rec b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;font-size:11.6px;margin-right:8px}.rec.q{border-color:var(--border);background:transparent}
+.card{width:346px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px 12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 8px 30px rgba(0,0,0,.35);position:relative}
+.eyebrow{font-size:var(--label);letter-spacing:.13em;text-transform:uppercase;color:var(--primary);font-weight:600;margin-bottom:4px}
+.hrow{display:flex;align-items:center;gap:10px}.ico{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--primary);flex:none}
+.ttl{font-size:var(--title);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.aside{margin-left:auto;flex:none}
+.chip{display:inline-flex;align-items:center;border:1px solid var(--border);background:var(--wash-faint);border-radius:4px;padding:2px 6px;font-size:var(--label);line-height:1.15;color:var(--muted)}
+.hair{border-top:1px solid var(--border);margin:11px 0 10px}.lead{color:var(--dim);margin:0}
+.fact{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:5px 0}.fact>span:first-child{color:var(--muted)}.m{font-family:var(--mono)}
+.sec{display:flex;justify-content:space-between;align-items:baseline;font-size:var(--label);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin:0 0 7px}.sec b{color:var(--fg);font:700 var(--body) var(--mono);letter-spacing:0}.sec .u{letter-spacing:0;text-transform:none;margin-right:6px}
+.tb{display:grid;grid-template-columns:9.4em 2.6em minmax(0,1fr);gap:3px 8px;font-size:var(--label);align-items:start}.tb .nm{color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tb .num{font-family:var(--mono);text-align:right}
+.units{display:flex;flex-wrap:wrap;gap:1.5px;padding-top:5px}.units i{display:block;width:6px;height:6px;border-radius:1.5px}
+.bar{display:block;height:5px;margin-top:6px}.bar i{display:block;height:100%;border-radius:3px;min-width:2px}
+.strip{display:flex;flex-wrap:wrap;gap:2px;margin:0 0 6px}.strip i{display:block;width:8px;height:8px;border-radius:2px}
+.layers{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.layers div{border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:var(--label);color:var(--muted);background:var(--wash-faint)}.layers div b{display:block;color:var(--fg);font:600 var(--body) var(--mono)}.layers div.off{opacity:.4;border-style:dashed;background:none}
+.gap{height:10px}
+</style></head><body>
+<h1>Country and provider — the same card twice</h1>
+<p class="lede">Open a country, then a provider inside it, and the rail shows two cards with the same shape and nearly the same content: a node count, the same cut by network, then a row or two. The provider card's table is usually a smaller copy of the country's. Four ways to make each card say something the other does not.</p>
+<p class="note">Each option shows the two cards as they stack in the rail (country above, provider below). Germany, 62 nodes; Hetzner in Falkenstein, 31 of them. The splits are illustrative. Today's cards are option A.</p>
+<div id="out"></div>
+<div class="rec"><b>Recommend</b> B. Each card answers the question its own level raises and hands off to the next: the country says <i>who hosts here</i> (its providers), the provider says <i>whose nodes these are</i> (the networks). Read down the pile it is place, then host, then network, with no table repeated. It needs no new element, only a different cut on the country card. C is the stronger picture, since the provider's share of the country is the one figure neither card shows today, and it can be added to B later.</div>
+<div class="rec q"><b>Your call</b> (a) Which option. (b) In B, the country card's provider rows repeat what the explorer lists on the left when the country is open; fine, or should it show cities instead. (c) Whether the provider card keeps its network table when only one network is present (it is then a single row).</div>
+
+<script>
+const BL='var(--blue)',OR='var(--orange)';
+const sq=(n,c)=>`<span class="units">${Array.from({length:n},()=>`<i style="background:${c}"></i>`).join('')}</span>`;
+const bar=(f,c)=>`<span class="bar"><i style="width:${f*100}%;background:${c}"></i></span>`;
+const tb=(rows,mode)=>{const max=Math.max(...rows.map(r=>r[1]));return `<div class="tb">${rows.map(r=>`<span class="nm">${r[0]}</span><span class="num">${r[1]}</span>${mode==='bar'?bar(r[1]/max,r[2]):sq(r[1],r[2])}`).join('')}</div>`};
+const sec=(l,n,u)=>`<div class="sec"><span>${l}</span><span>${u?`<span class="u">${u}</span>`:''}<b>${n}</b></span></div>`;
+const fact=(l,v)=>`<div class="fact"><span>${l}</span><span>${v}</span></div>`;
+const hair='<div class="hair"></div>';
+const card=(eye,title,chip,body)=>`<div class="card"><div class="eyebrow">${eye}</div><div class="hrow"><span class="ico"></span><div class="ttl">${title}</div><span class="aside"><span class="chip">${chip}</span></span></div>${hair}${body}</div>`;
+const strip=(n,of,c)=>`<div class="strip">${Array.from({length:of},(_,i)=>`<i style="background:${i<n?c:'var(--n4)'}"></i>`).join('')}</div>`;
+const netsC=[['DAG',60,BL],['Dor Technologies',2,OR]], netsP=[['DAG',30,BL],['Dor Technologies',1,OR]];
+const provs=[['Hetzner Online',51,'var(--n1)'],['IONOS SE',5,'var(--n2)'],['netcup GmbH',3,'var(--n3)'],['3 others',3,'var(--n4)']];
+const cities=[['Falkenstein',31,'var(--n1)'],['Nuremberg',19,'var(--n2)'],['Gunzenhausen',4,'var(--n3)'],['4 others',8,'var(--n4)']];
+const C=(lead,body)=>card('Country','Germany','DE',`<p class="lead">${lead}</p>${hair}${body}`);
+const P=(lead,body)=>card('Provider','Hetzner Online GmbH','Falkenstein',`<p class="lead">${lead}</p>${hair}${body}`);
+const V={
+ A:()=>[C('Hosts 37% of the selection\'s nodes.',sec('Nodes',62)+tb(netsC,'bar')+hair+fact('Cities',7)+fact('Providers',6)),
+        P('Hosts nodes of 2 networks in Germany.',sec('Nodes',31)+tb(netsP)+hair+fact('ASN','<span class="m">AS24940</span>'))],
+ B:()=>[C('Hosts 37% of the selection\'s nodes, in 7 cities.',sec('Nodes',62,'by provider')+tb(provs,'bar')),
+        P('Half of Germany\'s nodes, in Falkenstein.',sec('Nodes',31,'by network')+tb(netsP)+hair+fact('ASN','<span class="m">AS24940</span>'))],
+ C:()=>[C('Hosts 37% of the selection\'s nodes.',sec('Nodes',62,'of 168')+strip(62,168,'var(--primary)')+hair+fact('Cities',7)+fact('Providers',6)+fact('Networks','2')),
+        P('Half of Germany\'s nodes, in Falkenstein.',sec('Nodes',31,'of Germany\'s 62')+strip(31,62,'var(--primary)')+hair+fact('Networks','<span style="color:var(--blue)">DAG</span> 30 · <span style="color:var(--orange)">DOR</span> 1')+fact('ASN','<span class="m">AS24940</span>'))],
+ D:()=>[C('Hosts 37% of the selection\'s nodes.',sec('Nodes',62,'by city')+tb(cities,'bar')+hair+fact('Providers',6)),
+        P('Half of Germany\'s nodes, in Falkenstein.',sec('Runs',31,'nodes')+`<div class="layers"><div><b>L0</b>24 nodes</div><div><b>cL1</b>30 nodes</div><div><b>dL1</b>1 node</div></div>`+hair+fact('Networks','<span style="color:var(--blue)">DAG</span> 30 · <span style="color:var(--orange)">DOR</span> 1')+fact('ASN','<span class="m">AS24940</span>'))]
+};
+const T={
+ A:['A','Today','Both cards cut their nodes by network. The provider\'s table is the country\'s, smaller.',['Nothing to build.'],['Two cards, one reading. The second adds only a count and an ASN.']],
+ B:['B','Each card cuts by the next level down','The country is cut by PROVIDER (who hosts here); the provider is cut by NETWORK (whose nodes). The lead of each says its share of the level above.',['Read down the pile it is place → host → network, and nothing repeats.','No new element: the same table, a different cut.','The provider\'s lead gains the one figure missing today: its share of the country.'],['The country\'s provider rows overlap the explorer\'s list on the left.','Networks leave the country card (they are still one card down).']],
+ C:['C','Each card shows its share of the one above','A strip of squares: the country\'s nodes lit inside the whole selection, the provider\'s lit inside the country. Networks become a single fact row.',['The pile reads as a zoom: 62 of 168, then 31 of those 62.','Says something neither card says today.'],['Above about 200 nodes the strip stops being countable and has to become a bar.','You rejected a similar "N of M" strip on the composition card as hard to read.']],
+ D:['D','Place on one, machines on the other','The country is cut by CITY (it is a place card). The provider says what its nodes RUN, with the node card\'s three layer cells and a count in each.',['The two cards could not be confused.','Reuses the layer cells just added to the node card, so the rail gains a second use for them.'],['The city rows overlap the explorer, like B.','A layer count per provider is rarely the question someone is asking.']]
+};
+document.getElementById('out').innerHTML=Object.keys(V).map(k=>{const [c,p]=V[k]();return `<h2><b>${T[k][0]}</b>${T[k][1]}</h2><p class="lede">${T[k][2]}</p><div class="row"><div class="col">${c}<div class="gap"></div>${p}</div><div class="pc" style="flex-direction:column;max-width:420px;margin-top:0"><div><b>For</b> ${T[k][3].join(' ')}</div><div><b>Against</b> ${T[k][4].join(' ')}</div></div></div>`}).join('');
+</script></body></html>

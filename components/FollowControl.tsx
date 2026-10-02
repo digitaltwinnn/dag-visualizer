@@ -55,7 +55,7 @@ export default function FollowControl({ className }: { className?: string }) {
   // "live · 3s" beside a four-minute-old snapshot (rule 10: the label never overstates).
   const shown = snap?.data ?? latestSnapshot;
   const sub =
-    !following && !pinned ? "· off" : shown ? <Age ts={shown.timestamp} /> : null;
+    shown ? <Age ts={shown.timestamp} /> : null;
 
   return (
     <button

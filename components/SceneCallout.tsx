@@ -44,7 +44,7 @@ import { coLocatedNetworks, filterAccent, getAnchor, isAnchorSettling, metagraph
 import { midHash } from "@/src/util/format";
 import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
 import { SCENE_GLASS } from "@/components/selection";
-import { RoleChips, StatusMark } from "@/components/inspector/parts";
+import { RoleChips, StatusMark, TickerChip } from "@/components/inspector/parts";
 // The lead line's codes come from the composition vocabulary's ONE home, rendered by the cards'
 // own RoleChips (user, 2026-08-15: "look at my cards — square pills").
 import { layerCodesOf } from "@/src/data/composition";
@@ -56,6 +56,7 @@ import { CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET } from "@/src/engine/do
 import type { GeoInfo } from "@/src/data/types";
 import LiveDot from "@/components/LiveDot";
 import { IDENT_INK } from "@/components/identInk";
+import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 
 // The panel's standoff from the anchor lives in `src/engine/domain/calloutPlacement.ts`, with the
 // reach thresholds derived from it and the placement rules that read them. It used to be a local
@@ -123,21 +124,16 @@ export function CalloutPanel({ m, className }: { m: CalloutModel; className?: st
           on this row, and the anchor ring is the subject mark at the scene end of the tie. */}
       <div className="flex items-center gap-[7px]">
         <span className={cn("text-body font-semibold text-foreground", m.titleMono && "font-mono tabular-nums")}>{m.title}</span>
-        {m.aside && (
-          <span
-            className={
-              m.aside.hue
-                ? cn("text-label font-bold ml-1", IDENT_INK)
-                : "inline-flex items-center gap-1.5 text-label text-muted-foreground ml-1"
-            }
-            style={m.aside.hue ? { color: m.aside.hue } : undefined}
-          >
-            {m.aside.live && (
-              <LiveDot />
-            )}
+        {/* A hued aside is a TICKER beside a title, so it is the card head's own chip
+            (`TickerChip`, 2026-10-02); the un-hued one is a state line and stays text. */}
+        {m.aside && m.aside.hue ? (
+          <TickerChip text={m.aside.text} hue={m.aside.hue} className="ml-1" />
+        ) : m.aside ? (
+          <span className="inline-flex items-center gap-1.5 text-label text-muted-foreground ml-1">
+            {m.aside.live && <LiveDot />}
             {m.aside.text}
           </span>
-        )}
+        ) : null}
       </div>
       {/* The card grammar's HEAD HAIRLINE at callout scale (user, 2026-08-15 — "cards have an
           underline between header and the rest"): it divides the HEAD (eyebrow + title, whose
@@ -194,6 +190,7 @@ export default function SceneCallout() {
   const selNodes = useStore((s) => s.selNodes);
   const metaSnap = useStore((s) => s.metaSnap);
   const snap = useStore((s) => s.snap);
+  const tickNet = useStore((s) => s.tickNet);
   const following = useStore((s) => s.following);
   // THE BOX LEADS (user, 2026-08-15 — clicking a committed node's hub re-boxes the metagraph
   // card and "nothing happens in the scene"): the box is the subject (it gets the camera), so
@@ -351,8 +348,12 @@ export default function SceneCallout() {
       // Gate and source are the strip's own (`metagraphById`, the anchor index's per-id
       // counts), so a lane the catalog can't name — "all", the DAG itself, unlisted — keeps
       // the tick-wide total rather than guessing a share of it.
-      const cfg = metagraphById(filter);
-      const mine = cfg && filter !== "all" && filter !== "dag" ? cfg : null;
+      // THE NETWORK THE CHAMBER RESOLVES AGAINST (2026-10-02): the one picked inside this tick,
+      // else the filter — the callout used to read the filter alone, so with Dor picked inside a
+      // tick it still ringed the whole bar.
+      const net = ledgerNetwork({ filter, tickNet, snapOrdinal: snap.data.ordinal });
+      const cfg = metagraphById(net);
+      const mine = cfg && net !== "all" && net !== "dag" ? cfg : null;
       const total = snap.data.metagraphSnapshotCount;
       // ⚠ A SHARE THAT HASN'T FOLDED IN YET IS NOT A ZERO (rule 10). A tick's `total` is final
       // the instant it arrives, but the per-metagraph stamps land over the next seconds and the
@@ -360,10 +361,10 @@ export default function SceneCallout() {
       // that DID anchor here, and then silently corrects itself. `isAnchorSettling` is that
       // lifecycle's one home (src/data/network.ts, CLAUDE.md → "The tick lifecycle"); while it
       // holds, this falls back to the tick-wide form — the SAME answer the comment above already
-      // gives a lane the catalog can't name. The ring keeps the filter's hue, so the identity is
+      // gives a lane the catalog can't name. The ring keeps the network's hue, so the identity is
       // not lost, and the share appears the moment it is real. (The strip's own `?? 0` one surface
       // over drives a BAR HEIGHT, where an absent count is an honest gap, not a stated numeral.)
-      const share = mine ? getAnchor(snap.data.timestamp)?.metaCounts?.get(filter) : undefined;
+      const share = mine ? getAnchor(snap.data.timestamp)?.metaCounts?.get(net) : undefined;
       const settling = mine != null && share == null && isAnchorSettling(snap.data.timestamp, typeof total === "number" ? total : null);
       return {
         // The live-lane key rule — see msModel above (the follow advances this ordinal ~every
@@ -372,16 +373,16 @@ export default function SceneCallout() {
         eyebrow: "Global snapshot",
         title: snap.data.ordinal.toLocaleString(),
         aside: following ? { text: rel ? `live · ${rel}` : "live", live: true } : { text: rel ? `pinned · ${rel}` : "pinned" },
-        // Unfiltered the ring marks the whole bar (core cyan); under a filter the anchor
+        // Unneted the ring marks the whole bar (core cyan); under a filter the anchor
         // points at the committed network's own SEGMENT, so the ring takes its accent
         // (user, 2026-08-16 — "if filter, select the correct segment of the byte bar").
-        ring: filter !== "all" ? filterAccent(filter) : "var(--core)",
+        ring: net !== "all" ? filterAccent(net) : "var(--core)",
         lead:
           typeof total !== "number"
             ? undefined
             : mine && !settling
               ? {
-                  ident: { text: mine.ticker || mine.name, hue: filterAccent(filter) },
+                  ident: { text: mine.ticker || mine.name, hue: filterAccent(net) },
                   text: `${share ?? 0} of ${total} anchors`,
                 }
               : { text: `${total} anchors` },

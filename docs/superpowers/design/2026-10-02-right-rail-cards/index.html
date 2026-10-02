@@ -49,6 +49,7 @@ table{border-collapse:collapse;font-size:var(--label);margin-top:14px}th,td{bord
 .pager{display:flex;align-items:center;justify-content:center;gap:6px;color:var(--muted);font-size:var(--label);font-variant-numeric:tabular-nums;padding:6px 0 8px;margin:0 -18px;padding-left:18px;padding-right:18px;border-top:1px solid var(--border);background:var(--plate);border-radius:0 0 13px 13px}
 .pager.plain{background:none}.pager .b{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px}.pager .b:hover{background:var(--wash-hover);color:var(--fg)}.pager .sp{flex:1}
 .pad{height:14px}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin:2px 0 8px}.tabs span{font-size:var(--label);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);padding:6px 10px;border:1px solid transparent;border-bottom:0;border-radius:6px 6px 0 0;margin-bottom:-1px}.tabs span.on{color:var(--primary);border-color:var(--border);background:var(--wash-faint);border-bottom:1px solid transparent}.tabs span:hover{color:var(--fg)}
 /* anatomy */
 .anat{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start;margin-top:16px}.slots{font-size:var(--label);max-width:60ch}.slots li{margin:0 0 9px;color:var(--dim)}.slots b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;font-size:11.6px;margin-right:6px}
 .tag{position:absolute;left:-30px;font-size:11px;color:var(--primary);font-weight:700;width:22px;text-align:right}
@@ -74,8 +75,8 @@ table{border-collapse:collapse;font-size:var(--label);margin-top:14px}th,td{bord
 <div class="anat"><div id="anat"></div>
 <ol class="slots">
 <li><b>1 Head</b> Eyebrow, glyph, title, and ONE aside that is either a <i>qualifier chip</i> (ticker, role, country code, city) or a <i>state pill</i> (ready, live / pinned). Names in sans, machine ids and ordinals in mono. Relations and ages leave the aside.</li>
-<li><b>2 Lead</b> One sentence in dim ink, two lines at most, saying what this is in relation to its parent. The metagraph's subtitle and description merge here, clamped with "more". Relations and ages land here ("Anchored to 6,989,808 · 35s ago").</li>
-<li><b>3 Breakdown</b> A caps section label with its total on the right, then the breakdown. The dossier keeps its stacked bars; a per-network cut uses the bar rows. The label line is where the card's one headline figure lives.</li>
+<li><b>2 Lead</b> One sentence in dim ink, two lines at most, on EVERY card, saying what this is in relation to its parent. The metagraph keeps its type line under the title and its description is the lead, clamped with "more". Relations and ages land here ("Anchored to 6,989,808 · 35s ago"). A separator follows the lead wherever a breakdown comes next.</li>
+<li><b>3 Breakdown</b> A caps section label with its total on the right, then the breakdown. The dossier keeps its stacked bars; a per-network cut uses the bar rows; the metagraph snapshot's State and Data are TABS here. The label line is where the card's one headline figure lives.</li>
 <li><b>4 Facts</b> Label left, value right, regular weight. One dash for every empty value, with the reason on hover. Sub-notes become their own fact ("Size 50 KB") or join the value line.</li>
 <li><b>5 Doors</b> Every way out of the card is one full-bleed row: label, target, glyph. Site, Decompress, Snapshot records.</li>
 <li><b>6 Foot + pager</b> Identifiers on the plate (as built today), the pager always last.</li>
@@ -88,7 +89,8 @@ table{border-collapse:collapse;font-size:var(--label);margin-top:14px}th,td{bord
 <h2>4 · What each card uses</h2>
 <table id="matrix"></table>
 <div class="rec"><b>Recommend</b> Adopt the skeleton as a whole. The three changes that carry most of it are: one aside rule (chip or pill), a lead line on every card, and one door row. The breakdown and the foot are already close and mostly need the section label.</div>
-<div class="rec" style="border-color:var(--border);background:transparent"><b>Your calls</b> (a) Chips for every qualifier, or keep the ticker as bare hued text and chip only the rest. (b) A lead on every card, or only where one exists today. (c) One dash for empties, or keep the words. (d) Whether the metagraph's description clamps to two lines.</div>
+<div class="rec"><b>Decided</b> The skeleton, a lead on every card, one dash for empties, a separator between lead and breakdown, State and Data as tabs, the metagraph keeps its type line.</div>
+<div class="rec" style="border-color:var(--border);background:transparent"><b>Still open</b> (a) Chips for every qualifier, or keep the ticker as bare hued text and chip only the rest. (b) Whether the metagraph's description clamps to two lines with "more", or shows in full as today.</div>
 
 <script>
 const h=(t,c,x)=>`<${t}${c?` class="${c}"`:''}>${x??''}</${t}>`;
@@ -102,6 +104,7 @@ const B={ // block renderers
  door:b=>`<div class="door">${b.k?`<span class="k">${b.k}</span>`:''}<span class="${b.p?'p':''}">${b.t}</span><span class="g">${b.g||'↗'}</span></div>`,
  foot:b=>`<div class="foot">${b.rows.map(r=>`<div class="frow"><span class="l">${r[0]}</span><span class="v">${r[1]}</span><span class="c">⧉</span></div>`).join('')}</div>`,
  pager:b=>`<div class="pager ${b.plain?'plain':''}"><span class="b">‹</span>${b.t||''}<span class="b">›</span><span class="sp"></span><span class="b">⌃</span><span class="b">⌄</span></div>`,
+ tabs:b=>`<div class="tabs">${b.t.map((t,i)=>`<span class="${i===0?'on':''}">${t}</span>`).join('')}</div>`,
  pad:()=>`<div class="pad"></div>`
 };
 const card=c=>`<div class="card"><span class="x">×</span><div class="eyebrow">${c.eye}</div><div class="hrow">${c.av?'<span class="av"></span>':`<span class="ico ${c.io?'o':''}"></span>`}<div style="min-width:0"><div class="ttl ${c.mono?'m':''}">${c.title}</div>${c.sub?`<div class="sub">${c.sub}</div>`:''}</div><span class="aside">${c.aside||''}</span></div><div class="hair"></div>${c.body.map(b=>B[b[0]](b[1]||{})).join('')}</div>`;
@@ -138,9 +141,9 @@ const T={ // TODAY
   ['pad'],['door',{t:'▦ &nbsp;Snapshot records'}]]}
 };
 const P={ // PROPOSED
- metagraph:{eye:'Metagraph',av:1,title:'Dor Technologies',aside:'<span class="chip id">DOR</span>',body:[
-  ['lead',{t:'Data and currency metagraph. Decentralized service used for the distribution, validation, and… <span class="more">more</span>'}],
-  ['sec',{l:'Online nodes',caret:1,n:18}],
+ metagraph:{eye:'Metagraph',av:1,title:'Dor Technologies',sub:'data and currency metagraph',aside:'<span class="chip id">DOR</span>',body:[
+  ['lead',{t:'Decentralized service used for the distribution, validation, and incentivization of data produced… <span class="more">more</span>'}],
+  ['hair'],['sec',{l:'Online nodes',caret:1,n:18}],
   ['sched',{rows:[{ax:'Composition',parts:[{l:'Hybrid',n:3,c:O},{l:'Data',n:15,c:'oklch(0.74 0.12 41)'}]},{ax:'Status',parts:[{l:'Ready',n:18,c:G}]},{ax:'Archive depth',parts:[{l:'Full archive',n:0,c:N},{l:'16 months',n:3,c:N},{l:'Unknown',n:15,c:'oklch(0.45 0.03 265)'}]}]}],
   ['pad'],['door',{k:'Site',t:'explorer.getdor.com',p:1}],
   ['foot',{rows:[['ID','DAG0CyySf35ftDQDQ…acMghpnCuM'],['OWNER','DAG0o6WSyvc7Xfz…oLYDD6wqnk']]}],['pager',{t:'2 / 12'}]]},
@@ -159,25 +162,26 @@ const P={ // PROPOSED
   ['fact',{l:'ASN',v:'AS24940'}],['fact',{l:'Nodes',v:'31'}],['fact',{l:'Networks',v:`<i class="d" style="background:${BL}"></i>DAG &nbsp;<i class="d" style="background:${O}"></i>DOR`}],['pad'],['pager',{t:'1 / 9',plain:1}]]},
  snap:{eye:'Global snapshot',mono:1,title:'6,989,808',aside:'<span class="pill pin"><i></i>pinned · 35s ago</span>',body:[
   ['lead',{t:'Anchored by 4 metagraphs.'}],
-  ['sec',{l:'Snapshots anchored',n:14}],
+  ['hair'],['sec',{l:'Snapshots anchored',n:14}],
   ['bars',{max:11,rows:[{l:'DOR',n:11,c:O},{l:'USDC.dag',n:1,c:BL},{l:'DED',n:1,c:BL},{l:'unlisted',n:1,c:N}]}],
   ['hair'],['fact',{l:'Fees paid',v:'0.0890 DAG'}],['fact',{l:'Size',v:'50 KB'}],['fact',{l:'Signed by',v:`125 ${L0} validators`}],
   ['foot',{rows:[['HASH','85b020541219469c1…b3614f34ec'],['PREVIOUS','984b5976bc9414…459a4bad']]}],['pager',{}]]},
  metaSnap:{eye:'Metagraph snapshot',io:1,mono:1,title:'28,642,671',aside:'<span class="chip id">DOR</span>',body:[
   ['lead',{t:'Anchored to 6,989,808 · 35s ago.'}],
-  ['sec',{l:'State',caret:1}],['sec',{l:'Data',caret:1}],
+  ['hair'],['tabs',{t:['State','Data']}],
+  ['fact',{l:'Schema',v:'updates'}],['fact',{l:'Records',v:'1'}],
   ['hair'],['fact',{l:'Fees paid',v:'0.0070 DAG'}],['fact',{l:'Size',v:'4.2 KB compressed'}],['fact',{l:'Signed by',v:`3 ${L0} validators`}],
   ['pad'],['door',{t:'Decompress this snapshot',g:'⤓'}],
   ['foot',{rows:[['HASH','2c34a5f7a6649856e…e11237ff43'],['PREVIOUS','3bc51a3f0488ea…038bb244'],['STATE','c50fb5d76983b54a…74b59c7c6a']]}],['pager',{t:'11 / 11'}]]},
  moment:{eye:'Moment',mono:1,title:'Sep 14, 13:00 UTC',aside:'',body:[
   ['lead',{t:'18 days ago, inside the window on screen.'}],
-  ['sec',{l:'Snapshots',u:'per hour',n:'3,412'}],
+  ['hair'],['sec',{l:'Snapshots',u:'per hour',n:'3,412'}],
   ['bars',{max:1717,rows:[{l:'DOR',n:1717,c:O},{l:'DED',n:1032,c:BL},{l:'UP',n:111,c:O}]}],
   ['pad'],['door',{t:'Snapshot records'}]]}
 };
 const order=[['metagraph','Metagraph'],['composition','Composition'],['node','Node'],['country','Country'],['provider','Provider'],['snap','Global snapshot'],['metaSnap','Metagraph snapshot'],['moment','Moment']];
 document.getElementById('today').innerHTML=order.map(([k,n])=>`<div class="col"><div class="cap"><b>${n}</b></div>${card(T[k])}</div>`).join('');
-const WHY={metagraph:'Subtitle and description merge into a two-line lead. The node total moves onto the section label, so the breakdown has a heading. Site becomes a door row.',composition:'The share becomes the lead: it is the one thing the card says about its parent.',node:'Place and host read as one lead sentence instead of three rows. One dash for the three empty words; the reason stays visible where there is one.',country:'The code is a chip like every other qualifier. The share becomes the lead.',provider:'City as a chip; the count and country say what the cohort is.',snap:'The count sentence splits: the relation is the lead, the total sits on the breakdown’s label. Size is a fact, not a hanging note. Figures are regular weight.',metaSnap:'The relation leaves the aside for the lead, and the aside names the network. State and Data use the section-label form. Decompress is a door.',moment:'The age leaves the aside for the lead. The headline moves onto the section label; the networks use the bar rows the snapshot card uses.'};
+const WHY={metagraph:'The type line stays under the title. The description is the lead, clamped to two lines. A separator, then the node total on the section label so the breakdown has a heading. Site becomes a door row.',composition:'The share becomes the lead: it is the one thing the card says about its parent.',node:'Place and host read as one lead sentence instead of three rows. One dash for the three empty words; the reason stays visible where there is one.',country:'The code is a chip like every other qualifier. The share becomes the lead.',provider:'City as a chip; the count and country say what the cohort is.',snap:'The count sentence splits: the relation is the lead, the total sits on the breakdown’s label. Size is a fact, not a hanging note. Figures are regular weight.',metaSnap:'The relation leaves the aside for the lead, and the aside names the network. State and Data are tabs in the breakdown slot (the cabinet recipe the raw layer uses). Decompress is a door.',moment:'The age leaves the aside for the lead. The headline moves onto the section label; the networks use the bar rows the snapshot card uses.'};
 document.getElementById('pairs').innerHTML=order.map(([k,n])=>`<div class="pair"><div class="col"><div class="cap"><b>${n}</b><span>today</span></div>${card(T[k])}</div><div class="arrow">→</div><div class="col"><div class="cap"><b>${n}</b><span>proposed</span></div>${card(P[k])}<p class="why">${WHY[k]}</p></div></div>`).join('');
 // anatomy card with slot numbers
 const A=JSON.parse(JSON.stringify(P.snap));

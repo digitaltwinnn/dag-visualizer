@@ -61,7 +61,7 @@ import { snapsAtTick } from "@/src/data/anchorLog";
 import { UNLISTED_HUE } from "@/src/data/unlisted";
 import { PAYLOAD_LANES, parsePayload, payloadKinds, stateSchema, unifyFieldKinds } from "@/src/data/payloadKinds";
 import { identityHudCss } from "@/src/palette/identity";
-import { CopyButton, FootRow, IdentityDot, RoleChips } from "@/components/inspector/parts";
+import { CopyButton, FootRow, IdentityDot, RoleChips, TickerChip } from "@/components/inspector/parts";
 import { fmtDag, fmtKB, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import JsonTree, { type JsonTreeCmd } from "@/components/datasection/JsonTree";
@@ -568,7 +568,9 @@ export function ChannelStatePanel() {
         <span className="text-label tracking-caps uppercase text-muted-foreground">Metagraph snapshot</span>
         <span className="flex items-center gap-2 text-title font-semibold text-foreground">
           <IdentityDot hue={hue} />
-          {ticker} <span className="tabular-nums">{sel.ordinal.toLocaleString()}</span>
+          <span className="tabular-nums">{sel.ordinal.toLocaleString()}</span>
+          {/* The ordinal is the title; the network qualifies it — the one ticker chip. */}
+          <TickerChip text={ticker} hue={hue} />
         </span>
       </div>
 
@@ -715,7 +717,7 @@ export function ChannelStatePanel() {
                   from the content"), so the active tab visibly opens INTO the bounded panel
                   (its panel-solid fill already bridges the baseline). Same border weight as the
                   tabs' own (border/50); bottom corners pick up the pane radius. */}
-              <div className={cn(CABINET_BODY, "min-h-0 flex-1 flex flex-col overflow-hidden px-2.5 pt-2 pb-2 max-[700px]:flex-none max-[700px]:overflow-visible")}>
+              <div className={cn(CABINET_BODY, "min-h-0 flex-1 flex flex-col overflow-hidden pt-2 pb-2 max-[700px]:flex-none max-[700px]:overflow-visible")}>
                 {/* ⚠️ EVERY LANE'S PANEL MUST CARRY THE FLEX CHAIN THE PLAIN DIV DID. `TabsContent`
                     inserts a layer between the bordered box and the lane body, so `min-h-0 flex
                     flex-col` has to continue through it — the raw-JSON well below sizes against

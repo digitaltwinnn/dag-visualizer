@@ -99,7 +99,7 @@ function Section({ id, title, lead, children }: { id: string; title: string; lea
       // 20 plus this 32). first:mt-0 leaves the drawer's 20px, matching its own px-5.
       className="mt-8 first:mt-0 scroll-mt-24"
     >
-      <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+      <h2 className="text-xl font-semibold text-foreground">{title}</h2>
       <div className="mt-3 border-t border-border" />
       <p className="mt-3 text-prose text-muted-foreground">{lead}</p>
       {/* ONE COLUMN (user, 2026-09-07): every chart shares the same time axis, so
@@ -428,7 +428,7 @@ export default function TrendsDoc() {
   return (
     <article className="pt-14">
       <p className="text-label tracking-caps uppercase text-muted-foreground">Trends</p>
-      <h1 className="mt-3 text-2xl font-semibold tracking-[-0.01em] leading-tight">
+      <h1 className="mt-3 text-3xl font-semibold tracking-[-0.01em] leading-tight">
         {buckets.length > 1 ? spanPhrase(buckets, stepMs) : "The network, measured"}
       </h1>
       {/* HUMAN VOICE (user, 2026-09-09 — the /about rule reaches every doc page: say what
@@ -512,7 +512,7 @@ export default function TrendsDoc() {
               channel pane's rule), so the active tab's panel-solid fill bridges into it. */}
           {/* QUIET WHILE HELD: the previous window stands in until the new one lands
               (`useTrendsSlice`'s hold) — dimmed, so it never reads as the window the pickers name. */}
-          <div className={cn(CABINET_BODY, "px-5 pb-8 [transition:opacity_200ms_ease] motion-reduce:!transition-none", stale && "opacity-45")}>
+          <div className={cn(CABINET_BODY, "pb-8 [transition:opacity_200ms_ease] motion-reduce:!transition-none", stale && "opacity-45")}>
 
 
           <TabsContent value="hypergraph" className="pt-5">

@@ -62,7 +62,7 @@ export default function HeightEase({
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
   const anim = useRef<Animation | null>(null);
-  const fade = useRef<Animation | null>(null);
+  const fade = useRef<Animation[]>([]);
   const confirm = useRef(0);
   const stretched = useRef<HTMLElement[]>([]);
   const last = useRef(-1);
@@ -199,8 +199,34 @@ export default function HeightEase({
       // are one gesture by construction rather than by agreement.
       if (arriving.current) {
         arriving.current = false;
-        i.style.opacity = "1";
-        fade.current = i.animate([{ opacity: 0 }, { opacity: 1 }], timing);
+        // ⚠️ ONLY WHAT IS NEW ARRIVES (user, 2026-10-02: "clicking a right-rail card briefly hides
+        // the header, while that is unchanged if collapsed or expanded"). The fade used to ride
+        // `i`, the whole occupant, so the head — the same eyebrow, title and aside in both tiers
+        // — blinked out and back on every expand and collapse. A card's head is everything up
+        // to and including the panel child that holds `[data-eyebrow]` (the marker the thread
+        // already reads); what follows it is the body, and that, plus anything beside the panel
+        // (the pager's plank), is what fades. A collapse therefore fades nothing: an entry is
+        // its head. An occupant with no head marker keeps the whole-occupant fade.
+        const targets: Element[] = [];
+        const mark = panel?.querySelector("[data-eyebrow]") ?? null;
+        if (panel && mark) {
+          let headChild: Element = mark;
+          while (headChild.parentElement && headChild.parentElement !== panel) headChild = headChild.parentElement;
+          let after = false;
+          for (const c of Array.from(panel.children)) {
+            if (c === headChild) after = true;
+            else if (after) targets.push(c);
+          }
+          for (let el: HTMLElement = panel; el !== i && el.parentElement; el = el.parentElement) {
+            for (const sib of Array.from(el.parentElement.children)) if (sib !== el) targets.push(sib);
+          }
+        } else {
+          i.style.opacity = "1";
+          targets.push(i);
+        }
+        // `{}` as the end keyframe lands on each element's own computed opacity (a dimmed row
+        // must not flash to 1 on the last frame).
+        fade.current = targets.map((t) => t.animate([{ opacity: 0 }, {}], timing));
         // ⚠️ AND THE RUNG GOES POINTER-INERT WHILE IT ARRIVES (user, 2026-09-13: "when I click a
         // card in the right rail node stack, the focus still gives a blink … it goes from a
         // hovered focus on a square element straight to a rounded corner element. Maybe just let
@@ -222,8 +248,8 @@ export default function HeightEase({
       a.onfinish = a.oncancel = () => {
         if (anim.current === a) {
           anim.current = null;
-          fade.current?.cancel();
-          fade.current = null;
+          for (const f of fade.current) f.cancel();
+          fade.current = [];
           clearStyles();
         }
       };
@@ -233,7 +259,7 @@ export default function HeightEase({
     return () => {
       ro.disconnect();
       cancelAnimationFrame(confirm.current);
-      fade.current?.cancel();
+      for (const f of fade.current) f.cancel();
       anim.current?.cancel();
     };
   }, []);

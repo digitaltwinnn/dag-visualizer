@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   archiveDisplay,
+  archiveReach,
   archiveFactState,
   archiveSummary,
   fmtReach,
@@ -38,7 +39,7 @@ describe("archive value", () => {
       latest: 6_768_000,
       floorTs: new Date(now - 78 * 86_400_000).toISOString(),
     };
-    expect(archiveDisplay(win, "Nov 2023")).toEqual({ genesis: false, reach: "~3 months", count: "241k snapshots" });
+    expect(archiveDisplay(win, "Nov 2023")).toEqual({ genesis: false, value: "3 months", note: "241k of 6.8M snapshots" });
   });
 
   it("a genesis node: Yes, the whole chain with its age and size; deep: No, era only", () => {
@@ -46,15 +47,15 @@ describe("archive value", () => {
     const birth = new Date(now - 450 * 86_400_000).toISOString();
     expect(archiveDisplay({ ...base, kind: "genesis", floor: 1, latest: 1_213_930, floorTs: birth }, "Nov 2023")).toEqual({
       genesis: true,
-      reach: "~15 months",
-      count: "1.2M snapshots",
+      value: "Full",
+      note: "all 1.2M snapshots",
     });
-    expect(archiveDisplay({ ...base, kind: "deep" }, "Nov 2023")).toEqual({ genesis: false, reach: "back to Nov 2023" });
+    expect(archiveDisplay({ ...base, kind: "deep" }, "Nov 2023")).toEqual({ genesis: false, value: "since Nov 2023", note: "with some gaps" });
   });
 
   it("keeps the count when the floor date is unknown", () => {
     const win: ArchiveEntry = { ...base, floor: 100, latest: 5_100, floorTs: null };
-    expect(archiveDisplay(win, "Nov 2023")).toEqual({ genesis: false, reach: undefined, count: "5k snapshots" });
+    expect(archiveDisplay(win, "Nov 2023")).toEqual({ genesis: false, value: "5k snapshots", note: "5k of 5k snapshots" });
   });
 });
 
@@ -105,7 +106,7 @@ describe("archive fact state", () => {
   it("a census entry wins whatever the roles say", () => {
     const s = archiveFactState(entry, "Nov 2023", true, ["l0", "dl1"]);
     expect(s.kind).toBe("value");
-    if (s.kind === "value") expect(s.display).toEqual({ genesis: false, reach: "back to Nov 2023" });
+    if (s.kind === "value") expect(s.display).toEqual({ genesis: false, value: "since Nov 2023", note: "with some gaps" });
   });
 
   it("no L0 process answers n/a immediately, census still in flight", () => {
@@ -177,5 +178,20 @@ describe("archiveSchedule (the dossier's by-archival partition)", () => {
   });
   it("null when the census carries nothing for the chain", () => {
     expect(archiveSchedule(census([]), "x", 3, now)).toBeNull();
+  });
+});
+
+describe("archive reach (the node card's bar)", () => {
+  const e = { ip: "1.1.1.1", chain: "global", floorTs: null };
+  it("a genesis keeper holds the whole chain", () => {
+    expect(archiveReach({ ...e, kind: "genesis", floor: 1, latest: 1000 })).toBe(1);
+  });
+  it("a window is its share of the chain's ordinals", () => {
+    expect(archiveReach({ ...e, kind: "window", floor: 751, latest: 1000 })).toBe(0.25);
+    expect(archiveReach({ ...e, kind: "deep", floor: 501, latest: 1000 })).toBe(0.5);
+  });
+  it("answers null rather than a guess for a reading that cannot say", () => {
+    expect(archiveReach({ ...e, kind: "window", floor: 0, latest: 0 })).toBeNull();
+    expect(archiveReach({ ...e, kind: "window", floor: 20, latest: 10 })).toBeNull();
   });
 });

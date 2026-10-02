@@ -214,6 +214,7 @@ export default function RailPager({
   const inspect = useStore((s) => s.inspect);
   const snap = useStore((s) => s.snap);
   const metaSnap = useStore((s) => s.metaSnap);
+  const tickNet = useStore((s) => s.tickNet);
   const selNodes = useStore((s) => s.selNodes);
   const metaList = useStore((s) => s.metaList);
   const leaderboard = useStore((s) => s.leaderboard);
@@ -249,6 +250,7 @@ export default function RailPager({
       composition,
       inspect,
       snap,
+      tickNet,
       metaSnap,
       selNodes,
       metaList,
@@ -268,7 +270,7 @@ export default function RailPager({
       // A finer COMMITTED rung wins over a fresh commit — the pile is stepped, not re-built.
       child: downSlot == null ? childStep(slot, state) : null,
     };
-  }, [slot, downSlot, mode, filter, country, cohort, composition, inspect, snap, metaSnap, selNodes, metaList, leaderboard, snapshotExact, following, snapsForTicks]);
+  }, [slot, downSlot, mode, filter, country, cohort, composition, inspect, snap, tickNet, metaSnap, selNodes, metaList, leaderboard, snapshotExact, following, snapsForTicks]);
 
   // --- swipe state: ALL refs. Nothing here re-renders — the transform is written to the node. ---
   const wrap = useRef<HTMLDivElement | null>(null);

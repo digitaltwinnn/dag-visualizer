@@ -38,7 +38,7 @@ function Val({ v }: { v: unknown }) {
       );
     }
     case "number":
-      return <span className="text-[var(--primary)] tabular-nums">{String(v)}</span>;
+      return <span className="text-primary-ink tabular-nums">{String(v)}</span>;
     case "boolean":
       return <span className="text-warn-soft">{String(v)}</span>;
     default:

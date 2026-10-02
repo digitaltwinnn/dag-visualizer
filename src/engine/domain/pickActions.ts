@@ -14,7 +14,8 @@
 //     matches `domain/focusLadder.ts`'s finerLevels() exactly, so pickActions can't drift
 //     from the ladder even though the drop list is hand-written per builder.
 import type { Mode } from "@/src/store/store";
-import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
+import type { PickDescriptor, MetaSnapSel, TickNetSel } from "@/src/data/types";
+import { METAGRAPHS } from "@/src/net/current";
 import type { CohortSel, CompositionSel } from "./focusLadder";
 import { UNLISTED_KEY } from "./ledgerBands";
 import { VIEW_POLICIES } from "./viewPolicy";
@@ -28,6 +29,9 @@ export type ClickAction =
   // Select a snapshot (follow decides pin vs heartbeat) — or CLEAR it (pick null, follow
   // omitted: the follow state is untouched; FollowController owns the re-follow).
   | { kind: "snapshot"; pick: Extract<PickDescriptor, { kind: "snapshot" }> | null; follow?: boolean }
+  // Commit/clear the network INSIDE the pinned tick — the ledger's Metagraph rung. NOT the filter:
+  // see `tickNetSelectActions` and `domain/tickNet.ts`.
+  | { kind: "tickNet"; sel: TickNetSel | null }
   | { kind: "metaSnap"; sel: MetaSnapSel | null }
   // Bring a trend plane forward, or release the focused one (null) — a VIEW-LOCAL emphasis, not a
   // selection rung: see `trendPlaneActions`.
@@ -207,20 +211,25 @@ export function filterToggleActions(id: string, currentFilter: string): ClickAct
 // (the FollowController only auto-advances while following).
 /** CLEARING A GLOBAL SNAPSHOT — its card's × and the pinned tick's re-click, one builder (user,
  *  2026-09-29: "deleting a snapshot card will clear the rung that is there at that moment"; live
- *  stays the default). The tick is the ledger rail's PARENT: the metagraph card (the committed
- *  filter — the DAG's included, the base ledger's lens) and its metagraph snapshot hang under it,
- *  so they clear with it, finest first, and live resumes. The filter has to go too, not just the
- *  metaSnap: with a metagraph committed, live follow RE-GROWS that network's newest snapshot card
- *  on the next beat (`followLatest`'s live metagraph mode), which is how the × used to leave the
- *  children standing. Only what is there right now is cleared. */
-export function snapshotClearActions(current: { metaSnap: MetaSnapSel | null; filter: string; hasInspect?: boolean }): ClickAction[] {
+ *  stays the default). The tick is the ledger rail's PARENT: the tick-local network, its metagraph
+ *  snapshot and a node under it hang from it, so they clear with it, finest first, and live
+ *  resumes. Only what is there right now is cleared.
+ *
+ *  ⚠️ NOT THE FILTER (user, 2026-10-02: "I want that changed too" — closing the last exception to
+ *  "no selection in Snapshots writes the filter"). It used to clear a committed filter here,
+ *  because with one set, live follow re-grows that network's newest snapshot card on the next
+ *  beat and the × seemed to leave the children standing. That is simply what live means under a
+ *  lens: the × releases the PIN, and the card goes back to following the filtered network's
+ *  newest tick. The filter is cleared where it is set — the top bar. */
+export function snapshotClearActions(current: { metaSnap: MetaSnapSel | null; hasInspect?: boolean; tickNet?: TickNetSel | null }): ClickAction[] {
   const out: ClickAction[] = [];
   // The NODE is the ledger ladder's finest rung (a metagraph snapshot's validator, `∨`), so a node
   // card left standing under a cleared tick would hang from nothing — and its pager, losing the
   // signer set, would fall back to walking every node.
   if (current.hasInspect) out.push({ kind: "inspect", pick: null });
   if (current.metaSnap) out.push({ kind: "metaSnap", sel: null });
-  if (current.filter !== "all") out.push({ kind: "filter", id: "all" });
+  // The network committed INSIDE this tick hangs under it by construction, so it goes with it.
+  if (current.tickNet) out.push({ kind: "tickNet", sel: null });
   out.push({ kind: "snapshot", pick: null, follow: true });
   return out;
 }
@@ -231,13 +240,9 @@ export function snapshotSelectActions(
   current?: {
     pinnedOrdinal: number | null;
     metaSnap: MetaSnapSel | null;
-    /** The committed network filter + whether the clicked tick's anchor set contains it. A
-     *  FILTER IS A STORY (user, 2026-08-07): pinning a tick the committed network did NOT
-     *  anchor into releases the filter back to "all" — otherwise the network dim keeps
-     *  shaping a snapshot that has nothing to do with it. Omitted = the filter holds. */
-    filter?: string;
-    tickHasFilter?: boolean;
     hasInspect?: boolean;
+    /** The network committed inside the pinned tick, if any — it belongs to THAT tick. */
+    tickNet?: TickNetSel | null;
   },
 ): ClickAction[] {
   // RE-CLICKING the pinned tick DESELECTS (2026-08-07 — the toggle every other rung already
@@ -245,15 +250,16 @@ export function snapshotSelectActions(
   // default until something is clicked — the FollowController repopulates the card chain and
   // the trail slides back to the live front).
   if (!isLiveTip && current && current.pinnedOrdinal != null && current.pinnedOrdinal === p.data.ordinal) {
-    return snapshotClearActions({ metaSnap: current.metaSnap, filter: current.filter ?? "all", hasInspect: current.hasInspect });
+    return snapshotClearActions({ metaSnap: current.metaSnap, hasInspect: current.hasInspect, tickNet: current.tickNet });
   }
   const out: ClickAction[] = [];
-  if (
-    current?.filter && current.filter !== "all" && current.filter !== "dag" &&
-    current.tickHasFilter === false
-  ) {
-    out.push({ kind: "filter", id: "all" });
-  }
+  // ⚠️ NO SELECTION IN SNAPSHOTS WRITES THE FILTER (user, 2026-10-02: "consistent, and a filter
+  // should not be changed from the explorer, so no reset also"). "A filter is a story" (2026-08-07)
+  // used to RELEASE the filter here when the pinned tick held nothing of the filtered network, so
+  // the explorer's rows reset the top bar while tiles and bands kept it — two behaviours. The
+  // filter is the reader's lens and stays what they set; a tick the lens has nothing in is shown
+  // as exactly that (the chamber dims, the explorer row is faint, and the rail's Metagraph card
+  // stands down — `domain/tickNet.ledgerCardNetwork`).
   // A METAGRAPH SNAPSHOT ANCHORS INTO EXACTLY ONE TICK, so committing a DIFFERENT tick drops it
   // (user, 2026-08-10). This is stronger than the filter's story rule one rung up: that one is
   // about set membership, this is a one-to-one join (`metagraph.timestamp === global.timestamp`),
@@ -263,9 +269,61 @@ export function snapshotSelectActions(
   if (current?.metaSnap && current.metaSnap.globalOrdinal !== p.data.ordinal) {
     out.push({ kind: "metaSnap", sel: null });
   }
+  // …and so does the network committed INSIDE the old tick (2026-10-02): it is "this network in
+  // THAT tick", so under another tick's card it would claim a membership nobody committed. The
+  // resolver already refuses to honour it there (`ledgerNetwork`); this keeps the store honest.
+  if (current?.tickNet && current.tickNet.globalOrdinal !== p.data.ordinal) {
+    out.push({ kind: "tickNet", sel: null });
+  }
   out.push({ kind: "snapshot", pick: p, follow: isLiveTip });
   return out;
 }
+
+/** THE NETWORK INSIDE A TICK (user, 2026-10-02) — the ledger's Metagraph rung, committed WITHOUT
+ *  the filter. The pager's ∨ from the tick card, its ‹ › between that tick's networks, the byte
+ *  bar's band and a snapshot tile's ancestry all land here.
+ *
+ *  It replaces "the filter IS the step" (2026-09-15): stepping down from a card re-scoped the whole
+ *  app — the top bar, the other views, the lists — from a pager, and the commit outlived the visit.
+ *  The chamber still answers exactly as it did (the coloured dim, the commit tilt, the Metagraph
+ *  card), because every ledger surface resolves through `domain/tickNet.ledgerNetwork`; only the
+ *  app-wide lens is left alone.
+ *
+ *  It always PINS the tick (`follow: false`): the commit is "this network in THIS tick", so a live
+ *  tick advancing underneath would orphan it on the next beat. A network the held snapshot does
+ *  not belong to drops that snapshot first — releases first, coarse → fine, subject last. */
+export function tickNetSelectActions(
+  metaId: string,
+  global: Extract<PickDescriptor, { kind: "snapshot" }>,
+  current: { metaSnap: MetaSnapSel | null; hasInspect?: boolean; net?: string | null },
+): ClickAction[] {
+  const out: ClickAction[] = [];
+  // A NODE hangs under the network it was opened from, so moving to ANOTHER network drops it —
+  // the filter's own cascade did this while the rung was the filter; a tick-local commit has no
+  // such cascade, and a Dor validator left under "Metagraph Paca" states a membership nobody
+  // committed. Finest first, like every release.
+  if (current.hasInspect && current.net !== metaId) out.push({ kind: "inspect", pick: null });
+  if (current.metaSnap && current.metaSnap.metaId !== metaId) out.push({ kind: "metaSnap", sel: null });
+  out.push({ kind: "snapshot", pick: global, follow: false });
+  out.push({ kind: "tickNet", sel: { metaId, globalOrdinal: global.data.ordinal } });
+  return out;
+}
+
+/** The tick-local Metagraph card's × — everything that hangs under it, finest first, then the
+ *  network itself. The tick stays: it is the parent, and its own × is `snapshotClearActions`. */
+export function tickNetClearActions(current: { metaSnap: MetaSnapSel | null; hasInspect?: boolean }): ClickAction[] {
+  const out: ClickAction[] = [];
+  if (current.hasInspect) out.push({ kind: "inspect", pick: null });
+  if (current.metaSnap) out.push({ kind: "metaSnap", sel: null });
+  out.push({ kind: "tickNet", sel: null });
+  return out;
+}
+
+/** The tick-local network a metagraph snapshot's commit carries: its own network when that is a
+ *  catalogued one, else NULL — and null is WRITTEN, not skipped, so an unlisted channel (or a
+ *  seam row) never sits under a network left standing from the previous commit in the same tick. */
+const tickNetOf = (sel: MetaSnapSel | null, global: Extract<PickDescriptor, { kind: "snapshot" }>): TickNetSel | null =>
+  sel && METAGRAPHS.some((m) => m.id === sel.metaId) ? { metaId: sel.metaId, globalOrdinal: global.data.ordinal } : null;
 
 // Metagraph snapshot identity — metaId + ordinal (the snapshot's own ordinal, not the global one).
 export const sameMetaSnap = (a: MetaSnapSel | null, b: MetaSnapSel | null): boolean =>
@@ -281,7 +339,13 @@ export const sameMetaSnap = (a: MetaSnapSel | null, b: MetaSnapSel | null): bool
  *  the chamber, the list and the other views, and the commit outlived the visit (user: "click dor,
  *  then click the actual dor snapshot: it does filter"). A snapshot is a record in a tick; the
  *  filter is a lens over the whole app, and only the top bar's picker and the Hypergraph's hub
- *  and network rows set it now. Full ancestry here is tick → snapshot. */
+ *  and network rows set it now.
+ *
+ *  FULL ANCESTRY IS tick → network → snapshot (user, 2026-10-02: "the parent rung is incomplete;
+ *  it should ensure it is complete and also select the related details card"). Dropping the filter
+ *  left the Metagraph rung between the two EMPTY, because that rung had no state but the filter.
+ *  It commits the tick-local network now (`tickNet`), which fills the rung and writes nothing
+ *  app-wide. An UNLISTED channel names no catalogued network, so that rung stays honestly empty. */
 export function metaSnapSelectActions(
   sel: MetaSnapSel,
   global: Extract<PickDescriptor, { kind: "snapshot" }>,
@@ -291,10 +355,10 @@ export function metaSnapSelectActions(
   // is auto-selected — clicking it must CONVERT the auto-selection into an explicit pin (the
   // click-scoped decode rule, user 2026-08-07), not silently deselect.
   if (sameMetaSnap(current.metaSnap, sel) && !current.following) return [{ kind: "metaSnap", sel: null }];
-  return [
-    { kind: "snapshot", pick: global, follow: false },
-    { kind: "metaSnap", sel },
-  ];
+  const out: ClickAction[] = [{ kind: "snapshot", pick: global, follow: false }];
+  out.push({ kind: "tickNet", sel: tickNetOf(sel, global) });
+  out.push({ kind: "metaSnap", sel });
+  return out;
 }
 
 /** A PLANE in the History view's stack (2026-09-18) — and it is FOCUS ONLY.
@@ -334,6 +398,8 @@ export function metaSnapArrivalActions(
 ): ClickAction[] {
   return [
     { kind: "snapshot", pick: global, follow: false },
+    // The full ancestry, as a click builds it — and a stale network from the same tick is replaced.
+    { kind: "tickNet", sel: tickNetOf(sel, global) },
     { kind: "metaSnap", sel },
   ];
 }
@@ -344,17 +410,20 @@ export function metaSnapArrivalActions(
 export function bandSelectActions(
   metaId: string,
   global: Extract<PickDescriptor, { kind: "snapshot" }>,
-  current: { filter: string; metaSnap: MetaSnapSel | null; tickHasFilter?: boolean },
+  current: { metaSnap: MetaSnapSel | null; hasInspect?: boolean; net?: string | null },
 ): ClickAction[] {
   const out: ClickAction[] = [];
   const listed = metaId !== UNLISTED_KEY;
-  if (listed && current.filter !== metaId) out.push({ kind: "filter", id: metaId });
-  // The UNLISTED band can't filter-first, so it carries the RELEASE rule itself (2026-08-08,
-  // review fix — a listed band's filter-first makes the new filter in-story by construction,
-  // but the unlisted band of an out-of-story tick would leave a stale filter dimming it).
-  if (!listed && current.tickHasFilter === false) out.push({ kind: "filter", id: "all" });
+  // Another network's band drops the node committed under the old one (see `tickNetSelectActions`).
+  if (current.hasInspect && current.net !== metaId) out.push({ kind: "inspect", pick: null });
+  // The UNLISTED band names no network, so it commits the tick alone — and, like every Snapshots
+  // selection, it leaves the filter as the reader set it (see `snapshotSelectActions`).
   if (current.metaSnap) out.push({ kind: "metaSnap", sel: null });
   out.push({ kind: "snapshot", pick: global, follow: false });
+  // THE NETWORK HALF OF THE PAIR IS TICK-LOCAL (2026-10-02) — it used to filter-first, the last
+  // ledger gesture still committing the app filter; now it is the same commit the tile and the
+  // pager's ∨ make (`tickNetSelectActions`), coarse → fine, subject last.
+  if (listed) out.push({ kind: "tickNet", sel: { metaId, globalOrdinal: global.data.ordinal } });
   return out;
 }
 
@@ -367,7 +436,11 @@ export function followToggleActions(
   shown: Extract<PickDescriptor, { kind: "snapshot" }>,
   following: boolean,
 ): ClickAction[] {
-  return [{ kind: "snapshot", pick: shown, follow: !following }];
+  // Resuming live releases the tick-local network first: it is "this network in THAT tick", and
+  // left standing it kept the chamber dimmed for it until the next beat — and came back from a
+  // plain click on the same tick later.
+  if (!following) return [{ kind: "tickNet", sel: null }, { kind: "snapshot", pick: shown, follow: true }];
+  return [{ kind: "snapshot", pick: shown, follow: false }];
 }
 
 export function clickActions(input: {
@@ -383,9 +456,10 @@ export function clickActions(input: {
   current: {
     filter: string; country: string | null; hasInspect: boolean; cohort: CohortSel | null;
     // Ledger: the pinned tick + its metaSnap child — a scene band click on the pinned tick
-    // deselects, same as the explorer row (the toggle rule; omitted = never toggles) — and
-    // whether the clicked tick's anchors include the committed filter (the filter-releases rule).
-    pinnedOrdinal?: number | null; metaSnap?: MetaSnapSel | null; tickHasFilter?: boolean;
+    // deselects, same as the explorer row (the toggle rule; omitted = never toggles).
+    pinnedOrdinal?: number | null; metaSnap?: MetaSnapSel | null;
+    // …and the network committed inside the pinned tick, which a different tick's click drops.
+    tickNet?: TickNetSel | null;
   };
 }): ClickAction[] {
   const { mode, pick: p, countryCc, current } = input;
@@ -404,9 +478,8 @@ export function clickActions(input: {
     return snapshotSelectActions(p, false, {
       pinnedOrdinal: current.pinnedOrdinal ?? null,
       metaSnap: current.metaSnap ?? null,
-      filter: current.filter,
-      tickHasFilter: current.tickHasFilter,
       hasInspect: current.hasInspect,
+      tickNet: current.tickNet,
     });
 
   // A node, in any view. (No autoRotate action: geo disables the controls' rotation at mode
