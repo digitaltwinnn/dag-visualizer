@@ -99,7 +99,7 @@ const Dash = () => (
 // explorer stamps metagraph snapshots with the anchoring global's own timestamp). Until it
 // resolves the cell reads "…" and the row does not commit: a metagraph-snapshot selection IS
 // the (snapshot, tick) pair, and committing half of it would break every downstream consumer.
-export default function AnchorLogTable() {
+export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens the snapshot's own page (RecordsSurface) — see the row's `commit`. */ onOpen?: () => void } = {}) {
   useSnapshotFeed(MAX); // re-render driver: global + anchor events (the buffers below refresh)
   const filter = useStore((s) => s.filter);
   const live = useStore((s) => s.live);
@@ -807,8 +807,14 @@ export default function AnchorLogTable() {
         {/* PHONE SETS THE LOG AT THE LABEL STEP (2026-10-02, the phone pass): the type scale raised
             the table's 14px rows with everything else, and the four columns that survive on phone
             (see COLUMNS) outgrew the pane again — AGE was cut off at the right edge. */}
-        <Table className="max-[700px]:[&_td]:text-label">
-          <TableHeader className="sticky top-0 z-10 bg-[var(--panel-solid)] backdrop-blur-md">
+        <Table className="max-[700px]:block max-[700px]:[&_tbody]:block">
+          {/* TWO-LINE ROWS ON PHONE (design 2026-10-02, option E): the header stands down — a row
+              names its own parts there — and each row is network · snapshot · age over one muted
+              line of "into <global> · fee · size". That brings fee and size back on phone and
+              ends the column squeeze for good (the four-column table was cut off at the edge
+              twice). Sorting by header is a desktop/tablet affordance; the phone list is the
+              log in its natural order. */}
+          <TableHeader className="sticky top-0 z-10 bg-[var(--panel-solid)] backdrop-blur-md max-[700px]:hidden">
             <TableRow className="border-border">
               {COLUMNS.map((c, i) => (
                 <TableHead
@@ -855,6 +861,11 @@ export default function AnchorLogTable() {
               const pending = !!r.pending;
               const commit = () => {
                 if (pending) return; // half a (snapshot, tick) pair must not commit
+                // PHONE: the list and the snapshot are two pages (design 2026-10-02, option B), so
+                // a tap on the ALREADY-selected row opens its page rather than deselecting it —
+                // there the toggle would close the very thing the reader asked to read.
+                if (onOpen && rowSel) return onOpen();
+                if (onOpen && !seam) queueMicrotask(onOpen);
                 if (seam || r.metaId == null) {
                   // Nothing anchored here, so the only subject is the TICK — commit it alone rather
                   // than inventing a metagraph snapshot the row does not have (rule 10).
@@ -887,6 +898,8 @@ export default function AnchorLogTable() {
                   // the accent.
                   className={cn(
                     "text-body hover:bg-[color-mix(in_oklch,var(--row-hue,var(--primary))_12%,transparent)]",
+                    // Phone: the row is a three-column grid with the detail line spanning beneath.
+                    "max-[700px]:grid max-[700px]:grid-cols-[auto_minmax(0,1fr)_auto] max-[700px]:items-baseline max-[700px]:[&>td]:pb-0 max-[700px]:[&>td:last-child]:pb-2",
                     pending ? "cursor-default" : "cursor-pointer",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                     rowSel && "bg-[var(--sel-bg)] text-foreground",
@@ -959,7 +972,7 @@ export default function AnchorLogTable() {
                   </TableCell>
                   <TableCell className={cn("text-right tabular-nums", PHONE_HIDDEN)}>{seam ? <Dash /> : fmtDag(r.fee)}</TableCell>
                   <TableCell className={cn("text-right tabular-nums text-foreground-dim", PHONE_HIDDEN)}>{seam ? <Dash /> : fmtKB(r.sizeInKB)}</TableCell>
-                  <TableCell className="text-right font-mono tabular-nums">
+                  <TableCell className="text-right font-mono tabular-nums max-[700px]:hidden">
                     {pending ? <span className="text-muted-foreground">…</span> : r.global.ordinal.toLocaleString()}
                   </TableCell>
                   <TableCell className="text-right text-muted-foreground">
@@ -968,6 +981,15 @@ export default function AnchorLogTable() {
                         holding this table in sideways scroll. */}
                     <span className="max-[700px]:hidden">{relativeAge(now - Date.parse(r.ts))}</span>
                     <span className="min-[700px]:hidden">{relativeAge(now - Date.parse(r.ts), true)}</span>
+                  </TableCell>
+                  {/* The phone row's SECOND LINE — where it anchored, what it paid, how big it was.
+                      One muted line under the row's identity; absent from the table tiers, whose
+                      columns state the same three. A seam has only its tick. */}
+                  <TableCell className="min-[700px]:hidden col-span-full pt-0 text-label text-muted-foreground whitespace-normal">
+                    <span className="font-mono tabular-nums">
+                      into {pending ? "…" : r.global.ordinal.toLocaleString()}
+                      {!seam && <> · {fmtDag(r.fee)} DAG · {fmtKB(r.sizeInKB)}</>}
+                    </span>
                   </TableCell>
                 </TableRow>
               );

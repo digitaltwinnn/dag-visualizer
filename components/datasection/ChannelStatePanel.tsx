@@ -63,6 +63,7 @@ import { PAYLOAD_LANES, parsePayload, payloadKinds, stateSchema, unifyFieldKinds
 import { identityHudCss } from "@/src/palette/identity";
 import { CopyButton, FootRow, IdentityDot, RoleChips, TickerChip } from "@/components/inspector/parts";
 import { fmtDag, fmtKB, midHash } from "@/src/util/format";
+import { useBreakpoint } from "@/components/useBreakpoint";
 import { relativeAge } from "@/src/util/relativeAge";
 import JsonTree, { type JsonTreeCmd } from "@/components/datasection/JsonTree";
 import { LANE_ICONS } from "@/components/icons";
@@ -475,6 +476,10 @@ function SignerGroup({
 export function ChannelStatePanel() {
   const coarse = usePointerCoarse(); // the invitation names the gesture — Tap on touch
   const sel = useStore((s) => s.metaSnap);
+  // The foot's hash budgets on PHONE: the line is `LABEL  hash  [copy]` in ~290px, so the budget is
+  // what the label leaves — the desktop 46 cut the tail off, and the tail identifies a hash.
+  const phone = useBreakpoint() === "phone";
+  const hashFor = (v: string, phoneChars: number): string => (phone ? midHash(v, phoneChars) : paneHash(v));
   const deep = useStore((s) => (sel ? s.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal)] : undefined));
   const following = useStore((s) => s.following);
   const selNodes = useStore((s) => s.selNodes);
@@ -798,9 +803,9 @@ export function ChannelStatePanel() {
             // own inset, so the values still share an edge — the tab box's, which is the pane's
             // visible frame on that tier.
             <div className="flex-none flex flex-col gap-1 rounded-md bg-[var(--panel-plate)] px-2.5 -mx-2.5 py-2 max-[700px]:mx-0">
-              {hash && <FootRow label="Hash" value={paneHash(hash)} title={hash} copy={hash} />}
+              {hash && <FootRow label="Hash" value={hashFor(hash, 24)} title={hash} copy={hash} />}
               {deep.lastSnapshotHash && (
-                <FootRow label="Previous hash" value={paneHash(deep.lastSnapshotHash)} title={deep.lastSnapshotHash} copy={deep.lastSnapshotHash} />
+                <FootRow label="Previous hash" value={hashFor(deep.lastSnapshotHash, 15)} title={deep.lastSnapshotHash} copy={deep.lastSnapshotHash} />
               )}
               {deep.stateProof && (
                 // "State HASH", not "state proof" (user, 2026-08-14 — the SIGNERS tab says
@@ -808,7 +813,7 @@ export function ChannelStatePanel() {
                 // word one screen apart and read as kin). It is a digest, the same species as
                 // its Hash/Parent siblings; the chain field stays calculatedStateProof (internal
                 // identifiers keep their names). The title carries the distinction.
-                <FootRow label="State hash" value={paneHash(deep.stateProof)} title={"The hash of the application state this snapshot results in, covered by the snapshot's L0 signatures — the state's provability. Distinct from the SIGNERS tab's 'snapshot proof', which is the L0 signature set; this is a digest, and the signatures sign over it." + deep.stateProof} copy={deep.stateProof} />
+                <FootRow label="State hash" value={hashFor(deep.stateProof, 18)} title={"The hash of the application state this snapshot results in, covered by the snapshot's L0 signatures — the state's provability. Distinct from the SIGNERS tab's 'snapshot proof', which is the L0 signature set; this is a digest, and the signatures sign over it." + deep.stateProof} copy={deep.stateProof} />
               )}
             </div>
           )}
