@@ -1,7 +1,8 @@
 "use client";
 
 import { CircleHelp } from "lucide-react";
-import { ledgerNetwork } from "@/src/engine/domain/tickNet";
+import { ledgerCardNetwork } from "@/src/engine/domain/tickNet";
+import { useTickHasFilter } from "@/components/useTickHasFilter";
 import { tickNetClearActions } from "@/src/engine/domain/pickActions";
 import { useStore } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -36,8 +37,13 @@ export default function ContextCard({
   // (`ledgerNetwork`, 2026-10-02) — so the Metagraph rung under a tick is this same dossier
   // without the top bar being written. `filter` below is that resolved id.
   const appFilter = useStore((s) => s.filter);
+  // …and it STANDS DOWN ("all") under a tick the filtered network did not anchor into
+  // (`ledgerCardNetwork`) — the filter itself is left alone.
+  const tickHasFilter = useTickHasFilter();
   const filter = useStore((s) =>
-    s.mode === "ledger" ? ledgerNetwork({ filter: s.filter, tickNet: s.tickNet, snapOrdinal: s.snap?.data.ordinal ?? null }) : s.filter,
+    s.mode === "ledger"
+      ? ledgerCardNetwork({ filter: s.filter, tickNet: s.tickNet, snapOrdinal: s.snap?.data.ordinal ?? null, tickHasFilter })
+      : s.filter,
   );
   // The × clears what the card STANDS ON: a tick-local network clears itself and what hangs under
   // it (the tick stays); the filter clears the filter, as it always did.

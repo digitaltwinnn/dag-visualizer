@@ -21,6 +21,21 @@ export function ledgerNetwork(s: { filter: string; tickNet: TickNetSel | null; s
   return s.filter;
 }
 
+/** The network the rail's METAGRAPH CARD shows in the ledger — `ledgerNetwork`, less one case
+ *  (user, 2026-10-02: "third, smaller route"). The filter is a lens over the whole app and a click
+ *  inside Snapshots never moves it; but the rail stacks cards as containment, so a filtered
+ *  network's card under a tick it did NOT anchor into states a membership that is false. There the
+ *  card stands down (`"all"` = no card) and the filter stays exactly what the reader set. A
+ *  tick-local network is in its tick by construction, and an unknown verdict (`undefined` — the
+ *  count still settling, no exact read yet) never hides anything. The chamber's dim and tilt keep
+ *  reading `ledgerNetwork`: a lens with nothing in view is an honest picture. */
+export function ledgerCardNetwork(s: { filter: string; tickNet: TickNetSel | null; snapOrdinal: number | null; tickHasFilter?: boolean }): string {
+  const net = ledgerNetwork(s);
+  const local = !!s.tickNet && s.snapOrdinal != null && s.tickNet.globalOrdinal === s.snapOrdinal;
+  if (!local && s.snapOrdinal != null && s.tickHasFilter === false) return "all";
+  return net;
+}
+
 /** Tick-network identity — the network and the tick it is committed inside. */
 export const sameTickNet = (a: TickNetSel | null, b: TickNetSel | null): boolean =>
   a === b || (!!a && !!b && a.metaId === b.metaId && a.globalOrdinal === b.globalOrdinal);

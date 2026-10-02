@@ -11,6 +11,7 @@ import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { compositionGroups } from "@/src/data/composition";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import CardHead, { RailPane } from "@/components/CardHead";
+import { useTickHasFilter } from "@/components/useTickHasFilter";
 import InspectorCard from "@/components/InspectorCard";
 import ContextCard from "@/components/ContextCard";
 import RailThread from "@/components/RailThread";
@@ -369,8 +370,9 @@ export default function Inspector() {
   const selNodes = useStore((s) => s.selNodes);
   const coarse = usePointerCoarse();
   const trendCursorMs = useStore((s) => s.trendCursorMs);
+  const tickHasFilter = useTickHasFilter();
   const manifest = detailsCards({
-    mode, filter, tickNet, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs,
+    mode, filter, tickNet, tickHasFilter, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs,
     selNodesCount: selNodes.length,
     filterLabel: displayNetwork(filter)?.ticker ?? null, // one lookup — catalog + the unlisted pseudo-network
   });
