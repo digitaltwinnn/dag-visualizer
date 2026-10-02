@@ -420,8 +420,6 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
           {
             pinnedOrdinal: s.following ? null : cur.data.ordinal,
             metaSnap: s.metaSnap,
-            filter: s.filter,
-            tickHasFilter: t.inStory,
             tickNet: s.tickNet,
           },
         ),
@@ -506,7 +504,12 @@ const firstNodeOfComposition = (s: SiblingState): SiblingStep | null => {
  *  because a filter commit in the ledger re-enters live). An UNLISTED channel names no network,
  *  so there is nothing to commit and the control dims. */
 const firstAnchoringNetwork = (s: SiblingState): SiblingStep | null => {
-  if (netOf(s) !== "all" || !s.snap) return null;
+  if (!s.snap) return null;
+  // A network already stands under the tick — unless it is the FILTER's and this tick holds nothing
+  // of it, where its card has stood down (`ledgerCardNetwork`) and ∨ steps into the tick's own
+  // first network instead of going dead.
+  const stoodDown = s.tickNet == null && s.ticks.find((t) => t.data.ordinal === s.snap!.data.ordinal)?.inStory === false;
+  if (netOf(s) !== "all" && !stoodDown) return null;
   const meta = tickNetworks(s)?.[0];
   return meta ? { key: meta.id, label: meta.name, actions: tickNetSelectActions(meta.id, s.snap, { metaSnap: s.metaSnap, hasInspect: s.inspect != null, net: null }) } : null;
 };

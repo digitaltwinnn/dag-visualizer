@@ -237,12 +237,6 @@ export function snapshotSelectActions(
   current?: {
     pinnedOrdinal: number | null;
     metaSnap: MetaSnapSel | null;
-    /** The committed network filter + whether the clicked tick's anchor set contains it. A
-     *  FILTER IS A STORY (user, 2026-08-07): pinning a tick the committed network did NOT
-     *  anchor into releases the filter back to "all" — otherwise the network dim keeps
-     *  shaping a snapshot that has nothing to do with it. Omitted = the filter holds. */
-    filter?: string;
-    tickHasFilter?: boolean;
     hasInspect?: boolean;
     /** The network committed inside the pinned tick, if any — it belongs to THAT tick. */
     tickNet?: TickNetSel | null;
@@ -253,15 +247,18 @@ export function snapshotSelectActions(
   // default until something is clicked — the FollowController repopulates the card chain and
   // the trail slides back to the live front).
   if (!isLiveTip && current && current.pinnedOrdinal != null && current.pinnedOrdinal === p.data.ordinal) {
-    return snapshotClearActions({ metaSnap: current.metaSnap, filter: current.filter ?? "all", hasInspect: current.hasInspect, tickNet: current.tickNet });
+    // `filter: "all"` = leave the filter alone: a re-click is a selection gesture, and those never
+    // write the filter (below). Only the card's own × clears it, with everything under the tick.
+    return snapshotClearActions({ metaSnap: current.metaSnap, filter: "all", hasInspect: current.hasInspect, tickNet: current.tickNet });
   }
   const out: ClickAction[] = [];
-  if (
-    current?.filter && current.filter !== "all" && current.filter !== "dag" &&
-    current.tickHasFilter === false
-  ) {
-    out.push({ kind: "filter", id: "all" });
-  }
+  // ⚠️ NO SELECTION IN SNAPSHOTS WRITES THE FILTER (user, 2026-10-02: "consistent, and a filter
+  // should not be changed from the explorer, so no reset also"). "A filter is a story" (2026-08-07)
+  // used to RELEASE the filter here when the pinned tick held nothing of the filtered network, so
+  // the explorer's rows reset the top bar while tiles and bands kept it — two behaviours. The
+  // filter is the reader's lens and stays what they set; a tick the lens has nothing in is shown
+  // as exactly that (the chamber dims, the explorer row is faint, and the rail's Metagraph card
+  // stands down — `domain/tickNet.ledgerCardNetwork`).
   // A METAGRAPH SNAPSHOT ANCHORS INTO EXACTLY ONE TICK, so committing a DIFFERENT tick drops it
   // (user, 2026-08-10). This is stronger than the filter's story rule one rung up: that one is
   // about set membership, this is a one-to-one join (`metagraph.timestamp === global.timestamp`),
@@ -412,15 +409,14 @@ export function metaSnapArrivalActions(
 export function bandSelectActions(
   metaId: string,
   global: Extract<PickDescriptor, { kind: "snapshot" }>,
-  current: { filter: string; metaSnap: MetaSnapSel | null; tickHasFilter?: boolean; hasInspect?: boolean; net?: string | null },
+  current: { metaSnap: MetaSnapSel | null; hasInspect?: boolean; net?: string | null },
 ): ClickAction[] {
   const out: ClickAction[] = [];
   const listed = metaId !== UNLISTED_KEY;
   // Another network's band drops the node committed under the old one (see `tickNetSelectActions`).
   if (current.hasInspect && current.net !== metaId) out.push({ kind: "inspect", pick: null });
-  // The UNLISTED band names no network, so it carries only the filter's RELEASE rule (2026-08-08,
-  // review fix — the unlisted band of an out-of-story tick would leave a stale filter dimming it).
-  if (!listed && current.tickHasFilter === false) out.push({ kind: "filter", id: "all" });
+  // The UNLISTED band names no network, so it commits the tick alone — and, like every Snapshots
+  // selection, it leaves the filter as the reader set it (see `snapshotSelectActions`).
   if (current.metaSnap) out.push({ kind: "metaSnap", sel: null });
   out.push({ kind: "snapshot", pick: global, follow: false });
   // THE NETWORK HALF OF THE PAIR IS TICK-LOCAL (2026-10-02) — it used to filter-first, the last
@@ -459,9 +455,8 @@ export function clickActions(input: {
   current: {
     filter: string; country: string | null; hasInspect: boolean; cohort: CohortSel | null;
     // Ledger: the pinned tick + its metaSnap child — a scene band click on the pinned tick
-    // deselects, same as the explorer row (the toggle rule; omitted = never toggles) — and
-    // whether the clicked tick's anchors include the committed filter (the filter-releases rule).
-    pinnedOrdinal?: number | null; metaSnap?: MetaSnapSel | null; tickHasFilter?: boolean;
+    // deselects, same as the explorer row (the toggle rule; omitted = never toggles).
+    pinnedOrdinal?: number | null; metaSnap?: MetaSnapSel | null;
     // …and the network committed inside the pinned tick, which a different tick's click drops.
     tickNet?: TickNetSel | null;
   };
@@ -482,8 +477,6 @@ export function clickActions(input: {
     return snapshotSelectActions(p, false, {
       pinnedOrdinal: current.pinnedOrdinal ?? null,
       metaSnap: current.metaSnap ?? null,
-      filter: current.filter,
-      tickHasFilter: current.tickHasFilter,
       hasInspect: current.hasInspect,
       tickNet: current.tickNet,
     });

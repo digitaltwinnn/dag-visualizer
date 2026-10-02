@@ -613,7 +613,7 @@ export function ScheduleTable({ axis, axisTitle, parts, className }: { axis?: st
     <div
       className={cn(
         axis != null
-          ? "grid grid-cols-[6.4em_6.2em_2em_minmax(0,1fr)] items-start gap-x-2 gap-y-0.5 py-1.5 text-label border-t border-border first:border-t-0"
+          ? "grid grid-cols-[6em_7.4em_2em_minmax(0,1fr)] items-start gap-x-2 gap-y-0.5 py-1.5 text-label border-t border-border first:border-t-0"
           : cn(CUT_ROW, "gap-y-0.5"),
         className,
       )}

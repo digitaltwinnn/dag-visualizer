@@ -233,12 +233,14 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
       { kind: "snapshot", pick: null, follow: true },
     ]);
   });
-  it("the pinned tick's RE-CLICK is the same clear as its × (one toggle language)", () => {
+  it("the pinned tick's RE-CLICK clears what hangs under it and resumes live — and never the filter", () => {
     const p = { kind: "snapshot", title: "Global snapshot #42", data: { ordinal: 42 } } as unknown as Parameters<typeof snapshotSelectActions>[0];
     const child = { metaId: "dor", ordinal: 7, hash: "", globalOrdinal: 42, ts: "T" };
-    expect(snapshotSelectActions(p, false, { pinnedOrdinal: 42, metaSnap: child, filter: "dor" })).toEqual(
-      snapshotClearActions({ metaSnap: child, filter: "dor" }),
-    );
+    // A re-click is a selection gesture; only the card's own × also clears the filter.
+    expect(snapshotSelectActions(p, false, { pinnedOrdinal: 42, metaSnap: child })).toEqual([
+      { kind: "metaSnap", sel: null },
+      { kind: "snapshot", pick: null, follow: true },
+    ]);
   });
 
   it("snapshotSelectActions: committing a DIFFERENT tick drops the metaSnap it can't contain", () => {
@@ -261,36 +263,13 @@ describe("the shared component builders (GeoExplore rows + LiveStrip bars run th
       { kind: "metaSnap", sel: null },
       { kind: "snapshot", pick: p, follow: true },
     ]);
-    // Both releases can fire, and both precede the subject.
-    expect(
-      snapshotSelectActions(p, false, {
-        pinnedOrdinal: null, metaSnap: elsewhere, filter: "dor", tickHasFilter: false,
-      }),
-    ).toEqual([
-      { kind: "filter", id: "all" },
-      { kind: "metaSnap", sel: null },
-      { kind: "snapshot", pick: p, follow: false },
-    ]);
   });
 
-  it("snapshotSelectActions: the filter RELEASES when its network is absent from the tick", () => {
+  it("snapshotSelectActions never writes the filter — the reader's lens is not a selection's to move", () => {
     const p = snapPick();
-    // Absent → the filter steps back to "all" before the pin.
-    expect(snapshotSelectActions(p, false, { pinnedOrdinal: null, metaSnap: null, filter: "dor", tickHasFilter: false })).toEqual([
-      { kind: "filter", id: "all" },
-      { kind: "snapshot", pick: p, follow: false },
-    ]);
-    // Present → the filter holds (the tick is part of its story).
-    expect(snapshotSelectActions(p, false, { pinnedOrdinal: null, metaSnap: null, filter: "dor", tickHasFilter: true })).toEqual([
-      { kind: "snapshot", pick: p, follow: false },
-    ]);
-    // "all" / unknown membership → untouched.
-    expect(snapshotSelectActions(p, false, { pinnedOrdinal: null, metaSnap: null, filter: "all", tickHasFilter: false })).toEqual([
-      { kind: "snapshot", pick: p, follow: false },
-    ]);
-    expect(snapshotSelectActions(p, false, { pinnedOrdinal: null, metaSnap: null, filter: "dor" })).toEqual([
-      { kind: "snapshot", pick: p, follow: false },
-    ]);
+    const a = snapshotSelectActions(p, false, { pinnedOrdinal: null, metaSnap: null });
+    expect(a).toEqual([{ kind: "snapshot", pick: p, follow: false }]);
+    expect(a.some((x) => x.kind === "filter")).toBe(false);
   });
 
   it("followToggleActions: the card's live switch flips following, keeping the shown subject", () => {
@@ -556,7 +535,7 @@ describe("bandSelectActions (a band on the byte bar)", () => {
   // tick-local commit, not the app filter (the same rule the tile and the pager's ∨ take): only the
   // top bar's picker and the Hypergraph's hub and rows set the filter.
   it("selects the tick and the network inside it, drops the finer tile, and never the filter", () => {
-    const a = bandSelectActions("DAG-A", GLOBAL, { filter: "all", metaSnap: SEL });
+    const a = bandSelectActions("DAG-A", GLOBAL, { metaSnap: SEL });
     expect(a).toEqual([
       { kind: "metaSnap", sel: null },
       { kind: "snapshot", pick: GLOBAL, follow: false },
@@ -566,7 +545,7 @@ describe("bandSelectActions (a band on the byte bar)", () => {
   });
 
   it("leaves an unlisted band without a filter commit", () => {
-    const a = bandSelectActions("unlisted", GLOBAL, { filter: "all", metaSnap: null });
+    const a = bandSelectActions("unlisted", GLOBAL, { metaSnap: null });
     expect(a).toEqual([{ kind: "snapshot", pick: GLOBAL, follow: false }]);
   });
 });

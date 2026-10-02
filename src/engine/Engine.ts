@@ -3,7 +3,7 @@ import Stats from "stats.js";
 import { useStore, type Mode } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR, resolveSignerIps } from "@/src/data/network";
-import { ledgerLens, tickInStory } from "@/src/data/ledgerStory";
+import { ledgerLens } from "@/src/data/ledgerStory";
 import { reportPoll, touchPoll } from "@/src/data/api";
 import { STALE_FACTOR } from "@/src/data/pollStatus";
 import { LISTED_IDS, UNLISTED_ID, UNLISTED_SCENE_HEX_BY_THEME } from "@/src/data/unlisted";
@@ -1965,9 +1965,7 @@ export class Engine {
     if (p?.kind === "snapshot" && bandKey) {
       applyClickActions(
         bandSelectActions(bandKey, p, {
-          filter: st.filter,
           metaSnap: st.metaSnap,
-          tickHasFilter: this._tickHasFilter(p, st.filter),
           hasInspect: st.inspect != null,
           net: this._ledgerNet(),
         }),
@@ -1990,7 +1988,6 @@ export class Engine {
           cohort: this.cohortSel,
           pinnedOrdinal: !st.following ? st.snap?.data?.ordinal ?? null : null,
           metaSnap: st.metaSnap,
-          tickHasFilter: this._tickHasFilter(p, st.filter),
           tickNet: st.tickNet,
         },
       }),
@@ -2005,15 +2002,6 @@ export class Engine {
   // The composition group a PICK belongs to — network + make-up key. null when the pick isn't a
   // node, carries no role info (the group would be meaningless), or the CURRENT view's ladder has
   // no composition rung (today: hyper alone, but the ladder table says so, not this method).
-  /** The filter-releases rule's input for scene band clicks — the ONE story rule
-   *  (src/data/ledgerStory.ts; explorer/strip read the same home). */
-  private _tickHasFilter(p: PickDescriptor | null, filter: string): boolean | undefined {
-    if (!p || p.kind !== "snapshot") return undefined;
-    const d = (p as { data?: GlobalSnapshot }).data;
-    if (!d) return undefined;
-    return tickInStory(filter, getAnchor(d.timestamp), useStore.getState().snapshotExact[d.ordinal]);
-  }
-
   private _compositionOf(p: PickDescriptor | null): CompositionSel | null {
     if (!p || !is3D(this.mode) || !hasLevel(this.mode, "composition")) return null;
     const node = "node" in p ? p.node : null;

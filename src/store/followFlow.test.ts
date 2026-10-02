@@ -116,17 +116,10 @@ describe("the follow flow decision table", () => {
     expect(st().metaSnap?.globalOrdinal).toBe(100);
   });
 
-  it("the release rule: pinning an out-of-story tick steps the filter to all first", () => {
+  it("pinning a tick the filtered network sat out leaves the filter as the reader set it", () => {
     useStore.setState({ filter: LISTED, following: true, snap: snapPick(100) });
-    applyClickActions(
-      snapshotSelectActions(snapPick(90), false, {
-        pinnedOrdinal: null,
-        metaSnap: null,
-        filter: LISTED,
-        tickHasFilter: false,
-      }),
-    );
-    expect(st().filter).toBe("all");
+    applyClickActions(snapshotSelectActions(snapPick(90), false, { pinnedOrdinal: null, metaSnap: null }));
+    expect(st().filter).toBe(LISTED);
     expect(st().snap?.data.ordinal).toBe(90);
     expect(st().following).toBe(false);
   });

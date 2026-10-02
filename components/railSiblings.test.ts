@@ -304,7 +304,7 @@ describe("siblingSet — global snapshot slot (the OPEN set)", () => {
       snapshotSelectActions(
         { kind: "snapshot", title: "Global snapshot #41", data: ticks[0]!.data },
         false,
-        { pinnedOrdinal: 42, metaSnap: null, filter: "all", tickHasFilter: true },
+        { pinnedOrdinal: 42, metaSnap: null },
       ),
     );
   });
@@ -319,13 +319,10 @@ describe("siblingSet — global snapshot slot (the OPEN set)", () => {
     // shown tick is not the deselect-toggle it would be under a pin.
     expect(set.items[set.index]!.actions).toEqual([{ kind: "snapshot", pick: expect.anything(), follow: false }]);
   });
-  it("a tick the committed network never anchored into releases the filter (the story rule)", () => {
-    // #41 carries no anchor from the committed network; #42 (the shown tick) does.
+  it("stepping to a tick the committed network sat out leaves the filter alone", () => {
     const away = [{ ...tick(41), inStory: false }, tick(42)];
     const set = siblingSet("snap", base({ ...s, filter: "ded", snap: snapPick, ticks: away }))!;
-    expect(set.items[0]!.actions[0]).toEqual({ kind: "filter", id: "all" });
-    const kept = siblingSet("snap", base({ ...s, filter: "ded", snap: snapPick, ticks: [tick(41), tick(42)] }))!;
-    expect(kept.items[0]!.actions[0]).not.toEqual({ kind: "filter", id: "all" });
+    expect(set.items[0]!.actions.some((a) => a.kind === "filter")).toBe(false);
   });
   it("no shown tick, a window too short to step, or a pin aged OUT of it → no set", () => {
     expect(siblingSet("snap", base({ ticks }))).toBeNull();

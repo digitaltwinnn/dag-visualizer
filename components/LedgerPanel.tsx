@@ -30,7 +30,7 @@ import {
   SNAP_MEASURES,
   TICK_NET_MEASURES,
 } from "@/src/data/ledgerMeasure";
-import { ledgerLens, storyCount, tickInStory } from "@/src/data/ledgerStory";
+import { ledgerLens, storyCount } from "@/src/data/ledgerStory";
 import { filterAccent, getAnchor, getNetwork, metagraphById, resolveSigner, SIGNER_GROUPS, SIGNER_UNKNOWN, snapshotSigners } from "@/src/data/network";
 import { metaSnapHoverKey, type GlobalSnapshot, type NodeRow, type SnapshotExact } from "@/src/data/types";
 import { displayNetwork, LISTED_IDS, UNLISTED_HUE, UNLISTED_ID, UNLISTED_LABEL, unlistedLog } from "@/src/data/unlisted";
@@ -355,7 +355,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         const count = tickFilterCount(d);
         const v = tickValues[i];
         const globalPick = { kind: "snapshot", title: `Global snapshot #${d.ordinal}`, data: d } as const;
-        const tickHasFilter = tickInStory(filter, getAnchor(d.timestamp), snapshotExact[d.ordinal]);
         const on = d.ordinal === activeSnapOrd;
         return {
           key: String(d.ordinal),
@@ -375,8 +374,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
               snapshotSelectActions(globalPick, latestRelevant("all")?.ordinal === d.ordinal, {
                 pinnedOrdinal: !following && snap ? snap.data.ordinal : null,
                 metaSnap,
-                filter,
-                tickHasFilter,
                 tickNet,
               }),
             );

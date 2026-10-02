@@ -112,9 +112,15 @@ The design rules behind the table, which the tests pin but don't explain:
   bar's picker and the Hypergraph's hub and rows set the filter; a ledger NODE never does
   (`viewPolicy.nodeCommitsNetwork` is hyper's alone). A filter switch clears it (same rung, one commit
   finer), and so does leaving the view.
-- **A filter is a story.** Pinning a global tick whose anchors don't include the committed network
-  releases the filter back to "all", so a network's dim never shapes a snapshot that has nothing to do
-  with it. The membership rule lives in `src/data/ledgerStory.ts`.
+- **No selection in Snapshots writes the filter — not even to release it** (user, 2026-10-02:
+  "consistent, and a filter should not be changed from the explorer, so no reset also"). The old
+  "a filter is a story" rule (2026-08-07) reset the filter to "all" when a pinned tick held nothing
+  of the filtered network; it is retired, because rows reset the top bar while tiles and bands kept
+  it. A tick the lens has nothing in is SHOWN as that: the chamber dims, the explorer row is faint,
+  and the rail's Metagraph card stands down with a hint saying so (`tickNet.ledgerCardNetwork`) —
+  the global card's ∨ then steps into the tick's own first network. The one thing that clears the
+  filter from the rail is the global snapshot card's ×, which clears everything under the tick.
+  Membership still lives in `src/data/ledgerStory.ts`.
 - **A committed ancestry rung borrows its members' glow only while it is the FINEST committed rung**
   (user, 2026-08-11). Every other rung has a 3D counterpart you could have clicked — the hub, the
   border, the chip; the **group** rungs (geo's provider cohort, hyper's composition group) have none,
