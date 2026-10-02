@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Metagraph card — breakdown alternatives</title>
+<style>
+:root{--bg:oklch(0.09 0.02 265);--fg:oklch(0.94 0.02 255);--dim:#c7d0ea;--muted:oklch(0.66 0.04 265);--primary:oklch(0.88 0.13 195);
+--border:rgba(90,140,255,.22);--panel:rgba(12,16,32,.94);--radius:14px;--wash-faint:color-mix(in oklch,var(--primary) 6%,transparent);--wash-hover:color-mix(in oklch,var(--primary) 16%,transparent);
+--sel-bg:color-mix(in oklch,var(--primary) 12%,transparent);--sel-border:color-mix(in oklch,var(--primary) 52%,transparent);
+--label:12.6px;--body:14.9px;--title:16.6px;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+--hue:oklch(0.74 0.19 41);--hue2:color-mix(in oklch,var(--hue) 60%,transparent);--hue3:color-mix(in oklch,var(--hue) 38%,transparent);--hue4:color-mix(in oklch,var(--hue) 22%,transparent);
+--ok:oklch(0.80 0.15 165);--warn:oklch(0.80 0.15 75);--bad:oklch(0.68 0.2 25);--n1:oklch(0.70 0.03 265);--n2:oklch(0.52 0.03 265);--n3:oklch(0.36 0.03 265)}
+*{box-sizing:border-box}html{color-scheme:dark}
+body{margin:0;background:radial-gradient(1200px 600px at 60% 0%,#0b1230 0%,var(--bg) 60%);color:var(--fg);font:var(--body)/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:32px 40px 96px}
+h1{font-size:24px;font-weight:600;margin:0 0 6px}h2{font-size:18px;font-weight:600;margin:52px 0 4px;display:flex;gap:10px;align-items:baseline}h2 b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;font-size:var(--label)}
+p.lede{color:var(--dim);max-width:80ch;margin:0 0 6px}.note{color:var(--muted);font-size:var(--label);max-width:88ch;margin:4px 0}
+.pair{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start;margin-top:14px}.col{width:346px}.cap{font-size:var(--label);color:var(--muted);margin:0 2px 8px}
+.rec{border:1px solid var(--sel-border);background:var(--sel-bg);border-radius:8px;padding:10px 14px;font-size:var(--label);margin-top:18px;max-width:92ch}.rec b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;font-size:11.6px;margin-right:8px}
+.pc{display:flex;gap:28px;flex-wrap:wrap;font-size:var(--label);color:var(--dim);margin-top:10px;max-width:92ch}.pc div{flex:1;min-width:260px}.pc b{color:var(--fg)}
+.card{width:346px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px 16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 8px 30px rgba(0,0,0,.35)}
+.sec{display:flex;justify-content:space-between;align-items:baseline;font-size:var(--label);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}.sec b{color:var(--fg);font:700 var(--body) var(--mono);letter-spacing:0}
+.ax{color:var(--muted)}em{font-style:normal;font-family:var(--mono);color:var(--fg)}.z{color:var(--muted)}.z em{color:var(--muted)}
+.d{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.bar{height:6px;border-radius:3px;display:flex;gap:2px;overflow:hidden}.bar i{display:block;height:100%;border-radius:1px;min-width:2px}.bar i:hover{filter:brightness(1.3)}
+/* V0 */
+.v0{display:grid;grid-template-columns:100px 1fr;gap:10px 10px}.v0 .parts{display:flex;flex-wrap:wrap;gap:1px 12px;margin-top:5px}.v0 .parts span{white-space:nowrap}
+/* V1 */
+.v1 .row{display:grid;grid-template-columns:92px 86px 1fr;gap:0 10px;align-items:center;margin:7px 0}.v1 .lab{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:var(--label);color:var(--dim)}
+/* V2 */
+.v2 .row{margin:8px 0}.v2 .line{display:flex;justify-content:space-between;gap:10px;align-items:baseline}.v2 .say{color:var(--fg)}.v2 .bar{margin-top:5px;height:4px}
+.v2 .okline{display:inline-flex;align-items:center;gap:6px}
+/* V3 */
+.v3 .row{display:grid;grid-template-columns:92px 1fr;gap:0 10px;margin:8px 0;align-items:start}.units{display:flex;flex-wrap:wrap;gap:2px}.units i{width:9px;height:9px;border-radius:2px;display:block}.units i:hover{outline:1px solid var(--fg)}
+.v3 .leg{grid-column:2;font-size:var(--label);color:var(--dim);display:flex;flex-wrap:wrap;gap:1px 12px;margin-top:4px}
+/* V4 */
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.tile{border:1px solid var(--border);border-radius:8px;padding:8px 9px 9px;background:var(--wash-faint)}.tile .k{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.tile .n{font:700 20px/1.1 var(--mono);margin:6px 0 2px}.tile .n small{font:400 var(--label) system-ui;color:var(--muted)}.tile .c{font-size:var(--label);color:var(--dim);line-height:1.3}.tile .bar{margin-top:7px;height:4px}
+a{color:var(--primary)}
+</style></head><body>
+<h1>Metagraph card — the breakdown, five ways</h1>
+<p class="lede">The breakdown answers one question three ways: of this network's online nodes, what do they run, are they ready, and how far back does their archive reach. Each option is drawn twice at the card's 346px: a small network (Dor Technologies, the live figures) and a large one (168 nodes, illustrative split) to show how it scales.</p>
+<p class="note">Colour follows the app's existing rule in every option: composition in the network's own hue at stepped strengths, status in the reserved status colours, archive depth in neutral greys. Every part is named in text, so nothing is read from colour alone. Hover a segment for its count. Back to the <a href="./">skeleton page</a>.</p>
+
+<div id="out"></div>
+
+<div class="rec"><b>Recommend</b> C. It is the only compact option that never truncates, because a sentence wraps where a label column cannot. It draws a bar only where there is a split to show, so the status cut stops being a one-segment bar and says "All 18 ready", and it speaks in the same voice as the lead line above it. On the small network it is about a third shorter than today.</div>
+<div class="rec" style="border-color:var(--border);background:transparent"><b>Why not the others as the default</b> B is the tidiest when it fits, and it does not fit: rendered at the card width its labels cut off. D is the most literal and the nicest at 18 nodes, but past about 60 it has to fall back to bars, so the card would change form between networks. E reads fastest and compares worst: three headline numbers lose the second and third parts of each cut.</div>
+
+<script>
+const S={ // datasets
+ small:{name:'Dor Technologies · 18 nodes',total:18,cuts:[
+  {ax:'Composition',parts:[{l:'Hybrid',n:3,c:'var(--hue)'},{l:'Data',n:15,c:'var(--hue2)'}]},
+  {ax:'Status',parts:[{l:'Ready',n:18,c:'var(--ok)'}]},
+  {ax:'Archive depth',parts:[{l:'Full archive',n:0,c:'var(--n1)'},{l:'16 months',n:3,c:'var(--n2)'},{l:'Unknown',n:15,c:'var(--n3)'}]}]},
+ large:{name:'A large network · 168 nodes (illustrative)',total:168,cuts:[
+  {ax:'Composition',parts:[{l:'Hybrid',n:137,c:'var(--hue)'},{l:'Data',n:15,c:'var(--hue2)'},{l:'Currency',n:9,c:'var(--hue3)'},{l:'Consensus',n:7,c:'var(--hue4)'}]},
+  {ax:'Status',parts:[{l:'Ready',n:165,c:'var(--ok)'},{l:'Syncing',n:2,c:'var(--warn)'},{l:'Joining',n:1,c:'var(--bad)'}]},
+  {ax:'Archive depth',parts:[{l:'Full archive',n:40,c:'var(--n1)'},{l:'16 months',n:30,c:'var(--n2)'},{l:'Unknown',n:98,c:'var(--n3)'}]}]}
+};
+const bar=(c,t)=>`<div class="bar">${c.parts.filter(p=>p.n>0).map(p=>`<i title="${p.l}: ${p.n} of ${t}" style="flex:${p.n};background:${p.c}"></i>`).join('')}</div>`;
+const part=p=>`<span class="${p.n?'':'z'}">${p.n?`<i class="d" style="background:${p.c}"></i>`:''}${p.l} <em>${p.n}</em></span>`;
+const head=d=>`<div class="sec"><span>Online nodes ⌄</span><b>${d.total}</b></div>`;
+const V={
+ A:d=>head(d)+`<div class="v0">${d.cuts.map(c=>`<span class="ax">${c.ax}</span><span>${bar(c,d.total)}<div class="parts">${c.parts.map(part).join('')}</div></span>`).join('')}</div>`,
+ B:d=>head(d)+`<div class="v1">${d.cuts.map(c=>`<div class="row"><span class="ax">${c.ax}</span>${bar(c,d.total)}<span class="lab">${c.parts.filter(p=>p.n>0).map(p=>`${p.l} <em>${p.n}</em>`).join(' · ')}</span></div>`).join('')}</div>`,
+ C:d=>head(d)+`<div class="v2">${d.cuts.map(c=>{const live=c.parts.filter(p=>p.n>0);const zero=c.parts.filter(p=>!p.n);
+   if(live.length===1) return `<div class="row"><div class="line"><span class="ax">${c.ax}</span><span class="say okline"><i class="d" style="background:${live[0].c}"></i>All ${d.total} ${live[0].l.toLowerCase()}</span></div></div>`;
+   return `<div class="row"><div class="line"><span class="ax">${c.ax}</span><span class="say">${live.map(p=>`${p.l.toLowerCase()} <em>${p.n}</em>`).join(' · ')}</span></div>${bar(c,d.total)}${zero.length?`<div class="z" style="font-size:var(--label);margin-top:3px;text-align:right">none with ${zero.map(p=>p.l.toLowerCase()).join(', ')}</div>`:''}</div>`}).join('')}</div>`,
+ D:d=>head(d)+(d.total>60?`<div class="note" style="margin:0 0 6px">Past about 60 nodes the grid stops being countable, so this option falls back to bars (option B):</div>`+V.B(d).replace(head(d),''):`<div class="v3">${d.cuts.map(c=>`<div class="row"><span class="ax">${c.ax}</span><div class="units">${c.parts.flatMap(p=>Array.from({length:p.n},()=>`<i title="${p.l}" style="background:${p.c}"></i>`)).join('')}</div><div class="leg">${c.parts.map(part).join('')}</div></div>`).join('')}</div>`),
+ E:d=>head(d)+`<div class="tiles">${d.cuts.map(c=>{const top=[...c.parts].sort((a,b)=>b.n-a.n)[0];return `<div class="tile"><div class="k">${c.ax.replace(' depth','')}</div><div class="n">${top.n}<small> / ${d.total}</small></div><div class="c">${top.l.toLowerCase()}</div>${bar(c,d.total)}</div>`}).join('')}</div>`
+};
+const T={
+ A:['Today — three stacked bars','A label column, a bar per cut, the parts named underneath. Six lines for three cuts; a zero part is named muted.',['Complete: every part named, including zeros.','Already built and agreed (2026-09-26).'],['Tall: about 150px of the card.','The status bar is a single segment most of the time.']],
+ B:['One line per cut','The same bars, with the parts as direct labels on the same line. Zero parts are dropped from the line (they have no segment either).',['Half the height: three lines.','Split and names read together, left to right.'],['The labels truncate at 346px even with three parts (the small network archive line), so names are lost exactly where there is most to say.','Zeros are no longer stated.']],
+ C:['Say it, and draw only a real split','Each cut is a sentence. A cut with one part gets no bar ("All 18 ready"); a real split gets a thin bar under its sentence, and zeros are said in words.',['Never draws a one-segment bar.','Reads like the lead line above it: one voice.'],['Variable height: a cut is one or two lines.','More words than marks.']],
+ D:['Every node a square','A unit strip: one 9px cell per node, coloured by part. You can count them.',['Exact and literal at small counts: 3 of 18 is three squares.','No scale to misread.'],['Does not scale: past about 60 nodes it must fall back to bars.','The card would change form between networks.']],
+ E:['Three stat tiles','The largest part of each cut as a headline number over a thin bar.',['Fastest read: three numbers.','Compact: one row.'],['Hides every part but the largest.','A tile row is a different component from the rest of the card.']]
+};
+document.getElementById('out').innerHTML=Object.keys(V).map(k=>`<h2><b>${k}</b>${T[k][0]}</h2><p class="lede">${T[k][1]}</p><div class="pair">${['small','large'].map(n=>`<div class="col"><div class="cap">${S[n].name}</div><div class="card">${V[k](S[n])}</div></div>`).join('')}</div><div class="pc"><div><b>For</b> ${T[k][2].join(' ')}</div><div><b>Against</b> ${T[k][3].join(' ')}</div></div>`).join('');
+</script></body></html>
