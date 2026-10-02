@@ -73,6 +73,9 @@ export default function SiteFooter() {
   // Constellation link below wears (same record the dossier avatar reads).
   const dag = metagraphById("dag");
   const doc = useStore((s) => s.docPage);
+  // The raw layer hides the dock with the rest of the HUD, so on phone the row rides the screen's
+  // bottom edge there, as it does under a doc page — and the raw panel takes the strip it leaves.
+  const raw = useStore((s) => s.section === "data");
   // SCENE mode takes the strip FULL-BLEED (user, 2026-09-14: "expand the footer to full width —
   // the vitals it attached to is no longer there"). The `--bar-margin` inset is not a margin for
   // its own sake: it exists so this row's edges line up with the two BARS and the rail cards
@@ -119,7 +122,7 @@ export default function SiteFooter() {
         // join rather than one bottom chrome block. `max-[700px]` is the same arm the two
         // rules below already use (CSS trap 8: one number, both arms).
         "max-[700px]:inset-x-0",
-        doc == null
+        doc == null && !raw
           ? "max-[700px]:bottom-[var(--phone-dock-h)] max-[700px]:h-[var(--footer-phone-h)]"
           : "max-[700px]:bottom-[env(safe-area-inset-bottom)] max-[700px]:h-[var(--footer-phone-h)]",
       )}

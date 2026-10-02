@@ -772,6 +772,11 @@ export default function RailDock({
             isBarHalf
               ? cn(
                   "!bottom-[var(--phone-dock-h)]",
+                  // DENSER GLASS ON PHONE (2026-10-02): the sheet is the reading surface there and the
+                  // camera often sits close behind it — at `--panel-light` a bright stack of chips
+                  // showed through the collapsed card heads. The desktop panel's own fill and a
+                  // stronger blur keep it glass without the scene competing with the text.
+                  "!bg-[var(--panel)] !backdrop-blur-[14px]",
                   // The slide keyframe never plays on the bar half — the entry is the height
                   // grow above ('!': the animate utility is a (0,2,0) variant, the documented
                   // escape). Reduced motion collapses the grow too (transition-none).
@@ -870,7 +875,7 @@ export default function RailDock({
                 nothing: hosted cards rendered flush (user, 2026-08-30 — "zero gap between the
                 cards", tablet/phone only, desktop's #leftcol has no such wrapper). The gaps are
                 part of the content height, so the fit measurement stays honest. */}
-            <div ref={setFitEl} className="flex flex-col gap-[var(--rail-gap)]">{children}</div>
+            <div ref={setFitEl} className="flex flex-col gap-[var(--rail-gap)] max-[700px]:pb-2">{children}</div>
           </div>
         </SheetContent>
       </Sheet>
