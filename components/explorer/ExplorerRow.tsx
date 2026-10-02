@@ -142,7 +142,7 @@ export default function ExplorerRow({
         "hover:bg-wash-hover",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
         on && selectedRow(true),
-        faint && !on && "opacity-55",
+        faint && !on && "opacity-65",
         pair?.paired && pair.className,
         className,
       )}

@@ -51,7 +51,7 @@ export default function ViewPicker({ onPicked }: { onPicked?: () => void }) {
               "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",
               "data-[state=on]:shadow-[inset_0_0_0_1px_var(--sel-border)]",
               "pointer-coarse:min-h-11",
-              v.soon && "opacity-55",
+              v.soon && "opacity-65",
             )}
           >
             <Icon aria-hidden className="size-4 group-data-[state=on]:text-primary" />

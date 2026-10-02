@@ -414,7 +414,7 @@ export default function TopBar() {
                 // The dimmed soon entry STAYS at every width (review find, 2026-09-05: the phone comment
                 // promised all four views but this class still hid it below 860 — and below 700 it has
                 // no other route at all: no slug, and the footer's view links stand down on phone).
-                v.soon && "opacity-55",
+                v.soon && "opacity-65",
               )}
             >
               <Icon aria-hidden className="size-4 group-data-[state=on]:text-primary" />

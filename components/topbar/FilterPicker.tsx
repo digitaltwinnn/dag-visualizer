@@ -62,7 +62,7 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
       // touch device wherever the window edge sits; a fine pointer never needs it.
       "pointer-coarse:min-h-11",
       active && SELECTED_ROW,
-      off && "opacity-55",
+      off && "opacity-65",
     );
 
   return (

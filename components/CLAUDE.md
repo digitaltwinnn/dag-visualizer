@@ -940,7 +940,7 @@ doc overlay's paragraphs ONLY; a card's description stays `text-body`. The rail 
 `--detail-w`) and the vitals band (`--vitals-h`, paired with BottomStream's `RESERVE`) grew with it.
 **The accent is a glow, `--primary-ink` is the accent as TEXT**: links, eyebrows and tickers set in
 the accent take `text-primary-ink` (the accent itself on dark; two-thirds toward black on paper, where
-the bare accent measured 2.3–3.1:1). The shared "present, not your subject" dim is `opacity-55`.
+the bare accent measured 2.3–3.1:1). The shared "present, not your subject" dim is `opacity-65` (0.55 still measured 3.6:1 on paper).
 
 ### Two colour lanes
 
