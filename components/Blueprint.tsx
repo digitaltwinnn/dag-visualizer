@@ -1,9 +1,9 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { ArrowLeftRight, HandCoins, Radar, type LucideIcon } from "lucide-react";
+import type { CSSProperties, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
+import { useBreakpoint } from "@/components/useBreakpoint";
 
 // Structural blueprint chrome expressed as Tailwind-on-tokens. Stroke/fill come through
 // class-based `[stroke:…]` utilities (CSS declarations, so `var()`/`color-mix()` resolve —
@@ -16,7 +16,8 @@ const BP_ARROWHEAD = "fill-none [stroke:color-mix(in_oklch,var(--primary)_55%,tr
 const BP_VALIDATOR = "fill-none [stroke:color-mix(in_oklch,var(--primary)_45%,var(--border))] [stroke-width:1.5]";
 const BP_STAKER = "[fill:color-mix(in_oklch,var(--primary)_45%,transparent)] stroke-none";
 const BP_DELEGATE = "[stroke:var(--border)] [stroke-width:1]";
-const BP_SVG = "w-[min(26vw,280px)] h-auto overflow-visible";
+const BP_SVG = "block w-full h-auto overflow-visible";
+const BP_SLOT = "fill-none [stroke:color-mix(in_oklch,var(--primary)_38%,var(--border))] [stroke-width:1.5] [stroke-dasharray:5_6]";
 
 // The schematic BLUEPRINT GALLERY for the one consolidated "Coming soon" view (2026-09-04 —
 // three separate placeholder modes said the same nothing three times; the ONE view now previews
@@ -26,8 +27,14 @@ const BP_SVG = "w-[min(26vw,280px)] h-auto overflow-visible";
 // "Coming soon").
 // Structural chrome only (blueprint = chrome, not identity); accent/flow lines in cyan. Renders
 // on the empty scene (the canvas hides for the flat view). Not shown in any 3D view.
-// Each feature keeps the mark it wore as a bar button (Radar / ArrowLeftRight / HandCoins), so
-// the vocabulary survives the consolidation.
+//
+// DRAWINGS ONLY, ON A LOOSE TABLE (user, 2026-10-02 — `docs/superpowers/design/2026-10-02-soon-
+// gallery`, option B: "just show the separate svgs but no text … say more things are coming but
+// not sure yet what will come first"). The names, the icons and the sentences are gone, and so is
+// the ROW: three captioned columns read as a roadmap, in that order. The drawings now lie like
+// sketches on a table — different sizes, slightly turned, no shared baseline — so nothing is
+// first, and a few EMPTY dashed frames among them say "and more" without naming anything. Static:
+// the turn is a resting pose, not motion. The accessible names stay on each drawing.
 
 // Network → a health GRID of node cells (a couple dashed = waiting, one hollow = offline —
 // schematic states, not counts).
@@ -100,61 +107,63 @@ function StakingSchematic() {
   );
 }
 
-const SOON_FEATURES: { name: string; icon: LucideIcon; art: ReactNode; caption: string }[] = [
-  {
-    name: "Network",
-    icon: Radar,
-    art: <NetworkSchematic />,
-    caption: "Network health: node uptime, node states and version spread across the network.",
-  },
-  {
-    name: "Transactions",
-    icon: ArrowLeftRight,
-    art: <TransactionsSchematic />,
-    caption: "$DAG and metagraph currencies moving between addresses, plus lookup and economics.",
-  },
-  {
-    name: "Staking",
-    icon: HandCoins,
-    art: <StakingSchematic />,
-    caption: "Who is staked to which nodes, total delegated, and rewards flowing back.",
-  },
+// An empty frame — a coming thing nobody has drawn yet.
+function EmptyFrame({ w, h }: { w: number; h: number }) {
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className={BP_SVG} aria-hidden>
+      <rect x={1} y={1} width={w - 2} height={h - 2} rx={10} className={BP_SLOT} />
+    </svg>
+  );
+}
+
+// The table's layout as data: each piece's place (percent of the table), width and turn. Two
+// arrangements — the wide table, and a tall one for a phone, where the same pieces stack loosely
+// instead of shrinking to thumbnails. The order here is paint order only.
+interface Piece { art: ReactNode; left: number; top: number; width: number; turn: number; dim?: number }
+const WIDE: Piece[] = [
+  { art: <TransactionsSchematic />, left: 9, top: 10, width: 23, turn: -4 },
+  { art: <NetworkSchematic />, left: 39, top: 38, width: 27, turn: 2 },
+  { art: <StakingSchematic />, left: 71, top: 6, width: 19, turn: 5 },
+  { art: <EmptyFrame w={200} h={120} />, left: 22, top: 68, width: 13, turn: 3, dim: 0.6 },
+  { art: <EmptyFrame w={160} h={130} />, left: 74, top: 62, width: 11, turn: -6, dim: 0.6 },
+  { art: <EmptyFrame w={150} h={100} />, left: 47, top: 4, width: 9, turn: -2, dim: 0.5 },
+];
+// ⚠️ On a phone the parked grids are COLUMNS, and the DAG's runs down the left edge to about 60%
+// of the screen — so the upper half of the tall table keeps to the right of it.
+const TALL: Piece[] = [
+  { art: <EmptyFrame w={150} h={100} />, left: 66, top: 0, width: 24, turn: 5, dim: 0.5 },
+  { art: <TransactionsSchematic />, left: 42, top: 14, width: 48, turn: -4 },
+  { art: <NetworkSchematic />, left: 32, top: 47, width: 58, turn: 2 },
+  { art: <StakingSchematic />, left: 6, top: 68, width: 40, turn: 4 },
+  { art: <EmptyFrame w={160} h={130} />, left: 60, top: 82, width: 20, turn: -6, dim: 0.6 },
 ];
 
 export default function Blueprint() {
   const mode = useStore((s) => s.mode);
+  const bp = useBreakpoint();
   if (mode !== "soon") return null;
+  const pieces = bp === "phone" ? TALL : WIDE;
   return (
-    // top-[38vh], not inset-0 (user, 2026-09-04: the eyebrow "fights with the nodes at the
-    // top"): the parked fleet grids hold the viewport's top band on every flat view, so the
-    // gallery centres in the space BELOW them rather than the full height (38vh, raised from
-    // 24 — the band's projected bottom sits near ~38% at common aspects, and the first cut's
-    // headings overlapped the grids AND the new ticker legend). The bottom edge
-    // clears the footer strip plus a breather (user, same day: "the staking text almost
-    // touches the bottom bar").
-    // overflow-y-auto + a TOP-ANCHORED wrapper (mb-auto): when the columns wrap on a narrow
-    // viewport the content grows past the box, and flex-centering made the overflowing top
-    // unreachable — and even when it fit, centring left "a huge gap from the top" (user,
-    // 2026-09-04): 38vh IS the band's bottom, so the eyebrow belongs snug under it, not
-    // floated mid-void. Scrolls honestly when it doesn't fit; pointer-events on for the
-    // scroll (the flat view has nothing pickable behind).
-    <figure id="blueprint" className="fixed inset-x-0 top-[38vh] bottom-[calc(var(--footer-h,0px)+16px)] z-[6] flex flex-col items-center overflow-y-auto overscroll-contain px-6">
-      <div className="mb-auto flex flex-col items-center gap-8 py-2">
-      {/* The `preview · in development` eyebrow RETIRED (user, 2026-09-09): the view switch
-          already says "Coming soon" and the wireframes carry no numbers, so the caption
-          restated what the whole surface's register — dashed art, no values — says itself. */}
-      <div className="flex flex-wrap items-start justify-center gap-x-10 gap-y-8 max-w-[1160px]">
-        {SOON_FEATURES.map((f) => (
-          <figcaption key={f.name} className="flex flex-col items-center gap-3 text-center max-w-[270px]">
-            <span className="flex items-center gap-2 text-title font-semibold text-foreground">
-              <f.icon aria-hidden className="size-4 text-primary flex-none" />
-              {f.name}
-            </span>
-            <div className="opacity-50">{f.art}</div>
-            <span className="text-label text-muted-foreground leading-relaxed">{f.caption}</span>
-          </figcaption>
+    // top-[38vh], not inset-0 (user, 2026-09-04: the gallery "fights with the nodes at the top"):
+    // the parked fleet grids hold the viewport's top band on every flat view, so the table takes
+    // the space BELOW them. The bottom edge clears the footer strip plus a breather. Nothing here
+    // is interactive, so it takes no pointer events.
+    <figure
+      id="blueprint"
+      aria-label="Coming features, in no particular order"
+      // The phone arm also clears the dock that sits under the footer there.
+      className="fixed inset-x-0 top-[38vh] bottom-[calc(var(--footer-h,0px)+16px)] max-[700px]:bottom-[104px] z-[6] flex justify-center px-6 pointer-events-none"
+    >
+      <div className="relative h-full w-full max-w-[1100px]">
+        {pieces.map((p, i) => (
+          <div
+            key={i}
+            className="absolute"
+            style={{ left: `${p.left}%`, top: `${p.top}%`, width: `${p.width}%`, opacity: p.dim ?? 0.75, rotate: `${p.turn}deg` } as CSSProperties}
+          >
+            {p.art}
+          </div>
         ))}
-      </div>
       </div>
     </figure>
   );

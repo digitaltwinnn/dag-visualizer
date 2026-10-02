@@ -807,6 +807,11 @@ inline in the return would quietly restore the bug for every consumer at once.
   nothing three times): one dimmed "Coming soon" bar entry, one FLAT policy row, and the
   Blueprint GALLERY inside it previews every coming feature (each keeping the mark it wore as a
   bar button). A future placeholder is a gallery entry, not a Mode.
+  **The gallery is DRAWINGS ONLY on a loose table** (user, 2026-10-02 — option B of
+  `docs/superpowers/design/2026-10-02-soon-gallery`): no names, icons or captions, the wireframes
+  at different sizes and slightly turned with empty dashed frames among them, so nothing reads
+  as first — a captioned row was a roadmap. Static, takes no pointer events; a tall arrangement
+  on phone keeps clear of the parked node columns.
 - **The doc pages' one door is the footer's About · Design row** (2026-09-28 — user: "doc pages
   are not settings"; they rode the SettingsMenu as a Pages section from 2026-09-08 until then,
   and `InfoMenu.tsx` retired with it). The in-view ABOUT row in the bar is orientation for the
