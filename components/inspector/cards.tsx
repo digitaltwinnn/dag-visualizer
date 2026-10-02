@@ -22,7 +22,7 @@ import { useMinHold } from "@/components/useMinHold";
 import { useArchive, archiveFactState, archiveReach, archiveSchedule, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
 import { useNodeNames, nodeName, nodeRegistered } from "@/components/useNodeNames";
 import { POLL } from "@/src/engine/config";
-import { cap, Desc, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark, ScheduleTable, partShade, countable, Lead, Empty, QualifierChip, Door, SectionLabel, shareWords, type SchedulePart } from "./parts";
+import { cap, Desc, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, BoolMark, ScheduleTable, partShade, Lead, Empty, QualifierChip, Door, SectionLabel, shareWords, type SchedulePart } from "./parts";
 import { statusItems } from "@/src/data/nodeStatus";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { pickNetId } from "@/src/engine/domain/pickActions";
@@ -1171,24 +1171,11 @@ export function CompositionCard({ sel }: { sel: CompositionSel }) {
     <>
     {/* THE LEAD: the group's share of its network — the old "Share of network" fact. */}
     {share && <Lead>{share[0].toUpperCase() + share.slice(1)} of this network&apos;s online nodes.</Lead>}
-    {/* THE BREAKDOWN (`visuals.html`, user 2026-10-02): the network's nodes as the dossier's own
-        squares with THIS group's lit — stepping down a rung reads as "these ones" — then the
-        group's status in the same table the dossier uses. Above the countable limit the strip
-        is dropped rather than scaled (a square is always one node). */}
-    <Separator className="mb-2" />
-    <SectionLabel label="Nodes" unit={`of ${total}`} total={members.length} className="mb-1.5" />
-    {countable(total) && total > 0 && (
-      <span aria-hidden className="mb-1.5 flex flex-wrap gap-[2px]">
-        {Array.from({ length: total }, (_, k) => (
-          <span key={k} className="block size-2 rounded-[2px]" style={{ background: k < members.length ? hue : `color-mix(in oklch, ${hue} 22%, transparent)` }} />
-        ))}
-      </span>
-    )}
-    {members.length > 0 && (
-      <ScheduleTable axis="Status" parts={statusItems(members.map((r) => r.state)).map((it) => ({ label: cap(it.label), count: it.count, color: it.color }))} />
-    )}
-    <Separator className="my-2" />
+    {/* A PLAIN FACT CARD (user, 2026-10-02, reversing the same day's `visuals.html` strip + status
+        table: "of 3 · 1 makes no sense to a human; remove the status row" — that made Nodes a
+        regular row, not a breakdown). The group's share is the lead; its status is each node's own. */}
     <FactGroup>
+      <Fact label="Nodes">{members.length}</Fact>
       <Fact label="Network">
         <span className="inline-flex items-center gap-1.5 min-w-0">
           <IdentityDot hue={hue} />
