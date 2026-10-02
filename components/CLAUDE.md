@@ -942,7 +942,10 @@ the doc overlay's paragraphs ONLY; a card's description stays `text-body`. The r
 `--detail-w`) and the vitals band (`--vitals-h`, paired with BottomStream's `RESERVE`) grew with it.
 **The accent is a glow, `--primary-ink` is the accent as TEXT**: links, eyebrows and tickers set in
 the accent take `text-primary-ink` (the accent itself on dark; two-thirds toward black on paper, where
-the bare accent measured 2.3–3.1:1). The shared "present, not your subject" dim is `opacity-65` (0.55 still measured 3.6:1 on paper).
+the bare accent measured 2.3–3.1:1). **An identity hue set as TEXT takes `IDENT_INK`** (`components/identInk.ts`): it
+re-points `--ident-l` to `--ident-ink-l` on that element — 0.48 on paper, the lane's own 0.74 on dark —
+because the lane's L is a MARK's lightness and a ticker in it measured 3.2:1. Dots, bars and icons keep
+the lane. The shared "present, not your subject" dim is `opacity-65` (0.55 still measured 3.6:1 on paper).
 
 ### Two colour lanes
 
