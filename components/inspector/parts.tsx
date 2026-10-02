@@ -127,13 +127,13 @@ export function CopyButton({ value, subject, className }: { value: string; subje
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
+      size="icon-xs"
       aria-label={`Copy ${subject}`}
       title={`Copy ${subject}`}
       className={cn(
-        "flex-none inline-flex items-center justify-center size-6 -my-1 rounded-xs cursor-pointer",
-        "text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
+        "flex-none size-6 -my-1 rounded-xs text-muted-foreground",
         "opacity-0 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
         copied && "opacity-100 text-[var(--success)] hover:text-[var(--success)]",
         className,
@@ -150,7 +150,7 @@ export function CopyButton({ value, subject, className }: { value: string; subje
       }}
     >
       {copied ? <Check aria-hidden className="size-3.5" /> : <Copy aria-hidden className="size-3.5" />}
-    </button>
+    </Button>
   );
 }
 

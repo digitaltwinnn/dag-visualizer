@@ -274,7 +274,7 @@ export default function CardHead({
                 {toggleable && (
                   <span
                     aria-hidden
-                    className="inline-flex items-center justify-center size-6 -my-[3px] leading-none text-muted-foreground group-hover:text-foreground"
+                    className="inline-flex items-center justify-center size-6 -my-[3px] leading-none rounded-md text-muted-foreground group-hover:text-foreground group-hover:bg-wash-hover"
                   >
                     {collapsed ? <Plus className="size-3.5" /> : <Minus className="size-3.5" />}
                   </span>
@@ -374,7 +374,7 @@ function keepFocusOnRung(el: HTMLElement): void {
           title={closeTitle}
           aria-label={closeTitle}
           onClick={onClose}
-          className="absolute top-[8px] right-[10px] z-10 size-auto rounded-md py-1 px-2 leading-none cursor-pointer text-muted-foreground hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent"
+          className="absolute top-[8px] right-[10px] z-10 size-auto rounded-md py-1 px-2 leading-none text-muted-foreground"
         >
           <X aria-hidden className="size-4" />
         </Button>

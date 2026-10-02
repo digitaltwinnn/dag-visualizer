@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { fmtCount } from "@/src/util/format";
 
@@ -53,10 +55,9 @@ export default function TablePager({
   // hover tooltip and gains the click as a second route; the line dismisses on re-tap.
   const [explain, setExplain] = useState(false);
   if (pages <= 1 && !scope) return null;
-  const btn =
-    "inline-flex items-center justify-center size-6 rounded-xs cursor-pointer text-muted-foreground " +
-    "hover:text-foreground hover:bg-wash-faint disabled:opacity-30 disabled:cursor-default disabled:hover:bg-transparent " +
-    "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]";
+  // The chevrons are shadcn `Button`s on the ghost recipe — the one hover every icon control shares
+  // (button.tsx) — so this names only what is local: the box and the muted rest ink.
+  const btn = "size-6 rounded-xs text-muted-foreground disabled:opacity-30";
   return (
     <div className="flex-none pt-1.5">
       <div className="flex items-center justify-between gap-2">
@@ -88,23 +89,23 @@ export default function TablePager({
             go page by page"): the standard « ‹ › » cluster. The last page IS genesis in the
             history mode, one jump deep now that pages are ordinal-addressed. */}
         {!compact && (
-          <button type="button" className={btn} aria-label="First page" disabled={page <= 1} onClick={() => onPage(1)}>
+          <Button variant="ghost" size="icon-xs" className={btn} aria-label="First page" disabled={page <= 1} onClick={() => onPage(1)}>
             <ChevronsLeft aria-hidden className="size-4" />
-          </button>
+          </Button>
         )}
-        <button type="button" className={btn} aria-label="Previous page" disabled={page <= 1} onClick={() => onPage(page - 1)}>
+        <Button variant="ghost" size="icon-xs" className={btn} aria-label="Previous page" disabled={page <= 1} onClick={() => onPage(page - 1)}>
           <ChevronLeft aria-hidden className="size-4" />
-        </button>
+        </Button>
         <span className={cn("text-label tabular-nums text-muted-foreground whitespace-nowrap")}>
           {page} / {fmtCount(pages)}
         </span>
-        <button type="button" className={btn} aria-label="Next page" disabled={page >= pages} onClick={() => onPage(page + 1)}>
+        <Button variant="ghost" size="icon-xs" className={btn} aria-label="Next page" disabled={page >= pages} onClick={() => onPage(page + 1)}>
           <ChevronRight aria-hidden className="size-4" />
-        </button>
+        </Button>
         {!compact && (
-          <button type="button" className={btn} aria-label="Last page" disabled={page >= pages} onClick={() => onPage(pages)}>
+          <Button variant="ghost" size="icon-xs" className={btn} aria-label="Last page" disabled={page >= pages} onClick={() => onPage(pages)}>
             <ChevronsRight aria-hidden className="size-4" />
-          </button>
+          </Button>
         )}
       </span>
       )}
