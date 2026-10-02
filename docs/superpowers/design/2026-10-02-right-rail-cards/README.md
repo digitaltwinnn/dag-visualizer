@@ -84,3 +84,6 @@ More rulings, same day:
   but this is a simple control"): muted labels, the active one in full ink over a 2px accent rule
   on the row's hairline; no fill, outline or radius, and the body under them has no box
   (`components/cabinetTabs.ts`, all three tab strips).
+- **Breakdown rows read name · mark · count**: the count right-aligned on the card's edge, the mark
+  right-aligned against it, in a count column only as wide as its widest figure ("should we right
+  align the number and put the visual in front?" … "a bit closer to the number").
