@@ -1129,6 +1129,9 @@ export function CompositionCard({ sel }: { sel: CompositionSel }) {
     <>
     {/* THE LEAD: the group's share of its network — the old "Share of network" fact. */}
     {share && <Lead>{share[0].toUpperCase() + share.slice(1)} of this network&apos;s online nodes.</Lead>}
+    {/* The divider every card draws between its lead and what follows (lost when the breakdown
+        left this card on 2026-10-02). */}
+    {share && <Separator className="mb-2" />}
     {/* A PLAIN FACT CARD (user, 2026-10-02, reversing the same day's `visuals.html` strip + status
         table: "of 3 · 1 makes no sense to a human; remove the status row" — that made Nodes a
         regular row, not a breakdown). The group's share is the lead; its status is each node's own. */}
