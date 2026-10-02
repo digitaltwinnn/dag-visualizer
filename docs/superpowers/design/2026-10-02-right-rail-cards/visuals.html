@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Right rail — visuals for the other cards</title>
+<style>
+:root{--bg:oklch(0.09 0.02 265);--fg:oklch(0.94 0.02 255);--dim:#c7d0ea;--muted:oklch(0.66 0.04 265);--primary:oklch(0.88 0.13 195);
+--border:rgba(90,140,255,.22);--panel:rgba(12,16,32,.94);--plate:rgba(6,9,20,.7);--radius:14px;--wash-faint:color-mix(in oklch,var(--primary) 6%,transparent);--wash-hover:color-mix(in oklch,var(--primary) 10%,transparent);
+--sel-bg:color-mix(in oklch,var(--primary) 12%,transparent);--sel-border:color-mix(in oklch,var(--primary) 52%,transparent);
+--label:12.6px;--body:14.9px;--title:17.1px;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+--orange:oklch(0.74 0.19 41);--blue:oklch(0.72 0.16 255);--green:oklch(0.80 0.15 165);--violet:oklch(0.72 0.16 310);--yellow:oklch(0.82 0.15 100);
+--n1:oklch(0.70 0.03 265);--n2:oklch(0.52 0.03 265);--n3:oklch(0.36 0.03 265);--ghost:oklch(0.30 0.03 265)}
+*{box-sizing:border-box}html{color-scheme:dark}
+body{margin:0;background:radial-gradient(1200px 600px at 60% 0%,#0b1230 0%,var(--bg) 60%);color:var(--fg);font:var(--body)/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:32px 40px 96px}
+h1{font-size:24px;font-weight:600;margin:0 0 6px}h2{font-size:18px;font-weight:600;margin:56px 0 4px;display:flex;gap:10px;align-items:baseline}h2 b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;font-size:var(--label)}
+p.lede{color:var(--dim);max-width:84ch;margin:0 0 6px}.note{color:var(--muted);font-size:var(--label);max-width:88ch;margin:4px 0}a{color:var(--primary)}
+.pair{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start;margin-top:14px}.col{width:346px}.cap{font-size:var(--label);color:var(--muted);margin:0 2px 8px;display:flex;justify-content:space-between}.cap b{color:var(--fg);font-weight:600}
+.arrow{align-self:center;color:var(--muted);font-size:20px}
+.why{font-size:var(--label);color:var(--dim);max-width:44ch;align-self:center}.why b{color:var(--fg)}.why p{margin:0 0 8px}
+.rec{border:1px solid var(--sel-border);background:var(--sel-bg);border-radius:8px;padding:10px 14px;font-size:var(--label);margin-top:18px;max-width:92ch}.rec b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;font-size:11.6px;margin-right:8px}
+.rec.q{border-color:var(--border);background:transparent}
+.card{width:346px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px 0;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 8px 30px rgba(0,0,0,.35);position:relative;overflow:hidden}
+.card.new{border-color:var(--sel-border)}
+.x{position:absolute;right:14px;top:10px;color:var(--muted)}
+.eyebrow{font-size:var(--label);letter-spacing:.13em;text-transform:uppercase;color:var(--primary);font-weight:600;margin-bottom:4px}
+.hrow{display:flex;align-items:center;gap:10px}.ico{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--primary);flex:none}.ico.o{border-color:var(--orange)}
+.ttl{font-size:var(--title);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ttl.m{font-family:var(--mono)}
+.aside{margin-left:auto;flex:none}
+.chip{display:inline-flex;align-items:center;border:1px solid var(--border);background:var(--wash-faint);border-radius:4px;padding:2px 6px;font-size:var(--label);line-height:1.1;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:var(--label);padding:3px 7px;border-radius:999px;border:1px solid color-mix(in oklch,var(--green) 50%,transparent);color:var(--green)}
+.pill.pin{border-radius:4px;border-color:var(--sel-border);background:var(--sel-bg);color:var(--fg)}.pill.pin i{width:8px;height:8px;border-radius:50%;border:1.5px solid var(--primary);display:inline-block}
+.hair{border-top:1px solid var(--border);margin:12px 0 10px}.lead{color:var(--dim);margin:10px 0 0}
+.fact{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:5px 0}.fact>span:first-child{color:var(--muted);flex:none}.fact .v{text-align:right;min-width:0}.e{color:var(--muted)}
+.sec{display:flex;justify-content:space-between;align-items:baseline;font-size:var(--label);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}.sec b{color:var(--fg);font:400 var(--body) var(--mono);letter-spacing:0}.sec .u{letter-spacing:0;text-transform:none;margin-right:6px}
+.d{display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:6px;vertical-align:middle}
+.brow{display:grid;grid-template-columns:14px 78px 1fr 36px;gap:0 8px;align-items:center;margin:6px 0}.brow .t{height:5px;border-radius:3px;background:var(--wash-faint);overflow:hidden}.brow .t i{display:block;height:100%;border-radius:3px}.brow .n{text-align:right;font-family:var(--mono)}
+.foot{margin:12px -18px 0;padding:11px 18px 10px;background:var(--plate);display:flex;flex-direction:column;gap:5px}
+.frow{display:flex;align-items:center;gap:8px;font:var(--label)/1.4 var(--mono)}.frow .l{letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}.frow .v{color:var(--dim);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.frow .c{color:var(--muted);opacity:.6}
+.pager{display:flex;align-items:center;justify-content:center;gap:6px;color:var(--muted);font-size:var(--label);font-variant-numeric:tabular-nums;padding:6px 18px 8px;margin:0 -18px;border-top:1px solid var(--border)}.pager.pl{background:var(--plate)}
+.pager .b{width:24px;height:24px;display:inline-flex;align-items:center;justify-content:center}.pager .sp{flex:1}.pad{height:12px}
+.door{display:flex;align-items:center;gap:8px;margin:0 -18px;padding:8px 18px;border-top:1px solid var(--border)}.door .g{margin-left:auto;color:var(--muted)}
+/* THE one breakdown table — the built ScheduleTable's grid */
+.tb{display:grid;grid-template-columns:6.4em 6.2em 2.4em minmax(0,1fr);gap:2px 8px;font-size:var(--label);padding:6px 0;border-top:1px solid var(--border);align-items:start}.tb:first-of-type,.tb.f{border-top:0;padding-top:0}
+.tb.na{grid-template-columns:8.6em 3.4em minmax(0,1fr)}
+.tb .ax{color:var(--muted)}.tb .nm{color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tb .num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}.tb .z{color:var(--muted)}
+.units{display:flex;flex-wrap:wrap;gap:1.5px;align-content:flex-start;padding-top:5px}.units i{display:block;width:6px;height:6px;border-radius:1.5px}
+.bar{display:block;height:5px;margin-top:6px}.bar i{display:block;height:100%;border-radius:3px;min-width:2px}
+/* archive reach meter */
+.reach{margin:2px 0 6px}.reach .tr{height:5px;border-radius:3px;background:var(--ghost);position:relative;overflow:hidden}.reach .tr i{position:absolute;right:0;top:0;bottom:0;background:var(--n1);border-radius:3px}
+.reach .ends{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:3px}
+.layers{display:inline-flex;gap:3px}.layers span{border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:var(--label);color:var(--muted);opacity:.45}.layers span.on{opacity:1;color:var(--fg);background:var(--wash-faint)}
+table.m{border-collapse:collapse;margin-top:18px;font-size:var(--label);max-width:92ch}table.m td,table.m th{border-bottom:1px solid var(--border);padding:6px 14px 6px 0;text-align:left;vertical-align:top}table.m th{color:var(--muted);font-weight:500}table.m td:first-child{color:var(--fg);white-space:nowrap}table.m td{color:var(--dim)}
+</style></head><body>
+<h1>The other cards — where a visual earns its place</h1>
+<p class="lede">The metagraph card's breakdown is now one table whose squares are the bars (D2, built). This page asks which of the other seven cards gain from the same treatment. The short answer: five of them already carry a count that is drawn three different ways or not drawn at all, and all five can use the <b>same table</b>. Two are records and should stay plain.</p>
+<p class="note">Nothing here is built. Each pair is the card as it is today on the left and the proposal on the right, at the rail's 346px. Counts are the live ones where I had them; the splits marked illustrative are not measured. The skeleton page is <a href="./">here</a>, the breakdown rounds <a href="./breakdown.html">one</a> and <a href="./breakdown-2.html">two</a>.</p>
+
+<table class="m">
+<tr><th>The rule that keeps the rail consistent</th><th></th></tr>
+<tr><td>One breakdown species</td><td>Name, count, mark, in the D2 grid. No dots, no legends, no second bar recipe. A card with one cut drops the first (axis) column because its section label already names the cut.</td></tr>
+<tr><td>Square or bar</td><td>A square is always exactly one countable thing (a node, a snapshot). A rate or a size, or a count above 60, is a bar on the same row. Never both in one cut.</td></tr>
+<tr><td>Where it sits</td><td>Only in slot 3, under a section label that carries the total. Head, lead, facts, doors and foot stay as built.</td></tr>
+<tr><td>Colour</td><td>A network's rows wear its identity hue; a state wears the status colour; everything else is the neutral ramp.</td></tr>
+</table>
+
+<div id="out"></div>
+
+<div class="rec"><b>Recommend</b> Build 1 to 5 as one change: they replace two older breakdown recipes (dot · name · bar · count rows, and inline dots) with the table the metagraph card already uses, so the rail ends with one. Build 6 only as far as the archive reach bar. Leave 7 alone.</div>
+<div class="rec q"><b>Your call</b> (a) Country: the network cut only, or also a second cut by provider (it repeats what the explorer on the left already lists). (b) Node: the archive reach bar, yes or no. (c) Composition: the "lit squares in the whole network" strip, or keep it a plain fact card.</div>
+
+<script>
+const O='var(--orange)',BL='var(--blue)',G='var(--green)',V='var(--violet)',Y='var(--yellow)',N='var(--n2)';
+const sq=(n,c)=>`<span class="units">${Array.from({length:n},()=>`<i style="background:${c}"></i>`).join('')}</span>`;
+const bar=(f,c)=>`<span class="bar"><i style="width:${f*100}%;background:${c}"></i></span>`;
+const B={
+ lead:b=>`<p class="lead">${b.t}</p>`,hair:()=>`<div class="hair"></div>`,pad:()=>`<div class="pad"></div>`,
+ fact:b=>`<div class="fact"><span>${b.l}</span><span class="v ${b.c||''}">${b.v}</span></div>`,
+ sec:b=>`<div class="sec"><span>${b.l}</span><span>${b.u?`<span class="u">${b.u}</span>`:''}${b.n!=null?`<b>${b.n}</b>`:''}</span></div>`,
+ bars:b=>b.rows.map(r=>`<div class="brow"><i class="d" style="background:${r.c};margin:auto"></i><span>${r.l}</span><span class="t"><i style="width:${r.n/b.max*100}%;background:${r.c}"></i></span><span class="n">${Number(r.n).toLocaleString()}</span></div>`).join(''),
+ // the one table: rows [name,count,color]; mode 'sq' | 'bar'; ax = optional axis name
+ tb:b=>{const max=Math.max(...b.rows.map(r=>r[1]));return `<div class="tb ${b.ax?'':'na'} ${b.f?'f':''}">${b.ax?`<span class="ax" style="grid-row:span ${b.rows.length}">${b.ax}</span>`:''}${b.rows.map(r=>`<span class="nm ${r[1]?'':'z'}">${r[0]}</span><span class="num ${r[1]?'':'z'}">${Number(r[1]).toLocaleString()}</span>${b.mode==='bar'?(r[1]?bar(r[1]/max,r[2]):'<span></span>'):sq(r[1],r[2])}`).join('')}</div>`},
+ strip:b=>`<span class="units" style="padding:0 0 4px;gap:2px">${Array.from({length:b.of},(_,i)=>`<i style="width:8px;height:8px;border-radius:2px;background:${i<b.n?b.c:'var(--ghost)'}"></i>`).join('')}</span>`,
+ reach:b=>`<div class="reach"><div class="tr"><i style="width:${b.f*100}%"></i></div><div class="ends"><span>genesis</span><span>${b.t}</span><span>now</span></div></div>`,
+ foot:b=>`<div class="foot">${b.rows.map(r=>`<div class="frow"><span class="l">${r[0]}</span><span class="v">${r[1]}</span><span class="c">⧉</span></div>`).join('')}</div>`,
+ door:b=>`<div class="door"><span>${b.t}</span><span class="g">↗</span></div>`,
+ pager:b=>`<div class="pager ${b.pl?'pl':''}"><span class="b">‹</span>${b.t||''}<span class="b">›</span><span class="sp"></span><span class="b">⌃</span><span class="b">⌄</span></div>`
+};
+const card=(c,nw)=>`<div class="card ${nw?'new':''}"><span class="x">×</span><div class="eyebrow">${c.eye}</div><div class="hrow"><span class="ico ${c.io?'o':''}"></span><div class="ttl ${c.mono?'m':''}">${c.title}</div><span class="aside">${c.aside||''}</span></div>${c.body.map(b=>B[b[0]](b[1]||{})).join('')}</div>`;
+const L0='<span class="chip">L0</span>';
+const snapFoot=['foot',{rows:[['HASH','85b020541219469c1…b3614f34ec'],['PREVIOUS','984b5976bc9414…459a4bad']]}];
+const C=[
+{k:'1',name:'Global snapshot',h:'Snapshots anchored: squares, one per snapshot',
+ why:['<b>What changes.</b> The dot · name · track · count rows become the table. One square is one metagraph snapshot anchored in this tick, in the network\'s hue.','<b>Why it is worth it.</b> A tick anchors a handful of snapshots, so they are countable, and the picture matches the scene: one square here is one tile on that network\'s plane. The leading dots go, as on the metagraph card.','<b>Cost.</b> None in data. A tick with more than 60 snapshots falls back to bars.'],
+ a:{eye:'Global snapshot',mono:1,title:'6,989,808',aside:'<span class="pill pin"><i></i>pinned · 35s</span>',body:[['lead',{t:'Anchored by 4 metagraphs.'}],['hair'],['sec',{l:'Snapshots anchored',n:14}],['bars',{max:11,rows:[{l:'DOR',n:11,c:O},{l:'USDC.dag',n:1,c:BL},{l:'DED',n:1,c:V},{l:'unlisted',n:1,c:N}]}],['hair'],['fact',{l:'Fees paid',v:'0.0890 DAG'}],['fact',{l:'Size',v:'50 KB'}],['fact',{l:'Signed by',v:`125 ${L0} validators`}],snapFoot,['pager',{pl:1}]]},
+ b:{eye:'Global snapshot',mono:1,title:'6,989,808',aside:'<span class="pill pin"><i></i>pinned · 35s</span>',body:[['lead',{t:'Anchored by 4 metagraphs.'}],['hair'],['sec',{l:'Snapshots anchored',n:14}],['tb',{f:1,rows:[['Dor Technologies',11,O],['USDC.dag',1,BL],['Digital Evidence',1,V],['Unlisted',1,N]]}],['hair'],['fact',{l:'Fees paid',v:'0.0890 DAG'}],['fact',{l:'Size',v:'50 KB'}],['fact',{l:'Signed by',v:`125 ${L0} validators`}],snapFoot,['pager',{pl:1}]]}},
+{k:'2',name:'Moment',h:'The reading per network: the same rows, as bars',
+ why:['<b>What changes.</b> The dot-and-name fact rows become the table. These are rates, not things you can count, so the mark is a bar scaled to the busiest network. The headline moves onto the section label.','<b>Why it is worth it.</b> Today the card lists three numbers and leaves the comparison to you. The bars make "Dor is most of it" a glance, and it is the same picture as the chart planes behind the card.','<b>Cost.</b> None in data. A network with no reading stays a muted row with a dash.'],
+ a:{eye:'Moment',mono:1,title:'Sep 14, 13:00 UTC',body:[['lead',{t:'18 days ago.'}],['hair'],['fact',{l:'<span style="color:var(--fg);font-size:var(--title);font-weight:600">3,412</span> per hour',v:'<span class="e" style="font-size:var(--label)">all networks</span>'}],['sec',{l:'At that moment',u:'per hour'}],['fact',{l:`<i class="d" style="background:${O}"></i><span style="color:var(--fg)">Dor Technologies</span>`,v:'1,717'}],['fact',{l:`<i class="d" style="background:${V}"></i><span style="color:var(--fg)">Digital Evidence</span>`,v:'1,032'}],['fact',{l:`<i class="d" style="background:${Y}"></i><span style="color:var(--fg)">The Upsider AI</span>`,v:'111'}],['pad'],['door',{t:'Snapshot records'}]]},
+ b:{eye:'Moment',mono:1,title:'Sep 14, 13:00 UTC',body:[['lead',{t:'18 days ago.'}],['hair'],['sec',{l:'Snapshots',u:'per hour',n:'3,412'}],['tb',{f:1,mode:'bar',rows:[['Dor Technologies',1717,O],['Digital Evidence',1032,V],['The Upsider AI',111,Y],['Global L0',552,BL]]}],['pad'],['door',{t:'Snapshot records'}]]}},
+{k:'3',name:'Provider',h:'Networks: from inline dots to the table',
+ why:['<b>What changes.</b> "Networks ● DAG ● DOR" names the networks and hides how many nodes each has here. It becomes a section with the cohort\'s node total and one row per network.','<b>Why it is worth it.</b> It removes the third breakdown recipe on the rail, and adds a figure the card did not show (the split).','<b>Cost.</b> The count per network is already computed for the explorer. Illustrative split here.'],
+ a:{eye:'Provider',title:'Hetzner Online GmbH',aside:'<span class="chip">Falkenstein</span>',body:[['lead',{t:'31 nodes in Germany, on two networks.'}],['pad'],['fact',{l:'ASN',v:'<span style="font-family:var(--mono)">AS24940</span>'}],['fact',{l:'Nodes',v:'31'}],['fact',{l:'Networks',v:`<i class="d" style="background:${BL}"></i>DAG &nbsp;<i class="d" style="background:${O}"></i>DOR`}],['pad'],['pager',{t:'1 / 9'}]]},
+ b:{eye:'Provider',title:'Hetzner Online GmbH',aside:'<span class="chip">Falkenstein</span>',body:[['lead',{t:'Hosts nodes of two networks in Germany.'}],['hair'],['sec',{l:'Nodes',n:31}],['tb',{f:1,rows:[['Constellation',24,BL],['Dor Technologies',7,O]]}],['hair'],['fact',{l:'ASN',v:'<span style="font-family:var(--mono)">AS24940</span>'}],['pad'],['pager',{t:'1 / 9'}]]}},
+{k:'4',name:'Country',h:'Nodes by network',
+ why:['<b>What changes.</b> The node count gets a section and a cut by network. Cities and Providers stay facts, because the explorer on the left already lists them and the card should not repeat it.','<b>Why it is worth it.</b> The card answers "whose nodes are in Germany", which is the question a country selection raises and no surface answers today.','<b>Cost.</b> The count is 62 here, just over the square limit, so this card would often show bars. Either accept that, or raise the limit to about 90 (six rows of squares). Illustrative split.'],
+ a:{eye:'Country',title:'Germany',aside:'<span class="chip">DE</span>',body:[['lead',{t:'Hosts 37% of the selection\'s nodes.'}],['pad'],['fact',{l:'Nodes',v:'62'}],['fact',{l:'Cities',v:'7'}],['fact',{l:'Providers',v:'6'}],['pad'],['pager',{t:'1 / 7'}]]},
+ b:{eye:'Country',title:'Germany',aside:'<span class="chip">DE</span>',body:[['lead',{t:'Hosts 37% of the selection\'s nodes.'}],['hair'],['sec',{l:'Nodes',n:62}],['tb',{f:1,rows:[['Constellation',41,BL],['Dor Technologies',12,O],['Digital Evidence',6,V],['The Upsider AI',3,Y]]}],['hair'],['fact',{l:'Cities',v:'7'}],['fact',{l:'Providers',v:'6'}],['pad'],['pager',{t:'1 / 7'}]]}},
+{k:'5',name:'Composition',h:'The group, lit inside its network',
+ why:['<b>What changes.</b> The lead says 83%; a strip of the network\'s 18 squares shows it, with this group\'s 15 lit. Under it, the group\'s status in the table.','<b>Why it is worth it.</b> It is the same square the metagraph card above it draws, so stepping down a rung reads as "these ones". It also gives the card a reason to exist beyond two facts.','<b>Cost.</b> Status per node is already there. It restates the parent card\'s Composition row, which is the argument for keeping this card plain.'],
+ a:{eye:'Composition',io:1,title:'Data validators',aside:'<span class="chip">dL1</span>',body:[['lead',{t:'83% of this network\'s online nodes.'}],['pad'],['fact',{l:'Nodes',v:'15'}],['fact',{l:'Network',v:'Dor Technologies'}],['pad'],['pager',{t:'1 / 2'}]]},
+ b:{eye:'Composition',io:1,title:'Data validators',aside:'<span class="chip">dL1</span>',body:[['lead',{t:'83% of this network\'s online nodes.'}],['hair'],['sec',{l:'Nodes',u:'of 18',n:15}],['strip',{n:15,of:18,c:O}],['tb',{ax:'Status',rows:[['Ready',15,G]]}],['hair'],['fact',{l:'Network',v:'Dor Technologies'}],['pad'],['pager',{t:'1 / 2'}]]}},
+{k:'6',name:'Node',h:'A record. One optional mark: how far back its archive reaches',
+ why:['<b>What changes.</b> Almost nothing. A node is one thing, so there is no population to draw. The one quantity on the card is its archive depth, and a reach bar (genesis to now, the kept part filled) says "16 months" at a glance. Layers it runs show as lit chips instead of a word.','<b>Why keep it small.</b> Anything more would be decoration: the card is where you look a node up.','<b>Cost.</b> The reach needs the chain\'s age next to the kept count; both are read already. Only an L0 validator has a reach; the others keep the dash.'],
+ a:{eye:'Node',io:1,mono:1,title:'1545a38…ba24',aside:'<span class="pill">ready</span>',body:[['lead',{t:'Helsinki, Finland · Hetzner Online GmbH.'}],['pad'],['fact',{l:'Alias',v:'—',c:'e'}],['fact',{l:'Composition',v:'Hybrid'}],['fact',{l:'ASN',v:'<span style="font-family:var(--mono)">AS24940</span>'}],['fact',{l:'Co-located',v:'—',c:'e'}],['fact',{l:'Full archive',v:'16 months'}],['foot',{rows:[['NODE ID','1545a38af9b71e1f35…a4e575dba24']]}],['pager',{t:'1 / 15',pl:1}]]},
+ b:{eye:'Node',io:1,mono:1,title:'1545a38…ba24',aside:'<span class="pill">ready</span>',body:[['lead',{t:'Helsinki, Finland · Hetzner Online GmbH.'}],['pad'],['fact',{l:'Alias',v:'—',c:'e'}],['fact',{l:'Runs',v:'<span class="layers"><span class="on">L0</span><span class="on">cL1</span><span class="on">dL1</span></span>'}],['fact',{l:'ASN',v:'<span style="font-family:var(--mono)">AS24940</span>'}],['fact',{l:'Co-located',v:'—',c:'e'}],['fact',{l:'Archive',v:'16 months'}],['reach',{f:.42,t:'kept since Jun 2025'}],['foot',{rows:[['NODE ID','1545a38af9b71e1f35…a4e575dba24']]}],['pager',{t:'1 / 15',pl:1}]]}}
+];
+document.getElementById('out').innerHTML=C.map(c=>`<h2><b>${c.k} · ${c.name}</b>${c.h}</h2><div class="pair"><div class="col"><div class="cap"><b>${c.name}</b><span>today</span></div>${card(c.a)}</div><div class="arrow">→</div><div class="col"><div class="cap"><b>${c.name}</b><span>proposed</span></div>${card(c.b,1)}</div><div class="why">${c.why.map(w=>`<p>${w}</p>`).join('')}</div></div>`).join('')
++`<h2><b>7 · Metagraph snapshot</b>Leave it as built</h2><p class="lede">Its content is one snapshot's payload: a schema name, a record count, fees, size, signers. There is no population and no comparison on the card, and the State / Data tabs already carry its structure. A visual here would be the first one on the rail that shows nothing the numbers do not.</p>`;
+</script></body></html>

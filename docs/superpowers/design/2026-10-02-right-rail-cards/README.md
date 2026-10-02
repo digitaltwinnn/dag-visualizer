@@ -33,9 +33,8 @@ Deviations from the drawings, each for a recorded rule:
 - **The Moment card keeps its headline line** (the reading at the instant, with its scope) under
   the new lead; its "Snapshot records" control was already the door recipe and keeps its own foot
   geometry.
-- **The metagraph card's breakdown is unchanged** pending a pick from `breakdown.html`.
 
-## The metagraph breakdown (open)
+## The metagraph breakdown (decided: D2, built)
 
 `breakdown.html` — five forms (A today · B one line per cut · C say-it · D unit strip · E tiles).
 User, 2026-10-02: the dot legend is what bothers most ("can it be solved with tables?"); D is the
@@ -43,4 +42,14 @@ favourite, E is nice but loses information; and **the largest network will soon 
 nodes**, so a square is always one node and D needs no scaled fallback.
 `breakdown-2.html` — four D variants with the legend as a table and no dots: D1 strip + table
 beside, D2 one table whose squares are the bars (recommended), D3 names as columns under the
-strip, D4 a composition × status / archive cross table. Awaiting his pick; the built card keeps A.
+strip, D4 a composition × status / archive cross table. **Picked D2 (user, 2026-10-02) and built** as `ScheduleTable` in `components/inspector/parts.tsx`:
+name · count · one square per node, a proportional bar above 60 nodes.
+
+## Visuals for the other cards (open)
+
+`visuals.html` — which of the other seven cards gain from the D2 table. Proposed: global snapshot
+(one square per anchored snapshot), Moment (bars per network), provider (nodes per network instead
+of inline dots), country (nodes by network), composition (the group lit inside its network's
+strip); the node card gets at most an archive reach bar; the metagraph snapshot stays as built.
+One rule: name · count · mark in the D2 grid, a square for a countable thing and a bar for a rate
+or a count above 60, only in the breakdown slot. Awaiting his call.
