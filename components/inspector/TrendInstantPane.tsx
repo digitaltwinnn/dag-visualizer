@@ -6,6 +6,7 @@ import { INSTANT_ICON } from "@/components/icons";
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { Lead, FactGroup, UnitMarks, CUT_ROW } from "@/components/inspector/parts";
+import { IDENT_INK } from "@/components/identInk";
 import { Separator } from "@/components/ui/separator";
 import { SELECTED_ROW, selectionHue } from "@/components/selection";
 import { openRecords, spanOfWindow } from "@/components/trendDoors";
@@ -193,7 +194,7 @@ export default function TrendInstantPane({
                 )}
                 </span>
                 <span
-                  className="min-w-0 truncate text-right text-label font-normal text-muted-foreground"
+                  className={cn("min-w-0 truncate text-right text-label font-normal text-muted-foreground", subject && IDENT_INK)}
                   title={subject ? rows.get(subject)?.name : undefined}
                   // The ticker in its network's hue (user, 2026-09-26) — the dossier aside's own rule.
                   style={subject ? { color: rows.get(subject)?.hue } : undefined}

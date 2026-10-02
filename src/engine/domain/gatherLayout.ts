@@ -55,8 +55,12 @@ export interface GatherExtent {
 // cancels out and the rails' top is `--rail-top` in CANVAS-local pixels whatever the bar does.
 const RAIL_TOP = 90; //        --rail-top: top of both rails, i.e. the top of the first card
 const RAIL_GUTTER = 26; //     both rails' outer margin
-const LEFT_RAIL_W = 264; //    --rail-w
-const RIGHT_RAIL_W = 320; //   --detail-w
+// The rails are FLUID since 2026-10-02 (`--rail-w: clamp(264px, 16vw, 340px)`, `--detail-w:
+// clamp(320px, 18vw, 400px)`), so the mirror is the same clamp over the viewport width — as fixed
+// 264/320 the band ran under the right rail on a wide screen and History's free gap was overstated.
+const clampPx = (min: number, v: number, max: number) => Math.min(max, Math.max(min, v));
+const leftRailW = (viewW: number) => clampPx(264, viewW * 0.16, 340); //  --rail-w
+const rightRailW = (viewW: number) => clampPx(320, viewW * 0.18, 400); // --detail-w
 const BOTTOM_RESERVE = 130; // --bottom-reserve at its LEDGER value — the LiveStrip lane. Kept as a
 //                            constant rather than read per view: the lane only mounts in ledger, so
 //                            in hyper/geo this reserves ~130px the band could have used. Measured,
@@ -171,7 +175,7 @@ export const GATHER_LEGEND_PX = 22;
  */
 export function railGapShiftPx(viewW: number, railsHidden: boolean): number {
   const railed = !railsHidden && viewW >= RAILS_TIER;
-  return railed ? (LEFT_RAIL_W - RIGHT_RAIL_W) / 2 : 0;
+  return railed ? (leftRailW(viewW) - rightRailW(viewW)) / 2 : 0;
 }
 
 /**
@@ -185,12 +189,12 @@ export function railGapShiftPx(viewW: number, railsHidden: boolean): number {
  */
 export function railGapPx(viewW: number, railsHidden: boolean): number {
   const railed = !railsHidden && viewW >= RAILS_TIER;
-  return Math.max(1, railed ? viewW - 2 * RAIL_GUTTER - LEFT_RAIL_W - RIGHT_RAIL_W : viewW);
+  return Math.max(1, railed ? viewW - 2 * RAIL_GUTTER - leftRailW(viewW) - rightRailW(viewW) : viewW);
 }
 
 export function gatherBand(viewW: number, viewH: number, railsHidden: boolean, out: GatherBand): GatherBand {
   const railed = !railsHidden && viewW >= RAILS_TIER;
-  const reach = railed ? RAIL_GUTTER + Math.max(LEFT_RAIL_W, RIGHT_RAIL_W) : 0;
+  const reach = railed ? RAIL_GUTTER + Math.max(leftRailW(viewW), rightRailW(viewW)) : 0;
   const halfWidthPx = Math.max(1, viewW / 2 - reach - BAND_MARGIN);
   const top = RAIL_TOP + GATHER_LEGEND_PX;
   // A point `f` half-heights above centre lands at `viewH/2 * (1 - f)` pixels from the top.

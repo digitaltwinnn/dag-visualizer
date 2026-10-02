@@ -68,12 +68,13 @@ import type { ZoomId } from "@/src/data/trendWindow";
 // pill already states. So no span reachable here is unreachable there.
 
 /** The plot's height inside the track box; the rest is the month strip. */
-const LABEL_H = 13;
+const LABEL_H = 16; // the label step is 12–13.5px since the type scale (was 13 for 9px type)
 /** A month label needs about this much room before the next one is a smear. */
 const TICK_GAP_PX = 44;
 /** Within this many px of the track's right edge the cursor's stamp sits to the LEFT of its line,
- *  so the widest form (a fine-tier stamp with its UTC suffix, ~100px) never runs off the track. */
-const STAMP_FLIP_PX = 110;
+ *  so the widest form (a fine-tier stamp with its UTC suffix, ~150px at the label step's ceiling)
+ *  never runs off the track. */
+const STAMP_FLIP_PX = 160;
 /** The narrowest a brush may DRAW. A one-hour window over a six-year track is a real span and a
  *  sub-pixel rectangle; the mark has to be findable or the band would say nothing about where the
  *  stack is looking. */
