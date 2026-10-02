@@ -610,7 +610,10 @@ export const countable = (total: number) => total <= UNIT_MAX;
  *  snapshot's anchored rows, the Moment's readings, a provider's and a country's networks. Rows
  *  that are their own controls (an accordion trigger, a hover-paired button) wear this class
  *  themselves, so every card's names, figures and marks sit in the same three columns. */
-export const CUT_ROW = "grid grid-cols-[8.6em_3.4em_minmax(0,1fr)] items-start gap-x-2 text-label";
+// MARK BEFORE FIGURE (user, 2026-10-02: "should we right-align the number and put the visual in
+// front?"): name · mark · count, the count on the card's right edge — the fact rows' own grammar
+// (label left, value right) and the explorer rows' order (name, bar, figure).
+export const CUT_ROW = "grid grid-cols-[8.6em_minmax(0,1fr)_3.4em] items-start gap-x-2 text-label";
 
 /** ONE CUT OF A TOTAL, AS TABLE ROWS (user, 2026-10-02 — `docs/superpowers/design/2026-10-02-right-
  *  rail-cards/breakdown-2.html`, D2: "what bothers me most is that the legend has those dots in it
@@ -630,7 +633,7 @@ export function ScheduleTable({ axis, axisTitle, parts, className }: { axis?: st
     <div
       className={cn(
         axis != null
-          ? "grid grid-cols-[6em_7.4em_2em_minmax(0,1fr)] items-start gap-x-2 gap-y-0.5 py-1.5 text-label border-t border-border first:border-t-0"
+          ? "grid grid-cols-[6em_7.4em_minmax(0,1fr)_2.4em] items-start gap-x-2 gap-y-0.5 py-1.5 text-label border-t border-border first:border-t-0"
           : cn(CUT_ROW, "gap-y-0.5"),
         className,
       )}
@@ -645,8 +648,8 @@ export function ScheduleTable({ axis, axisTitle, parts, className }: { axis?: st
           <span className={cn("min-w-0 truncate", p.count > 0 ? "text-foreground-dim" : "text-muted-foreground")} title={p.title ?? p.label}>
             {p.label}
           </span>
-          <span className={cn("font-mono tabular-nums text-right", p.count > 0 ? "text-foreground" : "text-muted-foreground")}>{p.count}</span>
           <UnitMarks count={p.count} color={p.color} units={units} frac={p.count / Math.max(1, total)} />
+          <span className={cn("font-mono tabular-nums text-right", p.count > 0 ? "text-foreground" : "text-muted-foreground")}>{p.count}</span>
         </Fragment>
       ))}
     </div>

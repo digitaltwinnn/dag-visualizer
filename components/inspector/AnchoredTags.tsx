@@ -185,8 +185,8 @@ export default function AnchoredTags({
                   >
                     {r.label}
                   </span>
-                  <span className="font-mono tabular-nums text-right text-foreground">{r.n}</span>
                   <UnitMarks count={r.n} color={r.hue ?? "var(--core)"} units={units} frac={pct(r.n) / 100} />
+                  <span className="font-mono tabular-nums text-right text-foreground">{r.n}</span>
                 </span>
                 {/* Expand affordance / open-state cue. Open rows show a down chevron. Closed rows:
                     hidden on a mouse (revealed on row hover/focus — keeps the resting list clean),
