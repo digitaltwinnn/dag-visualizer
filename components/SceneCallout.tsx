@@ -199,8 +199,11 @@ export default function SceneCallout() {
   // apply the SAME preference, so label and anchor step up and down together.
   const boxedCard = useStore((s) => s.boxedCard);
   // The global tick's aside is its AGE, ticking (user, 2026-08-15 — "same as card"):
-  // SnapshotAside's two states mirrored as a label — `live · Xs` with the beating dot while
-  // following, `◷ Xs` on a pin. The card keeps the BUTTON (follow toggle); this is read-only.
+  // The card's two states mirrored as a label — `live · Xs` with the beating dot while
+  // following, `pinned · Xs` on a pin, in the card's own words (2026-10-02, B1: the callout is the
+  // ONE mirror of the state now that the explorer's pill is gone, so it says the word the card
+  // says rather than a bare clock glyph). The card keeps the BUTTON (follow toggle); this is
+  // read-only.
   const now = useNowTick(1000);
   // NOT ON A PHONE (user, 2026-08-18) — the reasoning lives with the Engine's mirrored gate in
   // `_syncCallout`: the label's value is co-location, and under 700px the panel's reach can't
@@ -366,7 +369,7 @@ export default function SceneCallout() {
         key: following ? "gs|live" : `gs|${snap.data.ordinal}`,
         eyebrow: "Global snapshot",
         title: snap.data.ordinal.toLocaleString(),
-        aside: following ? { text: rel ? `live · ${rel}` : "live", live: true } : rel ? { text: `◷ ${rel}` } : undefined,
+        aside: following ? { text: rel ? `live · ${rel}` : "live", live: true } : { text: rel ? `pinned · ${rel}` : "pinned" },
         // Unfiltered the ring marks the whole bar (core cyan); under a filter the anchor
         // points at the committed network's own SEGMENT, so the ring takes its accent
         // (user, 2026-08-16 — "if filter, select the correct segment of the byte bar").
