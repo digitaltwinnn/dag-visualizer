@@ -135,6 +135,14 @@
   animation: none !important;
   transition: none !important;
 }
+/* …AND THE GHOST IS NOBODY'S HOVER SUBJECT (user, 2026-10-03: "the swipe left/right on the card
+   has some flashes"). Its root is inline `pointer-events: none`, but the panel inside carries the
+   card's own `pointer-events-auto` class, so the outgoing copy still took the pointer as it slid
+   under a resting cursor — measured, its scene-facing edge line lit at full strength two thirds
+   of the way out. It is a picture of a card that has already left: no pointer, no edge signal. */
+[data-pager-ghost], [data-pager-ghost] * { pointer-events: none !important; }
+[data-pager-ghost] .sig-left::before, [data-pager-ghost].sig-left::before,
+[data-pager-ghost] .sig-right::after, [data-pager-ghost].sig-right::after { opacity: 0 !important; }
 
 /* THE ONE DISCLOSURE PANEL RECIPE — every collapsible body in the app wears `.disclose-panel`.
    Radix's Collapsible keeps its content mounted through the close and publishes the measured
@@ -660,7 +668,18 @@
    swallowed. When the window closes, whatever sits under the pointer hovers normally: a resting
    state, no flash. */
 .rail-ladder [data-arriving] .ig-panel,
-.rail-ladder [data-arriving] .rail-entry { pointer-events: none; }
+.rail-ladder [data-arriving] .rail-entry,
+/* …and a SLIDING card, for the pager's own window (`RailPager.commitStep` marks its wrapper
+   `data-sliding`): its inline `pointer-events: none` stops at the wrapper, because the panel
+   re-enables the pointer for itself. Same device, same reason, and the plank stays live. */
+.rail-card[data-sliding] .ig-panel,
+.rail-card[data-sliding] .rail-entry { pointer-events: none; }
+/* …and its hover edge stays dark for the slide. Chromium keeps a LATCHED `:hover` on the wrapper
+   until the pointer next moves, so the incoming card mounted with its edge line already lit and
+   spent its first 130ms fading it out while it entered the lane — measured, a line of light at
+   the lane's right edge on every swipe. The pulse is a different element and still plays. */
+.rail-card[data-sliding] .sig-left::before,
+.rail-card[data-sliding] .sig-right::after { opacity: 0 !important; }
 
 .rail-ladder[data-stepping] .rail-entry,
 .rail-ladder[data-stepping] .rail-entry:hover,

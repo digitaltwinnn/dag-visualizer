@@ -428,6 +428,19 @@ no height, and the store commits synchronously, so the slot becomes the NEW card
 frame later (the new height is unknowable until React has painted it). Both restore in `fin()` beside
 the position/overflow it already saved.
 
+⚠️ **A FOURTH, 2026-10-03 ("the swipe left/right on the card has some flashes"): THE SLIDE'S
+HOVER-INERT WINDOW HAS TO BE STATED IN CSS.** `commitStep` set `pointer-events: none` inline on its
+wrapper, and the panel inside carries its own `pointer-events-auto` (it must — `#rightcol` is
+inert), so the card was never inert at all: as the lane's height eased under a resting pointer it
+took the hover, wore the pairing ring for ~45ms (its explorer row and scene tile with it) and
+dropped it. The wrapper is marked `data-sliding` for the window and globals.css carries it past
+the class; the same rule holds the incoming card's hover edge dark (a LATCHED `:hover` lit it on
+mount), and the ghost is pointer-inert and edge-less by its own rule. The same report turned up
+two neighbours: `HeightEase` opens an expanding rung's `data-arriving` window WITH THE COMMIT (a
+frame later, the fresh box took the pointer and blinked its ring on, off, on), and `RailShade`
+is `flex-none`, never `min-h-0` — shrinkable, it made `.rail-clip` flip every frame whenever the
+cards overran the lane by less than `--rail-fade`.
+
 **The pull SHOWS THE NEIGHBOUR** (`showPeek`, 2026-09-01 — user: "the new card only appears after
 I've moved the old card … I expect to already see it appearing before that"). A card-shaped peek
 carrying the incoming sibling's NAME rides the same damped travel, one width out on the side it will

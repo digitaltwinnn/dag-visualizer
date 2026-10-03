@@ -464,8 +464,17 @@ export default function RailPager({
     // slide's own window; the plank stays interactive (its group is pointer-events-auto, which
     // overrides the ancestor), so rapid chevron stepping keeps working. Restored in fin(), at
     // which point whatever sits under the pointer hovers normally — a resting state, no flash.
+    // ⚠️ …AND THE INLINE STYLE ALONE NEVER REACHED THE CARD (user, 2026-10-03: "the swipe
+    // left/right on the card has some flashes"). `pointer-events` inherits, and the panel inside
+    // states its own `pointer-events-auto` (it must — `#rightcol` is inert), so the wrapper's
+    // `none` stopped at the wrapper. Measured on a chevron step: the lane's height eased, the
+    // plank moved out from under a resting pointer, the card took the hover and wore the
+    // pairing ring for 46ms — its explorer row and scene tile lighting with it — and lost it
+    // when the plank came back. `data-sliding` is the same window stated where CSS can carry it
+    // past that class (globals.css, beside the arriving rule); the plank stays live.
     const prevPE = el.style.pointerEvents;
     el.style.pointerEvents = "none";
+    el.dataset.sliding = "";
     void el.offsetWidth; // flush, so both start their slide together
     el.style.transition = `transform ${SLIDE_MS}ms ${SLIDE_EASE}`;
     el.style.transform = "";
@@ -482,6 +491,7 @@ export default function RailPager({
       el.style.transition = "none";
       el.style.transform = "";
       el.style.pointerEvents = prevPE;
+      delete el.dataset.sliding;
     };
     pending.current = { fin, t: setTimeout(() => { pending.current = null; fin(); }, SLIDE_MS + 40) };
     // The new card's height is only knowable after React has painted it, so the lane's ease is armed
