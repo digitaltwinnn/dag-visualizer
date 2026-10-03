@@ -64,6 +64,10 @@ export interface ExplorerRowProps {
    *  user: "lots of space on their left side — any reason not to use it?"). Decided per level by
    *  the caller, never per row: bars only compare when every one starts at the same x. */
   wideBar?: boolean;
+  /** A PINNED row (the level's `lead`): no bar and no track — it is what the rows are read
+   *  against, and a bar there would be a share of itself. The name takes only its own width so
+   *  the tag beside it has the room the bar would have had. */
+  plain?: boolean;
   /** A real-but-empty subject (a 0-node network): present, dimmed. */
   faint?: boolean;
   title?: string;
@@ -97,7 +101,7 @@ function recentGesture(): boolean {
 }
 
 export default function ExplorerRow({
-  glyph, name, nameMono, tag, bar, figure, hasFigure, nameW = 84, figureW = 40, glyphW = 14, on, hue, nested, wideBar, faint, title, onClick, pair, className,
+  glyph, name, nameMono, tag, bar, figure, hasFigure, nameW = 84, figureW = 40, glyphW = 14, on, hue, nested, wideBar, plain, faint, title, onClick, pair, className,
 }: ExplorerRowProps) {
   const el = useRef<HTMLButtonElement>(null);
   // SELECTION STAYS IN PLACE (design 2026-09-26, decision 12): the list never re-orders on a
@@ -176,7 +180,9 @@ export default function ExplorerRow({
         // that is +26px, enough to untruncate "Dor Technologies" — while the tag home takes the
         // rest. Stated against the token, so the grammar's one width stays the stylesheet's.
         gridTemplateColumns: hasFigure
-          ? wideBar
+          ? plain
+            ? `${glyphCol} auto minmax(0,1fr) 0px ${figureCol}`
+            : wideBar
             ? `${glyphCol} minmax(0,${nameCol}) 0px minmax(${nested ? 24 : 36}px,1fr) ${figureCol}`
             : `${glyphCol} minmax(0,${nameCol}) minmax(0,1fr) ${nested ? 24 : 36}px ${figureCol}`
           : `${glyphCol} minmax(0,1fr) auto`,
@@ -219,7 +225,7 @@ export default function ExplorerRow({
       </span>
       {hasFigure && (
         <>
-          <span className="h-[5px] rounded-[3px] bg-wash-faint overflow-hidden">
+          <span className={cn("h-[5px] rounded-[3px] overflow-hidden", !plain && "bg-wash-faint")}>
             {bar && (
               <span
                 className="block h-full rounded-[3px]"

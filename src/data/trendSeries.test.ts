@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { headWord, spanAverage, spanWord, typeBands,
   GLOBAL_METRIC_ROWS,
+  GLOBAL_READING,
   TREND_METRICS,
   globalSeries,
   formatDag,
@@ -622,5 +623,24 @@ describe("typeBands", () => {
   });
   it("no type history at all is no bands, never a fabricated split", () => {
     expect(typeBands("up", series)).toEqual([]);
+  });
+});
+
+describe("GLOBAL_READING — what the whole-network figure is beside the networks' own", () => {
+  it("calls it a total only where it is the networks' rows added up", () => {
+    expect(GLOBAL_READING.snapshots).toBe("total");
+    expect(GLOBAL_READING.fees).toBe("total");
+    expect(GLOBAL_READING.kb).toBe("total");
+  });
+
+  it("never calls the fleet or the base ledger's own readings a total", () => {
+    // Every node includes the DAG's own validators; blocks and cadence are the ledger's own.
+    expect(GLOBAL_READING.nodes).toBe("fleet");
+    expect(GLOBAL_READING.blocks).toBe("own");
+    expect(GLOBAL_READING.continuity).toBe("own");
+  });
+
+  it("answers for every measure the explorer can pick", () => {
+    expect(Object.keys(GLOBAL_READING).sort()).toEqual([...METRIC_ORDER].sort());
   });
 });

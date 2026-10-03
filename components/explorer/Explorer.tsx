@@ -85,6 +85,10 @@ export interface ExplorerLevelSpec {
    *  widens it for the network TICKER that leads its rows (`NODE_GLYPH_W`). */
   glyphW?: number;
   rows: ExplorerRowSpec[];
+  /** A row PINNED above the list and set apart by a hairline — what the rows are read against
+   *  (History's DAG row, the networks' total), never ranked among them. It shares the list's
+   *  columns, and carries no bar: a bar there would be a share of itself. */
+  lead?: ExplorerRowSpec;
   /** What to say when there are no rows — an honest instrument state, never fabricated rows. */
   empty?: ReactNode;
   /** The view's one setting, shown on the heading row (Same scale, Live). */
@@ -119,8 +123,8 @@ export default function Explorer({ id, title, hint, levels, onLeave, defaultColl
   // rows change; the rows read the variable with `glyphW` as its fallback, so the first paint and
   // the server render keep the old width rather than collapsing.
   const cap = current?.glyphW ?? 14;
-  const rowKeys = current?.rows.map((r) => r.key).join("|") ?? "";
-  const figKey = current?.rows.map((r) => (typeof r.figure === "string" || typeof r.figure === "number" ? String(r.figure).length : 0)).join("") ?? "";
+  const rowKeys = (current?.lead ? `${current.lead.key}||` : "") + (current?.rows.map((r) => r.key).join("|") ?? "");
+  const figKey = (current?.lead && (typeof current.lead.figure === "string" || typeof current.lead.figure === "number") ? `${String(current.lead.figure).length}:` : "") + (current?.rows.map((r) => (typeof r.figure === "string" || typeof r.figure === "number" ? String(r.figure).length : 0)).join("") ?? "");
   const listEl = useRef<HTMLDivElement | null>(null);
   const fitGlyphs = useCallback((el: HTMLDivElement | null) => { listEl.current = el; }, []);
   useLayoutEffect(() => {
@@ -204,6 +208,28 @@ export default function Explorer({ id, title, hint, levels, onLeave, defaultColl
               ) : null
             ) : (
               <div ref={fitGlyphs} className="flex flex-col gap-0.5">
+                {current.lead && (
+                  <div className="mb-1 border-b border-border pb-1">
+                    <ExplorerRow
+                      hasFigure={current.hasFigure}
+                      nameW={current.nameW}
+                      figureW={current.figureW}
+                      glyphW={current.glyphW}
+                      nested={nested}
+                      plain
+                      glyph={current.lead.glyph}
+                      name={current.lead.name}
+                      tag={current.lead.tag}
+                      figure={current.lead.figure}
+                      on={current.lead.on}
+                      hue={current.lead.hue}
+                      faint={current.lead.faint}
+                      title={current.lead.title}
+                      onClick={current.lead.onClick}
+                      pair={current.lead.pair}
+                    />
+                  </div>
+                )}
                 {current.rows.map((r) => (
                   <ExplorerRow
                     key={r.key}

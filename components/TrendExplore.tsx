@@ -6,7 +6,7 @@ import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
-import { METRIC_LABELS, METRIC_ORDER, headWord, metricUnit, spanWord } from "@/src/data/trendSeries";
+import { GLOBAL_READING, METRIC_LABELS, METRIC_ORDER, headWord, metricUnit, spanWord } from "@/src/data/trendSeries";
 import { spanPhrase } from "@/src/data/trendWindow";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -107,6 +107,38 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   // already carries, made visible in the list.
   const maxLast = Math.max(1e-9, ...ranked.map((id) => rows.get(id)?.head ?? 0));
 
+  // THE DAG, PINNED ABOVE THE LIST (user, 2026-10-03: "should dag be added to the explorer trend
+  // page? isn't it basically the hypergraph metrics?" — "ok as pinned row, show that it's the
+  // totals of the rows below"). It is the hypergraph's own reading, the figure its plane opens
+  // with under the DAG filter. Ranked among the networks it would always stand first with a full
+  // bar and flatten the shared scale — for snapshots, fees and data it IS their sum — so it
+  // stands apart: above the hairline, no bar, and a chip saying what it is beside them. That
+  // chip is honest per measure (`GLOBAL_READING`): "total" only where it is the rows added up.
+  // A click commits the DAG filter, where its plane already stands.
+  const total = roster.total;
+  const reading = GLOBAL_READING[metric];
+  const totalChip = reading === "total" ? "total" : reading === "fleet" ? "whole network" : "base ledger";
+  const totalWhy =
+    reading === "total"
+      ? "The networks below, added up"
+      : reading === "fleet"
+        ? "Every node, the DAG's own validators included"
+        : "The base ledger's own reading, not a sum of the networks below";
+  const lead =
+    total && !empty
+      ? {
+          key: "dag-total",
+          glyph: <IdentityDot hue={total.hue} />,
+          name: "DAG",
+          tag: <QualifierChip>{totalChip}</QualifierChip>,
+          hue: total.hue,
+          figure:
+            slice.stale ? <NodeStars count={3} /> : total.head != null ? format(total.head) : roster.pending || (roster.headKind === "day" && roster.dayPending) ? <NodeStars count={3} /> : <span className="text-muted-foreground" title={NO_READING}>—</span>,
+          title: `DAG. ${totalWhy}. ${total.head != null ? `${format(total.head)}${unit ? ` ${unit}` : ""}, ${headWord(metric, roster.headKind)}` : NO_READING}`,
+          onClick: () => applyClickActions([{ kind: "filter", id: "dag" }]),
+        }
+      : undefined;
+
   const level: ExplorerLevelSpec = {
     key: "networks",
     crumb: { label: "Networks" },
@@ -123,6 +155,7 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
     figureW: 64,
     // No fabricated rows (rule 10): the two commits the trends store keeps nothing for say so in
     // the same sentences the stack and the document say them in.
+    lead,
     empty: empty ? `${empty.fact} ${empty.route}` : "Waiting for the measured history…",
     rows: empty
       ? []

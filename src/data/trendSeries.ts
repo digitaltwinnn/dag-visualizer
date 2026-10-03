@@ -319,6 +319,21 @@ export const GLOBAL_METRIC_ROWS: Record<TrendMetric, { key: string | null; scale
   continuity: { key: null, scale: 1 },
 };
 
+/** WHAT THE WHOLE-NETWORK READING IS, NEXT TO THE NETWORKS' OWN (2026-10-03 — the History
+ *  explorer's pinned DAG row; user: "show that it's the totals of the rows below"). It is a sum
+ *  of the rows only for three measures, and the row must not claim it for the others (rule 10):
+ *    · `total` — what the networks anchored, paid and wrote, added up (snapshots, fees, data);
+ *    · `fleet` — every node, the DAG's own validators included, so more than the rows add up to;
+ *    · `own`   — the base ledger's own reading (its blocks, its own cadence), not a sum at all. */
+export const GLOBAL_READING: Record<TrendMetric, "total" | "fleet" | "own"> = {
+  snapshots: "total",
+  fees: "total",
+  kb: "total",
+  nodes: "fleet",
+  blocks: "own",
+  continuity: "own",
+};
+
 /** What the overview track draws for one metric across the whole network. Mirrors
  *  `metricSeries` — copies, never aliases, so a consumer's trim cannot reach the shared window
  *  cache — and derives continuity as the MEAN gap (`g.gapSum ÷ g.ticks`), null wherever the
