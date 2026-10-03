@@ -21,7 +21,7 @@ export const CABINET_LIST =
   "relative flex h-auto flex-none w-full justify-start gap-4 rounded-none p-0 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border";
 
 /** Every `TabsTrigger`. The primitive's own active underline and focus ring are replaced: the
- *  accent rule is drawn as an inset shadow (no layout, no pseudo to fight), and this app's focus
+ *  accent rule is drawn as a 2px background along the bottom (no layout, no pseudo to fight), and this app's focus
  *  language is a 1px outline. */
 export const CABINET_TRIGGER = [
   "flex-none flex items-center justify-center gap-1.5 px-0.5 rounded-none!",
@@ -31,7 +31,13 @@ export const CABINET_TRIGGER = [
   "after:hidden focus-visible:ring-0",
   "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
   "data-[state=active]:z-[1] data-[state=active]:text-foreground!",
-  "data-[state=active]:shadow-[inset_0_-2px_0_var(--primary)]!",
+  // ⚠️ THE RULE IS A BACKGROUND, NOT AN INSET SHADOW (test pass, 2026-10-03). A tab hugs its
+  // label, so its box is a fractional width (44.26px), and at a 3x pixel ratio Chrome's inset
+  // shadow leaked a one-pixel vertical hairline down the tab's right edge. A 2px gradient laid
+  // along the bottom has no edge to leak from. `shadow-none!` clears the primitive's own.
+  "data-[state=active]:shadow-none!",
+  "data-[state=active]:[background-image:linear-gradient(var(--primary),var(--primary))]!",
+  "data-[state=active]:[background-size:100%_2px]! data-[state=active]:[background-position:bottom]! data-[state=active]:bg-no-repeat!",
 ].join(" ");
 
 /** The body under the row. No box: the baseline hairline above it is the only division. */

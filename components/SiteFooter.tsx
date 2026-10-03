@@ -137,7 +137,8 @@ export default function SiteFooter() {
           separates the two rows now that they touch. */}
       <nav
         className={cn(
-          "flex-1 flex items-center justify-center gap-2.5 text-label text-foreground-dim [&_a]:pointer-events-auto bg-[var(--footer-glass)] backdrop-blur-sm",
+          // `whitespace-nowrap`: a link is one unit — it may be dropped at a tier, never broken in two.
+          "flex-1 flex items-center justify-center gap-2.5 whitespace-nowrap text-label text-foreground-dim [&_a]:pointer-events-auto bg-[var(--footer-glass)] backdrop-blur-sm",
           "max-[700px]:[&_a]:pt-[26px] max-[700px]:[&_a]:-mt-[26px] max-[700px]:[&_a]:pb-1.5 max-[700px]:[&_a]:-mb-1.5 max-[700px]:[&_a]:px-1.5 max-[700px]:[&_a]:-mx-1.5",
           "pt-[min(10px,var(--bottom-reserve,0px))] max-[700px]:pt-0",
         )}

@@ -8,12 +8,14 @@ import { ROUTED_VIEWS } from "@/components/views";
 // a real navigation would tear down and reboot the WebGL engine for a switch the command bar
 // does as a store write, and setMode also closes any open doc overlay, so from /about a view
 // link lands straight in the scene. The real href keeps middle-click / new-tab / copy-link
-// honest. Hidden on phone (the row would overflow 390px; the bar's own switch carries the views
-// there) — the group hides as ONE span, separators included, so no dangling mid-dot survives.
+// honest. Hidden BELOW THE DESKTOP TIER (the bar's own switch carries the views there) — on phone
+// the row would overflow 390px, and on a 900px tablet it ran 885px into an 868px strip, so
+// "Source code" and the project tag each broke onto two lines (test pass, 2026-10-03). The group
+// hides as ONE span, separators included, so no dangling mid-dot survives.
 export default function FooterViewLinks() {
   const setMode = useStore((s) => s.setMode);
   return (
-    <span className="flex items-center gap-2 max-[700px]:hidden">
+    <span className="flex items-center gap-2 max-[1100px]:hidden">
       {ROUTED_VIEWS.map((v, i) => (
         <span key={v.id} className="flex items-center gap-2">
           {i > 0 && (
