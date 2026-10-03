@@ -720,7 +720,7 @@ and a track you cannot press is a picture of one. So the timeline re-enables poi
 OWN ROOT and nothing else — every other view's band keeps the charter and the orbit drag keeps
 passing through. The sheets' `sceneCover` clip still governs it: measured, a covered strip hands
 both paint and hit-testing to the sheet above.
-**The Time range group stands above the band's right corner again since 2026-10-03** (user: "what about moving the time-range control just above the vitals section, right side?" — it was inside the band, on the left, from 2026-09-29; `TrendTimeline` records all three placements and why, and this time the group keeps its "Time range" label). The original note: **The track takes the whole band and the window pills stand above its top-right corner** (user,
+**The Time range group stands above the band's right corner again since 2026-10-03** (user: "what about moving the time-range control just above the vitals section, right side?" — it was inside the band, on the left, from 2026-09-29; `TrendTimeline` records all three placements and why, without the "Time range" words: "it's obvious"). The original note: **The track takes the whole band and the window pills stand above its top-right corner** (user,
 2026-09-26, two rounds — first over the corner, then "above the bottom section, not on top of it";
 the band's clip opens its top edge for them, and `BottomStream` reserves their room while the
 band holds the timeline). The band held three columns — the track, a CURSOR readout with a 16ch reserve, the

@@ -1,7 +1,7 @@
 "use client";
 
 import Explorer, { type ExplorerLevelSpec } from "@/components/explorer/Explorer";
-import { IdentityDot } from "@/components/inspector/parts";
+import { IdentityDot, QualifierChip } from "@/components/inspector/parts";
 import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
@@ -70,7 +70,19 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   // 2026-09-29: "didn't we agree to keep it consistent … like the card"). Over a window of a day
   // or more that is the span's average per day; under a day (1H, a short brush) there is no
   // measured day inside the span to average, so both say the latest full day.
-  const over = roster.headKind === "span" ? `${spanWord(metric)} · ${spanPhrase(windowId, range)}` : "Latest full day";
+  // THE SPAN IS A CHIP, NOT A CLAUSE (user, 2026-10-03: "same for 'last 30 days' in the explorer —
+  // such dynamic values shouldn't be plain text"). The hint's words are fixed; the span is the one
+  // part that changes with the Time range, so it wears the qualifier chip the cards' leads use for
+  // a value that moves (the snapshot card's age) instead of trailing a mid-dot.
+  const over =
+    roster.headKind === "span" ? (
+      <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+        {spanWord(metric)}
+        <QualifierChip>{spanPhrase(windowId, range)}</QualifierChip>
+      </span>
+    ) : (
+      "Latest full day."
+    );
   const empty = scopeEmptyCopy(roster.scope, "view");
 
   // THE WHOLE ROSTER, NO PAGER (user, 2026-09-28, two rounds). The card paged for nine days — first
@@ -155,7 +167,7 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
       // As short as the other explorers' hints (user, 2026-09-28: "way too verbose").
       // The hint NAMES THE SPAN the figures are over (design A) — the one place the list says
       // which time it is about.
-      hint={empty ? null : `${over}. Pick one to bring it forward.`}
+      hint={empty ? null : <>{over} <span className="block">Pick one to bring it forward.</span></>}
       levels={[level]}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => setHover(null)}

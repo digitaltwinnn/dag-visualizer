@@ -138,7 +138,7 @@ export default function TrendTimeline() {
     // moved inside on the left under a "Time range" label); inside, they took the track's left
     // quarter again and sat at the far end from the span they set, which is drawn at the RIGHT —
     // the newest end. Above the right corner they stand over that span, the track runs the whole
-    // band, and the label that named them comes along, so they are a named control this time.
+    // band. (The "Time range" label came along for one round and went — see the group's note.)
     // `relative` is the group's containing block.
     <div className="pointer-events-auto relative flex-1 min-w-0 flex items-stretch gap-3 px-1.5 max-[700px]:flex-col max-[700px]:gap-1.5 max-[700px]:px-0">
       {/* First in DOM order so the phone arm, where the group is static, puts it ABOVE the track.
@@ -146,8 +146,14 @@ export default function TrendTimeline() {
           over the SCENE, where the picker's own hairline-and-wash would let the ground's ink
           run through the words. `bottom-full` is the tenant's top; `mb-3` clears the plate's
           padding and edge by a hairline's breath. */}
-      <div className="absolute bottom-full right-0 mb-3 z-[1] flex items-center gap-2.5 rounded-lg pl-3 pr-1 py-1 [background:var(--topbar-glass)] backdrop-blur-sm max-[700px]:static max-[700px]:mb-0 max-[700px]:p-0 max-[700px]:[background:none] max-[700px]:backdrop-blur-none">
-        <span className="text-label tracking-caps uppercase text-muted-foreground leading-none whitespace-nowrap max-[700px]:hidden">Time range</span>
+      {/* NO "Time range" WORDS (user, 2026-10-03, minutes after they came up with the group:
+          "remove the 'time range' text, it's obvious") — standing over the span, the pills name
+          themselves. The group keeps its accessible name (`WindowPicker`'s own). */}
+      {/* `-right-[7px]`: this root sits inside the band's border and its own 6px padding, so
+          `right-0` left the group 7px short of the plate's edge (user: "should align with the
+          bottom section"). The offset is that inset, measured — the group's right edge IS the
+          band's. */}
+      <div className="absolute bottom-full -right-[7px] mb-3 z-[1] flex items-center rounded-lg p-1 [background:var(--topbar-glass)] backdrop-blur-sm max-[700px]:static max-[700px]:mb-0 max-[700px]:p-0 max-[700px]:[background:none] max-[700px]:backdrop-blur-none">
         <div className="flex items-center gap-1.5 max-[700px]:flex-1">
           <WindowPicker
             className="bg-transparent max-[700px]:flex-1"
