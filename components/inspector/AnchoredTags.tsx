@@ -12,7 +12,7 @@ import { fmtDag, fmtKB } from "@/src/util/format";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { useMinHold } from "@/components/useMinHold";
 import { CONTENT_EASE } from "@/components/RollSwap";
-import { FoldMark, Lead, SectionLabel, UnitMarks, CUT_ROW, countable, figWidth } from "@/components/inspector/parts";
+import { foldLabel, Lead, SectionLabel, UnitMarks, CUT_ROW, countable, figWidth } from "@/components/inspector/parts";
 import { Separator } from "@/components/ui/separator";
 
 // The anchored block on the snapshot card: a ranked breakdown of the metagraph snapshots this
@@ -165,7 +165,7 @@ export default function AnchoredTags({
                   // box left — its right edge stops 6px SHORT of the content edge, and with the 6px
                   // padding the counts printed 12px left of the section's total (measured 2026-10-03).
                   // The wash overhangs the content by 6px on BOTH sides; the columns sit on its edges.
-                  "group relative flex items-start gap-2 w-[calc(100%+12px)] text-left border-none cursor-pointer py-[3px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
+                  "group flex items-start gap-2 w-[calc(100%+12px)] text-left border-none cursor-pointer py-[3px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
                   isSel ? "bg-transparent" : "bg-transparent hover:bg-wash-hover",
                   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                 )}
@@ -179,9 +179,13 @@ export default function AnchoredTags({
                     tone (2026-08-07), the same neutral-blue it carries on the filter chip. */}
                 <span className={cn(CUT_ROW, "flex-1 min-w-0")}>
                   <span
+                    // THE NAME IS THE FOLD'S MARK (`foldLabel`, 2026-10-03) — no chevron: in the flow
+                    // it held 22px beside every count, so the counts stood left of the section's
+                    // own total. Every row is tappable, including the unlisted roll-up.
                     className={cn(
                       "min-w-0 truncate",
-                      !r.hue ? "italic text-muted-foreground" : isSel ? "font-semibold" : "text-foreground-dim",
+                      !r.hue ? "italic text-muted-foreground" : isSel ? "font-semibold" : isOpen ? "text-foreground" : "text-foreground-dim",
+                      foldLabel(isOpen),
                     )}
                     style={isSel && r.hue ? { color: r.hue } : undefined}
                     title={r.label}
@@ -191,12 +195,6 @@ export default function AnchoredTags({
                   <UnitMarks count={r.n} color={r.hue ?? "var(--core)"} units={units} frac={pct(r.n) / 100} />
                   <span className="font-mono tabular-nums text-right text-foreground">{r.n}</span>
                 </span>
-                {/* Expand affordance / open-state cue, in the card's GUTTER (`FoldMark`, 2026-10-03):
-                    in the flow it held 22px beside every count — hidden until hover, but still
-                    there — so the counts stood left of the section's own total. Quiet while
-                    closed on a mouse, always shown on touch. `bleed` is this row's own 6px
-                    hover-wash overhang. Every row is tappable, including the unlisted roll-up. */}
-                <FoldMark open={isOpen} quiet bleed={6} />
               </CollapsibleTrigger>
 
               <CollapsibleContent className="disclose-panel">

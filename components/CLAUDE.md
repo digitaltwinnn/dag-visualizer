@@ -1040,12 +1040,14 @@ Moment's readings, a provider's and a country's nodes by network; the compositio
 fact card — its strip and status row were built and removed the same day). Rows that are their own controls wear `CUT_ROW` themselves and
 draw `UnitMarks`, so every card shares the columns. It replaced the stacked bars with a wrapping dot
 legend, the dot · name · track · count rows and the inline network dots — three recipes. A zero part
-is a muted row with no mark. **A FOLD MARK HANGS IN THE GUTTER** (`FoldMark`, user 2026-10-03:
-"numbers should be on the right side and aligned … a structural solution for the > space being
-taken sometimes"): a disclosure chevron is absolutely placed in the card's right padding, past the
-content edge, so it never takes column space and a row with one prints its figure on the same right
-edge as a row without — the dossier's total over its cuts, the global snapshot's rows under their
-total. ⚠️ A row with a `-mx-N` hover wash must be `w-[calc(100%+2N)]`, never `w-full`: at 100% the
+is a muted row with no mark. **A FOLD IS MARKED ON ITS LABEL, never by a glyph beside the figure** (`foldLabel`,
+user 2026-10-03, two rounds): a chevron in the row's flow pushed that row's figure left of every row
+without one ("numbers should be on the right side and aligned … a structural solution for the >
+space being taken sometimes"), and hung in the card's padding it "touches the edge, there is simply
+no place there for a control". The label that opens a fold wears the dotted underline (the pager
+scope word's affordance), solid and full ink when open — it takes no space, so every figure in a
+card shares one right edge: the dossier's total over its cuts, the global snapshot's rows under
+their total. ⚠️ A row with a `-mx-N` hover wash must be `w-[calc(100%+2N)]`, never `w-full`: at 100% the
 negative margin only shifts the box, and its figures stop 2N short of the edge. The node card is a record and carries one mark only: the archive REACH
 bar, the share of its chain's ordinals it still serves (`archiveReach`, `components/useArchive.ts`).
 
@@ -1127,8 +1129,10 @@ to lead with what the present context makes relevant. Three forms, one principle
   should say something like 'validated snapshot 123'. This should be the principle for that
   section"): it opens with what the node is TO THE SUBJECT ON SCREEN, then where it sits and who
   hosts it. With a metagraph snapshot committed and its signer list read, a node of that network
-  reads `Signed snapshot N with 2 others.` or `Did not sign snapshot N.`; another network's node
-  has no relation to it and says nothing. The head aside keeps the status. A new view's relation
+  reads `Signed snapshot N.` or `Did not sign snapshot N.` and NOTHING ELSE (user, 2026-10-03: "too
+  much text, just say that it signed the snapshot") — the place and host step down into `Location`
+  and `Hosting` fact rows while the relation holds the lead; another network's node has no relation
+  to it and says nothing. The head aside keeps the status. A new view's relation
   joins the lead the same way — presence-gated, one sentence, before the place.
 - **Across surfaces** — the subject callout mirrors the BOX (`store.boxedCard`, published by Inspector
   from the same state that renders it): the box is the subject — it already gets the camera — so

@@ -112,6 +112,14 @@
     transparent 0, var(--pulse-hue) 14%, var(--pulse-hue) 86%, transparent 100%);
   animation: edge-line-fade var(--tempo-signal) ease both;
 }
+/* THE PULSE WAITS FOR ITS CARD TO SETTLE (user, 2026-10-03). Expanding a rail card remounts it as
+   the box, which replays the pulse — on the click, along an edge whose height was still easing.
+   `HeightEase` marks its box `data-resizing` from the pin to the landing; both layers hold at
+   their first frame (opacity 0) under it and run when it clears, so the order is: the card opens,
+   THEN its edge speaks. A subject change that does not resize the card still pulses at once, with
+   the title's roll. */
+[data-resizing] .edge-pulse::before,
+[data-resizing] .edge-pulse > i { animation-play-state: paused; }
 /* THE PAGER GHOST — the outgoing card during a RailPager slide (`RailPager.commitStep`).
    ⚠️ A CSS RULE, NOT INLINE STYLE, and the reason is `::before`. `cloneNode(true)` copies class
    names, so every animation on the card restarts from frame 0 when the clone is inserted: the card

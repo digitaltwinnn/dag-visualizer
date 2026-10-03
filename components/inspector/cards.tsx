@@ -22,7 +22,7 @@ import { useMinHold } from "@/components/useMinHold";
 import { useArchive, archiveFactState, archiveReach, archiveSchedule, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
 import { useNodeNames, nodeName } from "@/components/useNodeNames";
 import { POLL } from "@/src/engine/config";
-import { cap, Desc, FoldMark, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, ScheduleTable, partShade, Lead, Empty, QualifierChip, TickerChip, LayerCells, Door, SectionLabel, shareWords, type SchedulePart } from "./parts";
+import { cap, Desc, foldLabel, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, ScheduleTable, partShade, Lead, Empty, QualifierChip, TickerChip, LayerCells, Door, SectionLabel, shareWords, type SchedulePart } from "./parts";
 import { statusItems } from "@/src/data/nodeStatus";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { pickNetId } from "@/src/engine/domain/pickActions";
@@ -133,7 +133,7 @@ function inspectedNode(inspect: ReturnType<typeof useStore.getState>["inspect"])
 function useSignedSelected(
   node: { id?: string | null; ids?: string[] } | undefined | null,
   netId: string | null,
-): { ordinal: number; signed: boolean; others: number } | null {
+): { ordinal: number; signed: boolean } | null {
   const metaSnap = useStore((s) => s.metaSnap);
   const deepMap = useStore((s) => s.metaSnapDeep);
   const exact = useStore((s) => s.snapshotExact);
@@ -152,7 +152,7 @@ function useSignedSelected(
   const signed = nodeSigned(node, signers);
   const sameNet = !!netId && (metagraphById(netId)?.id ?? netId) === (metagraphById(metaSnap.metaId)?.id ?? metaSnap.metaId);
   if (!signed && !sameNet) return null;
-  return { ordinal: metaSnap.ordinal, signed, others: Math.max(0, signers.length - 1) };
+  return { ordinal: metaSnap.ordinal, signed };
 }
 
 // Node title: the Geography view mark (Globe — the Geography view's top-bar icon, same view-glyph
@@ -420,17 +420,14 @@ function ScheduleGroup({
           selection, which can never include the chevron): the row is one CONTROL, so it
           selects nothing, and focus shows only for the keyboard in CopyButton's own
           focus-visible recipe. */}
-      <CollapsibleTrigger className="group relative mt-2 flex w-full items-center gap-1 cursor-pointer select-none outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]">
+      <CollapsibleTrigger className="group mt-2 flex w-full items-center gap-1 cursor-pointer select-none outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]">
         {/* A SECTION LABEL in both forms (the card skeleton, 2026-10-02): caps and muted, the
             total it heads on the right — the breakdown slot's one heading recipe. */}
-        <span className="text-label tracking-caps uppercase text-muted-foreground">{label}</span>
+        {/* THE LABEL IS THE FOLD'S MARK (`foldLabel`, user 2026-10-03): a dotted underline, no
+            chevron — beside the total a chevron pushed "17" off the 3 / 14 / 17 column it heads,
+            and hung in the gutter it touched the card's edge. */}
+        <span className={cn("text-label tracking-caps uppercase", open ? "text-foreground" : "text-muted-foreground group-hover:text-foreground", foldLabel(open))}>{label}</span>
         {value !== undefined && <span className="ml-auto min-w-0 text-body text-foreground tabular-nums text-right">{value}</span>}
-        {/* THE FOLD MARK SITS AT THE ROW'S FAR END (user, 2026-10-02: "it is on the text; where does
-            it belong?") — and since 2026-10-03 PAST the content edge, in the card's gutter
-            (`FoldMark`): after the total in the flow it pushed "17" a chevron's width left of the
-            3 / 14 / 17 column it heads. It is not the pager's ‹ ›: those STEP to a sibling, this
-            one folds the rows beneath it. */}
-        <FoldMark open={open} />
       </CollapsibleTrigger>
       <CollapsibleContent className="disclose-panel">
         <div className="mt-1 pl-2">{children}</div>
@@ -834,12 +831,18 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // under a committed country and provider the lead is the relation alone, or nothing: a card
   // never restates its ancestors to fill a slot.
   const place = [cohort == null ? geo?.city : null, country == null ? geo?.country : null].filter(Boolean).join(", ");
-  const leadBits = [place, cohort == null ? geo?.isp : null].filter(Boolean).join(" · ");
+  const host = cohort == null ? geo?.isp : null;
+  const leadBits = [place, host].filter(Boolean).join(" · ");
+  const lead = signed != null || !!leadBits;
   return (
     <>
-      {(signed != null || leadBits) && (
+      {/* ONE SHORT SENTENCE (user, 2026-10-03: "'signed snapshot N with 2 others' and then the
+          country etc. is too much text. Just say that it signed the snapshot"). While the lead
+          states the relation, where the node sits and who hosts it step DOWN into fact rows —
+          redistributed, never dropped. */}
+      {lead && (
         <Lead>
-          {signed != null && (
+          {signed != null ? (
             <span
               title={
                 signed.signed
@@ -847,14 +850,12 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
                   : "This node is not among the committed metagraph snapshot's proof signers — a snapshot is signed by the metagraph's own L0 validators that were in that round."
               }
             >
-              {signed.signed
-                ? `Signed snapshot ${signed.ordinal.toLocaleString()}${signed.others > 0 ? ` with ${signed.others} other${signed.others === 1 ? "" : "s"}` : ""}`
-                : `Did not sign snapshot ${signed.ordinal.toLocaleString()}`}
-              {leadBits ? ". " : "."}
+              {signed.signed ? "Signed" : "Did not sign"} snapshot {signed.ordinal.toLocaleString()}.
             </span>
+          ) : (
+            // A host name may end in its own period ("Amazon.com, Inc.") — never two.
+            `${leadBits.replace(/\.$/, "")}.`
           )}
-          {/* A host name may end in its own period ("Amazon.com, Inc.") — never two. */}
-          {leadBits ? `${leadBits.replace(/\.$/, "")}.` : null}
         </Lead>
       )}
       {/* WHAT IT RUNS, DRAWN (user, 2026-10-02 — `docs/superpowers/design/2026-10-02-node-card`,
@@ -868,7 +869,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
         <>
           {/* Only under a LEAD: without one (place and host owned by the cards above) the head's own
               hairline is the division, and a second rule under it drew two lines an inch apart. */}
-          {(signed != null || leadBits) && <Separator className="mb-2" />}
+          {lead && <Separator className="mb-2" />}
           <SectionLabel label="Runs" total={<span className="font-sans font-normal">{comp}</span>} className="mb-1.5" />
           <LayerCells codes={codes} />
         </>
@@ -939,7 +940,10 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
             represent? Remove it for now"). It read the Global L0 registry's opt-in — whether the
             operator REGISTERED as a candidate DAG holders can delegate to — and "Yes" was too easy
             to read as "has stake delegated", which the data does not say. */}
-        {/* The provider's NUMBER — its name is in the lead, or is the provider card's title. */}
+        {/* Stepped down from the lead while it states the signing relation (see the lead's note). */}
+        {signed != null && place && <Fact label="Location">{place}</Fact>}
+        {signed != null && host && <Fact label="Hosting">{host}</Fact>}
+        {/* The provider's NUMBER — its name is in the lead, the Hosting row or the provider card's title. */}
         {asn && <Fact label="ASN"><span className="font-mono">{asn}</span></Fact>}
         {/* NETWORK(S) — which network this node belongs to, and any other network the same machine
             also runs (user, 2026-10-02: "it should say which network it belongs to; we can combine

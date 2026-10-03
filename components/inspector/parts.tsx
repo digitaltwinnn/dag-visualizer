@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, type CSSProperties, useRef, useState, type ReactNode } from "react";
-import { Check, ChevronRight, Copy, X } from "lucide-react";
+import { Check, Copy, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { IDENT_INK } from "@/components/identInk";
 import { BAR_EASE } from "@/components/RollSwap";
@@ -106,35 +106,27 @@ export function SectionLabel({ label, total, unit, className }: { label: ReactNo
   );
 }
 
-/** THE FOLD MARK HANGS IN THE GUTTER — it never takes a column (user, 2026-10-03: "numbers should
- *  be on the right side and aligned … need a structural solution for the > space being taken
- *  sometimes"). A disclosure chevron placed in the row's flow sat between the figure and the card's
- *  edge, so a row WITH one printed its number a chevron's width left of every row without: the
- *  dossier's "17 ›" stood off the 3 / 14 / 17 column beneath it, and the global snapshot's rows
- *  (whose mark is hidden until hover, but still holds its place) stood off their own total.
+/** A FOLD IS MARKED ON ITS LABEL, NEVER BY A GLYPH BESIDE THE FIGURE (user, 2026-10-03, two rounds).
+ *  A disclosure chevron in the row's flow sat between the figure and the card's edge, so a row WITH
+ *  one printed its number a chevron's width left of every row without: the dossier's "17 ›" stood
+ *  off the 3 / 14 / 17 column beneath it, and the global snapshot's rows (whose mark was hidden
+ *  until hover but still held its place) stood off their own total — "numbers should be on the
+ *  right side and aligned … a structural solution for the > space being taken sometimes". Hanging
+ *  the chevron in the card's right padding fixed the columns and failed on its own terms: "it
+ *  touches the edge, there is simply no place there for a control".
  *
- *  So the mark is out of the flow entirely: absolutely placed in the card's right PADDING, past the
- *  content edge every figure is right-aligned to. The host row is `relative`; `bleed` is how far
- *  the host itself already reaches past the content edge (a row with a `-mx-1.5` hover wash passes
- *  6), so the mark lands at the same x on every row of every card. Still the row's far end, still
- *  the one disclosure glyph, turning down when open. `quiet` hides a CLOSED mark until the row is
- *  hovered or focused (the host carries `group`); touch has no hover, so it always shows there. */
-const FOLD_SIZE = 12;
-/** The mark's left edge sits this far past the content edge — centred in the cards' 18px padding. */
-const FOLD_GUTTER = 3;
-export function FoldMark({ open, quiet, bleed = 0 }: { open: boolean; quiet?: boolean; bleed?: number }) {
-  return (
-    <ChevronRight
-      aria-hidden
-      style={{ right: -(FOLD_GUTTER + FOLD_SIZE - bleed), width: FOLD_SIZE, height: FOLD_SIZE }}
-      className={cn(
-        "absolute top-1/2 -translate-y-1/2 flex-none transition-[rotate,opacity] duration-150 motion-reduce:transition-none",
-        open ? "rotate-90 text-foreground" : "text-muted-foreground",
-        quiet && !open && "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-      )}
-    />
+ *  So a fold takes NO space: the label that opens it wears the dotted underline — the app's
+ *  there-is-more affordance, the pager's scope word's own — and the row's figure sits on the same
+ *  right edge as every other row's. Open, the underline goes solid and the label takes full ink;
+ *  the rows beneath are the rest of the statement. The host carries `group` so a hover on any part
+ *  of the row lifts the label. */
+export const foldLabel = (open: boolean): string =>
+  cn(
+    "underline underline-offset-[3px] decoration-[1px]",
+    open
+      ? "decoration-solid decoration-[var(--muted-foreground)]"
+      : "decoration-dotted decoration-[var(--muted-foreground)] group-hover:decoration-[var(--foreground)]",
   );
-}
 
 /** THE HEAD'S QUALIFIER — one hairline chip: a ticker, a country code, a city, a role. The head's
  *  right slot is either this or a state pill (ready, live / pinned), never bare text, a relation

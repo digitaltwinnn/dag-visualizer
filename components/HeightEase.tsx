@@ -98,6 +98,7 @@ export default function HeightEase({
     const i = inner.current!;
     const clearStyles = () => {
       delete o.dataset.arriving;
+      delete o.dataset.resizing;
       i.style.opacity = "";
       o.style.height = "";
       o.style.overflow = "";
@@ -151,6 +152,13 @@ export default function HeightEase({
       // so the follow-don't-fight guarantee is unchanged: a foreign animator's pin is still
       // never written by us, and the pin here is released the moment one is detected.
       o.style.height = `${from}px`;
+      // THE BOX IS IN MOTION FROM HERE until `clearStyles` — stated as an attribute so what rides
+      // the card's edge can wait for it: the subject-change pulse sweeps a track pinned to the
+      // card's top and bottom, and started on the click it ran along an edge that was still
+      // growing (user, 2026-10-03: "it should happen after that animation is done"). Set HERE,
+      // before paint, so a pulse mounted by the same commit never draws a frame; globals.css
+      // holds `.edge-pulse` paused under it, and it plays the moment the height lands.
+      o.dataset.resizing = "";
       o.style.overflow = "clip";
       o.style.overflowClipMargin = "18px";
       // The one-frame confirmation (see the follow-don't-fight note above): a foreign
