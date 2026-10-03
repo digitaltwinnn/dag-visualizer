@@ -864,7 +864,10 @@ export default function RailDock({
                 aria-label={`Close ${label} panel`}
                 title={`Close ${label} panel`}
                 onClick={() => handleOpenChange(false)}
-                className="flex-none w-11 h-11 rounded-[var(--radius)] leading-none cursor-pointer text-muted-foreground hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent"
+                // The ghost recipe's own hover wash, like every other icon control (user, 2026-10-03:
+                // "the details and explore pane × does not have the fill effect on hover like other
+                // buttons do") — this one had it switched OFF by three overrides.
+                className="flex-none w-11 h-11 rounded-md leading-none cursor-pointer text-muted-foreground"
               >
                 <X aria-hidden className="size-5" />
               </Button>
