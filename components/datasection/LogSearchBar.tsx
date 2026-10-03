@@ -274,7 +274,10 @@ export default function LogSearchBar({
           // the control says it exists and waits for a criterion.
           "ml-auto inline-flex flex-none items-center justify-center gap-2 h-8 pointer-coarse:h-11 max-[700px]:h-12 px-4 rounded-btn cursor-pointer max-[700px]:w-full max-[700px]:mt-1",
           "text-body max-[700px]:text-base font-semibold transition-colors",
-          "bg-primary text-primary-foreground hover:bg-primary/90",
+          // THE ACCENT AS A FILL UNDER TEXT IS `--primary-ink` (light-theme pass, 2026-10-03): on paper
+          // near-white on the bare accent measured 4.21:1; on the ink (a third toward black there,
+          // the accent itself on dark) it is 9.1:1. The same token the accent takes as TEXT.
+          "bg-primary-ink text-primary-foreground hover:bg-primary-ink/90",
           "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
           "disabled:opacity-45 disabled:cursor-default disabled:hover:bg-primary",
         )}

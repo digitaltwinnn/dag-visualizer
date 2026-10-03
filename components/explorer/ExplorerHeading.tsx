@@ -112,7 +112,10 @@ export default function ExplorerHeading({
 }) {
   return (
     <div className={cn("flex items-end justify-between gap-2.5 min-h-[22px] border-b border-border pb-[5px] mb-1.5", className)}>
-      {hint != null && <p className="m-0 min-w-0 text-label text-muted-foreground">{hint}</p>}
+      {/* `flex-1`: the hint OWNS the row's width, so a hint that carries a right-hand indicator
+          (History's span chip) can push it to the card's edge — content-sized, its own flex row
+          had no room to spread. */}
+      {hint != null && <p className="m-0 min-w-0 flex-1 text-label text-muted-foreground">{hint}</p>}
       {setting != null && <span className="ml-auto flex-none">{setting}</span>}
     </div>
   );

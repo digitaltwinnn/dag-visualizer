@@ -670,10 +670,17 @@ export default function RailDock({
               // The on-state cyan tint targets `>svg` (the half's OWN EXPLORE_ICON/ListTree mark
               // only) — the tray icons inside the span keep their muted/identity colours.
               "relative w-full h-full rounded-none! items-center justify-center gap-2 cursor-pointer",
-              "bg-[var(--panel-light)] border border-[var(--thread-faint)] backdrop-blur-[8px]",
+              // THE DOCK IS THE BOTTOM BAR, SO IT WEARS THE BAR'S PLATE (light-theme pass, 2026-10-03).
+              // It was `--panel-light` — 40% white on paper — and its open half swapped that for the
+              // 12% selection wash ALONE, so both let the scene's grey foot through: grey tabs and a
+              // grey-green active one under a white sheet. `--topbar-glass` is the command bar's own
+              // plate on both grounds; the open half lays the selection wash OVER it rather than
+              // instead of it. Arbitrary `background` properties, not `bg-[…]`: the token is a
+              // gradient (CSS trap 3).
+              "[background:var(--topbar-glass)] border border-[var(--thread-faint)] backdrop-blur-[8px]",
               "text-body font-semibold tracking-[0.02em] text-muted-foreground",
-              "hover:bg-[var(--panel-light)] hover:text-muted-foreground",
-              "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",
+              "hover:[background:var(--topbar-glass)] hover:text-muted-foreground",
+              "data-[state=on]:text-foreground data-[state=on]:[background:linear-gradient(var(--sel-bg),var(--sel-bg)),var(--topbar-glass)]",
               "data-[state=on]:shadow-[inset_0_2px_0_var(--sel-border)] data-[state=on]:[&>svg]:text-[var(--primary)]",
             )}
           >

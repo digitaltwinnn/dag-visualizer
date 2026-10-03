@@ -112,7 +112,7 @@ const Dash = () => (
 function ChainLabel({ address, current }: { address: string; current: boolean }) {
   const span = useChainSpan(address);
   const since = span?.genesisTs ? new Date(span.genesisTs).toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : null;
-  return <>{current ? "Current chain" : "Earlier chain"}{since ? <span className="normal-case tracking-normal text-muted-foreground"> · from {since}</span> : null}</>;
+  return <>{current ? "Current chain" : "Earlier chain"}{since ? <span className="normal-case tracking-normal text-muted-foreground"> from {since}</span> : null}</>;
 }
 
 export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens the snapshot's own page (RecordsSurface) — see the row's `commit`. */ onOpen?: () => void } = {}) {
