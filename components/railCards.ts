@@ -302,11 +302,12 @@ function nodeHint(s: RailManifestState): string | null {
 }
 function snapHint(s: RailManifestState): string | null {
   // LEDGER-SCOPED (spec 2026-08-01, a deliberate reversal of the old carry-across-views rule):
-  // the strip's bars now run only in ledger and leaving the view clears the pin (Engine.setMode),
-  // so the slot invites — and exists — only there. The strip earns its clause (it is a second
-  // route in a different ZONE, not the explorer refrain) and the parallel is real: the same
-  // subject is a bar in both places.
-  return s.mode === "ledger" ? `${CLICK(s)} a bar on the floor, or in the strip below.` : null;
+  // leaving the view clears the pin (Engine.setMode), so the slot invites — and exists — only
+  // there. ⚠️ ONE route (test pass, 2026-10-03): it ended ", or in the strip below", but the
+  // band's tick chart has taken no pointer events since 2026-08-30 — the hint had been naming a
+  // gesture that does nothing for five weeks. No explorer clause in its place: that is the
+  // retired refrain every ghost would then repeat (`railCards.test.ts` pins it).
+  return s.mode === "ledger" ? `${CLICK(s)} a bar on the floor.` : null;
 }
 // Country/cohort are geo-only focus-ladder rungs (the drill + the city×provider commit) — their
 // ghosts only ever invite in geo, same allow-list idiom as every other slot.

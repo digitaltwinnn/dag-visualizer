@@ -6,6 +6,7 @@ import { relativeAge } from "@/src/util/relativeAge";
 import { BandCard } from "@/components/vitals/bandParts";
 import { useNowTick } from "@/components/useNowTick";
 import { cn } from "@/lib/utils";
+import { okShare } from "@/src/data/pollShare";
 import { BAR_EASE } from "@/components/RollSwap";
 import { Timer } from "lucide-react";
 // THE PULSE STRIP — the heartbeat's own row (user, 2026-08-30: clicking the ECG "should show a
@@ -45,13 +46,6 @@ const cadenceWord = (r: PollHealth): string =>
       ? `${Math.round(r.everyMs / 60_000)} min`
       : `${Math.round(r.everyMs / 1000)}s`
     : (r.when ?? "—");
-
-/** The share of polls that succeeded, as a reader would say it. */
-const okShare = (ok: number, err: number): string => {
-  const pct = (ok / Math.max(1, ok + err)) * 100;
-  if (pct >= 99) return `${Math.min(99.9, Math.floor(pct * 10) / 10).toFixed(1)}%`;
-  return `${Math.round(pct)}%`;
-};
 
 export default function PulseStrip() {
   const now = useNowTick(1000);

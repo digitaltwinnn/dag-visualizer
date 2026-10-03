@@ -456,7 +456,8 @@ export function holdOrder(held: readonly string[], ranked: readonly string[]): s
  *  The card's head used to carry the unit alone ("per day"), which was enough while the measure
  *  could only change in the rail's picker; once it can be stepped FROM the card (2026-09-19) the
  *  card has to name what it turned into. A bare rate reads as part of the name ("Snapshots per
- *  day"); a unit with its own noun is set off ("Fees · DAG per day"); and a unit that only repeats
+ *  day"); a unit with its own noun is joined by "in" ("Fees in DAG per day" — it was set off with a
+ *  mid-dot until 2026-10-03, the separator the user asked out of reader copy); and a unit that only repeats
  *  the name is dropped ("Nodes", never "Nodes · nodes"). */
 export function metricCaption(metric: TrendMetric, stepMs: number): string {
   const label = METRIC_LABELS[metric];
@@ -464,7 +465,7 @@ export function metricCaption(metric: TrendMetric, stepMs: number): string {
   if (!unit || unit.toLowerCase() === label.toLowerCase()) return label;
   // Asked of the SPEC, not sniffed off the string: a unit is a bare rate exactly when its row uses
   // this module's own `rate`, and the words "per …" are that function's business, not this one's.
-  return TREND_METRICS[metric].unit === rate ? `${label} ${unit}` : `${label} · ${unit}`;
+  return TREND_METRICS[metric].unit === rate ? `${label} ${unit}` : `${label} in ${unit}`;
 }
 
 // ── WHY A MOMENT HAS NO CHART (2026-09-19) ──────────────────────────────────────────────────

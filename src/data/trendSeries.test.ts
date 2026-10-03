@@ -523,8 +523,8 @@ describe("metricCaption — what a card says it is showing", () => {
     expect(metricCaption("blocks", HOUR)).toBe("Blocks per hour");
   });
   it("sets off a unit that carries its own noun", () => {
-    expect(metricCaption("fees", DAY)).toBe("Fees · DAG per day");
-    expect(metricCaption("continuity", DAY)).toBe("Continuity · seconds");
+    expect(metricCaption("fees", DAY)).toBe("Fees in DAG per day");
+    expect(metricCaption("continuity", DAY)).toBe("Continuity in seconds");
   });
   it("drops a unit that only repeats the name", () => {
     expect(metricCaption("nodes", DAY)).toBe("Nodes");

@@ -289,6 +289,23 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
     // eslint-disable-next-line react-hooks/exhaustive-deps -- follows the pin, not the path
   }, [activeSnapOrd, following]);
 
+  // RESUMING LIVE CLOSES THE PATH (test pass, 2026-10-03). Releasing a pin clears the tick-local
+  // commits — the rail drops its Metagraph and Metagraph-snapshot cards — but the path is local
+  // state and stayed where it was: the rail said "live", the explorer still listed the validators
+  // that signed the snapshot just let go, three levels inside a tick nothing was pinned to. A
+  // resume is a return to the stream, so the explorer returns to the list of it. Only on the
+  // false → true EDGE: a path opened by browsing while live is the reader's own and is left alone.
+  const wasFollowing = useRef(following);
+  useEffect(() => {
+    const resumed = following && !wasFollowing.current;
+    wasFollowing.current = following;
+    if (!resumed) return;
+    setOpenTick(null);
+    setOpenNet(null);
+    setOpenSnap(null);
+    setTickPage(1);
+  }, [following]);
+
   const accent = filterAccent(filter);
   const tick = openTick != null ? orderedSnaps.find((d) => d.ordinal === openTick) ?? null : null;
   const exact = tick ? snapshotExact[tick.ordinal] : undefined;

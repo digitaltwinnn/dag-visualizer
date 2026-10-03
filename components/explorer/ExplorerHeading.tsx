@@ -88,7 +88,8 @@ export function MeasureMenu({ measure }: { measure: MeasureControl | null }) {
               )}
             >
               <span>{o.label}</span>
-              {o.unit && <span className="text-label text-muted-foreground">{o.unit}</span>}
+              {/* A unit that only repeats the label is left out ("Nodes", never "Nodes nodes"). */}
+              {o.unit && o.unit.toLowerCase() !== o.label.toLowerCase() && <span className="text-label text-muted-foreground">{o.unit}</span>}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
