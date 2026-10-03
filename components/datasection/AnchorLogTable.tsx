@@ -409,6 +409,13 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   })();
   useEffect(() => {
     if (section !== "data" || !armed.current || metaSnap || !windowFirst) return;
+    // AN ARRIVAL THROUGH A DOOR OPENS ON WHAT IT ASKED FOR (2026-10-03). History's "Snapshot
+    // records" door hands a moment to search for; this effect used to commit the newest row
+    // anyway, so the list landed nine months back while the pane beside it showed a snapshot
+    // from seconds ago. The commit waits for the search and takes the row it lands on (below).
+    // Read from the STORE: this effect is declared before the one that consumes `logSeek`, so in
+    // the arriving commit no local flag has been raised yet.
+    if (useStore.getState().logSeek?.metaId) return;
     armed.current = false;
     applyClickActions(
       metaSnapArrivalActions(
@@ -688,6 +695,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
    *  but a door from one instant should land AT it, not at that day's midnight (measured: the
    *  Moment card's 02:45 landed 4,700 DOR snapshots early). Consumed by the one seek it arms. */
   const exactFrom = useRef<number | null>(null);
+  /** An arrival's search has landed and its row has yet to be committed (see the hold's effect). */
+  const landCommit = useRef(false);
   useEffect(() => {
     if (!logSeek) return;
     const iso = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
@@ -905,7 +914,27 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // The hold ends on the ANSWER'S ROWS, not on the walk: the walk lands on a page number and the
   // page still has to be read, and ending on the walk showed "reading the chain…" in between.
   useEffect(() => {
-    if (arriving && !seeking && marked != null && rows.length > 0) setArriving(false);
+    if (arriving && !seeking && marked != null && rows.length > 0) {
+      setArriving(false);
+      landCommit.current = true;
+    }
+    // …and the pane opens on the row the arrival landed on — the door's own subject. An arrival
+    // is a deliberate gesture, so it takes the arrival builder (no toggle, never the filter), the
+    // same one the layer's first-row commit uses. ⚠️ It WAITS for the row to be whole: a history
+    // row's anchoring global is resolved a request later (`pending`), and half a (snapshot, tick)
+    // pair must not commit — so this is a standing intent consumed on a later render, not a
+    // one-shot at the landing.
+    if (!landCommit.current || marked == null) return;
+    const hit = rows.find((r) => r.metaId != null && r.ordinal === marked);
+    if (!hit || hit.metaId == null || hit.pending) return;
+    landCommit.current = false;
+    armed.current = false;
+    applyClickActions(
+      metaSnapArrivalActions(
+        { metaId: hit.metaId, ordinal: hit.ordinal, hash: hit.hash, globalOrdinal: hit.global.ordinal, ts: hit.ts },
+        { kind: "snapshot", title: `Global snapshot #${hit.global.ordinal}`, data: hit.global as GlobalSnapshot },
+      ),
+    );
   });
 
   if (arriving && histNet)
@@ -992,6 +1021,23 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
               const rowSel = !seam && metaSnap?.metaId === r.metaId && metaSnap?.ordinal === r.ordinal;
               const tickMate = !rowSel && !r.pending && snap?.data.ordinal === r.global.ordinal;
               const pending = !!r.pending;
+              // THE SIZE IS THE REAL ONE WHERE WE HAVE IT (user, 2026-10-03: "focus on real size —
+              // compressed, as it is used"). The explorer's `sizeInKB` is the BILLED size: whole
+              // kilobytes, rounded up, the figure the fee is computed from — so the column was
+              // restating the fee, and it disagreed with the card and the pane, which print the
+              // bytes actually anchored (3.4 KB beside this column's 6.0). The exact read of the
+              // row's global snapshot carries those bytes for every row in the live window; a deep
+              // history page has only the explorer's record, and there the billed size is shown AS
+              // WHAT IT IS — an upper bound, muted, with "≤" — until the row is opened.
+              const realBytes = seam ? undefined : snapshotExact[r.global.ordinal]?.rows?.find((x) => x.metaId === r.metaId && x.ordinal === r.ordinal)?.bytes;
+              const size =
+                realBytes != null && realBytes > 0 ? (
+                  fmtKB(realBytes / 1024)
+                ) : (
+                  <span className="text-muted-foreground" title="The billed size, rounded up to whole KB. The compressed size actually anchored is read when you open the snapshot.">
+                    ≤ {fmtKB(r.sizeInKB)}
+                  </span>
+                );
               const commit = () => {
                 if (pending) return; // half a (snapshot, tick) pair must not commit
                 // PHONE: the list and the snapshot are two pages (design 2026-10-02, option B), so
@@ -1106,7 +1152,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                     </span>
                   </TableCell>
                   <TableCell className={cn("text-right tabular-nums", PHONE_HIDDEN)}>{seam ? <Dash /> : fmtDag(r.fee)}</TableCell>
-                  <TableCell className={cn("text-right tabular-nums text-foreground-dim", PHONE_HIDDEN)}>{seam ? <Dash /> : fmtKB(r.sizeInKB)}</TableCell>
+                  <TableCell className={cn("text-right tabular-nums text-foreground-dim", PHONE_HIDDEN)}>{seam ? <Dash /> : size}</TableCell>
                   <TableCell className="text-right font-mono tabular-nums max-[700px]:hidden">
                     {pending ? <span className="text-muted-foreground">…</span> : r.global.ordinal.toLocaleString()}
                   </TableCell>
@@ -1120,10 +1166,14 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   {/* The phone row's SECOND LINE — where it anchored, what it paid, how big it was.
                       One muted line under the row's identity; absent from the table tiers, whose
                       columns state the same three. A seam has only its tick. */}
+                  {/* THREE FACTS, THREE PLACES — no mid-dots (user, 2026-10-03: "likely separate facts
+                      to show instead of a combined text"): where it anchored on the left, what it
+                      paid and how big it is ranged right, each in its own cell of the line. */}
                   <TableCell className="min-[700px]:hidden col-span-full pt-0 text-label text-muted-foreground whitespace-normal">
-                    <span className="font-mono tabular-nums">
-                      into {pending ? "…" : r.global.ordinal.toLocaleString()}
-                      {!seam && <> · {fmtDag(r.fee)} DAG · {fmtKB(r.sizeInKB)}</>}
+                    <span className="flex items-baseline gap-4 font-mono tabular-nums">
+                      <span className="mr-auto">into {pending ? "…" : r.global.ordinal.toLocaleString()}</span>
+                      {!seam && <span>{fmtDag(r.fee)} DAG</span>}
+                      {!seam && <span className="min-w-[6ch] text-right">{size}</span>}
                     </span>
                   </TableCell>
                 </TableRow>
