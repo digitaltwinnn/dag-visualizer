@@ -145,6 +145,22 @@ export default function HeightEase({
         last.current = h;
         return;
       }
+      // ⚠️ A SLIDING CARD'S HEIGHT IS THE PAGER'S, AND THAT IS STATED, NOT GUESSED (user,
+      // 2026-10-03: "the dossier card, when swiped left/right changes in height (ok) but the
+      // resize is a bit jumpy/snappy"). The pager pins its lane to the old card's height and
+      // eases it to the new one on the slide's own clock. The stand-down below (the one-frame
+      // confirmation) INFERS a foreign animator from the height still moving a frame later — and
+      // the pager arms its ease a frame after the swap, on a curve that starts slowly, so the
+      // check saw a still box and this ease took it. Measured, Dor → USDC: held at the old 500px
+      // for 650ms, snapped to 458 and back within two frames — 42px of everything below jumping
+      // — then eased down for another 650ms. Two animators, one after the other, with a tear
+      // between them. `RailPager` marks its wrapper `data-sliding` for exactly the window it owns
+      // the lane; under it this box follows (the height is recorded, nothing is pinned), and
+      // there is one movement.
+      if (i.querySelector("[data-sliding]")) {
+        last.current = h;
+        return;
+      }
       const from = first ? 0 : last.current;
       last.current = h;
       if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
