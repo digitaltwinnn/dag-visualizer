@@ -636,3 +636,28 @@ describe("arrivalPose — a lone card is dealt forward from one slot back", () =
     expect(two[1]!.z - two[0]!.z).toBeCloseTo(from.z - front.z, 9);
   });
 });
+
+describe("scrollToKeep — a focus that joins the roster with the publish is shown", () => {
+  const ELEVEN = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k"];
+  // History's DAG plane: absent from the resting deck, joined at the FRONT when its row is picked.
+  const WITH_DAG = ["dag", ...ELEVEN];
+
+  it("pages a window that was scrolled down back to the joined plane, and the poses put it first", () => {
+    const scroll = scrollToKeep(ELEVEN, WITH_DAG, "dag", 6);
+    expect(scroll).toBe(0);
+    expect(stackPoses(WITH_DAG, { scroll, focus: "dag" })[0]!.id).toBe("dag");
+  });
+
+  it("leaves an unpaged window where it is — the joined plane is already in it", () => {
+    expect(scrollToKeep(ELEVEN, WITH_DAG, "dag", 0)).toBe(0);
+  });
+
+  it("is not a view arriving: an empty previous roster keeps the reader's scroll", () => {
+    expect(scrollToKeep([], ELEVEN, "h", 0)).toBe(0);
+  });
+
+  it("still declines a focus the reader had paged away from", () => {
+    // "a" was in the roster and off screen at scroll 6 — the window was the reader's choice.
+    expect(scrollToKeep(ELEVEN, [...ELEVEN].reverse().reverse().slice(), "a", 6)).toBe(6);
+  });
+});

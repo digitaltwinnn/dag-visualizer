@@ -124,7 +124,7 @@ export default function Explorer({ id, title, hint, levels, onLeave, defaultColl
   // the server render keep the old width rather than collapsing.
   const cap = current?.glyphW ?? 14;
   const rowKeys = (current?.lead ? `${current.lead.key}||` : "") + (current?.rows.map((r) => r.key).join("|") ?? "");
-  const figKey = (current?.lead && (typeof current.lead.figure === "string" || typeof current.lead.figure === "number") ? `${String(current.lead.figure).length}:` : "") + (current?.rows.map((r) => (typeof r.figure === "string" || typeof r.figure === "number" ? String(r.figure).length : 0)).join("") ?? "");
+  const figKey = (current?.lead && (typeof current.lead.figure === "string" || typeof current.lead.figure === "number") ? `${String(current.lead.figure).length}:` : "") + (current?.rows.map((r) => (typeof r.figure === "string" || typeof r.figure === "number" ? String(r.figure).length : 0)).join(",") ?? "");
   const listEl = useRef<HTMLDivElement | null>(null);
   const fitGlyphs = useCallback((el: HTMLDivElement | null) => { listEl.current = el; }, []);
   useLayoutEffect(() => {

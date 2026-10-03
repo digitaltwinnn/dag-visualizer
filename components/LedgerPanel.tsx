@@ -297,11 +297,20 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // that signed the snapshot just let go, three levels inside a tick nothing was pinned to. A
   // resume is a return to the stream, so the explorer returns to the list of it. Only on the
   // false → true EDGE: a path opened by browsing while live is the reader's own and is left alone.
+  // ⚠️ …UNLESS THE RESUME IS THIS EXPLORER'S OWN CLICK (whole-branch review, 2026-10-03). The
+  // live tip's row resumes live AND opens the tick — its handler says so — and this effect, a
+  // render later, closed what the click had just opened: the row needed a second click. The
+  // handler flags the resume it is about to cause, and that one edge is left alone.
   const wasFollowing = useRef(following);
+  const ownResume = useRef(false);
   useEffect(() => {
     const resumed = following && !wasFollowing.current;
     wasFollowing.current = following;
     if (!resumed) return;
+    if (ownResume.current) {
+      ownResume.current = false;
+      return;
+    }
     setOpenTick(null);
     setOpenNet(null);
     setOpenSnap(null);
@@ -380,8 +389,10 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           figure: tickMeasure(ledgerMeasure, d, snapshotExact[d.ordinal]),
           on,
           faint: !!filterNet && count === 0 && !on,
-          title: `Global snapshot ${d.ordinal.toLocaleString()} · ${d.metagraphSnapshotCount ?? 0} anchors`,
+          title: `Global snapshot ${d.ordinal.toLocaleString()}, ${d.metagraphSnapshotCount ?? 0} snapshots anchored`,
           onClick: () => {
+            // A pinned stream and the live tip's row: this click resumes live (see the effect above).
+            ownResume.current = !following && latestRelevant("all")?.ordinal === d.ordinal && !(on && !following);
             applyClickActions(
               snapshotSelectActions(globalPick, latestRelevant("all")?.ordinal === d.ordinal, {
                 pinnedOrdinal: !following && snap ? snap.data.ordinal : null,

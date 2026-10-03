@@ -695,8 +695,15 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
    *  but a door from one instant should land AT it, not at that day's midnight (measured: the
    *  Moment card's 02:45 landed 4,700 DOR snapshots early). Consumed by the one seek it arms. */
   const exactFrom = useRef<number | null>(null);
-  /** An arrival's search has landed and its row has yet to be committed (see the hold's effect). */
-  const landCommit = useRef(false);
+  /** An arrival's search has landed and its row has yet to be committed (see the hold's effect):
+   *  the ORDINAL it landed on, else null.
+   *  ⚠️ BOUND TO ITS LANDING, AND DROPPED BY ANY GESTURE OF THE READER'S (whole-branch review,
+   *  2026-10-03). As a bare flag it stood until consumed — and a landed row whose anchoring
+   *  global never resolved (or was still resolving) left it standing, so the reader's NEXT
+   *  search, a plain look-up, committed its landing as a selection: pane, rail and scene all
+   *  moved on a mark that by this file's own rule "carries no store write". It names the row it
+   *  is for, and a manual search, a clear or a page turn withdraws it. */
+  const landCommit = useRef<number | null>(null);
   useEffect(() => {
     if (!logSeek) return;
     const iso = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
@@ -766,6 +773,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // metagraph's chain…" answer is the whole teaching (user, 2026-09-09 — the old guard let the
   // press fall through silently, and the button before it sat disabled with no reason).
   const onSubmit = () => {
+    landCommit.current = null; // the reader's own search: an arrival still waiting to commit is withdrawn
     if (qSnapshot) seekSnapshot();
     else if (qTick) void seekTick();
     else if (qFrom) void seekAge();
@@ -811,6 +819,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     setMarked(null); setJumpMiss(null);
     // Clearing the arrival's search cancels it: nothing is being found any more.
     pendingSeek.current = false;
+    landCommit.current = null;
     setArriving(false);
   };
 
@@ -917,7 +926,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   useEffect(() => {
     if (arriving && !seeking && marked != null && rows.length > 0) {
       setArriving(false);
-      landCommit.current = true;
+      landCommit.current = marked;
     }
     // …and the pane opens on the row the arrival landed on — the door's own subject. An arrival
     // is a deliberate gesture, so it takes the arrival builder (no toggle, never the filter), the
@@ -925,10 +934,10 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     // row's anchoring global is resolved a request later (`pending`), and half a (snapshot, tick)
     // pair must not commit — so this is a standing intent consumed on a later render, not a
     // one-shot at the landing.
-    if (!landCommit.current || marked == null) return;
+    if (landCommit.current == null || marked == null || marked !== landCommit.current) return;
     const hit = rows.find((r) => r.metaId != null && r.ordinal === marked);
     if (!hit || hit.metaId == null || hit.pending) return;
-    landCommit.current = false;
+    landCommit.current = null;
     armed.current = false;
     applyClickActions(
       metaSnapArrivalActions(
@@ -1209,6 +1218,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
           title: "These are only the most recent snapshots, not a whole chain. This view keeps a short stretch of TIME, and every network snapshots at its own rate — so a busy network fills it with hundreds while a quiet one adds three, and the count says nothing about how long either chain is. Pick a network in the top-bar filter to page through all of its snapshots, back to the very first one.",
         }}
         onPage={(n) => {
+          landCommit.current = null; // paging away from a landing leaves it uncommitted
           setPageState(n);
           // Manual paging is the reader leaving the landing — release the row-follow, or the
           // next live tick would snap the view straight back to the mark.

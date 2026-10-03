@@ -495,6 +495,14 @@ export function scrollToKeep(
   scroll: number,
 ): number {
   if (focus === null || prev === next) return scroll;
+  // ⚠️ A FOCUS THAT JOINS THE ROSTER WITH THIS PUBLISH IS SHOWN (whole-branch review, 2026-10-03).
+  // History's DAG plane is not in the resting deck: it joins at the front when its row is
+  // picked, a publish AFTER the executor's own `scrollToShow` — which ran against a roster that
+  // did not hold it yet and so had no opinion. With the window paged down, the plane joined at
+  // index 0, out of sight: the row washed as selected and no chart came forward. "Was it on
+  // screen before" cannot be asked of a plane that did not exist before; it has just been asked
+  // for. An EMPTY previous roster is a view arriving, not a plane joining, and keeps the scroll.
+  if (prev.length > 0 && !prev.includes(focus)) return scrollToShow(next, focus, scroll);
   if (!focusInWindow(prev, scroll, focus)) return scroll;
   return scrollToShow(next, focus, scroll);
 }
