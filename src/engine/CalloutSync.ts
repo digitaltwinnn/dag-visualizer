@@ -66,12 +66,16 @@ export interface CalloutHost {
   dofMeta(): { group: THREE.Object3D } | null;
 }
 
+const isNodePick = (p: PickDescriptor | null): boolean =>
+  !!p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode");
+
 export class CalloutSync {
   private readonly h: CalloutHost;
   private st!: CalloutState;
 
   // scratch — all of it was Engine-private and callout-only before the move
   private _calloutV = new THREE.Vector3();
+  private _calloutV2 = new THREE.Vector3();
   private _calloutSibs = [new THREE.Vector3(), new THREE.Vector3()];
   private _calloutNodeAnchor = false;
   private _geoNodePick: unknown = null;
@@ -115,8 +119,14 @@ export class CalloutSync {
   // the two owners cannot drift apart at the boundary.
   private _syncCallout(): void {
     const el = document.getElementById("callout");
-    if (!el) return;
-    let on =
+    // THE SECOND ANCHOR (user, 2026-10-03: "2 callouts"). In Snapshots a committed metagraph
+    // snapshot stands with the global snapshot it is read against, and each gets its own label:
+    // `callout` is the metagraph snapshot's (or a boxed node's), `callout-2` the global
+    // snapshot's, at `_ledgerGlobalAnchor`. Either may be absent — a global snapshot alone
+    // renders only the second.
+    const el2 = document.getElementById("callout-2");
+    if (!el && !el2) return;
+    const allowed =
       this.h.calloutAllowed() &&
       !this.h.transitionActive() &&
       // …and not while the camera is still FLYING to the subject (user, 2026-09-04: the label
@@ -126,52 +136,73 @@ export class CalloutSync {
       // camera leans, and the label tracks its unchanged subject per frame.
       (!this.h.flyingNow() || this.h.sameSubjectFlight()) &&
       breakpointOf(window.innerWidth) !== "phone";
-    if (on) {
+    if (el) {
       const v = this._calloutV;
-      on =
-        this.h.mode === "geo"
+      const on =
+        allowed &&
+        (this.h.mode === "geo"
           ? this._geoCalloutAnchor(v)
           : this.h.mode === "ledger"
             ? this._ledgerCalloutAnchor(v)
-            : this._hyperCalloutAnchor(v);
-      if (on) {
-        v.applyMatrix4(this.h.ctx.camera.matrixWorldInverse); // world → view (camera looks −z)
-        if (v.z > -0.1) on = false; // behind (or grazing) the camera plane
-        else {
-          v.applyMatrix4(this.h.ctx.camera.projectionMatrix); // view → NDC (w-divide included)
-          const r = this.h.ctx.renderer.domElement.getBoundingClientRect();
-          const x = r.left + (v.x * 0.5 + 0.5) * r.width;
-          const y = r.top + (-v.y * 0.5 + 0.5) * r.height;
-          // Placement is `domain/calloutPlacement.ts` — the flip/drop rules and the panel's reach
-          // live there with their test, and globals.css mirrors the geometry off the attributes
-          // written below (guarded writes, like data-on).
-          // ⚠️ MEASURE THE FREE CANVAS BAND, NOT THE CANVAS. Below 1100px the rails are
-          // sheets that OVERLAY a still-viewport-sized canvas, so `r.left`/`r.right` describe room
-          // the callout does not have: at 900px with both sheets open a geo node's panel rendered
-          // as a ~25px fragment in the strip between them. `sceneCoverL`/`sceneCoverR` are what the
-          // open sheets measured off themselves (0 on desktop and phone, so this is a no-op there).
-          const p = calloutPlacement(x, y, r.left + this.st.sceneCoverL, r.right - this.st.sceneCoverR, r.top);
-          if (!p.show) on = false;
-          else {
-            el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
-            if ((el.dataset.flip != null) !== p.flip) {
-              if (p.flip) el.dataset.flip = "";
-              else delete el.dataset.flip;
-            }
-            if ((el.dataset.drop != null) !== p.drop) {
-              if (p.drop) el.dataset.drop = "";
-              else delete el.dataset.drop;
-            }
-            this._syncCalloutMulti(el, x, y, r, p.flip, p.drop);
-          }
-        }
-      }
+            : this._hyperCalloutAnchor(v)) &&
+        this._placeCallout(el, v);
+      if (on) this._syncCalloutMulti(el, this._placedX, this._placedY, this._placedRect, this._placedFlip, this._placedDrop);
+      else this._syncCalloutMulti(el, 0, 0, null, false, false);
+      // Guard on the ELEMENT's own attribute, not a cached flag: React remounts the wrapper on a
+      // subject change (fresh data-on="0"), so a field would go stale exactly then.
+      const flag = on ? "1" : "0";
+      if (el.dataset.on !== flag) el.dataset.on = flag;
     }
-    if (!on) this._syncCalloutMulti(el, 0, 0, null, false, false);
-    // Guard on the ELEMENT's own attribute, not a cached flag: React remounts the wrapper on a
-    // subject change (fresh data-on="0"), so a field would go stale exactly then.
-    const flag = on ? "1" : "0";
-    if (el.dataset.on !== flag) el.dataset.on = flag;
+    if (el2) {
+      const v = this._calloutV2;
+      const on = allowed && this.h.mode === "ledger" && this._ledgerGlobalAnchor(v) && this._placeCallout(el2, v);
+      const flag = on ? "1" : "0";
+      if (el2.dataset.on !== flag) el2.dataset.on = flag;
+    }
+  }
+
+  // Where the last `_placeCallout` put its anchor — read back by the multi-leader, which draws
+  // from the same point with the same flips. Fields, not a returned object (rule 5).
+  private _placedX = 0;
+  private _placedY = 0;
+  private _placedRect: DOMRect | null = null;
+  private _placedFlip = false;
+  private _placedDrop = false;
+
+  /** Project a WORLD anchor to the screen and write one callout's transform and flips. False
+   *  when the point is behind the camera or the panel has no room on either side. */
+  private _placeCallout(el: HTMLElement, v: THREE.Vector3): boolean {
+    v.applyMatrix4(this.h.ctx.camera.matrixWorldInverse); // world → view (camera looks −z)
+    if (v.z > -0.1) return false; // behind (or grazing) the camera plane
+    v.applyMatrix4(this.h.ctx.camera.projectionMatrix); // view → NDC (w-divide included)
+    const r = this.h.ctx.renderer.domElement.getBoundingClientRect();
+    const x = r.left + (v.x * 0.5 + 0.5) * r.width;
+    const y = r.top + (-v.y * 0.5 + 0.5) * r.height;
+    // Placement is `domain/calloutPlacement.ts` — the flip/drop rules and the panel's reach
+    // live there with their test, and globals.css mirrors the geometry off the attributes
+    // written below (guarded writes, like data-on).
+    // ⚠️ MEASURE THE FREE CANVAS BAND, NOT THE CANVAS. Below 1100px the rails are
+    // sheets that OVERLAY a still-viewport-sized canvas, so `r.left`/`r.right` describe room
+    // the callout does not have: at 900px with both sheets open a geo node's panel rendered
+    // as a ~25px fragment in the strip between them. `sceneCoverL`/`sceneCoverR` are what the
+    // open sheets measured off themselves (0 on desktop and phone, so this is a no-op there).
+    const p = calloutPlacement(x, y, r.left + this.st.sceneCoverL, r.right - this.st.sceneCoverR, r.top);
+    if (!p.show) return false;
+    el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
+    if ((el.dataset.flip != null) !== p.flip) {
+      if (p.flip) el.dataset.flip = "";
+      else delete el.dataset.flip;
+    }
+    if ((el.dataset.drop != null) !== p.drop) {
+      if (p.drop) el.dataset.drop = "";
+      else delete el.dataset.drop;
+    }
+    this._placedX = x;
+    this._placedY = y;
+    this._placedRect = r;
+    this._placedFlip = p.flip;
+    this._placedDrop = p.drop;
+    return true;
   }
 
   // THE MULTI-LEADER (user, 2026-08-30): a machine is SEVERAL beads in hyper — one per layer it
@@ -331,41 +362,47 @@ export class CalloutSync {
   // layout data). An uncataloged channel's rows live on the unlisted lane.
   private _ledgerCalloutAnchor(v: THREE.Vector3): boolean {
     const st = this.st;
-        // THE BOX LEADS (user, 2026-08-15/16): the boxed NODE card anchors the machine's own tray
-    // chip; the boxed GLOBAL card anchors the tick's bar — even while a finer subject stays
-    // committed. The boxed METAGRAPH card shows NOTHING (user, 2026-08-16 — like geo's network
-    // rung: a network in the chamber is a whole LANE, and a single anchor would lie about it).
-    // Then the default order: metagraph tile > global bar > tray node.
+    // THE BOX LEADS (user, 2026-08-15/16): the boxed NODE card anchors the node's own tray chip,
+    // and the boxed METAGRAPH card shows NOTHING (user, 2026-08-16 — like geo's network rung: a
+    // network in the chamber is a whole LANE, and a single anchor would lie about it).
     if (st.boxedCard === "context") return false;
-    if (st.boxedCard === "node" && this._ledgerNodeAnchor(st, v)) return true;
-    if (st.boxedCard === "snap" && st.snap) {
+    if (st.boxedCard === "node" && isNodePick(st.inspect)) return this._ledgerNodeAnchor(st, v);
+    // Otherwise this anchor is the METAGRAPH SNAPSHOT's, and the global snapshot's label has an
+    // anchor of its own (`_ledgerGlobalAnchor`) — `SceneCallout` states why the two are fixed.
+    if (st.metaSnap) {
       // A snapshot's label waits until its row is FIXED on the plane (LedgerView.calloutSettled
       // — the chamber's own clocks; the tray-node paths stay exempt, chips don't ride the trail).
       if (!this.h.ledger.calloutSettled(st.following)) return false;
-      this._ledgerBarAnchor(v);
-      this.h.ledger.group.localToWorld(v); // render-state OK
+      if (!this._ledgerTileAnchor(st.metaSnap, v)) return false;
+      this.h.ledger.group.localToWorld(v); // the rendered chamber transform — a label read. render-state OK
       return true;
     }
-    if (st.metaSnap) {
-      if (!this.h.ledger.calloutSettled(st.following)) return false;
-      // THE committed snapshot's tile (user, 2026-08-15), rewind offsets included; the lane
-      // lead stays as the fallback while the tile is off-trail (aged out of the window or not
-      // drawn this frame).
-      if (!this.h.ledger.selectedTileAnchor(v)) {
-        if (!this.h.ledger.calloutAnchor(st.metaSnap.metaId, v) && !this.h.ledger.calloutAnchor(UNLISTED_ID, v)) return false;
-      }
-    } else if (st.snap) {
-      if (!this.h.ledger.calloutSettled(st.following)) return false;
-      this._ledgerBarAnchor(v);
-    } else if (this._ledgerNodeAnchor(st, v)) return true;
-    else return false;
+    if (st.snap) return false;
+    return this._ledgerNodeAnchor(st, v);
+  }
+
+  // THE committed snapshot's tile (user, 2026-08-15), rewind offsets included; the lane lead
+  // stays as the fallback while the tile is off-trail (aged out of the window or not drawn this
+  // frame). Chamber-local, like every LedgerView anchor.
+  private _ledgerTileAnchor(sel: MetaSnapSel, v: THREE.Vector3): boolean {
+    if (this.h.ledger.selectedTileAnchor(v)) return true;
+    return this.h.ledger.calloutAnchor(sel.metaId, v) || this.h.ledger.calloutAnchor(UNLISTED_ID, v);
+  }
+
+  // The GLOBAL SNAPSHOT's label — the second anchor, `SceneCallout`'s `m2` gate mirrored: a
+  // global snapshot is shown, and the box is neither a node (its own label owns the scene) nor
+  // the Metagraph card (a lane gets no label). It points at the snapshot's bar, or at the
+  // resolved network's own segment of it.
+  private _ledgerGlobalAnchor(v: THREE.Vector3): boolean {
+    const st = this.st;
+    if (st.boxedCard === "context" || !st.snap) return false;
+    if (st.boxedCard === "node" && isNodePick(st.inspect)) return false;
+    if (!this.h.ledger.calloutSettled(st.following)) return false;
+    this._ledgerBarAnchor(v);
     this.h.ledger.group.localToWorld(v); // the rendered chamber transform — a label read. render-state OK
     return true;
   }
 
-  // The tick's byte-bar anchor: under a committed filter, the network's OWN band on the shown
-  // row (user, 2026-08-16 — "the correct segment of the byte bar"); unfiltered, or when the
-  // band isn't drawn (unmeasured tick), the bar's lead centre. Chamber-local (caller lifts).
   private _ledgerBarAnchor(v: THREE.Vector3): void {
     const lens = ledgerLens(this.h.ledgerNet);
     if (lens !== "all" && this.h.ledger.bandAnchor(lens, v)) return;

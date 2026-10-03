@@ -1449,6 +1449,7 @@ seam and corner rules select on the same markers the thread measures:
 | `#topbar`, `#metapane`, `#tooltip` | Layout and positioning |
 | `canvas.scene-canvas` | `SceneCanvas` renders it; the engine's controls listen on it (the card-drag handoff that once queried it is retired) |
 | `#callout` (+ `data-on`) | The subject callout's 0-size anchor wrapper — `SceneCallout` renders it, `CalloutSync` writes its transform + `data-on` per frame (the Tooltip discipline: position never renders React) |
+| `#callout-2` (+ `data-on`) | The same contract's second anchor — the GLOBAL snapshot's label in Snapshots. Same two homes, same per-frame writes, no multi-leader |
 | `#trend-stack` (+ `data-on`) | The trend view's chart-plane layer — `TrendStack` renders it, the engine queries it to find the planes. It waits at `opacity: 0` and `TrendStackSync` writes `data-on="1"` once the view has ARRIVED (policy `chartStack` + the trend furniture alpha at full), so the stack fades in with the room rather than riding the camera's flight — the `#callout` `data-on` precedent |
 | `[data-plane]` (the network id) | One chart plane, as an ANCHOR + a CHILD. The anchor is a **0-size box at the layer's top-left with `origin-top-left`**, mounted `invisible`; its one child is the plane, `planeFormat(tier).pxW` wide (640 on desktop and tablet; 360 on phone, so the card is drawn at about scale 1 and its type is legible — the projector divides by the same number, and on phone the head drops its unit into the front plot's caption, `unitInPlot`), centred on it by `-translate-x-1/2 -translate-y-1/2`. **React renders the plane and owns everything inside it** plus the anchor's `opacity` / `zIndex` / `pointer-events` (all from the same `PlanePose`); `TrendStackSync` (engine layer) writes the anchor's `transform` — a `matrix3d` translate + uniform scale, never a rotation — and its `style.visibility` per frame. The anchor's geometry IS that matrix's coordinate system, so don't give it a size, an origin or a transform of its own; `components/trendStackBoundary.test.ts` pins it |
 
@@ -1476,6 +1477,13 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
   the same state that renders the box), exactly as the camera answers it; the component picks the
   MODEL and the Engine the ANCHOR from one mirrored preference, falling through to the finest
   committed rung.
+- **Snapshots stands TWO callouts, each on a FIXED anchor** (user, 2026-10-03: "2 callouts"). A
+  committed metagraph snapshot is always read against a global snapshot, and one label could
+  name only one of them. `#callout` is the metagraph snapshot's (its tile) and `#callout-2` the
+  global snapshot's (its bar, or the resolved network's segment of it) — whichever card is boxed.
+  Handing the subject's anchor to the boxed card was the first cut and it re-drew both labels on
+  every re-box, over two subjects that had not changed. The box still rules the two older cases:
+  a boxed node's label stands alone, and a boxed Metagraph card shows none.
 - **A hyper NODE's callout points at EVERY layer bead** (the multi-leader, 2026-08-30): a machine
   is one record per layer on separate shells, so up to two extra dashed legs fan **from the
   panel's own corner** (the beads are peers — user's second-round correction of a bead-to-bead

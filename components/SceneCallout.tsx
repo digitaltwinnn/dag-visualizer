@@ -271,6 +271,7 @@ export default function SceneCallout() {
   };
 
   let m: Model | null = null;
+  let m2: Model | null = null;
   if (mode === "hyper") {
     m = boxedCard === "context" ? (netModel() ?? nodeModel()) : (nodeModel() ?? netModel());
     if (!m) return null;
@@ -399,23 +400,51 @@ export default function SceneCallout() {
               : { text: `${total} anchors` },
       };
     };
-    // The boxed NODE card leads (user, 2026-08-16 — a tray machine selected via the card
-    // stack shows ITS callout); then the boxed global card; then the default finest-first.
     // The boxed METAGRAPH card shows NOTHING (user, 2026-08-16 — like geo's network rung: a
     // network in the chamber is a whole lane, and a single anchor would lie about it).
     if (boxedCard === "context") return null;
-    m =
-      (boxedCard === "node" ? nodeModel() : null) ??
-      (boxedCard === "snap" ? gsModel() : null) ??
-      msModel() ??
-      gsModel() ??
-      nodeModel();
+    // The boxed NODE card leads, alone (user, 2026-08-16 — a tray node selected via the card
+    // stack shows ITS callout).
+    const node = nodeModel();
+    if (boxedCard === "node" && node) m = node;
+    else {
+      // THE PAIR GETS TWO CALLOUTS (user, 2026-10-03: asked "should snapshot view have two
+      // callouts, one for global- and one for metagraph snapshot?" — "2 callouts"). A committed
+      // metagraph snapshot always stands with the global snapshot it is read against, and one
+      // label could only name one of them: the tile, with nothing saying which bar it fell
+      // into, or the bar, with the tile unnamed.
+      // ⚠️ EACH SNAPSHOT HAS ITS OWN ANCHOR, FIXED: the metagraph snapshot is the subject's
+      // (`callout`), the global snapshot the second (`callout-2`), whichever card is boxed. The
+      // first cut handed the subject's anchor to the boxed card and the other to the second —
+      // so re-boxing swapped the two, both wrappers remounted, and both labels replayed their
+      // whole entrance over two subjects that had not changed (the 2026-09-11 complaint, "it
+      // re-draws the card while the subject is the same"). Fixed places also keep the global's
+      // label standing while metagraph snapshots come and go above it. CalloutSync mirrors this.
+      m = msModel() ?? (snap ? null : node);
+      m2 = gsModel();
+    }
   }
-  if (!m) return null;
+  if (!m && !m2) return null;
 
   return (
+    <>
+      {m && <CalloutMark m={m} id="callout" multi />}
+      {m2 && <CalloutMark m={m2} id="callout-2" />}
+    </>
+  );
+}
+
+/** One callout: the 0-size anchor wrapper CalloutSync positions, its ring, leader and panel.
+ *  `id` is the marker the engine queries (`callout` for the subject, `callout-2` for the global
+ *  snapshot in Snapshots); `multi` mounts the hyper node's extra legs, which only the subject's
+ *  callout ever draws. */
+function CalloutMark({ m, id, multi }: { m: Model; id: "callout" | "callout-2"; multi?: boolean }) {
+  // One mask per mark: an SVG `url(#…)` resolves to the FIRST element with that id in the
+  // document, so two marks sharing one id would both be revealed by the first one's draw.
+  const maskId = `${id}-draw-mask`;
+  return (
     <div
-      id="callout"
+      id={id}
       // Keyed by SUBJECT (user, 2026-09-05 — the leader was already drawn while the panel was
       // still rolling in): a subject change remounts the whole wrapper, so the entrance
       // choreography below (panel roll → leader draw → ring landing) replays as one unit, and
@@ -444,7 +473,7 @@ export default function SceneCallout() {
           globals.css animates its dash offset — revealing the dashes progressively without the
           dash pattern itself crawling. White stroke is mask luminance, not a palette hue. */}
       <svg className="co-leader absolute left-0 top-0 overflow-visible" width="1" height="1" aria-hidden>
-        <mask id="co-draw-mask" maskUnits="userSpaceOnUse" x={-20} y={-CALLOUT_OFF_Y - 40} width={CALLOUT_OFF_X + 60} height={CALLOUT_OFF_Y + 60}>
+        <mask id={maskId} maskUnits="userSpaceOnUse" x={-20} y={-CALLOUT_OFF_Y - 40} width={CALLOUT_OFF_X + 60} height={CALLOUT_OFF_Y + 60}>
           <line
             className="co-draw"
             x1={CALLOUT_OFF_X}
@@ -457,7 +486,7 @@ export default function SceneCallout() {
           />
         </mask>
         <line
-          mask="url(#co-draw-mask)"
+          mask={`url(#${maskId})`}
           x1={6}
           y1={-6}
           x2={CALLOUT_OFF_X}
@@ -476,14 +505,16 @@ export default function SceneCallout() {
           the primary leader's draw window (globals.css) — legs fan from the same panel corner,
           so they arrive with the tie rather than pre-drawn (their per-frame geometry can't
           ride the mask draw itself). */}
-      <svg className="co-multi absolute left-0 top-0 overflow-visible" width="1" height="1" aria-hidden>
-        {[0, 1].map((i) => (
-          <g key={i} className="co-mleg" visibility="hidden">
-            <line x1={0} y1={0} x2={0} y2={0} stroke="var(--primary)" strokeOpacity="0.55" strokeWidth="1.5" strokeDasharray="4 4" />
-            <circle cx={0} cy={0} r={3.5} fill="none" strokeWidth={1.5} stroke={m.ring} />
-          </g>
-        ))}
-      </svg>
+      {multi && (
+        <svg className="co-multi absolute left-0 top-0 overflow-visible" width="1" height="1" aria-hidden>
+          {[0, 1].map((i) => (
+            <g key={i} className="co-mleg" visibility="hidden">
+              <line x1={0} y1={0} x2={0} y2={0} stroke="var(--primary)" strokeOpacity="0.55" strokeWidth="1.5" strokeDasharray="4 4" />
+              <circle cx={0} cy={0} r={3.5} fill="none" strokeWidth={1.5} stroke={m.ring} />
+            </g>
+          ))}
+        </svg>
+      )}
       {/* The panel — keyed by subject so the roll-in replays on a change, like a card title. */}
       {/* Position lives in globals.css (`.co-panel` + the data-flip/data-drop mirrors the
           Engine toggles near viewport edges) — inline left/bottom would beat the flip rules. */}

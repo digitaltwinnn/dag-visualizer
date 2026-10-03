@@ -387,13 +387,13 @@
    the identity spine stays on the SCENE-FACING edge. The 100/140 offsets are mirrored by the
    leader-line endpoints in SceneCallout.tsx — change them together, and see the standoff note
    there for why the tie is longer than the panel is tall. */
-#callout .co-panel { left: 100px; bottom: 140px; }
-#callout[data-flip] .co-panel { left: auto; right: 100px; }
-#callout[data-drop] .co-panel { bottom: auto; top: 140px; }
-#callout .co-leader { transform: none; }
-#callout[data-flip] .co-leader { transform: scaleX(-1); }
-#callout[data-drop] .co-leader { transform: scaleY(-1); }
-#callout[data-flip][data-drop] .co-leader { transform: scale(-1, -1); }
+:is(#callout, #callout-2) .co-panel { left: 100px; bottom: 140px; }
+:is(#callout, #callout-2)[data-flip] .co-panel { left: auto; right: 100px; }
+:is(#callout, #callout-2)[data-drop] .co-panel { bottom: auto; top: 140px; }
+:is(#callout, #callout-2) .co-leader { transform: none; }
+:is(#callout, #callout-2)[data-flip] .co-leader { transform: scaleX(-1); }
+:is(#callout, #callout-2)[data-drop] .co-leader { transform: scaleY(-1); }
+:is(#callout, #callout-2)[data-flip][data-drop] .co-leader { transform: scale(-1, -1); }
 
 /* THE ENTRANCE CHOREOGRAPHY (user, 2026-09-05 — "the dotted line is already drawn before the
    animation"): panel rolls in → the leader DRAWS from the panel corner toward the anchor →
@@ -415,23 +415,23 @@
    wait for: a 0.05s lag, a 0.7s rise, a 0.45s draw — line home at 0.9s, ring at 1.05s. Same
    sequence, same curve, about 40% sooner. Three local numbers rather than the shared tokens, so
    the cards' text clock is untouched. */
-#callout {
+:is(#callout, #callout-2) {
   --co-lag: 0.05s;
   --co-rise: 0.7s;
   --co-draw: 0.45s;
   --co-draw-at: calc(var(--co-lag) + 0.6 * var(--co-rise));
 }
-#callout .roll-in { animation-duration: var(--co-rise); animation-delay: var(--co-lag); }
-#callout .co-draw {
+:is(#callout, #callout-2) .roll-in { animation-duration: var(--co-rise); animation-delay: var(--co-lag); }
+:is(#callout, #callout-2) .co-draw {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
   animation: co-draw var(--co-draw) var(--ease-roll) var(--co-draw-at) forwards;
 }
-#callout .co-tip {
+:is(#callout, #callout-2) .co-tip {
   opacity: 0;
   animation: co-fade 0.15s ease-out calc(var(--co-draw-at) + var(--co-draw)) forwards;
 }
-#callout .co-multi {
+:is(#callout, #callout-2) .co-multi {
   opacity: 0;
   animation: co-fade var(--co-draw) var(--ease-roll) var(--co-draw-at) forwards;
 }
@@ -439,14 +439,14 @@
    flight keeps the wrapper hidden for the whole arrival, and an entrance that played invisibly
    would present a finished callout on reveal — the exact complaint the draw exists to fix. The
    delay phases pause too, so the clock starts at first visibility. */
-#callout:not([data-on="1"]) :is(.roll-in, .co-draw, .co-tip, .co-multi) { animation-play-state: paused; }
+:is(#callout, #callout-2):not([data-on="1"]) :is(.roll-in, .co-draw, .co-tip, .co-multi) { animation-play-state: paused; }
 @keyframes co-draw { to { stroke-dashoffset: 0; } }
 @keyframes co-fade { to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  #callout .co-draw { animation: none; stroke-dashoffset: 0; }
-  #callout .co-tip, #callout .co-multi { animation: none; opacity: 1; }
+  :is(#callout, #callout-2) .co-draw { animation: none; stroke-dashoffset: 0; }
+  :is(#callout, #callout-2) .co-tip, :is(#callout, #callout-2) .co-multi { animation: none; opacity: 1; }
 }
-#callout[data-flip] .edge-spine {
+:is(#callout, #callout-2)[data-flip] .edge-spine {
   border-left-color: transparent;
   border-right-color: var(--spine, var(--primary));
   -webkit-mask: linear-gradient(180deg, transparent, #000 var(--edge-runoff), #000 calc(100% - var(--edge-runoff)), transparent);
