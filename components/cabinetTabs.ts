@@ -44,6 +44,8 @@ export const CABINET_TRIGGER = [
   // along the baseline it belongs to.
   "[background-image:linear-gradient(var(--primary),var(--primary))]! [background-position:left_bottom]! bg-no-repeat! [background-size:0%_2px]!",
   "data-[state=active]:[background-size:100%_2px]!",
+  // The growth is the primitive's `transition-all`; reduced motion gets the rule at full length.
+  "motion-reduce:transition-none!",
 ].join(" ");
 
 /** The body under the row. No box: the baseline hairline above it is the only division. */
