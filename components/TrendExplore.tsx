@@ -119,7 +119,10 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   // THE CHIP SAYS WHAT THE FIGURE IS, IN PLAIN WORDS (user, 2026-10-03: "total vs base ledger is
   // not very clear to me in naming"). "total" and "base ledger" named two kinds of reading
   // without saying how either relates to the list; these say it outright.
-  const totalChip = reading === "total" ? "sum of rows below" : reading === "fleet" ? "all nodes" : "DAG's own";
+  // …and as a TAG, not a sentence (same day: "it's a tag in a website, not some human prose"):
+  // one word that completes the row's name — "DAG sum", "DAG all", "DAG only". The hover title
+  // carries the full statement.
+  const totalChip = reading === "total" ? "sum" : reading === "fleet" ? "all" : "only";
   const totalWhy =
     reading === "total"
       ? "The networks below, added up"
