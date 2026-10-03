@@ -141,7 +141,7 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
       case "city":
         return r.node.city ?? "—";
       case "isp":
-        return r.isp ? `${r.isp}${r.asn ? ` · ${r.asn}` : ""}` : "—";
+        return r.isp ? `${r.isp}${r.asn ? ` (${r.asn})` : ""}` : "—";
     }
   };
 
@@ -234,13 +234,17 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
                   </span>
                 </TableCell>
                 <TableCell className="min-[700px]:hidden pt-0 pb-2 text-label text-muted-foreground whitespace-normal">
-                  {[
-                    [r.node.city, r.node.country].filter(Boolean).join(", "),
-                    r.isp,
-                    compositionRows([{ roles: r.roles, layer: r.node.layer }])[0]?.label,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ") || "—"}
+                  {/* Place, host and make-up are three facts: three items on a wrapping line. */}
+                  <span className="flex flex-wrap gap-x-3 gap-y-0.5">
+                    {(() => {
+                      const parts = [
+                        [r.node.city, r.node.country].filter(Boolean).join(", "),
+                        r.isp,
+                        compositionRows([{ roles: r.roles, layer: r.node.layer }])[0]?.label,
+                      ].filter((x): x is string => !!x);
+                      return parts.length ? parts.map((x) => <span key={x}>{x}</span>) : "—";
+                    })()}
+                  </span>
                 </TableCell>
               </TableRow>
             );

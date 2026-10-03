@@ -132,9 +132,10 @@ function cohortsOf(rows: NodeRow[]): CohortGroup[] {
 
 /** A provider cohort's one label — PROVIDER FIRST (user, 2026-09-29), with the unknowns NAMED
  *  rather than dropped. The rail's pager and the Geography explorer's crumb both read this, so a
- *  cohort can never be "Berlin" in one and "Unknown provider · Berlin" in the other. */
+ *  cohort can never be "Berlin" in one and "Unknown provider, Berlin" in the other. */
 export const cohortLabel = (c: { city: string | null; isp: string | null }): string =>
-  `${c.isp ?? "Unknown provider"} · ${c.city ?? "Unlocated"}`;
+  // A comma, not a mid-dot (user, 2026-10-03): a provider in a place reads as one name.
+  `${c.isp ?? "Unknown provider"}, ${c.city ?? "Unlocated"}`;
 
 // GeoExplore's within-country node order: city (falling back to label) then id.
 const nodeSort = (a: NodeRow, b: NodeRow) =>
@@ -410,7 +411,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         actions: metaSnapSelectActions(metaSnapSelOf(r, cur.globalOrdinal, cur.ts), s.snap!, { metaSnap: cur, inspect: s.inspect }),
       }));
       const index = rows.findIndex((r) => r.metaId === cur.metaId && r.ordinal === cur.ordinal);
-      return finish(slot, items, index, `${who} · Global ${cur.globalOrdinal.toLocaleString()}`);
+      return finish(slot, items, index, `${who} in global ${cur.globalOrdinal.toLocaleString()}`);
     }
 
     // The GLOBAL snapshot — the one OPEN set: time, stepped one tick at a time. The window is the

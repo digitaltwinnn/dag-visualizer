@@ -10,6 +10,7 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import { relativeAge } from "@/src/util/relativeAge";
 import { cn } from "@/lib/utils";
+import { QualifierChip } from "@/components/inspector/parts";
 
 // THE LIVE / PINNED SWITCH — one component (user, 2026-09-29: "if a snapshot is pinned, it shows in
 // the explorer but not in the snapshot card; … it should show pinned in both"). The Snapshots
@@ -25,11 +26,17 @@ import { cn } from "@/lib/utils";
 // and OFF (following off with nothing pinned — no age, since one would read as live). The write
 // goes through `followToggleActions` + the one executor.
 
-/** `· 5s ago`, ticking — its own component so the clock re-renders this span alone. */
+/** `5s ago`, ticking — its own component so the clock re-renders this chip alone.
+ *
+ *  ⚠️ A CHIP OF ITS OWN, NOT A CLAUSE (user, 2026-10-03: "design the mid dots — likely two separate
+ *  facts to show instead of a combined text"). The control read "live · 5s ago": a STATE you can
+ *  press and a READING you cannot, glued by a dot inside one button. They are two things now — the
+ *  age is the qualifier chip the leads use for a value that moves, and the pill beside it is the
+ *  control alone. */
 function Age({ ts }: { ts: string }) {
   const now = useNowTick(1000);
   const age = relativeAge(now - Date.parse(ts));
-  return age ? <>· {age}</> : null;
+  return age ? <QualifierChip className="tabular-nums">{age}</QualifierChip> : null;
 }
 
 export default function FollowControl({ className }: { className?: string }) {
@@ -58,6 +65,8 @@ export default function FollowControl({ className }: { className?: string }) {
     shown ? <Age ts={shown.timestamp} /> : null;
 
   return (
+    <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap", className)}>
+    {sub}
     <button
       type="button"
       aria-pressed={following}
@@ -73,7 +82,6 @@ export default function FollowControl({ className }: { className?: string }) {
         "inline-flex items-center gap-1.5 rounded-sm px-1.5 py-[3px] cursor-pointer select-none border border-transparent whitespace-nowrap",
         "hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
         washed && selectedRow(true),
-        className,
       )}
       style={washed ? selectionHue(filterAccent(filter)) : undefined}
     >
@@ -83,7 +91,7 @@ export default function FollowControl({ className }: { className?: string }) {
         <span className={cn("flex-none w-2 h-2 rounded-full border", washed ? "border-primary/80" : "border-muted-foreground/70")} />
       )}
       <span className={cn("text-label", washed ? "text-foreground" : "text-muted-foreground")}>{label}</span>
-      {sub && <span className="tabular-nums text-label text-muted-foreground">{sub}</span>}
     </button>
+    </span>
   );
 }

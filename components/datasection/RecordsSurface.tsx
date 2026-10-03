@@ -88,7 +88,7 @@ export default function RecordsSurface() {
       ) : mode === "hyper" || mode === "geo" ? (
         <NodeRosterTable mode={mode} />
       ) : (
-        <p className="m-auto text-label text-muted-foreground uppercase tracking-caps">preview · in development</p>
+        <p className="m-auto text-label text-muted-foreground uppercase tracking-caps">preview, in development</p>
       )}
     </div>
   );

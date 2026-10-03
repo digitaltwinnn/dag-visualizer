@@ -863,11 +863,12 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       )}
       {searchSet && (
         <span className="inline-flex min-w-0 items-center gap-1 h-8 pointer-coarse:h-11 max-[700px]:h-11 max-[700px]:flex-1 pl-3 pr-1 rounded-btn border border-border/70 bg-[var(--panel-plate)] text-body text-foreground-dim">
-          <span className="min-w-0 truncate tabular-nums">
-            {/* Ordinals with their separators, as every other surface writes them. */}
+          {/* Each applied criterion is its own item — a gap, not a mid-dot, between them. Ordinals
+              with their separators, as every other surface writes them. */}
+          <span className="min-w-0 truncate tabular-nums inline-flex items-center gap-3">
             {[qSnapshot && `snapshot ${fmtOrd(qSnapshot)}`, qTick && `in global ${fmtOrd(qTick)}`, qFrom && `from ${qFrom}`, qTo && `to ${qTo}`]
-              .filter(Boolean)
-              .join(" · ")}
+              .filter((x): x is string => !!x)
+              .map((x) => <span key={x}>{x}</span>)}
           </span>
           <button
             type="button"
@@ -1139,7 +1140,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                         <span title={cfg.name}>{cfg.ticker}</span>
                       ) : (
                         // An uncataloged channel: the core tone + its address, honestly unnamed.
-                        <span className="italic text-muted-foreground">unlisted · {r.metaId?.slice(0, 10)}…</span>
+                        <span className="inline-flex items-baseline gap-2 text-muted-foreground"><span className="italic">unlisted</span><span className="font-mono text-label">{r.metaId?.slice(0, 10)}…</span></span>
                       )}
                     </span>
                     )}

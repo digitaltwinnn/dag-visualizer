@@ -125,7 +125,7 @@ describe("siblingSet — cohort (provider) rung", () => {
   const cohort = { cc: "de", city: "Falkenstein", isp: "Hetzner" };
   it("steps the committed country's cohorts, count-desc, other countries excluded", () => {
     const set = siblingSet("cohort", base({ mode: "geo", country: "de", cohort }))!;
-    expect(set.items.map((i) => i.label)).toEqual(["Hetzner · Falkenstein", "AWS · Berlin"]);
+    expect(set.items.map((i) => i.label)).toEqual(["Hetzner, Falkenstein", "AWS, Berlin"]);
     expect(set.index).toBe(0);
     expect(set.parentLabel).toBe("Germany");
   });
@@ -163,7 +163,7 @@ describe("siblingSet — node rung", () => {
     const set = siblingSet("node", s)!;
     expect(set.items.map((i) => i.key)).toEqual(["1.1.1.1", "1.1.1.2"]);
     expect(set.index).toBe(0);
-    expect(set.parentLabel).toBe("Hetzner · Falkenstein");
+    expect(set.parentLabel).toBe("Hetzner, Falkenstein");
     expect(set.items[1]!.actions).toEqual(
       nodeSelectActions(deB.pick, { mode: "geo", currentFilter: "all", deselect: false, compositionSel: undefined }),
     );
@@ -240,7 +240,7 @@ describe("siblingSet — metagraph snapshot rung", () => {
     const set = siblingSet("metaSnap", s)!;
     expect(set.items.map((i) => i.label)).toEqual(["100", "101"]);
     expect(set.index).toBe(0);
-    expect(set.parentLabel).toBe("DED · Global 42");
+    expect(set.parentLabel).toBe("DED in global 42");
   });
   it("excludes the tick's OTHER networks — a step must never move the coarser network rung", () => {
     const set = siblingSet("metaSnap", s)!;
@@ -366,7 +366,7 @@ describe("childStep — the first-child DOWN step", () => {
   });
   it("a country opens its first cohort (count-desc then city)", () => {
     const step = childStep("country", base({ country: "de" }))!;
-    expect(step.label).toBe("Hetzner · Falkenstein"); // 2 machines beat Berlin's 1
+    expect(step.label).toBe("Hetzner, Falkenstein"); // 2 machines beat Berlin's 1
     expect(step.actions).toEqual(
       cohortToggleActions({ cc: "de", city: "Falkenstein", isp: "Hetzner" }, { cohort: null, hasInspect: false }),
     );

@@ -178,10 +178,9 @@ export default function TrendInstantPane({
                         one network, and "1 of 1" says nothing (user, 2026-09-26). */}
                     {rank && rank.of > 1 && (
                       <span
-                        className="text-body font-normal text-muted-foreground"
+                        className="ml-2 text-body font-normal text-muted-foreground"
                         title={`Ranked among the ${rank.of} network${rank.of === 1 ? "" : "s"} with a reading at this instant`}
                       >
-                        {" · "}
                         <span className="tabular-nums">
                           {rank.rank} of {rank.of}
                         </span>

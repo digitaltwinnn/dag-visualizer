@@ -1019,12 +1019,12 @@ const TrendPlot = memo(function TrendPlot({
                   if (!active || !payload?.length) return null;
                   return (
                     <div className="rounded border border-border bg-[var(--panel)] px-1.5 py-0.5 text-label text-foreground whitespace-nowrap tabular-nums">
-                      <span className="text-muted-foreground">{stampOf(Number(label), stepMs)}{" · "}</span>
+                      <span className="mr-2 text-muted-foreground">{stampOf(Number(label), stepMs)}</span>
                       {lines.map((l, li) => {
                         const v = payload.find((e) => e.dataKey === l.label)?.value;
                         return (
                           <span key={l.label}>
-                            {li > 0 && <span className="text-muted-foreground"> · </span>}
+                            {li > 0 && <span className="inline-block w-2" />}
                             {lines.length > 1 && <span className="text-muted-foreground">{l.label} </span>}
                             {v != null ? format(Number(v)) : "—"}
                           </span>
@@ -1034,7 +1034,7 @@ const TrendPlot = memo(function TrendPlot({
                         const v = payload.find((e) => e.dataKey === `s:${b.label}`)?.value;
                         return v == null ? null : (
                           <span key={`s:${b.label}`}>
-                            <span className="text-muted-foreground"> · {b.label} </span>
+                            <span className="ml-2 text-muted-foreground">{b.label} </span>
                             {format(Number(v))}
                           </span>
                         );
@@ -1070,7 +1070,8 @@ const TrendPlot = memo(function TrendPlot({
               is the window's peak, and the baseline is 0 by construction. */}
           {!compact && (
             <span aria-hidden className="absolute top-1 left-1.5 text-label text-muted-foreground pointer-events-none tabular-nums">
-              {plotUnit ? `${plotUnit} · ` : ""}peak {format(ownMax)}
+              {/* Two facts, a gap between them — the unit, then the scale's one number. */}
+              {plotUnit && <span className="mr-2.5">{plotUnit}</span>}peak {format(ownMax)}
             </span>
           )}
     </>

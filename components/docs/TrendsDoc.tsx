@@ -250,7 +250,7 @@ export default function TrendsDoc() {
    *  node counts once per role it runs), so they are not a partition and never sum to it; the head
    *  names the one line it reads. A daily chart states its own last total. */
   const totalRead = (r: ReturnType<typeof dayRead>, points: readonly (number | null)[]) =>
-    r ? { ...r, word: `total · ${r.word}` } : { value: lastMeasured(points), word: "total · latest full day", pending: false };
+    r ? { ...r, word: `total, ${r.word}` } : { value: lastMeasured(points), word: "total, latest full day", pending: false };
   /** The Metagraphs tab's panel list: one chart per catalog network for one stored metric,
    *  ranked by the LAST measured day, busiest first (per-section — each ranking is its own
    *  reading). The vitals' catalog-order rule guards live charts that reshuffle under the
@@ -545,7 +545,7 @@ export default function TrendsDoc() {
             lead="How regularly the global snapshots were produced, and how long the pauses were. Gray marks a pause that is normal for this network; amber marks one unusually long by its own history; a striped area means this app was not watching at the time."
           >
             <TrendChart onRange={onRange} inspect={inspectHere} name="Mean gap" unit="seconds" readout={dayRead((d) => meanGap({ series: d } as unknown as TrendsPayload), stepMs)} buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} gaps={trim(S(p, "g.gapMax"))} lines={[{ label: "mean", points: trim(meanGap(p)) }]} />
-            <TrendChart onRange={onRange} inspect={inspectHere} name="Longest pause" unit={`seconds · the ${stepMs >= 86400000 ? "day" : "bucket"}'s single widest gap`} readout={dayRead((d) => d["g.gapMax"] ?? [], stepMs)} buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} gaps={trim(S(p, "g.gapMax"))} lines={[{ label: "max", points: trim(S(p, "g.gapMax")) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Longest pause" unit={`seconds, the ${stepMs >= 86400000 ? "day" : "bucket"}'s single widest gap`} readout={dayRead((d) => d["g.gapMax"] ?? [], stepMs)} buckets={cBuckets} stepMs={stepMs} format={secs} sampled={trim(S(p, "g.ticks"))} gaps={trim(S(p, "g.gapMax"))} lines={[{ label: "max", points: trim(S(p, "g.gapMax")) }]} />
           </Section>
           )}
           {sectionTab === "economics" && (<>
@@ -554,14 +554,14 @@ export default function TrendsDoc() {
             title="Total fees paid"
             lead="What the metagraphs paid to anchor into the global ledger."
           >
-            <TrendChart onRange={onRange} inspect={inspectHere} name="Fees paid" unit={`DAG ${per} · at least`} readout={dayReadout("g.feeFloor", 1e-8)} buckets={cBuckets} stepMs={stepMs} format={dag} lines={[{ label: "fees", points: trim(scale(S(p, "g.feeFloor"), 1e-8)) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Fees paid" unit={`DAG ${per}, at least`} readout={dayReadout("g.feeFloor", 1e-8)} buckets={cBuckets} stepMs={stepMs} format={dag} lines={[{ label: "fees", points: trim(scale(S(p, "g.feeFloor"), 1e-8)) }]} />
           </Section>
           <Section
             id="economics-data"
             title="Total data anchored"
             lead="How much data the metagraphs anchored into the global ledger."
           >
-            <TrendChart onRange={onRange} inspect={inspectHere} name="Data anchored" unit={`${per} · at least`} readout={dayReadout("g.kbFloor", 1 / 1024)} buckets={cBuckets} stepMs={stepMs} format={mb} lines={[{ label: "data", points: trim(scale(S(p, "g.kbFloor"), 1 / 1024)) }]} />
+            <TrendChart onRange={onRange} inspect={inspectHere} name="Data anchored" unit={`${per}, at least`} readout={dayReadout("g.kbFloor", 1 / 1024)} buckets={cBuckets} stepMs={stepMs} format={mb} lines={[{ label: "data", points: trim(scale(S(p, "g.kbFloor"), 1 / 1024)) }]} />
           </Section>
           </>)}
           {sectionTab === "fleet" && (

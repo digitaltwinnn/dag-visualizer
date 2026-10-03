@@ -108,8 +108,9 @@ export function WindowPicker({
         ))}
       {range && (
         <span className={cn("h-6 px-2 inline-flex items-center gap-1.5 rounded-md text-label font-bold text-foreground whitespace-nowrap", SELECTED_ROW)}>
+          {/* The network and the span are two facts, set apart by the gap — no mid-dot. */}
+          {range.metaId && <span>{displayNetwork(range.metaId)?.ticker ?? ""}</span>}
           <span className="tabular-nums">
-            {range.metaId ? `${displayNetwork(range.metaId)?.ticker ?? ""} · ` : ""}
             {stampRange(range.fromMs, stepMs)}–{stampRange(range.toMs, stepMs)}
           </span>
           <button

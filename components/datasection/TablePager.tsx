@@ -72,7 +72,7 @@ export default function TablePager({
         {compact && scope ? null : compact ? fmtCount(total) : `${from}–${to} of ${fmtCount(total)}`}
         {scope ? (
           <>
-            {compact ? null : " · "}
+            {compact ? null : " "}
             {!scope.title ? (
               <span className="inline-flex items-center min-h-6">{scope.word}</span>
             ) : (

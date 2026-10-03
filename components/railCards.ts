@@ -316,7 +316,7 @@ function countryHint(s: RailManifestState): string | null {
 }
 function cohortHint(s: RailManifestState): string | null {
   // Explorer-only rung: no 3D cohort exists to click, so naming the row IS the route.
-  return s.mode === "geo" ? "Open any provider · city row under a country." : null;
+  return s.mode === "geo" ? "Open any row under a country." : null;
 }
 // Composition is hyper's own middle rung (2026-08-02) — the layer groups under a network in
 // the explorer. Hyper-only, same allow-list idiom; explorer-only like the cohort above.

@@ -44,7 +44,7 @@ import { coLocatedNetworks, filterAccent, getAnchor, isAnchorSettling, metagraph
 import { midHash } from "@/src/util/format";
 import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
 import { SCENE_GLASS } from "@/components/selection";
-import { RoleChips, StatusMark, TickerChip } from "@/components/inspector/parts";
+import { QualifierChip, RoleChips, StatusMark, TickerChip } from "@/components/inspector/parts";
 // The lead line's codes come from the composition vocabulary's ONE home, rendered by the cards'
 // own RoleChips (user, 2026-08-15: "look at my cards — square pills").
 import { layerCodesOf } from "@/src/data/composition";
@@ -81,7 +81,8 @@ export interface CalloutModel {
   key: string;
   eyebrow: string;
   title: string;
-  aside?: { text: string; hue?: string; live?: boolean };
+  /** `chip` is a second, separate fact beside the state — an age — never a clause after a dot. */
+  aside?: { text: string; hue?: string; live?: boolean; chip?: string };
   ring: string;
   /** `ident` leads the row in its identity hue (the aside's hued-ticker idiom, one register).
    *  `also` closes it with the OTHER networks sharing this subject's machine — same idiom,
@@ -132,6 +133,7 @@ export function CalloutPanel({ m, className }: { m: CalloutModel; className?: st
           <span className="inline-flex items-center gap-1.5 text-label text-muted-foreground ml-1">
             {m.aside.live && <LiveDot />}
             {m.aside.text}
+            {m.aside.chip && <QualifierChip className="ml-0.5 tabular-nums">{m.aside.chip}</QualifierChip>}
           </span>
         ) : null}
       </div>
@@ -379,9 +381,9 @@ export default function SceneCallout() {
         // network was answering. A pin is unaffected: a held snapshot is not a claim about now.
         aside: following
           ? liveFeed
-            ? { text: rel ? `live · ${rel}` : "live", live: true }
+            ? { text: "live", live: true, chip: rel || undefined }
             : { text: "no signal" }
-          : { text: rel ? `pinned · ${rel}` : "pinned" },
+          : { text: "pinned", chip: rel || undefined },
         // Unneted the ring marks the whole bar (core cyan); under a filter the anchor
         // points at the committed network's own SEGMENT, so the ring takes its accent
         // (user, 2026-08-16 — "if filter, select the correct segment of the byte bar").

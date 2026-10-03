@@ -85,10 +85,15 @@ export default function PulseStrip() {
                     at the compact py-px the icon-bearing chip read cramped and the glyph sat
                     optically high beside the 10px text (user, 2026-09-11 — "padding … they look
                     small and text icon alignment feels a bit off"). */}
-                <span className="inline-flex items-center gap-1 rounded-xs border border-border bg-wash-faint px-1.5 py-[3px] text-label leading-none text-muted-foreground">
-                  {r.everyMs != null && <Timer aria-hidden className="size-3 flex-none" />}
-                  {cadenceWord(r)}
-                </span>
+                {/* ONE CHIP PER FACT (user, 2026-10-03, on the mid-dots): "5 min · while shown" is a
+                    cadence and a condition, so it is two chips — the registry's words are split on
+                    its own separator. */}
+                {cadenceWord(r).split(" · ").map((part, i) => (
+                  <span key={part} className="inline-flex items-center gap-1 rounded-xs border border-border bg-wash-faint px-1.5 py-[3px] text-label leading-none text-muted-foreground">
+                    {i === 0 && r.everyMs != null && <Timer aria-hidden className="size-3 flex-none" />}
+                    {part}
+                  </span>
+                ))}
               </span>
               {/* The ok/err record shows ONLY when there is something to weigh (user,
                   2026-09-09, second round: the all-ok "N polls, all ok" line said what the
