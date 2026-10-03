@@ -46,6 +46,13 @@ const cadenceWord = (r: PollHealth): string =>
       : `${Math.round(r.everyMs / 1000)}s`
     : (r.when ?? "—");
 
+/** The share of polls that succeeded, as a reader would say it. */
+const okShare = (ok: number, err: number): string => {
+  const pct = (ok / Math.max(1, ok + err)) * 100;
+  if (pct >= 99) return `${Math.min(99.9, Math.floor(pct * 10) / 10).toFixed(1)}%`;
+  return `${Math.round(pct)}%`;
+};
+
 export default function PulseStrip() {
   const now = useNowTick(1000);
   const rows = pollHealthRows();
@@ -103,8 +110,12 @@ export default function PulseStrip() {
                     <span style={{ width: `${(r.ok / Math.max(1, r.ok + r.err)) * 100}%`, background: "var(--success)" }} className={cn("opacity-70", BAR_EASE)} />
                     <span style={{ width: `${(r.err / Math.max(1, r.ok + r.err)) * 100}%`, background: "var(--destructive)" }} className={cn("opacity-80 min-w-[3px]", BAR_EASE)} />
                   </span>
-                  <span className="text-label tabular-nums text-muted-foreground">
-                    {r.ok.toLocaleString()} ok · {r.err.toLocaleString()} failed
+                  {/* ONE READING, no mid-dot (user, 2026-10-03: "'237 ok · 2 failed' — perhaps a
+                      percentage is better? I don't like the dot"). The share that succeeded says how
+                      healthy the feed is at a glance; the exact counts are on hover. Never "100%"
+                      while anything failed — one decimal from 99 up, capped at 99.9. */}
+                  <span className="text-label tabular-nums text-muted-foreground" title={`${r.ok.toLocaleString()} ok, ${r.err.toLocaleString()} failed`}>
+                    {okShare(r.ok, r.err)} ok
                   </span>
                 </span>
               )}

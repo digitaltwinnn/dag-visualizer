@@ -69,6 +69,15 @@ describe("VIEW_POLICIES", () => {
     }
   });
 
+  it("states a band's shared window once — only the Snapshots band has one", () => {
+    // Its cards are all cut from one measured window, so the band says it once above its corner
+    // and the cards stay quiet; every other band holds live readings, or (History) its own range.
+    expect(VIEW_POLICIES.ledger.bandWindow).toBe("24h");
+    for (const m of ["hyper", "geo", "trend", "soon"] as const) {
+      expect(VIEW_POLICIES[m].bandWindow, `${m} has no shared window to state`).toBeNull();
+    }
+  });
+
   it("gives flat views NO sims, NO picks, NO DoF, NO canvas, NO show", () => {
     for (const m of FLAT_MODES) {
       const p = VIEW_POLICIES[m];

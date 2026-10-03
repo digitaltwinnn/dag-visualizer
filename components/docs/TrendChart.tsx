@@ -110,6 +110,7 @@ export default function TrendChart({
   syncId = "trends",
   compact = false,
   unitInPlot = false,
+  lineWidth = 2,
   className,
   headClassName,
   headAction,
@@ -258,6 +259,11 @@ export default function TrendChart({
    *  card in front. The unit is the same on every card of a stack, so it is said once, on the
    *  one plot that is visible: "Snapshots per hour · peak 1,717". The document never passes it. */
   unitInPlot?: boolean;
+  /** The series line's stroke, in CSS px at scale 1. The document's small charts draw at 2; a
+   *  History card is drawn LARGER than authored (scale ~1.3 on a desktop), so the same 2 landed
+   *  at 2.6px and read as heavy (user, 2026-10-03: "the trend card lines are too thick") — the
+   *  stack passes a finer one. */
+  lineWidth?: number;
   className?: string;
   /** Extra classes for the HEAD ROW alone (2026-09-18). The 3D trend stack's planes have no
    *  chrome of their own — the head IS each plane's header strip, the one part of a fully
@@ -474,17 +480,22 @@ export default function TrendChart({
           // staleness nuance too thin to carry — user: "'newest' not 'latest'?" — the hover
           // stamp and the gray band are what actually say when the reading lags the clock.)
           <span
-            className="ml-auto inline-flex items-baseline gap-1 whitespace-nowrap"
+            className="ml-auto inline-flex items-baseline gap-1.5 whitespace-nowrap"
             title={readout ? (readout.title ?? "The newest complete measured day, from the daily tier") : `The newest complete measured ${stepMs >= 86400000 ? "day" : stepMs >= 3600000 ? "hour" : "five-minute bucket"} (${stampOf(buckets[lastIdx], stepMs)})`}
           >
             {/* A null readout value is ACQUIRING — the daily tier behind "latest full day" is still in
                 flight — so the slot holds its place (NodeStars) rather than show a finer bucket
                 under the day's word, or a number that isn't the day's. */}
-            <span className="text-label text-foreground-dim tabular-nums">
-              {readout ? (readout.value != null ? format(readout.value) : readout.pending === false ? "—" : <NodeStars count={3} />) : format(last)}
-            </span>
+            {/* LABEL, THEN VALUE — no mid-dot, no abbreviation (user, 2026-10-03: "is there a better
+                way to visualise '· avg per day'? dots are ugly and avg is an abbreviation"). It read
+                "26,573 · avg per day": a number, a separator and a clipped phrase. It is the app's own
+                row grammar now — the words that say what the number IS, muted, then the number in
+                full ink: "daily average 26,573". */}
             <span className="text-label text-muted-foreground">
-              · {readout ? readout.word : `latest full ${stepMs >= 86400000 ? "day" : stepMs >= 3600000 ? "hour" : "5 min"}`}
+              {readout ? readout.word : `latest full ${stepMs >= 86400000 ? "day" : stepMs >= 3600000 ? "hour" : "5 min"}`}
+            </span>
+            <span className="text-label font-medium text-foreground tabular-nums">
+              {readout ? (readout.value != null ? format(readout.value) : readout.pending === false ? "—" : <NodeStars count={3} />) : format(last)}
             </span>
           </span>
         )}
@@ -534,6 +545,7 @@ export default function TrendChart({
             const plot = (
               <TrendPlot
                 compact={compact}
+                lineWidth={lineWidth}
                 plotUnit={unitInPlot ? unit : undefined}
                 syncId={syncId}
                 lines={lines}
@@ -643,6 +655,7 @@ const TrendPlot = memo(function TrendPlot({
   stack,
   plotH,
   compact = false,
+  lineWidth = 2,
   plotUnit,
 }: {
   /** See the outer component's prop — a STRING, so it holds the memo still. */
@@ -665,6 +678,7 @@ const TrendPlot = memo(function TrendPlot({
   compact?: boolean;
   /** The unit to lead the peak caption with — see the chart's `unitInPlot`. */
   plotUnit?: string;
+  lineWidth?: number;
 }) {
   const n = buckets.length;
   const hue0 = lines[0]?.hue ?? "var(--primary)";
@@ -1035,7 +1049,7 @@ const TrendPlot = memo(function TrendPlot({
                   dataKey={l.label}
                   type="linear"
                   stroke={l.hue ?? hue0}
-                  strokeWidth={2}
+                  strokeWidth={lineWidth}
                   strokeDasharray={typeof l.dash === "string" ? l.dash : l.dash ? "4 4" : undefined}
                   connectNulls={false}
                   isAnimationActive={false}

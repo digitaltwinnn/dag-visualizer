@@ -271,7 +271,9 @@ export function spanAverage(
  *  hover: the latest full day, or the span's average. */
 export function headWord(metric: TrendMetric, kind: "span" | "day"): string {
   if (kind === "day") return "latest full day";
-  return spanWord(metric) === "Average per day" ? "avg per day" : "average";
+  // Whole words, and no leading mark: the word is a LABEL that precedes its number
+  // ("daily average 26,573") — it was "avg per day" after a mid-dot (user, 2026-10-03).
+  return spanWord(metric) === "Average per day" ? "daily average" : "average";
 }
 
 /** The words a span reading carries: a rate is an average PER DAY, anything else an average. */

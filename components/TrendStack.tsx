@@ -502,6 +502,9 @@ export default function TrendStack() {
                 // PHONE: the card is too narrow for name + measure + reading on one line, so the
                 // measure rides the front plot's caption instead (`unitInPlot`).
                 unitInPlot={fmt === planeFormat(true)}
+                // A finer line: the card is drawn larger than authored, so the chart's own 2px
+                // landed at 2.6 (see `lineWidth`).
+                lineWidth={1.25}
                 // THE HEADLINE IS THE ROSTER'S `head` (user, 2026-09-29: "keep it consistent") —
                 // the same number the Networks list states: the span's average per day over a
                 // window of a day or more, the latest full day under one.

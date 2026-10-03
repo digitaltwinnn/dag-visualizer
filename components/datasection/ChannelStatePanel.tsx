@@ -209,7 +209,11 @@ function SchemaRow({
   count: number;
   kinds: { kind: string; fields: string[] | null; count: number }[];
 }) {
-  const [open, setOpen] = useState(false);
+  // OPEN BY DEFAULT (user, 2026-10-03: "in the raw snapshot page, expand the schema sections by
+  // default"): the raw page IS the payload surface — a reader who came this far wants the fields,
+  // and a column of folded rows made them open each one. Still a disclosure, so a long schema can
+  // be folded back.
+  const [open, setOpen] = useState(true);
   // Only a row with fields BEHIND it discloses — a chevron onto nothing is a lie about the data.
   const openable = kinds.some((k) => k.fields != null || k.kind !== label);
   const row = (

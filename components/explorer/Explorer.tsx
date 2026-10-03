@@ -120,6 +120,7 @@ export default function Explorer({ id, title, hint, levels, onLeave, defaultColl
   // the server render keep the old width rather than collapsing.
   const cap = current?.glyphW ?? 14;
   const rowKeys = current?.rows.map((r) => r.key).join("|") ?? "";
+  const figKey = current?.rows.map((r) => (typeof r.figure === "string" || typeof r.figure === "number" ? String(r.figure).length : 0)).join("") ?? "";
   const listEl = useRef<HTMLDivElement | null>(null);
   const fitGlyphs = useCallback((el: HTMLDivElement | null) => { listEl.current = el; }, []);
   useLayoutEffect(() => {
@@ -133,12 +134,22 @@ export default function Explorer({ id, title, hint, levels, onLeave, defaultColl
       }
       if (w > 0) el.style.setProperty("--glyph-w", `${Math.min(cap, w + 1)}px`);
       else el.style.removeProperty("--glyph-w");
+      // The FIGURE column, the same way (ExplorerRow's `figureCol`): as wide as the widest figure
+      // printed, capped by the level's own width in the row's template.
+      let f = 0;
+      for (const g of el.querySelectorAll<HTMLElement>("[data-fit-fig]")) f = Math.max(f, g.getBoundingClientRect().width);
+      const next = f > 0 ? `${Math.ceil(f) + 1}px` : "";
+      if (el.style.getPropertyValue("--fig-w") !== next) {
+        if (next) el.style.setProperty("--fig-w", next);
+        else el.style.removeProperty("--fig-w");
+      }
     };
     fit();
     // The type scale is fluid, so a resize changes what the tickers measure.
     window.addEventListener("resize", fit);
     return () => window.removeEventListener("resize", fit);
-  }, [rowKeys, cap]);
+  // `figKey`: a figure that gains a digit (9 → 10) changes what the column must hold.
+  }, [rowKeys, cap, figKey]);
   // The crumbs: the ROOT as the house glyph (its word is the accessible name — the card's title
   // already says it, and the word cost the width the crumbs need; user, 2026-09-26, two rounds),
   // then every OPENED level, the current one last as the page.

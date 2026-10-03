@@ -126,7 +126,12 @@ export default function ExplorerRow({
   // THE FIGURE COLUMN IS IN EM (2026-10-02): its width was measured for a 12.5px mono figure, and
   // the body step is fluid now — a 4-decimal fee in a 48px column truncated to "0.02…" at 14px.
   // The row's own font-size is `text-body` (below), so an em here IS the figure's size.
-  const figureCol = `${(figureW / 12.5).toFixed(2)}em`;
+  // …AND NO WIDER THAN THE WIDEST FIGURE ON SCREEN (2026-10-03, the ticker column's rule reaching
+  // the figure): `figureW` is the room a level's LONGEST possible figure needs, and a list of
+  // "14" and "3" held all 46px of it open while the tag beside it — three layer pills, a city —
+  // was clipped for want of 6. The Explorer measures the figures it rendered and publishes
+  // `--fig-w`; the level's width stays the cap, and the fallback before the first measure.
+  const figureCol = `min(${(figureW / 12.5).toFixed(2)}em, var(--fig-w, 999px))`;
   // A TEXT glyph (a node level's ticker) is as wide as the widest one ON SCREEN, up to the level's
   // `glyphW`: the Explorer measures the list and publishes `--glyph-w` (see its `fitGlyphs`), so
   // a list of three-letter tickers does not hold a co-located pair's 56px open beside every id
@@ -204,7 +209,12 @@ export default function ExplorerRow({
       >
         {name}
       </span>
-      <span className="min-w-0 truncate flex items-center gap-1 text-label text-muted-foreground">{tag}</span>
+      {/* A TEXT tag ellipsises; a flex container cannot do that for a bare string (its
+          `text-overflow` has no inline box to act on), so "Falkenstein" was cut to "Falkens" with
+          no mark that anything was missing. Chips and dots stay direct children. */}
+      <span className="min-w-0 truncate flex items-center gap-1 text-label text-muted-foreground">
+        {typeof tag === "string" ? <span className="min-w-0 truncate">{tag}</span> : tag}
+      </span>
       {hasFigure && (
         <>
           <span className="h-[5px] rounded-[3px] bg-wash-faint overflow-hidden">
@@ -216,7 +226,8 @@ export default function ExplorerRow({
             )}
           </span>
           <span className={cn("min-w-0 truncate text-right font-mono text-body tabular-nums", nested ? "text-foreground-dim" : "text-foreground")}>
-            {figure}
+            {/* An inline box, so its width is the figure's own — what the Explorer measures. */}
+            <span data-fit-fig="">{figure}</span>
           </span>
         </>
       )}

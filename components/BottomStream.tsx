@@ -36,6 +36,8 @@ const RESERVE = 112; // --vitals-h (104px, globals.css) + 8px clearance above th
  *  group plus its 12px gap, which the rails must clear too, or a tall right rail's last card sits
  *  under it. Reserved only while the band holds the timeline — a policy row, not a mode compare. */
 const PILLS_ABOVE = 44;
+/** The same for a vitals band's shared-window chip: a 22px chip plus its 8px gap. */
+const CHIP_ABOVE = 30;
 
 export default function BottomStream() {
   const mode = useStore((s) => s.mode);
@@ -61,7 +63,9 @@ export default function BottomStream() {
   // other gate still unmounts — there is nothing to slide when the lane does not apply.
   const applicable = VIEW_POLICIES[mode].vitalsLane && section === "scene" && bp !== "phone" && !short;
   const lane = applicable && !railsHidden;
-  const reserve = RESERVE + (VIEW_POLICIES[mode].bandContent === "timeline" ? PILLS_ABOVE : 0);
+  // …and a band that states a shared window stands a chip in the same place (`bandWindow`).
+  const reserve =
+    RESERVE + (VIEW_POLICIES[mode].bandContent === "timeline" ? PILLS_ABOVE : VIEW_POLICIES[mode].bandWindow ? CHIP_ABOVE : 0);
   useEffect(() => {
     document.documentElement.style.setProperty("--bottom-reserve", lane ? `${reserve}px` : "0px");
     return () => document.documentElement.style.setProperty("--bottom-reserve", "0px");

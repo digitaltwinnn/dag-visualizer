@@ -466,6 +466,10 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
   // the chart and the roster that legends it can never rank over different reaches.
   const barData = windowed;
   const span = "last 24 hours";
+  /** A card states a span only when its own DIFFERS from the band's (user, 2026-10-03: "each
+   *  vital repeats 'last 24 hours'"). The band says the shared window once, above its corner
+   *  (`viewPolicy.bandWindow`); the live fallback's reach is a different fact and still shows. */
+  const ownSpan = (s: string | undefined): string | undefined => (s && s !== span ? s : undefined);
   const stepWord =
     windowed?.stepMs === 300_000 ? "in five-minute buckets"
     : windowed?.stepMs === 3_600_000 ? "hour by hour"
@@ -517,7 +521,9 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
         // eye asking). The fallback keeps its bare "per hour": its lead is a current rate.
         // Prose units, not the "/day" glyph — the Trends DOCUMENT's own 2026-09-09 ruling (user:
         // "what is /day?"), one vocabulary across both surfaces.
-        unit: "avg per day",
+        // "daily average", in whole words (user, 2026-10-03: "avg is an abbreviation") — the same
+        // phrase the History cards' headline uses.
+        unit: "daily average",
         span,
         sr: `Measured from the chain's own records (${span}, ${stepWord}); the rate is the window's mean, stated per day.`,
         offRim: false,
@@ -579,7 +585,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
           key={label}
           label={label}
           title={title}
-          aside={spark.data != null ? spark.span || undefined : undefined}
+          aside={spark.data != null ? ownSpan(spark.span) : undefined}
           lead={
             <span className="flex flex-col items-start">
               <span className="font-mono font-bold text-muted-foreground tabular-nums whitespace-nowrap">idle</span>
@@ -618,7 +624,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
       // the right words per card and needs no new rule: the measured cards say the band's
       // window, and the live fallback keeps saying its own — which is the one case where the
       // two genuinely differ, and the reason this is one expression rather than a constant.
-      aside={spark.span || undefined}
+      aside={ownSpan(spark.span)}
       lead={
         <span className="flex flex-col items-start">
           {/* NodeStars while the window's mean is still in flight (user, 2026-09-08: the
@@ -709,7 +715,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
       {rate("Snapshots", sparkOf(scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries, activity?.snapsPerHour))}
       {/* The chart states the same reach its rows do — it plots the very buckets the rate cards
           average, so a silent chart beside two captioned ones would read as a different window. */}
-      <BandCard label="Anchors by metagraph" aside={span} className="min-w-[220px]">
+      <BandCard label="Anchors by metagraph" className="min-w-[220px]">
         <StackBars accent={accent} isMeta={isMeta} filter={filter} data={barData} />
       </BandCard>
     </>

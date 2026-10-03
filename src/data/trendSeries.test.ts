@@ -597,7 +597,7 @@ describe("spanAverage", () => {
 describe("headWord", () => {
   it("names the head reading: the day, or the span's average", () => {
     expect(headWord("snapshots", "day")).toBe("latest full day");
-    expect(headWord("snapshots", "span")).toBe("avg per day");
+    expect(headWord("snapshots", "span")).toBe("daily average");
     expect(headWord("nodes", "span")).toBe("average");
   });
 });

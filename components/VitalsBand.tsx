@@ -33,6 +33,8 @@ import { useSceneYield } from "@/components/RailShade";
 import { cn } from "@/lib/utils";
 import { HyperCells, GeoCells, LedgerCells } from "@/components/vitals/viewCells";
 import TrendTimeline from "@/components/TrendTimeline";
+import { QualifierChip } from "@/components/inspector/parts";
+import { spanPhrase } from "@/src/data/trendWindow";
 
 function useVitalsScope() {
   const mode = useStore((s) => s.mode);
@@ -85,6 +87,7 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
   // — the same one read the RailShade dims on, at the recipe's own tempos (away 0.3s, the return
   // faster: it answers a gesture already finished).
   const yielding = useSceneYield();
+  const bandWindow = VIEW_POLICIES[mode].bandWindow;
   // THE BAND NEVER PAINTS UNDER AN OPEN SHEET (user, 2026-09-04 — "sometimes I see flickering
   // when the explore and bottom bar overlap"). The overlay decision above stands: the sheets
   // cover the band. But the sheet's glass is translucent, so a band that kept PAINTING under
@@ -175,6 +178,16 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
       )}
     >
       {!live && <span className="self-center"><NoSignalDot /></span>}
+      {/* THE BAND'S WINDOW, ONCE (`viewPolicy.bandWindow`, user 2026-10-03): above the plate's right
+          corner, where History's range pills stand — the band's time scope has one place in
+          every view. The cards below no longer repeat it (`viewCells`: a card states a span
+          only when its own differs). The section is `fixed`, so it is this chip's containing
+          block; the bar's own glass under it, since it floats over the scene. */}
+      {bandWindow && (
+        <span className="absolute bottom-full right-0 mb-2 rounded-md [background:var(--topbar-glass)] backdrop-blur-sm">
+          <QualifierChip>{spanPhrase(bandWindow, null)}</QualifierChip>
+        </span>
+      )}
       {/* The no-pop swap (RollSwap): the PLATE persists, the cells roll — and the wrapper takes
           over the row's cell-targeting rules (flatten, dividers, stretch), which is why the
           section above no longer carries them: an element between a `[&>*]` and its subjects
@@ -216,6 +229,10 @@ export function VitalsSheetBody() {
       )}
     >
       {!live && <span className="self-center flex-none mb-2"><NoSignalDot /></span>}
+      {/* The band's shared window, once, at the sheet's top right — the desktop chip's phone home. */}
+      {VIEW_POLICIES[mode].bandWindow && (
+        <span className="self-end flex-none mb-2"><QualifierChip>{spanPhrase(VIEW_POLICIES[mode].bandWindow, null)}</QualifierChip></span>
+      )}
       {/* The no-pop swap — the cell-targeting `[&>*]` rules ride the wrapper for the same
           retargeting reason the band's do (see the desktop section above). */}
       <RollSwap

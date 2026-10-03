@@ -124,7 +124,10 @@ const groundY = (centre: number, f: PlaneFormat): number => PLANE_Y - centre * f
  *  the one it needs is higher than dark's — measured, because the two grounds are genuinely
  *  different instruments (dark adds light to nothing and bloom lifts it further; paper only has
  *  ink, and this ground is a 0.88-L page). */
-const GROUND_PRESENCE = { dark: 0.07, paper: 0.2 } as const;
+// Paper was 0.2 until 2026-10-03: at that level the bands under the deck read as two grey SMUDGES
+// on the page rather than as a floor (light-theme pass; user: "fix it"). 0.11 keeps the footprint
+// legible — still above dark's number, for the reason given above — without the dirt.
+const GROUND_PRESENCE = { dark: 0.07, paper: 0.11 } as const;
 
 /** The shadow band's height in world units — how far below the floor line the soft falloff runs.
  *  A little over a tenth of the card: enough to read as a shadow's spread, not a second card. */

@@ -25,6 +25,10 @@ import { useStore } from "@/src/store/store";
 // timeline lives in the Vitals sheet, which opens directly under the stack, so the lines rise
 // from behind the sheet's top edge — the sheet paints over this layer — to the chart's axis.
 
+const TETHER_STROKE = {
+  stroke: "light-dark(color-mix(in oklch, var(--primary-ink) 80%, transparent), color-mix(in oklch, var(--primary) 45%, transparent))",
+} as const;
+
 export default function TrendTether() {
   const svg = useRef<SVGSVGElement>(null);
   const bp = useBreakpoint();
@@ -121,8 +125,13 @@ export default function TrendTether() {
 
   return (
     <svg ref={svg} aria-hidden className="absolute inset-0 w-full h-full pointer-events-none overflow-visible" style={{ visibility: "hidden" }}>
-      <line stroke="var(--primary)" strokeOpacity={0.45} strokeWidth={1} strokeDasharray="3 4" />
-      <line stroke="var(--primary)" strokeOpacity={0.45} strokeWidth={1} strokeDasharray="3 4" />
+      {/* ⚠️ THE LINE'S STRENGTH IS PER GROUND (user, 2026-10-03: "the dotted line to the chart in
+          light mode is too faint"). The bare accent at 0.45 is a glow on the dark ground and a
+          pale thread on paper, where there is no bloom and the page is its own bright field. On
+          paper it takes the accent's INK (`--primary-ink`) at 0.8; dark keeps what it had.
+          `light-dark()` resolves colours only, so the alpha rides the colour, not `strokeOpacity`. */}
+      <line style={TETHER_STROKE} strokeWidth={1} strokeDasharray="3 4" />
+      <line style={TETHER_STROKE} strokeWidth={1} strokeDasharray="3 4" />
       <line stroke="var(--primary)" strokeOpacity={0.9} strokeWidth={2} strokeLinecap="round" />
     </svg>
   );

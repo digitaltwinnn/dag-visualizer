@@ -231,8 +231,12 @@ export function Door({
     // The agreed door recipe (design 2026-09-26, `moment-door.html` A — the Moment card's
     // "Snapshot records" control is its first instance and keeps its own foot geometry): a
     // full-bleed row on the wash ladder every control wears.
-    "flex items-center gap-2 -mx-[var(--card-pad)] px-[var(--card-pad)] py-2 border-t border-wash-strong bg-wash-faint text-body text-foreground text-left",
-    "hover:bg-wash-soft focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+    // ⚠️ ONE STEP UP THE LADDER ON PAPER (user, 2026-10-03: "the clickable section saying 'site' is
+    // a bit too faint in light mode"). 6% of the accent is a visible plate on the dark glass and
+    // very nearly the card's own white on paper, so the row stopped reading as a control there:
+    // paper rests at `soft` and hovers at `hover`, dark keeps `faint` → `soft`.
+    "flex items-center gap-2 -mx-[var(--card-pad)] px-[var(--card-pad)] py-2 border-t border-wash-strong [background:light-dark(var(--wash-soft),var(--wash-faint))] text-body text-foreground text-left",
+    "hover:[background:light-dark(var(--wash-hover),var(--wash-soft))] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
     disabled && "opacity-65 pointer-events-none",
   );
   const inner = (

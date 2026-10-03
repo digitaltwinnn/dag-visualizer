@@ -302,7 +302,7 @@ export default function TrendInstantPane({
                   // and the corners square there (`--foot-radius`, which RailPager zeroes).
                   "-mx-[var(--card-pad)] px-[var(--card-pad)] py-2.5",
                   "mb-[var(--foot-mb,calc(0px-var(--card-pad)))]",
-                  "rounded-b-[var(--foot-radius,calc(var(--radius)-1px))] border-t border-wash-strong bg-wash-faint hover:bg-wash-soft",
+                  "rounded-b-[var(--foot-radius,calc(var(--radius)-1px))] border-t border-wash-strong [background:light-dark(var(--wash-soft),var(--wash-faint))] hover:[background:light-dark(var(--wash-hover),var(--wash-soft))]", // the Door's own per-ground wash (parts.tsx)
                   "disabled:opacity-45 disabled:pointer-events-none",
                   "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                 )}
