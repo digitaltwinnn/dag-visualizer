@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { fmtBytes, fmtKB, midHash } from "./format";
+import { fmtBytes, fmtKB, midHash, fmtShareKB } from "./format";
 
 // The sub-KB boundary is the whole reason `fmtBytes` exists, so it is pinned here: the
 // metagraph-snapshot card states an application state's size, and mainnet states routinely
@@ -39,5 +39,17 @@ describe("midHash", () => {
   });
   it("defaults to the raw pane's 46", () => {
     expect(midHash(h).length).toBe(46);
+  });
+});
+
+describe("fmtShareKB", () => {
+  it("says the unit once when both halves share it", () => {
+    expect(fmtShareKB(56.0, 64.8)).toBe("56 of 65 KB");
+    expect(fmtShareKB(2.9, 5.9)).toBe("2.9 of 5.9 KB");
+    expect(fmtShareKB(1536, 4096)).toBe("1.5 of 4.0 MB");
+  });
+
+  it("keeps both units where they differ — a bare number against another unit would mislead", () => {
+    expect(fmtShareKB(900, 1228.8)).toBe("900 KB of 1.2 MB");
   });
 });

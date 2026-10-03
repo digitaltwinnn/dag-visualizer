@@ -1490,6 +1490,17 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
   circle — `--co-k` shortens both axes by one factor, so the two leaders are parallel. Standing
   up-right from the floor put its panel over the ribbons. `calloutHangs` (domain, tested) says
   whether the strip has room; where it has not, the label stands as it always did.
+- **A callout wears its card's MARK** before the title (user, 2026-10-03 — picks 1, 4 and 5 of
+  `docs/superpowers/design/2026-10-03-callout-cards`): the cube, the stacked cubes, the globe,
+  the pin, the server, or a network's logo — `iconForPick`, the cards' own glyph home, in the
+  card head's own hue rule. A label and its card pair at a glance instead of by reading both.
+- **The global snapshot's label names BOTH things its bar shows**: the count in the card's word
+  ("3 of 5 snapshots") and the size as a chip on the right ("8.9 of 15 KB"), because the band its
+  ring points at is drawn in BYTES. The size is the exact read's or absent — never estimated.
+  Its aside reads age, then state, the order the card's head uses.
+- **The free band starts under the command bar.** The canvas runs behind the bar, so "near the
+  top" was measured from y = 0 and a label stood up into it; `CalloutSync` hands
+  `calloutPlacement` the bar's bottom edge as `top`.
 - **Ring and leader wear a ground-coloured casing** (same day): a ring in its subject's hue lands
   on a block of that hue, and the dashed line crosses lit geometry — both read as nothing there.
 - **A hyper NODE's callout points at EVERY layer bead** (the multi-leader, 2026-08-30): a machine

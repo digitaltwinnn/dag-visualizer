@@ -41,7 +41,11 @@ import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { displayNetwork } from "@/src/data/unlisted";
 import { coLocatedNetworks, filterAccent, getAnchor, isAnchorSettling, metagraphById } from "@/src/data/network";
-import { midHash } from "@/src/util/format";
+import { fmtKB, fmtShareKB, midHash } from "@/src/util/format";
+import type { LucideIcon } from "lucide-react";
+import { iconForPick } from "@/components/icons";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { netKeyOf } from "@/src/engine/domain/pickActions";
 import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
 import { SCENE_GLASS } from "@/components/selection";
 import { QualifierChip, RoleChips, StatusMark, TickerChip } from "@/components/inspector/parts";
@@ -84,6 +88,12 @@ export interface CalloutModel {
   /** `chip` is a second, separate fact beside the state — an age — never a clause after a dot. */
   aside?: { text: string; hue?: string; live?: boolean; chip?: string };
   ring: string;
+  /** THE MARK THE SUBJECT'S CARD WEARS before its title (user, 2026-10-03 — suggestion 4 of
+   *  `docs/superpowers/design/2026-10-03-callout-cards`): the cube, the stacked cubes, the globe,
+   *  the pin, the server — or a network's logo. A label and its card were tied only by reading
+   *  both; with the same mark they pair at a glance. Same glyph home (`iconForPick`), same hue
+   *  rule as the card head: a kind mark takes the filter's accent, a subject's own mark its hue. */
+  mark?: { icon: LucideIcon; hue: string } | { logo: string | undefined; monogram: string; hue: string };
   /** `ident` leads the row in its identity hue (the aside's hued-ticker idiom, one register).
    *  `also` closes it with the OTHER networks sharing this subject's machine — same idiom,
    *  one hued ticker each (user, 2026-08-18). */
@@ -96,6 +106,8 @@ export interface CalloutModel {
      *  2026-09-11); `unknown` stays absent, the callout's unmeasured-means-no-line rule. */
     status?: string;
     also?: { text: string; hue: string }[];
+    /** A second measure of the same subject, on the right — a size beside a count. */
+    chip?: string;
   };
 }
 type Model = CalloutModel;
@@ -124,16 +136,18 @@ export function CalloutPanel({ m, className }: { m: CalloutModel; className?: st
       {/* No identity dot here (user, 2026-08-15): the hued aside already carries the identity
           on this row, and the anchor ring is the subject mark at the scene end of the tie. */}
       <div className="flex items-center gap-[7px]">
+        {m.mark && <Mark mark={m.mark} />}
         <span className={cn("text-body font-semibold text-foreground", m.titleMono && "font-mono tabular-nums")}>{m.title}</span>
         {/* A hued aside is a TICKER beside a title, so it is the card head's own chip
             (`TickerChip`, 2026-10-02); the un-hued one is a state line and stays text. */}
         {m.aside && m.aside.hue ? (
           <TickerChip text={m.aside.text} hue={m.aside.hue} className="ml-1" />
         ) : m.aside ? (
+          // Age, then state — the order the card's own head reads (2026-10-03).
           <span className="inline-flex items-center gap-1.5 text-label text-muted-foreground ml-1">
+            {m.aside.chip && <QualifierChip className="mr-0.5 tabular-nums">{m.aside.chip}</QualifierChip>}
             {m.aside.live && <LiveDot />}
             {m.aside.text}
-            {m.aside.chip && <QualifierChip className="ml-0.5 tabular-nums">{m.aside.chip}</QualifierChip>}
           </span>
         ) : null}
       </div>
@@ -175,9 +189,30 @@ export function CalloutPanel({ m, className }: { m: CalloutModel; className?: st
               ))}
             </span>
           )}
+          {m.lead.chip && (
+            <>
+              <span className="flex-1 min-w-1.5" />
+              <QualifierChip className="tabular-nums">{m.lead.chip}</QualifierChip>
+            </>
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+function Mark({ mark }: { mark: NonNullable<CalloutModel["mark"]> }) {
+  if ("icon" in mark) {
+    const Icon = mark.icon;
+    return <Icon aria-hidden className="flex-none size-[15px]" style={{ color: mark.hue }} />;
+  }
+  return (
+    <Avatar className="size-4 flex-none">
+      {mark.logo && <AvatarImage src={mark.logo} alt="" />}
+      <AvatarFallback className={cn("text-[9px] font-bold", IDENT_INK)} style={{ color: mark.hue }}>
+        {mark.monogram.slice(0, 1)}
+      </AvatarFallback>
+    </Avatar>
   );
 }
 
@@ -193,6 +228,7 @@ export default function SceneCallout() {
   const metaSnap = useStore((s) => s.metaSnap);
   const snap = useStore((s) => s.snap);
   const tickNet = useStore((s) => s.tickNet);
+  const exact = useStore((s) => (s.snap ? s.snapshotExact[s.snap.data.ordinal] : undefined));
   const following = useStore((s) => s.following);
   const liveFeed = useStore((s) => s.live);
   // THE BOX LEADS (user, 2026-08-15 — clicking a committed node's hub re-boxes the metagraph
@@ -248,6 +284,7 @@ export default function SceneCallout() {
       titleMono: !!id,
       aside: nnet ? { text: nnet.ticker, hue: nnet.hue } : undefined,
       ring: nnet?.hue ?? "var(--primary)",
+      mark: { icon: iconForPick("metanode"), hue: nnet?.hue ?? "var(--primary)" },
       lead: codes.length || also.length || status ? { codes, status, also } : undefined,
     };
   };
@@ -266,6 +303,8 @@ export default function SceneCallout() {
       // its name) — a head must not say the same thing twice (the CardHead aside rule).
       aside: net.ticker !== net.name ? { text: net.ticker, hue: net.hue } : undefined,
       ring: net.hue,
+      // The dossier's own logo (the live metagraph's icon, else the catalog's bundled one).
+      mark: { logo: mg?.iconUrl || metagraphById(filter)?.iconUrl, monogram: net.ticker || net.name, hue: net.hue },
       lead: mg ? { text: `${mg.nodes.length} nodes`, codes } : undefined,
     };
   };
@@ -294,6 +333,7 @@ export default function SceneCallout() {
         title: cohort.isp ?? "Unknown provider",
         aside: cohort.city ? { text: cohort.city } : undefined,
         ring: filterAccent(filter),
+        mark: { icon: iconForPick("cohort"), hue: filterAccent(filter) },
         lead: n > 0 ? { text: `${n} nodes` } : undefined,
       };
     };
@@ -309,6 +349,7 @@ export default function SceneCallout() {
         title: name ?? country,
         aside: name ? { text: country } : undefined,
         ring: filterAccent(filter),
+        mark: { icon: iconForPick("country"), hue: filterAccent(filter) },
         lead: members.length > 0 ? { text: `${members.length} nodes` } : undefined,
       };
     };
@@ -339,6 +380,7 @@ export default function SceneCallout() {
         title: metaSnap.ordinal.toLocaleString(),
         aside: nnet ? { text: nnet.ticker, hue: nnet.hue } : undefined,
         ring: nnet?.hue ?? "var(--primary)",
+        mark: { icon: iconForPick("metaSnap"), hue: nnet?.hue ?? "var(--primary)" },
       };
     };
     const gsModel = (): Model | null => {
@@ -369,6 +411,23 @@ export default function SceneCallout() {
       // not lost, and the share appears the moment it is real. (The strip's own `?? 0` one surface
       // over drives a BAR HEIGHT, where an absent count is an honest gap, not a stated numeral.)
       const share = mine ? getAnchor(snap.data.timestamp)?.metaCounts?.get(net) : undefined;
+      // THE LABEL NAMES BOTH THINGS THE BAR SHOWS (user, 2026-10-03 — suggestion 1). The ring
+      // points at this network's band, and a band's LENGTH is bytes (`domain/ledgerBands`) — the
+      // label only counted. The count now says "snapshots", the card's word, and the size rides
+      // the right as a chip. MEASURED OR ABSENT (rule 10): the bytes come from the exact read
+      // alone, so the chip appears when that read has landed and never as an estimate. A network
+      // that changed address is summed across its ids (`netKeyOf`).
+      let mineKB: number | null = null;
+      if (mine && exact) {
+        let bytes = 0;
+        let any = false;
+        for (const [addr, v] of Object.entries(exact.perMeta)) {
+          if (netKeyOf(addr) !== net) continue;
+          bytes += v.bytes;
+          any = true;
+        }
+        if (any) mineKB = bytes / 1024;
+      }
       const settling = mine != null && share == null && isAnchorSettling(snap.data.timestamp, typeof total === "number" ? total : null);
       return {
         // The live-lane key rule — see msModel above (the follow advances this ordinal ~every
@@ -389,15 +448,17 @@ export default function SceneCallout() {
         // points at the committed network's own SEGMENT, so the ring takes its accent
         // (user, 2026-08-16 — "if filter, select the correct segment of the byte bar").
         ring: net !== "all" ? filterAccent(net) : "var(--core)",
+        mark: { icon: iconForPick("snapshot"), hue: filterAccent(filter) },
         lead:
           typeof total !== "number"
             ? undefined
             : mine && !settling
               ? {
                   ident: { text: mine.ticker || mine.name, hue: filterAccent(net) },
-                  text: `${share ?? 0} of ${total} anchors`,
+                  text: `${share ?? 0} of ${total} snapshots`,
+                  chip: mineKB != null && exact ? fmtShareKB(mineKB, exact.totalSizeKB) : undefined,
                 }
-              : { text: `${total} anchors` },
+              : { text: `${total} snapshots`, chip: exact ? fmtKB(exact.totalSizeKB) : undefined },
       };
     };
     // The boxed METAGRAPH card shows NOTHING (user, 2026-08-16 — like geo's network rung: a

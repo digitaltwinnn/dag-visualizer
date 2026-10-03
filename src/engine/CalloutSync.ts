@@ -195,7 +195,7 @@ export class CalloutSync {
     let flip = true;
     let drop = true;
     if (!hang) {
-      const p = calloutPlacement(x, y, bandL, bandR, r.top);
+      const p = calloutPlacement(x, y, bandL, bandR, Math.max(r.top, this._freeTop()));
       if (!p.show) return false;
       flip = p.flip;
       drop = p.drop;
@@ -226,14 +226,28 @@ export class CalloutSync {
   // is a DOM read — taken every thirtieth call rather than every frame, since the band moves
   // only on a resize or a presentation change and a half-second-late answer costs nothing.
   private _bottom = 0;
-  private _bottomIn = 0;
+  private _top = 0;
+  private _boundsIn = 0;
+  private _bounds(): void {
+    if (this._boundsIn-- > 0) return;
+    this._boundsIn = 30;
+    const band = document.getElementById("vitalsband");
+    this._bottom = (band ? band.getBoundingClientRect().top : window.innerHeight) - 4;
+    const bar = document.getElementById("topbar");
+    this._top = bar ? bar.getBoundingClientRect().bottom : 0;
+  }
   private _freeBottom(): number {
-    if (this._bottomIn-- <= 0) {
-      this._bottomIn = 30;
-      const band = document.getElementById("vitalsband");
-      this._bottom = (band ? band.getBoundingClientRect().top : window.innerHeight) - 10;
-    }
+    this._bounds();
     return this._bottom;
+  }
+  // …and where it BEGINS: the command bar's bottom edge (any open strip included). The canvas
+  // runs behind the bar, so "near the top of the canvas" was measured from y = 0 and a label
+  // 220px tall stood up into the bar — in Hypergraph a node high on a hub showed only its last
+  // row under it (user, 2026-10-03, suggestion 5 of the callout review). Measured from here, the
+  // same rule drops the panel below its subject while there is still room to read it.
+  private _freeTop(): number {
+    this._bounds();
+    return this._top;
   }
 
   // THE MULTI-LEADER (user, 2026-08-30): a machine is SEVERAL beads in hyper — one per layer it

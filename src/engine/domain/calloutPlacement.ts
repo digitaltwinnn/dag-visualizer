@@ -49,7 +49,8 @@ const HIDDEN: CalloutPlacement = { show: false, flip: false, drop: false };
  * Resolve where the panel stands for an anchor projected to `(x, y)` in viewport px.
  *
  * `bandL`/`bandR` are the free canvas band — the viewport edges on desktop, pulled in by whatever
- * an open sheet covers below 1100px. `top` is the canvas's own top edge.
+ * an open sheet covers below 1100px. `top` is where the free band begins: the canvas's own top
+ * edge, or the command bar's bottom where the canvas runs behind it.
  *
  * The rules, in the order they matter:
  *
@@ -101,8 +102,9 @@ export function calloutPlacement(
 /** The hanging standoff, as a share of the standing one. `app/globals.css` mirrors it (`--co-k`
  *  under `[data-hang]`) — change both or neither. */
 export const CALLOUT_HANG_K = 0.55;
-/** The tallest panel the hanging label renders (eyebrow, title row, rule, lead), with a little air. */
-const HANG_PANEL_H = 92;
+/** The tallest panel the hanging label renders (eyebrow, title row, rule, lead) — 88px measured.
+ *  The air under it is the caller's (`bottom` already stops short of the band). */
+const HANG_PANEL_H = 88;
 /** The hanging panel's full reach from its anchor: leftward and downward. */
 export const CALLOUT_HANG_REACH_X = Math.round(CALLOUT_OFF_X * CALLOUT_HANG_K) + (CALLOUT_REACH_X - CALLOUT_OFF_X);
 export const CALLOUT_HANG_REACH_Y = Math.round(CALLOUT_OFF_Y * CALLOUT_HANG_K) + HANG_PANEL_H;

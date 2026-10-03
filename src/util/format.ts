@@ -19,6 +19,16 @@ export const fmtKB = (kb: number) =>
       ? `${Math.round(kb).toLocaleString()} KB`
       : `${kb.toFixed(1)} KB`;
 
+/** A share of a size, with the unit said once: "56 of 65 KB". The two halves keep their own
+ *  units where they differ ("900 KB of 1.2 MB") — dropping one there would compare a number
+ *  against a different unit. */
+export const fmtShareKB = (partKB: number, totalKB: number): string => {
+  const part = fmtKB(partKB);
+  const total = fmtKB(totalKB);
+  const unit = total.slice(total.lastIndexOf(" "));
+  return part.endsWith(unit) ? `${part.slice(0, -unit.length)} of ${total}` : `${part} of ${total}`;
+};
+
 // Byte count → readable string, staying in BYTES under 1 KB. An application state that serializes
 // to 14 bytes is a real state, and `fmtKB` would render it "0.0 KB" — a zero the card would then be
 // asserting about live data (rule 10). Above 1 KB it is the same scale everything else uses.
