@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Callouts and their cards — review</title>
+<style>
+:root{--bg:oklch(0.09 0.02 265);--fg:oklch(0.94 0.02 255);--dim:#c7d0ea;--muted:oklch(0.66 0.04 265);--primary:oklch(0.88 0.13 195);
+--border:rgba(90,140,255,.22);--glass:rgba(8,12,26,.92);--panel:rgba(12,16,32,.94);--plate:rgba(255,255,255,.035);--dor:oklch(0.74 0.19 41);--ok:oklch(0.82 0.17 155);
+--sel-bg:color-mix(in oklch,var(--primary) 12%,transparent);--sel-border:color-mix(in oklch,var(--primary) 52%,transparent);
+--label:12.2px;--body:14.3px;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+*{box-sizing:border-box}html{color-scheme:dark}
+body{margin:0;background:radial-gradient(1200px 600px at 60% 0%,#0b1230 0%,var(--bg) 60%);color:var(--fg);font:var(--body)/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:32px 40px 96px}
+h1{font-size:24px;font-weight:600;margin:0 0 6px}
+h2{font-size:18px;font-weight:600;margin:56px 0 12px;padding-top:18px;border-top:1px solid var(--border);display:flex;gap:10px;align-items:baseline}
+h2 small{font-size:13px;font-weight:400;color:var(--muted)}
+p.lede{color:var(--dim);max-width:92ch;margin:0 0 6px}.note{color:var(--muted);font-size:13px;max-width:96ch;margin:4px 0 14px}
+.pair{display:grid;grid-template-columns:290px 340px minmax(380px,1fr);gap:28px;align-items:start}
+.col>.h{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.shot{display:block;border:1px solid var(--border);border-radius:8px}
+.sug{margin:0 0 18px;max-width:64ch}
+.sug .id{display:inline-block;min-width:30px;font:700 12px/20px system-ui;color:#111;background:oklch(0.80 0.16 85);border-radius:10px;text-align:center;padding:0 7px;margin-right:8px}
+.sug .id.k{background:var(--primary)}
+.sug b{font-weight:600}.sug p{margin:4px 0 8px;color:var(--dim)}
+.keep{color:var(--muted);font-size:13px}
+.mock{display:inline-block;margin:2px 0 0;padding:14px 16px;border:1px dashed var(--border);border-radius:8px;background:rgba(0,0,0,.35)}
+.mock .cap{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.duo{display:flex;gap:16px;flex-wrap:wrap}
+/* callout (as built) */
+.co{position:relative;display:inline-block;white-space:nowrap;background:var(--glass);border:1px solid var(--border);border-radius:7px;padding:8px 12px}
+.co::before{content:"";position:absolute;left:-1px;top:8px;bottom:8px;width:2px;background:linear-gradient(transparent,var(--primary) 30%,var(--primary) 70%,transparent);opacity:.8}
+.eb{font-size:var(--label);font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--primary);line-height:1.3}
+.tr{display:flex;align-items:center;gap:10px;margin-top:4px}
+.tt{font-size:var(--body);font-weight:600;font-variant-numeric:tabular-nums}.tt.m{font-family:var(--mono)}
+.tk{font-size:var(--label);font-weight:600;color:var(--dor);border:1px solid var(--border);border-radius:4px;padding:2px 6px;line-height:1.2;background:rgba(90,140,255,.06)}
+.mu{font-size:var(--label);color:var(--muted)}
+.chip{font-size:var(--label);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;line-height:1.2;background:rgba(90,140,255,.06)}
+.role{font:var(--label)/1.2 var(--mono);color:var(--dim);border:1px solid var(--border);border-radius:4px;padding:2px 5px}
+.pill{font-size:var(--label);font-weight:600;color:var(--ok);border:1px solid color-mix(in oklch,var(--ok) 45%,transparent);border-radius:10px;padding:1px 8px;line-height:1.3}
+.hr{border-top:1px solid var(--border);margin:8px 0 7px}
+.ln{display:flex;gap:8px;align-items:center;font-size:var(--label)}.ln b{color:var(--dor);font-weight:700}.ln .sp{flex:1}
+/* card fragment */
+.card{width:300px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-size:var(--body)}
+.card .eb{color:var(--primary)}.card .ttl{font:600 16px var(--mono);margin-top:3px}.card .ttl.s{font-family:system-ui}
+.card .lead{display:flex;justify-content:space-between;gap:10px;align-items:baseline;color:var(--dim);margin:10px 0}
+.card .hair{border-top:1px solid var(--border);margin:10px 0}
+.fact{display:flex;justify-content:space-between;gap:12px;margin:5px 0}.fact>span:first-child{color:var(--muted)}
+.tabs{display:flex;gap:18px;border-bottom:1px solid var(--border);font-size:var(--label);letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+.tabs span{padding:0 1px 6px}.tabs .on{color:var(--fg);box-shadow:inset 0 -2px 0 var(--primary)}
+.door{margin:10px -16px 0;padding:11px 16px;background:rgba(90,140,255,.07);display:flex;justify-content:space-between;color:var(--fg)}
+.foot{margin:10px -16px -14px;padding:10px 16px;background:var(--plate);border-radius:0 0 10px 10px;font:var(--label)/1.9 var(--mono)}
+.foot .l{letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-right:10px}.foot .v{color:var(--dim)}
+.rec{border:1px solid var(--sel-border);background:var(--sel-bg);border-radius:8px;padding:12px 16px;font-size:13px;margin-top:48px;max-width:100ch}
+.rec b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;margin-right:8px;font-size:var(--label)}
+</style></head><body>
+
+<h1>Callouts and the cards they mirror</h1>
+<p class="lede">Every callout the scene can stand, photographed from the running app beside the right-rail card for the same subject. A callout is the scene's short label; the card is the full reading. So each pair is checked for three things: does the label say what the mark in the scene shows, does it agree with its card, and does either repeat or cut something it should not.</p>
+<p class="note">The pictures are real (1600 × 900, dark, mainnet, taken today). Suggestions are numbered — <span class="sug" style="display:inline"><span class="id">L1</span></span> for a label, <span class="sug" style="display:inline"><span class="id k">C1</span></span> for a card — so you can answer with the numbers you want. Mock-ups show only the part that changes; a number in a mock-up that is not in a photograph is a stand-in (Dor's 52 KB, the 18% and 2 cities, the two not-ready nodes). Nothing here is built.</p>
+
+<!-- ============ GLOBAL SNAPSHOT ============ -->
+<h2>Global snapshot <small>Snapshots</small></h2>
+<div class="pair">
+ <div class="col"><div class="h">Callout now</div><img class="shot" src="gs-co.webp" width="226" height="106" alt=""></div>
+ <div class="col"><div class="h">Card now</div><img class="shot" src="gs-card.webp" width="328" height="432" alt=""></div>
+ <div class="col"><div class="h">Suggested</div>
+  <div class="sug"><span class="id">L1</span><b>Say what the ring is pointing at.</b>
+   <p>The bar's length is bytes, and the ring sits on Dor's share of that length — but the label counts snapshots ("13 of 16 anchors"). Give it both, each named: the count in the card's own word, and the size as the chip on the right.</p>
+   <div class="mock"><div class="co"><div class="eb">Global snapshot</div><div class="tr"><span class="tt">6,995,026</span><span class="chip">1m ago</span><span class="mu">pinned</span></div><div class="hr"></div><div class="ln"><b>DOR</b><span class="mu">13 of 16 snapshots</span><span class="sp"></span><span class="chip">52 of 65 KB</span></div></div></div>
+  </div>
+  <div class="sug"><span class="id">L2</span><b>Same order as the card's head.</b><p>The card reads age, then state; the label reads state, then age. Drawn above in the card's order.</p></div>
+  <div class="sug"><span class="id k">C1</span><b>One word for size.</b><p>This card says "65 KB"; the Metagraph snapshot card says "5.8 KB compressed". Both are compressed bytes as anchored, so both should read the same way: "65 KB compressed".</p></div>
+ </div>
+</div>
+
+<!-- ============ METAGRAPH SNAPSHOT ============ -->
+<h2>Metagraph snapshot <small>Snapshots</small></h2>
+<div class="pair">
+ <div class="col"><div class="h">Callout now</div><img class="shot" src="ms-co.webp" width="211" height="76" alt=""><p class="keep">Keep. With the global label below it, nothing is missing: this one names the tile, that one names where it fell.</p></div>
+ <div class="col"><div class="h">Card now</div><img class="shot" src="ms-card.webp" width="328" height="450" alt=""></div>
+ <div class="col"><div class="h">Suggested</div>
+  <div class="sug"><span class="id k">C2</span><b>No tabs until there is something under them.</b>
+   <p>Before the snapshot is decompressed the card shows two tabs, a line saying there is nothing to show, three facts, and only then the control that fills the tabs. The control belongs where the tabs are; the tabs arrive with their content.</p>
+   <div class="duo">
+    <div class="mock"><div class="cap">Before decompressing</div><div class="card"><div class="eb">Metagraph snapshot</div><div class="ttl">28,674,136</div><div class="lead"><span>Anchored to 6,995,026.</span><span class="chip">46s ago</span></div><div class="hair"></div><div class="fact"><span>Fees paid</span><span>0.0090 DAG</span></div><div class="fact"><span>Size</span><span>5.8 KB compressed</span></div><div class="fact"><span>Signed by</span><span>3 <span class="role">L0</span> validators</span></div><div class="door"><span>Decompress this snapshot</span><span class="mu">↓</span></div><div class="foot" style="margin-top:0"><div><span class="l">Hash</span><span class="v">b0a46cf997a755…8b7dfeda</span></div><div><span class="l">Previous</span><span class="v">91d79b4df57…bad2b3</span></div><div><span class="l">State hash</span><span class="v">3a139873bd8fc…a4bcf0d1</span></div></div></div></div>
+    <div class="mock"><div class="cap">After</div><div class="card"><div class="eb">Metagraph snapshot</div><div class="ttl">28,674,136</div><div class="lead"><span>Anchored to 6,995,026.</span><span class="chip">46s ago</span></div><div class="tabs"><span class="on">State</span><span>Data</span></div><div class="fact" style="margin-top:9px"><span>latestOrdinal</span><span class="mu">0 records</span></div><div class="fact"><span>latestUpdates</span><span class="mu">0 records</span></div><div class="hair"></div><div class="fact"><span>Fees paid</span><span>0.0090 DAG</span></div><div class="fact"><span>Size</span><span>5.8 KB compressed</span></div></div></div>
+   </div>
+  </div>
+  <div class="sug"><span class="id k">C3</span><b>"State" in the foot becomes "State hash".</b><p>The foot row and the tab are both called STATE and mean different things. Drawn in the first mock-up above.</p></div>
+ </div>
+</div>
+
+<!-- ============ NODE ============ -->
+<h2>Node <small>Snapshots (top row), Geography (bottom row); Hypergraph uses the same label</small></h2>
+<div class="pair">
+ <div class="col"><div class="h">Callout now</div><img class="shot" src="lnode-co.webp" width="199" height="109" alt=""><div style="height:14px"></div><img class="shot" src="gnode-co.webp" width="198" height="109" alt=""></div>
+ <div class="col"><div class="h">Card now</div><img class="shot" src="lnode-card.webp" width="328" height="452" alt=""><div style="height:14px"></div><img class="shot" src="gnode-card.webp" width="328" height="388" alt=""></div>
+ <div class="col"><div class="h">Suggested</div>
+  <div class="sug"><span class="id">L3</span><b>In Snapshots, the label says what the card leads with.</b>
+   <p>The card opens with "Signed snapshot 28,674,136." — the reason this node is on screen. The label beside the node says its layers and status, which are true in every view. One more short line carries the relation where there is one.</p>
+   <div class="mock"><div class="co"><div class="eb">Node</div><div class="tr"><span class="tt m">c54ccbe…413c</span><span class="tk">DOR</span></div><div class="hr"></div><div class="ln"><span class="role">L0</span><span class="role">cL1</span><span class="role">dL1</span><span class="pill">ready</span></div><div class="ln" style="margin-top:6px"><span class="mu">Signed 28,674,136</span></div></div></div>
+  </div>
+  <div class="sug"><span class="id k">C4</span><b>Drop "Network" when the Metagraph card is already in the pile.</b><p>In Snapshots the Metagraph card sits two rungs above this one and says Dor Technologies as its title. The node card already drops Country and Hosting on that rule; Network does not follow it yet. It stays wherever nothing above says it (Geography with the filter on All).</p></div>
+  <div class="sug"><span class="id k">C5</span><b>No "Alias" row for a node that has none.</b><p>A dash there is not a reading that failed; the node simply has no alias. The row shows when there is one (bottom card: Gen.Dagnum) and is left out when there is not.</p></div>
+  <div class="sug"><span class="id">L4</span><b>Labels keep clear of the rails.</b>
+   <p>In Hypergraph a node on the right side of a network puts its label under the right rail — the placement only knows about the rails when they are tablet sheets. It should flip to the other side of the node, as it already does at a screen edge.</p>
+   <img class="shot" src="hnode-collide.webp" width="405" height="188" alt="">
+  </div>
+ </div>
+</div>
+
+<!-- ============ METAGRAPH ============ -->
+<h2>Metagraph <small>Hypergraph, with the filter on a network</small></h2>
+<div class="pair">
+ <div class="col"><div class="h">Callout now</div><img class="shot" src="mg-co.webp" width="215" height="106" alt=""></div>
+ <div class="col"><div class="h">Card now</div><img class="shot" src="mg-card.webp" width="328" height="509" alt=""><p class="keep">Keep.</p></div>
+ <div class="col"><div class="h">Suggested</div>
+  <div class="sug"><span class="id">L5</span><b>Name the status only when it is not all ready.</b>
+   <p>The scene draws a node that is not ready as a hollow chip. When every node is ready the label stays as it is ("17 nodes"); when some are not, it says how many are, so the hollow chips have a number next to them.</p>
+   <div class="duo">
+    <div class="mock"><div class="cap">All ready — as today</div><div class="co"><div class="eb">Metagraph</div><div class="tr"><span class="tt">Dor Technologies</span><span class="tk">DOR</span></div><div class="hr"></div><div class="ln"><span class="mu">17 nodes</span><span class="role">L0</span><span class="role">cL1</span><span class="role">dL1</span></div></div></div>
+    <div class="mock"><div class="cap">Two not ready</div><div class="co"><div class="eb">Metagraph</div><div class="tr"><span class="tt">Dor Technologies</span><span class="tk">DOR</span></div><div class="hr"></div><div class="ln"><span class="mu">15 of 17 nodes ready</span><span class="role">L0</span><span class="role">cL1</span><span class="role">dL1</span></div></div></div>
+   </div>
+  </div>
+ </div>
+</div>
+
+<!-- ============ COUNTRY ============ -->
+<h2>Country <small>Geography</small></h2>
+<div class="pair">
+ <div class="col"><div class="h">Callout now</div><img class="shot" src="cc-co.webp" width="135" height="106" alt=""><p class="keep">Keep.</p></div>
+ <div class="col"><div class="h">Card now</div><img class="shot" src="cc-card.webp" width="328" height="294" alt=""></div>
+ <div class="col"><div class="h">Suggested</div>
+  <div class="sug"><span class="id k">C6</span><b>"the selection's nodes" becomes plain.</b>
+   <p>"Selection" is our word for the filter. With the filter on All the sentence is about every node; with a network picked it is about that network's.</p>
+   <div class="mock"><div class="card" style="width:320px"><div class="eb">Country</div><div class="ttl s">Germany</div><div class="lead"><span>36% of all nodes, in 8 cities.</span></div><div class="hair" style="margin-bottom:0"></div></div><div style="height:10px"></div><div class="card" style="width:320px"><div class="eb">Country</div><div class="ttl s">Germany</div><div class="lead"><span>18% of Dor's nodes, in 2 cities.</span></div><div class="hair" style="margin-bottom:0"></div></div></div>
+  </div>
+ </div>
+</div>
+
+<!-- ============ PROVIDER ============ -->
+<h2>Provider <small>Geography</small></h2>
+<div class="pair">
+ <div class="col"><div class="h">Callout now</div><img class="shot" src="pv-co.webp" width="273" height="106" alt=""><p class="keep">Keep. It shows the full name and the city, which the card does not manage.</p></div>
+ <div class="col"><div class="h">Card now</div><img class="shot" src="pv-card.webp" width="328" height="267" alt=""></div>
+ <div class="col"><div class="h">Suggested</div>
+  <div class="sug"><span class="id k">C7</span><b>The provider's name is not cut for the city chip.</b>
+   <p>"Hetzner Online Gm…" loses its end because the city shares the title row. The city is the first thing the lead can say, and the title keeps the row.</p>
+   <div class="mock"><div class="card" style="width:320px"><div class="eb">Provider</div><div class="ttl s">Hetzner Online GmbH</div><div class="lead"><span>Nuremberg. 25% of Germany's nodes.</span></div><div class="hair" style="margin-bottom:0"></div></div></div>
+  </div>
+ </div>
+</div>
+
+<div class="rec"><b>My picks</b>L1 and L4 first: one makes the global label name the quantity its ring points at, the other is a label drawn under a card. Then C2 (tabs with nothing under them), C7 (a cut-off name) and C4 (a fact the pile already states). L2, C1, C3, C5 and C6 are one-line consistency fixes that can ride along. L3 and L5 add a line to a label, so they are the two I would look at in the running app before keeping.</div>
+
+</body></html>
