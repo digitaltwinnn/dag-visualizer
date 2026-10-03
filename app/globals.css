@@ -1757,3 +1757,12 @@
 @media (min-width: 1100px) {
   :root { --bar-margin: var(--rail-margin); }
 }
+/* ON A PHONE the two bars take the screen's own 8px gutter (user, 2026-10-03: "the top bar does
+   not need that margin reserved for the rails that are present in normal and tablet mode"). The
+   16px default is the TABLET's: its edge tabs hang in that inset. A phone has no rails and no
+   tabs — the dock is its own full-width strip — so the inset was 32px of a 390px screen spent on
+   nothing. 700 is `breakpointOf`'s phone boundary, written as the exclusive arm Tailwind's
+   `max-[700px]` compiles to (CSS trap 8). */
+@media not all and (min-width: 700px) {
+  :root { --bar-margin: 8px; }
+}

@@ -50,16 +50,15 @@ export default function PulseStrip() {
   const now = useNowTick(1000);
   const rows = pollHealthRows();
   return (
-    // ⚠️ TOUCH SNAPS TO A CARD (user, 2026-09-03: "lock them onto a card, don't allow positions
-    // that show only half cards"). Native CSS scroll-snap: mandatory on coarse pointers only —
-    // momentum scrolling stays the platform's own (which is the smoothness), each fling rests
-    // with a card's left edge on the strip's own padding (scroll-px matches px). A fine
-    // pointer's wheel is left free: mandatory snap under a trackpad reads as the strip grabbing
-    // the scroll. And on PHONE each card is HALF the strip (minus half the gap), so exactly two
-    // cards tile the view and no rest position shows a fraction of a third (user, 2026-09-03:
-    // "sometimes I see 2⅓ cards") — content-sized cards can never promise that, since their
-    // widths are the feeds' own words.
-    <div className="flex items-stretch gap-2 mx-2 px-2 pb-2 pt-1.5 border-t border-border/60 overflow-x-auto slim-scroll pointer-coarse:snap-x pointer-coarse:snap-mandatory scroll-px-2 pointer-coarse:[&>*]:snap-start max-[700px]:[&>*]:basis-[calc(50%-4px)] max-[700px]:[&>*]:grow-0 max-[700px]:[&>*]:shrink-0 max-[700px]:[&>*]:min-w-0">
+    // THE CARDS WRAP — NO SIDEWAYS SCROLL (user, 2026-10-03: "the network info has a horizontal
+    // scrollbar; is there another way to show these cards? I don't think anywhere else we have
+    // such scrollbars by design"). It was one scrolling row with touch snap (2026-09-03, two
+    // rounds chasing half-visible cards) — a row that hides feeds off its end, in a strip whose
+    // whole job is to show every feed at once. A grid of as many 150px-or-wider columns as fit:
+    // one row on a desktop, two columns on a phone with an odd last card spanning both. The strip
+    // is a layout participant (TopBar publishes its height), so growing a row costs the rails a
+    // card's height and nothing else.
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] items-stretch gap-2 mx-2 px-2 pb-2 pt-1.5 border-t border-border/60 max-[700px]:grid-cols-2 max-[700px]:[&>*]:min-w-0 max-[700px]:[&>*:last-child:nth-child(odd)]:col-span-full">
       {rows.length === 0 && (
         <span className="text-label text-muted-foreground self-center px-1">acquiring — no polls have completed yet</span>
       )}
