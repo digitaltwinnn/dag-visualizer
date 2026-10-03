@@ -786,7 +786,13 @@
      <color>-only, so they use the guarded override pair instead. */
   color-scheme: light dark;
 
-  --radius: 14px;
+  /* THE HUD'S ROUNDING, ONE NOTCH TIGHTER (user, 2026-10-03: "the rounded corners in the cards,
+     panels etc. are a bit too round — make them less round"). The scale was 14 / 10 / 6 / 4 with
+     8px controls; at 14 a card's corner was a visible curve, softer than the hairlines, rulers
+     and squared chips around it. 10 / 7 / 5 / 3 with 6px controls keeps every step distinct and
+     the whole instrument a little crisper. Pills (`rounded-full`: status, dots, the range
+     group) are a different shape, not a step on this scale, and stay. */
+  --radius: 10px;
   /* Height of the phone persistent bottom dock bar — the single source of truth referenced by
      the phone bar-half sheet offset (RailDock) AND the LiveStrip's phone bottom offset. (Was
      16-responsive-shell.css `:root`, re-homed here when that file was retired in Task 9.) */
@@ -1462,10 +1468,10 @@
   --color-wash-hover: var(--wash-hover);
   --color-wash-strong: var(--wash-strong);
   --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 4px);
-  --radius-sm: calc(var(--radius) - 8px);   /* 6px */
-  --radius-xs: 4px;                          /* tiny chrome — tags, chips, share-bars, list rows */
-  --radius-btn: 8px;                         /* control rounding — view-switch, filter face, tooltips/popovers */
+  --radius-md: calc(var(--radius) - 3px);   /* 7px */
+  --radius-sm: calc(var(--radius) - 5px);   /* 5px */
+  --radius-xs: 3px;                          /* tiny chrome — tags, chips, share-bars, list rows */
+  --radius-btn: 6px;                         /* control rounding — view-switch, filter face, tooltips/popovers */
 
   /* ── HUD type scale (THREE steps every HUD text site snaps to) ──────────────────────────────
      label = eyebrows, tags, chips, axis labels, counts, codes, hints — everything set small, caps

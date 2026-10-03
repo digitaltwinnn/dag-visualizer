@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Snapshot pane head — design options</title>
+<style>
+:root{--bg:oklch(0.09 0.02 265);--fg:oklch(0.94 0.02 255);--dim:#c7d0ea;--muted:oklch(0.66 0.04 265);--primary:oklch(0.88 0.13 195);
+--border:rgba(90,140,255,.22);--panel:rgba(12,16,32,.94);--plate:rgba(255,255,255,.035);--radius:14px;
+--wash-faint:color-mix(in oklch,var(--primary) 6%,transparent);--wash-strong:color-mix(in oklch,var(--primary) 22%,transparent);
+--sel-bg:color-mix(in oklch,var(--primary) 12%,transparent);--sel-border:color-mix(in oklch,var(--primary) 52%,transparent);
+--label:12.6px;--body:14.9px;--title:17.1px;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;--green:oklch(0.80 0.19 135)}
+*{box-sizing:border-box}html{color-scheme:dark}
+body{margin:0;background:radial-gradient(1200px 600px at 60% 0%,#0b1230 0%,var(--bg) 60%);color:var(--fg);font:var(--body)/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:32px 40px 96px}
+h1{font-size:24px;font-weight:600;margin:0 0 6px}
+h2{font-size:18px;font-weight:600;margin:48px 0 4px;display:flex;gap:10px;align-items:baseline}
+h2 b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;font-size:var(--label)}
+p.lede{color:var(--dim);max-width:86ch;margin:0 0 6px}.note{color:var(--muted);font-size:var(--label);max-width:88ch;margin:4px 0 12px}
+.rec{border:1px solid var(--sel-border);background:var(--sel-bg);border-radius:8px;padding:10px 14px;font-size:var(--label);margin-top:36px;max-width:92ch}
+.rec b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;margin-right:8px}
+.row{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start}
+.pane{width:520px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px 0;box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 8px 30px rgba(0,0,0,.35);position:relative;overflow:hidden}
+.pane.ph{width:340px}
+.x{position:absolute;right:14px;top:10px;color:var(--muted)}
+.eyebrow{font-size:var(--label);letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.hrow{display:flex;align-items:center;gap:9px}.dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex:none}
+.ttl{font:600 var(--title) var(--mono)}
+.chip{display:inline-flex;align-items:center;border:1px solid var(--border);background:var(--wash-faint);border-radius:4px;padding:3px 6px;font-size:var(--label);line-height:1;color:var(--muted)}
+.chip.t{color:var(--green);font-weight:600;border-color:color-mix(in oklch,var(--green) 40%,transparent)}
+.hair{border-top:1px solid var(--border);margin:11px 0 10px}
+.m{font-family:var(--mono);font-variant-numeric:tabular-nums}.mu{color:var(--muted)}.dm{color:var(--dim)}
+.lbl{font-size:var(--label);color:var(--muted)}
+/* tabs + body stub, the same under every option */
+.tabs{display:flex;gap:18px;margin:14px 0 0;border-bottom:1px solid var(--border);font-size:var(--label);letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+.tabs span{padding:0 1px 7px}.tabs .on{color:var(--fg);box-shadow:inset 0 -2px 0 var(--primary)}
+.stub{font-size:var(--label);color:var(--muted);padding:10px 0 14px}
+/* now */
+.now{display:grid;grid-template-columns:auto 1fr;gap:2px 24px;font-size:var(--label)}.now span:nth-child(odd){color:var(--muted)}.now span:nth-child(even){text-align:right;color:var(--dim);font-variant-numeric:tabular-nums}
+/* A lead + facts + foot */
+.lead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;color:var(--dim);margin:0 0 2px}
+.fact{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:5px 0}.fact>span:first-child{color:var(--muted)}
+.foot{margin:12px -18px 0;padding:10px 18px;background:var(--plate);display:flex;gap:22px;flex-wrap:wrap;font:var(--label)/1.4 var(--mono)}
+.foot .l{letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-right:8px}.foot .v{color:var(--dim)}
+/* B tiles */
+.tiles{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:8px;margin-top:2px}
+.tile{border:1px solid var(--border);border-radius:8px;padding:8px 10px;background:var(--wash-faint)}
+.tile .k{font-size:var(--label);letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+.tile .v{font:600 var(--title)/1.25 var(--mono);margin-top:3px}.tile .s{font-size:var(--label);color:var(--muted);margin-top:1px}
+.pane.ph .tiles{grid-template-columns:1fr 1fr}.pane.ph .tiles .tile:first-child{grid-column:1/-1}
+/* C header band */
+.band{display:flex;justify-content:space-between;align-items:flex-end;gap:16px}
+.when{text-align:right}.when .d{font:600 var(--body) system-ui}.when .t{font-size:var(--label);color:var(--muted)}
+.meter{display:grid;grid-template-columns:repeat(3,1fr);margin-top:12px;border-top:1px solid var(--border)}
+.meter div{padding:9px 12px 0 0}.meter div+div{padding-left:12px;border-left:1px solid var(--border)}
+.meter .k{font-size:var(--label);color:var(--muted)}.meter .v{font:600 var(--body) var(--mono);margin-top:1px}
+/* D sentence */
+.sent{color:var(--dim);margin:0;line-height:1.6}.sent b{color:var(--fg);font-weight:600}.sent .m{color:var(--fg)}
+</style></head><body>
+<h1>Raw snapshot pane — the top section</h1>
+<p class="lede">The pane on the raw page opens with the snapshot's ordinal and five labelled rows before its State / Data / Signers tabs. Today those rows are a plain two-column list at one weight: <span class="m">Timestamp</span>, <span class="m">Fee</span>, <span class="m">Anchored</span> (which actually prints the size), <span class="m">Height · sub</span> and <span class="m">Blocks</span>.</p>
+<p class="note">Each option is drawn at the pane's desktop width and at phone width. The values are one real BioFi snapshot. The tabs and what is under them stay as they are in every option. Nothing here is built.</p>
+
+<h2><b>Now</b> what the pane shows today</h2>
+<div class="row">
+ <div class="pane"><span class="x">×</span><div class="eyebrow">Metagraph snapshot</div><div class="hrow"><span class="dot"></span><div class="ttl">3,992</div><span class="chip t">BIOFI</span></div>
+  <div style="height:10px"></div>
+  <div class="now"><span>Timestamp</span><span>Oct 3, 2026 · 08:14:32 UTC</span><span>Fee</span><span><b style="color:var(--fg)">0.0040</b> DAG</span><span>Anchored</span><span>4.0 KB · compressed</span><span>Height · sub</span><span>0 · 3,992</span><span>Blocks</span><span>0</span></div>
+  <div class="tabs"><span class="on">State</span><span>Data</span><span>Signers</span></div><div class="stub">…</div></div>
+</div>
+
+<h2><b>A</b> the card's own grammar: one sentence, three facts, counters in the foot</h2>
+<p class="note">Reads like the right-rail snapshot card it is the deeper version of. The lead says what the snapshot is to the chain, with its age as the chip. Height, sub-height and blocks are bookkeeping, so they sit on the foot plate in mono.</p>
+<div class="row">
+ <div class="pane"><span class="x">×</span><div class="eyebrow">Metagraph snapshot</div><div class="hrow"><span class="dot"></span><div class="ttl">3,992</div><span class="chip t">BIOFI</span></div>
+  <div class="hair"></div>
+  <div class="lead"><span>Anchored into global snapshot <span class="m" style="color:var(--fg)">6,994,083</span>.</span><span class="chip">2 min ago</span></div>
+  <div class="hair"></div>
+  <div class="fact"><span>Time</span><span class="m dm">Oct 3, 2026, 08:14:32 UTC</span></div>
+  <div class="fact"><span>Fee paid</span><span class="m">0.0040 DAG</span></div>
+  <div class="fact"><span>Size</span><span class="m dm">4.0 KB compressed</span></div>
+  <div class="foot"><span><span class="l">Height</span><span class="v">0</span></span><span><span class="l">Sub-height</span><span class="v">3,992</span></span><span><span class="l">Blocks</span><span class="v">0</span></span></div>
+  <div class="tabs"><span class="on">State</span><span>Data</span><span>Signers</span></div><div class="stub">…</div></div>
+ <div class="pane ph"><span class="x">×</span><div class="eyebrow">Metagraph snapshot</div><div class="hrow"><span class="dot"></span><div class="ttl">3,992</div><span class="chip t">BIOFI</span></div>
+  <div class="hair"></div>
+  <div class="lead"><span>Anchored into <span class="m" style="color:var(--fg)">6,994,083</span>.</span><span class="chip">2 min ago</span></div>
+  <div class="hair"></div>
+  <div class="fact"><span>Time</span><span class="m dm">Oct 3, 08:14:32 UTC</span></div>
+  <div class="fact"><span>Fee paid</span><span class="m">0.0040 DAG</span></div>
+  <div class="fact"><span>Size</span><span class="m dm">4.0 KB compressed</span></div>
+  <div class="foot"><span><span class="l">Height</span><span class="v">0</span></span><span><span class="l">Sub</span><span class="v">3,992</span></span><span><span class="l">Blocks</span><span class="v">0</span></span></div>
+  <div class="tabs"><span class="on">State</span><span>Data</span><span>Signers</span></div><div class="stub">…</div></div>
+</div>
+
+<h2><b>B</b> three tiles: when, what it cost, how big</h2>
+<p class="note">The three facts a reader comes for, each with room for its own second line. The anchoring relation is a quiet line under the tiles, and the counters stay in the foot.</p>
+<div class="row">
+ <div class="pane"><span class="x">×</span><div class="eyebrow">Metagraph snapshot</div><div class="hrow"><span class="dot"></span><div class="ttl">3,992</div><span class="chip t">BIOFI</span></div>
+  <div style="height:12px"></div>
+  <div class="tiles">
+   <div class="tile"><div class="k">When</div><div class="v">Oct 3, 2026</div><div class="s m">08:14:32 UTC</div></div>
+   <div class="tile"><div class="k">Fee paid</div><div class="v">0.0040</div><div class="s">DAG</div></div>
+   <div class="tile"><div class="k">Size</div><div class="v">4.0 KB</div><div class="s">compressed</div></div>
+  </div>
+  <div class="lead" style="margin-top:10px;font-size:var(--label)"><span class="mu">Anchored into global snapshot <span class="m dm">6,994,083</span></span><span class="chip">2 min ago</span></div>
+  <div class="foot"><span><span class="l">Height</span><span class="v">0</span></span><span><span class="l">Sub-height</span><span class="v">3,992</span></span><span><span class="l">Blocks</span><span class="v">0</span></span></div>
+  <div class="tabs"><span class="on">State</span><span>Data</span><span>Signers</span></div><div class="stub">…</div></div>
+ <div class="pane ph"><span class="x">×</span><div class="eyebrow">Metagraph snapshot</div><div class="hrow"><span class="dot"></span><div class="ttl">3,992</div><span class="chip t">BIOFI</span></div>
+  <div style="height:12px"></div>
+  <div class="tiles">
+   <div class="tile"><div class="k">When</div><div class="v">Oct 3, 2026</div><div class="s m">08:14:32 UTC</div></div>
+   <div class="tile"><div class="k">Fee paid</div><div class="v">0.0040</div><div class="s">DAG</div></div>
+   <div class="tile"><div class="k">Size</div><div class="v">4.0 KB</div><div class="s">compressed</div></div>
+  </div>
+  <div class="lead" style="margin-top:10px;font-size:var(--label)"><span class="mu">Anchored into <span class="m dm">6,994,083</span></span><span class="chip">2 min ago</span></div>
+  <div class="foot"><span><span class="l">Height</span><span class="v">0</span></span><span><span class="l">Sub</span><span class="v">3,992</span></span><span><span class="l">Blocks</span><span class="v">0</span></span></div>
+  <div class="tabs"><span class="on">State</span><span>Data</span><span>Signers</span></div><div class="stub">…</div></div>
+</div>
+
+<h2><b>C</b> a header band: the time beside the ordinal, three figures under a rule</h2>
+<p class="note">The time moves up into the head, opposite the ordinal, since "which snapshot" and "when" are read together. Fee, size and the global it anchored into sit in three equal columns under one hairline. The counters are dropped from view (still in the raw JSON).</p>
+<div class="row">
+ <div class="pane"><span class="x">×</span>
+  <div class="band"><div><div class="eyebrow">Metagraph snapshot</div><div class="hrow"><span class="dot"></span><div class="ttl">3,992</div><span class="chip t">BIOFI</span></div></div>
+   <div class="when" style="margin-right:22px"><div class="d">Oct 3, 2026</div><div class="t m">08:14:32 UTC</div></div></div>
+  <div class="meter">
+   <div><div class="k">Fee paid</div><div class="v">0.0040 DAG</div></div>
+   <div><div class="k">Size, compressed</div><div class="v">4.0 KB</div></div>
+   <div><div class="k">Anchored into</div><div class="v">6,994,083</div></div>
+  </div>
+  <div class="tabs"><span class="on">State</span><span>Data</span><span>Signers</span></div><div class="stub">…</div></div>
+ <div class="pane ph"><span class="x">×</span>
+  <div class="band"><div><div class="eyebrow">Metagraph snapshot</div><div class="hrow"><span class="dot"></span><div class="ttl">3,992</div><span class="chip t">BIOFI</span></div></div></div>
+  <div class="lbl m" style="margin-top:6px">Oct 3, 2026, 08:14:32 UTC</div>
+  <div class="meter">
+   <div><div class="k">Fee paid</div><div class="v">0.0040</div></div>
+   <div><div class="k">Size</div><div class="v">4.0 KB</div></div>
+   <div><div class="k">Anchored</div><div class="v">6,994,083</div></div>
+  </div>
+  <div class="tabs"><span class="on">State</span><span>Data</span><span>Signers</span></div><div class="stub">…</div></div>
+</div>
+
+<h2><b>D</b> one sentence</h2>
+<p class="note">The whole section as prose, the figures set in mono inside it. The shortest of the four and the hardest to scan when comparing two snapshots, because the numbers land in different places on the line.</p>
+<div class="row">
+ <div class="pane"><span class="x">×</span><div class="eyebrow">Metagraph snapshot</div><div class="hrow"><span class="dot"></span><div class="ttl">3,992</div><span class="chip t">BIOFI</span></div>
+  <div class="hair"></div>
+  <p class="sent">Sealed on <b>Oct 3, 2026</b> at <span class="m">08:14:32 UTC</span> and anchored into global snapshot <span class="m">6,994,083</span>. It paid <span class="m">0.0040 DAG</span> for <span class="m">4.0 KB</span> compressed.</p>
+  <div class="tabs"><span class="on">State</span><span>Data</span><span>Signers</span></div><div class="stub">…</div></div>
+ <div class="pane ph"><span class="x">×</span><div class="eyebrow">Metagraph snapshot</div><div class="hrow"><span class="dot"></span><div class="ttl">3,992</div><span class="chip t">BIOFI</span></div>
+  <div class="hair"></div>
+  <p class="sent">Sealed on <b>Oct 3, 2026</b> at <span class="m">08:14:32 UTC</span> and anchored into <span class="m">6,994,083</span>. It paid <span class="m">0.0040 DAG</span> for <span class="m">4.0 KB</span> compressed.</p>
+  <div class="tabs"><span class="on">State</span><span>Data</span><span>Signers</span></div><div class="stub">…</div></div>
+</div>
+
+<div class="rec"><b>Recommend</b> A. It is the same lead, facts and foot the right-rail snapshot card already uses, so the raw pane reads as that card one level deeper, and it puts the counters where bookkeeping goes. B is the most visual and the best on a wide pane, but tiles are a new element the cards do not have.</div>
+<div class="rec"><b>Your call</b> (1) Which layout. (2) Whether Height, Sub-height and Blocks stay visible at all (A and B keep them in the foot, C and D drop them). (3) All four rename "Anchored" to "Size", since the row prints the compressed size, and add the global snapshot it anchored into, which the pane does not state today.</div>
+</body></html>

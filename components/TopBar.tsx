@@ -394,7 +394,7 @@ export default function TopBar() {
               className={cn(
                 // The design OWNS its sizing/rounding here (not inherited from the shadcn
                 // toggle primitive): explicit h-9 (== today's rendered 36px — the primitive's
-                // default is the same, but the bar now states it) and `rounded-[8px]!` — the
+                // default is the same, but the bar now states it) and `rounded-btn!` — the
                 // important variant beats toggle-group.tsx's `data-[spacing=0]:rounded-none`
                 // (class+attribute specificity) so ALL buttons, incl. the middle ones' hover/on
                 // fill, get the intended 8px corners (was: middle square, first/last 10px).
