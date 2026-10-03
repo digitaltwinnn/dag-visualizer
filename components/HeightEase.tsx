@@ -92,6 +92,30 @@ export default function HeightEase({
     if (settleRef.current === settleKey) return;
     settleRef.current = settleKey;
     arriving.current = true;   // consumed by the next ease; a mount never arms it
+    // ⚠️ THE POINTER-INERT WINDOW OPENS HERE, WITH THE COMMIT (user, 2026-10-03: "a click gives its
+    // outline a flash that is not needed"). The ease below marks the box `data-arriving` in its
+    // CONFIRMATION frame, one frame after the swap — and in that frame the new occupant sat under
+    // a cursor that never moved and took the pointer: measured, the box wore `.subject-paired`
+    // (the hover ring round the whole card) 29ms after it mounted and lost it 58ms later when the
+    // window finally opened, then lit again when the expand landed. On, off, on. A layout effect
+    // runs before the browser's first hit test of the new occupant, so stated here the card never
+    // hears that first hover and lights once, at rest. Where no resize follows there is no ease
+    // to close the window, so it closes itself once the frame an ease would have claimed it in
+    // has passed unclaimed.
+    const o = outer.current!;
+    o.dataset.arriving = "";
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(() => {
+        // An ease that has claimed the box — pinned and awaiting its confirmation frame, or
+        // already running — owns the attribute from here and clears it when it lands.
+        if (arriving.current && !confirm.current && !anim.current) delete o.dataset.arriving;
+      });
+    });
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+    };
   }, [settleKey]);
   useLayoutEffect(() => {
     const o = outer.current!;
