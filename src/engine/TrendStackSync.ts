@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { PLANE_PX_W, PLANE_WORLD_W, STACK_EASE_K, arrivalPose, loneShiftPx, morePose, stackPoses } from "./domain/trendStack";
+import { PLANE_WORLD_W, STACK_EASE_K, arrivalPose, loneShiftPx, morePose, planeFormat, stackPoses } from "./domain/trendStack";
 
 // THE TREND STACK'S PER-FRAME PLACEMENT — `CalloutSync`'s sibling, and the second instance of the
 // same mechanism (2026-09-18). React renders one transparent DOM plane per network
@@ -39,6 +39,9 @@ export interface TrendStackState {
   /** A narrow canvas (below the desktop tier, `breakpointOf`): the deck stacks straight up —
    *  `trendStack.stepX`. The Engine reads the tier; this module only carries it to the poses. */
   narrow: boolean;
+  /** The phone tier: the card wears the phone FORMAT (`trendStack.planeFormat`) — a narrower
+   *  authored width, so this module divides by a different number, and a larger up-stagger. */
+  phone: boolean;
 }
 
 /** One `[data-plane]` anchor, as narrowly as this module needs it — a `style` it writes and a
@@ -119,6 +122,9 @@ export class TrendStackSync {
   private _focus: string | null = null;
   private _ids: readonly string[] | null = null;
   private _narrow: boolean | null = null;
+  private _phone: boolean | null = null;
+  /** The authored CSS width the scale divides by — the format's, re-read on a tier change. */
+  private _pxW = planeFormat(false).pxW;
   private _w = -1;
   private _h = -1;
   private _settled = false;
@@ -169,12 +175,15 @@ export class TrendStackSync {
       st.ids !== this._ids ||
       st.scroll !== this._scroll ||
       st.focus !== this._focus ||
-      st.narrow !== this._narrow
+      st.narrow !== this._narrow ||
+      st.phone !== this._phone
     ) {
       this._ids = st.ids;
       this._scroll = st.scroll;
       this._focus = st.focus;
       this._narrow = st.narrow;
+      this._phone = st.phone;
+      this._pxW = planeFormat(st.phone).pxW;
       this._retarget(st);
       retarget = true;
     }
@@ -221,10 +230,10 @@ export class TrendStackSync {
   // runs against plain numbers. A plane SEEN FOR THE FIRST TIME starts AT its target: a fly-in from
   // the origin would make every roster refresh look like an entrance.
   private _retarget(st: TrendStackState): void {
-    const poses = stackPoses(st.ids, { scroll: st.scroll, focus: st.focus, narrow: st.narrow }); // event-time
+    const poses = stackPoses(st.ids, { scroll: st.scroll, focus: st.focus, narrow: st.narrow, phone: st.phone }); // event-time
     // The sixth, unnamed plane rides the same projection (`morePose`): one more anchor, one more
     // slot, appended behind the window so the deck's own poses stay the window's.
-    const more = morePose(st.ids, { scroll: st.scroll, focus: st.focus, narrow: st.narrow }); // event-time
+    const more = morePose(st.ids, { scroll: st.scroll, focus: st.focus, narrow: st.narrow, phone: st.phone }); // event-time
     if (more) poses.push(more);
     this._order.length = 0;
     for (let i = 0; i < poses.length; i++) {
@@ -310,7 +319,7 @@ export class TrendStackSync {
       v.applyMatrix4(cam.projectionMatrix); // view → NDC (w-divide included)
       const tx = (v.x * 0.5 + 0.5) * w + this._shift;
       const ty = (-v.y * 0.5 + 0.5) * h;
-      const s = (PLANE_WORLD_W * (pxPerUnitAt1 / d)) / PLANE_PX_W * sl.s;
+      const s = (PLANE_WORLD_W * (pxPerUnitAt1 / d)) / this._pxW * sl.s;
       // Rounded to keep the STRING short and its parse cheap — the browser re-parses this value on
       // every write, and `0.8231045836…` costs more than `0.823` for a difference no display can
       // show (3 decimals of scale is ~0.27px at the plane's own edge; 2 of translate is a

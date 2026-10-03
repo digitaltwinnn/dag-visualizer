@@ -1709,6 +1709,7 @@ export class Engine {
         railGapPx(window.innerWidth, this.railsHidden),
         el.clientHeight || window.innerHeight,
         this.ctx.camera.fov,
+        breakpointOf(window.innerWidth) === "phone",
       );
       trendFit(f.pos, f.target, dist, this.cam.out.pos);
       trendFocusPush(this.cam.out.pos, f.target, depth, this.cam.out.pos);
@@ -2318,7 +2319,8 @@ export class Engine {
       // The canvas height is only read while a shift needs converting — it is a layout read.
       const viewH = shift !== 0 ? this.ctx.renderer.domElement.clientHeight || window.innerHeight : 0;
       // `_frameDt`, the projector's own clock (`?slowmo` included), so floor and cards ease as one.
-      this.trends.face(this.ctx.camera, count, shift, viewH, this._frameDt, breakpointOf(window.innerWidth) !== "desktop");
+      const tier = breakpointOf(window.innerWidth);
+      this.trends.face(this.ctx.camera, count, shift, viewH, this._frameDt, tier !== "desktop", tier === "phone");
     }
     // The stage light's per-view PRESENCE, published BEFORE the view updates that claim it: a claim
     // is scaled by its view's furniture alpha, so a fading view's light fades with its furniture and
@@ -2495,14 +2497,17 @@ export class Engine {
    *  published a roster (see `_writeScene`). */
   private _scopeFor: string | null = null;
   private _scopeCount = 0;
-  private _trendState: TrendStackState = { scroll: 0, focus: null, ids: [], gapShiftPx: 0, narrow: false };
+  private _trendState: TrendStackState = { scroll: 0, focus: null, ids: [], gapShiftPx: 0, narrow: false, phone: false };
   private _syncTrendStack(): void {
     const st = useStore.getState();
     const t = this._trendState;
     t.scroll = st.trendScroll; t.focus = st.trendFocus; t.ids = st.trendIds;
     t.gapShiftPx = railGapShiftPx(window.innerWidth, this.railsHidden);
     // The canvas TIER decides the stagger (`trendStack.stepX`); the same read the ground makes.
-    t.narrow = breakpointOf(window.innerWidth) !== "desktop";
+    const tier = breakpointOf(window.innerWidth);
+    t.narrow = tier !== "desktop";
+    // …and the card's FORMAT (`trendStack.planeFormat`): the phone authors a narrower, squarer card.
+    t.phone = tier === "phone";
     this.trendStack.sync(t);
   }
 

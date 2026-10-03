@@ -16,7 +16,7 @@
 // box pinned at the layer's top-left with `transform-origin: 0 0`, so the engine's matrix can be
 // the projected point itself — a translate and a uniform scale, no centring term to compose and no
 // rotation, which is what keeps the chart's text crisp and the compositor off the re-raster path.
-// Its ONE child is the actual `PLANE_PX_W` plane, centred on that origin by its own −50%/−50%. The
+// Its ONE child is the actual plane (`planeFormat(...).pxW` wide), centred on that origin by its own −50%/−50%. The
 // anchor mounts `invisible` and the ENGINE flips `style.visibility`: a class, so React's own
 // re-renders can never clobber the engine's inline write, and a plane can never flash at the
 // corner before the first projection lands.
@@ -72,12 +72,13 @@ import { cn } from "@/lib/utils";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
 import { headWord, metricCaption, sharedCeiling, stepMetric } from "@/src/data/trendSeries";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
-import { MORE_ID, PLANE_PLOT_PX_H, PLANE_PX_H, PLANE_PX_W, moreCount, morePose, stackPoses } from "@/src/engine/domain/trendStack";
+import { MORE_ID, moreCount, morePose, planeFormat, stackPoses } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import TrendTether from "@/components/TrendTether";
+import { useBreakpoint } from "@/components/useBreakpoint";
 import { WINDOW_MS } from "@/src/data/trendTimeline";
 
 /** The empty roster, as ONE frozen reference. Publishing a fresh `[]` would be a content-free
@@ -172,6 +173,10 @@ export default function TrendStack() {
   // this rung cannot say different things about the same commit.
   const empty = scopeEmptyCopy(roster.scope, "view");
 
+  // THE CARD'S FORMAT IS THE TIER'S (`trendStack.planeFormat`, 2026-10-03): on a phone the card is
+  // authored narrower and squarer, so it is drawn at about scale 1 and its type is legible. The
+  // projector reads the same format from the same tier; this side only sizes the element.
+  const fmt = planeFormat(useBreakpoint() === "phone");
   const poses = stackPoses(order, { scroll, focus });
   // THE SIXTH, UNNAMED PLANE (user, 2026-09-28) — the domain's `morePose`, rendered below the
   // window's cards as one more anchor the projector places like any other. It says only how many
@@ -384,7 +389,7 @@ export default function TrendStack() {
         >
           <div
             className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border p-2 [background:linear-gradient(var(--panel-solid),var(--panel-solid)),var(--scene-ground)]"
-            style={{ width: PLANE_PX_W, height: PLANE_PX_H }}
+            style={{ width: fmt.pxW, height: fmt.pxH }}
           >
             <div className="px-2 py-1 text-label text-muted-foreground select-none">
               {behind} more
@@ -451,7 +456,7 @@ export default function TrendStack() {
             }}
           >
             {/* THE PLANE — an opaque card centred on the anchor's projected point, content-height.
-                Width is the shared `PLANE_PX_W`; the projector divides by the same constant, so the
+                Width is the shared format's `pxW`; the projector divides by the same number, so the
                 two sides cannot drift about how big a plane is.
                 ⚠️ TWO BACKGROUND LAYERS, ONE SHORTHAND: `--panel-solid` is 0.92-alpha glass, so on
                 its own the card would still leak the plane behind it. Laid over the opaque
@@ -467,7 +472,7 @@ export default function TrendStack() {
             <div
               className="absolute left-0 top-0 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border p-2 [background:linear-gradient(var(--panel-solid),var(--panel-solid)),var(--scene-ground)] [transition:border-color_0.16s_ease] motion-reduce:!transition-none"
               style={{
-                width: PLANE_PX_W,
+                width: fmt.pxW,
                 ...(pair.paired
                   ? {
                       borderColor: `color-mix(in oklch, ${row.hue ?? "var(--primary)"} 60%, transparent)`,
@@ -494,6 +499,9 @@ export default function TrendStack() {
                 // THE CARD NAMES ITS MEASURE, not just its unit — it can be stepped from right here,
                 // so the card has to say what it turned into.
                 unit={caption}
+                // PHONE: the card is too narrow for name + measure + reading on one line, so the
+                // measure rides the front plot's caption instead (`unitInPlot`).
+                unitInPlot={fmt === planeFormat(true)}
                 // THE HEADLINE IS THE ROSTER'S `head` (user, 2026-09-29: "keep it consistent") —
                 // the same number the Networks list states: the span's average per day over a
                 // window of a day or more, the latest full day under one.
@@ -533,7 +541,7 @@ export default function TrendStack() {
                 // A card is ONE chart read on its own, so its plot is taller than the document's
                 // small-multiples. The number is the domain's: the ground's drop and the flat
                 // column's pitch are derived from the card's height.
-                plotHeight={PLANE_PLOT_PX_H}
+                plotHeight={fmt.plotPxH}
                 // THE PLOT ROLLS ON A MEASURE CHANGE, inside a frame that holds still: the card is
                 // the NETWORK, and the network did not change — only what is being read off it.
                 // A CSS transition keyed off the root's `data-roll`, NOT a remount: the plots leave

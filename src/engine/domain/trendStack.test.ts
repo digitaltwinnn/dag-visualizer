@@ -30,6 +30,7 @@ import {
   morePose,
   arrivalPose,
   fitDistance,
+  planeFormat,
   PLANE_FIT,
   CARD_FIT_H,
 } from "./trendStack";
@@ -521,6 +522,61 @@ describe("stepX — the across-stagger is a desktop thing (user, 2026-09-26)", (
     // The desktop deck stacks straight up too since 2026-09-28 (`PLANE_STEP_X` = 0), so the two
     // tiers agree on x — the flag now only guards the day the constant is re-opened.
     for (let i = 0; i < wide.length; i++) expect(wide[i]!.x + 0).toBe(0);
+  });
+});
+
+describe("planeFormat — the card a tier authors", () => {
+  const FOV = 55;
+  const pxPerUnitAt1 = (h: number) => h / (2 * Math.tan((FOV * Math.PI) / 360));
+
+  it("is the module's own constants everywhere but the phone", () => {
+    const wide = planeFormat(false);
+    expect(wide.pxW).toBe(PLANE_PX_W);
+    expect(wide.plotPxH).toBe(PLANE_PLOT_PX_H);
+    expect(wide.pxH).toBe(PLANE_PX_H);
+    expect(wide.worldH).toBe(PLANE_WORLD_H);
+    expect(wide.stepY).toBe(PLANE_STEP_Y);
+    // Two stable objects — the ground compares the format by reference.
+    expect(planeFormat(false)).toBe(wide);
+    expect(planeFormat(true)).toBe(planeFormat(true));
+  });
+
+  it("draws the phone's front card at about scale 1 — the type is the type", () => {
+    // The 640px card fitted to a 390px phone ran at 0.56, so 12px type rendered at 6.7px.
+    const phone = planeFormat(true);
+    for (const w of [360, 390, 430]) {
+      const d = fitDistance(w, 844, FOV, true);
+      const cardPx = (PLANE_WORLD_W * pxPerUnitAt1(844)) / d;
+      const scale = cardPx / phone.pxW;
+      expect(scale).toBeGreaterThan(0.9);
+      expect(scale).toBeLessThan(1.15);
+    }
+    expect((PLANE_FIT * 390) / PLANE_PX_W).toBeLessThan(0.6); // what it replaced
+  });
+
+  it("grows the up-stagger with the narrower width, so a rear header stays uncovered", () => {
+    // The header strip is a fixed number of CSS px; on a narrower card it is a larger share of the
+    // world width, and the step that uncovers it scales by the same ratio — the same px on screen.
+    const wide = planeFormat(false), phone = planeFormat(true);
+    expect(phone.stepY / wide.stepY).toBeCloseTo(wide.pxW / phone.pxW, 9);
+    expect((phone.stepY * phone.pxW) / PLANE_WORLD_W).toBeCloseTo((wide.stepY * wide.pxW) / PLANE_WORLD_W, 9);
+    const a = stackPoses(IDS, { scroll: 0, focus: null });
+    const b = stackPoses(IDS, { scroll: 0, focus: null, phone: true });
+    expect(b[1].y - b[0].y).toBeCloseTo(phone.stepY);
+    expect(a[1].y - a[0].y).toBeCloseTo(wide.stepY);
+    // …and the hint card steps with the deck it stands behind.
+    const more = morePose([...IDS, "x", "y"], { scroll: 0, focus: null, phone: true })!;
+    expect(more.y - b[b.length - 1].y).toBeCloseTo(phone.stepY);
+  });
+
+  it("states the phone card's height from the same two numbers, and the planes still overlap", () => {
+    const phone = planeFormat(true);
+    expect(phone.worldH).toBeCloseTo((PLANE_WORLD_W * phone.pxH) / phone.pxW);
+    expect(phone.pxH).toBeGreaterThan(phone.plotPxH);
+    expect(phone.worldH).toBeGreaterThan(phone.stepY); // the level floor's premise holds here too
+    // The squarer card is still under the height cap on a portrait phone: the WIDTH fit decides.
+    const d = fitDistance(390, 844, FOV, true);
+    expect((phone.worldH * pxPerUnitAt1(844)) / d).toBeLessThan(CARD_FIT_H * 844);
   });
 });
 

@@ -109,6 +109,7 @@ export default function TrendChart({
   note,
   syncId = "trends",
   compact = false,
+  unitInPlot = false,
   className,
   headClassName,
   headAction,
@@ -251,6 +252,12 @@ export default function TrendChart({
    *  name, the readout and the line, and drops the axis ticks and the peak readout; the axis
    *  STRIP stays, so the plane's height (a domain constant, `PLANE_PX_H`) does not change. */
   compact?: boolean;
+  /** THE UNIT RIDES THE PLOT'S CAPTION, NOT THE HEAD (2026-10-03). A History plane authored at
+   *  phone width has no room for name + unit + readout on one line: the readout wrapped, and on
+   *  the rear cards — where only the head strip shows — the wrapped line was cut in half by the
+   *  card in front. The unit is the same on every card of a stack, so it is said once, on the
+   *  one plot that is visible: "Snapshots per hour · peak 1,717". The document never passes it. */
+  unitInPlot?: boolean;
   className?: string;
   /** Extra classes for the HEAD ROW alone (2026-09-18). The 3D trend stack's planes have no
    *  chrome of their own — the head IS each plane's header strip, the one part of a fully
@@ -411,7 +418,7 @@ export default function TrendChart({
         <span className="inline-flex items-baseline gap-2 min-w-0 max-w-full flex-none">
           <span className="inline-block w-2 h-2 rounded-full flex-none" style={{ background: hue0 }} aria-hidden />
           <span className="text-label font-semibold text-foreground truncate">{name}</span>
-          {unit && <span className="text-label text-muted-foreground whitespace-nowrap">{unit}</span>}
+          {unit && !unitInPlot && <span className="text-label text-muted-foreground whitespace-nowrap">{unit}</span>}
         </span>
         {/* One rung down the ladder (convention 12): only offered while a range is active,
             because the destination — the anchor log's date search — receives that range. */}
@@ -527,6 +534,7 @@ export default function TrendChart({
             const plot = (
               <TrendPlot
                 compact={compact}
+                plotUnit={unitInPlot ? unit : undefined}
                 syncId={syncId}
                 lines={lines}
                 buckets={buckets}
@@ -635,6 +643,7 @@ const TrendPlot = memo(function TrendPlot({
   stack,
   plotH,
   compact = false,
+  plotUnit,
 }: {
   /** See the outer component's prop — a STRING, so it holds the memo still. */
   syncId: string;
@@ -654,6 +663,8 @@ const TrendPlot = memo(function TrendPlot({
   plotH: number;
   /** See the outer component's prop — a plain boolean, so it holds the memo still. */
   compact?: boolean;
+  /** The unit to lead the peak caption with — see the chart's `unitInPlot`. */
+  plotUnit?: string;
 }) {
   const n = buckets.length;
   const hue0 = lines[0]?.hue ?? "var(--primary)";
@@ -1045,7 +1056,7 @@ const TrendPlot = memo(function TrendPlot({
               is the window's peak, and the baseline is 0 by construction. */}
           {!compact && (
             <span aria-hidden className="absolute top-1 left-1.5 text-label text-muted-foreground pointer-events-none tabular-nums">
-              peak {format(ownMax)}
+              {plotUnit ? `${plotUnit} · ` : ""}peak {format(ownMax)}
             </span>
           )}
     </>
