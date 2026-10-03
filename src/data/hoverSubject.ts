@@ -1,6 +1,7 @@
 import type { PickDescriptor } from "./types";
 import { METAGRAPHS } from "@/src/net/current";
 import { identityHudCss } from "@/src/palette/identity";
+import { UNLISTED_HUE } from "@/src/data/unlistedId";
 
 // The identity colour for every NON-metagraph subject (a DAG-core validator, the L0 core, a
 // global snapshot) is the structural accent token itself, `var(--primary)` — resolved by CSS
@@ -54,7 +55,11 @@ export function tooltipSubject(p: PickDescriptor | null | undefined): HoverSubje
       // row, so its address is the only name it has (the card's fallback, shortened here).
       const cfg = METAGRAPHS.find((m) => m.id === p.sel.metaId);
       const ident = cfg?.ticker || cfg?.name || p.sel.metaId.slice(0, 6) + "…";
-      return { ident, name: p.sel.ordinal.toLocaleString(), color: identityHudCss(p.sel.metaId), mono: false };
+      // ⚠️ AN UNLISTED CHANNEL HOVERS IN THE UNLISTED SET'S NEUTRAL, like its card (2026-10-03).
+      // Hashing its address through the identity palette minted a hue per channel — the fault
+      // the card dropped on 2026-08-08 ("pink icons for a set that deliberately has no identity
+      // of its own") had survived here, one surface over.
+      return { ident, name: p.sel.ordinal.toLocaleString(), color: cfg ? identityHudCss(cfg.id) : UNLISTED_HUE, mono: false };
     }
     default:
       return null; // geoLive is a rail-only proxy, never a 3D-hover subject

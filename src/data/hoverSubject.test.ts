@@ -54,3 +54,20 @@ describe("tooltipSubject", () => {
     expect(tooltipSubject(null)).toBeNull();
   });
 });
+
+describe("tooltipSubject — a metagraph snapshot tile", () => {
+  it("hovers an UNLISTED channel in the unlisted set's neutral, never a hue hashed from its address", async () => {
+    const { UNLISTED_HUE } = await import("./unlistedId");
+    const s = tooltipSubject({ kind: "metaSnap", sel: { metaId: "DAG1notInTheCatalogAtAll", ordinal: 42 } } as never);
+    expect(s?.color).toBe(UNLISTED_HUE);
+    expect(s?.name).toBe("42");
+  });
+
+  it("hovers a listed network's tile in that network's identity hue", async () => {
+    const { METAGRAPHS } = await import("@/src/net/current");
+    const listed = METAGRAPHS.find((m) => m.id !== "dag")!;
+    const s = tooltipSubject({ kind: "metaSnap", sel: { metaId: listed.id, ordinal: 7 } } as never);
+    expect(s?.color).toMatch(/^oklch\(var\(--ident-l\)/);
+    expect(s?.ident).toBe(listed.ticker || listed.name);
+  });
+});

@@ -3,7 +3,8 @@
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
-import { shortHash } from "@/src/data/network";
+import { midHash } from "@/src/util/format";
+import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
 import { SCENE_GLASS } from "@/components/selection";
 import { TickerChip } from "@/components/inspector/parts";
 
@@ -34,7 +35,9 @@ export default function Tooltip() {
   }, []);
 
   if (!hover) return null;
-  const name = hover.mono ? shortHash(hover.name) : hover.name;
+  // A node's id is cut the way its callout, its card and its explorer row cut it (2026-10-03) —
+  // the hover used its own shortening at a smaller size, so one node read as two strings.
+  const name = hover.mono ? midHash(hover.name, NODE_ID_GLYPHS) : hover.name;
   return (
     <div
       id="tooltip"
@@ -44,7 +47,7 @@ export default function Tooltip() {
         SCENE_GLASS,
       )}
     >
-      <span className={cn("text-body font-semibold text-foreground", hover.mono && "font-mono text-label")}>{name}</span>
+      <span className={cn("text-body font-semibold text-foreground", hover.mono && "font-mono tabular-nums")}>{name}</span>
       {/* The ticker beside a name is the one chip (`TickerChip`) — hover and commit are one species. */}
       {hover.ident && <TickerChip text={hover.ident} hue={hover.color} className="self-center" />}
       <span className="text-muted-foreground text-label ml-[6px] opacity-75">click to inspect</span>
