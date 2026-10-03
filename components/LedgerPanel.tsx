@@ -556,7 +556,9 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
             // we don't have. Re-clicking (the deselect) closes the level with it.
             setOpenSnap(!on && signers.length > 0 ? key : null);
           },
-          pair: subjectPairing(hoverMetaSnap, metaSnapHoverKey(r.metaId, r.ordinal), setHoverMetaSnap, leafHue),
+          // The pairing wash follows the FILTER, as the snapshot's card does (2026-10-03) — the
+          // two ends of one pairing light in one hue. The dot keeps the network's own.
+          pair: subjectPairing(hoverMetaSnap, metaSnapHoverKey(r.metaId, r.ordinal), setHoverMetaSnap, openNet === filter ? leafHue : accent),
         };
       }),
     });

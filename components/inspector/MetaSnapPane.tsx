@@ -30,7 +30,7 @@ import { useNowTick } from "@/components/useNowTick";
 import { identityHudCss } from "@/src/palette/identity";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { METASNAP_ICON, KIND_MARK_CLASS } from "@/components/icons";
-import { metaSnapSelectActions } from "@/src/engine/domain/pickActions";
+import { metaSnapSelectActions, netKeyOf } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { cn } from "@/lib/utils";
 
@@ -68,6 +68,7 @@ export default function MetaSnapPane({
   const hoverMetaSnap = useStore((s) => s.hoverMetaSnap);
   const setHoverMetaSnap = useStore((s) => s.setHoverMetaSnap);
   const snap = useStore((s) => s.snap);
+  const appFilter = useStore((s) => s.filter);
   const setSection = useStore((s) => s.setSection);
   const setDeepWanted = useStore((s) => s.setDeepWanted);
   const deepWanted = useStore((s) => s.deepWanted);
@@ -135,7 +136,12 @@ export default function MetaSnapPane({
   // (2026-08-08: hashing the address through the identity palette minted a random hue per channel —
   // pink icons for a set that deliberately has no identity of its own).
   const hue = cfg ? identityHudCss(sel.metaId) : UNLISTED_HUE;
-  const pair = subjectPairing<string>(hoverMetaSnap, metaSnapHoverKey(sel.metaId, sel.ordinal), setHoverMetaSnap, hue);
+  // THE EDGE SIGNALS FOLLOW THE FILTER, like the Metagraph card above (user, 2026-10-03: "snapshot
+  // card should follow"). A snapshot reached inside a global snapshot with the top bar on All is
+  // a subject like any other, so its hover edge and ring take the accent; they wear the network's
+  // hue only while that network IS the filter. The mark that names it keeps its hue.
+  const pairHue = netKeyOf(sel.metaId) === appFilter ? hue : "var(--primary)";
+  const pair = subjectPairing<string>(hoverMetaSnap, metaSnapHoverKey(sel.metaId, sel.ordinal), setHoverMetaSnap, pairHue);
   // Hoisted out of the state tier so the FOOT can reach it — it is a hash, and hashes are looked
   // up, not read. The deep read wins where it exists; the exact row carries it otherwise.
   const stateProof = deep?.stateProof ?? row?.stateProof;
