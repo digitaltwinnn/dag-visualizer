@@ -45,7 +45,17 @@ export default function RecordsSurface() {
     // the 24px pads left them 309 (DOR's ordinals are 10 digits; nothing else left to stand
     // down). The × overlaps only the toolbar row's free right end. Both arms below name the same
     // 700/1099 the shell's tiers use.
-    <div className="h-full flex flex-col pl-6 pr-6 max-[1099px]:pr-10 max-[700px]:pr-4 max-[700px]:pl-4 py-3">
+    // …and THE ROSTER KEEPS THE GUTTER AT EVERY WIDTH (user, 2026-10-03: "the x button in the raw
+    // page gets in the way of the table"). "Nothing runs beneath the ×" was true of the LOG, whose
+    // × stands in the detail pane's own head corner; the roster is one table across the whole
+    // pane, so at desktop its header row ran under the close mark — and under a 44px target on a
+    // wide touch screen. The mark gets its own column there, level with the header row.
+    <div
+      className={
+        "h-full flex flex-col pl-6 max-[700px]:pr-4 max-[700px]:pl-4 py-3 " +
+        (mode === "ledger" ? "pr-6 max-[1099px]:pr-10" : "pr-10")
+      }
+    >
       {mode === "ledger" ? (
         // MASTER–DETAIL (item 9, 2026-08-06): the anchor log is the index on the left; the right
         // pane renders the SELECTED metagraph snapshot's contents (the deep read + the JSON tree),
