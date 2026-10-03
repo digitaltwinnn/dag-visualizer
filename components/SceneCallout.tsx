@@ -192,6 +192,7 @@ export default function SceneCallout() {
   const snap = useStore((s) => s.snap);
   const tickNet = useStore((s) => s.tickNet);
   const following = useStore((s) => s.following);
+  const liveFeed = useStore((s) => s.live);
   // THE BOX LEADS (user, 2026-08-15 — clicking a committed node's hub re-boxes the metagraph
   // card and "nothing happens in the scene"): the box is the subject (it gets the camera), so
   // the callout mirrors it. Inspector publishes the boxed slot; the Engine's anchor resolvers
@@ -372,7 +373,15 @@ export default function SceneCallout() {
         key: following ? "gs|live" : `gs|${snap.data.ordinal}`,
         eyebrow: "Global snapshot",
         title: snap.data.ordinal.toLocaleString(),
-        aside: following ? { text: rel ? `live · ${rel}` : "live", live: true } : { text: rel ? `pinned · ${rel}` : "pinned" },
+        // The card's THIRD state, mirrored too (test pass, 2026-10-03): with the feed down the
+        // card's follow control says "no signal", and this label went on saying "live · 58s ago"
+        // behind a beating dot — two surfaces a hand's width apart disagreeing about whether the
+        // network was answering. A pin is unaffected: a held snapshot is not a claim about now.
+        aside: following
+          ? liveFeed
+            ? { text: rel ? `live · ${rel}` : "live", live: true }
+            : { text: "no signal" }
+          : { text: rel ? `pinned · ${rel}` : "pinned" },
         // Unneted the ring marks the whole bar (core cyan); under a filter the anchor
         // points at the committed network's own SEGMENT, so the ring takes its accent
         // (user, 2026-08-16 — "if filter, select the correct segment of the byte bar").
