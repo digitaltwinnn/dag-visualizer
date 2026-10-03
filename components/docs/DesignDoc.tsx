@@ -336,7 +336,7 @@ export default function DesignDoc() {
                   { key: "de", label: "Germany", title: "Germany", onSelect: () => {} },
                   { key: "cohort", label: "Frankfurt · Hetzner Online AG", title: "Frankfurt · Hetzner Online AG" },
                 ]}
-                hint="Each node in this cohort"
+                hint="Each node at this provider"
               />
               <div className="mt-1.5 -ml-0.5 border-l-2 border-wash-strong pl-2.5 flex flex-col gap-0.5">
                 <div className="flex items-center gap-2 rounded-[5px] px-1.5 py-1 text-body text-foreground-dim">

@@ -1231,7 +1231,7 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
           (user, 2026-08-09). The COUNTRY is deliberately absent: the cohort always sits under a
           committed country, whose own card states it one slot up (user, 2026-08-02 — a facts rail
           shouldn't say the same thing twice). */}
-      <Fact label="ASN">{asn ? <span className="font-mono">{asn}</span> : <Empty why="No member of this cohort reports an AS number" />}</Fact>
+      <Fact label="ASN">{asn ? <span className="font-mono">{asn}</span> : <Empty why="No node at this provider reports an AS number" />}</Fact>
     </FactGroup>
     </>
   );

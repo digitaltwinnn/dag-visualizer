@@ -236,7 +236,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
         label: cohortLabel(openCohort),
         title: cohortLabel(openCohort),
       },
-      meaning: "Each node in this cohort",
+      meaning: "Each node at this provider",
       glyphW: NODE_GLYPH_W,
       measure: null,
       hasFigure: false,
