@@ -492,7 +492,11 @@ child in the explorer's own order ("just pick the 1st one"). A rung with no chil
 A metagraph snapshot's ∨ opens its first VALIDATOR (2026-09-29), and the node card under it pages
 only the nodes that signed it — `snapshotSignerRows` (`src/data/network.ts`), the same list and
 order as the explorer's signer level, so the two can't disagree about who signed. The sibling trio is CENTERED as one cluster with the ladder pair at the
-right, a hairline between the axes so they never read as one four-way control — and **an
+right, told apart by WEIGHT rather than a divider (2026-10-03, option B of
+`docs/superpowers/design/2026-10-03-card-pager` — user: "a lot of <> and ^^, and also / and |"):
+the pair is drawn smaller and quieter, and **the position is DRAWN, not written** — one small
+square per sibling with the current one lit (the cards' own unit marks), "n of N" in words only
+past fifteen, never a slash. The two axes still never read as one four-way control — and **an
 exhausted direction is INACTIVE while an axis with nothing to ever navigate is ABSENT** (user,
 2026-09-11, two rounds; supersedes 2026-09-03's invisible rule, which predates the pair): a
 direction that ran out mid-set dims — a vanishing chevron re-composes the row at every edge,

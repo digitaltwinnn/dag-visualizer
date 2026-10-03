@@ -156,6 +156,8 @@ const slideGap = (): number => {
 };
 
 const SLIDE_MS = 820;
+/** The longest sibling set whose position is drawn as squares; beyond it the strip says "n of N". */
+const POSITION_MARKS_MAX = 15;
 const SLIDE_EASE = "cubic-bezier(0.45, 0.05, 0.25, 1)";
 
 // THE LANE'S SOFT EDGE (user, 2026-09-10: "the card swipe has a hard edge against which it
@@ -727,9 +729,37 @@ export default function RailPager({
               {/* An OPEN set shows NO position (user, 2026-08-09): the global chain is ongoing,
                   so `n / N` would state a total the window doesn't have. The min-width keeps the
                   chevron spacing identical across the variants. */}
-              <div className="min-w-[3ch] whitespace-nowrap text-center text-label uppercase tracking-caps text-muted-foreground tabular-nums">
-                {set.open ? "" : `${set.index + 1} / ${set.items.length}`}
-              </div>
+              {/* THE POSITION IS DRAWN, NOT WRITTEN (user, 2026-10-03: "the card bottom has a lot
+                  of <> and ^^, and also / and | — can it be designed a bit nicer?"; option B of
+                  `docs/superpowers/design/2026-10-03-card-pager`). One small square per card,
+                  the current one lit — the cards' own way of counting (`UnitMarks`), so the
+                  strip carries no digits and no slash. A set too long for squares says it in
+                  words, "37 of 213". The count stays available to AT and on hover. */}
+              {set.open ? (
+                <div className="min-w-[3ch]" />
+              ) : set.items.length <= POSITION_MARKS_MAX ? (
+                <div
+                  role="img"
+                  aria-label={`${set.index + 1} of ${set.items.length}`}
+                  title={`${set.index + 1} of ${set.items.length}`}
+                  className="flex items-center gap-[3px] px-0.5"
+                >
+                  {set.items.map((_, k) => (
+                    <i
+                      key={k}
+                      className={
+                        k === set.index
+                          ? "size-[7px] rounded-[1px] bg-[var(--filter-accent,var(--primary))]"
+                          : "size-[5px] rounded-[1px] bg-muted-foreground/45"
+                      }
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="min-w-[3ch] whitespace-nowrap text-center text-label text-muted-foreground tabular-nums">
+                  <span className="font-semibold text-foreground">{(set.index + 1).toLocaleString()}</span> of {set.items.length.toLocaleString()}
+                </div>
+              )}
               <Button
                 variant="ghost"
                 size="icon-xs"
@@ -749,31 +779,31 @@ export default function RailPager({
               finer one (the accordion's own expand — the camera and callout follow the box as
               they always do), and with nothing finer committed ∨ commits the rung's FIRST child
               in the explorer's own order. Same chrome-less grammar, same inactive-at-the-edge
-              rule; the hairline keeps the two axes from reading as one four-way control. */}
+              rule. The two axes are told apart by WEIGHT, not by a line (2026-10-03): the pair is
+              drawn smaller and quieter, so it reads as the lesser control without a divider. */}
           {(up || down) && (
             <div className="flex items-center justify-self-end gap-1">
-              {set && <div aria-hidden className="mx-0.5 h-3 w-px bg-border" />}
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className={PLANK_BTN}
+                className={cn(PLANK_BTN, "text-muted-foreground")}
                 disabled={!up}
                 onClick={() => up?.()}
                 aria-label="Open the coarser card"
                 title="Open the coarser card"
               >
-                <ChevronUp aria-hidden className="size-4" />
+                <ChevronUp aria-hidden className="size-3.5" />
               </Button>
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className={PLANK_BTN}
+                className={cn(PLANK_BTN, "text-muted-foreground")}
                 disabled={!down}
                 onClick={() => down?.run()}
                 aria-label={down?.label ?? "Open the finer card"}
                 title={down?.label}
               >
-                <ChevronDown aria-hidden className="size-4" />
+                <ChevronDown aria-hidden className="size-3.5" />
               </Button>
             </div>
           )}
