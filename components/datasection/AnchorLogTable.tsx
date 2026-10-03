@@ -16,7 +16,7 @@ import { metaSnapArrivalActions, metaSnapSelectActions } from "@/src/engine/doma
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
-import { IdentityDot } from "@/components/inspector/parts";
+import { Empty, IdentityDot } from "@/components/inspector/parts";
 import { SelectedRowMark, selectionHue } from "@/components/selection";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -1022,22 +1022,23 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
               const rowSel = !seam && metaSnap?.metaId === r.metaId && metaSnap?.ordinal === r.ordinal;
               const tickMate = !rowSel && !r.pending && snap?.data.ordinal === r.global.ordinal;
               const pending = !!r.pending;
-              // THE SIZE IS THE REAL ONE WHERE WE HAVE IT (user, 2026-10-03: "focus on real size —
-              // compressed, as it is used"). The explorer's `sizeInKB` is the BILLED size: whole
-              // kilobytes, rounded up, the figure the fee is computed from — so the column was
-              // restating the fee, and it disagreed with the card and the pane, which print the
-              // bytes actually anchored (3.4 KB beside this column's 6.0). The exact read of the
-              // row's global snapshot carries those bytes for every row in the live window; a deep
-              // history page has only the explorer's record, and there the billed size is shown AS
-              // WHAT IT IS — an upper bound, muted, with "≤" — until the row is opened.
+              // THE SIZE IS MEASURED OR IT IS ABSENT (user, 2026-10-03, two rounds: "focus on real size —
+              // compressed, as it is used", then, of a "≤ 7.0 KB" stand-in, "I don't like any
+              // approximations, use facts"). The explorer's `sizeInKB` is the BILLED size — whole
+              // kilobytes, rounded up, the figure the fee is computed from — so the column restated
+              // the fee and disagreed with the card and the pane, which print the bytes actually
+              // anchored (3.4 KB beside this column's 6.0). Those bytes exist in one place: the
+              // global snapshot the row anchored into. The exact read of it is held for every row
+              // in the live window and for any row that has been opened; a deep history row that
+              // nobody has opened has NO measured size here, and says so with the dash — never the
+              // billed figure dressed as a bound. Opening the row reads its global, and every row
+              // anchored into that global then states its size.
               const realBytes = seam ? undefined : snapshotExact[r.global.ordinal]?.rows?.find((x) => x.metaId === r.metaId && x.ordinal === r.ordinal)?.bytes;
               const size =
                 realBytes != null && realBytes > 0 ? (
                   fmtKB(realBytes / 1024)
                 ) : (
-                  <span className="text-muted-foreground" title="The billed size, rounded up to whole KB. The compressed size actually anchored is read when you open the snapshot.">
-                    ≤ {fmtKB(r.sizeInKB)}
-                  </span>
+                  <Empty why="Not read yet. The size is measured from the global snapshot this one anchored into — open the row to read it." />
                 );
               const commit = () => {
                 if (pending) return; // half a (snapshot, tick) pair must not commit
