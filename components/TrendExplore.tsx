@@ -115,27 +115,21 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   // stands apart: above the hairline, no bar, and a chip saying what it is beside them. That
   // chip is honest per measure (`GLOBAL_READING`): a sum only where it is the rows added up.
   const total = roster.total;
-  const reading = GLOBAL_READING[metric];
-  // THE CHIP SAYS WHAT THE FIGURE IS, IN PLAIN WORDS (user, 2026-10-03: "total vs base ledger is
-  // not very clear to me in naming"). "total" and "base ledger" named two kinds of reading
-  // without saying how either relates to the list; these say it outright.
-  // …and as a TAG, not a sentence (same day: "it's a tag in a website, not some human prose"):
-  // one word that completes the row's name — "DAG sum", "DAG all", "DAG only". The hover title
-  // carries the full statement.
-  const totalChip = reading === "total" ? "sum" : reading === "fleet" ? "all" : "only";
-  const totalWhy =
-    reading === "total"
-      ? "The networks below, added up"
-      : reading === "fleet"
-        ? "Every node, the DAG's own validators included"
-        : "The base ledger's own reading, not a sum of the networks below";
+  // ONE TAG, AND ONLY WHERE IT IS TRUE (user, 2026-10-03, after "total"/"base ledger", then
+  // "sum of rows below"/"DAG's own", then "sum"/"all"/"only": "make it consistent where
+  // possible, it's too random"). The row is either the rows below added up — tagged "total",
+  // his own word for it — or the DAG's own figure, the same kind every row below states for
+  // itself, which needs no tag because an untagged row is a network's own. Three tags for three
+  // shades of meaning was the randomness; `GLOBAL_READING` is the one distinction left.
+  const isTotal = GLOBAL_READING[metric] === "total";
+  const totalWhy = isTotal ? "The networks below, added up" : "The DAG's own, like each network below";
   const lead =
     total && !empty
       ? {
           key: "dag-total",
           glyph: <IdentityDot hue={total.hue} />,
           name: "DAG",
-          tag: <QualifierChip>{totalChip}</QualifierChip>,
+          tag: isTotal ? <QualifierChip>total</QualifierChip> : undefined,
           hue: total.hue,
           figure:
             slice.stale ? <NodeStars count={3} /> : total.head != null ? format(total.head) : roster.pending || (roster.headKind === "day" && roster.dayPending) ? <NodeStars count={3} /> : <span className="text-muted-foreground" title={NO_READING}>—</span>,

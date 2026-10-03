@@ -251,12 +251,14 @@ decisions inside them are design, not detail:
   **The DAG is a PINNED row above the list** (user, 2026-10-03: "isn't it basically the
   hypergraph metrics?" — "ok as pinned row, show that it's the totals of the rows below"): the
   hypergraph's own reading (`roster.total`, the same pass and head rule its plane uses), above
-  a hairline, with no bar and a one-word TAG that completes the row's name — "sum" only for the
-  three measures where it IS the rows added up (`GLOBAL_READING`: snapshots, fees, data), "all"
-  for nodes, "only" for blocks and continuity, which are the DAG's alone. A tag is a word, not
-  prose: "total"/"base ledger" read as jargon and "sum of rows below"/"DAG's own" as sentences
-  (user, three rounds); the hover title carries the full statement. Never ranked among them: it would always be first with
-  a full bar. **It is a reading, not a control** — no click, and above all it never sets the
+  a hairline, with no bar. **ONE tag, and only where it is true**: "total" for the three measures
+  where the figure IS the rows below added up (`GLOBAL_READING`: snapshots, fees, data), and no
+  tag where it is the DAG's own figure — its nodes (`f.nodes.dag`, never the fleet total), its
+  blocks, its cadence — because an untagged row is a network's own, like
+  every row beneath it. Four rounds of wording got here ("total"/"base ledger", "sum of rows
+  below"/"DAG's own", "sum"/"all"/"only" — user: "make it consistent where possible, it's too
+  random"): three tags for three shades of meaning was the randomness. Never ranked among the
+  networks: it would always be first with a full bar. **It is a reading, not a control** — no click, and above all it never sets the
   page filter (user, same day). The STACK under "all" is unchanged — no DAG plane in front of
   the layers it sums.
   ⚠️ **The roster is computed ONCE, in `components/useTrendRoster.ts`** — the planes, this list and

@@ -319,17 +319,22 @@ export const GLOBAL_METRIC_ROWS: Record<TrendMetric, { key: string | null; scale
   continuity: { key: null, scale: 1 },
 };
 
-/** WHAT THE WHOLE-NETWORK READING IS, NEXT TO THE NETWORKS' OWN (2026-10-03 — the History
- *  explorer's pinned DAG row; user: "show that it's the totals of the rows below"). It is a sum
- *  of the rows only for three measures, and the row must not claim it for the others (rule 10):
- *    · `total` — what the networks anchored, paid and wrote, added up (snapshots, fees, data);
- *    · `fleet` — every node, the DAG's own validators included, so more than the rows add up to;
- *    · `own`   — the base ledger's own reading (its blocks, its own cadence), not a sum at all. */
-export const GLOBAL_READING: Record<TrendMetric, "total" | "fleet" | "own"> = {
+/** WHAT THE DAG'S PINNED ROW IS, NEXT TO THE NETWORKS BELOW IT (2026-10-03 — the History
+ *  explorer; user: "show that it's the totals of the rows below", then, after three rounds of
+ *  tags: "make it consistent where possible, it's too random"). ONE distinction, and so one tag:
+ *    · `total` — the rows below, added up: what the networks anchored, paid and wrote. The row
+ *      is tagged "total".
+ *    · `own`   — the DAG's own figure, the same kind of reading every row below states for
+ *      itself (its nodes, its blocks, its cadence). No tag: an untagged row is a network's own.
+ *  The row never claims a sum it is not (rule 10). NODES are the one measure whose global series
+ *  is not the DAG's own: `f.nodes` is the whole fleet, and beside rows that each state their own
+ *  nodes it read as one more "all nodes" — the pinned row reads `f.nodes.dag`, the DAG's stored
+ *  count, through the same `metricSeries` every row uses. */
+export const GLOBAL_READING: Record<TrendMetric, "total" | "own"> = {
   snapshots: "total",
   fees: "total",
   kb: "total",
-  nodes: "fleet",
+  nodes: "own",
   blocks: "own",
   continuity: "own",
 };

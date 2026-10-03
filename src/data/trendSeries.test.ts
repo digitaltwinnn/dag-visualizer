@@ -626,21 +626,29 @@ describe("typeBands", () => {
   });
 });
 
-describe("GLOBAL_READING — what the whole-network figure is beside the networks' own", () => {
-  it("calls it a total only where it is the networks' rows added up", () => {
+describe("GLOBAL_READING — what the DAG's pinned row is beside the rows below it", () => {
+  it("is a total only where it is the networks' rows added up", () => {
     expect(GLOBAL_READING.snapshots).toBe("total");
     expect(GLOBAL_READING.fees).toBe("total");
     expect(GLOBAL_READING.kb).toBe("total");
   });
 
-  it("never calls the fleet or the base ledger's own readings a total", () => {
-    // Every node includes the DAG's own validators; blocks and cadence are the ledger's own.
-    expect(GLOBAL_READING.nodes).toBe("fleet");
+  it("is the DAG's own figure everywhere else — one distinction, so one tag", () => {
+    expect(GLOBAL_READING.nodes).toBe("own");
     expect(GLOBAL_READING.blocks).toBe("own");
     expect(GLOBAL_READING.continuity).toBe("own");
+    expect(new Set(Object.values(GLOBAL_READING))).toEqual(new Set(["total", "own"]));
   });
 
   it("answers for every measure the explorer can pick", () => {
     expect(Object.keys(GLOBAL_READING).sort()).toEqual([...METRIC_ORDER].sort());
+  });
+});
+
+describe("the DAG's own nodes are a stored series, like any network's", () => {
+  it("reads f.nodes.dag through metricSeries — never the fleet total", () => {
+    const series = { "f.nodes": [167], "f.nodes.dag": [135], "f.nodes.dor": [17] };
+    expect(metricSeries("nodes", "dag", series).points).toEqual([135]);
+    expect(globalSeries("nodes", series)).toEqual([167]);
   });
 });

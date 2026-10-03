@@ -181,13 +181,27 @@ export default function useTrendRoster(
       return r;
     };
     for (const id of ids) rows.set(id, rowOf(id));
+    // The pinned row's NODES are the DAG's own (`f.nodes.dag`), not the fleet the global series
+    // carries: beside rows that each state their own nodes, the fleet read as one more "all
+    // nodes". Every other measure is the global series as it stands.
+    const totalRow = (): TrendRosterRow => {
+      const r = rowOf("dag");
+      if (metric !== "nodes") return r;
+      const points = cut(metricSeries("nodes", "dag", series).points);
+      r.series = { points, sampled: undefined, gaps: undefined };
+      r.last = lastMeasured(points);
+      r.day = stepMs >= 86_400_000 ? lastMeasured(points) : daily ? lastMeasured(metricSeries("nodes", "dag", daily).points) : null;
+      r.span = spanAverage(metric, points, stepMs);
+      r.head = headKind === "span" ? r.span : r.day;
+      return r;
+    };
     return {
       rows,
       // THE WHOLE NETWORK AS A ROW (2026-10-03 — the explorer's pinned DAG row under "all"): the
       // DAG plane's own reading, by the same pass and the same head rule, so the pinned figure
       // and the plane the row opens can never quote two numbers. Only under "all": a committed
       // network's list is that network, and under the DAG filter the DAG already is the row.
-      total: filter === "all" ? rowOf("dag") : null,
+      total: filter === "all" ? totalRow() : null,
       // Busiest OVER THE SPAN the list states (design A) — the window on screen, so a new range
       // re-ranks the list and the stack together. The day, then the last reading, only where the
       // span has nothing measured, so a quiet network still sorts by what it last said.
