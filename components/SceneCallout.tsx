@@ -42,9 +42,8 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { displayNetwork } from "@/src/data/unlisted";
 import { coLocatedNetworks, filterAccent, getAnchor, isAnchorSettling, metagraphById } from "@/src/data/network";
 import { fmtKB, fmtShareKB, midHash } from "@/src/util/format";
-import type { LucideIcon } from "lucide-react";
 import { iconForPick } from "@/components/icons";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { SceneMark, type SceneMarkSpec } from "@/components/SceneMark";
 import { netKeyOf } from "@/src/engine/domain/pickActions";
 import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
 import { SCENE_GLASS } from "@/components/selection";
@@ -93,7 +92,7 @@ export interface CalloutModel {
    *  the pin, the server — or a network's logo. A label and its card were tied only by reading
    *  both; with the same mark they pair at a glance. Same glyph home (`iconForPick`), same hue
    *  rule as the card head: a kind mark takes the filter's accent, a subject's own mark its hue. */
-  mark?: { icon: LucideIcon; hue: string } | { logo: string | undefined; monogram: string; hue: string };
+  mark?: SceneMarkSpec;
   /** `ident` leads the row in its identity hue (the aside's hued-ticker idiom, one register).
    *  `also` closes it with the OTHER networks sharing this subject's machine — same idiom,
    *  one hued ticker each (user, 2026-08-18). */
@@ -136,7 +135,7 @@ export function CalloutPanel({ m, className }: { m: CalloutModel; className?: st
       {/* No identity dot here (user, 2026-08-15): the hued aside already carries the identity
           on this row, and the anchor ring is the subject mark at the scene end of the tie. */}
       <div className="flex items-center gap-[7px]">
-        {m.mark && <Mark mark={m.mark} />}
+        {m.mark && <SceneMark mark={m.mark} />}
         <span className={cn("text-body font-semibold text-foreground", m.titleMono && "font-mono tabular-nums")}>{m.title}</span>
         {/* A hued aside is a TICKER beside a title, so it is the card head's own chip
             (`TickerChip`, 2026-10-02); the un-hued one is a state line and stays text. */}
@@ -198,21 +197,6 @@ export function CalloutPanel({ m, className }: { m: CalloutModel; className?: st
         </div>
       )}
     </div>
-  );
-}
-
-function Mark({ mark }: { mark: NonNullable<CalloutModel["mark"]> }) {
-  if ("icon" in mark) {
-    const Icon = mark.icon;
-    return <Icon aria-hidden className="flex-none size-[15px]" style={{ color: mark.hue }} />;
-  }
-  return (
-    <Avatar className="size-4 flex-none">
-      {mark.logo && <AvatarImage src={mark.logo} alt="" />}
-      <AvatarFallback className={cn("text-[9px] font-bold", IDENT_INK)} style={{ color: mark.hue }}>
-        {mark.monogram.slice(0, 1)}
-      </AvatarFallback>
-    </Avatar>
   );
 }
 

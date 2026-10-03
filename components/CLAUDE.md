@@ -1499,6 +1499,12 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
   circle — `--co-k` shortens both axes by one factor, so the two leaders are parallel. Standing
   up-right from the floor put its panel over the ribbons. `calloutHangs` (domain, tested) says
   whether the strip has room; where it has not, the label stands as it always did.
+- **The HOVER card is the name of the thing with its mark** (user, 2026-10-03 — all three of
+  `docs/superpowers/design/2026-10-03-hover-cards`): the same mark (`SceneMark`, shared with the
+  callout), no "click to inspect", no "L0" chip on a global snapshot, and a country is named
+  where only its border lit. **Its colour is the hovered OBJECT's own, never the filter's**
+  (same day): a network's hue, the unlisted neutral, the DAG's identity hue for what is the
+  DAG's (its nodes, its core, a global snapshot), the structural accent only for a country.
 - **A callout wears its card's MARK** before the title (user, 2026-10-03 — picks 1, 4 and 5 of
   `docs/superpowers/design/2026-10-03-callout-cards`): the cube, the stacked cubes, the globe,
   the pin, the server, or a network's logo — `iconForPick`, the cards' own glyph home, in the

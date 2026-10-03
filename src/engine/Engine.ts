@@ -7,7 +7,7 @@ import { ledgerLens } from "@/src/data/ledgerStory";
 import { reportPoll, touchPoll } from "@/src/data/api";
 import { STALE_FACTOR } from "@/src/data/pollStatus";
 import { LISTED_IDS, UNLISTED_ID, UNLISTED_SCENE_HEX_BY_THEME } from "@/src/data/unlisted";
-import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
+import { countrySubject, hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
 import { createScene, type SceneCtx } from "./scene/SceneContext";
 import { HyperView, type MetaHubRec } from "./scene/views/HyperView";
@@ -1919,8 +1919,9 @@ export class Engine {
 
     // The lean tooltip label — re-write the store only when the subject's identity changes so
     // following the cursor never re-renders React.
-    const subj = tooltipSubject(p);
-    const key = subj ? `${subj.ident}|${subj.name}|${subj.color}` : null;
+    // Land with nothing on it still names itself: the country whose border the pointer lit.
+    const subj = tooltipSubject(p) ?? (countryCc ? countrySubject(countryCc) : null);
+    const key = subj ? `${subj.kind}|${subj.ident}|${subj.name}|${subj.color}` : null;
     if (key === this._hoverKey) return;
     this._hoverKey = key;
     st.setHover(subj);
