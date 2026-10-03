@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
-import { CATALOG, NETWORKS, type NetworkId } from "@/src/engine/config";
+import { NETWORKS, type NetworkId } from "@/src/engine/config";
+import { isTracked } from "@/src/net/lineage";
 import { netOf } from "@/src/net/request";
 
 // A NETWORK'S SNAPSHOT HISTORY, ordinal-addressed (user, 2026-08-14 — "the pagination should be
@@ -79,7 +80,8 @@ const cachedBefore = (net: NetworkId, address: string, before: number) =>
 export async function GET(req: Request, ctx: { params: Promise<{ address: string }> }) {
   const { address } = await ctx.params;
   const net = netOf(req);
-  if (!new Set(CATALOG[net].map((m) => m.id)).has(address)) {
+  // Former addresses are served too: a re-registered network's first chain is still its history.
+  if (!isTracked(net, address)) {
     return NextResponse.json({ error: "unknown network" }, { status: 404 });
   }
   const beforeRaw = new URL(req.url).searchParams.get("before");

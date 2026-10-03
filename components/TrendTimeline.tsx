@@ -126,18 +126,37 @@ export default function TrendTimeline() {
     //
     // ⚠️ THE BAND IS A CONTROL STRIP, NOT A VITAL (design round 2026-09-29, "A + B"; user: the band
     // "feels a bit disconnected from the scene … unclear that it can be used to actually interact
-    // with the scene (none of the other vitals do)"). So its controls live INSIDE it: the window
-    // pills (and Same scale) as one group on the left under a "Time range" label — they stood
-    // ABOVE the plate's corner, reading as a separate widget — and the track to their right,
-    // labelled with WHAT its line is ("All networks · …": the whole network, the frame the planes
-    // sit in, never the front card zoomed out — the tether to the chart says TIME only), plus the
-    // gesture hint. The plate's accent frame is VitalsBand's, keyed on the same policy row.
+    // with the scene (none of the other vitals do)"). What that round gave it stays: the accent
+    // frame (VitalsBand's, keyed on the same policy row), the label saying WHAT the track's line
+    // is ("All networks · …": the whole network, the frame the planes sit in, never the front card
+    // zoomed out — the tether to the chart says TIME only), and the gesture hint.
+    //
+    // THE TIME RANGE STANDS ABOVE THE BAND'S RIGHT CORNER (user, 2026-10-03: "what about moving
+    // the time-range control just above the vitals section, right side?"). Third placement, and
+    // the reasons are cumulative: a column of their own cost the track a third of the lane
+    // (2026-09-26, moved above); above, unlabelled, they read as a separate widget (2026-09-29,
+    // moved inside on the left under a "Time range" label); inside, they took the track's left
+    // quarter again and sat at the far end from the span they set, which is drawn at the RIGHT —
+    // the newest end. Above the right corner they stand over that span, the track runs the whole
+    // band. (The "Time range" label came along for one round and went — see the group's note.)
+    // `relative` is the group's containing block.
     <div className="pointer-events-auto relative flex-1 min-w-0 flex items-stretch gap-3 px-1.5 max-[700px]:flex-col max-[700px]:gap-1.5 max-[700px]:px-0">
-      <div className="flex-none flex flex-col justify-center gap-1.5 pr-3 border-r border-border/60 max-[700px]:pr-0 max-[700px]:border-r-0">
-        <span className="text-label tracking-caps uppercase text-muted-foreground leading-none max-[700px]:hidden">Time range</span>
-        <div className="flex items-center gap-1.5">
+      {/* First in DOM order so the phone arm, where the group is static, puts it ABOVE the track.
+          The COMMAND BAR's glass under it (same `--topbar-glass`, same blur): the group floats
+          over the SCENE, where the picker's own hairline-and-wash would let the ground's ink
+          run through the words. `bottom-full` is the tenant's top; `mb-3` clears the plate's
+          padding and edge by a hairline's breath. */}
+      {/* NO "Time range" WORDS (user, 2026-10-03, minutes after they came up with the group:
+          "remove the 'time range' text, it's obvious") — standing over the span, the pills name
+          themselves. The group keeps its accessible name (`WindowPicker`'s own). */}
+      {/* `-right-[7px]`: this root sits inside the band's border and its own 6px padding, so
+          `right-0` left the group 7px short of the plate's edge (user: "should align with the
+          bottom section"). The offset is that inset, measured — the group's right edge IS the
+          band's. */}
+      <div className="absolute bottom-full -right-[7px] mb-3 z-[1] flex items-center rounded-lg p-1 [background:var(--topbar-glass)] backdrop-blur-sm max-[700px]:static max-[700px]:mb-0 max-[700px]:p-0 max-[700px]:[background:none] max-[700px]:backdrop-blur-none">
+        <div className="flex items-center gap-1.5 max-[700px]:flex-1">
           <WindowPicker
-            className="max-[700px]:flex-1"
+            className="bg-transparent max-[700px]:flex-1"
             zoom={windowId}
             range={range}
             stepMs={stepMs}
@@ -153,10 +172,11 @@ export default function TrendTimeline() {
           month labels, the plot under 30). 110px gives the brush and its grips a thumb's worth. */}
       <div className="flex-1 min-w-0 flex flex-col max-[700px]:min-h-[110px]">
         <div className="flex items-baseline justify-between gap-3 pt-0.5 leading-none">
-          <span className="text-label text-muted-foreground truncate">All networks · {metricCaption(metric, 86_400_000)}</span>
-          {showHint && (
+          <span className="text-label text-muted-foreground truncate">{metricCaption(metric, 86_400_000)} across all networks</span>
+          {/* …and only over a track there is something to drag on. */}
+          {showHint && measured && (
             <span className="flex-none text-label text-foreground-dim max-[700px]:hidden">
-              Drag to set a range · {coarse ? "tap" : "click"} to mark a moment
+              Drag to set a range, {coarse ? "tap" : "click"} to mark a moment
             </span>
           )}
         </div>

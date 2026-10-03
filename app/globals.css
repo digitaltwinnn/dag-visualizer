@@ -112,6 +112,14 @@
     transparent 0, var(--pulse-hue) 14%, var(--pulse-hue) 86%, transparent 100%);
   animation: edge-line-fade var(--tempo-signal) ease both;
 }
+/* THE PULSE WAITS FOR ITS CARD TO SETTLE (user, 2026-10-03). Expanding a rail card remounts it as
+   the box, which replays the pulse — on the click, along an edge whose height was still easing.
+   `HeightEase` marks its box `data-resizing` from the pin to the landing; both layers hold at
+   their first frame (opacity 0) under it and run when it clears, so the order is: the card opens,
+   THEN its edge speaks. A subject change that does not resize the card still pulses at once, with
+   the title's roll. */
+[data-resizing] .edge-pulse::before,
+[data-resizing] .edge-pulse > i { animation-play-state: paused; }
 /* THE PAGER GHOST — the outgoing card during a RailPager slide (`RailPager.commitStep`).
    ⚠️ A CSS RULE, NOT INLINE STYLE, and the reason is `::before`. `cloneNode(true)` copies class
    names, so every animation on the card restarts from frame 0 when the clone is inserted: the card
@@ -127,6 +135,14 @@
   animation: none !important;
   transition: none !important;
 }
+/* …AND THE GHOST IS NOBODY'S HOVER SUBJECT (user, 2026-10-03: "the swipe left/right on the card
+   has some flashes"). Its root is inline `pointer-events: none`, but the panel inside carries the
+   card's own `pointer-events-auto` class, so the outgoing copy still took the pointer as it slid
+   under a resting cursor — measured, its scene-facing edge line lit at full strength two thirds
+   of the way out. It is a picture of a card that has already left: no pointer, no edge signal. */
+[data-pager-ghost], [data-pager-ghost] * { pointer-events: none !important; }
+[data-pager-ghost] .sig-left::before, [data-pager-ghost].sig-left::before,
+[data-pager-ghost] .sig-right::after, [data-pager-ghost].sig-right::after { opacity: 0 !important; }
 
 /* THE ONE DISCLOSURE PANEL RECIPE — every collapsible body in the app wears `.disclose-panel`.
    Radix's Collapsible keeps its content mounted through the close and publishes the measured
@@ -315,6 +331,13 @@
    entirely with pairing, and a paired card hovered on its plank still reads as paired. */
 .rail-card:hover .sig-left::before  { opacity: 1; }
 .rail-card:hover .sig-right::after  { opacity: 1; }
+/* THE PULSE OUTRANKS THE HOVER EDGE (user, 2026-10-03: "the edge pulse fights with the mouse
+   hover"). Both draw on the scene-facing edge; while a pulse is live on a card (`data-live`,
+   `EdgePulse.tsx` — its paused wait for the card's expand included) the host's own edge line
+   stays dark, whisper and pairing alike, and fades in when the pulse has left. `!important`
+   because the pairing rule below sets opacity too and must not out-order this. */
+.sig-left:has(.edge-pulse[data-live])::before,
+.sig-right:has(.edge-pulse[data-live])::after { opacity: 0 !important; }
 
 /* Hover PAIRING — the only non-pulse edge signal, shown strictly WHILE HOVERED (the class comes
    and goes with the hover; the 0.16s transition on the base elements eases it in/out).
@@ -364,13 +387,22 @@
    the identity spine stays on the SCENE-FACING edge. The 100/140 offsets are mirrored by the
    leader-line endpoints in SceneCallout.tsx — change them together, and see the standoff note
    there for why the tie is longer than the panel is tall. */
-#callout .co-panel { left: 100px; bottom: 140px; }
-#callout[data-flip] .co-panel { left: auto; right: 100px; }
-#callout[data-drop] .co-panel { bottom: auto; top: 140px; }
-#callout .co-leader { transform: none; }
-#callout[data-flip] .co-leader { transform: scaleX(-1); }
-#callout[data-drop] .co-leader { transform: scaleY(-1); }
-#callout[data-flip][data-drop] .co-leader { transform: scale(-1, -1); }
+/* THE STANDOFF HAS ONE FACTOR, `--co-k` (2026-10-03). The global snapshot's label in Snapshots
+   HANGS below-left of its bar on a shorter line (`data-hang`, written by CalloutSync from
+   `domain/calloutPlacement.calloutHangs`), and "make the angle of the lines the same" (user) is
+   only true if both axes shorten together — so the panel's offsets and the leader's scale read
+   the one number. The leader is scaled as a whole; its strokes are `non-scaling-stroke`, so the
+   line keeps its weight and its dash at any length. 0.55 mirrors `CALLOUT_HANG_K`. */
+:is(#callout, #callout-2) { --co-k: 1; }
+:is(#callout, #callout-2)[data-hang] { --co-k: 0.55; }
+:is(#callout, #callout-2) .co-panel { left: calc(100px * var(--co-k)); bottom: calc(140px * var(--co-k)); }
+:is(#callout, #callout-2)[data-flip] .co-panel { left: auto; right: calc(100px * var(--co-k)); }
+:is(#callout, #callout-2)[data-drop] .co-panel { bottom: auto; top: calc(140px * var(--co-k)); }
+:is(#callout, #callout-2) .co-leader { transform: scale(var(--co-k)); }
+:is(#callout, #callout-2)[data-flip] .co-leader { transform: scale(calc(-1 * var(--co-k)), var(--co-k)); }
+:is(#callout, #callout-2)[data-drop] .co-leader { transform: scale(var(--co-k), calc(-1 * var(--co-k))); }
+:is(#callout, #callout-2)[data-flip][data-drop] .co-leader { transform: scale(calc(-1 * var(--co-k))); }
+:is(#callout, #callout-2) .co-leader > line { vector-effect: non-scaling-stroke; }
 
 /* THE ENTRANCE CHOREOGRAPHY (user, 2026-09-05 — "the dotted line is already drawn before the
    animation"): panel rolls in → the leader DRAWS from the panel corner toward the anchor →
@@ -383,32 +415,47 @@
    visibly settling panel without the dead beat a full-rise wait read as. The wrapper is keyed
    by subject, so a subject change replays the whole sequence. Unlayered on purpose — the pause
    gate must beat `.roll-in`'s layered animation shorthand (CSS trap 1). */
-#callout { --co-draw-at: calc(var(--tempo-roll-lag) + 0.6 * var(--tempo-doc-rise)); }
-#callout .co-draw {
+/* THE CALLOUT RUNS ON ITS OWN, QUICKER CLOCK (user, 2026-10-03: "the dotted line and callout
+   should appear a bit faster" — the second ask of the kind; 2026-09-05 moved the draw up to 60%
+   of the rise). It borrowed the cards' text-arrival tempo: a 0.2s lag, a 1.15s rise, then a 0.65s
+   draw — the line landed 1.5s after the reveal and the ring at 1.7s, and the reveal itself
+   already waits for the camera's flight. A card's title arrives beside a body that is easing its
+   height; the callout arrives alone over a scene that has just stopped, so it has nothing to
+   wait for: a 0.05s lag, a 0.7s rise, a 0.45s draw — line home at 0.9s, ring at 1.05s. Same
+   sequence, same curve, about 40% sooner. Three local numbers rather than the shared tokens, so
+   the cards' text clock is untouched. */
+:is(#callout, #callout-2) {
+  --co-lag: 0.05s;
+  --co-rise: 0.7s;
+  --co-draw: 0.45s;
+  --co-draw-at: calc(var(--co-lag) + 0.6 * var(--co-rise));
+}
+:is(#callout, #callout-2) .roll-in { animation-duration: var(--co-rise); animation-delay: var(--co-lag); }
+:is(#callout, #callout-2) .co-draw {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: co-draw var(--tempo-roll) var(--ease-roll) var(--co-draw-at) forwards;
+  animation: co-draw var(--co-draw) var(--ease-roll) var(--co-draw-at) forwards;
 }
-#callout .co-tip {
+:is(#callout, #callout-2) .co-tip {
   opacity: 0;
-  animation: co-fade 0.2s ease-out calc(var(--co-draw-at) + var(--tempo-roll)) forwards;
+  animation: co-fade 0.15s ease-out calc(var(--co-draw-at) + var(--co-draw)) forwards;
 }
-#callout .co-multi {
+:is(#callout, #callout-2) .co-multi {
   opacity: 0;
-  animation: co-fade var(--tempo-roll) var(--ease-roll) var(--co-draw-at) forwards;
+  animation: co-fade var(--co-draw) var(--ease-roll) var(--co-draw-at) forwards;
 }
 /* Paused until the Engine actually SHOWS the callout (`data-on`): a commit answered by a camera
    flight keeps the wrapper hidden for the whole arrival, and an entrance that played invisibly
    would present a finished callout on reveal — the exact complaint the draw exists to fix. The
    delay phases pause too, so the clock starts at first visibility. */
-#callout:not([data-on="1"]) :is(.roll-in, .co-draw, .co-tip, .co-multi) { animation-play-state: paused; }
+:is(#callout, #callout-2):not([data-on="1"]) :is(.roll-in, .co-draw, .co-tip, .co-multi) { animation-play-state: paused; }
 @keyframes co-draw { to { stroke-dashoffset: 0; } }
 @keyframes co-fade { to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  #callout .co-draw { animation: none; stroke-dashoffset: 0; }
-  #callout .co-tip, #callout .co-multi { animation: none; opacity: 1; }
+  :is(#callout, #callout-2) .co-draw { animation: none; stroke-dashoffset: 0; }
+  :is(#callout, #callout-2) .co-tip, :is(#callout, #callout-2) .co-multi { animation: none; opacity: 1; }
 }
-#callout[data-flip] .edge-spine {
+:is(#callout, #callout-2)[data-flip] .edge-spine {
   border-left-color: transparent;
   border-right-color: var(--spine, var(--primary));
   -webkit-mask: linear-gradient(180deg, transparent, #000 var(--edge-runoff), #000 calc(100% - var(--edge-runoff)), transparent);
@@ -630,7 +677,18 @@
    swallowed. When the window closes, whatever sits under the pointer hovers normally: a resting
    state, no flash. */
 .rail-ladder [data-arriving] .ig-panel,
-.rail-ladder [data-arriving] .rail-entry { pointer-events: none; }
+.rail-ladder [data-arriving] .rail-entry,
+/* …and a SLIDING card, for the pager's own window (`RailPager.commitStep` marks its wrapper
+   `data-sliding`): its inline `pointer-events: none` stops at the wrapper, because the panel
+   re-enables the pointer for itself. Same device, same reason, and the plank stays live. */
+.rail-card[data-sliding] .ig-panel,
+.rail-card[data-sliding] .rail-entry { pointer-events: none; }
+/* …and its hover edge stays dark for the slide. Chromium keeps a LATCHED `:hover` on the wrapper
+   until the pointer next moves, so the incoming card mounted with its edge line already lit and
+   spent its first 130ms fading it out while it entered the lane — measured, a line of light at
+   the lane's right edge on every swipe. The pulse is a different element and still plays. */
+.rail-card[data-sliding] .sig-left::before,
+.rail-card[data-sliding] .sig-right::after { opacity: 0 !important; }
 
 .rail-ladder[data-stepping] .rail-entry,
 .rail-ladder[data-stepping] .rail-entry:hover,
@@ -756,7 +814,13 @@
      <color>-only, so they use the guarded override pair instead. */
   color-scheme: light dark;
 
-  --radius: 14px;
+  /* THE HUD'S ROUNDING, ONE NOTCH TIGHTER (user, 2026-10-03: "the rounded corners in the cards,
+     panels etc. are a bit too round — make them less round"). The scale was 14 / 10 / 6 / 4 with
+     8px controls; at 14 a card's corner was a visible curve, softer than the hairlines, rulers
+     and squared chips around it. 10 / 7 / 5 / 3 with 6px controls keeps every step distinct and
+     the whole instrument a little crisper. Pills (`rounded-full`: status, dots, the range
+     group) are a different shape, not a step on this scale, and stay. */
+  --radius: 10px;
   /* Height of the phone persistent bottom dock bar — the single source of truth referenced by
      the phone bar-half sheet offset (RailDock) AND the LiveStrip's phone bottom offset. (Was
      16-responsive-shell.css `:root`, re-homed here when that file was retired in Task 9.) */
@@ -1432,10 +1496,10 @@
   --color-wash-hover: var(--wash-hover);
   --color-wash-strong: var(--wash-strong);
   --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 4px);
-  --radius-sm: calc(var(--radius) - 8px);   /* 6px */
-  --radius-xs: 4px;                          /* tiny chrome — tags, chips, share-bars, list rows */
-  --radius-btn: 8px;                         /* control rounding — view-switch, filter face, tooltips/popovers */
+  --radius-md: calc(var(--radius) - 3px);   /* 7px */
+  --radius-sm: calc(var(--radius) - 5px);   /* 5px */
+  --radius-xs: 3px;                          /* tiny chrome — tags, chips, share-bars, list rows */
+  --radius-btn: 6px;                         /* control rounding — view-switch, filter face, tooltips/popovers */
 
   /* ── HUD type scale (THREE steps every HUD text site snaps to) ──────────────────────────────
      label = eyebrows, tags, chips, axis labels, counts, codes, hints — everything set small, caps
@@ -1748,4 +1812,13 @@
    max-width, which disagrees by exactly one pixel. */
 @media (min-width: 1100px) {
   :root { --bar-margin: var(--rail-margin); }
+}
+/* ON A PHONE the two bars take the screen's own 8px gutter (user, 2026-10-03: "the top bar does
+   not need that margin reserved for the rails that are present in normal and tablet mode"). The
+   16px default is the TABLET's: its edge tabs hang in that inset. A phone has no rails and no
+   tabs — the dock is its own full-width strip — so the inset was 32px of a 390px screen spent on
+   nothing. 700 is `breakpointOf`'s phone boundary, written as the exclusive arm Tailwind's
+   `max-[700px]` compiles to (CSS trap 8). */
+@media not all and (min-width: 700px) {
+  :root { --bar-margin: 8px; }
 }

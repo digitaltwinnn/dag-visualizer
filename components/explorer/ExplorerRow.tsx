@@ -64,6 +64,10 @@ export interface ExplorerRowProps {
    *  user: "lots of space on their left side — any reason not to use it?"). Decided per level by
    *  the caller, never per row: bars only compare when every one starts at the same x. */
   wideBar?: boolean;
+  /** A PINNED row (the level's `lead`): no bar and no track — it is what the rows are read
+   *  against, and a bar there would be a share of itself. The name takes only its own width so
+   *  the tag beside it has the room the bar would have had. */
+  plain?: boolean;
   /** A real-but-empty subject (a 0-node network): present, dimmed. */
   faint?: boolean;
   title?: string;
@@ -97,9 +101,12 @@ function recentGesture(): boolean {
 }
 
 export default function ExplorerRow({
-  glyph, name, nameMono, tag, bar, figure, hasFigure, nameW = 84, figureW = 40, glyphW = 14, on, hue, nested, wideBar, faint, title, onClick, pair, className,
+  glyph, name, nameMono, tag, bar, figure, hasFigure, nameW = 84, figureW = 40, glyphW = 14, on, hue, nested, wideBar, plain, faint, title, onClick, pair, className,
 }: ExplorerRowProps) {
   const el = useRef<HTMLButtonElement>(null);
+  // A row with nothing to do is not a button: a pinned reading (the level's `lead`) may carry no
+  // click, and then it renders as a plain row — no pointer, no hover wash, no tab stop.
+  const Tag = (onClick ? "button" : "div") as "button";
   // SELECTION STAYS IN PLACE (design 2026-09-26, decision 12): the list never re-orders on a
   // commit; the committed row is scrolled into view instead — `nearest`, so a row already on
   // screen does not move the rail under the pointer.
@@ -126,20 +133,33 @@ export default function ExplorerRow({
   // THE FIGURE COLUMN IS IN EM (2026-10-02): its width was measured for a 12.5px mono figure, and
   // the body step is fluid now — a 4-decimal fee in a 48px column truncated to "0.02…" at 14px.
   // The row's own font-size is `text-body` (below), so an em here IS the figure's size.
-  const figureCol = `${(figureW / 12.5).toFixed(2)}em`;
+  // …AND NO WIDER THAN THE WIDEST FIGURE ON SCREEN (2026-10-03, the ticker column's rule reaching
+  // the figure): `figureW` is the room a level's LONGEST possible figure needs, and a list of
+  // "14" and "3" held all 46px of it open while the tag beside it — three layer pills, a city —
+  // was clipped for want of 6. The Explorer measures the figures it rendered and publishes
+  // `--fig-w`; the level's width stays the cap, and the fallback before the first measure.
+  const figureCol = `min(${(figureW / 12.5).toFixed(2)}em, var(--fig-w, 999px))`;
+  // A TEXT glyph (a node level's ticker) is as wide as the widest one ON SCREEN, up to the level's
+  // `glyphW`: the Explorer measures the list and publishes `--glyph-w` (see its `fitGlyphs`), so
+  // a list of three-letter tickers does not hold a co-located pair's 56px open beside every id
+  // (user, 2026-10-03). A dot or a code keeps its fixed 14px.
+  const wideGlyph = glyphW > 14;
+  const glyphCol = wideGlyph ? `var(--glyph-w, ${glyphW}px)` : `${glyphW}px`;
   return (
-    <button
+    <Tag
       ref={el}
-      type="button"
+      type={onClick ? "button" : undefined}
       title={title}
       aria-pressed={on ? true : undefined}
       onClick={onClick}
       className={cn(
         // `pr-2.5`, not the symmetric 6px (user, 2026-09-26): the figure — or the state dot where a
         // row ends in one — sat hard on the wash's right edge and wanted air.
-        "nb-row group grid items-center gap-x-[5px] w-[calc(100%+12px)] -mx-1.5 pl-1.5 pr-2.5 py-1 rounded-[5px] text-left text-body",
-        "border border-transparent bg-transparent cursor-pointer transition-[background] duration-150",
-        "hover:bg-wash-hover",
+        // 44px on a touch pointer: these rows are the explorer's whole surface and measured 29px on a
+        // phone, a third under the floor with 2px between them (test pass, 2026-10-03).
+        "nb-row group grid items-center gap-x-[5px] w-[calc(100%+12px)] -mx-1.5 pl-1.5 pr-2.5 py-1 pointer-coarse:min-h-11 rounded-[5px] text-left text-body",
+        "border border-transparent bg-transparent transition-[background] duration-150",
+        onClick && "cursor-pointer hover:bg-wash-hover",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
         on && selectedRow(true),
         faint && !on && "opacity-65",
@@ -163,10 +183,12 @@ export default function ExplorerRow({
         // that is +26px, enough to untruncate "Dor Technologies" — while the tag home takes the
         // rest. Stated against the token, so the grammar's one width stays the stylesheet's.
         gridTemplateColumns: hasFigure
-          ? wideBar
-            ? `${glyphW}px minmax(0,${nameCol}) 0px minmax(${nested ? 24 : 36}px,1fr) ${figureCol}`
-            : `${glyphW}px minmax(0,${nameCol}) minmax(0,1fr) ${nested ? 24 : 36}px ${figureCol}`
-          : `${glyphW}px minmax(0,1fr) auto`,
+          ? plain
+            ? `${glyphCol} auto minmax(0,1fr) 0px ${figureCol}`
+            : wideBar
+            ? `${glyphCol} minmax(0,${nameCol}) 0px minmax(${nested ? 24 : 36}px,1fr) ${figureCol}`
+            : `${glyphCol} minmax(0,${nameCol}) minmax(0,1fr) ${nested ? 24 : 36}px ${figureCol}`
+          : `${glyphCol} minmax(0,1fr) auto`,
         ...(on ? selectionHue(hue) : undefined),
         ...pair?.style,
       }}
@@ -188,7 +210,7 @@ export default function ExplorerRow({
         pair?.onBlur();
       }}
     >
-      <span className={cn("flex items-center min-w-0", glyphW > 14 ? "justify-start" : "justify-center")}>{glyph}</span>
+      <span data-glyph={wideGlyph ? "" : undefined} className={cn("flex items-center min-w-0", wideGlyph ? "justify-start" : "justify-center")}>{glyph}</span>
       <span
         className={cn(
           "min-w-0 truncate text-body",
@@ -198,10 +220,15 @@ export default function ExplorerRow({
       >
         {name}
       </span>
-      <span className="min-w-0 truncate flex items-center gap-1 text-label text-muted-foreground">{tag}</span>
+      {/* A TEXT tag ellipsises; a flex container cannot do that for a bare string (its
+          `text-overflow` has no inline box to act on), so "Falkenstein" was cut to "Falkens" with
+          no mark that anything was missing. Chips and dots stay direct children. */}
+      <span className="min-w-0 truncate flex items-center gap-1 text-label text-muted-foreground">
+        {typeof tag === "string" ? <span className="min-w-0 truncate">{tag}</span> : tag}
+      </span>
       {hasFigure && (
         <>
-          <span className="h-[5px] rounded-[3px] bg-wash-faint overflow-hidden">
+          <span className={cn("h-[5px] rounded-[3px] overflow-hidden", !plain && "bg-wash-faint")}>
             {bar && (
               <span
                 className="block h-full rounded-[3px]"
@@ -210,10 +237,11 @@ export default function ExplorerRow({
             )}
           </span>
           <span className={cn("min-w-0 truncate text-right font-mono text-body tabular-nums", nested ? "text-foreground-dim" : "text-foreground")}>
-            {figure}
+            {/* An inline box, so its width is the figure's own — what the Explorer measures. */}
+            <span data-fit-fig="">{figure}</span>
           </span>
         </>
       )}
-    </button>
+    </Tag>
   );
 }

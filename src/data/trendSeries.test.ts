@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { headWord, spanAverage, spanWord, typeBands,
   GLOBAL_METRIC_ROWS,
+  GLOBAL_READING,
   TREND_METRICS,
   globalSeries,
   formatDag,
@@ -523,8 +524,8 @@ describe("metricCaption — what a card says it is showing", () => {
     expect(metricCaption("blocks", HOUR)).toBe("Blocks per hour");
   });
   it("sets off a unit that carries its own noun", () => {
-    expect(metricCaption("fees", DAY)).toBe("Fees · DAG per day");
-    expect(metricCaption("continuity", DAY)).toBe("Continuity · seconds");
+    expect(metricCaption("fees", DAY)).toBe("Fees in DAG per day");
+    expect(metricCaption("continuity", DAY)).toBe("Continuity in seconds");
   });
   it("drops a unit that only repeats the name", () => {
     expect(metricCaption("nodes", DAY)).toBe("Nodes");
@@ -597,7 +598,7 @@ describe("spanAverage", () => {
 describe("headWord", () => {
   it("names the head reading: the day, or the span's average", () => {
     expect(headWord("snapshots", "day")).toBe("latest full day");
-    expect(headWord("snapshots", "span")).toBe("avg per day");
+    expect(headWord("snapshots", "span")).toBe("daily average");
     expect(headWord("nodes", "span")).toBe("average");
   });
 });
@@ -622,5 +623,32 @@ describe("typeBands", () => {
   });
   it("no type history at all is no bands, never a fabricated split", () => {
     expect(typeBands("up", series)).toEqual([]);
+  });
+});
+
+describe("GLOBAL_READING — what the DAG's pinned row is beside the rows below it", () => {
+  it("is a total only where it is the networks' rows added up", () => {
+    expect(GLOBAL_READING.snapshots).toBe("total");
+    expect(GLOBAL_READING.fees).toBe("total");
+    expect(GLOBAL_READING.kb).toBe("total");
+  });
+
+  it("is the DAG's own figure everywhere else — one distinction, so one tag", () => {
+    expect(GLOBAL_READING.nodes).toBe("own");
+    expect(GLOBAL_READING.blocks).toBe("own");
+    expect(GLOBAL_READING.continuity).toBe("own");
+    expect(new Set(Object.values(GLOBAL_READING))).toEqual(new Set(["total", "own"]));
+  });
+
+  it("answers for every measure the explorer can pick", () => {
+    expect(Object.keys(GLOBAL_READING).sort()).toEqual([...METRIC_ORDER].sort());
+  });
+});
+
+describe("the DAG's own nodes are a stored series, like any network's", () => {
+  it("reads f.nodes.dag through metricSeries — never the fleet total", () => {
+    const series = { "f.nodes": [167], "f.nodes.dag": [135], "f.nodes.dor": [17] };
+    expect(metricSeries("nodes", "dag", series).points).toEqual([135]);
+    expect(globalSeries("nodes", series)).toEqual([167]);
   });
 });

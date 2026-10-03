@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { PLANE_PX_W } from "@/src/engine/domain/trendStack";
+import { PLANE_PX_W, planeFormat } from "@/src/engine/domain/trendStack";
 
 // THE TREND STACK's contracts, made executable (2026-09-18 — the boundary-test idiom).
 //
@@ -40,7 +40,9 @@ import { PLANE_PX_W } from "@/src/engine/domain/trendStack";
 //  8. ONE PLANE WIDTH, and it lives in `domain/trendStack.ts`. The projector divides by the same
 //     constant to resolve a slot's scale, so a local copy of the number here would render every
 //     plane at the wrong size with nothing failing anywhere. The check reads the live
-//     `PLANE_PX_W` rather than naming a value, so re-tuning the plane can never quietly retire it.
+//     widths rather than naming a value, so re-tuning the plane can never quietly retire it. The
+//     width is PER TIER since 2026-10-03 (`planeFormat` — the phone authors a narrower card so its
+//     type is legible), so the component reads the format and neither tier's number may appear.
 //
 //  9. THE CHART PRIMITIVE'S PLOT STAYS MEMOISED, AND THE CURSOR STAYS OUT OF IT
 //     (2026-09-19). Measured: with the shared cursor drawn as a recharts `ReferenceLine`, every
@@ -150,16 +152,18 @@ describe("trend-stack boundary", () => {
   it("takes the plane's width from the pose module, never a local number", () => {
     const src = code();
     expect(
-      /PLANE_PX_W/.test(src) && /from\s+["']@\/src\/engine\/domain\/trendStack["']/.test(src),
-      `${FILE} must read PLANE_PX_W from domain/trendStack — the projector divides by the same constant`,
+      /planeFormat\(/.test(src) && /from\s+["']@\/src\/engine\/domain\/trendStack["']/.test(src),
+      `${FILE} must read planeFormat() from domain/trendStack — the projector divides by the same width`,
     ).toBe(true);
     // Not `\b540\b` — a pinned literal stops meaning anything the moment the constant is retuned.
     // This asks the question the rule is actually about: does the file repeat TODAY's width?
-    const bare = new RegExp(`(^|[^\\w.])${PLANE_PX_W}([^\\w]|$)`);
-    expect(
-      bare.test(src),
-      `${FILE} repeats the plane width (${PLANE_PX_W}) as a literal — PLANE_PX_W has one home`,
-    ).toBe(false);
+    for (const w of [PLANE_PX_W, planeFormat(true).pxW]) {
+      const bare = new RegExp(`(^|[^\\w.])${w}([^\\w]|$)`);
+      expect(
+        bare.test(src),
+        `${FILE} repeats a plane width (${w}) as a literal — the format has one home`,
+      ).toBe(false);
+    }
   });
 
   it("hosts a chart whose recharts plot is memoised — a cursor write must not re-render it", () => {

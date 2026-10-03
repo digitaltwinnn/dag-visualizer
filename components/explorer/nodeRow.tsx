@@ -68,6 +68,25 @@ export const tickerOf = (id: string): string => metagraphById(id)?.ticker ?? (id
 // Twelve (was 14 until the ticker moved into its own first column, 2026-09-29): beside that column
 // and the widest tag (three chips and the dot) the id still shows whole — cut once, never twice.
 export const NODE_ID_GLYPHS = 12;
+/** The id's SHORT form, for a cell too narrow for the twelve — a row with three layer pills in a
+ *  rail at its narrowest. */
+const NODE_ID_GLYPHS_SHORT = 8;
+
+/** THE ID IS CUT ONCE, WHATEVER ITS CELL (2026-10-03). `midHash` cuts the id in the middle; a cell
+ *  narrower than that form then cut it AGAIN at the end ("c54ccbe……"), which lost the tail the
+ *  first cut exists to keep. The cell is a size container and prints the form that fits it: the
+ *  twelve-glyph id from 12.5ch up, the eight-glyph one below. `ch` in a container query is the
+ *  CONTAINER's own (the mono face at the row's size), so the threshold follows the fluid type.
+ *  Safe as a container because the name cell is a `minmax(0,1fr)` track — it never needed its
+ *  content's intrinsic width (the trap `bandParts` records). */
+function NodeId({ id }: { id: string }) {
+  return (
+    <span className="@container block w-full">
+      <span className="hidden @[12.5ch]:inline">{midHash(id, NODE_ID_GLYPHS)}</span>
+      <span className="@[12.5ch]:hidden">{midHash(id, NODE_ID_GLYPHS_SHORT)}</span>
+    </span>
+  );
+}
 
 export function nodeRowSpec(args: {
   key: string;
@@ -99,12 +118,14 @@ export function nodeRowSpec(args: {
         ))}
       </span>
     ),
-    name: midHash(id, NODE_ID_GLYPHS),
+    name: <NodeId id={id} />,
     nameMono: true,
     tag: (
       <>
         {codes.length > 0 && <RoleChips codes={codes} tight />}
-        <StateDot state={row.state} />
+        {/* The dot stands CLEAR of the last pill (user, 2026-10-03: "almost no padding between
+            the pills and the status bullet") — its 2px halo ate half of the cell's 4px gap. */}
+        <span className={cn("inline-flex", codes.length > 0 && "ml-1")}><StateDot state={row.state} /></span>
       </>
     ),
     on: args.on,

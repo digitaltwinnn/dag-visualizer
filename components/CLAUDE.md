@@ -248,6 +248,23 @@ decisions inside them are design, not detail:
   one slot behind the deck (`trendStack.morePose`, rendered by `TrendStack` and projected like
   any other anchor) printing only "N more" — no network, no chart, no pointer events; a roster
   that fits shows no ghost.
+  **The DAG is a PINNED row above the list** (user, 2026-10-03: "isn't it basically the
+  hypergraph metrics?" — "ok as pinned row, show that it's the totals of the rows below"): the
+  hypergraph's own reading (`roster.total`, the same pass and head rule its plane uses), above
+  a hairline, with no bar. **ONE tag, and only where it is true**: "total" for the three measures
+  where the figure IS the rows below added up (`GLOBAL_READING`: snapshots, fees, data), and no
+  tag where it is the DAG's own figure — its nodes (`f.nodes.dag`, never the fleet total), its
+  blocks, its cadence — because an untagged row is a network's own, like
+  every row beneath it. Four rounds of wording got here ("total"/"base ledger", "sum of rows
+  below"/"DAG's own", "sum"/"all"/"only" — user: "make it consistent where possible, it's too
+  random"): three tags for three shades of meaning was the randomness. Never ranked among the
+  networks: it would always be first with a full bar. **A click brings the DAG's chart forward and never sets the page filter** (user, same
+  day, two rounds: "don't set the page filter", then "why is the dag pinned row not clickable?
+  we have the chart data, no?"). The DAG's plane — the one the DAG filter always drew — joins the
+  deck at the FRONT while it is the focus (`TrendStack`'s `deck`) and leaves when released, so
+  the resting stack is unchanged and the row runs the same plane focus every other row does.
+  (Parked at the back of the deck it paged the stack to its tail on focus.) It stays out of the
+  RANK and off the shared ceiling: it is what the layers add up to.
   ⚠️ **The roster is computed ONCE, in `components/useTrendRoster.ts`** — the planes, this list and
   the cursor card all read it, counter EDGE TRIM included. A surface reading the payload directly
   is one bucket out of step with the axis, which is exactly how the cursor card briefly quoted
@@ -428,6 +445,19 @@ no height, and the store commits synchronously, so the slot becomes the NEW card
 frame later (the new height is unknowable until React has painted it). Both restore in `fin()` beside
 the position/overflow it already saved.
 
+⚠️ **A FOURTH, 2026-10-03 ("the swipe left/right on the card has some flashes"): THE SLIDE'S
+HOVER-INERT WINDOW HAS TO BE STATED IN CSS.** `commitStep` set `pointer-events: none` inline on its
+wrapper, and the panel inside carries its own `pointer-events-auto` (it must — `#rightcol` is
+inert), so the card was never inert at all: as the lane's height eased under a resting pointer it
+took the hover, wore the pairing ring for ~45ms (its explorer row and scene tile with it) and
+dropped it. The wrapper is marked `data-sliding` for the window and globals.css carries it past
+the class; the same rule holds the incoming card's hover edge dark (a LATCHED `:hover` lit it on
+mount), and the ghost is pointer-inert and edge-less by its own rule. The same report turned up
+two neighbours: `HeightEase` opens an expanding rung's `data-arriving` window WITH THE COMMIT (a
+frame later, the fresh box took the pointer and blinked its ring on, off, on), and `RailShade`
+is `flex-none`, never `min-h-0` — shrinkable, it made `.rail-clip` flip every frame whenever the
+cards overran the lane by less than `--rail-fade`.
+
 **The pull SHOWS THE NEIGHBOUR** (`showPeek`, 2026-09-01 — user: "the new card only appears after
 I've moved the old card … I expect to already see it appearing before that"). A card-shaped peek
 carrying the incoming sibling's NAME rides the same damped travel, one width out on the side it will
@@ -479,7 +509,11 @@ child in the explorer's own order ("just pick the 1st one"). A rung with no chil
 A metagraph snapshot's ∨ opens its first VALIDATOR (2026-09-29), and the node card under it pages
 only the nodes that signed it — `snapshotSignerRows` (`src/data/network.ts`), the same list and
 order as the explorer's signer level, so the two can't disagree about who signed. The sibling trio is CENTERED as one cluster with the ladder pair at the
-right, a hairline between the axes so they never read as one four-way control — and **an
+right, told apart by WEIGHT rather than a divider (2026-10-03, option B of
+`docs/superpowers/design/2026-10-03-card-pager` — user: "a lot of <> and ^^, and also / and |"):
+the pair is drawn smaller and quieter, and **the position is DRAWN, not written** — one small
+square per sibling with the current one lit (the cards' own unit marks), "n of N" in words only
+past fifteen, never a slash. The two axes still never read as one four-way control — and **an
 exhausted direction is INACTIVE while an axis with nothing to ever navigate is ABSENT** (user,
 2026-09-11, two rounds; supersedes 2026-09-03's invisible rule, which predates the pair): a
 direction that ran out mid-set dims — a vanishing chevron re-composes the row at every edge,
@@ -720,7 +754,7 @@ and a track you cannot press is a picture of one. So the timeline re-enables poi
 OWN ROOT and nothing else — every other view's band keeps the charter and the orbit drag keeps
 passing through. The sheets' `sceneCover` clip still governs it: measured, a covered strip hands
 both paint and hit-testing to the sheet above.
-**The track takes the whole band and the window pills stand above its top-right corner** (user,
+**The Time range group stands above the band's right corner again since 2026-10-03** (user: "what about moving the time-range control just above the vitals section, right side?" — it was inside the band, on the left, from 2026-09-29; `TrendTimeline` records all three placements and why, without the "Time range" words: "it's obvious"). The original note: **The track takes the whole band and the window pills stand above its top-right corner** (user,
 2026-09-26, two rounds — first over the corner, then "above the bottom section, not on top of it";
 the band's clip opens its top edge for them, and `BottomStream` reserves their room while the
 band holds the timeline). The band held three columns — the track, a CURSOR readout with a 16ch reserve, the
@@ -1040,7 +1074,15 @@ Moment's readings, a provider's and a country's nodes by network; the compositio
 fact card — its strip and status row were built and removed the same day). Rows that are their own controls wear `CUT_ROW` themselves and
 draw `UnitMarks`, so every card shares the columns. It replaced the stacked bars with a wrapping dot
 legend, the dot · name · track · count rows and the inline network dots — three recipes. A zero part
-is a muted row with no mark. The node card is a record and carries one mark only: the archive REACH
+is a muted row with no mark. **A FOLD IS MARKED ON ITS LABEL, never by a glyph beside the figure** (`foldLabel`,
+user 2026-10-03, two rounds): a chevron in the row's flow pushed that row's figure left of every row
+without one ("numbers should be on the right side and aligned … a structural solution for the >
+space being taken sometimes"), and hung in the card's padding it "touches the edge, there is simply
+no place there for a control". The label that opens a fold wears the dotted underline (the pager
+scope word's affordance), solid and full ink when open — it takes no space, so every figure in a
+card shares one right edge: the dossier's total over its cuts, the global snapshot's rows under
+their total. ⚠️ A row with a `-mx-N` hover wash must be `w-[calc(100%+2N)]`, never `w-full`: at 100% the
+negative margin only shifts the box, and its figures stop 2N short of the edge. The node card is a record and carries one mark only: the archive REACH
 bar, the share of its chain's ordinals it still serves (`archiveReach`, `components/useArchive.ts`).
 
 **Every right-rail card is the same SIX SLOTS in one order** (user, 2026-10-02 — the design and its
@@ -1117,10 +1159,15 @@ to lead with what the present context makes relevant. Three forms, one principle
 
 - **Across cards** — the pile dedup above: a fact moves to whichever plank states it best, never
   duplicated at equal weight.
-- **Within a card** — the node card's SIGNED relation: with a metagraph snapshot committed and the node
-  among its proof signers, the head aside states the relation (`signed` + the L0 chip — the one fact
-  tying the node to the chamber's subject) and the status moves down to the first body row. Nothing
-  lost, redistributed.
+- **Within a card** — the node card's LEAD is contextual (user, 2026-10-02: "in snapshot view it
+  should say something like 'validated snapshot 123'. This should be the principle for that
+  section"): it opens with what the node is TO THE SUBJECT ON SCREEN, then where it sits and who
+  hosts it. With a metagraph snapshot committed and its signer list read, a node of that network
+  reads `Signed snapshot N.` or `Did not sign snapshot N.` and NOTHING ELSE (user, 2026-10-03: "too
+  much text, just say that it signed the snapshot") — the place and host step down into `Location`
+  and `Hosting` fact rows while the relation holds the lead; another network's node has no relation
+  to it and says nothing. The head aside keeps the status. A new view's relation
+  joins the lead the same way — presence-gated, one sentence, before the place.
 - **Across surfaces** — the subject callout mirrors the BOX (`store.boxedCard`, published by Inspector
   from the same state that renders it): the box is the subject — it already gets the camera — so
   re-boxing an ancestor card steps the scene label up with it.
@@ -1423,8 +1470,9 @@ seam and corner rules select on the same markers the thread measures:
 | `#topbar`, `#metapane`, `#tooltip` | Layout and positioning |
 | `canvas.scene-canvas` | `SceneCanvas` renders it; the engine's controls listen on it (the card-drag handoff that once queried it is retired) |
 | `#callout` (+ `data-on`) | The subject callout's 0-size anchor wrapper — `SceneCallout` renders it, `CalloutSync` writes its transform + `data-on` per frame (the Tooltip discipline: position never renders React) |
+| `#callout-2` (+ `data-on`) | The same contract's second anchor — the GLOBAL snapshot's label in Snapshots. Same two homes, same per-frame writes, no multi-leader |
 | `#trend-stack` (+ `data-on`) | The trend view's chart-plane layer — `TrendStack` renders it, the engine queries it to find the planes. It waits at `opacity: 0` and `TrendStackSync` writes `data-on="1"` once the view has ARRIVED (policy `chartStack` + the trend furniture alpha at full), so the stack fades in with the room rather than riding the camera's flight — the `#callout` `data-on` precedent |
-| `[data-plane]` (the network id) | One chart plane, as an ANCHOR + a CHILD. The anchor is a **0-size box at the layer's top-left with `origin-top-left`**, mounted `invisible`; its one child is the `PLANE_PX_W`-wide plane, centred on it by `-translate-x-1/2 -translate-y-1/2`. **React renders the plane and owns everything inside it** plus the anchor's `opacity` / `zIndex` / `pointer-events` (all from the same `PlanePose`); `TrendStackSync` (engine layer) writes the anchor's `transform` — a `matrix3d` translate + uniform scale, never a rotation — and its `style.visibility` per frame. The anchor's geometry IS that matrix's coordinate system, so don't give it a size, an origin or a transform of its own; `components/trendStackBoundary.test.ts` pins it |
+| `[data-plane]` (the network id) | One chart plane, as an ANCHOR + a CHILD. The anchor is a **0-size box at the layer's top-left with `origin-top-left`**, mounted `invisible`; its one child is the plane, `planeFormat(tier).pxW` wide (640 on desktop and tablet; 360 on phone, so the card is drawn at about scale 1 and its type is legible — the projector divides by the same number, and on phone the head drops its unit into the front plot's caption, `unitInPlot`), centred on it by `-translate-x-1/2 -translate-y-1/2`. **React renders the plane and owns everything inside it** plus the anchor's `opacity` / `zIndex` / `pointer-events` (all from the same `PlanePose`); `TrendStackSync` (engine layer) writes the anchor's `transform` — a `matrix3d` translate + uniform scale, never a rotation — and its `style.visibility` per frame. The anchor's geometry IS that matrix's coordinate system, so don't give it a size, an origin or a transform of its own; `components/trendStackBoundary.test.ts` pins it |
 
 ⚠️ The card query is deliberately **depth-agnostic** (filtered to outermost panels): a `:scope >
 .ig-panel` form silently matches nothing once the ladder lane nests the cards.
@@ -1450,6 +1498,43 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
   the same state that renders the box), exactly as the camera answers it; the component picks the
   MODEL and the Engine the ANCHOR from one mirrored preference, falling through to the finest
   committed rung.
+- **Snapshots stands TWO callouts, each on a FIXED anchor** (user, 2026-10-03: "2 callouts"). A
+  committed metagraph snapshot is always read against a global snapshot, and one label could
+  name only one of them. `#callout` is the metagraph snapshot's (its tile) and `#callout-2` the
+  global snapshot's (its bar, or the resolved network's segment of it) — whichever card is boxed.
+  Handing the subject's anchor to the boxed card was the first cut and it re-drew both labels on
+  every re-box, over two subjects that had not changed. A boxed node's label still stands alone.
+  **The Metagraph card has a label too** (user, same day: "the dossier on snapshots page has no
+  callout on the scene" — reversing 2026-08-16's "a lane gets no label", which read as a
+  forgotten card once both snapshots were labelled): the hyper dossier's own model, at the head
+  of the network's lane. It SHARES `#callout` with the metagraph snapshot — the two stand at
+  the same end of the same lane — and takes it when the Metagraph card is the box or no
+  snapshot of that network is committed.
+  **The global one HANGS** (design A of `docs/superpowers/design/2026-10-03-snapshot-callouts`,
+  user: "ok A, but make the angle of the lines the same"): below-left of its bar, into the strip
+  between the floor and the bottom band, on the standing label's own diagonal turned half a
+  circle — `--co-k` shortens both axes by one factor, so the two leaders are parallel. Standing
+  up-right from the floor put its panel over the ribbons. `calloutHangs` (domain, tested) says
+  whether the strip has room; where it has not, the label stands as it always did.
+- **The HOVER card is the name of the thing with its mark** (user, 2026-10-03 — all three of
+  `docs/superpowers/design/2026-10-03-hover-cards`): the same mark (`SceneMark`, shared with the
+  callout), no "click to inspect", no "L0" chip on a global snapshot, and a country is named
+  where only its border lit. **Its colour is the hovered OBJECT's own, never the filter's**
+  (same day): a network's hue, the unlisted neutral, the DAG's identity hue for what is the
+  DAG's (its nodes, its core, a global snapshot), the structural accent only for a country.
+- **A callout wears its card's MARK** before the title (user, 2026-10-03 — picks 1, 4 and 5 of
+  `docs/superpowers/design/2026-10-03-callout-cards`): the cube, the stacked cubes, the globe,
+  the pin, the server, or a network's logo — `iconForPick`, the cards' own glyph home, in the
+  card head's own hue rule. A label and its card pair at a glance instead of by reading both.
+- **The global snapshot's label names BOTH things its bar shows**: the count in the card's word
+  ("3 of 5 snapshots") and the size as a chip on the right ("8.9 of 15 KB"), because the band its
+  ring points at is drawn in BYTES. The size is the exact read's or absent — never estimated.
+  Its aside reads age, then state, the order the card's head uses.
+- **The free band starts under the command bar.** The canvas runs behind the bar, so "near the
+  top" was measured from y = 0 and a label stood up into it; `CalloutSync` hands
+  `calloutPlacement` the bar's bottom edge as `top`.
+- **Ring and leader wear a ground-coloured casing** (same day): a ring in its subject's hue lands
+  on a block of that hue, and the dashed line crosses lit geometry — both read as nothing there.
 - **A hyper NODE's callout points at EVERY layer bead** (the multi-leader, 2026-08-30): a machine
   is one record per layer on separate shells, so up to two extra dashed legs fan **from the
   panel's own corner** (the beads are peers — user's second-round correction of a bead-to-bead

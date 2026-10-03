@@ -8,7 +8,8 @@ import { ROUTED_VIEWS, viewTitle } from "@/components/views";
 // actually shows is store state (RouteSync seeds it from the pathname on mount). In-app switches
 // move between these URLs by shallow pushState, never navigation — the engine must survive.
 //
-// Static by construction: the three params are generated at build and anything else 404s, so a
+// (`/soon`, the placeholder, joined them on 2026-10-03 — see `views.ts`.)
+// Static by construction: the params are generated at build and anything else 404s, so a
 // pushState URL and a hard navigation can never disagree about what exists.
 export const dynamicParams = false;
 
@@ -24,6 +25,9 @@ export async function generateMetadata({ params }: { params: Promise<{ view: str
     title,
     description: def.desc,
     alternates: { canonical: `/${def.slug}` },
+    // The placeholder is a real URL (so the address bar is honest and a reload stays put) but not
+    // a page to index: it is a gallery of wireframes with no content of its own.
+    ...(def.soon ? { robots: { index: false, follow: true } } : {}),
     openGraph: { title, description: def.desc, type: "website", url: `/${def.slug}`, siteName: "DAG Visualizer" },
     twitter: { card: "summary_large_image", title, description: def.desc },
   };

@@ -5,6 +5,10 @@ import {
   CALLOUT_OFF_Y,
   CALLOUT_REACH_X,
   CALLOUT_REACH_Y,
+  CALLOUT_HANG_K,
+  CALLOUT_HANG_REACH_X,
+  CALLOUT_HANG_REACH_Y,
+  calloutHangs,
   calloutPlacement,
 } from "./calloutPlacement";
 
@@ -108,5 +112,45 @@ describe("CALLOUT_LEG_INSET", () => {
   it("is a small positive inset inside the leader's run", () => {
     expect(CALLOUT_LEG_INSET).toBeGreaterThan(0);
     expect(CALLOUT_LEG_INSET).toBeLessThan(CALLOUT_OFF_Y);
+  });
+});
+
+describe("calloutHangs — the second Snapshots label, below-left of its bar", () => {
+  // Measured live at 1600×900: the global snapshot's bar projects to about (772, 574) and the
+  // bottom band's top edge sits at 770.
+  const BAR = { x: 772, y: 574 };
+  const BAND_TOP = 770;
+
+  it("hangs into the strip between the floor and the band on a desktop frame", () => {
+    expect(calloutHangs(BAR.x, BAR.y, DESKTOP.l, DESKTOP.r, BAND_TOP - 10)).toBe(true);
+  });
+
+  it("declines when the strip is too short, so the caller stands the label where it always stood", () => {
+    // A 780px-high window: the band rides up and the floor's bar sits close above it.
+    expect(calloutHangs(BAR.x, 520, DESKTOP.l, DESKTOP.r, 650)).toBe(false);
+  });
+
+  it("declines when the panel would run off the band's left edge", () => {
+    expect(calloutHangs(CALLOUT_HANG_REACH_X - 1, BAR.y, DESKTOP.l, DESKTOP.r, BAND_TOP)).toBe(false);
+    expect(calloutHangs(TABLET_EXPLORE.l + 40, BAR.y, TABLET_EXPLORE.l, TABLET_EXPLORE.r, 2000)).toBe(false);
+  });
+
+  it("declines an anchor outside the band, and a band that does not exist", () => {
+    expect(calloutHangs(100, BAR.y, TABLET_EXPLORE.l, TABLET_EXPLORE.r, 2000)).toBe(false);
+    expect(calloutHangs(BAR.x, BAR.y, 600, 600, 2000)).toBe(false);
+  });
+
+  it("shortens BOTH axes by one factor — the leader keeps the standing label's angle", () => {
+    // The reach is the scaled standoff plus the panel, on each axis. A factor applied to one
+    // axis alone would turn the line, which is the one thing the hang must not do.
+    expect(CALLOUT_HANG_K).toBeGreaterThan(0);
+    expect(CALLOUT_HANG_K).toBeLessThan(1);
+    expect(CALLOUT_HANG_REACH_X - (CALLOUT_REACH_X - CALLOUT_OFF_X)).toBe(Math.round(CALLOUT_OFF_X * CALLOUT_HANG_K));
+    expect(CALLOUT_HANG_REACH_Y).toBeGreaterThan(Math.round(CALLOUT_OFF_Y * CALLOUT_HANG_K));
+  });
+
+  it("mirrors the factor app/globals.css hardcodes", () => {
+    // :is(#callout, #callout-2)[data-hang] { --co-k: 0.55 } — change both or neither.
+    expect(CALLOUT_HANG_K).toBe(0.55);
   });
 });

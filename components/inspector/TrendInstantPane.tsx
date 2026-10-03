@@ -103,9 +103,12 @@ export default function TrendInstantPane({
   // moment's AGE now) — the note below still names the precision where a reader needs it.
   const fmt = (v: number | null) => (v != null ? format(v) : NO_READING);
 
-  // THE SPAN A DOOR CARRIES: the brushed range if one stands, else the window on screen. One
-  // helper, shared with the document (`components/trendDoors.ts`).
-  const span = range ?? spanOfWindow(buckets, stepMs);
+  // THE SPAN THIS CARD'S DOOR CARRIES IS THE MOMENT (the search pass, 2026-10-02). It handed the
+  // brushed range, else the whole window on screen — the document's rule, where a chart's link is
+  // about a span. But this card states ONE instant, and its door landed the reader a month away
+  // from it (the 30-day window's first day). The bucket the cursor sits in is the span here; the
+  // window is only the fallback for a cursor with no bucket.
+  const span = bucket != null ? { fromMs: bucket, toMs: bucket + stepMs } : (range ?? spanOfWindow(buckets, stepMs));
 
   // THE UNMOUNT BACKSTOP (convention 9's other half): a row that leaves the roster under a
   // stationary pointer — a filter commit, a re-rank that drops it — never fires its own leave, and
@@ -175,10 +178,9 @@ export default function TrendInstantPane({
                         one network, and "1 of 1" says nothing (user, 2026-09-26). */}
                     {rank && rank.of > 1 && (
                       <span
-                        className="text-body font-normal text-muted-foreground"
+                        className="ml-2 text-body font-normal text-muted-foreground"
                         title={`Ranked among the ${rank.of} network${rank.of === 1 ? "" : "s"} with a reading at this instant`}
                       >
-                        {" · "}
                         <span className="tabular-nums">
                           {rank.rank} of {rank.of}
                         </span>
@@ -243,7 +245,7 @@ export default function TrendInstantPane({
                           // `block w-full`: this is the one `.nb-row` whose content is a single
                           // flex row rather than its own flex children, so it has to claim the
                           // width the row grammar assumes (label left, value right, one line).
-                          "nb-row block w-full -mx-1 px-1 py-[3px] rounded-sm cursor-pointer text-left bg-transparent border-0",
+                          "nb-row block w-[calc(100%+8px)] -mx-1 px-1 py-[3px] rounded-sm cursor-pointer text-left bg-transparent border-0",
                           "hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
                           on && SELECTED_ROW,
                           pair.paired && pair.className,
@@ -284,8 +286,8 @@ export default function TrendInstantPane({
                 disabled={!span}
                 title={
                   subject && subject !== "dag"
-                    ? "Opens the anchor log at this span, with this network in the search."
-                    : "Opens the anchor log at this span, across every network."
+                    ? "Opens the snapshot log at this moment, for this network."
+                    : "Opens the snapshot log. To jump to this moment, pick a network in the top bar first."
                 }
                 onClick={() => openRecords(subject, span)}
                 className={cn(
@@ -299,7 +301,7 @@ export default function TrendInstantPane({
                   // and the corners square there (`--foot-radius`, which RailPager zeroes).
                   "-mx-[var(--card-pad)] px-[var(--card-pad)] py-2.5",
                   "mb-[var(--foot-mb,calc(0px-var(--card-pad)))]",
-                  "rounded-b-[var(--foot-radius,calc(var(--radius)-1px))] border-t border-wash-strong bg-wash-faint hover:bg-wash-soft",
+                  "rounded-b-[var(--foot-radius,calc(var(--radius)-1px))] border-t border-wash-strong [background:light-dark(var(--wash-soft),var(--wash-faint))] hover:[background:light-dark(var(--wash-hover),var(--wash-soft))]", // the Door's own per-ground wash (parts.tsx)
                   "disabled:opacity-45 disabled:pointer-events-none",
                   "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                 )}
@@ -314,7 +316,7 @@ export default function TrendInstantPane({
           )}
         </div>
       )}
-      <PulseEdge pulseKey={pulseKey} rail="right" />
+      <PulseEdge pulseKey={pulseKey} rail="right" off={collapsed} />
     </RailPane>
   );
 }

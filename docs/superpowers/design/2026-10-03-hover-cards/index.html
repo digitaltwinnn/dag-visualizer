@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hover cards — suggested changes</title>
+<style>
+:root{--bg:oklch(0.09 0.02 265);--fg:oklch(0.94 0.02 255);--dim:#c7d0ea;--muted:oklch(0.66 0.04 265);--primary:oklch(0.88 0.13 195);
+--border:rgba(90,140,255,.22);--glass:rgba(8,12,26,.92);--dor:oklch(0.74 0.19 41);--cmc:oklch(0.74 0.15 230);
+--sel-bg:color-mix(in oklch,var(--primary) 12%,transparent);--sel-border:color-mix(in oklch,var(--primary) 52%,transparent);
+--label:12.2px;--body:14.3px;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+*{box-sizing:border-box}html{color-scheme:dark}
+body{margin:0;background:radial-gradient(1200px 600px at 60% 0%,#0b1230 0%,var(--bg) 60%);color:var(--fg);font:var(--body)/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:32px 40px 96px}
+h1{font-size:24px;font-weight:600;margin:0 0 6px}
+p.lede{color:var(--dim);max-width:80ch;margin:0}
+h2{font-size:18px;font-weight:600;margin:52px 0 6px;display:flex;gap:12px;align-items:center}
+h2 .n{flex:none;width:26px;height:26px;border-radius:50%;background:var(--primary);color:#06121a;font:700 14px/26px system-ui;text-align:center}
+p.why{color:var(--dim);max-width:78ch;margin:0 0 14px 38px}
+.row{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;margin-left:38px}
+.cell .h{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.arrow{align-self:center;color:var(--muted);font-size:22px;padding-top:16px}
+.shot{display:block;border:1px solid var(--border);border-radius:8px}
+.bk{display:flex;flex-direction:column;gap:10px;align-items:flex-start;background:#000;padding:12px;border:1px solid var(--border);border-radius:8px}
+.hv{display:inline-flex;align-items:center;gap:8px;white-space:nowrap;background:var(--glass);border:1px solid var(--border);border-radius:7px;padding:8px 12px}
+.tt{font-size:var(--body);font-weight:600;font-variant-numeric:tabular-nums}.tt.m{font-family:var(--mono)}
+.tk{font-size:var(--label);font-weight:600;color:var(--dor);border:1px solid var(--border);border-radius:4px;padding:2px 6px;line-height:1.2;background:rgba(90,140,255,.06)}.tk.cmc{color:var(--cmc)}.tk.core{color:var(--primary)}
+.mu{font-size:var(--label);color:var(--muted);margin-left:6px;opacity:.75}
+.new{outline:1px dashed oklch(0.80 0.16 85);outline-offset:3px;border-radius:3px}
+svg.ic{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;color:var(--primary)}
+.logo{width:15px;height:15px;border-radius:50%;background:var(--dor);flex:none}
+.rec{border:1px solid var(--sel-border);background:var(--sel-bg);border-radius:8px;padding:12px 16px;font-size:13.5px;margin-top:52px;max-width:86ch}
+.rec b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;margin-right:8px;font-size:var(--label)}
+</style></head><body>
+
+<h1>Hover cards — suggested changes</h1>
+<p class="lede">The hover card is the one-line label that follows the pointer over the scene. Three suggestions, each shown as it is today and as it would look; a dashed yellow frame marks what is new. Answer with the numbers you want. Nothing here is built. (Two plain fixes are already in: a node's id is now cut the same way as on its card, and an unlisted snapshot hovers in the neutral grey.)</p>
+
+<h2><span class="n">1</span>Say what the thing is: the card's mark, and no "L0"</h2>
+<p class="why">Over a global snapshot the hover shows a bare number and an "L0" chip that looks like a layer. Over a metagraph snapshot it shows another bare number. Nothing says which kind of thing the pointer is on. The callouts now wear their card's mark; the hover wears the same one, and the "L0" chip goes.</p>
+<div class="row">
+ <div class="cell"><div class="h">Now</div><img class="shot" src="now-global.webp" width="244" height="62" alt=""><div style="height:10px"></div><img class="shot" src="now-node.webp" width="296" height="62" alt=""></div>
+ <div class="arrow">→</div>
+ <div class="cell"><div class="h">Suggested</div><div class="bk">
+  <div class="hv"><svg class="ic new" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><span class="tt">6,995,319</span><span class="mu">click to inspect</span></div>
+  <div class="hv"><svg class="ic new" viewBox="0 0 24 24" style="color:var(--dor)"><path d="M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42Z"/><path d="m7 16.5-4.74-2.85"/><path d="m7 16.5 5-3"/><path d="M7 16.5v5.17"/><path d="M12 13.5V19l3.97 2.38a2 2 0 0 0 2.06 0l3-1.8a2 2 0 0 0 .97-1.71v-3.24a2 2 0 0 0-.97-1.71L17 10.5l-5 3Z"/><path d="m17 16.5-5-3"/><path d="m17 16.5 4.74-2.85"/><path d="M17 16.5v5.17"/><path d="M7.97 4.42A2 2 0 0 0 7 6.13v4.37l5 3 5-3V6.13a2 2 0 0 0-.97-1.71l-3-1.8a2 2 0 0 0-2.06 0l-3 1.8Z"/><path d="M12 8 7.26 5.15"/><path d="m12 8 4.74-2.85"/><path d="M12 13.5V8"/></svg><span class="tt">28,675,897</span><span class="tk">DOR</span><span class="mu">click to inspect</span></div>
+  <div class="hv"><svg class="ic new" viewBox="0 0 24 24" style="color:var(--cmc)"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg><span class="tt m">77f7f6e…c194</span><span class="tk cmc">CMC</span><span class="mu">click to inspect</span></div>
+  <div class="hv"><span class="logo new"></span><span class="tt">Dor Technologies</span><span class="tk">DOR</span><span class="mu">click to inspect</span></div>
+ </div></div>
+</div>
+
+<h2><span class="n">2</span>Drop "click to inspect"</h2>
+<p class="why">It is on every hover card, and the pointer already turns into a hand over anything clickable. Without it the card is just the name of the thing. Drawn here together with the marks from 1.</p>
+<div class="row">
+ <div class="cell"><div class="h">Now</div><img class="shot" src="now-node.webp" width="296" height="62" alt=""></div>
+ <div class="arrow">→</div>
+ <div class="cell"><div class="h">Suggested</div><div class="bk">
+  <div class="hv"><svg class="ic" viewBox="0 0 24 24" style="color:var(--cmc)"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg><span class="tt m">77f7f6e…c194</span><span class="tk cmc">CMC</span></div>
+  <div class="hv"><svg class="ic" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><span class="tt">6,995,319</span></div>
+ </div></div>
+</div>
+
+<h2><span class="n">3</span>Name the country under the pointer, in Geography</h2>
+<p class="why">Moving over land lights the country's border, but nothing says which country it is until you click. The hover card would name it, with the pin its card wears.</p>
+<div class="row">
+ <div class="cell"><div class="h">Now</div><div class="bk"><span style="color:var(--muted);font-size:13px">no hover card — only the border lights</span></div></div>
+ <div class="arrow">→</div>
+ <div class="cell"><div class="h">Suggested</div><div class="bk">
+  <div class="hv new"><svg class="ic" viewBox="0 0 24 24"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg><span class="tt">Germany</span></div>
+ </div></div>
+</div>
+
+<div class="rec"><b>My picks</b>All three. 1 and 2 together turn the hover into the name of the thing with its mark, which is what the callout and the card already are. 3 fills the one place where the scene reacts to the pointer without saying what it is pointing at.</div>
+
+</body></html>

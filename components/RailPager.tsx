@@ -51,6 +51,7 @@
 //   - and what the track would buy — a new card sliding in — is a second arrival signal competing
 //     with the title roll-in and edge pulse that already answer the step.
 // The actionable half of the challenge was the FEEL, which is the flick and the render fix above.
+import { cn, TOUCH_HIT } from "@/lib/utils";
 import {
   useEffect,
   useMemo,
@@ -67,6 +68,7 @@ import { childStep, siblingSet, type SiblingState } from "@/components/railSibli
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { latestRelevant } from "@/src/data/follow";
 import { getAnchor } from "@/src/data/network";
+import { LISTED_IDS } from "@/src/data/unlisted";
 import { tickInStory } from "@/src/data/ledgerStory";
 import { POLL } from "@/src/engine/config";
 import { Button } from "@/components/ui/button";
@@ -154,6 +156,8 @@ const slideGap = (): number => {
 };
 
 const SLIDE_MS = 820;
+/** The longest sibling set whose position is drawn as squares; beyond it the strip says "n of N". */
+const POSITION_MARKS_MAX = 15;
 const SLIDE_EASE = "cubic-bezier(0.45, 0.05, 0.25, 1)";
 
 // THE LANE'S SOFT EDGE (user, 2026-09-10: "the card swipe has a hard edge against which it
@@ -187,6 +191,9 @@ const FLICK_V = 0.35; // px/ms at release — a throw this fast commits regardle
 const FLICK_MS = 90; // velocity is measured over this trailing window, never off one sample:
 // a finger that pauses before lifting reads ~0 (correctly — a pause then lift is not a flick),
 // but a genuine throw's last sample can land 2ms before pointerup and read as noise either way.
+
+/** A plank chevron: 24px to the eye, a thumb-sized target on touch (`TOUCH_HIT`). */
+const PLANK_BTN = cn("size-6 disabled:opacity-30", TOUCH_HIT);
 
 export default function RailPager({
   slot,
@@ -254,6 +261,7 @@ export default function RailPager({
       metaSnap,
       selNodes,
       metaList,
+      isListed: (id) => LISTED_IDS.has(id),
       countries: leaderboard?.countries ?? [],
       // The metaSnap pager reads its committed pair's rows; the snap slot's DOWN step (first
       // channel row of the boxed tick) reads its own tick's exact rows.
@@ -458,8 +466,17 @@ export default function RailPager({
     // slide's own window; the plank stays interactive (its group is pointer-events-auto, which
     // overrides the ancestor), so rapid chevron stepping keeps working. Restored in fin(), at
     // which point whatever sits under the pointer hovers normally — a resting state, no flash.
+    // ⚠️ …AND THE INLINE STYLE ALONE NEVER REACHED THE CARD (user, 2026-10-03: "the swipe
+    // left/right on the card has some flashes"). `pointer-events` inherits, and the panel inside
+    // states its own `pointer-events-auto` (it must — `#rightcol` is inert), so the wrapper's
+    // `none` stopped at the wrapper. Measured on a chevron step: the lane's height eased, the
+    // plank moved out from under a resting pointer, the card took the hover and wore the
+    // pairing ring for 46ms — its explorer row and scene tile lighting with it — and lost it
+    // when the plank came back. `data-sliding` is the same window stated where CSS can carry it
+    // past that class (globals.css, beside the arriving rule); the plank stays live.
     const prevPE = el.style.pointerEvents;
     el.style.pointerEvents = "none";
+    el.dataset.sliding = "";
     void el.offsetWidth; // flush, so both start their slide together
     el.style.transition = `transform ${SLIDE_MS}ms ${SLIDE_EASE}`;
     el.style.transform = "";
@@ -476,6 +493,7 @@ export default function RailPager({
       el.style.transition = "none";
       el.style.transform = "";
       el.style.pointerEvents = prevPE;
+      delete el.dataset.sliding;
     };
     pending.current = { fin, t: setTimeout(() => { pending.current = null; fin(); }, SLIDE_MS + 40) };
     // The new card's height is only knowable after React has painted it, so the lane's ease is armed
@@ -676,7 +694,7 @@ export default function RailPager({
           role="group"
           aria-label={set ? (set.open ? `Step through ${set.parentLabel}` : `Siblings in ${set.parentLabel}`) : "Card ladder"}
           title={set?.parentLabel}
-          className="pointer-events-auto absolute bottom-1 inset-x-[19px] flex h-5 items-center gap-1"
+          className="pointer-events-auto absolute bottom-1 inset-x-[19px] grid h-5 grid-cols-[1fr_auto_1fr] items-center"
         >
           {/* An edge chevron is INACTIVE, not hidden — but an AXIS with nothing to navigate on
               this card EVER is ABSENT (user, 2026-09-11, two rounds; supersedes 2026-09-03's
@@ -688,14 +706,19 @@ export default function RailPager({
               The trio is CENTERED as one cluster — chevrons hugging the counter — rather than
               spread to the card edges (user, same day: with the ladder pair aboard, an
               edge-aligned › sat right beside ∧; the flex spacers put clear air between the two
-              axes instead). */}
-          <div className="min-w-0 flex-1" />
-          {set && (
-            <>
+              axes instead).
+              ⚠️ CENTRED ON THE CARD, NOT ON THE ROOM LEFT OVER (user, 2026-10-03: "the <> control
+              at the card bottom should be center aligned"). As a flex row with two spacers the
+              trio centred in whatever the ladder pair did not take — 33px left of the card's
+              middle. Three columns, `1fr auto 1fr`: the trio owns the middle one, the pair sits
+              at the end of the third, and the first is its mirror — empty, but as wide. */}
+          <span aria-hidden />
+          {set ? (
+            <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className="size-6 disabled:opacity-30"
+                className={PLANK_BTN}
                 disabled={!prev}
                 onClick={() => commitStep(-1)}
                 aria-label={prev ? `Previous: ${prev.label}` : "Previous"}
@@ -706,13 +729,41 @@ export default function RailPager({
               {/* An OPEN set shows NO position (user, 2026-08-09): the global chain is ongoing,
                   so `n / N` would state a total the window doesn't have. The min-width keeps the
                   chevron spacing identical across the variants. */}
-              <div className="min-w-[3ch] whitespace-nowrap text-center text-label uppercase tracking-caps text-muted-foreground tabular-nums">
-                {set.open ? "" : `${set.index + 1} / ${set.items.length}`}
-              </div>
+              {/* THE POSITION IS DRAWN, NOT WRITTEN (user, 2026-10-03: "the card bottom has a lot
+                  of <> and ^^, and also / and | — can it be designed a bit nicer?"; option B of
+                  `docs/superpowers/design/2026-10-03-card-pager`). One small square per card,
+                  the current one lit — the cards' own way of counting (`UnitMarks`), so the
+                  strip carries no digits and no slash. A set too long for squares says it in
+                  words, "37 of 213". The count stays available to AT and on hover. */}
+              {set.open ? (
+                <div className="min-w-[3ch]" />
+              ) : set.items.length <= POSITION_MARKS_MAX ? (
+                <div
+                  role="img"
+                  aria-label={`${set.index + 1} of ${set.items.length}`}
+                  title={`${set.index + 1} of ${set.items.length}`}
+                  className="flex items-center gap-[3px] px-0.5"
+                >
+                  {set.items.map((_, k) => (
+                    <i
+                      key={k}
+                      className={
+                        k === set.index
+                          ? "size-[7px] rounded-[1px] bg-[var(--filter-accent,var(--primary))]"
+                          : "size-[5px] rounded-[1px] bg-muted-foreground/45"
+                      }
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="min-w-[3ch] whitespace-nowrap text-center text-label text-muted-foreground tabular-nums">
+                  <span className="font-semibold text-foreground">{(set.index + 1).toLocaleString()}</span> of {set.items.length.toLocaleString()}
+                </div>
+              )}
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className="size-6 disabled:opacity-30"
+                className={PLANK_BTN}
                 disabled={!next}
                 onClick={() => commitStep(1)}
                 aria-label={next ? `Next: ${next.label}` : "Next"}
@@ -720,40 +771,41 @@ export default function RailPager({
               >
                 <ChevronRight aria-hidden className="size-4" />
               </Button>
-              <div className="min-w-0 flex-1" />
-            </>
+            </div>
+          ) : (
+            <span aria-hidden />
           )}
           {/* THE LADDER PAIR (user, 2026-09-11) — ∧ re-boxes the coarser committed rung, ∨ the
               finer one (the accordion's own expand — the camera and callout follow the box as
               they always do), and with nothing finer committed ∨ commits the rung's FIRST child
               in the explorer's own order. Same chrome-less grammar, same inactive-at-the-edge
-              rule; the hairline keeps the two axes from reading as one four-way control. */}
+              rule. The two axes are told apart by WEIGHT, not by a line (2026-10-03): the pair is
+              drawn smaller and quieter, so it reads as the lesser control without a divider. */}
           {(up || down) && (
-            <>
-              {set && <div aria-hidden className="mx-0.5 h-3 w-px bg-border" />}
+            <div className="flex items-center justify-self-end gap-1">
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className="size-6 disabled:opacity-30"
+                className={cn(PLANK_BTN, "text-muted-foreground")}
                 disabled={!up}
                 onClick={() => up?.()}
                 aria-label="Open the coarser card"
                 title="Open the coarser card"
               >
-                <ChevronUp aria-hidden className="size-4" />
+                <ChevronUp aria-hidden className="size-3.5" />
               </Button>
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className="size-6 disabled:opacity-30"
+                className={cn(PLANK_BTN, "text-muted-foreground")}
                 disabled={!down}
                 onClick={() => down?.run()}
                 aria-label={down?.label ?? "Open the finer card"}
                 title={down?.label}
               >
-                <ChevronDown aria-hidden className="size-4" />
+                <ChevronDown aria-hidden className="size-3.5" />
               </Button>
-            </>
+            </div>
           )}
         </div>
       </div>

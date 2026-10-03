@@ -1,12 +1,13 @@
 "use client";
 
+import { useMemo } from "react";
 import Explorer, { type ExplorerLevelSpec } from "@/components/explorer/Explorer";
-import { IdentityDot } from "@/components/inspector/parts";
+import { IdentityDot, QualifierChip } from "@/components/inspector/parts";
 import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
-import { METRIC_LABELS, METRIC_ORDER, headWord, metricUnit, spanWord } from "@/src/data/trendSeries";
+import { GLOBAL_READING, METRIC_LABELS, METRIC_ORDER, headWord, metricUnit, spanWord } from "@/src/data/trendSeries";
 import { spanPhrase } from "@/src/data/trendWindow";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -70,7 +71,22 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   // 2026-09-29: "didn't we agree to keep it consistent … like the card"). Over a window of a day
   // or more that is the span's average per day; under a day (1H, a short brush) there is no
   // measured day inside the span to average, so both say the latest full day.
-  const over = roster.headKind === "span" ? `${spanWord(metric)} · ${spanPhrase(windowId, range)}` : "Latest full day";
+  // THE SPAN IS A CHIP, NOT A CLAUSE (user, 2026-10-03: "same for 'last 30 days' in the explorer —
+  // such dynamic values shouldn't be plain text"). The hint's words are fixed; the span is the one
+  // part that changes with the Time range, so it wears the qualifier chip the cards' leads use for
+  // a value that moves (the snapshot card's age) instead of trailing a mid-dot.
+  const over =
+    roster.headKind === "span" ? (
+      // The chip is an INDICATOR at the row's right end, not a word in the sentence (user, same
+      // day: "right align it, as an indicator, not part of the actual text") — the Lead's own
+      // sentence-left, chip-right row.
+      <span className="flex items-center justify-between gap-2">
+        <span className="min-w-0">{spanWord(metric)}.</span>
+        <QualifierChip className="flex-none">{spanPhrase(windowId, range)}</QualifierChip>
+      </span>
+    ) : (
+      "Latest full day."
+    );
   const empty = scopeEmptyCopy(roster.scope, "view");
 
   // THE WHOLE ROSTER, NO PAGER (user, 2026-09-28, two rounds). The card paged for nine days — first
@@ -86,11 +102,50 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   // The unmount backstop for the pairing — a row that leaves the roster under a stationary pointer
   // (a filter commit, a re-rank) never fires its own leave. Every write goes through the RETURNED
   // setter, so the hook releases only hovers this card set.
-  const setHover = useHoverRelease(hoverFilter, ranked, setHoverFilter);
+  const hoverIds = useMemo(() => (roster.total ? [...ranked, "dag"] : ranked), [ranked, roster.total]);
+  const setHover = useHoverRelease(hoverFilter, hoverIds, setHoverFilter);
 
   // The bar: each network's last reading as a share of the busiest — the ranking the stack's depth
   // already carries, made visible in the list.
   const maxLast = Math.max(1e-9, ...ranked.map((id) => rows.get(id)?.head ?? 0));
+
+  // THE DAG, PINNED ABOVE THE LIST (user, 2026-10-03: "should dag be added to the explorer trend
+  // page? isn't it basically the hypergraph metrics?" — "ok as pinned row, show that it's the
+  // totals of the rows below"). It is the hypergraph's own reading, the figure its plane opens
+  // with under the DAG filter. Ranked among the networks it would always stand first with a full
+  // bar and flatten the shared scale — for snapshots, fees and data it IS their sum — so it
+  // stands apart: above the hairline, no bar, and a chip saying what it is beside them. That
+  // chip is honest per measure (`GLOBAL_READING`): a sum only where it is the rows added up.
+  const total = roster.total;
+  // ONE TAG, AND ONLY WHERE IT IS TRUE (user, 2026-10-03, after "total"/"base ledger", then
+  // "sum of rows below"/"DAG's own", then "sum"/"all"/"only": "make it consistent where
+  // possible, it's too random"). The row is either the rows below added up — tagged "total",
+  // his own word for it — or the DAG's own figure, the same kind every row below states for
+  // itself, which needs no tag because an untagged row is a network's own. Three tags for three
+  // shades of meaning was the randomness; `GLOBAL_READING` is the one distinction left.
+  const isTotal = GLOBAL_READING[metric] === "total";
+  const totalWhy = isTotal ? "The networks below, added up" : "The DAG's own, like each network below";
+  const lead =
+    total && !empty
+      ? {
+          key: "dag-total",
+          glyph: <IdentityDot hue={total.hue} />,
+          name: "DAG",
+          tag: isTotal ? <QualifierChip>total</QualifierChip> : undefined,
+          hue: total.hue,
+          figure:
+            slice.stale ? <NodeStars count={3} /> : total.head != null ? format(total.head) : roster.pending || (roster.headKind === "day" && roster.dayPending) ? <NodeStars count={3} /> : <span className="text-muted-foreground" title={NO_READING}>—</span>,
+          title: `DAG. ${totalWhy}. ${total.head != null ? `${format(total.head)}${unit ? ` ${unit}` : ""}, ${headWord(metric, roster.headKind)}` : NO_READING}`,
+          // THE ROW BRINGS THE DAG'S CHART FORWARD, like every row below it (user, 2026-10-03:
+          // "why is the dag pinned row not clickable? we have the chart data, no?"). Its plane
+          // joins the front of the deck while it is the focus (`TrendStack`), so this is the same
+          // plane focus the other rows run. It NEVER sets the page filter (same day: "don't set the page filter") —
+          // the first cut did, and re-scoped the whole app from a row that states one number.
+          on: focus === "dag",
+          onClick: () => applyClickActions(trendPlaneActions("dag", focus)),
+          pair: subjectPairing(hoverFilter, "dag", setHover, total.hue),
+        }
+      : undefined;
 
   const level: ExplorerLevelSpec = {
     key: "networks",
@@ -108,6 +163,7 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
     figureW: 64,
     // No fabricated rows (rule 10): the two commits the trends store keeps nothing for say so in
     // the same sentences the stack and the document say them in.
+    lead,
     empty: empty ? `${empty.fact} ${empty.route}` : "Waiting for the measured history…",
     rows: empty
       ? []
@@ -155,7 +211,9 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
       // As short as the other explorers' hints (user, 2026-09-28: "way too verbose").
       // The hint NAMES THE SPAN the figures are over (design A) — the one place the list says
       // which time it is about.
-      hint={empty ? null : `${over}. Pick one to bring it forward.`}
+      // The span alone (user, 2026-10-03: remove "Pick one to bring it forward."): rows that
+      // highlight under the pointer already say they can be picked.
+      hint={empty ? null : over}
       levels={[level]}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => setHover(null)}

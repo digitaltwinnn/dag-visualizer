@@ -61,7 +61,7 @@ export function MeasureMenu({ measure }: { measure: MeasureControl | null }) {
         // A padded box like the setting pill's, so the two are one control species; the open
         // state takes the wash.
         className={cn(
-          "inline-flex items-center gap-1 rounded-sm px-1.5 -mr-1.5 py-[3px] min-h-6 text-label tracking-caps uppercase text-foreground select-none cursor-pointer",
+          "inline-flex items-center gap-1 rounded-sm px-1.5 -mr-1.5 py-[3px] min-h-6 pointer-coarse:min-h-10 text-label tracking-caps uppercase text-foreground select-none cursor-pointer",
           "hover:bg-wash-hover data-[state=open]:bg-wash-soft",
           "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
         )}
@@ -88,7 +88,8 @@ export function MeasureMenu({ measure }: { measure: MeasureControl | null }) {
               )}
             >
               <span>{o.label}</span>
-              {o.unit && <span className="text-label text-muted-foreground">{o.unit}</span>}
+              {/* A unit that only repeats the label is left out ("Nodes", never "Nodes nodes"). */}
+              {o.unit && o.unit.toLowerCase() !== o.label.toLowerCase() && <span className="text-label text-muted-foreground">{o.unit}</span>}
             </DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>
@@ -112,7 +113,10 @@ export default function ExplorerHeading({
 }) {
   return (
     <div className={cn("flex items-end justify-between gap-2.5 min-h-[22px] border-b border-border pb-[5px] mb-1.5", className)}>
-      {hint != null && <p className="m-0 min-w-0 text-label text-muted-foreground">{hint}</p>}
+      {/* `flex-1`: the hint OWNS the row's width, so a hint that carries a right-hand indicator
+          (History's span chip) can push it to the card's edge — content-sized, its own flex row
+          had no room to spread. */}
+      {hint != null && <p className="m-0 min-w-0 flex-1 text-label text-muted-foreground">{hint}</p>}
       {setting != null && <span className="ml-auto flex-none">{setting}</span>}
     </div>
   );

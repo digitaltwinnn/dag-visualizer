@@ -31,8 +31,13 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 //    the scene takes the band's reserve back; the vitals stay one rotation away. 500 clears every
 //    landscape phone and touches no tablet (the shortest, an iPad mini landscape, is 744).
 const RESERVE = 112; // --vitals-h (104px, globals.css) + 8px clearance above the band — keep the pair in step
-// (The History pills stood ABOVE the plate from 2026-09-26 and reserved 44px for it; since the
-// 2026-09-29 control-strip round they live INSIDE the band, so the reserve is the band's alone.)
+/** The Time range group STANDS ABOVE the plate in History (2026-09-26, inside the band from
+ *  2026-09-29, above again since 2026-10-03 — `TrendTimeline` has the three reasons): a 32px
+ *  group plus its 12px gap, which the rails must clear too, or a tall right rail's last card sits
+ *  under it. Reserved only while the band holds the timeline — a policy row, not a mode compare. */
+const PILLS_ABOVE = 44;
+/** The same for a vitals band's shared-window chip: a 22px chip plus its 8px gap. */
+const CHIP_ABOVE = 30;
 
 export default function BottomStream() {
   const mode = useStore((s) => s.mode);
@@ -58,7 +63,9 @@ export default function BottomStream() {
   // other gate still unmounts — there is nothing to slide when the lane does not apply.
   const applicable = VIEW_POLICIES[mode].vitalsLane && section === "scene" && bp !== "phone" && !short;
   const lane = applicable && !railsHidden;
-  const reserve = RESERVE;
+  // …and a band that states a shared window stands a chip in the same place (`bandWindow`).
+  const reserve =
+    RESERVE + (VIEW_POLICIES[mode].bandContent === "timeline" ? PILLS_ABOVE : VIEW_POLICIES[mode].bandWindow ? CHIP_ABOVE : 0);
   useEffect(() => {
     document.documentElement.style.setProperty("--bottom-reserve", lane ? `${reserve}px` : "0px");
     return () => document.documentElement.style.setProperty("--bottom-reserve", "0px");

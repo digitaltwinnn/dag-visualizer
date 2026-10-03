@@ -180,7 +180,10 @@ export default function SectionShell({
           // Phone adds the FOOTER ROW's own height: the row floats over the scene's bottom edge by
           // design (--footer-h zeroes on phone), but this layer is a DATA pane — measured, the
           // lozenge sat on the channel pane's hash rows. One token, shared with SiteFooter.
-          "max-[700px]:bottom-[calc(var(--phone-dock-h,56px)+var(--bottom-reserve,0px)+var(--footer-phone-h,22px))]"
+          // …and NOT the dock's (2026-10-02, the phone pass): the dock fades out with the HUD while
+          // this layer is up, and reserving its 56px left a blank strip under the footer. The footer
+          // drops to the screen edge in the same state (SiteFooter), so the pane ends just above it.
+          "max-[700px]:bottom-[calc(env(safe-area-inset-bottom,0px)+var(--footer-phone-h,22px)+6px)]"
         }
         style={{ visibility: "hidden", willChange: "transform, opacity" }}
       >

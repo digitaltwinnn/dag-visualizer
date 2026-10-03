@@ -271,7 +271,9 @@ export function spanAverage(
  *  hover: the latest full day, or the span's average. */
 export function headWord(metric: TrendMetric, kind: "span" | "day"): string {
   if (kind === "day") return "latest full day";
-  return spanWord(metric) === "Average per day" ? "avg per day" : "average";
+  // Whole words, and no leading mark: the word is a LABEL that precedes its number
+  // ("daily average 26,573") — it was "avg per day" after a mid-dot (user, 2026-10-03).
+  return spanWord(metric) === "Average per day" ? "daily average" : "average";
 }
 
 /** The words a span reading carries: a rate is an average PER DAY, anything else an average. */
@@ -315,6 +317,26 @@ export const GLOBAL_METRIC_ROWS: Record<TrendMetric, { key: string | null; scale
   kb: { key: "g.kbFloor", scale: 1 / 1024 },
   nodes: { key: "f.nodes", scale: 1 },
   continuity: { key: null, scale: 1 },
+};
+
+/** WHAT THE DAG'S PINNED ROW IS, NEXT TO THE NETWORKS BELOW IT (2026-10-03 — the History
+ *  explorer; user: "show that it's the totals of the rows below", then, after three rounds of
+ *  tags: "make it consistent where possible, it's too random"). ONE distinction, and so one tag:
+ *    · `total` — the rows below, added up: what the networks anchored, paid and wrote. The row
+ *      is tagged "total".
+ *    · `own`   — the DAG's own figure, the same kind of reading every row below states for
+ *      itself (its nodes, its blocks, its cadence). No tag: an untagged row is a network's own.
+ *  The row never claims a sum it is not (rule 10). NODES are the one measure whose global series
+ *  is not the DAG's own: `f.nodes` is the whole fleet, and beside rows that each state their own
+ *  nodes it read as one more "all nodes" — the pinned row reads `f.nodes.dag`, the DAG's stored
+ *  count, through the same `metricSeries` every row uses. */
+export const GLOBAL_READING: Record<TrendMetric, "total" | "own"> = {
+  snapshots: "total",
+  fees: "total",
+  kb: "total",
+  nodes: "own",
+  blocks: "own",
+  continuity: "own",
 };
 
 /** What the overview track draws for one metric across the whole network. Mirrors
@@ -454,7 +476,8 @@ export function holdOrder(held: readonly string[], ranked: readonly string[]): s
  *  The card's head used to carry the unit alone ("per day"), which was enough while the measure
  *  could only change in the rail's picker; once it can be stepped FROM the card (2026-09-19) the
  *  card has to name what it turned into. A bare rate reads as part of the name ("Snapshots per
- *  day"); a unit with its own noun is set off ("Fees · DAG per day"); and a unit that only repeats
+ *  day"); a unit with its own noun is joined by "in" ("Fees in DAG per day" — it was set off with a
+ *  mid-dot until 2026-10-03, the separator the user asked out of reader copy); and a unit that only repeats
  *  the name is dropped ("Nodes", never "Nodes · nodes"). */
 export function metricCaption(metric: TrendMetric, stepMs: number): string {
   const label = METRIC_LABELS[metric];
@@ -462,7 +485,7 @@ export function metricCaption(metric: TrendMetric, stepMs: number): string {
   if (!unit || unit.toLowerCase() === label.toLowerCase()) return label;
   // Asked of the SPEC, not sniffed off the string: a unit is a bare rate exactly when its row uses
   // this module's own `rate`, and the words "per …" are that function's business, not this one's.
-  return TREND_METRICS[metric].unit === rate ? `${label} ${unit}` : `${label} · ${unit}`;
+  return TREND_METRICS[metric].unit === rate ? `${label} ${unit}` : `${label} in ${unit}`;
 }
 
 // ── WHY A MOMENT HAS NO CHART (2026-09-19) ──────────────────────────────────────────────────

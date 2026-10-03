@@ -18,8 +18,17 @@ export function RailShade({ children }: { children: ReactNode }) {
   const hidden = useStore((s) => s.railsHidden);
   const yielding = useSceneYield();
   return (
+    // ⚠️ `flex-none`, NEVER `min-h-0` (found 2026-10-03, chasing "the swipe has some flashes"). The
+    // rail is the scroller and this wrapper is its one flex child. Shrinkable, it took the rail's
+    // own height and let the cards overflow IT — so the `--rail-fade` runway that `.rail-clip`
+    // adds as padding shortened this box instead of extending the scroll, and RailScroll's
+    // measure (scrollHeight minus the runway) read one height with the class and another
+    // without. Whenever the cards overran the lane by less than the fade, the class flipped on
+    // and off EVERY FRAME — the rail's bottom mask strobing, measured at 60 toggles a second —
+    // and at any overrun the last card could never scroll clear of the fade. Unshrinkable, the
+    // padding lands after the content and both hold.
     <div
-      className="rail-shade flex flex-col gap-[var(--rail-gap)] min-h-0"
+      className="rail-shade flex flex-col gap-[var(--rail-gap)] flex-none"
       data-hidden={hidden ? "" : undefined}
       data-dim={!hidden && yielding ? "" : undefined}
     >

@@ -240,6 +240,9 @@ async function main(): Promise<void> {
   // Deferred imports: store.ts reads env at construction, so env must be loaded first.
   const { Redis } = await import("@upstash/redis");
   const { NETWORKS, CATALOG } = await import("../src/engine/config");
+  // Every address the catalog has EVER tracked — a re-registered network's retired chain keeps its
+  // days in the store, so a rebuild or recompute must walk it too (`src/net/lineage.ts`).
+  const { lineageIds } = await import("../src/net/lineage");
   const { TIER_SINCE } = await import("../src/data/trendWindow");
   const { TTL_S, slotOf, cursorKeyOf, lockKeyOf } = await import("../app/api/trends/keys");
   const { bucketGlobals, bucketMetas, addInc } = await import("../app/api/trends/bucketing");
@@ -511,7 +514,7 @@ async function main(): Promise<void> {
     console.log(`backfilling per-network block counts ${new Date(blocksFromMs).toISOString().slice(0, 10)} → yesterday …`);
     const tierOf = (key: string): Tier => key.split(":")[2] as Tier;
     let fields = 0;
-    for (const id of CATALOG[net].map((m) => m.id).filter((v): v is string => !!v)) {
+    for (const id of lineageIds(net)) {
       // Timestamps + block counts only — one field is all this mode may write. Each chain
       // writes as soon as its walk ends (complete-day HSETs are idempotent), the gaps
       // walk's crash rule.
@@ -548,7 +551,7 @@ async function main(): Promise<void> {
       // so nothing is skipped (2026-09-10, the keep-forever flip).
       const fresh5m = TTL_S["5m"] == null ? "" : slotOf(net, "5m", Date.now() - TTL_S["5m"] * 1000).key;
     let fields = 0;
-    for (const id of CATALOG[net].map((m) => m.id).filter((v): v is string => !!v)) {
+    for (const id of lineageIds(net)) {
       // Timestamps only — the walk's records are otherwise discarded, and the two gap
       // fields are the only thing this mode may write. Each chain WRITES as soon as its
       // walk ends (complete-day HSET recomputations are idempotent), so a crash mid-run
@@ -587,7 +590,7 @@ async function main(): Promise<void> {
     ensureCkptMeta("recompute", recomputeFromMs, todayStartMs);
     console.log(`recomputing ${new Date(recomputeFromMs).toISOString().slice(0, 10)} → yesterday, whole days, from the tip (all tiers; flush + checkpoint every ${FLUSH_EVERY / 1000}K records${resume !== "no" ? "; resuming" : ""}) …`);
     await walkGlobalCkpt(recomputeFromMs, todayStartMs);
-    const ids = CATALOG[net].map((m) => m.id).filter((v): v is string => !!v);
+    const ids = lineageIds(net);
     for (const id of ids) await walkMetaCkpt(id, recomputeFromMs, todayStartMs);
     await writeFloorsAndFinish(ids);
     console.log("  every affected tier repaired; cursor untouched.");
@@ -641,7 +644,7 @@ async function main(): Promise<void> {
     // Metagraphs: per-chain seek + crash-safe walk. A chain born after the boundary skips
     // (recorded done, so a resume never re-seeks it). Crafted cursors land ON their record —
     // walkMetaCkpt's upper filter keeps only what is strictly before the boundary.
-    const ids = CATALOG[net].map((id0) => id0.id).filter((id0): id0 is string => !!id0);
+    const ids = lineageIds(net);
     for (const id of ids) {
       const label = id.slice(0, 10);
       const prev = resume !== "no" ? readJson<ChainCkpt>(label) : null;
@@ -738,7 +741,7 @@ async function main(): Promise<void> {
   }
 
   // ---- metagraphs: stream pages straight into the IncMap (bounded — records aren't retained) ----
-  const metaIds = CATALOG[net].map((m) => m.id).filter((id): id is string => !!id);
+  const metaIds = lineageIds(net);
   const newestMetaOrd: Record<string, number> = {};
   const POOL = 3; // polite: a few chains at a time
   for (let i = 0; i < metaIds.length; i += POOL) {

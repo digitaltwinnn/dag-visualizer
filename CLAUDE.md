@@ -35,7 +35,7 @@ Four views drive the 3D scene:
   plane at once. The planes are DOM, not WebGL — the same `TrendChart` the document register uses —
   and the bottom band is a scrubbable timeline rather than vitals cells.
 
-The placeholder is ONE consolidated `soon` Mode (2026-09-04; the old `status`/`transactions`/
+The placeholder is ONE consolidated `soon` Mode, at `/soon` (2026-09-04; the old `status`/`transactions`/
 `staking` modes said the same nothing three times): the canvas fades out and `Blueprint.tsx` draws a
 wireframe GALLERY of the coming features, with no numbers, so it never reads as live data. The two
 doc pages (/about, /design) are an overlay over the same bare stage, not Modes.
@@ -220,9 +220,9 @@ Gotchas worth knowing before you burn time on them:
 - **The four 3D views ARE URL deep links** (2026-09-04): `/hypergraph`, `/geography`, `/snapshots`,
   `/trends` boot straight into their view (`components/RouteSync.tsx` seeds the store from the pathname), so a
   one-shot screenshot of a view needs no store edit. In-app switches publish those paths by shallow
-  pushState — never a navigation, the engine must survive. Only the placeholder views (routeless by
-  decision) still need the old trick: temporarily seed the store default in `src/store/store.ts`,
-  screenshot, revert.
+  pushState — never a navigation, the engine must survive. The placeholder is a URL too since
+  2026-10-03 (`/soon` — a real static route, kept out of the sitemap and the footer's view links
+  and marked noindex), so the old seed-the-store trick is no longer needed for any view.
 - **`--virtual-time-budget` runs very few frames**, so a fresh boot gets caught mid-intro. Use
   **`?slowmo=N`** (a dev flag like `?stats`, clamped to `[0.1, 20]`, values <1 speeding things UP) to
   inspect mid-flight states.

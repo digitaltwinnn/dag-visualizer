@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import { useCallback, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from "react";
 
 import ExplorerShell from "@/components/ExplorerShell";
 import ExplorerHeading, { MeasureMenu, type MeasureControl } from "@/components/explorer/ExplorerHeading";
@@ -85,6 +85,10 @@ export interface ExplorerLevelSpec {
    *  widens it for the network TICKER that leads its rows (`NODE_GLYPH_W`). */
   glyphW?: number;
   rows: ExplorerRowSpec[];
+  /** A row PINNED above the list and set apart by a hairline — what the rows are read against
+   *  (History's DAG row, the networks' total), never ranked among them. It shares the list's
+   *  columns, and carries no bar: a bar there would be a share of itself. */
+  lead?: ExplorerRowSpec;
   /** What to say when there are no rows — an honest instrument state, never fabricated rows. */
   empty?: ReactNode;
   /** The view's one setting, shown on the heading row (Same scale, Live). */
@@ -109,6 +113,47 @@ export interface ExplorerProps {
 export default function Explorer({ id, title, hint, levels, onLeave, defaultCollapsed, aside }: ExplorerProps) {
   const current = levels[levels.length - 1];
   const nested = levels.length > 1;
+  // THE TICKER COLUMN FITS ITS LIST (user, 2026-10-03: "a lot of space between the ticker and the
+  // node id … grow the ticker part only when it needs to be larger"). A node level's `glyphW` is
+  // the room a co-located PAIR needs ("DAG UP", or one long "USDC.dag") — and every list of plain
+  // three-letter tickers held that width open beside each id. Measured rather than estimated: the
+  // face is proportional ("DOR" is 26px, "USDC.dag" 56) and the type is fluid, so the list's own
+  // glyph cells are read after layout and the widest sets `--glyph-w`, capped by the level's
+  // `glyphW` (past it the ticker truncates, as it always has). A callback ref, re-run whenever the
+  // rows change; the rows read the variable with `glyphW` as its fallback, so the first paint and
+  // the server render keep the old width rather than collapsing.
+  const cap = current?.glyphW ?? 14;
+  const rowKeys = (current?.lead ? `${current.lead.key}||` : "") + (current?.rows.map((r) => r.key).join("|") ?? "");
+  const figKey = (current?.lead && (typeof current.lead.figure === "string" || typeof current.lead.figure === "number") ? `${String(current.lead.figure).length}:` : "") + (current?.rows.map((r) => (typeof r.figure === "string" || typeof r.figure === "number" ? String(r.figure).length : 0)).join(",") ?? "");
+  const listEl = useRef<HTMLDivElement | null>(null);
+  const fitGlyphs = useCallback((el: HTMLDivElement | null) => { listEl.current = el; }, []);
+  useLayoutEffect(() => {
+    const el = listEl.current;
+    if (!el) return;
+    const fit = () => {
+      let w = 0;
+      for (const g of el.querySelectorAll<HTMLElement>("[data-glyph]")) {
+        const inner = g.firstElementChild as HTMLElement | null;
+        if (inner) w = Math.max(w, inner.scrollWidth);
+      }
+      if (w > 0) el.style.setProperty("--glyph-w", `${Math.min(cap, w + 1)}px`);
+      else el.style.removeProperty("--glyph-w");
+      // The FIGURE column, the same way (ExplorerRow's `figureCol`): as wide as the widest figure
+      // printed, capped by the level's own width in the row's template.
+      let f = 0;
+      for (const g of el.querySelectorAll<HTMLElement>("[data-fit-fig]")) f = Math.max(f, g.getBoundingClientRect().width);
+      const next = f > 0 ? `${Math.ceil(f) + 1}px` : "";
+      if (el.style.getPropertyValue("--fig-w") !== next) {
+        if (next) el.style.setProperty("--fig-w", next);
+        else el.style.removeProperty("--fig-w");
+      }
+    };
+    fit();
+    // The type scale is fluid, so a resize changes what the tickers measure.
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  // `figKey`: a figure that gains a digit (9 → 10) changes what the column must hold.
+  }, [rowKeys, cap, figKey]);
   // The crumbs: the ROOT as the house glyph (its word is the accessible name — the card's title
   // already says it, and the word cost the width the crumbs need; user, 2026-09-26, two rounds),
   // then every OPENED level, the current one last as the page.
@@ -162,7 +207,29 @@ export default function Explorer({ id, title, hint, levels, onLeave, defaultColl
                 <p className="mt-1 mx-1 mb-1.5 text-label text-muted-foreground">{current.empty}</p>
               ) : null
             ) : (
-              <div className="flex flex-col gap-0.5">
+              <div ref={fitGlyphs} className="flex flex-col gap-0.5">
+                {current.lead && (
+                  <div className="mb-1 border-b border-border pb-1">
+                    <ExplorerRow
+                      hasFigure={current.hasFigure}
+                      nameW={current.nameW}
+                      figureW={current.figureW}
+                      glyphW={current.glyphW}
+                      nested={nested}
+                      plain
+                      glyph={current.lead.glyph}
+                      name={current.lead.name}
+                      tag={current.lead.tag}
+                      figure={current.lead.figure}
+                      on={current.lead.on}
+                      hue={current.lead.hue}
+                      faint={current.lead.faint}
+                      title={current.lead.title}
+                      onClick={current.lead.onClick}
+                      pair={current.lead.pair}
+                    />
+                  </div>
+                )}
                 {current.rows.map((r) => (
                   <ExplorerRow
                     key={r.key}

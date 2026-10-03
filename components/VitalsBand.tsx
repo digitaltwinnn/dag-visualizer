@@ -33,6 +33,9 @@ import { useSceneYield } from "@/components/RailShade";
 import { cn } from "@/lib/utils";
 import { HyperCells, GeoCells, LedgerCells } from "@/components/vitals/viewCells";
 import TrendTimeline from "@/components/TrendTimeline";
+import { QualifierChip } from "@/components/inspector/parts";
+import { spanPhrase } from "@/src/data/trendWindow";
+import { NO_SIGNAL_COPY, useNoSignal } from "@/components/useNoSignal";
 
 function useVitalsScope() {
   const mode = useStore((s) => s.mode);
@@ -85,6 +88,8 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
   // — the same one read the RailShade dims on, at the recipe's own tempos (away 0.3s, the return
   // faster: it answers a gesture already finished).
   const yielding = useSceneYield();
+  const bandWindow = VIEW_POLICIES[mode].bandWindow;
+  const dead = useNoSignal() && VIEW_POLICIES[mode].bandContent === "vitals";
   // THE BAND NEVER PAINTS UNDER AN OPEN SHEET (user, 2026-09-04 — "sometimes I see flickering
   // when the explore and bottom bar overlap"). The overlay decision above stands: the sheets
   // cover the band. But the sheet's glass is translucent, so a band that kept PAINTING under
@@ -142,10 +147,11 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
         // as a bar and a scattering of chips (user, 2026-09-01: "the bottom bar should be the same
         // exactly as the top bar").
         "rounded-lg border border-border/60 [background:var(--topbar-glass)] backdrop-blur-sm",
-        // The clip exists for the SIDE covers only. (Its top edge stood open for the History
-        // timeline's window pills while they stood above the plate; they live inside it since
-        // 2026-09-29, so nothing may paint above the band now.)
-        "[clip-path:inset(0_max(0px,calc(var(--cover-r)-var(--bar-margin)))_0_max(0px,calc(var(--cover-l)-var(--bar-margin))))]",
+        // The TOP inset is NEGATIVE so a tenant may stand something just ABOVE the plate — the
+        // History timeline's Time range group (user, 2026-09-26: "above the bottom section, not on
+        // top of it"; inside the band 2026-09-29; above again 2026-10-03). The clip exists for the
+        // SIDE covers and never needed the top edge.
+        "[clip-path:inset(-48px_max(0px,calc(var(--cover-r)-var(--bar-margin)))_0_max(0px,calc(var(--cover-l)-var(--bar-margin))))]",
         // ⚠️ The cell-targeting rules (card flattening, section dividers) moved ONTO the
         // RollSwap wrapper below (2026-09-04, the no-pop swap): they are `[&>*]` selectors, and
         // the wrapper between this section and the cells would otherwise be their new subject.
@@ -173,7 +179,29 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
         !live && "saturate-[.45]",
       )}
     >
+      {/* A NETWORK THAT HAS NEVER ANSWERED gets ONE statement, not a row of cells (test pass,
+          2026-10-03, on TestNet during its outage): the cells printed "0 located", "Hybrid 0",
+          "L0 0" — counts of nothing, set like readings (rule 10). A later drop is different and
+          unchanged: those numbers were real, so they stay, desaturated, beside the dot. The
+          History band is exempt — its tenant is a control with honesty states of its own. */}
+      {dead ? (
+        <span className="flex-1 flex items-center justify-center gap-2.5 text-body text-muted-foreground">
+          <NoSignalDot />
+          {NO_SIGNAL_COPY}
+        </span>
+      ) : (
+        <>
       {!live && <span className="self-center"><NoSignalDot /></span>}
+      {/* THE BAND'S WINDOW, ONCE (`viewPolicy.bandWindow`, user 2026-10-03): above the plate's right
+          corner, where History's range pills stand — the band's time scope has one place in
+          every view. The cards below no longer repeat it (`viewCells`: a card states a span
+          only when its own differs). The section is `fixed`, so it is this chip's containing
+          block; the bar's own glass under it, since it floats over the scene. */}
+      {bandWindow && (
+        <span className="absolute bottom-full right-0 mb-2 rounded-md [background:var(--topbar-glass)] backdrop-blur-sm">
+          <QualifierChip>{spanPhrase(bandWindow, null)}</QualifierChip>
+        </span>
+      )}
       {/* The no-pop swap (RollSwap): the PLATE persists, the cells roll — and the wrapper takes
           over the row's cell-targeting rules (flatten, dividers, stretch), which is why the
           section above no longer carries them: an element between a `[&>*]` and its subjects
@@ -187,6 +215,8 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
           "[&>*+*]:border-l [&>*+*]:border-border/60 [&>*+*]:rounded-none",
         )}
       />
+        </>
+      )}
       {/* NO filter-scope hairline (user, 2026-08-30 — removed): unlike the old bar cluster's
           bare numbers, the band's own charts already wear the identity accent under a filter,
           so the scope is stated by the vitals themselves. */}
@@ -205,6 +235,16 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
  *  width, which is what `[&>*]:flex-none [&>*]:basis-auto` on the wrapper below says. */
 export function VitalsSheetBody() {
   const { mode, live, filter, accent } = useVitalsScope();
+  const dead = useNoSignal() && VIEW_POLICIES[mode].bandContent === "vitals";
+  // The band's own rule (see the desktop section): never-answered → one statement, no cells.
+  if (dead) {
+    return (
+      <p className="m-0 flex items-center gap-2.5 py-2 text-body text-muted-foreground">
+        <NoSignalDot />
+        {NO_SIGNAL_COPY}
+      </p>
+    );
+  }
   return (
     <div
       className={cn(
@@ -215,6 +255,10 @@ export function VitalsSheetBody() {
       )}
     >
       {!live && <span className="self-center flex-none mb-2"><NoSignalDot /></span>}
+      {/* The band's shared window, once, at the sheet's top right — the desktop chip's phone home. */}
+      {VIEW_POLICIES[mode].bandWindow && (
+        <span className="self-end flex-none mb-2"><QualifierChip>{spanPhrase(VIEW_POLICIES[mode].bandWindow, null)}</QualifierChip></span>
+      )}
       {/* The no-pop swap — the cell-targeting `[&>*]` rules ride the wrapper for the same
           retargeting reason the band's do (see the desktop section above). */}
       <RollSwap

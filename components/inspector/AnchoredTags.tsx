@@ -1,15 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronRight } from "lucide-react";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 import { UNLISTED_ID } from "@/src/data/unlisted";
 import { metagraphById } from "@/src/data/network";
 import { identityHudCss } from "@/src/palette/identity";
-import { fmtDag, fmtKB } from "@/src/util/format";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { useMinHold } from "@/components/useMinHold";
 import { CONTENT_EASE } from "@/components/RollSwap";
@@ -22,11 +18,12 @@ import { Separator } from "@/components/ui/separator";
 // comparable across the whole list. Source = the EXACT raw-L0 read only (no polled floor); while
 // it loads we show the header + "reading…".
 //
-// Every listed row is an EXPANDABLE accordion: click to reveal its stat line
-// (`N snapshots · P% · KB · DAG`) — you can inspect any metagraph's detail, filter or not. The
-// network-filtered metagraph is highlighted in place (identity-hue ticker + a thin left accent)
-// and AUTO-OPENED, so its detail shows without a click. The `unlisted` aggregate row is NOT
-// expandable — it's a roll-up of several metagraphs with no single fee/size to break out.
+// THE ROWS ARE READINGS, NOT DISCLOSURES (user, 2026-10-03: "remove the breakdown for each
+// metagraph row — it will show in the child metagraph card anyway"). Each row used to be an
+// accordion opening a stat line (`N snapshots, P%, KB, DAG`) for that network in this tick: a
+// second, smaller card inside the card, restating what the rung below it is for. The row says who
+// anchored and how many; the network's own card, one step down the ladder, says the rest. The
+// network the chamber is resolved against stays highlighted in place, in its hue.
 export default function AnchoredTags({
   ordinal,
   anchored,
@@ -42,17 +39,6 @@ export default function AnchoredTags({
   const exact = useStore((s) => s.snapshotExact[ordinal]);
   const cfg = metagraphById(filter);
   const focusId = cfg?.id ?? null;
-
-  // Which rows are expanded. Persists across live ticks (the component re-renders with a new
-  // `ordinal` rather than remounting), so an opened row stays open as the tick advances. The
-  // network-selected metagraph is highlighted (below) but NOT auto-expanded — the user opens it.
-  const [open, setOpen] = useState<Set<string>>(() => new Set());
-  const toggle = (id: string) =>
-    setOpen((s) => {
-      const n = new Set(s);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
-    });
 
   // Rule 10: an ABSENT count is not zero. `anchored` is null whenever the polled feed carries no
   // `metagraphSnapshotCount` for this tick, and the exact read may not have landed yet — so the
@@ -118,28 +104,21 @@ export default function AnchoredTags({
 
   // Rows from the exact per-metagraph breakdown: listed (named/hued, expandable) + one aggregate
   // unlisted row (neutral, not expandable).
-  type Row = { id: string; label: string; hue: string | null; n: number; fee: number; bytes: number };
+  type Row = { id: string; label: string; hue: string | null; n: number };
   const listed: Row[] = [];
-  for (const [addr, { count, fee, bytes }] of Object.entries(exact.perMeta)) {
+  for (const [addr, { count }] of Object.entries(exact.perMeta)) {
     const c = metagraphById(addr);
-    if (c) listed.push({ id: addr, label: c.name || c.ticker, hue: identityHudCss(c.id), n: count, fee, bytes });
+    if (c) listed.push({ id: addr, label: c.name || c.ticker, hue: identityHudCss(c.id), n: count });
   }
   listed.sort((a, b) => b.n - a.n);
 
-  // The genuinely-unlisted metagraphs are in `perMeta` too (addresses not in config) — roll them
-  // into ONE neutral row at the bottom, aggregating count/fee/bytes so it expands to its own stat
-  // line just like the listed rows. It's never the network selection, so it never gets the hue wash.
+  // The genuinely-unlisted metagraphs are in `perMeta` too (addresses not in config) — one neutral
+  // row at the bottom. It is never the network selection, so it never gets the hue wash.
   const rows: Row[] = [...listed];
-  if (exact.unlistedCount > 0) {
-    const unlistedBytes = Object.entries(exact.perMeta)
-      .filter(([addr]) => !metagraphById(addr))
-      .reduce((sum, [, v]) => sum + v.bytes, 0);
-    rows.push({ id: UNLISTED_ID, label: UNLISTED_ID, hue: null, n: exact.unlistedCount, fee: exact.unlistedFee, bytes: unlistedBytes });
-  }
+  if (exact.unlistedCount > 0) rows.push({ id: UNLISTED_ID, label: UNLISTED_ID, hue: null, n: exact.unlistedCount });
 
   const denom = total ?? exact.anchored;
   const pct = (n: number) => (denom > 0 ? (n / denom) * 100 : 0);
-  const pctStr = (n: number) => `${pct(n).toFixed(pct(n) < 10 ? 1 : 0)}%`;
   // One square per anchored snapshot while the tick's total is countable, a share bar above that.
   const units = countable(denom);
 
@@ -154,69 +133,30 @@ export default function AnchoredTags({
           remount means there is never an old width to ease from. */}
       <div className={cn("flex flex-col gap-y-1", CONTENT_EASE)} style={figWidth(rows.map((r) => r.n))}>
         {rows.map((r) => {
-          const isOpen = open.has(r.id);
           const isSel = r.id === focusId;
           return (
-            // Radix owns the open state and the trigger↔panel pairing; `onOpenChange` still runs
-            // the caller's own `toggle`, which holds the open SET (several rows may be open).
-            <Collapsible key={r.id} open={isOpen} onOpenChange={() => toggle(r.id)}>
-              <CollapsibleTrigger
-                className={cn(
-                  "group flex items-start gap-2 w-full text-left border-none cursor-pointer py-[3px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
-                  isSel ? "bg-transparent" : "bg-transparent hover:bg-wash-hover",
-                  "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-                )}
-                // Selected (network-filtered) row: highlighted in place by a faint identity-hue row
-                // wash (+ the hue ticker below) — reads as "the selection" even while collapsed.
-                style={isSel ? ({ background: `color-mix(in oklch, ${r.hue ?? "var(--primary)"} 16%, transparent)` } as const) : undefined}
+            // THE BREAKDOWN TABLE'S ROW (`visuals.html`, user 2026-10-02): name, one square per
+            // anchored snapshot, count — in the dossier's columns. Unlisted wears the CORE tone
+            // (2026-08-07), the same neutral-blue it carries on the filter chip. The wash overhangs
+            // the content by 6px on both sides (`w-[calc(100%+12px)]`, never `w-full` under a
+            // negative margin — that stops the counts 12px short of the section's total).
+            <div
+              key={r.id}
+              className={cn(CUT_ROW, "w-[calc(100%+12px)] -mx-1.5 px-1.5 py-[3px] rounded-sm")}
+              // The network the chamber resolves against: highlighted in place by a faint
+              // identity-hue wash and its name in the hue.
+              style={isSel ? ({ background: `color-mix(in oklch, ${r.hue ?? "var(--primary)"} 16%, transparent)` } as const) : undefined}
+            >
+              <span
+                className={cn("min-w-0 truncate", !r.hue ? "italic text-muted-foreground" : isSel ? "font-semibold" : "text-foreground-dim")}
+                style={isSel && r.hue ? { color: r.hue } : undefined}
+                title={r.label}
               >
-                {/* THE BREAKDOWN TABLE'S ROW (`visuals.html`, user 2026-10-02): name · count · one
-                    square per anchored snapshot, in the dossier's columns — the leading dot and
-                    the share track are gone, the squares carry the hue. Unlisted wears the CORE
-                    tone (2026-08-07), the same neutral-blue it carries on the filter chip. */}
-                <span className={cn(CUT_ROW, "flex-1 min-w-0")}>
-                  <span
-                    className={cn(
-                      "min-w-0 truncate",
-                      !r.hue ? "italic text-muted-foreground" : isSel ? "font-semibold" : "text-foreground-dim",
-                    )}
-                    style={isSel && r.hue ? { color: r.hue } : undefined}
-                    title={r.label}
-                  >
-                    {r.label}
-                  </span>
-                  <UnitMarks count={r.n} color={r.hue ?? "var(--core)"} units={units} frac={pct(r.n) / 100} />
-                  <span className="font-mono tabular-nums text-right text-foreground">{r.n}</span>
-                </span>
-                {/* Expand affordance / open-state cue. Open rows show a down chevron. Closed rows:
-                    hidden on a mouse (revealed on row hover/focus — keeps the resting list clean),
-                    but ALWAYS shown on touch (`@media (hover:none)`), where there's no hover to
-                    surface it. Kept via opacity so the count column never shifts. Every row is
-                    tappable, including the unlisted roll-up. */}
-                <ChevronRight
-                  aria-hidden
-                  className={cn(
-                    "mt-[0.15em] size-3.5 flex-none transition-[transform,opacity] duration-150 motion-reduce:transition-none",
-                    isOpen
-                      ? "rotate-90 text-foreground opacity-100"
-                      : "text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-                  )}
-                />
-              </CollapsibleTrigger>
-
-              <CollapsibleContent className="disclose-panel">
-                {/* Revealed stat line: this metagraph's exact detail for the tick. */}
-                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 pl-0 pr-1.5 pb-1 pt-0.5 text-label text-muted-foreground tabular-nums">
-                  <span>{r.n} snapshot{r.n === 1 ? "" : "s"}</span>
-                  <span aria-hidden>·</span>
-                  <span>{pctStr(r.n)}</span>
-                  <span aria-hidden>·</span>
-                  <span>{fmtKB(r.bytes / 1024)}</span>
-                  <span aria-hidden>·</span>
-                  <span>{fmtDag(r.fee)} DAG</span>
-                </div>
-              </CollapsibleContent>
-            </Collapsible>
+                {r.label}
+              </span>
+              <UnitMarks count={r.n} color={r.hue ?? "var(--core)"} units={units} frac={pct(r.n) / 100} />
+              <span className="font-mono tabular-nums text-right text-foreground">{r.n}</span>
+            </div>
           );
         })}
       </div>

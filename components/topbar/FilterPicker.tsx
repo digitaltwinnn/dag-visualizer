@@ -48,6 +48,8 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
     onPicked?.();
   };
 
+  /** A chip's name and its count, as ONE baseline group (see the "All" chip's note). */
+  const NAME_COUNT = "inline-flex items-baseline gap-1.5";
   const chipClass = (active: boolean, off: boolean) =>
     cn(
       // Tightened one step each (user, 2026-08-14 — "a little too much margin/spacing
@@ -85,6 +87,11 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
         onMouseEnter={() => setHoverFilter("all")}
       >
         <IdentityDot hue="var(--primary)" />
+        {/* NAME AND COUNT SHARE A BASELINE (user, 2026-10-03: "the numbers in the filter don't seem
+            to align well with the text"). They are two faces at two sizes — 14px sans, 12px mono —
+            and the chip CENTRES its children, which lines up their boxes, not their letters: the
+            digits sat off the name's baseline. One baseline group; the dot stays centred on it. */}
+        <span className={NAME_COUNT}>
         <span className="text-body text-foreground">All</span>
         {/* ONE count like every other chip (user, 2026-08-14): the node total. The metagraph
             count is the strip itself — its chips are countable right there. */}
@@ -92,6 +99,7 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
             counts the explorer rows below them print, so the two were reading in different faces in one
             viewport (user, 2026-09-14). */}
         <span className="font-mono text-label text-muted-foreground tabular-nums">{totalNodes}</span>
+        </span>
       </button>
       <span className="w-px self-stretch bg-foreground/25 my-1.5 mx-1" aria-hidden />
       {rows.map((m, i) => {
@@ -113,11 +121,13 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
               onMouseEnter={() => setHoverFilter(m.id)}
             >
               <IdentityDot hue={identityHudCss(m.id)} />
+              <span className={NAME_COUNT}>
               <span className="text-body text-foreground">{m.name}</span>
               {/* The count column belongs to the WITH-NODES group alone (user, 2026-08-13): past
                   the divider every count is 0 by construction, so the divider carries that fact
                   once and the chips drop the noise. */}
               {!off && <span className="font-mono text-label text-muted-foreground tabular-nums">{m.located ?? 0}</span>}
+              </span>
             </button>
           </Fragment>
         );

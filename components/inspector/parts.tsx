@@ -2,7 +2,7 @@
 
 import { Fragment, type CSSProperties, useRef, useState, type ReactNode } from "react";
 import { Check, Copy, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, TOUCH_HIT } from "@/lib/utils";
 import { IDENT_INK } from "@/components/identInk";
 import { BAR_EASE } from "@/components/RollSwap";
 import { Badge } from "@/components/ui/badge";
@@ -64,8 +64,18 @@ export function Fact({ label, children, title, className }: { label: ReactNode; 
 
 /** THE LEAD — the one sentence a card says first, in dim ink, two lines at most: what this subject
  *  is in relation to its parent ("83% of Dor Technologies' online nodes."). Every card has one. */
-export function Lead({ children, className }: { children: ReactNode; className?: string }) {
-  return <p className={cn("m-0 mb-2.5 text-body leading-snug text-foreground-dim line-clamp-2", className)}>{children}</p>;
+export function Lead({ children, aside, className }: { children: ReactNode; /** A second fact that would otherwise be glued on with a mid-dot — an age, a count — as a
+   *  qualifier chip on the row's right (user, 2026-10-03, on "Anchored to N · 1 min ago": "should
+   *  that second part be a pill on the right side? I don't like those dots separating texts").
+   *  The sentence stays one statement; the chip is the head aside's own species. */
+  aside?: ReactNode; className?: string }) {
+  if (aside == null) return <p className={cn("m-0 mb-2.5 text-body leading-snug text-foreground-dim line-clamp-2", className)}>{children}</p>;
+  return (
+    <div className={cn("mb-2.5 flex items-baseline justify-between gap-2.5", className)}>
+      <p className="m-0 min-w-0 text-body leading-snug text-foreground-dim line-clamp-2">{children}</p>
+      <QualifierChip className="flex-none tabular-nums">{aside}</QualifierChip>
+    </div>
+  );
 }
 
 /** A share as the words a lead may say: never "0%" for a part that exists nor "100%" for one that
@@ -105,6 +115,28 @@ export function SectionLabel({ label, total, unit, className }: { label: ReactNo
     </div>
   );
 }
+
+/** A FOLD IS MARKED ON ITS LABEL, NEVER BY A GLYPH BESIDE THE FIGURE (user, 2026-10-03, two rounds).
+ *  A disclosure chevron in the row's flow sat between the figure and the card's edge, so a row WITH
+ *  one printed its number a chevron's width left of every row without: the dossier's "17 ›" stood
+ *  off the 3 / 14 / 17 column beneath it, and the global snapshot's rows (whose mark was hidden
+ *  until hover but still held its place) stood off their own total — "numbers should be on the
+ *  right side and aligned … a structural solution for the > space being taken sometimes". Hanging
+ *  the chevron in the card's right padding fixed the columns and failed on its own terms: "it
+ *  touches the edge, there is simply no place there for a control".
+ *
+ *  So a fold takes NO space: the label that opens it wears the dotted underline — the app's
+ *  there-is-more affordance, the pager's scope word's own — and the row's figure sits on the same
+ *  right edge as every other row's. Open, the underline goes solid and the label takes full ink;
+ *  the rows beneath are the rest of the statement. The host carries `group` so a hover on any part
+ *  of the row lifts the label. */
+export const foldLabel = (open: boolean): string =>
+  cn(
+    "underline underline-offset-[3px] decoration-[1px]",
+    open
+      ? "decoration-solid decoration-[var(--muted-foreground)]"
+      : "decoration-dotted decoration-[var(--muted-foreground)] group-hover:decoration-[var(--foreground)]",
+  );
 
 /** THE HEAD'S QUALIFIER — one hairline chip: a ticker, a country code, a city, a role. The head's
  *  right slot is either this or a state pill (ready, live / pinned), never bare text, a relation
@@ -199,8 +231,12 @@ export function Door({
     // The agreed door recipe (design 2026-09-26, `moment-door.html` A — the Moment card's
     // "Snapshot records" control is its first instance and keeps its own foot geometry): a
     // full-bleed row on the wash ladder every control wears.
-    "flex items-center gap-2 -mx-[var(--card-pad)] px-[var(--card-pad)] py-2 border-t border-wash-strong bg-wash-faint text-body text-foreground text-left",
-    "hover:bg-wash-soft focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+    // ⚠️ ONE STEP UP THE LADDER ON PAPER (user, 2026-10-03: "the clickable section saying 'site' is
+    // a bit too faint in light mode"). 6% of the accent is a visible plate on the dark glass and
+    // very nearly the card's own white on paper, so the row stopped reading as a control there:
+    // paper rests at `soft` and hovers at `hover`, dark keeps `faint` → `soft`.
+    "flex items-center gap-2 -mx-[var(--card-pad)] px-[var(--card-pad)] py-2 pointer-coarse:min-h-11 border-t border-wash-strong [background:light-dark(var(--wash-soft),var(--wash-faint))] text-body text-foreground text-left",
+    "hover:[background:light-dark(var(--wash-hover),var(--wash-soft))] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
     disabled && "opacity-65 pointer-events-none",
   );
   const inner = (
@@ -282,6 +318,7 @@ export function CopyButton({ value, subject, always = false, className }: { valu
       title={`Copy ${subject}`}
       className={cn(
         "flex-none size-6 -my-1 rounded-xs text-muted-foreground",
+        TOUCH_HIT,
         always ? "opacity-75 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100" : "opacity-0 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
         copied && "opacity-100 text-[var(--success)] hover:text-[var(--success)]",
         className,
@@ -645,7 +682,7 @@ export function ScheduleTable({ axis, axisTitle, parts, className }: { axis?: st
     <div
       className={cn(
         axis != null
-          ? "grid grid-cols-[6em_7.4em_minmax(0,1fr)_var(--cut-fig,2.4em)] items-start gap-x-1.5 gap-y-0.5 py-1.5 text-label border-t border-border first:border-t-0"
+          ? "grid grid-cols-[6.9em_7.4em_minmax(0,1fr)_var(--cut-fig,2.4em)] items-start gap-x-1.5 gap-y-0.5 py-1.5 text-label border-t border-border first:border-t-0"
           : cn(CUT_ROW, "gap-y-0.5"),
         className,
       )}

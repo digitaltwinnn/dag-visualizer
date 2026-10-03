@@ -49,7 +49,7 @@ export interface Crumb {
 // The chevron: a 7px arrow tip on the right and, past the first step, a 7px notch on the left that
 // the previous step's tip sits in. Steps overlap by 5px, so a 2px seam of the plate's own colour
 // runs between them. (Literal class strings — Tailwind's scanner reads no template.)
-const STEP = "inline-flex h-[24px] min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap";
+const STEP = "inline-flex h-[24px] pointer-coarse:h-10 min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap";
 const SHAPE_FIRST = "rounded-l-[5px] [clip-path:polygon(0_0,calc(100%-7px)_0,100%_50%,calc(100%-7px)_100%,0_100%)]";
 const SHAPE_MID = "[clip-path:polygon(0_0,calc(100%-7px)_0,100%_50%,calc(100%-7px)_100%,0_100%,7px_50%)]";
 const SHAPE_LAST = "rounded-r-[5px] [clip-path:polygon(0_0,100%_0,100%_100%,0_100%,7px_50%)]";
@@ -74,7 +74,17 @@ export default function ExplorerPath({ crumbs, hint, className }: { crumbs: read
               // The CURRENT step runs to the plate's edge (user, 2026-09-26: the steps "often stop
               // half way") — the control is the plate's full width, and the filled last segment
               // is what carries that; ancestors stay their own width.
-              className={cn("min-w-0 gap-0", last ? "flex-1" : "shrink-0 max-w-[45%]", !first && "-ml-[5px]")}
+              // THE LAST STEP IS WHERE THE READER IS, SO IT IS THE ONE THAT KEEPS ITS ROOM (found
+              // 2026-10-03, four steps deep in Snapshots: the ancestors were unshrinkable at up to
+              // 45% each, and the current step — a snapshot's ordinal — was squeezed down to ":").
+              // It holds at least two fifths of the row and takes whatever is left; the steps
+              // behind it give way, each ellipsised down to a floor that still shows a few
+              // characters. The root is a glyph and never shrinks.
+              className={cn(
+                "gap-0",
+                last ? "min-w-[40%] flex-1" : c.root ? "shrink-0" : "min-w-[3.25rem] max-w-[45%] shrink",
+                !first && "-ml-[5px]",
+              )}
             >
               {last ? (
                 <BreadcrumbPage className={cn(STEP, shape, pad, "w-full bg-wash-strong text-foreground")} title={c.title}>

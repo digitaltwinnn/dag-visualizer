@@ -24,3 +24,34 @@ row on phone). ⚠️ Anything network-dependent that SSR renders must start as 
 in a mount effect (NetLink, NetworkSwitch): a hydration mismatch makes React 19 regenerate the
 tree, which strips the `data-net` stamp — and `suppressHydrationWarning` is not the tool, it
 KEEPS the server value.
+
+## A network can change its address — the lineage
+
+A metagraph's id IS its state-channel address, and a metagraph can be RE-REGISTERED under a new
+one (BioFi: first chain 2026-07-17 → 08-16, new chain from 2026-09-18). The catalog row carries
+the current `id` and lists the earlier addresses in `formerIds`; **`src/net/lineage.ts` is the one
+home** that turns that into answers, and its test is the specification:
+
+- **Lookup** — `metagraphById`, `LISTED_IDS` and the click table's `netKeyOf` resolve a former
+  address to its network, so an old-chain row is never "unlisted".
+- **History** — the trends store keeps each chain under the address it was measured at;
+  `foldLineage` merges the former addresses' series into the current one's ON THE READ PATH
+  (`app/api/trends/assemble.ts`), so every chart shows the network's whole life. The 15-minute
+  sampler tracks current ids only (a retired chain produces nothing); `scripts/rebuild-trends.ts`
+  walks `lineageIds`, so a rebuild keeps the retired chains' days.
+- **Server routes** — the exact-read decode and the per-chain snapshot route accept former
+  addresses.
+
+When the live directory lists an id the catalog lacks, the Engine warns once in dev. If that id
+is an existing network re-registered: move the old id into `formerIds`, set the new `id`, and
+re-key `data/brand-hues.json`.
+
+**The raw anchor log pages every chain of the lineage** (`components/datasection/AnchorLogTable.tsx`,
+2026-10-02). Ordinals are PER CHAIN — a re-registered network starts again at 1 — so the chains are
+never spliced into one list: under a committed filter with former addresses the toolbar carries a
+chain picker ("Current chain · from …" / "Earlier chain · from …") and the table pages ONE address
+at a time (`histAddr`). The search crosses chains by itself where the criterion can say which
+chain: a DATE picks the chain whose genesis precedes it, a GLOBAL snapshot the chain whose address
+anchored into it. A metagraph ORDINAL cannot (both chains have a #2), so it searches the chain on
+screen. ⚠️ A chain switch re-reads the tip, and a pending seek must wait for it (`walkReady`) —
+run against the previous chain's `latest` it pages to the wrong place.

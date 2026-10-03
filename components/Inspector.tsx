@@ -110,7 +110,7 @@ function CardPane({
       {/* Every card's × is CardHead's shared ghost-Button close — one baseline close (the node
           card's old hand-rolled × was removed). */}
       <InspectorCard p={pick} eyebrow={eyebrow} onClose={onClose} collapsed={collapsed} onToggle={onToggle} />
-      <PulseEdge pulseKey={pulseKey} rail="right" />
+      <PulseEdge pulseKey={pulseKey} rail="right" off={collapsed} />
     </RailPane>
   );
 }
@@ -144,7 +144,7 @@ function CountryPane({ cc, onClose, collapsed, onToggle }: { cc: string; onClose
         onToggle={onToggle}
       />
       {!collapsed && <CountryCard cc={cc} />}
-      <PulseEdge pulseKey={pulseKey} rail="right" />
+      <PulseEdge pulseKey={pulseKey} rail="right" off={collapsed} />
     </RailPane>
   );
 }
@@ -206,7 +206,7 @@ function ProviderPane({ sel, onClose, collapsed, onToggle }: { sel: CohortSel; o
         onToggle={onToggle}
       />
       {!collapsed && <ProviderCard sel={sel} />}
-      <PulseEdge pulseKey={pulseKey} rail="right" />
+      <PulseEdge pulseKey={pulseKey} rail="right" off={collapsed} />
     </RailPane>
   );
 }
@@ -272,7 +272,7 @@ function CompositionPane({ sel, onClose, collapsed, onToggle }: { sel: Compositi
         onToggle={onToggle}
       />
       {!collapsed && <CompositionCard sel={sel} />}
-      <PulseEdge pulseKey={pulseKey} rail="right" />
+      <PulseEdge pulseKey={pulseKey} rail="right" off={collapsed} />
     </RailPane>
   );
 }

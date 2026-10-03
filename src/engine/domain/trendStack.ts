@@ -175,6 +175,62 @@ export const PLANE_PX_H = PLANE_PLOT_PX_H + PLANE_CHROME_PX_H;
 /** The plane's height in world units, from the two numbers above and its world width. */
 export const PLANE_WORLD_H = (PLANE_WORLD_W * PLANE_PX_H) / PLANE_PX_W;
 
+/** A PLANE'S FORMAT — everything about a card that follows from how wide it is AUTHORED. */
+export interface PlaneFormat {
+  /** CSS width at scale 1 (the element's own width; the projector divides by it). */
+  pxW: number;
+  /** The chart's plot height in CSS px (`TrendChart`'s `plotHeight`). */
+  plotPxH: number;
+  /** The card's nominal CSS height at scale 1. */
+  pxH: number;
+  /** The card's height in world units. */
+  worldH: number;
+  /** The up-stagger per slot, in world units — sized to uncover a rear card's HEADER STRIP. */
+  stepY: number;
+}
+
+/** The format every tier wore until 2026-10-03, and still the desktop and tablet one — the
+ *  constants above, gathered. */
+const WIDE_FORMAT: PlaneFormat = {
+  pxW: PLANE_PX_W,
+  plotPxH: PLANE_PLOT_PX_H,
+  pxH: PLANE_PX_H,
+  worldH: PLANE_WORLD_H,
+  stepY: PLANE_STEP_Y,
+};
+
+/** THE PHONE'S AUTHORED WIDTH. The front card is fitted to `PLANE_FIT` of the canvas at every tier
+ *  (`fitDistance`), so its ON-SCREEN width is decided; what the authored width decides is the CSS
+ *  SCALE the card is drawn at, and with it the size of every glyph on it. A 640px card fitted to a
+ *  390px phone runs at 0.56 — measured 2026-10-03, its 12px type rendered at 6.7px (user: "tiny
+ *  text"). Authored at about the width a phone gives it, the card runs at ~1 and the type is the
+ *  type. */
+const PHONE_PX_W = 360;
+/** The phone plot. Shorter than the wide one in CSS px but far taller on screen (170 at scale ~1
+ *  against 210 at 0.56): a portrait canvas has the height, and the 1.5:1 card uses it. */
+const PHONE_PLOT_PX_H = 170;
+
+/** ⚠️ THE STEP FOLLOWS THE WIDTH. A header strip is a fixed number of CSS px, so on a card authored
+ *  narrower the same strip is a LARGER share of the card's world width — the up-stagger that
+ *  uncovers it has to grow by the same ratio, or the rear headers (the roster's index) sink behind
+ *  the card in front. Derived, so a re-tune of either width keeps the headers showing. */
+const PHONE_FORMAT: PlaneFormat = {
+  pxW: PHONE_PX_W,
+  plotPxH: PHONE_PLOT_PX_H,
+  pxH: PHONE_PLOT_PX_H + PLANE_CHROME_PX_H,
+  worldH: (PLANE_WORLD_W * (PHONE_PLOT_PX_H + PLANE_CHROME_PX_H)) / PHONE_PX_W,
+  stepY: (PLANE_STEP_Y * PLANE_PX_W) / PHONE_PX_W,
+};
+
+/** The card's format for a canvas tier — the ONE home. Four readers: the component (the element's
+ *  size and its plot), the projector (the scale it divides by), the poses (the up-stagger) and the
+ *  ground (the drop under the front card). Two stable objects, so a caller may compare by
+ *  reference. `phone` is `breakpointOf(...) === "phone"`; the tablet keeps the wide format because
+ *  a 644px-plus card already runs at scale 1 or more there. */
+export function planeFormat(phone: boolean): PlaneFormat {
+  return phone ? PHONE_FORMAT : WIDE_FORMAT;
+}
+
 /** THE FRONT CARD'S SHARE OF THE FREE BAND — the fraction of the canvas width between the rails
  *  (the whole width where the rails are sheets) the front card spans at rest. Measured off the
  *  desktop pose the user tuned by eye (2026-09-19, "larger"): 798px of the 864px gap at 1500×1000,
@@ -191,10 +247,11 @@ export const PLANE_FIT = 0.92;
  *  pose (the rails' gap and the aspect are its inputs; the global zoom is folded into `PLANE_FIT`),
  *  because those three scale a pose tuned for a 3D volume and this subject is a DOM card whose
  *  width is a known number. */
-export function fitDistance(freeWidthPx: number, viewHeightPx: number, fovDeg: number): number {
+export function fitDistance(freeWidthPx: number, viewHeightPx: number, fovDeg: number, phone = false): number {
   const pxPerUnitAt1 = Math.max(1, viewHeightPx) / (2 * Math.tan((fovDeg * Math.PI) / 360));
   const byWidth = (PLANE_WORLD_W * pxPerUnitAt1) / (PLANE_FIT * Math.max(1, freeWidthPx));
-  const byHeight = (PLANE_WORLD_H * pxPerUnitAt1) / (CARD_FIT_H * Math.max(1, viewHeightPx));
+  // The card's own height for this tier — the phone card is squarer (`planeFormat`).
+  const byHeight = (planeFormat(phone).worldH * pxPerUnitAt1) / (CARD_FIT_H * Math.max(1, viewHeightPx));
   return Math.max(byWidth, byHeight);
 }
 
@@ -232,6 +289,8 @@ interface StackOpts {
   focus: string | null;
   /** A narrow canvas (below the desktop tier): the across-stagger is zero — see `stepX`. */
   narrow?: boolean;
+  /** The phone tier: the card wears the phone format, whose up-stagger is larger (`planeFormat`). */
+  phone?: boolean;
 }
 
 /** Clamp `scroll` to the roster's own end and floor it to an integer slot — a fractional scroll
@@ -282,8 +341,9 @@ export function focusInWindow(ids: readonly string[], scroll: number, focus: str
  * a plane focus goes through the click table rather than straight to its setter.
  */
 export function stackPoses(ids: readonly string[], opts: StackOpts): PlanePose[] {
-  const { scroll, focus, narrow = false } = opts;
+  const { scroll, focus, narrow = false, phone = false } = opts;
   const sx = stepX(narrow);
+  const sy = planeFormat(phone).stepY;
   const start = clampScroll(ids.length, scroll);
   const visible = ids.slice(start, start + VISIBLE_PLANES);
   // The shared predicate, never a local `visible.includes` — `focusDepth` reads the same answer,
@@ -309,7 +369,7 @@ export function stackPoses(ids: readonly string[], opts: StackOpts): PlanePose[]
     return {
       id,
       x: (slot - c) * sx,
-      y: PLANE_Y + (slot - c) * PLANE_STEP_Y,
+      y: PLANE_Y + (slot - c) * sy,
       z: -slot * PLANE_GAP,
       scale: 1 - SCALE_FALLOFF * slot,
       opacity: 1 - OPACITY_FALLOFF * slot,
@@ -352,11 +412,12 @@ export function morePose(ids: readonly string[], opts: StackOpts): PlanePose | n
   const n = windowCount(ids.length);
   const c = staggerCentre(n);
   const sx = stepX(opts.narrow ?? false);
+  const sy = planeFormat(opts.phone ?? false).stepY;
   const slot = n;
   return {
     id: MORE_ID,
     x: (slot - c) * sx,
-    y: PLANE_Y + (slot - c) * PLANE_STEP_Y,
+    y: PLANE_Y + (slot - c) * sy,
     z: -slot * PLANE_GAP,
     scale: 1 - SCALE_FALLOFF * slot,
     opacity: 1 - OPACITY_FALLOFF * slot,
@@ -434,6 +495,14 @@ export function scrollToKeep(
   scroll: number,
 ): number {
   if (focus === null || prev === next) return scroll;
+  // ⚠️ A FOCUS THAT JOINS THE ROSTER WITH THIS PUBLISH IS SHOWN (whole-branch review, 2026-10-03).
+  // History's DAG plane is not in the resting deck: it joins at the front when its row is
+  // picked, a publish AFTER the executor's own `scrollToShow` — which ran against a roster that
+  // did not hold it yet and so had no opinion. With the window paged down, the plane joined at
+  // index 0, out of sight: the row washed as selected and no chart came forward. "Was it on
+  // screen before" cannot be asked of a plane that did not exist before; it has just been asked
+  // for. An EMPTY previous roster is a view arriving, not a plane joining, and keeps the scroll.
+  if (prev.length > 0 && !prev.includes(focus)) return scrollToShow(next, focus, scroll);
   if (!focusInWindow(prev, scroll, focus)) return scroll;
   return scrollToShow(next, focus, scroll);
 }

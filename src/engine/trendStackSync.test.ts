@@ -66,7 +66,7 @@ function fakeHost(opts: { pos?: THREE.Vector3; target?: THREE.Vector3 } = {}) {
 }
 
 const state = (over: Partial<TrendStackState> = {}): TrendStackState => ({
-  scroll: 0, focus: null, ids: ["a", "b", "c"], gapShiftPx: 0, narrow: false, ...over,
+  scroll: 0, focus: null, ids: ["a", "b", "c"], gapShiftPx: 0, narrow: false, phone: false, ...over,
 });
 
 /** The uniform scale out of a `matrix3d(s,0,0,0, 0,s,0,0, 0,0,1,0, tx,ty,0,1)` string. */

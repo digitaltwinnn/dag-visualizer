@@ -38,7 +38,8 @@ export { UNLISTED_ID, UNLISTED_HUE, UNLISTED_LABEL };
 export const UNLISTED_SCENE_HEX_BY_THEME: Record<Theme, number> = { dark: 0x8a96b8, light: 0x5a6478 };
 export const UNLISTED_SCENE_HEX = UNLISTED_SCENE_HEX_BY_THEME.dark;
 
-export const LISTED_IDS: ReadonlySet<string> = new Set(METAGRAPHS.map((m) => m.id));
+// Current ids AND former addresses: a network's retired chain is still that network's.
+export const LISTED_IDS: ReadonlySet<string> = new Set(METAGRAPHS.flatMap((m) => [m.id, ...(m.formerIds ?? [])]));
 
 /** The unlisted set as a MetaCfg, so the SAME dossier component renders it (user, 2026-08-14 —
  *  "I'd rather not just share grammar but prefer sharing components"). The blurb is built by

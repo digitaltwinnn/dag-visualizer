@@ -670,10 +670,17 @@ export default function RailDock({
               // The on-state cyan tint targets `>svg` (the half's OWN EXPLORE_ICON/ListTree mark
               // only) — the tray icons inside the span keep their muted/identity colours.
               "relative w-full h-full rounded-none! items-center justify-center gap-2 cursor-pointer",
-              "bg-[var(--panel-light)] border border-[var(--thread-faint)] backdrop-blur-[8px]",
+              // THE DOCK IS THE BOTTOM BAR, SO IT WEARS THE BAR'S PLATE (light-theme pass, 2026-10-03).
+              // It was `--panel-light` — 40% white on paper — and its open half swapped that for the
+              // 12% selection wash ALONE, so both let the scene's grey foot through: grey tabs and a
+              // grey-green active one under a white sheet. `--topbar-glass` is the command bar's own
+              // plate on both grounds; the open half lays the selection wash OVER it rather than
+              // instead of it. Arbitrary `background` properties, not `bg-[…]`: the token is a
+              // gradient (CSS trap 3).
+              "[background:var(--topbar-glass)] border border-[var(--thread-faint)] backdrop-blur-[8px]",
               "text-body font-semibold tracking-[0.02em] text-muted-foreground",
-              "hover:bg-[var(--panel-light)] hover:text-muted-foreground",
-              "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",
+              "hover:[background:var(--topbar-glass)] hover:text-muted-foreground",
+              "data-[state=on]:text-foreground data-[state=on]:[background:linear-gradient(var(--sel-bg),var(--sel-bg)),var(--topbar-glass)]",
               "data-[state=on]:shadow-[inset_0_2px_0_var(--sel-border)] data-[state=on]:[&>svg]:text-[var(--primary)]",
             )}
           >
@@ -772,6 +779,11 @@ export default function RailDock({
             isBarHalf
               ? cn(
                   "!bottom-[var(--phone-dock-h)]",
+                  // DENSER GLASS ON PHONE (2026-10-02): the sheet is the reading surface there and the
+                  // camera often sits close behind it — at `--panel-light` a bright stack of chips
+                  // showed through the collapsed card heads. The desktop panel's own fill and a
+                  // stronger blur keep it glass without the scene competing with the text.
+                  "!bg-[var(--panel)] !backdrop-blur-[14px]",
                   // The slide keyframe never plays on the bar half — the entry is the height
                   // grow above ('!': the animate utility is a (0,2,0) variant, the documented
                   // escape). Reduced motion collapses the grow too (transition-none).
@@ -819,6 +831,8 @@ export default function RailDock({
               className={cn(
                 "self-center w-11 h-11 mx-0 -mt-[22px] -mb-[18px] flex items-center justify-center cursor-grab active:cursor-grabbing",
                 "p-0 border-none bg-none [-webkit-tap-highlight-color:transparent] [touch-action:none]",
+                // The app's focus language (a 1px accent outline), not the platform's white box.
+                "outline-none rounded-md focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
                 "before:content-[''] before:w-9 before:h-1 before:rounded-[2px] before:bg-border",
               )}
               aria-label={`Collapse ${label} panel`}
@@ -850,7 +864,10 @@ export default function RailDock({
                 aria-label={`Close ${label} panel`}
                 title={`Close ${label} panel`}
                 onClick={() => handleOpenChange(false)}
-                className="flex-none w-11 h-11 rounded-[var(--radius)] leading-none cursor-pointer text-muted-foreground hover:bg-transparent hover:text-muted-foreground dark:hover:bg-transparent"
+                // The ghost recipe's own hover wash, like every other icon control (user, 2026-10-03:
+                // "the details and explore pane × does not have the fill effect on hover like other
+                // buttons do") — this one had it switched OFF by three overrides.
+                className="flex-none w-11 h-11 rounded-md leading-none cursor-pointer text-muted-foreground"
               >
                 <X aria-hidden className="size-5" />
               </Button>
@@ -868,7 +885,7 @@ export default function RailDock({
                 nothing: hosted cards rendered flush (user, 2026-08-30 — "zero gap between the
                 cards", tablet/phone only, desktop's #leftcol has no such wrapper). The gaps are
                 part of the content height, so the fit measurement stays honest. */}
-            <div ref={setFitEl} className="flex flex-col gap-[var(--rail-gap)]">{children}</div>
+            <div ref={setFitEl} className="flex flex-col gap-[var(--rail-gap)] max-[700px]:pb-2">{children}</div>
           </div>
         </SheetContent>
       </Sheet>

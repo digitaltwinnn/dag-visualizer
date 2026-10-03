@@ -92,12 +92,37 @@ export default function HeightEase({
     if (settleRef.current === settleKey) return;
     settleRef.current = settleKey;
     arriving.current = true;   // consumed by the next ease; a mount never arms it
+    // ⚠️ THE POINTER-INERT WINDOW OPENS HERE, WITH THE COMMIT (user, 2026-10-03: "a click gives its
+    // outline a flash that is not needed"). The ease below marks the box `data-arriving` in its
+    // CONFIRMATION frame, one frame after the swap — and in that frame the new occupant sat under
+    // a cursor that never moved and took the pointer: measured, the box wore `.subject-paired`
+    // (the hover ring round the whole card) 29ms after it mounted and lost it 58ms later when the
+    // window finally opened, then lit again when the expand landed. On, off, on. A layout effect
+    // runs before the browser's first hit test of the new occupant, so stated here the card never
+    // hears that first hover and lights once, at rest. Where no resize follows there is no ease
+    // to close the window, so it closes itself once the frame an ease would have claimed it in
+    // has passed unclaimed.
+    const o = outer.current!;
+    o.dataset.arriving = "";
+    let second = 0;
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(() => {
+        // An ease that has claimed the box — pinned and awaiting its confirmation frame, or
+        // already running — owns the attribute from here and clears it when it lands.
+        if (arriving.current && !confirm.current && !anim.current) delete o.dataset.arriving;
+      });
+    });
+    return () => {
+      cancelAnimationFrame(first);
+      cancelAnimationFrame(second);
+    };
   }, [settleKey]);
   useLayoutEffect(() => {
     const o = outer.current!;
     const i = inner.current!;
     const clearStyles = () => {
       delete o.dataset.arriving;
+      delete o.dataset.resizing;
       i.style.opacity = "";
       o.style.height = "";
       o.style.overflow = "";
@@ -117,6 +142,22 @@ export default function HeightEase({
       if (h === last.current) return;
       const first = last.current < 0;
       if (first && (!growInRef.current || h === 0)) {
+        last.current = h;
+        return;
+      }
+      // ⚠️ A SLIDING CARD'S HEIGHT IS THE PAGER'S, AND THAT IS STATED, NOT GUESSED (user,
+      // 2026-10-03: "the dossier card, when swiped left/right changes in height (ok) but the
+      // resize is a bit jumpy/snappy"). The pager pins its lane to the old card's height and
+      // eases it to the new one on the slide's own clock. The stand-down below (the one-frame
+      // confirmation) INFERS a foreign animator from the height still moving a frame later — and
+      // the pager arms its ease a frame after the swap, on a curve that starts slowly, so the
+      // check saw a still box and this ease took it. Measured, Dor → USDC: held at the old 500px
+      // for 650ms, snapped to 458 and back within two frames — 42px of everything below jumping
+      // — then eased down for another 650ms. Two animators, one after the other, with a tear
+      // between them. `RailPager` marks its wrapper `data-sliding` for exactly the window it owns
+      // the lane; under it this box follows (the height is recorded, nothing is pinned), and
+      // there is one movement.
+      if (i.querySelector("[data-sliding]")) {
         last.current = h;
         return;
       }
@@ -151,6 +192,13 @@ export default function HeightEase({
       // so the follow-don't-fight guarantee is unchanged: a foreign animator's pin is still
       // never written by us, and the pin here is released the moment one is detected.
       o.style.height = `${from}px`;
+      // THE BOX IS IN MOTION FROM HERE until `clearStyles` — stated as an attribute so what rides
+      // the card's edge can wait for it: the subject-change pulse sweeps a track pinned to the
+      // card's top and bottom, and started on the click it ran along an edge that was still
+      // growing (user, 2026-10-03: "it should happen after that animation is done"). Set HERE,
+      // before paint, so a pulse mounted by the same commit never draws a frame; globals.css
+      // holds `.edge-pulse` paused under it, and it plays the moment the height lands.
+      o.dataset.resizing = "";
       o.style.overflow = "clip";
       o.style.overflowClipMargin = "18px";
       // The one-frame confirmation (see the follow-don't-fight note above): a foreign

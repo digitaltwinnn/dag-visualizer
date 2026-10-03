@@ -49,7 +49,8 @@ const HIDDEN: CalloutPlacement = { show: false, flip: false, drop: false };
  * Resolve where the panel stands for an anchor projected to `(x, y)` in viewport px.
  *
  * `bandL`/`bandR` are the free canvas band — the viewport edges on desktop, pulled in by whatever
- * an open sheet covers below 1100px. `top` is the canvas's own top edge.
+ * an open sheet covers below 1100px. `top` is where the free band begins: the canvas's own top
+ * edge, or the command bar's bottom where the canvas runs behind it.
  *
  * The rules, in the order they matter:
  *
@@ -82,4 +83,39 @@ export function calloutPlacement(
   // The vertical band is unaffected by the sheets — they are full-height, so they take width and
   // never height. Near the top the panel drops below the anchor instead.
   return { show: true, flip: !fitR, drop: y < top + CALLOUT_REACH_Y };
+}
+
+// ---- the hanging label ---------------------------------------------------------------------
+//
+// Snapshots stands TWO callouts (2026-10-03): the metagraph snapshot's on its tile and the global
+// snapshot's on its bar. The second one stood up-right like every callout, which from the floor
+// is the middle of the chamber — its panel covered the ribbons and the other networks' lanes,
+// the part of the scene the label is about. It HANGS instead (user: "ok A, but make the angle of
+// the lines the same"): below-left of its anchor, into the empty strip between the floor and the
+// bottom band, so the pair reads the way the chamber is built — the snapshot above, the global
+// snapshot it fell into below.
+//
+// ⚠️ THE SAME DIAGONAL, MIRRORED THROUGH THE ANCHOR. Down-left is the up-right standoff turned
+// half a circle, so the two leaders are parallel; only the LENGTH differs, by one factor on both
+// axes, because the strip under the floor is short. Scaling one axis alone would change the angle.
+
+/** The hanging standoff, as a share of the standing one. `app/globals.css` mirrors it (`--co-k`
+ *  under `[data-hang]`) — change both or neither. */
+export const CALLOUT_HANG_K = 0.55;
+/** The tallest panel the hanging label renders (eyebrow, title row, rule, lead) — 88px measured.
+ *  The air under it is the caller's (`bottom` already stops short of the band). */
+const HANG_PANEL_H = 88;
+/** The hanging panel's full reach from its anchor: leftward and downward. */
+export const CALLOUT_HANG_REACH_X = Math.round(CALLOUT_OFF_X * CALLOUT_HANG_K) + (CALLOUT_REACH_X - CALLOUT_OFF_X);
+export const CALLOUT_HANG_REACH_Y = Math.round(CALLOUT_OFF_Y * CALLOUT_HANG_K) + HANG_PANEL_H;
+
+/**
+ * May a label hang below-left of an anchor at `(x, y)`? `bottom` is where the free canvas ends —
+ * the bottom band's top edge, or the viewport's where there is no band. False sends the caller
+ * back to `calloutPlacement`, which stands the label where it always stood: a window too short
+ * for the strip gets the old label, never a clipped new one.
+ */
+export function calloutHangs(x: number, y: number, bandL: number, bandR: number, bottom: number): boolean {
+  if (!(bandR > bandL) || x < bandL || x > bandR) return false;
+  return x - CALLOUT_HANG_REACH_X >= bandL && y + CALLOUT_HANG_REACH_Y <= bottom;
 }

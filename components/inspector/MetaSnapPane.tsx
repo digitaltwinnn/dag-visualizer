@@ -30,7 +30,7 @@ import { useNowTick } from "@/components/useNowTick";
 import { identityHudCss } from "@/src/palette/identity";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { METASNAP_ICON, KIND_MARK_CLASS } from "@/components/icons";
-import { metaSnapSelectActions } from "@/src/engine/domain/pickActions";
+import { metaSnapSelectActions, netKeyOf } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { cn } from "@/lib/utils";
 
@@ -68,6 +68,7 @@ export default function MetaSnapPane({
   const hoverMetaSnap = useStore((s) => s.hoverMetaSnap);
   const setHoverMetaSnap = useStore((s) => s.setHoverMetaSnap);
   const snap = useStore((s) => s.snap);
+  const appFilter = useStore((s) => s.filter);
   const setSection = useStore((s) => s.setSection);
   const setDeepWanted = useStore((s) => s.setDeepWanted);
   const deepWanted = useStore((s) => s.deepWanted);
@@ -135,7 +136,12 @@ export default function MetaSnapPane({
   // (2026-08-08: hashing the address through the identity palette minted a random hue per channel —
   // pink icons for a set that deliberately has no identity of its own).
   const hue = cfg ? identityHudCss(sel.metaId) : UNLISTED_HUE;
-  const pair = subjectPairing<string>(hoverMetaSnap, metaSnapHoverKey(sel.metaId, sel.ordinal), setHoverMetaSnap, hue);
+  // THE EDGE SIGNALS FOLLOW THE FILTER, like the Metagraph card above (user, 2026-10-03: "snapshot
+  // card should follow"). A snapshot reached inside a global snapshot with the top bar on All is
+  // a subject like any other, so its hover edge and ring take the accent; they wear the network's
+  // hue only while that network IS the filter. The mark that names it keeps its hue.
+  const pairHue = netKeyOf(sel.metaId) === appFilter ? hue : "var(--primary)";
+  const pair = subjectPairing<string>(hoverMetaSnap, metaSnapHoverKey(sel.metaId, sel.ordinal), setHoverMetaSnap, pairHue);
   // Hoisted out of the state tier so the FOOT can reach it — it is a hash, and hashes are looked
   // up, not read. The deep read wins where it exists; the exact row carries it otherwise.
   const stateProof = deep?.stateProof ?? row?.stateProof;
@@ -169,7 +175,8 @@ export default function MetaSnapPane({
   // directly above since the tick-local network landed (`store.tickNet`), and a card never
   // restates its ancestor (the pile rule — the same reason the ticker left this head on
   // 2026-08-10).
-  const lead = `${following && !sameTick ? "Following live. " : ""}Anchored to ${anchor}${rel ? ` · ${rel}` : ""}.`;
+  // The AGE is the lead's chip, not a clause after a mid-dot (user, 2026-10-03).
+  const lead = `${following && !sameTick ? "Following live. " : ""}Anchored to ${anchor}.`;
 
   return (
     <RailPane
@@ -203,7 +210,7 @@ export default function MetaSnapPane({
                 Two labelled sections, State and Data — the same two payload lanes the raw layer
                 opens one tier down, so the card states their SHAPE and the pane renders them.
                 Both always render, each honest about its own tier. */}
-            <Lead>{lead}</Lead>
+            <Lead aside={rel || undefined}>{lead}</Lead>
             <Separator className="mb-2" />
             <PayloadBlock row={row} deep={deep ?? null} asked={deepAsked} decodeGaveUp={decodeGaveUp} />
 
@@ -339,7 +346,7 @@ export default function MetaSnapPane({
                   // not just unnecessary but wrong: `metaSnapSelectActions`' deselect early-return
                   // needs `!current.following`, so re-committing the selected snapshot would CLEAR
                   // it, on a button that says `read this`.
-                  if (following) applyClickActions(metaSnapSelectActions(sel, snap, { metaSnap: sel, following }));
+                  if (following) applyClickActions(metaSnapSelectActions(sel, snap, { metaSnap: sel, following, inspect: useStore.getState().inspect }));
                   setDeepWanted(metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal));
                 }}
                 >
@@ -381,7 +388,7 @@ export default function MetaSnapPane({
             </Foot>
           </div>
         )}
-        <PulseEdge pulseKey={pulseKey} rail="right" />
+        <PulseEdge pulseKey={pulseKey} rail="right" off={collapsed} />
     </RailPane>
   );
 }
@@ -556,7 +563,7 @@ function PayloadSection({
           muted line — a tab opening onto nothing would read as an empty reading, and "unread and
           none are different facts". It names no control: the Decompress door below shows only
           when this snapshot can be read, and a sentence pointing at an absent door is a dead end. */}
-      {!read && !pending && <p className="m-0 text-label text-muted-foreground">Not read yet.</p>}
+      {!read && !pending && <p className="m-0 text-label text-muted-foreground">Not decompressed yet.</p>}
       {pending && <p className="m-0 text-label text-muted-foreground italic">{pending}</p>}
       {read && rows.length === 0 && !signers && (
         // MEASURED empty — the deep read landed and this section carries nothing. A reading,

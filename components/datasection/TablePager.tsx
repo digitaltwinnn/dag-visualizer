@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, TOUCH_HIT } from "@/lib/utils";
 import { fmtCount } from "@/src/util/format";
 
 // The raw layer's ONE table pager (user, 2026-08-14 — "add a bottom row with pagination", the
@@ -37,8 +37,12 @@ export default function TablePager({
    *  — "no human understands this"). It reads directly after a number, so it must complete the
    *  sentence a reader is already forming — "501 recent", not "501 window". Both consumers say
    *  "recent", deliberately: the qualifier is one idea (this is not the whole chain) and is
-   *  learned once; only the `title` differs, because the way to see more differs per surface. */
-  scope?: { word: string; title: string };
+   *  learned once; only the `title` differs, because the way to see more differs per surface.
+   *
+   *  A scope WITHOUT a `title` is a plain label (user, 2026-10-03, on the Snapshots explorer's
+   *  "last 12 min": "remove the explanatory text section") — no button, no dotted underline, no
+   *  line under the strip. The span is a fact a reader can use; how the explorer holds it is not. */
+  scope?: { word: string; title?: string };
   /** RAIL WIDTH (2026-09-13, the Snapshots explorer's pager). The strip was drawn for a raw-layer
    *  table with hundreds of pixels to spend; in a ~264px rail card the range words and the
    *  four-button cluster fought for the same line and "1 / 4" wrapped onto two. Compact keeps
@@ -57,7 +61,7 @@ export default function TablePager({
   if (pages <= 1 && !scope) return null;
   // The chevrons are shadcn `Button`s on the ghost recipe — the one hover every icon control shares
   // (button.tsx) — so this names only what is local: the box and the muted rest ink.
-  const btn = "size-6 rounded-xs text-muted-foreground disabled:opacity-30";
+  const btn = cn("size-6 rounded-xs text-muted-foreground disabled:opacity-30", TOUCH_HIT);
   return (
     <div className="flex-none pt-1.5">
       <div className="flex items-center justify-between gap-2">
@@ -68,7 +72,10 @@ export default function TablePager({
         {compact && scope ? null : compact ? fmtCount(total) : `${from}–${to} of ${fmtCount(total)}`}
         {scope ? (
           <>
-            {compact ? null : " · "}
+            {compact ? null : " "}
+            {!scope.title ? (
+              <span className="inline-flex items-center min-h-6">{scope.word}</span>
+            ) : (
             <button
               type="button"
               aria-expanded={explain}
@@ -78,6 +85,7 @@ export default function TablePager({
             >
               {scope.word}
             </button>
+            )}
           </>
         ) : null}
       </span>
@@ -110,7 +118,7 @@ export default function TablePager({
       </span>
       )}
       </div>
-      {explain && scope && (
+      {explain && scope?.title && (
         <p className="m-0 pt-1 text-label text-muted-foreground max-w-[52ch]">{scope.title}</p>
       )}
     </div>

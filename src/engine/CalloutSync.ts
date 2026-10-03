@@ -3,7 +3,7 @@ import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
 import type { CohortSel } from "./domain/focusLadder";
 import type { Mode } from "@/src/store/store";
 import { breakpointOf } from "@/src/data/breakpoint";
-import { calloutPlacement, CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET } from "./domain/calloutPlacement";
+import { calloutHangs, calloutPlacement, CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET } from "./domain/calloutPlacement";
 import { R as GEO_R, LAND_H, latLonToVec3 } from "./domain/geoLayout";
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
@@ -66,12 +66,16 @@ export interface CalloutHost {
   dofMeta(): { group: THREE.Object3D } | null;
 }
 
+const isNodePick = (p: PickDescriptor | null): boolean =>
+  !!p && (p.kind === "l0" || p.kind === "l1" || p.kind === "metanode");
+
 export class CalloutSync {
   private readonly h: CalloutHost;
   private st!: CalloutState;
 
   // scratch — all of it was Engine-private and callout-only before the move
   private _calloutV = new THREE.Vector3();
+  private _calloutV2 = new THREE.Vector3();
   private _calloutSibs = [new THREE.Vector3(), new THREE.Vector3()];
   private _calloutNodeAnchor = false;
   private _geoNodePick: unknown = null;
@@ -115,8 +119,14 @@ export class CalloutSync {
   // the two owners cannot drift apart at the boundary.
   private _syncCallout(): void {
     const el = document.getElementById("callout");
-    if (!el) return;
-    let on =
+    // THE SECOND ANCHOR (user, 2026-10-03: "2 callouts"). In Snapshots a committed metagraph
+    // snapshot stands with the global snapshot it is read against, and each gets its own label:
+    // `callout` is the metagraph snapshot's (or a boxed node's), `callout-2` the global
+    // snapshot's, at `_ledgerGlobalAnchor`. Either may be absent — a global snapshot alone
+    // renders only the second.
+    const el2 = document.getElementById("callout-2");
+    if (!el && !el2) return;
+    const allowed =
       this.h.calloutAllowed() &&
       !this.h.transitionActive() &&
       // …and not while the camera is still FLYING to the subject (user, 2026-09-04: the label
@@ -126,52 +136,118 @@ export class CalloutSync {
       // camera leans, and the label tracks its unchanged subject per frame.
       (!this.h.flyingNow() || this.h.sameSubjectFlight()) &&
       breakpointOf(window.innerWidth) !== "phone";
-    if (on) {
+    if (el) {
       const v = this._calloutV;
-      on =
-        this.h.mode === "geo"
+      const on =
+        allowed &&
+        (this.h.mode === "geo"
           ? this._geoCalloutAnchor(v)
           : this.h.mode === "ledger"
             ? this._ledgerCalloutAnchor(v)
-            : this._hyperCalloutAnchor(v);
-      if (on) {
-        v.applyMatrix4(this.h.ctx.camera.matrixWorldInverse); // world → view (camera looks −z)
-        if (v.z > -0.1) on = false; // behind (or grazing) the camera plane
-        else {
-          v.applyMatrix4(this.h.ctx.camera.projectionMatrix); // view → NDC (w-divide included)
-          const r = this.h.ctx.renderer.domElement.getBoundingClientRect();
-          const x = r.left + (v.x * 0.5 + 0.5) * r.width;
-          const y = r.top + (-v.y * 0.5 + 0.5) * r.height;
-          // Placement is `domain/calloutPlacement.ts` — the flip/drop rules and the panel's reach
-          // live there with their test, and globals.css mirrors the geometry off the attributes
-          // written below (guarded writes, like data-on).
-          // ⚠️ MEASURE THE FREE CANVAS BAND, NOT THE CANVAS. Below 1100px the rails are
-          // sheets that OVERLAY a still-viewport-sized canvas, so `r.left`/`r.right` describe room
-          // the callout does not have: at 900px with both sheets open a geo node's panel rendered
-          // as a ~25px fragment in the strip between them. `sceneCoverL`/`sceneCoverR` are what the
-          // open sheets measured off themselves (0 on desktop and phone, so this is a no-op there).
-          const p = calloutPlacement(x, y, r.left + this.st.sceneCoverL, r.right - this.st.sceneCoverR, r.top);
-          if (!p.show) on = false;
-          else {
-            el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
-            if ((el.dataset.flip != null) !== p.flip) {
-              if (p.flip) el.dataset.flip = "";
-              else delete el.dataset.flip;
-            }
-            if ((el.dataset.drop != null) !== p.drop) {
-              if (p.drop) el.dataset.drop = "";
-              else delete el.dataset.drop;
-            }
-            this._syncCalloutMulti(el, x, y, r, p.flip, p.drop);
-          }
-        }
-      }
+            : this._hyperCalloutAnchor(v)) &&
+        this._placeCallout(el, v);
+      if (on) this._syncCalloutMulti(el, this._placedX, this._placedY, this._placedRect, this._placedFlip, this._placedDrop);
+      else this._syncCalloutMulti(el, 0, 0, null, false, false);
+      // Guard on the ELEMENT's own attribute, not a cached flag: React remounts the wrapper on a
+      // subject change (fresh data-on="0"), so a field would go stale exactly then.
+      const flag = on ? "1" : "0";
+      if (el.dataset.on !== flag) el.dataset.on = flag;
     }
-    if (!on) this._syncCalloutMulti(el, 0, 0, null, false, false);
-    // Guard on the ELEMENT's own attribute, not a cached flag: React remounts the wrapper on a
-    // subject change (fresh data-on="0"), so a field would go stale exactly then.
-    const flag = on ? "1" : "0";
-    if (el.dataset.on !== flag) el.dataset.on = flag;
+    if (el2) {
+      const v = this._calloutV2;
+      const on = allowed && this.h.mode === "ledger" && this._ledgerGlobalAnchor(v) && this._placeCallout(el2, v, true);
+      const flag = on ? "1" : "0";
+      if (el2.dataset.on !== flag) el2.dataset.on = flag;
+    }
+  }
+
+  // Where the last `_placeCallout` put its anchor — read back by the multi-leader, which draws
+  // from the same point with the same flips. Fields, not a returned object (rule 5).
+  private _placedX = 0;
+  private _placedY = 0;
+  private _placedRect: DOMRect | null = null;
+  private _placedFlip = false;
+  private _placedDrop = false;
+
+  /** Project a WORLD anchor to the screen and write one callout's transform and flips. False
+   *  when the point is behind the camera or the panel has no room on either side. */
+  private _placeCallout(el: HTMLElement, v: THREE.Vector3, hangs = false): boolean {
+    v.applyMatrix4(this.h.ctx.camera.matrixWorldInverse); // world → view (camera looks −z)
+    if (v.z > -0.1) return false; // behind (or grazing) the camera plane
+    v.applyMatrix4(this.h.ctx.camera.projectionMatrix); // view → NDC (w-divide included)
+    const r = this.h.ctx.renderer.domElement.getBoundingClientRect();
+    const x = r.left + (v.x * 0.5 + 0.5) * r.width;
+    const y = r.top + (-v.y * 0.5 + 0.5) * r.height;
+    // Placement is `domain/calloutPlacement.ts` — the flip/drop rules and the panel's reach
+    // live there with their test, and globals.css mirrors the geometry off the attributes
+    // written below (guarded writes, like data-on).
+    // ⚠️ MEASURE THE FREE CANVAS BAND, NOT THE CANVAS. Below 1100px the rails are
+    // sheets that OVERLAY a still-viewport-sized canvas, so `r.left`/`r.right` describe room
+    // the callout does not have: at 900px with both sheets open a geo node's panel rendered
+    // as a ~25px fragment in the strip between them. `sceneCoverL`/`sceneCoverR` are what the
+    // open sheets measured off themselves (0 on desktop and phone, so this is a no-op there).
+    const bandL = r.left + this.st.sceneCoverL;
+    const bandR = r.right - this.st.sceneCoverR;
+    // THE GLOBAL SNAPSHOT'S LABEL HANGS (`calloutHangs`, with its test): below-left of the bar,
+    // on the standing label's own diagonal turned half a circle, where the strip under the floor
+    // has room for it. Where it has not, the label stands as every callout does.
+    const hang = hangs && calloutHangs(x, y, bandL, bandR, this._freeBottom());
+    let flip = true;
+    let drop = true;
+    if (!hang) {
+      const p = calloutPlacement(x, y, bandL, bandR, Math.max(r.top, this._freeTop()));
+      if (!p.show) return false;
+      flip = p.flip;
+      drop = p.drop;
+    }
+    el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
+    if ((el.dataset.flip != null) !== flip) {
+      if (flip) el.dataset.flip = "";
+      else delete el.dataset.flip;
+    }
+    if ((el.dataset.drop != null) !== drop) {
+      if (drop) el.dataset.drop = "";
+      else delete el.dataset.drop;
+    }
+    if ((el.dataset.hang != null) !== hang) {
+      if (hang) el.dataset.hang = "";
+      else delete el.dataset.hang;
+    }
+    this._placedX = x;
+    this._placedY = y;
+    this._placedRect = r;
+    this._placedFlip = flip;
+    this._placedDrop = drop;
+    return true;
+  }
+
+  // Where the free canvas ends: the bottom band's top edge, less a little air, or the viewport's
+  // where no band is up (SCENE presentation, a view without one). The band is React's, so this
+  // is a DOM read — taken every thirtieth call rather than every frame, since the band moves
+  // only on a resize or a presentation change and a half-second-late answer costs nothing.
+  private _bottom = 0;
+  private _top = 0;
+  private _boundsIn = 0;
+  private _bounds(): void {
+    if (this._boundsIn-- > 0) return;
+    this._boundsIn = 30;
+    const band = document.getElementById("vitalsband");
+    this._bottom = (band ? band.getBoundingClientRect().top : window.innerHeight) - 4;
+    const bar = document.getElementById("topbar");
+    this._top = bar ? bar.getBoundingClientRect().bottom : 0;
+  }
+  private _freeBottom(): number {
+    this._bounds();
+    return this._bottom;
+  }
+  // …and where it BEGINS: the command bar's bottom edge (any open strip included). The canvas
+  // runs behind the bar, so "near the top of the canvas" was measured from y = 0 and a label
+  // 220px tall stood up into the bar — in Hypergraph a node high on a hub showed only its last
+  // row under it (user, 2026-10-03, suggestion 5 of the callout review). Measured from here, the
+  // same rule drops the panel below its subject while there is still room to read it.
+  private _freeTop(): number {
+    this._bounds();
+    return this._top;
   }
 
   // THE MULTI-LEADER (user, 2026-08-30): a machine is SEVERAL beads in hyper — one per layer it
@@ -331,41 +407,55 @@ export class CalloutSync {
   // layout data). An uncataloged channel's rows live on the unlisted lane.
   private _ledgerCalloutAnchor(v: THREE.Vector3): boolean {
     const st = this.st;
-        // THE BOX LEADS (user, 2026-08-15/16): the boxed NODE card anchors the machine's own tray
-    // chip; the boxed GLOBAL card anchors the tick's bar — even while a finer subject stays
-    // committed. The boxed METAGRAPH card shows NOTHING (user, 2026-08-16 — like geo's network
-    // rung: a network in the chamber is a whole LANE, and a single anchor would lie about it).
-    // Then the default order: metagraph tile > global bar > tray node.
-    if (st.boxedCard === "context") return false;
-    if (st.boxedCard === "node" && this._ledgerNodeAnchor(st, v)) return true;
-    if (st.boxedCard === "snap" && st.snap) {
-      // A snapshot's label waits until its row is FIXED on the plane (LedgerView.calloutSettled
-      // — the chamber's own clocks; the tray-node paths stay exempt, chips don't ride the trail).
-      if (!this.h.ledger.calloutSettled(st.following)) return false;
-      this._ledgerBarAnchor(v);
-      this.h.ledger.group.localToWorld(v); // render-state OK
+    // THE BOX LEADS (user, 2026-08-15/16): the boxed NODE card anchors the node's own tray chip.
+    if (st.boxedCard === "node" && isNodePick(st.inspect)) return this._ledgerNodeAnchor(st, v);
+    // Otherwise this anchor is the UPPER STOREY's — `SceneCallout`'s chain, mirrored term for
+    // term: the metagraph snapshot's tile, or its network's LANE when the Metagraph card is the
+    // box or no snapshot of that network is committed (user, 2026-10-03: "the dossier on
+    // snapshots page has no callout on the scene"). The global snapshot's label has an anchor of
+    // its own (`_ledgerGlobalAnchor`).
+    const net = this.h.ledgerNet;
+    const lane = net !== "all" && net !== "dag" && net !== UNLISTED_ID;
+    if (lane && (st.boxedCard === "context" || !st.metaSnap)) {
+      // The lane's head — layout data, fixed for the session; false when the lane isn't in the
+      // field, and then the label stays down rather than borrow another subject's point.
+      if (!this.h.ledger.calloutAnchor(net, v)) return false;
+      this.h.ledger.group.localToWorld(v); // the rendered chamber transform — a label read. render-state OK
       return true;
     }
     if (st.metaSnap) {
+      // A snapshot's label waits until its row is FIXED on the plane (LedgerView.calloutSettled
+      // — the chamber's own clocks; the tray-node paths stay exempt, chips don't ride the trail).
       if (!this.h.ledger.calloutSettled(st.following)) return false;
-      // THE committed snapshot's tile (user, 2026-08-15), rewind offsets included; the lane
-      // lead stays as the fallback while the tile is off-trail (aged out of the window or not
-      // drawn this frame).
-      if (!this.h.ledger.selectedTileAnchor(v)) {
-        if (!this.h.ledger.calloutAnchor(st.metaSnap.metaId, v) && !this.h.ledger.calloutAnchor(UNLISTED_ID, v)) return false;
-      }
-    } else if (st.snap) {
-      if (!this.h.ledger.calloutSettled(st.following)) return false;
-      this._ledgerBarAnchor(v);
-    } else if (this._ledgerNodeAnchor(st, v)) return true;
-    else return false;
+      if (!this._ledgerTileAnchor(st.metaSnap, v)) return false;
+      this.h.ledger.group.localToWorld(v); // the rendered chamber transform — a label read. render-state OK
+      return true;
+    }
+    if (st.snap) return false;
+    return this._ledgerNodeAnchor(st, v);
+  }
+
+  // THE committed snapshot's tile (user, 2026-08-15), rewind offsets included; the lane lead
+  // stays as the fallback while the tile is off-trail (aged out of the window or not drawn this
+  // frame). Chamber-local, like every LedgerView anchor.
+  private _ledgerTileAnchor(sel: MetaSnapSel, v: THREE.Vector3): boolean {
+    if (this.h.ledger.selectedTileAnchor(v)) return true;
+    return this.h.ledger.calloutAnchor(sel.metaId, v) || this.h.ledger.calloutAnchor(UNLISTED_ID, v);
+  }
+
+  // The GLOBAL SNAPSHOT's label — the second anchor, `SceneCallout`'s `m2` gate mirrored: a
+  // global snapshot is shown and the box is not a node (its own label owns the scene). It
+  // points at the snapshot's bar, or at the resolved network's own segment of it.
+  private _ledgerGlobalAnchor(v: THREE.Vector3): boolean {
+    const st = this.st;
+    if (!st.snap) return false;
+    if (st.boxedCard === "node" && isNodePick(st.inspect)) return false;
+    if (!this.h.ledger.calloutSettled(st.following)) return false;
+    this._ledgerBarAnchor(v);
     this.h.ledger.group.localToWorld(v); // the rendered chamber transform — a label read. render-state OK
     return true;
   }
 
-  // The tick's byte-bar anchor: under a committed filter, the network's OWN band on the shown
-  // row (user, 2026-08-16 — "the correct segment of the byte bar"); unfiltered, or when the
-  // band isn't drawn (unmeasured tick), the bar's lead centre. Chamber-local (caller lifts).
   private _ledgerBarAnchor(v: THREE.Vector3): void {
     const lens = ledgerLens(this.h.ledgerNet);
     if (lens !== "all" && this.h.ledger.bandAnchor(lens, v)) return;

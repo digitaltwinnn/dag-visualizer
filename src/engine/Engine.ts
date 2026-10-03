@@ -7,7 +7,7 @@ import { ledgerLens } from "@/src/data/ledgerStory";
 import { reportPoll, touchPoll } from "@/src/data/api";
 import { STALE_FACTOR } from "@/src/data/pollStatus";
 import { LISTED_IDS, UNLISTED_ID, UNLISTED_SCENE_HEX_BY_THEME } from "@/src/data/unlisted";
-import { hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
+import { countrySubject, hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
 import { createScene, type SceneCtx } from "./scene/SceneContext";
 import { HyperView, type MetaHubRec } from "./scene/views/HyperView";
@@ -204,6 +204,7 @@ export class Engine {
   // The focused metagraph's hub record, cached on filter/mode change — kills the per-frame
   // `metas.find` the DoF read used to do every frame (Task 15 allocation fix).
   private _dofMeta: MetaHubRec | null = null;
+  private _warnedUnbaked = false;
 
   private raycaster = new THREE.Raycaster();
   // Land-sphere hit scratch for the scene country hover/click (ray→sphere analytically —
@@ -1202,6 +1203,16 @@ export class Engine {
     const countriesOf = (nodes: { ip: string }[]) =>
       new Set(nodes.map((n) => this.geoMap[n.ip]?.country).filter(Boolean)).size;
     const data: RouteMetagraph[] = this.metaData || [];
+    // REGISTERED BUT NOT BAKED (2026-10-02): the live directory can list a metagraph the catalog
+    // does not — a new one, or one re-registered under a new address (BioFi was). Its snapshots
+    // then read as `unlisted` on every catalog-keyed surface. Say so once, in dev, by name.
+    if (process.env.NODE_ENV !== "production" && !this._warnedUnbaked) {
+      const unbaked = data.filter((m) => !metagraphById(m.id));
+      if (data.length && unbaked.length) {
+        this._warnedUnbaked = true;
+        console.warn(`[catalog] the live directory lists ${unbaked.length} metagraph(s) missing from config CATALOG — bake them: ${unbaked.map((m) => `${m.name} ${m.id}`).join(", ")}`);
+      }
+    }
     const metas = data.map((m) => {
       const nodes = m.nodes || [];
       return {
@@ -1698,6 +1709,7 @@ export class Engine {
         railGapPx(window.innerWidth, this.railsHidden),
         el.clientHeight || window.innerHeight,
         this.ctx.camera.fov,
+        breakpointOf(window.innerWidth) === "phone",
       );
       trendFit(f.pos, f.target, dist, this.cam.out.pos);
       trendFocusPush(this.cam.out.pos, f.target, depth, this.cam.out.pos);
@@ -1907,8 +1919,9 @@ export class Engine {
 
     // The lean tooltip label — re-write the store only when the subject's identity changes so
     // following the cursor never re-renders React.
-    const subj = tooltipSubject(p);
-    const key = subj ? `${subj.ident}|${subj.name}|${subj.color}` : null;
+    // Land with nothing on it still names itself: the country whose border the pointer lit.
+    const subj = tooltipSubject(p) ?? (countryCc ? countrySubject(countryCc) : null);
+    const key = subj ? `${subj.kind}|${subj.ident}|${subj.name}|${subj.color}` : null;
     if (key === this._hoverKey) return;
     this._hoverKey = key;
     st.setHover(subj);
@@ -1956,7 +1969,7 @@ export class Engine {
     // A metagraph-snapshot TILE: commit the tile AND pin the global tick it anchored into.
     if (p?.kind === "metaSnap") {
       applyClickActions(
-        metaSnapSelectActions(p.sel, p.global, { metaSnap: st.metaSnap, following: st.following }),
+        metaSnapSelectActions(p.sel, p.global, { metaSnap: st.metaSnap, following: st.following, inspect: st.inspect }),
       );
       return;
     }
@@ -2307,7 +2320,8 @@ export class Engine {
       // The canvas height is only read while a shift needs converting — it is a layout read.
       const viewH = shift !== 0 ? this.ctx.renderer.domElement.clientHeight || window.innerHeight : 0;
       // `_frameDt`, the projector's own clock (`?slowmo` included), so floor and cards ease as one.
-      this.trends.face(this.ctx.camera, count, shift, viewH, this._frameDt, breakpointOf(window.innerWidth) !== "desktop");
+      const tier = breakpointOf(window.innerWidth);
+      this.trends.face(this.ctx.camera, count, shift, viewH, this._frameDt, tier !== "desktop", tier === "phone");
     }
     // The stage light's per-view PRESENCE, published BEFORE the view updates that claim it: a claim
     // is scaled by its view's furniture alpha, so a fading view's light fades with its furniture and
@@ -2484,14 +2498,17 @@ export class Engine {
    *  published a roster (see `_writeScene`). */
   private _scopeFor: string | null = null;
   private _scopeCount = 0;
-  private _trendState: TrendStackState = { scroll: 0, focus: null, ids: [], gapShiftPx: 0, narrow: false };
+  private _trendState: TrendStackState = { scroll: 0, focus: null, ids: [], gapShiftPx: 0, narrow: false, phone: false };
   private _syncTrendStack(): void {
     const st = useStore.getState();
     const t = this._trendState;
     t.scroll = st.trendScroll; t.focus = st.trendFocus; t.ids = st.trendIds;
     t.gapShiftPx = railGapShiftPx(window.innerWidth, this.railsHidden);
     // The canvas TIER decides the stagger (`trendStack.stepX`); the same read the ground makes.
-    t.narrow = breakpointOf(window.innerWidth) !== "desktop";
+    const tier = breakpointOf(window.innerWidth);
+    t.narrow = tier !== "desktop";
+    // …and the card's FORMAT (`trendStack.planeFormat`): the phone authors a narrower, squarer card.
+    t.phone = tier === "phone";
     this.trendStack.sync(t);
   }
 

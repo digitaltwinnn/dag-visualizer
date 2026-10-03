@@ -14,7 +14,7 @@
 // rather than cyan coloured; it's too distracting and does not present any useful information").
 // It was an accent hairline, and an accent line is a MARK — the eye reads it as a gridline or a
 // reading, and there is nothing to read. So each rung is a soft band hanging from the floor line:
-// a quad billboard `SHADOW_H` tall whose alpha rises over the top `SHADOW_LIP` and decays to
+// a quad billboard `shadowH` tall whose alpha rises over the top `SHADOW_LIP` and decays to
 // nothing at the bottom (`shadowTexture`), in the NEUTRAL ink (`SceneColors.fg`) rather than the
 // accent, with the ends feathered so nothing about it has an edge. Furniture that recedes into the
 // ground it sits on, on both grounds: additive haze on dark, ink on paper.
@@ -50,15 +50,15 @@
 import * as THREE from "three";
 import {
   PLANE_GAP,
-  PLANE_STEP_Y,
-  PLANE_WORLD_H,
   PLANE_WORLD_W,
   PLANE_Y,
   SCALE_FALLOFF,
   STACK_EASE_K,
   VISIBLE_PLANES,
+  planeFormat,
   staggerCentre,
   stepX,
+  type PlaneFormat,
 } from "../../domain/trendStack";
 import { glowBlend, inkMix, isLightGround, type SceneColors } from "../../sceneColors";
 import { FadeSet } from "../objects/FadeSet";
@@ -88,7 +88,7 @@ const RUNG_FALLOFF = 0.16;
 // this view's whole job is to stay out of the charts' way.
 
 /** How far below the NEAREST slot's centre the floor lies: half the plane's own height
- *  (`PLANE_WORLD_H` — the domain states it beside the width, so a re-tune of either moves the floor
+ *  (`PlaneFormat.worldH` — the domain states it beside the width, so a re-tune of either moves the floor
  *  with it), plus the half step the FOCUS pose carries a plane further down, plus a small margin.
  *  Derived, not eyeballed: the first cut was a multiple of the slot step, which only cleared the
  *  plot while the plane happened to be shorter than a step — enlarging the plane (2026-09-19) would
@@ -96,19 +96,19 @@ const RUNG_FALLOFF = 0.16;
  *
  *  ⚠️ THE FLOOR IS LEVEL, AND A RAMP RISING WITH THE STACK WAS BUILT AND CUT (the second look).
  *  Putting each rung one step under its OWN plane is the obvious reading of "every plane stands on
- *  its own line", and it cannot work here: `PLANE_STEP_Y` is much smaller than a plane's own
- *  height (`PLANE_WORLD_H`), so the planes OVERLAP — a rung tucked under
+ *  its own line", and it cannot work here: the up-stagger is much smaller than a plane's own
+ *  height (`PlaneFormat.stepY` against `worldH`, on either format), so the planes OVERLAP — a rung tucked under
  *  plane i lands inside plane i−1's plot, and there is no drop that escapes it (clear your own
  *  plane's bottom and you are already past the top of the one in front). A hairline crossing a
  *  chart's plot area reads as a gridline or a zero line, which is a claim about the DATA that the
  *  furniture has no business making. Level, below everything, is the version that stays furniture.
  *  What the rungs say instead is each plane's FOOTPRINT on the floor: same depth, same width, same
  *  stagger — the shadow the stack would cast. */
-const GROUND_DROP = PLANE_WORLD_H / 2 + PLANE_STEP_Y / 2 + PLANE_WORLD_H * 0.12;
+const groundDrop = (f: PlaneFormat): number => f.worldH / 2 + f.stepY / 2 + f.worldH * 0.12;
 
 /** The floor's world height for a stagger centred on `centre` (`staggerCentre(count)`, eased):
- *  `GROUND_DROP` below the FRONT card's centre, which `stackPoses` places from the same number. */
-const groundY = (centre: number): number => PLANE_Y - centre * PLANE_STEP_Y - GROUND_DROP;
+ *  `groundDrop` below the FRONT card's centre, which `stackPoses` places from the same number. */
+const groundY = (centre: number, f: PlaneFormat): number => PLANE_Y - centre * f.stepY - groundDrop(f);
 
 /** The nearest rung's PRESENCE, one number per ground — how much of the accent the floor carries
  *  at the front. Quiet by intent on both: this is furniture establishing an axis, and everything a
@@ -124,11 +124,14 @@ const groundY = (centre: number): number => PLANE_Y - centre * PLANE_STEP_Y - GR
  *  the one it needs is higher than dark's — measured, because the two grounds are genuinely
  *  different instruments (dark adds light to nothing and bloom lifts it further; paper only has
  *  ink, and this ground is a 0.88-L page). */
-const GROUND_PRESENCE = { dark: 0.07, paper: 0.2 } as const;
+// Paper was 0.2 until 2026-10-03: at that level the bands under the deck read as two grey SMUDGES
+// on the page rather than as a floor (light-theme pass; user: "fix it"). 0.11 keeps the footprint
+// legible — still above dark's number, for the reason given above — without the dirt.
+const GROUND_PRESENCE = { dark: 0.07, paper: 0.11 } as const;
 
 /** The shadow band's height in world units — how far below the floor line the soft falloff runs.
  *  A little over a tenth of the card: enough to read as a shadow's spread, not a second card. */
-const SHADOW_H = PLANE_WORLD_H * 0.22;
+const shadowH = (f: PlaneFormat): number => f.worldH * 0.22;
 /** The band's alpha ramps UP over this fraction of its height before it decays, so the floor line
  *  itself has no hard edge — a shadow's darkest part is just under the object, not a crease. */
 const SHADOW_LIP = 0.04;
@@ -181,7 +184,7 @@ const slotPresence = (i: number, paper: boolean): number => {
 };
 
 /** The slot stagger's X and Z, as `stackPoses` states them — the RISE is the one component the
- *  floor drops (see `GROUND_DROP`). One home: re-tune the stagger in `domain/trendStack.ts` and
+ *  floor drops (see `groundDrop`). One home: re-tune the stagger in `domain/trendStack.ts` and
  *  the ground follows, because it is derived from the same arithmetic rather than eyeballed
  *  against a screenshot of it. */
 const slotX = (i: number, centre: number, narrow: boolean): number => (i - centre) * stepX(narrow);
@@ -226,6 +229,7 @@ export class TrendsView implements SceneView {
   private _py = NaN;
   private _pz = NaN;
   private _narrow = false;
+  private _fmt: PlaneFormat | null = null;
 
   constructor(scene: THREE.Scene, colors: SceneColors) {
     this._colors = colors;
@@ -242,9 +246,10 @@ export class TrendsView implements SceneView {
     for (const i of RUNGS) {
       const c = staggerCentre(VISIBLE_PLANES);
       const x0 = slotX(i, c, false) - halfW(i), x1 = slotX(i, c, false) + halfW(i);
-      const y = groundY(c), z = slotZ(i);
+      const wide = planeFormat(false);
+      const y = groundY(c, wide), z = slotZ(i);
       const b = pos.length / 3;
-      pos.push(x0, y, z, x1, y, z, x1, y - SHADOW_H, z, x0, y - SHADOW_H, z);
+      pos.push(x0, y, z, x1, y, z, x1, y - shadowH(wide), z, x0, y - shadowH(wide), z);
       uv.push(0, 1, 1, 1, 1, 0, 0, 0);
       idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
       this._vertSlot.push(i, i, i, i);
@@ -314,7 +319,10 @@ export class TrendsView implements SceneView {
    *  buffer, and skips entirely while nothing it reads has changed — the camera's orientation and
    *  the eased values always, the camera's position too while a shift stands (the px→world
    *  conversion reads the view depth). */
-  face(camera: THREE.PerspectiveCamera, count: number, shiftPx: number, viewH: number, dt: number, narrow: boolean): void {
+  face(camera: THREE.PerspectiveCamera, count: number, shiftPx: number, viewH: number, dt: number, narrow: boolean, phone = false): void {
+    // The card's format for this tier (`trendStack.planeFormat`) — two stable objects, so the
+    // reference is the change signal.
+    const fmt = planeFormat(phone);
     const centreT = staggerCentre(count);
     let moved = false;
     if (this._fresh) {
@@ -337,7 +345,7 @@ export class TrendsView implements SceneView {
     const q = camera.quaternion;
     const p = camera.position;
     const still =
-      !moved && count === this._count && narrow === this._narrow &&
+      !moved && count === this._count && narrow === this._narrow && fmt === this._fmt &&
       q.x === this._qx && q.y === this._qy && q.z === this._qz && q.w === this._qw &&
       (this._shift === 0 || (p.x === this._px && p.y === this._py && p.z === this._pz));
     if (still) return;
@@ -345,13 +353,15 @@ export class TrendsView implements SceneView {
     this._px = p.x; this._py = p.y; this._pz = p.z;
     this._count = count;
     this._narrow = narrow;
+    this._fmt = fmt;
     this._right.set(1, 0, 0).applyQuaternion(q);
     this._up.set(0, 1, 0).applyQuaternion(q);
     this._fwd.set(0, 0, -1).applyQuaternion(q);
     // px per world unit at one unit of depth — the projector's own expression.
     const pxPerUnitAt1 = this._viewH / (2 * Math.tan((camera.fov * Math.PI) / 360));
     const c = this._centre;
-    const y = groundY(c);
+    const y = groundY(c, fmt);
+    const band = shadowH(fmt);
     const shift = this._shift;
     const attr = this._mesh.geometry.getAttribute("position") as THREE.BufferAttribute;
     const R = this._right, U = this._up;
@@ -359,7 +369,7 @@ export class TrendsView implements SceneView {
       const i = RUNGS[r];
       // A rung past the count collapses to a point, which draws nothing.
       const h = i < count ? halfW(i) : 0;
-      const drop = i < count ? SHADOW_H : 0;
+      const drop = i < count ? band : 0;
       let cx = slotX(i, c, narrow), cy = y, cz = slotZ(i);
       if (shift !== 0 && pxPerUnitAt1 > 0) {
         const d = (cx - p.x) * this._fwd.x + (cy - p.y) * this._fwd.y + (cz - p.z) * this._fwd.z;

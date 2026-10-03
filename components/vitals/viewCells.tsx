@@ -301,12 +301,20 @@ export function GeoCells({ accent }: { accent: string }) {
 // hue — the tick chart's scoped rule, at the store's resolution.
 const STACK_ORDER: string[] = METAGRAPHS.map((m) => m.id);
 
+/** THE GIVE-UP WORDS for a measured card whose store read FAILED (user, 2026-10-03: "fix" — the
+ *  test pass found the rate cards saying "acquiring…" for as long as the trends store was down).
+ *  "Acquiring" is a promise that a number is on its way; once the fetch has errored and nothing is
+ *  held, that promise is the fabricated state rule 10 forbids. The hook keeps retrying, so the
+ *  words say the store is not answering NOW, not that it never will. No fallback to the live
+ *  buffer — that ruling (2026-09-09) stands; this only stops the card from lying while it waits. */
+const STORE_DOWN = "history not answering";
+
 type Snaps = ReturnType<typeof useSnapshotFeed>["snaps"];
 interface StackSeg { key: string; n: number; color: string }
 
-function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: boolean; filter: string; data: TrendsWindowData | null }) {
+function StackBars({ accent, isMeta, filter, data, down }: { accent: string; isMeta: boolean; filter: string; data: TrendsWindowData | null; /** The history store failed and nothing is held — see `STORE_DOWN`. */ down?: boolean }) {
   if (!data) {
-    return <span className="flex items-center justify-center w-full self-center text-label text-muted-foreground" aria-hidden>acquiring…</span>;
+    return <span className="flex items-center justify-center w-full self-center text-label text-muted-foreground" aria-hidden={!down}>{down ? STORE_DOWN : "acquiring…"}</span>;
   }
   const anchors = data.series["g.anchors"] ?? [];
   const ticks = data.series["g.ticks"] ?? [];
@@ -465,7 +473,13 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
   // The bars and the lines share the windowed buckets exactly — one window, one payload, so
   // the chart and the roster that legends it can never rank over different reaches.
   const barData = windowed;
+  /** The fetch errored and nothing is held from before (a failed REFRESH keeps its last data). */
+  const storeDown = t7.error && !t7.data;
   const span = "last 24 hours";
+  /** A card states a span only when its own DIFFERS from the band's (user, 2026-10-03: "each
+   *  vital repeats 'last 24 hours'"). The band says the shared window once, above its corner
+   *  (`viewPolicy.bandWindow`); the live fallback's reach is a different fact and still shows. */
+  const ownSpan = (s: string | undefined): string | undefined => (s && s !== span ? s : undefined);
   const stepWord =
     windowed?.stepMs === 300_000 ? "in five-minute buckets"
     : windowed?.stepMs === 3_600_000 ? "hour by hour"
@@ -517,7 +531,9 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
         // eye asking). The fallback keeps its bare "per hour": its lead is a current rate.
         // Prose units, not the "/day" glyph — the Trends DOCUMENT's own 2026-09-09 ruling (user:
         // "what is /day?"), one vocabulary across both surfaces.
-        unit: "avg per day",
+        // "daily average", in whole words (user, 2026-10-03: "avg is an abbreviation") — the same
+        // phrase the History cards' headline uses.
+        unit: "daily average",
         span,
         sr: `Measured from the chain's own records (${span}, ${stepWord}); the rate is the window's mean, stated per day.`,
         offRim: false,
@@ -557,6 +573,25 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
     </BandCard>
   );
   const rate = (label: string, spark: SparkSpec, note?: string, title?: string) => {
+    // The store failed and this card reads from it: say so, in the lead's own stacked grammar.
+    if (storeDown && spark.data == null) {
+      return (
+        <BandCard
+          key={label}
+          label={label}
+          title={title}
+          lead={
+            <span className="flex flex-col items-start">
+              <span className="font-mono font-bold text-xl text-muted-foreground tabular-nums whitespace-nowrap">—</span>
+              <span className="text-label text-muted-foreground leading-none">{spark.unit}</span>
+            </span>
+          }
+        >
+          <span className="flex items-center self-stretch text-label text-muted-foreground">{STORE_DOWN}</span>
+          <span className="sr-only">The history store is not answering, so this reading is unavailable for now.</span>
+        </BandCard>
+      );
+    }
     // NO ENDPOINT AXIS. It existed for the 1Y/ALL windows, where months repeat across the year
     // boundary and position-in-window stopped reading as "when" (user, 2026-09-09). Over a
     // single 24-hour window position IS when, and the card's own words state the reach — the
@@ -579,7 +614,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
           key={label}
           label={label}
           title={title}
-          aside={spark.data != null ? spark.span || undefined : undefined}
+          aside={spark.data != null ? ownSpan(spark.span) : undefined}
           lead={
             <span className="flex flex-col items-start">
               <span className="font-mono font-bold text-muted-foreground tabular-nums whitespace-nowrap">idle</span>
@@ -618,7 +653,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
       // the right words per card and needs no new rule: the measured cards say the band's
       // window, and the live fallback keeps saying its own — which is the one case where the
       // two genuinely differ, and the reason this is one expression rather than a constant.
-      aside={spark.span || undefined}
+      aside={ownSpan(spark.span)}
       lead={
         <span className="flex flex-col items-start">
           {/* NodeStars while the window's mean is still in flight (user, 2026-09-08: the
@@ -709,8 +744,8 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
       {rate("Snapshots", sparkOf(scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries, activity?.snapsPerHour))}
       {/* The chart states the same reach its rows do — it plots the very buckets the rate cards
           average, so a silent chart beside two captioned ones would read as a different window. */}
-      <BandCard label="Anchors by metagraph" aside={span} className="min-w-[220px]">
-        <StackBars accent={accent} isMeta={isMeta} filter={filter} data={barData} />
+      <BandCard label="Anchors by metagraph" className="min-w-[220px]">
+        <StackBars accent={accent} isMeta={isMeta} filter={filter} data={barData} down={storeDown} />
       </BandCard>
     </>
   );

@@ -65,9 +65,12 @@ export const RIBBON_TUNE_DEFAULTS: RibbonTune = {
   restOp: 0.21, // 0.25 → 0.21 with brightness 0.85 → 1.1 (user export, 2026-08-30): a touch less film, more vivid colour — beside the snapshots' new halo lift
   brightness: 1.1,
   curve: 1,
-  // Deliberately low: the thread's job is to say a relation EXISTS down the trail, not to compete
-  // with the four sheets that show it in full. Raise it and the chamber becomes a harp.
-  threadAlpha: 0.4,
+  // The thread's job is to say a relation EXISTS down the trail, not to compete with the four
+  // sheets that show it in full. ⚠️ ITS OWN LEVEL since 2026-10-03 (user: "the line between their
+  // byte bar and snapshots is too faint, in light and dark"): the material used to ride the
+  // SHEETS' `restOp` (0.21) and this number multiplied it, so a "0.4" thread drew at 0.084 — a
+  // hairline at 8% is not a hint, it is absent. The material takes this number directly now.
+  threadAlpha: 0.5,
 };
 
 /** The `?tune` knob ranges (contract: src/engine/tune.ts) — colocated so a range sits next to the
@@ -323,7 +326,7 @@ export class Ribbons {
     const c = this._thCol.array as Float32Array;
     let dirty = false;
     for (let i = 0; i < this._thCount; i++) {
-      const a = fadeOf(this._thSlots[i]) * this.tune.threadAlpha;
+      const a = fadeOf(this._thSlots[i]); // the row's own ramp; the LEVEL is the material's (setAlpha)
       if (Math.abs(a - this._thAlpha[i]) < 0.004) continue;
       this._thAlpha[i] = a;
       dirty = true;
@@ -360,7 +363,7 @@ export class Ribbons {
     // quarter strength, which is precisely how the ribbons read as white ghosts on the light ground.
     // Presence, so it asks the ground — see inkPresence.
     this._mat.opacity = inkPresence(this.tune.restOp, this._paper) * a;
-    this._thMat.opacity = inkPresence(this.tune.restOp, this._paper) * a;
+    this._thMat.opacity = inkPresence(this.tune.threadAlpha, this._paper) * a;
   }
 
   /** COMMITTED filter → the other metagraphs' sheets take the COLORED dim (identity hue at the

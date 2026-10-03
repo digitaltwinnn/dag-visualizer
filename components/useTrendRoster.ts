@@ -73,6 +73,9 @@ export interface TrendRosterView {
    *  itself moves, which is what the `trendIds` publish channel requires of its publisher. */
   ranked: readonly string[];
   rows: ReadonlyMap<string, TrendRosterRow>;
+  /** The whole network as ONE row — the DAG's own plane reading — under the "all" filter, else
+   *  null. Never in `ranked`: it is what the ranked rows are read against, not one of them. */
+  total: TrendRosterRow | null;
   /** The WHOLE NETWORK's series for this metric (`globalSeries`) — the reading a surface states
    *  when no one network is the subject. Cut by the SAME edge rule as the per-network rows, which
    *  is exactly why it lives here: read straight off the payload it is one bucket out of step with
@@ -150,7 +153,7 @@ export default function useTrendRoster(
     const cut = <T,>(a: readonly T[]): T[] => (counter ? trimCounterEdges(a, stepMs) : a.slice());
     const ids = stackRoster(filter);
     const rows = new Map<string, TrendRosterRow>();
-    for (const id of ids) {
+    const rowOf = (id: string): TrendRosterRow => {
       // THE HYPERGRAPH'S OWN SERIES is the global one (`globalSeries` — the same read the Moment
       // card's whole-network lead and the band's overview make), with no sampling or gap marks:
       // those are per-metagraph facts. Every other id reads its own `m.<id>.*` rows.
@@ -160,7 +163,7 @@ export default function useTrendRoster(
       // Continuity's weights: the snapshots each bucket's spacing was measured over.
       const weights =
         metric === "continuity" ? cut(id === "dag" ? globalSeries("snapshots", series) : metricSeries("snapshots", id, series).points) : undefined;
-      rows.set(id, {
+      const r: TrendRosterRow = {
         id,
         name: net?.name ?? id,
         hue: net?.hue ?? "var(--primary)",
@@ -173,19 +176,45 @@ export default function useTrendRoster(
         day: latestDay(metric, id, daily, points, stepMs),
         span: spanAverage(metric, points, stepMs, weights),
         head: null,
-      });
-      const r = rows.get(id)!;
+      };
       r.head = headKind === "span" ? r.span : r.day;
-    }
+      return r;
+    };
+    for (const id of ids) rows.set(id, rowOf(id));
+    const ranked = rankByLast(ids, (id) => {
+      const r = rows.get(id)!;
+      return [r.head ?? r.day ?? r.last];
+    });
+    // The pinned row's NODES are the DAG's own (`f.nodes.dag`), not the fleet the global series
+    // carries: beside rows that each state their own nodes, the fleet read as one more "all
+    // nodes". Every other measure is the global series as it stands.
+    const totalRow = (): TrendRosterRow => {
+      const r = rowOf("dag");
+      if (metric !== "nodes") return r;
+      const points = cut(metricSeries("nodes", "dag", series).points);
+      r.series = { points, sampled: undefined, gaps: undefined };
+      r.last = lastMeasured(points);
+      r.day = stepMs >= 86_400_000 ? lastMeasured(points) : daily ? lastMeasured(metricSeries("nodes", "dag", daily).points) : null;
+      r.span = spanAverage(metric, points, stepMs);
+      r.head = headKind === "span" ? r.span : r.day;
+      return r;
+    };
+    // Under "all" the DAG's row joins the MAP — the stack draws its plane from it — but never
+    // the RANK: `order` stays the networks, so the explorer's list, the Moment card and the
+    // shared ceiling keep reading the layers alone.
+    const total = filter === "all" ? totalRow() : null;
+    if (total) rows.set("dag", total);
     return {
       rows,
+      // THE WHOLE NETWORK AS A ROW (2026-10-03 — the explorer's pinned DAG row under "all"): the
+      // DAG plane's own reading, by the same pass and the same head rule, so the pinned figure
+      // and the plane the row opens can never quote two numbers. Only under "all": a committed
+      // network's list is that network, and under the DAG filter the DAG already is the row.
+      total,
       // Busiest OVER THE SPAN the list states (design A) — the window on screen, so a new range
       // re-ranks the list and the stack together. The day, then the last reading, only where the
       // span has nothing measured, so a quiet network still sorts by what it last said.
-      order: rankByLast(ids, (id) => {
-        const r = rows.get(id)!;
-        return [r.head ?? r.day ?? r.last];
-      }),
+      order: ranked,
       buckets: cut(rawAxis),
       global: cut(globalSeries(metric, series)),
     };
@@ -218,6 +247,7 @@ export default function useTrendRoster(
     () => ({
       ranked,
       rows: pass.rows,
+      total: pass.total,
       global: pass.global,
       buckets: pass.buckets,
       rawBuckets: rawAxis,

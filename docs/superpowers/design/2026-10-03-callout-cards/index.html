@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Callouts — suggested changes</title>
+<style>
+:root{--bg:oklch(0.09 0.02 265);--fg:oklch(0.94 0.02 255);--dim:#c7d0ea;--muted:oklch(0.66 0.04 265);--primary:oklch(0.88 0.13 195);
+--border:rgba(90,140,255,.22);--glass:rgba(8,12,26,.92);--dor:oklch(0.74 0.19 41);--dag:oklch(0.72 0.16 250);--ok:oklch(0.82 0.17 155);
+--sel-bg:color-mix(in oklch,var(--primary) 12%,transparent);--sel-border:color-mix(in oklch,var(--primary) 52%,transparent);
+--label:12.2px;--body:14.3px;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+*{box-sizing:border-box}html{color-scheme:dark}
+body{margin:0;background:radial-gradient(1200px 600px at 60% 0%,#0b1230 0%,var(--bg) 60%);color:var(--fg);font:var(--body)/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:32px 40px 96px}
+h1{font-size:24px;font-weight:600;margin:0 0 6px}
+p.lede{color:var(--dim);max-width:80ch;margin:0}
+h2{font-size:18px;font-weight:600;margin:52px 0 6px;display:flex;gap:12px;align-items:center}
+h2 .n{flex:none;width:26px;height:26px;border-radius:50%;background:var(--primary);color:#06121a;font:700 14px/26px system-ui;text-align:center}
+p.why{color:var(--dim);max-width:78ch;margin:0 0 14px 38px}
+.row{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;margin-left:38px}
+.cell .h{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.arrow{align-self:center;color:var(--muted);font-size:22px;padding-top:16px}
+.shot{display:block;border:1px solid var(--border);border-radius:8px}
+.bk{display:inline-block;background:#000;padding:10px;border:1px solid var(--border);border-radius:8px}
+/* the callout, as built */
+.co{position:relative;display:inline-block;white-space:nowrap;background:var(--glass);border:1px solid var(--border);border-radius:7px;padding:8px 12px;vertical-align:top}
+.co::before{content:"";position:absolute;left:-1px;top:8px;bottom:8px;width:2px;background:linear-gradient(transparent,var(--primary) 30%,var(--primary) 70%,transparent);opacity:.8}
+.eb{font-size:var(--label);font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--primary);line-height:1.3}
+.tr{display:flex;align-items:center;gap:9px;margin-top:4px}
+.tt{font-size:var(--body);font-weight:600;font-variant-numeric:tabular-nums}.tt.m{font-family:var(--mono)}
+.tk{font-size:var(--label);font-weight:600;color:var(--dor);border:1px solid var(--border);border-radius:4px;padding:2px 6px;line-height:1.2;background:rgba(90,140,255,.06)}.tk.dag{color:var(--dag)}
+.mu{font-size:var(--label);color:var(--muted)}
+.chip{font-size:var(--label);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;line-height:1.2;background:rgba(90,140,255,.06)}
+.role{font:var(--label)/1.2 var(--mono);color:var(--dim);border:1px solid var(--border);border-radius:4px;padding:2px 5px}
+.pill{font-size:var(--label);font-weight:600;color:var(--ok);border:1px solid color-mix(in oklch,var(--ok) 45%,transparent);border-radius:10px;padding:1px 8px;line-height:1.3}
+.hr{border-top:1px solid var(--border);margin:8px 0 7px}
+.ln{display:flex;gap:8px;align-items:center;font-size:var(--label)}.ln b{color:var(--dor);font-weight:700}.ln .sp{flex:1;min-width:6px}
+.new{outline:1px dashed oklch(0.80 0.16 85);outline-offset:3px;border-radius:3px}
+svg.ic{width:15px;height:15px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;color:var(--primary)}
+.logo{width:15px;height:15px;border-radius:50%;background:var(--dor);flex:none}
+.grid{display:flex;gap:12px;flex-wrap:wrap;margin-left:38px}
+.legend{margin:8px 0 6px 38px;font-size:13px;color:var(--muted)}
+.rec{border:1px solid var(--sel-border);background:var(--sel-bg);border-radius:8px;padding:12px 16px;font-size:13.5px;margin-top:52px;max-width:86ch}
+.rec b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;margin-right:8px;font-size:var(--label)}
+</style></head><body>
+
+<h1>Callouts — suggested changes</h1>
+<p class="lede">Five suggestions for the labels the scene draws beside a selected thing. Each shows the callout as it is today (a photo from the running app) and how it would look. A dashed yellow frame marks what is new. Answer with the numbers you want. Nothing here is built.</p>
+
+<h2><span class="n">1</span>Global snapshot: name both things the bar shows</h2>
+<p class="why">The ring points at Dor's part of the bar, and the bar's length is its size in bytes. The label only counts ("13 of 16 anchors"). Say the count in the card's word, snapshots, and add the size on the right. The age also moves before "pinned", the order the card's head uses.</p>
+<div class="row">
+ <div class="cell"><div class="h">Now</div><img class="shot" src="gs-co.webp" width="226" height="106" alt=""></div>
+ <div class="arrow">→</div>
+ <div class="cell"><div class="h">Suggested</div><div class="bk"><div class="co"><div class="eb">Global snapshot</div><div class="tr"><span class="tt">6,995,026</span><span class="chip">1m ago</span><span class="mu">pinned</span></div><div class="hr"></div><div class="ln"><b>DOR</b><span class="mu">13 of 16 snapshots</span><span class="sp"></span><span class="chip new">56 of 65 KB</span></div></div></div></div>
+</div>
+
+<h2><span class="n">2</span>Node, in Snapshots: say why it is on screen</h2>
+<p class="why">In Snapshots a node is selected as a signer of the snapshot above it, and its card opens with exactly that. The label only lists layers and status, the same as in every other view. One short line adds the reason. Hypergraph and Geography keep the label as it is.</p>
+<div class="row">
+ <div class="cell"><div class="h">Now</div><img class="shot" src="lnode-co.webp" width="199" height="109" alt=""></div>
+ <div class="arrow">→</div>
+ <div class="cell"><div class="h">Suggested</div><div class="bk"><div class="co"><div class="eb">Node</div><div class="tr"><span class="tt m">c54ccbe…413c</span><span class="tk">DOR</span></div><div class="hr"></div><div class="ln"><span class="role">L0</span><span class="role">cL1</span><span class="role">dL1</span><span class="pill">ready</span></div><div class="ln" style="margin-top:7px"><span class="mu new">Signed 28,674,136</span></div></div></div></div>
+</div>
+
+<h2><span class="n">3</span>Metagraph: say how many nodes are ready, but only when some are not</h2>
+<p class="why">The scene draws a node that is not ready as a hollow chip. While every node is ready the label stays as it is. When some are not, the count turns into "15 of 17 nodes ready", so the hollow chips have a number beside them. (The second drawing is an example state; Dor had all 17 ready when the photo was taken.)</p>
+<div class="row">
+ <div class="cell"><div class="h">Now, and when all are ready</div><img class="shot" src="mg-co.webp" width="215" height="106" alt=""></div>
+ <div class="arrow">→</div>
+ <div class="cell"><div class="h">Suggested, when two are not ready</div><div class="bk"><div class="co"><div class="eb">Metagraph</div><div class="tr"><span class="tt">Dor Technologies</span><span class="tk">DOR</span></div><div class="hr"></div><div class="ln"><span class="mu new">15 of 17 nodes ready</span><span class="role">L0</span><span class="role">cL1</span><span class="role">dL1</span></div></div></div></div>
+</div>
+
+<h2><span class="n">4</span>Every callout: wear the mark its card wears</h2>
+<p class="why">Each card has a small mark before its title: a cube for a global snapshot, stacked cubes for a metagraph snapshot, a globe for a node, a pin for a country, a server for a provider, the logo for a metagraph. The callouts have none, so the only thing tying a label to its card is reading both. With the same mark, the two pair at a glance. Nothing else in these six changes.</p>
+<div class="legend">Today</div>
+<div class="grid">
+ <div><img class="shot" src="gs-co.webp" width="226" height="106" alt=""></div>
+ <div><img class="shot" src="ms-co.webp" width="211" height="76" alt=""></div>
+ <div><img class="shot" src="gnode-co.webp" width="198" height="109" alt=""></div>
+ <div><img class="shot" src="mg-co.webp" width="215" height="106" alt=""></div>
+ <div><img class="shot" src="cc-co.webp" width="135" height="106" alt=""></div>
+ <div><img class="shot" src="pv-co.webp" width="273" height="106" alt=""></div>
+</div>
+<div class="legend" style="margin-top:18px">Suggested</div>
+<div class="grid">
+ <div class="bk"><div class="co"><div class="eb">Global snapshot</div><div class="tr"><svg class="ic new" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><span class="tt">6,995,026</span><span class="mu">pinned</span><span class="chip">1m ago</span></div><div class="hr"></div><div class="ln"><b>DOR</b><span class="mu">13 of 16 anchors</span></div></div></div>
+ <div class="bk"><div class="co"><div class="eb">Metagraph snapshot</div><div class="tr"><svg class="ic new" viewBox="0 0 24 24" style="color:var(--dor)"><path d="M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42Z"/><path d="m7 16.5-4.74-2.85"/><path d="m7 16.5 5-3"/><path d="M7 16.5v5.17"/><path d="M12 13.5V19l3.97 2.38a2 2 0 0 0 2.06 0l3-1.8a2 2 0 0 0 .97-1.71v-3.24a2 2 0 0 0-.97-1.71L17 10.5l-5 3Z"/><path d="m17 16.5-5-3"/><path d="m17 16.5 4.74-2.85"/><path d="M17 16.5v5.17"/><path d="M7.97 4.42A2 2 0 0 0 7 6.13v4.37l5 3 5-3V6.13a2 2 0 0 0-.97-1.71l-3-1.8a2 2 0 0 0-2.06 0l-3 1.8Z"/><path d="M12 8 7.26 5.15"/><path d="m12 8 4.74-2.85"/><path d="M12 13.5V8"/></svg><span class="tt">28,674,136</span><span class="tk">DOR</span></div></div></div>
+ <div class="bk"><div class="co"><div class="eb">Node</div><div class="tr"><svg class="ic new" viewBox="0 0 24 24" style="color:var(--dag)"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg><span class="tt m">138ab8d…d331</span><span class="tk dag">DAG</span></div><div class="hr"></div><div class="ln"><span class="role">L0</span><span class="role">cL1</span><span class="pill">ready</span></div></div></div>
+ <div class="bk"><div class="co"><div class="eb">Metagraph</div><div class="tr"><span class="logo new"></span><span class="tt">Dor Technologies</span><span class="tk">DOR</span></div><div class="hr"></div><div class="ln"><span class="mu">17 nodes</span><span class="role">L0</span><span class="role">cL1</span><span class="role">dL1</span></div></div></div>
+ <div class="bk"><div class="co"><div class="eb">Country</div><div class="tr"><svg class="ic new" viewBox="0 0 24 24"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg><span class="tt">Germany</span><span class="mu">DE</span></div><div class="hr"></div><div class="ln"><span class="mu">60 nodes</span></div></div></div>
+ <div class="bk"><div class="co"><div class="eb">Provider</div><div class="tr"><svg class="ic new" viewBox="0 0 24 24"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg><span class="tt">Hetzner Online GmbH</span><span class="mu">Nuremberg</span></div><div class="hr"></div><div class="ln"><span class="mu">15 nodes</span></div></div></div>
+</div>
+<div class="legend">In the Metagraph label the orange disc stands for the network's logo.</div>
+
+<h2><span class="n">5</span>Every callout: stay clear of the top bar</h2>
+<p class="why">A callout drops below its subject when it would run off the top of the scene. The scene continues behind the top bar, so that check passes while the label is half hidden under the bar, as in this photo from Hypergraph: only the bottom row of the node's label shows. It should measure from the bar's bottom edge. Nothing changes in how the label looks.</p>
+<div class="row"><div class="cell"><div class="h">Now</div><img class="shot" src="hnode-collide.webp" width="540" height="300" alt=""></div></div>
+
+<div class="rec"><b>My picks</b>5 and 1. Number 5 is a label half hidden under the top bar. Number 1 makes the global label name the quantity its ring points at. Number 4 is the one design addition; it is small and applies everywhere, so it is worth seeing live before keeping. Numbers 2 and 3 each add words to a label, so they are the two to leave out if you want the callouts to stay as short as they are.</div>
+
+</body></html>

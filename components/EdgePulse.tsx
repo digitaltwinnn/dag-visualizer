@@ -47,11 +47,41 @@ export function useEdgePulse(subjectKey: unknown): number {
 // so a card whose subject spans a BRANCH swap (ContextCard's dossier ⇄ "all") can host the hook at
 // its top level (so a change across the swap still counts) and drop this in each branch: a fresh
 // mount replays the effect on the swap, and a `pulseKey` bump replays it in place.
-export function PulseEdge({ pulseKey, rail = "left" }: { pulseKey: number; rail?: "left" | "right" }) {
+export function PulseEdge({
+  pulseKey,
+  rail = "left",
+  off,
+}: {
+  pulseKey: number;
+  rail?: "left" | "right";
+  /** The host is a COLLAPSED entry: no pulse. Expanding one rail card collapses another, and the
+   *  swap remounts both — so the card that had just stepped BACK replayed the pulse alongside the
+   *  one that came forward (user, 2026-10-03: "it should only trigger the card that is the new
+   *  active card, now it does also for the one that collapsed"). The pulse is the active card's
+   *  signal; an entry stays quiet, and pulses when it is opened. */
+  off?: boolean;
+}) {
+  if (off) return null;
   if (pulseKey === 0) return null; // nothing until the first real subject change (skips mount)
+  return <PulseSpan key={pulseKey} rail={rail} />;
+}
+
+/** One pulse, keyed by its parent so it remounts per pulse.
+ *
+ *  ⚠️ IT SAYS WHEN IT IS LIVE (user, 2026-10-03: "the edge pulse fights with the mouse hover").
+ *  The pulse and the hover edge (whisper and pairing) draw on the SAME scene-facing edge, and
+ *  since the pulse waits for the card's expand it plays exactly while the pointer that clicked is
+ *  still on the card — a grey line and a travelling hue on one edge at once. The signal ladder is
+ *  whisper < pairing < pulse, so the pulse wins: `data-live` stands from the mount (the paused
+ *  wait included) until either layer's animation ends, and globals.css holds the host's hover
+ *  edge at 0 under it. `animationend` bubbles from the `<i>` sweep and fires on the span for its
+ *  `::before` line — under reduced motion only the line animates, and that one end is enough. */
+function PulseSpan({ rail }: { rail: "left" | "right" }) {
+  const [live, setLive] = useState(true);
   return (
     <span
-      key={pulseKey}
+      data-live={live ? "" : undefined}
+      onAnimationEnd={() => setLive(false)}
       className={cn("edge-pulse", rail === "right" && "edge-pulse--rail-right")}
       aria-hidden="true"
     >

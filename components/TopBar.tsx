@@ -48,6 +48,7 @@ export default function TopBar() {
   // whole ordinary face over it, filter included, exactly as it does over the anchor log. The
   // exception had no second user, so it left with the doc (views.ts records the flags' removal).
   const doc = useStore((s) => s.docPage);
+  const rawOpen = useStore((s) => s.section === "data");
   const filterOff = doc != null;
   // The presentation pair is VIEW-SCOPED (SCENE⇄HUD and RAW act on the 3D view under the bar),
   // so it stands down wherever there is no such view: a doc overlay, or the flat "soon" view
@@ -393,7 +394,7 @@ export default function TopBar() {
               className={cn(
                 // The design OWNS its sizing/rounding here (not inherited from the shadcn
                 // toggle primitive): explicit h-9 (== today's rendered 36px — the primitive's
-                // default is the same, but the bar now states it) and `rounded-[8px]!` — the
+                // default is the same, but the bar now states it) and `rounded-btn!` — the
                 // important variant beats toggle-group.tsx's `data-[spacing=0]:rounded-none`
                 // (class+attribute specificity) so ALL buttons, incl. the middle ones' hover/on
                 // fill, get the intended 8px corners (was: middle square, first/last 10px).
@@ -531,7 +532,9 @@ export default function TopBar() {
           kept naming the hidden view underneath — an honest label names what is on screen). */}
       {/* The phone rides this too (2026-09-28): its face is the view's icon alone, so the caption is
           where the view's name lives there, as on every icon-only tier. */}
-      <div className="hidden max-[1299px]:flex justify-end pr-2.5 mt-1.5" aria-hidden>
+      {/* On phone the raw panel starts where this caption hangs, so the word showed half-covered
+          behind the panel's top edge; the pressed RAW toggle and the panel itself name the place. */}
+      <div className={cn("hidden max-[1299px]:flex justify-end pr-2.5 mt-1.5", rawOpen && "max-[700px]:!hidden")} aria-hidden>
         <span key={doc ?? mode} className="roll-in text-label tracking-caps uppercase text-muted-foreground leading-none">
           {doc ? DOC_PAGES[doc].label : VIEWS.find((v) => v.id === mode)?.name}
         </span>

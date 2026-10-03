@@ -41,6 +41,7 @@ import LiveDot from "@/components/LiveDot";
 import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
+import { NO_SIGNAL_COPY, useNoSignal } from "@/components/useNoSignal";
 import { levelMeasure } from "@/src/data/explorerMeasure";
 import { IDENT_INK } from "@/components/identInk";
 
@@ -175,6 +176,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const setLedgerMeasure = useStore((s) => s.setLedgerMeasure);
   const snap = useStore((s) => s.snap);
   const following = useStore((s) => s.following);
+  const dead = useNoSignal();
   const live = useStore((s) => s.live);
   const metaSnap = useStore((s) => s.metaSnap);
   const tickNet = useStore((s) => s.tickNet);
@@ -289,6 +291,32 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
     // eslint-disable-next-line react-hooks/exhaustive-deps -- follows the pin, not the path
   }, [activeSnapOrd, following]);
 
+  // RESUMING LIVE CLOSES THE PATH (test pass, 2026-10-03). Releasing a pin clears the tick-local
+  // commits — the rail drops its Metagraph and Metagraph-snapshot cards — but the path is local
+  // state and stayed where it was: the rail said "live", the explorer still listed the validators
+  // that signed the snapshot just let go, three levels inside a tick nothing was pinned to. A
+  // resume is a return to the stream, so the explorer returns to the list of it. Only on the
+  // false → true EDGE: a path opened by browsing while live is the reader's own and is left alone.
+  // ⚠️ …UNLESS THE RESUME IS THIS EXPLORER'S OWN CLICK (whole-branch review, 2026-10-03). The
+  // live tip's row resumes live AND opens the tick — its handler says so — and this effect, a
+  // render later, closed what the click had just opened: the row needed a second click. The
+  // handler flags the resume it is about to cause, and that one edge is left alone.
+  const wasFollowing = useRef(following);
+  const ownResume = useRef(false);
+  useEffect(() => {
+    const resumed = following && !wasFollowing.current;
+    wasFollowing.current = following;
+    if (!resumed) return;
+    if (ownResume.current) {
+      ownResume.current = false;
+      return;
+    }
+    setOpenTick(null);
+    setOpenNet(null);
+    setOpenSnap(null);
+    setTickPage(1);
+  }, [following]);
+
   const accent = filterAccent(filter);
   const tick = openTick != null ? orderedSnaps.find((d) => d.ordinal === openTick) ?? null : null;
   const exact = tick ? snapshotExact[tick.ordinal] : undefined;
@@ -303,10 +331,10 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // THE SPAN THE EXPLORER HOLDS — stated on EVERY level (user, 2026-09-29: "even if there is no
   // pager you should still indicate the size of the cache, e.g. 'last 11 min'"). The deeper levels
   // have nothing to page, so they carry the same footer with the span alone.
-  const spanScope = {
-    word: spanWords(orderedSnaps),
-    title: `The explorer keeps the latest ${POLL.maxSnapshots} global snapshots, the stretch it follows live. For anything older, open the raw data layer and search the whole chain.`,
-  };
+  // The span ALONE (user, 2026-10-03: "remove the explanatory text section"): the word was a
+  // button opening a sentence about how many snapshots the explorer keeps — the cache again, which
+  // is ours to know and not the reader's (his ruling on the raw phone panel's title, 2026-10-02).
+  const spanScope = { word: spanWords(orderedSnaps) };
   const spanFooter =
     live && orderedSnaps.length > 0 ? (
       <TablePager page={1} pages={1} from={1} to={orderedSnaps.length} total={orderedSnaps.length} compact scope={spanScope} onPage={() => {}} />
@@ -342,7 +370,8 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
       // A 4-decimal fee ("0.0680") needs the wider figure column; the width holds across the
       // level's measures so the columns never shift when the heading's pick changes.
       figureW: 48,
-      empty: "Waiting for snapshots…",
+      // "Waiting" is a promise; a network that has never answered gets the honest state instead.
+      empty: dead ? NO_SIGNAL_COPY : "Waiting for snapshots…",
       rows: pagedSnaps.map((d, i): ExplorerRowSpec => {
         const count = tickFilterCount(d);
         const v = tickValues[i];
@@ -360,8 +389,10 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           figure: tickMeasure(ledgerMeasure, d, snapshotExact[d.ordinal]),
           on,
           faint: !!filterNet && count === 0 && !on,
-          title: `Global snapshot ${d.ordinal.toLocaleString()} · ${d.metagraphSnapshotCount ?? 0} anchors`,
+          title: `Global snapshot ${d.ordinal.toLocaleString()}, ${d.metagraphSnapshotCount ?? 0} snapshots anchored`,
           onClick: () => {
+            // A pinned stream and the live tip's row: this click resumes live (see the effect above).
+            ownResume.current = !following && latestRelevant("all")?.ordinal === d.ordinal && !(on && !following);
             applyClickActions(
               snapshotSelectActions(globalPick, latestRelevant("all")?.ordinal === d.ordinal, {
                 pinnedOrdinal: !following && snap ? snap.data.ordinal : null,
@@ -530,13 +561,15 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
             ? `Unlisted channel ${r.metaId} · anchored into global ${tick.ordinal.toLocaleString()}${signers.length ? ` · signed by ${signers.length} ${SIGNER_GROUPS.proof.who}` : ""}`
             : `${leafName} snapshot ${r.ordinal.toLocaleString()} · anchored into global ${tick.ordinal.toLocaleString()}${signers.length ? ` · signed by ${signers.length} ${SIGNER_GROUPS.proof.who}` : ""}`,
           onClick: () => {
-            applyClickActions(metaSnapSelectActions(sel, globalPick, { metaSnap, following }));
+            applyClickActions(metaSnapSelectActions(sel, globalPick, { metaSnap, following, inspect: useStore.getState().inspect }));
             // The AFFORDANCE FOLLOWS THE DATA: no exact read for this tick means no signers are
             // knowable, so the row commits and stays — a level onto nothing would claim a fact
             // we don't have. Re-clicking (the deselect) closes the level with it.
             setOpenSnap(!on && signers.length > 0 ? key : null);
           },
-          pair: subjectPairing(hoverMetaSnap, metaSnapHoverKey(r.metaId, r.ordinal), setHoverMetaSnap, leafHue),
+          // The pairing wash follows the FILTER, as the snapshot's card does (2026-10-03) — the
+          // two ends of one pairing light in one hue. The dot keeps the network's own.
+          pair: subjectPairing(hoverMetaSnap, metaSnapHoverKey(r.metaId, r.ordinal), setHoverMetaSnap, openNet === filter ? leafHue : accent),
         };
       }),
     });

@@ -254,14 +254,21 @@ const _sph = new THREE.Spherical();
 // Hypergraph metagraph-hub framing (Engine.ts:699-707 `_focusFilter` verbatim): camera pulled
 // back along the hub's outward radial, offset sideways and lifted, looking at the hub itself.
 // `hubLocalPos` is read-only (never mutated); the result is written into `out.pos`/`out.target`.
+//
+// ⚠️ ONE CLOSENESS NUMBER OVER A FIXED DIRECTION (user, 2026-10-03: "when a metagraph is selected,
+// zoom in a bit more"). The offset's DIRECTION — out, a half-step to the side, a lift — is the
+// composition, tuned once; `HUB_CLOSE` scales its length alone, so "closer" can never also turn
+// the view. 1 was the pose until then (14.5 units out); 0.85 stands the camera 12.3 out, where the
+// committed hub and its shells fill the gap between the rails instead of floating in it.
+export const HUB_CLOSE = 0.85;
 export function hubFraming(hubLocalPos: THREE.Vector3, out: CameraFraming): void {
   _out.copy(hubLocalPos).normalize();
   _side.crossVectors(_up, _out).normalize();
   out.pos
     .copy(hubLocalPos)
-    .addScaledVector(_out, 12)
-    .addScaledVector(_side, -6)
-    .addScaledVector(_up, 5.5);
+    .addScaledVector(_out, 12 * HUB_CLOSE)
+    .addScaledVector(_side, -6 * HUB_CLOSE)
+    .addScaledVector(_up, 5.5 * HUB_CLOSE);
   out.target.copy(hubLocalPos);
 }
 

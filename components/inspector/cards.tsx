@@ -17,12 +17,12 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { SonarRing, NodeStars } from "@/components/state/StateAtoms";
 import { VIEW_ICONS, SNAPSHOT_ICON, COUNTRY_ICON, PROVIDER_ICON, COMPOSITION_ICON, KIND_MARK_CLASS } from "@/components/icons";
-import { ChevronRight, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { useMinHold } from "@/components/useMinHold";
 import { useArchive, archiveFactState, archiveReach, archiveSchedule, archiveSummary, fmtSnapCount, fmtReach, useChainSpan } from "@/components/useArchive";
 import { useNodeNames, nodeName } from "@/components/useNodeNames";
 import { POLL } from "@/src/engine/config";
-import { cap, Desc, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, ScheduleTable, partShade, Lead, Empty, QualifierChip, TickerChip, LayerCells, Door, SectionLabel, shareWords, type SchedulePart } from "./parts";
+import { cap, Desc, foldLabel, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, ScheduleTable, partShade, Lead, Empty, QualifierChip, TickerChip, LayerCells, Door, SectionLabel, shareWords, type SchedulePart } from "./parts";
 import { statusItems } from "@/src/data/nodeStatus";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
 import { pickNetId } from "@/src/engine/domain/pickActions";
@@ -130,7 +130,10 @@ function inspectedNode(inspect: ReturnType<typeof useStore.getState>["inspect"])
 // so this reads as the Snapshots view's variant with no view check anywhere. Signers come from
 // the same two sources the Engine's tray glow reads — the deep read when it has landed, else
 // the exact read's shallow row.
-function useSignedSelected(node: { id?: string | null; ids?: string[] } | undefined | null): number | null {
+function useSignedSelected(
+  node: { id?: string | null; ids?: string[] } | undefined | null,
+  netId: string | null,
+): { ordinal: number; signed: boolean } | null {
   const metaSnap = useStore((s) => s.metaSnap);
   const deepMap = useStore((s) => s.metaSnapDeep);
   const exact = useStore((s) => s.snapshotExact);
@@ -139,9 +142,17 @@ function useSignedSelected(node: { id?: string | null; ids?: string[] } | undefi
   const row = exact[metaSnap.globalOrdinal]?.rows?.find(
     (r) => r.metaId === metaSnap.metaId && r.ordinal === metaSnap.ordinal,
   );
-  // Returns the SIGNED snapshot's ordinal (not a bare boolean): the relation names its object
-  // (user, 2026-08-15 — "say what it signed, like 'anchored to'").
-  return nodeSigned(node, deep?.signers ?? row?.signers ?? null) ? metaSnap.ordinal : null;
+  const signers = deep?.signers ?? row?.signers ?? null;
+  // The relation names its OBJECT (user, 2026-08-15 — "say what it signed, like 'anchored to'"),
+  // and since 2026-10-02 it is stated BOTH ways: a node of the snapshot's own network that is not
+  // among its signers says so. Only once the signer list has been read (an unread list is not a
+  // "did not"), and only for that network's nodes — another network's node has no relation to
+  // this snapshot at all, and a sentence about it would invent one.
+  if (!signers?.length) return null;
+  const signed = nodeSigned(node, signers);
+  const sameNet = !!netId && (metagraphById(netId)?.id ?? netId) === (metagraphById(metaSnap.metaId)?.id ?? metaSnap.metaId);
+  if (!signed && !sameNet) return null;
+  return { ordinal: metaSnap.ordinal, signed };
 }
 
 // Node title: the Geography view mark (Globe — the Geography view's top-bar icon, same view-glyph
@@ -409,27 +420,20 @@ function ScheduleGroup({
           selection, which can never include the chevron): the row is one CONTROL, so it
           selects nothing, and focus shows only for the keyboard in CopyButton's own
           focus-visible recipe. */}
-      <CollapsibleTrigger className="group mt-2 flex w-full items-center gap-1 cursor-pointer select-none outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]">
+      <CollapsibleTrigger className="group mt-2 flex w-full items-center gap-1 pointer-coarse:min-h-10 cursor-pointer select-none outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]">
         {/* A SECTION LABEL in both forms (the card skeleton, 2026-10-02): caps and muted, the
             total it heads on the right — the breakdown slot's one heading recipe. */}
-        <span className="text-label tracking-caps uppercase text-muted-foreground">{label}</span>
+        {/* THE LABEL IS THE FOLD'S MARK (`foldLabel`, user 2026-10-03): a dotted underline, no
+            chevron — beside the total a chevron pushed "17" off the 3 / 14 / 17 column it heads,
+            and hung in the gutter it touched the card's edge. */}
+        <span className={cn("text-label tracking-caps uppercase", open ? "text-foreground" : "text-muted-foreground group-hover:text-foreground", foldLabel(open))}>{label}</span>
         {value !== undefined && <span className="ml-auto min-w-0 text-body text-foreground tabular-nums text-right">{value}</span>}
-        {/* THE FOLD MARK SITS AT THE ROW'S FAR END, after the total (user, 2026-10-02: "it is on the
-            text; where does it belong?") — the same place and the same glyph as the snapshot card's
-            expandable rows, so the rail has one disclosure mark. It is not the pager's ‹ ›: those
-            STEP to a sibling, this one folds the rows beneath it, which is why it is the smaller
-            muted chevron that turns down when open. */}
-        <ChevronRight
-          aria-hidden
-          className={cn(
-            "size-3.5 flex-none text-muted-foreground transition-transform duration-150 motion-reduce:transition-none",
-            value === undefined && "ml-auto",
-            open && "rotate-90",
-          )}
-        />
       </CollapsibleTrigger>
       <CollapsibleContent className="disclose-panel">
-        <div className="mt-1 pl-2">{children}</div>
+        {/* No indent (user, 2026-10-03: "the label has room to move to the left"). The 8px nested
+            the rows under a chevron that is gone — the fold is marked on its label now — and it
+            was exactly the room the cut's name needed to stand clear of its first value. */}
+        <div className="mt-1">{children}</div>
       </CollapsibleContent>
     </Collapsible>
   );
@@ -765,7 +769,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // The SIGNED relation owns the head aside while it exists (GeoLiveAside) — the status the
   // head normally carries moves down here as the first body row, so no fact is lost, only
   // redistributed (the pile rule's redistribution idea, applied within one card).
-  const signed = useSignedSelected(p.node);
+  const signed = useSignedSelected(p.node, pickNetId(p));
   // The operator's self-registered ALIAS from the delegated-staking registry (user,
   // 2026-08-16 — "those names look informal often": a content attribute, never the title; and
   // "alias" is the user-facing word, "nickname" stays the internal register). The registry
@@ -817,26 +821,44 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   const metaList = useStore((s) => s.metaList);
   const coloReady = metaList.some((m) => m.isRoot) && metaList.some((m) => !m.isRoot);
   const colo = coloReady ? coLocatedNetworks(p.node?.ip, pickNetId(p), metaList) : null;
+  // The node's OWN network, in the same shape as a co-tenant so one row lists them all.
+  const ownId = pickNetId(p);
+  const ownNet = ownId ? { id: ownId, name: metagraphById(ownId)?.name ?? ownId } : null;
   // NB: the hover pairing (synced 3D glow) lives on the OUTER pane (Inspector.CardPane), not here,
   // so the glow lights the card's rounded edge.
-  // THE LEAD (the card skeleton, 2026-10-02): the relation to the chamber's subject when there is
-  // one, then where the node sits and who hosts it — the City / Country / Hosting rows read as one
+  // THE LEAD IS CONTEXTUAL (user, 2026-10-02 — "in snapshot view it should say something like
+  // 'validated snapshot 123'. This should be the principle for that section"): it opens with what
+  // this node is TO THE SUBJECT ON SCREEN — under a committed metagraph snapshot, whether it signed
+  // it — and only then where the node sits and who hosts it — the City / Country / Hosting rows read as one
   // sentence. Each piece still YIELDS to the ancestor card that states it (the pile rule), so
   // under a committed country and provider the lead is the relation alone, or nothing: a card
   // never restates its ancestors to fill a slot.
   const place = [cohort == null ? geo?.city : null, country == null ? geo?.country : null].filter(Boolean).join(", ");
-  const leadBits = [place, cohort == null ? geo?.isp : null].filter(Boolean).join(" · ");
+  const host = cohort == null ? geo?.isp : null;
+  // NO MID-DOT LEADS (user, 2026-10-03: "I don't like those dots separating texts"): the lead is
+  // ONE statement — the relation, else where the node sits — and the host is a row of its own.
+  const lead = signed != null || !!place;
   return (
     <>
-      {(signed != null || leadBits) && (
+      {/* ONE SHORT SENTENCE (user, 2026-10-03: "'signed snapshot N with 2 others' and then the
+          country etc. is too much text. Just say that it signed the snapshot"). While the lead
+          states the relation, where the node sits and who hosts it step DOWN into fact rows —
+          redistributed, never dropped. */}
+      {lead && (
         <Lead>
-          {signed != null && (
-            <span title="This node is among the committed metagraph snapshot's proof signers — a snapshot is signed by the metagraph's own L0 validators.">
-              Signed {signed.toLocaleString()}{leadBits ? ". " : "."}
+          {signed != null ? (
+            <span
+              title={
+                signed.signed
+                  ? "This node is among the committed metagraph snapshot's proof signers — a snapshot is signed by the metagraph's own L0 validators."
+                  : "This node is not among the committed metagraph snapshot's proof signers — a snapshot is signed by the metagraph's own L0 validators that were in that round."
+              }
+            >
+              {signed.signed ? "Signed" : "Did not sign"} snapshot {signed.ordinal.toLocaleString()}.
             </span>
+          ) : (
+            `${place}.`
           )}
-          {/* A host name may end in its own period ("Amazon.com, Inc.") — never two. */}
-          {leadBits ? `${leadBits.replace(/\.$/, "")}.` : null}
         </Lead>
       )}
       {/* WHAT IT RUNS, DRAWN (user, 2026-10-02 — `docs/superpowers/design/2026-10-02-node-card`,
@@ -848,12 +870,19 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           composition card: the cells are this node's own make-up, and the picture is the card. */}
       {codes && codes.length > 0 && (
         <>
-          <Separator className="mb-2" />
+          {/* Only under a LEAD: without one (place and host owned by the cards above) the head's own
+              hairline is the division, and a second rule under it drew two lines an inch apart. */}
+          {lead && <Separator className="mb-2" />}
           <SectionLabel label="Runs" total={<span className="font-sans font-normal">{comp}</span>} className="mb-1.5" />
           <LayerCells codes={codes} />
         </>
       )}
-      {archState.kind !== "none" && (
+      {/* The Archive section stands only where it can be FILLED (user, 2026-10-02: "the second section
+          is not always filled in"). A node with no L0 keeps no snapshot archive — the Runs cells
+          just above already show its L0 dashed — and a section that was a dash and a sentence on
+          most metagraph nodes read as a card that had failed to load. An L0 node the census has no
+          reading for keeps the section and its dash: that one is a real gap. */}
+      {archState.kind !== "none" && archState.kind !== "na" && (
         <>
           <Separator className="mt-2.5 mb-2" />
           <SectionLabel
@@ -861,9 +890,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
             total={
               <span className="font-sans font-normal">
                 {archState.kind === "value" ? archState.display.value : archState.kind === "acquiring" ? <NodeStars count={4} /> : (
-                  <Empty why={archState.kind === "na"
-                    ? "A chain's snapshots are served by its L0 validators; this node runs no L0, so it keeps no snapshot archive."
-                    : "The archive census (refreshed every few hours) has no reading for this node — it was unreachable at probe time, not Ready then, or joined the cluster since."} />
+                  <Empty why="The archive census (refreshed every few hours) has no reading for this node — it was unreachable at probe time, not Ready then, or joined the cluster since." />
                 )}
               </span>
             }
@@ -894,7 +921,6 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
               {archState.display.note && <span className="mt-1 block text-label text-muted-foreground">{archState.display.note}</span>}
             </div>
           )}
-          {archState.kind === "na" && <span className="block text-label text-muted-foreground">Only an L0 keeps a snapshot archive.</span>}
         </>
       )}
       <Separator className="mt-2.5 mb-2" />
@@ -917,31 +943,31 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
             represent? Remove it for now"). It read the Global L0 registry's opt-in — whether the
             operator REGISTERED as a candidate DAG holders can delegate to — and "Yes" was too easy
             to read as "has stake delegated", which the data does not say. */}
-        {/* The provider's NUMBER — its name is in the lead, or is the provider card's title. */}
+        {/* Stepped down from the lead while it states the signing relation (see the lead's note). */}
+        {signed != null && place && <Fact label="Location">{place}</Fact>}
+        {host && <Fact label="Hosting">{host}</Fact>}
+        {/* The provider's NUMBER — its name is in the lead, the Hosting row or the provider card's title. */}
         {asn && <Fact label="ASN"><span className="font-mono">{asn}</span></Fact>}
-        {/* CO-LOCATED — the machine's other tenant networks (see the note above). Each name
-            keeps its identity dot: a metagraph's hue is the same everywhere it appears. */}
-        <Fact label="Co-located">
-          {colo == null ? (
-            <NodeStars count={3} />
-          ) : colo.length ? (
-            <span
-              className="inline-flex items-center gap-1.5"
-              title="Another network runs its layers at this node's IP — one host answering in more than one cluster."
-            >
-              {colo.map((c) => (
-                <span key={c.id} className="inline-flex items-center gap-1.5">
-                  <IdentityDot hue={filterAccent(c.id)} />
-                  {c.name}
-                </span>
-              ))}
-            </span>
-          ) : (
-            // "none" is a MEASURED reading (both cluster sides are live and no co-tenant
-            // exists), so it takes the value register like any other fact — muting it made a
-            // fact read as an instrument state (user, 2026-08-16).
-            <Empty why="No other network has a node at this IP." />
-          )}
+        {/* NETWORK(S) — which network this node belongs to, and any other network the same machine
+            also runs (user, 2026-10-02: "it should say which network it belongs to; we can combine
+            that with co-located — just say network(s) and show multiple if it applies"). The
+            node's own network leads; co-tenants follow once both cluster sides are live (before
+            that the list would be a guess, so only the node's own network shows). Each keeps its
+            identity dot. Stated even under a committed network card: here it is the node's fact,
+            and on Geography and Snapshots no card above says it. */}
+        <Fact label={colo && colo.length > 0 ? "Networks" : "Network"}>
+          <span
+            className="inline-flex flex-wrap items-center justify-end gap-x-2.5 gap-y-0.5"
+            title={colo && colo.length > 0 ? "This machine answers in more than one network's cluster at the same IP." : undefined}
+          >
+            {[ownNet, ...(colo ?? [])].filter((c): c is { id: string; name: string } => c != null).map((c) => (
+              <span key={c.id} className="inline-flex items-center gap-1.5">
+                <IdentityDot hue={filterAccent(c.id)} />
+                {c.name}
+              </span>
+            ))}
+            {ownNet == null && (!colo || colo.length === 0) && <Empty why="This node's network is not known." />}
+          </span>
         </Fact>
       </FactGroup>
       {/* The look-up column: this node's own reference, and nothing else — the unique reference
@@ -1205,7 +1231,7 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
           (user, 2026-08-09). The COUNTRY is deliberately absent: the cohort always sits under a
           committed country, whose own card states it one slot up (user, 2026-08-02 — a facts rail
           shouldn't say the same thing twice). */}
-      <Fact label="ASN">{asn ? <span className="font-mono">{asn}</span> : <Empty why="No member of this cohort reports an AS number" />}</Fact>
+      <Fact label="ASN">{asn ? <span className="font-mono">{asn}</span> : <Empty why="No node at this provider reports an AS number" />}</Fact>
     </FactGroup>
     </>
   );

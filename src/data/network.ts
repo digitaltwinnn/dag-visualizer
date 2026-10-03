@@ -320,7 +320,9 @@ const DAG_CFG: MetagraphConfig = {
 // reads this field — it rides the CSS-token lane directly via identityHudCss (Task 6).
 export function metagraphById(id: string): MetagraphConfig | null {
   if (id === "dag") return { ...DAG_CFG, color: identityHudNumber(id) };
-  const cfg = (METAGRAPHS as MetagraphConfig[]).find((m) => m.id === id);
+  // …by its current id OR a former address (`src/net/lineage.ts`): a re-registered network's
+  // old chain is still that network, never an unknown one.
+  const cfg = (METAGRAPHS as MetagraphConfig[]).find((m) => m.id === id || m.formerIds?.includes(id) === true);
   return cfg ? { ...cfg, color: identityHudNumber(id) } : null;
 }
 
@@ -349,4 +351,6 @@ export interface MetagraphConfig {
   color: number;
   iconUrl?: string;
   siteUrl?: string; // config-level site (the DAG core; metagraphs get theirs from the live metaList)
+  /** Addresses the network used before `id` (config `MetaConfig.formerIds`). */
+  formerIds?: string[];
 }

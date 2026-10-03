@@ -41,10 +41,13 @@ import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { displayNetwork } from "@/src/data/unlisted";
 import { coLocatedNetworks, filterAccent, getAnchor, isAnchorSettling, metagraphById } from "@/src/data/network";
-import { midHash } from "@/src/util/format";
+import { fmtKB, fmtShareKB, midHash } from "@/src/util/format";
+import { iconForPick } from "@/components/icons";
+import { SceneMark, type SceneMarkSpec } from "@/components/SceneMark";
+import { netKeyOf } from "@/src/engine/domain/pickActions";
 import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
 import { SCENE_GLASS } from "@/components/selection";
-import { RoleChips, StatusMark, TickerChip } from "@/components/inspector/parts";
+import { QualifierChip, RoleChips, StatusMark, TickerChip } from "@/components/inspector/parts";
 // The lead line's codes come from the composition vocabulary's ONE home, rendered by the cards'
 // own RoleChips (user, 2026-08-15: "look at my cards — square pills").
 import { layerCodesOf } from "@/src/data/composition";
@@ -81,8 +84,15 @@ export interface CalloutModel {
   key: string;
   eyebrow: string;
   title: string;
-  aside?: { text: string; hue?: string; live?: boolean };
+  /** `chip` is a second, separate fact beside the state — an age — never a clause after a dot. */
+  aside?: { text: string; hue?: string; live?: boolean; chip?: string };
   ring: string;
+  /** THE MARK THE SUBJECT'S CARD WEARS before its title (user, 2026-10-03 — suggestion 4 of
+   *  `docs/superpowers/design/2026-10-03-callout-cards`): the cube, the stacked cubes, the globe,
+   *  the pin, the server — or a network's logo. A label and its card were tied only by reading
+   *  both; with the same mark they pair at a glance. Same glyph home (`iconForPick`), same hue
+   *  rule as the card head: a kind mark takes the filter's accent, a subject's own mark its hue. */
+  mark?: SceneMarkSpec;
   /** `ident` leads the row in its identity hue (the aside's hued-ticker idiom, one register).
    *  `also` closes it with the OTHER networks sharing this subject's machine — same idiom,
    *  one hued ticker each (user, 2026-08-18). */
@@ -95,9 +105,21 @@ export interface CalloutModel {
      *  2026-09-11); `unknown` stays absent, the callout's unmeasured-means-no-line rule. */
     status?: string;
     also?: { text: string; hue: string }[];
+    /** A second measure of the same subject, on the right — a size beside a count. */
+    chip?: string;
   };
 }
 type Model = CalloutModel;
+
+// THE LEADER'S STRENGTH IS PER GROUND (user, 2026-10-03: "the callout line is not very easy to
+// see in light mode"). The bare accent at 0.55 is a glow on the dark ground and a pale thread on
+// paper, where nothing blooms and the page is its own bright field — the History tether's
+// finding the same week (`TrendTether`), and the same answer: on paper the line takes the
+// accent's INK (`--primary-ink`) at 0.85; dark keeps what it had. `light-dark()` resolves
+// colours only, so the alpha rides the colour rather than `strokeOpacity`.
+const LEADER_STROKE = {
+  stroke: "light-dark(color-mix(in oklch, var(--primary-ink) 85%, transparent), color-mix(in oklch, var(--primary) 55%, transparent))",
+} as const;
 
 const geoOf = (p: { kind: string }): GeoInfo | undefined =>
   "geo" in p ? (p as { geo?: GeoInfo }).geo : undefined;
@@ -123,13 +145,16 @@ export function CalloutPanel({ m, className }: { m: CalloutModel; className?: st
       {/* No identity dot here (user, 2026-08-15): the hued aside already carries the identity
           on this row, and the anchor ring is the subject mark at the scene end of the tie. */}
       <div className="flex items-center gap-[7px]">
+        {m.mark && <SceneMark mark={m.mark} />}
         <span className={cn("text-body font-semibold text-foreground", m.titleMono && "font-mono tabular-nums")}>{m.title}</span>
         {/* A hued aside is a TICKER beside a title, so it is the card head's own chip
             (`TickerChip`, 2026-10-02); the un-hued one is a state line and stays text. */}
         {m.aside && m.aside.hue ? (
           <TickerChip text={m.aside.text} hue={m.aside.hue} className="ml-1" />
         ) : m.aside ? (
+          // Age, then state — the order the card's own head reads (2026-10-03).
           <span className="inline-flex items-center gap-1.5 text-label text-muted-foreground ml-1">
+            {m.aside.chip && <QualifierChip className="mr-0.5 tabular-nums">{m.aside.chip}</QualifierChip>}
             {m.aside.live && <LiveDot />}
             {m.aside.text}
           </span>
@@ -173,6 +198,12 @@ export function CalloutPanel({ m, className }: { m: CalloutModel; className?: st
               ))}
             </span>
           )}
+          {m.lead.chip && (
+            <>
+              <span className="flex-1 min-w-1.5" />
+              <QualifierChip className="tabular-nums">{m.lead.chip}</QualifierChip>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -191,7 +222,9 @@ export default function SceneCallout() {
   const metaSnap = useStore((s) => s.metaSnap);
   const snap = useStore((s) => s.snap);
   const tickNet = useStore((s) => s.tickNet);
+  const exact = useStore((s) => (s.snap ? s.snapshotExact[s.snap.data.ordinal] : undefined));
   const following = useStore((s) => s.following);
+  const liveFeed = useStore((s) => s.live);
   // THE BOX LEADS (user, 2026-08-15 — clicking a committed node's hub re-boxes the metagraph
   // card and "nothing happens in the scene"): the box is the subject (it gets the camera), so
   // the callout mirrors it. Inspector publishes the boxed slot; the Engine's anchor resolvers
@@ -245,29 +278,33 @@ export default function SceneCallout() {
       titleMono: !!id,
       aside: nnet ? { text: nnet.ticker, hue: nnet.hue } : undefined,
       ring: nnet?.hue ?? "var(--primary)",
+      mark: { icon: iconForPick("metanode"), hue: nnet?.hue ?? "var(--primary)" },
       lead: codes.length || also.length || status ? { codes, status, also } : undefined,
     };
   };
 
-  const netModel = (): Model | null => {
-    const net = displayNetwork(filter);
+  const netModel = (id: string = filter): Model | null => {
+    const net = displayNetwork(id);
     // "all" has no subject; the unlisted set has no 3D anchor (no machines are knowable).
     if (!net || net.virtual) return null;
-    const mg = metaList.find((x) => x.id === filter) ?? null;
+    const mg = metaList.find((x) => x.id === id) ?? null;
     const codes = mg ? layerCodesOf(mg.nodes) : [];
     return {
-      key: `net|${filter}`,
-      eyebrow: filter === "dag" ? "Network" : "Metagraph",
+      key: `net|${id}`,
+      eyebrow: id === "dag" ? "Network" : "Metagraph",
       title: net.name,
       // The aside suppresses itself when it only restates the name (the DAG core's ticker IS
       // its name) — a head must not say the same thing twice (the CardHead aside rule).
       aside: net.ticker !== net.name ? { text: net.ticker, hue: net.hue } : undefined,
       ring: net.hue,
+      // The dossier's own logo (the live metagraph's icon, else the catalog's bundled one).
+      mark: { logo: mg?.iconUrl || metagraphById(id)?.iconUrl, monogram: net.ticker || net.name, hue: net.hue },
       lead: mg ? { text: `${mg.nodes.length} nodes`, codes } : undefined,
     };
   };
 
   let m: Model | null = null;
+  let m2: Model | null = null;
   if (mode === "hyper") {
     m = boxedCard === "context" ? (netModel() ?? nodeModel()) : (nodeModel() ?? netModel());
     if (!m) return null;
@@ -290,6 +327,7 @@ export default function SceneCallout() {
         title: cohort.isp ?? "Unknown provider",
         aside: cohort.city ? { text: cohort.city } : undefined,
         ring: filterAccent(filter),
+        mark: { icon: iconForPick("cohort"), hue: filterAccent(filter) },
         lead: n > 0 ? { text: `${n} nodes` } : undefined,
       };
     };
@@ -305,6 +343,7 @@ export default function SceneCallout() {
         title: name ?? country,
         aside: name ? { text: country } : undefined,
         ring: filterAccent(filter),
+        mark: { icon: iconForPick("country"), hue: filterAccent(filter) },
         lead: members.length > 0 ? { text: `${members.length} nodes` } : undefined,
       };
     };
@@ -335,6 +374,7 @@ export default function SceneCallout() {
         title: metaSnap.ordinal.toLocaleString(),
         aside: nnet ? { text: nnet.ticker, hue: nnet.hue } : undefined,
         ring: nnet?.hue ?? "var(--primary)",
+        mark: { icon: iconForPick("metaSnap"), hue: nnet?.hue ?? "var(--primary)" },
       };
     };
     const gsModel = (): Model | null => {
@@ -365,6 +405,23 @@ export default function SceneCallout() {
       // not lost, and the share appears the moment it is real. (The strip's own `?? 0` one surface
       // over drives a BAR HEIGHT, where an absent count is an honest gap, not a stated numeral.)
       const share = mine ? getAnchor(snap.data.timestamp)?.metaCounts?.get(net) : undefined;
+      // THE LABEL NAMES BOTH THINGS THE BAR SHOWS (user, 2026-10-03 — suggestion 1). The ring
+      // points at this network's band, and a band's LENGTH is bytes (`domain/ledgerBands`) — the
+      // label only counted. The count now says "snapshots", the card's word, and the size rides
+      // the right as a chip. MEASURED OR ABSENT (rule 10): the bytes come from the exact read
+      // alone, so the chip appears when that read has landed and never as an estimate. A network
+      // that changed address is summed across its ids (`netKeyOf`).
+      let mineKB: number | null = null;
+      if (mine && exact) {
+        let bytes = 0;
+        let any = false;
+        for (const [addr, v] of Object.entries(exact.perMeta)) {
+          if (netKeyOf(addr) !== net) continue;
+          bytes += v.bytes;
+          any = true;
+        }
+        if (any) mineKB = bytes / 1024;
+      }
       const settling = mine != null && share == null && isAnchorSettling(snap.data.timestamp, typeof total === "number" ? total : null);
       return {
         // The live-lane key rule — see msModel above (the follow advances this ordinal ~every
@@ -372,39 +429,87 @@ export default function SceneCallout() {
         key: following ? "gs|live" : `gs|${snap.data.ordinal}`,
         eyebrow: "Global snapshot",
         title: snap.data.ordinal.toLocaleString(),
-        aside: following ? { text: rel ? `live · ${rel}` : "live", live: true } : { text: rel ? `pinned · ${rel}` : "pinned" },
+        // The card's THIRD state, mirrored too (test pass, 2026-10-03): with the feed down the
+        // card's follow control says "no signal", and this label went on saying "live · 58s ago"
+        // behind a beating dot — two surfaces a hand's width apart disagreeing about whether the
+        // network was answering. A pin is unaffected: a held snapshot is not a claim about now.
+        aside: following
+          ? liveFeed
+            ? { text: "live", live: true, chip: rel || undefined }
+            : { text: "no signal" }
+          : { text: "pinned", chip: rel || undefined },
         // Unneted the ring marks the whole bar (core cyan); under a filter the anchor
         // points at the committed network's own SEGMENT, so the ring takes its accent
         // (user, 2026-08-16 — "if filter, select the correct segment of the byte bar").
         ring: net !== "all" ? filterAccent(net) : "var(--core)",
+        mark: { icon: iconForPick("snapshot"), hue: filterAccent(filter) },
         lead:
           typeof total !== "number"
             ? undefined
             : mine && !settling
               ? {
                   ident: { text: mine.ticker || mine.name, hue: filterAccent(net) },
-                  text: `${share ?? 0} of ${total} anchors`,
+                  text: `${share ?? 0} of ${total} snapshots`,
+                  chip: mineKB != null && exact ? fmtShareKB(mineKB, exact.totalSizeKB) : undefined,
                 }
-              : { text: `${total} anchors` },
+              : { text: `${total} snapshots`, chip: exact ? fmtKB(exact.totalSizeKB) : undefined },
       };
     };
-    // The boxed NODE card leads (user, 2026-08-16 — a tray machine selected via the card
-    // stack shows ITS callout); then the boxed global card; then the default finest-first.
-    // The boxed METAGRAPH card shows NOTHING (user, 2026-08-16 — like geo's network rung: a
-    // network in the chamber is a whole lane, and a single anchor would lie about it).
-    if (boxedCard === "context") return null;
-    m =
-      (boxedCard === "node" ? nodeModel() : null) ??
-      (boxedCard === "snap" ? gsModel() : null) ??
-      msModel() ??
-      gsModel() ??
-      nodeModel();
+    // THE NETWORK'S OWN LABEL, on its lane (user, 2026-10-03: "the dossier on snapshots page has
+    // no callout on the scene"). A boxed Metagraph card used to clear the scene of labels — the
+    // 2026-08-16 rule was that a network in the chamber is a whole lane and one anchor would lie
+    // about it. With a label on each snapshot, that silence read as a card the scene had
+    // forgotten: every other card you open is pointed at. The label stands at the head of the
+    // network's lane, which is where that lane is read from. It is the hyper dossier's own
+    // model (logo, name, ticker, nodes and layers); the DAG and the unlisted set have no lane
+    // of their own to point at, as in hyper. `ledgerNetwork` is the chamber's own resolver —
+    // the network picked inside this global snapshot, else the filter.
+    const lnet = ledgerNetwork({ filter, tickNet, snapOrdinal: snap?.data.ordinal ?? null });
+    const laneModel = (): Model | null => (lnet === "all" || lnet === "dag" ? null : netModel(lnet));
+    // The boxed NODE card leads, alone (user, 2026-08-16 — a tray node selected via the card
+    // stack shows ITS callout).
+    const node = nodeModel();
+    if (boxedCard === "node" && node) m = node;
+    else {
+      // THE PAIR GETS TWO CALLOUTS (user, 2026-10-03: asked "should snapshot view have two
+      // callouts, one for global- and one for metagraph snapshot?" — "2 callouts"). A committed
+      // metagraph snapshot always stands with the global snapshot it is read against, and one
+      // label could only name one of them: the tile, with nothing saying which bar it fell
+      // into, or the bar, with the tile unnamed.
+      // ⚠️ EACH HAS ITS OWN ANCHOR, FIXED: the global snapshot is always the second
+      // (`callout-2`), whichever card is boxed. The first cut handed the subject's anchor to the
+      // boxed card and the other to the second — so re-boxing swapped the two, both wrappers
+      // remounted, and both labels replayed their whole entrance over two subjects that had
+      // not changed (the 2026-09-11 complaint, "it re-draws the card while the subject is the
+      // same"). The subject's anchor (`callout`) is the upper storey's: the metagraph snapshot's
+      // tile, or its network's lane when the Metagraph card is the box or no snapshot of that
+      // network is committed — the two stand at the same end of the same lane, so they share
+      // the one anchor rather than stack two labels on it. CalloutSync mirrors this exactly.
+      m = boxedCard === "context" ? (laneModel() ?? msModel()) : (msModel() ?? laneModel() ?? (snap ? null : node));
+      m2 = gsModel();
+    }
   }
-  if (!m) return null;
+  if (!m && !m2) return null;
 
   return (
+    <>
+      {m && <CalloutMark m={m} id="callout" multi />}
+      {m2 && <CalloutMark m={m2} id="callout-2" />}
+    </>
+  );
+}
+
+/** One callout: the 0-size anchor wrapper CalloutSync positions, its ring, leader and panel.
+ *  `id` is the marker the engine queries (`callout` for the subject, `callout-2` for the global
+ *  snapshot in Snapshots); `multi` mounts the hyper node's extra legs, which only the subject's
+ *  callout ever draws. */
+function CalloutMark({ m, id, multi }: { m: Model; id: "callout" | "callout-2"; multi?: boolean }) {
+  // One mask per mark: an SVG `url(#…)` resolves to the FIRST element with that id in the
+  // document, so two marks sharing one id would both be revealed by the first one's draw.
+  const maskId = `${id}-draw-mask`;
+  return (
     <div
-      id="callout"
+      id={id}
       // Keyed by SUBJECT (user, 2026-09-05 — the leader was already drawn while the panel was
       // still rolling in): a subject change remounts the whole wrapper, so the entrance
       // choreography below (panel roll → leader draw → ring landing) replays as one unit, and
@@ -420,7 +525,10 @@ export default function SceneCallout() {
       {/* Anchor ring at the projected point (the wrapper's origin) — the subject mark at the
           scene end of the tie. `.co-tip` lands it when the drawing leader arrives. */}
       <span
-        className="co-tip absolute -translate-x-1/2 -translate-y-1/2 w-[9px] h-[9px] rounded-full border-[1.5px]"
+        // A CASING IN THE GROUND'S COLOUR (2026-10-03): the ring wears its subject's hue and
+        // lands on a block of that same hue — the Dor ring on Dor's lit bar read as nothing.
+        // A thin ground-coloured line outside and inside it is what a map puts round a symbol.
+        className="co-tip absolute -translate-x-1/2 -translate-y-1/2 w-[9px] h-[9px] rounded-full border-[1.5px] [box-shadow:0_0_0_1.5px_color-mix(in_oklch,var(--background)_78%,transparent),inset_0_0_0_1px_color-mix(in_oklch,var(--background)_78%,transparent)]"
         style={{ borderColor: m.ring }}
       />
       {/* Dashed leader from the anchor to the panel's near corner — the ordinal-label language,
@@ -433,7 +541,7 @@ export default function SceneCallout() {
           globals.css animates its dash offset — revealing the dashes progressively without the
           dash pattern itself crawling. White stroke is mask luminance, not a palette hue. */}
       <svg className="co-leader absolute left-0 top-0 overflow-visible" width="1" height="1" aria-hidden>
-        <mask id="co-draw-mask" maskUnits="userSpaceOnUse" x={-20} y={-CALLOUT_OFF_Y - 40} width={CALLOUT_OFF_X + 60} height={CALLOUT_OFF_Y + 60}>
+        <mask id={maskId} maskUnits="userSpaceOnUse" x={-20} y={-CALLOUT_OFF_Y - 40} width={CALLOUT_OFF_X + 60} height={CALLOUT_OFF_Y + 60}>
           <line
             className="co-draw"
             x1={CALLOUT_OFF_X}
@@ -442,17 +550,30 @@ export default function SceneCallout() {
             y2={-6}
             pathLength={1}
             stroke="white"
-            strokeWidth="3"
+            strokeWidth="8"
           />
         </mask>
+        {/* The leader's CASING, under the dashes and drawn by the same mask: over lit geometry
+            (a bar, a ribbon) the dashed line alone disappeared on dark and fought the ribbon on
+            paper. Ground colour, so it is a dark line here and a pale one there. */}
         <line
-          mask="url(#co-draw-mask)"
+          mask={`url(#${maskId})`}
           x1={6}
           y1={-6}
           x2={CALLOUT_OFF_X}
           y2={-(CALLOUT_OFF_Y - CALLOUT_LEG_INSET)}
-          stroke="var(--primary)"
-          strokeOpacity="0.55"
+          stroke="var(--background)"
+          strokeOpacity="0.6"
+          strokeWidth="3.5"
+          strokeLinecap="round"
+        />
+        <line
+          mask={`url(#${maskId})`}
+          x1={6}
+          y1={-6}
+          x2={CALLOUT_OFF_X}
+          y2={-(CALLOUT_OFF_Y - CALLOUT_LEG_INSET)}
+          style={LEADER_STROKE}
           strokeWidth="1.5"
           strokeDasharray="4 4"
         />
@@ -465,14 +586,16 @@ export default function SceneCallout() {
           the primary leader's draw window (globals.css) — legs fan from the same panel corner,
           so they arrive with the tie rather than pre-drawn (their per-frame geometry can't
           ride the mask draw itself). */}
-      <svg className="co-multi absolute left-0 top-0 overflow-visible" width="1" height="1" aria-hidden>
-        {[0, 1].map((i) => (
-          <g key={i} className="co-mleg" visibility="hidden">
-            <line x1={0} y1={0} x2={0} y2={0} stroke="var(--primary)" strokeOpacity="0.55" strokeWidth="1.5" strokeDasharray="4 4" />
-            <circle cx={0} cy={0} r={3.5} fill="none" strokeWidth={1.5} stroke={m.ring} />
-          </g>
-        ))}
-      </svg>
+      {multi && (
+        <svg className="co-multi absolute left-0 top-0 overflow-visible" width="1" height="1" aria-hidden>
+          {[0, 1].map((i) => (
+            <g key={i} className="co-mleg" visibility="hidden">
+              <line x1={0} y1={0} x2={0} y2={0} style={LEADER_STROKE} strokeWidth="1.5" strokeDasharray="4 4" />
+              <circle cx={0} cy={0} r={3.5} fill="none" strokeWidth={1.5} stroke={m.ring} />
+            </g>
+          ))}
+        </svg>
+      )}
       {/* The panel — keyed by subject so the roll-in replays on a change, like a card title. */}
       {/* Position lives in globals.css (`.co-panel` + the data-flip/data-drop mirrors the
           Engine toggles near viewport edges) — inline left/bottom would beat the flip rules. */}

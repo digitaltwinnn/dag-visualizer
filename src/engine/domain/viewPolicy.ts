@@ -98,6 +98,14 @@ export interface ViewPolicy {
   // the phone dock's Vitals sheet) read it through the ONE `ViewCells` dispatch, so a band's
   // content can never differ between them.
   bandContent: "vitals" | "timeline";
+  // THE WINDOW THE BAND'S CARDS SHARE, if they share one (user, 2026-10-03: "each vital repeats
+  // 'last 24 hours', is there a better way?"). The Snapshots band's four cards are all cut from
+  // one measured window, and each said so in its own corner — the same three words three times in
+  // one row. A band with a shared window says it ONCE, as a chip above its right corner (where the
+  // History band's range pills stand: the band's time scope has one place), and a card speaks only
+  // when its own reach DIFFERS (the live fallback). `null` where the cards are live readings with
+  // no window to state. A row, so a new view answers the question rather than inheriting a chip.
+  bandWindow: "24h" | null;
   // Does this view anchor the SUBJECT CALLOUT (user, 2026-08-15) — the HUD-layer label the Engine
   // positions over the committed subject's projected anchor each frame? Two readers: SceneCallout
   // mounts on it, the Engine's per-frame sync gates on it — one flag, so the label and its
@@ -179,6 +187,7 @@ const FLAT: ViewPolicy = {
   nodeList: false,
   vitalsLane: false,
   bandContent: "vitals",
+  bandWindow: null,
   callout: false,
   bloom: BLOOM_CALM,
   chipEnv: 1,
@@ -225,6 +234,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     nodeList: true,
     vitalsLane: true,
     bandContent: "vitals",
+    bandWindow: null,
     callout: true, // first consumer of the subject callout (rolling out view by view)
     // Calmer than ledger: the core + dense node field piled up an additive bleed on OLED/HDR.
     bloom: { strength: 0.27, radius: 0.32, threshold: 0.14 },
@@ -256,6 +266,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     nodeList: true,
     vitalsLane: true,
     bandContent: "vitals",
+    bandWindow: null,
     callout: true, // node > cohort > country anchors; the distributed network rung has none
     // The lowest bloom of the three views: strength drives the "black halo" ring the saturated
     // node/wall hues cast on the globe, and the additive coastal walls read fuzzy under bloom.
@@ -296,6 +307,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     nodeList: true,
     vitalsLane: true,
     bandContent: "vitals",
+    bandWindow: "24h",
     callout: true, // the pinned snapshot — the lane lead tile, or the global tick's bar
     bloom: BLOOM_CALM, // the reference look the design likes — unchanged
     chipEnv: 0.5, // low, not zero — coplanar trays wash at full sheen, go bland at none (field note)
@@ -334,6 +346,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     // reserve it publishes is the same either way, which is why the two are separate rows.
     vitalsLane: true,
     bandContent: "timeline",
+    bandWindow: null,
     // The planes carry their own headers, so a floating label over a projected anchor would be
     // a second name for the same thing.
     callout: false,

@@ -61,8 +61,9 @@ import { snapsAtTick } from "@/src/data/anchorLog";
 import { UNLISTED_HUE } from "@/src/data/unlisted";
 import { PAYLOAD_LANES, parsePayload, payloadKinds, stateSchema, unifyFieldKinds } from "@/src/data/payloadKinds";
 import { identityHudCss } from "@/src/palette/identity";
-import { CopyButton, FootRow, IdentityDot, RoleChips, TickerChip } from "@/components/inspector/parts";
+import { CopyButton, Fact, FactGroup, FootRow, IdentityDot, Lead, RoleChips, TickerChip } from "@/components/inspector/parts";
 import { fmtDag, fmtKB, midHash } from "@/src/util/format";
+import { useBreakpoint } from "@/components/useBreakpoint";
 import { relativeAge } from "@/src/util/relativeAge";
 import JsonTree, { type JsonTreeCmd } from "@/components/datasection/JsonTree";
 import { LANE_ICONS } from "@/components/icons";
@@ -100,7 +101,7 @@ const stampUtc = (ts: string): string => {
   const d = new Date(ms);
   return (
     d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) +
-    " · " +
+    ", " + // a comma, not a mid-dot (user, 2026-10-03)
     d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone: "UTC" }) +
     " UTC"
   );
@@ -208,7 +209,11 @@ function SchemaRow({
   count: number;
   kinds: { kind: string; fields: string[] | null; count: number }[];
 }) {
-  const [open, setOpen] = useState(false);
+  // OPEN BY DEFAULT (user, 2026-10-03: "in the raw snapshot page, expand the schema sections by
+  // default"): the raw page IS the payload surface — a reader who came this far wants the fields,
+  // and a column of folded rows made them open each one. Still a disclosure, so a long schema can
+  // be folded back.
+  const [open, setOpen] = useState(true);
   // Only a row with fields BEHIND it discloses — a chevron onto nothing is a lie about the data.
   const openable = kinds.some((k) => k.fields != null || k.kind !== label);
   const row = (
@@ -475,6 +480,10 @@ function SignerGroup({
 export function ChannelStatePanel() {
   const coarse = usePointerCoarse(); // the invitation names the gesture — Tap on touch
   const sel = useStore((s) => s.metaSnap);
+  // The foot's hash budgets on PHONE: the line is `LABEL  hash  [copy]` in ~290px, so the budget is
+  // what the label leaves — the desktop 46 cut the tail off, and the tail identifies a hash.
+  const phone = useBreakpoint() === "phone";
+  const hashFor = (v: string, phoneChars: number): string => (phone ? midHash(v, phoneChars) : paneHash(v));
   const deep = useStore((s) => (sel ? s.metaSnapDeep[metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal)] : undefined));
   const following = useStore((s) => s.following);
   const selNodes = useStore((s) => s.selNodes);
@@ -595,37 +604,42 @@ export function ChannelStatePanel() {
         </p>
       ) : (
         <>
-          {/* The chain facts as LABELLED rows at the label size (user, 2026-08-14 — the first
-              redesign borrowed the card's composed lead lines, and "two rows of only values"
-              read as clutter here: the card's lead works because the card names things around
-              it; this pane stands alone in the raw layer, so its facts wear their labels. Four
-              quiet rows, not the old five body-size ones — the REFERENCES stay in the foot
-              strip below, and "· compressed" keeps naming the wire figure's basis against the
-              lanes' decoded sizes. */}
-          <div className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-0.5 flex-none text-label">
-            {/* ⚠️ WHEN, BEFORE WHAT IT COST (user, 2026-09-14: "add a date/time attribute to the
-                snapshot details section"). The anchor log to the left addresses this row by AGE —
-                a relative reading, right for a column repeated down 25 rows — and the pane it
-                opens then stated four facts about the snapshot without ever saying WHEN it
-                happened. The raw layer is the record-level rung of the observation ladder, so the
-                answer here is the ABSOLUTE stamp, to the second, not another relative one: it is
-                the only place in the app that can be quoted, and "2m ago" cannot.
-                UTC, and it says so — the explorer's own stamps are UTC and every other absolute
-                time in this app is printed that way, so a viewer's local midnight can never
-                silently re-date a snapshot. The relative age rides the title, which is the reading
-                the reader already has from the column they clicked. */}
-            <span className="text-muted-foreground">Timestamp</span>
-            <span className="text-right tabular-nums text-foreground-dim" title={`${relativeAge(Date.now() - Date.parse(sel.ts))} — the stamp this snapshot shares with the global snapshot it anchored into`}>
-              {stampUtc(sel.ts)}
-            </span>
-            <span className="text-muted-foreground">Fee</span>
-            <span className="text-right tabular-nums text-foreground"><b className="font-bold">{fmtDag(deep.fee)}</b> DAG</span>
-            <span className="text-muted-foreground">Anchored</span>
-            <span className="text-right tabular-nums text-foreground-dim">{fmtKB(deep.bytes / 1024)} · compressed</span>
-            <span className="text-muted-foreground">Height · sub</span>
-            <span className="text-right tabular-nums text-foreground-dim">{deep.height.toLocaleString()} · {deep.subHeight.toLocaleString()}</span>
-            <span className="text-muted-foreground">Blocks</span>
-            <span className="text-right tabular-nums text-foreground-dim">{deep.blocks.toLocaleString()}</span>
+          {/* THE HEAD IS THE CARD'S OWN GRAMMAR, ONE LEVEL DEEPER (user, 2026-10-03 — option A of
+              `docs/superpowers/design/2026-10-03-snapshot-pane-head`): a lead, three facts, the
+              counters on a plate. It was five labelled rows at one weight — Timestamp, Fee,
+              "Anchored" (which printed the SIZE), "Height · sub", Blocks — so the three things a
+              reader comes for sat level with two bookkeeping counters, and the one relation the
+              pane exists under, the global snapshot it anchored into, was never stated.
+
+              · the LEAD says that relation, with the age as its chip (a value that moves is a
+                chip, never a clause after a mid-dot);
+              · three FACTS, label left and value right: when, what it cost, how big;
+              · the COUNTERS sit on a plate in mono, where bookkeeping goes — read to compare,
+                not to learn. The references (hash, previous, state) stay in the foot below. */}
+          <Lead aside={relativeAge(Date.now() - Date.parse(sel.ts)) || undefined} className="flex-none">
+            Anchored into global snapshot <span className="font-mono tabular-nums text-foreground">{sel.globalOrdinal.toLocaleString()}</span>.
+          </Lead>
+          <FactGroup className="flex-none">
+            {/* ⚠️ THE ABSOLUTE STAMP, to the second, in UTC (user, 2026-09-14: "add a date/time
+                attribute to the snapshot details section"). The log to the left addresses this row
+                by AGE — right for a column repeated down 25 rows — and the raw layer is the
+                record-level rung, the one place in the app a time can be QUOTED from. UTC and it
+                says so: the explorer's own stamps are UTC, so a viewer's local midnight can never
+                silently re-date a snapshot. */}
+            <Fact label="Time" title="The stamp this snapshot shares with the global snapshot it anchored into">
+              <span className="tabular-nums text-foreground-dim">{stampUtc(sel.ts)}</span>
+            </Fact>
+            <Fact label="Fee paid"><span className="tabular-nums">{fmtDag(deep.fee)} DAG</span></Fact>
+            {/* "compressed" names the wire figure's basis against the lanes' decoded sizes. */}
+            <Fact label="Size"><span className="tabular-nums text-foreground-dim">{fmtKB(deep.bytes / 1024)} compressed</span></Fact>
+          </FactGroup>
+          <div className="flex-none flex flex-wrap gap-x-6 gap-y-1 rounded-sm bg-[var(--panel-plate)] px-2.5 py-1.5 font-mono text-label">
+            {([["Height", deep.height], ["Sub-height", deep.subHeight], ["Blocks", deep.blocks]] as const).map(([k, v]) => (
+              <span key={k} className="inline-flex items-baseline gap-2">
+                <span className="uppercase tracking-caps text-muted-foreground">{k}</span>
+                <span className="tabular-nums text-foreground-dim">{v.toLocaleString()}</span>
+              </span>
+            ))}
           </div>
 
           {/* THE IDLE LINE, the card's own remark in the same lead position (user, 2026-08-14):
@@ -798,9 +812,9 @@ export function ChannelStatePanel() {
             // own inset, so the values still share an edge — the tab box's, which is the pane's
             // visible frame on that tier.
             <div className="flex-none flex flex-col gap-1 rounded-md bg-[var(--panel-plate)] px-2.5 -mx-2.5 py-2 max-[700px]:mx-0">
-              {hash && <FootRow label="Hash" value={paneHash(hash)} title={hash} copy={hash} />}
+              {hash && <FootRow label="Hash" value={hashFor(hash, 24)} title={hash} copy={hash} />}
               {deep.lastSnapshotHash && (
-                <FootRow label="Previous hash" value={paneHash(deep.lastSnapshotHash)} title={deep.lastSnapshotHash} copy={deep.lastSnapshotHash} />
+                <FootRow label="Previous hash" value={hashFor(deep.lastSnapshotHash, 15)} title={deep.lastSnapshotHash} copy={deep.lastSnapshotHash} />
               )}
               {deep.stateProof && (
                 // "State HASH", not "state proof" (user, 2026-08-14 — the SIGNERS tab says
@@ -808,7 +822,7 @@ export function ChannelStatePanel() {
                 // word one screen apart and read as kin). It is a digest, the same species as
                 // its Hash/Parent siblings; the chain field stays calculatedStateProof (internal
                 // identifiers keep their names). The title carries the distinction.
-                <FootRow label="State hash" value={paneHash(deep.stateProof)} title={"The hash of the application state this snapshot results in, covered by the snapshot's L0 signatures — the state's provability. Distinct from the SIGNERS tab's 'snapshot proof', which is the L0 signature set; this is a digest, and the signatures sign over it." + deep.stateProof} copy={deep.stateProof} />
+                <FootRow label="State hash" value={hashFor(deep.stateProof, 18)} title={"The hash of the application state this snapshot results in, covered by the snapshot's L0 signatures — the state's provability. Distinct from the SIGNERS tab's 'snapshot proof', which is the L0 signature set; this is a digest, and the signatures sign over it." + deep.stateProof} copy={deep.stateProof} />
               )}
             </div>
           )}
