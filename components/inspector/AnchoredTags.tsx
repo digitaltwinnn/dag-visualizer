@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronRight } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
@@ -13,7 +12,7 @@ import { fmtDag, fmtKB } from "@/src/util/format";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { useMinHold } from "@/components/useMinHold";
 import { CONTENT_EASE } from "@/components/RollSwap";
-import { Lead, SectionLabel, UnitMarks, CUT_ROW, countable, figWidth } from "@/components/inspector/parts";
+import { FoldMark, Lead, SectionLabel, UnitMarks, CUT_ROW, countable, figWidth } from "@/components/inspector/parts";
 import { Separator } from "@/components/ui/separator";
 
 // The anchored block on the snapshot card: a ranked breakdown of the metagraph snapshots this
@@ -162,7 +161,11 @@ export default function AnchoredTags({
             <Collapsible key={r.id} open={isOpen} onOpenChange={() => toggle(r.id)}>
               <CollapsibleTrigger
                 className={cn(
-                  "group flex items-start gap-2 w-full text-left border-none cursor-pointer py-[3px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
+                  // ⚠️ `w-[calc(100%+12px)]`, NOT `w-full`: a fixed 100% width under `-mx-1.5` only shifts the
+                  // box left — its right edge stops 6px SHORT of the content edge, and with the 6px
+                  // padding the counts printed 12px left of the section's total (measured 2026-10-03).
+                  // The wash overhangs the content by 6px on BOTH sides; the columns sit on its edges.
+                  "group relative flex items-start gap-2 w-[calc(100%+12px)] text-left border-none cursor-pointer py-[3px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
                   isSel ? "bg-transparent" : "bg-transparent hover:bg-wash-hover",
                   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                 )}
@@ -188,20 +191,12 @@ export default function AnchoredTags({
                   <UnitMarks count={r.n} color={r.hue ?? "var(--core)"} units={units} frac={pct(r.n) / 100} />
                   <span className="font-mono tabular-nums text-right text-foreground">{r.n}</span>
                 </span>
-                {/* Expand affordance / open-state cue. Open rows show a down chevron. Closed rows:
-                    hidden on a mouse (revealed on row hover/focus — keeps the resting list clean),
-                    but ALWAYS shown on touch (`@media (hover:none)`), where there's no hover to
-                    surface it. Kept via opacity so the count column never shifts. Every row is
-                    tappable, including the unlisted roll-up. */}
-                <ChevronRight
-                  aria-hidden
-                  className={cn(
-                    "mt-[0.15em] size-3.5 flex-none transition-[transform,opacity] duration-150 motion-reduce:transition-none",
-                    isOpen
-                      ? "rotate-90 text-foreground opacity-100"
-                      : "text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-                  )}
-                />
+                {/* Expand affordance / open-state cue, in the card's GUTTER (`FoldMark`, 2026-10-03):
+                    in the flow it held 22px beside every count — hidden until hover, but still
+                    there — so the counts stood left of the section's own total. Quiet while
+                    closed on a mouse, always shown on touch. `bleed` is this row's own 6px
+                    hover-wash overhang. Every row is tappable, including the unlisted roll-up. */}
+                <FoldMark open={isOpen} quiet bleed={6} />
               </CollapsibleTrigger>
 
               <CollapsibleContent className="disclose-panel">

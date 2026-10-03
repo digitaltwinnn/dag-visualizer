@@ -246,7 +246,7 @@ export default function TrendInstantPane({
                           // `block w-full`: this is the one `.nb-row` whose content is a single
                           // flex row rather than its own flex children, so it has to claim the
                           // width the row grammar assumes (label left, value right, one line).
-                          "nb-row block w-full -mx-1 px-1 py-[3px] rounded-sm cursor-pointer text-left bg-transparent border-0",
+                          "nb-row block w-[calc(100%+8px)] -mx-1 px-1 py-[3px] rounded-sm cursor-pointer text-left bg-transparent border-0",
                           "hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
                           on && SELECTED_ROW,
                           pair.paired && pair.className,

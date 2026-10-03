@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, type CSSProperties, useRef, useState, type ReactNode } from "react";
-import { Check, Copy, X } from "lucide-react";
+import { Check, ChevronRight, Copy, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { IDENT_INK } from "@/components/identInk";
 import { BAR_EASE } from "@/components/RollSwap";
@@ -103,6 +103,36 @@ export function SectionLabel({ label, total, unit, className }: { label: ReactNo
         </span>
       )}
     </div>
+  );
+}
+
+/** THE FOLD MARK HANGS IN THE GUTTER — it never takes a column (user, 2026-10-03: "numbers should
+ *  be on the right side and aligned … need a structural solution for the > space being taken
+ *  sometimes"). A disclosure chevron placed in the row's flow sat between the figure and the card's
+ *  edge, so a row WITH one printed its number a chevron's width left of every row without: the
+ *  dossier's "17 ›" stood off the 3 / 14 / 17 column beneath it, and the global snapshot's rows
+ *  (whose mark is hidden until hover, but still holds its place) stood off their own total.
+ *
+ *  So the mark is out of the flow entirely: absolutely placed in the card's right PADDING, past the
+ *  content edge every figure is right-aligned to. The host row is `relative`; `bleed` is how far
+ *  the host itself already reaches past the content edge (a row with a `-mx-1.5` hover wash passes
+ *  6), so the mark lands at the same x on every row of every card. Still the row's far end, still
+ *  the one disclosure glyph, turning down when open. `quiet` hides a CLOSED mark until the row is
+ *  hovered or focused (the host carries `group`); touch has no hover, so it always shows there. */
+const FOLD_SIZE = 12;
+/** The mark's left edge sits this far past the content edge — centred in the cards' 18px padding. */
+const FOLD_GUTTER = 3;
+export function FoldMark({ open, quiet, bleed = 0 }: { open: boolean; quiet?: boolean; bleed?: number }) {
+  return (
+    <ChevronRight
+      aria-hidden
+      style={{ right: -(FOLD_GUTTER + FOLD_SIZE - bleed), width: FOLD_SIZE, height: FOLD_SIZE }}
+      className={cn(
+        "absolute top-1/2 -translate-y-1/2 flex-none transition-[rotate,opacity] duration-150 motion-reduce:transition-none",
+        open ? "rotate-90 text-foreground" : "text-muted-foreground",
+        quiet && !open && "opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
+      )}
+    />
   );
 }
 

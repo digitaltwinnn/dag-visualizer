@@ -1040,7 +1040,13 @@ Moment's readings, a provider's and a country's nodes by network; the compositio
 fact card — its strip and status row were built and removed the same day). Rows that are their own controls wear `CUT_ROW` themselves and
 draw `UnitMarks`, so every card shares the columns. It replaced the stacked bars with a wrapping dot
 legend, the dot · name · track · count rows and the inline network dots — three recipes. A zero part
-is a muted row with no mark. The node card is a record and carries one mark only: the archive REACH
+is a muted row with no mark. **A FOLD MARK HANGS IN THE GUTTER** (`FoldMark`, user 2026-10-03:
+"numbers should be on the right side and aligned … a structural solution for the > space being
+taken sometimes"): a disclosure chevron is absolutely placed in the card's right padding, past the
+content edge, so it never takes column space and a row with one prints its figure on the same right
+edge as a row without — the dossier's total over its cuts, the global snapshot's rows under their
+total. ⚠️ A row with a `-mx-N` hover wash must be `w-[calc(100%+2N)]`, never `w-full`: at 100% the
+negative margin only shifts the box, and its figures stop 2N short of the edge. The node card is a record and carries one mark only: the archive REACH
 bar, the share of its chain's ordinals it still serves (`archiveReach`, `components/useArchive.ts`).
 
 **Every right-rail card is the same SIX SLOTS in one order** (user, 2026-10-02 — the design and its
