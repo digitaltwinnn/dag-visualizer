@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Snapshot callouts — design options</title>
+<style>
+:root{--bg:oklch(0.09 0.02 265);--fg:oklch(0.94 0.02 255);--dim:#c7d0ea;--muted:oklch(0.66 0.04 265);--primary:oklch(0.88 0.13 195);
+--border:rgba(90,140,255,.22);--glass:rgba(8,12,26,.92);--ground:rgba(3,5,12,.9);--dor:oklch(0.74 0.19 41);
+--sel-bg:color-mix(in oklch,var(--primary) 12%,transparent);--sel-border:color-mix(in oklch,var(--primary) 52%,transparent);
+--label:12.2px;--body:14.3px}
+*{box-sizing:border-box}html{color-scheme:dark}
+body{margin:0;background:radial-gradient(1200px 600px at 60% 0%,#0b1230 0%,var(--bg) 60%);color:var(--fg);font:var(--body)/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:32px 40px 96px}
+h1{font-size:24px;font-weight:600;margin:0 0 6px}
+h2{font-size:18px;font-weight:600;margin:52px 0 4px;display:flex;gap:10px;align-items:baseline}
+h2 b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;font-size:var(--label)}
+p.lede{color:var(--dim);max-width:90ch;margin:0 0 6px}.note{color:var(--muted);font-size:13px;max-width:96ch;margin:4px 0 14px}
+ol.find{color:var(--dim);max-width:96ch;margin:10px 0 0;padding-left:22px}ol.find li{margin:5px 0}ol.find b{color:var(--fg);font-weight:600}
+.rec{border:1px solid var(--sel-border);background:var(--sel-bg);border-radius:8px;padding:10px 14px;font-size:13px;margin-top:40px;max-width:96ch}
+.rec b{color:var(--primary);letter-spacing:.13em;text-transform:uppercase;margin-right:8px;font-size:var(--label)}
+/* the stage: the real Snapshots frame at 1600x900, cropped to the canvas between the rails, 1:1 */
+.stage{width:990px;height:720px;position:relative;overflow:hidden;border:1px solid var(--border);border-radius:10px;
+ background:#000 url(scene.jpeg) -280px -75px / 1600px 900px no-repeat}
+.stage svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.ld{stroke:var(--primary);stroke-opacity:.55;stroke-width:1.5;stroke-dasharray:4 4;fill:none}
+.ld.on{stroke-opacity:.8}.case{stroke:rgba(3,5,12,.62);stroke-width:3.5;fill:none;stroke-linecap:round}
+.ring{position:absolute;width:9px;height:9px;border-radius:50%;border:1.5px solid var(--dor);transform:translate(-50%,-50%)}
+.ring.halo{box-shadow:0 0 0 1.5px rgba(3,5,12,.8),inset 0 0 0 1px rgba(3,5,12,.8);width:11px;height:11px;background:transparent}
+/* the callout panel, as built (SCENE_GLASS) */
+.co{position:absolute;white-space:nowrap;background:var(--glass);border:1px solid var(--border);border-radius:7px;padding:8px 12px;backdrop-filter:blur(8px)}
+.co::before{content:"";position:absolute;left:-1px;top:8px;bottom:8px;width:2px;background:linear-gradient(transparent,var(--primary) 30%,var(--primary) 70%,transparent);opacity:.8}
+.eb{font-size:var(--label);font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--primary);line-height:1.3}
+.tr{display:flex;align-items:center;gap:10px;margin-top:4px}
+.tt{font-size:var(--body);font-weight:600;font-variant-numeric:tabular-nums}
+.tk{font-size:var(--label);font-weight:600;color:var(--dor);border:1px solid var(--border);border-radius:4px;padding:2px 6px;line-height:1.2;background:rgba(90,140,255,.06)}
+.mu{font-size:var(--label);color:var(--muted)}
+.chip{font-size:var(--label);color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:2px 6px;line-height:1.2;background:rgba(90,140,255,.06)}
+.hr{border-top:1px solid var(--border);margin:8px 0 7px}
+.ln{display:flex;gap:8px;align-items:baseline;font-size:var(--label)}.ln b{color:var(--dor);font-weight:700}
+/* the tag: one line, the same glass */
+.tag{position:absolute;white-space:nowrap;display:flex;align-items:center;gap:9px;height:28px;padding:0 10px;background:var(--glass);border:1px solid var(--border);border-radius:6px;backdrop-filter:blur(8px)}
+.tag .sep{width:1px;height:14px;background:var(--border)}
+.tag b{font-size:var(--label);color:var(--dor);font-weight:700}
+.cap{position:absolute;left:12px;top:10px;font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);background:rgba(3,5,12,.6);padding:3px 7px;border-radius:4px}
+.mark{position:absolute;width:20px;height:20px;border-radius:50%;background:oklch(0.80 0.16 85);color:#111;font:700 12px/20px system-ui;text-align:center}
+.zoom{display:flex;gap:28px;flex-wrap:wrap;margin-top:6px}
+.z{width:300px;height:150px;position:relative;overflow:hidden;border:1px solid var(--border);border-radius:10px;background:#000 url(scene.jpeg) no-repeat}
+.z .t{position:absolute;left:8px;bottom:6px;font-size:11px;color:var(--dim);background:rgba(3,5,12,.7);padding:2px 6px;border-radius:4px}
+</style></head><body>
+
+<h1>Snapshots — the two callouts</h1>
+<p class="lede">Since today the scene carries two labels when a metagraph snapshot is committed: one on its tile, one on the global snapshot's bar. I checked them at desktop, at tablet width, on dark and on light. They work, and they stay put when another card is opened. Five things are worth changing.</p>
+<ol class="find">
+ <li><b>The global snapshot's label lands on the chamber.</b> Its panel stands up and to the right of its ring, which is the middle of the structure, so it covers the ribbons and the other networks' lanes — the part of the scene the label is about.</li>
+ <li><b>Its dashed line runs through the brightest part of the scene.</b> Over the lit bars the line disappears on dark, and on light it competes with the ribbon.</li>
+ <li><b>Both rings vanish into their own subject.</b> A ring takes the network's colour and sits on a block of that same colour.</li>
+ <li><b>The global label repeats the card beside it.</b> "pinned" and the age are already in the Global snapshot card's head. The line that only the scene needs is the last one, "DOR 13 of 16 anchors", because it says what the ring is pointing at.</li>
+ <li><b>Nothing ties the pair together in reading order.</b> The chamber reads top to bottom (planes above, global floor below); the labels sit side by side at unrelated heights.</li>
+</ol>
+<p class="note">Every drawing below is the real Snapshots frame (1600 × 900, dark, filter All, Dor snapshot 28,673,647 in global snapshot 6,994,941), cropped to the canvas between the rails and shown at true size, so positions and sizes are what you would get. Nothing here is built.</p>
+
+<h2><b>Now</b> as built this afternoon</h2>
+<div class="stage">
+ <span class="cap">Now</span>
+ <svg><line class="ld" x1="286" y1="225" x2="380" y2="94"/><line class="ld" x1="499" y1="493" x2="593" y2="361"/></svg>
+ <span class="ring" style="left:280px;top:231px"></span><span class="ring" style="left:492px;top:499px"></span>
+ <div class="co" style="left:380px;top:35px"><div class="eb">Metagraph snapshot</div><div class="tr"><span class="tt">28,673,647</span><span class="tk">DOR</span></div></div>
+ <div class="co" style="left:592px;top:273px"><div class="eb">Global snapshot</div><div class="tr"><span class="tt">6,994,941</span><span class="mu">pinned</span><span class="chip">5m ago</span></div><div class="hr"></div><div class="ln"><b>DOR</b><span class="mu">13 of 16 anchors</span></div></div>
+ <span class="mark" style="left:800px;top:262px">1</span><span class="mark" style="left:552px;top:408px">2</span><span class="mark" style="left:502px;top:508px">3</span>
+</div>
+
+<h2><b>Both</b> two repairs that go with every option</h2>
+<p class="note">Drawn at three times size, on the global snapshot's bar. Left is today. Right: the ring gets a thin dark casing so it reads on a block of its own colour, and the dashed line gets the same casing so it survives crossing lit geometry. Both are the ground's colour, so on light they become a pale casing.</p>
+<div class="zoom">
+ <div class="z" style="background-size:4800px 2700px;background-position:-2167px -1647px"><svg style="position:absolute;inset:0;width:100%;height:100%"><line class="ld" x1="168" y1="57" x2="300" y2="-128" style="stroke-width:4.5;stroke-dasharray:12 12"/></svg><span class="ring" style="left:150px;top:75px;width:27px;height:27px;border-width:4.5px"></span><span class="t">today</span></div>
+ <div class="z" style="background-size:4800px 2700px;background-position:-2167px -1647px"><svg style="position:absolute;inset:0;width:100%;height:100%"><line class="case" x1="168" y1="57" x2="300" y2="-128" style="stroke-width:10.5"/><line class="ld on" x1="168" y1="57" x2="300" y2="-128" style="stroke-width:4.5;stroke-dasharray:12 12"/></svg><span class="ring" style="left:150px;top:75px;width:33px;height:33px;border-width:4.5px;box-shadow:0 0 0 4.5px rgba(3,5,12,.8),inset 0 0 0 3px rgba(3,5,12,.8)"></span><span class="t">with a casing</span></div>
+</div>
+
+<h2><b>A</b> the global label hangs below the floor</h2>
+<p class="note">Same label, same words, moved: it drops under the floor's front edge on a short line, into the empty strip above the bottom band. The chamber is clear, and the pair now reads the way the chamber is built — the metagraph snapshot above, the global snapshot it fell into below. Where the window is too short for that strip, the label falls back to where it stands today.</p>
+<div class="stage">
+ <span class="cap">A</span>
+ <svg><line class="ld" x1="286" y1="225" x2="380" y2="94"/><line class="case" x1="489" y1="506" x2="472" y2="589"/><line class="ld on" x1="489" y1="506" x2="472" y2="589"/></svg>
+ <span class="ring halo" style="left:280px;top:231px"></span><span class="ring halo" style="left:492px;top:499px"></span>
+ <div class="co" style="left:380px;top:35px"><div class="eb">Metagraph snapshot</div><div class="tr"><span class="tt">28,673,647</span><span class="tk">DOR</span></div></div>
+ <div class="co" style="left:268px;top:589px"><div class="eb">Global snapshot</div><div class="tr"><span class="tt">6,994,941</span><span class="mu">pinned</span><span class="chip">5m ago</span></div><div class="hr"></div><div class="ln"><b>DOR</b><span class="mu">13 of 16 anchors</span></div></div>
+</div>
+
+<h2><b>B</b> the global label becomes one line</h2>
+<p class="note">Below the floor as in A, but cut to what the scene alone has to say: which global snapshot this bar is, and how much of it is Dor's. The state and the age stay in the card's head, where they already are. While nothing is committed and the global snapshot is the only label, it keeps its full form with "live" and the age — that is the scene's one mirror of the follow state.</p>
+<div class="stage">
+ <span class="cap">B</span>
+ <svg><line class="ld" x1="286" y1="225" x2="380" y2="94"/><line class="case" x1="492" y1="507" x2="492" y2="590"/><line class="ld on" x1="492" y1="507" x2="492" y2="590"/></svg>
+ <span class="ring halo" style="left:280px;top:231px"></span><span class="ring halo" style="left:492px;top:499px"></span>
+ <div class="co" style="left:380px;top:35px"><div class="eb">Metagraph snapshot</div><div class="tr"><span class="tt">28,673,647</span><span class="tk">DOR</span></div></div>
+ <div class="tag" style="left:372px;top:590px"><span class="mu" style="letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--primary)">Global</span><span class="tt">6,994,941</span><span class="sep"></span><b>DOR</b><span class="mu">13 of 16 anchors</span></div>
+</div>
+
+<h2><b>C</b> both labels become one line, each beside its subject</h2>
+<p class="note">The least ink. The metagraph snapshot's label sits just left of its tile, the global snapshot's under its bar; neither has an eyebrow, because the two cards on the right name them and the positions say which is which. The long diagonal line to the top label goes away. This is a second kind of label next to the panels the other views use.</p>
+<div class="stage">
+ <span class="cap">C</span>
+ <svg><line class="case" x1="273" y1="231" x2="258" y2="231"/><line class="ld on" x1="273" y1="231" x2="258" y2="231"/><line class="case" x1="492" y1="507" x2="492" y2="590"/><line class="ld on" x1="492" y1="507" x2="492" y2="590"/></svg>
+ <span class="ring halo" style="left:280px;top:231px"></span><span class="ring halo" style="left:492px;top:499px"></span>
+ <div class="tag" style="right:733px;top:217px"><span class="tt">28,673,647</span><span class="tk" style="border:0;background:none;padding:0">DOR</span></div>
+ <div class="tag" style="left:392px;top:590px"><span class="tt">6,994,941</span><span class="sep"></span><b>DOR</b><span class="mu">13 of 16 anchors</span></div>
+</div>
+
+<div class="rec"><b>Recommended</b>A, with both repairs. It fixes the three things you can see (the covered chamber, the lost line, the lost rings) and gives the pair a reading order, without adding a second kind of label or deciding what to cut. B is the next step if the label still feels heavy once it is out of the way. C reads cleanest in this frame but changes what a callout is in one view only.</div>
+
+</body></html>
