@@ -181,6 +181,10 @@ export default function useTrendRoster(
       return r;
     };
     for (const id of ids) rows.set(id, rowOf(id));
+    const ranked = rankByLast(ids, (id) => {
+      const r = rows.get(id)!;
+      return [r.head ?? r.day ?? r.last];
+    });
     // The pinned row's NODES are the DAG's own (`f.nodes.dag`), not the fleet the global series
     // carries: beside rows that each state their own nodes, the fleet read as one more "all
     // nodes". Every other measure is the global series as it stands.
@@ -195,20 +199,22 @@ export default function useTrendRoster(
       r.head = headKind === "span" ? r.span : r.day;
       return r;
     };
+    // Under "all" the DAG's row joins the MAP — the stack draws its plane from it — but never
+    // the RANK: `order` stays the networks, so the explorer's list, the Moment card and the
+    // shared ceiling keep reading the layers alone.
+    const total = filter === "all" ? totalRow() : null;
+    if (total) rows.set("dag", total);
     return {
       rows,
       // THE WHOLE NETWORK AS A ROW (2026-10-03 — the explorer's pinned DAG row under "all"): the
       // DAG plane's own reading, by the same pass and the same head rule, so the pinned figure
       // and the plane the row opens can never quote two numbers. Only under "all": a committed
       // network's list is that network, and under the DAG filter the DAG already is the row.
-      total: filter === "all" ? totalRow() : null,
+      total,
       // Busiest OVER THE SPAN the list states (design A) — the window on screen, so a new range
       // re-ranks the list and the stack together. The day, then the last reading, only where the
       // span has nothing measured, so a quiet network still sorts by what it last said.
-      order: rankByLast(ids, (id) => {
-        const r = rows.get(id)!;
-        return [r.head ?? r.day ?? r.last];
-      }),
+      order: ranked,
       buckets: cut(rawAxis),
       global: cut(globalSeries(metric, series)),
     };

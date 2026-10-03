@@ -164,7 +164,17 @@ export default function TrendStack() {
   // THE ORDER ON SCREEN — the ranking once settled, the HELD order while a measure change is in
   // flight, so the plots land before the cards move. Poses, the hover backstop and the engine's
   // `trendIds` all read THIS, never `ranked`: the projector and React must agree on the order.
-  const order = useHeldOrder(ranked, staged.settled);
+  // THE DAG'S PLANE JOINS THE DECK WHILE IT IS THE FOCUS (user, 2026-10-03: "why is the dag
+  // pinned row not clickable? we have the chart data, no?"). It is the plane the DAG filter has
+  // always drawn; under "all" the explorer's pinned row brings it to the FRONT of the stack
+  // with the busiest networks behind it, and releasing it takes it away again — the resting
+  // stack stays the networks, and the filter is never touched. Parked at the back of the deck
+  // instead (the first cut) it paged the stack to its tail: the focus re-deal holds the focused
+  // plane in the window, so the empty networks stood behind the DAG and stayed there after.
+  // Outside the rank on purpose: it is what the layers add up to, so it stays off the shared
+  // ceiling and out of the networks' order.
+  const deck = useMemo(() => (roster.total && focus === "dag" ? ["dag", ...ranked] : ranked), [ranked, roster.total, focus]);
+  const order = useHeldOrder(deck, staged.settled);
   // What a card says it shows.
   const caption = metricCaption(shown, step);
   // THE SCOPE WITH NOTHING TO DRAW (2026-09-19): a `dag` or unlisted commit
@@ -523,7 +533,9 @@ export default function TrendStack() {
                 sampled={row.series.sampled}
                 gaps={row.series.gaps}
                 lines={linesById.get(pose.id)!}
-                scaleMax={sharedMax}
+                // The DAG's plane keeps its own scale: on the networks' shared ceiling the sum of
+                // them all would run off the top, and with it IN the ceiling they would all go flat.
+                scaleMax={pose.id === "dag" ? undefined : sharedMax}
                 cursorMs={cursorMs}
                 onPick={(ms) => {
                   if (!rangedThisPress.current) setTrendCursor(ms);

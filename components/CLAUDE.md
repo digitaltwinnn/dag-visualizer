@@ -258,9 +258,13 @@ decisions inside them are design, not detail:
   every row beneath it. Four rounds of wording got here ("total"/"base ledger", "sum of rows
   below"/"DAG's own", "sum"/"all"/"only" — user: "make it consistent where possible, it's too
   random"): three tags for three shades of meaning was the randomness. Never ranked among the
-  networks: it would always be first with a full bar. **It is a reading, not a control** — no click, and above all it never sets the
-  page filter (user, same day). The STACK under "all" is unchanged — no DAG plane in front of
-  the layers it sums.
+  networks: it would always be first with a full bar. **A click brings the DAG's chart forward and never sets the page filter** (user, same
+  day, two rounds: "don't set the page filter", then "why is the dag pinned row not clickable?
+  we have the chart data, no?"). The DAG's plane — the one the DAG filter always drew — joins the
+  deck at the FRONT while it is the focus (`TrendStack`'s `deck`) and leaves when released, so
+  the resting stack is unchanged and the row runs the same plane focus every other row does.
+  (Parked at the back of the deck it paged the stack to its tail on focus.) It stays out of the
+  RANK and off the shared ceiling: it is what the layers add up to.
   ⚠️ **The roster is computed ONCE, in `components/useTrendRoster.ts`** — the planes, this list and
   the cursor card all read it, counter EDGE TRIM included. A surface reading the payload directly
   is one bucket out of step with the axis, which is exactly how the cursor card briefly quoted

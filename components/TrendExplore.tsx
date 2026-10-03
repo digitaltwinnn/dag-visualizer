@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import Explorer, { type ExplorerLevelSpec } from "@/components/explorer/Explorer";
 import { IdentityDot, QualifierChip } from "@/components/inspector/parts";
 import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
@@ -101,7 +102,8 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   // The unmount backstop for the pairing — a row that leaves the roster under a stationary pointer
   // (a filter commit, a re-rank) never fires its own leave. Every write goes through the RETURNED
   // setter, so the hook releases only hovers this card set.
-  const setHover = useHoverRelease(hoverFilter, ranked, setHoverFilter);
+  const hoverIds = useMemo(() => (roster.total ? [...ranked, "dag"] : ranked), [ranked, roster.total]);
+  const setHover = useHoverRelease(hoverFilter, hoverIds, setHoverFilter);
 
   // The bar: each network's last reading as a share of the busiest — the ranking the stack's depth
   // already carries, made visible in the list.
@@ -134,9 +136,14 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
           figure:
             slice.stale ? <NodeStars count={3} /> : total.head != null ? format(total.head) : roster.pending || (roster.headKind === "day" && roster.dayPending) ? <NodeStars count={3} /> : <span className="text-muted-foreground" title={NO_READING}>—</span>,
           title: `DAG. ${totalWhy}. ${total.head != null ? `${format(total.head)}${unit ? ` ${unit}` : ""}, ${headWord(metric, roster.headKind)}` : NO_READING}`,
-          // NO CLICK (user, 2026-10-03: "don't set the page filter"). The row is a reading to
-          // hold the list against, not a way in: the first cut committed the DAG filter, which
-          // re-scoped the whole app from a row that only meant to state a number.
+          // THE ROW BRINGS THE DAG'S CHART FORWARD, like every row below it (user, 2026-10-03:
+          // "why is the dag pinned row not clickable? we have the chart data, no?"). Its plane
+          // joins the front of the deck while it is the focus (`TrendStack`), so this is the same
+          // plane focus the other rows run. It NEVER sets the page filter (same day: "don't set the page filter") —
+          // the first cut did, and re-scoped the whole app from a row that states one number.
+          on: focus === "dag",
+          onClick: () => applyClickActions(trendPlaneActions("dag", focus)),
+          pair: subjectPairing(hoverFilter, "dag", setHover, total.hue),
         }
       : undefined;
 
@@ -204,7 +211,9 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
       // As short as the other explorers' hints (user, 2026-09-28: "way too verbose").
       // The hint NAMES THE SPAN the figures are over (design A) — the one place the list says
       // which time it is about.
-      hint={empty ? null : <>{over} <span className="block">Pick one to bring it forward.</span></>}
+      // The span alone (user, 2026-10-03: remove "Pick one to bring it forward."): rows that
+      // highlight under the pointer already say they can be picked.
+      hint={empty ? null : over}
       levels={[level]}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => setHover(null)}
