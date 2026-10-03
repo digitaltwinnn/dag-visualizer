@@ -3,7 +3,7 @@ import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
 import type { CohortSel } from "./domain/focusLadder";
 import type { Mode } from "@/src/store/store";
 import { breakpointOf } from "@/src/data/breakpoint";
-import { calloutPlacement, CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET } from "./domain/calloutPlacement";
+import { calloutHangs, calloutPlacement, CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET } from "./domain/calloutPlacement";
 import { R as GEO_R, LAND_H, latLonToVec3 } from "./domain/geoLayout";
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
@@ -155,7 +155,7 @@ export class CalloutSync {
     }
     if (el2) {
       const v = this._calloutV2;
-      const on = allowed && this.h.mode === "ledger" && this._ledgerGlobalAnchor(v) && this._placeCallout(el2, v);
+      const on = allowed && this.h.mode === "ledger" && this._ledgerGlobalAnchor(v) && this._placeCallout(el2, v, true);
       const flag = on ? "1" : "0";
       if (el2.dataset.on !== flag) el2.dataset.on = flag;
     }
@@ -171,7 +171,7 @@ export class CalloutSync {
 
   /** Project a WORLD anchor to the screen and write one callout's transform and flips. False
    *  when the point is behind the camera or the panel has no room on either side. */
-  private _placeCallout(el: HTMLElement, v: THREE.Vector3): boolean {
+  private _placeCallout(el: HTMLElement, v: THREE.Vector3, hangs = false): boolean {
     v.applyMatrix4(this.h.ctx.camera.matrixWorldInverse); // world → view (camera looks −z)
     if (v.z > -0.1) return false; // behind (or grazing) the camera plane
     v.applyMatrix4(this.h.ctx.camera.projectionMatrix); // view → NDC (w-divide included)
@@ -186,23 +186,54 @@ export class CalloutSync {
     // the callout does not have: at 900px with both sheets open a geo node's panel rendered
     // as a ~25px fragment in the strip between them. `sceneCoverL`/`sceneCoverR` are what the
     // open sheets measured off themselves (0 on desktop and phone, so this is a no-op there).
-    const p = calloutPlacement(x, y, r.left + this.st.sceneCoverL, r.right - this.st.sceneCoverR, r.top);
-    if (!p.show) return false;
+    const bandL = r.left + this.st.sceneCoverL;
+    const bandR = r.right - this.st.sceneCoverR;
+    // THE GLOBAL SNAPSHOT'S LABEL HANGS (`calloutHangs`, with its test): below-left of the bar,
+    // on the standing label's own diagonal turned half a circle, where the strip under the floor
+    // has room for it. Where it has not, the label stands as every callout does.
+    const hang = hangs && calloutHangs(x, y, bandL, bandR, this._freeBottom());
+    let flip = true;
+    let drop = true;
+    if (!hang) {
+      const p = calloutPlacement(x, y, bandL, bandR, r.top);
+      if (!p.show) return false;
+      flip = p.flip;
+      drop = p.drop;
+    }
     el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
-    if ((el.dataset.flip != null) !== p.flip) {
-      if (p.flip) el.dataset.flip = "";
+    if ((el.dataset.flip != null) !== flip) {
+      if (flip) el.dataset.flip = "";
       else delete el.dataset.flip;
     }
-    if ((el.dataset.drop != null) !== p.drop) {
-      if (p.drop) el.dataset.drop = "";
+    if ((el.dataset.drop != null) !== drop) {
+      if (drop) el.dataset.drop = "";
       else delete el.dataset.drop;
+    }
+    if ((el.dataset.hang != null) !== hang) {
+      if (hang) el.dataset.hang = "";
+      else delete el.dataset.hang;
     }
     this._placedX = x;
     this._placedY = y;
     this._placedRect = r;
-    this._placedFlip = p.flip;
-    this._placedDrop = p.drop;
+    this._placedFlip = flip;
+    this._placedDrop = drop;
     return true;
+  }
+
+  // Where the free canvas ends: the bottom band's top edge, less a little air, or the viewport's
+  // where no band is up (SCENE presentation, a view without one). The band is React's, so this
+  // is a DOM read — taken every thirtieth call rather than every frame, since the band moves
+  // only on a resize or a presentation change and a half-second-late answer costs nothing.
+  private _bottom = 0;
+  private _bottomIn = 0;
+  private _freeBottom(): number {
+    if (this._bottomIn-- <= 0) {
+      this._bottomIn = 30;
+      const band = document.getElementById("vitalsband");
+      this._bottom = (band ? band.getBoundingClientRect().top : window.innerHeight) - 10;
+    }
+    return this._bottom;
   }
 
   // THE MULTI-LEADER (user, 2026-08-30): a machine is SEVERAL beads in hyper — one per layer it

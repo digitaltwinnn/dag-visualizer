@@ -460,7 +460,10 @@ function CalloutMark({ m, id, multi }: { m: Model; id: "callout" | "callout-2"; 
       {/* Anchor ring at the projected point (the wrapper's origin) — the subject mark at the
           scene end of the tie. `.co-tip` lands it when the drawing leader arrives. */}
       <span
-        className="co-tip absolute -translate-x-1/2 -translate-y-1/2 w-[9px] h-[9px] rounded-full border-[1.5px]"
+        // A CASING IN THE GROUND'S COLOUR (2026-10-03): the ring wears its subject's hue and
+        // lands on a block of that same hue — the Dor ring on Dor's lit bar read as nothing.
+        // A thin ground-coloured line outside and inside it is what a map puts round a symbol.
+        className="co-tip absolute -translate-x-1/2 -translate-y-1/2 w-[9px] h-[9px] rounded-full border-[1.5px] [box-shadow:0_0_0_1.5px_color-mix(in_oklch,var(--background)_78%,transparent),inset_0_0_0_1px_color-mix(in_oklch,var(--background)_78%,transparent)]"
         style={{ borderColor: m.ring }}
       />
       {/* Dashed leader from the anchor to the panel's near corner — the ordinal-label language,
@@ -482,9 +485,23 @@ function CalloutMark({ m, id, multi }: { m: Model; id: "callout" | "callout-2"; 
             y2={-6}
             pathLength={1}
             stroke="white"
-            strokeWidth="3"
+            strokeWidth="8"
           />
         </mask>
+        {/* The leader's CASING, under the dashes and drawn by the same mask: over lit geometry
+            (a bar, a ribbon) the dashed line alone disappeared on dark and fought the ribbon on
+            paper. Ground colour, so it is a dark line here and a pale one there. */}
+        <line
+          mask={`url(#${maskId})`}
+          x1={6}
+          y1={-6}
+          x2={CALLOUT_OFF_X}
+          y2={-(CALLOUT_OFF_Y - CALLOUT_LEG_INSET)}
+          stroke="var(--background)"
+          strokeOpacity="0.6"
+          strokeWidth="3.5"
+          strokeLinecap="round"
+        />
         <line
           mask={`url(#${maskId})`}
           x1={6}

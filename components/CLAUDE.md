@@ -1484,6 +1484,14 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
   Handing the subject's anchor to the boxed card was the first cut and it re-drew both labels on
   every re-box, over two subjects that had not changed. The box still rules the two older cases:
   a boxed node's label stands alone, and a boxed Metagraph card shows none.
+  **The global one HANGS** (design A of `docs/superpowers/design/2026-10-03-snapshot-callouts`,
+  user: "ok A, but make the angle of the lines the same"): below-left of its bar, into the strip
+  between the floor and the bottom band, on the standing label's own diagonal turned half a
+  circle — `--co-k` shortens both axes by one factor, so the two leaders are parallel. Standing
+  up-right from the floor put its panel over the ribbons. `calloutHangs` (domain, tested) says
+  whether the strip has room; where it has not, the label stands as it always did.
+- **Ring and leader wear a ground-coloured casing** (same day): a ring in its subject's hue lands
+  on a block of that hue, and the dashed line crosses lit geometry — both read as nothing there.
 - **A hyper NODE's callout points at EVERY layer bead** (the multi-leader, 2026-08-30): a machine
   is one record per layer on separate shells, so up to two extra dashed legs fan **from the
   panel's own corner** (the beads are peers — user's second-round correction of a bead-to-bead
