@@ -244,7 +244,11 @@ export default function CardHead({
       <>
         <div
           className={cn(
-            "flex flex-col gap-[3px] py-[var(--panel-pad-y)] px-[var(--panel-pad-x)]",
+            // 6px between the eyebrow row and the title row (was 3 until 2026-10-03): the minimize
+            // mark and the title row's aside control are both 24px boxes hanging off shorter rows,
+            // and at 3px they overlapped by 3 — their two hover washes ran into each other (user:
+            // "the explorer control overlaps a bit with the minimize button").
+            "flex flex-col gap-1.5 py-[var(--panel-pad-y)] px-[var(--panel-pad-x)]",
             toggleable && "relative group",
           )}
         >
@@ -274,7 +278,10 @@ export default function CardHead({
                 {toggleable && (
                   <span
                     aria-hidden
-                    className="inline-flex items-center justify-center size-6 -my-[3px] leading-none rounded-md text-muted-foreground group-hover:text-foreground group-hover:bg-wash-hover"
+                    // The mark lights with the HEAD, which is the toggle — but not while the pointer is
+                    // on the aside's own control: a press there does not collapse the card, so the
+                    // minimize mark must not answer it.
+                    className="inline-flex items-center justify-center size-6 -my-[3px] leading-none rounded-md text-muted-foreground group-hover:text-foreground group-hover:bg-wash-hover group-has-[[data-head-aside]_:hover]:!text-muted-foreground group-has-[[data-head-aside]_:hover]:!bg-transparent"
                   >
                     {collapsed ? <Plus className="size-3.5" /> : <Minus className="size-3.5" />}
                   </span>
@@ -303,7 +310,7 @@ export default function CardHead({
               )}
             </h2>
             {aside != null && (
-              <span className="relative z-[1] flex-none flex items-center pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
+              <span data-head-aside="" className="relative z-[1] flex-none flex items-center pointer-events-none [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
                 {aside}
               </span>
             )}

@@ -303,10 +303,10 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // THE SPAN THE EXPLORER HOLDS — stated on EVERY level (user, 2026-09-29: "even if there is no
   // pager you should still indicate the size of the cache, e.g. 'last 11 min'"). The deeper levels
   // have nothing to page, so they carry the same footer with the span alone.
-  const spanScope = {
-    word: spanWords(orderedSnaps),
-    title: `The explorer keeps the latest ${POLL.maxSnapshots} global snapshots, the stretch it follows live. For anything older, open the raw data layer and search the whole chain.`,
-  };
+  // The span ALONE (user, 2026-10-03: "remove the explanatory text section"): the word was a
+  // button opening a sentence about how many snapshots the explorer keeps — the cache again, which
+  // is ours to know and not the reader's (his ruling on the raw phone panel's title, 2026-10-02).
+  const spanScope = { word: spanWords(orderedSnaps) };
   const spanFooter =
     live && orderedSnaps.length > 0 ? (
       <TablePager page={1} pages={1} from={1} to={orderedSnaps.length} total={orderedSnaps.length} compact scope={spanScope} onPage={() => {}} />
