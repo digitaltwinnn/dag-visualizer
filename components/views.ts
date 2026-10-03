@@ -6,10 +6,13 @@ import type { Mode } from "@/src/store/store";
 // footer's view links (FooterViewLinks), so a view's name, slug and mark can never disagree
 // between the command bar, the address bar and the footer.
 //
-// The placeholder views deliberately carry NO slug (user decision, 2026-09-04): a shareable link
-// to `preview · in development` isn't worth a route, and with `dynamicParams = false` a pushState
-// URL that a hard navigation would 404 on is worse than no URL at all. Switching to a placeholder
-// view leaves the address bar where it was.
+// THE PLACEHOLDER HAS A ROUTE TOO: `/soon` (user, 2026-10-03). It was routeless from 2026-09-04 —
+// "a shareable link to a preview isn't worth a route" — so switching to it left the address bar on
+// the PREVIOUS view's URL: the bar said /trends over the Coming-soon gallery, and a reload or a
+// shared link opened History instead (test pass, same day). A URL that names what is on screen is
+// worth more than the link's value. It is a real static route like the others (`app/[view]`), so a
+// hard navigation lands on it; what it does NOT get is a place in the sitemap or the footer's view
+// links, and its page asks not to be indexed — `LISTED_VIEWS` is that narrower list.
 //
 // The type-only Mode import erases at compile (the aboutCopy precedent), so server pages can
 // import this module without dragging the store into their bundle.
@@ -58,11 +61,21 @@ export const VIEWS: readonly ViewDef[] = [
   },
   // ONE consolidated entry (user, 2026-09-04): three dimmed dead buttons spent bar width saying
   // the same nothing — the generic soon view's Blueprint gallery names what is coming instead.
-  { id: "soon", name: "Coming soon", soon: true },
+  {
+    id: "soon",
+    name: "Coming soon",
+    slug: "soon",
+    desc: "What is being built next for the DAG Visualizer, sketched as wireframes.",
+    soon: true,
+  },
 ];
 
-/** The routed subset, in switch order — the pages under app/[view] and the sitemap read this. */
+/** Every view with a URL, in switch order — the pages under app/[view] and the path↔mode maps. */
 export const ROUTED_VIEWS = VIEWS.filter((v): v is ViewDef & { slug: string; desc: string } => v.slug != null);
+
+/** The views worth LISTING — the sitemap and the footer's view links. The placeholder has a URL
+ *  but is not a destination anyone should be sent to. */
+export const LISTED_VIEWS = ROUTED_VIEWS.filter((v) => !v.soon);
 
 const MODE_BY_SLUG = new Map<string, Mode>(ROUTED_VIEWS.map((v) => [v.slug, v.id]));
 
@@ -73,7 +86,7 @@ export function modeForPath(pathname: string): Mode | null {
   return MODE_BY_SLUG.get(seg) ?? null;
 }
 
-/** The path a mode publishes to the address bar — null for the routeless placeholder views. */
+/** The path a mode publishes to the address bar — null only for a mode with no slug (none today). */
 export function pathForMode(mode: Mode): string | null {
   const v = VIEWS.find((x) => x.id === mode);
   return v?.slug ? `/${v.slug}` : null;

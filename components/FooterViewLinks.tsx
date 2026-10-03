@@ -1,7 +1,7 @@
 "use client";
 import { useStore } from "@/src/store/store";
 import NetLink from "@/components/NetLink";
-import { ROUTED_VIEWS } from "@/components/views";
+import { LISTED_VIEWS } from "@/components/views";
 
 // THE FOOTER'S VIEW LINKS (user, 2026-09-04 — "shouldn't a footer be a consistent anchor?"):
 // the same three destinations on every surface. A plain left-click COMMITS through the store —
@@ -16,7 +16,7 @@ export default function FooterViewLinks() {
   const setMode = useStore((s) => s.setMode);
   return (
     <span className="flex items-center gap-2 max-[1100px]:hidden">
-      {ROUTED_VIEWS.map((v, i) => (
+      {LISTED_VIEWS.map((v, i) => (
         <span key={v.id} className="flex items-center gap-2">
           {i > 0 && (
             <span aria-hidden className="opacity-70 text-muted-foreground">

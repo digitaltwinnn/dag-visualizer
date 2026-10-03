@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { SITE_ORIGIN } from "@/src/data/site";
-import { ROUTED_VIEWS } from "@/components/views";
+import { LISTED_VIEWS } from "@/components/views";
 
 // The root, the three routed views (app/[view] — real URLs since 2026-09-04) and the crawlable
 // /about prose page. /design is styleguide-internal and disallowed in robots. Served at
@@ -13,7 +13,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "weekly" as const,
       priority: 1,
     },
-    ...ROUTED_VIEWS.map((v) => ({
+    ...LISTED_VIEWS.map((v) => ({
       url: `${SITE_ORIGIN}/${v.slug}`,
       lastModified: new Date(),
       changeFrequency: "weekly" as const,

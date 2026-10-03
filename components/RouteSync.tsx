@@ -27,8 +27,9 @@ import {
 //     DocLayer, whose `initial` prop is what the route server-rendered — one owner per axis.
 //  2. PUBLISH — a store subscription pushes the derived path whenever mode or docPage changes
 //     (search string preserved — ?net= and the dev flags ride along), skipped when the URL
-//     already says it and when the change came from popstate. A placeholder view has no path
-//     and leaves the address bar untouched; `/` is only ever the landing URL.
+//     already says it and when the change came from popstate. Every view has a path since
+//     2026-10-03 (the placeholder is `/soon`); the no-path branch below stays for a mode that
+//     ever lacks one. `/` is only ever the landing URL.
 //  3. RESTORE — popstate maps the pathname back onto the store, so browser back/forward steps
 //     views and docs alike (view granularity only — the focus ladder stays out of history).
 //
