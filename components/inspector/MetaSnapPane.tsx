@@ -169,7 +169,8 @@ export default function MetaSnapPane({
   // directly above since the tick-local network landed (`store.tickNet`), and a card never
   // restates its ancestor (the pile rule — the same reason the ticker left this head on
   // 2026-08-10).
-  const lead = `${following && !sameTick ? "Following live. " : ""}Anchored to ${anchor}${rel ? ` · ${rel}` : ""}.`;
+  // The AGE is the lead's chip, not a clause after a mid-dot (user, 2026-10-03).
+  const lead = `${following && !sameTick ? "Following live. " : ""}Anchored to ${anchor}.`;
 
   return (
     <RailPane
@@ -203,7 +204,7 @@ export default function MetaSnapPane({
                 Two labelled sections, State and Data — the same two payload lanes the raw layer
                 opens one tier down, so the card states their SHAPE and the pane renders them.
                 Both always render, each honest about its own tier. */}
-            <Lead>{lead}</Lead>
+            <Lead aside={rel || undefined}>{lead}</Lead>
             <Separator className="mb-2" />
             <PayloadBlock row={row} deep={deep ?? null} asked={deepAsked} decodeGaveUp={decodeGaveUp} />
 

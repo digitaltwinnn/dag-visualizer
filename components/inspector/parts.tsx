@@ -64,8 +64,18 @@ export function Fact({ label, children, title, className }: { label: ReactNode; 
 
 /** THE LEAD — the one sentence a card says first, in dim ink, two lines at most: what this subject
  *  is in relation to its parent ("83% of Dor Technologies' online nodes."). Every card has one. */
-export function Lead({ children, className }: { children: ReactNode; className?: string }) {
-  return <p className={cn("m-0 mb-2.5 text-body leading-snug text-foreground-dim line-clamp-2", className)}>{children}</p>;
+export function Lead({ children, aside, className }: { children: ReactNode; /** A second fact that would otherwise be glued on with a mid-dot — an age, a count — as a
+   *  qualifier chip on the row's right (user, 2026-10-03, on "Anchored to N · 1 min ago": "should
+   *  that second part be a pill on the right side? I don't like those dots separating texts").
+   *  The sentence stays one statement; the chip is the head aside's own species. */
+  aside?: ReactNode; className?: string }) {
+  if (aside == null) return <p className={cn("m-0 mb-2.5 text-body leading-snug text-foreground-dim line-clamp-2", className)}>{children}</p>;
+  return (
+    <div className={cn("mb-2.5 flex items-baseline justify-between gap-2.5", className)}>
+      <p className="m-0 min-w-0 text-body leading-snug text-foreground-dim line-clamp-2">{children}</p>
+      <QualifierChip className="flex-none tabular-nums">{aside}</QualifierChip>
+    </div>
+  );
 }
 
 /** A share as the words a lead may say: never "0%" for a part that exists nor "100%" for one that

@@ -832,8 +832,9 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
   // never restates its ancestors to fill a slot.
   const place = [cohort == null ? geo?.city : null, country == null ? geo?.country : null].filter(Boolean).join(", ");
   const host = cohort == null ? geo?.isp : null;
-  const leadBits = [place, host].filter(Boolean).join(" · ");
-  const lead = signed != null || !!leadBits;
+  // NO MID-DOT LEADS (user, 2026-10-03: "I don't like those dots separating texts"): the lead is
+  // ONE statement — the relation, else where the node sits — and the host is a row of its own.
+  const lead = signed != null || !!place;
   return (
     <>
       {/* ONE SHORT SENTENCE (user, 2026-10-03: "'signed snapshot N with 2 others' and then the
@@ -853,8 +854,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
               {signed.signed ? "Signed" : "Did not sign"} snapshot {signed.ordinal.toLocaleString()}.
             </span>
           ) : (
-            // A host name may end in its own period ("Amazon.com, Inc.") — never two.
-            `${leadBits.replace(/\.$/, "")}.`
+            `${place}.`
           )}
         </Lead>
       )}
@@ -942,7 +942,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
             to read as "has stake delegated", which the data does not say. */}
         {/* Stepped down from the lead while it states the signing relation (see the lead's note). */}
         {signed != null && place && <Fact label="Location">{place}</Fact>}
-        {signed != null && host && <Fact label="Hosting">{host}</Fact>}
+        {host && <Fact label="Hosting">{host}</Fact>}
         {/* The provider's NUMBER — its name is in the lead, the Hosting row or the provider card's title. */}
         {asn && <Fact label="ASN"><span className="font-mono">{asn}</span></Fact>}
         {/* NETWORK(S) — which network this node belongs to, and any other network the same machine

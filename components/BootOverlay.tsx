@@ -31,7 +31,7 @@ export default function BootOverlay() {
   return (
     <div
       className={cn(
-        "fixed inset-0 z-[9] flex flex-col items-center justify-center gap-[18px] pointer-events-none",
+        "fixed inset-0 z-[9] flex flex-col items-center justify-center gap-6 pointer-events-none",
         // Fades IN at 0 ms; once the boot resolves LIVE (after the min hold) it fades OUT calmly
         // instead of unmounting. Reduced motion: the hook collapses the fade, so `fading` never
         // trips and the swap is instant (the class is guarded too).
@@ -40,11 +40,16 @@ export default function BootOverlay() {
       )}
       aria-hidden
     >
-      <div className="relative w-[120px] h-[120px]">
+      {/* SIZED TO THE VIEWPORT (user, 2026-10-03: "the animation can be bigger, it's quite small
+          currently"). It was a fixed 120px — a seventh of a laptop's height, on a stage with
+          nothing else on it. A quarter of the viewport's short side, held between 180 and 260px;
+          every part inside is a PERCENTAGE of the box (the insets it was drawn at, over 120), so
+          the core, the shells and the ping grow as one mark. */}
+      <div className="relative w-[clamp(180px,26vmin,260px)] aspect-square">
         {!noEngine && (
           <span
             className={cn(
-              "absolute inset-[45px] rounded-full border border-[color-mix(in_oklch,var(--primary)_55%,transparent)]",
+              "absolute inset-[37.5%] rounded-full border border-[color-mix(in_oklch,var(--primary)_55%,transparent)]",
               "animate-boot-ping motion-reduce:animate-none motion-reduce:opacity-0", // reuse the sonar expand (peak ≤ 0.6)
               dead && "grayscale",
             )}
@@ -59,10 +64,10 @@ export default function BootOverlay() {
         {!noEngine && (
           <>
             <span className={cn("absolute inset-0 animate-boot-shell motion-reduce:animate-none", dead && "grayscale")}>
-              <span className="absolute inset-[16px] rounded-full border border-[color-mix(in_oklch,var(--primary)_38%,transparent)] [transform:rotateX(66deg)]" />
+              <span className="absolute inset-[13.3%] rounded-full border border-[color-mix(in_oklch,var(--primary)_38%,transparent)] [transform:rotateX(66deg)]" />
             </span>
             <span className={cn("absolute inset-0 animate-boot-shell-alt motion-reduce:animate-none", dead && "grayscale")}>
-              <span className="absolute inset-[31px] rounded-full border border-[color-mix(in_oklch,var(--primary)_52%,transparent)] [transform:rotateX(44deg)]" />
+              <span className="absolute inset-[25.8%] rounded-full border border-[color-mix(in_oklch,var(--primary)_52%,transparent)] [transform:rotateX(44deg)]" />
             </span>
           </>
         )}
@@ -71,8 +76,8 @@ export default function BootOverlay() {
             with a long smear — a blob, where every other mark in the app is an instrument. */}
         <span
           className={cn(
-            "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[13px] h-[13px] rounded-full",
-            "bg-[var(--primary)] shadow-[0_0_14px_3px_color-mix(in_oklch,var(--primary)_45%,transparent)]",
+            "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[10.8%] h-[10.8%] rounded-full",
+            "bg-[var(--primary)] shadow-[0_0_26px_5px_color-mix(in_oklch,var(--primary)_45%,transparent)]",
             "animate-breathe motion-reduce:animate-none motion-reduce:opacity-90",
             dead && "grayscale",
           )}
@@ -80,7 +85,7 @@ export default function BootOverlay() {
       </div>
       <p
         className={cn(
-          "text-label tracking-[0.08em] lowercase m-0",
+          "text-body tracking-[0.08em] lowercase m-0",
           dead ? "text-muted-foreground" : "text-[color-mix(in_oklch,var(--primary)_80%,var(--foreground))]",
         )}
       >
