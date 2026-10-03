@@ -381,7 +381,9 @@ function keepFocusOnRung(el: HTMLElement): void {
           title={closeTitle}
           aria-label={closeTitle}
           onClick={onClose}
-          className="absolute top-[8px] right-[10px] z-10 size-auto rounded-md py-1 px-2 leading-none text-muted-foreground"
+          // `after:` hit area on touch, written out rather than `TOUCH_HIT`: this button is already
+          // `absolute`, and the shared recipe's `relative` would un-pin it.
+          className="absolute top-[8px] right-[10px] z-10 size-auto rounded-md py-1 px-2 leading-none text-muted-foreground pointer-coarse:after:absolute pointer-coarse:after:-inset-2 pointer-coarse:after:content-['']"
         >
           <X aria-hidden className="size-4" />
         </Button>

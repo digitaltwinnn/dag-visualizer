@@ -165,7 +165,7 @@ export default function AnchoredTags({
                   // box left — its right edge stops 6px SHORT of the content edge, and with the 6px
                   // padding the counts printed 12px left of the section's total (measured 2026-10-03).
                   // The wash overhangs the content by 6px on BOTH sides; the columns sit on its edges.
-                  "group flex items-start gap-2 w-[calc(100%+12px)] text-left border-none cursor-pointer py-[3px] px-1.5 -mx-1.5 rounded-sm transition-[background] duration-150",
+                  "group flex items-start gap-2 w-[calc(100%+12px)] text-left border-none cursor-pointer py-[3px] px-1.5 -mx-1.5 pointer-coarse:min-h-10 pointer-coarse:items-center rounded-sm transition-[background] duration-150",
                   isSel ? "bg-transparent" : "bg-transparent hover:bg-wash-hover",
                   "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                 )}

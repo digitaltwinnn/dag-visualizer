@@ -340,7 +340,7 @@ export default function MetaSnapPane({
                   // not just unnecessary but wrong: `metaSnapSelectActions`' deselect early-return
                   // needs `!current.following`, so re-committing the selected snapshot would CLEAR
                   // it, on a button that says `read this`.
-                  if (following) applyClickActions(metaSnapSelectActions(sel, snap, { metaSnap: sel, following }));
+                  if (following) applyClickActions(metaSnapSelectActions(sel, snap, { metaSnap: sel, following, inspect: useStore.getState().inspect }));
                   setDeepWanted(metaSnapDeepKey(sel.globalOrdinal, sel.metaId, sel.ordinal));
                 }}
                 >

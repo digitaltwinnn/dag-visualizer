@@ -447,8 +447,25 @@ describe("metaSnapSelectActions (a tile on the upper floor)", () => {
   // the Metagraph rung between the tick and the snapshot EMPTY — that rung had no state but the
   // filter. It has one now: the tick-local network (`tickNet`), so the pile is tick → network →
   // snapshot and the top bar is never written.
+  // A SNAPSHOT DROPS THE NODE IT CANNOT CONTAIN (user, 2026-10-03: "remove node"). A node carried
+  // in from another view stayed in the pile under a snapshot of a different network, where
+  // adjacency is containment.
+  it("drops a held node of ANOTHER network first, and keeps one of the snapshot's own", () => {
+    const dagNode = { kind: "l0", title: "n" } as unknown as PickDescriptor;
+    const other = { kind: "metanode", title: "n", meta: { id: "some-other-metagraph" } } as unknown as PickDescriptor;
+    const own = { kind: "metanode", title: "n", meta: { id: SEL.metaId } } as unknown as PickDescriptor;
+    for (const foreign of [dagNode, other]) {
+      const a = metaSnapSelectActions(SEL, GLOBAL, { metaSnap: null, inspect: foreign });
+      expect(a[0]).toEqual({ kind: "inspect", pick: null }); // finest first
+      expect(a.map((x) => x.kind)).toEqual(["inspect", "snapshot", "tickNet", "metaSnap"]);
+    }
+    const kept = metaSnapSelectActions(SEL, GLOBAL, { metaSnap: null, inspect: own });
+    expect(kept.map((x) => x.kind)).toEqual(["snapshot", "tickNet", "metaSnap"]);
+    expect(kept.some((x) => x.kind === "filter")).toBe(false);
+  });
+
   it("commits the tick, then the network INSIDE that tick, then the subject — and NEVER the filter", () => {
-    const a = metaSnapSelectActions(SEL, GLOBAL, { metaSnap: null });
+    const a = metaSnapSelectActions(SEL, GLOBAL, { metaSnap: null, inspect: null });
     expect(a).toEqual([
       { kind: "snapshot", pick: GLOBAL, follow: false },
       { kind: "tickNet", sel: { metaId: LISTED, globalOrdinal: 4200 } },
@@ -459,7 +476,7 @@ describe("metaSnapSelectActions (a tile on the upper floor)", () => {
 
   it("an UNKNOWN-lane tile (raw unlisted address) commits the UNLISTED network as its rung", () => {
     const un: MetaSnapSel = { metaId: "DAGunlisted123", ordinal: 9, hash: "", globalOrdinal: 4200, ts: "t" };
-    const a = metaSnapSelectActions(un, GLOBAL, { metaSnap: null });
+    const a = metaSnapSelectActions(un, GLOBAL, { metaSnap: null, inspect: null });
     expect(netKeyOf("DAGunlisted123")).toBe("unlisted");
     expect(a).toEqual([
       { kind: "snapshot", pick: GLOBAL, follow: false },
@@ -469,12 +486,12 @@ describe("metaSnapSelectActions (a tile on the upper floor)", () => {
   });
 
   it("steps back ONE rung — to the network in the tick — when the same tile is picked again", () => {
-    const a = metaSnapSelectActions(SEL, GLOBAL, { metaSnap: { ...SEL } });
+    const a = metaSnapSelectActions(SEL, GLOBAL, { metaSnap: { ...SEL }, inspect: null });
     expect(a).toEqual([{ kind: "metaSnap", sel: null }]);
   });
 
   it("while FOLLOWING, re-picking the auto-selected tile converts it to a pin rather than deselecting", () => {
-    const a = metaSnapSelectActions(SEL, GLOBAL, { metaSnap: { ...SEL }, following: true });
+    const a = metaSnapSelectActions(SEL, GLOBAL, { metaSnap: { ...SEL }, following: true, inspect: null });
     // The pin commits the same full ancestry a fresh select does: tick → network → snapshot.
     expect(a.map((x) => x.kind)).toEqual(["snapshot", "tickNet", "metaSnap"]);
   });

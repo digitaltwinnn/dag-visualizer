@@ -550,7 +550,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
             ? `Unlisted channel ${r.metaId} · anchored into global ${tick.ordinal.toLocaleString()}${signers.length ? ` · signed by ${signers.length} ${SIGNER_GROUPS.proof.who}` : ""}`
             : `${leafName} snapshot ${r.ordinal.toLocaleString()} · anchored into global ${tick.ordinal.toLocaleString()}${signers.length ? ` · signed by ${signers.length} ${SIGNER_GROUPS.proof.who}` : ""}`,
           onClick: () => {
-            applyClickActions(metaSnapSelectActions(sel, globalPick, { metaSnap, following }));
+            applyClickActions(metaSnapSelectActions(sel, globalPick, { metaSnap, following, inspect: useStore.getState().inspect }));
             // The AFFORDANCE FOLLOWS THE DATA: no exact read for this tick means no signers are
             // knowable, so the row commits and stays — a level onto nothing would claim a fact
             // we don't have. Re-clicking (the deselect) closes the level with it.

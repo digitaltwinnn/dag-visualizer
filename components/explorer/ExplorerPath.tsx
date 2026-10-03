@@ -49,7 +49,7 @@ export interface Crumb {
 // The chevron: a 7px arrow tip on the right and, past the first step, a 7px notch on the left that
 // the previous step's tip sits in. Steps overlap by 5px, so a 2px seam of the plate's own colour
 // runs between them. (Literal class strings — Tailwind's scanner reads no template.)
-const STEP = "inline-flex h-[24px] min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap";
+const STEP = "inline-flex h-[24px] pointer-coarse:h-10 min-w-0 max-w-full items-center gap-1.5 whitespace-nowrap";
 const SHAPE_FIRST = "rounded-l-[5px] [clip-path:polygon(0_0,calc(100%-7px)_0,100%_50%,calc(100%-7px)_100%,0_100%)]";
 const SHAPE_MID = "[clip-path:polygon(0_0,calc(100%-7px)_0,100%_50%,calc(100%-7px)_100%,0_100%,7px_50%)]";
 const SHAPE_LAST = "rounded-r-[5px] [clip-path:polygon(0_0,100%_0,100%_100%,0_100%,7px_50%)]";

@@ -256,7 +256,7 @@ describe("siblingSet — metagraph snapshot rung", () => {
       metaSnapSelectActions(
         { metaId: "ded", ordinal: 101, hash: "", globalOrdinal: 42, ts: "T" },
         snapPick,
-        { metaSnap: cur },
+        { metaSnap: cur, inspect: null },
       ),
     );
   });
@@ -457,7 +457,7 @@ describe("childStep — the first-child DOWN step", () => {
       metaSnapSelectActions(
         { metaId: "ded", ordinal: 500, hash: "", globalOrdinal: 42, ts: "T" },
         snapPick,
-        { metaSnap: null },
+        { metaSnap: null, inspect: null },
       ),
     );
   });

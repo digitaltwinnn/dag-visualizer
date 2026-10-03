@@ -24,7 +24,7 @@ export const CABINET_LIST =
  *  accent rule is drawn as a 2px background along the bottom (no layout, no pseudo to fight), and this app's focus
  *  language is a 1px outline. */
 export const CABINET_TRIGGER = [
-  "flex-none flex items-center justify-center gap-1.5 px-0.5 rounded-none!",
+  "flex-none flex items-center justify-center gap-1.5 px-0.5 pointer-coarse:min-h-11 rounded-none!",
   "tracking-caps uppercase font-normal",
   "text-muted-foreground bg-transparent! border-0!",
   "hover:text-foreground",

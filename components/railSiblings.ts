@@ -407,7 +407,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         // other rendered ordinal — and an undecodable payload says so rather than claiming 0
         // (the route's contract).
         label: ordinalLabel(r),
-        actions: metaSnapSelectActions(metaSnapSelOf(r, cur.globalOrdinal, cur.ts), s.snap!, { metaSnap: cur }),
+        actions: metaSnapSelectActions(metaSnapSelOf(r, cur.globalOrdinal, cur.ts), s.snap!, { metaSnap: cur, inspect: s.inspect }),
       }));
       const index = rows.findIndex((r) => r.metaId === cur.metaId && r.ordinal === cur.ordinal);
       return finish(slot, items, index, `${who} · Global ${cur.globalOrdinal.toLocaleString()}`);
@@ -539,7 +539,7 @@ const firstMetaSnapOfTick = (s: SiblingState): SiblingStep | null => {
   return {
     key: `${r.metaId}:${r.ordinal}`,
     label: ordinalLabel(r),
-    actions: metaSnapSelectActions(sel, s.snap, { metaSnap: s.metaSnap }),
+    actions: metaSnapSelectActions(sel, s.snap, { metaSnap: s.metaSnap, inspect: s.inspect }),
   };
 };
 

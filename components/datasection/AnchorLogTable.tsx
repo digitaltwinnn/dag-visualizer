@@ -1014,7 +1014,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   metaSnapSelectActions(
                     { metaId: r.metaId, ordinal: r.ordinal, hash: r.hash, globalOrdinal: r.global.ordinal, ts: r.ts },
                     { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot },
-                    { metaSnap, following },
+                    { metaSnap, following, inspect: useStore.getState().inspect },
                   ),
                 );
               };
@@ -1031,6 +1031,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   // the accent.
                   className={cn(
                     "text-body hover:bg-[color-mix(in_oklch,var(--row-hue,var(--primary))_12%,transparent)]",
+                    // 44px on a touch pointer (a tablet shows the desktop table at ~33px rows).
+                    "pointer-coarse:h-11",
                     // Phone: the row is a three-column grid with the detail line spanning beneath.
                     "max-[700px]:grid max-[700px]:grid-cols-[auto_minmax(0,1fr)_auto] max-[700px]:items-baseline max-[700px]:[&>td]:pb-0 max-[700px]:[&>td:last-child]:pb-2",
                     pending ? "cursor-default" : "cursor-pointer",

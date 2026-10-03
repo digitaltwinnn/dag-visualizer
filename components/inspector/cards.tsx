@@ -420,7 +420,7 @@ function ScheduleGroup({
           selection, which can never include the chevron): the row is one CONTROL, so it
           selects nothing, and focus shows only for the keyboard in CopyButton's own
           focus-visible recipe. */}
-      <CollapsibleTrigger className="group mt-2 flex w-full items-center gap-1 cursor-pointer select-none outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]">
+      <CollapsibleTrigger className="group mt-2 flex w-full items-center gap-1 pointer-coarse:min-h-10 cursor-pointer select-none outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]">
         {/* A SECTION LABEL in both forms (the card skeleton, 2026-10-02): caps and muted, the
             total it heads on the right — the breakdown slot's one heading recipe. */}
         {/* THE LABEL IS THE FOLD'S MARK (`foldLabel`, user 2026-10-03): a dotted underline, no

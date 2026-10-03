@@ -301,12 +301,20 @@ export function GeoCells({ accent }: { accent: string }) {
 // hue — the tick chart's scoped rule, at the store's resolution.
 const STACK_ORDER: string[] = METAGRAPHS.map((m) => m.id);
 
+/** THE GIVE-UP WORDS for a measured card whose store read FAILED (user, 2026-10-03: "fix" — the
+ *  test pass found the rate cards saying "acquiring…" for as long as the trends store was down).
+ *  "Acquiring" is a promise that a number is on its way; once the fetch has errored and nothing is
+ *  held, that promise is the fabricated state rule 10 forbids. The hook keeps retrying, so the
+ *  words say the store is not answering NOW, not that it never will. No fallback to the live
+ *  buffer — that ruling (2026-09-09) stands; this only stops the card from lying while it waits. */
+const STORE_DOWN = "history not answering";
+
 type Snaps = ReturnType<typeof useSnapshotFeed>["snaps"];
 interface StackSeg { key: string; n: number; color: string }
 
-function StackBars({ accent, isMeta, filter, data }: { accent: string; isMeta: boolean; filter: string; data: TrendsWindowData | null }) {
+function StackBars({ accent, isMeta, filter, data, down }: { accent: string; isMeta: boolean; filter: string; data: TrendsWindowData | null; /** The history store failed and nothing is held — see `STORE_DOWN`. */ down?: boolean }) {
   if (!data) {
-    return <span className="flex items-center justify-center w-full self-center text-label text-muted-foreground" aria-hidden>acquiring…</span>;
+    return <span className="flex items-center justify-center w-full self-center text-label text-muted-foreground" aria-hidden={!down}>{down ? STORE_DOWN : "acquiring…"}</span>;
   }
   const anchors = data.series["g.anchors"] ?? [];
   const ticks = data.series["g.ticks"] ?? [];
@@ -465,6 +473,8 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
   // The bars and the lines share the windowed buckets exactly — one window, one payload, so
   // the chart and the roster that legends it can never rank over different reaches.
   const barData = windowed;
+  /** The fetch errored and nothing is held from before (a failed REFRESH keeps its last data). */
+  const storeDown = t7.error && !t7.data;
   const span = "last 24 hours";
   /** A card states a span only when its own DIFFERS from the band's (user, 2026-10-03: "each
    *  vital repeats 'last 24 hours'"). The band says the shared window once, above its corner
@@ -563,6 +573,25 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
     </BandCard>
   );
   const rate = (label: string, spark: SparkSpec, note?: string, title?: string) => {
+    // The store failed and this card reads from it: say so, in the lead's own stacked grammar.
+    if (storeDown && spark.data == null) {
+      return (
+        <BandCard
+          key={label}
+          label={label}
+          title={title}
+          lead={
+            <span className="flex flex-col items-start">
+              <span className="font-mono font-bold text-xl text-muted-foreground tabular-nums whitespace-nowrap">—</span>
+              <span className="text-label text-muted-foreground leading-none">{spark.unit}</span>
+            </span>
+          }
+        >
+          <span className="flex items-center self-stretch text-label text-muted-foreground">{STORE_DOWN}</span>
+          <span className="sr-only">The history store is not answering, so this reading is unavailable for now.</span>
+        </BandCard>
+      );
+    }
     // NO ENDPOINT AXIS. It existed for the 1Y/ALL windows, where months repeat across the year
     // boundary and position-in-window stopped reading as "when" (user, 2026-09-09). Over a
     // single 24-hour window position IS when, and the card's own words state the reach — the
@@ -716,7 +745,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
       {/* The chart states the same reach its rows do — it plots the very buckets the rate cards
           average, so a silent chart beside two captioned ones would read as a different window. */}
       <BandCard label="Anchors by metagraph" className="min-w-[220px]">
-        <StackBars accent={accent} isMeta={isMeta} filter={filter} data={barData} />
+        <StackBars accent={accent} isMeta={isMeta} filter={filter} data={barData} down={storeDown} />
       </BandCard>
     </>
   );

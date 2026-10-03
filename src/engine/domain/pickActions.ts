@@ -340,6 +340,14 @@ export const netKeyOf = (metaId: string): string =>
 const tickNetOf = (sel: MetaSnapSel | null, global: Extract<PickDescriptor, { kind: "snapshot" }>): TickNetSel | null =>
   sel ? { metaId: netKeyOf(sel.metaId), globalOrdinal: global.data.ordinal } : null;
 
+/** Does a held node belong to this channel's network? The DAG core's nodes belong to no
+ *  metagraph; everything else compares by NETWORK KEY, so a former address and the unlisted set
+ *  each match themselves. */
+const nodeIsOf = (inspect: PickDescriptor, metaId: string): boolean => {
+  const net = pickNetId(inspect);
+  return net != null && net !== "dag" && netKeyOf(net) === netKeyOf(metaId);
+};
+
 // Metagraph snapshot identity — metaId + ordinal (the snapshot's own ordinal, not the global one).
 export const sameMetaSnap = (a: MetaSnapSel | null, b: MetaSnapSel | null): boolean =>
   a === b || (!!a && !!b && a.metaId === b.metaId && a.ordinal === b.ordinal);
@@ -364,13 +372,27 @@ export const sameMetaSnap = (a: MetaSnapSel | null, b: MetaSnapSel | null): bool
 export function metaSnapSelectActions(
   sel: MetaSnapSel,
   global: Extract<PickDescriptor, { kind: "snapshot" }>,
-  current: { metaSnap: MetaSnapSel | null; following?: boolean },
+  current: {
+    metaSnap: MetaSnapSel | null;
+    following?: boolean;
+    /** The node card's pick, if one is held. REQUIRED, so no caller can forget the rule below. */
+    inspect: PickDescriptor | null;
+  },
 ): ClickAction[] {
   // The deselect-toggle applies only to a PINNED selection. While FOLLOWING, the shown subject
   // is auto-selected — clicking it must CONVERT the auto-selection into an explicit pin (the
   // click-scoped decode rule, user 2026-08-07), not silently deselect.
   if (sameMetaSnap(current.metaSnap, sel) && !current.following) return [{ kind: "metaSnap", sel: null }];
-  const out: ClickAction[] = [{ kind: "snapshot", pick: global, follow: false }];
+  const out: ClickAction[] = [];
+  // A SNAPSHOT DROPS THE NODE IT CANNOT CONTAIN (user, 2026-10-03: "remove node"). A node carried
+  // in from another view — a DAG validator picked on the globe — stayed in the pile under a
+  // Digital Evidence snapshot, where adjacency is containment: the rail said that node belonged
+  // to that snapshot. `tickNetSelectActions` already drops a node on a network change; this is
+  // the same rule for the commit that reaches the network THROUGH a snapshot. A node of the
+  // snapshot's own network stays (its card says whether it signed). Finest first, like every
+  // release.
+  if (current.inspect && !nodeIsOf(current.inspect, sel.metaId)) out.push({ kind: "inspect", pick: null });
+  out.push({ kind: "snapshot", pick: global, follow: false });
   out.push({ kind: "tickNet", sel: tickNetOf(sel, global) });
   out.push({ kind: "metaSnap", sel });
   return out;

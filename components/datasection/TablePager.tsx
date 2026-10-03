@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { cn, TOUCH_HIT } from "@/lib/utils";
 import { fmtCount } from "@/src/util/format";
 
 // The raw layer's ONE table pager (user, 2026-08-14 — "add a bottom row with pagination", the
@@ -61,7 +61,7 @@ export default function TablePager({
   if (pages <= 1 && !scope) return null;
   // The chevrons are shadcn `Button`s on the ghost recipe — the one hover every icon control shares
   // (button.tsx) — so this names only what is local: the box and the muted rest ink.
-  const btn = "size-6 rounded-xs text-muted-foreground disabled:opacity-30";
+  const btn = cn("size-6 rounded-xs text-muted-foreground disabled:opacity-30", TOUCH_HIT);
   return (
     <div className="flex-none pt-1.5">
       <div className="flex items-center justify-between gap-2">

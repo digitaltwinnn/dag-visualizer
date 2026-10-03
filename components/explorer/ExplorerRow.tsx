@@ -148,7 +148,9 @@ export default function ExplorerRow({
       className={cn(
         // `pr-2.5`, not the symmetric 6px (user, 2026-09-26): the figure — or the state dot where a
         // row ends in one — sat hard on the wash's right edge and wanted air.
-        "nb-row group grid items-center gap-x-[5px] w-[calc(100%+12px)] -mx-1.5 pl-1.5 pr-2.5 py-1 rounded-[5px] text-left text-body",
+        // 44px on a touch pointer: these rows are the explorer's whole surface and measured 29px on a
+        // phone, a third under the floor with 2px between them (test pass, 2026-10-03).
+        "nb-row group grid items-center gap-x-[5px] w-[calc(100%+12px)] -mx-1.5 pl-1.5 pr-2.5 py-1 pointer-coarse:min-h-11 rounded-[5px] text-left text-body",
         "border border-transparent bg-transparent cursor-pointer transition-[background] duration-150",
         "hover:bg-wash-hover",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",

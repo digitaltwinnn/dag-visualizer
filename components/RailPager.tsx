@@ -51,6 +51,7 @@
 //   - and what the track would buy — a new card sliding in — is a second arrival signal competing
 //     with the title roll-in and edge pulse that already answer the step.
 // The actionable half of the challenge was the FEEL, which is the flick and the render fix above.
+import { cn, TOUCH_HIT } from "@/lib/utils";
 import {
   useEffect,
   useMemo,
@@ -188,6 +189,9 @@ const FLICK_V = 0.35; // px/ms at release — a throw this fast commits regardle
 const FLICK_MS = 90; // velocity is measured over this trailing window, never off one sample:
 // a finger that pauses before lifting reads ~0 (correctly — a pause then lift is not a flick),
 // but a genuine throw's last sample can land 2ms before pointerup and read as noise either way.
+
+/** A plank chevron: 24px to the eye, a thumb-sized target on touch (`TOUCH_HIT`). */
+const PLANK_BTN = cn("size-6 disabled:opacity-30", TOUCH_HIT);
 
 export default function RailPager({
   slot,
@@ -702,7 +706,7 @@ export default function RailPager({
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className="size-6 disabled:opacity-30"
+                className={PLANK_BTN}
                 disabled={!prev}
                 onClick={() => commitStep(-1)}
                 aria-label={prev ? `Previous: ${prev.label}` : "Previous"}
@@ -719,7 +723,7 @@ export default function RailPager({
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className="size-6 disabled:opacity-30"
+                className={PLANK_BTN}
                 disabled={!next}
                 onClick={() => commitStep(1)}
                 aria-label={next ? `Next: ${next.label}` : "Next"}
@@ -742,7 +746,7 @@ export default function RailPager({
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className="size-6 disabled:opacity-30"
+                className={PLANK_BTN}
                 disabled={!up}
                 onClick={() => up?.()}
                 aria-label="Open the coarser card"
@@ -753,7 +757,7 @@ export default function RailPager({
               <Button
                 variant="ghost"
                 size="icon-xs"
-                className="size-6 disabled:opacity-30"
+                className={PLANK_BTN}
                 disabled={!down}
                 onClick={() => down?.run()}
                 aria-label={down?.label ?? "Open the finer card"}
