@@ -289,22 +289,22 @@ export default function SceneCallout() {
     };
   };
 
-  const netModel = (): Model | null => {
-    const net = displayNetwork(filter);
+  const netModel = (id: string = filter): Model | null => {
+    const net = displayNetwork(id);
     // "all" has no subject; the unlisted set has no 3D anchor (no machines are knowable).
     if (!net || net.virtual) return null;
-    const mg = metaList.find((x) => x.id === filter) ?? null;
+    const mg = metaList.find((x) => x.id === id) ?? null;
     const codes = mg ? layerCodesOf(mg.nodes) : [];
     return {
-      key: `net|${filter}`,
-      eyebrow: filter === "dag" ? "Network" : "Metagraph",
+      key: `net|${id}`,
+      eyebrow: id === "dag" ? "Network" : "Metagraph",
       title: net.name,
       // The aside suppresses itself when it only restates the name (the DAG core's ticker IS
       // its name) — a head must not say the same thing twice (the CardHead aside rule).
       aside: net.ticker !== net.name ? { text: net.ticker, hue: net.hue } : undefined,
       ring: net.hue,
       // The dossier's own logo (the live metagraph's icon, else the catalog's bundled one).
-      mark: { logo: mg?.iconUrl || metagraphById(filter)?.iconUrl, monogram: net.ticker || net.name, hue: net.hue },
+      mark: { logo: mg?.iconUrl || metagraphById(id)?.iconUrl, monogram: net.ticker || net.name, hue: net.hue },
       lead: mg ? { text: `${mg.nodes.length} nodes`, codes } : undefined,
     };
   };
@@ -461,9 +461,17 @@ export default function SceneCallout() {
               : { text: `${total} snapshots`, chip: exact ? fmtKB(exact.totalSizeKB) : undefined },
       };
     };
-    // The boxed METAGRAPH card shows NOTHING (user, 2026-08-16 — like geo's network rung: a
-    // network in the chamber is a whole lane, and a single anchor would lie about it).
-    if (boxedCard === "context") return null;
+    // THE NETWORK'S OWN LABEL, on its lane (user, 2026-10-03: "the dossier on snapshots page has
+    // no callout on the scene"). A boxed Metagraph card used to clear the scene of labels — the
+    // 2026-08-16 rule was that a network in the chamber is a whole lane and one anchor would lie
+    // about it. With a label on each snapshot, that silence read as a card the scene had
+    // forgotten: every other card you open is pointed at. The label stands at the head of the
+    // network's lane, which is where that lane is read from. It is the hyper dossier's own
+    // model (logo, name, ticker, nodes and layers); the DAG and the unlisted set have no lane
+    // of their own to point at, as in hyper. `ledgerNetwork` is the chamber's own resolver —
+    // the network picked inside this global snapshot, else the filter.
+    const lnet = ledgerNetwork({ filter, tickNet, snapOrdinal: snap?.data.ordinal ?? null });
+    const laneModel = (): Model | null => (lnet === "all" || lnet === "dag" ? null : netModel(lnet));
     // The boxed NODE card leads, alone (user, 2026-08-16 — a tray node selected via the card
     // stack shows ITS callout).
     const node = nodeModel();
@@ -474,14 +482,16 @@ export default function SceneCallout() {
       // metagraph snapshot always stands with the global snapshot it is read against, and one
       // label could only name one of them: the tile, with nothing saying which bar it fell
       // into, or the bar, with the tile unnamed.
-      // ⚠️ EACH SNAPSHOT HAS ITS OWN ANCHOR, FIXED: the metagraph snapshot is the subject's
-      // (`callout`), the global snapshot the second (`callout-2`), whichever card is boxed. The
-      // first cut handed the subject's anchor to the boxed card and the other to the second —
-      // so re-boxing swapped the two, both wrappers remounted, and both labels replayed their
-      // whole entrance over two subjects that had not changed (the 2026-09-11 complaint, "it
-      // re-draws the card while the subject is the same"). Fixed places also keep the global's
-      // label standing while metagraph snapshots come and go above it. CalloutSync mirrors this.
-      m = msModel() ?? (snap ? null : node);
+      // ⚠️ EACH HAS ITS OWN ANCHOR, FIXED: the global snapshot is always the second
+      // (`callout-2`), whichever card is boxed. The first cut handed the subject's anchor to the
+      // boxed card and the other to the second — so re-boxing swapped the two, both wrappers
+      // remounted, and both labels replayed their whole entrance over two subjects that had
+      // not changed (the 2026-09-11 complaint, "it re-draws the card while the subject is the
+      // same"). The subject's anchor (`callout`) is the upper storey's: the metagraph snapshot's
+      // tile, or its network's lane when the Metagraph card is the box or no snapshot of that
+      // network is committed — the two stand at the same end of the same lane, so they share
+      // the one anchor rather than stack two labels on it. CalloutSync mirrors this exactly.
+      m = boxedCard === "context" ? (laneModel() ?? msModel()) : (msModel() ?? laneModel() ?? (snap ? null : node));
       m2 = gsModel();
     }
   }

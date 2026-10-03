@@ -1482,8 +1482,13 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
   name only one of them. `#callout` is the metagraph snapshot's (its tile) and `#callout-2` the
   global snapshot's (its bar, or the resolved network's segment of it) — whichever card is boxed.
   Handing the subject's anchor to the boxed card was the first cut and it re-drew both labels on
-  every re-box, over two subjects that had not changed. The box still rules the two older cases:
-  a boxed node's label stands alone, and a boxed Metagraph card shows none.
+  every re-box, over two subjects that had not changed. A boxed node's label still stands alone.
+  **The Metagraph card has a label too** (user, same day: "the dossier on snapshots page has no
+  callout on the scene" — reversing 2026-08-16's "a lane gets no label", which read as a
+  forgotten card once both snapshots were labelled): the hyper dossier's own model, at the head
+  of the network's lane. It SHARES `#callout` with the metagraph snapshot — the two stand at
+  the same end of the same lane — and takes it when the Metagraph card is the box or no
+  snapshot of that network is committed.
   **The global one HANGS** (design A of `docs/superpowers/design/2026-10-03-snapshot-callouts`,
   user: "ok A, but make the angle of the lines the same"): below-left of its bar, into the strip
   between the floor and the bottom band, on the standing label's own diagonal turned half a

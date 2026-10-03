@@ -407,13 +407,22 @@ export class CalloutSync {
   // layout data). An uncataloged channel's rows live on the unlisted lane.
   private _ledgerCalloutAnchor(v: THREE.Vector3): boolean {
     const st = this.st;
-    // THE BOX LEADS (user, 2026-08-15/16): the boxed NODE card anchors the node's own tray chip,
-    // and the boxed METAGRAPH card shows NOTHING (user, 2026-08-16 — like geo's network rung: a
-    // network in the chamber is a whole LANE, and a single anchor would lie about it).
-    if (st.boxedCard === "context") return false;
+    // THE BOX LEADS (user, 2026-08-15/16): the boxed NODE card anchors the node's own tray chip.
     if (st.boxedCard === "node" && isNodePick(st.inspect)) return this._ledgerNodeAnchor(st, v);
-    // Otherwise this anchor is the METAGRAPH SNAPSHOT's, and the global snapshot's label has an
-    // anchor of its own (`_ledgerGlobalAnchor`) — `SceneCallout` states why the two are fixed.
+    // Otherwise this anchor is the UPPER STOREY's — `SceneCallout`'s chain, mirrored term for
+    // term: the metagraph snapshot's tile, or its network's LANE when the Metagraph card is the
+    // box or no snapshot of that network is committed (user, 2026-10-03: "the dossier on
+    // snapshots page has no callout on the scene"). The global snapshot's label has an anchor of
+    // its own (`_ledgerGlobalAnchor`).
+    const net = this.h.ledgerNet;
+    const lane = net !== "all" && net !== "dag" && net !== UNLISTED_ID;
+    if (lane && (st.boxedCard === "context" || !st.metaSnap)) {
+      // The lane's head — layout data, fixed for the session; false when the lane isn't in the
+      // field, and then the label stays down rather than borrow another subject's point.
+      if (!this.h.ledger.calloutAnchor(net, v)) return false;
+      this.h.ledger.group.localToWorld(v); // the rendered chamber transform — a label read. render-state OK
+      return true;
+    }
     if (st.metaSnap) {
       // A snapshot's label waits until its row is FIXED on the plane (LedgerView.calloutSettled
       // — the chamber's own clocks; the tray-node paths stay exempt, chips don't ride the trail).
@@ -435,12 +444,11 @@ export class CalloutSync {
   }
 
   // The GLOBAL SNAPSHOT's label — the second anchor, `SceneCallout`'s `m2` gate mirrored: a
-  // global snapshot is shown, and the box is neither a node (its own label owns the scene) nor
-  // the Metagraph card (a lane gets no label). It points at the snapshot's bar, or at the
-  // resolved network's own segment of it.
+  // global snapshot is shown and the box is not a node (its own label owns the scene). It
+  // points at the snapshot's bar, or at the resolved network's own segment of it.
   private _ledgerGlobalAnchor(v: THREE.Vector3): boolean {
     const st = this.st;
-    if (st.boxedCard === "context" || !st.snap) return false;
+    if (!st.snap) return false;
     if (st.boxedCard === "node" && isNodePick(st.inspect)) return false;
     if (!this.h.ledger.calloutSettled(st.following)) return false;
     this._ledgerBarAnchor(v);
