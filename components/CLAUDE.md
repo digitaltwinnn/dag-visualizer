@@ -251,11 +251,13 @@ decisions inside them are design, not detail:
   **The DAG is a PINNED row above the list** (user, 2026-10-03: "isn't it basically the
   hypergraph metrics?" — "ok as pinned row, show that it's the totals of the rows below"): the
   hypergraph's own reading (`roster.total`, the same pass and head rule its plane uses), above
-  a hairline, with no bar and a chip saying what it is beside the rows — "total" only for the
-  three measures where it IS their sum (`GLOBAL_READING`: snapshots, fees, data), "whole
-  network" for nodes, "base ledger" for blocks and continuity. Never ranked among them: it
-  would always be first with a full bar. A click commits the DAG filter. The STACK under "all"
-  is unchanged — no DAG plane in front of the layers it sums.
+  a hairline, with no bar and a chip saying what it is beside the rows in plain words — "sum of
+  rows below" only for the three measures where it IS their sum (`GLOBAL_READING`: snapshots,
+  fees, data), "all nodes" for nodes, "DAG's own" for blocks and continuity ("total" and "base
+  ledger" were tried and read as jargon). Never ranked among them: it would always be first with
+  a full bar. **It is a reading, not a control** — no click, and above all it never sets the
+  page filter (user, same day). The STACK under "all" is unchanged — no DAG plane in front of
+  the layers it sums.
   ⚠️ **The roster is computed ONCE, in `components/useTrendRoster.ts`** — the planes, this list and
   the cursor card all read it, counter EDGE TRIM included. A surface reading the payload directly
   is one bucket out of step with the axis, which is exactly how the cursor card briefly quoted

@@ -104,6 +104,9 @@ export default function ExplorerRow({
   glyph, name, nameMono, tag, bar, figure, hasFigure, nameW = 84, figureW = 40, glyphW = 14, on, hue, nested, wideBar, plain, faint, title, onClick, pair, className,
 }: ExplorerRowProps) {
   const el = useRef<HTMLButtonElement>(null);
+  // A row with nothing to do is not a button: a pinned reading (the level's `lead`) may carry no
+  // click, and then it renders as a plain row — no pointer, no hover wash, no tab stop.
+  const Tag = (onClick ? "button" : "div") as "button";
   // SELECTION STAYS IN PLACE (design 2026-09-26, decision 12): the list never re-orders on a
   // commit; the committed row is scrolled into view instead — `nearest`, so a row already on
   // screen does not move the rail under the pointer.
@@ -143,9 +146,9 @@ export default function ExplorerRow({
   const wideGlyph = glyphW > 14;
   const glyphCol = wideGlyph ? `var(--glyph-w, ${glyphW}px)` : `${glyphW}px`;
   return (
-    <button
+    <Tag
       ref={el}
-      type="button"
+      type={onClick ? "button" : undefined}
       title={title}
       aria-pressed={on ? true : undefined}
       onClick={onClick}
@@ -155,8 +158,8 @@ export default function ExplorerRow({
         // 44px on a touch pointer: these rows are the explorer's whole surface and measured 29px on a
         // phone, a third under the floor with 2px between them (test pass, 2026-10-03).
         "nb-row group grid items-center gap-x-[5px] w-[calc(100%+12px)] -mx-1.5 pl-1.5 pr-2.5 py-1 pointer-coarse:min-h-11 rounded-[5px] text-left text-body",
-        "border border-transparent bg-transparent cursor-pointer transition-[background] duration-150",
-        "hover:bg-wash-hover",
+        "border border-transparent bg-transparent transition-[background] duration-150",
+        onClick && "cursor-pointer hover:bg-wash-hover",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
         on && selectedRow(true),
         faint && !on && "opacity-65",
@@ -239,6 +242,6 @@ export default function ExplorerRow({
           </span>
         </>
       )}
-    </button>
+    </Tag>
   );
 }

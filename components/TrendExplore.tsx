@@ -113,11 +113,13 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   // with under the DAG filter. Ranked among the networks it would always stand first with a full
   // bar and flatten the shared scale — for snapshots, fees and data it IS their sum — so it
   // stands apart: above the hairline, no bar, and a chip saying what it is beside them. That
-  // chip is honest per measure (`GLOBAL_READING`): "total" only where it is the rows added up.
-  // A click commits the DAG filter, where its plane already stands.
+  // chip is honest per measure (`GLOBAL_READING`): a sum only where it is the rows added up.
   const total = roster.total;
   const reading = GLOBAL_READING[metric];
-  const totalChip = reading === "total" ? "total" : reading === "fleet" ? "whole network" : "base ledger";
+  // THE CHIP SAYS WHAT THE FIGURE IS, IN PLAIN WORDS (user, 2026-10-03: "total vs base ledger is
+  // not very clear to me in naming"). "total" and "base ledger" named two kinds of reading
+  // without saying how either relates to the list; these say it outright.
+  const totalChip = reading === "total" ? "sum of rows below" : reading === "fleet" ? "all nodes" : "DAG's own";
   const totalWhy =
     reading === "total"
       ? "The networks below, added up"
@@ -135,7 +137,9 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
           figure:
             slice.stale ? <NodeStars count={3} /> : total.head != null ? format(total.head) : roster.pending || (roster.headKind === "day" && roster.dayPending) ? <NodeStars count={3} /> : <span className="text-muted-foreground" title={NO_READING}>—</span>,
           title: `DAG. ${totalWhy}. ${total.head != null ? `${format(total.head)}${unit ? ` ${unit}` : ""}, ${headWord(metric, roster.headKind)}` : NO_READING}`,
-          onClick: () => applyClickActions([{ kind: "filter", id: "dag" }]),
+          // NO CLICK (user, 2026-10-03: "don't set the page filter"). The row is a reading to
+          // hold the list against, not a way in: the first cut committed the DAG filter, which
+          // re-scoped the whole app from a row that only meant to state a number.
         }
       : undefined;
 
