@@ -316,7 +316,7 @@ export default function TrendInstantPane({
           )}
         </div>
       )}
-      <PulseEdge pulseKey={pulseKey} rail="right" />
+      <PulseEdge pulseKey={pulseKey} rail="right" off={collapsed} />
     </RailPane>
   );
 }

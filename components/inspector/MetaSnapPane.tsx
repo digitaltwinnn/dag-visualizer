@@ -382,7 +382,7 @@ export default function MetaSnapPane({
             </Foot>
           </div>
         )}
-        <PulseEdge pulseKey={pulseKey} rail="right" />
+        <PulseEdge pulseKey={pulseKey} rail="right" off={collapsed} />
     </RailPane>
   );
 }

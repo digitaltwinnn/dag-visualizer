@@ -47,7 +47,21 @@ export function useEdgePulse(subjectKey: unknown): number {
 // so a card whose subject spans a BRANCH swap (ContextCard's dossier ⇄ "all") can host the hook at
 // its top level (so a change across the swap still counts) and drop this in each branch: a fresh
 // mount replays the effect on the swap, and a `pulseKey` bump replays it in place.
-export function PulseEdge({ pulseKey, rail = "left" }: { pulseKey: number; rail?: "left" | "right" }) {
+export function PulseEdge({
+  pulseKey,
+  rail = "left",
+  off,
+}: {
+  pulseKey: number;
+  rail?: "left" | "right";
+  /** The host is a COLLAPSED entry: no pulse. Expanding one rail card collapses another, and the
+   *  swap remounts both — so the card that had just stepped BACK replayed the pulse alongside the
+   *  one that came forward (user, 2026-10-03: "it should only trigger the card that is the new
+   *  active card, now it does also for the one that collapsed"). The pulse is the active card's
+   *  signal; an entry stays quiet, and pulses when it is opened. */
+  off?: boolean;
+}) {
+  if (off) return null;
   if (pulseKey === 0) return null; // nothing until the first real subject change (skips mount)
   return <PulseSpan key={pulseKey} rail={rail} />;
 }

@@ -53,6 +53,14 @@ export default function ContextCard({
       filter !== appFilter ? tickNetClearActions({ metaSnap: st.metaSnap, hasInspect: !!st.inspect }) : [{ kind: "filter", id: "all" }],
     );
   };
+  // THE CARD'S EFFECTS WEAR THE NETWORK'S HUE ONLY WHILE IT IS THE FILTER (user, 2026-10-03: "a
+  // metagraph card, in snapshot view for example, when shown but not actually the filter should
+  // be cyan"). In Snapshots this card also stands for a network picked INSIDE a tick (`tickNet`),
+  // with the top bar still on All — and its hover edge and pairing glowed in that network's
+  // colour, as if the app were scoped to it. The identity hue is the mark of a committed filter
+  // (the structural-cyan rule); a tick-local network is a subject like any other, so its edge
+  // signals take the accent. The marks that NAME it — avatar ring, ticker chip — keep their hue.
+  const effectHue = (own: string): string => (filter === appFilter ? own : "var(--primary)");
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const mgCfg = metagraphById(filter);
@@ -69,7 +77,7 @@ export default function ContextCard({
   // noun stays Metagraph like every dossier, the "?" says which kind this one is.
   if (filter === UNLISTED_ID) {
     const dn = displayNetwork(UNLISTED_ID)!;
-    const pair = subjectPairing<string>(hoverFilter, dn.id, setHoverFilter, dn.hue);
+    const pair = subjectPairing<string>(hoverFilter, dn.id, setHoverFilter, effectHue(dn.hue));
     return (
       <RailPane
         entry={collapsed}
@@ -101,7 +109,7 @@ export default function ContextCard({
             facts, and the shared Foot. Only the HEAD stays bespoke (the "?" mark, italic
             name): a mixed set has no logo, brand hue or site. */}
         {!collapsed && <MetaCard cfg={UNLISTED_CFG} />}
-        <PulseEdge pulseKey={pulseKey} rail="right" />
+        <PulseEdge pulseKey={pulseKey} rail="right" off={collapsed} />
       </RailPane>
     );
   }
@@ -111,7 +119,7 @@ export default function ContextCard({
   const context: PickDescriptor = { kind: "meta", title: mgCfg.name, cfg: mgCfg };
   // Pair the dossier (the outer rounded pane) with its 3D hub: hovering either glows both in the
   // metagraph's hue, via the shared hoverFilter channel.
-  const pair = subjectPairing<string>(hoverFilter, mgCfg.id, setHoverFilter, identityHudCss(mgCfg.id));
+  const pair = subjectPairing<string>(hoverFilter, mgCfg.id, setHoverFilter, effectHue(identityHudCss(mgCfg.id)));
   return (
     <RailPane
       entry={collapsed}
@@ -134,7 +142,7 @@ export default function ContextCard({
       {/* Scene-facing (left) edge pulse on a new subject (metagraph picked) — synced with the
           dossier title's own roll-in (MetaCard keys it on cfg.name; both fire on the filter
           change). */}
-      <PulseEdge pulseKey={pulseKey} rail="right" />
+      <PulseEdge pulseKey={pulseKey} rail="right" off={collapsed} />
     </RailPane>
   );
 }
