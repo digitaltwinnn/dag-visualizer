@@ -36,8 +36,14 @@ export const CABINET_TRIGGER = [
   // shadow leaked a one-pixel vertical hairline down the tab's right edge. A 2px gradient laid
   // along the bottom has no edge to leak from. `shadow-none!` clears the primitive's own.
   "data-[state=active]:shadow-none!",
-  "data-[state=active]:[background-image:linear-gradient(var(--primary),var(--primary))]!",
-  "data-[state=active]:[background-size:100%_2px]! data-[state=active]:[background-position:bottom]! data-[state=active]:bg-no-repeat!",
+  // ⚠️ THE RULE'S PLACE IS STATED AT REST, and only its LENGTH changes on the active tab (user,
+  // 2026-10-03: "clicking that tab has the underline arriving from the top, looks strange"). The
+  // image, its position and its size all used to arrive with the active state, and the primitive
+  // transitions every property — so the rule eased from a background's defaults (top-left, full
+  // height) down to the bottom edge. Pinned to the bottom-left at zero length, it can only grow
+  // along the baseline it belongs to.
+  "[background-image:linear-gradient(var(--primary),var(--primary))]! [background-position:left_bottom]! bg-no-repeat! [background-size:0%_2px]!",
+  "data-[state=active]:[background-size:100%_2px]!",
 ].join(" ");
 
 /** The body under the row. No box: the baseline hairline above it is the only division. */
