@@ -111,6 +111,16 @@ export interface CalloutModel {
 }
 type Model = CalloutModel;
 
+// THE LEADER'S STRENGTH IS PER GROUND (user, 2026-10-03: "the callout line is not very easy to
+// see in light mode"). The bare accent at 0.55 is a glow on the dark ground and a pale thread on
+// paper, where nothing blooms and the page is its own bright field — the History tether's
+// finding the same week (`TrendTether`), and the same answer: on paper the line takes the
+// accent's INK (`--primary-ink`) at 0.85; dark keeps what it had. `light-dark()` resolves
+// colours only, so the alpha rides the colour rather than `strokeOpacity`.
+const LEADER_STROKE = {
+  stroke: "light-dark(color-mix(in oklch, var(--primary-ink) 85%, transparent), color-mix(in oklch, var(--primary) 55%, transparent))",
+} as const;
+
 const geoOf = (p: { kind: string }): GeoInfo | undefined =>
   "geo" in p ? (p as { geo?: GeoInfo }).geo : undefined;
 
@@ -563,8 +573,7 @@ function CalloutMark({ m, id, multi }: { m: Model; id: "callout" | "callout-2"; 
           y1={-6}
           x2={CALLOUT_OFF_X}
           y2={-(CALLOUT_OFF_Y - CALLOUT_LEG_INSET)}
-          stroke="var(--primary)"
-          strokeOpacity="0.55"
+          style={LEADER_STROKE}
           strokeWidth="1.5"
           strokeDasharray="4 4"
         />
@@ -581,7 +590,7 @@ function CalloutMark({ m, id, multi }: { m: Model; id: "callout" | "callout-2"; 
         <svg className="co-multi absolute left-0 top-0 overflow-visible" width="1" height="1" aria-hidden>
           {[0, 1].map((i) => (
             <g key={i} className="co-mleg" visibility="hidden">
-              <line x1={0} y1={0} x2={0} y2={0} stroke="var(--primary)" strokeOpacity="0.55" strokeWidth="1.5" strokeDasharray="4 4" />
+              <line x1={0} y1={0} x2={0} y2={0} style={LEADER_STROKE} strokeWidth="1.5" strokeDasharray="4 4" />
               <circle cx={0} cy={0} r={3.5} fill="none" strokeWidth={1.5} stroke={m.ring} />
             </g>
           ))}
