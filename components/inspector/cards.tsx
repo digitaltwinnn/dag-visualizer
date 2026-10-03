@@ -430,7 +430,10 @@ function ScheduleGroup({
         {value !== undefined && <span className="ml-auto min-w-0 text-body text-foreground tabular-nums text-right">{value}</span>}
       </CollapsibleTrigger>
       <CollapsibleContent className="disclose-panel">
-        <div className="mt-1 pl-2">{children}</div>
+        {/* No indent (user, 2026-10-03: "the label has room to move to the left"). The 8px nested
+            the rows under a chevron that is gone — the fold is marked on its label now — and it
+            was exactly the room the cut's name needed to stand clear of its first value. */}
+        <div className="mt-1">{children}</div>
       </CollapsibleContent>
     </Collapsible>
   );
