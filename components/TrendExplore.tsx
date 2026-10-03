@@ -76,9 +76,12 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   // a value that moves (the snapshot card's age) instead of trailing a mid-dot.
   const over =
     roster.headKind === "span" ? (
-      <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-        {spanWord(metric)}
-        <QualifierChip>{spanPhrase(windowId, range)}</QualifierChip>
+      // The chip is an INDICATOR at the row's right end, not a word in the sentence (user, same
+      // day: "right align it, as an indicator, not part of the actual text") — the Lead's own
+      // sentence-left, chip-right row.
+      <span className="flex items-center justify-between gap-2">
+        <span className="min-w-0">{spanWord(metric)}.</span>
+        <QualifierChip className="flex-none">{spanPhrase(windowId, range)}</QualifierChip>
       </span>
     ) : (
       "Latest full day."

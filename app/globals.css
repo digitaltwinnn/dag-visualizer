@@ -323,6 +323,13 @@
    entirely with pairing, and a paired card hovered on its plank still reads as paired. */
 .rail-card:hover .sig-left::before  { opacity: 1; }
 .rail-card:hover .sig-right::after  { opacity: 1; }
+/* THE PULSE OUTRANKS THE HOVER EDGE (user, 2026-10-03: "the edge pulse fights with the mouse
+   hover"). Both draw on the scene-facing edge; while a pulse is live on a card (`data-live`,
+   `EdgePulse.tsx` — its paused wait for the card's expand included) the host's own edge line
+   stays dark, whisper and pairing alike, and fades in when the pulse has left. `!important`
+   because the pairing rule below sets opacity too and must not out-order this. */
+.sig-left:has(.edge-pulse[data-live])::before,
+.sig-right:has(.edge-pulse[data-live])::after { opacity: 0 !important; }
 
 /* Hover PAIRING — the only non-pulse edge signal, shown strictly WHILE HOVERED (the class comes
    and goes with the hover; the 0.16s transition on the base elements eases it in/out).
@@ -391,19 +398,34 @@
    visibly settling panel without the dead beat a full-rise wait read as. The wrapper is keyed
    by subject, so a subject change replays the whole sequence. Unlayered on purpose — the pause
    gate must beat `.roll-in`'s layered animation shorthand (CSS trap 1). */
-#callout { --co-draw-at: calc(var(--tempo-roll-lag) + 0.6 * var(--tempo-doc-rise)); }
+/* THE CALLOUT RUNS ON ITS OWN, QUICKER CLOCK (user, 2026-10-03: "the dotted line and callout
+   should appear a bit faster" — the second ask of the kind; 2026-09-05 moved the draw up to 60%
+   of the rise). It borrowed the cards' text-arrival tempo: a 0.2s lag, a 1.15s rise, then a 0.65s
+   draw — the line landed 1.5s after the reveal and the ring at 1.7s, and the reveal itself
+   already waits for the camera's flight. A card's title arrives beside a body that is easing its
+   height; the callout arrives alone over a scene that has just stopped, so it has nothing to
+   wait for: a 0.05s lag, a 0.7s rise, a 0.45s draw — line home at 0.9s, ring at 1.05s. Same
+   sequence, same curve, about 40% sooner. Three local numbers rather than the shared tokens, so
+   the cards' text clock is untouched. */
+#callout {
+  --co-lag: 0.05s;
+  --co-rise: 0.7s;
+  --co-draw: 0.45s;
+  --co-draw-at: calc(var(--co-lag) + 0.6 * var(--co-rise));
+}
+#callout .roll-in { animation-duration: var(--co-rise); animation-delay: var(--co-lag); }
 #callout .co-draw {
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: co-draw var(--tempo-roll) var(--ease-roll) var(--co-draw-at) forwards;
+  animation: co-draw var(--co-draw) var(--ease-roll) var(--co-draw-at) forwards;
 }
 #callout .co-tip {
   opacity: 0;
-  animation: co-fade 0.2s ease-out calc(var(--co-draw-at) + var(--tempo-roll)) forwards;
+  animation: co-fade 0.15s ease-out calc(var(--co-draw-at) + var(--co-draw)) forwards;
 }
 #callout .co-multi {
   opacity: 0;
-  animation: co-fade var(--tempo-roll) var(--ease-roll) var(--co-draw-at) forwards;
+  animation: co-fade var(--co-draw) var(--ease-roll) var(--co-draw-at) forwards;
 }
 /* Paused until the Engine actually SHOWS the callout (`data-on`): a commit answered by a camera
    flight keeps the wrapper hidden for the whole arrival, and an entrance that played invisibly

@@ -678,7 +678,7 @@ export default function RailPager({
           role="group"
           aria-label={set ? (set.open ? `Step through ${set.parentLabel}` : `Siblings in ${set.parentLabel}`) : "Card ladder"}
           title={set?.parentLabel}
-          className="pointer-events-auto absolute bottom-1 inset-x-[19px] flex h-5 items-center gap-1"
+          className="pointer-events-auto absolute bottom-1 inset-x-[19px] grid h-5 grid-cols-[1fr_auto_1fr] items-center"
         >
           {/* An edge chevron is INACTIVE, not hidden — but an AXIS with nothing to navigate on
               this card EVER is ABSENT (user, 2026-09-11, two rounds; supersedes 2026-09-03's
@@ -690,10 +690,15 @@ export default function RailPager({
               The trio is CENTERED as one cluster — chevrons hugging the counter — rather than
               spread to the card edges (user, same day: with the ladder pair aboard, an
               edge-aligned › sat right beside ∧; the flex spacers put clear air between the two
-              axes instead). */}
-          <div className="min-w-0 flex-1" />
-          {set && (
-            <>
+              axes instead).
+              ⚠️ CENTRED ON THE CARD, NOT ON THE ROOM LEFT OVER (user, 2026-10-03: "the <> control
+              at the card bottom should be center aligned"). As a flex row with two spacers the
+              trio centred in whatever the ladder pair did not take — 33px left of the card's
+              middle. Three columns, `1fr auto 1fr`: the trio owns the middle one, the pair sits
+              at the end of the third, and the first is its mirror — empty, but as wide. */}
+          <span aria-hidden />
+          {set ? (
+            <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="icon-xs"
@@ -722,8 +727,9 @@ export default function RailPager({
               >
                 <ChevronRight aria-hidden className="size-4" />
               </Button>
-              <div className="min-w-0 flex-1" />
-            </>
+            </div>
+          ) : (
+            <span aria-hidden />
           )}
           {/* THE LADDER PAIR (user, 2026-09-11) — ∧ re-boxes the coarser committed rung, ∨ the
               finer one (the accordion's own expand — the camera and callout follow the box as
@@ -731,7 +737,7 @@ export default function RailPager({
               in the explorer's own order. Same chrome-less grammar, same inactive-at-the-edge
               rule; the hairline keeps the two axes from reading as one four-way control. */}
           {(up || down) && (
-            <>
+            <div className="flex items-center justify-self-end gap-1">
               {set && <div aria-hidden className="mx-0.5 h-3 w-px bg-border" />}
               <Button
                 variant="ghost"
@@ -755,7 +761,7 @@ export default function RailPager({
               >
                 <ChevronDown aria-hidden className="size-4" />
               </Button>
-            </>
+            </div>
           )}
         </div>
       </div>
