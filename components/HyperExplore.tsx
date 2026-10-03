@@ -16,6 +16,7 @@ import { compositionToggleActions, filterToggleActions, nodeSelectActions } from
 import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
+import { useNoSignal } from "@/components/useNoSignal";
 
 // THE HYPERGRAPH'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -33,6 +34,7 @@ import { useStore } from "@/src/store/store";
 // none of them commits.
 
 export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: boolean } = {}) {
+  const dead = useNoSignal();
   const metaList = useStore((s) => s.metaList);
   const filter = useStore((s) => s.filter);
   const selNodes = useStore((s) => s.selNodes);
@@ -108,8 +110,10 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
           name,
           share: v / maxV,
           hue,
-          figure: v.toLocaleString(),
-          faint: m.nodes.length === 0,
+          // A network that has never answered has no count to state — a dash, not a 0 (rule 10;
+          // `useNoSignal`). The row still lists: the catalog is ours and the network exists.
+          figure: dead ? "—" : v.toLocaleString(),
+          faint: dead || m.nodes.length === 0,
           title: `${name} · ${m.nodes.length} node${m.nodes.length === 1 ? "" : "s"}`,
           onClick: () => toggleNetwork(m.id),
           pair: subjectPairing(hoverFilter, m.id, setHoverFilter, hue),

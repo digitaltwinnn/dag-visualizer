@@ -41,6 +41,7 @@ import LiveDot from "@/components/LiveDot";
 import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
+import { NO_SIGNAL_COPY, useNoSignal } from "@/components/useNoSignal";
 import { levelMeasure } from "@/src/data/explorerMeasure";
 import { IDENT_INK } from "@/components/identInk";
 
@@ -175,6 +176,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const setLedgerMeasure = useStore((s) => s.setLedgerMeasure);
   const snap = useStore((s) => s.snap);
   const following = useStore((s) => s.following);
+  const dead = useNoSignal();
   const live = useStore((s) => s.live);
   const metaSnap = useStore((s) => s.metaSnap);
   const tickNet = useStore((s) => s.tickNet);
@@ -359,7 +361,8 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
       // A 4-decimal fee ("0.0680") needs the wider figure column; the width holds across the
       // level's measures so the columns never shift when the heading's pick changes.
       figureW: 48,
-      empty: "Waiting for snapshots…",
+      // "Waiting" is a promise; a network that has never answered gets the honest state instead.
+      empty: dead ? NO_SIGNAL_COPY : "Waiting for snapshots…",
       rows: pagedSnaps.map((d, i): ExplorerRowSpec => {
         const count = tickFilterCount(d);
         const v = tickValues[i];

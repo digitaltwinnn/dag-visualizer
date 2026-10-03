@@ -173,7 +173,8 @@ export default function TrendTimeline() {
       <div className="flex-1 min-w-0 flex flex-col max-[700px]:min-h-[110px]">
         <div className="flex items-baseline justify-between gap-3 pt-0.5 leading-none">
           <span className="text-label text-muted-foreground truncate">{metricCaption(metric, 86_400_000)} across all networks</span>
-          {showHint && (
+          {/* …and only over a track there is something to drag on. */}
+          {showHint && measured && (
             <span className="flex-none text-label text-foreground-dim max-[700px]:hidden">
               Drag to set a range, {coarse ? "tap" : "click"} to mark a moment
             </span>

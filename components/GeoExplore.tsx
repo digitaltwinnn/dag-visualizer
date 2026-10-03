@@ -22,6 +22,7 @@ import { cohortToggleActions, countryToggleActions, nodeSelectActions, sameCohor
 import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
+import { NO_SIGNAL_COPY, useNoSignal } from "@/components/useNoSignal";
 import { ccMark } from "@/src/util/format";
 import { levelMeasure } from "@/src/data/explorerMeasure";
 
@@ -43,6 +44,7 @@ import { levelMeasure } from "@/src/data/explorerMeasure";
 // + `hoverCohort` for a cohort, `hoverNodeId` for a node), and none commits.
 
 export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: boolean } = {}) {
+  const dead = useNoSignal();
   const lb = useStore((s) => s.leaderboard);
   const country = useStore((s) => s.country);
   const cohort = useStore((s) => s.cohort);
@@ -140,7 +142,12 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
       // No tags at this level, so the name takes the tag home's room.
       nameW: 128,
       // Quiet-empty (a real metagraph with no locatable nodes): one honest message, no rows.
-      empty: quietEmpty ? (
+      // A network that has never answered: the list is empty because nothing was READ, which is a
+      // different fact from "no nodes" — and it used to be an empty card body with no words at
+      // all (test pass, 2026-10-03).
+      empty: dead ? (
+        NO_SIGNAL_COPY
+      ) : quietEmpty ? (
         <>
           <span className="block text-body text-foreground">No locatable nodes</span>
           {tickerOrName} has no nodes we can place on the map right now. It still appears in the Hypergraph.

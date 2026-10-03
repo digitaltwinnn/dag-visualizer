@@ -58,6 +58,12 @@ describe("leadingTrim", () => {
     expect(t.buckets).toEqual([]);
     expect(t.series["g.ticks"]).toEqual([]);
   });
+  it("trims a payload with NO coverage marker to EMPTY — a never-sampled network measured nothing", () => {
+    const bare = { ...win(0, DAY, [1, 2, 3]), series: {} };
+    const t = leadingTrim(bare);
+    expect(t.buckets).toEqual([]);
+  });
+
   it("is identity when measurement starts at the first bucket", () => {
     const w = win(0, DAY, [1, 2]);
     expect(leadingTrim(w)).toEqual(w);

@@ -61,7 +61,12 @@ export function sliceWindow(data: TrendsWindowData, ms: number): TrendsWindowDat
  *  let the band claim "since <a year ago>" over zero measurements). */
 export function leadingTrim(data: TrendsWindowData): TrendsWindowData {
   const ticks = data.series["g.ticks"];
-  if (!ticks) return data;
+  // NO COVERAGE MARKER AT ALL is the same fact as an all-null one (test pass, 2026-10-03): the
+  // store emits a series name only when a sample carried it, so a network that was never sampled
+  // — TestNet during its outage — answers with six years of buckets and an empty `series`. This
+  // used to return that payload untouched, and the History band drew an empty six-year axis
+  // with a brush on it instead of saying "nothing measured yet".
+  if (!ticks) return cut(data, data.buckets.length);
   const from = ticks.findIndex((v) => v != null);
   if (from === 0) return data;
   if (from < 0) return cut(data, data.buckets.length);

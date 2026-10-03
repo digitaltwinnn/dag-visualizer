@@ -35,6 +35,7 @@ import { HyperCells, GeoCells, LedgerCells } from "@/components/vitals/viewCells
 import TrendTimeline from "@/components/TrendTimeline";
 import { QualifierChip } from "@/components/inspector/parts";
 import { spanPhrase } from "@/src/data/trendWindow";
+import { NO_SIGNAL_COPY, useNoSignal } from "@/components/useNoSignal";
 
 function useVitalsScope() {
   const mode = useStore((s) => s.mode);
@@ -88,6 +89,7 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
   // faster: it answers a gesture already finished).
   const yielding = useSceneYield();
   const bandWindow = VIEW_POLICIES[mode].bandWindow;
+  const dead = useNoSignal() && VIEW_POLICIES[mode].bandContent === "vitals";
   // THE BAND NEVER PAINTS UNDER AN OPEN SHEET (user, 2026-09-04 — "sometimes I see flickering
   // when the explore and bottom bar overlap"). The overlay decision above stands: the sheets
   // cover the band. But the sheet's glass is translucent, so a band that kept PAINTING under
@@ -177,6 +179,18 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
         !live && "saturate-[.45]",
       )}
     >
+      {/* A NETWORK THAT HAS NEVER ANSWERED gets ONE statement, not a row of cells (test pass,
+          2026-10-03, on TestNet during its outage): the cells printed "0 located", "Hybrid 0",
+          "L0 0" — counts of nothing, set like readings (rule 10). A later drop is different and
+          unchanged: those numbers were real, so they stay, desaturated, beside the dot. The
+          History band is exempt — its tenant is a control with honesty states of its own. */}
+      {dead ? (
+        <span className="flex-1 flex items-center justify-center gap-2.5 text-body text-muted-foreground">
+          <NoSignalDot />
+          {NO_SIGNAL_COPY}
+        </span>
+      ) : (
+        <>
       {!live && <span className="self-center"><NoSignalDot /></span>}
       {/* THE BAND'S WINDOW, ONCE (`viewPolicy.bandWindow`, user 2026-10-03): above the plate's right
           corner, where History's range pills stand — the band's time scope has one place in
@@ -201,6 +215,8 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
           "[&>*+*]:border-l [&>*+*]:border-border/60 [&>*+*]:rounded-none",
         )}
       />
+        </>
+      )}
       {/* NO filter-scope hairline (user, 2026-08-30 — removed): unlike the old bar cluster's
           bare numbers, the band's own charts already wear the identity accent under a filter,
           so the scope is stated by the vitals themselves. */}
@@ -219,6 +235,16 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
  *  width, which is what `[&>*]:flex-none [&>*]:basis-auto` on the wrapper below says. */
 export function VitalsSheetBody() {
   const { mode, live, filter, accent } = useVitalsScope();
+  const dead = useNoSignal() && VIEW_POLICIES[mode].bandContent === "vitals";
+  // The band's own rule (see the desktop section): never-answered → one statement, no cells.
+  if (dead) {
+    return (
+      <p className="m-0 flex items-center gap-2.5 py-2 text-body text-muted-foreground">
+        <NoSignalDot />
+        {NO_SIGNAL_COPY}
+      </p>
+    );
+  }
   return (
     <div
       className={cn(
