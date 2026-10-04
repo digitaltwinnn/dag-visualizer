@@ -43,7 +43,6 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import { NO_SIGNAL_COPY, useNoSignal } from "@/components/useNoSignal";
 import { levelMeasure } from "@/src/data/explorerMeasure";
-import { IDENT_INK } from "@/components/identInk";
 
 // THE SNAPSHOTS VIEW'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -387,16 +386,18 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         return {
           key: String(d.ordinal),
           name: <span className="tabular-nums">{d.ordinal.toLocaleString()}</span>,
-          // The lens's count in the network's hue where it anchored; no "0" — a zero in a
-          // network's own colour reads as a reading about that network.
-          tag: filterNet && count > 0 ? <span className={cn("tabular-nums", IDENT_INK)} style={{ color: filterNet.hue }}>{count}</span> : undefined,
+          // THE LENS IS THE BAR'S COLOUR, not a number beside it (user, 2026-10-04: "remove the
+          // added '1' and instead use the colour"). The bar always measures the whole tick, as it
+          // does unfiltered, so it keeps the default cyan; a tick the committed network anchored
+          // into takes that network's hue. Colour plus the faint row below, never colour alone.
           share: v != null ? v / maxTick : undefined,
-          hue: accent,
+          hue: filterNet && count > 0 ? filterNet.hue : "var(--primary)",
           // Absent = the dash, never a number derived from another (rule 10).
           figure: tickMeasure(ledgerMeasure, d, snapshotExact[d.ordinal]),
           on,
           faint: !!filterNet && count === 0 && !on,
-          title: `Global snapshot ${d.ordinal.toLocaleString()}, ${d.metagraphSnapshotCount ?? 0} snapshots anchored`,
+          // The count the bar's colour stands for, in words — colour is never the only carrier.
+          title: `Global snapshot ${d.ordinal.toLocaleString()}, ${d.metagraphSnapshotCount ?? 0} snapshots anchored${filterNet ? (count > 0 ? `, ${count} from ${filterNet.name}` : `, none from ${filterNet.name}`) : ""}`,
           onClick: () => {
             // A pinned stream and the live tip's row: this click resumes live (see the effect above).
             ownResume.current = !following && latestRelevant("all")?.ordinal === d.ordinal && !(on && !following);
