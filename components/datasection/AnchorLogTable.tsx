@@ -143,8 +143,15 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   const net = getNetwork();
   const snapshotExact = useStore((s) => s.snapshotExact);
   const lens = ledgerLens(filter);
-  // HISTORY mode: a committed catalog network (the lens already maps DAG → "all").
-  const histNet = lens !== "all" && lens !== UNLISTED_ID && metagraphById(lens) ? lens : null;
+  // The network the COMMITTED FILTER names, if any (the lens already maps DAG → "all").
+  const lensNet = lens !== "all" && lens !== UNLISTED_ID && metagraphById(lens) ? lens : null;
+  // The log's OWN scope under "all": the network picked in its search, or handed in by a door
+  // (user, 2026-10-04: "in the moment card, go to raw snapshot sets the global filter — that should
+  // not happen; only set the filter in the raw list / search section"). See `searchMeta` below.
+  const [searchMeta, setSearchMeta] = useState<string | null>(null);
+  // HISTORY mode: the chain this table pages — the committed filter's network, else the log's own
+  // pick. The filter wins: under a commit the table IS that network's chain.
+  const histNet = lensNet ?? (searchMeta && metagraphById(searchMeta) ? searchMeta : null);
   // ⚠️ A NETWORK CAN HAVE MORE THAN ONE CHAIN (user, 2026-10-02: "try also searching the first
   // BioFi retired chain, it should be able to handle that by design"). A re-registered metagraph
   // keeps its earlier addresses in the catalog (`formerIds`, `src/net/lineage.ts`), and each is a
@@ -183,7 +190,6 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // committed filter whenever there is one (user: "in a filter you can preselect it no?") — under
   // "all" the log is a window over every network at once, so there is nothing to infer and the
   // reader picks (user: "in all there are multiple networks, so it's needed").
-  const [searchMeta, setSearchMeta] = useState<string | null>(null);
   // ⚠️ UNDER A COMMIT THE PICKER IS A READOUT, NOT A CHOICE. This table IS the committed network's
   // chain — it pages that chain server-side — so an ordinal typed here can only ever count on it,
   // and offering a different network would promise a search this surface cannot run. `histNet`
@@ -843,7 +849,9 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       networks={searchNets}
       metaId={searchNet}
       setMetaId={setSearchMeta}
-      metaLocked={!!histNet}
+      // Locked only by the FILTER: under "all" the pick is the log's own scope, and changing it
+      // pages the other network's chain.
+      metaLocked={!!lensNet}
       seeking={seeking}
       snapshot={qSnapshot}
       tick={qTick}
@@ -861,6 +869,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
 
   const clearSearch = () => {
     setQSnapshot(""); setQTick(""); setQFrom(""); setQTo("");
+    // Clearing the search under "all" also drops the log's own scope, back to every network.
+    if (!lensNet) setSearchMeta(null);
     setMarked(null); setJumpMiss(null);
     // Clearing the arrival's search cancels it: nothing is being found any more.
     pendingSeek.current = false;

@@ -13,9 +13,10 @@ import { join } from "node:path";
 //     directly is separately caught by `selectionBoundary.test.ts`; what this adds is the positive
 //     half, that the three known ones still go through the table.
 //
-//  2. ONE RECORDS DOOR. The step one rung down the observation ladder is a SEQUENCE — commit the
-//     network through the table, hand the span to the log, switch the view, open the raw layer —
-//     and it is written once, in `components/trendDoors.ts`. The Trends document carried it inline
+//  2. ONE RECORDS DOOR. The step one rung down the observation ladder is a SEQUENCE — hand the
+//     network and span to the log, switch the view, open the raw layer — and it is written once, in
+//     `components/trendDoors.ts`. It NEVER writes the app filter (user, 2026-10-04): the log scopes
+//     itself to the network it is handed. The Trends document carried it inline
 //     until the cursor card needed the same door; two copies of four ordered steps is how two
 //     surfaces quietly start landing a reader in different places.
 //
@@ -84,12 +85,13 @@ describe("one door to the records", () => {
     }
   });
 
-  it("the door still commits the network through the table, guarded so it never toggles OFF", () => {
+  it("the door never writes the app filter — it hands the network to the log", () => {
+    // User, 2026-10-04: going from the Moment card to the raw records "sets the global filter, that
+    // should not happen; only set the filter in the raw list / search section". The log scopes
+    // itself (AnchorLogTable's `searchMeta`); the top bar keeps the lens the reader chose.
     const code = stripComments(readFileSync("components/trendDoors.ts", "utf8"));
-    expect(code).toMatch(/applyClickActions\(\s*filterToggleActions/);
-    // The guard IS the correctness: `filterToggleActions` toggles, so handing it the already
-    // committed network would RELEASE the filter on a control whose whole purpose is to scope.
-    expect(code, "the filter commit must be guarded by a difference check").toMatch(/st\.filter\s*!==\s*scoped/);
+    expect(code).not.toMatch(/filterToggleActions|setFilter\s*\(/);
+    expect(code).toMatch(/setLogSeek\(\{\s*metaId/);
   });
 });
 

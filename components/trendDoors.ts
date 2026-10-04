@@ -1,7 +1,5 @@
 "use client";
 
-import { filterToggleActions } from "@/src/engine/domain/pickActions";
-import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 
 // THE MEASURED HISTORY'S TWO DOORS — ONE HOME (2026-09-19).
@@ -58,7 +56,10 @@ export function openRecords(metaId: string | null, span: RecordSpan | null): voi
   // as every network. Handing "dag" through left the chain picker empty and the seek waiting
   // forever (review, 2026-09-26).
   const scoped = metaId && metaId !== "dag" ? metaId : null;
-  if (scoped && st.filter !== scoped) applyClickActions(filterToggleActions(scoped, st.filter));
+  // ⚠️ THE DOOR NEVER WRITES THE APP FILTER (user, 2026-10-04: "it sets the global filter, that
+  // should not happen; only set the filter in the raw list / search section"). It hands the network
+  // to the log, which scopes ITSELF to it (AnchorLogTable's `searchMeta`) — the top bar, the scene
+  // and every other view keep the lens the reader chose.
   st.setLogSeek({ metaId: scoped, fromMs: span.fromMs, toMs: span.toMs });
   if (st.mode !== "ledger") {
     // Remember WHERE THE DOOR WAS (user, 2026-09-26): closing the layer goes back there, not to
