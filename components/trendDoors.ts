@@ -1,7 +1,5 @@
 "use client";
 
-import { filterToggleActions } from "@/src/engine/domain/pickActions";
-import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 
 // THE MEASURED HISTORY'S TWO DOORS — ONE HOME (2026-09-19).
@@ -58,7 +56,10 @@ export function openRecords(metaId: string | null, span: RecordSpan | null): voi
   // as every network. Handing "dag" through left the chain picker empty and the seek waiting
   // forever (review, 2026-09-26).
   const scoped = metaId && metaId !== "dag" ? metaId : null;
-  if (scoped && st.filter !== scoped) applyClickActions(filterToggleActions(scoped, st.filter));
+  // ⚠️ THE DOOR NEVER WRITES THE APP FILTER (user, 2026-10-04: "it sets the global filter, that
+  // should not happen; only set the filter in the raw list / search section"). It hands the network
+  // to the log, which scopes ITSELF to it (AnchorLogTable's `searchMeta`) — the top bar, the scene
+  // and every other view keep the lens the reader chose.
   st.setLogSeek({ metaId: scoped, fromMs: span.fromMs, toMs: span.toMs });
   if (st.mode !== "ledger") {
     // Remember WHERE THE DOOR WAS (user, 2026-09-26): closing the layer goes back there, not to
@@ -70,3 +71,16 @@ export function openRecords(metaId: string | null, span: RecordSpan | null): voi
   st.setSection("data");
 }
 
+
+/** THE SNAPSHOT DOOR (2026-10-04): a metagraph-snapshot card's "Show the raw data" hands the log
+ *  that one snapshot — its network and number — and the log's own snapshot search pages to the row
+ *  and marks it (user: "it should filter on that metagraph snapshot — now I see lots of records, and
+ *  quickly the one from my card is not even shown"). It opens the layer in place: the card's own
+ *  view and selection are untouched, so there is no mode step and no return to remember. The log
+ *  pages the door's network even under another filter (AnchorLogTable's `doorMeta`). */
+export function openSnapshotRecord(metaId: string, ordinal: number, ts: string): void {
+  const st = useStore.getState();
+  const at = Date.parse(ts);
+  st.setLogSeek({ metaId, fromMs: at, toMs: at, snapshot: ordinal });
+  st.setSection("data");
+}

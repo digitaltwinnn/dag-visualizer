@@ -258,9 +258,12 @@ const _sph = new THREE.Spherical();
 // ⚠️ ONE CLOSENESS NUMBER OVER A FIXED DIRECTION (user, 2026-10-03: "when a metagraph is selected,
 // zoom in a bit more"). The offset's DIRECTION — out, a half-step to the side, a lift — is the
 // composition, tuned once; `HUB_CLOSE` scales its length alone, so "closer" can never also turn
-// the view. 1 was the pose until then (14.5 units out); 0.85 stands the camera 12.3 out, where the
-// committed hub and its shells fill the gap between the rails instead of floating in it.
-export const HUB_CLOSE = 0.85;
+// the view. 1 was the pose until then (14.5 units out); 0.85 stood the camera 12.3 out, where the
+// committed hub and its shells fill the gap between the rails instead of floating in it; 0.75
+// (user, 2026-10-04: "make the hyper background a bit more fuzzy, but keep the selected metagraph
+// clear; perhaps a bit more zoom can help") stands it 10.9 out — closer, the subject owns more of
+// the depth of field's sharp zone and the rest of the hypergraph falls further behind it.
+export const HUB_CLOSE = 0.75;
 export function hubFraming(hubLocalPos: THREE.Vector3, out: CameraFraming): void {
   _out.copy(hubLocalPos).normalize();
   _side.crossVectors(_up, _out).normalize();

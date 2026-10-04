@@ -35,15 +35,15 @@ import { filterAccent, getAnchor, getNetwork, metagraphById, resolveSigner, SIGN
 import { metaSnapHoverKey, type GlobalSnapshot, type NodeRow, type SnapshotExact } from "@/src/data/types";
 import { displayNetwork, LISTED_IDS, UNLISTED_HUE, UNLISTED_ID, UNLISTED_LABEL, unlistedLog } from "@/src/data/unlisted";
 import { POLL } from "@/src/engine/config";
-import { followToggleActions, metaSnapSelectActions, nodeSelectActions, sameMetaSnap, snapshotSelectActions } from "@/src/engine/domain/pickActions";
+import { followToggleActions, metaSnapSelectActions, nodeSelectActions, sameMetaSnap, snapshotSelectActions, tickNetSelectActions } from "@/src/engine/domain/pickActions";
 import { heldTicks, nextHoldTop } from "@/src/data/ledgerHold";
+import { CLOSED_PATH, pathViewChanged, syncLedgerPath, type LedgerPath, type LedgerPathView } from "@/src/data/ledgerPath";
 import LiveDot from "@/components/LiveDot";
 import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import { NO_SIGNAL_COPY, useNoSignal } from "@/components/useNoSignal";
 import { levelMeasure } from "@/src/data/explorerMeasure";
-import { IDENT_INK } from "@/components/identInk";
 
 // THE SNAPSHOTS VIEW'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -232,9 +232,13 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const orderedSnaps = [...held.ticks].reverse(); // newest first, the log convention
   const activeSnapOrd = snap?.data.ordinal ?? null;
   const [tickPage, setTickPage] = useState(1);
-  // The path's first step, declared here because the page size reads it: the fit measures only
-  // while the tick level (no tick open) is the one on screen.
-  const [openTick, setOpenTick] = useState<number | null>(null);
+  // THE PATH — which tick, which network in it, which snapshot's signers are open. Declared here
+  // because the page size reads it (the fit measures only while the tick level is on screen); how
+  // the store moves it is `src/data/ledgerPath.ts`, applied below.
+  const [path, setPath] = useState<LedgerPath>(CLOSED_PATH);
+  const openTick = path.tick;
+  const openNet = path.net;
+  const openSnap = path.snap;
   // THE PAGE SIZE FILLS THE RAIL on desktop (`useFitRows`): measured only while the tick level is
   // the one on screen, and when it changes the reader keeps their place — the page holding the
   // row that was first on screen (`pageKeepingRow`), so a resize never throws them to page 1.
@@ -262,60 +266,33 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
     return ensurePage(ords);
   }, [pagedKey]);
 
-  // The path: which tick, which network in it, which snapshot's signers.
-  const [openNet, setOpenNet] = useState<string | null>(null);
-  const [openSnap, setOpenSnap] = useState<string | null>(null); // `${metaId}|${ordinal}` — a bare ordinal collides (every undecodable unlisted payload is 0)
-  // A snapshot committed ANYWHERE opens the path to it (the scene's tile, the rail's pager, the
-  // raw log), so the explorer always shows the level the committed subject sits on.
-  const metaSnapKey = metaSnap ? `${metaSnap.globalOrdinal}|${metaSnap.metaId}|${metaSnap.ordinal}` : null;
-  useEffect(() => {
-    if (!metaSnap) return;
-    const netId = LISTED_IDS.has(metaSnap.metaId) ? metaSnap.metaId : UNLISTED_ID;
-    setOpenTick(metaSnap.globalOrdinal);
-    setOpenNet(netId);
-    setOpenSnap((cur) => (cur === `${metaSnap.metaId}|${metaSnap.ordinal}` ? cur : null));
-    const at = orderedSnaps.findIndex((d) => d.ordinal === metaSnap.globalOrdinal);
-    if (at >= 0) setTickPage(Math.floor(at / pageSize) + 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one sync per committed snapshot
-  }, [metaSnapKey]);
-  // A tick pinned elsewhere (the rail's ‹ › plank) while a tick is open re-points the path — but
-  // NOT when the same commit carried a metagraph snapshot for that tick: the effect above has
-  // just opened the path to the snapshot, and this one, reading the stale `openTick`, would
-  // close it back to the networks level (review, 2026-09-26). The effects run in one commit.
-  useEffect(() => {
-    if (openTick == null || following || activeSnapOrd == null || activeSnapOrd === openTick) return;
-    if (metaSnap && metaSnap.globalOrdinal === activeSnapOrd) return;
-    setOpenTick(activeSnapOrd);
-    setOpenNet(null);
-    setOpenSnap(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- follows the pin, not the path
-  }, [activeSnapOrd, following]);
-
-  // RESUMING LIVE CLOSES THE PATH (test pass, 2026-10-03). Releasing a pin clears the tick-local
-  // commits — the rail drops its Metagraph and Metagraph-snapshot cards — but the path is local
-  // state and stayed where it was: the rail said "live", the explorer still listed the validators
-  // that signed the snapshot just let go, three levels inside a tick nothing was pinned to. A
-  // resume is a return to the stream, so the explorer returns to the list of it. Only on the
-  // false → true EDGE: a path opened by browsing while live is the reader's own and is left alone.
-  // ⚠️ …UNLESS THE RESUME IS THIS EXPLORER'S OWN CLICK (whole-branch review, 2026-10-03). The
-  // live tip's row resumes live AND opens the tick — its handler says so — and this effect, a
-  // render later, closed what the click had just opened: the row needed a second click. The
-  // handler flags the resume it is about to cause, and that one edge is left alone.
-  const wasFollowing = useRef(following);
-  const ownResume = useRef(false);
-  useEffect(() => {
-    const resumed = following && !wasFollowing.current;
-    wasFollowing.current = following;
-    if (!resumed) return;
-    if (ownResume.current) {
-      ownResume.current = false;
-      return;
+  // THE STORE MOVES THE PATH through one pure function (`syncLedgerPath`, with its rules and their
+  // history) — applied DURING RENDER when the view it reads changes, so the path lands in the same
+  // commit as the selection. The two page moves ride the same transitions: opening onto a snapshot
+  // turns to its tick's page, and a resume that closes the path returns to page 1.
+  const pathView: LedgerPathView = {
+    metaSnap: metaSnap
+      ? { metaId: metaSnap.metaId, ordinal: metaSnap.ordinal, globalOrdinal: metaSnap.globalOrdinal, netKey: LISTED_IDS.has(metaSnap.metaId) ? metaSnap.metaId : UNLISTED_ID }
+      : null,
+    snapOrd: activeSnapOrd,
+    following,
+  };
+  const [seenView, setSeenView] = useState(pathView);
+  if (pathViewChanged(seenView, pathView)) {
+    setSeenView(pathView);
+    const next = syncLedgerPath(path, seenView, pathView);
+    // A resume is a return to the stream, so the list returns to its live page — even with no tick
+    // open (review, 2026-10-04) — unless it is this explorer's own click, which opened a tick.
+    if (pathView.following && !seenView.following && !path.selfResume) setTickPage(1);
+    if (next !== path) {
+      setPath(next);
+      if (next.tick == null && path.tick != null) setTickPage(1);
+      else if (pathView.metaSnap && next.tick === pathView.metaSnap.globalOrdinal && next.tick !== path.tick) {
+        const at = orderedSnaps.findIndex((d) => d.ordinal === next.tick);
+        if (at >= 0) setTickPage(Math.floor(at / pageSize) + 1);
+      }
     }
-    setOpenTick(null);
-    setOpenNet(null);
-    setOpenSnap(null);
-    setTickPage(1);
-  }, [following]);
+  }
 
   const accent = filterAccent(filter);
   const tick = openTick != null ? orderedSnaps.find((d) => d.ordinal === openTick) ?? null : null;
@@ -344,11 +321,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
       key: "ticks",
       crumb: {
         label: "Snapshots",
-        onRelease: () => {
-          setOpenTick(null);
-          setOpenNet(null);
-          setOpenSnap(null);
-        },
+        onRelease: () => setPath(CLOSED_PATH),
       },
       measure: { options: LEDGER_MEASURE_OPTIONS, value: ledgerMeasure, onPick: (id) => setLedgerMeasure(id as LedgerMeasure) },
       // The held list's ONE control: how many ticks arrived behind the pin, and the way back to
@@ -380,19 +353,26 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         return {
           key: String(d.ordinal),
           name: <span className="tabular-nums">{d.ordinal.toLocaleString()}</span>,
-          // The lens's count in the network's hue where it anchored; no "0" — a zero in a
-          // network's own colour reads as a reading about that network.
-          tag: filterNet && count > 0 ? <span className={cn("tabular-nums", IDENT_INK)} style={{ color: filterNet.hue }}>{count}</span> : undefined,
+          // THE LENS IS THE BAR'S COLOUR, not a number beside it (user, 2026-10-04: "remove the
+          // added '1' and instead use the colour"). The bar always measures the whole tick, as it
+          // does unfiltered, so it keeps the default cyan; a tick the committed network anchored
+          // into takes that network's hue. Colour plus the faint row below, never colour alone.
           share: v != null ? v / maxTick : undefined,
-          hue: accent,
+          // …and under a filter a tick it did NOT anchor into steps back to a SOFTER cyan — the same
+          // hue at less strength, never a grey (user, 2026-10-04: "a bit more muted, like the scene",
+          // then "not gray-cyan, just a less strong cyan"). Unfiltered, every bar keeps the full accent.
+          hue: !filterNet ? "var(--primary)" : count > 0 ? filterNet.hue : "color-mix(in oklch, var(--primary) 50%, transparent)",
           // Absent = the dash, never a number derived from another (rule 10).
           figure: tickMeasure(ledgerMeasure, d, snapshotExact[d.ordinal]),
           on,
+          // No `rung`: a committed tick row's click also opens its tick in this card (local path
+          // state), which a re-box would swallow — and its Global snapshot card is the box anyway.
           faint: !!filterNet && count === 0 && !on,
-          title: `Global snapshot ${d.ordinal.toLocaleString()}, ${d.metagraphSnapshotCount ?? 0} snapshots anchored`,
+          // The count the bar's colour stands for, in words — colour is never the only carrier.
+          title: `Global snapshot ${d.ordinal.toLocaleString()}, ${d.metagraphSnapshotCount ?? 0} snapshots anchored${filterNet ? (count > 0 ? `, ${count} from ${filterNet.name}` : `, none from ${filterNet.name}`) : ""}`,
           onClick: () => {
             // A pinned stream and the live tip's row: this click resumes live (see the effect above).
-            ownResume.current = !following && latestRelevant("all")?.ordinal === d.ordinal && !(on && !following);
+            const selfResume = !following && latestRelevant("all")?.ordinal === d.ordinal && !(on && !following);
             applyClickActions(
               snapshotSelectActions(globalPick, latestRelevant("all")?.ordinal === d.ordinal, {
                 pinnedOrdinal: !following && snap ? snap.data.ordinal : null,
@@ -404,9 +384,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
             // with it rather than opening the tick it just let go (review, 2026-09-26); any other
             // click toggles the tick open, the live tip included.
             const releasing = on && !following;
-            setOpenTick(releasing || openTick === d.ordinal ? null : d.ordinal);
-            setOpenNet(null);
-            setOpenSnap(null);
+            setPath({ ...CLOSED_PATH, tick: releasing || openTick === d.ordinal ? null : d.ordinal, selfResume });
           },
           pair: subjectPairing(hoverSnapOrd, d.ordinal, setHoverSnapOrd, accent),
         };
@@ -450,10 +428,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
       key: "networks",
       crumb: {
         label: <span className="tabular-nums">{tick.ordinal.toLocaleString()}</span>,
-        onRelease: () => {
-          setOpenNet(null);
-          setOpenSnap(null);
-        },
+        onRelease: () => setPath((p) => ({ ...p, net: null, snap: null })),
       },
       meaning: "Networks that anchored into it",
       measure: { options: TICK_NET_MEASURE_OPTIONS, value: netPick, onPick: (id) => setLedgerMeasure(id as LedgerMeasure) },
@@ -484,12 +459,23 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           title: lensedOut
             ? `${n.name} · ${n.count} snapshot${n.count === 1 ? "" : "s"} anchored here — outside the committed filter`
             : `${n.name} · ${n.count} snapshot${n.count === 1 ? "" : "s"} anchored into ${tick.ordinal.toLocaleString()}`,
-          // OPENS, never commits (user, 2026-08-10).
+          // OPENS ITS CARD TOO (user, 2026-10-04: "clicking a row in the explorer should open the
+          // related card; happens for some but not for all" — this row was the one that only
+          // drilled, ruled "opens, never commits" on 2026-08-10, before a network could be
+          // committed INSIDE a tick). It commits the tick-local network — the pager ∨'s own
+          // `tickNetSelectActions`, which pins the tick and never writes the filter — so the
+          // Metagraph card boxes, and the path opens to its snapshots as before.
           onClick: lensedOut
             ? undefined
             : () => {
-                setOpenNet(n.id);
-                setOpenSnap(null);
+                applyClickActions(
+                  tickNetSelectActions(n.id, { kind: "snapshot", title: `Global snapshot #${tick.ordinal}`, data: tick }, {
+                    metaSnap,
+                    hasInspect: !!selNode,
+                    net: ledgerNetwork({ filter, tickNet, snapOrdinal: activeSnapOrd ?? null }),
+                  }),
+                );
+                setPath((p) => ({ ...p, net: n.id, snap: null }));
               },
           // The row's hover IS the network's lane preview in the chamber (`hoverFilter`), paired
           // in the network's own hue — a scene-side hover of that lane lights this row back.
@@ -532,7 +518,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
             <span className={cn(openNet === UNLISTED_ID && "italic")}>{leafName}</span>
           </>
         ),
-        onRelease: () => setOpenSnap(null),
+        onRelease: () => setPath((p) => ({ ...p, snap: null })),
       },
       meaning: "Its snapshots anchored here",
       measure: { options: SNAP_MEASURE_OPTIONS, value: snapPick, onPick: (id) => setLedgerMeasure(id as LedgerMeasure) },
@@ -557,6 +543,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           hue: leafHue,
           figure: snapMeasure(snapPick, r),
           on,
+          rung: "metaSnap",
           title: isUnlisted
             ? `Unlisted channel ${r.metaId} · anchored into global ${tick.ordinal.toLocaleString()}${signers.length ? ` · signed by ${signers.length} ${SIGNER_GROUPS.proof.who}` : ""}`
             : `${leafName} snapshot ${r.ordinal.toLocaleString()} · anchored into global ${tick.ordinal.toLocaleString()}${signers.length ? ` · signed by ${signers.length} ${SIGNER_GROUPS.proof.who}` : ""}`,
@@ -565,7 +552,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
             // The AFFORDANCE FOLLOWS THE DATA: no exact read for this tick means no signers are
             // knowable, so the row commits and stays — a level onto nothing would claim a fact
             // we don't have. Re-clicking (the deselect) closes the level with it.
-            setOpenSnap(!on && signers.length > 0 ? key : null);
+            setPath((p) => ({ ...p, snap: !on && signers.length > 0 ? key : null }));
           },
           // The pairing wash follows the FILTER, as the snapshot's card does (2026-10-03) — the
           // two ends of one pairing light in one hue. The dot keeps the network's own.

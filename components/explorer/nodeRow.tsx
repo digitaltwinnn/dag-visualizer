@@ -129,6 +129,8 @@ export function nodeRowSpec(args: {
       </>
     ),
     on: args.on,
+    // Every node row's subject boxes the Node card (Explorer's committed-row re-box).
+    rung: "node",
     hue,
     // The hover names the row's facts in words; the id stays in its SHORT form (a full 128-glyph
     // id was "a very long text" — user, 2026-09-26). The whole id is the Node card's, one click on.

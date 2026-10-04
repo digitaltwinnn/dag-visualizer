@@ -28,7 +28,8 @@ import { readSceneColors, type SceneColors, LIGHT_TUNE } from "./sceneColors";
 import { setNodeDimTarget, setNodeEnv } from "./scene/objects/NodeFabric";
 import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme/resolve";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
-import { SHEET_SHIFT_K, sheetShiftPx } from "./domain/sheetShift";
+import { SHEET_SHIFT_K, chromeShiftPx, sheetShiftPx } from "./domain/sheetShift";
+import { ChromeBounds } from "./ChromeBounds";
 import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush, trendFit } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
@@ -398,6 +399,13 @@ export class Engine {
   private _reduceMotion: MediaQueryList =
     typeof window !== "undefined" ? window.matchMedia("(prefers-reduced-motion: reduce)") : ({ matches: false } as MediaQueryList);
   private _sheetShiftApplied = 0;
+  // The HUD bars' edges, read once for every engine consumer (`ChromeBounds`): the framing shift
+  // here and the callout's placement.
+  private _chrome = new ChromeBounds();
+  private _chromeShift(): number {
+    const c = this._chrome.read();
+    return c.bandOn ? chromeShiftPx(c.top, window.innerHeight - c.bandTop) : 0;
+  }
   private _sheetShiftW = 0;
   private _sheetShiftH = 0;
   /** The aspect the current pose was resolved at — seeds from the boot camera, updated per re-frame. */
@@ -548,6 +556,7 @@ export class Engine {
     // for the few values that change, so `sync` allocates nothing.
     this.callout = new CalloutSync({
       ctx: this.ctx,
+      chrome: this._chrome,
       globe: this.globe,
       ledger: this.ledger,
       layers: this.layers,
@@ -2161,7 +2170,8 @@ export class Engine {
       const el = this.ctx.renderer.domElement;
       const w = el.clientWidth || window.innerWidth;
       const h = el.clientHeight || window.innerHeight;
-      const target = sheetShiftPx(Math.max(st.sceneCoverBExplore, st.sceneCoverBDetails, st.sceneCoverBVitals), h);
+      const target =
+        sheetShiftPx(Math.max(st.sceneCoverBExplore, st.sceneCoverBDetails, st.sceneCoverBVitals), h) + this._chromeShift();
       const d = target - this._sheetShift;
       // REDUCED MOTION SNAPS (review, 2026-09-28): a whole-scene slide of up to half the viewport,
       // riding a sheet, is exactly the large-area motion the setting exists to remove. The sheet
@@ -2420,8 +2430,11 @@ export class Engine {
       // this cap — see SceneContext's dofParams note); raised 0.08 → 0.16 (user 2026-07-17:
       // more background separation while focused), then eased back to 0.10 (user 2026-09-26:
       // "the blur / focus effect in hyper view is a bit too strong") — the background still
-      // falls off, but a hub behind the focused one stays a hub rather than a smear.
-      this.ctx.dof.uniforms["maxblur"].value = 0.10 * dofMix;
+      // falls off, but a hub behind the focused one stays a hub rather than a smear — then up to
+      // 0.14 with the closer hub framing (`HUB_CLOSE` 0.75; user 2026-10-04: "a bit more fuzzy, but
+      // keep the selected metagraph clear"): nearer, the selection holds the sharp zone, so the
+      // background can take more blur without the subject paying for it. Still under 0.16.
+      this.ctx.dof.uniforms["maxblur"].value = 0.14 * dofMix;
     }
 
     this._syncCallout();
@@ -2478,7 +2491,7 @@ export class Engine {
   // so one buffer is safe; nothing may retain the reference across frames.
   private _calloutState: CalloutState = {
     inspect: null, snap: null, metaSnap: null, following: false, boxedCard: null,
-    country: null, cohort: null, sceneCoverL: 0, sceneCoverR: 0,
+    country: null, cohort: null, sceneCoverL: 0, sceneCoverR: 0, sceneCoverB: 0,
   };
   private _syncCallout(): void {
     const st = useStore.getState();
@@ -2486,6 +2499,7 @@ export class Engine {
     c.inspect = st.inspect; c.snap = st.snap; c.metaSnap = st.metaSnap; c.following = st.following;
     c.boxedCard = st.boxedCard; c.country = st.country; c.cohort = st.cohort;
     c.sceneCoverL = st.sceneCoverL; c.sceneCoverR = st.sceneCoverR;
+    c.sceneCoverB = Math.max(st.sceneCoverBExplore, st.sceneCoverBDetails, st.sceneCoverBVitals);
     this.callout.sync(c);
   }
 

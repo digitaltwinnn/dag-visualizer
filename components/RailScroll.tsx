@@ -53,7 +53,9 @@ export default function RailScroll() {
         const px = (name: string) => parseFloat(root.getPropertyValue(name)) || 0;
         const reserve = px("--bottom-reserve");
         const r = el.getBoundingClientRect();
-        const runway = el.classList.contains("rail-clip") ? px("--rail-fade") : 0; // globals.css .rail-clip
+        // The column's bottom padding is never content: `.rail-clip`'s runway when clipped, the
+        // shadow bleed (`--rail-bleed`) otherwise — read off the element so either counts.
+        const runway = parseFloat(getComputedStyle(el).paddingBottom) || 0;
         const contentH = el.scrollHeight - runway;
         // Space above the band, NO tolerance: any entry into the chart band fades (a +24px
         // slack let the rail overlap the chart unfaded — user bug; the content-height measure

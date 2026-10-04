@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SHEET_SHIFT_K, sheetShiftPx } from "./sheetShift";
+import { SHEET_SHIFT_K, chromeShiftPx, sheetShiftPx } from "./sheetShift";
 
 // The phone sheet's projection shift — the module header carries the design; this pins the
 // arithmetic the Engine hands to `camera.setViewOffset`.
@@ -20,5 +20,16 @@ describe("sheetShiftPx — half the bottom cover, up", () => {
     // 1 − e^(−k·0.55) ≈ 0.98: the shift lands with the glass, not ahead of it.
     expect(1 - Math.exp(-SHEET_SHIFT_K * 0.55)).toBeGreaterThan(0.95);
     expect(SHEET_SHIFT_K).toBeLessThan(12);
+  });
+});
+
+describe("chromeShiftPx — centre the frame in the band the bars leave", () => {
+  it("moves up by half of what the bottom chrome exceeds the top bar by", () => {
+    // Desktop, measured: top bar ends 67px down, band + footer take the last 132px.
+    expect(chromeShiftPx(67, 132)).toBe(32.5);
+  });
+  it("is zero when the two bars are even, and never reads a negative edge", () => {
+    expect(chromeShiftPx(80, 80)).toBe(0);
+    expect(chromeShiftPx(-5, 0)).toBe(0);
   });
 });

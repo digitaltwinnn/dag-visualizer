@@ -5,10 +5,9 @@
 // `CalloutSync` writes the per-frame transform and the flip/drop attributes), and the
 // standoff numbers below used to live in BOTH of them: the component as `OFF_X`/`OFF_Y`, the
 // Engine as the two reach thresholds derived from them, with a comment asking the next reader to
-// "change all four together". They are one concern, so they get one home. `app/globals.css` still
-// mirrors the standoff (`#callout .co-panel { left: 100px; bottom: 140px }`) because CSS can't
-// import a TS const — the same accepted mirror `RailThread`'s SVG stroke literals are, and the
-// only one left. Keep it in sync.
+// "change all four together". They are one concern, so they get one home — and the stylesheet reads
+// them too: SceneCallout writes the standoff and both factors onto each callout as CSS variables
+// (`--co-off-x/y`, `--co-hang-k`, `--co-phone-k`), so `app/globals.css` states no copy of them.
 //
 // ⚠️ THE FREE BAND IS NOT THE VIEWPORT. Below 1100px the rails become sheets that OVERLAY the
 // canvas rather than sitting beside it (see `RailDock`), and the canvas stays viewport-sized
@@ -99,8 +98,7 @@ export function calloutPlacement(
 // half a circle, so the two leaders are parallel; only the LENGTH differs, by one factor on both
 // axes, because the strip under the floor is short. Scaling one axis alone would change the angle.
 
-/** The hanging standoff, as a share of the standing one. `app/globals.css` mirrors it (`--co-k`
- *  under `[data-hang]`) — change both or neither. */
+/** The hanging standoff, as a share of the standing one (the stylesheet reads it as `--co-hang-k`). */
 export const CALLOUT_HANG_K = 0.55;
 /** The tallest panel the hanging label renders (eyebrow, title row, rule, lead) — 88px measured.
  *  The air under it is the caller's (`bottom` already stops short of the band). */
@@ -118,4 +116,45 @@ export const CALLOUT_HANG_REACH_Y = Math.round(CALLOUT_OFF_Y * CALLOUT_HANG_K) +
 export function calloutHangs(x: number, y: number, bandL: number, bandR: number, bottom: number): boolean {
   if (!(bandR > bandL) || x < bandL || x > bandR) return false;
   return x - CALLOUT_HANG_REACH_X >= bandL && y + CALLOUT_HANG_REACH_Y <= bottom;
+}
+
+// ---- the phone label ------------------------------------------------------------------------
+//
+// A PHONE STANDS THE LABEL STRAIGHT ABOVE ITS SUBJECT (user, 2026-10-04 — reversing 2026-08-18's
+// "drop the callout when in mobile mode": "it should fit, can also shorten the line … add an x").
+// The diagonal standoff cannot fit: a ~200px panel beside its anchor leaves the label only near the
+// screen's edges. Above the anchor it always fits horizontally — centred, nudged inward at an edge —
+// and the leader runs vertically into the subject, so it still says WHERE, which is what the old
+// ruling was protecting. Same factor family as the hanging label: one number shortens the leader.
+
+/** The phone leader's length, as a share of the standing standoff's height (read as `--co-phone-k`). */
+export const CALLOUT_PHONE_K = 0.4;
+const PHONE_AIR = 8;
+
+/**
+ * Where the phone label stands for an anchor at `(x, y)`: `left` is the panel's left edge relative
+ * to the anchor (centred, then clamped into the band with `PHONE_AIR` to spare); `drop` puts it
+ * below. `top`/`bottom` bound the free canvas — the command bar and the open sheet's top edge. The
+ * panel's measured size comes in, because its content (and so its width) varies by subject.
+ */
+export function calloutPhonePlacement(
+  x: number,
+  y: number,
+  bandL: number,
+  bandR: number,
+  top: number,
+  bottom: number,
+  panelW: number,
+  panelH: number,
+): { show: boolean; drop: boolean; left: number } {
+  const hidden = { show: false, drop: false, left: 0 };
+  if (!(bandR > bandL) || x < bandL || x > bandR || y < top || y > bottom) return hidden;
+  const reach = Math.round(CALLOUT_OFF_Y * CALLOUT_PHONE_K) + panelH;
+  const above = y - reach >= top;
+  const below = y + reach <= bottom;
+  if (!above && !below) return hidden;
+  const lo = bandL + PHONE_AIR - x;
+  const hi = bandR - PHONE_AIR - panelW - x;
+  const left = Math.max(lo, Math.min(hi, -panelW / 2));
+  return { show: true, drop: !above, left };
 }

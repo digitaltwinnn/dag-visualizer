@@ -6,6 +6,8 @@ import ExplorerShell from "@/components/ExplorerShell";
 import ExplorerHeading, { MeasureMenu, type MeasureControl } from "@/components/explorer/ExplorerHeading";
 import ExplorerPath, { type Crumb } from "@/components/explorer/ExplorerPath";
 import ExplorerRow from "@/components/explorer/ExplorerRow";
+import { useStore } from "@/src/store/store";
+import { openRailCard } from "@/components/railOpen";
 import { cn } from "@/lib/utils";
 
 // THE EXPLORER — one component, four views (design session 2026-09-26; the agreed screens and
@@ -47,6 +49,12 @@ export interface ExplorerRowSpec {
   figure?: ReactNode;
   /** The committed subject: wears the wash. */
   on?: boolean;
+  /** The rail CARD this row's subject boxes (a slot id: "country", "node", "metaSnap" …). With it,
+   *  a click on the COMMITTED row whose card is not the box brings that card back to the front
+   *  instead of deselecting — or opens it when no card is the box (user, 2026-10-04: "clicking a row in the explorer should open the
+   *  related card; happens for some but not for all") — the deselect stays the click on a row whose
+   *  card is already open. */
+  rung?: string;
   /** A real-but-empty subject: present, dimmed. */
   faint?: boolean;
   title?: string;
@@ -108,6 +116,15 @@ export interface ExplorerProps {
   /** The card head's right-aligned slot — a CARD-level state that holds on every level (the
    *  snapshot explorer's LIVE/PINNED, since 2026-09-28), as opposed to a level's own `setting`. */
   aside?: ReactNode;
+}
+
+/** A committed row's click: re-box its card when another card is the box (the accordion's own
+ *  expand — single-open, a quiet navigation, the camera following the box), else run the row's own
+ *  click, which for a committed row is the deselect. View state only — no selection is written. */
+function openOrToggle(rung: string, click: () => void): void {
+  const boxed = useStore.getState().boxedCard;
+  if (boxed === rung) return click();
+  openRailCard(rung, [boxed]);
 }
 
 export default function Explorer({ id, title, hint, levels, onLeave, defaultCollapsed, aside }: ExplorerProps) {
@@ -249,7 +266,7 @@ export default function Explorer({ id, title, hint, levels, onLeave, defaultColl
                     hue={r.hue}
                     faint={r.faint}
                     title={r.title}
-                    onClick={r.onClick}
+                    onClick={r.on && r.rung && r.onClick ? () => openOrToggle(r.rung!, r.onClick!) : r.onClick}
                     pair={r.pair}
                   />
                 ))}

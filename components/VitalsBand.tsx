@@ -146,12 +146,13 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
         // same radius — so the two bars now bracket the scene as an actual matched pair rather than
         // as a bar and a scattering of chips (user, 2026-09-01: "the bottom bar should be the same
         // exactly as the top bar").
-        "rounded-lg border border-border/60 [background:var(--topbar-glass)] backdrop-blur-sm",
+        "rounded-lg border border-border/60 [background:var(--topbar-glass)] backdrop-blur-sm [box-shadow:var(--band-ambient)]",
         // The TOP inset is NEGATIVE so a tenant may stand something just ABOVE the plate — the
         // History timeline's Time range group (user, 2026-09-26: "above the bottom section, not on
         // top of it"; inside the band 2026-09-29; above again 2026-10-03). The clip exists for the
-        // SIDE covers and never needed the top edge.
-        "[clip-path:inset(-48px_max(0px,calc(var(--cover-r)-var(--bar-margin)))_0_max(0px,calc(var(--cover-l)-var(--bar-margin))))]",
+        // SIDE covers and never needed the top edge. With no sheet over a side it lets 24px through
+        // there too, for the band's upward shadow (`--band-ambient`) to fade out rather than stop.
+        "[clip-path:inset(-48px_max(-24px,calc(var(--cover-r)-var(--bar-margin)))_0_max(-24px,calc(var(--cover-l)-var(--bar-margin))))]",
         // ⚠️ The cell-targeting rules (card flattening, section dividers) moved ONTO the
         // RollSwap wrapper below (2026-09-04, the no-pop swap): they are `[&>*]` selectors, and
         // the wrapper between this section and the cells would otherwise be their new subject.
@@ -196,9 +197,12 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
           corner, where History's range pills stand — the band's time scope has one place in
           every view. The cards below no longer repeat it (`viewCells`: a card states a span
           only when its own differs). The section is `fixed`, so it is this chip's containing
-          block; the bar's own glass under it, since it floats over the scene. */}
+          block; the bar's own glass under it, since it floats over the scene.
+          ⚠️ The glass is EXACTLY the chip's box (`flex`, the chip's own `rounded-xs`) — as an inline
+          span its line box stood 5px taller than the chip with a rounder corner, and that sliver of
+          glass read as a stray line on the chip (user, 2026-10-04). */}
       {bandWindow && (
-        <span className="absolute bottom-full right-0 mb-2 rounded-md [background:var(--topbar-glass)] backdrop-blur-sm">
+        <span className="absolute bottom-full right-0 mb-2 flex rounded-xs [background:var(--topbar-glass)] backdrop-blur-sm">
           <QualifierChip>{spanPhrase(bandWindow, null)}</QualifierChip>
         </span>
       )}

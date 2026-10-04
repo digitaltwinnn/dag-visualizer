@@ -30,8 +30,11 @@ export default function useFitRows(cardId: string, fill: boolean, measuring: boo
     if (!rail || !card) return;
     const hostBottom = (): number => {
       if (sheet) return sheet.getBoundingClientRect().bottom - parseFloat(getComputedStyle(sheet).paddingBottom || "0");
-      const maxH = parseFloat(getComputedStyle(rail).maxHeight);
-      return Number.isFinite(maxH) ? rail.getBoundingClientRect().top + maxH : NaN;
+      // The column's own bottom padding (the shadow bleed, or `.rail-clip`'s runway) is no room
+      // for rows.
+      const cs = getComputedStyle(rail);
+      const maxH = parseFloat(cs.maxHeight);
+      return Number.isFinite(maxH) ? rail.getBoundingClientRect().top + maxH - (parseFloat(cs.paddingBottom) || 0) : NaN;
     };
     const measure = () => {
       const rows = card.querySelectorAll<HTMLElement>(".nb-row");

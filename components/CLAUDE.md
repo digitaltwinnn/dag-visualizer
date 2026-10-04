@@ -280,7 +280,13 @@ country" names one measure of three). Eyebrows are bare role words, and each exp
 hint leads its card rather than trailing it. An explorer ROW is a browse target — mark, name, count,
 nothing more; **the prose that EXPLAINS a subject belongs to that subject's right-rail card, once**,
 and since a row commits its card in the same click, nothing is lost by keeping the sentence in one
-place.
+place. **Every row click shows its card** (user, 2026-10-04: "happens for some but not for all"):
+a row tagged with its card's slot (`ExplorerRowSpec.rung`) that is already committed brings that card
+back to the front when another card is the box, and only deselects once its own card is in front
+(`openOrToggle` in `Explorer.tsx` — view state, no selection written). Snapshots' network row commits
+the network inside its tick (`tickNetSelectActions`, never the filter), so it opens the Metagraph
+card as well as the level; a committed TICK row stays untagged, because its click also opens the
+tick in the explorer's own path state.
 
 **Right rail — the facts scope, read-only.** A set of fixed card slots in one stable order — network
 dossier, country, provider, composition, then the snapshot chain (global snapshot ABOVE the metagraph
@@ -498,28 +504,20 @@ box unique) — it is the tier's own `boxed` condition, and `railTierBoundary.te
 can't drift. Keying it to the FOCUS rung was the same mistake `data-tier` fixed above, and it also shut
 out the two snapshot slots, which ride the lane with no focus rung at all.
 
-**The plank also carries the LADDER PAIR** (`∧ ∨`, 2026-09-11 — the user liked the sibling swipe
-and asked for the vertical axis; a vertical SWIPE was rejected together because it fights the
-rails' touch scrolling and the sheets' drag gestures, so it is buttons): ∧ re-boxes the next
-coarser COMMITTED rung and ∨ the next finer one — the accordion's own `toggleCollapse`, committing
-nothing, with the camera and callout following the box as always — and where nothing finer is
-committed, ∨ falls through to `childStep` (railSiblings.ts, tested) and COMMITS the rung's FIRST
-child in the explorer's own order ("just pick the 1st one"). A rung with no child vocabulary
-(a node, the ledger's network — its finer subjects belong to the tick axis) disables the control.
-A metagraph snapshot's ∨ opens its first VALIDATOR (2026-09-29), and the node card under it pages
-only the nodes that signed it — `snapshotSignerRows` (`src/data/network.ts`), the same list and
-order as the explorer's signer level, so the two can't disagree about who signed. The sibling trio is CENTERED as one cluster with the ladder pair at the
-right, told apart by WEIGHT rather than a divider (2026-10-03, option B of
-`docs/superpowers/design/2026-10-03-card-pager` — user: "a lot of <> and ^^, and also / and |"):
-the pair is drawn smaller and quieter, and **the position is DRAWN, not written** — one small
-square per sibling with the current one lit (the cards' own unit marks), "n of N" in words only
-past fifteen, never a slash. The two axes still never read as one four-way control — and **an
-exhausted direction is INACTIVE while an axis with nothing to ever navigate is ABSENT** (user,
-2026-09-11, two rounds; supersedes 2026-09-03's invisible rule, which predates the pair): a
-direction that ran out mid-set dims — a vanishing chevron re-composes the row at every edge,
-and the dimmed state reads as "the control exists, the direction is exhausted" — while a card
-that is the only record at its rung shows no trio at all, and one with no ladder step shows no
-pair. Permanently dead chrome is not a control.
+**The ladder pair is RETIRED; the plank is ONE AXIS** (user, 2026-10-04: "do we still need it
+actually? … now the ghost is clickable"). `∧ ∨` (2026-09-11) re-boxed the coarser/finer committed
+card — both one click away on the cards themselves — and, with nothing finer committed, ∨ committed
+the rung's FIRST child. That one unique job moved into the **NEXT GHOST**: the ghost directly below
+the deepest committed rung, opened, offers the first `GHOST_PICKS` (3) children in the explorer's
+own order as quick picks (`childSteps` in railSiblings.ts, the list form of the old first-child
+step, read through the pager's own state builder `useSiblingState`), each running that row's own
+actions through the one executor. A metagraph snapshot's next ghost lists its first validators
+(`snapshotSignerRows`, the explorer's signer order). The plank is `‹` at the card's left edge, the
+position squares centred, `›` at its right edge — the position DRAWN, never written: one small square
+per sibling with the current one lit, a set past fifteen sliding a fifteen-wide window whose ends
+are drawn small (`positionMarks`; user, 2026-10-04). An exhausted direction DIMS rather than
+vanishing (a vanishing chevron re-composes the row at every edge), and a card that is the only
+record at its rung has no plank at all. Permanently dead chrome is not a control.
 
 **Ladder steps are QUIET, and the quiet is PROVENANCE, not a timer** (user, 2026-09-11, four
 rounds ending in "solve it structurally"): `store.navQuiet` records HOW the current state was
@@ -590,8 +588,13 @@ noise in all of them: the label beside it already says what the number is. Inter
 strings still read `Global snapshot #N`, but nothing renders that field for a snapshot.
 
 Every card the current view CAN produce is always visible — populated when its subject is selected,
-else a quiet **ghost hint line** — so the rail shows the view's whole possibility space and a deselect
-returns its slot to the ghost in place.
+else a **ghost card** — so the rail shows the view's whole possibility space and a deselect returns
+its slot to the ghost in place. A ghost is a card like every other (user, 2026-10-04 — option A of
+`docs/superpowers/design/2026-10-04-ghost-cards`, "the structure is always present, but the visual
+and content differ"): FOLDED it is the rung's name alone, one quiet line; OPEN it is a dashed,
+glassless box whose body is the hint. It opens on its own, outside the single-open accordion — it
+holds no subject, so reading a hint never dissolves the committed box, its callout or its camera —
+through the same per-selection `railCollapse` override, so a new selection folds it back.
 
 **A hint is the gesture and nothing else.** The slot label already names the subject and the dashed
 frame already says "nothing here yet", so a hint must not end "… to inspect it" — four ghosts stacked
@@ -927,17 +930,28 @@ inline in the return would quietly restore the bug for every consumer at once.
 Only the rails restructure; everything else holds the four-zone shape. Desktop (≥1100px) has both rails
 inline with their `RailThread` siblings; tablet (700–1099px) collapses them to edge tabs opening
 **non-modal** sheets (both can be open, orbit still works behind them — the sheets OVERLAY the
-vitals band, which CLIPS its paint by their published `sceneCover`, see the band bullet); phone
+vitals band, which CLIPS its paint by their published `sceneCover`, see the band bullet). **The
+tablet tab is its sheet's one control** (user, 2026-10-04 — option C2 of
+`docs/superpowers/design/2026-10-04-tablet-tabs`): a single chevron pointing into the scene, which
+travels WITH the opened sheet to ride its inner edge, flipped, and closes it — no header row, no ×.
+An unseen card update colours the chevron in that card's hue rather than adding a mark; phone
 (<700px) has a persistent bottom bar — Explore | Vitals | Details thirds where the view has a
 vitals lane, halves elsewhere (`barGeom`; the icon trays compact to one unseen-update dot at
-thirds) — and ONE sheet at a time, with grabber drag-resize and flick-dismiss. **An open sheet
+thirds) — and ONE sheet at a time, with a grabber that drags and flick-dismisses. **The bottom
+section (dock bar + sheet) never takes more than 60% of the viewport** (user, 2026-10-04 — "so
+that there is always room for the scene to show"; `RailDock`'s `sectionCeilingPx`): the sheet has
+ONE resting height, its content's fit under that ceiling, a taller card scrolls inside it, and a
+drag that does not dismiss springs back — the ~80% expanded detent is retired. **An open sheet
 shifts the scene up into the band above it** (2026-09-28): the dock publishes its target height as
 a bottom cover (`sceneCoverBExplore` / `sceneCoverBDetails` / `sceneCoverBVitals`, one per dock because their exits lag)
 and the Engine eases a projection offset — `camera.setViewOffset`, never a camera move, so every
 pose, the callout, the chart planes and picking follow — by half the cover
-(`domain/sheetShift.ts`). Shift only, no zoom. The sheet GROWS out
+(`domain/sheetShift.ts`). Shift only, no zoom. **Desktop and tablet take the same offset for the
+CHROME** (user, 2026-10-04: "move the scene slightly up"): the band + footer are taller than the
+top bar, so `chromeShiftPx` moves the framing centre up by half the difference, measured off the
+two bars while the band is in the lane (not on the phone, not under the SCENE toggle). The sheet GROWS out
 of the dock (a height transition from a zero armed on the open flip — the content mounts a commit
-later, the portal trap), fits its content live (drag wins until close), and shrinks back on a
+later, the portal trap), fits its content live, and shrinks back on a
 render-phase-derived exit. Dismissing a sheet only collapses it — it does not clear the selection.
 On phone the Explore card opens EXPANDED like everywhere else (2026-09-28 — it opened collapsed
 while the About card shared the sheet, as a two-head chooser; one card has nothing to choose
@@ -1235,7 +1249,7 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
   no per-card variants. A right-rail ENTRY expands on click (the whole entry is one invisible
   stretched toggle, required for touch) — but the BOX carries **no minimize** (user, 2026-09-11:
   "hardly used"; the − on the eyebrow line and the whole-head collapse toggle both went): the box
-  moves by expanding another entry or by the plank's ladder pair, never by collapsing into
+  moves by expanding another entry (or an explorer row's re-box), never by collapsing into
   nothing. The LEFT rail's explore cards keep their collapse toggle. The × and the aside float
   above the entry overlay so closing and links keep working. ⚠️ **Floating above it means
   `pointer-events-none` on the wrapper and `pointer-events-auto` on its own links/buttons**
@@ -1573,6 +1587,17 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
   portals its content), so the cover is published off a callback REF, not an effect keyed on `open`
   — keyed on `open` it measures a null node and publishes 0 forever, which passes tsc and vitest
   and fails only in the browser.
+- **A phone gets ONE compact label STRAIGHT ABOVE its subject** (user, 2026-10-04, reversing the
+  2026-08-18 phone decline: "it should fit, can also shorten the line … perhaps add an x"). The
+  diagonal standoff could only point sideways at nothing under 700px; a vertical leader still says
+  WHERE. `calloutPhonePlacement` (tested) centres the panel over the anchor, nudges it inward at an
+  edge, and drops it below when the command bar leaves no room — inside the canvas the dock bar
+  (`[data-phone-dock]`) and the open sheet (`sceneCoverB`) leave. SceneCallout draws the leader as
+  its own vertical line at `CALLOUT_PHONE_K`, keeps the head only (no lead row), shows one label
+  where Snapshots shows a pair. **Every callout carries an × at its top-right, on every tier**
+  (user, 2026-10-04): it hides that label FOR ITS VIEW until the view's subject changes — keyed by
+  view and slot, so the same subject's label in another view stands, and a new selection brings
+  it back.
 - **Furniture labels are sparse by review**: geo's hosting-country names (the set states where the
   network runs — empty countries staying nameless is information) are the only ones standing. Hyper's
   hub tickers AND its "Global L0" were built and removed the same day (clutter over what hues,

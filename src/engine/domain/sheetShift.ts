@@ -29,3 +29,15 @@ export function sheetShiftPx(coverPx: number, viewHeightPx: number): number {
   const cover = Math.min(Math.max(0, coverPx), Math.max(0, viewHeightPx));
   return cover / 2;
 }
+
+/** THE CHROME'S SHIFT (user, 2026-10-04: "move the scene slightly up — we added a larger bottom
+ *  section later, so now it sits a bit too close to that"). On desktop and tablet the free canvas
+ *  runs from the top bar's bottom edge (`topPx` from the viewport top) to the vitals band's top edge
+ *  (`bottomPx` from the viewport bottom, the footer under it included), and the bottom chrome is the
+ *  taller — so the viewport's centre, which every pose frames, sat below the free band's. The
+ *  framing centre moves up by half the difference: the same projection offset as the phone sheet's,
+ *  so no pose changes. Signed only in principle — callers pass a band that is on screen, and the
+ *  phone (no band in the lane) and the scene-only presentation (band stepped aside) pass none. */
+export function chromeShiftPx(topPx: number, bottomPx: number): number {
+  return (Math.max(0, bottomPx) - Math.max(0, topPx)) / 2;
+}

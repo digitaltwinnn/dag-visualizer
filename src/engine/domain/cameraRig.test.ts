@@ -33,16 +33,16 @@ describe("hubFraming", () => {
   // Hand-computed from the exact Engine.ts:699-707 formula for a hub at local (36, 4, 0):
   //   out = hub.normalize() = (0.99388373467…, 0.11043152607…, 0)
   //   side = normalize(cross((0,1,0), out)) = (0, 0, -1)
-  //   camPos = hub + (out*12 + side*-6 + (0,1,0)*5.5) × HUB_CLOSE (0.85)
-  //          = (46.13761409367091, 9.801401565963435, 5.1)
+  //   camPos = hub + (out*12 + side*-6 + (0,1,0)*5.5) × HUB_CLOSE (0.75)
+  //          = (44.94495361206257, 9.11888373467362, 4.5)
   //   target = hub
   it("matches the hand-computed framing for hub local (36, 4, 0)", () => {
     const hub = new THREE.Vector3(36, 4, 0);
     const out = { pos: new THREE.Vector3(), target: new THREE.Vector3() };
     hubFraming(hub, out);
-    expect(out.pos.x).toBeCloseTo(46.13761409367091, 10);
-    expect(out.pos.y).toBeCloseTo(9.801401565963435, 10);
-    expect(out.pos.z).toBeCloseTo(5.1, 10);
+    expect(out.pos.x).toBeCloseTo(44.94495361206257, 10);
+    expect(out.pos.y).toBeCloseTo(9.11888373467362, 10);
+    expect(out.pos.z).toBeCloseTo(4.5, 10);
     expect(out.target.x).toBeCloseTo(36, 10);
     expect(out.target.y).toBeCloseTo(4, 10);
     expect(out.target.z).toBeCloseTo(0, 10);

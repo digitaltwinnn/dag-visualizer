@@ -204,7 +204,9 @@ interface AppState {
   // range handed to the anchor log's search. The trends page writes it as it closes; the log
   // consumes it on sight (prefills the date criteria, seeks when it can) and clears it — a
   // navigation bridge, not a selection (the network commit itself rides the pickActions table).
-  logSeek: { metaId: string | null; fromMs: number; toMs: number } | null;
+  /** A door's hand-off to the anchor log: a span to land in, or — with `snapshot` — one metagraph
+   *  snapshot to find (its card's "Show the raw data", 2026-10-04). */
+  logSeek: { metaId: string | null; fromMs: number; toMs: number; snapshot?: number } | null;
   // The doc overlay's STAGE-READY signal, written by the Engine (the one clock that knows the
   // choreography's real boundary — frame-driven, so ?slowmo and low FPS stretch it correctly,
   // where a wall-clock wait in the HUD desynced). DEFAULT TRUE so a document never waits on a
@@ -288,9 +290,9 @@ interface AppState {
   // hub re-boxes the metagraph card — the callout must step up with it). Never a selection
   // channel: committing/deselecting stays with the ladder.
   boxedCard: string | null;
-  // PHONE ONLY: the bottom sheet's drag-chosen height override in px (null = the default 60vh).
-  // Shared by BOTH dock sheets so switching halves keeps the chosen height; reset to null the
-  // moment the dock fully closes (`setPhoneDock(null)`) so reopening starts at the default.
+  // PHONE ONLY: the bottom sheet's height under the finger, in px, WHILE A DRAG IS LIVE (null =
+  // the sheet stands at its content's fit, under RailDock's 60% section ceiling). A release
+  // clears it (2026-10-04 — the resting detents went with the ceiling), and so does a full close.
   phoneSheetPx: number | null;
   // How many px of the CANVAS each side is covered by an open rail sheet, left and right (0 =
   // nothing covering that side). Below 1100px the rails stop sitting BESIDE the canvas and become
@@ -411,7 +413,7 @@ interface AppState {
   setActivity: (activity: Activity | null) => void;
   setMode: (mode: Mode) => void;
   setDocPage: (docPage: "about" | "design" | null) => void;
-  setLogSeek: (logSeek: { metaId: string | null; fromMs: number; toMs: number } | null) => void;
+  setLogSeek: (logSeek: { metaId: string | null; fromMs: number; toMs: number; snapshot?: number } | null) => void;
   setDocStageReady: (ready: boolean) => void;
   setDocClosing: (closing: boolean) => void;
   setFilter: (filter: string) => void;

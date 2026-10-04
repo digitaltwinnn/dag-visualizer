@@ -1,5 +1,7 @@
 "use client";
 
+import { cn } from "@/lib/utils";
+
 import { useEffect, useRef } from "react";
 
 import { useBreakpoint } from "@/components/useBreakpoint";
@@ -44,6 +46,10 @@ export default function TrendTether() {
   // is a change to both ends.
   const dock = useStore((s) => s.phoneDock);
   const sheetPx = useStore((s) => s.phoneSheetPx);
+  // SCENE MODE TAKES THE TETHER WITH THE BAND (user, 2026-10-04: "in scene mode the vitals section
+  // is hidden but the dotted lines still show"): the lines run from the timeline, so with the
+  // timeline stepped aside they point at nothing. They leave on the band's own exit tempo.
+  const railsHidden = useStore((s) => s.railsHidden);
 
   useEffect(() => {
     const el = svg.current;
@@ -124,7 +130,15 @@ export default function TrendTether() {
   }, [bp, range, windowId, focus, scroll, moving, dock, sheetPx]);
 
   return (
-    <svg ref={svg} aria-hidden className="absolute inset-0 w-full h-full pointer-events-none overflow-visible" style={{ visibility: "hidden" }}>
+    <svg
+      ref={svg}
+      aria-hidden
+      className={cn(
+        "absolute inset-0 w-full h-full pointer-events-none overflow-visible transition-opacity duration-300 motion-reduce:transition-none",
+        railsHidden && "opacity-0",
+      )}
+      style={{ visibility: "hidden" }}
+    >
       {/* ⚠️ THE LINE'S STRENGTH IS PER GROUND (user, 2026-10-03: "the dotted line to the chart in
           light mode is too faint"). The bare accent at 0.45 is a glow on the dark ground and a
           pale thread on paper, where there is no bloom and the page is its own bright field. On

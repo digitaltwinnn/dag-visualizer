@@ -392,17 +392,31 @@
    `domain/calloutPlacement.calloutHangs`), and "make the angle of the lines the same" (user) is
    only true if both axes shorten together — so the panel's offsets and the leader's scale read
    the one number. The leader is scaled as a whole; its strokes are `non-scaling-stroke`, so the
-   line keeps its weight and its dash at any length. 0.55 mirrors `CALLOUT_HANG_K`. */
+   line keeps its weight and its dash at any length.
+   ⚠️ NO NUMBER HERE IS A COPY (2026-10-04): the standoff (`--co-off-x/y`) and both factors
+   (`--co-hang-k`, `--co-phone-k`) are written onto each callout by SceneCallout from
+   `domain/calloutPlacement.ts`, the one home — calloutBoundary.test.ts keeps it that way.
+   ⚠️ The scale is on the leader's inner <g>, never on the <svg> box: `non-scaling-stroke` only
+   undoes transforms inside the SVG's own coordinate system, and a transform on the box scaled
+   the strokes and dashes with it (2026-10-04 — the hanging line drew at 0.55 weight). */
 :is(#callout, #callout-2) { --co-k: 1; }
-:is(#callout, #callout-2)[data-hang] { --co-k: 0.55; }
-:is(#callout, #callout-2) .co-panel { left: calc(100px * var(--co-k)); bottom: calc(140px * var(--co-k)); }
-:is(#callout, #callout-2)[data-flip] .co-panel { left: auto; right: calc(100px * var(--co-k)); }
-:is(#callout, #callout-2)[data-drop] .co-panel { bottom: auto; top: calc(140px * var(--co-k)); }
-:is(#callout, #callout-2) .co-leader { transform: scale(var(--co-k)); }
-:is(#callout, #callout-2)[data-flip] .co-leader { transform: scale(calc(-1 * var(--co-k)), var(--co-k)); }
-:is(#callout, #callout-2)[data-drop] .co-leader { transform: scale(var(--co-k), calc(-1 * var(--co-k))); }
-:is(#callout, #callout-2)[data-flip][data-drop] .co-leader { transform: scale(calc(-1 * var(--co-k))); }
-:is(#callout, #callout-2) .co-leader > line { vector-effect: non-scaling-stroke; }
+:is(#callout, #callout-2)[data-hang] { --co-k: var(--co-hang-k); }
+:is(#callout, #callout-2) .co-panel { left: calc(var(--co-off-x) * var(--co-k)); bottom: calc(var(--co-off-y) * var(--co-k)); }
+:is(#callout, #callout-2)[data-flip] .co-panel { left: auto; right: calc(var(--co-off-x) * var(--co-k)); }
+:is(#callout, #callout-2)[data-drop] .co-panel { bottom: auto; top: calc(var(--co-off-y) * var(--co-k)); }
+:is(#callout, #callout-2) .co-scale { transform: scale(var(--co-k)); }
+:is(#callout, #callout-2)[data-flip] .co-scale { transform: scale(calc(-1 * var(--co-k)), var(--co-k)); }
+:is(#callout, #callout-2)[data-drop] .co-scale { transform: scale(var(--co-k), calc(-1 * var(--co-k))); }
+:is(#callout, #callout-2)[data-flip][data-drop] .co-scale { transform: scale(calc(-1 * var(--co-k))); }
+:is(#callout, #callout-2) .co-scale > line { vector-effect: non-scaling-stroke; }
+/* THE PHONE LABEL (2026-10-04, `calloutPhonePlacement`): straight above its subject on a short
+   VERTICAL leader, which SceneCallout draws at its own length (`CALLOUT_PHONE_K`, handed in as
+   `--co-phone-k` for the panel's standoff), so the leader takes no scale; a
+   dropped label mirrors it below. The panel's left edge is the sync's `--co-left` (centred, clamped). */
+:is(#callout, #callout-2)[data-phone] { --co-k: var(--co-phone-k); }
+:is(#callout, #callout-2)[data-phone] .co-panel { left: var(--co-left, 0px); right: auto; }
+:is(#callout, #callout-2)[data-phone] .co-scale { transform: none; }
+:is(#callout, #callout-2)[data-phone][data-drop] .co-scale { transform: scale(1, -1); }
 
 /* THE ENTRANCE CHOREOGRAPHY (user, 2026-09-05 — "the dotted line is already drawn before the
    animation"): panel rolls in → the leader DRAWS from the panel corner toward the anchor →
@@ -736,6 +750,30 @@
   border-bottom-right-radius: 0;
 }
 
+/* A GHOST'S HINT ARRIVES ON ITS OWN (2026-10-04): opening a ghost grows its frame through the
+   lane's HeightEase, and only the hint fades in, on the rail's roll tempo — the name above it never
+   moves or blinks. Reduced motion: the hint is simply there. */
+@keyframes ghostHintIn { from { opacity: 0; } to { opacity: 1; } }
+.ghost-hint-in { animation: ghostHintIn var(--tempo-roll) ease-out both; }
+@media (prefers-reduced-motion: reduce) { .ghost-hint-in { animation: none; } }
+
+/* THE PILE HAS AN EDGE (user, 2026-10-04: "the difference between a collapsed active card and a
+   ghost card is not very clear … the fill or outline is too faint to distinguish it from the
+   background/ghost cards"). An entry's only mark was its `--panel-solid` fill, which on dark sits
+   within a few points of the scene and on paper within a few of the page — so a committed rung read
+   as one more ghost line. It now wears the card hairline, drawn as an INSET RING (no layout, follows
+   the radius) whose top and bottom edges are dropped wherever the entry JOINS another member of the
+   pile: the pile gets one outline, and the joints keep their inset seams and the box's own border.
+   A ghost is never matched (it is not `[data-tier="entry"]`), so the ring is exactly the
+   committed-vs-empty distinction. Specific enough to survive the pairing wash's `box-shadow: none`. */
+.rail-ladder > [data-tier="entry"] .rail-entry {
+  --ring-t: var(--border);
+  --ring-b: var(--border);
+  box-shadow: inset 1px 0 0 var(--border), inset -1px 0 0 var(--border), inset 0 1px 0 var(--ring-t), inset 0 -1px 0 var(--ring-b);
+}
+.rail-ladder > :is([data-tier="entry"], [data-tier="box"]) + [data-tier="entry"] .rail-entry { --ring-t: transparent; }
+.rail-ladder > [data-tier="entry"]:has(+ :is([data-tier="entry"], [data-tier="box"])) .rail-entry { --ring-b: transparent; }
+
 /* The box is a ROUNDED PLANK IN the pile, not a break-out (user, 2026-08-09): it abuts its
    neighbours at ZERO gap, so ancestry + subject read as ONE body, but it keeps its own radius and
    its own hairline all the way round, so the pile visibly opens around it. That is why its border
@@ -864,6 +902,11 @@
      (user), so light casts a soft ink-navy at a third the weight; dark keeps the original bytes. */
   --card-ambient: inset 0 1px 0 rgba(255, 255, 255, 0.05),
     0 8px 30px light-dark(rgba(15, 23, 42, 0.14), rgba(0, 0, 0, 0.35));
+  /* The vitals band's lift — the card ambient cast UPWARD (user, 2026-10-04): the band sits flush on
+     the footer, so a downward shadow would fall on the strip under it; above, it is the same layer
+     the top bar and the cards are. The -4px spread keeps its side reach inside the 24px the band's
+     clip allows. */
+  --band-ambient: 0 -8px 28px -4px light-dark(rgba(15, 23, 42, 0.14), rgba(0, 0, 0, 0.35));
   --box-lift: 0 10px 26px -12px light-dark(rgba(15, 23, 42, 0.32), rgba(0, 0, 0, 0.85)),
     0 -8px 22px -14px light-dark(rgba(15, 23, 42, 0.28), rgba(0, 0, 0, 0.8));
   --foreground: light-dark(oklch(0.21 0.035 265), oklch(0.94 0.02 255));       /* #e8eefc text (dark) */
@@ -1124,6 +1167,12 @@
      which is what keeps the band's edges off the RailThread rulers. The override lives beside the
      phone block at the foot of this file. */
   --bar-margin: 16px;
+  --rail-bleed: 24px;      /* room each rail column keeps either side of its cards for their shadow —
+                              a scroll container clips its children at its padding box, so a column
+                              exactly as wide as its cards cut their 30px shadow off at the sides
+                              (user, 2026-10-04: "on the sides it's cut off"). The column grows by it
+                              and is padded back, so no card moves; RailThread measures from the
+                              content edge. */
   --rail-margin: 26px;     /* both rails' outer margin — room for the mirrored RailThread rulers.
                               ONE home (review, 2026-08-31): #leftcol/#rightcol and the vitals
                               band's edges all read it, so the band stays aligned with the rail
@@ -1292,12 +1341,19 @@
      margin matches the right rail's, making room for the mirrored identity RailThread
      (design evolution, Task 12: both rails carry the identity thread). */
   #leftcol {
-    position: fixed; z-index: 10; top: calc(var(--rail-top) + var(--topbar-extra, 0px)); left: var(--rail-margin);
+    position: fixed; z-index: 10; top: calc(var(--rail-top) + var(--topbar-extra, 0px)); left: calc(var(--rail-margin) - var(--rail-bleed));
+    padding-inline: var(--rail-bleed);
+    /* …and below the last card, which the column's own bottom edge cut the same way. Above the
+       first card the shadow is a few px of ambient and stays clipped: a top bleed would move the
+       cards. `.rail-clip`'s runway replaces this with its own, longer padding. */
+    padding-bottom: var(--rail-bleed);
+    /* The bleed is empty column: it must not take the scene's clicks. The cards opt back in. */
+    pointer-events: none;
     /* `transform` rides the shade's RETURN tempo here and its away tempo on the hidden arm
        above the rule pair — the recipe's rule that the HUD comes back faster than it steps
        aside, because the return answers a gesture already finished. */
     transition: top 0.25s ease-out, transform 0.18s ease-out;
-    width: var(--rail-w);
+    width: calc(var(--rail-w) + 2 * var(--rail-bleed));
     display: flex; flex-direction: column; gap: var(--rail-gap);
     /* The box's own bottom must never enter the bottom lane's reserved band — the rail-clip fade
        below only dims PIXELS (mask-image), it doesn't disable clicks, so a box that physically
@@ -1396,15 +1452,18 @@
     [data-slot="sheet-content"][data-dim] { transition: none; }
   }
   #leftcol > aside { width: auto; }
+  #leftcol > * { pointer-events: auto; }
 
   /* Right details rail (`#rightcol`, Inspector.tsx) — the facts scope: a STACK of
      selected-subject cards. `pointer-events: none` so the gaps between cards click
      through to the scene/bottom strip below; each card re-enables it via the
      `pointer-events-auto` in RIGHT_CARD (CardHead.tsx). */
   #rightcol {
-    position: fixed; z-index: 10; top: calc(var(--rail-top) + var(--topbar-extra, 0px)); right: var(--rail-margin);
+    position: fixed; z-index: 10; top: calc(var(--rail-top) + var(--topbar-extra, 0px)); right: calc(var(--rail-margin) - var(--rail-bleed));
+    padding-inline: var(--rail-bleed);
+    padding-bottom: var(--rail-bleed);
     transition: top 0.25s ease-out, transform 0.18s ease-out;
-    width: var(--detail-w);
+    width: calc(var(--detail-w) + 2 * var(--rail-bleed));
     display: flex; flex-direction: column; gap: var(--rail-gap);
     /* Must never enter the bottom lane's reserved band — see the matching #leftcol comment above
        (same bug: a masked-invisible trailing card was still fully clickable, and the bottom

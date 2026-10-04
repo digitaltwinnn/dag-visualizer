@@ -14,7 +14,7 @@ import { BandCard, MicroBars, DonutTotal, TypeGlyph, TYPE_ORDER, compositionCoun
 import { useStore } from "@/src/store/store";
 import { metagraphById, getAnchor } from "@/src/data/network";
 import { displayNetwork } from "@/src/data/unlisted";
-import { metaType, rolesOf, IdentityDot, RoleChips } from "@/components/inspector/parts";
+import { metaType, rolesOf, IdentityDot, RoleChips, TickerChip } from "@/components/inspector/parts";
 import { machineKey } from "@/src/data/composition";
 import { identityHudCss } from "@/src/palette/identity";
 import { METAGRAPHS } from "@/src/net/current";
@@ -458,7 +458,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
   // floor rule the store already solved.
   // `paused` while the HUD is stepped aside (2026-09-13): the band stays MOUNTED through the
   // SCENE toggle so it can slide out, and a mounted-but-hidden band that kept polling would
-  // make the pulse strip's "while shown" words a lie about this feed.
+  // make the pulse strip's last-success age a lie about this feed.
   const t7 = useTrendsWindow(paused ? null : "7d");
   const windowed = useMemo<TrendsWindowData | null>(
     // trimNewestPartial FIRST (the payload's own clock drops the still-filling bucket — the
@@ -823,21 +823,27 @@ function AnchoringNetworks({ windowed, snaps, filter }: { windowed: TrendsWindow
           and it stays short enough that four or five pairs wrap cleanly at a third of the plate.
           ⚠️ THE CAP DROPS 12 → 8 with the labels: twelve NAMED entries is a list, not a legend,
           and the honest total is the lead numeral beside them, not the length of this run. */}
-      <span className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 flex-1 min-w-0">
+      {/* ⚠️ TICKERS ARE CHIPS (user, 2026-10-04: "based on our design change should they be dots or
+          pills?" — pills). Since the card redesign a network's ticker standing on its own is the
+          head's `TickerChip` everywhere — card heads, callouts, node rows — and the dot is the mark
+          that stands BESIDE a full name (the explorer rows). This roster is bare tickers, so it
+          wears the chip. The committed network steps forward with its chip's border in its own hue;
+          the others step back to the lens's 0.65. */}
+      <span className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 flex-1 min-w-0">
         {list.slice(0, 8).map((id) => {
           const on = filter !== "all" && id === filter;
           const label = metagraphById(id)?.ticker ?? displayNetwork(id)?.ticker ?? null;
+          const hue = identityHudCss(id);
           return (
-            <span key={id} className={cn("inline-flex items-center gap-1 min-w-0", filter !== "all" && !on && "opacity-65")}>
-              <IdentityDot hue={identityHudCss(id)} className={on ? "w-3.5 h-3.5" : undefined} />
+            <span key={id} className={cn("inline-flex min-w-0", filter !== "all" && !on && "opacity-65")}>
               {/* No hand-written fallback label — `displayNetwork` is the one home for what an
                   uncatalogued channel is CALLED (unlistedBoundary.test.ts enforces that the id
                   literal has two homes, and this is not one of them). With no name to give, the
                   dot stands alone rather than being captioned with a guess. */}
-              {label && (
-                <span className={cn("text-label truncate", on ? "text-foreground" : "text-muted-foreground")}>
-                  {label}
-                </span>
+              {label ? (
+                <TickerChip text={label} hue={hue} className={on ? "border-current" : undefined} />
+              ) : (
+                <IdentityDot hue={hue} />
               )}
             </span>
           );

@@ -61,20 +61,13 @@ import {
   type PointerEvent,
   type ReactNode,
 } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-react";
-import { useStore } from "@/src/store/store";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { childStep, siblingSet, type SiblingState } from "@/components/railSiblings";
-import { useSnapshotFeed } from "@/components/useSnapshotFeed";
-import { latestRelevant } from "@/src/data/follow";
-import { getAnchor } from "@/src/data/network";
-import { LISTED_IDS } from "@/src/data/unlisted";
-import { tickInStory } from "@/src/data/ledgerStory";
-import { POLL } from "@/src/engine/config";
+import { positionMarks, siblingSet } from "@/components/railSiblings";
+import { useSiblingState } from "@/components/useSiblingState";
 import { Button } from "@/components/ui/button";
 import type { RailCardKind } from "@/components/railCards";
 
-const EMPTY_SNAPS: never[] = []; // stable ref — the non-snap slots' tick placeholder (see snapsForTicks)
 const ENGAGE_PX = 14; // horizontal travel before the drag claims the pointer
 const STEP_PX = 48; // release travel that commits a step
 const DRAG_LIMIT = 84; // rubber-band asymptote mid-set
@@ -156,7 +149,7 @@ const slideGap = (): number => {
 };
 
 const SLIDE_MS = 820;
-/** The longest sibling set whose position is drawn as squares; beyond it the strip says "n of N". */
+/** How many position squares the plank draws at most; a longer set slides a window this wide. */
 const POSITION_MARKS_MAX = 15;
 const SLIDE_EASE = "cubic-bezier(0.45, 0.05, 0.25, 1)";
 
@@ -195,90 +188,10 @@ const FLICK_MS = 90; // velocity is measured over this trailing window, never of
 /** A plank chevron: 24px to the eye, a thumb-sized target on touch (`TOUCH_HIT`). */
 const PLANK_BTN = cn("size-6 disabled:opacity-30", TOUCH_HIT);
 
-export default function RailPager({
-  slot,
-  upSlot,
-  downSlot,
-  onOpenSlot,
-  children,
-}: {
-  slot: RailCardKind;
-  /** The next coarser COMMITTED rung in the pile (Inspector's present order) — the plank's ∧
-   *  re-boxes it through the accordion's own expand, committing nothing. Null at the top. */
-  upSlot?: string | null;
-  /** The next finer COMMITTED rung — the plank's ∨ re-boxes it. When null, ∨ falls through to
-   *  `childStep`: COMMIT the rung's first child in the explorer's own order (user, 2026-09-11). */
-  downSlot?: string | null;
-  /** Inspector's own toggleCollapse — the same routine an entry's head click runs. */
-  onOpenSlot?: (id: string) => void;
-  children: ReactNode;
-}) {
-  const mode = useStore((s) => s.mode);
-  const filter = useStore((s) => s.filter);
-  const country = useStore((s) => s.country);
-  const cohort = useStore((s) => s.cohort);
-  const composition = useStore((s) => s.composition);
-  const inspect = useStore((s) => s.inspect);
-  const snap = useStore((s) => s.snap);
-  const metaSnap = useStore((s) => s.metaSnap);
-  const tickNet = useStore((s) => s.tickNet);
-  const selNodes = useStore((s) => s.selNodes);
-  const metaList = useStore((s) => s.metaList);
-  const leaderboard = useStore((s) => s.leaderboard);
-  const snapshotExact = useStore((s) => s.snapshotExact);
-  const following = useStore((s) => s.following);
-  // The global chain's window — the SAME buffer and cap the LiveStrip plots, so the plank and the
-  // bars step the same sequence in the same direction. Subscribed unconditionally (hooks are), but
-  // a tick only re-renders THIS wrapper: `children` keeps its element identity, so the card
-  // underneath doesn't re-render with it.
-  const { snaps } = useSnapshotFeed(POLL.maxSnapshots);
-
-  // Only the SNAP slot reads the tick window, so only it re-derives on a feed tick (review
-  // find, 2026-09-11: with `snaps` as a plain dep, every ~4s poll re-ran childStep's
-  // O(selNodes) grouping for a boxed country/cohort whose answer the tick cannot change).
-  const snapsForTicks = slot === "snap" ? snaps : EMPTY_SNAPS;
-  const { set, child } = useMemo(() => {
-    // The two live reads railSiblings can't make itself (network singleton + the story rule), done
-    // ONLY for the slot that uses them — the tick window is irrelevant to every other card.
-    const liveOrd = slot === "snap" ? (latestRelevant("all")?.ordinal ?? null) : null;
-    const ticks =
-      slot === "snap"
-        ? snapsForTicks.map((d) => ({
-            data: d,
-            isLiveTip: d.ordinal === liveOrd,
-            inStory: tickInStory(filter, getAnchor(d.timestamp), snapshotExact[d.ordinal]),
-          }))
-        : [];
-    const state: SiblingState = {
-      mode,
-      filter,
-      country,
-      cohort,
-      composition,
-      inspect,
-      snap,
-      tickNet,
-      metaSnap,
-      selNodes,
-      metaList,
-      isListed: (id) => LISTED_IDS.has(id),
-      countries: leaderboard?.countries ?? [],
-      // The metaSnap pager reads its committed pair's rows; the snap slot's DOWN step (first
-      // channel row of the boxed tick) reads its own tick's exact rows.
-      exactRows: metaSnap
-        ? (snapshotExact[metaSnap.globalOrdinal]?.rows ?? null)
-        : snap
-          ? (snapshotExact[snap.data.ordinal]?.rows ?? null)
-          : null,
-      following,
-      ticks,
-    };
-    return {
-      set: siblingSet(slot, state),
-      // A finer COMMITTED rung wins over a fresh commit — the pile is stepped, not re-built.
-      child: downSlot == null ? childStep(slot, state) : null,
-    };
-  }, [slot, downSlot, mode, filter, country, cohort, composition, inspect, snap, tickNet, metaSnap, selNodes, metaList, leaderboard, snapshotExact, following, snapsForTicks]);
+export default function RailPager({ slot, children }: { slot: RailCardKind; children: ReactNode }) {
+  // The rail's state, read by the ONE builder the next ghost's quick picks share (`useSiblingState`).
+  const state = useSiblingState(slot);
+  const set = useMemo(() => siblingSet(slot, state), [slot, state]);
 
   // --- swipe state: ALL refs. Nothing here re-renders — the transform is written to the node. ---
   const wrap = useRef<HTMLDivElement | null>(null);
@@ -508,20 +421,11 @@ export default function RailPager({
     });
   };
 
-  // The ladder pair (user, 2026-09-11 — a button pair instead of a vertical swipe, which would
-  // fight the rails' touch scrolling and the sheets' drag gestures): ∧ re-boxes the coarser
-  // committed rung, ∨ the finer one — the accordion's own expand, committing nothing — and where
-  // nothing finer is committed, ∨ falls through to `childStep` and COMMITS the first child.
-  // Every step first arms the lane's hover-inert window (`data-stepping`, globals.css): the
-  // pile re-lays under a resting cursor and entries easing past it flashed their hover release
-  // (user, same day — the pager slide's own bug on the vertical axis). Cleared a beat after
-  // the mover it covers finishes — the height ease's own `--tempo-roll` (rollWindowMs) for a
-  // ladder step, the slide's SLIDE_MS for a sibling step — with the timer keyed on the LANE
-  // (laneStill), since a ladder step unmounts the arming instance; any step re-arms it. The
-  // ROLL suppression no longer rides this window (user: "timer-based is too fragile, solve it
-  // structurally") — it is the store's `navQuiet` provenance now: toggleCollapse marks itself
-  // quiet, and the ∨ first-child commit passes `quiet` through the one executor, so a card
-  // mounting however late still knows the gesture it came from.
+  // THE LADDER PAIR IS GONE (user, 2026-10-04: "do we still need it actually? … now the ghost is
+  // clickable"). ∧ duplicated a click on the committed card above; ∨'s re-box duplicated a click on
+  // the one below, and its one unique job — commit the first child where nothing finer is committed —
+  // moved into the NEXT GHOST card's quick picks (Inspector, `childSteps`). The foot is one axis now.
+  // `stillLane` stays: the sibling slide arms the same hover-inert window.
   const stillLane = (ms = rollWindowMs()) => {
     const lane = wrap.current?.closest(".rail-ladder");
     if (!(lane instanceof HTMLElement)) return; // no lane, nothing re-lays under a slab — no-op
@@ -536,15 +440,7 @@ export default function RailPager({
       }, ms),
     );
   };
-  const up = upSlot != null && onOpenSlot ? () => { stillLane(); onOpenSlot(upSlot); } : null;
-  const down =
-    downSlot != null && onOpenSlot
-      ? { label: "Open the finer card", run: () => { stillLane(); onOpenSlot(downSlot); } }
-      : child
-        ? { label: `Open first: ${child.label}`, run: () => { stillLane(); applyClickActions(child.actions, { quiet: true }); } }
-        : null;
-
-  if (!set && !up && !down) return <>{children}</>;
+  if (!set) return <>{children}</>;
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
@@ -554,7 +450,6 @@ export default function RailPager({
     trail.current = [{ x: e.clientX, t: e.timeStamp }];
   };
   const onPointerMove = (e: PointerEvent<HTMLDivElement>) => {
-    if (!set) return; // ladder-only plank: the ∧/∨ buttons work, the sibling swipe has no set to step
     const st = start.current;
     if (!st || e.pointerId !== st.id) return;
     const ddx = e.clientX - st.x;
@@ -636,8 +531,8 @@ export default function RailPager({
     commitStep(e.key === "ArrowLeft" ? -1 : 1);
   };
 
-  const prev = set ? set.items[set.index - 1] : undefined;
-  const next = set ? set.items[set.index + 1] : undefined;
+  const prev = set.items[set.index - 1];
+  const next = set.items[set.index + 1];
   return (
     <div onKeyDown={onKeyDown}>
       <div
@@ -692,121 +587,78 @@ export default function RailPager({
             is a sibling of the card, not a descendant, and `#rightcol` is pointer-events:none. */}
         <div
           role="group"
-          aria-label={set ? (set.open ? `Step through ${set.parentLabel}` : `Siblings in ${set.parentLabel}`) : "Card ladder"}
-          title={set?.parentLabel}
-          className="pointer-events-auto absolute bottom-1 inset-x-[19px] grid h-5 grid-cols-[1fr_auto_1fr] items-center"
+          aria-label={set.open ? `Step through ${set.parentLabel}` : `Siblings in ${set.parentLabel}`}
+          title={set.parentLabel}
+          className="pointer-events-auto absolute bottom-1 inset-x-[19px] flex h-5 items-center justify-between"
         >
-          {/* An edge chevron is INACTIVE, not hidden — but an AXIS with nothing to navigate on
-              this card EVER is ABSENT (user, 2026-09-11, two rounds; supersedes 2026-09-03's
-              invisible rule, which predates the ladder pair). The split: a direction that ran
-              out mid-set dims (the control exists, the direction is exhausted — and a vanishing
-              chevron would re-compose the row at every edge), while a card with no sibling set
-              at all (the only record at its rung) shows no trio, and a card with no ladder step
-              at all shows no pair — permanently dead chrome is not a control.
-              The trio is CENTERED as one cluster — chevrons hugging the counter — rather than
-              spread to the card edges (user, same day: with the ladder pair aboard, an
-              edge-aligned › sat right beside ∧; the flex spacers put clear air between the two
-              axes instead).
-              ⚠️ CENTRED ON THE CARD, NOT ON THE ROOM LEFT OVER (user, 2026-10-03: "the <> control
-              at the card bottom should be center aligned"). As a flex row with two spacers the
-              trio centred in whatever the ladder pair did not take — 33px left of the card's
-              middle. Three columns, `1fr auto 1fr`: the trio owns the middle one, the pair sits
-              at the end of the third, and the first is its mirror — empty, but as wide. */}
-          <span aria-hidden />
-          {set ? (
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className={PLANK_BTN}
-                disabled={!prev}
-                onClick={() => commitStep(-1)}
-                aria-label={prev ? `Previous: ${prev.label}` : "Previous"}
-                title={prev?.label}
-              >
-                <ChevronLeft aria-hidden className="size-4" />
-              </Button>
-              {/* An OPEN set shows NO position (user, 2026-08-09): the global chain is ongoing,
-                  so `n / N` would state a total the window doesn't have. The min-width keeps the
-                  chevron spacing identical across the variants. */}
-              {/* THE POSITION IS DRAWN, NOT WRITTEN (user, 2026-10-03: "the card bottom has a lot
-                  of <> and ^^, and also / and | — can it be designed a bit nicer?"; option B of
-                  `docs/superpowers/design/2026-10-03-card-pager`). One small square per card,
-                  the current one lit — the cards' own way of counting (`UnitMarks`), so the
-                  strip carries no digits and no slash. A set too long for squares says it in
-                  words, "37 of 213". The count stays available to AT and on hover. */}
-              {set.open ? (
-                <div className="min-w-[3ch]" />
-              ) : set.items.length <= POSITION_MARKS_MAX ? (
+          {/* ONE AXIS, EDGE TO EDGE (user, 2026-10-04 — "why not < on the left and > on the right?",
+              once the ladder pair left the foot): ‹ at the card's left edge, the position in the
+              middle, › at its right edge. An exhausted direction DIMS rather than vanishing (user,
+              2026-09-11): a vanishing chevron would re-compose the row at every edge, and the dim
+              reads as "the control exists, the direction is exhausted". A card that is the only
+              record at its rung has no set, and so no plank at all. */}
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            className={PLANK_BTN}
+            disabled={!prev}
+            onClick={() => commitStep(-1)}
+            aria-label={prev ? `Previous: ${prev.label}` : "Previous"}
+            title={prev?.label}
+          >
+            <ChevronLeft aria-hidden className="size-4" />
+          </Button>
+          {/* An OPEN set shows NO position (user, 2026-08-09): the global chain is ongoing, so a
+              position would state a total the window doesn't have.
+              THE POSITION IS DRAWN, NOT WRITTEN (user, 2026-10-03, option B of
+              `docs/superpowers/design/2026-10-03-card-pager`): one small square per card, the
+              current one lit — the cards' own way of counting (`UnitMarks`). EVERY set draws squares
+              (user, 2026-10-04: "make it consistent with all the other cards"): a long set draws a
+              fixed-width window that follows the current square, its ends drawn small where more
+              lie beyond (`positionMarks`). The count stays available to AT and on hover. */}
+          {set.open ? (
+            <span aria-hidden />
+          ) : (
+            (() => {
+              const w = positionMarks(set.index, set.items.length, POSITION_MARKS_MAX);
+              return (
                 <div
                   role="img"
                   aria-label={`${set.index + 1} of ${set.items.length}`}
                   title={`${set.index + 1} of ${set.items.length}`}
                   className="flex items-center gap-[3px] px-0.5"
                 >
-                  {set.items.map((_, k) => (
-                    <i
-                      key={k}
-                      className={
-                        k === set.index
-                          ? "size-[7px] rounded-[1px] bg-[var(--filter-accent,var(--primary))]"
-                          : "size-[5px] rounded-[1px] bg-muted-foreground/45"
-                      }
-                    />
-                  ))}
+                  {Array.from({ length: w.end - w.start }, (_, j) => {
+                    const k = w.start + j;
+                    const edge = (j === 0 && w.fadeStart) || (j === w.end - w.start - 1 && w.fadeEnd);
+                    return (
+                      <i
+                        key={k}
+                        className={
+                          k === set.index
+                            ? "size-[7px] rounded-[1px] bg-[var(--filter-accent,var(--primary))]"
+                            : edge
+                              ? "size-[3px] rounded-[1px] bg-muted-foreground/45"
+                              : "size-[5px] rounded-[1px] bg-muted-foreground/45"
+                        }
+                      />
+                    );
+                  })}
                 </div>
-              ) : (
-                <div className="min-w-[3ch] whitespace-nowrap text-center text-label text-muted-foreground tabular-nums">
-                  <span className="font-semibold text-foreground">{(set.index + 1).toLocaleString()}</span> of {set.items.length.toLocaleString()}
-                </div>
-              )}
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className={PLANK_BTN}
-                disabled={!next}
-                onClick={() => commitStep(1)}
-                aria-label={next ? `Next: ${next.label}` : "Next"}
-                title={next?.label}
-              >
-                <ChevronRight aria-hidden className="size-4" />
-              </Button>
-            </div>
-          ) : (
-            <span aria-hidden />
+              );
+            })()
           )}
-          {/* THE LADDER PAIR (user, 2026-09-11) — ∧ re-boxes the coarser committed rung, ∨ the
-              finer one (the accordion's own expand — the camera and callout follow the box as
-              they always do), and with nothing finer committed ∨ commits the rung's FIRST child
-              in the explorer's own order. Same chrome-less grammar, same inactive-at-the-edge
-              rule. The two axes are told apart by WEIGHT, not by a line (2026-10-03): the pair is
-              drawn smaller and quieter, so it reads as the lesser control without a divider. */}
-          {(up || down) && (
-            <div className="flex items-center justify-self-end gap-1">
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className={cn(PLANK_BTN, "text-muted-foreground")}
-                disabled={!up}
-                onClick={() => up?.()}
-                aria-label="Open the coarser card"
-                title="Open the coarser card"
-              >
-                <ChevronUp aria-hidden className="size-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className={cn(PLANK_BTN, "text-muted-foreground")}
-                disabled={!down}
-                onClick={() => down?.run()}
-                aria-label={down?.label ?? "Open the finer card"}
-                title={down?.label}
-              >
-                <ChevronDown aria-hidden className="size-3.5" />
-              </Button>
-            </div>
-          )}
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            className={PLANK_BTN}
+            disabled={!next}
+            onClick={() => commitStep(1)}
+            aria-label={next ? `Next: ${next.label}` : "Next"}
+            title={next?.label}
+          >
+            <ChevronRight aria-hidden className="size-4" />
+          </Button>
         </div>
       </div>
     </div>

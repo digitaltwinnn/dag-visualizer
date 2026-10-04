@@ -41,7 +41,7 @@ const CONSTELLATION = "https://constellationnetwork.io";
 // internal doc links beside it (user: "make a visual distinction … gh icon").
 function GithubMark() {
   return (
-    <svg viewBox="0 0 16 16" width="12" height="12" fill="currentColor" aria-hidden className="flex-none">
+    <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden className="flex-none">
       <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
     </svg>
   );
@@ -138,7 +138,12 @@ export default function SiteFooter() {
       <nav
         className={cn(
           // `whitespace-nowrap`: a link is one unit — it may be dropped at a tier, never broken in two.
-          "flex-1 flex items-center justify-center gap-2.5 whitespace-nowrap text-label text-foreground-dim [&_a]:pointer-events-auto bg-[var(--footer-glass)] backdrop-blur-sm",
+          // THE BODY STEP, NOT THE LABEL STEP (user, 2026-10-04: "the footer is too small as per
+          // normal UI/UX design standards, for sure in phone mode"): these are links a thumb has to
+          // read and hit, and 12px is the floor for secondary text, not a target. 14px fits both
+          // bands (26px on the phone, 28 on the desktop) at its own 1.45 leading; on the phone the
+          // gaps tighten so the row still fits a 360px screen.
+          "flex-1 flex items-center justify-center gap-2.5 max-[700px]:gap-1.5 whitespace-nowrap text-body text-foreground-dim [&_a]:pointer-events-auto bg-[var(--footer-glass)] backdrop-blur-sm",
           "max-[700px]:[&_a]:pt-[26px] max-[700px]:[&_a]:-mt-[26px] max-[700px]:[&_a]:pb-1.5 max-[700px]:[&_a]:-mb-1.5 max-[700px]:[&_a]:px-1.5 max-[700px]:[&_a]:-mx-1.5",
           "pt-[min(10px,var(--bottom-reserve,0px))] max-[700px]:pt-0",
         )}
@@ -199,7 +204,7 @@ export default function SiteFooter() {
             // A 12px brand dot: plain <img>, round like every brand icon (the dossier avatar's
             // own rule) — Radix Avatar's load machinery is a client concern this static row
             // doesn't need.
-            <img src={dag.iconUrl} alt="" width={12} height={12} className="rounded-full flex-none" />
+            <img src={dag.iconUrl} alt="" width={14} height={14} className="rounded-full flex-none" />
           )}
           Constellation
         </a>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { childStep, siblingSet, type SiblingState } from "@/components/railSiblings";
+import { childStep, childSteps, positionMarks, siblingSet, type SiblingState } from "@/components/railSiblings";
 import {
   cohortToggleActions,
   compositionToggleActions,
@@ -577,5 +577,47 @@ describe("the ledger's node rung under a metagraph snapshot", () => {
   });
   it("no signer known → no ∨", () => {
     expect(childStep("metaSnap", { ...s, selNodes: [other] })).toBeNull();
+  });
+});
+
+describe("positionMarks", () => {
+  // Every card's pager DRAWS its position (user, 2026-10-04: "make it consistent with all the
+  // other cards" — Geography's 28-node set was the one card still writing "1 of 28"). A set
+  // longer than the run slides a fixed-width window that keeps the current mark in view, and an
+  // end mark with more beyond it is drawn small.
+  it("a set that fits draws every mark, none small", () => {
+    expect(positionMarks(2, 5, 15)).toEqual({ start: 0, end: 5, fadeStart: false, fadeEnd: false });
+  });
+  it("a long set's window starts at the front while the current mark is near it", () => {
+    expect(positionMarks(0, 28, 15)).toEqual({ start: 0, end: 15, fadeStart: false, fadeEnd: true });
+  });
+  it("mid-set the window centres the current mark and both ends fade", () => {
+    expect(positionMarks(14, 28, 15)).toEqual({ start: 7, end: 22, fadeStart: true, fadeEnd: true });
+  });
+  it("at the back the window clamps to the end", () => {
+    expect(positionMarks(27, 28, 15)).toEqual({ start: 13, end: 28, fadeStart: true, fadeEnd: false });
+  });
+  it("the window is always the run's width, so the strip never re-composes", () => {
+    for (let i = 0; i < 213; i++) {
+      const w = positionMarks(i, 213, 15);
+      expect(w.end - w.start).toBe(15);
+      expect(i >= w.start && i < w.end).toBe(true);
+    }
+  });
+});
+
+describe("childSteps — the next ghost's quick picks", () => {
+  // The first few children in the explorer's own order (user, 2026-10-04): the ghost below the
+  // deepest commit offers them, so the list and the pager's old first-child step can never disagree.
+  it("lists a country's cohorts in the explorer's order, the first being childStep's", () => {
+    const s = base({ country: "de" });
+    const picks = childSteps("country", s, 3);
+    expect(picks.length).toBeGreaterThan(1);
+    expect(picks[0]).toEqual(childStep("country", s));
+    expect(picks.map((p) => p.label)).toEqual(["Hetzner, Falkenstein", ...picks.slice(1).map((p) => p.label)]);
+  });
+  it("caps the list at n, and is empty where there is nothing finer", () => {
+    expect(childSteps("context", base({ filter: "ded" }), 1)).toHaveLength(1);
+    expect(childSteps("context", base({}), 3)).toEqual([]);
   });
 });

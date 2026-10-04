@@ -1,13 +1,12 @@
 "use client";
 
-import { pollHealthRows, type PollHealth } from "@/src/data/api";
+import { pollHealthRows, RECENT_OUTCOMES, type PollHealth } from "@/src/data/api";
 import { pollStatusOf, type PollStatus } from "@/src/data/pollStatus";
 import { relativeAge } from "@/src/util/relativeAge";
 import { BandCard } from "@/components/vitals/bandParts";
 import { useNowTick } from "@/components/useNowTick";
 import { cn } from "@/lib/utils";
 import { okShare } from "@/src/data/pollShare";
-import { BAR_EASE } from "@/components/RollSwap";
 import { Timer } from "lucide-react";
 // THE PULSE STRIP — the heartbeat's own row (user, 2026-08-30: clicking the ECG "should show a
 // bottom section (like the filter) with relevant information about the liveliness of the app —
@@ -38,7 +37,7 @@ const AGE_INK: Record<PollStatus, string> = {
 // The cadence chip says the DURATION, the timer glyph says "scheduled" (user, 2026-09-11 —
 // "can't we say 5 mins with an icon?"): a fixed-cadence feed wears the glyph + the bare
 // duration. A feed with no fixed cadence wears its `when` words instead — the honest trigger
-// ("at start" for the boot-loaded geo map, "5 min · in view" for trends), because "on demand"
+// ("page load" for the boot-loaded geo map, "each tick" for the snapshot reads), because "on demand"
 // claimed a user gesture neither feed answers to (same user round).
 const cadenceWord = (r: PollHealth): string =>
   r.everyMs != null
@@ -85,9 +84,8 @@ export default function PulseStrip() {
                     at the compact py-px the icon-bearing chip read cramped and the glyph sat
                     optically high beside the 10px text (user, 2026-09-11 — "padding … they look
                     small and text icon alignment feels a bit off"). */}
-                {/* ONE CHIP PER FACT (user, 2026-10-03, on the mid-dots): "5 min · while shown" is a
-                    cadence and a condition, so it is two chips — the registry's words are split on
-                    its own separator. */}
+                {/* ONE CHIP PER FACT (user, 2026-10-03, on the mid-dots): registry words carrying
+                    a cadence and a condition are split on their own separator into two chips. */}
                 {cadenceWord(r).split(" · ").map((part, i) => (
                   <span key={part} className="inline-flex items-center gap-1 rounded-xs border border-border bg-wash-faint px-1.5 py-[3px] text-label leading-none text-muted-foreground">
                     {i === 0 && r.everyMs != null && <Timer aria-hidden className="size-3 flex-none" />}
@@ -95,27 +93,42 @@ export default function PulseStrip() {
                   </span>
                 ))}
               </span>
-              {/* The ok/err record shows ONLY when there is something to weigh (user,
-                  2026-09-09, second round: the all-ok "N polls, all ok" line said what the
-                  green dot and the ticking last-success already say — chrome restating
-                  health). With failures it is a GLANCE instrument (2026-09-04): a hairline
-                  ratio bar in the two status tones, exact counts beside it (identity is
-                  never colour-alone — each count keeps its word, and "failed" is the human
-                  word for the red share). The err segment floors at 3px so one failure
-                  among thousands stays a visible mark. */}
-              {r.err > 0 && (
-                <span className="flex items-center gap-1.5 whitespace-nowrap">
-                  <span aria-hidden className="flex h-[3px] w-12 flex-none rounded-full overflow-hidden bg-border/60">
-                    <span style={{ width: `${(r.ok / Math.max(1, r.ok + r.err)) * 100}%`, background: "var(--success)" }} className={cn("opacity-70", BAR_EASE)} />
-                    <span style={{ width: `${(r.err / Math.max(1, r.ok + r.err)) * 100}%`, background: "var(--destructive)" }} className={cn("opacity-80 min-w-[3px]", BAR_EASE)} />
+              {/* THE RECENT RUN (user, 2026-10-04: "show a nice chart for each card there,
+                  green=ok red=fail"): one mark per outcome, oldest left, newest right — the last
+                  RECENT_OUTCOMES of them, in the two status tones. It replaces the hairline ratio
+                  bar, which only appeared once something had failed and could not say WHEN: a run
+                  shows a blip as a blip and an outage as a wall of red at the right end. The slots
+                  a young feed has not filled stay as faint marks, so every card's run is one width.
+                  Identity is never colour-alone: the share reading beside it keeps its word, and
+                  the exact counts are on hover. */}
+              {r.recent.length > 0 && (
+                <span className="flex items-center gap-2 whitespace-nowrap">
+                  <span
+                    role="img"
+                    aria-label={`Last ${r.recent.length} outcomes: ${r.recent.filter(Boolean).length} ok, ${r.recent.filter((x) => !x).length} failed`}
+                    className="flex h-2.5 flex-none items-end gap-px"
+                  >
+                    {Array.from({ length: RECENT_OUTCOMES }, (_, i) => {
+                      const o = r.recent[i - (RECENT_OUTCOMES - r.recent.length)];
+                      return (
+                        <span
+                          key={i}
+                          className={cn(
+                            "w-[3px] rounded-[1px]",
+                            o === undefined ? "h-1 bg-border/60" : o ? "h-full bg-[var(--success)] opacity-70" : "h-full bg-[var(--destructive)]",
+                          )}
+                        />
+                      );
+                    })}
                   </span>
-                  {/* ONE READING, no mid-dot (user, 2026-10-03: "'237 ok · 2 failed' — perhaps a
-                      percentage is better? I don't like the dot"). The share that succeeded says how
-                      healthy the feed is at a glance; the exact counts are on hover. Never "100%"
-                      while anything failed — one decimal from 99 up, capped at 99.9. */}
-                  <span className="text-label tabular-nums text-muted-foreground" title={`${r.ok.toLocaleString()} ok, ${r.err.toLocaleString()} failed`}>
-                    {okShare(r.ok, r.err)} ok
-                  </span>
+                  {/* ONE READING, no mid-dot (user, 2026-10-03): the share that succeeded, shown
+                      only when something failed — "100% ok" would restate the green run. Never
+                      "100%" while anything failed; one decimal from 99 up, capped at 99.9. */}
+                  {r.err > 0 && (
+                    <span className="text-label tabular-nums text-muted-foreground" title={`${r.ok.toLocaleString()} ok, ${r.err.toLocaleString()} failed`}>
+                      {okShare(r.ok, r.err)} ok
+                    </span>
+                  )}
                 </span>
               )}
             </span>
