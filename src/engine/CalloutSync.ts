@@ -3,6 +3,7 @@ import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
 import type { CohortSel } from "./domain/focusLadder";
 import type { Mode } from "@/src/store/store";
 import { breakpointOf } from "@/src/data/breakpoint";
+import type { ChromeBounds } from "./ChromeBounds";
 import { calloutHangs, calloutPhonePlacement, calloutPlacement, CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET } from "./domain/calloutPlacement";
 import { R as GEO_R, LAND_H, latLonToVec3 } from "./domain/geoLayout";
 import { ledgerLens } from "@/src/data/ledgerStory";
@@ -48,6 +49,8 @@ export interface CalloutState {
  *  getters for the handful of things that change per frame. */
 export interface CalloutHost {
   ctx: SceneCtx;
+  /** The HUD bars' edges — one reading shared with the Engine's framing shift. */
+  chrome: ChromeBounds;
   globe: Globe;
   ledger: LedgerView;
   layers: HyperView;
@@ -261,41 +264,19 @@ export class CalloutSync {
   private _ppW = 0;
   private _ppH = 0;
 
-  // Where the free canvas ends: the bottom band's top edge, less a little air, or the viewport's
-  // where no band is up (SCENE presentation, a view without one). The band is React's, so this
-  // is a DOM read — taken every thirtieth call rather than every frame, since the band moves
-  // only on a resize or a presentation change and a half-second-late answer costs nothing.
-  private _bottom = 0;
-  private _top = 0;
-  private _boundsIn = 0;
-  private _bounds(): void {
-    if (this._boundsIn-- > 0) return;
-    this._boundsIn = 30;
-    const band = document.getElementById("vitalsband");
-    this._bottom = (band ? band.getBoundingClientRect().top : window.innerHeight) - 4;
-    const bar = document.getElementById("topbar");
-    this._top = bar ? bar.getBoundingClientRect().bottom : 0;
-    // The phone dock bar's top edge (the sheet, when open, stands on it — `sceneCoverB`).
-    const dock = document.querySelector("[data-phone-dock]");
-    this._dockTop = (dock ? dock.getBoundingClientRect().top : window.innerHeight) - 4;
-  }
-  private _dockTop = 0;
-  private _phoneBottom(): number {
-    this._bounds();
-    return this._dockTop;
-  }
+  // The free canvas, from the one reading the Engine's framing shift shares (`ChromeBounds`).
+  // Where it ENDS: the bottom band's top edge less a little air, or the viewport's where no band is
+  // in the lane. Where it BEGINS: the command bar's bottom edge — the canvas runs behind the bar, so
+  // a top measured from y = 0 let a 220px label stand up into it (user, 2026-10-03, suggestion 5 of
+  // the callout review). On a phone the floor is the dock bar's top edge.
   private _freeBottom(): number {
-    this._bounds();
-    return this._bottom;
+    return this.h.chrome.read().bandTop - 4;
   }
-  // …and where it BEGINS: the command bar's bottom edge (any open strip included). The canvas
-  // runs behind the bar, so "near the top of the canvas" was measured from y = 0 and a label
-  // 220px tall stood up into the bar — in Hypergraph a node high on a hub showed only its last
-  // row under it (user, 2026-10-03, suggestion 5 of the callout review). Measured from here, the
-  // same rule drops the panel below its subject while there is still room to read it.
+  private _phoneBottom(): number {
+    return this.h.chrome.read().dockTop - 4;
+  }
   private _freeTop(): number {
-    this._bounds();
-    return this._top;
+    return this.h.chrome.read().top;
   }
 
   // THE MULTI-LEADER (user, 2026-08-30): a machine is SEVERAL beads in hyper — one per layer it

@@ -29,6 +29,7 @@ import { setNodeDimTarget, setNodeEnv } from "./scene/objects/NodeFabric";
 import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme/resolve";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
 import { SHEET_SHIFT_K, chromeShiftPx, sheetShiftPx } from "./domain/sheetShift";
+import { ChromeBounds } from "./ChromeBounds";
 import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush, trendFit } from "./domain/cameraRig";
 import { countryFraming } from "./domain/countryShape";
 import { R as GEO_R, LAND_H } from "./domain/geoLayout";
@@ -398,22 +399,12 @@ export class Engine {
   private _reduceMotion: MediaQueryList =
     typeof window !== "undefined" ? window.matchMedia("(prefers-reduced-motion: reduce)") : ({ matches: false } as MediaQueryList);
   private _sheetShiftApplied = 0;
-  // THE CHROME'S SHIFT's measurement (`chromeShiftPx`): the two bars are React's, so their edges are
-  // a DOM read — taken every thirtieth frame, since they move only on a resize, a strip opening or
-  // the SCENE toggle, and an answer half a second late is eased in anyway.
-  private _chromeIn = 0;
-  private _chromePx = 0;
-  private _chromeShift(h: number): number {
-    if (this._chromeIn-- > 0) return this._chromePx;
-    this._chromeIn = 30;
-    const band = document.getElementById("vitalsband");
-    const bar = document.getElementById("topbar");
-    const br = band?.getBoundingClientRect();
-    // Only while the band is IN the lane: hidden on the phone (its vitals ride the dock) and
-    // translated off-screen by the SCENE toggle, where the old centre stands.
-    const onScreen = !!br && br.height > 0 && br.top < h && getComputedStyle(band!).visibility !== "hidden";
-    this._chromePx = onScreen && bar ? chromeShiftPx(bar.getBoundingClientRect().bottom, h - br!.top) : 0;
-    return this._chromePx;
+  // The HUD bars' edges, read once for every engine consumer (`ChromeBounds`): the framing shift
+  // here and the callout's placement.
+  private _chrome = new ChromeBounds();
+  private _chromeShift(): number {
+    const c = this._chrome.read();
+    return c.bandOn ? chromeShiftPx(c.top, window.innerHeight - c.bandTop) : 0;
   }
   private _sheetShiftW = 0;
   private _sheetShiftH = 0;
@@ -565,6 +556,7 @@ export class Engine {
     // for the few values that change, so `sync` allocates nothing.
     this.callout = new CalloutSync({
       ctx: this.ctx,
+      chrome: this._chrome,
       globe: this.globe,
       ledger: this.ledger,
       layers: this.layers,
@@ -2179,7 +2171,7 @@ export class Engine {
       const w = el.clientWidth || window.innerWidth;
       const h = el.clientHeight || window.innerHeight;
       const target =
-        sheetShiftPx(Math.max(st.sceneCoverBExplore, st.sceneCoverBDetails, st.sceneCoverBVitals), h) + this._chromeShift(h);
+        sheetShiftPx(Math.max(st.sceneCoverBExplore, st.sceneCoverBDetails, st.sceneCoverBVitals), h) + this._chromeShift();
       const d = target - this._sheetShift;
       // REDUCED MOTION SNAPS (review, 2026-09-28): a whole-scene slide of up to half the viewport,
       // riding a sheet, is exactly the large-area motion the setting exists to remove. The sheet
