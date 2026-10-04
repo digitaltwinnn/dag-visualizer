@@ -24,6 +24,10 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 import { usePointerCoarse } from "@/components/usePointerCoarse";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { detailsCards, ladderSlotIds, ladderLevelOfSlot, type RailCard } from "@/components/railCards";
+import { CHILD_OF, childSteps, type SiblingStep } from "@/components/railSiblings";
+import { useSiblingState } from "@/components/useSiblingState";
+import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
+import { midHash } from "@/src/util/format";
 import { useLadderFocus } from "@/components/useLadderFocus";
 import { useTrayActives } from "@/components/useTrayActives";
 import { countryToggleActions, cohortToggleActions, compositionToggleActions, snapshotClearActions } from "@/src/engine/domain/pickActions";
@@ -304,7 +308,11 @@ const GHOST_EYEBROW: Record<string, string> = {
  *  open state is the same per-selection `railCollapse` override (false = open), so a new selection
  *  folds every ghost back. `.rail-entry` keeps it in the thread's query and `data-ghost` keeps its
  *  dot hollow, open or folded. */
-export function GhostCard({ card, open = false, onToggle }: { card: RailCard; open?: boolean; onToggle?: () => void }) {
+/** How many quick picks the next ghost offers. */
+const GHOST_PICKS = 3;
+/** A pick labelled by a node's peer id (a long hex string) — shown short, as every node row is. */
+const NODE_ID = /^[0-9a-f]{40,}$/i;
+export function GhostCard({ card, open = false, onToggle, picks }: { card: RailCard; open?: boolean; onToggle?: () => void; picks?: SiblingStep[] }) {
   const Icon = card.icon;
   const label = GHOST_EYEBROW[card.id] ?? card.id;
   return (
@@ -346,6 +354,30 @@ export function GhostCard({ card, open = false, onToggle }: { card: RailCard; op
           it stood at full size before the frame grew, then a whole-card fade blinked the header):
           the lane's HeightEase grows the frame, and the hint alone fades in on the same tempo. */}
       {open && <p className="ghost-hint-in m-0 mt-1.5 pl-6 text-body text-foreground-dim">{card.hint}</p>}
+      {/* THE QUICK PICKS (user, 2026-10-04): on the NEXT ghost only, the first few of the rows the
+          explorer would list here, in its order. A pick runs that row's own actions through the one
+          executor (rule 2), so it commits exactly what the explorer click would — and the ghost
+          becomes the real card. Raised above the card's stretched toggle so they take the click. */}
+      {open && picks && picks.length > 0 && (
+        <ul className="ghost-hint-in relative z-[2] m-0 mt-2 ml-6 p-0 list-none flex flex-col gap-0.5">
+          {picks.map((p) => (
+            <li key={p.key}>
+              <button
+                type="button"
+                onClick={() => applyClickActions(p.actions)}
+                title={p.label}
+                className={cn(
+                  "w-full text-left truncate rounded-sm px-2 py-1 -mx-2 text-body text-foreground cursor-pointer hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
+                  NODE_ID.test(p.label) && "font-mono tabular-nums",
+                )}
+              >
+                {/* A node is named by its id, in the short form every node row uses. */}
+                {NODE_ID.test(p.label) ? midHash(p.label, NODE_ID_GLYPHS) : p.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </aside>
   );
 }
@@ -437,6 +469,23 @@ export default function Inspector() {
   // open — single-open accordion semantics across the present ladder rungs, written as overrides
   // in one store update. Collapsing the open box just closes it (no box open is a legal rest).
   const presentLadderIds = ladderIds.filter(presentOf);
+  // THE NEXT GHOST (user, 2026-10-04 — the ladder pair retired for it): the rung directly below the
+  // deepest committed one, when the explorer's rows for it are known. Opened, it offers the first
+  // few of them as quick picks (`childSteps`, the same list and order the pager's old ∨ took its
+  // first child from), so stepping down to an unchosen level happens where that level is drawn.
+  // The rail's state is read by the pager's own builder, so the picks and the pager cannot disagree.
+  const deepestId = presentLadderIds[presentLadderIds.length - 1] ?? null;
+  const deepestKind = deepestId ? (manifest.find((c) => c.id === deepestId)?.kind ?? null) : null;
+  const siblingState = useSiblingState(deepestKind);
+  const nextGhost = useMemo(() => {
+    if (!deepestId || !deepestKind) return null;
+    const below = ladderIds[ladderIds.indexOf(deepestId) + 1];
+    const to = CHILD_OF[mode]?.[deepestKind]?.to;
+    if (!below || presentOf(below) || manifest.find((c) => c.id === below)?.kind !== to) return null;
+    const picks = childSteps(deepestKind, siblingState, GHOST_PICKS);
+    return picks.length ? { id: below, picks } : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `manifest`/`ladderIds` derive from the same store slices
+  }, [deepestId, deepestKind, siblingState, mode]);
   // EXPAND-ONLY since the box lost its minimize (review find, 2026-09-11): every reachable
   // caller — an entry's stretched toggle, the plank's ∧/∨ targeting collapsed neighbours —
   // arrives with effCollapsed(id) true, so this always OPENS `id` (single-open collapses the
@@ -646,7 +695,7 @@ export default function Inspector() {
           ) : card.present ? (
             detailPane[id]
           ) : card.hint != null ? (
-            <GhostCard card={card} {...ghostCx(id)} />
+            <GhostCard card={card} {...ghostCx(id)} picks={id === nextGhost?.id ? nextGhost.picks : undefined} />
           ) : null;
         if (!body) return null;
         // The rung's PRESENTATION TIER, stated on the wrapper for the slab CSS (globals.css) —
@@ -665,14 +714,7 @@ export default function Inspector() {
         // (`railLadderBoundary.test.ts` asserts rung → slot, never the reverse). RailPager renders
         // children untouched when the rung has no sibling set.
         const focused = id === focusId;
-        // The plank's ladder pair steps the PILE: the boxed rung's committed neighbours in
-        // display order, opened through the accordion's own toggleCollapse (single-open makes
-        // the target the box). With no finer committed rung, RailPager's ∨ falls through to
-        // childStep and commits the first child (user, 2026-09-11).
-        const pi = presentLadderIds.indexOf(id);
-        const upSlot = pi > 0 ? presentLadderIds[pi - 1] : null;
-        const downSlot = pi >= 0 && pi < presentLadderIds.length - 1 ? presentLadderIds[pi + 1] : null;
-        const wrapped = boxed ? <RailPager slot={card.kind} upSlot={upSlot} downSlot={downSlot} onOpenSlot={toggleCollapse}>{body}</RailPager> : body;
+        const wrapped = boxed ? <RailPager slot={card.kind} >{body}</RailPager> : body;
         return (
           // The distance-dim rides a VAR, not wrapper opacity (2026-08-08): the entry itself
           // applies `opacity-[var(--entry-dim,1)]` and RELEASES it on hover (the materialize

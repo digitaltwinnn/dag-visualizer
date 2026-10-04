@@ -504,30 +504,20 @@ box unique) — it is the tier's own `boxed` condition, and `railTierBoundary.te
 can't drift. Keying it to the FOCUS rung was the same mistake `data-tier` fixed above, and it also shut
 out the two snapshot slots, which ride the lane with no focus rung at all.
 
-**The plank also carries the LADDER PAIR** (`∧ ∨`, 2026-09-11 — the user liked the sibling swipe
-and asked for the vertical axis; a vertical SWIPE was rejected together because it fights the
-rails' touch scrolling and the sheets' drag gestures, so it is buttons): ∧ re-boxes the next
-coarser COMMITTED rung and ∨ the next finer one — the accordion's own `toggleCollapse`, committing
-nothing, with the camera and callout following the box as always — and where nothing finer is
-committed, ∨ falls through to `childStep` (railSiblings.ts, tested) and COMMITS the rung's FIRST
-child in the explorer's own order ("just pick the 1st one"). A rung with no child vocabulary
-(a node, the ledger's network — its finer subjects belong to the tick axis) disables the control.
-A metagraph snapshot's ∨ opens its first VALIDATOR (2026-09-29), and the node card under it pages
-only the nodes that signed it — `snapshotSignerRows` (`src/data/network.ts`), the same list and
-order as the explorer's signer level, so the two can't disagree about who signed. The sibling trio is CENTERED as one cluster with the ladder pair at the
-right, told apart by WEIGHT rather than a divider (2026-10-03, option B of
-`docs/superpowers/design/2026-10-03-card-pager` — user: "a lot of <> and ^^, and also / and |"):
-the pair is drawn smaller and quieter, and **the position is DRAWN, not written** — one small
-square per sibling with the current one lit (the cards' own unit marks), never digits or a slash
-— a set past fifteen slides a fifteen-wide window that follows the current square, its ends drawn
-small where more lie beyond (`positionMarks` in railSiblings.ts; user, 2026-10-04, retiring the
-"n of N" words as the one card that read differently). The two axes still never read as one four-way control — and **an
-exhausted direction is INACTIVE while an axis with nothing to ever navigate is ABSENT** (user,
-2026-09-11, two rounds; supersedes 2026-09-03's invisible rule, which predates the pair): a
-direction that ran out mid-set dims — a vanishing chevron re-composes the row at every edge,
-and the dimmed state reads as "the control exists, the direction is exhausted" — while a card
-that is the only record at its rung shows no trio at all, and one with no ladder step shows no
-pair. Permanently dead chrome is not a control.
+**The ladder pair is RETIRED; the plank is ONE AXIS** (user, 2026-10-04: "do we still need it
+actually? … now the ghost is clickable"). `∧ ∨` (2026-09-11) re-boxed the coarser/finer committed
+card — both one click away on the cards themselves — and, with nothing finer committed, ∨ committed
+the rung's FIRST child. That one unique job moved into the **NEXT GHOST**: the ghost directly below
+the deepest committed rung, opened, offers the first `GHOST_PICKS` (3) children in the explorer's
+own order as quick picks (`childSteps` in railSiblings.ts, the list form of the old first-child
+step, read through the pager's own state builder `useSiblingState`), each running that row's own
+actions through the one executor. A metagraph snapshot's next ghost lists its first validators
+(`snapshotSignerRows`, the explorer's signer order). The plank is `‹` at the card's left edge, the
+position squares centred, `›` at its right edge — the position DRAWN, never written: one small square
+per sibling with the current one lit, a set past fifteen sliding a fifteen-wide window whose ends
+are drawn small (`positionMarks`; user, 2026-10-04). An exhausted direction DIMS rather than
+vanishing (a vanishing chevron re-composes the row at every edge), and a card that is the only
+record at its rung has no plank at all. Permanently dead chrome is not a control.
 
 **Ladder steps are QUIET, and the quiet is PROVENANCE, not a timer** (user, 2026-09-11, four
 rounds ending in "solve it structurally"): `store.navQuiet` records HOW the current state was
@@ -1259,7 +1249,7 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
   no per-card variants. A right-rail ENTRY expands on click (the whole entry is one invisible
   stretched toggle, required for touch) — but the BOX carries **no minimize** (user, 2026-09-11:
   "hardly used"; the − on the eyebrow line and the whole-head collapse toggle both went): the box
-  moves by expanding another entry or by the plank's ladder pair, never by collapsing into
+  moves by expanding another entry (or an explorer row's re-box), never by collapsing into
   nothing. The LEFT rail's explore cards keep their collapse toggle. The × and the aside float
   above the entry overlay so closing and links keep working. ⚠️ **Floating above it means
   `pointer-events-none` on the wrapper and `pointer-events-auto` on its own links/buttons**

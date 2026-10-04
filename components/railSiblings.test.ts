@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { childStep, positionMarks, siblingSet, type SiblingState } from "@/components/railSiblings";
+import { childStep, childSteps, positionMarks, siblingSet, type SiblingState } from "@/components/railSiblings";
 import {
   cohortToggleActions,
   compositionToggleActions,
@@ -603,5 +603,21 @@ describe("positionMarks", () => {
       expect(w.end - w.start).toBe(15);
       expect(i >= w.start && i < w.end).toBe(true);
     }
+  });
+});
+
+describe("childSteps — the next ghost's quick picks", () => {
+  // The first few children in the explorer's own order (user, 2026-10-04): the ghost below the
+  // deepest commit offers them, so the list and the pager's old first-child step can never disagree.
+  it("lists a country's cohorts in the explorer's order, the first being childStep's", () => {
+    const s = base({ country: "de" });
+    const picks = childSteps("country", s, 3);
+    expect(picks.length).toBeGreaterThan(1);
+    expect(picks[0]).toEqual(childStep("country", s));
+    expect(picks.map((p) => p.label)).toEqual(["Hetzner, Falkenstein", ...picks.slice(1).map((p) => p.label)]);
+  });
+  it("caps the list at n, and is empty where there is nothing finer", () => {
+    expect(childSteps("context", base({ filter: "ded" }), 1)).toHaveLength(1);
+    expect(childSteps("context", base({}), 3)).toEqual([]);
   });
 });

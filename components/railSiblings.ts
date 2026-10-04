@@ -471,110 +471,122 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
  *  The step FUNCTIONS stay small and named, and they keep using this file's shared item builders,
  *  so a rung's sibling set and its parent's child step still commit the same subject through the
  *  same pickActions builder. */
-interface ChildEntry { to: RailCardKind; step: (s: SiblingState) => SiblingStep | null }
+/** A rung's CHILDREN in the explorer's own order — the first `n` of them. The pager's old ∨ took the
+ *  first; the NEXT GHOST card offers the first few as quick picks (user, 2026-10-04 — "now the
+ *  ghost is clickable; something more we can do with that?"), so the step is a list. */
+interface ChildEntry { to: RailCardKind; steps: (s: SiblingState, n: number) => SiblingStep[] }
 
-// geo: the explorer's own first row, countries count-desc. Like every child-of-the-dossier step
+// geo: the explorer's own first rows, countries count-desc. Like every child-of-the-dossier step
 // it states its own precondition — the dossier only exists under a committed network, so at "all"
-// there is no card to open anything FROM (the same shape `firstCohort` asserts with `s.country`).
-const firstCountry = (s: SiblingState): SiblingStep | null => {
-  if (s.filter === "all") return null;
-  const c = s.countries[0];
-  return c ? countryItem(c, s) : null;
+// there is no card to open anything FROM (the same shape `cohortChildren` asserts with `s.country`).
+const countryChildren = (s: SiblingState, n: number): SiblingStep[] => {
+  if (s.filter === "all") return [];
+  return s.countries.slice(0, n).map((c) => countryItem(c, s));
 };
-// geo: the committed country's first cohort.
-const firstCohort = (s: SiblingState): SiblingStep | null => {
-  if (!s.country) return null;
-  const g = cohortsOf(s.selNodes.filter((r) => r.cc === s.country))[0];
-  return g ? cohortItem(s.country, g, s) : null;
+// geo: the committed country's cohorts.
+const cohortChildren = (s: SiblingState, n: number): SiblingStep[] => {
+  if (!s.country) return [];
+  const cc = s.country;
+  return cohortsOf(s.selNodes.filter((r) => r.cc === cc)).slice(0, n).map((g) => cohortItem(cc, g, s));
 };
-// geo: the committed cohort's first machine.
-const firstNodeOfCohort = (s: SiblingState): SiblingStep | null => {
+// geo: the committed cohort's machines.
+const nodeOfCohortChildren = (s: SiblingState, n: number): SiblingStep[] => {
   const c = s.cohort;
-  if (!c) return null;
+  if (!c) return [];
   const g = cohortsOf(s.selNodes.filter((r) => r.cc === c.cc)).find((x) =>
     sameCohort(c, { cc: c.cc, city: x.city, isp: x.isp }),
   );
-  const r = g ? machineRows(g.rows).sort(nodeSort)[0] : undefined;
-  return r ? nodeItem(r, s) : null;
+  return g ? machineRows(g.rows).sort(nodeSort).slice(0, n).map((r) => nodeItem(r, s)) : [];
 };
 // hyper: the explorer leads with the composition groups, size-desc (same dossier precondition).
-const firstComposition = (s: SiblingState): SiblingStep | null => {
-  if (s.filter === "all") return null;
-  const g = compositionGroups(s.selNodes)[0];
-  return g ? compositionItem(g, s) : null;
+const compositionChildren = (s: SiblingState, n: number): SiblingStep[] => {
+  if (s.filter === "all") return [];
+  return compositionGroups(s.selNodes).slice(0, n).map((g) => compositionItem(g, s));
 };
 // hyper: the committed group's own row order — the same sequence the node pager steps.
-const firstNodeOfComposition = (s: SiblingState): SiblingStep | null => {
-  if (!s.composition) return null;
+const nodeOfCompositionChildren = (s: SiblingState, n: number): SiblingStep[] => {
+  if (!s.composition) return [];
   const g = compositionGroups(s.selNodes).find((x) => x.key === s.composition!.key);
-  const r = g ? machineRows(g.rows)[0] : undefined;
-  return r && g ? nodeItem(r, s, { netId: s.filter, key: g.key }) : null;
+  return g ? machineRows(g.rows).slice(0, n).map((r) => nodeItem(r, s, { netId: s.filter, key: g.key })) : [];
 };
-/** ledger: the network that anchored MOST into this tick — the order the tick card prints its
- *  anchors in. Opening the Metagraph card under a tick commits that network INSIDE the tick
+/** ledger: the networks that anchored into this tick, MOST first — the order the tick card prints
+ *  its anchors in. Opening the Metagraph card under a tick commits that network INSIDE the tick
  *  (`tickNetSelectActions`), never the app filter (user, 2026-10-02 — reversing 2026-09-15's "the
  *  filter IS the step": a card's pager re-scoped the whole app, and it dropped the pin on the way
  *  because a filter commit in the ledger re-enters live). An UNLISTED channel names no network,
- *  so there is nothing to commit and the control dims. */
-const firstAnchoringNetwork = (s: SiblingState): SiblingStep | null => {
-  if (!s.snap) return null;
+ *  so there is nothing to commit. */
+const anchoringNetworkChildren = (s: SiblingState, n: number): SiblingStep[] => {
+  if (!s.snap) return [];
   // A network already stands under the tick — unless it is the FILTER's and this tick holds nothing
-  // of it, where its card has stood down (`ledgerCardNetwork`) and ∨ steps into the tick's own
-  // first network instead of going dead.
+  // of it, where its card has stood down (`ledgerCardNetwork`) and the step goes into the tick's
+  // own networks instead of going dead.
   const stoodDown = s.tickNet == null && s.ticks.find((t) => t.data.ordinal === s.snap!.data.ordinal)?.inStory === false;
-  if (netOf(s) !== "all" && !stoodDown) return null;
-  const meta = tickNetworks(s)?.[0];
-  return meta ? { key: meta.id, label: meta.name, actions: tickNetSelectActions(meta.id, s.snap, { metaSnap: s.metaSnap, hasInspect: s.inspect != null, net: null }) } : null;
+  if (netOf(s) !== "all" && !stoodDown) return [];
+  const snap = s.snap;
+  return (tickNetworks(s) ?? []).slice(0, n).map((meta) => ({
+    key: meta.id,
+    label: meta.name,
+    actions: tickNetSelectActions(meta.id, snap, { metaSnap: s.metaSnap, hasInspect: s.inspect != null, net: null }),
+  }));
 };
-/** ledger: the committed network's OWN snapshot in the shown tick — never the tick's first row,
+/** ledger: the committed network's OWN snapshots in the shown tick — never the tick's first rows,
  *  which would re-commit the filter to whichever network leads the exact read and release the
- *  committed story (review find, 2026-09-11). No row → the network did not anchor here, which is
- *  the honest answer, and the control dims. */
-const firstMetaSnapOfTick = (s: SiblingState): SiblingStep | null => {
+ *  committed story (review find, 2026-09-11). None → the network did not anchor here, which is
+ *  the honest answer. */
+const metaSnapOfTickChildren = (s: SiblingState, n: number): SiblingStep[] => {
   const net = netOf(s);
-  if (net === "all" || !s.snap || !s.exactRows) return null;
+  if (net === "all" || !s.snap || !s.exactRows) return [];
+  const snap = s.snap;
   // By network KEY: the unlisted network's snapshots carry their own raw addresses.
-  const r = s.exactRows.find((x) => keyOf(s, x.metaId) === net);
-  if (!r) return null;
-  const sel = metaSnapSelOf(r, s.snap.data.ordinal, s.snap.data.timestamp);
-  return {
-    key: `${r.metaId}:${r.ordinal}`,
-    label: ordinalLabel(r),
-    actions: metaSnapSelectActions(sel, s.snap, { metaSnap: s.metaSnap, inspect: s.inspect }),
-  };
+  return s.exactRows
+    .filter((x) => keyOf(s, x.metaId) === net)
+    .slice(0, n)
+    .map((r) => {
+      const sel = metaSnapSelOf(r, snap.data.ordinal, snap.data.timestamp);
+      return {
+        key: `${r.metaId}:${r.ordinal}`,
+        label: ordinalLabel(r),
+        actions: metaSnapSelectActions(sel, snap, { metaSnap: s.metaSnap, inspect: s.inspect }),
+      };
+    });
 };
 
-/** ledger: a metagraph snapshot's FIRST validator (user, 2026-09-29 — "from the metagraph snapshot
- *  … click the down button and go to its validators"). The same list and order as the explorer's
- *  signer level (`snapshotSignerRows`); a signature no known node carries has nothing to open, so
- *  the step takes the first KNOWN one, and none known dims the control. */
-const firstSignerOfMetaSnap = (s: SiblingState): SiblingStep | null => {
-  if (!s.metaSnap) return null;
-  const r = snapshotSignerRows(s.selNodes, s.exactRows, s.metaSnap)[0];
-  return r ? nodeItem(r, s) : null;
+/** ledger: a metagraph snapshot's validators (user, 2026-09-29 — "from the metagraph snapshot …
+ *  go to its validators"). The same list and order as the explorer's signer level
+ *  (`snapshotSignerRows`); a signature no known node carries has nothing to open, so only KNOWN
+ *  ones are offered. */
+const signerOfMetaSnapChildren = (s: SiblingState, n: number): SiblingStep[] => {
+  if (!s.metaSnap) return [];
+  return snapshotSignerRows(s.selNodes, s.exactRows, s.metaSnap).slice(0, n).map((r) => nodeItem(r, s));
 };
 
 export const CHILD_OF: Partial<Record<Mode, Partial<Record<RailCardKind, ChildEntry>>>> = {
   geo: {
-    context: { to: "country", step: firstCountry },
-    country: { to: "cohort", step: firstCohort },
-    cohort: { to: "node", step: firstNodeOfCohort },
+    context: { to: "country", steps: countryChildren },
+    country: { to: "cohort", steps: cohortChildren },
+    cohort: { to: "node", steps: nodeOfCohortChildren },
   },
   hyper: {
-    context: { to: "composition", step: firstComposition },
-    composition: { to: "node", step: firstNodeOfComposition },
+    context: { to: "composition", steps: compositionChildren },
+    composition: { to: "node", steps: nodeOfCompositionChildren },
   },
   ledger: {
-    snap: { to: "context", step: firstAnchoringNetwork },
-    context: { to: "metaSnap", step: firstMetaSnapOfTick },
-    metaSnap: { to: "node", step: firstSignerOfMetaSnap },
+    snap: { to: "context", steps: anchoringNetworkChildren },
+    context: { to: "metaSnap", steps: metaSnapOfTickChildren },
+    metaSnap: { to: "node", steps: signerOfMetaSnapChildren },
   },
 };
 
-/** The rung's first child, or null when there is nothing finer to open (the control dims).
+/** The rung's first child, or null when there is nothing finer to open.
  *  A node and a metagraph snapshot are leaves; About and the tool card never focus. */
 export function childStep(slot: RailCardKind, s: SiblingState): SiblingStep | null {
-  return CHILD_OF[s.mode]?.[slot]?.step(s) ?? null;
+  return childSteps(slot, s, 1)[0] ?? null;
+}
+
+/** The rung's first `n` children, in the explorer's own order, and the card they open (`to`) — the
+ *  NEXT GHOST's quick picks (2026-10-04). Empty where there is nothing finer to open. */
+export function childSteps(slot: RailCardKind, s: SiblingState, n: number): SiblingStep[] {
+  return CHILD_OF[s.mode]?.[slot]?.steps(s, n) ?? [];
 }
 
 /** Which of a sibling set's position marks the pager draws (user, 2026-10-04 — every card's pager
