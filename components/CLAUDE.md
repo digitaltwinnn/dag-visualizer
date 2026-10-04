@@ -956,7 +956,10 @@ shifts the scene up into the band above it** (2026-09-28): the dock publishes it
 a bottom cover (`sceneCoverBExplore` / `sceneCoverBDetails` / `sceneCoverBVitals`, one per dock because their exits lag)
 and the Engine eases a projection offset — `camera.setViewOffset`, never a camera move, so every
 pose, the callout, the chart planes and picking follow — by half the cover
-(`domain/sheetShift.ts`). Shift only, no zoom. The sheet GROWS out
+(`domain/sheetShift.ts`). Shift only, no zoom. **Desktop and tablet take the same offset for the
+CHROME** (user, 2026-10-04: "move the scene slightly up"): the band + footer are taller than the
+top bar, so `chromeShiftPx` moves the framing centre up by half the difference, measured off the
+two bars while the band is in the lane (not on the phone, not under the SCENE toggle). The sheet GROWS out
 of the dock (a height transition from a zero armed on the open flip — the content mounts a commit
 later, the portal trap), fits its content live, and shrinks back on a
 render-phase-derived exit. Dismissing a sheet only collapses it — it does not clear the selection.
