@@ -39,6 +39,14 @@ describe("syncLedgerPath", () => {
   });
 });
 
+describe("syncLedgerPath — pinning the live tip", () => {
+  it("re-points an open path when the followed tick is pinned in place", () => {
+    // Browsing tick 100 while live; the card pins the live tip, 105 — no ordinal changes.
+    const next = syncLedgerPath(open, view({ following: true, snapOrd: 105 }), view({ following: false, snapOrd: 105 }));
+    expect(next).toEqual({ ...CLOSED_PATH, tick: 105 });
+  });
+});
+
 describe("pathViewChanged", () => {
   it("sees a new snapshot, tick or follow state, and nothing else", () => {
     expect(pathViewChanged(view(), view())).toBe(false);

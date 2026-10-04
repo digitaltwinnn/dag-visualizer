@@ -23,9 +23,10 @@ import HeightEase from "@/components/HeightEase";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { usePointerCoarse } from "@/components/usePointerCoarse";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { detailsCards, ladderSlotIds, ladderLevelOfSlot, type RailCard } from "@/components/railCards";
+import { detailsCards, ladderSlotIds, type RailCard } from "@/components/railCards";
 import { CHILD_OF, childSteps, type SiblingStep } from "@/components/railSiblings";
 import { useSiblingState } from "@/components/useSiblingState";
+import { openRailCard } from "@/components/railOpen";
 import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
 import { midHash } from "@/src/util/format";
 import { useLadderFocus } from "@/components/useLadderFocus";
@@ -449,7 +450,6 @@ export default function Inspector() {
   const railCollapse = useStore((s) => s.railCollapse);
   const setRailCollapse = useStore((s) => s.setRailCollapse);
   const setRailCollapseMany = useStore((s) => s.setRailCollapseMany);
-  const requestFocusRung = useStore((s) => s.requestFocusRung);
   const ladderIds = ladderSlotIds(mode);
   const presentOf = (id: string) => manifest.find((c) => c.id === id)?.present ?? false;
   // The focus rung comes from the shared derivation the EXPLORE rail reads too (`focusSlotId`),
@@ -494,31 +494,9 @@ export default function Inspector() {
   // arrives with effCollapsed(id) true, so this always OPENS `id` (single-open collapses the
   // rest); there is no gesture left that collapses a box into nothing. Kept under its
   // historical name because cx/onToggle is the wiring vocabulary CardHead shares.
-  const toggleCollapse = (id: string) => {
-    // A manual expand is a QUIET navigation (the About card's never-roll-on-a-manual-
-    // expand rule, structural since 2026-09-11): heads remounting from this gesture — the
-    // plank's ∧/∨ and an entry's own click alike — skip the title roll. The provenance lives
-    // in the store so a late-mounting card still knows it; the next ordinary commit resets it
-    // through the one executor.
-    useStore.getState().setNavQuiet(true);
-    if (ladderIds.includes(id)) {
-      setRailCollapseMany({
-        ...Object.fromEntries(presentLadderIds.filter((x) => x !== id).map((x) => [x, true])),
-        [id]: false,
-      });
-    } else {
-      setRailCollapse(id, false);
-    }
-    // THE CAMERA FRAMES THE BOXED RUNG (user, 2026-08-09: "when we click the card, can we also
-    // update the view camera position, we do the same when we click a row in the explorer").
-    // Only for a real rung — the snapshot slots aren't rungs (no pose of their own). The
-    // Engine re-walks its own ladder from this rung, so the card lands the pose its explorer
-    // row would have, without re-applying the row's actions — those are TOGGLES, and feeding a
-    // committed rung back through one would DESELECT it. Nothing is committed or released
-    // here, so the finest selection stands.
-    const level = ladderLevelOfSlot(id);
-    if (level) requestFocusRung(level);
-  };
+  const toggleCollapse = (id: string) =>
+    // The one open-a-card routine (railOpen.ts). A non-ladder card (the snapshot slots) folds nothing.
+    openRailCard(id, ladderIds.includes(id) ? presentLadderIds : []);
   const cx = (id: string) => ({ collapsed: effCollapsed(id), onToggle: () => toggleCollapse(id) });
   // A GHOST's disclosure (GhostCard's header has the why): its own override, outside the
   // single-open accordion — folded by default, `false` = open, cleared back to folded.

@@ -81,4 +81,17 @@ describe("the LB breaker", () => {
     await fetchGlobalJson("mainnet", 6);
     expect(calls.filter((u) => u.includes(LB)).length).toBe(2);
   });
+  it("while backing off, asks the LB anyway when every archive fails", async () => {
+    let lbStatus = 503;
+    stub(async () => (lbStatus === 200 ? ok({ from: "lb" }) : new Response("no", { status: lbStatus })), async () => new Response("no", { status: 404 }));
+    await expect(fetchGlobalJson("mainnet", 5)).rejects.toThrow();
+    lbStatus = 200;
+    expect(await fetchGlobalJson("mainnet", 6)).toEqual({ from: "lb" });
+  });
+  it("an LB body that fails to parse falls back to the archives and trips the backoff", async () => {
+    const calls = stub(async () => new Response("not json", { status: 200 }), async () => ok({ from: "archive" }));
+    expect(await fetchGlobalJson("mainnet", 5)).toEqual({ from: "archive" });
+    await fetchGlobalJson("mainnet", 6);
+    expect(calls.filter((u) => u.includes(LB)).length).toBe(1);
+  });
 });

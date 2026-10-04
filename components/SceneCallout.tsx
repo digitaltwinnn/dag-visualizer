@@ -143,7 +143,9 @@ export function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; cla
           type="button"
           tabIndex={-1}
           onClick={onDismiss}
-          className="pointer-events-auto absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-wash-hover hover:text-foreground after:absolute after:-inset-2 after:content-['']"
+          // Live only while the label is ON: a faded-out label keeps its place on screen, and an
+          // invisible × there would swallow a click on the scene (review, 2026-10-04).
+          className="pointer-events-auto [[data-on='0']_&]:pointer-events-none absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-wash-hover hover:text-foreground after:absolute after:-inset-2 after:content-['']"
         >
           <X aria-hidden className="size-3.5" />
         </button>
@@ -521,7 +523,21 @@ export default function SceneCallout() {
     if (m) m = { ...m, lead: undefined };
     if (m2) m2 = { ...m2, lead: undefined };
   }
-  // Closed for this view and subject (each Snapshots label has its own ×, so each is keyed).
+  // Closed for this view and subject (each Snapshots label has its own ×, so each is keyed). Once
+  // the slot shows ANY other subject — or none — the closure is spent, so re-selecting the closed
+  // subject brings its label back (review, 2026-10-04: "until something in that view changes").
+  const stale = (["callout", "callout-2"] as const).filter((slot) => {
+    const k = dismissed[`${mode}|${slot}`];
+    const cur = (slot === "callout" ? m : m2)?.key ?? null;
+    return k != null && k !== cur;
+  });
+  if (stale.length) {
+    setDismissed((d) => {
+      const n = { ...d };
+      for (const slot of stale) delete n[`${mode}|${slot}`];
+      return n;
+    });
+  }
   if (m && dismissed[`${mode}|callout`] === m.key) m = null;
   if (m2 && dismissed[`${mode}|callout-2`] === m2.key) m2 = null;
   if (!m && !m2) return null;

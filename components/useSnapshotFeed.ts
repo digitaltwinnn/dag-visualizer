@@ -9,11 +9,18 @@ import type { GlobalEvent, GlobalSnapshot } from "@/src/data/types";
 // Snapshots arrive ~every 15s, so React state is fine here (Lane B). The anchor-tick
 // state bumps when the anchor index fills in, forcing a re-render so derived fees/cues
 // re-read getAnchor() (the value itself is internal — consumers just observe the render).
-export function useSnapshotFeed(max: number) {
+/** `enabled` false subscribes to nothing and holds an empty window — for a caller that needs the
+ *  feed only in some states (the rail's sibling state, for the snapshot slot alone), so the others
+ *  do not re-render on every tick (review, 2026-10-04). */
+export function useSnapshotFeed(max: number, enabled = true) {
   const [snaps, setSnaps] = useState<GlobalSnapshot[]>([]);
   const [, setAnchorTick] = useState(0);
 
   useEffect(() => {
+    if (!enabled) {
+      setSnaps((cur) => (cur.length ? [] : cur));
+      return;
+    }
     // Boot-order-INDEPENDENT on purpose. `DataBridge` owns the boot, but this hook's consumer
     // (`LiveStrip`) lives inside `SectionShell`, which React renders — and whose effects therefore
     // run — BEFORE the bridge's. Reading `getNetwork()` alone returned null there and the effect
@@ -47,7 +54,7 @@ export function useSnapshotFeed(max: number) {
       net.off("anchor", onAnchor);
       cancelAnimationFrame(raf);
     };
-  }, [max]);
+  }, [max, enabled]);
 
   return { snaps };
 }

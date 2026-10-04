@@ -149,9 +149,20 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // (user, 2026-10-04: "in the moment card, go to raw snapshot sets the global filter — that should
   // not happen; only set the filter in the raw list / search section"). See `searchMeta` below.
   const [searchMeta, setSearchMeta] = useState<string | null>(null);
-  // HISTORY mode: the chain this table pages — the committed filter's network, else the log's own
-  // pick. The filter wins: under a commit the table IS that network's chain.
-  const histNet = lensNet ?? (searchMeta && metagraphById(searchMeta) ? searchMeta : null);
+  // A DOOR'S NETWORK WINS, EVEN OVER THE FILTER (user, 2026-10-04 — option a of the branch review):
+  // a door names the records it is for, and since it may not set the filter, the log must honour it
+  // itself — otherwise a BioFi door under a DOR filter landed on DOR's chain with BioFi's dates.
+  // Spent when the reader clears the search, or when the filter changes under it.
+  const [doorMeta, setDoorMeta] = useState<string | null>(null);
+  const [doorFilter, setDoorFilter] = useState(filter);
+  if (doorFilter !== filter) {
+    setDoorFilter(filter);
+    if (doorMeta) setDoorMeta(null);
+  }
+  // HISTORY mode: the chain this table pages — a door's network, else the committed filter's (under
+  // a commit the table IS that network's chain), else the log's own pick.
+  const histNet =
+    (doorMeta && metagraphById(doorMeta) ? doorMeta : null) ?? lensNet ?? (searchMeta && metagraphById(searchMeta) ? searchMeta : null);
   // ⚠️ A NETWORK CAN HAVE MORE THAN ONE CHAIN (user, 2026-10-02: "try also searching the first
   // BioFi retired chain, it should be able to handle that by design"). A re-registered metagraph
   // keeps its earlier addresses in the catalog (`formerIds`, `src/net/lineage.ts`), and each is a
@@ -732,9 +743,9 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     const iso = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
     // ONE SNAPSHOT (a metagraph-snapshot card's door, 2026-10-04): the exact address — the most
     // specific search there is — so the dates stay empty and the snapshot field takes the number.
-    // …only on ITS chain: under a filter the log pages the filter's chain, and the same number on
-    // another network is another snapshot — there the door simply opens the log.
-    if (logSeek.snapshot != null && logSeek.metaId && (!histNet || histNet === logSeek.metaId)) {
+    // It pages ITS network's chain, whatever the filter or an earlier scope (`doorMeta`).
+    if (logSeek.snapshot != null && logSeek.metaId) {
+      setDoorMeta(logSeek.metaId);
       setSearchOpen(true);
       setQFrom("");
       setQTo("");
@@ -756,6 +767,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     setQFrom(iso(logSeek.fromMs));
     setQTo(iso(logSeek.toMs));
     if (logSeek.metaId) {
+      setDoorMeta(logSeek.metaId);
       setSearchMeta(logSeek.metaId);
       pendingSeek.current = true;
       exactFrom.current = logSeek.fromMs;
@@ -851,7 +863,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       setMetaId={setSearchMeta}
       // Locked only by the FILTER: under "all" the pick is the log's own scope, and changing it
       // pages the other network's chain.
-      metaLocked={!!lensNet}
+      metaLocked={!!lensNet || !!doorMeta}
       seeking={seeking}
       snapshot={qSnapshot}
       tick={qTick}
@@ -869,7 +881,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
 
   const clearSearch = () => {
     setQSnapshot(""); setQTick(""); setQFrom(""); setQTo("");
-    // Clearing the search under "all" also drops the log's own scope, back to every network.
+    // Clearing the search drops a door's scope, and under "all" the log's own pick too.
+    setDoorMeta(null);
     if (!lensNet) setSearchMeta(null);
     setMarked(null); setJumpMiss(null);
     // Clearing the arrival's search cancels it: nothing is being found any more.

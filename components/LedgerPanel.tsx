@@ -281,6 +281,9 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   if (pathViewChanged(seenView, pathView)) {
     setSeenView(pathView);
     const next = syncLedgerPath(path, seenView, pathView);
+    // A resume is a return to the stream, so the list returns to its live page — even with no tick
+    // open (review, 2026-10-04) — unless it is this explorer's own click, which opened a tick.
+    if (pathView.following && !seenView.following && !path.selfResume) setTickPage(1);
     if (next !== path) {
       setPath(next);
       if (next.tick == null && path.tick != null) setTickPage(1);

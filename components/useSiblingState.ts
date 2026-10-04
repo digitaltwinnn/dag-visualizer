@@ -34,9 +34,10 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
   const snapshotExact = useStore((s) => s.snapshotExact);
   const following = useStore((s) => s.following);
   // The global chain's window — the SAME buffer and cap the vitals band plots, so the plank and the
-  // bars step the same sequence. Subscribed unconditionally (hooks are); only the SNAP slot reads it
-  // (review find, 2026-09-11: with the feed as a plain dep, every poll re-derived every card).
-  const { snaps } = useSnapshotFeed(POLL.maxSnapshots);
+  // bars step the same sequence. Only the SNAP slot reads it (review find, 2026-09-11: with the feed
+  // as a plain dep, every poll re-derived every card) — and only the snap slot SUBSCRIBES: the next ghost reads this hook from Inspector itself, and a
+  // subscription there re-rendered the whole rail on every tick in every view (review, 2026-10-04).
+  const { snaps } = useSnapshotFeed(POLL.maxSnapshots, slot === "snap");
   const snapsForTicks = slot === "snap" ? snaps : EMPTY_SNAPS;
   return useMemo(() => {
     const liveOrd = slot === "snap" ? (latestRelevant("all")?.ordinal ?? null) : null;

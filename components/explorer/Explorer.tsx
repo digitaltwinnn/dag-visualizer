@@ -7,7 +7,7 @@ import ExplorerHeading, { MeasureMenu, type MeasureControl } from "@/components/
 import ExplorerPath, { type Crumb } from "@/components/explorer/ExplorerPath";
 import ExplorerRow from "@/components/explorer/ExplorerRow";
 import { useStore } from "@/src/store/store";
-import { ladderLevelOfSlot } from "@/components/railCards";
+import { openRailCard } from "@/components/railOpen";
 import { cn } from "@/lib/utils";
 
 // THE EXPLORER — one component, four views (design session 2026-09-26; the agreed screens and
@@ -122,12 +122,9 @@ export interface ExplorerProps {
  *  expand — single-open, a quiet navigation, the camera following the box), else run the row's own
  *  click, which for a committed row is the deselect. View state only — no selection is written. */
 function openOrToggle(rung: string, click: () => void): void {
-  const st = useStore.getState();
-  if (st.boxedCard === rung) return click();
-  st.setNavQuiet(true);
-  st.setRailCollapseMany(st.boxedCard ? { [st.boxedCard]: true, [rung]: false } : { [rung]: false });
-  const level = ladderLevelOfSlot(rung);
-  if (level) st.requestFocusRung(level);
+  const boxed = useStore.getState().boxedCard;
+  if (boxed === rung) return click();
+  openRailCard(rung, [boxed]);
 }
 
 export default function Explorer({ id, title, hint, levels, onLeave, defaultCollapsed, aside }: ExplorerProps) {

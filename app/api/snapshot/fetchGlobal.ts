@@ -22,27 +22,35 @@ import { NETWORKS, type NetworkId } from "@/src/engine/config";
 export const LB_BACKOFF_MS = 10 * 60_000;
 const lbSkipUntil = new Map<NetworkId, number>();
 
+/** One attempt at the LB: the parsed snapshot, or why not. The BODY is read inside the try — a
+ *  body that stalls or fails to parse is a failing LB like any other (review, 2026-10-04). */
+async function tryLb(net: NetworkId, ordinal: number): Promise<{ ok: true; json: unknown } | { ok: false; why: string; trip: boolean }> {
+  try {
+    const r = await fetch(`${NETWORKS[net].l0}/global-snapshots/${ordinal}`, {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(8000),
+    });
+    if (r.ok) return { ok: true, json: await r.json() };
+    return { ok: false, why: String(r.status), trip: r.status !== 404 };
+  } catch {
+    return { ok: false, why: "unreachable", trip: true };
+  }
+}
+
 export async function fetchGlobalJson(net: NetworkId, ordinal: number): Promise<unknown> {
   let lb: string;
-  if ((lbSkipUntil.get(net) ?? 0) > Date.now()) {
+  const skipping = (lbSkipUntil.get(net) ?? 0) > Date.now();
+  if (skipping) {
     lb = "skipped (backing off)";
   } else {
-    try {
-      const r = await fetch(`${NETWORKS[net].l0}/global-snapshots/${ordinal}`, {
-        headers: { Accept: "application/json" },
-        cache: "no-store",
-        signal: AbortSignal.timeout(8000),
-      });
-      if (r.ok) {
-        lbSkipUntil.delete(net);
-        return r.json();
-      }
-      lb = String(r.status);
-      if (r.status !== 404) lbSkipUntil.set(net, Date.now() + LB_BACKOFF_MS);
-    } catch {
-      lb = "unreachable";
-      lbSkipUntil.set(net, Date.now() + LB_BACKOFF_MS);
+    const a = await tryLb(net, ordinal);
+    if (a.ok) {
+      lbSkipUntil.delete(net);
+      return a.json;
     }
+    lb = a.why;
+    if (a.trip) lbSkipUntil.set(net, Date.now() + LB_BACKOFF_MS);
   }
   const info = await getArchiveInfo(net).catch(() => null);
   // Random order so the handful of archival nodes share the deep-read load — then try them ALL:
@@ -62,10 +70,21 @@ export async function fetchGlobalJson(net: NetworkId, ordinal: number): Promise<
         cache: "no-store",
         signal: AbortSignal.timeout(4000),
       });
-      if (a.ok) return a.json();
+      if (a.ok) return await a.json();
     } catch {
       /* next target */
     }
+  }
+  // THE BACKOFF CAN NEVER MAKE A READ WORSE (review, 2026-10-04): while skipping, if every archive
+  // failed too, ask the LB after all — one blip must not cost ten minutes of reads the LB could
+  // have answered. A success there lifts the backoff.
+  if (skipping) {
+    const a = await tryLb(net, ordinal);
+    if (a.ok) {
+      lbSkipUntil.delete(net);
+      return a.json;
+    }
+    lb = `${a.why} (after backing off)`;
   }
   throw new Error(`l0 ${lb} (lb and archival nodes)`);
 }

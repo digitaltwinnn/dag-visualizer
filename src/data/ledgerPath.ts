@@ -60,7 +60,10 @@ export function syncLedgerPath(path: LedgerPath, prev: LedgerPathView, next: Led
     return { tick: m.globalOrdinal, net: m.netKey, snap: path.snap === key ? key : null, selfResume: path.selfResume };
   }
   const ord = next.snapOrd;
-  if (path.tick != null && ord != null && ord !== path.tick && ord !== prev.snapOrd && !(m && m.globalOrdinal === ord)) {
+  // On a new pin — a different tick, OR the same tick going from followed to pinned (pinning the
+  // live tip changes no ordinal; review, 2026-10-04).
+  const pinMoved = ord !== prev.snapOrd || prev.following;
+  if (path.tick != null && ord != null && ord !== path.tick && pinMoved && !(m && m.globalOrdinal === ord)) {
     return { ...CLOSED_PATH, tick: ord, selfResume: path.selfResume };
   }
   return path;
