@@ -325,7 +325,10 @@ export function GhostCard({ card, open = false, onToggle, picks }: { card: RailC
       // opening changes the frame's COLOUR and the hint below — never where the name sits.
       className={cn(
         "rail-entry relative block w-auto pointer-events-auto min-h-0 flex-none text-foreground-dim",
-        "px-[18px] py-2 rounded-[var(--radius)] border border-dashed transition-colors duration-150 motion-reduce:transition-none",
+        // A LIGHT GLASS, not bare scene (user, 2026-10-04: "the ghost card should have some fill, not
+        // fully transparent — to read text"): `--panel-light` under a blur, a step below the
+        // committed entry's `--panel-solid` + hairline ring, so empty still reads lighter than held.
+        "px-[18px] py-2 rounded-[var(--radius)] border border-dashed bg-[var(--panel-light)] backdrop-blur-[8px] transition-colors duration-150 motion-reduce:transition-none",
         open ? "border-border pb-3" : "border-transparent",
       )}
     >
