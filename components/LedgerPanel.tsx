@@ -268,8 +268,15 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // A snapshot committed ANYWHERE opens the path to it (the scene's tile, the rail's pager, the
   // raw log), so the explorer always shows the level the committed subject sits on.
   const metaSnapKey = metaSnap ? `${metaSnap.globalOrdinal}|${metaSnap.metaId}|${metaSnap.ordinal}` : null;
+  // ⚠️ …EXCEPT THE LIVE FOLLOW'S OWN COMMIT (user, 2026-10-04: "the scene shows 3 snapshots on the
+  // trail while the explorer only shows 1 … ensure the explorer is always filled — mirror what the
+  // scene shows"). Under a metagraph filter the heartbeat (`src/data/follow.ts`) commits that
+  // network's newest snapshot on every tick, and this path followed each one down to a single
+  // tick's single row. A live commit is the stream moving, not a reader choosing a subject, so the
+  // explorer stays on the tick list — filled, the filtered network's ticks lit — exactly as the
+  // trail shows it. Any commit that pins (a tile, the pager, the raw log) still opens the path.
   useEffect(() => {
-    if (!metaSnap) return;
+    if (!metaSnap || following) return;
     const netId = LISTED_IDS.has(metaSnap.metaId) ? metaSnap.metaId : UNLISTED_ID;
     setOpenTick(metaSnap.globalOrdinal);
     setOpenNet(netId);
