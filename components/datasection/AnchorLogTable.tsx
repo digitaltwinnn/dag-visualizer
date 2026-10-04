@@ -719,9 +719,33 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
    *  moved on a mark that by this file's own rule "carries no store write". It names the row it
    *  is for, and a manual search, a clear or a page turn withdraws it. */
   const landCommit = useRef<number | null>(null);
+  /** A snapshot search a door armed, run once the chain it counts on is the one in hand. */
+  const pendingSnap = useRef(false);
   useEffect(() => {
     if (!logSeek) return;
     const iso = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+    // ONE SNAPSHOT (a metagraph-snapshot card's door, 2026-10-04): the exact address — the most
+    // specific search there is — so the dates stay empty and the snapshot field takes the number.
+    // …only on ITS chain: under a filter the log pages the filter's chain, and the same number on
+    // another network is another snapshot — there the door simply opens the log.
+    if (logSeek.snapshot != null && logSeek.metaId && (!histNet || histNet === logSeek.metaId)) {
+      setSearchOpen(true);
+      setQFrom("");
+      setQTo("");
+      setQTick("");
+      setSearchMeta(logSeek.metaId);
+      setQSnapshot(String(logSeek.snapshot));
+      setMarked(null);
+      setJumpMiss(null);
+      landCommit.current = null;
+      pendingSnap.current = true;
+      setLogSeek(null);
+      return;
+    }
+    if (logSeek.snapshot != null) {
+      setLogSeek(null);
+      return;
+    }
     setSearchOpen(true);
     setQFrom(iso(logSeek.fromMs));
     setQTo(iso(logSeek.toMs));
@@ -764,6 +788,12 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     if (pendingSeek.current && walkReady && qFrom && !seeking) {
       pendingSeek.current = false;
       void seekAge();
+    }
+    // A door's snapshot search runs as soon as it can answer: at once against the live window,
+    // or once the committed chain's walk is in hand.
+    if (pendingSnap.current && qSnapshot && (!histNet || walkReady)) {
+      pendingSnap.current = false;
+      seekSnapshot();
     }
   });
 

@@ -16,6 +16,7 @@ import { ArrowDownToLine, ArrowUpRight } from "lucide-react";
 import { useSnapRecord } from "@/components/useArchive";
 import { Separator } from "@/components/ui/separator";
 import { useStore } from "@/src/store/store";
+import { openSnapshotRecord } from "@/components/trendDoors";
 import { metaSnapDeepKey, metaSnapHoverKey } from "@/src/data/types";
 import type { ChannelSnapDeep, ChannelSnapRow } from "@/src/data/types";
 import { getNetwork, SIGNER_GROUPS, metagraphById } from "@/src/data/network";
@@ -330,7 +331,16 @@ export default function MetaSnapPane({
                 "Read"/"decoding" made three word families for one action. */}
             {deep != null ? (
               <div className="mt-2.5">
-                <Door onClick={() => setSection("data")} glyph={<ArrowUpRight className="size-3.5" />} flushFoot>
+                <Door
+                  // THE LOG OPENS ON THIS SNAPSHOT (user, 2026-10-04: "it should filter on that
+                  // metagraph snapshot — now I see lots of records, and quickly the one from my card
+                  // is not even shown on the list"): the door hands the log its network and number,
+                  // and the log's own snapshot search pages to the row and marks it. An uncataloged
+                  // channel has no chain to search, so it just opens.
+                  onClick={() => (sel && metagraphById(sel.metaId) ? openSnapshotRecord(sel.metaId, sel.ordinal, sel.ts) : setSection("data"))}
+                  glyph={<ArrowUpRight className="size-3.5" />}
+                  flushFoot
+                >
                   Show the raw data
                 </Door>
               </div>

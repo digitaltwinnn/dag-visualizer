@@ -70,3 +70,16 @@ export function openRecords(metaId: string | null, span: RecordSpan | null): voi
   st.setSection("data");
 }
 
+
+/** THE SNAPSHOT DOOR (2026-10-04): a metagraph-snapshot card's "Show the raw data" hands the log
+ *  that one snapshot — its network and number — and the log's own snapshot search pages to the row
+ *  and marks it (user: "it should filter on that metagraph snapshot — now I see lots of records, and
+ *  quickly the one from my card is not even shown"). It opens the layer in place: the card's own
+ *  view and selection are untouched, so there is no mode step and no return to remember. The log
+ *  declines the search where it would read the wrong chain (a filter on another network). */
+export function openSnapshotRecord(metaId: string, ordinal: number, ts: string): void {
+  const st = useStore.getState();
+  const at = Date.parse(ts);
+  st.setLogSeek({ metaId, fromMs: at, toMs: at, snapshot: ordinal });
+  st.setSection("data");
+}
