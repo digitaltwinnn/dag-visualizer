@@ -109,10 +109,25 @@ const Dash = () => (
 // the (snapshot, tick) pair, and committing half of it would break every downstream consumer.
 /** One chain's label in the toolbar: the current one says so, an earlier one says when it ran —
  *  its genesis date, read from the chain's own span (the same lookup the dossier uses). */
-function ChainLabel({ address, current }: { address: string; current: boolean }) {
+/** One segment of the chain toggle: a one-word name, the chain's start and address on hover. */
+function ChainSegment({ address, idx, on, onPick }: { address: string; idx: number; on: boolean; onPick: () => void }) {
   const span = useChainSpan(address);
   const since = span?.genesisTs ? new Date(span.genesisTs).toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : null;
-  return <>{current ? "Current chain" : "Earlier chain"}{since ? <span className="normal-case tracking-normal text-muted-foreground"> from {since}</span> : null}</>;
+  const name = idx === 0 ? "Current" : idx === 1 ? "Earlier" : `Earlier ${idx}`;
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      title={`${idx === 0 ? "The current chain" : "An earlier chain"}${since ? `, from ${since}` : ""} · ${address}`}
+      onClick={onPick}
+      className={cn(
+        "h-7 pointer-coarse:h-10 px-2.5 rounded-sm cursor-pointer text-label",
+        on ? "bg-[var(--sel-bg)] text-foreground" : "text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {name}
+    </button>
+  );
 }
 
 export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens the snapshot's own page (RecordsSurface) — see the row's `commit`. */ onOpen?: () => void } = {}) {
@@ -849,24 +864,14 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     // controls now (44px on touch and phone) on the bar's own type: the toggle a real button that
     // shows pressed while open, the applied search ONE chip whose × clears it.
     <div className="flex-none flex items-center justify-end gap-2 pb-2 max-[700px]:pr-10">
-      {/* THE NETWORK'S CHAINS — only where there is more than one (see `lineage`). A plain pair of
-          text buttons on the bar's own type: the pressed one is the chain this table pages. */}
+      {/* THE NETWORK'S CHAINS — only where there is more than one (see `lineage`). ONE SEGMENTED
+          TOGGLE of one-word names (user, 2026-10-04: "two buttons with lots of text, even on
+          mobile … can't we just have a simple toggle?"): Current | Earlier, the pressed segment the
+          chain this table pages; each chain's start date and address are its segment's title. */}
       {lineage.length > 1 && (
-        <span className="mr-auto inline-flex items-center gap-1 text-label" role="group" aria-label="Which of this network's chains to page">
+        <span className="mr-auto inline-flex items-center gap-0.5 p-0.5 rounded-btn border border-border" role="group" aria-label="Which of this network's chains to page">
           {lineage.map((addr, i) => (
-            <button
-              key={addr}
-              type="button"
-              aria-pressed={i === chainIdx}
-              title={addr}
-              onClick={() => { setMarked(null); setJumpMiss(null); setChain(i); }}
-              className={cn(
-                "h-8 pointer-coarse:h-11 px-2.5 rounded-btn border cursor-pointer tracking-caps uppercase",
-                i === chainIdx ? "border-[var(--sel-border)] bg-[var(--sel-bg)] text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <ChainLabel address={addr} current={i === 0} />
-            </button>
+            <ChainSegment key={addr} address={addr} idx={i} on={i === chainIdx} onPick={() => { setMarked(null); setJumpMiss(null); setChain(i); }} />
           ))}
         </span>
       )}
