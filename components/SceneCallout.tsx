@@ -540,43 +540,50 @@ function CalloutMark({ m, id, multi }: { m: Model; id: "callout" | "callout-2"; 
           `.co-draw` ink line runs the same span from the PANEL corner with `pathLength=1`, and
           globals.css animates its dash offset — revealing the dashes progressively without the
           dash pattern itself crawling. White stroke is mask luminance, not a palette hue. */}
+      {/* ⚠️ THE STANDOFF'S SCALE RIDES THE INNER <g>, NOT THE <svg> BOX (user, 2026-10-04: "the
+          2nd callout … has a different line than the normal callout line"). `non-scaling-stroke`
+          undoes transforms INSIDE the SVG's own coordinate system; a CSS transform on the <svg>
+          element scales the finished picture, strokes and dashes with it — so the hanging
+          callout's line was drawn at 0.55 of the weight and dash of every other leader. */}
       <svg className="co-leader absolute left-0 top-0 overflow-visible" width="1" height="1" aria-hidden>
-        <mask id={maskId} maskUnits="userSpaceOnUse" x={-20} y={-CALLOUT_OFF_Y - 40} width={CALLOUT_OFF_X + 60} height={CALLOUT_OFF_Y + 60}>
+        <g className="co-scale">
+          <mask id={maskId} maskUnits="userSpaceOnUse" x={-20} y={-CALLOUT_OFF_Y - 40} width={CALLOUT_OFF_X + 60} height={CALLOUT_OFF_Y + 60}>
+            <line
+              className="co-draw"
+              x1={CALLOUT_OFF_X}
+              y1={-(CALLOUT_OFF_Y - CALLOUT_LEG_INSET)}
+              x2={6}
+              y2={-6}
+              pathLength={1}
+              stroke="white"
+              strokeWidth="8"
+            />
+          </mask>
+          {/* The leader's CASING, under the dashes and drawn by the same mask: over lit geometry
+              (a bar, a ribbon) the dashed line alone disappeared on dark and fought the ribbon on
+              paper. Ground colour, so it is a dark line here and a pale one there. */}
           <line
-            className="co-draw"
-            x1={CALLOUT_OFF_X}
-            y1={-(CALLOUT_OFF_Y - CALLOUT_LEG_INSET)}
-            x2={6}
-            y2={-6}
-            pathLength={1}
-            stroke="white"
-            strokeWidth="8"
+            mask={`url(#${maskId})`}
+            x1={6}
+            y1={-6}
+            x2={CALLOUT_OFF_X}
+            y2={-(CALLOUT_OFF_Y - CALLOUT_LEG_INSET)}
+            stroke="var(--background)"
+            strokeOpacity="0.6"
+            strokeWidth="3.5"
+            strokeLinecap="round"
           />
-        </mask>
-        {/* The leader's CASING, under the dashes and drawn by the same mask: over lit geometry
-            (a bar, a ribbon) the dashed line alone disappeared on dark and fought the ribbon on
-            paper. Ground colour, so it is a dark line here and a pale one there. */}
-        <line
-          mask={`url(#${maskId})`}
-          x1={6}
-          y1={-6}
-          x2={CALLOUT_OFF_X}
-          y2={-(CALLOUT_OFF_Y - CALLOUT_LEG_INSET)}
-          stroke="var(--background)"
-          strokeOpacity="0.6"
-          strokeWidth="3.5"
-          strokeLinecap="round"
-        />
-        <line
-          mask={`url(#${maskId})`}
-          x1={6}
-          y1={-6}
-          x2={CALLOUT_OFF_X}
-          y2={-(CALLOUT_OFF_Y - CALLOUT_LEG_INSET)}
-          style={LEADER_STROKE}
-          strokeWidth="1.5"
-          strokeDasharray="4 4"
-        />
+          <line
+            mask={`url(#${maskId})`}
+            x1={6}
+            y1={-6}
+            x2={CALLOUT_OFF_X}
+            y2={-(CALLOUT_OFF_Y - CALLOUT_LEG_INSET)}
+            style={LEADER_STROKE}
+            strokeWidth="1.5"
+            strokeDasharray="4 4"
+          />
+        </g>
       </svg>
       {/* MULTI-LEADER (user, 2026-08-30): a machine's callout points at EACH of its layer beads
           — up to two extra dashed legs from the anchor to the non-primary shells, written per
