@@ -196,9 +196,12 @@ export default function VitalsBand({ hidden = false }: { hidden?: boolean }) {
           corner, where History's range pills stand — the band's time scope has one place in
           every view. The cards below no longer repeat it (`viewCells`: a card states a span
           only when its own differs). The section is `fixed`, so it is this chip's containing
-          block; the bar's own glass under it, since it floats over the scene. */}
+          block; the bar's own glass under it, since it floats over the scene.
+          ⚠️ The glass is EXACTLY the chip's box (`flex`, the chip's own `rounded-xs`) — as an inline
+          span its line box stood 5px taller than the chip with a rounder corner, and that sliver of
+          glass read as a stray line on the chip (user, 2026-10-04). */}
       {bandWindow && (
-        <span className="absolute bottom-full right-0 mb-2 rounded-md [background:var(--topbar-glass)] backdrop-blur-sm">
+        <span className="absolute bottom-full right-0 mb-2 flex rounded-xs [background:var(--topbar-glass)] backdrop-blur-sm">
           <QualifierChip>{spanPhrase(bandWindow, null)}</QualifierChip>
         </span>
       )}
