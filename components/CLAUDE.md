@@ -592,8 +592,13 @@ noise in all of them: the label beside it already says what the number is. Inter
 strings still read `Global snapshot #N`, but nothing renders that field for a snapshot.
 
 Every card the current view CAN produce is always visible — populated when its subject is selected,
-else a quiet **ghost hint line** — so the rail shows the view's whole possibility space and a deselect
-returns its slot to the ghost in place.
+else a **ghost card** — so the rail shows the view's whole possibility space and a deselect returns
+its slot to the ghost in place. A ghost is a card like every other (user, 2026-10-04 — option A of
+`docs/superpowers/design/2026-10-04-ghost-cards`, "the structure is always present, but the visual
+and content differ"): FOLDED it is the rung's name alone, one quiet line; OPEN it is a dashed,
+glassless box whose body is the hint. It opens on its own, outside the single-open accordion — it
+holds no subject, so reading a hint never dissolves the committed box, its callout or its camera —
+through the same per-selection `railCollapse` override, so a new selection folds it back.
 
 **A hint is the gesture and nothing else.** The slot label already names the subject and the dashed
 frame already says "nothing here yet", so a hint must not end "… to inspect it" — four ghosts stacked

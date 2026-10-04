@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from "react";
 import { useStore } from "@/src/store/store";
+import { cn } from "@/lib/utils";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { displayNetwork } from "@/src/data/unlisted";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -288,36 +289,58 @@ const GHOST_EYEBROW: Record<string, string> = {
   context: "Metagraph", country: "Country", cohort: "Provider", composition: "Composition", node: "Node", snap: "Global snapshot",
   metaSnap: "Metagraph snapshot", instant: "Moment",
 };
-export function GhostCard({ card }: { card: RailCard }) {
+/** An EMPTY RUNG, drawn as a card like every other (user, 2026-10-04 — option A of
+ *  `docs/superpowers/design/2026-10-04-ghost-cards`, with "like any other card it can be expanded
+ *  and then you show the hint instead of the actual contents … the structure is always present,
+ *  but the visual (ghost vs normal) and content (hint vs real content) differ").
+ *
+ *  FOLDED it is the rung's name alone — one quiet line, no hint, so the rail reads as the list of
+ *  what this view can show. OPEN it is a box whose body is the HINT: the gesture that fills it.
+ *  The ghost look is the frame: a dashed hairline, no glass and no lift, so an open ghost can never
+ *  read as the committed box.
+ *
+ *  It opens ON ITS OWN — not through the single-open accordion — because it holds no subject:
+ *  opening a hint must not dissolve the committed card, its callout or its camera framing. Its
+ *  open state is the same per-selection `railCollapse` override (false = open), so a new selection
+ *  folds every ghost back. `.rail-entry` keeps it in the thread's query and `data-ghost` keeps its
+ *  dot hollow, open or folded. */
+export function GhostCard({ card, open = false, onToggle }: { card: RailCard; open?: boolean; onToggle?: () => void }) {
   const Icon = card.icon;
   const label = GHOST_EYEBROW[card.id] ?? card.id;
+  const head = (
+    <span className="flex items-center gap-2.5">
+      <Icon aria-hidden className="size-3.5 flex-none text-[var(--filter-accent,var(--primary))] opacity-45" />
+      <span className="text-label tracking-caps uppercase">{label}</span>
+    </span>
+  );
   return (
-    // UNBOXED (card-redesign 2026-08-08): the ghost sheds its dashed Card frame entirely — the
-    // rail's boxes now mean "you are here", so an empty slot must not be a box at all. It rests
-    // as a quiet hint LINE in the entry lane; the thread's HOLLOW dot (via `data-ghost`) is its
-    // marker. `.rail-entry` keeps it in the thread's query.
     <aside
       data-ghost=""
+      data-open={open ? "" : undefined}
       aria-label={`${label}: nothing selected yet`}
-      className="rail-entry relative block w-auto pointer-events-auto px-[18px] py-2 min-h-0 flex-none"
+      className={cn(
+        "rail-entry relative block w-auto pointer-events-auto min-h-0 flex-none text-foreground-dim",
+        open ? "mx-0 px-[18px] pt-2.5 pb-3 rounded-[var(--radius)] border border-dashed border-border" : "px-[18px] py-2",
+      )}
     >
-      {/* FULL INK, NO OPACITY (design review 2026-10-02): this line is the only text that says how
-          to reach the next rung, and at 80% muted over the bare scene it measured 3.2:1 on dark and
-          2.7 on paper. The line takes `--foreground-dim`, one step under the cards' own copy (muted
-          at full strength still measured 4.2 on the light scene ground), so it reads as a hint and
-          not as a card. */}
-      <p className="m-0 flex items-start gap-2.5 text-label text-foreground-dim">
-        <Icon
-          aria-hidden
-          className="size-3.5 flex-none mt-[1px] text-[var(--filter-accent,var(--primary))] opacity-45"
-        />
-        {/* fixed label column (fits the longest slot name, "METAGRAPH") so the instruction
-            text starts at the SAME x on every ghost card (user). In em, not px (2026-10-02): the
-            type scale is fluid, and an 86px column that fit 10.5px caps overlapped the hint at
-            12.5px. */}
-        <span className="flex-none w-[8.5em] mt-[2px] text-label tracking-caps uppercase">{label}</span>
-        <span className="min-w-0 italic">{card.hint}</span>
-      </p>
+      {onToggle ? (
+        <button
+          type="button"
+          aria-expanded={open}
+          title={open ? "Collapse" : "Expand"}
+          // The head persists across both states, so focus simply stays on it — no hand-off needed.
+          onClick={onToggle}
+          className="block w-full appearance-none bg-transparent border-0 p-0 m-0 text-left text-inherit cursor-pointer rounded-sm focus-visible:outline-1 focus-visible:outline-ring/60"
+        >
+          {head}
+        </button>
+      ) : (
+        head
+      )}
+      {/* FULL INK, NO OPACITY (design review 2026-10-02): the hint is the only text that says how to
+          reach this rung, so it takes `--foreground-dim`, one step under a card's own copy, upright —
+          it is the card's body now, not an aside. */}
+      {open && <p className="m-0 mt-1.5 pl-6 text-body text-foreground-dim">{card.hint}</p>}
     </aside>
   );
 }
@@ -440,6 +463,12 @@ export default function Inspector() {
     if (level) requestFocusRung(level);
   };
   const cx = (id: string) => ({ collapsed: effCollapsed(id), onToggle: () => toggleCollapse(id) });
+  // A GHOST's disclosure (GhostCard's header has the why): its own override, outside the
+  // single-open accordion — folded by default, `false` = open, cleared back to folded.
+  const ghostCx = (id: string) => {
+    const open = railCollapse[id] === false;
+    return { open, onToggle: () => setRailCollapse(id, open ? null : false) };
+  };
 
   // The overrides are scoped to ONE selection moment (user, 2026-08-02: "only in geo it minimises
   // the parent card, not in the other views"). They were permanent: expanding the Metagraph card
@@ -607,12 +636,12 @@ export default function Inspector() {
           id === "context" ? (
             <>
               <ContextCard {...cx("context")} />
-              {!card.present && card.hint != null && <GhostCard card={card} />}
+              {!card.present && card.hint != null && <GhostCard card={card} {...ghostCx(id)} />}
             </>
           ) : card.present ? (
             detailPane[id]
           ) : card.hint != null ? (
-            <GhostCard card={card} />
+            <GhostCard card={card} {...ghostCx(id)} />
           ) : null;
         if (!body) return null;
         // The rung's PRESENTATION TIER, stated on the wrapper for the slab CSS (globals.css) —
@@ -672,7 +701,7 @@ export default function Inspector() {
   const trailingPanes = nonLadder.filter((c) => c.present).map((c) => detailPane[c.id]);
   const trailingGhosts = nonLadder
     .filter((c) => !c.present && c.hint != null)
-    .map((c) => <GhostCard key={`${c.id}-ghost`} card={c} />);
+    .map((c) => <GhostCard key={`${c.id}-ghost`} card={c} {...ghostCx(c.id)} />);
 
 
 
