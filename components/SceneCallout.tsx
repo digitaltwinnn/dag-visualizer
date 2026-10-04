@@ -36,7 +36,7 @@
 //   anchor would lie about where it is.
 // - ledger: the pinned metagraph snapshot's own tile (rewind included), else the committed
 //   global tick's byte-bar lead.
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
@@ -57,7 +57,7 @@ import { nodeStatus } from "@/src/data/nodeStatus";
 import { useNowTick } from "@/components/useNowTick";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { relativeAge } from "@/src/util/relativeAge";
-import { CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET, CALLOUT_PHONE_K } from "@/src/engine/domain/calloutPlacement";
+import { CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET, CALLOUT_PHONE_K, CALLOUT_HANG_K } from "@/src/engine/domain/calloutPlacement";
 import type { GeoInfo } from "@/src/data/types";
 import LiveDot from "@/components/LiveDot";
 import { IDENT_INK } from "@/components/identInk";
@@ -535,6 +535,14 @@ export default function SceneCallout() {
   );
 }
 
+/** The callout geometry the stylesheet reads, written once from the TS constants. */
+const CALLOUT_VARS = {
+  "--co-off-x": `${CALLOUT_OFF_X}px`,
+  "--co-off-y": `${CALLOUT_OFF_Y}px`,
+  "--co-hang-k": String(CALLOUT_HANG_K),
+  "--co-phone-k": String(CALLOUT_PHONE_K),
+} as CSSProperties;
+
 /** One callout: the 0-size anchor wrapper CalloutSync positions, its ring, leader and panel.
  *  `id` is the marker the engine queries (`callout` for the subject, `callout-2` for the global
  *  snapshot in Snapshots); `multi` mounts the hyper node's extra legs, which only the subject's
@@ -562,6 +570,9 @@ function CalloutMark({ m, id, multi, phone, onDismiss }: { m: Model; id: "callou
       key={m.key}
       data-on="0"
       aria-hidden
+      // The standoff and both of its factors, from their one home (`calloutPlacement.ts`) — the
+      // stylesheet's callout rules read these and state no number of their own.
+      style={CALLOUT_VARS}
       className="fixed left-0 top-0 z-[5] pointer-events-none opacity-0 data-[on=1]:opacity-100 transition-opacity duration-200 motion-reduce:transition-none"
     >
       {/* Anchor ring at the projected point (the wrapper's origin) — the subject mark at the

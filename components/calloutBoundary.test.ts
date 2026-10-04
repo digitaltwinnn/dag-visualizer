@@ -83,4 +83,19 @@ describe("subject-callout boundary", () => {
       expect(code.includes('"phone"'), `${home} no longer answers the phone tier — its variant must be decided from the shared breakpoint`).toBe(true);
     }
   });
+
+  it("the stylesheet states no copy of the callout geometry — it reads SceneCallout's variables", () => {
+    // `domain/calloutPlacement.ts` is the one home of the standoff and its two factors; SceneCallout
+    // writes them onto each callout (`--co-off-x/y`, `--co-hang-k`, `--co-phone-k`). A literal
+    // in a callout rule would be a second home that drifts (2026-10-04, review item 6).
+    const css = read("app/globals.css");
+    const rules = css.split("\n").filter((l) => /^:is\(#callout, #callout-2\)/.test(l));
+    expect(rules.length).toBeGreaterThan(0);
+    for (const l of rules) {
+      // `--co-k: 1` is the identity (the standing label), not a copy of anything.
+      expect(/--co-k:\s*(?!1;)[\d.]/.test(l), `a literal --co-k factor: ${l}`).toBe(false);
+      expect(/\b(100|140)px/.test(l), `a literal standoff: ${l}`).toBe(false);
+    }
+    expect(stripComments(read("components/SceneCallout.tsx"))).toMatch(/"--co-off-x":[\s\S]*"--co-hang-k":[\s\S]*"--co-phone-k":/);
+  });
 });

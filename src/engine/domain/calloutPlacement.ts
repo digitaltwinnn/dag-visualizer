@@ -5,10 +5,9 @@
 // `CalloutSync` writes the per-frame transform and the flip/drop attributes), and the
 // standoff numbers below used to live in BOTH of them: the component as `OFF_X`/`OFF_Y`, the
 // Engine as the two reach thresholds derived from them, with a comment asking the next reader to
-// "change all four together". They are one concern, so they get one home. `app/globals.css` still
-// mirrors the standoff (`#callout .co-panel { left: 100px; bottom: 140px }`) because CSS can't
-// import a TS const — the same accepted mirror `RailThread`'s SVG stroke literals are, and the
-// only one left. Keep it in sync.
+// "change all four together". They are one concern, so they get one home — and the stylesheet reads
+// them too: SceneCallout writes the standoff and both factors onto each callout as CSS variables
+// (`--co-off-x/y`, `--co-hang-k`, `--co-phone-k`), so `app/globals.css` states no copy of them.
 //
 // ⚠️ THE FREE BAND IS NOT THE VIEWPORT. Below 1100px the rails become sheets that OVERLAY the
 // canvas rather than sitting beside it (see `RailDock`), and the canvas stays viewport-sized
@@ -99,8 +98,7 @@ export function calloutPlacement(
 // half a circle, so the two leaders are parallel; only the LENGTH differs, by one factor on both
 // axes, because the strip under the floor is short. Scaling one axis alone would change the angle.
 
-/** The hanging standoff, as a share of the standing one. `app/globals.css` mirrors it (`--co-k`
- *  under `[data-hang]`) — change both or neither. */
+/** The hanging standoff, as a share of the standing one (the stylesheet reads it as `--co-hang-k`). */
 export const CALLOUT_HANG_K = 0.55;
 /** The tallest panel the hanging label renders (eyebrow, title row, rule, lead) — 88px measured.
  *  The air under it is the caller's (`bottom` already stops short of the band). */
@@ -129,8 +127,7 @@ export function calloutHangs(x: number, y: number, bandL: number, bandR: number,
 // and the leader runs vertically into the subject, so it still says WHERE, which is what the old
 // ruling was protecting. Same factor family as the hanging label: one number shortens the leader.
 
-/** The phone leader's length, as a share of the standing standoff's height. `app/globals.css`
- *  mirrors it (`--co-k` under `[data-phone]`) — change both or neither. */
+/** The phone leader's length, as a share of the standing standoff's height (read as `--co-phone-k`). */
 export const CALLOUT_PHONE_K = 0.4;
 const PHONE_AIR = 8;
 
