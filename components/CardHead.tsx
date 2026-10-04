@@ -98,8 +98,9 @@ export const RIGHT_CARD = "relative block w-auto pointer-events-auto [--spine:tr
 // place its node dots and the depth-reach connectors — rename only with that consumer. The 18px
 // horizontal pad matches RIGHT_CARD's flat pad so entry titles align with box content. It wears a
 // solid-leaning glass (user, 2026-08-08, twice-strengthened — bare text, then the faint `--panel`
-// fill, both fought the bright 3D scene): `--panel-solid` + light blur, NO border/shadow (a border
-// would re-box it). The ladder's distance-dim rides `--entry-dim` (set by Inspector's rung
+// fill, both fought the bright 3D scene): `--panel-solid` + light blur, and since 2026-10-04 the card
+// hairline as an inset RING that drops its top/bottom where the entry joins the pile (globals.css,
+// "THE PILE HAS AN EDGE") — the fill alone left a committed entry indistinguishable from a ghost. The ladder's distance-dim rides `--entry-dim` (set by Inspector's rung
 // wrapper) so fill + text fade together — and HOVER lifts the entry (user, 2026-08-08: a hover
 // previews the materialization; full expand-on-hover was rejected — it shifts layout under the
 // pointer): the dim RELEASES to full luminance AND a small brightness boost rides on top, so

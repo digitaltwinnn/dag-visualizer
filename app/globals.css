@@ -739,6 +739,23 @@
   border-bottom-right-radius: 0;
 }
 
+/* THE PILE HAS AN EDGE (user, 2026-10-04: "the difference between a collapsed active card and a
+   ghost card is not very clear … the fill or outline is too faint to distinguish it from the
+   background/ghost cards"). An entry's only mark was its `--panel-solid` fill, which on dark sits
+   within a few points of the scene and on paper within a few of the page — so a committed rung read
+   as one more ghost line. It now wears the card hairline, drawn as an INSET RING (no layout, follows
+   the radius) whose top and bottom edges are dropped wherever the entry JOINS another member of the
+   pile: the pile gets one outline, and the joints keep their inset seams and the box's own border.
+   A ghost is never matched (it is not `[data-tier="entry"]`), so the ring is exactly the
+   committed-vs-empty distinction. Specific enough to survive the pairing wash's `box-shadow: none`. */
+.rail-ladder > [data-tier="entry"] .rail-entry {
+  --ring-t: var(--border);
+  --ring-b: var(--border);
+  box-shadow: inset 1px 0 0 var(--border), inset -1px 0 0 var(--border), inset 0 1px 0 var(--ring-t), inset 0 -1px 0 var(--ring-b);
+}
+.rail-ladder > :is([data-tier="entry"], [data-tier="box"]) + [data-tier="entry"] .rail-entry { --ring-t: transparent; }
+.rail-ladder > [data-tier="entry"]:has(+ :is([data-tier="entry"], [data-tier="box"])) .rail-entry { --ring-b: transparent; }
+
 /* The box is a ROUNDED PLANK IN the pile, not a break-out (user, 2026-08-09): it abuts its
    neighbours at ZERO gap, so ancestry + subject read as ONE body, but it keeps its own radius and
    its own hairline all the way round, so the pile visibly opens around it. That is why its border
