@@ -1,5 +1,7 @@
 "use client";
 
+import { netUrl } from "@/src/net/current";
+
 import { useEffect } from "react";
 
 // DEV-ONLY CSS canary (2026-08-16). Turbopack's persistent cache can serve a STALE
@@ -32,6 +34,22 @@ export default function DevCssCanary() {
           for (const sel of missing) if (text.includes(sel)) missing.delete(sel);
         }
       }
+      // THE STAMP (2026-10-04): the selector list above only knows the rules that existed when it
+      // was written — a NEW rule missing from a stale compile passed it. The served sheet carries
+      // the hash of the source it was built from (postcss/cssStamp.mjs); the file on disk has its
+      // own. Different hashes = a stale compile, whatever the rule.
+      const served = getComputedStyle(document.documentElement).getPropertyValue("--css-stamp").trim().replace(/"/g, "");
+      void fetch(netUrl("/api/dev/css-stamp"), { cache: "no-store" })
+        .then((r) => (r.ok ? (r.json() as Promise<{ stamp: string }>) : null))
+        .then((j) => {
+          if (!j || j.stamp === served) return;
+          console.error(
+            `[CSS canary] the served globals.css (${served || "no stamp"}) is not the one on disk (${j.stamp}) — ` +
+              "the Turbopack stale-CSS cache (CLAUDE.md, CSS traps). Do not debug the cascade: " +
+              "kill the dev server, `rm -rf .next/dev`, restart.",
+          );
+        })
+        .catch(() => {});
       if (missing.size) {
         console.error(
           `[CSS canary] ${[...missing].join(", ")} missing from the served CSSOM — this is the ` +
