@@ -619,12 +619,9 @@ export default function RailDock({
         <Icon
           key={id}
           strokeWidth={active ? 2.25 : 1.75}
-          className={cn(
-            "size-3.5 flex-none",
-            active
-              ? "drop-shadow-[0_0_4px_currentColor]"
-              : "text-muted-foreground opacity-60",
-          )}
+          // Lit = its own colour and a heavier stroke, nothing else (user, 2026-10-04: "no shadow
+          // on icons" — the 4px glow in the icon's colour read as a shadow under it).
+          className={cn("size-3.5 flex-none", !active && "text-muted-foreground opacity-60")}
           style={active ? { color: hue ?? "var(--primary)" } : undefined}
         />
       ))}
