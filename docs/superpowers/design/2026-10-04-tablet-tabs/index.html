@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tablet edge tabs — design options</title>
+<style>
+:root{--bg:oklch(0.09 0.02 265);--fg:oklch(0.94 0.02 255);--dim:#c7d0ea;--muted:oklch(0.66 0.04 265);--primary:oklch(0.88 0.13 195);
+--border:rgba(90,140,255,.22);--panel:rgba(12,16,32,.96);--label:12.2px;--body:14.3px}
+*{box-sizing:border-box}html{color-scheme:dark}
+body{margin:0;background:radial-gradient(1200px 600px at 60% 0%,#0b1230 0%,var(--bg) 60%);color:var(--fg);font:var(--body)/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:32px 40px 96px}
+h1{font-size:24px;font-weight:600;margin:0 0 6px}
+p.lede{color:var(--dim);max-width:82ch;margin:0 0 6px}
+h2{font-size:18px;font-weight:600;margin:48px 0 6px;display:flex;gap:12px;align-items:center}
+h2 .n{flex:none;min-width:26px;height:26px;border-radius:13px;padding:0 7px;background:var(--primary);color:#06121a;font:700 14px/26px system-ui;text-align:center}
+h2 .n.now{background:var(--muted)}
+h2 .rec{font:600 11px/1 system-ui;letter-spacing:.13em;text-transform:uppercase;color:var(--primary);border:1px solid color-mix(in oklch,var(--primary) 50%,transparent);border-radius:4px;padding:4px 6px}
+ul.why{color:var(--dim);max-width:80ch;margin:0 0 14px 38px;padding-left:18px}
+.row{display:flex;gap:28px;flex-wrap:wrap;margin-left:38px;align-items:flex-start}
+.cap{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.shot{display:block;border:1px solid var(--border);border-radius:8px}
+/* a tablet frame, scaled: 410×590 = 820×1180 at 0.5 */
+.tab-frame{position:relative;width:410px;height:300px;border:1px solid var(--border);border-radius:10px;overflow:hidden;
+  background:radial-gradient(260px 200px at 55% 55%,rgba(42,245,255,.14),transparent 70%),radial-gradient(500px 300px at 50% 60%,#0c1838,#05070f)}
+.globe{position:absolute;left:115px;top:70px;width:200px;height:200px;border-radius:50%;border:1px solid rgba(42,245,255,.25);box-shadow:inset 0 0 40px rgba(42,245,255,.15)}
+svg.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none}
+svg.s{width:12px;height:12px}
+.sheet{position:absolute;top:0;bottom:0;width:170px;background:rgba(12,16,32,.92);backdrop-filter:blur(10px);border-left:1px solid var(--border);padding:12px}
+.sheet.r{right:0}.sheet.l{left:0;border-left:0;border-right:1px solid var(--border)}
+.mini{background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:8px 10px;margin-top:8px;font-size:11px;color:var(--dim)}
+.mini b{display:block;font:600 9px/1 system-ui;letter-spacing:.14em;color:var(--primary);margin-bottom:5px}
+.ghost{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:10px 4px}
+/* NOW tab */
+.t0{position:absolute;top:110px;width:22px;height:58px;background:var(--panel);border:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:6px 0;color:var(--muted)}
+.t0.l{left:0;border-left:0;border-radius:0 6px 6px 0}.t0.r{right:0;border-right:0;border-radius:6px 0 0 6px}
+/* A — slim grip */
+.tA{position:absolute;top:118px;width:8px;height:44px;border-radius:4px;background:color-mix(in oklch,var(--muted) 55%,transparent)}
+.tA.l{left:4px}.tA.r{right:4px}
+.tA::after{content:"";position:absolute;inset:-6px -14px;}/* the 44px hit area, invisible */
+.tA .sig{position:absolute;top:-10px;left:50%;translate:-50% 0;width:6px;height:6px;border-radius:50%;background:var(--primary)}
+.tA.attached.r{right:174px}
+/* B — labelled spine */
+.tB{position:absolute;top:92px;width:24px;height:110px;background:var(--panel);border:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--fg)}
+.tB.l{left:0;border-left:0;border-radius:0 6px 6px 0}.tB.r{right:0;border-right:0;border-radius:6px 0 0 6px}
+.tB .w{writing-mode:vertical-rl;font:600 9.5px/1 system-ui;letter-spacing:.18em;text-transform:uppercase}
+.tB.l .w{transform:rotate(180deg)}
+.tB .sig{width:5px;height:5px;border-radius:50%;background:var(--primary)}
+/* C — one tab that travels with the sheet */
+.tC{position:absolute;top:112px;width:22px;height:52px;background:var(--panel);border:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--fg)}
+.tC.l{left:0;border-left:0;border-radius:0 6px 6px 0}.tC.r{right:0;border-right:0;border-radius:6px 0 0 6px}
+.tC.r.attached{right:170px;border-right:0}
+.tC .sig{width:5px;height:5px;border-radius:50%;background:var(--primary)}
+/* D — in the top bar */
+.bar{position:absolute;left:8px;right:8px;top:8px;height:28px;background:var(--panel);border:1px solid var(--border);border-radius:7px;display:flex;align-items:center;padding:0 8px;gap:8px;color:var(--muted);font-size:10px}
+.bar .grow{flex:1}
+.bar .tg{display:flex;align-items:center;justify-content:center;width:26px;height:20px;border-radius:5px;color:var(--fg)}
+.bar .tg.on{background:color-mix(in oklch,var(--primary) 14%,transparent);box-shadow:inset 0 -2px 0 var(--primary);color:var(--primary)}
+.note{margin:10px 0 0 38px;color:var(--muted);font-size:13px;max-width:80ch}
+</style></head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<symbol id="cl" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+<symbol id="cr" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+<symbol id="cmp" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></symbol>
+<symbol id="lst" viewBox="0 0 24 24"><path d="M3 6h3M3 12h3M3 18h3M10 6h11M10 12h11M10 18h11"/></symbol>
+<symbol id="pin" viewBox="0 0 24 24"><path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+<symbol id="x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+</defs></svg>
+
+<h1>Tablet edge tabs</h1>
+<p class="lede">The control that opens and closes the Explore and Details sheets on tablet (700–1099px). Drawn at half
+scale on an 820-wide tablet. Each option shows the tabs closed, then with Details open.</p>
+
+<h2><span class="n now">0</span>Now</h2>
+<ul class="why">
+  <li><b>Closed:</b> a 44×116 slab per edge. It keeps a fixed three-slot icon frame so the two sides match, which leaves most of the slab empty. Below a hairline sits a chevron that points <i>toward the screen edge</i> on the Explore side.</li>
+  <li><b>Open:</b> the tab disappears and the sheet grows a "DETAILS" heading with a boxed × at the top corner. Opening and closing therefore use two different controls in two different places.</li>
+</ul>
+<div class="row">
+  <div><div class="cap">closed</div><img class="shot" src="now-closed.webp" width="300" alt="tablet closed"></div>
+  <div><div class="cap">Details open</div><img class="shot" src="now-open.webp" width="300" alt="tablet open"></div>
+  <div><div class="cap">the tabs, 1:1</div><img class="shot" src="now-tab-left.webp" width="140" alt="left tab"><img class="shot" src="now-tab-right.webp" width="140" style="margin-top:8px" alt="right tab"></div>
+</div>
+
+<h2><span class="n">A</span>A slim grip</h2>
+<ul class="why">
+  <li>Each edge shows only a short rounded grip, about 4px wide, with an invisible 44px hit area. An unseen update shows as one dot above it.</li>
+  <li>When open, the grip rides the sheet's inner edge. Tap or drag it to close, with no heading or ×.</li>
+  <li>Trade-off: it is the most minimal, and the least discoverable. It reads as "something is there" more than "Explore".</li>
+</ul>
+<div class="row">
+  <div><div class="cap">closed</div><div class="tab-frame"><div class="globe"></div><div class="tA l"></div><div class="tA r"><span class="sig"></span></div></div></div>
+  <div><div class="cap">Details open</div><div class="tab-frame"><div class="globe"></div><div class="tA l"></div>
+    <div class="sheet r"><div class="ghost">Metagraph</div><div class="mini"><b>COUNTRY</b>United States</div><div class="ghost">Provider</div><div class="ghost">Node</div></div><div class="tA r attached"></div></div></div>
+</div>
+
+<h2><span class="n">B</span>A labelled spine</h2>
+<ul class="why">
+  <li>The tab carries its word, set vertically ("EXPLORE", "DETAILS"), with an update dot. There is no icon tray and no chevron, because the word is the affordance.</li>
+  <li>When open, the sheet keeps today's head row (word + ×).</li>
+  <li>Trade-off: it is the most legible closed state, but vertical type is slower to read and the tab stays about 110px tall.</li>
+</ul>
+<div class="row">
+  <div><div class="cap">closed</div><div class="tab-frame"><div class="globe"></div><div class="tB l"><span class="w">Explore</span></div><div class="tB r"><span class="sig"></span><span class="w">Details</span></div></div></div>
+  <div><div class="cap">Details open</div><div class="tab-frame"><div class="globe"></div><div class="tB l"><span class="w">Explore</span></div>
+    <div class="sheet r"><div style="display:flex;justify-content:space-between;align-items:center;font:600 10px/1 system-ui;letter-spacing:.14em;color:var(--dim)">DETAILS<svg class="i s"><use href="#x"/></svg></div><div class="ghost">Metagraph</div><div class="mini"><b>COUNTRY</b>United States</div><div class="ghost">Provider</div></div></div></div>
+</div>
+
+<h2><span class="n">C</span>One tab that travels with its sheet</h2>
+<ul class="why">
+  <li><b>Closed:</b> the tab shrinks to its content: the panel's icon, an update dot when something changed, and a chevron pointing <i>into</i> the scene, the way the sheet will come. No fixed three-slot frame, no hairline.</li>
+  <li><b>Open:</b> the same tab slides out with the sheet and sits on the sheet's inner edge, its chevron flipped to point back. Tapping it again closes the sheet. The heading row and its boxed × go, which gives the sheet that height back.</li>
+  <li>One control, one place, two states: the same "tap the thing again to collapse" the phone dock already uses. Escape and the × for keyboard and screen-reader users stay as accessible names on the tab.</li>
+</ul>
+<div class="row">
+  <div><div class="cap">closed</div><div class="tab-frame"><div class="globe"></div>
+    <div class="tC l"><svg class="i s"><use href="#cmp"/></svg><svg class="i s"><use href="#cr"/></svg></div>
+    <div class="tC r"><span class="sig"></span><svg class="i s"><use href="#lst"/></svg><svg class="i s"><use href="#cl"/></svg></div></div></div>
+  <div><div class="cap">Details open</div><div class="tab-frame"><div class="globe"></div>
+    <div class="tC l"><svg class="i s"><use href="#cmp"/></svg><svg class="i s"><use href="#cr"/></svg></div>
+    <div class="sheet r"><div class="ghost">Metagraph</div><div class="mini"><b>COUNTRY</b>United States</div><div class="ghost">Provider</div><div class="ghost">Node</div></div>
+    <div class="tC r attached"><svg class="i s"><use href="#lst"/></svg><svg class="i s"><use href="#cr"/></svg></div></div></div>
+</div>
+<p class="note">The open tab is the sheet's handle, the same idea as the phone's dock half: the control you opened with is the one that closes.</p>
+
+<h2><span class="n">C2</span>C, with the chevron alone <span class="rec">recommended</span></h2>
+<ul class="why">
+  <li>Your note on C: the panel icon and the chevron sit stacked like one icon set, though one names the panel and the other is the control. C2 keeps <b>only the chevron</b>. It is the control and the whole tab, pointing into the scene when closed and back out when open.</li>
+  <li>An unseen card update is a single accent dot on the tab's scene-facing edge, a signal rather than a second glyph.</li>
+  <li>Which panel is which is told by side, as now: Explore on the left, Details on the right. The accessible name still says it.</li>
+</ul>
+<div class="row">
+  <div><div class="cap">closed</div><div class="tab-frame"><div class="globe"></div>
+    <div class="tC l" style="height:44px"><svg class="i s"><use href="#cr"/></svg></div>
+    <div class="tC r" style="height:44px"><svg class="i s"><use href="#cl"/></svg><span class="sig" style="position:absolute;left:-3px;top:50%;translate:0 -50%"></span></div></div></div>
+  <div><div class="cap">Details open</div><div class="tab-frame"><div class="globe"></div>
+    <div class="tC l" style="height:44px"><svg class="i s"><use href="#cr"/></svg></div>
+    <div class="sheet r"><div class="ghost">Metagraph</div><div class="mini"><b>COUNTRY</b>United States</div><div class="ghost">Provider</div><div class="ghost">Node</div></div>
+    <div class="tC r attached" style="height:44px"><svg class="i s"><use href="#cr"/></svg></div></div></div>
+</div>
+
+<h2><span class="n">C3</span>C, with the panel's icon alone</h2>
+<ul class="why">
+  <li>The other way to make it one glyph: keep the <b>panel's own icon</b> (the compass, the list) and drop the chevron. Open or closed is told by the tab's position (on the screen edge vs on the sheet's edge) and an accent wash while open.</li>
+  <li>This names the panel at a glance and matches the phone dock, which uses the same icons. The trade-off is that nothing says "this slides", so the first tap teaches it.</li>
+</ul>
+<div class="row">
+  <div><div class="cap">closed</div><div class="tab-frame"><div class="globe"></div>
+    <div class="tC l" style="height:44px"><svg class="i s"><use href="#cmp"/></svg></div>
+    <div class="tC r" style="height:44px"><svg class="i s"><use href="#lst"/></svg><span class="sig" style="position:absolute;left:-3px;top:50%;translate:0 -50%"></span></div></div></div>
+  <div><div class="cap">Details open</div><div class="tab-frame"><div class="globe"></div>
+    <div class="tC l" style="height:44px"><svg class="i s"><use href="#cmp"/></svg></div>
+    <div class="sheet r"><div class="ghost">Metagraph</div><div class="mini"><b>COUNTRY</b>United States</div><div class="ghost">Provider</div><div class="ghost">Node</div></div>
+    <div class="tC r attached" style="height:44px;color:var(--primary);background:color-mix(in oklch,var(--primary) 14%,rgba(12,16,32,.96))"><svg class="i s"><use href="#lst"/></svg></div></div></div>
+</div>
+
+<h2><span class="n">D</span>No edge tabs: two toggles in the top bar</h2>
+<ul class="why">
+  <li>The edges stay clear. Two panel toggles (Explore, Details) join the top bar's right-hand group, the same buttons desktop has for scene mode, and are lit while their sheet is open.</li>
+  <li>Trade-off: the edges are fully free for the scene, but the controls move far from where the sheets appear, and the top bar is already full at 820px.</li>
+</ul>
+<div class="row">
+  <div><div class="cap">closed</div><div class="tab-frame"><div class="globe"></div>
+    <div class="bar"><span>DAG</span><span class="grow"></span><span class="tg"><svg class="i s"><use href="#cmp"/></svg></span><span class="tg"><svg class="i s"><use href="#lst"/></svg></span></div></div></div>
+  <div><div class="cap">Details open</div><div class="tab-frame"><div class="globe"></div>
+    <div class="sheet r" style="top:40px"><div class="ghost">Metagraph</div><div class="mini"><b>COUNTRY</b>United States</div><div class="ghost">Provider</div></div>
+    <div class="bar"><span>DAG</span><span class="grow"></span><span class="tg"><svg class="i s"><use href="#cmp"/></svg></span><span class="tg on"><svg class="i s"><use href="#lst"/></svg></span></div></div></div>
+</div>
+</body></html>
