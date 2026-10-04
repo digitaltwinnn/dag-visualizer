@@ -186,7 +186,10 @@ the "bug" was chased in the state machine first). When a rule is missing from th
 don't debug the cascade: kill the server, `rm -rf .next/dev`, restart. **A `:root` token edit is the
 common case** (2026-09-26, twice in one session: the `--wash-*` family, then `--sel-*`): the JSX
 hot-reloads and the token keeps its old value, so a measurement that reads the old colour is the
-cache, not the CSS. Restart before doubting the edit.
+cache, not the CSS. Restart before doubting the edit. **The dev canary says so out loud**
+(2026-10-04): `postcss/cssStamp.mjs` stamps the compiled sheet with its source's hash and
+`DevCssCanary` compares it with `/api/dev/css-stamp` (the file on disk) — a `[CSS canary]` console
+error is this trap, nothing else.
 
 `next build` and `next dev` don't conflict (dev outputs to `.next/dev`), so the production check can
 run alongside the dev server. Do it at phase boundaries: the build should be clean;
