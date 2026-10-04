@@ -280,7 +280,13 @@ country" names one measure of three). Eyebrows are bare role words, and each exp
 hint leads its card rather than trailing it. An explorer ROW is a browse target — mark, name, count,
 nothing more; **the prose that EXPLAINS a subject belongs to that subject's right-rail card, once**,
 and since a row commits its card in the same click, nothing is lost by keeping the sentence in one
-place.
+place. **Every row click shows its card** (user, 2026-10-04: "happens for some but not for all"):
+a row tagged with its card's slot (`ExplorerRowSpec.rung`) that is already committed brings that card
+back to the front when another card is the box, and only deselects once its own card is in front
+(`openOrToggle` in `Explorer.tsx` — view state, no selection written). Snapshots' network row commits
+the network inside its tick (`tickNetSelectActions`, never the filter), so it opens the Metagraph
+card as well as the level; a committed TICK row stays untagged, because its click also opens the
+tick in the explorer's own path state.
 
 **Right rail — the facts scope, read-only.** A set of fixed card slots in one stable order — network
 dossier, country, provider, composition, then the snapshot chain (global snapshot ABOVE the metagraph

@@ -161,6 +161,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
         hue: accent,
         figure: v.toLocaleString(),
         on: c.cc === country,
+        rung: "country",
         title: `${c.country} · ${c.count} node${c.count === 1 ? "" : "s"}`,
         onClick: () => drill(c.cc),
         // The country's border on the globe previews while the row is hovered, and the scene's
@@ -200,6 +201,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
           hue: accent,
           figure: v.toLocaleString(),
           on,
+          rung: "cohort",
           title: `${cohortLabel(ch)} · ${ch.rows.length} node${ch.rows.length === 1 ? "" : "s"}`,
           // A cohort of ONE is its node: the click selects the node outright (full ancestry
           // commits the cohort with it), so the reader never opens a list of one.

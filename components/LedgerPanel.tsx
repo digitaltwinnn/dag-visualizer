@@ -35,7 +35,7 @@ import { filterAccent, getAnchor, getNetwork, metagraphById, resolveSigner, SIGN
 import { metaSnapHoverKey, type GlobalSnapshot, type NodeRow, type SnapshotExact } from "@/src/data/types";
 import { displayNetwork, LISTED_IDS, UNLISTED_HUE, UNLISTED_ID, UNLISTED_LABEL, unlistedLog } from "@/src/data/unlisted";
 import { POLL } from "@/src/engine/config";
-import { followToggleActions, metaSnapSelectActions, nodeSelectActions, sameMetaSnap, snapshotSelectActions } from "@/src/engine/domain/pickActions";
+import { followToggleActions, metaSnapSelectActions, nodeSelectActions, sameMetaSnap, snapshotSelectActions, tickNetSelectActions } from "@/src/engine/domain/pickActions";
 import { heldTicks, nextHoldTop } from "@/src/data/ledgerHold";
 import LiveDot from "@/components/LiveDot";
 import { identityHudCss } from "@/src/palette/identity";
@@ -395,6 +395,8 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           // Absent = the dash, never a number derived from another (rule 10).
           figure: tickMeasure(ledgerMeasure, d, snapshotExact[d.ordinal]),
           on,
+          // No `rung`: a committed tick row's click also opens its tick in this card (local path
+          // state), which a re-box would swallow — and its Global snapshot card is the box anyway.
           faint: !!filterNet && count === 0 && !on,
           // The count the bar's colour stands for, in words — colour is never the only carrier.
           title: `Global snapshot ${d.ordinal.toLocaleString()}, ${d.metagraphSnapshotCount ?? 0} snapshots anchored${filterNet ? (count > 0 ? `, ${count} from ${filterNet.name}` : `, none from ${filterNet.name}`) : ""}`,
@@ -492,10 +494,22 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           title: lensedOut
             ? `${n.name} · ${n.count} snapshot${n.count === 1 ? "" : "s"} anchored here — outside the committed filter`
             : `${n.name} · ${n.count} snapshot${n.count === 1 ? "" : "s"} anchored into ${tick.ordinal.toLocaleString()}`,
-          // OPENS, never commits (user, 2026-08-10).
+          // OPENS ITS CARD TOO (user, 2026-10-04: "clicking a row in the explorer should open the
+          // related card; happens for some but not for all" — this row was the one that only
+          // drilled, ruled "opens, never commits" on 2026-08-10, before a network could be
+          // committed INSIDE a tick). It commits the tick-local network — the pager ∨'s own
+          // `tickNetSelectActions`, which pins the tick and never writes the filter — so the
+          // Metagraph card boxes, and the path opens to its snapshots as before.
           onClick: lensedOut
             ? undefined
             : () => {
+                applyClickActions(
+                  tickNetSelectActions(n.id, { kind: "snapshot", title: `Global snapshot #${tick.ordinal}`, data: tick }, {
+                    metaSnap,
+                    hasInspect: !!selNode,
+                    net: ledgerNetwork({ filter, tickNet, snapOrdinal: activeSnapOrd ?? null }),
+                  }),
+                );
                 setOpenNet(n.id);
                 setOpenSnap(null);
               },
@@ -565,6 +579,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           hue: leafHue,
           figure: snapMeasure(snapPick, r),
           on,
+          rung: "metaSnap",
           title: isUnlisted
             ? `Unlisted channel ${r.metaId} · anchored into global ${tick.ordinal.toLocaleString()}${signers.length ? ` · signed by ${signers.length} ${SIGNER_GROUPS.proof.who}` : ""}`
             : `${leafName} snapshot ${r.ordinal.toLocaleString()} · anchored into global ${tick.ordinal.toLocaleString()}${signers.length ? ` · signed by ${signers.length} ${SIGNER_GROUPS.proof.who}` : ""}`,
