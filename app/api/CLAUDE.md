@@ -61,7 +61,7 @@ them — but the Next Node server can.
 - **`/api/snapshot/[ordinal]`** reads the raw L0 global snapshot (~2.5 MB) and returns a tiny exact
   summary plus one row per anchored channel entry. **An `ordinal: 0` marks a payload the decoder
   couldn't read, which the UI must show as undecoded rather than as zero.** Cached per ordinal
-  (immutable; a transient upstream failure throws so it retries). The pull (`fetchGlobal.ts`) tries the L0 LB first and falls back to the archival nodes on ANY LB failure — a 404, a CDN block, a 5xx or a timeout (2026-10-04: the LB's CDN 403'd one source IP while the archives served). It's called for the live and
+  (immutable; a transient upstream failure throws so it retries). The pull (`fetchGlobal.ts`) tries the L0 LB first and falls back to the archival nodes on ANY LB failure — a 404, a CDN block, a 5xx or a timeout (2026-10-04: the LB's CDN 403'd one source IP while the archives served) — and after a non-404 failure skips the LB for `LB_BACKOFF_MS` (10 min), so a blocked source stops knocking on the shut door every tick. It's called for the live and
   selected tick only — never the whole chain, never a poll loop — plus a one-time paced backfill on a
   cold load, because the trail otherwise opens with its unmeasured rows drawing no bars. Each ordinal
   is immutable and cached, so the backfill costs at most once per ordinal ever.

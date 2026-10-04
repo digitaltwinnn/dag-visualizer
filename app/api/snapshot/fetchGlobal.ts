@@ -13,18 +13,36 @@ import { NETWORKS, type NetworkId } from "@/src/engine/config";
 // the same answer from the reader's side: this door is shut, try the others. Only when every
 // node fails does it throw, naming the LB's own answer, and the caller's no-cache-on-throw
 // contract retries it later.
+// ⚠️ A FAILING LB IS LEFT ALONE FOR A WHILE (user, 2026-10-04). While the CDN refuses this source,
+// every live tick still knocked on the shut door first — a wasted request each time, and the kind of
+// steady traffic that keeps a WAF block in place. A block, a 5xx or no answer at all now sends reads
+// straight to the archives for `LB_BACKOFF_MS`; the first read after it asks the LB again, so a lifted
+// block heals itself. A 404 trips nothing: it is the LB's depth lottery (above), not a failing LB.
+// Per network and per server instance — a cold function simply starts by asking the LB.
+export const LB_BACKOFF_MS = 10 * 60_000;
+const lbSkipUntil = new Map<NetworkId, number>();
+
 export async function fetchGlobalJson(net: NetworkId, ordinal: number): Promise<unknown> {
   let lb: string;
-  try {
-    const r = await fetch(`${NETWORKS[net].l0}/global-snapshots/${ordinal}`, {
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-      signal: AbortSignal.timeout(8000),
-    });
-    if (r.ok) return r.json();
-    lb = String(r.status);
-  } catch {
-    lb = "unreachable";
+  if ((lbSkipUntil.get(net) ?? 0) > Date.now()) {
+    lb = "skipped (backing off)";
+  } else {
+    try {
+      const r = await fetch(`${NETWORKS[net].l0}/global-snapshots/${ordinal}`, {
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+        signal: AbortSignal.timeout(8000),
+      });
+      if (r.ok) {
+        lbSkipUntil.delete(net);
+        return r.json();
+      }
+      lb = String(r.status);
+      if (r.status !== 404) lbSkipUntil.set(net, Date.now() + LB_BACKOFF_MS);
+    } catch {
+      lb = "unreachable";
+      lbSkipUntil.set(net, Date.now() + LB_BACKOFF_MS);
+    }
   }
   const info = await getArchiveInfo(net).catch(() => null);
   // Random order so the handful of archival nodes share the deep-read load — then try them ALL:
