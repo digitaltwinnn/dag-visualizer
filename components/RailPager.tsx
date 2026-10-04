@@ -64,7 +64,7 @@ import {
 import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp } from "lucide-react";
 import { useStore } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { childStep, siblingSet, type SiblingState } from "@/components/railSiblings";
+import { childStep, positionMarks, siblingSet, type SiblingState } from "@/components/railSiblings";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { latestRelevant } from "@/src/data/follow";
 import { getAnchor } from "@/src/data/network";
@@ -156,7 +156,7 @@ const slideGap = (): number => {
 };
 
 const SLIDE_MS = 820;
-/** The longest sibling set whose position is drawn as squares; beyond it the strip says "n of N". */
+/** How many position squares the plank draws at most; a longer set slides a window this wide. */
 const POSITION_MARKS_MAX = 15;
 const SLIDE_EASE = "cubic-bezier(0.45, 0.05, 0.25, 1)";
 
@@ -733,32 +733,42 @@ export default function RailPager({
                   of <> and ^^, and also / and | — can it be designed a bit nicer?"; option B of
                   `docs/superpowers/design/2026-10-03-card-pager`). One small square per card,
                   the current one lit — the cards' own way of counting (`UnitMarks`), so the
-                  strip carries no digits and no slash. A set too long for squares says it in
-                  words, "37 of 213". The count stays available to AT and on hover. */}
+                  strip carries no digits and no slash. EVERY set draws squares (user, 2026-10-04:
+                  "make it consistent with all the other cards" — sets past fifteen used to say
+                  "37 of 213"): a long set draws a fixed-width window that follows the current
+                  square, its ends drawn small where more lie beyond (`positionMarks`). The count
+                  stays available to AT and on hover. */}
               {set.open ? (
                 <div className="min-w-[3ch]" />
-              ) : set.items.length <= POSITION_MARKS_MAX ? (
-                <div
-                  role="img"
-                  aria-label={`${set.index + 1} of ${set.items.length}`}
-                  title={`${set.index + 1} of ${set.items.length}`}
-                  className="flex items-center gap-[3px] px-0.5"
-                >
-                  {set.items.map((_, k) => (
-                    <i
-                      key={k}
-                      className={
-                        k === set.index
-                          ? "size-[7px] rounded-[1px] bg-[var(--filter-accent,var(--primary))]"
-                          : "size-[5px] rounded-[1px] bg-muted-foreground/45"
-                      }
-                    />
-                  ))}
-                </div>
               ) : (
-                <div className="min-w-[3ch] whitespace-nowrap text-center text-label text-muted-foreground tabular-nums">
-                  <span className="font-semibold text-foreground">{(set.index + 1).toLocaleString()}</span> of {set.items.length.toLocaleString()}
-                </div>
+                (() => {
+                  const w = positionMarks(set.index, set.items.length, POSITION_MARKS_MAX);
+                  return (
+                    <div
+                      role="img"
+                      aria-label={`${set.index + 1} of ${set.items.length}`}
+                      title={`${set.index + 1} of ${set.items.length}`}
+                      className="flex items-center gap-[3px] px-0.5"
+                    >
+                      {Array.from({ length: w.end - w.start }, (_, j) => {
+                        const k = w.start + j;
+                        const edge = (j === 0 && w.fadeStart) || (j === w.end - w.start - 1 && w.fadeEnd);
+                        return (
+                          <i
+                            key={k}
+                            className={
+                              k === set.index
+                                ? "size-[7px] rounded-[1px] bg-[var(--filter-accent,var(--primary))]"
+                                : edge
+                                  ? "size-[3px] rounded-[1px] bg-muted-foreground/45"
+                                  : "size-[5px] rounded-[1px] bg-muted-foreground/45"
+                            }
+                          />
+                        );
+                      })}
+                    </div>
+                  );
+                })()
               )}
               <Button
                 variant="ghost"

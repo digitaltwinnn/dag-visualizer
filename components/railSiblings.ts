@@ -576,3 +576,20 @@ export const CHILD_OF: Partial<Record<Mode, Partial<Record<RailCardKind, ChildEn
 export function childStep(slot: RailCardKind, s: SiblingState): SiblingStep | null {
   return CHILD_OF[s.mode]?.[slot]?.step(s) ?? null;
 }
+
+/** Which of a sibling set's position marks the pager draws (user, 2026-10-04 — every card's pager
+ *  draws its position; none writes "n of N"). A set of at most `max` draws them all. A longer one
+ *  draws a `max`-wide window that keeps `index` in view — centred where it can be, clamped at
+ *  either end — and an end of the window with more marks beyond it is drawn small (`fadeStart` /
+ *  `fadeEnd`), which is how the strip says "this continues" without a number. The window's width
+ *  never changes, so stepping through a long set never re-composes the plank. */
+export function positionMarks(
+  index: number,
+  n: number,
+  max: number,
+): { start: number; end: number; fadeStart: boolean; fadeEnd: boolean } {
+  if (n <= max) return { start: 0, end: n, fadeStart: false, fadeEnd: false };
+  const start = Math.min(Math.max(0, index - Math.floor(max / 2)), n - max);
+  const end = start + max;
+  return { start, end, fadeStart: start > 0, fadeEnd: end < n };
+}

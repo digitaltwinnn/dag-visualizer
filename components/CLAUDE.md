@@ -512,8 +512,10 @@ order as the explorer's signer level, so the two can't disagree about who signed
 right, told apart by WEIGHT rather than a divider (2026-10-03, option B of
 `docs/superpowers/design/2026-10-03-card-pager` — user: "a lot of <> and ^^, and also / and |"):
 the pair is drawn smaller and quieter, and **the position is DRAWN, not written** — one small
-square per sibling with the current one lit (the cards' own unit marks), "n of N" in words only
-past fifteen, never a slash. The two axes still never read as one four-way control — and **an
+square per sibling with the current one lit (the cards' own unit marks), never digits or a slash
+— a set past fifteen slides a fifteen-wide window that follows the current square, its ends drawn
+small where more lie beyond (`positionMarks` in railSiblings.ts; user, 2026-10-04, retiring the
+"n of N" words as the one card that read differently). The two axes still never read as one four-way control — and **an
 exhausted direction is INACTIVE while an axis with nothing to ever navigate is ABSENT** (user,
 2026-09-11, two rounds; supersedes 2026-09-03's invisible rule, which predates the pair): a
 direction that ran out mid-set dims — a vanishing chevron re-composes the row at every edge,
