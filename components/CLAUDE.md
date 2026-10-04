@@ -934,7 +934,11 @@ inline in the return would quietly restore the bug for every consumer at once.
 Only the rails restructure; everything else holds the four-zone shape. Desktop (≥1100px) has both rails
 inline with their `RailThread` siblings; tablet (700–1099px) collapses them to edge tabs opening
 **non-modal** sheets (both can be open, orbit still works behind them — the sheets OVERLAY the
-vitals band, which CLIPS its paint by their published `sceneCover`, see the band bullet); phone
+vitals band, which CLIPS its paint by their published `sceneCover`, see the band bullet). **The
+tablet tab is its sheet's one control** (user, 2026-10-04 — option C2 of
+`docs/superpowers/design/2026-10-04-tablet-tabs`): a single chevron pointing into the scene, which
+travels WITH the opened sheet to ride its inner edge, flipped, and closes it — no header row, no ×.
+An unseen card update colours the chevron in that card's hue rather than adding a mark; phone
 (<700px) has a persistent bottom bar — Explore | Vitals | Details thirds where the view has a
 vitals lane, halves elsewhere (`barGeom`; the icon trays compact to one unseen-update dot at
 thirds) — and ONE sheet at a time, with a grabber that drags and flick-dismisses. **The bottom

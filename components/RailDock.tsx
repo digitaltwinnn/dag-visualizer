@@ -3,10 +3,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { ListTree, ChevronLeft, ChevronRight, X, type LucideIcon } from "lucide-react";
+import { ListTree, ChevronLeft, ChevronRight, type LucideIcon } from "lucide-react";
 import { EXPLORE_ICON } from "@/components/icons";
 import { useStore } from "@/src/store/store";
 import { useSceneYield } from "@/components/RailShade";
@@ -41,21 +40,22 @@ export function usePulseWindow(key: unknown): { pulse: number; live: boolean } {
   return { pulse, live };
 }
 
-// Tablet/phone edge dock for a rail's content: a slim fixed edge tab (`‹`/`›`) that opens the
+// Tablet/phone edge dock for a rail's content: a slim fixed edge tab (one chevron) that opens the
 // SAME content the desktop inline rail shows, inside a Sheet overlay (full-width scene stays
 // behind it). Desktop never renders this — `ExploreRail`/`Inspector` branch on `useBreakpoint()`
 // and keep the inline `#leftcol`/`#rightcol` path unchanged there.
 //
-// The Sheet primitive has no built-in close affordance, so this adds a dedicated **header row**
-// (`.sheet-head`) at the top of the SheetContent: the panel label on the left (which doubles as
-// the accessible `SheetTitle`) and the ✕ close (`.sheet-close`, ≥44px) on the right, ABOVE the
-// hosted `children`. A floating corner ✕ would collide with the hosted cards' own top-right
-// controls (CardPane's `.rc-close`, ContextCard's close, the left tool cards' `.panel-collapse`),
-// so the close lives in the sheet's own chrome instead. Scrim-click + Escape still dismiss too.
+// THE TABLET TAB IS THE SHEET'S ONE CONTROL (user, 2026-10-04 — option C2 of
+// `docs/superpowers/design/2026-10-04-tablet-tabs`): one chevron, pointing into the scene while
+// closed; when the sheet opens the SAME tab travels with it and rides the sheet's inner edge, its
+// chevron flipped, and tapping it again closes the sheet. So there is no header row and no ×: the
+// control you opened with is the one that closes, as on the phone dock. An unseen update on a hosted
+// card colours the CHEVRON in that card's hue (no dot beside it — "adding a 2nd width"). Escape
+// still dismisses; the label stays the sheet's accessible title.
 //
 // `signals`: the dock's icon TRAY (see `TabSignal` above) — a quiet legend of the hosted cards
-// (muted icons at rest, on the edge tab as a vertical stack under the chevron, on the phone dock
-// half as a horizontal row after the label), with `active` entries vivid/identity-hued and
+// (muted icons at rest, on the phone dock half as a horizontal row after the label; on the
+// tablet tab only the first active entry's hue survives, as the chevron's colour), with `active` entries vivid/identity-hued and
 // still (the beat they breathed on went 2026-09-28 — colour is the whole cue). PURELY visual: never opens the
 // sheet itself (Global Constraint — no auto-open on a pick; the user always taps the trigger).
 // Presentation-only data (icon component + a CSS colour + the active flag), so RailDock stays
@@ -363,6 +363,8 @@ export default function RailDock({
   // a tier switch, which a window-resize listener would also have caught, and a token change,
   // which it would not.
   const [sheetEl, setSheetEl] = useState<HTMLDivElement | null>(null);
+  // The side sheet's MEASURED width — where the tablet tab rides while the sheet is open.
+  const [sheetW, setSheetW] = useState(0);
   const onCoverRef = useRef(onCoverPx);
   onCoverRef.current = onCoverPx;
   const isBottom = (sheetSide ?? side) === "bottom";
@@ -377,7 +379,11 @@ export default function RailDock({
       cover?.(0);
       return;
     }
-    const publish = () => cover?.(Math.round(sheetEl.offsetWidth));
+    const publish = () => {
+      const w = Math.round(sheetEl.offsetWidth);
+      cover?.(w);
+      setSheetW(w);
+    };
     publish();
     const ro = new ResizeObserver(publish);
     ro.observe(sheetEl);
@@ -611,7 +617,7 @@ export default function RailDock({
     <span
       className={cn(
         "flex items-center pointer-events-none flex-none",
-        isBarHalf ? "gap-1.5 w-[54px] justify-start" : "flex-col gap-2 h-[58px] justify-start",
+        "gap-1.5 w-[54px] justify-start",
       )}
       aria-hidden="true"
     >
@@ -626,22 +632,6 @@ export default function RailDock({
         />
       ))}
     </span>
-  );
-  // The [icons legend] | [open control] split (user refinement): the chevron serves a different
-  // purpose than the card icons (open affordance vs contents legend), so a hairline separates
-  // the two sections — the app's inset-hairline idiom — and the chevron sits at the END of the
-  // tray (bottom on edge tabs, trailing on the phone dock half), subtly dimmer than the icons'
-  // active states. The WHOLE tray stays one ≥44px tap target.
-  // Bar halves render NO rule at all (user, 2026-09-03, second round: with the trays standing
-  // down at thirds the hairline only separated a label from its own chevron — "I think we can
-  // remove the hairline"; the first round made it structural for consistency, and the consistent
-  // answer that survived review is none). The tablet edge tab keeps its tray-gated rule: there
-  // it divides two stacked GROUPS, which is a real division.
-  const trayRule = signals && !isBarHalf && (
-    <span
-      className={cn("flex-none bg-border", isBarHalf ? "w-px h-4" : "h-px w-4")}
-      aria-hidden="true"
-    />
   );
   return (
     <>
@@ -704,7 +694,6 @@ export default function RailDock({
                 the sheet's own grabber says it drags. The ∧/∨ restated the open state and cost the
                 tray its width. */}
             {tray}
-            {trayRule}
             {/* Hosted-card UPDATE signal only: a travelling pulse along the half's TOP edge — the
                 shared vertical recipe rotated onto the horizontal edge (the mask/geometry live in
                 the carrier's local coords, so the soft tips + sweep rotate with it), sweeping from
@@ -723,30 +712,30 @@ export default function RailDock({
           </ToggleGroupItem>
         </ToggleGroup>
       ) : (
-        // Tablet edge tab (700–1099px only; hidden on desktop AND phone): a slim rectangular TRAY
-        // docked to the screen edge — the hosted cards' icon legend (a FIXED 3-slot frame, so the
-        // left + right trays mirror each other's height exactly) over a hairline, over the
-        // chevron (the open affordance). Width holds the ≥44px tap target (w-11); the fixed
-        // column means icons never collide with the chevron and the geometry never shifts.
+        // Tablet edge tab (700–1099px only; hidden on desktop AND phone): ONE CHEVRON, and the
+        // sheet's one control (see the header — option C2). Closed it sits on the screen edge
+        // pointing into the scene; open it rides the sheet's inner edge (`sheetW`, measured), its
+        // chevron flipped, and the same tap closes. It moves on the sheet's own slide clock. An
+        // unseen update colours the chevron in that card's hue — the only signal it carries.
+        // 32×64 to the eye; the hit area reaches 48px wide on touch.
         <button
           className={cn(
-            "fixed z-[39] top-1/2 -translate-y-1/2 w-11 min-h-[56px] hidden flex-col items-center justify-center gap-2 py-2.5 cursor-pointer",
+            "fixed z-[39] top-1/2 -translate-y-1/2 w-8 h-16 hidden items-center justify-center cursor-pointer",
             "bg-[var(--panel)] border border-border text-foreground backdrop-blur-[14px]",
+            "transition-[left,right] duration-[280ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+            "pointer-coarse:after:absolute pointer-coarse:after:-inset-x-2 pointer-coarse:after:inset-y-0 pointer-coarse:after:content-['']",
             "min-[700px]:max-[1099px]:flex",
-            side === "left" ? "left-0 rounded-r-[var(--radius)] border-l-0" : "right-0 rounded-l-[var(--radius)] border-r-0",
+            side === "left" ? "rounded-r-[var(--radius)] border-l-0" : "rounded-l-[var(--radius)] border-r-0",
           )}
-          aria-label={`${label} panel`}
-          // The edge tab is hidden the instant its own sheet opens, so it can only ever mean
-          // "open" (the bar half's open/collapse toggle is ToggleGroup's native deselect above).
-          onClick={() => handleOpenChange(true)}
+          style={{ [side]: open && shellVisible ? sheetW : 0 }}
+          aria-label={open ? `Close ${label} panel` : `${label} panel`}
+          aria-expanded={open}
+          onClick={() => handleOpenChange(!open)}
         >
-          {/* [icons legend] above the hairline, [open control] below — see the trayRule doc. */}
-          {tray}
-          {trayRule}
-          {side === "left" ? (
-            <ChevronLeft size={20} className="flex-none opacity-70" aria-hidden />
+          {(side === "left") !== open ? (
+            <ChevronRight size={18} aria-hidden className={cn("flex-none", !firstActive && "opacity-70")} style={firstActive && !open ? { color: firstActive.hue ?? "var(--primary)" } : undefined} />
           ) : (
-            <ChevronRight size={20} className="flex-none opacity-70" aria-hidden />
+            <ChevronLeft size={18} aria-hidden className={cn("flex-none", !firstActive && "opacity-70")} style={firstActive && !open ? { color: firstActive.hue ?? "var(--primary)" } : undefined} />
           )}
           {/* CLOSED-state pulses down the tab's scene-facing edge (the sheet's spine-equivalent
               while there's no sheet on screen): the view/filter SWITCH signal + the hosted-card
@@ -855,36 +844,10 @@ export default function RailDock({
               onClick={grabClick}
             />
           )}
-          {isBarHalf ? (
-            // The persistent bar half already shows the label + icon tray visibly — no redundant
-            // header row (no ✕ either; the bar half itself is the close affordance, via the toggle
-            // above). SheetTitle stays for the accessible dialog name only.
-            <SheetTitle className="sr-only">{label}</SheetTitle>
-          ) : (
-            // Sheet's own chrome (label + close), ABOVE the hosted content so the ✕ never overlaps a
-            // hosted card's top-right control. The close is ≥44px.
-            <div className="flex items-center justify-between gap-2">
-              <SheetTitle className="m-0 text-body font-semibold tracking-[0.02em] uppercase text-foreground opacity-90 [text-shadow:0_1px_2px_var(--scrim-shadow)]">
-                {label}
-              </SheetTitle>
-              {/* The sheet's × on the same ghost-Button baseline as CardHead's card close (muted,
-                  no box — the old hand-rolled panel-boxed button is gone), just kept ≥44px since
-                  it's the sheet's primary touch dismiss. */}
-              <Button
-                variant="ghost"
-                size="icon-lg"
-                aria-label={`Close ${label} panel`}
-                title={`Close ${label} panel`}
-                onClick={() => handleOpenChange(false)}
-                // The ghost recipe's own hover wash, like every other icon control (user, 2026-10-03:
-                // "the details and explore pane × does not have the fill effect on hover like other
-                // buttons do") — this one had it switched OFF by three overrides.
-                className="flex-none w-11 h-11 rounded-md leading-none cursor-pointer text-muted-foreground"
-              >
-                <X aria-hidden className="size-5" />
-              </Button>
-            </div>
-          )}
+          {/* NO HEADER ROW on either tier: the phone's bar half and the tablet's travelling tab are
+              each the sheet's visible label and its close. SheetTitle stays for the accessible
+              dialog name only. */}
+          <SheetTitle className="sr-only">{label}</SheetTitle>
           {/* The cards scroll in an inner body so the sheet itself is `overflow: visible` — that lets
               the bottom sheet paint its instrument ruler ABOVE its top edge (outside the element).
               Native scrollbar hidden, momentum kept (like #rightcol). `sheet-cards` (globals.css)
