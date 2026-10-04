@@ -307,12 +307,6 @@ const GHOST_EYEBROW: Record<string, string> = {
 export function GhostCard({ card, open = false, onToggle }: { card: RailCard; open?: boolean; onToggle?: () => void }) {
   const Icon = card.icon;
   const label = GHOST_EYEBROW[card.id] ?? card.id;
-  const head = (
-    <span className="flex items-center gap-2.5">
-      <Icon aria-hidden className="size-3.5 flex-none text-[var(--filter-accent,var(--primary))] opacity-45" />
-      <span className="text-label tracking-caps uppercase">{label}</span>
-    </span>
-  );
   return (
     <aside
       data-ghost=""
@@ -323,23 +317,30 @@ export function GhostCard({ card, open = false, onToggle }: { card: RailCard; op
         open ? "mx-0 px-[18px] pt-2.5 pb-3 rounded-[var(--radius)] border border-dashed border-border" : "px-[18px] py-2",
       )}
     >
-      {onToggle ? (
+      {/* THE WHOLE CARD IS THE TOGGLE (user, 2026-10-04: "the hint should be clickable as well to
+          close it again"), the entry's own stretched-button device: one invisible button over the
+          card, the head and hint drawn beneath it. The button persists across both states, so focus
+          simply stays on it — no hand-off needed. */}
+      {onToggle && (
         <button
           type="button"
           aria-expanded={open}
           title={open ? "Collapse" : "Expand"}
-          // The head persists across both states, so focus simply stays on it — no hand-off needed.
           onClick={onToggle}
-          className="block w-full appearance-none bg-transparent border-0 p-0 m-0 text-left text-inherit cursor-pointer rounded-sm focus-visible:outline-1 focus-visible:outline-ring/60"
+          className="absolute inset-0 z-[1] appearance-none bg-transparent border-0 p-0 m-0 cursor-pointer rounded-[inherit] focus-visible:outline-1 focus-visible:outline-ring/60"
         >
-          {head}
+          <span className="sr-only">{open ? `Collapse ${label}` : `Expand ${label}`}</span>
         </button>
-      ) : (
-        head
       )}
+      <span className="flex items-center gap-2.5">
+        <Icon aria-hidden className="size-3.5 flex-none text-[var(--filter-accent,var(--primary))] opacity-45" />
+        <span className="text-label tracking-caps uppercase">{label}</span>
+      </span>
       {/* FULL INK, NO OPACITY (design review 2026-10-02): the hint is the only text that says how to
           reach this rung, so it takes `--foreground-dim`, one step under a card's own copy, upright —
-          it is the card's body now, not an aside. */}
+          it is the card's body now, not an aside. It ARRIVES WITH THE BOX: the lane's HeightEase
+          keys its fade on the ghost's open state (`settleKey`), so the hint fades in on the very ease
+          that grows the frame instead of standing there before it (user, 2026-10-04). */}
       {open && <p className="m-0 mt-1.5 pl-6 text-body text-foreground-dim">{card.hint}</p>}
     </aside>
   );
@@ -652,6 +653,10 @@ export default function Inspector() {
         // an entry and the box sits mid-pile) — both joints around it fell back to `--rail-gap`.
         const boxed = card.present && !effCollapsed(id);
         const tier = !card.present ? "ghost" : boxed ? "box" : "entry";
+        // What the slot SHOWS, for HeightEase's arrival: the tier, refined by a ghost's open state —
+        // an opening ghost is a new occupant (its hint arrives), so the hint fades in on the frame's
+        // own ease instead of standing there before it (user, 2026-10-04).
+        const settleTier = tier === "ghost" && ghostCx(id).open ? "ghost-open" : tier;
         // The materialized BOX carries the sibling pager + swipe — the plank is drawn on the card's
         // own bottom edge, so it must never ride a one-line entry. That's the whole gate: `boxed`,
         // not the focus rung. Single-open makes the box unique, and it can be ANY committed rung, so
@@ -689,7 +694,7 @@ export default function Inspector() {
                 very animation that resizes the slot. It used to be inferred — CSS keyframes
                 restarting because React swapped `.rail-entry` for `.ig-panel` — which made the
                 arrival an accident of reconciliation and put it on a second clock. */}
-            <HeightEase growIn={laneBooted.current && bp === "desktop"} settleKey={tier}>{wrapped}</HeightEase>
+            <HeightEase growIn={laneBooted.current && bp === "desktop"} settleKey={settleTier}>{wrapped}</HeightEase>
           </div>
         );
       })}

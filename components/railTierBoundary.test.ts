@@ -105,13 +105,17 @@ describe("rail pager boundary — the plank rides the boxed tier", () => {
 // merely READ the same `--tempo-roll` as the height, so the two agreed by convention and could
 // drift the moment either was retuned.
 //
-// So the rule this pins: the tier travels to HeightEase as `settleKey` (the stated fact), and the
+// So the rule this pins: the tier travels to HeightEase as `settleKey` (the stated fact — refined
+// only by a ghost's open state), and the
 // tier keyframes own no opacity (the CSS may settle the plate's border and radius — decoration
 // with no timing contract — and nothing else).
 describe("rail tier boundary — the arrival is HeightEase's, not the stylesheet's", () => {
   it("hands the tier to HeightEase as settleKey", () => {
     const src = readFileSync("components/Inspector.tsx", "utf8");
-    expect(src).toMatch(/<HeightEase[^>]*settleKey=\{tier\}/);
+    // The key is the tier, refined only by a ghost's open state (an opening ghost's hint is a new
+    // occupant, 2026-10-04) — never anything that is not derived from the tier.
+    expect(src).toMatch(/<HeightEase[^>]*settleKey=\{settleTier\}/);
+    expect(src).toMatch(/const settleTier = tier === "ghost" && ghostCx\(id\)\.open \? "ghost-open" : tier;/);
   });
 
   it("leaves no opacity in the tier keyframes", () => {
