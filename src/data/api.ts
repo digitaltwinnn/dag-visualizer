@@ -25,7 +25,13 @@ export interface PollHealth {
   lastErrAt: number | null;
   ok: number;
   err: number;
+  /** The last `RECENT_OUTCOMES` outcomes, oldest first — true ok, false failed. The pulse strip
+   *  draws them as a run of marks (user, 2026-10-04: "show a nice chart for each card there,
+   *  green=ok red=fail"). Empty until the feed has an outcome. */
+  recent: boolean[];
 }
+/** How many outcomes each feed's history keeps — the pulse strip's mark count. */
+export const RECENT_OUTCOMES = 24;
 // THE FEEDS TABLE — the one home for each feed's descriptor (2026-08-30, same-day structural
 // fix): the first cut passed (label, interval) at every reportPoll call site, which is
 // the two-homes drift class this repo keeps re-catching — change a label at the success site
@@ -41,9 +47,13 @@ const FEEDS = {
   "api-geo": { label: "Validator geo map", everyMs: null, when: "page load" },
   // everyMs null on purpose: the feed polls POLL.trendsMs only WHILE a consumer is mounted
   // (the ledger band's cards, the /trends doc) — a fixed cadence here would derive STALE in
-  // every other view. The `when` words state that real behaviour ("while shown", user round 2:
-  // "in view" still read like on-demand).
-  "api-trends": { label: "Trends history", everyMs: null, when: `${Math.round(POLL.trendsMs / 60_000)} min · while shown` },
+  // every other view. The chip states the cadence alone: its "while shown" condition was
+  // dropped (user, 2026-10-04: "not very relevant").
+  "api-trends": { label: "Trends history", everyMs: null, when: `${Math.round(POLL.trendsMs / 60_000)} min` },
+  // The exact read behind the snapshot card's breakdown (/api/snapshot/[ordinal]) — once per live
+  // tick and per pinned one, so it has no cadence of its own (2026-10-04: a run of failed reads
+  // showed on the card while every row here still read healthy, because this feed had no row).
+  exact: { label: "Snapshot reads", everyMs: null, when: "each tick" },
 } as const;
 export type FeedId = keyof typeof FEEDS;
 const POLL_HEALTH = new Map<string, PollHealth>();
@@ -52,8 +62,10 @@ const POLL_HEALTH = new Map<string, PollHealth>();
 export function reportPoll(id: FeedId, ok: boolean): void {
   const d = FEEDS[id];
   let r = POLL_HEALTH.get(id);
-  if (!r) { r = { id, label: d.label, everyMs: d.everyMs, when: d.when, lastOkAt: null, lastErrAt: null, ok: 0, err: 0 }; POLL_HEALTH.set(id, r); }
+  if (!r) { r = { id, label: d.label, everyMs: d.everyMs, when: d.when, lastOkAt: null, lastErrAt: null, ok: 0, err: 0, recent: [] }; POLL_HEALTH.set(id, r); }
   if (ok) { r.lastOkAt = Date.now(); r.ok++; } else { r.lastErrAt = Date.now(); r.err++; }
+  r.recent.push(ok);
+  if (r.recent.length > RECENT_OUTCOMES) r.recent.shift();
 }
 /** Ensure a feed has a ROW without recording an outcome.
  *
@@ -65,7 +77,7 @@ export function reportPoll(id: FeedId, ok: boolean): void {
 export function touchPoll(id: FeedId): void {
   const d = FEEDS[id];
   if (!POLL_HEALTH.has(id)) {
-    POLL_HEALTH.set(id, { id, label: d.label, everyMs: d.everyMs, when: d.when, lastOkAt: null, lastErrAt: null, ok: 0, err: 0 });
+    POLL_HEALTH.set(id, { id, label: d.label, everyMs: d.everyMs, when: d.when, lastOkAt: null, lastErrAt: null, ok: 0, err: 0, recent: [] });
   }
 }
 

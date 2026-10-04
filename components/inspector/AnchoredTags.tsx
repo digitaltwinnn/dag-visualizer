@@ -75,7 +75,9 @@ export default function AnchoredTags({
           : channels != null && !acquiring
             ? `Anchored by ${channels} metagraph${channels === 1 ? "" : "s"}.`
             : missed && !resolveHold.show
-              ? "Which metagraphs anchored into it could not be read."
+              ? // Two words (user, 2026-10-04: "why so much text, just say 'read failed'"); the
+                // lead is the failure's one statement, so the line under the label is gone.
+                "Read failed."
               : "Reading which metagraphs anchored into it."}
       </Lead>
       <Separator className="mb-2" />
@@ -87,12 +89,8 @@ export default function AnchoredTags({
     return (
       <div className="mt-1">
         {header}
-        {missed && !resolveHold.show ? (
-          // The honest terminal: the read failed, nothing is in flight. Word, not stars.
-          <div className="mt-1 text-label tracking-[0.08em] uppercase text-muted-foreground">
-            exact read failed
-          </div>
-        ) : (awaiting || resolveHold.show) && (
+        {/* A failed read is stated once, by the lead above; only a read in flight draws here. */}
+        {!(missed && !resolveHold.show) && (awaiting || resolveHold.show) && (
           <div className={cn("flex items-center gap-2 mt-1", resolveHold.fading && "animate-hold-fade-out motion-reduce:animate-none")}>
             <NodeStars count={4} />
             <span className="text-label tracking-[0.08em] uppercase text-muted-foreground">resolving</span>

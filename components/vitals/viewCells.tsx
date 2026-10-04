@@ -458,7 +458,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
   // floor rule the store already solved.
   // `paused` while the HUD is stepped aside (2026-09-13): the band stays MOUNTED through the
   // SCENE toggle so it can slide out, and a mounted-but-hidden band that kept polling would
-  // make the pulse strip's "while shown" words a lie about this feed.
+  // make the pulse strip's last-success age a lie about this feed.
   const t7 = useTrendsWindow(paused ? null : "7d");
   const windowed = useMemo<TrendsWindowData | null>(
     // trimNewestPartial FIRST (the payload's own clock drops the still-filling bucket — the

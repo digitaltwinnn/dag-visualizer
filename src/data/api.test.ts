@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { staleTickKeys, isGlobalActivityScope, shortHash, fanOut, cycleOk, touchPoll, reportPoll, pollHealthRows } from "./api";
+import { staleTickKeys, isGlobalActivityScope, shortHash, fanOut, cycleOk, touchPoll, reportPoll, pollHealthRows, RECENT_OUTCOMES } from "./api";
 import { vi, afterEach } from "vitest";
 
 // api.ts is exempt from dataExportCoverage (it IS the live feed). These cover the PURE parts only
@@ -152,5 +152,22 @@ describe("touchPoll", () => {
     const after = pollHealthRows().find((r) => r.id === "clusters")!;
     expect(after.lastOkAt).toBe(okAt);
     expect(after.ok).toBe(okN);
+  });
+});
+
+describe("reportPoll's recent outcomes", () => {
+  // The pulse strip draws each feed's recent history as a run of marks — green ok, red failed
+  // (user, 2026-10-04) — so the registry keeps the outcomes themselves, newest last, capped.
+  it("keeps the last RECENT_OUTCOMES outcomes in order, oldest first", () => {
+    for (let i = 0; i < RECENT_OUTCOMES + 5; i++) reportPoll("exact", i % 3 !== 0);
+    const row = pollHealthRows().find((r) => r.id === "exact")!;
+    expect(row.recent).toHaveLength(RECENT_OUTCOMES);
+    const all = Array.from({ length: RECENT_OUTCOMES + 5 }, (_, i) => i % 3 !== 0);
+    expect(row.recent).toEqual(all.slice(-RECENT_OUTCOMES));
+  });
+
+  it("a touched row has an empty history, not a claimed one", () => {
+    touchPoll("api-trends");
+    expect(pollHealthRows().find((r) => r.id === "api-trends")!.recent).toEqual([]);
   });
 });

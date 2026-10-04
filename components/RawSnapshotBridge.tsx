@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react";
 import { useStore } from "@/src/store/store";
 import type { SnapshotExact, ChannelSnapDeep } from "@/src/data/types";
 import { metaSnapDeepKey } from "@/src/data/types";
+import { reportPoll } from "@/src/data/api";
 
 // Keeps the EXACT per-snapshot totals (fee + listed/unlisted breakdown) in the store for the
 // snapshots currently in focus — the LIVE tick and any SELECTED one — by pulling them from
@@ -108,7 +109,9 @@ function ensure(ordinal: number | null | undefined, retry = false) {
   fetch(netUrl(`/api/snapshot/${ordinal}`))
     .then((r) => (r.ok ? (r.json() as Promise<SnapshotExact>) : null))
     .then((data) => {
-      if (data && typeof data.totalFee === "number") st.setSnapshotExact(data);
+      const ok = !!data && typeof data.totalFee === "number";
+      reportPoll("exact", ok); // the pulse strip's "Snapshot reads" row
+      if (ok) st.setSnapshotExact(data);
       // On unavailable (transient blip / outside the served window) record the MISS instead of
       // storing nothing: the acquiring surfaces (fee node-stars, "resolving", "reading…") key
       // their give-up on it, so a failed read on a pinned tick terminates honestly instead of
@@ -120,6 +123,7 @@ function ensure(ordinal: number | null | undefined, retry = false) {
       }
     })
     .catch(() => {
+      reportPoll("exact", false);
       st.setExactMiss(ordinal);
       if (retry) scheduleRetry(ordinal);
     })
