@@ -61,7 +61,9 @@ const SHEET_SIDE: Record<"left" | "right" | "bottom", string> = {
   bottom:
     // dvh, not vh (2026-09-03): on iOS Safari `vh` measures the LARGEST viewport, so with the
     // toolbar up a 60vh sheet ran taller than the visible page; dvh tracks the live viewport.
-    "left-0 right-0 bottom-0 h-[60dvh] max-h-[72dvh] rounded-t-[var(--radius)] " +
+    // One ceiling (2026-10-04): the phone sheet states its own height inline, under RailDock's
+    // `sectionCeilingPx`; these are the pre-measure default and never taller than that.
+    "left-0 right-0 bottom-0 h-[60dvh] max-h-[60dvh] rounded-t-[var(--radius)] " +
     "ig-sheet-topruler data-[state=open]:animate-sheet-in-bottom",
 }
 

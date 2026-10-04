@@ -288,9 +288,9 @@ interface AppState {
   // hub re-boxes the metagraph card — the callout must step up with it). Never a selection
   // channel: committing/deselecting stays with the ladder.
   boxedCard: string | null;
-  // PHONE ONLY: the bottom sheet's drag-chosen height override in px (null = the default 60vh).
-  // Shared by BOTH dock sheets so switching halves keeps the chosen height; reset to null the
-  // moment the dock fully closes (`setPhoneDock(null)`) so reopening starts at the default.
+  // PHONE ONLY: the bottom sheet's height under the finger, in px, WHILE A DRAG IS LIVE (null =
+  // the sheet stands at its content's fit, under RailDock's 60% section ceiling). A release
+  // clears it (2026-10-04 — the resting detents went with the ceiling), and so does a full close.
   phoneSheetPx: number | null;
   // How many px of the CANVAS each side is covered by an open rail sheet, left and right (0 =
   // nothing covering that side). Below 1100px the rails stop sitting BESIDE the canvas and become

@@ -96,6 +96,20 @@ export function usePulseWindow(key: unknown): { pulse: number; live: boolean } {
 // on every user-driven change (tap-open, tap-active-to-collapse, Escape) either way; in controlled
 // mode the caller is responsible for feeding that back into the store field. Uncontrolled
 // (tablet's two independent edge docks) keeps owning its own `open` exactly as before.
+
+/** How much of the phone's viewport the BOTTOM SECTION may take — the dock bar and the sheet
+ *  above it, together (user, 2026-10-04: "don't make the bottom section any larger than let's
+ *  say 60% of the view so that there is always room for the scene to show"). */
+const SECTION_MAX = 0.6;
+/** The tallest the phone sheet may stand: the section's share of the viewport, less the dock bar
+ *  the sheet sits on. The bar's height is read back from the sheet's own `bottom` (it is anchored
+ *  at `--phone-dock-h`, which carries the safe-area inset and so has no number to restate here);
+ *  the fallback is that token's base, for the one frame before the sheet is in the document. */
+function sectionCeilingPx(sheet: HTMLElement | null): number {
+  const dock = (sheet ? parseFloat(getComputedStyle(sheet).bottom) : NaN) || 56;
+  return Math.round(window.innerHeight * SECTION_MAX) - dock;
+}
+
 export default function RailDock({
   side,
   label,
@@ -139,9 +153,10 @@ export default function RailDock({
    *  rest. Fixed width by construction, so the overflow the full tray caused cannot return. */
   trayCompact?: boolean;
   open?: boolean;
-  // Bottom-sheet drag (phone): the caller-held height override in px (null = the default 60vh)
-  // + its setter. Store-backed by BOTH phone docks (`store.phoneSheetPx`) so switching halves
-  // keeps the chosen height; the store resets it on full close (reopen = default). RailDock
+  // Bottom-sheet drag (phone): the caller-held height override in px + its setter — the
+  // finger's height WHILE A DRAG IS LIVE, null otherwise (the sheet then stands at its content's
+  // fit; a release clears it — 2026-10-04). Store-backed (`store.phoneSheetPx`) because the
+  // History tether re-measures against it. RailDock
   // stays store-free — it just reads/writes through these props.
   sheetPx?: number | null;
   onSheetPx?: (px: number | null) => void;
@@ -202,11 +217,12 @@ export default function RailDock({
   // DRAG-chosen height alone, and a drag wins over the fit until the sheet fully closes
   // (`phoneSheetPx` resets there, so every open re-fits). Height changes ride the sheet's own
   // 380ms spring transition below, so growth eases; the FIRST measure lands in a layout effect
-  // before paint, so opening never plays a 60vh→fit settle. CEILING AT THE EXPANDED SNAP
-  // (user, 2026-09-28: "for explore it's much smaller than the card") — the same
-  // viewport-minus-140 cap the drag's expanded detent uses, so a card fits whole whenever it
-  // can without covering the top bar, and only a card taller than that scrolls. The 60vh
-  // ceiling it replaced dated from the two-head chooser, when the sheet had little to show.
+  // before paint, so opening never plays a 60vh→fit settle. ONE CEILING, `sectionCeilingPx`
+  // (user, 2026-10-04: "don't make the bottom section any larger than let's say 60% of the
+  // view so that there is always room for the scene to show … the bottom section is scrollable
+  // so that should be fine"). It retires the 2026-09-28 ceiling at the expanded snap (~80% of
+  // the viewport, so a card fit whole): a card taller than the ceiling scrolls inside the
+  // sheet, and the scene above always keeps its share.
   // ⚠️ A CALLBACK REF AS STATE, not a ref — the same portal trap the canvas-cover publisher
   // below records: the sheet's content mounts a commit LATER than the `open` that reveals it,
   // so an effect keyed on `open` alone runs against null and fits nothing (measured: the sheet
@@ -290,7 +306,7 @@ export default function RailDock({
     // number, and its excess showed up as a band of dead glass under the last card).
     const CHROME = 46;
     const apply = () => {
-      const cap = Math.min(Math.round(window.innerHeight * 0.8), window.innerHeight - 140); // = expandedPx
+      const cap = sectionCeilingPx(fitEl.closest<HTMLElement>('[data-slot="sheet-content"]'));
       setFitPx(Math.min(cap, Math.max(170, fitEl.offsetHeight + CHROME)));
       // CONTENT THAT IS ITSELF ANIMATING IS FOLLOWED, NOT EASED (user, 2026-09-28: the card's
       // collapse "doesn't animate properly"). A card collapsing runs HeightEase's 650ms, and the
@@ -454,10 +470,12 @@ export default function RailDock({
   // so only the grabber (a dedicated ≥44px handle with `touch-action:none`) initiates a drag —
   // no drag/scroll arbitration needed. Pointer events, no dependency: capture on the grabber,
   // the sheet follows the finger live (height written through `onSheetPx`, transition suspended
-  // while dragging), release snaps to the NEAREST of dismissed / default (60vh, the CSS value) /
-  // expanded (~80vh, capped so the top bar stays visible). A fast downward flick (velocity over
-  // the last ~120ms) dismisses regardless of position. A plain tap (no real movement) keeps
-  // today's tap-to-collapse. Reduced motion: the snap is instant (the transition class is
+  // while dragging), and a release either DISMISSES or lets go: there is one resting height, the
+  // content's fit under `sectionCeilingPx`, so a release that does not dismiss clears the
+  // override and the sheet springs back to it (2026-10-04 — the expanded ~80vh detent went with
+  // the 60% ceiling, and the default detent with it: a second resting height had nothing left
+  // to be). A fast downward flick (velocity over the last ~120ms) dismisses regardless of
+  // position. A plain tap (no real movement) keeps today's tap-to-collapse. Reduced motion: the snap is instant (the transition class is
   // motion-reduce-suppressed); the drag itself is direct manipulation and stays.
   const [dragging, setDragging] = useState(false);
   // THE SPRING IS THE DRAG RELEASE'S ALONE (user, 2026-09-28: "the transition is just too
@@ -474,11 +492,9 @@ export default function RailDock({
   };
   useEffect(() => () => { if (snapT.current) clearTimeout(snapT.current); }, []);
   const drag = useRef<{ startY: number; startH: number; moved: boolean; samples: { t: number; y: number }[]; el: HTMLElement } | null>(null);
-  const expandedPx = () => Math.min(Math.round(window.innerHeight * 0.8), window.innerHeight - 140);
-  const defaultPx = () => Math.round(window.innerHeight * 0.6); // = the CSS h-[60vh]
   const MIN_PX = 90;
-  // Rubber-band past the detent range (user, 2026-08-15 — the native "final touches"): beyond
-  // [MIN_PX, expanded] the height keeps tracking with progressive resistance toward a short
+  // Rubber-band past the drag range (user, 2026-08-15 — the native "final touches"): beyond
+  // [MIN_PX, the ceiling] the height keeps tracking with progressive resistance toward a short
   // asymptote instead of hard-clamping, and the release snap pulls it back on the spring. Same
   // curve as RailPager's — identity-sloped at 0, never reaching the asymptote.
   const RUBBER_PX = 36;
@@ -507,7 +523,7 @@ export default function RailDock({
     if (Math.abs(dy) > 6) d.moved = true;
     if (!d.moved) return;
     const raw = d.startH + dy;
-    const max = expandedPx();
+    const max = sectionCeilingPx(d.el);
     const h = raw > max ? max + rubber(raw - max, RUBBER_PX) : raw < MIN_PX ? MIN_PX - rubber(MIN_PX - raw, RUBBER_PX) : raw;
     onSheetPx?.(Math.round(h));
     d.samples.push({ t: performance.now(), y: e.clientY });
@@ -525,25 +541,25 @@ export default function RailDock({
       return;
     }
     const h = d.el.getBoundingClientRect().height;
-    const def = defaultPx();
+    // The height the sheet rested at when the finger took it — what "well below" is measured from.
+    const rest = Math.min(d.startH, sectionCeilingPx(d.el));
     // Downward flick velocity (px/ms, positive = down) over the last ~120ms of the gesture.
     const now = performance.now();
     const past = d.samples.find((s) => now - s.t <= 120) ?? d.samples[0]!;
     const vy = (e.clientY - past.y) / Math.max(1, now - past.t);
-    // MOMENTUM-PROJECTED settle (user, 2026-08-15): the detent choice reads where the throw
-    // would land (~160ms of release velocity carried forward), not where the finger stopped —
-    // a medium downward toss from expanded now reaches default instead of springing back up.
-    // The hard flick-dismiss rule stays on top: a genuine throw down closes from anywhere.
+    // MOMENTUM-PROJECTED settle (user, 2026-08-15): the choice reads where the throw would land
+    // (~160ms of release velocity carried forward), not where the finger stopped. The hard
+    // flick-dismiss rule stays on top: a genuine throw down closes from anywhere.
     const hp = h - vy * 160;
-    if (vy > 0.5 || hp < def * 0.55) {
-      // Fast flick down, or projected to land well below the default → dismiss (same as retap).
+    if (vy > 0.5 || hp < rest * 0.55) {
+      // Fast flick down, or projected to land well below where it rested → dismiss (same as retap).
       onSheetPx?.(null);
       handleOpenChange(false);
       return;
     }
-    const exp = expandedPx();
+    // Not a dismiss: let go, and the sheet springs back to its content's fit.
     armSnap();
-    onSheetPx?.(Math.abs(hp - def) <= Math.abs(hp - exp) ? def : exp);
+    onSheetPx?.(null);
   };
   // A completed drag also fires a click on the grabber — swallow it so it doesn't re-collapse.
   const grabClick = (e: React.MouseEvent) => {
@@ -754,9 +770,8 @@ export default function RailDock({
         <SheetContent
           ref={setSheetEl}
           side={sheetSide ?? side}
-          // Drag-chosen height override (phone bottom sheet): inline height + unlocked max-height
-          // (the CSS caps at 72vh, below the expanded snap). Cleared back to the 60vh default when
-          // `sheetPx` is null.
+          // The phone bottom sheet's height is always stated inline — the finger's while a drag
+          // is live (`sheetPx`), else the content's fit — and both stay under `sectionCeilingPx`.
           style={heightPx != null ? { ...style, height: heightPx, maxHeight: "none" } : style}
           overlay={false}
           // The HUD's step-back while the camera moves (`useSceneYield`). Both tiers yield to the

@@ -930,14 +930,18 @@ inline with their `RailThread` siblings; tablet (700–1099px) collapses them to
 vitals band, which CLIPS its paint by their published `sceneCover`, see the band bullet); phone
 (<700px) has a persistent bottom bar — Explore | Vitals | Details thirds where the view has a
 vitals lane, halves elsewhere (`barGeom`; the icon trays compact to one unseen-update dot at
-thirds) — and ONE sheet at a time, with grabber drag-resize and flick-dismiss. **An open sheet
+thirds) — and ONE sheet at a time, with a grabber that drags and flick-dismisses. **The bottom
+section (dock bar + sheet) never takes more than 60% of the viewport** (user, 2026-10-04 — "so
+that there is always room for the scene to show"; `RailDock`'s `sectionCeilingPx`): the sheet has
+ONE resting height, its content's fit under that ceiling, a taller card scrolls inside it, and a
+drag that does not dismiss springs back — the ~80% expanded detent is retired. **An open sheet
 shifts the scene up into the band above it** (2026-09-28): the dock publishes its target height as
 a bottom cover (`sceneCoverBExplore` / `sceneCoverBDetails` / `sceneCoverBVitals`, one per dock because their exits lag)
 and the Engine eases a projection offset — `camera.setViewOffset`, never a camera move, so every
 pose, the callout, the chart planes and picking follow — by half the cover
 (`domain/sheetShift.ts`). Shift only, no zoom. The sheet GROWS out
 of the dock (a height transition from a zero armed on the open flip — the content mounts a commit
-later, the portal trap), fits its content live (drag wins until close), and shrinks back on a
+later, the portal trap), fits its content live, and shrinks back on a
 render-phase-derived exit. Dismissing a sheet only collapses it — it does not clear the selection.
 On phone the Explore card opens EXPANDED like everywhere else (2026-09-28 — it opened collapsed
 while the About card shared the sheet, as a two-head chooser; one card has nothing to choose
