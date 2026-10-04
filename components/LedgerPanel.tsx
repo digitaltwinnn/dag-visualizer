@@ -391,7 +391,10 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           // does unfiltered, so it keeps the default cyan; a tick the committed network anchored
           // into takes that network's hue. Colour plus the faint row below, never colour alone.
           share: v != null ? v / maxTick : undefined,
-          hue: filterNet && count > 0 ? filterNet.hue : "var(--primary)",
+          // …and under a filter a tick it did NOT anchor into steps back to a MUTED cyan (user,
+          // 2026-10-04: "a bit more muted, like we do in the scene") — the scene's neutral trail,
+          // in bar form. Unfiltered, every bar keeps the full accent.
+          hue: !filterNet ? "var(--primary)" : count > 0 ? filterNet.hue : "color-mix(in oklch, var(--primary) 40%, var(--muted-foreground))",
           // Absent = the dash, never a number derived from another (rule 10).
           figure: tickMeasure(ledgerMeasure, d, snapshotExact[d.ordinal]),
           on,
