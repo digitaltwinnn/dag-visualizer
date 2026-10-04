@@ -646,6 +646,8 @@ export default function RailDock({
         // ExploreRail's and Inspector's); their mutual exclusion stays where it was, in the shared
         // controlled `open` (`store.phoneDock`), which RailDock never owned anyway.
         <ToggleGroup
+          // The phone callout's floor (CalloutSync reads this bar's top edge).
+          data-phone-dock=""
           type="single"
           value={open ? "open" : ""}
           onValueChange={(v) => handleOpenChange(v === "open")}

@@ -3,7 +3,7 @@ import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
 import type { CohortSel } from "./domain/focusLadder";
 import type { Mode } from "@/src/store/store";
 import { breakpointOf } from "@/src/data/breakpoint";
-import { calloutHangs, calloutPlacement, CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET } from "./domain/calloutPlacement";
+import { calloutHangs, calloutPhonePlacement, calloutPlacement, CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET } from "./domain/calloutPlacement";
 import { R as GEO_R, LAND_H, latLonToVec3 } from "./domain/geoLayout";
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { UNLISTED_ID } from "@/src/data/unlistedId";
@@ -40,6 +40,8 @@ export interface CalloutState {
   cohort: CohortSel | null;
   sceneCoverL: number;
   sceneCoverR: number;
+  /** The open PHONE sheet's height above the dock bar (the tallest of the three bottom covers). */
+  sceneCoverB: number;
 }
 
 /** The engine-side values the anchors need. Bound once — these are stable object refs plus
@@ -107,16 +109,14 @@ export class CalloutSync {
   // component independently declines to render the same cases from store state, so `data-on` is
   // belt on top of braces, never the only gate.
   //
-  // NOT ON A PHONE (user, 2026-08-18 — "drop the callout when in mobile mode"). The label's whole
-  // value is CO-LOCATION with its subject, and under 700px the ~298px reach can't deliver it:
-  // shortening the leader parks the panel ON the thing it points at, clamping points it sideways
-  // at nothing — both keep the pixels and throw the meaning away. It is the same judgement the
-  // view already makes for a distributed subject (a filtered fleet gets no callout, because "a
-  // single anchor would lie about where it is"); a callout that cannot say WHERE is not a smaller
-  // callout, it is a wrong one. Nothing is lost that isn't one tap away — the phone's Details
-  // sheet carries the box and the dock's icon tray announces when it updates. `breakpointOf` is
-  // the ONE home for the tier (the component gates on the same call through `useBreakpoint`), so
-  // the two owners cannot drift apart at the boundary.
+  // ON A PHONE THE LABEL STANDS STRAIGHT ABOVE ITS SUBJECT (user, 2026-10-04 — reversing
+  // 2026-08-18's "drop the callout when in mobile mode": "it should fit, can also shorten the line").
+  // The old ruling's reason still governs: a label's value is CO-LOCATION, and the diagonal
+  // standoff could only point sideways at nothing under 700px. Vertically it can't: the panel is
+  // centred over the anchor and nudged inward at an edge, on a short leader that runs straight
+  // into the subject (`calloutPhonePlacement`, tested), inside the canvas the open sheet leaves.
+  // `breakpointOf` is the ONE home for the tier (the component reads the same call through
+  // `useBreakpoint`), so the two owners cannot drift apart at the boundary.
   private _syncCallout(): void {
     const el = document.getElementById("callout");
     // THE SECOND ANCHOR (user, 2026-10-03: "2 callouts"). In Snapshots a committed metagraph
@@ -134,8 +134,8 @@ export class CalloutSync {
       // arrival, the commit flight included; the view transition above is the other half).
       // A SAME-SUBJECT flight is exempt (see the host field): nothing is arriving, only the
       // camera leans, and the label tracks its unchanged subject per frame.
-      (!this.h.flyingNow() || this.h.sameSubjectFlight()) &&
-      breakpointOf(window.innerWidth) !== "phone";
+      (!this.h.flyingNow() || this.h.sameSubjectFlight());
+    const phone = breakpointOf(window.innerWidth) === "phone";
     if (el) {
       const v = this._calloutV;
       const on =
@@ -145,8 +145,9 @@ export class CalloutSync {
           : this.h.mode === "ledger"
             ? this._ledgerCalloutAnchor(v)
             : this._hyperCalloutAnchor(v)) &&
-        this._placeCallout(el, v);
-      if (on) this._syncCalloutMulti(el, this._placedX, this._placedY, this._placedRect, this._placedFlip, this._placedDrop);
+        this._placeCallout(el, v, false, phone);
+      // No multi-leader on a phone: its legs fan from the diagonal standoff's corner.
+      if (on && !phone) this._syncCalloutMulti(el, this._placedX, this._placedY, this._placedRect, this._placedFlip, this._placedDrop);
       else this._syncCalloutMulti(el, 0, 0, null, false, false);
       // Guard on the ELEMENT's own attribute, not a cached flag: React remounts the wrapper on a
       // subject change (fresh data-on="0"), so a field would go stale exactly then.
@@ -155,7 +156,7 @@ export class CalloutSync {
     }
     if (el2) {
       const v = this._calloutV2;
-      const on = allowed && this.h.mode === "ledger" && this._ledgerGlobalAnchor(v) && this._placeCallout(el2, v, true);
+      const on = allowed && this.h.mode === "ledger" && this._ledgerGlobalAnchor(v) && this._placeCallout(el2, v, true, phone);
       const flag = on ? "1" : "0";
       if (el2.dataset.on !== flag) el2.dataset.on = flag;
     }
@@ -171,7 +172,7 @@ export class CalloutSync {
 
   /** Project a WORLD anchor to the screen and write one callout's transform and flips. False
    *  when the point is behind the camera or the panel has no room on either side. */
-  private _placeCallout(el: HTMLElement, v: THREE.Vector3, hangs = false): boolean {
+  private _placeCallout(el: HTMLElement, v: THREE.Vector3, hangs = false, phone = false): boolean {
     v.applyMatrix4(this.h.ctx.camera.matrixWorldInverse); // world → view (camera looks −z)
     if (v.z > -0.1) return false; // behind (or grazing) the camera plane
     v.applyMatrix4(this.h.ctx.camera.projectionMatrix); // view → NDC (w-divide included)
@@ -188,6 +189,8 @@ export class CalloutSync {
     // open sheets measured off themselves (0 on desktop and phone, so this is a no-op there).
     const bandL = r.left + this.st.sceneCoverL;
     const bandR = r.right - this.st.sceneCoverR;
+    if (phone) return this._placePhone(el, x, y, r, bandL, bandR);
+    if (el.dataset.phone != null) delete el.dataset.phone;
     // THE GLOBAL SNAPSHOT'S LABEL HANGS (`calloutHangs`, with its test): below-left of the bar,
     // on the standing label's own diagonal turned half a circle, where the strip under the floor
     // has room for it. Where it has not, the label stands as every callout does.
@@ -221,6 +224,43 @@ export class CalloutSync {
     return true;
   }
 
+  /** The phone's placement: straight above (or below) the anchor, centred and clamped into the
+   *  band, between the command bar and the open sheet. The panel's size is measured — its content
+   *  varies by subject — and re-read on the bounds clock, not per frame. */
+  private _placePhone(el: HTMLElement, x: number, y: number, r: DOMRect, bandL: number, bandR: number): boolean {
+    if (this._ppEl !== el || this._ppIn-- <= 0) {
+      const panel = el.querySelector<HTMLElement>(".co-panel");
+      this._ppEl = el;
+      this._ppIn = 30;
+      this._ppW = panel ? panel.offsetWidth : 0;
+      this._ppH = panel ? panel.offsetHeight : 0;
+    }
+    if (!this._ppW) return false;
+    const bottom = this._phoneBottom() - this.st.sceneCoverB;
+    const p = calloutPhonePlacement(x, y, bandL, bandR, Math.max(r.top, this._freeTop()), bottom, this._ppW, this._ppH);
+    if (!p.show) return false;
+    el.style.transform = `translate3d(${x.toFixed(1)}px, ${y.toFixed(1)}px, 0)`;
+    if (el.dataset.phone == null) el.dataset.phone = "";
+    if (el.dataset.flip != null) delete el.dataset.flip;
+    if (el.dataset.hang != null) delete el.dataset.hang;
+    if ((el.dataset.drop != null) !== p.drop) {
+      if (p.drop) el.dataset.drop = "";
+      else delete el.dataset.drop;
+    }
+    const left = `${Math.round(p.left)}px`;
+    if (el.style.getPropertyValue("--co-left") !== left) el.style.setProperty("--co-left", left);
+    this._placedX = x;
+    this._placedY = y;
+    this._placedRect = r;
+    this._placedFlip = false;
+    this._placedDrop = p.drop;
+    return true;
+  }
+  private _ppEl: HTMLElement | null = null;
+  private _ppIn = 0;
+  private _ppW = 0;
+  private _ppH = 0;
+
   // Where the free canvas ends: the bottom band's top edge, less a little air, or the viewport's
   // where no band is up (SCENE presentation, a view without one). The band is React's, so this
   // is a DOM read — taken every thirtieth call rather than every frame, since the band moves
@@ -235,6 +275,14 @@ export class CalloutSync {
     this._bottom = (band ? band.getBoundingClientRect().top : window.innerHeight) - 4;
     const bar = document.getElementById("topbar");
     this._top = bar ? bar.getBoundingClientRect().bottom : 0;
+    // The phone dock bar's top edge (the sheet, when open, stands on it — `sceneCoverB`).
+    const dock = document.querySelector("[data-phone-dock]");
+    this._dockTop = (dock ? dock.getBoundingClientRect().top : window.innerHeight) - 4;
+  }
+  private _dockTop = 0;
+  private _phoneBottom(): number {
+    this._bounds();
+    return this._dockTop;
   }
   private _freeBottom(): number {
     this._bounds();

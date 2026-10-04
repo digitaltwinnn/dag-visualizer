@@ -15,10 +15,11 @@ import { join } from "node:path";
 //  3. `SCENE_GLASS` (components/selection.tsx, the shared-recipe home) is the ONE container
 //     for scene-anchored labels: SceneCallout and Tooltip both wear it (user, 2026-08-15 —
 //     "align the hover and the click card"). Neither may re-grow its own glass recipe.
-//  4. BOTH owners decline on a PHONE, through `breakpointOf`'s one home (the component via
-//     `useBreakpoint`, CalloutSync directly). The callout's value is co-location with its
-//     subject and its ~298px reach cannot deliver that under 700px; a hard-coded width in
-//     either owner would let the DOM and the placement disagree about where the tier ends.
+//  4. BOTH owners read the PHONE tier through `breakpointOf`'s one home (the component via
+//     `useBreakpoint`, CalloutSync directly). Since 2026-10-04 the phone gets its own variant
+//     rather than no callout — the component a compact, dismissible panel, the sync a label
+//     straight above its subject (`calloutPhonePlacement`) — and a hard-coded width in either
+//     owner would let the DOM and the placement disagree about where the tier ends.
 
 const ROOTS = ["components", "src", "app"];
 // The engine-side home moved out of Engine.ts into CalloutSync.ts (2026-08-31) — the placement
@@ -72,14 +73,14 @@ describe("subject-callout boundary", () => {
     }
   });
 
-  it("both callout owners decline on a phone through the shared breakpoint home", () => {
+  it("both callout owners read the phone tier through the shared breakpoint home", () => {
     for (const home of CALLOUT_HOMES) {
       const code = stripComments(read(home));
       expect(
         /breakpointOf|useBreakpoint/.test(code),
         `${home} must read the tier from src/data/breakpoint (directly or via useBreakpoint) — a hard-coded width lets the two owners disagree about where the phone tier ends`,
       ).toBe(true);
-      expect(code.includes('"phone"'), `${home} no longer declines the callout on the phone tier`).toBe(true);
+      expect(code.includes('"phone"'), `${home} no longer answers the phone tier — its variant must be decided from the shared breakpoint`).toBe(true);
     }
   });
 });

@@ -119,3 +119,45 @@ export function calloutHangs(x: number, y: number, bandL: number, bandR: number,
   if (!(bandR > bandL) || x < bandL || x > bandR) return false;
   return x - CALLOUT_HANG_REACH_X >= bandL && y + CALLOUT_HANG_REACH_Y <= bottom;
 }
+
+// ---- the phone label ------------------------------------------------------------------------
+//
+// A PHONE STANDS THE LABEL STRAIGHT ABOVE ITS SUBJECT (user, 2026-10-04 — reversing 2026-08-18's
+// "drop the callout when in mobile mode": "it should fit, can also shorten the line … add an x").
+// The diagonal standoff cannot fit: a ~200px panel beside its anchor leaves the label only near the
+// screen's edges. Above the anchor it always fits horizontally — centred, nudged inward at an edge —
+// and the leader runs vertically into the subject, so it still says WHERE, which is what the old
+// ruling was protecting. Same factor family as the hanging label: one number shortens the leader.
+
+/** The phone leader's length, as a share of the standing standoff's height. `app/globals.css`
+ *  mirrors it (`--co-k` under `[data-phone]`) — change both or neither. */
+export const CALLOUT_PHONE_K = 0.4;
+const PHONE_AIR = 8;
+
+/**
+ * Where the phone label stands for an anchor at `(x, y)`: `left` is the panel's left edge relative
+ * to the anchor (centred, then clamped into the band with `PHONE_AIR` to spare); `drop` puts it
+ * below. `top`/`bottom` bound the free canvas — the command bar and the open sheet's top edge. The
+ * panel's measured size comes in, because its content (and so its width) varies by subject.
+ */
+export function calloutPhonePlacement(
+  x: number,
+  y: number,
+  bandL: number,
+  bandR: number,
+  top: number,
+  bottom: number,
+  panelW: number,
+  panelH: number,
+): { show: boolean; drop: boolean; left: number } {
+  const hidden = { show: false, drop: false, left: 0 };
+  if (!(bandR > bandL) || x < bandL || x > bandR || y < top || y > bottom) return hidden;
+  const reach = Math.round(CALLOUT_OFF_Y * CALLOUT_PHONE_K) + panelH;
+  const above = y - reach >= top;
+  const below = y + reach <= bottom;
+  if (!above && !below) return hidden;
+  const lo = bandL + PHONE_AIR - x;
+  const hi = bandR - PHONE_AIR - panelW - x;
+  const left = Math.max(lo, Math.min(hi, -panelW / 2));
+  return { show: true, drop: !above, left };
+}

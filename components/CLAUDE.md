@@ -1588,6 +1588,14 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
   portals its content), so the cover is published off a callback REF, not an effect keyed on `open`
   — keyed on `open` it measures a null node and publishes 0 forever, which passes tsc and vitest
   and fails only in the browser.
+- **A phone gets ONE compact label STRAIGHT ABOVE its subject** (user, 2026-10-04, reversing the
+  2026-08-18 phone decline: "it should fit, can also shorten the line … perhaps add an x"). The
+  diagonal standoff could only point sideways at nothing under 700px; a vertical leader still says
+  WHERE. `calloutPhonePlacement` (tested) centres the panel over the anchor, nudges it inward at an
+  edge, and drops it below when the command bar leaves no room — inside the canvas the dock bar
+  (`[data-phone-dock]`) and the open sheet (`sceneCoverB`) leave. SceneCallout draws the leader as
+  its own vertical line at `CALLOUT_PHONE_K`, keeps the head only (no lead row), shows one label
+  where Snapshots shows a pair, and carries an × that hides the label until the subject changes.
 - **Furniture labels are sparse by review**: geo's hosting-country names (the set states where the
   network runs — empty countries staying nameless is information) are the only ones standing. Hyper's
   hub tickers AND its "Global L0" were built and removed the same day (clutter over what hues,

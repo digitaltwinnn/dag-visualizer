@@ -36,6 +36,8 @@
 //   anchor would lie about where it is.
 // - ledger: the pinned metagraph snapshot's own tile (rewind included), else the committed
 //   global tick's byte-bar lead.
+import { useState } from "react";
+import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
@@ -55,7 +57,7 @@ import { nodeStatus } from "@/src/data/nodeStatus";
 import { useNowTick } from "@/components/useNowTick";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { relativeAge } from "@/src/util/relativeAge";
-import { CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET } from "@/src/engine/domain/calloutPlacement";
+import { CALLOUT_OFF_X, CALLOUT_OFF_Y, CALLOUT_LEG_INSET, CALLOUT_PHONE_K } from "@/src/engine/domain/calloutPlacement";
 import type { GeoInfo } from "@/src/data/types";
 import LiveDot from "@/components/LiveDot";
 import { IDENT_INK } from "@/components/identInk";
@@ -128,7 +130,7 @@ const geoOf = (p: { kind: string }): GeoInfo | undefined =>
 /** The callout PANEL alone — the eyebrow / title+aside / lead grammar on SCENE_GLASS — shared
  *  with the LiveStrip's bar hover (user, 2026-08-16: "fully re-use the one from the scene"),
  *  which wraps it in its own cursor-follow box instead of the Engine-anchored `.co-panel`. */
-export function CalloutPanel({ m, className }: { m: CalloutModel; className?: string }) {
+export function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?: string; onDismiss?: () => void }) {
   return (
     <div key={m.key} className={cn("roll-in whitespace-nowrap", SCENE_GLASS, className)}>
       {/* The identity EDGE SPINE (user, 2026-08-15 — "the rails/hairline effect on the left
@@ -159,6 +161,20 @@ export function CalloutPanel({ m, className }: { m: CalloutModel; className?: st
             {m.aside.text}
           </span>
         ) : null}
+        {/* THE PHONE'S × (user, 2026-10-04): hides this label until the subject changes. The one
+            control on a pointer-inert label, so it opts back into the pointer; out of the tab
+            order because the label is aria-hidden — it mirrors the card, which keyboard and
+            screen-reader users have whole. A thumb-sized hit area around a quiet glyph. */}
+        {onDismiss && (
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={onDismiss}
+            className="pointer-events-auto relative -my-1 -mr-1.5 ml-1 flex size-6 flex-none items-center justify-center rounded-md text-muted-foreground after:absolute after:-inset-2.5 after:content-['']"
+          >
+            <X aria-hidden className="size-3.5" />
+          </button>
+        )}
       </div>
       {/* The card grammar's HEAD HAIRLINE at callout scale (user, 2026-08-15 — "cards have an
           underline between header and the rest"): it divides the HEAD (eyebrow + title, whose
@@ -237,11 +253,16 @@ export default function SceneCallout() {
   // says rather than a bare clock glyph). The card keeps the BUTTON (follow toggle); this is
   // read-only.
   const now = useNowTick(1000);
-  // NOT ON A PHONE (user, 2026-08-18) — the reasoning lives with the Engine's mirrored gate in
-  // `_syncCallout`: the label's value is co-location, and under 700px the panel's reach can't
-  // deliver it. `breakpointOf` is the one home for the tier, so both owners answer the same call.
+  // ON A PHONE, ONE COMPACT LABEL STRAIGHT ABOVE ITS SUBJECT (user, 2026-10-04 — reversing
+  // 2026-08-18's phone decline: "it should fit, can also shorten the line … perhaps add an x").
+  // The placement is CalloutSync's (`calloutPhonePlacement`); here the phone variant keeps the head
+  // only (no lead row), shows one label rather than Snapshots' pair, and carries an × that hides
+  // the label until the subject changes. `breakpointOf` is the one home for the tier (through
+  // `useBreakpoint`), so both owners answer the same call.
   const bp = useBreakpoint();
-  if (!VIEW_POLICIES[mode].callout || section !== "scene" || bp === "phone") return null;
+  const phone = bp === "phone";
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  if (!VIEW_POLICIES[mode].callout || section !== "scene") return null;
 
   // The committed NODE's model — shared by hyper and geo (user, 2026-08-15: in hyper too, "the
   // node does not have its callout — clickable, has a card"). Titled by its id like the node
@@ -489,12 +510,22 @@ export default function SceneCallout() {
       m2 = gsModel();
     }
   }
+  if (phone) {
+    // One label on a phone — the subject's, else the global snapshot's — head only, and gone
+    // once dismissed for THIS subject (a new subject's key brings it back).
+    if (m) m2 = null;
+    if (m) m = { ...m, lead: undefined };
+    if (m2) m2 = { ...m2, lead: undefined };
+    if (m && m.key === dismissed) m = null;
+    if (m2 && m2.key === dismissed) m2 = null;
+  }
   if (!m && !m2) return null;
+  const dismiss = phone ? (key: string) => setDismissed(key) : undefined;
 
   return (
     <>
-      {m && <CalloutMark m={m} id="callout" multi />}
-      {m2 && <CalloutMark m={m2} id="callout-2" />}
+      {m && <CalloutMark m={m} id="callout" multi onDismiss={dismiss} />}
+      {m2 && <CalloutMark m={m2} id="callout-2" onDismiss={dismiss} />}
     </>
   );
 }
@@ -503,7 +534,15 @@ export default function SceneCallout() {
  *  `id` is the marker the engine queries (`callout` for the subject, `callout-2` for the global
  *  snapshot in Snapshots); `multi` mounts the hyper node's extra legs, which only the subject's
  *  callout ever draws. */
-function CalloutMark({ m, id, multi }: { m: Model; id: "callout" | "callout-2"; multi?: boolean }) {
+function CalloutMark({ m, id, multi, onDismiss }: { m: Model; id: "callout" | "callout-2"; multi?: boolean; onDismiss?: (key: string) => void }) {
+  // The leader's two ends in the anchor's frame. On a PHONE it runs STRAIGHT UP into the panel
+  // standing over the subject (`calloutPhonePlacement`), drawn as its own vertical line — scaling
+  // the diagonal flat also flattened the draw-on mask to nothing, so the leader never showed.
+  // The phone variant is the one with a dismiss (SceneCallout hands it only there).
+  const phone = onDismiss != null;
+  const sx = phone ? 0 : 6;
+  const ex = phone ? 0 : CALLOUT_OFF_X;
+  const ey = phone ? -(Math.round(CALLOUT_OFF_Y * CALLOUT_PHONE_K) - CALLOUT_LEG_INSET) : -(CALLOUT_OFF_Y - CALLOUT_LEG_INSET);
   // One mask per mark: an SVG `url(#…)` resolves to the FIRST element with that id in the
   // document, so two marks sharing one id would both be revealed by the first one's draw.
   const maskId = `${id}-draw-mask`;
@@ -550,9 +589,9 @@ function CalloutMark({ m, id, multi }: { m: Model; id: "callout" | "callout-2"; 
           <mask id={maskId} maskUnits="userSpaceOnUse" x={-20} y={-CALLOUT_OFF_Y - 40} width={CALLOUT_OFF_X + 60} height={CALLOUT_OFF_Y + 60}>
             <line
               className="co-draw"
-              x1={CALLOUT_OFF_X}
-              y1={-(CALLOUT_OFF_Y - CALLOUT_LEG_INSET)}
-              x2={6}
+              x1={ex}
+              y1={ey}
+              x2={sx}
               y2={-6}
               pathLength={1}
               stroke="white"
@@ -564,10 +603,10 @@ function CalloutMark({ m, id, multi }: { m: Model; id: "callout" | "callout-2"; 
               paper. Ground colour, so it is a dark line here and a pale one there. */}
           <line
             mask={`url(#${maskId})`}
-            x1={6}
+            x1={sx}
             y1={-6}
-            x2={CALLOUT_OFF_X}
-            y2={-(CALLOUT_OFF_Y - CALLOUT_LEG_INSET)}
+            x2={ex}
+            y2={ey}
             stroke="var(--background)"
             strokeOpacity="0.6"
             strokeWidth="3.5"
@@ -575,10 +614,10 @@ function CalloutMark({ m, id, multi }: { m: Model; id: "callout" | "callout-2"; 
           />
           <line
             mask={`url(#${maskId})`}
-            x1={6}
+            x1={sx}
             y1={-6}
-            x2={CALLOUT_OFF_X}
-            y2={-(CALLOUT_OFF_Y - CALLOUT_LEG_INSET)}
+            x2={ex}
+            y2={ey}
             style={LEADER_STROKE}
             strokeWidth="1.5"
             strokeDasharray="4 4"
@@ -606,7 +645,7 @@ function CalloutMark({ m, id, multi }: { m: Model; id: "callout" | "callout-2"; 
       {/* The panel — keyed by subject so the roll-in replays on a change, like a card title. */}
       {/* Position lives in globals.css (`.co-panel` + the data-flip/data-drop mirrors the
           Engine toggles near viewport edges) — inline left/bottom would beat the flip rules. */}
-      <CalloutPanel m={m} className="co-panel absolute" />
+      <CalloutPanel m={m} className="co-panel absolute" onDismiss={onDismiss ? () => onDismiss(m.key) : undefined} />
     </div>
   );
 }

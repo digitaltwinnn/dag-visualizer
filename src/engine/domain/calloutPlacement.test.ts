@@ -8,8 +8,10 @@ import {
   CALLOUT_HANG_K,
   CALLOUT_HANG_REACH_X,
   CALLOUT_HANG_REACH_Y,
+  CALLOUT_PHONE_K,
   calloutHangs,
   calloutPlacement,
+  calloutPhonePlacement,
 } from "./calloutPlacement";
 
 // The band the three supported tiers actually present, so the cases below read as real geometry
@@ -152,5 +154,34 @@ describe("calloutHangs — the second Snapshots label, below-left of its bar", (
   it("mirrors the factor app/globals.css hardcodes", () => {
     // :is(#callout, #callout-2)[data-hang] { --co-k: 0.55 } — change both or neither.
     expect(CALLOUT_HANG_K).toBe(0.55);
+  });
+});
+
+describe("calloutPhonePlacement — the label straight above its subject", () => {
+  // A phone has no room for the diagonal standoff: a 200px panel beside its anchor fits only near
+  // an edge. So the label stands DIRECTLY over its subject on a short vertical leader, centred on
+  // it and nudged to stay on screen (user, 2026-10-04: "it should fit, can also shorten the line").
+  // A leader pointing straight down at its subject still says WHERE — the reason the phone used to
+  // get no callout at all was a panel that could only point sideways at nothing.
+  const W = 390, TOP = 64, BOTTOM = 500, PW = 180, PH = 56;
+  const rise = Math.round(CALLOUT_OFF_Y * CALLOUT_PHONE_K);
+  const place = (x: number, y: number) => calloutPhonePlacement(x, y, 0, W, TOP, BOTTOM, PW, PH);
+
+  it("centres the panel over a subject in the middle", () => {
+    const p = place(195, 300);
+    expect(p).toEqual({ show: true, drop: false, left: -PW / 2 });
+  });
+  it("nudges the panel inside the band near an edge, keeping 8px of air", () => {
+    expect(place(20, 300).left).toBe(8 - 20);
+    expect(place(380, 300).left).toBe(W - 8 - PW - 380);
+  });
+  it("drops below a subject too close to the top bar", () => {
+    const y = TOP + rise + PH - 1;
+    expect(place(195, y)).toMatchObject({ show: true, drop: true });
+  });
+  it("hides when neither above nor below has room, or the subject is under the sheet", () => {
+    expect(calloutPhonePlacement(195, 150, 0, W, TOP, 200, PW, PH).show).toBe(false);
+    expect(place(195, BOTTOM + 10).show).toBe(false);
+    expect(place(-5, 300).show).toBe(false);
   });
 });

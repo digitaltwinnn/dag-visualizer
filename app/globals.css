@@ -406,6 +406,14 @@
 :is(#callout, #callout-2)[data-drop] .co-scale { transform: scale(var(--co-k), calc(-1 * var(--co-k))); }
 :is(#callout, #callout-2)[data-flip][data-drop] .co-scale { transform: scale(calc(-1 * var(--co-k))); }
 :is(#callout, #callout-2) .co-scale > line { vector-effect: non-scaling-stroke; }
+/* THE PHONE LABEL (2026-10-04, `calloutPhonePlacement`): straight above its subject on a short
+   VERTICAL leader, which SceneCallout draws at its own length (`CALLOUT_PHONE_K`, mirrored here as
+   `--co-k` for the panel's standoff — change both or neither), so the leader takes no scale; a
+   dropped label mirrors it below. The panel's left edge is the sync's `--co-left` (centred, clamped). */
+:is(#callout, #callout-2)[data-phone] { --co-k: 0.4; }
+:is(#callout, #callout-2)[data-phone] .co-panel { left: var(--co-left, 0px); right: auto; }
+:is(#callout, #callout-2)[data-phone] .co-scale { transform: none; }
+:is(#callout, #callout-2)[data-phone][data-drop] .co-scale { transform: scale(1, -1); }
 
 /* THE ENTRANCE CHOREOGRAPHY (user, 2026-09-05 — "the dotted line is already drawn before the
    animation"): panel rolls in → the leader DRAWS from the panel corner toward the anchor →
