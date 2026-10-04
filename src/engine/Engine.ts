@@ -2420,8 +2420,11 @@ export class Engine {
       // this cap — see SceneContext's dofParams note); raised 0.08 → 0.16 (user 2026-07-17:
       // more background separation while focused), then eased back to 0.10 (user 2026-09-26:
       // "the blur / focus effect in hyper view is a bit too strong") — the background still
-      // falls off, but a hub behind the focused one stays a hub rather than a smear.
-      this.ctx.dof.uniforms["maxblur"].value = 0.10 * dofMix;
+      // falls off, but a hub behind the focused one stays a hub rather than a smear — then up to
+      // 0.14 with the closer hub framing (`HUB_CLOSE` 0.75; user 2026-10-04: "a bit more fuzzy, but
+      // keep the selected metagraph clear"): nearer, the selection holds the sharp zone, so the
+      // background can take more blur without the subject paying for it. Still under 0.16.
+      this.ctx.dof.uniforms["maxblur"].value = 0.14 * dofMix;
     }
 
     this._syncCallout();
