@@ -16,9 +16,15 @@
 // wiring; what cannot drift is the look. The names keep "cabinet" so the three call sites and
 // their history read unchanged.
 
-/** The `TabsList` (variant "line" — the only one without a track behind it). */
+/** The `TabsList` (variant "line" — the only one without a track behind it).
+ *  ⚠️ THE LIST HUGS ITS TABS, SO THE ACCENT RULE LANDS ON THE BASELINE (user, 2026-10-04: "the
+ *  underline … is not positioned correctly"). The primitive sizes a horizontal list through a
+ *  group variant, `group-data-[orientation=horizontal]/tabs:h-9`, which outranks a plain `h-auto`
+ *  — so a 28px tab centred in 36px and its 2px rule floated 4px above the hairline it belongs on.
+ *  The override names the SAME variant (twMerge replaces it), and `items-end` keeps a tab on the
+ *  baseline whatever height a call site gives it. */
 export const CABINET_LIST =
-  "relative flex h-auto flex-none w-full justify-start gap-4 rounded-none p-0 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border";
+  "relative flex h-auto group-data-[orientation=horizontal]/tabs:h-auto items-end flex-none w-full justify-start gap-4 rounded-none p-0 after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-border";
 
 /** Every `TabsTrigger`. The primitive's own active underline and focus ring are replaced: the
  *  accent rule is drawn as a 2px background along the bottom (no layout, no pseudo to fight), and this app's focus
