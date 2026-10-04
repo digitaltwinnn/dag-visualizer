@@ -1604,7 +1604,10 @@ hued ticker, the anchor ring and the `.edge-spine`). The design rules the test c
   edge, and drops it below when the command bar leaves no room — inside the canvas the dock bar
   (`[data-phone-dock]`) and the open sheet (`sceneCoverB`) leave. SceneCallout draws the leader as
   its own vertical line at `CALLOUT_PHONE_K`, keeps the head only (no lead row), shows one label
-  where Snapshots shows a pair, and carries an × that hides the label until the subject changes.
+  where Snapshots shows a pair. **Every callout carries an × at its top-right, on every tier**
+  (user, 2026-10-04): it hides that label FOR ITS VIEW until the view's subject changes — keyed by
+  view and slot, so the same subject's label in another view stands, and a new selection brings
+  it back.
 - **Furniture labels are sparse by review**: geo's hosting-country names (the set states where the
   network runs — empty countries staying nameless is information) are the only ones standing. Hyper's
   hub tickers AND its "Global L0" were built and removed the same day (clutter over what hues,

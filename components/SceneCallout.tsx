@@ -132,7 +132,22 @@ const geoOf = (p: { kind: string }): GeoInfo | undefined =>
  *  which wraps it in its own cursor-follow box instead of the Engine-anchored `.co-panel`. */
 export function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?: string; onDismiss?: () => void }) {
   return (
-    <div key={m.key} className={cn("roll-in whitespace-nowrap", SCENE_GLASS, className)}>
+    <div key={m.key} className={cn("roll-in whitespace-nowrap", SCENE_GLASS, onDismiss && "pr-9", className)}>
+      {/* THE ×, TOP-RIGHT (user, 2026-10-04: "put the callout x button at the top right", then
+          "always"): hides this label for its view until that view's subject changes. The one
+          control on a pointer-inert label, so it opts back into the pointer; out of the tab order
+          because the label is aria-hidden — it mirrors the card, which keyboard and screen-reader
+          users have whole. A thumb-sized hit area around a quiet glyph. */}
+      {onDismiss && (
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={onDismiss}
+          className="pointer-events-auto absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-wash-hover hover:text-foreground after:absolute after:-inset-2 after:content-['']"
+        >
+          <X aria-hidden className="size-3.5" />
+        </button>
+      )}
       {/* The identity EDGE SPINE (user, 2026-08-15 — "the rails/hairline effect on the left
           side, attached", then "let it fade into the corners"): the sheets' single-identity-
           cue language at callout scale, as the shared `.edge-spine` recipe (globals.css) — a
@@ -161,20 +176,6 @@ export function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; cla
             {m.aside.text}
           </span>
         ) : null}
-        {/* THE PHONE'S × (user, 2026-10-04): hides this label until the subject changes. The one
-            control on a pointer-inert label, so it opts back into the pointer; out of the tab
-            order because the label is aria-hidden — it mirrors the card, which keyboard and
-            screen-reader users have whole. A thumb-sized hit area around a quiet glyph. */}
-        {onDismiss && (
-          <button
-            type="button"
-            tabIndex={-1}
-            onClick={onDismiss}
-            className="pointer-events-auto relative -my-1 -mr-1.5 ml-1 flex size-6 flex-none items-center justify-center rounded-md text-muted-foreground after:absolute after:-inset-2.5 after:content-['']"
-          >
-            <X aria-hidden className="size-3.5" />
-          </button>
-        )}
       </div>
       {/* The card grammar's HEAD HAIRLINE at callout scale (user, 2026-08-15 — "cards have an
           underline between header and the rest"): it divides the HEAD (eyebrow + title, whose
@@ -261,7 +262,11 @@ export default function SceneCallout() {
   // `useBreakpoint`), so both owners answer the same call.
   const bp = useBreakpoint();
   const phone = bp === "phone";
-  const [dismissed, setDismissed] = useState<string | null>(null);
+  // THE × CLOSES A LABEL FOR ITS VIEW AND SUBJECT (user, 2026-10-04: "add an x … always? … if you
+  // close it in that view it will be hidden until something in that view changes"). Keyed by view,
+  // so the same metagraph's label in another view stands; the value is the closed label's subject
+  // key, so a new selection (a new key) brings it back.
+  const [dismissed, setDismissed] = useState<Partial<Record<string, string>>>({});
   if (!VIEW_POLICIES[mode].callout || section !== "scene") return null;
 
   // The committed NODE's model — shared by hyper and geo (user, 2026-08-15: in hyper too, "the
@@ -511,21 +516,21 @@ export default function SceneCallout() {
     }
   }
   if (phone) {
-    // One label on a phone — the subject's, else the global snapshot's — head only, and gone
-    // once dismissed for THIS subject (a new subject's key brings it back).
+    // One label on a phone — the subject's, else the global snapshot's — head only.
     if (m) m2 = null;
     if (m) m = { ...m, lead: undefined };
     if (m2) m2 = { ...m2, lead: undefined };
-    if (m && m.key === dismissed) m = null;
-    if (m2 && m2.key === dismissed) m2 = null;
   }
+  // Closed for this view and subject (each Snapshots label has its own ×, so each is keyed).
+  if (m && dismissed[`${mode}|callout`] === m.key) m = null;
+  if (m2 && dismissed[`${mode}|callout-2`] === m2.key) m2 = null;
   if (!m && !m2) return null;
-  const dismiss = phone ? (key: string) => setDismissed(key) : undefined;
+  const dismiss = (slot: "callout" | "callout-2") => (key: string) => setDismissed((d) => ({ ...d, [`${mode}|${slot}`]: key }));
 
   return (
     <>
-      {m && <CalloutMark m={m} id="callout" multi onDismiss={dismiss} />}
-      {m2 && <CalloutMark m={m2} id="callout-2" onDismiss={dismiss} />}
+      {m && <CalloutMark m={m} id="callout" multi phone={phone} onDismiss={dismiss("callout")} />}
+      {m2 && <CalloutMark m={m2} id="callout-2" phone={phone} onDismiss={dismiss("callout-2")} />}
     </>
   );
 }
@@ -534,12 +539,10 @@ export default function SceneCallout() {
  *  `id` is the marker the engine queries (`callout` for the subject, `callout-2` for the global
  *  snapshot in Snapshots); `multi` mounts the hyper node's extra legs, which only the subject's
  *  callout ever draws. */
-function CalloutMark({ m, id, multi, onDismiss }: { m: Model; id: "callout" | "callout-2"; multi?: boolean; onDismiss?: (key: string) => void }) {
+function CalloutMark({ m, id, multi, phone, onDismiss }: { m: Model; id: "callout" | "callout-2"; multi?: boolean; phone?: boolean; onDismiss?: (key: string) => void }) {
   // The leader's two ends in the anchor's frame. On a PHONE it runs STRAIGHT UP into the panel
   // standing over the subject (`calloutPhonePlacement`), drawn as its own vertical line — scaling
   // the diagonal flat also flattened the draw-on mask to nothing, so the leader never showed.
-  // The phone variant is the one with a dismiss (SceneCallout hands it only there).
-  const phone = onDismiss != null;
   const sx = phone ? 0 : 6;
   const ex = phone ? 0 : CALLOUT_OFF_X;
   const ey = phone ? -(Math.round(CALLOUT_OFF_Y * CALLOUT_PHONE_K) - CALLOUT_LEG_INSET) : -(CALLOUT_OFF_Y - CALLOUT_LEG_INSET);
