@@ -312,9 +312,13 @@ export function GhostCard({ card, open = false, onToggle }: { card: RailCard; op
       data-ghost=""
       data-open={open ? "" : undefined}
       aria-label={`${label}: nothing selected yet`}
+      // ONE BOX IN BOTH STATES (user, 2026-10-04: "the ghost card flashes — header hides/shows and
+      // text jumps"): the same padding and the same 1px dashed border, transparent while folded, so
+      // opening changes the frame's COLOUR and the hint below — never where the name sits.
       className={cn(
         "rail-entry relative block w-auto pointer-events-auto min-h-0 flex-none text-foreground-dim",
-        open ? "mx-0 px-[18px] pt-2.5 pb-3 rounded-[var(--radius)] border border-dashed border-border" : "px-[18px] py-2",
+        "px-[18px] py-2 rounded-[var(--radius)] border border-dashed transition-colors duration-150 motion-reduce:transition-none",
+        open ? "border-border pb-3" : "border-transparent",
       )}
     >
       {/* THE WHOLE CARD IS THE TOGGLE (user, 2026-10-04: "the hint should be clickable as well to
@@ -338,10 +342,10 @@ export function GhostCard({ card, open = false, onToggle }: { card: RailCard; op
       </span>
       {/* FULL INK, NO OPACITY (design review 2026-10-02): the hint is the only text that says how to
           reach this rung, so it takes `--foreground-dim`, one step under a card's own copy, upright —
-          it is the card's body now, not an aside. It ARRIVES WITH THE BOX: the lane's HeightEase
-          keys its fade on the ghost's open state (`settleKey`), so the hint fades in on the very ease
-          that grows the frame instead of standing there before it (user, 2026-10-04). */}
-      {open && <p className="m-0 mt-1.5 pl-6 text-body text-foreground-dim">{card.hint}</p>}
+          it is the card's body now, not an aside. ONLY THE HINT ARRIVES (user, 2026-10-04, two rounds:
+          it stood at full size before the frame grew, then a whole-card fade blinked the header):
+          the lane's HeightEase grows the frame, and the hint alone fades in on the same tempo. */}
+      {open && <p className="ghost-hint-in m-0 mt-1.5 pl-6 text-body text-foreground-dim">{card.hint}</p>}
     </aside>
   );
 }
@@ -653,10 +657,6 @@ export default function Inspector() {
         // an entry and the box sits mid-pile) — both joints around it fell back to `--rail-gap`.
         const boxed = card.present && !effCollapsed(id);
         const tier = !card.present ? "ghost" : boxed ? "box" : "entry";
-        // What the slot SHOWS, for HeightEase's arrival: the tier, refined by a ghost's open state —
-        // an opening ghost is a new occupant (its hint arrives), so the hint fades in on the frame's
-        // own ease instead of standing there before it (user, 2026-10-04).
-        const settleTier = tier === "ghost" && ghostCx(id).open ? "ghost-open" : tier;
         // The materialized BOX carries the sibling pager + swipe — the plank is drawn on the card's
         // own bottom edge, so it must never ride a one-line entry. That's the whole gate: `boxed`,
         // not the focus rung. Single-open makes the box unique, and it can be ANY committed rung, so
@@ -694,7 +694,7 @@ export default function Inspector() {
                 very animation that resizes the slot. It used to be inferred — CSS keyframes
                 restarting because React swapped `.rail-entry` for `.ig-panel` — which made the
                 arrival an accident of reconciliation and put it on a second clock. */}
-            <HeightEase growIn={laneBooted.current && bp === "desktop"} settleKey={settleTier}>{wrapped}</HeightEase>
+            <HeightEase growIn={laneBooted.current && bp === "desktop"} settleKey={tier}>{wrapped}</HeightEase>
           </div>
         );
       })}

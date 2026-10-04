@@ -747,6 +747,13 @@
   border-bottom-right-radius: 0;
 }
 
+/* A GHOST'S HINT ARRIVES ON ITS OWN (2026-10-04): opening a ghost grows its frame through the
+   lane's HeightEase, and only the hint fades in, on the rail's roll tempo — the name above it never
+   moves or blinks. Reduced motion: the hint is simply there. */
+@keyframes ghostHintIn { from { opacity: 0; } to { opacity: 1; } }
+.ghost-hint-in { animation: ghostHintIn var(--tempo-roll) ease-out both; }
+@media (prefers-reduced-motion: reduce) { .ghost-hint-in { animation: none; } }
+
 /* THE PILE HAS AN EDGE (user, 2026-10-04: "the difference between a collapsed active card and a
    ghost card is not very clear … the fill or outline is too faint to distinguish it from the
    background/ghost cards"). An entry's only mark was its `--panel-solid` fill, which on dark sits
