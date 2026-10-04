@@ -1073,17 +1073,13 @@ function providerParts(rows: { pick: PickDescriptor }[]): SchedulePart[] {
 export function CountryCard({ cc }: { cc: string }) {
   const selNodes = useStore((s) => s.selNodes);
   const rows = useMemo(() => selNodes.filter((r) => r.cc === cc), [selNodes, cc]);
-  const cities = useMemo(() => new Set(rows.map((r) => r.city).filter((c): c is string => !!c)), [rows]);
   const parts = useMemo(() => providerParts(rows), [rows]);
   const share = shareWords(rows.length, selNodes.length);
   return (
     <>
-      {/* THE LEAD: what this country is to the selection it sits in, and how spread out it is. */}
-      {share && (
-        <Lead>
-          Hosts {share} of the selection&apos;s nodes{cities.size > 0 ? `, in ${cities.size === 1 ? "one city" : `${cities.size} cities`}` : ""}.
-        </Lead>
-      )}
+      {/* THE LEAD: what this country is to the selection it sits in. The city count that followed
+          ("…, in 8 cities") is gone (user, 2026-10-04). */}
+      {share && <Lead>Hosts {share} of the selection&apos;s nodes.</Lead>}
       {/* EACH CARD CUTS BY THE NEXT LEVEL DOWN (user, 2026-10-02 — `docs/superpowers/design/
           2026-10-02-country-provider`, option B: "country and provider cards have the same content …
           the node part"). Both cards used to cut their nodes by network, so the provider's table was
