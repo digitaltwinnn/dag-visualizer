@@ -1159,6 +1159,12 @@
      which is what keeps the band's edges off the RailThread rulers. The override lives beside the
      phone block at the foot of this file. */
   --bar-margin: 16px;
+  --rail-bleed: 24px;      /* room each rail column keeps either side of its cards for their shadow —
+                              a scroll container clips its children at its padding box, so a column
+                              exactly as wide as its cards cut their 30px shadow off at the sides
+                              (user, 2026-10-04: "on the sides it's cut off"). The column grows by it
+                              and is padded back, so no card moves; RailThread measures from the
+                              content edge. */
   --rail-margin: 26px;     /* both rails' outer margin — room for the mirrored RailThread rulers.
                               ONE home (review, 2026-08-31): #leftcol/#rightcol and the vitals
                               band's edges all read it, so the band stays aligned with the rail
@@ -1327,12 +1333,19 @@
      margin matches the right rail's, making room for the mirrored identity RailThread
      (design evolution, Task 12: both rails carry the identity thread). */
   #leftcol {
-    position: fixed; z-index: 10; top: calc(var(--rail-top) + var(--topbar-extra, 0px)); left: var(--rail-margin);
+    position: fixed; z-index: 10; top: calc(var(--rail-top) + var(--topbar-extra, 0px)); left: calc(var(--rail-margin) - var(--rail-bleed));
+    padding-inline: var(--rail-bleed);
+    /* …and below the last card, which the column's own bottom edge cut the same way. Above the
+       first card the shadow is a few px of ambient and stays clipped: a top bleed would move the
+       cards. `.rail-clip`'s runway replaces this with its own, longer padding. */
+    padding-bottom: var(--rail-bleed);
+    /* The bleed is empty column: it must not take the scene's clicks. The cards opt back in. */
+    pointer-events: none;
     /* `transform` rides the shade's RETURN tempo here and its away tempo on the hidden arm
        above the rule pair — the recipe's rule that the HUD comes back faster than it steps
        aside, because the return answers a gesture already finished. */
     transition: top 0.25s ease-out, transform 0.18s ease-out;
-    width: var(--rail-w);
+    width: calc(var(--rail-w) + 2 * var(--rail-bleed));
     display: flex; flex-direction: column; gap: var(--rail-gap);
     /* The box's own bottom must never enter the bottom lane's reserved band — the rail-clip fade
        below only dims PIXELS (mask-image), it doesn't disable clicks, so a box that physically
@@ -1431,15 +1444,18 @@
     [data-slot="sheet-content"][data-dim] { transition: none; }
   }
   #leftcol > aside { width: auto; }
+  #leftcol > * { pointer-events: auto; }
 
   /* Right details rail (`#rightcol`, Inspector.tsx) — the facts scope: a STACK of
      selected-subject cards. `pointer-events: none` so the gaps between cards click
      through to the scene/bottom strip below; each card re-enables it via the
      `pointer-events-auto` in RIGHT_CARD (CardHead.tsx). */
   #rightcol {
-    position: fixed; z-index: 10; top: calc(var(--rail-top) + var(--topbar-extra, 0px)); right: var(--rail-margin);
+    position: fixed; z-index: 10; top: calc(var(--rail-top) + var(--topbar-extra, 0px)); right: calc(var(--rail-margin) - var(--rail-bleed));
+    padding-inline: var(--rail-bleed);
+    padding-bottom: var(--rail-bleed);
     transition: top 0.25s ease-out, transform 0.18s ease-out;
-    width: var(--detail-w);
+    width: calc(var(--detail-w) + 2 * var(--rail-bleed));
     display: flex; flex-direction: column; gap: var(--rail-gap);
     /* Must never enter the bottom lane's reserved band — see the matching #leftcol comment above
        (same bug: a masked-invisible trailing card was still fully clickable, and the bottom

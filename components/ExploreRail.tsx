@@ -116,7 +116,7 @@ export default function ExploreRail() {
             laptop / tablet rail-width narrowing. `!` beats the `#leftcol` id rule in globals.css. */}
         <div
           id="leftcol"
-          className="max-[1100px]:!w-[224px] max-[860px]:!w-[210px] max-[860px]:!max-h-[calc(100vh-320px)] max-[1099px]:!hidden"
+          className="max-[1100px]:!w-[calc(224px+2*var(--rail-bleed))] max-[860px]:!w-[210px] max-[860px]:!max-h-[calc(100vh-320px)] max-[1099px]:!hidden"
           style={accent}
         >
           <RailShade>{content}</RailShade>

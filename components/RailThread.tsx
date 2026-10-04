@@ -224,7 +224,13 @@ export default function RailThread({
       // edge. ⚠️ `r.right - W` here (the shape the funnel's `r.right - REACH_PAD` collapsed to when
       // the pad left the WIDTH but not the ORIGIN) slides the whole thread a full band INSIDE the
       // rail, so the connectors start under the cards and the ruler lands on their right 22px.
-      const left = side === "right" ? lx(r.right) : lx(r.left) - W;
+      // From the rail's CONTENT edge: the column is padded by `--rail-bleed` so the cards' shadows
+      // are not clipped at its sides (2026-10-04), and the padding is no part of the lane. It is a
+      // local length; `r` is the transformed viewport box, hence the `k`.
+      const cs = getComputedStyle(rail);
+      const padL = (parseFloat(cs.paddingLeft) || 0) * k;
+      const padR = (parseFloat(cs.paddingRight) || 0) * k;
+      const left = side === "right" ? lx(r.right - padR) : lx(r.left + padL) - W;
       // FULL-LANE height (user, 2026-08-09: "the left and right can be extended to the view […]
       // same as we have already in tablet mode"). The rails are content-height (`display: flex` +
       // `max-height` band, globals.css), so `r.height` ended the ruler at the last card and a

@@ -773,7 +773,7 @@ export default function Inspector() {
             small-laptop / tablet rail-width narrowing. `!` beats the `#rightcol` id rule in globals.css. */}
         <div
           id="rightcol"
-          className="max-[1100px]:!w-[288px] max-[860px]:!w-[min(300px,calc(100vw-32px))] max-[1099px]:!hidden"
+          className="max-[1100px]:!w-[calc(288px+2*var(--rail-bleed))] max-[860px]:!w-[min(300px,calc(100vw-32px))] max-[1099px]:!hidden"
           style={accent}
         >
           <RailShade>
