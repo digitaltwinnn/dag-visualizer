@@ -18,6 +18,8 @@ beforeEach(() => {
   st.setCountry(null);
   st.setInspect(null);
   st.setSnap(null);
+  st.setMetaSnap(null);
+  st.setTickNet(null);
   st.setFollowing(true);
 });
 
@@ -125,6 +127,32 @@ describe("tickNet action (the network inside a tick)", () => {
     applyClickActions([{ kind: "tickNet", sel: { metaId: "dor", globalOrdinal: 42 } }]);
     expect(useStore.getState().tickNet).toBe(first);
     applyClickActions([{ kind: "tickNet", sel: null }]);
+  });
+});
+
+describe("a filter change clears what was selected under the old lens", () => {
+  // User, 2026-10-07: "if I change the filter … it should clear the details pane; currently it does
+  // not". The metagraph snapshot (and the network picked inside a tick) belonged to the old lens.
+  const sel = { metaId: "DAG0", ordinal: 7, hash: "h", globalOrdinal: 42, ts: "t" };
+  it("changing the filter clears the metagraph snapshot and the tick-local network", () => {
+    const st = useStore.getState();
+    st.setMetaSnap(sel);
+    st.setTickNet({ metaId: "dor", globalOrdinal: 42 });
+    applyClickActions([{ kind: "filter", id: "ded" }]);
+    expect(useStore.getState().metaSnap).toBeNull();
+    expect(useStore.getState().tickNet).toBeNull();
+  });
+  it("re-stating the same filter clears nothing", () => {
+    const st = useStore.getState();
+    st.setFilter("ded");
+    st.setMetaSnap(sel);
+    applyClickActions([{ kind: "filter", id: "ded" }]);
+    expect(useStore.getState().metaSnap).toEqual(sel);
+  });
+  it("a later step of the same click may set them again", () => {
+    useStore.getState().setMetaSnap(null);
+    applyClickActions([{ kind: "filter", id: "dor" }, { kind: "metaSnap", sel }]);
+    expect(useStore.getState().metaSnap).toEqual(sel);
   });
 });
 

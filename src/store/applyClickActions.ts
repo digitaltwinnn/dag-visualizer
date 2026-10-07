@@ -21,6 +21,14 @@ export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boole
   for (const a of actions) {
     switch (a.kind) {
       case "filter":
+        // A NEW LENS CLEARS WHAT WAS PICKED UNDER THE OLD ONE (user, 2026-10-07: "if I change the
+        // filter … it should clear the details pane"): the metagraph snapshot and the network
+        // picked inside a tick belonged to the previous lens. Every filter writer runs through
+        // here, so the rule holds for all of them; a later step of the same click re-sets them.
+        if (a.id !== st.filter) {
+          if (st.metaSnap != null) st.setMetaSnap(null);
+          if (st.tickNet != null) st.setTickNet(null);
+        }
         st.setFilter(a.id);
         // COMMITTING a filter in the ledger (re-)enters live mode (2026-08-08 — moved here
         // from FollowController's filter-dep effect, which fired AFTER any pin whose actions
