@@ -30,6 +30,7 @@ import { dayWords } from "@/components/datasection/DateRange";
 import { useMergedLog, type MergedScope } from "@/components/datasection/useMergedLog";
 import type { ChainSpan } from "@/src/data/mergedLog";
 import { useMinHold } from "@/components/useMinHold";
+import { useUnlistedLastSeen } from "@/components/UnlistedStage";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { isRetired } from "@/src/net/lineage";
 
@@ -219,6 +220,9 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   const [timeCut, setTimeCut] = useState<{ fromMs: number; toMs: number | null } | null>(null);
   /** A global-snapshot search under All: exactly the snapshots that global carries. */
   const [globalSpans, setGlobalSpans] = useState<ChainSpan[] | null>(null);
+  /** How many of that global's snapshots came from UNLISTED channels — said, never silently dropped
+   *  (the Unlisted audit, 2026-10-07: global 6,700,000 anchored 18 and the log showed 15). */
+  const [globalUnlisted, setGlobalUnlisted] = useState(0);
   const mergedScope = useMemo<MergedScope>(
     () => (globalSpans ? { kind: "spans", spans: globalSpans } : timeCut ? { kind: "time", fromMs: timeCut.fromMs, toMs: timeCut.toMs } : { kind: "all" }),
     [globalSpans, timeCut],
@@ -227,6 +231,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // ungated merge read every network's chain on every Snapshots page load (measured: 28 requests
   // with RAW closed). Its caches survive closing, so reopening is instant.
   const rawOpen = useStore((s) => s.section === "data");
+  // Under the Unlisted lens an empty log says when one last anchored, never "waiting" forever.
+  const unlistedLastSeen = useUnlistedLastSeen(rawOpen && lens === UNLISTED_ID);
   const merged = useMergedLog(mergedMode && rawOpen, mergedChains, mergedScope, liveTips);
   /** A merged search waiting for its page: land (mark) its first row, or go to the oldest end. */
   const mergedLand = useRef<"newest" | "oldest" | null>(null);
@@ -720,7 +726,16 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
           const s = spans.get(r.metaId);
           spans.set(r.metaId, s ? { lo: Math.min(s.lo, r.ordinal), hi: Math.max(s.hi, r.ordinal) } : { lo: r.ordinal, hi: r.ordinal });
         }
-        if (!spans.size) { setJumpMiss(`no listed network anchored into global snapshot ${n.toLocaleString()}`); return; }
+        const unlistedN = (d.rows ?? []).filter((r) => !mergedChains.includes(r.metaId)).length;
+        setGlobalUnlisted(unlistedN);
+        if (!spans.size) {
+          setJumpMiss(
+            unlistedN
+              ? `global snapshot ${n.toLocaleString()} carried only ${unlistedN} unlisted snapshot${unlistedN === 1 ? "" : "s"}, which cannot be listed here`
+              : `no listed network anchored into global snapshot ${n.toLocaleString()}`,
+          );
+          return;
+        }
         setMarked(null);
         setGlobalSpans(mergedChains.filter((a) => spans.has(a)).map((addr) => ({ addr, ...spans.get(addr)! })));
         mergedLand.current = "newest";
@@ -1369,7 +1384,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         {toolbar}
         {search}
         <p className="m-auto text-label text-muted-foreground">
-          {!live ? "NO SIGNAL" : timeCut || globalSpans ? "No snapshots in that range" : mergedMode ? "No snapshots here" : histNet && bound?.addr === histAddr ? "No snapshots in that range" : histNet ? (histErr ? "history unavailable — the explorer read failed; paging again retries" : "reading the chain…") : "Waiting for anchored metagraph snapshots…"}
+          {!live ? "NO SIGNAL" : lens === UNLISTED_ID && !timeCut ? `No unlisted snapshots among the latest global snapshots. ${unlistedLastSeen}` : timeCut || globalSpans ? "No snapshots in that range" : mergedMode ? "No snapshots here" : histNet && bound?.addr === histAddr ? "No snapshots in that range" : histNet ? (histErr ? "history unavailable — the explorer read failed; paging again retries" : "reading the chain…") : "Waiting for anchored metagraph snapshots…"}
         </p>
       </>
     );
@@ -1380,6 +1395,12 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     <>
       {toolbar}
       {search}
+      {/* THE UNLISTED REMAINDER OF A GLOBAL SNAPSHOT, said rather than dropped. */}
+      {mergedMode && globalSpans && globalUnlisted > 0 && (
+        <p className="flex-none m-0 pb-2 text-label text-muted-foreground">
+          This global snapshot also carried {globalUnlisted} snapshot{globalUnlisted === 1 ? "" : "s"} from unlisted channels, which cannot be listed here.
+        </p>
+      )}
       {/* A PAGE BEING READ keeps the previous page on screen, dimmed — a page turn never blanks the
           table (the merged log reads a page of every network). */}
       <ScrollArea className={cn("flex-1 min-h-0 transition-opacity duration-150", mergedMode && merged.loading && "opacity-60")} aria-busy={mergedMode && merged.loading}>

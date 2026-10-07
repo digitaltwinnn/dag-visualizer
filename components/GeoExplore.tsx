@@ -25,6 +25,7 @@ import { NO_SIGNAL_COPY, useNoSignal } from "@/components/useNoSignal";
 import { ccMark } from "@/src/util/format";
 import { levelMeasure } from "@/src/data/explorerMeasure";
 import { cohortsLevel, countriesLevel, countryNodes, nodesByCountry } from "@/src/data/ladderLevels";
+import { UNLISTED_ID } from "@/src/data/unlisted";
 
 // THE GEOGRAPHY'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -120,7 +121,11 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
       ) : quietEmpty ? (
         <>
           <span className="block text-body text-foreground">No locatable nodes</span>
-          {tickerOrName} has no nodes we can place on the map right now. It still appears in the Hypergraph.
+          {/* The unlisted set is not one metagraph and publishes no nodes at all (the Unlisted
+              audit, 2026-10-07) — "right now" and "still appears in the Hypergraph" were false. */}
+          {filter === UNLISTED_ID
+            ? "Unlisted channels publish no nodes, so there is nothing to place on the map."
+            : `${tickerOrName} has no nodes we can place on the map right now. It still appears in the Hypergraph.`}
         </>
       ) : undefined,
       rows: measured.map(({ c, v }) => ({

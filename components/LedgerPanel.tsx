@@ -341,7 +341,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           // state), which a re-box would swallow — and its Global snapshot card is the box anyway.
           faint: !!filterNet && count === 0 && !on,
           // The count the bar's colour stands for, in words — colour is never the only carrier.
-          title: `Global snapshot ${d.ordinal.toLocaleString()}, ${d.metagraphSnapshotCount ?? 0} snapshots anchored${filterNet ? (count > 0 ? `, ${count} from ${filterNet.name}` : `, none from ${filterNet.name}`) : ""}`,
+          title: `Global snapshot ${d.ordinal.toLocaleString()}, ${d.metagraphSnapshotCount ?? 0} snapshot${(d.metagraphSnapshotCount ?? 0) === 1 ? "" : "s"} anchored${filterNet ? (count > 0 ? `, ${count} from ${filterNet.name}` : `, none from ${filterNet.name}`) : ""}`,
           onClick: () => {
             // THE SELECTED ROW DRILLS (user, 2026-10-07 — the explorer rests on this list, its axis,
             // so the highlighted row is always on screen and is the way DOWN): it opens the tick's

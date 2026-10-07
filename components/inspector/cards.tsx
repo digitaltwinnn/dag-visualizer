@@ -552,10 +552,10 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
     cfg.id === UNLISTED_ID
       ? "Metagraphs anchoring into Global L0 without an entry in the public catalog. " +
         (unlistedMembers.length === 0
-          ? "None was seen anchoring in the measured window."
+          ? "None has anchored while this page has been open."
           : unlistedMembers.length === 1
-            ? "One anchored in the measured window; its chain and owner address are public, its operator and nodes are not."
-            : `${unlistedMembers.length} anchored in the measured window; their chains and owner addresses are public, their operators and machines are not.`)
+            ? "One anchored while this page has been open. Its chain and owner address are public, its operator and nodes are not."
+            : `${unlistedMembers.length} anchored while this page has been open. Their chains and owner addresses are public, their operators and nodes are not.`)
       : mg?.description || cfg.blurb;
   // The site link rides the BODY now (MetaSiteRow — the aside slot carries the ticker). Falls
   // back to the config-level url for cores the live metaList doesn't carry a site for (the DAG).
