@@ -112,7 +112,7 @@ export const RIGHT_CARD = "relative block w-auto pointer-events-auto [--spine:tr
 // shared, the header holds still across the tier swap; the BOTTOM stays compact — an entry is
 // still a one-liner, just seated at the box's own first-content line.
 const RAIL_ENTRY =
-  "rail-entry relative block w-auto pointer-events-auto [--spine:transparent] px-[18px] pt-[18px] pb-1.5 min-h-0 flex-none rounded-md bg-[var(--panel-solid)] [backdrop-filter:blur(10px)] opacity-[var(--entry-dim,1)] hover:opacity-100 hover:brightness-[1.18] transition-[opacity,filter] duration-150 motion-reduce:transition-none";
+  "rail-entry relative block w-auto pointer-events-auto [--spine:transparent] px-[18px] pt-[18px] pb-1.5 min-h-0 flex-none rounded-md bg-[var(--panel-solid)] [backdrop-filter:blur(10px)] opacity-[var(--entry-dim,1)] hover:opacity-100 hover:brightness-[1.18] transition-[opacity,filter,box-shadow] duration-150 motion-reduce:transition-none";
 
 // The ONE right-rail pane frame — every facts-rail pane renders through this switch:
 //   • `entry` false → the full glass panel (Card baseline supplies `.ig-panel`; RIGHT_CARD the
