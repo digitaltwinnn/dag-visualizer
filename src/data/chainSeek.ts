@@ -212,11 +212,11 @@ export async function seekSpan(
     const ms = row ? Date.parse(row.ts) : NaN;
     return Number.isFinite(ms) ? ms : null;
   };
-  const start = await seekOrdinalByTime(fromMs, latest, loadPage);
-  const end = await seekOrdinalByTime(toMs, latest, loadPage);
+  // The two walks are independent, so they run TOGETHER (the tester pass, 2026-10-07: a range
+  // search under All took ~20s, each chain's walks running one after the other).
+  const [start, end] = await Promise.all([seekOrdinalByTime(fromMs, latest, loadPage), seekOrdinalByTime(toMs, latest, loadPage)]);
   if (start == null || end == null) return null;
-  const startMs = await tsOf(start);
-  const endMs = await tsOf(end);
+  const [startMs, endMs] = await Promise.all([tsOf(start), tsOf(end)]);
   if (startMs == null || endMs == null) return null;
   // The walk answers the tip for a time after it: a start the tip is still before holds nothing,
   // and an end the tip is still before ends at the tip itself.

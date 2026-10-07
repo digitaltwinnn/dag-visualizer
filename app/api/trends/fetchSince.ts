@@ -30,7 +30,18 @@ export async function listSince<T extends { ordinal: number }>(
   let res = await page(60);
   let all = res.data;
   if (!all.length) return { recs: [], gap: false };
-  if (sinceOrdinal < 0) return { recs: all.slice().reverse(), gap: false }; // cold cursor
+  // A COLD CURSOR — a chain this store has never read: a new network, or a network's new address —
+  // is read back to its FIRST snapshot (2026-10-07: it took only the newest 60, so BioFi's new
+  // chain lost the days before its first sampler run, twice). Within the same self-heal depth; a
+  // chain longer than that is read to the depth and the rest is reported as the gap it is.
+  if (sinceOrdinal < 0) {
+    while (all.length < CAP && res.next) {
+      res = await page(PAGE, res.next);
+      if (!res.data.length) break;
+      all = all.concat(res.data);
+    }
+    return { recs: all.slice().reverse(), gap: res.next != null && all.length >= CAP };
+  }
   // Not reached yet: walk older pages by cursor until the cursor is provably covered,
   // the chain ends, or the self-heal depth is spent.
   while (all[all.length - 1].ordinal > sinceOrdinal + 1 && all.length < CAP && res.next) {
