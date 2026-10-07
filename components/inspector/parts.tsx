@@ -66,15 +66,19 @@ export function Fact({ label, children, title, className }: { label: ReactNode; 
  *  is in relation to its parent ("83% of Dor Technologies' online nodes"). Every child card has
  *  one. NO FULL STOP (user, 2026-10-07: "remove the . — it's UI, not everything should be treated
  *  like grammar"): it is a label on an instrument, not prose — two clauses join with a comma. */
-export function Lead({ children, aside, className }: { children: ReactNode; /** A second fact that would otherwise be glued on with a mid-dot — an age, a count — as a
+export function Lead({ children, aside, className, lines = 2 }: { children: ReactNode; /** A second fact that would otherwise be glued on with a mid-dot — an age, a count — as a
    *  qualifier chip on the row's right (user, 2026-10-03, on "Anchored to N · 1 min ago": "should
    *  that second part be a pill on the right side? I don't like those dots separating texts").
    *  The sentence stays one statement; the chip is the head aside's own species. */
-  aside?: ReactNode; className?: string }) {
-  if (aside == null) return <p className={cn("m-0 mb-2.5 text-body leading-snug text-foreground-dim line-clamp-2", className)}>{children}</p>;
+  aside?: ReactNode; className?: string;
+  /** Two lines is the rule. History's sentence leads (a reading about a network over a span, 2026-10-07)
+   *  carry a chip AND a figure, and take three. */
+  lines?: 2 | 3 }) {
+  const clamp = lines === 3 ? "line-clamp-3" : "line-clamp-2";
+  if (aside == null) return <p className={cn("m-0 mb-2.5 text-body leading-snug text-foreground-dim", clamp, className)}>{children}</p>;
   return (
     <div className={cn("mb-2.5 flex items-baseline justify-between gap-2.5", className)}>
-      <p className="m-0 min-w-0 text-body leading-snug text-foreground-dim line-clamp-2">{children}</p>
+      <p className={cn("m-0 min-w-0 text-body leading-snug text-foreground-dim", clamp)}>{children}</p>
       <QualifierChip className="flex-none tabular-nums">{aside}</QualifierChip>
     </div>
   );

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { SELECTED_ROW } from "@/components/selection";
 import { displayNetwork } from "@/src/data/unlisted";
 import { ZOOMS, type TrendRange, type ZoomId } from "@/src/data/trendWindow";
+import { bucketStamp } from "@/src/util/localTime";
 
 // THE TRENDS CONTROLS, ONE HOME (2026-09-18; widened 2026-09-19) — the window pills and the scale
 // switch, shared by the Trends DOCUMENT, the History view's band TIMELINE and that view's Network
@@ -56,12 +57,7 @@ export const zoomBtn = (pressed: boolean) =>
 /** The instant stamps on a range chip — the document's own `stampRange` rule: a date, plus the
  *  clock only where the buckets on screen can actually resolve one. */
 function stampRange(ms: number, stepMs: number): string {
-  return new Date(ms).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    ...(stepMs < 86_400_000 ? { hour: "2-digit", minute: "2-digit", hour12: false } : {}),
-    timeZone: "UTC",
-  });
+  return bucketStamp(ms, stepMs);
 }
 
 /** THE WINDOW PICKER — the six windows, and, while a range stands, THE RANGE ITSELF as the group's

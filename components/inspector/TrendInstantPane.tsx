@@ -157,7 +157,7 @@ export default function TrendInstantPane({
               is every network. No age chip: the title already dates the moment, and beside a chip the
               sentence had ~22 characters a line and clipped (2026-10-07). */}
           {cursorMs != null && (
-            <Lead>
+            <Lead lines={3}>
               {bucket != null && lead != null ? (
                 <>
                   {who} {phrase.verb} <span className="font-medium text-foreground tabular-nums">{format(lead)}</span> {phrase.rest}

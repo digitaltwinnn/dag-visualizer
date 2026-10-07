@@ -408,10 +408,13 @@ describe("the cursor's readout", () => {
     expect(s).not.toMatch(/:/);
   });
 
-  it("adds the clock time, in UTC, once the stack's buckets are finer than a day", () => {
-    const s = stampInstant(Date.UTC(2026, 8, 18, 13, 45), HOUR);
-    expect(s).toMatch(/13:45/);
-    expect(s).toMatch(/UTC$/);
+  it("adds the READER'S clock once the stack's buckets are finer than a day — no zone suffix", () => {
+    // User, 2026-10-07: dates "in the actual locale" rather than UTC (`bucketStamp`).
+    const ms = Date.UTC(2026, 8, 18, 13, 45);
+    const s = stampInstant(ms, HOUR);
+    expect(s).not.toMatch(/UTC/);
+    const local = new Date(ms).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+    expect(s).toContain(local);
   });
 });
 

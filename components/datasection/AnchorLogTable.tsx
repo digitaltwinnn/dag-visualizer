@@ -25,6 +25,8 @@ import TablePager from "@/components/datasection/TablePager";
 import LogSearchBar from "@/components/datasection/LogSearchBar";
 import { pageOfOrdinal, seekOrdinalByTime, dayStartMs, dayEndMs, tsInRange } from "@/src/data/chainSeek";
 import { POLL } from "@/src/engine/config";
+import { localDayKey } from "@/src/util/localTime";
+import { dayWords } from "@/components/datasection/DateRange";
 
 // The retained global window the log joins against — the same buffer the strip's bars plot,
 // one row per anchored metagraph snapshot inside it.
@@ -112,7 +114,7 @@ const Dash = () => (
 /** One segment of the chain toggle: a one-word name, the chain's start and address on hover. */
 function ChainSegment({ address, idx, on, onPick }: { address: string; idx: number; on: boolean; onPick: () => void }) {
   const span = useChainSpan(address);
-  const since = span?.genesisTs ? new Date(span.genesisTs).toLocaleDateString("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : null;
+  const since = span?.genesisTs ? new Date(span.genesisTs).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : null;
   const name = idx === 0 ? "Current" : idx === 1 ? "Earlier" : `Earlier ${idx}`;
   return (
     <button
@@ -757,7 +759,6 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   const pendingSnap = useRef(false);
   useEffect(() => {
     if (!logSeek) return;
-    const iso = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
     // ONE SNAPSHOT (a metagraph-snapshot card's door, 2026-10-04): the exact address — the most
     // specific search there is — so the dates stay empty and the snapshot field takes the number.
     // It pages ITS network's chain, whatever the filter or an earlier scope (`doorMeta`).
@@ -781,8 +782,10 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       return;
     }
     setSearchOpen(true);
-    setQFrom(iso(logSeek.fromMs));
-    setQTo(iso(logSeek.toMs));
+    // The fields hold the reader's LOCAL days (2026-10-07); the span's end is exclusive, so its
+    // last day is the one holding the instant just before it.
+    setQFrom(localDayKey(logSeek.fromMs));
+    setQTo(localDayKey(logSeek.toMs - 1));
     if (logSeek.metaId) {
       setDoorMeta(logSeek.metaId);
       setSearchMeta(logSeek.metaId);
@@ -975,7 +978,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
             },
             (qFrom || qTo) && {
               key: "age",
-              text: [qFrom && `from ${qFrom}`, qTo && `to ${qTo}`].filter(Boolean).join(" "),
+              // In the date picker's own words ("Mar 13 – Mar 20"), never the field's YYYY-MM-DD.
+              text: qFrom && qTo ? (qFrom === qTo ? dayWords(qFrom) : `${dayWords(qFrom)} – ${dayWords(qTo)}`) : qFrom ? `from ${dayWords(qFrom)}` : `to ${dayWords(qTo)}`,
               clear: () => { setQFrom(""); setQTo(""); },
             },
           ]

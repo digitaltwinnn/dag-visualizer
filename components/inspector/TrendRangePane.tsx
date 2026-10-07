@@ -11,6 +11,7 @@ import useTrendsSlice from "@/components/useTrendsSlice";
 import { metagraphById } from "@/src/data/network";
 import { rangePhrase, sumMeasured, TREND_METRICS } from "@/src/data/trendSeries";
 import { spanPhrase } from "@/src/data/trendWindow";
+import { ageWords } from "@/src/util/relativeAge";
 import { useStore } from "@/src/store/store";
 
 // THE RANGE CARD (user, 2026-10-07) — History's brushed span as a committed subject, the PARENT of
@@ -51,7 +52,7 @@ export default function TrendRangePane({
   const windowId = useStore((s) => s.trendWindow);
 
   const roster = useTrendRoster(useTrendsSlice(windowId, range), filter, metric);
-  const { ranked, rows, format } = roster;
+  const { ranked, rows, format, stepMs } = roster;
   const pulseKey = useEdgePulse(range ? `${range.fromMs}-${range.toMs}` : null);
 
   const subject = subjectOf(focus, filter, ranked);
@@ -63,6 +64,10 @@ export default function TrendRangePane({
   const counter = TREND_METRICS[metric].kind === "counter" && metric !== "continuity";
   const total = counter ? sumMeasured(points) : null;
   const value = counter ? (total?.sum ?? null) : subject ? (rows.get(subject)?.span ?? null) : (roster.total?.span ?? null);
+  // How long ago the span ENDED — "until now" when it runs to the newest bucket (user, 2026-10-07:
+  // "keep the N months ago on the range").
+  const endAge = range ? Date.now() - range.toMs : null;
+  const aside = endAge == null ? undefined : endAge < stepMs ? "until now" : `${ageWords(endAge)} ago`;
   const phrase = range ? rangePhrase(metric, range.toMs - range.fromMs, total?.partial ?? false) : null;
 
   return (
@@ -87,8 +92,8 @@ export default function TrendRangePane({
       {!collapsed && range && phrase && (
         <div>
           {/* THE LEAD: what the span was to the network above, in one sentence (the Moment's
-              grammar). No chip: the title dates the span. */}
-          <Lead>
+              grammar), with when it ended on the chip. */}
+          <Lead aside={aside} lines={3}>
             {value != null ? (
               <>
                 {who} {phrase.verb} <span className="font-medium text-foreground tabular-nums">{format(value)}</span> {phrase.rest}

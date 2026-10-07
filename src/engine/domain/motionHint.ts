@@ -37,9 +37,10 @@ export interface HintNames {
   rung(level: FocusLevel): string;
 }
 
-/** A date for a range, in UTC like every stamp the trends surfaces show. */
+/** A date for a range, in the reader's own day like every stamp the trends surfaces show
+ *  (2026-10-07 — it was UTC). */
 function day(ms: number): string {
-  return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+  return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 /**

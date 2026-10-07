@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
  *  `Sep 1, 2026 – Sep 3, 2026` truncates there while `Sep 1 – Sep 3` fits — and the year is the
  *  half a reader can infer. It comes straight back for the case it actually carries information:
  *  a range reaching into the chain's older years, which is most of what this control is for. */
-const fmt = (day: string) => {
+export const dayWords = (day: string) => {
   const d = civilDate(day);
   if (!d) return day;
   const year = d.getFullYear() === new Date().getFullYear() ? undefined : "numeric";
@@ -57,7 +57,7 @@ export default function DateRange({
 
   // The trigger's WORDS are the state — a control that reads "any date" is honestly saying the
   // column is unfiltered, which an empty field cannot say without a label beside it.
-  const label = from && to ? `${fmt(from)} – ${fmt(to)}` : from ? `from ${fmt(from)}` : to ? `to ${fmt(to)}` : "Any date";
+  const label = from && to ? `${dayWords(from)} – ${dayWords(to)}` : from ? `from ${dayWords(from)}` : to ? `to ${dayWords(to)}` : "Any date";
   const title = from && to ? `${fmtFull(from)} to ${fmtFull(to)}` : from ? `from ${fmtFull(from)}` : to ? `up to ${fmtFull(to)}` : "no date range — pick one to jump into the chain";
   const armed = !!(from || to);
 

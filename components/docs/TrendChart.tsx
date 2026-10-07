@@ -5,6 +5,7 @@ import { Area, CartesianGrid, ComposedChart, Line, LineChart, ReferenceArea, Res
 import { cn } from "@/lib/utils";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { bucketAt, cursorFraction, heldZoom } from "@/src/data/trendWindow";
+import { bucketStamp } from "@/src/util/localTime";
 
 // THE TRENDS DOC'S ONE CHART PRIMITIVE — a small-multiple line chart over the /api/trends
 // buckets, on RECHARTS (user, 2026-09-07: "why hand-roll charts if we have a neat library?" —
@@ -72,10 +73,7 @@ const PLAIN = (v: number) => v.toLocaleString(undefined, { maximumFractionDigits
 
 /** A bucket instant in words, at the precision its own cadence earns. Module-level because both
  *  halves of this file read it — the head's readout title and the plot's tooltip. */
-const stampOf = (ts: number, stepMs: number): string =>
-  stepMs < 86400000
-    ? new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" }) + " UTC"
-    : new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+const stampOf = (ts: number, stepMs: number): string => bucketStamp(ts, stepMs);
 
 /** The axis's date formatters, built once: `toLocaleDateString` with options constructs a new
  *  formatter per call, and recharts asks for every candidate tick while it fits the labels. */

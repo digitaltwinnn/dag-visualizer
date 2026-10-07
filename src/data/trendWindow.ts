@@ -524,11 +524,11 @@ const SPAN_WORDS: Record<ZoomId, string> = {
 };
 
 /** THE SPAN ON SCREEN, IN WORDS — what a span reading is OVER (design A, 2026-09-29): the window
- *  pill's own phrase, or a brushed range's dates (UTC, the axis's own zone; the range's end is
+ *  pill's own phrase, or a brushed range's dates (the reader's own days, 2026-10-07; the range's end is
  *  exclusive, so the last day named is the one it reaches into). */
 export function spanPhrase(zoom: ZoomId, range: { fromMs: number; toMs: number } | null): string {
   if (!range) return SPAN_WORDS[zoom];
-  const day = (ms: number) => new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+  const day = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" }); // the reader's day (2026-10-07)
   const a = day(range.fromMs);
   const b = day(range.toMs - 1);
   return a === b ? a : `${a} – ${b}`;

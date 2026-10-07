@@ -46,19 +46,27 @@ export function estimateOrdinal(
   return Math.min(hi.ordinal - 1, Math.max(lo.ordinal + 1, guess));
 }
 
-/** Parse a `<input type="date">` value (YYYY-MM-DD) to the epoch millis of its UTC midnight.
- *  Returns null for anything else — the caller shows an unparsed range as no range at all rather
- *  than silently searching from the epoch. */
+/** Parse a date field's value (YYYY-MM-DD) to the epoch millis of the READER'S local midnight that
+ *  day — a picked day is their day, in their zone (user, 2026-10-07: dates "in the actual locale";
+ *  it was the UTC day). Returns null for anything else, an impossible date included — the caller
+ *  shows an unparsed range as no range at all rather than silently searching from the epoch. */
 export function dayStartMs(day: string): number | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
-  const ms = Date.parse(`${day}T00:00:00.000Z`);
-  return Number.isFinite(ms) ? ms : null;
+  return localMidnight(day, 0);
 }
 
-/** …and the exclusive end of that same UTC day, for a range's upper bound. */
+/** …and the exclusive end of that same local day — the NEXT local midnight, so a day that spans a
+ *  clock change keeps its 23 or 25 hours. */
 export function dayEndMs(day: string): number | null {
-  const start = dayStartMs(day);
-  return start == null ? null : start + 86_400_000;
+  return localMidnight(day, 1);
+}
+
+function localMidnight(day: string, plusDays: number): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+  if (!m) return null;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]) - 1, Number(m[3])];
+  const probe = new Date(y, mo, d);
+  if (probe.getFullYear() !== y || probe.getMonth() !== mo || probe.getDate() !== d) return null;
+  return new Date(y, mo, d + plusDays).getTime();
 }
 
 /** Is `ts` (an ISO stamp from the explorer) inside `[fromMs, toMs)`? An absent bound is open.

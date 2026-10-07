@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { afterAll, beforeAll, describe, it, expect } from "vitest";
 import { pageOfOrdinal, estimateOrdinal, dayStartMs, dayEndMs, tsInRange, seekOrdinalByTime, probeBudget, civilDate, civilString } from "./chainSeek";
 
 // The executable spec for the raw log's two non-arithmetic searches. The interpolation is the part
@@ -54,14 +54,25 @@ describe("estimateOrdinal (false position over a regular cadence)", () => {
 });
 
 describe("the date range", () => {
-  it("reads a date input as UTC midnight, and its end as the next", () => {
-    expect(dayStartMs("2026-09-01")).toBe(Date.parse("2026-09-01T00:00:00.000Z"));
-    expect(dayEndMs("2026-09-01")).toBe(Date.parse("2026-09-02T00:00:00.000Z"));
+  // A picked day is the READER'S day (user, 2026-10-07: dates "in the actual locale"): its local
+  // midnight to the next. Pinned in a zone far from UTC, so a UTC reading fails here.
+  const prevTz = process.env.TZ;
+  beforeAll(() => { process.env.TZ = "America/New_York"; });
+  afterAll(() => { process.env.TZ = prevTz; });
+
+  it("reads a date input as LOCAL midnight, and its end as the next local midnight", () => {
+    expect(dayStartMs("2026-09-01")).toBe(Date.parse("2026-09-01T04:00:00.000Z")); // EDT is UTC−4
+    expect(dayEndMs("2026-09-01")).toBe(Date.parse("2026-09-02T04:00:00.000Z"));
+  });
+
+  it("a day that spans a clock change is still one calendar day", () => {
+    // Nov 1 2026: New York falls back, so the local day is 25 hours long.
+    expect(dayEndMs("2026-11-01")! - dayStartMs("2026-11-01")!).toBe(25 * 3_600_000);
   });
 
   // An unparsed bound must be NULL, never 0 — a 0 would silently search from 1970.
   it("refuses anything that is not a plain YYYY-MM-DD", () => {
-    for (const bad of ["", "2026-9-1", "01/09/2026", "2026-09-01T00:00:00Z", "nonsense"]) {
+    for (const bad of ["", "2026-9-1", "01/09/2026", "2026-09-01T00:00:00Z", "nonsense", "2026-02-31"]) {
       expect(dayStartMs(bad)).toBeNull();
       expect(dayEndMs(bad)).toBeNull();
     }
@@ -70,10 +81,10 @@ describe("the date range", () => {
   it("treats the range as half-open, so adjacent days cannot both claim a stamp", () => {
     const from = dayStartMs("2026-09-01");
     const to = dayEndMs("2026-09-01");
-    expect(tsInRange("2026-09-01T00:00:00.000Z", from, to)).toBe(true);
-    expect(tsInRange("2026-09-01T23:59:59.999Z", from, to)).toBe(true);
-    expect(tsInRange("2026-09-02T00:00:00.000Z", from, to)).toBe(false);
-    expect(tsInRange("2026-08-31T23:59:59.999Z", from, to)).toBe(false);
+    expect(tsInRange("2026-09-01T04:00:00.000Z", from, to)).toBe(true);
+    expect(tsInRange("2026-09-02T03:59:59.999Z", from, to)).toBe(true);
+    expect(tsInRange("2026-09-02T04:00:00.000Z", from, to)).toBe(false);
+    expect(tsInRange("2026-09-01T03:59:59.999Z", from, to)).toBe(false);
   });
 
   it("leaves an absent bound open, and rejects an unparsable stamp", () => {

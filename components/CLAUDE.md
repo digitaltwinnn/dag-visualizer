@@ -610,6 +610,13 @@ from a body row on 2026-08-10 — a join is not a fact ABOUT the snapshot, it is
 already names — and the metagraph TICKER that shared that row went with it under the pile rule, since
 the METAGRAPH card sits directly above and this card's own mark already carries the hue.
 
+**A time is written in the READER'S clock** (user, 2026-10-07: "Instead of saying UTC, can we show
+all the dates in the actual locale?"). `src/util/localTime.ts` is the one home — their locale's
+date order and 12/24-hour clock, their zone, no suffix. The one exception is not a UTC label: a
+DAILY bucket is a UTC day, so its date-only label reads in UTC (its local reading would be the
+evening before, west of Greenwich). A brushed range is two instants, so its days are the reader's,
+and so are the raw log's date fields (`chainSeek.dayStartMs` is local midnight).
+
 **An ordinal is written BARE — no `#`** (user, 2026-08-10). Every surface that renders one as a value
 already did (the snapshot card titles, the explorer rows, the anchor-log cells, the old strip's tooltip
 head); the sigil only survived where a number got glued into a sentence — this aside, the raw layer's
