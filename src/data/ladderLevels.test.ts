@@ -97,8 +97,8 @@ describe("networksLevel", () => {
     expect(networksLevel(metas, all, "nodes").map((x) => x.m.id)).toEqual(["dor", "ded", "tbc"]);
   });
   it("breaks a tie on fleet size (Review Focus 3)", () => {
-    // countries: dor 2 (DE, FI), ded 2 (DE, FI) — tied; dor has the larger fleet
-    expect(networksLevel(metas, all, "countries").map((x) => x.m.id)).toEqual(["dor", "ded", "tbc"]);
+    // dL1: no fixture row runs it, so every network ties at 0 — fleet size decides
+    expect(networksLevel(metas, all, "dl1").map((x) => x.m.id)).toEqual(["dor", "ded", "tbc"]);
   });
 });
 
