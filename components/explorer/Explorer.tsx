@@ -173,16 +173,17 @@ export default function Explorer({ id, title, hint, levels, onLeave, defaultColl
   }, [rowKeys, cap, figKey]);
   // The crumbs: the ROOT as the house glyph (its word is the accessible name — the card's title
   // already says it, and the word cost the width the crumbs need; user, 2026-09-26, two rounds),
-  // then every OPENED level, the current one last as the page.
-  const crumbs: Crumb[] = nested
-    ? levels.map((l, i) => ({
-        key: l.key,
-        label: l.crumb.label,
-        title: l.crumb.title ?? (typeof l.crumb.label === "string" ? l.crumb.label : undefined),
-        root: i === 0,
-        ...(i < levels.length - 1 ? { onSelect: l.crumb.onRelease } : {}),
-      }))
-    : [];
+  // then every OPENED level, the current one last as the page. THE PATH IS ALWAYS DRAWN (user,
+  // 2026-10-07 — "where there is no filter, the whole control is missing … shouldn't we indicate
+  // that there is a control there always?"): at the root it is the one filled step, house and word,
+  // so the control is in place before the first drill rather than appearing with it.
+  const crumbs: Crumb[] = levels.map((l, i) => ({
+    key: l.key,
+    label: l.crumb.label,
+    title: l.crumb.title ?? (typeof l.crumb.label === "string" ? l.crumb.label : undefined),
+    root: i === 0,
+    ...(i < levels.length - 1 ? { onSelect: l.crumb.onRelease } : {}),
+  }));
   const measure: MeasureControl | null =
     current && current.measure
       ? "options" in current.measure

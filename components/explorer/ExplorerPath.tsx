@@ -88,6 +88,8 @@ export default function ExplorerPath({ crumbs, hint, className }: { crumbs: read
             >
               {last ? (
                 <BreadcrumbPage className={cn(STEP, shape, pad, "w-full bg-wash-strong text-foreground")} title={c.title}>
+                  {/* The root as the page — nothing opened yet: the house, then the root's word. */}
+                  {c.root && <House aria-hidden className="size-3.5 flex-none" />}
                   <span className="min-w-0 truncate [&>*]:align-middle">{c.label}</span>
                 </BreadcrumbPage>
               ) : (
