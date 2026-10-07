@@ -28,6 +28,8 @@ export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boole
         if (a.id !== st.filter) {
           if (st.metaSnap != null) st.setMetaSnap(null);
           if (st.tickNet != null) st.setTickNet(null);
+          // …and History's plane focus, which names the Metagraph card and scopes RAW there (I6).
+          if (st.trendFocus != null) st.setTrendFocus(null);
         }
         st.setFilter(a.id);
         // COMMITTING a filter in the ledger (re-)enters live mode (2026-08-08 — moved here

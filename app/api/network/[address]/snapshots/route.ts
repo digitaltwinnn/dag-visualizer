@@ -15,8 +15,9 @@ import { netOf } from "@/src/net/request";
 //     in parallel and cached immutably (history never changes). This is what makes «/» jumps —
 //     including straight to genesis, ordinal 1 — one request deep.
 //
-// Only CATALOG addresses are served: the explorer indexes currency metagraphs, and the app's
-// unlisted/"all" lenses stay window-scoped by design (no merged history feed exists to page).
+// Only CATALOG addresses are served (retired networks and former addresses included). Under "all"
+// the client merges these chains itself (`components/datasection/useMergedLog.ts`); the unlisted
+// lens has no catalog address to page.
 
 export const maxDuration = 15;
 

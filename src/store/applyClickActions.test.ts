@@ -267,3 +267,16 @@ describe("trendCursor action (a step through the moments of a Range, 2026-10-07)
     expect(useStore.getState().trendCursorMs).toBeNull();
   });
 });
+
+// A NEW LENS DROPS THE PLANE FOCUS TOO (the branch review's I6, 2026-10-07): the focus names
+// History's Metagraph card and scopes RAW, so a focus from under the old filter kept naming BioFi
+// after the top bar moved to DOR.
+describe("filter action clears a stale plane focus", () => {
+  it("a real filter change releases the focus; re-committing the same filter keeps it", () => {
+    useStore.setState({ filter: "all", trendFocus: "bio" });
+    applyClickActions([{ kind: "filter", id: "all" }]);
+    expect(useStore.getState().trendFocus).toBe("bio");
+    applyClickActions([{ kind: "filter", id: "dor" }]);
+    expect(useStore.getState().trendFocus).toBeNull();
+  });
+});

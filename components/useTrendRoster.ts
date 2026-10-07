@@ -55,6 +55,9 @@ export interface TrendRosterRow {
   hue: string;
   /** The series as DRAWN: already cut by the metric's own edge rule. */
   series: MetricSeries;
+  /** The same points UNTRIMMED, on `rawBuckets` — for a sum over an exact span whose edges are
+   *  whole (the Range card's total; the branch review's I8). Never drawn. */
+  rawPoints: (number | null)[];
   /** The newest MEASURED value, which is not the newest bucket (`lastMeasured`). */
   last: number | null;
   /** The newest complete DAY (`latestDay`; user, 2026-09-29: "day should be the standard always")
@@ -89,6 +92,8 @@ export interface TrendRosterView {
    *  is exactly why it lives here: read straight off the payload it is one bucket out of step with
    *  the axis, and a cursor then quotes yesterday's number (caught live, 2026-09-19). */
   global: (number | null)[];
+  /** The whole network's series UNTRIMMED, on `rawBuckets` (see `TrendRosterRow.rawPoints`). */
+  rawGlobal: (number | null)[];
   /** The axis every row is drawn against, cut by the same rule the series were. */
   buckets: number[];
   /** The payload's OWN axis, before the counter edge trim. Exposed so a surface can tell the two
@@ -184,6 +189,7 @@ export default function useTrendRoster(
           sampled: s.sampled && cut(s.sampled),
           gaps: s.gaps && cut(s.gaps),
         },
+        rawPoints: s.points,
         last: lastMeasured(points),
         day: latestDay(metric, id, daily, points, stepMs),
         span: spanAverage(metric, points, stepMs, weights),
@@ -203,8 +209,10 @@ export default function useTrendRoster(
     const totalRow = (): TrendRosterRow => {
       const r = rowOf("dag");
       if (metric !== "nodes") return r;
-      const points = cut(metricSeries("nodes", "dag", series).points);
+      const rawNodes = metricSeries("nodes", "dag", series).points;
+      const points = cut(rawNodes);
       r.series = { points, sampled: undefined, gaps: undefined };
+      r.rawPoints = rawNodes;
       r.last = lastMeasured(points);
       r.day = stepMs >= 86_400_000 ? lastMeasured(points) : daily ? lastMeasured(metricSeries("nodes", "dag", daily).points) : null;
       r.span = spanAverage(metric, points, stepMs);
@@ -219,13 +227,15 @@ export default function useTrendRoster(
     // The unlisted channels: Snapshots only, under "all" (while the span holds any) or their own filter.
     let unlisted: TrendRosterRow | null = null;
     if (metric === "snapshots" && (filter === "all" || unlistedFilter)) {
-      const points = cut(unlistedSeries(series));
+      const rawUnlisted = unlistedSeries(series);
+      const points = cut(rawUnlisted);
       const net = displayNetwork(UNLISTED_ID)!;
       const r: TrendRosterRow = {
         id: UNLISTED_ID,
         name: net.name,
         hue: net.hue,
         series: { points, sampled: undefined, gaps: undefined },
+        rawPoints: rawUnlisted,
         last: lastMeasured(points),
         day: stepMs >= 86_400_000 ? lastMeasured(points) : daily ? lastMeasured(unlistedSeries(daily)) : null,
         span: spanAverage(metric, points, stepMs),
@@ -252,6 +262,7 @@ export default function useTrendRoster(
       order,
       buckets: cut(rawAxis),
       global: cut(globalSeries(metric, series)),
+      rawGlobal: globalSeries(metric, series),
     };
   }, [filter, metric, series, rawAxis, stepMs, daily, headKind]);
 
@@ -285,6 +296,7 @@ export default function useTrendRoster(
       total: pass.total,
       unlisted: pass.unlisted,
       global: pass.global,
+      rawGlobal: pass.rawGlobal,
       buckets: pass.buckets,
       rawBuckets: rawAxis,
       stepMs,

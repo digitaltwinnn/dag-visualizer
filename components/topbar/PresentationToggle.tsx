@@ -8,6 +8,7 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { spanPhrase, windowSpan } from "@/src/data/trendWindow";
 import { openRecords } from "@/components/trendDoors";
+import { UNLISTED_ID } from "@/src/data/unlisted";
 
 // The command bar's trailing PRESENTATION group — TWO controls since 2026-08-30 (user: "scene
 // vs hud [is] a toggle; raw is still separate because that's unrelated"), splitting the one
@@ -87,7 +88,10 @@ export default function PresentationToggle() {
           // filter: the Moment card's own door, so the two land in the same place.
           const st = useStore.getState();
           if (VIEW_POLICIES[st.mode].rawSurface === "door") {
-            const net = st.trendFocus ?? (st.filter !== "all" ? st.filter : null);
+            // The Unlisted plane names no chain the log can page, so its RAW is the span's records for
+            // every network, unscoped — never a log scoped to "unlisted" that lists the others (I7).
+            const pick = st.trendFocus ?? (st.filter !== "all" ? st.filter : null);
+            const net = pick === UNLISTED_ID ? null : pick;
             const span = windowSpan(st.trendWindow, st.trendRange, Date.now());
             return openRecords(net, span && { ...span, label: spanPhrase(st.trendWindow, st.trendRange) });
           }

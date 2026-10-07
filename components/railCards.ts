@@ -357,6 +357,24 @@ function metaSnapHint(s: RailManifestState): string | null {
 // `hint` above) — so the rail always shows the view's full possibility space and a deselect
 // returns a slot to its ghost in place (spatially stable; the old recency reordering made cards
 // jump). Callers filter to `present` for the tray icons.
+/** THE NETWORK THE METAGRAPH CARD STANDS ON — one home for the manifest and the card itself (the
+ *  branch review's M7: the same three-way rule was written in both). In the ledger, the network
+ *  committed inside the pinned tick (else the filter, standing down under a tick it did not anchor
+ *  into); in History, the plane brought forward (else the filter); everywhere else, the filter. */
+export function metagraphCardNetwork(s: {
+  mode: string;
+  filter: string;
+  tickNet?: TickNetSel | null;
+  snap?: { data: { ordinal: number } } | null;
+  tickHasFilter?: boolean;
+  trendFocus?: string | null;
+}): string {
+  if (s.mode === "ledger")
+    return ledgerCardNetwork({ filter: s.filter, tickNet: s.tickNet ?? null, snapOrdinal: s.snap?.data.ordinal ?? null, tickHasFilter: s.tickHasFilter });
+  if (s.mode === "trend") return cardNetwork(s.filter, s.trendFocus ?? null);
+  return s.filter;
+}
+
 export function detailsCards(s: RailManifestState): RailCard[] {
   // A PLACEHOLDER VIEW HAS NO FACTS SCOPE (user, 2026-08-10). `status`/`transactions`/`staking`
   // draw a wireframe captioned `preview · in development` and deliberately show no numbers, so
@@ -377,12 +395,7 @@ export function detailsCards(s: RailManifestState): RailCard[] {
   // state but the filter). Everywhere else it is the filter, as it always was.
   // IN HISTORY it is the plane brought forward, else the filter (`trendStack.cardNetwork`, user
   // 2026-10-07) — a network row there names the card without writing the top bar.
-  const net =
-    s.mode === "ledger"
-      ? ledgerCardNetwork({ filter: s.filter, tickNet: s.tickNet ?? null, snapOrdinal: s.snap?.data.ordinal ?? null, tickHasFilter: s.tickHasFilter })
-      : s.mode === "trend"
-        ? cardNetwork(s.filter, s.trendFocus ?? null)
-        : s.filter;
+  const net = metagraphCardNetwork(s);
   const context: RailCard = {
     id: "context",
     kind: "context",

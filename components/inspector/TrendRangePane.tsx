@@ -60,7 +60,13 @@ export default function TrendRangePane({
 
   const subject = subjectOf(focus, filter, ranked, (id) => id !== "dag" && rows.has(id));
   const who = subject ? metagraphById(subject)?.ticker || rows.get(subject)?.name || subject : "All networks";
-  const points = subject ? (rows.get(subject)?.series.points ?? []) : roster.global;
+  // THE TOTAL IS SUMMED OVER EXACTLY [start, end) from the payload itself (the branch review's I8):
+  // the drawn series drop a counter's partial EDGE buckets, which for a range snapped to whole days
+  // dropped its whole first day. A snapped range's edges are whole, so nothing is trimmed here; a
+  // bucket that starts before the range is left out rather than counted partially.
+  const axis = roster.rawBuckets;
+  const rawAll = subject ? (rows.get(subject)?.rawPoints ?? []) : roster.rawGlobal;
+  const points = !range ? [] : rawAll.filter((_, i) => axis[i]! >= range.fromMs && axis[i]! < range.toMs);
 
   // A COUNTER is the span's total; a gauge and the spacing are its average (the roster's own span
   // reading, the figure the Networks list states).

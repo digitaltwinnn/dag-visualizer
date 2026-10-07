@@ -37,7 +37,10 @@ export default function RecordsDoor({
   return (
     <button
       type="button"
-      disabled={!span || unlisted}
+      // aria-disabled, not `disabled`, for the unlisted case: a disabled button takes no hover, so
+      // its title — the reason — could never be read (the branch review's M8).
+      disabled={!span}
+      aria-disabled={unlisted || undefined}
       // Under All the log reads every network's records too (2026-10-07), so the door always lands.
       title={
         unlisted
@@ -46,13 +49,15 @@ export default function RecordsDoor({
             ? `Opens the snapshot records ${at}, for this network.`
             : `Opens the snapshot records ${at}, for every network.`
       }
-      onClick={() => openRecords(subject, span)}
+      onClick={() => {
+        if (!unlisted) openRecords(subject, span);
+      }}
       className={cn(
         "mt-3 flex w-[calc(100%+2*var(--card-pad))] items-center gap-2.5 text-left text-body text-foreground cursor-pointer",
         "-mx-[var(--card-pad)] px-[var(--card-pad)] py-2.5",
         "mb-[var(--foot-mb,calc(0px-var(--card-pad)))]",
         "rounded-b-[var(--foot-radius,calc(var(--radius)-1px))] border-t border-wash-strong [background:light-dark(var(--wash-soft),var(--wash-faint))] hover:[background:light-dark(var(--wash-hover),var(--wash-soft))]", // the Door's own per-ground wash (parts.tsx)
-        "disabled:opacity-45 disabled:pointer-events-none",
+        "disabled:opacity-45 disabled:pointer-events-none aria-disabled:opacity-45 aria-disabled:cursor-not-allowed",
         "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
       )}
     >

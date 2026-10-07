@@ -23,6 +23,7 @@ export default function TablePager({
   compact = false,
   exact = false,
   totalPending = false,
+  floor = false,
   onPage,
 }: {
   page: number; // 1-based
@@ -59,6 +60,8 @@ export default function TablePager({
   exact?: boolean;
   /** The total is still being counted: its slot twinkles (`NodeStars` — a value arriving). */
   totalPending?: boolean;
+  /** The total is a lower bound (part of it could not be read): "of at least N". */
+  floor?: boolean;
   onPage: (p: number) => void;
 }) {
   // The scope term's explanation must be REACHABLE ON TOUCH (2026-09-03, the phone review's
@@ -79,7 +82,7 @@ export default function TablePager({
             meaning here"). The count stays wherever it is the statement (the full pager's range). */}
         {compact && scope ? null : totalPending ? (
           <span className="inline-flex items-center gap-1.5">{compact ? null : `${from}–${to} of `}<NodeStars count={3} /></span>
-        ) : compact ? fmtCount(total) : exact ? `${from.toLocaleString()}–${to.toLocaleString()} of ${total.toLocaleString()}` : `${from}–${to} of ${fmtCount(total)}`}
+        ) : compact ? fmtCount(total) : exact ? `${from.toLocaleString()}–${to.toLocaleString()} of ${floor ? "at least " : ""}${total.toLocaleString()}` : `${from}–${to} of ${fmtCount(total)}`}
         {scope ? (
           <>
             {compact ? null : " "}

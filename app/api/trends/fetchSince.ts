@@ -1,8 +1,8 @@
 // The sampler's grow-until-cursor pager — the same self-healing pattern the client's
 // _refreshOneMeta uses (src/data/api.ts:414-451): reach provably back to the cursor, capped.
 // Past the cap the gap is ACCEPTED and stays a gap in the series (rule 10: an honest hole
-// beats a fabricated bridge). A COLD cursor (-1) takes one page — history before the
-// feature's deploy simply doesn't exist (no backfill, per spec).
+// beats a fabricated bridge). A COLD cursor (-1) — a chain never read: a new network, or a
+// network's new address — is read back to its first snapshot within the same cap (2026-10-07).
 //
 // THE CAP IS THE SELF-HEAL DEPTH (30,000 records/chain — ~a day of the busiest chain, DOR at
 // ~29K/day; weeks of everything else), and it is walked by CURSOR PAGES, not one giant

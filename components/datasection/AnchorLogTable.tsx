@@ -101,9 +101,9 @@ const Dash = () => (
 // TWO SOURCES, ONE TABLE (user, 2026-08-14 — "the pagination should be based on the total
 // number of snapshots, not what we see in our buffers"):
 //
-//   · Under "all"/unlisted (and DAG, through the ledger lens) the log is WINDOW-scoped — no
-//     merged cross-network history feed exists to page — and its pager says so ("in window")
-//     with the route further back named in words: pick a network.
+//   · Under "all" (and DAG, through the ledger lens) the log is EVERY catalog chain merged by
+//     time with the real total (`useMergedLog`, 2026-10-07); under the unlisted lens it is the
+//     latest rows the live buffer holds — an unlisted channel has no chain to page.
 //   · Under a committed CATALOG network the log pages that network's ENTIRE chain through
 //     /api/network/[address]/snapshots. Ordinals are sequential and gapless, so the newest
 //     ordinal IS the lifetime total and EVERY page is pure arithmetic — page N asks for
@@ -121,7 +121,8 @@ const Dash = () => (
 /** One segment of the chain toggle: a one-word name, the chain's start and address on hover. */
 function ChainSegment({ address, idx, on, onPick }: { address: string; idx: number; on: boolean; onPick: () => void }) {
   const span = useChainSpan(address);
-  const since = span?.genesisTs ? new Date(span.genesisTs).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : null;
+  // A day-only label is a UTC day (M5).
+  const since = span?.genesisTs ? new Date(span.genesisTs).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : null;
   const name = idx === 0 ? "Current" : idx === 1 ? "Earlier" : `Earlier ${idx}`;
   return (
     <button
@@ -229,7 +230,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   const unlistedLastSeen = useUnlistedLastSeen(rawOpen && lens === UNLISTED_ID);
   const merged = useMergedLog(mergedMode && rawOpen, mergedChains, mergedScope, liveTips);
   /** A merged search waiting for its page: land (mark) its first row, or go to the oldest end. */
-  const mergedLand = useRef<"newest" | "oldest" | null>(null);
+  const mergedLand = useRef<"newest" | "oldest" | "landed-oldest" | null>(null);
 
   const [sort, setSort] = useState<{ key: AnchorLogSortKey; dir: 1 | -1 }>({ key: "age", dir: 1 });
   // GROUPED BY GLOBAL SNAPSHOT whenever the rows are in time order (see the table below). Grouped,
@@ -276,6 +277,10 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
    *  hour's Moment would otherwise read as its whole day — the chip repeats the card until the
    *  reader edits the dates themselves. */
   const [doorLabel, setDoorLabel] = useState<string | null>(null);
+  /** WHAT A SEARCH APPLIED, recorded when it runs — the chips read THIS, never the live fields (the
+   *  branch review's I5: typing a number beside an applied range showed two chips, and editing a
+   *  date retitled the chip while the old span stood). Null when no search is in force. */
+  const [applied, setApplied] = useState<{ snapshot: string; tick: string; from: string; to: string; doorLabel: string | null } | null>(null);
   /** The door's EXACT span, kept while its words stand (the tester pass: pressing Search on a
    *  Moment's hand-off re-read the fields as whole UTC days and widened an hour to a day). */
   const [doorSpan, setDoorSpan] = useState<{ fromMs: number; toMs: number } | null>(null);
@@ -344,6 +349,9 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     if (!histAddr) return;
     if (hist.current.net !== histAddr) {
       hist.current = { net: histAddr, pages: new Map(), latest: 0 };
+      // A new chain's walk starts with no failure: an old one would keep the hold-release effect
+      // (keyed on `histErr`) from firing for this chain's own failure (M2).
+      setHistErr(false);
       probes.current.clear();
       setPageState(1);
       setVersion((v) => v + 1);
@@ -656,6 +664,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     // showed both chips while only one was in force). An exact address replaces the other criteria.
     setBound(null); setTimeCut(null); setGlobalSpans(null); setDoorLabel(null); setDoorSpan(null);
     setQTick(""); setQFrom(""); setQTo("");
+    setApplied({ snapshot: qSnapshot, tick: "", from: "", to: "", doorLabel: null });
     const n = Number(qSnapshot.replace(/[^\d]/g, ""));
     if (!Number.isFinite(n) || n < 1) return;
     setJumpMiss(null);
@@ -668,7 +677,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       if (idx < 0) {
         setMarked(null);
         const who = displayNetwork(searchNet)?.ticker ?? "that network";
-        setJumpMiss(`${who} ${n.toLocaleString()} is not in the retained window — commit it in the top bar to page all time`);
+        setJumpMiss(`${who} ${n.toLocaleString()} is not among the latest snapshots — pick its network in the search or the top bar to page all time`);
         return;
       }
       setPageState(Math.floor(idx / PAGE) + 1);
@@ -700,6 +709,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     // One search at a time: a global snapshot replaces a snapshot number or a date range.
     setBound(null); setTimeCut(null); setDoorLabel(null); setDoorSpan(null);
     setQSnapshot(""); setQFrom(""); setQTo("");
+    setApplied({ snapshot: "", tick: qTick, from: "", to: "", doorLabel: null });
     const n = Number(qTick.replace(/[^\d]/g, ""));
     if (!Number.isFinite(n) || n < 1) return;
     setJumpMiss(null);
@@ -796,6 +806,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       }
       landOn(Math.min(...ordinals));
     } catch {
+      setTimeCut(null);
+      setApplied(null);
       setJumpMiss("the chain read failed — try again");
     } finally {
       setSeeking(false);
@@ -829,11 +841,13 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     if (qSnapshot) setQSnapshot("");
     if (qTick) setQTick("");
     setTimeCut({ fromMs, toMs });
+    setApplied({ snapshot: "", tick: "", from: qFrom, to: qTo, doorLabel });
     // UNDER ALL every network's chain is cut to the span (the merged scope reads `timeCut`), with its
     // exact total: a closed span opens on its newest snapshot, a from-date alone on that date.
     if (mergedMode) {
       setBound(null);
       setMarked(null);
+      merged.retry(); // the same search pressed again reads again
       mergedLand.current = toMs != null ? "newest" : "oldest";
       return;
     }
@@ -892,7 +906,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       // chain it was given (see chainSeek's probeBudget), so running out means a pathological run,
       // not a chain that lacks the date — and the probe cache survives the press, so a second one
       // resumes from a narrower bracket instead of starting over.
-      if (hit == null) { setJumpMiss("could not reach that date — press search again"); return; }
+      // A miss applies no range: the chip must not claim a filter that is not in force (M3).
+      if (hit == null) { setTimeCut(null); setApplied(null); setJumpMiss("could not reach that date — press search again"); return; }
       // A range's pages are its own (counted from its newest snapshot): a closed range opens on
       // its first page, a from-date alone on its last — the date it asked for.
       if (span) {
@@ -912,8 +927,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // store bridge — open the search bar, prefill the date criteria, and when the handoff named
   // a network (whose filter commit already happened on the trends side, through the table),
   // run the date seek as soon as the chain's tip is known. Consumed on sight so a later
-  // manual search starts clean; the unscoped case stays prefilled-only (a date seek pages a
-  // committed chain — under "all" the fields wait for the reader, and the bar says why).
+  // manual search starts clean; an unscoped arrival seeks too — under All the merged log is cut
+  // to the span (2026-10-07).
   const logSeek = useStore((st) => st.logSeek);
   const setLogSeek = useStore((st) => st.setLogSeek);
   const pendingSeek = useRef(false);
@@ -1071,7 +1086,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     }
     // A door's snapshot search runs as soon as it can answer: at once against the live window,
     // or once the committed chain's walk is in hand.
-    // A standing global-snapshot search, re-run on the chain now in hand (`reapply` below).
+    // A standing global-snapshot search, re-run on the chain now in hand (the `cutChain` effect).
     if (pendingTick.current && qTick && !seeking && (mergedMode || walkReady)) {
       pendingTick.current = false;
       void seekTick();
@@ -1118,7 +1133,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
 
   /** Any criterion typed — the toggle says so while the row is folded away, or a search would be
    *  silently in force with nothing on screen to explain the rows you are looking at. */
-  const searchSet = !!(qSnapshot || qTick || qFrom || qTo);
+  // What is IN FORCE (the applied record), not what is typed — the chips say only that.
+  const searchSet = applied != null;
 
   // A SEARCH THAT LANDS FOLDS THE BAR (design round, 2026-09-29): the landing mark on the row and
   // the toolbar's applied chip say what is in force, so the fields step aside and the log gets its
@@ -1165,7 +1181,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   );
 
   const clearSearch = () => {
-    setQSnapshot(""); setQTick(""); setQFrom(""); setQTo(""); setDoorLabel(null); setDoorSpan(null); setBound(null); setTimeCut(null); setGlobalSpans(null);
+    setQSnapshot(""); setQTick(""); setQFrom(""); setQTo(""); setDoorLabel(null); setDoorSpan(null); setBound(null); setTimeCut(null); setGlobalSpans(null); setApplied(null);
     // Clearing the search drops a door's scope, and under "all" the log's own pick too.
     setDoorMeta(null);
     if (!lensNet) setSearchMeta(null);
@@ -1220,7 +1236,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         // The date range is ONE condition, so one chip. Clearing the last chip clears the search.
         <span className="inline-flex min-w-0 flex-wrap items-center justify-end gap-2 max-[700px]:flex-1">
           {appliedChips(
-            { snapshot: qSnapshot, tick: qTick, from: qFrom, to: qTo, chain: searchNet, doorLabel },
+            { ...applied!, chain: searchNet },
             (id) => displayNetwork(id)?.ticker ?? id,
             dayWords,
           )
@@ -1228,10 +1244,10 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
               ...c,
               clear:
                 c.key === "snapshot"
-                  ? () => { setQSnapshot(""); setMarked(null); setJumpMiss(null); }
+                  ? () => { setQSnapshot(""); setMarked(null); setJumpMiss(null); setApplied(null); }
                   : c.key === "tick"
-                    ? () => { setQTick(""); setMarked(null); setJumpMiss(null); setGlobalSpans(null); }
-                    : () => { setQFrom(""); setQTo(""); setDoorLabel(null); setDoorSpan(null); setBound(null); setTimeCut(null); },
+                    ? () => { setQTick(""); setMarked(null); setJumpMiss(null); setGlobalSpans(null); setApplied(null); }
+                    : () => { setQFrom(""); setQTo(""); setDoorLabel(null); setDoorSpan(null); setBound(null); setTimeCut(null); setApplied(null); },
             }))
             .map((c, _i, all) => (
               <span
@@ -1283,16 +1299,29 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     </div>
   );
 
+  // A MERGED READ THAT FAILS ENDS AN ARRIVAL'S HOLD (the branch review's I2 — the chain log's
+  // `histErr` rule): the reader sees the failure and its retry, never "Finding…" forever.
+  useEffect(() => {
+    if (mergedMode && merged.error && arriving) {
+      setArriving(false);
+      mergedLand.current = null;
+      setJumpMiss("the snapshot history could not be read — press Search to try again");
+    }
+  }, [mergedMode, merged.error, arriving]);
+
   // A MERGED SEARCH LANDS once its page is here: a from-date alone first goes to the oldest end
   // (the date it asked for), then the page's first row is marked — and an arrival commits it below.
   useEffect(() => {
     if (!mergedMode || !mergedLand.current || merged.loading || !merged.rows) return;
     if (mergedLand.current === "oldest") {
-      mergedLand.current = "newest";
+      mergedLand.current = "landed-oldest";
       if (merged.pages > 1) { merged.go(merged.pages); return; }
     }
+    // A from-date alone landed on the OLDEST page, so its mark is that page's oldest row — the date
+    // asked for (M1); a closed range's is its newest.
+    const landing = mergedLand.current;
     mergedLand.current = null;
-    const first = merged.rows[0];
+    const first = landing === "newest" ? merged.rows[0] : merged.rows[merged.rows.length - 1];
     if (first) setMarked(first.ordinal);
     else { setArriving(false); setJumpMiss("no snapshots in that range"); }
   });
@@ -1351,7 +1380,12 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         {toolbar}
         {search}
         {merged.error ? (
-          <p className="m-auto text-label text-muted-foreground">The snapshot history could not be read — search again to retry</p>
+          <p className="m-auto flex items-center gap-3 text-label text-muted-foreground">
+            The snapshot history could not be read.
+            <button type="button" onClick={merged.retry} className="rounded-btn border border-border px-2 py-1 text-foreground hover:bg-wash-faint cursor-pointer">
+              Try again
+            </button>
+          </p>
         ) : (
           <div className={cn("m-auto", firstRead.fading && "animate-hold-fade-out motion-reduce:animate-none")}>{waiting("Reading every network's snapshots…")}</div>
         )}
@@ -1386,6 +1420,16 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     <>
       {toolbar}
       {search}
+      {/* A PAGE THAT FAILED TO READ says so beside the rows still on screen, with its retry (the
+          branch review's I1: the table sat dimmed with no word). */}
+      {mergedMode && merged.error && merged.rows && (
+        <p className="flex-none m-0 pb-2 flex items-center gap-3 text-label text-[var(--warn-soft)]">
+          That page could not be read.
+          <button type="button" onClick={merged.retry} className="rounded-btn border border-border px-2 py-0.5 text-foreground hover:bg-wash-faint cursor-pointer">
+            Try again
+          </button>
+        </p>
+      )}
       {/* THE UNLISTED REMAINDER OF A GLOBAL SNAPSHOT, said rather than dropped. */}
       {mergedMode && globalSpans && globalUnlisted > 0 && (
         <p className="flex-none m-0 pb-2 text-label text-muted-foreground">
@@ -1703,6 +1747,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         // While the networks' spans are still being measured, the count slot twinkles (NodeStars —
         // a value arriving into its slot).
         totalPending={mergedMode && merged.total == null}
+        // A chain that could not be read or searched makes the merged total a FLOOR (I3).
+        floor={mergedMode && merged.floor}
         // The windowed lenses state their scope and the way further back (user, 2026-08-14) —
         // since 2026-09-02 as one underlined word with the explanation behind it, because the
         // spelled-out line ran too long. The word was "window" until 2026-09-13, which named
