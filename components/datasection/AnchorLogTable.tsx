@@ -1,6 +1,6 @@
 "use client";
 
-import { netUrl } from "@/src/net/current";
+import { METAGRAPHS, netUrl } from "@/src/net/current";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, ChevronDown, Search, X } from "lucide-react";
 import type { CSSProperties } from "react";
@@ -202,14 +202,10 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // window: an unlisted channel has no public chain to page.
   const mergedMode = !histNet && lens === "all";
   const metaList = useStore((st) => st.metaList);
-  const mergedChains = useMemo(() => {
-    const out: string[] = [];
-    for (const m of metaList) {
-      if (m.isRoot || !metagraphById(m.id)) continue;
-      for (const addr of [m.id, ...(metagraphById(m.id)?.formerIds ?? [])]) if (!out.includes(addr)) out.push(addr);
-    }
-    return out;
-  }, [metaList]);
+  // THE CATALOG'S CHAINS, not the live directory's (2026-10-07 — retirement): every network the
+  // catalog has, RETIRED ones included, with their former addresses, so the all-time total and the
+  // records of a network Constellation no longer lists survive its removal.
+  const mergedChains = useMemo(() => METAGRAPHS.flatMap((m) => [m.id, ...(m.formerIds ?? [])]).filter((a, i, all) => !!a && all.indexOf(a) === i), []);
   // The live buffer's newest ordinal per chain — the merged log's tips lead with it.
   const liveTips: Record<string, number> = {};
   if (net) for (const [addr, snaps] of net.metaSnaps) for (const r of snaps) if (r.ordinal > (liveTips[addr] ?? 0)) liveTips[addr] = r.ordinal;
@@ -1083,6 +1079,12 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       if (m.isRoot || seen.has(m.id)) continue;
       seen.add(m.id);
       out.push({ id: m.id, label: displayNetwork(m.id)?.ticker ?? m.symbol ?? m.name });
+    }
+    // …and the RETIRED networks the live directory no longer lists: their records are still here.
+    for (const m of METAGRAPHS) {
+      if (!m.retiredAt || seen.has(m.id)) continue;
+      seen.add(m.id);
+      out.push({ id: m.id, label: `${m.ticker || m.name} (retired)` });
     }
     return out;
   }, [metaList]);

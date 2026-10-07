@@ -1,10 +1,11 @@
 // OFFLINE bake — run manually when the metagraph set changes: `npx tsx scripts/bake-brand-hues.ts`.
 // Derives each metagraph's identity hue from its brand (logo, then site theme-color) and writes
 // data/brand-hues.json. NEVER imported by the app/runtime — jimp is a devDependency only.
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { Jimp } from "jimp";
 import { parseSvgFills, pickBrandColor, snapToAllowedZone, hexToOklch, spreadColliding } from "../src/palette/brand";
 import { NETWORKS, type NetworkId } from "../src/engine/config";
+import { lineageIds } from "../src/net/lineage";
 
 type Meta = { id: string; name: string; iconUrl: string; siteUrl: string };
 const overrides = JSON.parse(readFileSync("data/brand-hue-overrides.json", "utf8")) as Record<string, number>;
@@ -127,6 +128,21 @@ async function main() {
     // "dag" is shared by every group; its mainnet spread wins (first written stays).
     for (const [id, r] of Object.entries(group)) if (!(id in out)) out[id] = r;
   }
+
+  // ⚠️ A NETWORK THE DIRECTORY NO LONGER LISTS KEEPS ITS COLOUR (2026-10-07 — retirement). This
+  // bake reads the LIVE directory, so a removed network would silently lose its pin and fall back
+  // to another hue in History. Every address the catalog still tracks (retired networks and former
+  // chains included) carries its existing pin over unchanged.
+  const prior: Record<string, { hueDeg: number; srcHex: string; source: string }> = existsSync("data/brand-hues.json")
+    ? JSON.parse(readFileSync("data/brand-hues.json", "utf8"))
+    : {};
+  let kept = 0;
+  for (const net of Object.keys(NETWORKS) as NetworkId[]) {
+    for (const id of lineageIds(net)) {
+      if (!(id in out) && prior[id]) { out[id] = prior[id]; kept++; console.log(`kept the pin of ${id} (no longer in the directory)`); }
+    }
+  }
+  if (kept) console.log(`${kept} pin(s) carried over for catalog networks the directory no longer lists`);
 
   writeFileSync("data/brand-hues.json", JSON.stringify(out, null, 2) + "\n");
   console.log(`\nwrote data/brand-hues.json (${Object.keys(out).length} entries / ${total} rows probed)`);

@@ -5,6 +5,7 @@
 import { METAGRAPHS, NET_DEF } from "@/src/net/current";
 import { COLORS, POLL, type MetaConfig } from "@/src/engine/config";
 import type { Anchor, ClusterNode, DagCore, GlobalSnapshot } from "@/src/data/types";
+import { activeRows } from "@/src/net/lineage";
 
 
 // ── POLL HEALTH — the pulse strip's read (user, 2026-08-30: clicking the heartbeat should show
@@ -428,7 +429,8 @@ export class NetworkData {
     // failing metagraph was MASKED: its eleven healthy siblings refreshed `lastOkAt` in the same
     // cycle, so the strip's derived dot stayed green while a feed was down. One row per FEED means
     // the row must answer for the whole feed.
-    const results = await Promise.allSettled(METAGRAPHS.map((m) => this._refreshOneMeta(m, limit)));
+    // A RETIRED network is not polled (`activeRows`): it has stopped, and its history is the store's.
+    const results = await Promise.allSettled(activeRows(METAGRAPHS).map((m) => this._refreshOneMeta(m, limit)));
     reportPoll("metasnaps", cycleOk(results));
   }
 

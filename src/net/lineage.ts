@@ -20,6 +20,21 @@ import { CATALOG, type NetworkId } from "@/src/engine/config";
 
 const catalogOf = (net: string) => CATALOG[net as NetworkId] ?? [];
 
+/** Is this catalog row RETIRED — a network that has stopped, kept for its history (`retiredAt`)? */
+export function isRetired(m: { retiredAt?: string }): boolean {
+  return !!m.retiredAt;
+}
+
+/** The rows still worth READING: everything the catalog lists, minus the retired networks. */
+export function activeRows<T extends { retiredAt?: string }>(rows: readonly T[]): T[] {
+  return rows.filter((m) => !isRetired(m));
+}
+
+/** The current ids the trends sampler reads — every catalog network that is not retired. */
+export function sampledIds(net: string): string[] {
+  return activeRows(catalogOf(net)).map((m) => m.id).filter((id): id is string => !!id);
+}
+
 /** Every address the network's catalog has ever tracked — current ids and former ones. */
 export function lineageIds(net: string): string[] {
   return catalogOf(net).flatMap((m) => [m.id, ...(m.formerIds ?? [])]).filter((id): id is string => !!id);

@@ -55,3 +55,25 @@ chain: a DATE picks the chain whose genesis precedes it, a GLOBAL snapshot the c
 anchored into it. A metagraph ORDINAL cannot (both chains have a #2), so it searches the chain on
 screen. ⚠️ A chain switch re-reads the tip, and a pending seek must wait for it (`walkReady`) —
 run against the previous chain's `latest` it pages to the wrong place.
+
+## A network is retired, never deleted (2026-10-07)
+
+User: "inactive networks like SWAP and PACA will be removed … how can we ensure that we can still
+view these networks in trend view history etc and keep their colors". The catalog row is what gives
+a network its name, ticker, colour and History row, and the trends store keeps its measured past
+forever — delete the row and that past becomes a raw address nothing shows.
+
+**To retire a network, add `retiredAt: "YYYY-MM-DD"` to its catalog row — nothing else.** Then:
+
+- it stops being READ: the trends sampler (`lineage.sampledIds`) and the live poll (`activeRows`)
+  skip it;
+- History keeps its row and its plane; where it measured nothing in the span its figure says
+  "retired" instead of a dash, and the row's hover gives the date;
+- the raw log under All still pages its chain (the merged log reads the CATALOG's chains, former
+  addresses included), and the search's network picker lists it as "TICKER (retired)";
+- `scripts/bake-brand-hues.ts` carries its existing colour pin over even though the live directory
+  no longer lists it;
+- the live views (filter strip, Hypergraph, Geography) drop it on their own — they show what runs.
+
+`src/net/catalogKeeps.test.ts` lists every address the catalog has ever held and fails if one
+disappears. A new network or a re-registration adds its address there in the same change.

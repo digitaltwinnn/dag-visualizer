@@ -353,4 +353,6 @@ export interface MetagraphConfig {
   siteUrl?: string; // config-level site (the DAG core; metagraphs get theirs from the live metaList)
   /** Addresses the network used before `id` (config `MetaConfig.formerIds`). */
   formerIds?: string[];
+  /** The date the network stopped (config `MetaConfig.retiredAt`) — kept for its history. */
+  retiredAt?: string;
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { NETWORKS, CATALOG } from "@/src/engine/config";
+import { NETWORKS } from "@/src/engine/config";
+import { sampledIds } from "@/src/net/lineage";
 import { netOf } from "@/src/net/request";
 import { getLive } from "@/app/api/metagraphs/live";
 import { getLiveGeo } from "@/app/api/geo/live";
@@ -96,7 +97,9 @@ export async function GET(req: Request) {
   try {
     const res = await runSample({
       net,
-      metaIds: CATALOG[net].map((m) => m.id).filter((id): id is string => !!id),
+      // Every catalog network that is NOT RETIRED (`sampledIds`): a retired network keeps its stored
+      // past and its row, and stops being read — paging a stopped chain every 15 minutes is waste.
+      metaIds: sampledIds(net),
       store: writeStore(),
       // Catch-up pages ride the explorer's own `meta.next` cursor — one request can't go
       // past ~10K records (probed live: the global list returns EMPTY above 10K and the

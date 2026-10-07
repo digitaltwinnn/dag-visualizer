@@ -79,6 +79,14 @@ export interface MetaConfig {
    *  state-channel address, and a re-registration gives it a new one; listing the old ones here
    *  is what keeps it one network with one history (`src/net/lineage.ts`). */
   formerIds?: string[];
+  /** RETIRED (user, 2026-10-07: "inactive networks … will be removed … how can we ensure that we
+   *  can still view these networks in trend view history etc and keep their colors"). The UTC date
+   *  a network stopped (YYYY-MM-DD). A retired row is NEVER deleted — it keeps the network's name,
+   *  ticker, colour and history (`src/net/catalogKeeps.test.ts` fails if a row disappears); it only
+   *  stops being read: the trends sampler and the live poll skip it (`src/net/lineage.ts`). History
+   *  still lists it, tagged "retired", and the raw log still pages its chain. To retire a network,
+   *  add this date to its row — nothing else. */
+  retiredAt?: string;
   blurb: string;
 }
 

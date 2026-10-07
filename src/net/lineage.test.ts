@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { CATALOG } from "@/src/engine/config";
-import { currentIdOf, foldLineage, isTracked, lineageIds } from "./lineage";
+import { activeRows, currentIdOf, foldLineage, isRetired, isTracked, lineageIds, sampledIds } from "./lineage";
 
 const op = (n: string) => (n.endsWith("gapMax") ? "max" : n.startsWith("f.") ? "set" : "add") as "add" | "max" | "set";
 // The catalog's own re-registered network — the fact these rules exist for.
@@ -63,5 +63,27 @@ describe("foldLineage (one history per network)", () => {
     expect(out[`f.nodes.${row.id}`]).toEqual([3, 3]);
     expect(out[`f.layer.${row.id}.l0`]).toEqual([3, null]);
     expect(Object.keys(out).some((k) => k.includes(former))).toBe(false);
+  });
+});
+
+// RETIREMENT (user, 2026-10-07: "inactive networks like SWAP and PACA will be removed … how can we
+// ensure that we can still view these networks in trend view history etc and keep their colors").
+// A retired network keeps its catalog row — its name, ticker, colour and history — and only stops
+// being READ: no sampler pass, no live poll.
+describe("retired networks", () => {
+  const rows = [
+    { id: "A", name: "Alive", ticker: "A", color: 1, blurb: "" },
+    { id: "R", name: "Retired", ticker: "R", color: 2, blurb: "", retiredAt: "2026-11-01" },
+  ];
+  it("a row with a retirement date is retired; one without is not", () => {
+    expect(isRetired(rows[0]!)).toBe(false);
+    expect(isRetired(rows[1]!)).toBe(true);
+  });
+  it("only the active rows are read", () => {
+    expect(activeRows(rows).map((m) => m.id)).toEqual(["A"]);
+  });
+  it("the sampler reads every catalog network that is not retired", () => {
+    const ids = sampledIds("mainnet");
+    expect(ids).toEqual(CATALOG.mainnet.filter((m) => !m.retiredAt).map((m) => m.id));
   });
 });
