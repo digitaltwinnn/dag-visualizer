@@ -63,7 +63,15 @@ view these networks in trend view history etc and keep their colors". The catalo
 a network its name, ticker, colour and History row, and the trends store keeps its measured past
 forever — delete the row and that past becomes a raw address nothing shows.
 
-**To retire a network, add `retiredAt: "YYYY-MM-DD"` to its catalog row — nothing else.** Then:
+**Retirement normally happens in the brand bake** (`scripts/bake-brand-hues.ts`, user 2026-10-07:
+"can it be done when we bake/rebake the network?"). For each catalog network the bake asks two
+questions — is it still in the live directory, and when did its chain last anchor — and retires it
+only when BOTH say so: gone from the directory AND silent for a week (`src/net/retire.ts`). The date
+is the chain's LAST snapshot. It is written to `data/retired.json` (added to, never removed from),
+printed, and reviewed in the diff like the colours. Either fact alone is printed under "LOOK AT
+THESE" and changes nothing — a flaky directory read can never retire a network. A person can also
+retire one by hand with `retiredAt: "YYYY-MM-DD"` on its catalog row; `lineage.retiredAtOf` reads
+both. Then:
 
 - it stops being READ: the trends sampler (`lineage.sampledIds`) and the live poll (`activeRows`)
   skip it;

@@ -17,16 +17,24 @@
 //
 // Pure: plain data in, plain data out. It reads the catalog and nothing else.
 import { CATALOG, type NetworkId } from "@/src/engine/config";
+import RETIRED from "@/data/retired.json";
 
 const catalogOf = (net: string) => CATALOG[net as NetworkId] ?? [];
 
-/** Is this catalog row RETIRED — a network that has stopped, kept for its history (`retiredAt`)? */
-export function isRetired(m: { retiredAt?: string }): boolean {
-  return !!m.retiredAt;
+/** When a network stopped: its catalog row's own `retiredAt`, else the date the brand bake wrote
+ *  for it (`data/retired.json` — `scripts/bake-brand-hues.ts`, from two facts at once: gone from
+ *  the directory AND its chain silent a week; `src/net/retire.ts`). Null while it runs. */
+export function retiredAtOf(m: { id?: string; retiredAt?: string }): string | null {
+  return m.retiredAt ?? (m.id ? (RETIRED as Record<string, string>)[m.id] : undefined) ?? null;
+}
+
+/** Is this catalog row RETIRED — a network that has stopped, kept for its history? */
+export function isRetired(m: { id?: string; retiredAt?: string }): boolean {
+  return retiredAtOf(m) != null;
 }
 
 /** The rows still worth READING: everything the catalog lists, minus the retired networks. */
-export function activeRows<T extends { retiredAt?: string }>(rows: readonly T[]): T[] {
+export function activeRows<T extends { id?: string; retiredAt?: string }>(rows: readonly T[]): T[] {
   return rows.filter((m) => !isRetired(m));
 }
 

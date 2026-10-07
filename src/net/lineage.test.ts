@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { CATALOG } from "@/src/engine/config";
-import { activeRows, currentIdOf, foldLineage, isRetired, isTracked, lineageIds, sampledIds } from "./lineage";
+import { activeRows, currentIdOf, foldLineage, isRetired, isTracked, lineageIds, retiredAtOf, sampledIds } from "./lineage";
 
 const op = (n: string) => (n.endsWith("gapMax") ? "max" : n.startsWith("f.") ? "set" : "add") as "add" | "max" | "set";
 // The catalog's own re-registered network — the fact these rules exist for.
@@ -75,6 +75,10 @@ describe("retired networks", () => {
     { id: "A", name: "Alive", ticker: "A", color: 1, blurb: "" },
     { id: "R", name: "Retired", ticker: "R", color: 2, blurb: "", retiredAt: "2026-11-01" },
   ];
+  it("a retirement comes from the row itself or from the bake's file (data/retired.json)", () => {
+    expect(retiredAtOf({ id: "X", retiredAt: "2026-11-02" })).toBe("2026-11-02");
+    expect(retiredAtOf({ id: "nobody" })).toBeNull();
+  });
   it("a row with a retirement date is retired; one without is not", () => {
     expect(isRetired(rows[0]!)).toBe(false);
     expect(isRetired(rows[1]!)).toBe(true);

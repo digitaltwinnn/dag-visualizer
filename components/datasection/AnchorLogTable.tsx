@@ -31,6 +31,7 @@ import { useMergedLog, type MergedScope } from "@/components/datasection/useMerg
 import type { ChainSpan } from "@/src/data/mergedLog";
 import { useMinHold } from "@/components/useMinHold";
 import { NodeStars } from "@/components/state/StateAtoms";
+import { isRetired } from "@/src/net/lineage";
 
 // The retained global window the log joins against — the same buffer the strip's bars plot,
 // one row per anchored metagraph snapshot inside it.
@@ -1082,7 +1083,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     }
     // …and the RETIRED networks the live directory no longer lists: their records are still here.
     for (const m of METAGRAPHS) {
-      if (!m.retiredAt || seen.has(m.id)) continue;
+      if (!isRetired(m) || seen.has(m.id)) continue;
       seen.add(m.id);
       out.push({ id: m.id, label: `${m.ticker || m.name} (retired)` });
     }

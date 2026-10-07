@@ -7,6 +7,7 @@ import { identityHudCss, identityHudNumber } from "@/src/palette/identity";
 import { UNLISTED_ID, UNLISTED_HUE } from "@/src/data/unlistedId";  // the LEAF, not unlisted.ts: importing the
 // network module here would close an import cycle (see src/data/unlistedId.ts).
 import { pickNetId } from "@/src/engine/domain/pickActions";
+import { retiredAtOf } from "@/src/net/lineage";
 
 export { shortHash };
 export const COLORS = RAW_COLORS;
@@ -323,7 +324,8 @@ export function metagraphById(id: string): MetagraphConfig | null {
   // …by its current id OR a former address (`src/net/lineage.ts`): a re-registered network's
   // old chain is still that network, never an unknown one.
   const cfg = (METAGRAPHS as MetagraphConfig[]).find((m) => m.id === id || m.formerIds?.includes(id) === true);
-  return cfg ? { ...cfg, color: identityHudNumber(id) } : null;
+  // The retirement is the row's own or the bake's (`retiredAtOf`), so every reader sees one answer.
+  return cfg ? { ...cfg, color: identityHudNumber(id), retiredAt: retiredAtOf(cfg) ?? undefined } : null;
 }
 
 // The accent colour for the active network filter, as a CSS colour string — the selected
