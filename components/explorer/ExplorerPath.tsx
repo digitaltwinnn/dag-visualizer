@@ -82,7 +82,9 @@ export default function ExplorerPath({ crumbs, hint, className }: { crumbs: read
               // characters. The root is a glyph and never shrinks.
               className={cn(
                 "gap-0",
-                last ? "min-w-[40%] flex-1" : c.root ? "shrink-0" : "min-w-[3.25rem] max-w-[45%] shrink",
+                // The root as the only step HUGS its house — a full-width bar holding one glyph reads
+                // as an empty field.
+                last && c.root ? "shrink-0" : last ? "min-w-[40%] flex-1" : c.root ? "shrink-0" : "min-w-[3.25rem] max-w-[45%] shrink",
                 !first && "-ml-[5px]",
               )}
             >
@@ -90,10 +92,18 @@ export default function ExplorerPath({ crumbs, hint, className }: { crumbs: read
                 // "YOU ARE HERE" IS A LABEL, NOT TEXT (user, 2026-10-07: "the mouse pointer is |"): its
                 // list is already on screen, so it takes no click — the default cursor and no text
                 // selection keep it from reading as a broken link beside the steps that do.
-                <BreadcrumbPage className={cn(STEP, shape, pad, "w-full cursor-default select-none bg-wash-strong text-foreground")} title={c.title}>
-                  {/* The root as the page — nothing opened yet: the house, then the root's word. */}
-                  {c.root && <House aria-hidden className="size-3.5 flex-none" />}
-                  <span className="min-w-0 truncate [&>*]:align-middle">{c.label}</span>
+                <BreadcrumbPage className={cn(STEP, shape, pad, "cursor-default select-none bg-wash-strong text-foreground", !c.root && "w-full")} title={c.title}>
+                  {/* THE ROOT AS THE PAGE IS THE HOUSE ALONE (user, 2026-10-07): its word is the card's
+                      title one line above, so printing it here said the same thing twice. The word
+                      stays the step's accessible name; the bar gains a name once a level is opened. */}
+                  {c.root ? (
+                    <>
+                      <House aria-hidden className="size-3.5 flex-none" />
+                      <span className="sr-only">{c.label}</span>
+                    </>
+                  ) : (
+                    <span className="min-w-0 truncate [&>*]:align-middle">{c.label}</span>
+                  )}
                 </BreadcrumbPage>
               ) : (
                 <button
