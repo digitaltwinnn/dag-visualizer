@@ -14,7 +14,7 @@ import type { RailCardKind } from "@/components/railCards";
 const EMPTY_SNAPS: never[] = []; // stable ref — the non-snap slots' tick placeholder
 
 /** The plain state `railSiblings` reads, for one rail slot — ONE builder shared by the card's sibling
- *  pager and the next ghost's quick picks (2026-10-04), so the two can never read the rail
+ *  pager and the next ghost's first-child step (2026-10-07), so the two can never read the rail
  *  differently. The two live reads `railSiblings` can't make itself (the network singleton and the
  *  story rule) are made only for the slot that uses them: the tick window is the snapshot slot's
  *  alone, so only it re-derives on a feed tick. */

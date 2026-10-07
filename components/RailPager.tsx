@@ -424,7 +424,7 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
   // THE LADDER PAIR IS GONE (user, 2026-10-04: "do we still need it actually? … now the ghost is
   // clickable"). ∧ duplicated a click on the committed card above; ∨'s re-box duplicated a click on
   // the one below, and its one unique job — commit the first child where nothing finer is committed —
-  // moved into the NEXT GHOST card's quick picks (Inspector, `childSteps`). The foot is one axis now.
+  // moved into the NEXT GHOST card, whose click is that step (Inspector, `childStep`). The foot is one axis now.
   // `stillLane` stays: the sibling slide arms the same hover-inert window.
   const stillLane = (ms = rollWindowMs()) => {
     const lane = wrap.current?.closest(".rail-ladder");

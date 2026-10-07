@@ -472,8 +472,8 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
  *  so a rung's sibling set and its parent's child step still commit the same subject through the
  *  same pickActions builder. */
 /** A rung's CHILDREN in the explorer's own order — the first `n` of them. The pager's old ∨ took the
- *  first; the NEXT GHOST card offers the first few as quick picks (user, 2026-10-04 — "now the
- *  ghost is clickable; something more we can do with that?"), so the step is a list. */
+ *  first, and so does the NEXT GHOST card that replaced it (user, 2026-10-07 — a click on it opens
+ *  the first child, as ∨ did; the 2026-10-04 quick-pick list is retired). */
 interface ChildEntry { to: RailCardKind; steps: (s: SiblingState, n: number) => SiblingStep[] }
 
 // geo: the explorer's own first rows, countries count-desc. Like every child-of-the-dossier step
@@ -580,13 +580,7 @@ export const CHILD_OF: Partial<Record<Mode, Partial<Record<RailCardKind, ChildEn
 /** The rung's first child, or null when there is nothing finer to open.
  *  A node and a metagraph snapshot are leaves; About and the tool card never focus. */
 export function childStep(slot: RailCardKind, s: SiblingState): SiblingStep | null {
-  return childSteps(slot, s, 1)[0] ?? null;
-}
-
-/** The rung's first `n` children, in the explorer's own order, and the card they open (`to`) — the
- *  NEXT GHOST's quick picks (2026-10-04). Empty where there is nothing finer to open. */
-export function childSteps(slot: RailCardKind, s: SiblingState, n: number): SiblingStep[] {
-  return CHILD_OF[s.mode]?.[slot]?.steps(s, n) ?? [];
+  return CHILD_OF[s.mode]?.[slot]?.steps(s, 1)[0] ?? null;
 }
 
 /** Which of a sibling set's position marks the pager draws (user, 2026-10-04 — every card's pager
