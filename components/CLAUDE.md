@@ -309,6 +309,13 @@ the executor's `trendCursor` action, and the Range's next ghost opens its first 
 lead is the same sentence shape for one bucket (`momentPhrase`: "DED anchored 7 snapshots in those
 5 minutes" — never a rate, never a rank).
 
+**The Metagraph card stands on the plane brought forward** (user, 2026-10-07: "if we click a
+network in explorer, should we set the metagraph card accordingly? (not the global filter
+though)"): `trendStack.cardNetwork` — the focus, else the filter — read by the manifest and the
+card, the Snapshots tick-local network's precedent. A focus bumps the network slot so the card it
+opens is the box; its × releases the focus, never the filter; and it carries no ‹ › while it stands
+on a focus (a filter step would write the top bar, and the stack's order lives only in React).
+
 **History's lane was the network dossier, then the MOMENT** (2026-09-19; named "Instant" until 2026-09-26) — the cursor card, a slot
 with NO focus rung, exactly as the two snapshot slots are. Its subject is `trendCursorMs`, which the
 band's timeline writes at most once per BUCKET (`sameBucket`, both gestures since 2026-09-19), so the

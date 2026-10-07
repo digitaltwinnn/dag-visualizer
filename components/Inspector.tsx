@@ -421,9 +421,10 @@ export default function Inspector() {
   const coarse = usePointerCoarse();
   const trendCursorMs = useStore((s) => s.trendCursorMs);
   const trendRange = useStore((s) => s.trendRange);
+  const trendFocus = useStore((s) => s.trendFocus);
   const tickHasFilter = useTickHasFilter();
   const manifest = detailsCards({
-    mode, filter, tickNet, tickHasFilter, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs, trendRange,
+    mode, filter, tickNet, tickHasFilter, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs, trendRange, trendFocus,
     selNodesCount: selNodes.length,
     filterLabel: displayNetwork(filter)?.ticker ?? null, // one lookup — catalog + the unlisted pseudo-network
   });
@@ -515,6 +516,9 @@ export default function Inspector() {
     trendCursorMs ?? "",
     // …and the RANGE, the cursor's parent (2026-10-07), for the same reason.
     trendRange ? `${trendRange.fromMs}-${trendRange.toMs}` : "",
+    // …and the PLANE FOCUS, which names the Metagraph card here (2026-10-07): a row click is a
+    // new selection moment, or a fold override from before it keeps the card shut.
+    trendFocus ?? "",
     // While FOLLOWING, the auto-advancing ordinals are NOT a new selection moment — the heartbeat
     // must not drop the user's +/− overrides every ~4s (item 8; advanceSnap already keeps the
     // recency stack still for the same reason). Guards BOTH live-advanced cards: the global

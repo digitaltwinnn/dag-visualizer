@@ -27,6 +27,7 @@ export function useLadderFocus(): string | null {
   // derivation has to see it or the cursor card can never be the box.
   const trendCursorMs = useStore((s) => s.trendCursorMs);
   const trendRange = useStore((s) => s.trendRange);
+  const trendFocus = useStore((s) => s.trendFocus);
   const tickHasFilter = useTickHasFilter();
-  return focusSlotId({ mode, filter, tickNet, tickHasFilter, country, cohort, composition, inspect, snap, metaSnap, trendCursorMs, trendRange, selStack });
+  return focusSlotId({ mode, filter, tickNet, tickHasFilter, country, cohort, composition, inspect, snap, metaSnap, trendCursorMs, trendRange, trendFocus, selStack });
 }

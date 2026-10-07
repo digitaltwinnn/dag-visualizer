@@ -100,6 +100,8 @@ export interface SiblingState {
   /** History's brushed range and time cursor — the Range card and the Moment under it. */
   trendRange: { fromMs: number; toMs: number } | null;
   trendCursorMs: number | null;
+  /** History's plane focus — the network its Metagraph card stands on when set. */
+  trendFocus?: string | null;
 }
 
 export interface SiblingStep {
@@ -243,6 +245,10 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         const items = nets.map((m) => ({ key: m.id, label: m.name, actions: tickNetSelectActions(m.id, s.snap!, { metaSnap: s.metaSnap, hasInspect: s.inspect != null, net }) }));
         return finish(slot, items, nets.findIndex((m) => m.id === net), `Global ${s.snap!.data.ordinal.toLocaleString()}`);
       }
+      // IN HISTORY, A CARD STANDING ON A PLANE FOCUS HAS NO PAGER (2026-10-07): the focus is not the
+      // filter, so a filter step would write the top bar, and History's network order is the
+      // stack's roster, which only React holds (`trendIds` is never read back by a component).
+      if (s.mode === "trend" && s.trendFocus != null && s.trendFocus !== s.filter) return null;
       // Hypergraph steps its explorer's network list, in the picked figure's order (one list per
       // level, 2026-10-07); elsewhere the Metagraph card has no explorer level above it and keeps the
       // filter strip's located order (0-located rows stay steppable, as the strip keeps them clickable).

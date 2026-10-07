@@ -713,3 +713,12 @@ describe("siblingSet — instant (a moment inside the committed range)", () => {
     expect(childStep("range", trend({}))!.actions).toEqual([{ kind: "trendCursor", ms: R.fromMs }]);
   });
 });
+
+describe("siblingSet — History's Metagraph card on a plane focus", () => {
+  it("has no pager: a filter step would write the top bar", () => {
+    expect(siblingSet("context", base({ mode: "trend", filter: "all", trendFocus: "ded" }))).toBeNull();
+  });
+  it("…while one standing on the filter keeps the filter's pager", () => {
+    expect(siblingSet("context", base({ mode: "trend", filter: "ded", trendFocus: null }))).not.toBeNull();
+  });
+});

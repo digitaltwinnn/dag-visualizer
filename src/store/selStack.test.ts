@@ -66,3 +66,12 @@ describe("the RANGE takes a place in the stack (History's Range card, 2026-10-07
     expect(useStore.getState().selStack).toEqual([]);
   });
 });
+
+describe("a plane focus bumps the network slot (History's Metagraph card, 2026-10-07)", () => {
+  beforeEach(() => useStore.setState({ selStack: [], trendFocus: null, filter: "all" }));
+  it("focusing a plane makes the Metagraph card the active card", () => {
+    useStore.getState().setTrendCursor(1_000);
+    useStore.getState().setTrendFocus("dor");
+    expect(useStore.getState().selStack).toEqual(["network", "instant"]);
+  });
+});

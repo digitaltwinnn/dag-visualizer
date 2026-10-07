@@ -413,3 +413,19 @@ describe("the ledger lane leads with the tick", () => {
     expect(ladderSlotIds("geo")[0]).toBe("context");
   });
 });
+
+// History's Metagraph card stands on the plane brought forward (2026-10-07), never on a written filter.
+describe("the Metagraph card in History follows the plane focus", () => {
+  const trend = (over: Partial<RailManifestState> = {}) => details({ mode: "trend", ...over });
+  it("a focus under All populates it, keyed on the focused network", () => {
+    const c = detailsCards(trend({ trendFocus: "dor" })).find((x) => x.id === "context")!;
+    expect(c.present).toBe(true);
+    expect(c.subjectKey).toBe("dor");
+  });
+  it("is the focus slot after a plane click", () => {
+    expect(focusSlotId({ ...trend({ trendFocus: "dor" }), selStack: ["network"] })).toBe("context");
+  });
+  it("no focus and no filter is still the ghost", () => {
+    expect(detailsCards(trend()).find((x) => x.id === "context")!.present).toBe(false);
+  });
+});

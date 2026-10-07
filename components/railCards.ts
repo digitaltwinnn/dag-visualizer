@@ -1,5 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { ledgerCardNetwork } from "@/src/engine/domain/tickNet";
+import { cardNetwork } from "@/src/engine/domain/trendStack";
 import type { TickNetSel } from "@/src/data/types";
 import { EXPLORE_ICON, INSTANT_ICON, RANGE_ICON, iconForPick } from "@/components/icons";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -97,8 +98,9 @@ const DISPLAY_LANE: Partial<Record<Mode, readonly string[]>> = {
   // focus rung — the two snapshot slots' precedent, and `railLadderBoundary.test.ts` asserts
   // rung → slot rather than the reverse. It sits UNDER the dossier because the lane is a
   // containment claim read coarse→fine: a network is the subject, and the cursor is one moment of
-  // it. (A focused PLANE gets no card of its own: a plane IS its network's chart, and the dossier
-  // above already stands for the network — which is also why it is no ladder rung.)
+  // it. (A focused PLANE gets no card of its own: a plane IS its network's chart, so the dossier
+  // stands on it — `trendStack.cardNetwork`, the focus else the filter, 2026-10-07 — which is also
+  // why it is no ladder rung.)
   // The RANGE sits between them (user, 2026-10-07: "range -> moment is also a logical parent -
   // child relation"): a brushed span of the network, and the cursor one moment inside it. Like
   // `instant`, a card slot with no rung.
@@ -113,7 +115,7 @@ export function ladderSlotIds(mode: Mode): string[] {
  *  inputs (which can't change a slot's presence). */
 export type LadderState = Pick<
   RailManifestState,
-  "mode" | "filter" | "tickNet" | "tickHasFilter" | "inspect" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "trendCursorMs" | "trendRange"
+  "mode" | "filter" | "tickNet" | "tickHasFilter" | "inspect" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "trendCursorMs" | "trendRange" | "trendFocus"
 > & {
   /** The store's selection recency (most-recent-FIRST) — the collapse rule reads it (item 8):
    *  the most recently selected present card is the ACTIVE one; the rest rest collapsed. */
@@ -202,6 +204,8 @@ export interface RailManifestState {
   /** THE BRUSHED RANGE (History, 2026-10-07) — `store.trendRange`, the Moment's parent. Optional
    *  for the same reason as the cursor: only History produces its card. */
   trendRange?: { fromMs: number; toMs: number } | null;
+  /** History's plane focus (`store.trendFocus`) — the network its Metagraph card stands on. */
+  trendFocus?: string | null;
   /** The selected metagraph-snapshot TILE — ledger's own card slot (spec 2026-08-04), not a
    *  ladder rung. Optional: the ladder derivation (`LadderState`) and its callers never carry
    *  this field, so `detailsCards` treats an absent key the same as `null`. */
@@ -371,10 +375,14 @@ export function detailsCards(s: RailManifestState): RailCard[] {
   // committed inside the pinned tick, else the app filter (`ledgerNetwork`; user, 2026-10-02: a
   // snapshot row left this rung a ghost above its own snapshot card, because the rung had no
   // state but the filter). Everywhere else it is the filter, as it always was.
+  // IN HISTORY it is the plane brought forward, else the filter (`trendStack.cardNetwork`, user
+  // 2026-10-07) — a network row there names the card without writing the top bar.
   const net =
     s.mode === "ledger"
       ? ledgerCardNetwork({ filter: s.filter, tickNet: s.tickNet ?? null, snapOrdinal: s.snap?.data.ordinal ?? null, tickHasFilter: s.tickHasFilter })
-      : s.filter;
+      : s.mode === "trend"
+        ? cardNetwork(s.filter, s.trendFocus ?? null)
+        : s.filter;
   const context: RailCard = {
     id: "context",
     kind: "context",

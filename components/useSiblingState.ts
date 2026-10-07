@@ -39,6 +39,7 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
   const allNodes = useStore((s) => s.allNodes);
   const trendRange = useStore((s) => s.trendRange);
   const trendCursorMs = useStore((s) => s.trendCursorMs);
+  const trendFocus = useStore((s) => s.trendFocus);
   // The global chain's window — the SAME buffer and cap the vitals band plots, so the plank and the
   // bars step the same sequence. Only the SNAP slot reads it (review find, 2026-09-11: with the feed
   // as a plain dep, every poll re-derived every card) — and only the snap slot SUBSCRIBES: the next ghost reads this hook from Inspector itself, and a
@@ -99,6 +100,7 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
       tickNets,
       trendRange,
       trendCursorMs,
+      trendFocus,
     };
-  }, [slot, mode, filter, country, cohort, composition, inspect, snap, tickNet, metaSnap, selNodes, metaList, leaderboard, snapshotExact, following, snapsForTicks, geoMeasure, hyperMeasure, allNodes, trendRange, trendCursorMs]);
+  }, [slot, mode, filter, country, cohort, composition, inspect, snap, tickNet, metaSnap, selNodes, metaList, leaderboard, snapshotExact, following, snapsForTicks, geoMeasure, hyperMeasure, allNodes, trendRange, trendCursorMs, trendFocus]);
 }

@@ -791,7 +791,10 @@ export const useStore = create<AppState>((set) => ({
   setGeoMeasure: (measure) => set({ geoMeasure: measure }),
   setHyperMeasure: (measure) => set({ hyperMeasure: measure }),
   setTrendScroll: (offset) => set({ trendScroll: offset, motionCause: { kind: "page" } }),
-  setTrendFocus: (id) => set({ trendFocus: id }),
+  // A plane focus names History's Metagraph card (`trendStack.cardNetwork`, 2026-10-07), so it
+  // bumps the network slot as a filter commit does — the card it opens becomes the active one. A
+  // release leaves the stack alone: the filter may still hold the card.
+  setTrendFocus: (id) => set((s) => ({ trendFocus: id, selStack: id != null ? bumpStack(s.selStack, "network", true) : s.selStack })),
   setTrendScale: (scale) => set({ trendScale: scale }),
   // A window and a range are the SAME statement about what is on screen, so picking one retires
   // the other (the document's zoom pills do exactly this).
