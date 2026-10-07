@@ -157,31 +157,37 @@ describe("calloutHangs — the second Snapshots label, below-left of its bar", (
   });
 });
 
-describe("calloutPhonePlacement — the label straight above its subject", () => {
-  // A phone has no room for the diagonal standoff: a 200px panel beside its anchor fits only near
-  // an edge. So the label stands DIRECTLY over its subject on a short vertical leader, centred on
-  // it and nudged to stay on screen (user, 2026-10-04: "it should fit, can also shorten the line").
-  // A leader pointing straight down at its subject still says WHERE — the reason the phone used to
-  // get no callout at all was a panel that could only point sideways at nothing.
-  const W = 390, TOP = 64, BOTTOM = 500, PW = 180, PH = 56;
+describe("calloutPhonePlacement — the label in the free strip above or below its subject", () => {
+  // A phone has no room for the diagonal standoff, so the label stands straight over (or under) its
+  // subject on a vertical leader (user, 2026-10-04). It used to stand a SHORT fixed distance away,
+  // which put it on the scene itself; it now goes out to the free strip at the nearer edge — under
+  // the command bar, or above the dock / open sheet — and the leader runs as long as it has to
+  // (user, 2026-10-07: "the scene usually has some space at the top and bottom where it fits better").
+  const W = 390, TOP = 64, BOTTOM = 500, PW = 180, PH = 56, AIR = 8;
   const rise = Math.round(CALLOUT_OFF_Y * CALLOUT_PHONE_K);
   const place = (x: number, y: number) => calloutPhonePlacement(x, y, 0, W, TOP, BOTTOM, PW, PH);
 
-  it("centres the panel over a subject in the middle", () => {
-    const p = place(195, 300);
-    expect(p).toEqual({ show: true, drop: false, left: -PW / 2 });
+  it("stands the panel just under the command bar when the top edge is nearer", () => {
+    const p = place(195, 200);
+    expect(p).toEqual({ show: true, drop: false, left: -PW / 2, leader: 200 - (TOP + AIR + PH) });
   });
-  it("nudges the panel inside the band near an edge, keeping 8px of air", () => {
-    expect(place(20, 300).left).toBe(8 - 20);
-    expect(place(380, 300).left).toBe(W - 8 - PW - 380);
+  it("drops the panel just above the dock when the bottom edge is nearer", () => {
+    const p = place(195, 330);
+    expect(p).toMatchObject({ show: true, drop: true, leader: BOTTOM - AIR - PH - 330 });
   });
-  it("drops below a subject too close to the top bar", () => {
-    const y = TOP + rise + PH - 1;
+  it("nudges the panel inside the band near a side edge, keeping 8px of air", () => {
+    expect(place(20, 200).left).toBe(8 - 20);
+    expect(place(380, 200).left).toBe(W - 8 - PW - 380);
+  });
+  it("never runs a leader shorter than the old standoff — a subject in the top strip drops", () => {
+    const y = TOP + AIR + PH + rise - 1;
     expect(place(195, y)).toMatchObject({ show: true, drop: true });
+    expect(place(195, y).leader).toBeGreaterThanOrEqual(rise);
   });
-  it("hides when neither above nor below has room, or the subject is under the sheet", () => {
+  it("hides when neither strip has room, or the subject is under the sheet", () => {
     expect(calloutPhonePlacement(195, 150, 0, W, TOP, 200, PW, PH).show).toBe(false);
     expect(place(195, BOTTOM + 10).show).toBe(false);
     expect(place(-5, 300).show).toBe(false);
   });
 });
+

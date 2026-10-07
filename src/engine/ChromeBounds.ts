@@ -20,7 +20,10 @@ export class ChromeBounds {
   bandTop = 0;
   /** Whether `bandTop` is the band's (true) or the viewport's (false). */
   bandOn = false;
-  /** The phone dock bar's top edge (an open sheet stands on it), else the viewport's bottom. */
+  /** The top of the phone's BOTTOM CHROME — the footer row that rides above the dock bar, else the
+   *  dock bar itself (an open sheet stands on it), else the viewport's bottom. The phone callout's
+   *  floor: the footer row is chrome too, and a label dropped to "just above the dock" landed on its
+   *  links (2026-10-07). */
   dockTop = 0;
 
   private _in = 0;
@@ -39,6 +42,8 @@ export class ChromeBounds {
     const dock = document.querySelector("[data-phone-dock]");
     const dr = dock?.getBoundingClientRect();
     this.dockTop = dr && dr.height > 0 ? dr.top : h;
+    const foot = document.getElementById("sitefoot")?.getBoundingClientRect();
+    if (dr && dr.height > 0 && foot && foot.height > 0 && foot.top < this.dockTop) this.dockTop = foot.top;
     return this;
   }
 }

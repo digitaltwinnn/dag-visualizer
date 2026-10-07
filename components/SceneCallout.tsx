@@ -616,7 +616,9 @@ function CalloutMark({ m, id, multi, phone, onDismiss }: { m: Model; id: "callou
           callout's line was drawn at 0.55 of the weight and dash of every other leader. */}
       <svg className="co-leader absolute left-0 top-0 overflow-visible" width="1" height="1" aria-hidden>
         <g className="co-scale">
-          <mask id={maskId} maskUnits="userSpaceOnUse" x={-20} y={-CALLOUT_OFF_Y - 40} width={CALLOUT_OFF_X + 60} height={CALLOUT_OFF_Y + 60}>
+          {/* The phone leader runs to the free strip at whatever length the sync writes, so its
+              mask region spans the screen's height rather than the standoff's. */}
+          <mask id={maskId} maskUnits="userSpaceOnUse" x={-20} y={phone ? -2000 : -CALLOUT_OFF_Y - 40} width={CALLOUT_OFF_X + 60} height={phone ? 2040 : CALLOUT_OFF_Y + 60}>
             <line
               className="co-draw"
               x1={ex}
