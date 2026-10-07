@@ -8,9 +8,13 @@
 // Pure: plain values in, plain subjects out — no React, no store, no singleton reads. A level's
 // ROW (glyph, bar, click) is the explorer's business; a level's STEP (label, actions) is the
 // rail's. Only membership and order live here.
+import { buildChannelLog, type AnchorLogRow } from "./anchorLog";
 import { countryMeasure, networkOfRow, type GeoMeasure } from "./geoMeasure";
 import { networkMeasure, type HyperMeasure } from "./hyperMeasure";
-import type { CountryStat, MetaInfo, NodeRow } from "./types";
+import { metagraphById } from "./network";
+import type { CountryStat, GlobalSnapshot, MetaInfo, NodeRow } from "./types";
+import { UNLISTED_HUE, UNLISTED_ID, UNLISTED_LABEL } from "./unlisted";
+import { identityHudCss } from "@/src/palette/identity";
 
 // ── Geography ───────────────────────────────────────────────────────────────────────────────
 
@@ -82,4 +86,64 @@ export function networksLevel(metaList: readonly MetaInfo[], allNodes: readonly 
   return metaList
     .map((m) => ({ m, v: networkMeasure(measure, m, byNet.get(m.id) ?? []) }))
     .sort((a, b) => b.v - a.v || b.m.nodes.length - a.m.nodes.length);
+}
+
+// ── Snapshots ───────────────────────────────────────────────────────────────────────────────
+
+/** One metagraph snapshot anchored into a global snapshot. */
+export interface TickSnap {
+  metaId: string;
+  ordinal: number;
+  hash: string;
+  ts: string;
+  fee: number;
+  sizeInKB: number;
+}
+
+/** One network that anchored into a global snapshot, with its snapshots there, NEWEST FIRST. */
+export interface TickNetwork {
+  id: string;
+  name: string;
+  hue: string;
+  unlisted: boolean;
+  snaps: TickSnap[];
+}
+
+const newestFirst = (a: TickSnap, b: TickSnap) => (a.metaId === b.metaId ? b.ordinal - a.ordinal : a.ts === b.ts ? b.ordinal - a.ordinal : a.ts < b.ts ? 1 : -1);
+const snapOf = (r: AnchorLogRow): TickSnap => ({ metaId: r.metaId!, ordinal: r.ordinal, hash: r.hash, ts: r.ts, fee: r.fee, sizeInKB: r.sizeInKB });
+
+/** THE NETWORKS IN A GLOBAL SNAPSHOT — the explorer's level under a tick, the Metagraph card's
+ *  pager under it, and the tick ghost's first child.
+ *
+ *  ONE TICK'S ROWS, from both sources, POLLED FIRST: the polled row wins where both hold the same
+ *  (metaId, ordinal) — it carries the snapshot's own `hash`, which the exact read lacks — and the
+ *  exact read supplies everything the per-network buffer has aged out. ⚠️ THE BREAKDOWN IS THE
+ *  UNION, and only the exact read makes it COMPLETE (user, 2026-09-14: "DED is missing"): the
+ *  polled buffers hold `POLL.metaSnapBuffer` rows PER NETWORK — a depth in rows, not ticks.
+ *  Listed networks by snapshot count, then name; the UNLISTED set last, one entry for every
+ *  uncatalogued address (the exact read is its only source). */
+export function tickNetworksLevel(
+  tick: GlobalSnapshot,
+  polled: readonly AnchorLogRow[],
+  exactRows: readonly { metaId: string; ordinal: number; fee: number; bytes: number }[] | null | undefined,
+  isListed: (metaId: string) => boolean,
+): TickNetwork[] {
+  const byOrd = exactRows ? { [tick.ordinal]: { rows: exactRows } } : {};
+  const mine = polled.filter((r) => r.metaId != null && r.global.ordinal === tick.ordinal);
+  const seen = new Set(mine.map((r) => `${r.metaId}|${r.ordinal}`));
+  const extra = buildChannelLog([tick], byOrd, isListed).filter((r) => !seen.has(`${r.metaId}|${r.ordinal}`));
+  const by = new Map<string, TickNetwork>();
+  for (const r of [...mine, ...extra]) {
+    const id = r.metaId!;
+    let n = by.get(id);
+    if (!n) {
+      n = { id, name: metagraphById(id)?.name ?? id, hue: identityHudCss(id), unlisted: false, snaps: [] };
+      by.set(id, n);
+    }
+    n.snaps.push(snapOf(r));
+  }
+  const listed = [...by.values()].sort((a, b) => b.snaps.length - a.snaps.length || a.name.localeCompare(b.name));
+  for (const n of listed) n.snaps.sort(newestFirst);
+  const unl = buildChannelLog([tick], byOrd, (id) => !isListed(id)).map(snapOf).sort(newestFirst);
+  return unl.length ? [...listed, { id: UNLISTED_ID, name: UNLISTED_LABEL, hue: UNLISTED_HUE, unlisted: true, snaps: unl }] : listed;
 }

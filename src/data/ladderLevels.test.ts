@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { cohortsLevel, countriesLevel, countryNodes, networksLevel, nodeOrder, nodesByCountry } from "./ladderLevels";
-import type { CountryStat, MetaInfo, NodeRow } from "./types";
+import { cohortsLevel, countriesLevel, countryNodes, networksLevel, nodeOrder, nodesByCountry, tickNetworksLevel } from "./ladderLevels";
+import type { AnchorLogRow } from "./anchorLog";
+import type { CountryStat, GlobalSnapshot, MetaInfo, NodeRow } from "./types";
 
 // A node row with just what the levels read. `meta` names its network (networkOfRow).
 const node = (o: { ip: string; id?: string; cc?: string | null; country?: string | null; city?: string; isp?: string; meta?: string; layer?: string }): NodeRow =>
@@ -97,5 +98,34 @@ describe("networksLevel", () => {
   it("breaks a tie on fleet size (Review Focus 3)", () => {
     // countries: dor 2 (DE, FI), ded 2 (DE, FI) — tied; dor has the larger fleet
     expect(networksLevel(metas, all, "countries").map((x) => x.m.id)).toEqual(["dor", "ded", "tbc"]);
+  });
+});
+
+describe("tickNetworksLevel", () => {
+  const tick = { ordinal: 42, timestamp: "T42" } as unknown as GlobalSnapshot;
+  const other = { ordinal: 41, timestamp: "T41" } as unknown as GlobalSnapshot;
+  const listed = (id: string) => id === "dor" || id === "ded";
+  const polledRow = (metaId: string, ordinal: number, g = tick): AnchorLogRow => ({ metaId, ordinal, hash: `h${ordinal}`, fee: 1, sizeInKB: 1, ts: g.timestamp, global: g });
+  const ex = (metaId: string, ordinal: number) => ({ metaId, ordinal, fee: 2, bytes: 2048 });
+
+  it("unions polled and exact rows, polled first, and lists listed networks by count then name", () => {
+    const nets = tickNetworksLevel(
+      tick,
+      [polledRow("ded", 5), polledRow("dor", 900, other)], // dor's polled row is another tick's
+      [ex("dor", 901), ex("dor", 902), ex("ded", 5), ex("ded", 6)],
+      listed,
+    );
+    expect(nets.map((n) => `${n.id}:${n.snaps.length}`)).toEqual(["ded:2", "dor:2"]); // tie → name: "ded" < "dor"
+    expect(nets[0]!.snaps.map((s) => `${s.ordinal}:${s.hash}`)).toEqual(["6:", "5:h5"]); // newest first; polled keeps its hash
+  });
+  it("puts the unlisted set LAST, whatever its count (Review Focus 4)", () => {
+    const nets = tickNetworksLevel(tick, [], [ex("X1", 1), ex("X1", 2), ex("X2", 7), ex("dor", 900)], listed);
+    expect(nets.map((n) => n.id)).toEqual(["dor", "unlisted"]);
+    expect(nets[1]!.unlisted).toBe(true);
+    expect(nets[1]!.snaps.map((s) => `${s.metaId}:${s.ordinal}`)).toEqual(["X2:7", "X1:2", "X1:1"]);
+  });
+  it("lists what is known while a read is missing (Review Focus 1)", () => {
+    expect(tickNetworksLevel(tick, [polledRow("dor", 900)], null, listed).map((n) => n.id)).toEqual(["dor"]);
+    expect(tickNetworksLevel(tick, [], undefined, listed)).toEqual([]);
   });
 });

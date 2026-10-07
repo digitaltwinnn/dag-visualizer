@@ -14,7 +14,7 @@ import { ensurePage } from "@/components/RawSnapshotBridge";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { cn } from "@/lib/utils";
-import { buildAnchorLog, buildChannelLog, type AnchorLogRow } from "@/src/data/anchorLog";
+import { buildAnchorLog } from "@/src/data/anchorLog";
 import { latestRelevant } from "@/src/data/follow";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import {
@@ -31,9 +31,9 @@ import {
   TICK_NET_MEASURES,
 } from "@/src/data/ledgerMeasure";
 import { ledgerLens, storyCount } from "@/src/data/ledgerStory";
-import { filterAccent, getAnchor, getNetwork, metagraphById, resolveSigner, SIGNER_GROUPS, SIGNER_UNKNOWN, snapshotSigners } from "@/src/data/network";
+import { filterAccent, getAnchor, getNetwork, resolveSigner, SIGNER_GROUPS, SIGNER_UNKNOWN, snapshotSigners } from "@/src/data/network";
 import { metaSnapHoverKey, type GlobalSnapshot, type NodeRow, type SnapshotExact } from "@/src/data/types";
-import { displayNetwork, LISTED_IDS, UNLISTED_HUE, UNLISTED_ID, UNLISTED_LABEL, unlistedLog } from "@/src/data/unlisted";
+import { displayNetwork, LISTED_IDS, UNLISTED_HUE, UNLISTED_ID } from "@/src/data/unlisted";
 import { POLL } from "@/src/engine/config";
 import { followToggleActions, metaSnapSelectActions, nodeSelectActions, sameMetaSnap, snapshotSelectActions, tickNetSelectActions } from "@/src/engine/domain/pickActions";
 import { heldTicks, nextHoldTop } from "@/src/data/ledgerHold";
@@ -44,6 +44,7 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import { NO_SIGNAL_COPY, useNoSignal } from "@/components/useNoSignal";
 import { levelMeasure } from "@/src/data/explorerMeasure";
+import { tickNetworksLevel } from "@/src/data/ladderLevels";
 
 // THE SNAPSHOTS VIEW'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -93,43 +94,6 @@ const TICK_PAGE_PHONE = 10;
 function outOfLens(filter: string, id: string): boolean {
   const f = ledgerLens(filter);
   return f !== "all" && f !== id;
-}
-
-/** One metagraph's anchored snapshots inside one tick. */
-interface MetaGroup {
-  id: string;
-  name: string;
-  hue: string;
-  rows: AnchorLogRow[];
-}
-
-/** ONE TICK'S ROWS, from both sources, POLLED FIRST. The polled row wins where both hold the same
- *  (metaId, ordinal) — it carries the snapshot's own `hash`, which the exact read lacks — and the
- *  exact read supplies everything the per-network buffer has aged out. ⚠️ THE BREAKDOWN IS THE
- *  UNION, and only the exact read makes it COMPLETE (user, 2026-09-14: "DED is missing"): the
- *  polled buffers hold `POLL.metaSnapBuffer` rows PER NETWORK — a depth in rows, not ticks — so a
- *  busy chain's older ticks lost their busiest contributor while the fee above still counted it. */
-function unionRows(polled: readonly AnchorLogRow[], exact: readonly AnchorLogRow[], tickOrdinal: number): AnchorLogRow[] {
-  const mine = polled.filter((r) => r.global.ordinal === tickOrdinal);
-  const seen = new Set(mine.map((r) => `${r.metaId}|${r.ordinal}`));
-  const extra = exact.filter((r) => r.global.ordinal === tickOrdinal && !seen.has(`${r.metaId}|${r.ordinal}`));
-  return extra.length ? [...mine, ...extra] : mine;
-}
-
-function groupByMeta(rows: readonly AnchorLogRow[]): MetaGroup[] {
-  const by = new Map<string, MetaGroup>();
-  for (const r of rows) {
-    if (r.metaId == null) continue;
-    const metaId = r.metaId;
-    let g = by.get(metaId);
-    if (!g) {
-      const cfg = metagraphById(metaId);
-      g = { id: metaId, name: cfg?.name ?? metaId, hue: identityHudCss(metaId), rows: [] };
-      by.set(metaId, g);
-    }
-    g.rows.push({ ...r, metaId });
-  }
-  return [...by.values()].sort((a, b) => b.rows.length - a.rows.length || a.name.localeCompare(b.name));
 }
 
 // A snapshot's signers: `snapshotSigners` (src/data/network.ts) — one home, shared with the node
@@ -205,8 +169,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const net = getNetwork();
   const visibleTs = new Set(snaps.map((s) => s.timestamp));
   const rows = net ? buildAnchorLog(net.metaSnaps, net.globalSnapshots, "all").filter((r) => visibleTs.has(r.ts)) : [];
-  const unlistedEntries = unlistedLog([...snaps].reverse(), snapshotExact);
-  const exactChannelRows = buildChannelLog([...snaps].reverse(), snapshotExact, (id: string) => LISTED_IDS.has(id));
   // Through the ledger's lens: `displayNetwork("dag")` RESOLVES, and a committed DAG must not
   // narrow the list to a story that can never have members (found live 2026-08-13).
   const filterNet = displayNetwork(ledgerLens(filter));
@@ -412,15 +374,17 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   ];
 
   // ---- level 1: the networks that anchored into the open tick ---------------------------------
-  let groups: MetaGroup[] = [];
-  let unlistedCount = 0;
+  // The ONE list (src/data/ladderLevels.ts): the Metagraph card's ‹ › and the tick's ghost step the
+  // same networks in the same order.
+  const tickNets = tick ? tickNetworksLevel(tick, rows, exact?.rows, (id) => LISTED_IDS.has(id)) : [];
   if (tick) {
-    groups = groupByMeta(unionRows(rows, exactChannelRows, tick.ordinal));
-    unlistedCount = exact?.unlistedCount ?? 0;
-    const netRows: { id: string; name: string; hue: string; count: number; italic?: boolean }[] = [
-      ...groups.map((g) => ({ id: g.id, name: g.name, hue: g.hue, count: g.rows.length })),
-      ...(unlistedCount > 0 ? [{ id: UNLISTED_ID, name: UNLISTED_LABEL, hue: UNLISTED_HUE, count: unlistedCount, italic: true }] : []),
-    ];
+    const netRows: { id: string; name: string; hue: string; count: number; italic?: boolean }[] = tickNets.map((n) => ({
+      id: n.id,
+      name: n.name,
+      hue: n.hue,
+      count: n.snaps.length,
+      ...(n.unlisted ? { italic: true } : {}),
+    }));
     const measured = netRows.map((n) => ({ n, m: tickNetMeasure(netPick, n.count, perMetaOf(exact, n.id)) }));
     const maxNet = Math.max(1e-9, ...measured.map(({ m }) => m.value ?? 0));
     levels.push({
@@ -490,23 +454,10 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
 
   // ---- level 2: one network's snapshots in the open tick ---------------------------------------
   type SnapLeaf = { metaId: string; ordinal: number; hash: string; ts: string; fee: number; sizeInKB?: number };
-  let leaves: SnapLeaf[] = [];
-  let leafHue = accent;
-  let leafName = "";
-  if (tick && openNet) {
-    const g = groups.find((x) => x.id === openNet) ?? null;
-    if (openNet === UNLISTED_ID && unlistedCount > 0) {
-      leafHue = UNLISTED_HUE;
-      leafName = UNLISTED_LABEL;
-      leaves = unlistedEntries
-        .filter((e) => e.global.ordinal === tick.ordinal)
-        .map((r) => ({ metaId: r.metaId, ordinal: r.ordinal, hash: "", ts: r.ts, fee: r.fee, sizeInKB: r.sizeInKB }));
-    } else if (g) {
-      leafHue = g.hue;
-      leafName = g.name;
-      leaves = g.rows.map((r) => ({ metaId: r.metaId!, ordinal: r.ordinal, hash: r.hash, ts: r.ts, fee: r.fee, sizeInKB: r.sizeInKB }));
-    }
-  }
+  const openTickNet = openNet ? (tickNets.find((n) => n.id === openNet) ?? null) : null;
+  const leaves: SnapLeaf[] = openTickNet?.snaps ?? [];
+  const leafHue = openTickNet?.hue ?? accent;
+  const leafName = openTickNet?.name ?? "";
   if (tick && openNet && (leaves.length > 0 || openNet === UNLISTED_ID)) {
     const globalPick = { kind: "snapshot", title: `Global snapshot #${tick.ordinal}`, data: tick } as const;
     const values = leaves.map((r) => snapMeasureValue(snapPick, r));
