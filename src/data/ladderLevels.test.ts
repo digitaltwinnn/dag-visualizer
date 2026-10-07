@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cohortsLevel, countriesLevel, countryNodes, networksLevel, nodeOrder, nodesByCountry, tickNetworksLevel } from "./ladderLevels";
+import { cohortsLevel, countriesLevel, countryNodes, machinesOf, networksLevel, nodeOrder, nodesByCountry, tickNetworksLevel } from "./ladderLevels";
 import type { AnchorLogRow } from "./anchorLog";
 import type { CountryStat, GlobalSnapshot, MetaInfo, NodeRow } from "./types";
 
@@ -127,5 +127,14 @@ describe("tickNetworksLevel", () => {
   it("lists what is known while a read is missing (Review Focus 1)", () => {
     expect(tickNetworksLevel(tick, [polledRow("dor", 900)], null, listed).map((n) => n.id)).toEqual(["dor"]);
     expect(tickNetworksLevel(tick, [], undefined, listed)).toEqual([]);
+  });
+});
+
+describe("machinesOf — the node pager steps nodes, not layer rows (Review Focus 5)", () => {
+  it("keeps one row per node, first occurrence, dropping rows with no key", () => {
+    const l0 = node({ ip: "8", id: "m", layer: "l0" });
+    const l1 = node({ ip: "8", id: "m", layer: "l1" });
+    const keyless = { ...node({ ip: "" }), pick: { kind: "metanode", node: null } } as unknown as NodeRow;
+    expect(machinesOf([l0, l1, de1, keyless]).map((r) => r.layer + r.id)).toEqual(["l0m", "l0b"]);
   });
 });

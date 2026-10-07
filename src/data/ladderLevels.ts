@@ -10,6 +10,7 @@
 // rail's. Only membership and order live here.
 import { buildChannelLog, type AnchorLogRow } from "./anchorLog";
 import { countryMeasure, networkOfRow, type GeoMeasure } from "./geoMeasure";
+import { hoverKeyOf } from "./hoverSubject";
 import { networkMeasure, type HyperMeasure } from "./hyperMeasure";
 import { metagraphById } from "./network";
 import type { CountryStat, GlobalSnapshot, MetaInfo, NodeRow } from "./types";
@@ -71,6 +72,21 @@ export function cohortsLevel(rows: readonly NodeRow[]): Cohort[] {
     (by.get(key) ?? by.set(key, { key, city, isp, rows: [] }).get(key)!).rows.push(r);
   }
   return [...by.values()].sort((a, b) => b.rows.length - a.rows.length || (a.city ?? "￿").localeCompare(b.city ?? "￿"));
+}
+
+/** THE NODE PAGER'S PROJECTION: a node that runs two layers is two explorer rows (one per layer) but
+ *  ONE pager stop — deduped by the shared hover key, the rule `hoverKeyOf` encodes for pairing.
+ *  A row without a key is neither pairable nor steppable. */
+export function machinesOf(rows: readonly NodeRow[]): NodeRow[] {
+  const seen = new Set<string>();
+  const out: NodeRow[] = [];
+  for (const r of rows) {
+    const k = hoverKeyOf(r.pick);
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(r);
+  }
+  return out;
 }
 
 // ── Hypergraph ──────────────────────────────────────────────────────────────────────────────
