@@ -531,3 +531,15 @@ export function spanPhrase(zoom: ZoomId, range: { fromMs: number; toMs: number }
   if (!range) return SPAN_WORDS[zoom];
   return rangeDays(range.fromMs, range.toMs);
 }
+
+/** A DAY-NAMED RANGE IS WHOLE DAYS (the tester pass, 2026-10-07): a range of two days or more is
+ *  labelled by its UTC days (`rangeDays`), so it snaps OUTWARD to UTC midnights — "May 21 – May 31"
+ *  then means exactly those days. A shorter range keeps its exact instants; its card states them as
+ *  clock times. Applied in the store's one range setter, so every gesture that brushes obeys it. */
+export function snapRange(r: { fromMs: number; toMs: number }, nowMs: number = Number.POSITIVE_INFINITY): { fromMs: number; toMs: number } {
+  const D = 86_400_000;
+  if (r.toMs - r.fromMs < 2 * D) return r;
+  // The end never snaps past NOW: a range brushed up to the present ends there ("until now").
+  const toMs = Math.ceil(r.toMs / D) * D;
+  return { fromMs: Math.floor(r.fromMs / D) * D, toMs: toMs > nowMs ? Math.max(r.toMs, Math.min(toMs, nowMs)) : toMs };
+}

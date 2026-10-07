@@ -73,6 +73,7 @@ function bumpStack(stack: SelSlot[], slot: SelSlot, active: boolean): SelSlot[] 
 // the new field type-errored against a type that no longer described the value it held.
 export type { Activity } from "@/src/data/api";
 import type { Activity } from "@/src/data/api";
+import { snapRange } from "@/src/data/trendWindow";
 
 // Panel-facing state only (Lane B). The 60fps scene + per-snapshot visuals subscribe
 // to NetworkData directly (Lane A) and never touch this store, so React renders stay
@@ -816,8 +817,12 @@ export const useStore = create<AppState>((set) => ({
   // retires the range and so drops it.
   setTrendWindow: (trendWindow) =>
     set((s) => ({ trendWindow, trendRange: null, selStack: bumpStack(s.selStack, "range", false), motionCause: { kind: "window", id: trendWindow } })),
-  setTrendRange: (trendRange) =>
-    set((s) => ({ trendRange, selStack: bumpStack(s.selStack, "range", trendRange != null), motionCause: { kind: "range", span: trendRange } })),
+  // A range of two days or more is WHOLE UTC DAYS (`snapRange`): it is labelled by its days.
+  setTrendRange: (range) =>
+    set((s) => {
+      const trendRange = range ? snapRange(range, Date.now()) : null;
+      return { trendRange, selStack: bumpStack(s.selStack, "range", trendRange != null), motionCause: { kind: "range", span: trendRange } };
+    }),
   // Stored BY REFERENCE — the array the publisher hands in is the one the Engine compares with
   // `!==`. No copy, no sort, no normalising: any of those would mint a fresh reference per call
   // and turn a no-op publish into a retarget (see the channel note on `trendIds`).

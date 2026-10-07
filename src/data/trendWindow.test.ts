@@ -4,7 +4,7 @@
 // as "no leading gap"; the client clock judging a CDN-cached payload's newest bucket; the
 // leading partial month drawn whole while the trailing one was trimmed).
 import { describe, expect, it } from "vitest";
-import { assembleTrendSlice, bucketAt, heldZoom, spanPhrase, cursorFraction, cutRange, leadingTrim, monthlySum, pickRangeTier, planTrendFetch, rangeBuckets, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, windowSpan, ZOOMS, type TrendsWindowData } from "./trendWindow";
+import { assembleTrendSlice, bucketAt, heldZoom, spanPhrase, cursorFraction, cutRange, leadingTrim, monthlySum, pickRangeTier, planTrendFetch, rangeBuckets, snapRange, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, windowSpan, ZOOMS, type TrendsWindowData } from "./trendWindow";
 import { rangeDays } from "@/src/util/localTime";
 
 const HOUR = 3_600_000;
@@ -513,5 +513,28 @@ describe("rangeBuckets — the moments a range holds (the Moment card's pager un
     expect(r.stepMs).toBe(D);
     expect(r.buckets[0]).toBe(Date.UTC(2026, 0, 2));
     expect(r.buckets.every((b) => b % D === 0)).toBe(true);
+  });
+});
+
+// A DAY-NAMED RANGE IS WHOLE DAYS (the tester pass, 2026-10-07: a brush from May 21 19:00 UTC read
+// "May 21 – May 31 · 9 days" — under the date rule a day-only label means whole UTC days). A range
+// of two days or more snaps outward to UTC midnights; a shorter one keeps its exact instants, which
+// its card states as clock times.
+describe("snapRange — a long range is whole UTC days", () => {
+  const D = 86_400_000;
+  it("snaps a multi-day range outward to UTC midnights", () => {
+    const r = snapRange({ fromMs: Date.UTC(2026, 4, 21, 19), toMs: Date.UTC(2026, 4, 31, 5) });
+    expect(r).toEqual({ fromMs: Date.UTC(2026, 4, 21), toMs: Date.UTC(2026, 5, 1) });
+  });
+  it("never snaps an end into the future — a range up to now ends now", () => {
+    const now = Date.UTC(2026, 9, 7, 18);
+    const r = snapRange({ fromMs: Date.UTC(2026, 8, 20, 7), toMs: now }, now);
+    expect(r).toEqual({ fromMs: Date.UTC(2026, 8, 20), toMs: now });
+  });
+  it("keeps a short range exact, and an already whole range as it is", () => {
+    const short = { fromMs: Date.UTC(2026, 4, 21, 19), toMs: Date.UTC(2026, 4, 22, 23) };
+    expect(snapRange(short)).toEqual(short);
+    const whole = { fromMs: Date.UTC(2026, 4, 1), toMs: Date.UTC(2026, 4, 1) + 10 * D };
+    expect(snapRange(whole)).toEqual(whole);
   });
 });
