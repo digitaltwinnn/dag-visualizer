@@ -1245,14 +1245,16 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   </TableCell>
                   <TableCell className={cn("text-right tabular-nums", PHONE_HIDDEN)}>{seam ? <Dash /> : fmtDag(r.fee)}</TableCell>
                   <TableCell className={cn("text-right tabular-nums text-foreground-dim", PHONE_HIDDEN)}>{seam ? <Dash /> : size}</TableCell>
+                  {/* GROUPED, the group's header states the global snapshot and its age once — the
+                      two cells stay (their headers are the sort controls) but say nothing twice. */}
                   <TableCell className="text-right font-mono tabular-nums max-[700px]:hidden">
-                    {pending ? <span className="text-muted-foreground">…</span> : r.global.ordinal.toLocaleString()}
+                    {grouped ? null : pending ? <span className="text-muted-foreground">…</span> : r.global.ordinal.toLocaleString()}
                   </TableCell>
                   <TableCell className={cn("text-right text-muted-foreground", grouped && "max-[700px]:hidden")}>
                     {/* Phone drops the " ago" (the bare register — relativeAge's own note): the
                         AGE header names the quantity, and the suffix's width was the last thing
                         holding this table in sideways scroll. */}
-                    <span className="max-[700px]:hidden">{relativeAge(now - Date.parse(r.ts))}</span>
+                    <span className="max-[700px]:hidden">{grouped ? null : relativeAge(now - Date.parse(r.ts))}</span>
                     <span className="min-[700px]:hidden">{relativeAge(now - Date.parse(r.ts), true)}</span>
                   </TableCell>
                   {/* The phone row's SECOND LINE — where it anchored, what it paid, how big it was.
