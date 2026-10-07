@@ -61,7 +61,8 @@ export function pathViewChanged(a: LedgerPathView, b: LedgerPathView): boolean {
  *    the path alone**: the tick list IS the stream there, and opening the newest tick every ~28s
  *    would throw it away. Resuming live closes the path, unless the resume is this explorer's own
  *    row click (`selfResume`), which keeps what that click opened and spends the flag. */
-export function syncLedgerPath(path: LedgerPath, prev: LedgerPathView, next: LedgerPathView): LedgerPath {
+export function syncLedgerPath(path: LedgerPath, prev: LedgerPathView, next: LedgerPathView, depth: "follow" | "axis" = "follow"): LedgerPath {
+  if (depth === "axis") return syncAxisPath(path, prev, next);
   const m = next.metaSnap;
   // The selected snapshot belongs to the shown tick (a stale one from an older tick does not).
   if (m && (next.snapOrd == null || m.globalOrdinal === next.snapOrd)) {
@@ -85,4 +86,17 @@ export function syncLedgerPath(path: LedgerPath, prev: LedgerPathView, next: Led
     return { ...CLOSED_PATH, tick: ord, selfResume: path.selfResume };
   }
   return path;
+}
+
+/** THE AXIS VIEW (user, 2026-10-07 — `viewPolicy.explorerDepth: "axis"`): the explorer RESTS on the
+ *  global snapshot list, the view's own axis. A selection made anywhere — live, a pin, a tile, the
+ *  rail's ghost or ‹ › — is a highlighted row on its page, never a drill; drilling is the
+ *  explorer's own click. Two store moves still touch a drill the reader made: a selection that
+ *  moves to ANOTHER tick returns it to the list (its new row highlighted there), and resuming live
+ *  closes it, unless the resume is that click's own (`selfResume`). The live heartbeat leaves it. */
+function syncAxisPath(path: LedgerPath, prev: LedgerPathView, next: LedgerPathView): LedgerPath {
+  if (next.following && !prev.following) return path.selfResume ? { ...path, selfResume: false } : CLOSED_PATH;
+  if (next.following || path.tick == null) return path;
+  const ord = next.snapOrd;
+  return ord != null && ord !== prev.snapOrd && ord !== path.tick ? CLOSED_PATH : path;
 }

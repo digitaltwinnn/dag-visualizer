@@ -207,11 +207,13 @@ decisions inside them are design, not detail:
   every tick still lists (they all happened — rule 10 doesn't let a lens edit the facts), a tick the
   network anchored into carries its count in the network's hue as the row's tag, one it sat out is
   `faint`, and inside a tick only the committed network's row is drillable (`outOfLens`); **the
-  path follows the SELECTION** (`src/data/ledgerPath.ts`) — a commit made anywhere (a tile, the
-  rail's ‹ › plank, the raw log) opens it down to that subject, a selected metagraph snapshot to
-  its signers; live under a filter the heartbeat's selection is followed too (it moves only when
-  that network anchors a new snapshot), while the unfiltered live stream leaves it at the tick
-  list, which IS the stream. The LIVE/PINNED
+  explorer RESTS ON THE GLOBAL SNAPSHOT LIST** — this view is the `"axis"` row of
+  `viewPolicy.explorerDepth` (user, 2026-10-07): its first level is the view's own axis, N
+  snapshots in time, the most valuable list it has. A selection made anywhere (live, a pin, a
+  tile, the rail's ghost or ‹ ›) is a highlighted row on its page, never a drill; the selected
+  row's click DRILLS (opens its networks, selection untouched — the pin's release is the card's);
+  a drill the reader made returns to the list when the selection moves to another tick
+  (`src/data/ledgerPath.ts`). The LIVE/PINNED
   control rides the CARD HEAD's eyebrow row with the shown snapshot's ticking age (2026-09-28 —
   it rode the heading row as the level's setting, design decision 15, until then), and the pager
   states the TIME the rows span ("last 11 min") rather than "52 recent". Each level shows
@@ -283,8 +285,11 @@ country" names one measure of three). Eyebrows are bare role words, and each exp
 hint leads its card rather than trailing it. An explorer ROW is a browse target — mark, name, count,
 nothing more; **the prose that EXPLAINS a subject belongs to that subject's right-rail card, once**,
 and since a row commits its card in the same click, nothing is lost by keeping the sentence in one
-place. **THE EXPLORER SHOWS THE OPEN CARD'S CHILDREN** (user, 2026-10-07 — one rule for every view,
-after a day of per-case fixes): the selected child's row highlighted, and a card with no children
+place. **THE EXPLORER SHOWS THE OPEN CARD'S CHILDREN — UNLESS ITS FIRST LEVEL IS THE VIEW'S AXIS**
+(user, 2026-10-07 — one rule for every view, after a day of per-case fixes; the exception is the
+`viewPolicy.explorerDepth` row, `"follow"` | `"axis"`: a root of N records along the view's axis
+— Snapshots' global snapshots in time — is where the explorer rests, a selection a highlighted
+row there; a root of scopes — countries, networks — follows). Following: the selected child's row highlighted, and a card with no children
 (a node) showing its siblings. A view hands `Explorer` every level its SELECTION opens, each level
 naming the rail card whose children it lists (`ExplorerLevelSpec.parent`), and the Explorer cuts
 the path at `store.boxedCard` (`components/explorer/boxLevel.ts`). Every new selection opens its

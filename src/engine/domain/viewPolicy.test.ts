@@ -135,6 +135,13 @@ describe("the trends view is registered and inert", () => {
     expect(VIEW_POLICIES.hyper.fleet).toBe("placed");
   });
 
+  // The explorer follows the open card down — except in a view whose first level is its own AXIS
+  // (Snapshots: the global snapshots in time), where it rests on that list (user, 2026-10-07).
+  it("rests the explorer on the axis only where the root list IS the view's axis", () => {
+    expect(VIEW_POLICIES.ledger.explorerDepth).toBe("axis");
+    for (const m of ["hyper", "geo", "trend", "soon"] as const) expect(VIEW_POLICIES[m].explorerDepth).toBe("follow");
+  });
+
   it("answers RAW with the document, not the records layer", () => {
     expect(VIEW_POLICIES.trend.rawSurface).toBe("document");
     expect(VIEW_POLICIES.ledger.rawSurface).toBe("records");

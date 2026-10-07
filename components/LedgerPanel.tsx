@@ -43,6 +43,7 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import { NO_SIGNAL_COPY, useNoSignal } from "@/components/useNoSignal";
 import { levelMeasure } from "@/src/data/explorerMeasure";
+import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { tickNetworksLevel, tickPolledRows } from "@/src/data/ladderLevels";
 
 // THE SNAPSHOTS VIEW'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
@@ -127,6 +128,7 @@ function spanWords(ordered: readonly GlobalSnapshot[]): string {
 
 export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: boolean } = {}) {
   const filter = useStore((s) => s.filter);
+  const mode = useStore((s) => s.mode);
   const hoverFilter = useStore((s) => s.hoverFilter);
   const setHoverFilter = useStore((s) => s.setHoverFilter);
   const hoverSnapOrd = useStore((s) => s.hoverSnapOrd);
@@ -245,21 +247,23 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const [seenView, setSeenView] = useState(pathView);
   if (pathViewChanged(seenView, pathView)) {
     setSeenView(pathView);
-    const next = syncLedgerPath(path, seenView, pathView);
+    // The view's policy row says whether the explorer FOLLOWS the selection down or RESTS on the
+    // global snapshot list, its axis (`viewPolicy.explorerDepth`, user 2026-10-07).
+    const next = syncLedgerPath(path, seenView, pathView, VIEW_POLICIES[mode].explorerDepth);
+    const turnTo = (ord: number) => {
+      const page = pageHolding(orderedSnaps.findIndex((d) => d.ordinal === ord), pageSize);
+      if (page != null) setTickPage(page);
+    };
     // A resume is a return to the stream, so the list returns to its live page — even with no tick
     // open (review, 2026-10-04) — unless it is this explorer's own click, which opened a tick.
     if (pathView.following && !seenView.following && !path.selfResume) setTickPage(1);
-    if (next !== path) {
-      setPath(next);
-      if (next.tick == null && path.tick != null) setTickPage(1);
-      // WHENEVER THE PATH OPENS A GLOBAL SNAPSHOT the list turns to the page holding it (user,
-      // 2026-10-07) — a pin from the card's ‹ ›, a bar or a tile, not only a metagraph snapshot's —
-      // so going back up via the crumb finds the pinned row on screen.
-      else if (next.tick != null && next.tick !== path.tick) {
-        const page = pageHolding(orderedSnaps.findIndex((d) => d.ordinal === next.tick), pageSize);
-        if (page != null) setTickPage(page);
-      }
-    }
+    if (next !== path) setPath(next);
+    // THE SELECTION'S ROW IS ON SCREEN (user, 2026-10-07): whenever the path opens a global snapshot,
+    // or a new pin lands — from the card's ‹ ›, a bar, a tile, wherever — the list turns to the page
+    // holding it, so the highlighted row (or the crumb back up to it) is where the reader looks.
+    if (next.tick != null && next.tick !== path.tick) turnTo(next.tick);
+    else if (!pathView.following && pathView.snapOrd != null && (pathView.snapOrd !== seenView.snapOrd || seenView.following)) turnTo(pathView.snapOrd);
+    else if (next.tick == null && path.tick != null) setTickPage(1);
   }
 
   const accent = filterAccent(filter);
@@ -339,6 +343,14 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           // The count the bar's colour stands for, in words — colour is never the only carrier.
           title: `Global snapshot ${d.ordinal.toLocaleString()}, ${d.metagraphSnapshotCount ?? 0} snapshots anchored${filterNet ? (count > 0 ? `, ${count} from ${filterNet.name}` : `, none from ${filterNet.name}`) : ""}`,
           onClick: () => {
+            // THE SELECTED ROW DRILLS (user, 2026-10-07 — the explorer rests on this list, its axis,
+            // so the highlighted row is always on screen and is the way DOWN): it opens the tick's
+            // networks and leaves the selection as it is — live stays live, a pin stays pinned. The
+            // pin's release is the card's (its × and the LIVE / PINNED control).
+            if (on) {
+              setPath({ ...CLOSED_PATH, tick: d.ordinal });
+              return;
+            }
             // A pinned stream and the live tip's row: this click resumes live (see the effect above).
             const selfResume = !following && latestRelevant("all")?.ordinal === d.ordinal && !(on && !following);
             applyClickActions(
@@ -348,11 +360,8 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
                 tickNet,
               }),
             );
-            // Re-clicking the PINNED tick releases it (the builder's toggle) — the path closes
-            // with it rather than opening the tick it just let go (review, 2026-09-26); any other
-            // click toggles the tick open, the live tip included.
-            const releasing = on && !following;
-            setPath({ ...CLOSED_PATH, tick: releasing || openTick === d.ordinal ? null : d.ordinal, selfResume });
+            // Any other row selects its tick and opens it, the live tip included.
+            setPath({ ...CLOSED_PATH, tick: d.ordinal, selfResume });
           },
           pair: subjectPairing(hoverSnapOrd, d.ordinal, setHoverSnapOrd, accent),
         };

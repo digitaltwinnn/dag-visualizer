@@ -319,8 +319,9 @@ you start:
 
 - **`viewPolicy.ts`** — the per-`Mode` allow-list behind convention 7: canvas, morph target, sim gates,
   shown geometry, pick sources, DoF eligibility, camera floors, which views publish `selNodes`, whether
-  the fleet is placed or parked, what the bottom band holds, which surface RAW shows, and whether the
-  camera idle-orbits.
+  the fleet is placed or parked, what the bottom band holds, which surface RAW shows, whether the
+  camera idle-orbits, and whether the explorer follows the open card down or rests on the view's
+  axis (`explorerDepth`).
 - **`focusLadder.ts`** — the focus/zoom ladder as data: one rung table per 3D view plus the cross-view
   carry policy. `finerLevels()` is the single source `pickActions` derives deselect stepping from.
 - **`pickActions.ts`** — the click/select decision table (see *Selection semantics*).

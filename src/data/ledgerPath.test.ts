@@ -62,3 +62,33 @@ describe("pathViewChanged", () => {
     expect(pathViewChanged(view(), view({ tickNet: "dor" }))).toBe(true);
   });
 });
+
+// THE AXIS VIEW (user, 2026-10-07 — `viewPolicy.explorerDepth: "axis"`): the explorer RESTS on the
+// global snapshot list. A selection made anywhere is a highlighted row, never a drill; drilling is
+// the explorer's own click (the component's setPath), and a selection that moves to another tick
+// returns a drilled path to the list.
+describe("syncLedgerPath — axis: the explorer rests on the global snapshot list", () => {
+  const axis = (path: LedgerPath, prev: LedgerPathView, next: LedgerPathView) => syncLedgerPath(path, prev, next, "axis");
+  it("a snapshot selected anywhere does not drill — pinned or live", () => {
+    expect(axis(CLOSED_PATH, view(), view({ metaSnap: ms(7, 120), snapOrd: 120 }))).toBe(CLOSED_PATH);
+    expect(axis(CLOSED_PATH, view({ following: true }), view({ following: true, metaSnap: ms(7, 120), snapOrd: 120 }))).toBe(CLOSED_PATH);
+  });
+  it("a tick pinned or a network selected inside it does not drill either", () => {
+    expect(axis(CLOSED_PATH, view({ snapOrd: 100 }), view({ snapOrd: 101 }))).toBe(CLOSED_PATH);
+    expect(axis(CLOSED_PATH, view({ snapOrd: 100 }), view({ snapOrd: 100, tickNet: "dor" }))).toBe(CLOSED_PATH);
+  });
+  it("a drill the reader made stays while the selection is inside it", () => {
+    const drilled = { tick: 100, net: "dor", snap: null, selfResume: false };
+    expect(axis(drilled, view({ snapOrd: 100 }), view({ snapOrd: 100, tickNet: "dor" }))).toBe(drilled);
+    expect(axis(drilled, view({ snapOrd: 100 }), view({ snapOrd: 100, metaSnap: ms(7, 100) }))).toBe(drilled);
+  });
+  it("…and returns to the list when the selection moves to another tick", () => {
+    const drilled = { tick: 100, net: "dor", snap: null, selfResume: false };
+    expect(axis(drilled, view({ snapOrd: 100 }), view({ snapOrd: 101 }))).toEqual(CLOSED_PATH);
+  });
+  it("live leaves a drill alone, and resuming closes it unless the resume is the explorer's own click", () => {
+    expect(axis(open, view({ following: true, snapOrd: 120 }), view({ following: true, snapOrd: 121 }))).toBe(open);
+    expect(axis(open, view({ snapOrd: 100 }), view({ following: true, snapOrd: 130 }))).toBe(CLOSED_PATH);
+    expect(axis({ ...open, selfResume: true }, view({ snapOrd: 100 }), view({ following: true, snapOrd: 130 }))).toEqual({ ...open, selfResume: false });
+  });
+});
