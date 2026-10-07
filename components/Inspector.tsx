@@ -655,7 +655,12 @@ export default function Inspector() {
           id === "context" ? (
             <>
               <ContextCard {...cx("context")} />
-              {!card.present && card.hint != null && <GhostCard card={card} {...ghostCx(id)} />}
+              {/* Context is a ladder rung like any other, so it can be the NEXT rung too — in
+                  Snapshots it sits under the global snapshot, and its step opens the tick's
+                  first network. */}
+              {!card.present && card.hint != null && (
+                <GhostCard card={card} {...ghostCx(id)} step={id === nextStep?.id ? nextStep.step : undefined} />
+              )}
             </>
           ) : card.present ? (
             detailPane[id]
