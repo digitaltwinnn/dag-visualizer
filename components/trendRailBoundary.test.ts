@@ -77,8 +77,8 @@ describe("one door to the records", () => {
     expect(writers).toEqual(["components/trendDoors.ts"]);
   });
 
-  it("both registers of the measured history reach it through that home", () => {
-    for (const path of ["components/docs/TrendsDoc.tsx", "components/inspector/TrendInstantPane.tsx"]) {
+  it("both exits to the records — the Moment card and History's RAW — reach it through that home", () => {
+    for (const path of ["components/topbar/PresentationToggle.tsx", "components/inspector/TrendInstantPane.tsx"]) {
       const code = stripComments(readFileSync(path, "utf8"));
       expect(code, `${path} must call the shared door`).toMatch(/openRecords\s*\(/);
       expect(code, `${path} must import it from components/trendDoors`).toMatch(/from\s+["']@\/components\/trendDoors["']/);
@@ -99,19 +99,12 @@ describe("one roster pass", () => {
   it("only the roster hook ranks the networks or reads their series", () => {
     const offenders = sources()
       .filter(({ path }) => path.startsWith("app/") || path.startsWith("components/"))
-      .filter(({ path }) => path !== "components/useTrendRoster.ts" && path !== "components/docs/TrendsDoc.tsx")
+      .filter(({ path }) => path !== "components/useTrendRoster.ts")
       .filter(({ code }) => /\b(rankByLast|metricSeries)\s*\(/.test(code))
       .map((s) => s.path)
       .sort();
-    // The DOCUMENT is the one exemption, and it is a real one: it is the OTHER register of this
-    // rung (convention 12) with its own local zoom, its own per-metric panel builders and no
-    // ranked stack to lay out. It already shares the series maths, the chart, the window path, the
-    // scope and the door; making it render from the view's roster hook as well would be forcing
-    // one shape onto two genuinely different surfaces.
     expect(offenders, "compute the roster once, in useTrendRoster").toEqual([]);
-    // …and the exemption is LIVE, not a stale line: a forbid-only check would pass the day the
-    // document stopped reading the series maths at all.
-    expect(/\bmetricSeries\s*\(/.test(stripComments(readFileSync("components/docs/TrendsDoc.tsx", "utf8")))).toBe(true);
+    // …and the rule is LIVE: the hook really does the pass.
     expect(/\bmetricSeries\s*\(|\brankByLast\s*\(/.test(stripComments(readFileSync("components/useTrendRoster.ts", "utf8")))).toBe(true);
   });
 

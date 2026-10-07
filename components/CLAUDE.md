@@ -109,32 +109,18 @@ fades, the scene recedes (still live behind), the raw layer surfaces out of that
 mirror, with three ways to ask for it — the switch, Escape, the layer's own × — all calling
 `setSection("scene")`. Reduced motion makes it an instant swap.
 
-⚠️ **WHAT THAT LAYER HOLDS IS A POLICY ROW, NOT A FIXED SURFACE** (2026-09-18). `section` is a
-PRESENTATION axis — one subject, two presentations — so `VIEW_POLICIES[mode].rawSurface` is where
-each view says which register it shows: `"records"` for the structural views (the anchor log, the
-node roster) and `"document"` for History, whose RAW is the measured-history DOCUMENT
-(`components/docs/TrendsDoc.tsx`, the view's other register under convention 12). The two live in
-`components/datasection/` as `RecordsSurface` / `DocumentSurface`, and `components/DataSection.tsx`
-is nothing but the keyed dispatch between them — a map, so a third register is a compile error
-rather than a silent fall-through, and gated on the row rather than a mode (convention 7). The mode
-compares that pick WHICH TABLE the records surface draws are records-internal, which is why they sit
-inside that surface and never in the dispatch; `components/rawSurfaceBoundary.test.ts` pins the
-split. The document's chunk is `dynamic()`-loaded — the raw layer mounts in every view — and it is
-set in the shared reading measure (`components/docs/measure.ts`) with no sheet of its own: the
-layer's `.ig-panel` glass IS its sheet, and a plate on a plate flattens both. Everything else about
-RAW is identical there: the toggle shows pressed, Escape and the × return to the scene, and the
-command bar keeps its whole ordinary face, filter included.
-
-⚠️ **AND THE DOCUMENT OPENS ON WHAT THE SCENE WAS SHOWING** (2026-09-19). The step ACROSS the
-rung carries its context exactly as the step DOWN does: `TrendsDoc` seeds its `zoom` from
-`store.trendWindow` and its `range` from `store.trendRange` — a brushed range arrives with
-`metaId: null`, since the timeline brushes the whole stack rather than one plane. These are its
-THIRD and first mount-once reads beside `initialTab`, and `DocumentSurface` remounts the component
-per open, so "at mount" is "when the reader asked to read it". **Seeded, not followed, and never
-written back**: after mount the pickers are the page's own, a subscription would fight the reader's
-own pill on the next cursor write, and a write the other way would make reading the page silently
-re-cut the scene behind it. `components/rawSurfaceBoundary.test.ts` pins all three halves — the
-`getState()` seed, the absent subscription, and the absent setter call.
+⚠️ **WHAT RAW DOES IS A POLICY ROW** (2026-09-18; RAW IS THE RECORDS in every view since
+2026-10-07). `VIEW_POLICIES[mode].rawSurface` is where each view says it: `"records"` for the
+structural views, whose own records the layer shows (the anchor log, the node roster), and
+`"door"` for History, which has none of its own — its RAW toggle runs `trendDoors.openRecords`
+over the span on screen (`trendWindow.windowSpan`: the brushed range, else the window), scoped to
+the plane brought forward, else the filter, and closing the layer returns to History. History's
+measured-history DOCUMENT, which RAW used to show there, was retired the same day (user: "not
+really raw, and mostly replaced by the scene"). `components/DataSection.tsx` is the keyed map from
+the row to a surface — a new answer is a compile error, never a silent fall-through, and gated on
+the row rather than a mode (convention 7); `components/rawSurfaceBoundary.test.ts` pins it and the
+toggle's door. The mode compares that pick WHICH TABLE the records surface draws are
+records-internal, which is why they sit inside that surface and never in the dispatch.
 
 **The page never scrolls.** The scene wrapper is `position:fixed; inset:0` with an identity transform
 from first paint, which makes it the containing block for every fixed descendant — see CSS trap 2,
@@ -328,12 +314,11 @@ pointermove. Three rules are worth knowing before touching it:
   the pickActions table).
 - **THE ONE EXIT IS THE CARD'S FOOT CONTROL, and it is shared.** `Snapshot records` — a full-bleed
   control on the wash ladder at the card's foot (2026-09-26, `moment-door.html` A; the bare text
-  links read as prose) — and the Trends document's per-chart link call ONE helper
+  links read as prose) — and History's RAW toggle call ONE helper
   (`components/trendDoors.ts`): commit the network through the table (guarded — that builder
   TOGGLES), hand the span to the log, switch the mode, open the raw layer. Two copies of four
   ordered steps is how two surfaces start landing a reader in different places. The card's
-  `All charts` link went the same day: this view's RAW surface is the document, so the command
-  bar's RAW toggle already is that door. **And the door remembers where it was** (2026-09-26):
+  `All charts` link went the same day. **And the door remembers where it was** (2026-09-26):
   `openRecords` records the view it left in `store.rawReturnMode`, and `setSection("scene")` —
   the toggle, Escape and the layer's × all end there — returns to it and clears it; a view switch
   made inside the layer clears it too. Closing the log used to strand the reader in Snapshots.
@@ -358,8 +343,8 @@ timeline is WHEN, the depth of the stack is WHO, and UP/DOWN is WHAT — the mea
 the Networks card's HEADING CONTROL (the explorer's figure heading opening `METRIC_ORDER` as a radio
 list with each measure's unit at the current cadence — design 2026-09-26; `Same scale` rode the
 same heading row until 2026-09-28, when it moved to the band's pill group). It replaced a `∧ SNAPSHOTS ∨` stepper, which walked a
-list the reader could not see, which itself replaced the six-pill picker no other surface used:
-the document lays its measures out as sections), plus `↑`/`↓` from inside a card; both write
+list the reader could not see, which itself replaced the six-pill picker no other surface used),
+plus `↑`/`↓` from inside a card; both write
 `trendMetric` from `METRIC_ORDER` (`src/data/trendSeries.ts`), so the two controls are one list. It is a view-level control because
 every card steps together (a stack whose planes showed different measures would stop being a
 comparison) — it first rode the front card's header as two bare chevrons, which said the measure
@@ -384,7 +369,7 @@ A step taken mid-sequence RETARGETS, never queues; reduced motion skips the sequ
 exit with transitions off is a 140ms blank).
 
 ⚠️ **A DRAG ACROSS THE FRONT CHART BRUSHES THE RANGE** (2026-09-26; user: "create a window also
-in the main chart"). It is the document's own `onRange` gesture on `TrendChart`, and it commits
+in the main chart"). It is `TrendChart`'s `onRange` gesture, and it commits
 `trendRange` for the whole stack exactly as the band's timeline does. It replaced the orbit
 handoff (`orbitHandoff.ts`, 2026-09-19, retired): History lost its orbit the same day
 (`viewPolicy.rotate` is false — the cards hold their implied places, a click brings one forward,
@@ -806,10 +791,7 @@ nothing (rule 9). Every decision a pointer makes is pure and tested in
 `TrendTimeline.tsx` is the band TENANT (which payload, the readout, the pills, the honesty
 states) and `TrendTrack.tsx` the INSTRUMENT (the SVG and every gesture), because the track's whole
 subject is a geometry it measures itself and nothing above it has those numbers. The window pills
-are shared with the Trends document through `components/trendPickers.tsx` — the two had already been
-caught drifting once (user, 2026-09-09), so the class strings have one home, and since 2026-09-19
-the setting SWITCH and the document's scope CHIP live there beside them for the same reason (the
-METRIC picker left on 2026-09-26 for the explorer's heading control).
+and the scale pill live in `components/trendPickers.tsx`.
 
 **THE SCRUB IS THIS VIEW'S PRIMARY GESTURE, AND FOUR SEPARATE MEMO FAILURES MADE IT UNUSABLE.** All
 four were invisible in review and visible only in a frame counter, so they are recorded with their
@@ -884,11 +866,8 @@ inline in the return would quietly restore the bug for every consumer at once.
   route file passing `doc`, a footer `DocToggle`. The engine's bare stage, both transition
   signals and the roll grammar follow automatically; the store's `docPage` union is the one
   deliberate duplicate, and tsc flags it the moment the registries disagree.
-  ⚠️ **The registry is for PROSE OVER THE BARE STAGE, and nothing else** (2026-09-18). A document
-  that is a VIEW's second register is not a doc page: it belongs to the raw layer, through that
-  view's `rawSurface` row. The Trends document was a third entry until History became a view, and
-  the two flags it needed there — `scoped` (keep the bar's filter up over it) and `routeless` (no
-  URL of its own) — were removed with it, since RAW gives both for free. Don't reintroduce either.
+  ⚠️ **The registry is for PROSE OVER THE BARE STAGE, and nothing else** (2026-09-18). A view's
+  data belongs to the raw layer through its `rawSurface` row, never to a doc page.
 
 - **The HUD arrives staged** (`useBootStage` + `BootFade`, wired in `AppShell`): command bar when
   the engine is up (or failed — chrome is controls), rails/dock/footer on first data, vitals band

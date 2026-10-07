@@ -196,7 +196,6 @@ describe("trend-stack boundary", () => {
 
   it("fills the planes' area without inventing a measurement", () => {
     const src = stripComments(readFileSync(CHART, "utf8"));
-    const doc = "components/docs/TrendsDoc.tsx";
     // ⚠️ THE TAG, NOT THE LINE (2026-09-19). The first cut matched `/^\s*fill\s*$/m` — a line
     // holding nothing but `fill` — which is how the STACK happens to be formatted and is not how
     // the DOCUMENT is: every `<TrendChart …>` there is one long line, so a `fill` added to any of
@@ -233,17 +232,6 @@ describe("trend-stack boundary", () => {
       passesFill(FILE),
       `${FILE} must pass \`fill\` to TrendChart — the plane's colour is the area under its line`,
     ).toBe(true);
-    // The document's own call sites must NOT: a filled document chart is a different page, and
-    // the chart type only leaves `LineChart` when the fill is on. Guarded against a VACUOUS pass —
-    // a rename of the component would otherwise leave this asserting about an empty list.
-    expect(
-      trendChartTags(stripComments(readFileSync(doc, "utf8"))).length,
-      `${doc} renders no <TrendChart> at all — this rule would pass by finding nothing`,
-    ).toBeGreaterThan(0);
-    expect(
-      passesFill(doc),
-      `${doc} passes \`fill\` — the document register is line-only`,
-    ).toBe(false);
     // The area is a graphical item like the line, so it takes the line's own honesty prop. Two
     // occurrences: the Line's and the Area's.
     expect(

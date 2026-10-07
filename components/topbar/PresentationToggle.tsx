@@ -5,6 +5,9 @@ import { Focus, Table2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { useBreakpoint } from "@/components/useBreakpoint";
+import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
+import { windowSpan } from "@/src/data/trendWindow";
+import { openRecords } from "@/components/trendDoors";
 
 // The command bar's trailing PRESENTATION group — TWO controls since 2026-08-30 (user: "scene
 // vs hud [is] a toggle; raw is still separate because that's unrelated"), splitting the one
@@ -77,7 +80,18 @@ export default function PresentationToggle() {
         type="button"
         aria-pressed={section === "data"}
         title="Raw: the data behind the view"
-        onClick={() => setSection(section === "data" ? "scene" : "data")}
+        onClick={() => {
+          if (section === "data") return setSection("scene");
+          // A view whose RAW is a DOOR (History — `viewPolicy.rawSurface`, user 2026-10-07) opens
+          // the anchor log for the span on screen, scoped to the plane brought forward, else the
+          // filter: the Moment card's own door, so the two land in the same place.
+          const st = useStore.getState();
+          if (VIEW_POLICIES[st.mode].rawSurface === "door") {
+            const net = st.trendFocus ?? (st.filter !== "all" ? st.filter : null);
+            return openRecords(net, windowSpan(st.trendWindow, st.trendRange, Date.now()));
+          }
+          setSection("data");
+        }}
         className={SEG}
       >
         <Table2 aria-hidden className="size-4" />

@@ -105,13 +105,7 @@ export function viewTitle(name: string): string {
 // engine's bare stage, both transition signals and the roll grammar follow automatically.
 //
 // ⚠️ A DOC PAGE IS PROSE OVER THE BARE STAGE, AND THE REGISTRY IS ONLY FOR THAT (2026-09-18).
-// The Trends document was a third entry until the measured history got a VIEW of its own; it is
-// that view's RAW register now (`viewPolicy.rawSurface`, rendered by
-// datasection/DocumentSurface), not an overlay. The two flags it needed — `scoped`, which kept
-// the command bar's filter up over it, and `routeless`, which gave it no URL of its own — left
-// with it: a document reached through RAW keeps the bar's ordinary face by construction, and it
-// is its view's URL that the address bar states. Don't reintroduce either for a surface that is
-// really a view's second register; give it a policy row instead.
+// A view's data belongs to the raw layer through its `viewPolicy.rawSurface` row, never here.
 export type DocDef = {
   label: string;
   title: string;

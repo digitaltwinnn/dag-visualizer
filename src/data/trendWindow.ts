@@ -292,6 +292,23 @@ export const ZOOMS = [
 ] as const;
 export type ZoomId = (typeof ZOOMS)[number]["id"];
 
+const H = 3_600_000; // an hour — `HOUR_MS` below is declared after this table is evaluated
+const WINDOW_MS: Record<Exclude<ZoomId, "all">, number> = {
+  "1h": H,
+  "24h": 24 * H,
+  "7d": 7 * 24 * H,
+  "30d": 30 * 24 * H,
+  "1y": 365 * 24 * H,
+};
+
+/** THE SPAN THE HISTORY VIEW HAS ON SCREEN — what its RAW hands the anchor log (user, 2026-10-07:
+ *  History's RAW is the records). A brushed range when one stands, else the window's trailing span
+ *  ending now; ALL has no span to hand over (null — the log opens on its newest page). */
+export function windowSpan(zoom: ZoomId, range: { fromMs: number; toMs: number } | null, nowMs: number): { fromMs: number; toMs: number } | null {
+  if (range) return { fromMs: range.fromMs, toMs: range.toMs };
+  return zoom === "all" ? null : { fromMs: nowMs - WINDOW_MS[zoom], toMs: nowMs };
+}
+
 /** A committed range — a drag on any chart (convention 12's zoom). `metaId` is whose chart the
  *  drag was drawn on (user, 2026-09-09: DOR committed, a range dragged on BIOFI's chart, "go to
  *  raw: no biofi in the filter" — a range must remember its network, and the document's records

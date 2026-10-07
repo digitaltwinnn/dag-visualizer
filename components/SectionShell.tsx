@@ -46,10 +46,9 @@ const SCENE_DIM = 0.26;
 /** How long the raw layer takes to SINK back into the scene, in seconds — the exit's first beat,
  *  after which the layer is `visibility:hidden` and out of the paint path entirely.
  *
- *  Exported because a surface inside the layer may need to outlive the store write that closed it:
- *  `datasection/DocumentSurface` unmounts the Trends document on close, and unmounting it the
- *  instant `section` flips would blank the layer while it is still receding. One number, read by
- *  the timeline below and by whoever has to wait for it — never a second constant that drifts. */
+ *  Exported for any surface inside the layer that has to outlive the store write that closed it
+ *  (unmounting the instant `section` flips would blank the layer while it is still receding). One
+ *  number, read by the timeline below and by whoever has to wait for it. */
 export const RAW_EXIT_S = 0.3;
 
 export default function SectionShell({

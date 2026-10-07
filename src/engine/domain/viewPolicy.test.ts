@@ -142,8 +142,8 @@ describe("the trends view is registered and inert", () => {
     for (const m of ["hyper", "geo", "trend", "soon"] as const) expect(VIEW_POLICIES[m].explorerDepth).toBe("follow");
   });
 
-  it("answers RAW with the document, not the records layer", () => {
-    expect(VIEW_POLICIES.trend.rawSurface).toBe("document");
+  it("answers RAW with a door onto the records, which History has none of its own", () => {
+    expect(VIEW_POLICIES.trend.rawSurface).toBe("door");
     expect(VIEW_POLICIES.ledger.rawSurface).toBe("records");
   });
 

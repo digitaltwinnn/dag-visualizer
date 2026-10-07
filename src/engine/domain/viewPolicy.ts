@@ -136,11 +136,13 @@ export interface ViewPolicy {
   // and has nowhere honest to put a node, so it reuses the doc overlay's park+fade path
   // (NodeFabric.tickFleetFade, the DOC_ROLL clock) rather than inventing node poses.
   fleet: "placed" | "parked";
-  // Which surface the RAW half of the `section` presentation axis shows. `section` is a
-  // PRESENTATION axis — same subject, two presentations — so the answer is per view rather than
-  // one hardcoded surface: the structural views show the records layer, and the trends view
-  // shows the measured-history DOCUMENT, which is its other register (CLAUDE.md convention 12).
-  rawSurface: "records" | "document";
+  // What the RAW half of the `section` presentation axis does in this view. RAW IS THE RECORDS
+  // in every view (user, 2026-10-07 — History's measured-history document was retired: the scene
+  // had replaced it). A structural view shows its OWN records in the layer ("records": the anchor
+  // log, the node roster); the History view has none of its own, so its RAW is a DOOR onto the
+  // anchor log for the span on screen ("door" — `trendDoors.openRecords`, the Moment card's door),
+  // and closing the layer returns to History.
+  rawSurface: "records" | "door";
   // How deep the left rail's EXPLORER stands (user, 2026-10-07). The rule: the explorer shows the
   // OPEN card's children (`components/explorer/boxLevel.ts`) — "follow" — UNLESS the view's first
   // level is its own AXIS: N records along it rather than a set of scopes to choose one of. Then
@@ -365,7 +367,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     bloom: BLOOM_CALM,
     chipEnv: 1,
     fleet: "parked",
-    rawSurface: "document",
+    rawSurface: "door",
     explorerDepth: "follow",
     chartStack: true,
     // ⚠️ OFF, and this row is why the field exists (2026-09-18). The planes are TEXT — a chart you

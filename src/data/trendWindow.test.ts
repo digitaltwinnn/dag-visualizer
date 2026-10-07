@@ -4,7 +4,7 @@
 // as "no leading gap"; the client clock judging a CDN-cached payload's newest bucket; the
 // leading partial month drawn whole while the trailing one was trimmed).
 import { describe, expect, it } from "vitest";
-import { assembleTrendSlice, bucketAt, heldZoom, spanPhrase, cursorFraction, cutRange, leadingTrim, monthlySum, pickRangeTier, planTrendFetch, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, ZOOMS, type TrendsWindowData } from "./trendWindow";
+import { assembleTrendSlice, bucketAt, heldZoom, spanPhrase, cursorFraction, cutRange, leadingTrim, monthlySum, pickRangeTier, planTrendFetch, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, windowSpan, ZOOMS, type TrendsWindowData } from "./trendWindow";
 
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
@@ -467,5 +467,24 @@ describe("spanPhrase", () => {
     const d = (s: string) => Date.parse(s);
     expect(spanPhrase("30d", { fromMs: d("2026-09-20T00:00Z"), toMs: d("2026-09-27T00:00Z") })).toBe("Sep 20 – Sep 26");
     expect(spanPhrase("30d", { fromMs: d("2026-09-20T03:00Z"), toMs: d("2026-09-20T09:00Z") })).toBe("Sep 20");
+  });
+});
+
+// HISTORY'S RAW IS THE RECORDS (user, 2026-10-07): RAW opens the anchor log for the span on screen —
+// a brushed range when one stands, else the window's trailing span ending now.
+describe("windowSpan — the span the History view has on screen", () => {
+  const now = Date.UTC(2026, 9, 7, 12);
+  it("a brushed range wins", () => {
+    expect(windowSpan("30d", { fromMs: 1, toMs: 2 }, now)).toEqual({ fromMs: 1, toMs: 2 });
+  });
+  it("else the window's trailing span, ending now", () => {
+    expect(windowSpan("1h", null, now)).toEqual({ fromMs: now - 3_600_000, toMs: now });
+    expect(windowSpan("24h", null, now)).toEqual({ fromMs: now - 86_400_000, toMs: now });
+    expect(windowSpan("7d", null, now)).toEqual({ fromMs: now - 7 * 86_400_000, toMs: now });
+    expect(windowSpan("30d", null, now)).toEqual({ fromMs: now - 30 * 86_400_000, toMs: now });
+    expect(windowSpan("1y", null, now)).toEqual({ fromMs: now - 365 * 86_400_000, toMs: now });
+  });
+  it("ALL has no span to hand over — the log opens on its newest page", () => {
+    expect(windowSpan("all", null, now)).toBeNull();
   });
 });
