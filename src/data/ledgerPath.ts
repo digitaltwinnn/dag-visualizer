@@ -29,8 +29,8 @@ export interface LedgerPathView {
   /** The committed tick's ordinal. */
   snapOrd: number | null;
   following: boolean;
-  /** The Metagraph snapshot CARD is the rail's open box (`store.boxedCard`). */
-  metaSnapBoxed: boolean;
+  /** The rail's open box (`store.boxedCard`) — a slot id, or null. */
+  boxed: string | null;
 }
 
 const metaSnapKey = (m: LedgerPathView["metaSnap"]) => (m ? `${m.globalOrdinal}|${m.metaId}|${m.ordinal}` : null);
@@ -41,7 +41,7 @@ export function pathViewChanged(a: LedgerPathView, b: LedgerPathView): boolean {
     metaSnapKey(a.metaSnap) !== metaSnapKey(b.metaSnap) ||
     a.snapOrd !== b.snapOrd ||
     a.following !== b.following ||
-    a.metaSnapBoxed !== b.metaSnapBoxed
+    a.boxed !== b.boxed
   );
 }
 
@@ -57,26 +57,37 @@ export function pathViewChanged(a: LedgerPathView, b: LedgerPathView): boolean {
  * 3. **A tick pinned elsewhere while a tick is open re-points the path** — unless the same commit
  *    carried a snapshot of that tick, which rule 2 has already opened (review, 2026-09-26).
  *
- * The one exception to rule 2's live-follow clause: **while LIVE, the path follows the Metagraph
- * snapshot CARD** (user, 2026-10-07 — "when I'm on a metagraph snapshot card the explorer … should
- * show the parent global snapshot → BioFi → the snapshot I see in my card"). With that card the
- * open box, the path opens down to the snapshot itself (its signers) and moves with each new one
- * the heartbeat commits; when the box moves off it, a path it opened goes back to the tick list.
- * Any other box under live leaves the path alone, which is what 2026-10-04 asked for. */
+ * And one rule over all three: **the path MIRRORS the snapshot chain's box** (user, 2026-10-07 —
+ * "when I'm on a metagraph snapshot card the explorer … should show the parent global snapshot →
+ * BioFi → the snapshot I see in my card", then "open it one level higher … if we click the node
+ * card, then we move to that validator row"). With the Metagraph snapshot card as the box the path
+ * stands at that network's snapshots in the tick, the snapshot's row washed; with the Node card as
+ * the box it goes one level deeper, to the snapshot's signers, the node's row washed.
+ * - A RE-BOX (the box moves, the snapshot does not) mirrors in both states — it is a card click,
+ *   and the explorer answers it the way a row click answers with its card.
+ * - LIVE, the heartbeat's commit is followed only while one of those two cards is the box, which is
+ *   the one exception to rule 2's live clause; when the box leaves them, a path the mirror opened
+ *   goes back to the tick list. Any other box under live leaves the path alone (2026-10-04).
+ * - PINNED, a commit keeps rule 2: the explorer's own snapshot row opens the signers itself, and a
+ *   mirror over it would take that drill back. */
+const mirrored = (v: LedgerPathView): LedgerPath | null => {
+  const m = v.metaSnap;
+  if (!m || (v.boxed !== "metaSnap" && v.boxed !== "node")) return null;
+  return { tick: m.globalOrdinal, net: m.netKey, snap: v.boxed === "node" ? `${m.metaId}|${m.ordinal}` : null, selfResume: false };
+};
+const samePath = (a: LedgerPath, b: LedgerPath) => a.tick === b.tick && a.net === b.net && a.snap === b.snap;
+
 export function syncLedgerPath(path: LedgerPath, prev: LedgerPathView, next: LedgerPathView): LedgerPath {
   if (next.following && !prev.following) {
     return path.selfResume ? { ...path, selfResume: false } : CLOSED_PATH;
   }
+  const target = mirrored(next);
+  const reboxed = next.boxed !== prev.boxed && metaSnapKey(next.metaSnap) === metaSnapKey(prev.metaSnap);
+  if (target && reboxed) return samePath(path, target) ? path : { ...target, selfResume: path.selfResume };
   if (next.following) {
-    const m = next.metaSnap;
-    if (next.metaSnapBoxed && m) {
-      if (metaSnapKey(m) === metaSnapKey(prev.metaSnap) && prev.metaSnapBoxed) return path;
-      return { tick: m.globalOrdinal, net: m.netKey, snap: `${m.metaId}|${m.ordinal}`, selfResume: path.selfResume };
-    }
-    const was = prev.metaSnapBoxed ? prev.metaSnap : null;
-    if (was && path.tick === was.globalOrdinal && path.snap === `${was.metaId}|${was.ordinal}`) {
-      return { ...CLOSED_PATH, selfResume: path.selfResume };
-    }
+    if (target) return metaSnapKey(next.metaSnap) !== metaSnapKey(prev.metaSnap) ? { ...target, selfResume: path.selfResume } : path;
+    const was = mirrored(prev);
+    if (was && samePath(path, was)) return { ...CLOSED_PATH, selfResume: path.selfResume };
     return path;
   }
   const m = next.metaSnap;

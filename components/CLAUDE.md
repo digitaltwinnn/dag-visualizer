@@ -209,9 +209,11 @@ decisions inside them are design, not detail:
   `faint`, and inside a tick only the committed network's row is drillable (`outOfLens`); **the
   path follows a commit made elsewhere** (a tile, the rail's ‹ › plank, the raw log) but never
   auto-opens from the root on the live heartbeat, because the newest tick changes every few
-  seconds — except while the Metagraph snapshot CARD is the box (user, 2026-10-07): then the path
-  opens down to that snapshot and follows it tick by tick, and steps back to the tick list when
-  another card is boxed (`src/data/ledgerPath.ts`). The LIVE/PINNED
+  seconds — and it MIRRORS the snapshot chain's box (user, 2026-10-07): the Metagraph snapshot card stands
+  it at the network's snapshots in the tick, that row washed; the Node card one level deeper, at
+  the signers, the node's row washed. Live, the heartbeat is followed only while one of those two
+  is the box, and the path steps back to the tick list when the box leaves them
+  (`src/data/ledgerPath.ts`). The LIVE/PINNED
   control rides the CARD HEAD's eyebrow row with the shown snapshot's ticking age (2026-09-28 —
   it rode the heading row as the level's setting, design decision 15, until then), and the pager
   states the TIME the rows span ("last 11 min") rather than "52 recent". Each level shows

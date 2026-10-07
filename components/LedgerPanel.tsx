@@ -184,7 +184,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const selNodes = useStore((s) => s.selNodes);
   const metaList = useStore((s) => s.metaList); // co-location reads the full catalog (nodeRowSpec)
   const inspect = useStore((s) => s.inspect);
-  const metaSnapBoxed = useStore((s) => s.boxedCard === "metaSnap");
+  const boxed = useStore((s) => s.boxedCard);
   // ONE PICK FOR EVERY LEVEL (user, 2026-09-29 — `src/data/explorerMeasure.ts`): the lower levels
   // show the tick level's `ledgerMeasure` where they can state it and their own first measure where
   // they can't, and a pick at any level writes that one value — so stepping down and back up never
@@ -277,7 +277,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
       : null,
     snapOrd: activeSnapOrd,
     following,
-    metaSnapBoxed,
+    boxed,
   };
   const [seenView, setSeenView] = useState(pathView);
   if (pathViewChanged(seenView, pathView)) {

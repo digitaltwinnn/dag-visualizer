@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CLOSED_PATH, pathViewChanged, syncLedgerPath, type LedgerPath, type LedgerPathView } from "./ledgerPath";
 
-const view = (p: Partial<LedgerPathView> = {}): LedgerPathView => ({ metaSnap: null, snapOrd: null, following: false, metaSnapBoxed: false, ...p });
+const view = (p: Partial<LedgerPathView> = {}): LedgerPathView => ({ metaSnap: null, snapOrd: null, following: false, boxed: null, ...p });
 const ms = (ordinal: number, globalOrdinal: number) => ({ metaId: "dor", ordinal, globalOrdinal, netKey: "dor" });
 const open: LedgerPath = { tick: 100, net: "dor", snap: "dor|5", selfResume: false };
 
@@ -39,23 +39,37 @@ describe("syncLedgerPath", () => {
   });
 });
 
-describe("syncLedgerPath — live, the path follows the Metagraph snapshot card", () => {
+describe("syncLedgerPath — the path mirrors the snapshot chain's box", () => {
   const live = (p: Partial<LedgerPathView> = {}) => view({ following: true, ...p });
-  it("opens down to the snapshot itself when that card becomes the box", () => {
-    const next = syncLedgerPath(CLOSED_PATH, live({ metaSnap: ms(7, 120) }), live({ metaSnap: ms(7, 120), metaSnapBoxed: true }));
-    expect(next).toEqual({ tick: 120, net: "dor", snap: "dor|7", selfResume: false });
+  const atSnaps = { tick: 120, net: "dor", snap: null, selfResume: false };
+  const atSigners = { tick: 120, net: "dor", snap: "dor|7", selfResume: false };
+  it("the Metagraph snapshot card stands the path at the network's snapshots, its row washed", () => {
+    expect(syncLedgerPath(CLOSED_PATH, live({ metaSnap: ms(7, 120) }), live({ metaSnap: ms(7, 120), boxed: "metaSnap" }))).toEqual(atSnaps);
   });
-  it("moves with each snapshot the heartbeat commits while the card stays the box", () => {
-    const at7 = { tick: 120, net: "dor", snap: "dor|7", selfResume: false };
-    const next = syncLedgerPath(at7, live({ metaSnap: ms(7, 120), metaSnapBoxed: true }), live({ metaSnap: ms(8, 121), metaSnapBoxed: true }));
-    expect(next).toEqual({ tick: 121, net: "dor", snap: "dor|8", selfResume: false });
+  it("the Node card takes it one level deeper, to the snapshot's signers", () => {
+    expect(syncLedgerPath(atSnaps, live({ metaSnap: ms(7, 120), boxed: "metaSnap" }), live({ metaSnap: ms(7, 120), boxed: "node" }))).toEqual(atSigners);
+    // …and back up when the snapshot card is re-boxed.
+    expect(syncLedgerPath(atSigners, live({ metaSnap: ms(7, 120), boxed: "node" }), live({ metaSnap: ms(7, 120), boxed: "metaSnap" }))).toEqual(atSnaps);
   });
-  it("goes back to the tick list when the box moves off the card", () => {
-    const at7 = { tick: 120, net: "dor", snap: "dor|7", selfResume: false };
-    expect(syncLedgerPath(at7, live({ metaSnap: ms(7, 120), metaSnapBoxed: true }), live({ metaSnap: ms(7, 120) }))).toEqual(CLOSED_PATH);
+  it("a re-box mirrors while pinned too", () => {
+    expect(syncLedgerPath(atSnaps, view({ metaSnap: ms(7, 120), boxed: "metaSnap" }), view({ metaSnap: ms(7, 120), boxed: "node" }))).toEqual(atSigners);
+  });
+  it("…but a pinned COMMIT keeps rule 2, so the explorer's own drill into the signers stands", () => {
+    const drilled = { tick: 120, net: "dor", snap: "dor|7", selfResume: false };
+    expect(syncLedgerPath(drilled, view({ boxed: "context" }), view({ metaSnap: ms(7, 120), snapOrd: 120, boxed: "metaSnap" }))).toEqual(drilled);
+  });
+  it("live, it moves with each snapshot the heartbeat commits while the card stays the box", () => {
+    const next = syncLedgerPath(atSnaps, live({ metaSnap: ms(7, 120), boxed: "metaSnap" }), live({ metaSnap: ms(8, 121), boxed: "metaSnap" }));
+    expect(next).toEqual({ tick: 121, net: "dor", snap: null, selfResume: false });
+  });
+  it("live, the heartbeat leaves the path alone under any other box", () => {
+    expect(syncLedgerPath(CLOSED_PATH, live({ boxed: "context" }), live({ metaSnap: ms(7, 120), boxed: "context" }))).toBe(CLOSED_PATH);
+  });
+  it("live, it goes back to the tick list when the box leaves the chain", () => {
+    expect(syncLedgerPath(atSnaps, live({ metaSnap: ms(7, 120), boxed: "metaSnap" }), live({ metaSnap: ms(7, 120), boxed: "context" }))).toEqual(CLOSED_PATH);
   });
   it("…but leaves a path the reader opened elsewhere alone", () => {
-    expect(syncLedgerPath(open, live({ metaSnap: ms(7, 120), metaSnapBoxed: true }), live({ metaSnap: ms(7, 120) }))).toBe(open);
+    expect(syncLedgerPath(open, live({ metaSnap: ms(7, 120), boxed: "metaSnap" }), live({ metaSnap: ms(7, 120), boxed: "context" }))).toBe(open);
   });
 });
 
@@ -73,6 +87,6 @@ describe("pathViewChanged", () => {
     expect(pathViewChanged(view(), view({ snapOrd: 1 }))).toBe(true);
     expect(pathViewChanged(view(), view({ following: true }))).toBe(true);
     expect(pathViewChanged(view(), view({ metaSnap: ms(1, 2) }))).toBe(true);
-    expect(pathViewChanged(view(), view({ metaSnapBoxed: true }))).toBe(true);
+    expect(pathViewChanged(view(), view({ boxed: "metaSnap" }))).toBe(true);
   });
 });
