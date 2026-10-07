@@ -119,6 +119,9 @@ export default function MotionHint() {
     <div
       role="status"
       aria-live="polite"
+      // The sentence is HELD through the visual fade, so a faded hint is hidden from assistive tech
+      // too — or it kept saying "Entering History" long after the view settled (the tester pass).
+      aria-hidden={state === "0"}
       data-on={state}
       style={{
         top:
