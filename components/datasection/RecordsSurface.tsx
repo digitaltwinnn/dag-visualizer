@@ -79,7 +79,9 @@ export default function RecordsSurface() {
               // pr-2: the phone pane SCROLLS (document mode), and without it the value column's
               // right edge sat against the scrollbar (user, 2026-09-02).
               "max-[700px]:pr-2 " +
-              "max-[700px]:pl-0 max-[700px]:overflow-y-auto slim-scroll"
+              // The phone pane scrolls DOWN only: 2px of a full-bleed plate's overhang drew a
+              // horizontal scrollbar along its bottom (2026-10-07, the raw phone pass).
+              "max-[700px]:pl-0 max-[700px]:overflow-y-auto max-[700px]:overflow-x-hidden slim-scroll"
             }
           >
             {onDetail && (
