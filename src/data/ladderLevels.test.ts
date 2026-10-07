@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { cohortsLevel, countriesLevel, countryNodes, machinesOf, networksLevel, nodeOrder, nodesByCountry, tickNetworksLevel } from "./ladderLevels";
+import { cohortsLevel, countriesLevel, countryNodes, machinesOf, networksLevel, nodeOrder, nodesByCountry, tickNetworksLevel, tickPolledRows } from "./ladderLevels";
 import type { AnchorLogRow } from "./anchorLog";
+import type { MetaSnapRecord } from "./api";
 import type { CountryStat, GlobalSnapshot, MetaInfo, NodeRow } from "./types";
 
 // A node row with just what the levels read. `meta` names its network (networkOfRow).
@@ -136,5 +137,22 @@ describe("machinesOf — the node pager steps nodes, not layer rows (Review Focu
     const l1 = node({ ip: "8", id: "m", layer: "l1" });
     const keyless = { ...node({ ip: "" }), pick: { kind: "metanode", node: null } } as unknown as NodeRow;
     expect(machinesOf([l0, l1, de1, keyless]).map((r) => r.layer + r.id)).toEqual(["l0m", "l0b"]);
+  });
+});
+
+describe("tickPolledRows — the one polled input both the explorer and the rail feed tickNetworksLevel", () => {
+  const tick = { ordinal: 42, timestamp: "T42" } as unknown as GlobalSnapshot;
+  const rec = (ordinal: number, ts: string) => ({ ordinal, ts, hash: `h${ordinal}`, fee: 1, sizeInKB: 2 }) as unknown as MetaSnapRecord;
+  const buffers = new Map<string, MetaSnapRecord[]>([
+    ["dor", [rec(900, "T41"), rec(901, "T42"), rec(902, "T42")]],
+    ["ded", [rec(5, "T43")]],
+  ]);
+  it("keeps only the records stamped with this tick, each joined to it", () => {
+    const rows = tickPolledRows(buffers, tick);
+    expect(rows.map((r) => `${r.metaId}:${r.ordinal}:${r.hash}`)).toEqual(["dor:901:h901", "dor:902:h902"]);
+    expect(rows.every((r) => r.global === tick && r.ts === "T42")).toBe(true);
+  });
+  it("an empty or missing buffer yields no rows", () => {
+    expect(tickPolledRows(new Map(), tick)).toEqual([]);
   });
 });

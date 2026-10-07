@@ -9,6 +9,7 @@
 // ROW (glyph, bar, click) is the explorer's business; a level's STEP (label, actions) is the
 // rail's. Only membership and order live here.
 import { buildChannelLog, type AnchorLogRow } from "./anchorLog";
+import type { MetaSnapRecord } from "./api";
 import { countryMeasure, networkOfRow, type GeoMeasure } from "./geoMeasure";
 import { hoverKeyOf } from "./hoverSubject";
 import { networkMeasure, type HyperMeasure } from "./hyperMeasure";
@@ -127,6 +128,21 @@ export interface TickNetwork {
 
 const newestFirst = (a: TickSnap, b: TickSnap) => (a.metaId === b.metaId ? b.ordinal - a.ordinal : a.ts === b.ts ? b.ordinal - a.ordinal : a.ts < b.ts ? 1 : -1);
 const snapOf = (r: AnchorLogRow): TickSnap => ({ metaId: r.metaId!, ordinal: r.ordinal, hash: r.hash, ts: r.ts, fee: r.fee, sizeInKB: r.sizeInKB });
+
+/** ONE TICK'S POLLED ROWS — the per-network buffers' records stamped with this global's timestamp
+ *  (the anchor join is exact: a record's `ts` IS its anchoring global's), each joined to it. The ONE
+ *  polled input both the explorer and the rail hand `tickNetworksLevel` (final review, 2026-10-07:
+ *  they had fed it two different ones), and a walk over ~10 short buffers rather than the whole log. */
+export function tickPolledRows(metaSnaps: ReadonlyMap<string, readonly MetaSnapRecord[]>, tick: GlobalSnapshot): AnchorLogRow[] {
+  const rows: AnchorLogRow[] = [];
+  for (const [metaId, recs] of metaSnaps) {
+    for (const rec of recs) {
+      if (rec.ts !== tick.timestamp) continue;
+      rows.push({ metaId, ordinal: rec.ordinal, hash: rec.hash, fee: rec.fee, sizeInKB: rec.sizeInKB, ts: rec.ts, global: tick });
+    }
+  }
+  return rows;
+}
 
 /** THE NETWORKS IN A GLOBAL SNAPSHOT — the explorer's level under a tick, the Metagraph card's
  *  pager under it, and the tick ghost's first child.

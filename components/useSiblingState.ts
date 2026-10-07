@@ -5,9 +5,8 @@ import { useStore } from "@/src/store/store";
 import type { SiblingState } from "@/components/railSiblings";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { latestRelevant } from "@/src/data/follow";
-import { buildAnchorLog } from "@/src/data/anchorLog";
 import { getAnchor, getNetwork } from "@/src/data/network";
-import { tickNetworksLevel } from "@/src/data/ladderLevels";
+import { tickNetworksLevel, tickPolledRows } from "@/src/data/ladderLevels";
 import { LISTED_IDS } from "@/src/data/unlisted";
 import { tickInStory } from "@/src/data/ledgerStory";
 import { POLL } from "@/src/engine/config";
@@ -57,12 +56,15 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
     // THE SHOWN TICK'S NETWORKS — the ledger explorer's own level, so the Metagraph card's ‹ › and
     // the tick's ghost step what the explorer lists. The polled half lives in the network singleton
     // (read at derivation time, as the tick window's live reads are); the exact read is the store's.
-    const tickGlobal = mode === "ledger" ? (snap?.data ?? null) : null;
+    // Only the slots whose steps read it — the tick's ghost, the Metagraph card and its snapshot's
+    // pager — and only that tick's records (final review, 2026-10-07: every slot rebuilt the whole log).
+    const wantsTick = slot === "snap" || slot === "context" || slot === "metaSnap";
+    const tickGlobal = mode === "ledger" && wantsTick ? (snap?.data ?? null) : null;
     const net = tickGlobal ? getNetwork() : null;
     const tickNets = tickGlobal
       ? tickNetworksLevel(
           tickGlobal,
-          net ? buildAnchorLog(net.metaSnaps, net.globalSnapshots, "all") : [],
+          net ? tickPolledRows(net.metaSnaps, tickGlobal) : [],
           snapshotExact[tickGlobal.ordinal]?.rows,
           (id) => LISTED_IDS.has(id),
         )

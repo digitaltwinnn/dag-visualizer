@@ -14,7 +14,6 @@ import { ensurePage } from "@/components/RawSnapshotBridge";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { cn } from "@/lib/utils";
-import { buildAnchorLog } from "@/src/data/anchorLog";
 import { latestRelevant } from "@/src/data/follow";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import {
@@ -44,7 +43,7 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import { NO_SIGNAL_COPY, useNoSignal } from "@/components/useNoSignal";
 import { levelMeasure } from "@/src/data/explorerMeasure";
-import { tickNetworksLevel } from "@/src/data/ladderLevels";
+import { tickNetworksLevel, tickPolledRows } from "@/src/data/ladderLevels";
 
 // THE SNAPSHOTS VIEW'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -167,8 +166,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // is an honest no-op, not a broken pair.
   const { snaps } = useSnapshotFeed(POLL.maxSnapshots);
   const net = getNetwork();
-  const visibleTs = new Set(snaps.map((s) => s.timestamp));
-  const rows = net ? buildAnchorLog(net.metaSnaps, net.globalSnapshots, "all").filter((r) => visibleTs.has(r.ts)) : [];
   // Through the ledger's lens: `displayNetwork("dag")` RESOLVES, and a committed DAG must not
   // narrow the list to a story that can never have members (found live 2026-08-13).
   const filterNet = displayNetwork(ledgerLens(filter));
@@ -386,7 +383,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // ---- level 1: the networks that anchored into the open tick ---------------------------------
   // The ONE list (src/data/ladderLevels.ts): the Metagraph card's ‹ › and the tick's ghost step the
   // same networks in the same order.
-  const tickNets = tick ? tickNetworksLevel(tick, rows, exact?.rows, (id) => LISTED_IDS.has(id)) : [];
+  const tickNets = tick ? tickNetworksLevel(tick, net ? tickPolledRows(net.metaSnaps, tick) : [], exact?.rows, (id) => LISTED_IDS.has(id)) : [];
   if (tick) {
     const netRows: { id: string; name: string; hue: string; count: number; italic?: boolean }[] = tickNets.map((n) => ({
       id: n.id,
