@@ -17,7 +17,11 @@ function ScrollArea({ className, children, ...props }: React.ComponentProps<type
     <ScrollAreaPrimitive.Root data-slot="scroll-area" className={cn("relative", className)} {...props}>
       <ScrollAreaPrimitive.Viewport
         data-slot="scroll-area-viewport"
-        className="focus-visible:ring-ring/50 size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1"
+        // THE SCROLLBAR GETS ITS OWN GUTTER (user, 2026-10-07: "the scrollbar sits a bit on top of
+        // the table instead of next to it"): Radix positions its bars OVER the viewport, so the
+        // content reserves the vertical bar's 10px (`w-2.5` below) plus 2px of air, and the bar
+        // stands beside the table's last column rather than across it.
+        className="focus-visible:ring-ring/50 size-full pr-3 rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1"
       >
         {children}
       </ScrollAreaPrimitive.Viewport>
