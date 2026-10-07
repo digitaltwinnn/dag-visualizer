@@ -15,10 +15,10 @@ import { cn } from "@/lib/utils";
 // site: two of them cannot render `mm/dd/yyyy` inside this table's ~165px AGE column. A portalled
 // popover has no such ceiling, so the picking moved there and the column kept one line.
 //
-// ⚠️ THE FROM BOUND IS THE DESTINATION. `to` never steers the walk — it only bounds which rows the
-// landing marks as in-range. So the trigger names the from-date first and a from-only range is a
-// complete, submittable state, while a to-only one is not: `seekAge` refuses it ("pick a
-// from-date"). Stated in that order because a chain is walked from a point, not filtered to a slice.
+// ⚠️ THE RANGE IS A FILTER, AND THE FROM-DATE IS REQUIRED (2026-10-07 — it was a jump whose `to`
+// only bounded the landing mark). The log keeps to the span (`AnchorLogTable`'s `bound`); a
+// from-only range is a complete, submittable state — the span then runs to now — while a to-only
+// one is not: `seekAge` refuses it ("pick a from-date"). So the trigger names the from-date first.
 
 /** ⚠️ THE YEAR IS SHOWN ONLY WHEN IT IS NOT THIS ONE. The AGE column is ~108px, and
  *  `Sep 1, 2026 – Sep 3, 2026` truncates there while `Sep 1 – Sep 3` fits — and the year is the

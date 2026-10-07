@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { pageOfOrdinal, estimateOrdinal, dayStartMs, dayEndMs, tsInRange, seekOrdinalByTime, probeBudget, civilDate, civilString } from "./chainSeek";
+import { pageOfOrdinal, estimateOrdinal, dayStartMs, dayEndMs, tsInRange, seekOrdinalByTime, seekSpan, probeBudget, civilDate, civilString } from "./chainSeek";
 
 // The executable spec for the raw log's two non-arithmetic searches. The interpolation is the part
 // worth pinning: it is what turns a ~21-probe binary search into a handful, and its failure modes
@@ -230,5 +230,29 @@ describe("seekOrdinalByTime (the walk the Age and Anchored-into columns spend)",
   it("still honours an explicit budget, so the give-up path stays testable", async () => {
     const c = chain(28_100_000, dorLike);
     expect(await seekOrdinalByTime(dorLike(22_000_001) + EPOCH, 28_100_000, c.loadPage, 1)).toBeNull();
+  });
+});
+
+// THE LOG KEEPS TO A RANGE (user, 2026-10-07): a span's first and last ordinals on one chain, so the
+// pager can stay inside it and say how many snapshots it holds.
+describe("seekSpan — the ordinals a time span holds on one chain", () => {
+  const T0 = Date.UTC(2026, 0, 1);
+  const MIN = 60_000;
+  const LATEST = 1000;
+  // One snapshot a minute: ordinal n at T0 + n minutes.
+  const tsOf = (n: number) => new Date(T0 + n * MIN).toISOString();
+  const loadPage = async (before: number) =>
+    Array.from({ length: 25 }, (_, i) => before - i).filter((n) => n >= 1).map((n) => ({ ordinal: n, ts: tsOf(n) }));
+
+  it("first is the first snapshot at or after the start; last the final one before the end", async () => {
+    expect(await seekSpan(T0 + 100 * MIN, T0 + 200 * MIN, LATEST, loadPage)).toEqual({ first: 100, last: 199, count: 100 });
+    expect(await seekSpan(T0 + 100.5 * MIN, T0 + 200.5 * MIN, LATEST, loadPage)).toEqual({ first: 101, last: 200, count: 100 });
+  });
+  it("a span running past the tip ends at the tip", async () => {
+    expect(await seekSpan(T0 + 990 * MIN, T0 + 5000 * MIN, LATEST, loadPage)).toEqual({ first: 990, last: 1000, count: 11 });
+  });
+  it("a span after the tip, or between two snapshots, holds nothing", async () => {
+    expect((await seekSpan(T0 + 2000 * MIN, T0 + 3000 * MIN, LATEST, loadPage))!.count).toBe(0);
+    expect((await seekSpan(T0 + 100.2 * MIN, T0 + 100.6 * MIN, LATEST, loadPage))!.count).toBe(0);
   });
 });

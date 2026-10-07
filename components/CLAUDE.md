@@ -63,6 +63,14 @@ and return the live tip), so it is the only criterion that walks. FEE and SIZE h
 layer — a field there could only filter the 25 rows on screen, and a reader who typed a fee and got
 "no match" would reasonably conclude no such snapshot exists when we looked at 25 of 1.1 million.
 
+⚠️ **A DATE RANGE IS A FILTER, NOT A JUMP** (user, 2026-10-07 — the log reached from a Range card
+should keep to the range). On a chain `chainSeek.seekSpan` resolves the span's first and last
+ordinals; the pager pages only between them and its count reads "of N in range". Under All the
+recent rows are cut to the span, and the count keeps the word "recent" unless they hold the WHOLE
+span — "of 174 in range" for a month that holds 1.3M would be a count of this view's buffer, not
+of the range (rule 10). A door hands its exact instants and its own words for the chip; a typed
+range is whole UTC days. A snapshot or global search, a clear, or another chain drops the range.
+
 **The toolbar carries the two states the first cuts had nowhere to put**, both named in every guide
 on table filtering: what is APPLIED (in words, so a folded bar can never leave the table on a search
 with nothing explaining it) and a way to CLEAR it.

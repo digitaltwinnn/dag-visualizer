@@ -23,7 +23,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import TablePager from "@/components/datasection/TablePager";
 import LogSearchBar from "@/components/datasection/LogSearchBar";
-import { pageOfOrdinal, seekOrdinalByTime, dayStartMs, dayEndMs, tsInRange } from "@/src/data/chainSeek";
+import { pageOfOrdinal, seekSpan, dayStartMs, dayEndMs, tsInRange } from "@/src/data/chainSeek";
 import { POLL } from "@/src/engine/config";
 import { recordStamp, utcDayKey, utcStamp } from "@/src/util/localTime";
 import { dayWords } from "@/components/datasection/DateRange";
@@ -236,6 +236,12 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
    *  hour's Moment would otherwise read as its whole day — the chip repeats the card until the
    *  reader edits the dates themselves. */
   const [doorLabel, setDoorLabel] = useState<string | null>(null);
+  /** THE RANGE THE LOG KEEPS TO (user, 2026-10-07 — "card → raw page incl. filters"). A date search
+   *  is a FILTER now, not only a jump: on a chain the pager stays between the span's first and last
+   *  ordinals (`seekSpan`) and says how many it holds; under All the recent rows are cut to it.
+   *  `addr` is the chain the ordinals count on — another chain's ordinals mean nothing here. A
+   *  snapshot or global search, a clear, or another chain drops it. */
+  const [bound, setBound] = useState<{ addr: string | null; fromMs: number; toMs: number | null; first: number | null; last: number | null } | null>(null);
   const [seeking, setSeeking] = useState(false);
   // ⚠️ AN ARRIVAL SHOWS ITS SEARCH, NOT THE LIVE PAGE (user, 2026-09-29: coming to the raw page
   // from History with a network in scope "looks like it's loading something twice"). The door hands
@@ -387,16 +393,31 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // memoized explorer page; a pending tick keeps `global` at ordinal 0 + `pending` true.
   type ViewRow = AnchorLogRow & { pending?: boolean };
   let allRows: AnchorLogRow[] = [];
+  /** The window's rows before a range cuts them — what a date search looks through. */
+  let allRowsUnbounded: AnchorLogRow[] = [];
   let rows: ViewRow[] = [];
+  /** A chain range's page window: the chain pages its first and last ordinals sit on. */
+  let rangePages: { lo: number; hi: number } | null = null;
   let pages = 1;
   let from = 0;
   let to = 0;
   let total = 0;
 
+  // Whether a range is CUTTING what this render shows (set in the branch that applies it).
+  let rangeActive = false;
   if (!histNet) {
     const listedRows = net ? buildAnchorLog(net.metaSnaps, net.globalSnapshots, filter) : [];
     const unlistedRows = net && (lens === "all" || lens === UNLISTED_ID) ? unlistedLog(net.globalSnapshots, snapshotExact) : [];
-    allRows = sortAnchorLog([...listedRows, ...unlistedRows], sort.key, sort.dir, (metaId) => displayNetwork(metaId)?.ticker ?? metaId);
+    allRowsUnbounded = sortAnchorLog([...listedRows, ...unlistedRows], sort.key, sort.dir, (metaId) => displayNetwork(metaId)?.ticker ?? metaId);
+    // A RANGE CUTS THE RECENT ROWS to its span (`bound`, addressed to no chain here).
+    // ⚠️ "IN RANGE" ONLY WHEN THE RECENT ROWS HOLD THE WHOLE RANGE (rule 10). Cut from the recent
+    // rows, a month's range showed "1–25 of 174 in range" — a count of what this view keeps, not of
+    // the range (1.29M). Where the range reaches past the oldest recent row, the count keeps the
+    // "recent" word, whose explanation is the route to the whole chain.
+    const oldestMs = allRowsUnbounded.reduce((m, r) => Math.min(m, Date.parse(r.ts) || Infinity), Infinity);
+    rangeActive = !!bound && bound.addr == null && bound.fromMs >= oldestMs;
+    const cut = !!bound && bound.addr == null;
+    allRows = cut ? allRowsUnbounded.filter((r) => tsInRange(r.ts, bound!.fromMs, bound!.toMs)) : allRowsUnbounded;
     total = allRows.length;
     pages = Math.max(1, Math.ceil(total / PAGE));
     // A LANDED SEARCH HOLDS ITS ROW, NOT ITS PAGE NUMBER (user, 2026-09-09: "a search filter
@@ -410,7 +431,13 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     from = total === 0 ? 0 : (p - 1) * PAGE + 1;
     to = Math.min(p * PAGE, total);
   } else {
-    const raw = hist.current.net === histAddr ? (hist.current.pages.get(page) ?? []) : [];
+    // A RANGE ON THIS CHAIN keeps the pager between its ends: only the pages its first and last
+    // ordinals sit on, and only the rows between them (the boundary pages hold neighbours too).
+    const span = bound && bound.addr === histAddr && bound.first != null && bound.last != null && latest ? bound : null;
+    if (span) rangePages = { lo: pageOfOrdinal(span.last!, latest, PAGE), hi: pageOfOrdinal(span.first!, latest, PAGE) };
+    rangeActive = !!span;
+    const rawPage = hist.current.net === histAddr ? (hist.current.pages.get(page) ?? []) : [];
+    const raw = span ? rawPage.filter((r) => r.ordinal >= span.first! && r.ordinal <= span.last!) : rawPage;
     const mapped: ViewRow[] = raw.map((r) => {
       const g = resolved.current.get(r.ts);
       return {
@@ -432,14 +459,16 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     // Sorting scopes to the page in history mode — the full set is the chain itself.
     rows = sortAnchorLog(mapped, sort.key, sort.dir, () => displayNetwork(histNet)?.ticker ?? histNet) as ViewRow[];
     allRows = rows;
-    total = latest;
-    pages = Math.max(1, Math.ceil(Math.max(total, 1) / PAGE));
+    total = span ? span.last! - span.first! + 1 : latest;
+    pages = rangePages ? rangePages.hi - rangePages.lo + 1 : Math.max(1, Math.ceil(Math.max(total, 1) / PAGE));
     const ords = raw.map((r) => r.ordinal);
     // Page 1 IS positions 1..N by definition — deriving them by subtraction mixes two sources
     // (the buffer's `latest` can lead the explorer's live page by a tick, which read "13–37").
     // Deeper pages subtract against the SAME frozen latest their ?before was computed from.
-    from = !ords.length ? 0 : page === 1 ? 1 : latest - Math.max(...ords) + 1;
-    to = !ords.length ? 0 : page === 1 ? ords.length : latest - Math.min(...ords) + 1;
+    // Inside a range the positions count from its newest snapshot.
+    const top = span ? span.last! : latest;
+    from = !ords.length ? 0 : !span && page === 1 ? 1 : top - Math.max(...ords) + 1;
+    to = !ords.length ? 0 : !span && page === 1 ? ords.length : top - Math.min(...ords) + 1;
   }
 
   // THE LAYER OPENS ON A SUBJECT (2026-08-13): with nothing selected, the log commits its own
@@ -549,6 +578,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
 
   /** SNAPSHOT — pure arithmetic, one request. */
   const seekSnapshot = () => {
+    setBound(null); // an exact address, not a span — the range no longer applies
     const n = Number(qSnapshot.replace(/[^\d]/g, ""));
     if (!Number.isFinite(n) || n < 1) return;
     setJumpMiss(null);
@@ -590,6 +620,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
    *  and the date range reaches any point in it. So an unserved ordinal is simply SAID, and the
    *  message names the route that does work. */
   const seekTick = async () => {
+    setBound(null);
     const n = Number(qTick.replace(/[^\d]/g, ""));
     if (!Number.isFinite(n) || n < 1) return;
     setJumpMiss(null);
@@ -662,21 +693,28 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
    *  description of the buffer that failed to hold it. */
   const PICK_A_CHAIN = "pick a network in the top-bar filter to search its history by date";
 
-  /** AGE — the FROM bound is the destination; `to` only bounds which rows the landing marks. */
+  /** AGE — a FILTER since 2026-10-07: the log keeps to [from, to) (`bound`). A closed span lands on
+   *  its newest snapshot, an open one (a from-date alone) on the date it asked for. A door's span is
+   *  exact (`exactFrom` / `exactTo`); a typed one is whole UTC days. */
   const seekAge = async () => {
     // An ARRIVAL carries its exact instant (the Moment card's door); a typed search is a day.
     const fromMs = exactFrom.current ?? dayStartMs(qFrom);
+    const toMs = exactTo.current ?? (qTo ? dayEndMs(qTo) : null);
     exactFrom.current = null;
+    exactTo.current = null;
     setJumpMiss(null);
     if (fromMs == null) { setJumpMiss("pick a from-date"); return; }
     if (!histNet) {
-      const toMs = dayEndMs(qTo);
-      const idx = allRows.findIndex((r) => tsInRange(r.ts, fromMs, toMs));
+      // The recent rows are CUT to the range (the render applies `bound`), so the first in-range
+      // row is page 1's first row.
+      const idx = allRowsUnbounded.findIndex((r) => tsInRange(r.ts, fromMs, toMs));
       if (idx >= 0) {
-        setPageState(Math.floor(idx / PAGE) + 1);
-        setMarked(markOf(allRows[idx]));
+        setBound({ addr: null, fromMs, toMs, first: null, last: null });
+        setPageState(1);
+        setMarked(markOf(allRowsUnbounded[idx]));
         return;
       }
+      setBound(null);
       setMarked(null);
       // ⚠️ TWO MISSES, NOT ONE — they are different facts and only one of them is the reader's to
       // fix. If the range reaches back past the oldest row here, the date is simply out of this
@@ -684,7 +722,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       // loaded and still matched nothing, the search genuinely found no snapshots, which is an
       // answer rather than a failure. The old single line ("nothing in that range inside the
       // window") conflated them and explained itself with the mechanism.
-      const oldest = allRows.reduce<number | null>((acc, r) => {
+      const oldest = allRowsUnbounded.reduce<number | null>((acc, r) => {
         const ms = Date.parse(r.ts);
         return Number.isFinite(ms) && (acc == null || ms < acc) ? ms : acc;
       }, null);
@@ -698,6 +736,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       const idx = await chainForDate(fromMs);
       if (idx != null && idx !== chainIdx) {
         exactFrom.current = fromMs;
+        exactTo.current = toMs;
         pendingSeek.current = true;
         setChain(idx);
         return;
@@ -706,7 +745,12 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     if (!latest) { setJumpMiss("still reading the chain"); return; }
     setSeeking(true);
     try {
-      const hit = await seekOrdinalByTime(fromMs, latest, loadPage);
+      const span = await seekSpan(fromMs, toMs ?? Number.MAX_SAFE_INTEGER, latest, loadPage);
+      if (span && span.count === 0) { setBound(null); setJumpMiss("no snapshots in that range"); return; }
+      // A CLOSED range lands on its NEWEST snapshot — page 1 of the range, as the log reads newest
+      // first; an open one (a from-date alone) lands on the date it asked for, as it always did.
+      const hit = span == null ? null : toMs != null ? span.last : span.first;
+      if (span) setBound({ addr: netAddr, fromMs, toMs, first: span.first, last: span.last });
       // ⚠️ A MISS HERE IS NOW GENUINELY EXCEPTIONAL, and the copy says what to do about it rather
       // than pronouncing on the chain. The walk's budget covers bisection's own worst case for the
       // chain it was given (see chainSeek's probeBudget), so running out means a pathological run,
@@ -758,6 +802,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
    *  but a door from one instant should land AT it, not at that day's midnight (measured: the
    *  Moment card's 02:45 landed 4,700 DOR snapshots early). Consumed by the one seek it arms. */
   const exactFrom = useRef<number | null>(null);
+  /** …and the arrival's exact END, so the log keeps to exactly the card's span. */
+  const exactTo = useRef<number | null>(null);
   /** An arrival's search has landed and its row has yet to be committed (see the hold's effect):
    *  the ORDINAL it landed on, else null.
    *  ⚠️ BOUND TO ITS LANDING, AND DROPPED BY ANY GESTURE OF THE READER'S (whole-branch review,
@@ -805,6 +851,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       setSearchMeta(logSeek.metaId);
       pendingSeek.current = true;
       exactFrom.current = logSeek.fromMs;
+      exactTo.current = logSeek.toMs;
       setArriving(true);
       // A PREVIOUS search's landing would satisfy the hold's release at once (a marked row, page 1
       // cached) and flash the live page before this seek runs — the double-load the hold exists
@@ -812,11 +859,15 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       setMarked(null);
       setJumpMiss(null);
     } else {
-      // ⚠️ AN ARRIVAL THAT CANNOT RUN MUST SAY SO. A global chart's range names no chain, so the
-      // dates land prefilled and the seek waits — and with nothing on screen to explain it, the
-      // ladder's own door read as a button that did nothing. It answers with the route, in the
-      // same words the manual search uses (user, 2026-09-14).
-      setJumpMiss(PICK_A_CHAIN);
+      // AN UNSCOPED ARRIVAL SEARCHES THE RECENT ROWS (2026-10-07): a span names no chain, but the
+      // recent rows of every network can still be cut to it. A span older than they reach answers
+      // with the route to a chain (`PICK_A_CHAIN`, from the seek itself) — never a door that did
+      // nothing (user, 2026-09-14).
+      pendingSeek.current = true;
+      exactFrom.current = logSeek.fromMs;
+      exactTo.current = logSeek.toMs;
+      setMarked(null);
+      setJumpMiss(null);
     }
     setLogSeek(null);
   }, [logSeek, setLogSeek]);
@@ -837,7 +888,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       pendingLand.current = null;
       landOn(o);
     }
-    if (pendingSeek.current && walkReady && qFrom && !seeking) {
+    if (pendingSeek.current && (histNet ? walkReady : !!net) && qFrom && !seeking) {
       pendingSeek.current = false;
       void seekAge();
     }
@@ -925,7 +976,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   );
 
   const clearSearch = () => {
-    setQSnapshot(""); setQTick(""); setQFrom(""); setQTo(""); setDoorLabel(null);
+    setQSnapshot(""); setQTick(""); setQFrom(""); setQTo(""); setDoorLabel(null); setBound(null);
     // Clearing the search drops a door's scope, and under "all" the log's own pick too.
     setDoorMeta(null);
     if (!lensNet) setSearchMeta(null);
@@ -993,8 +1044,9 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
             (qFrom || qTo) && {
               key: "age",
               // In the date picker's own words ("Mar 13 – Mar 20"), never the field's YYYY-MM-DD.
-              text: doorLabel ?? (qFrom && qTo ? (qFrom === qTo ? dayWords(qFrom) : `${dayWords(qFrom)} – ${dayWords(qTo)}`) : qFrom ? `from ${dayWords(qFrom)}` : `to ${dayWords(qTo)}`),
-              clear: () => { setQFrom(""); setQTo(""); setDoorLabel(null); },
+              // The chain it searches leads, as on the snapshot chip ("DED Sep 8 – Oct 7").
+              text: `${searchNet ? (displayNetwork(searchNet)?.ticker ?? searchNet) + " " : ""}${doorLabel ?? (qFrom && qTo ? (qFrom === qTo ? dayWords(qFrom) : `${dayWords(qFrom)} – ${dayWords(qTo)}`) : qFrom ? `from ${dayWords(qFrom)}` : `to ${dayWords(qTo)}`)}`,
+              clear: () => { setQFrom(""); setQTo(""); setDoorLabel(null); setBound(null); },
             },
           ]
             .filter((c): c is { key: string; text: string; clear: () => void } => !!c)
@@ -1399,7 +1451,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         <p className="flex-none pt-1 text-label text-[var(--warn-soft)]">{jumpMiss}</p>
       )}
       <TablePager
-        page={histNet ? page : Math.min(page, pages)}
+        page={rangePages ? page - rangePages.lo + 1 : histNet ? page : Math.min(page, pages)}
         pages={pages}
         from={from}
         to={to}
@@ -1411,13 +1463,14 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         // the Snapshots explorer's word too, so the qualifier is learned once. The title still
         // carries what the count actually is: the window is a span of TIME, and networks
         // snapshot at their own rates, so 262 here is not a fraction of anything.
-        scope={histNet ? undefined : {
+        // A RANGE says the count is the range's, in two words.
+        scope={rangeActive ? { word: "in range" } : histNet ? undefined : {
           word: "recent",
           title: "These are only the most recent snapshots, not a whole chain. This view keeps a short stretch of TIME, and every network snapshots at its own rate — so a busy network fills it with hundreds while a quiet one adds three, and the count says nothing about how long either chain is. Pick a network in the top-bar filter to page through all of its snapshots, back to the very first one.",
         }}
         onPage={(n) => {
           landCommit.current = null; // paging away from a landing leaves it uncommitted
-          setPageState(n);
+          setPageState(rangePages ? n + rangePages.lo - 1 : n);
           // Manual paging is the reader leaving the landing — release the row-follow, or the
           // next live tick would snap the view straight back to the mark.
           if (!histNet) setMarked(null);
