@@ -23,11 +23,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import TablePager from "@/components/datasection/TablePager";
 import LogSearchBar from "@/components/datasection/LogSearchBar";
-import { pageOfOrdinal, seekSpan, dayStartMs, dayEndMs, tsInRange } from "@/src/data/chainSeek";
+import { pageOfOrdinal, seekSpan, tsInRange } from "@/src/data/chainSeek";
 import { POLL } from "@/src/engine/config";
 import { recordStamp, utcDayKey, utcStamp } from "@/src/util/localTime";
 import { dayWords } from "@/components/datasection/DateRange";
 import { useMergedLog, type MergedScope } from "@/components/datasection/useMergedLog";
+import { appliedChips, logMode, rangePage, searchCriterion, spanOfSearch } from "@/src/data/logSearch";
 import type { ChainSpan } from "@/src/data/mergedLog";
 import { useMinHold } from "@/components/useMinHold";
 import { useUnlistedLastSeen } from "@/components/UnlistedStage";
@@ -80,13 +81,6 @@ const COLUMNS: { key: AnchorLogSortKey; label: string; phone?: false; phoneLabel
 ];
 /** The one class both the header cell and its body cells wear, so a column can never half-hide. */
 const PHONE_HIDDEN = "max-[700px]:hidden";
-
-/** A typed ordinal as the app prints one — digits only, with separators; whatever was typed if
- *  it holds no number. */
-const fmtOrd = (q: string): string => {
-  const n = Number(q.replace(/[^\d]/g, ""));
-  return Number.isFinite(n) && n > 0 ? n.toLocaleString() : q;
-};
 
 /** The absence mark for a SEAM's metagraph columns. Muted rather than dim, so a scan reads it as
  *  "nothing to say here" instead of as a faint value — and `aria-hidden` with an sr-only word,
@@ -202,7 +196,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // first, with the exact total (`useMergedLog`). It replaced a live WINDOW of the last few minutes
   // that called itself "recent" and explained the buffer on hover. The unlisted lens keeps the
   // window: an unlisted channel has no public chain to page.
-  const mergedMode = !histNet && lens === "all";
+  const mergedMode = logMode({ chain: histNet, lens }) === "merged";
   const metaList = useStore((st) => st.metaList);
   // THE CATALOG'S CHAINS, not the live directory's (2026-10-07 — retirement): every network the
   // catalog has, RETIRED ones included, with their former addresses, so the all-time total and the
@@ -391,8 +385,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     if (!rangeSpan || rangeSpan.last < rangeSpan.first) return;
     const key = rangeKey(page);
     if (rangeRows.current.has(key) || pageFetch.current.has(key)) return;
-    const before = rangeSpan.last - (page - 1) * PAGE;
-    if (before < rangeSpan.first) return;
+    const before = rangePage(rangeSpan, page, PAGE).before;
+    if (before == null || before < rangeSpan.first) return;
     pageFetch.current.add(key);
     fetch(netUrl(`/api/network/${rangeSpan.addr}/snapshots?before=${before}`))
       .then((r) => (r.ok ? (r.json() as Promise<{ rows: HistRow[] }>) : Promise.reject()))
@@ -539,7 +533,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     // Sorting scopes to the page in history mode — the full set is the chain itself.
     rows = sortAnchorLog(mapped, sort.key, sort.dir, () => displayNetwork(histNet)?.ticker ?? histNet) as ViewRow[];
     allRows = rows;
-    total = span ? span.last - span.first + 1 : latest;
+    total = span ? Math.max(0, span.last - span.first + 1) : latest;
     pages = Math.max(1, Math.ceil(Math.max(total, 1) / PAGE));
     const ords = raw.map((r) => r.ordinal);
     // Page 1 IS positions 1..N by definition — deriving them by subtraction mixes two sources
@@ -822,8 +816,10 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     // An ARRIVAL carries its exact instant (the Moment card's door); a typed search is a day.
     // The span: an arrival's exact one (a chain switch re-arming the seek, or the door's own span
     // while its words stand), else the typed whole UTC days.
-    const fromMs = exactFrom.current ?? doorSpan?.fromMs ?? dayStartMs(qFrom);
-    const toMs = exactTo.current ?? doorSpan?.toMs ?? (qTo ? dayEndMs(qTo) : null);
+    const typed = spanOfSearch({ door: doorSpan, from: qFrom, to: qTo });
+    const fromMs = exactFrom.current ?? typed?.fromMs ?? null;
+    // An exact start carries its own end (open where the re-armed cut was open).
+    const toMs = exactFrom.current !== null ? exactTo.current : (typed?.toMs ?? null);
     exactFrom.current = null;
     exactTo.current = null;
     setJumpMiss(null);
@@ -1114,9 +1110,10 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // press fall through silently, and the button before it sat disabled with no reason).
   const onSubmit = () => {
     landCommit.current = null; // the reader's own search: an arrival still waiting to commit is withdrawn
-    if (qSnapshot) seekSnapshot();
-    else if (qTick) void seekTick();
-    else if (qFrom) void seekAge();
+    const c = searchCriterion({ snapshot: qSnapshot, tick: qTick, from: qFrom });
+    if (c === "snapshot") seekSnapshot();
+    else if (c === "tick") void seekTick();
+    else if (c === "date") void seekAge();
   };
 
   /** Any criterion typed — the toggle says so while the row is folded away, or a search would be
@@ -1222,26 +1219,20 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         // as the search bar's composite field does — an ordinal is per chain, bare it names nothing.
         // The date range is ONE condition, so one chip. Clearing the last chip clears the search.
         <span className="inline-flex min-w-0 flex-wrap items-center justify-end gap-2 max-[700px]:flex-1">
-          {[
-            qSnapshot && {
-              key: "snapshot",
-              text: `${searchNet ? (displayNetwork(searchNet)?.ticker ?? searchNet) + " " : ""}${fmtOrd(qSnapshot)}`,
-              clear: () => { setQSnapshot(""); setMarked(null); setJumpMiss(null); },
-            },
-            qTick && {
-              key: "tick",
-              text: `in global ${fmtOrd(qTick)}`,
-              clear: () => { setQTick(""); setMarked(null); setJumpMiss(null); setGlobalSpans(null); },
-            },
-            (qFrom || qTo) && {
-              key: "age",
-              // In the date picker's own words ("Mar 13 – Mar 20"), never the field's YYYY-MM-DD.
-              // The chain it searches leads, as on the snapshot chip ("DED Sep 8 – Oct 7").
-              text: `${searchNet ? (displayNetwork(searchNet)?.ticker ?? searchNet) + " " : ""}${doorLabel ?? (qFrom && qTo ? (qFrom === qTo ? dayWords(qFrom) : `${dayWords(qFrom)} – ${dayWords(qTo)}`) : qFrom ? `from ${dayWords(qFrom)}` : `to ${dayWords(qTo)}`)}`,
-              clear: () => { setQFrom(""); setQTo(""); setDoorLabel(null); setDoorSpan(null); setBound(null); setTimeCut(null); },
-            },
-          ]
-            .filter((c): c is { key: string; text: string; clear: () => void } => !!c)
+          {appliedChips(
+            { snapshot: qSnapshot, tick: qTick, from: qFrom, to: qTo, chain: searchNet, doorLabel },
+            (id) => displayNetwork(id)?.ticker ?? id,
+            dayWords,
+          )
+            .map((c) => ({
+              ...c,
+              clear:
+                c.key === "snapshot"
+                  ? () => { setQSnapshot(""); setMarked(null); setJumpMiss(null); }
+                  : c.key === "tick"
+                    ? () => { setQTick(""); setMarked(null); setJumpMiss(null); setGlobalSpans(null); }
+                    : () => { setQFrom(""); setQTo(""); setDoorLabel(null); setDoorSpan(null); setBound(null); setTimeCut(null); },
+            }))
             .map((c, _i, all) => (
               <span
                 key={c.key}
