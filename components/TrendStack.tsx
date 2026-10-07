@@ -80,6 +80,7 @@ import { useStore } from "@/src/store/store";
 import TrendTether from "@/components/TrendTether";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { WINDOW_MS } from "@/src/data/trendTimeline";
+import { UNLISTED_ID } from "@/src/data/unlisted";
 
 /** The empty roster, as ONE frozen reference. Publishing a fresh `[]` would be a content-free
  *  change the engine's `!==` still has to answer. */
@@ -173,7 +174,17 @@ export default function TrendStack() {
   // plane in the window, so the empty networks stood behind the DAG and stayed there after.
   // Outside the rank on purpose: it is what the layers add up to, so it stays off the shared
   // ceiling and out of the networks' order.
-  const deck = useMemo(() => (roster.total && focus === "dag" ? ["dag", ...ranked] : ranked), [ranked, roster.total, focus]);
+  // …and so does the UNLISTED plane while it is the focus (the Unlisted audit, 2026-10-07): like the
+  // DAG it is outside the rank — what the networks leave over — so it comes forward on its row.
+  const deck = useMemo(
+    () =>
+      roster.total && focus === "dag"
+        ? ["dag", ...ranked]
+        : roster.unlisted && focus === UNLISTED_ID && !ranked.includes(UNLISTED_ID)
+          ? [UNLISTED_ID, ...ranked]
+          : ranked,
+    [ranked, roster.total, roster.unlisted, focus],
+  );
   const order = useHeldOrder(deck, staged.settled);
   // What a card says it shows.
   const caption = metricCaption(shown, step);

@@ -68,8 +68,12 @@ export function viewScope(filter: string): ViewScope {
 const FACT: Record<EmptyScope, string> = {
   "empty-dag":
     "The base ledger anchors metagraph snapshots rather than producing them, so it has no chart of its own here.",
+  // ONLY THEIR SNAPSHOT COUNT IS KNOWN (the Unlisted audit, 2026-10-07 — this said "no measured
+  // history", which was false: the global count less every listed network IS their history, and the
+  // Snapshots measure draws it). Every other measure is kept per listed network, so this sentence is
+  // only ever shown for those.
   "empty-unlisted":
-    "These charts are kept per listed metagraph, and the unlisted channels are the ones the catalog does not name. There is no measured history here for them.",
+    "Unlisted channels are the ones the catalog does not name, so only the snapshots they anchor are measured. That count is the global total less every listed network.",
 };
 
 /** THE ROUTE — where the reading does live, named as a gesture the reader can make on THIS
@@ -79,12 +83,12 @@ const FACT: Record<EmptyScope, string> = {
 const ROUTE: { document: Record<EmptyScope, string>; view: Record<Exclude<EmptyScope, "empty-dag">, string> } = {
   document: {
     "empty-dag": "Its own history is the Hypergraph tab above.",
-    "empty-unlisted": "The Snapshots view's records still show what they anchored.",
+    "empty-unlisted": "Pick Snapshots as the measure to see it.",
   },
   // The VIEW never asks about "empty-dag": `viewScope` scopes the DAG as a network there (its
   // own plane, 2026-09-26), so that route has no sentence to say.
   view: {
-    "empty-unlisted": "The Snapshots view's records still show what they anchored.",
+    "empty-unlisted": "Pick Snapshots as the measure to see it.",
   },
 };
 

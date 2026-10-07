@@ -65,7 +65,8 @@ describe("scopeEmptyCopy — the fact, plus the route THIS surface can offer", (
   it("covers the unlisted scope too, and never fabricates a chart", () => {
     for (const surface of ["view", "document"] as const) {
       const c = scopeEmptyCopy("empty-unlisted", surface)!;
-      expect(c.fact).toMatch(/listed metagraph/);
+      expect(c.fact).toMatch(/listed network/); // their one measured quantity, and how
+      expect(c.route).toMatch(/Snapshots/); // the measure that draws it
       expect(c.route.length).toBeGreaterThan(0);
     }
   });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { headWord, momentPhrase, rangePhrase, sumMeasured, spanAverage, spanWord, typeBands,
+import { headWord, lastSeen, momentPhrase, rangePhrase, sumMeasured, unlistedSeries, spanAverage, spanWord, typeBands,
   GLOBAL_METRIC_ROWS,
   GLOBAL_READING,
   TREND_METRICS,
@@ -702,5 +702,31 @@ describe("sumMeasured — a counter's total over a span", () => {
   it("nothing measured is no total, never a zero", () => {
     expect(sumMeasured([null, null])).toBeNull();
     expect(sumMeasured([])).toBeNull();
+  });
+});
+
+// UNLISTED ANCHORING, MEASURED (the Unlisted audit, 2026-10-07): the global count covers every
+// channel, the listed networks' series cover the catalog, so the difference IS the unlisted
+// channels — Dec 2025 – Aug 2026 it ran at ~3.9K a day. A bucket with no global reading, or with
+// a listed network unmeasured, has no difference to state: null, never a guess (rule 10).
+describe("unlistedSeries — the global count minus every listed network", () => {
+  const series = {
+    "g.anchors": [10, 12, null, 9],
+    "m.A.snaps": [6, 7, 3, 9],
+    "m.B.snaps": [2, 5, 1, null],
+    "m.A.fee": [1, 1, 1, 1], // not a snapshot count — ignored
+  };
+  it("subtracts the listed snapshot counts, bucket by bucket", () => {
+    expect(unlistedSeries(series)).toEqual([2, 0, null, null]);
+  });
+  it("never goes below zero (a listed count can lead the global one by a bucket edge)", () => {
+    expect(unlistedSeries({ "g.anchors": [5], "m.A.snaps": [6] })).toEqual([0]);
+  });
+});
+
+describe("lastSeen — the last bucket a series measured something in", () => {
+  it("is the newest bucket above zero, or null when there is none", () => {
+    expect(lastSeen([3, 0, 2, 0, null], [10, 20, 30, 40, 50])).toBe(30);
+    expect(lastSeen([0, null], [10, 20])).toBeNull();
   });
 });

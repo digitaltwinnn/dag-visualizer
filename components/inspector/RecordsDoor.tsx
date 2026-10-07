@@ -4,6 +4,7 @@ import { ArrowUpRight, Table2 } from "lucide-react";
 
 import { openRecords, type RecordSpan } from "@/components/trendDoors";
 import { cn } from "@/lib/utils";
+import { UNLISTED_ID } from "@/src/data/unlisted";
 
 /** HISTORY'S ONE EXIT, as a card's foot control (design 2026-09-26, `moment-door.html` A): the
  *  anchor log over a span, through `components/trendDoors.ts` — the shared home the RAW toggle
@@ -29,12 +30,22 @@ export default function RecordsDoor({
   what: "moment" | "range";
 }) {
   const at = what === "moment" ? "at this moment" : "over this range";
+  // The unlisted channels' own records cannot be paged yet: their addresses are not known to the
+  // log (the known-channel roster is the follow-up). The door says so rather than opening the
+  // listed networks' records under an Unlisted heading.
+  const unlisted = subject === UNLISTED_ID;
   return (
     <button
       type="button"
-      disabled={!span}
+      disabled={!span || unlisted}
       // Under All the log reads every network's records too (2026-10-07), so the door always lands.
-      title={subject && subject !== "dag" ? `Opens the snapshot records ${at}, for this network.` : `Opens the snapshot records ${at}, for every network.`}
+      title={
+        unlisted
+          ? "Unlisted channels' own records cannot be listed here yet."
+          : subject && subject !== "dag"
+            ? `Opens the snapshot records ${at}, for this network.`
+            : `Opens the snapshot records ${at}, for every network.`
+      }
       onClick={() => openRecords(subject, span)}
       className={cn(
         "mt-3 flex w-[calc(100%+2*var(--card-pad))] items-center gap-2.5 text-left text-body text-foreground cursor-pointer",

@@ -32,9 +32,11 @@ import { useStore } from "@/src/store/store";
 // its total is the sum of exactly the buckets the chart above draws.
 
 /** How the LEAD names its subject: the focused plane, else the committed network, else nobody. */
-function subjectOf(focus: string | null, filter: string, ranked: readonly string[]): string | null {
-  if (focus && ranked.includes(focus)) return focus;
-  return ranked.includes(filter) ? filter : null;
+function subjectOf(focus: string | null, filter: string, ranked: readonly string[], has: (id: string) => boolean): string | null {
+  // The focused plane, else the committed filter — any row the roster draws, the unranked
+  // Unlisted row included.
+  if (focus && (ranked.includes(focus) || has(focus))) return focus;
+  return ranked.includes(filter) || has(filter) ? filter : null;
 }
 
 export default function TrendRangePane({
@@ -56,7 +58,7 @@ export default function TrendRangePane({
   const { ranked, rows, format, stepMs } = roster;
   const pulseKey = useEdgePulse(range ? `${range.fromMs}-${range.toMs}` : null);
 
-  const subject = subjectOf(focus, filter, ranked);
+  const subject = subjectOf(focus, filter, ranked, (id) => id !== "dag" && rows.has(id));
   const who = subject ? metagraphById(subject)?.ticker || rows.get(subject)?.name || subject : "All networks";
   const points = subject ? (rows.get(subject)?.series.points ?? []) : roster.global;
 

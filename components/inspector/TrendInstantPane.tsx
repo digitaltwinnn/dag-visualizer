@@ -47,9 +47,11 @@ import Stamp from "@/components/Stamp";
 // subtree per bucket change and no extra request.
 
 /** How the LEAD names its subject: the focused plane, else the committed network, else nobody. */
-function subjectOf(focus: string | null, filter: string, ranked: readonly string[]): string | null {
-  if (focus && ranked.includes(focus)) return focus;
-  return ranked.includes(filter) ? filter : null;
+function subjectOf(focus: string | null, filter: string, ranked: readonly string[], has: (id: string) => boolean): string | null {
+  // The focused plane, else the committed filter — any row the roster draws, the unranked
+  // Unlisted row included.
+  if (focus && (ranked.includes(focus) || has(focus))) return focus;
+  return ranked.includes(filter) || has(filter) ? filter : null;
 }
 
 export default function TrendInstantPane({
@@ -82,7 +84,7 @@ export default function TrendInstantPane({
   // then and this card does not render at all.
   const note = cursorMs == null ? null : instantNote(placeInstant(cursorMs, buckets, roster.rawBuckets, stepMs), stepMs);
 
-  const subject = subjectOf(focus, filter, ranked);
+  const subject = subjectOf(focus, filter, ranked, (id) => id !== "dag" && rows.has(id));
   // Every network's reading at the cursor, in ONE pass — the rank, the order and the rows all read
   // this array, so they cannot describe different instants.
   const readings = ranked.map((id) => ({

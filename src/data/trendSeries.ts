@@ -640,3 +640,29 @@ export function typeBands(id: string, series: Readonly<Record<string, (number | 
     return { key, label, codes, points: recorded.map((r, i) => (r ? (cols[j]![i] ?? 0) : null)) };
   });
 }
+
+/** UNLISTED ANCHORING, MEASURED (the Unlisted audit, 2026-10-07): the global snapshot count covers
+ *  every channel and the listed networks' series cover the catalog, so per bucket the difference
+ *  is what the unlisted channels anchored. Null where the global count or any listed network is
+ *  unmeasured — a difference over a hole is a guess (rule 10). Never below zero: at a bucket edge a
+ *  listed count can lead the global one. */
+export function unlistedSeries(series: Readonly<Record<string, readonly (number | null)[]>>): (number | null)[] {
+  const g = series["g.anchors"] ?? [];
+  const listed = Object.keys(series).filter((k) => k.startsWith("m.") && k.endsWith(".snaps"));
+  return g.map((total, i) => {
+    if (total == null) return null;
+    let sum = 0;
+    for (const k of listed) {
+      const v = series[k]![i];
+      if (v == null) return null;
+      sum += v;
+    }
+    return Math.max(0, total - sum);
+  });
+}
+
+/** The newest bucket a series measured something above zero in, or null. */
+export function lastSeen(points: readonly (number | null)[], buckets: readonly number[]): number | null {
+  for (let i = points.length - 1; i >= 0; i--) if ((points[i] ?? 0) > 0) return buckets[i] ?? null;
+  return null;
+}
