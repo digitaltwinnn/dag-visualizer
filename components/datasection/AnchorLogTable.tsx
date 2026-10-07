@@ -140,6 +140,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // A row IS one metagraph snapshot, so its hover rides the snapshot channel, not the tick's
   // (user, 2026-08-09). Same channel the explorer's leaf rows and the scene's tiles use.
   const setHoverMetaSnap = useStore((s) => s.setHoverMetaSnap);
+  const setHoverSnapOrd = useStore((s) => s.setHoverSnapOrd);
   const net = getNetwork();
   const snapshotExact = useStore((s) => s.snapshotExact);
   const lens = ledgerLens(filter);
@@ -181,6 +182,12 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   const setChain = (idx: number) => setChainSel({ net: histNet, idx });
 
   const [sort, setSort] = useState<{ key: AnchorLogSortKey; dir: 1 | -1 }>({ key: "age", dir: 1 });
+  // GROUPED BY GLOBAL SNAPSHOT whenever the rows are in time order (see the table below). Grouped,
+  // the group's header row states the global snapshot and its age, so the two columns that said
+  // it on every row are DROPPED (user, 2026-10-07: "make the global row have label + value so the
+  // entire column can be dropped"); sorted by anything else they come back.
+  const grouped = sort.key === "age" || sort.key === "tick";
+  const columns = grouped ? COLUMNS.filter((c) => c.key !== "tick" && c.key !== "age") : COLUMNS;
   // THE JUMP'S LANDING MARK. A jump that only changed the page would leave the reader hunting the
   // ordinal they just typed among 25 near-identical rows, so the row is marked when it arrives.
   // It is LOCAL state and deliberately not a selection: rule 2 keeps one write path for that, and
@@ -440,7 +447,15 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     return listed.find((r) => r.metaId != null) ?? listed[0] ?? null;
   })();
   useEffect(() => {
-    if (section !== "data" || !armed.current || metaSnap || !windowFirst) return;
+    if (section !== "data" || !armed.current) return;
+    // AN ARRIVAL THAT ALREADY HAS A SUBJECT SPENDS THE ARM (2026-10-07): left armed, the first
+    // deliberate CLEAR afterwards — a global snapshot's header row, which selects the global
+    // alone — read as "opened on nothing" and the log picked a row the reader never asked for.
+    if (metaSnap) {
+      armed.current = false;
+      return;
+    }
+    if (!windowFirst) return;
     // AN ARRIVAL THROUGH A DOOR OPENS ON WHAT IT ASKED FOR (2026-10-03). History's "Snapshot
     // records" door hands a moment to search for; this effect used to commit the newest row
     // anyway, so the list landed nine months back while the pane beside it showed a snapshot
@@ -1053,7 +1068,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
               log in its natural order. */}
           <TableHeader className="sticky top-0 z-10 bg-[var(--panel-solid)] backdrop-blur-md max-[700px]:hidden">
             <TableRow className="border-border">
-              {COLUMNS.map((c, i) => (
+              {columns.map((c, i) => (
                 <TableHead
                   key={c.key}
                   aria-sort={sort.key === c.key ? (sort.dir === 1 ? "ascending" : "descending") : "none"}
@@ -1080,12 +1095,26 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   </button>
                 </TableHead>
               ))}
+              {/* Grouped, time order is the GROUPS' order: one control flips it (newest or oldest
+                  first), standing where the dropped Age column's header stood. */}
+              {grouped && (
+                <TableHead className="text-right">
+                  <button
+                    type="button"
+                    className="inline-flex flex-row-reverse items-center gap-1 text-label uppercase tracking-caps text-muted-foreground hover:text-foreground cursor-pointer"
+                    onClick={() => setSort((s) => ({ key: "age", dir: s.key === "age" ? ((s.dir * -1) as 1 | -1) : 1 }))}
+                    title={sort.dir === 1 ? "Newest first — click for oldest first" : "Oldest first — click for newest first"}
+                  >
+                    Age
+                    {sort.dir === 1 ? <ArrowUp className="size-3" aria-hidden /> : <ArrowDown className="size-3" aria-hidden />}
+                  </button>
+                </TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.map((r, i) => {
               const cfg = displayNetwork(r.metaId) ?? null;
-              const grouped = sort.key === "age" || sort.key === "tick";
               const prevTick = i > 0 ? rows[i - 1]!.global.ordinal : null;
               const groupHead = grouped && !r.pending && prevTick !== r.global.ordinal;
               const inSelGroup = grouped && !r.pending && snap?.data.ordinal === r.global.ordinal;
@@ -1146,12 +1175,38 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
               return (
                 <Fragment key={r.metaId == null ? `tick:${r.global.ordinal}` : `${r.metaId}:${r.ordinal}`}>
                 {groupHead && (
-                  <TableRow className={cn("hover:bg-transparent max-[700px]:block", inSelGroup ? "border-[var(--primary)]" : "border-border")}>
-                    <TableCell colSpan={COLUMNS.length} className="pt-3 pb-1 max-[700px]:block">
-                      <span className={cn("flex items-baseline gap-2 text-label uppercase tracking-caps", inSelGroup ? "text-primary-ink" : "text-muted-foreground")}>
-                        Global
-                        <span className={cn("font-mono tabular-nums normal-case tracking-normal", inSelGroup ? "text-primary-ink" : "text-foreground-dim")}>{r.global.ordinal.toLocaleString()}</span>
-                        <span className="ml-auto normal-case tracking-normal">{relativeAge(now - Date.parse(r.ts))}</span>
+                  // THE GLOBAL SNAPSHOT'S OWN ROW: its number and its age, each as label + value, and
+                  // a click selects THAT global snapshot alone (no metagraph snapshot — the pane
+                  // then has nothing to read, honestly), as an explorer row does; hovering it lights
+                  // the snapshot in the scene on its own channel (rule 9: hover what a click commits).
+                  <TableRow
+                    className={cn(
+                      "cursor-pointer max-[700px]:block hover:bg-[color-mix(in_oklch,var(--primary)_10%,transparent)]",
+                      "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
+                      inSelGroup ? "border-[var(--primary)]" : "border-border",
+                    )}
+                    tabIndex={0}
+                    title={`Select global snapshot ${r.global.ordinal.toLocaleString()}`}
+                    onClick={() => {
+                      applyClickActions(metaSnapArrivalActions(null, { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot }));
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        applyClickActions(metaSnapArrivalActions(null, { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot }));
+                      }
+                    }}
+                    onMouseEnter={() => setHoverSnapOrd(r.global.ordinal)}
+                    onMouseLeave={() => setHoverSnapOrd(null)}
+                    onFocus={() => setHoverSnapOrd(r.global.ordinal)}
+                    onBlur={() => setHoverSnapOrd(null)}
+                  >
+                    <TableCell colSpan={columns.length + 1} className="pt-3 pb-1 max-[700px]:block">
+                      <span className={cn("flex items-baseline gap-2 text-label", inSelGroup ? "text-primary-ink" : "text-muted-foreground")}>
+                        <span className="uppercase tracking-caps">Global</span>
+                        <span className={cn("font-mono tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground")}>{r.global.ordinal.toLocaleString()}</span>
+                        <span className="ml-auto uppercase tracking-caps">Age</span>
+                        <span className={cn("tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground")}>{relativeAge(now - Date.parse(r.ts))}</span>
                       </span>
                     </TableCell>
                   </TableRow>
@@ -1245,18 +1300,20 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   </TableCell>
                   <TableCell className={cn("text-right tabular-nums", PHONE_HIDDEN)}>{seam ? <Dash /> : fmtDag(r.fee)}</TableCell>
                   <TableCell className={cn("text-right tabular-nums text-foreground-dim", PHONE_HIDDEN)}>{seam ? <Dash /> : size}</TableCell>
-                  {/* GROUPED, the group's header states the global snapshot and its age once — the
-                      two cells stay (their headers are the sort controls) but say nothing twice. */}
-                  <TableCell className="text-right font-mono tabular-nums max-[700px]:hidden">
-                    {grouped ? null : pending ? <span className="text-muted-foreground">…</span> : r.global.ordinal.toLocaleString()}
-                  </TableCell>
-                  <TableCell className={cn("text-right text-muted-foreground", grouped && "max-[700px]:hidden")}>
-                    {/* Phone drops the " ago" (the bare register — relativeAge's own note): the
-                        AGE header names the quantity, and the suffix's width was the last thing
-                        holding this table in sideways scroll. */}
-                    <span className="max-[700px]:hidden">{grouped ? null : relativeAge(now - Date.parse(r.ts))}</span>
-                    <span className="min-[700px]:hidden">{relativeAge(now - Date.parse(r.ts), true)}</span>
-                  </TableCell>
+                  {!grouped && (
+                    <TableCell className="text-right font-mono tabular-nums max-[700px]:hidden">
+                      {pending ? <span className="text-muted-foreground">…</span> : r.global.ordinal.toLocaleString()}
+                    </TableCell>
+                  )}
+                  {!grouped && (
+                    <TableCell className="text-right text-muted-foreground">
+                      {/* Phone drops the " ago" (the bare register — relativeAge's own note): the
+                          AGE header names the quantity, and the suffix's width was the last thing
+                          holding this table in sideways scroll. */}
+                      <span className="max-[700px]:hidden">{relativeAge(now - Date.parse(r.ts))}</span>
+                      <span className="min-[700px]:hidden">{relativeAge(now - Date.parse(r.ts), true)}</span>
+                    </TableCell>
+                  )}
                   {/* The phone row's SECOND LINE — where it anchored, what it paid, how big it was.
                       One muted line under the row's identity; absent from the table tiers, whose
                       columns state the same three. A seam has only its tick. */}
