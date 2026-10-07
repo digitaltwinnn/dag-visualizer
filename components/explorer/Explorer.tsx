@@ -148,6 +148,9 @@ export default function Explorer({ id, title, hint, levels: selected, onLeave, d
   // rows change; the rows read the variable with `glyphW` as its fallback, so the first paint and
   // the server render keep the old width rather than collapsing.
   const cap = current?.glyphW ?? 14;
+  // A level whose rows carry no glyph drops the column (ExplorerRow), so its names line up with
+  // the path's house instead of sitting behind 14px of nothing.
+  const glyphW = current && (current.rows.some((r) => r.glyph != null) || current.lead?.glyph != null) ? current.glyphW : 0;
   const rowKeys = (current?.lead ? `${current.lead.key}||` : "") + (current?.rows.map((r) => r.key).join("|") ?? "");
   const figKey = (current?.lead && (typeof current.lead.figure === "string" || typeof current.lead.figure === "number") ? `${String(current.lead.figure).length}:` : "") + (current?.rows.map((r) => (typeof r.figure === "string" || typeof r.figure === "number" ? String(r.figure).length : 0)).join(",") ?? "");
   const listEl = useRef<HTMLDivElement | null>(null);
@@ -240,7 +243,7 @@ export default function Explorer({ id, title, hint, levels: selected, onLeave, d
                       hasFigure={current.hasFigure}
                       nameW={current.nameW}
                       figureW={current.figureW}
-                      glyphW={current.glyphW}
+                      glyphW={glyphW}
                       nested={nested}
                       plain
                       glyph={current.lead.glyph}
@@ -262,7 +265,7 @@ export default function Explorer({ id, title, hint, levels: selected, onLeave, d
                     hasFigure={current.hasFigure}
                     nameW={current.nameW}
                     figureW={current.figureW}
-                    glyphW={current.glyphW}
+                    glyphW={glyphW}
                     nested={nested}
                     wideBar={!current.rows.some((x) => x.tag != null && x.tag !== false)}
                     glyph={r.glyph}
