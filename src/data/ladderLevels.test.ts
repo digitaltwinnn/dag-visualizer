@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { cohortsLevel, countriesLevel, countryNodes, nodeOrder, nodesByCountry } from "./ladderLevels";
-import type { CountryStat, NodeRow } from "./types";
+import { cohortsLevel, countriesLevel, countryNodes, networksLevel, nodeOrder, nodesByCountry } from "./ladderLevels";
+import type { CountryStat, MetaInfo, NodeRow } from "./types";
 
 // A node row with just what the levels read. `meta` names its network (networkOfRow).
 const node = (o: { ip: string; id?: string; cc?: string | null; country?: string | null; city?: string; isp?: string; meta?: string; layer?: string }): NodeRow =>
@@ -83,5 +83,19 @@ describe("cohortsLevel", () => {
     const loose = node({ ip: "9", country: "Germany", isp: "X" }); // no city
     const cs = cohortsLevel([de3, loose]);
     expect(cs.map((c) => c.city)).toEqual(["Berlin", null]);
+  });
+});
+
+describe("networksLevel", () => {
+  const net = (id: string, n: number) => ({ id, name: id, nodes: Array.from({ length: n }, () => ({})) }) as unknown as MetaInfo;
+  // dor: 3 nodes in 2 countries; ded: 2 nodes in 2 countries; tbc: 1 node, 1 country
+  const all = [de1, de3, fi1, de2, fi2, fi3];
+  const metas = [net("ded", 2), net("dor", 3), net("tbc", 1)];
+  it("orders by the picked figure", () => {
+    expect(networksLevel(metas, all, "nodes").map((x) => x.m.id)).toEqual(["dor", "ded", "tbc"]);
+  });
+  it("breaks a tie on fleet size (Review Focus 3)", () => {
+    // countries: dor 2 (DE, FI), ded 2 (DE, FI) — tied; dor has the larger fleet
+    expect(networksLevel(metas, all, "countries").map((x) => x.m.id)).toEqual(["dor", "ded", "tbc"]);
   });
 });

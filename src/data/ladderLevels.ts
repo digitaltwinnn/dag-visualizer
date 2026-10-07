@@ -8,8 +8,9 @@
 // Pure: plain values in, plain subjects out — no React, no store, no singleton reads. A level's
 // ROW (glyph, bar, click) is the explorer's business; a level's STEP (label, actions) is the
 // rail's. Only membership and order live here.
-import { countryMeasure, type GeoMeasure } from "./geoMeasure";
-import type { CountryStat, NodeRow } from "./types";
+import { countryMeasure, networkOfRow, type GeoMeasure } from "./geoMeasure";
+import { networkMeasure, type HyperMeasure } from "./hyperMeasure";
+import type { CountryStat, MetaInfo, NodeRow } from "./types";
 
 // ── Geography ───────────────────────────────────────────────────────────────────────────────
 
@@ -66,4 +67,19 @@ export function cohortsLevel(rows: readonly NodeRow[]): Cohort[] {
     (by.get(key) ?? by.set(key, { key, city, isp, rows: [] }).get(key)!).rows.push(r);
   }
   return [...by.values()].sort((a, b) => b.rows.length - a.rows.length || (a.city ?? "￿").localeCompare(b.city ?? "￿"));
+}
+
+// ── Hypergraph ──────────────────────────────────────────────────────────────────────────────
+
+/** THE NETWORKS, by the picked figure, fleet size breaking a tie — the explorer's root list and the
+ *  Metagraph card's pager in this view. Counted over the whole fleet (`allNodes`), not the selection. */
+export function networksLevel(metaList: readonly MetaInfo[], allNodes: readonly NodeRow[], measure: HyperMeasure): { m: MetaInfo; v: number }[] {
+  const byNet = new Map<string, NodeRow[]>();
+  for (const r of allNodes) {
+    const n = networkOfRow(r);
+    if (n) (byNet.get(n) ?? byNet.set(n, []).get(n)!).push(r);
+  }
+  return metaList
+    .map((m) => ({ m, v: networkMeasure(measure, m, byNet.get(m.id) ?? []) }))
+    .sort((a, b) => b.v - a.v || b.m.nodes.length - a.m.nodes.length);
 }
