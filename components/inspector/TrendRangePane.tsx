@@ -110,7 +110,7 @@ export default function TrendRangePane({
                 {who} {phrase.verb} <span className="font-medium text-foreground tabular-nums">{format(value)}</span> {phrase.rest}
               </>
             ) : (
-              <>{who} has no reading over this range</>
+              <>No reading in this range</>
             )}
           </Lead>
           <FactGroup>

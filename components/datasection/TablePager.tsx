@@ -79,7 +79,7 @@ export default function TablePager({
             meaning here"). The count stays wherever it is the statement (the full pager's range). */}
         {compact && scope ? null : totalPending ? (
           <span className="inline-flex items-center gap-1.5">{compact ? null : `${from}–${to} of `}<NodeStars count={3} /></span>
-        ) : compact ? fmtCount(total) : `${from}–${to} of ${exact ? total.toLocaleString() : fmtCount(total)}`}
+        ) : compact ? fmtCount(total) : exact ? `${from.toLocaleString()}–${to.toLocaleString()} of ${total.toLocaleString()}` : `${from}–${to} of ${fmtCount(total)}`}
         {scope ? (
           <>
             {compact ? null : " "}
@@ -115,7 +115,7 @@ export default function TablePager({
           <ChevronLeft aria-hidden className="size-4" />
         </Button>
         <span className={cn("text-label tabular-nums text-muted-foreground whitespace-nowrap")}>
-          {page} / {fmtCount(pages)}
+          {exact ? `${page.toLocaleString()} / ${pages.toLocaleString()}` : `${page} / ${fmtCount(pages)}`}
         </span>
         <Button variant="ghost" size="icon-xs" className={btn} aria-label="Next page" disabled={page >= pages} onClick={() => onPage(page + 1)}>
           <ChevronRight aria-hidden className="size-4" />

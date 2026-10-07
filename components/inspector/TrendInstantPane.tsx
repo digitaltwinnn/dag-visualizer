@@ -170,7 +170,7 @@ export default function TrendInstantPane({
                   {who} {phrase.verb} <span className="font-medium text-foreground tabular-nums">{format(lead)}</span> {phrase.rest}
                 </>
               ) : (
-                <>{who} has no reading here</>
+                <>No reading in this moment</>
               )}
             </Lead>
           )}

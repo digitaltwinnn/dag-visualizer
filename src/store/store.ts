@@ -246,6 +246,9 @@ interface AppState {
    *  to this view and clears it. A view switch made while the layer is open clears it too — the
    *  reader has chosen a view, and there is nothing to return to. */
   rawReturnMode: Mode | null;
+  /** …and the History plane that was in front when the door was taken, restored with the view
+   *  (the tester pass, 2026-10-07: the round trip lost it). */
+  rawReturnFocus: string | null;
   // DESKTOP ONLY (card-redesign follow-up, 2026-08-08): collapse the HUD's card rails to their
   // THREADS — BOTH rails together (user: the rails are symmetric and the motive, "spotlight the
   // scene", is whole-HUD; one command-bar toggle beats two subtle per-rail chevrons). Cards fade
@@ -450,7 +453,7 @@ interface AppState {
   setDeepWanted: (key: string | null) => void;
   setPhoneDock: (dock: "explore" | "details" | "vitals" | null) => void;
   setSection: (section: "scene" | "data") => void;
-  setRawReturnMode: (mode: Mode | null) => void;
+  setRawReturnMode: (mode: Mode | null, focus?: string | null) => void;
   setRailsHidden: (hidden: boolean) => void;
   setSceneDragging: (dragging: boolean) => void;
   setCameraFlying: (flying: boolean) => void;
@@ -539,6 +542,7 @@ export const useStore = create<AppState>((set) => ({
   phoneDock: null,
   section: "scene",
   rawReturnMode: null,
+  rawReturnFocus: null,
   railsHidden: false,
   sceneDragging: false,
   cameraFlying: false,
@@ -723,10 +727,19 @@ export const useStore = create<AppState>((set) => ({
     set((s) => {
       const back = section === "scene" ? s.rawReturnMode : null;
       return back != null && back !== s.mode
-        ? { section, mode: back, rawReturnMode: null, motionCause: { kind: "view", from: s.mode, to: back } }
+        ? {
+            section,
+            mode: back,
+            rawReturnMode: null,
+            // The plane that was in front comes back with the view, as the card it names.
+            trendFocus: s.rawReturnFocus,
+            rawReturnFocus: null,
+            selStack: s.rawReturnFocus != null ? bumpStack(s.selStack, "network", true) : s.selStack,
+            motionCause: { kind: "view", from: s.mode, to: back },
+          }
         : { section, rawReturnMode: section === "scene" ? null : s.rawReturnMode };
     }),
-  setRawReturnMode: (rawReturnMode) => set({ rawReturnMode }),
+  setRawReturnMode: (rawReturnMode, focus = null) => set({ rawReturnMode, rawReturnFocus: focus }),
   setRailsHidden: (railsHidden) => set({ railsHidden }),
   setSceneDragging: (sceneDragging) => set({ sceneDragging }),
   setCameraFlying: (cameraFlying) => set({ cameraFlying }),

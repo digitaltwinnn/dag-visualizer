@@ -377,10 +377,12 @@ describe("instantNote — why no chart draws this moment", () => {
     );
   });
 
-  it("keeps the WINDOW sentence for a genuinely out-of-window instant, with its route", () => {
+  it("says a genuinely out-of-view moment is outside the charts, with the one route that always works", () => {
+    // No "wider window" route: under a range the window buttons are hidden (the tester pass,
+    // 2026-10-07). The cursor can always be moved.
     const out = instantNote("outside", DAY)!;
-    expect(out).toMatch(/outside the window/);
-    expect(out).toMatch(/wider window/);
+    expect(out).toMatch(/outside the charts/);
+    expect(out).toMatch(/Move the cursor/);
   });
 
   // The app-wide plain-writing rule: two clauses get two sentences, never a dash clause.

@@ -590,7 +590,9 @@ const TIER_WORDS = (stepMs: number): { n: string; is: string; it: string } => {
 export function instantNote(place: InstantPlace, stepMs: number): string | null {
   if (place === "drawn") return null;
   if (place === "outside") {
-    return "This instant is outside the window on screen. Pick a wider window below, or move the cursor.";
+    // No route that a range would hide (the tester pass, 2026-10-07: "pick a wider window" while
+    // the window buttons were hidden under a range) — the cursor is always movable.
+    return "This moment is outside the charts on screen. Move the cursor onto them.";
   }
   const { n, is, it } = TIER_WORDS(stepMs);
   return place === "edge-newest"

@@ -13,3 +13,17 @@ describe("openRecords hands the log the span and its words", () => {
     expect(useStore.getState().logSeek).toEqual({ metaId: "dor", fromMs: 1_000, toMs: 2_000, label: "Sep 22, 2026" });
   });
 });
+
+// THE DOOR BRINGS THE READER BACK TO WHAT THEY HAD (the tester pass, 2026-10-07): closing the log
+// returned to History with the plane focus gone — the Metagraph card empty, another chart in front.
+describe("closing the log returns the History focus", () => {
+  beforeEach(() => useStore.setState({ logSeek: null, mode: "trend", section: "scene", trendFocus: "dor", rawReturnMode: null }));
+
+  it("restores the view and the plane brought forward", () => {
+    openRecords("dor", { fromMs: 1_000, toMs: 2_000 });
+    expect(useStore.getState().mode).toBe("ledger");
+    useStore.getState().setSection("scene");
+    expect(useStore.getState().mode).toBe("trend");
+    expect(useStore.getState().trendFocus).toBe("dor");
+  });
+});

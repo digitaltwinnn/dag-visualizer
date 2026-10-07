@@ -33,11 +33,8 @@ export default function RecordsDoor({
     <button
       type="button"
       disabled={!span}
-      title={
-        subject && subject !== "dag"
-          ? `Opens the snapshot log ${at}, for this network.`
-          : `Opens the snapshot log. To jump ${what === "moment" ? "to this moment" : "into this range"}, pick a network in the top bar first.`
-      }
+      // Under All the log reads every network's records too (2026-10-07), so the door always lands.
+      title={subject && subject !== "dag" ? `Opens the snapshot records ${at}, for this network.` : `Opens the snapshot records ${at}, for every network.`}
       onClick={() => openRecords(subject, span)}
       className={cn(
         "mt-3 flex w-[calc(100%+2*var(--card-pad))] items-center gap-2.5 text-left text-body text-foreground cursor-pointer",

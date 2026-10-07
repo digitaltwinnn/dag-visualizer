@@ -70,8 +70,9 @@ export function openRecords(metaId: string | null, span: RecordSpan | null): voi
     // Remember WHERE THE DOOR WAS (user, 2026-09-26): closing the layer goes back there, not to
     // Snapshots. Set after the mode step, which clears it.
     const from = st.mode;
+    const focus = st.trendFocus; // the view switch clears it; the return restores it
     st.setMode("ledger");
-    st.setRawReturnMode(from);
+    st.setRawReturnMode(from, focus);
   }
   st.setSection("data");
 }
