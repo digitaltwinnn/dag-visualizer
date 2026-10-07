@@ -1,6 +1,7 @@
 import { bucketAt } from "@/src/data/trendWindow";
 import { roleKeyLabel } from "@/src/data/composition";
 import type { TrendMetric } from "@/src/store/store";
+import { compactDag } from "@/src/util/format";
 
 // THE PER-NETWORK SERIES MATHS — one home (2026-09-18, the 3D trends view). What a per-network
 // chart draws for a metric used to live inside `components/docs/TrendsDoc.tsx` as three panel
@@ -56,7 +57,7 @@ export interface MetricSpec {
 // the same quantities for the whole network that these rows read per network, and two copies of
 // "how many decimals does a fee get" is two answers waiting to diverge.
 /** DAG: two decimals under 10, none above — a fee is read at two very different scales. */
-export const formatDag = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: v < 10 ? 2 : 0 })}`;
+export const formatDag = (v: number) => compactDag(v); // "0.05", "12", "4.3K" (user, 2026-10-07)
 export const formatMb = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 1 })} MB`;
 export const formatSeconds = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}s`;
 

@@ -19,6 +19,7 @@ import {
 } from "@/src/data/trendSeries";
 import { displayNetwork } from "@/src/data/unlisted";
 import type { TrendMetric } from "@/src/store/store";
+import { compactNumber } from "@/src/util/format";
 
 // ONE ROSTER PASS FOR THE STACK AND BOTH RAILS (2026-09-19).
 //
@@ -114,7 +115,8 @@ const NO_SERIES: Readonly<Record<string, (number | null)[]>> = {};
  *  metrics that state no formatter of their own (snapshots, blocks, nodes). */
 // Whole numbers: every metric that falls back to this is a COUNT (snapshots, blocks, nodes), and
 // an average of counts stated to a decimal ("1,978.7 a day") claims precision the reading lacks.
-const PLAIN = (v: number) => Math.round(v).toLocaleString();
+// History's readings are MAGNITUDES — "43.5K", not "43,517" (user, 2026-10-07).
+const PLAIN = (v: number) => compactNumber(v);
 
 /** WHAT AN UNMEASURED BUCKET SAYS, in words (rule 10). A gap is not a zero, and every surface that
  *  can show one — the Networks list's last reading, the cursor card's per-network rows — says it the

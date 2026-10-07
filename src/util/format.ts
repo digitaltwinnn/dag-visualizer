@@ -67,3 +67,44 @@ export const fmtCount = (n: number): string =>
   n < 10_000
     ? n.toLocaleString()
     : `~${new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(n)}`;
+
+/** A MAGNITUDE, SHORTENED (user, 2026-10-07: History's "43.517 or 26.961 … like 43.5k"). Under a
+ *  thousand the number stands (rounded); above it K / M / B, with one decimal below 100 of the unit
+ *  and none above ("43.5K", "435K", "4.7M"). The suffix is fixed — the browser's own compact form
+ *  leaves German thousands unabbreviated — while the decimal mark is the reader's. A value that
+ *  rounds up to the next unit takes it ("1M", never "1000K"). */
+export function compactNumber(n: number): string {
+  const units: [number, string][] = [
+    [1e9, "B"],
+    [1e6, "M"],
+    [1e3, "K"],
+  ];
+  const abs = Math.abs(n);
+  const i = units.findIndex(([size]) => abs >= size);
+  if (i < 0) return Math.round(n).toLocaleString();
+  const [size, suffix] = units[i]!;
+  const v = n / size;
+  const digits = Math.abs(v) < 99.95 ? 1 : 0;
+  const rounded = Number(v.toFixed(digits));
+  // Rounding can reach the next unit (999,960 → 1000K): say it in that unit instead.
+  if (Math.abs(rounded) >= 1000 && i > 0) {
+    const [up, upSuffix] = units[i - 1]!;
+    return `${Number((n / up).toFixed(1)).toLocaleString(undefined, { maximumFractionDigits: 1 })}${upSuffix}`;
+  }
+  return `${rounded.toLocaleString(undefined, { maximumFractionDigits: digits })}${suffix}`;
+}
+
+/** A DAG AMOUNT, SHORTENED (user, 2026-10-07: "fees: instead of 0.0480 we could say 0.05"). Two
+ *  decimals at most from a hundredth up, whole numbers from 10, magnitudes from a thousand — and a
+ *  fee under a hundredth keeps ONE significant digit, or 0.003 would print "0.00" and read as free. */
+export function compactDag(v: number): string {
+  const abs = Math.abs(v);
+  if (abs >= 1000) return compactNumber(v);
+  if (abs >= 10) return Math.round(v).toLocaleString();
+  // Rounded with an epsilon nudge: 0.145 is stored as 0.14499999…, and a half must round up.
+  if (abs >= 0.01 || v === 0) return (Math.round((v + Math.sign(v) * Number.EPSILON) * 100) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 });
+  return v.toLocaleString(undefined, { maximumSignificantDigits: 1 });
+}
+
+/** `compactDag` for a value in DATUMS, the chain's unit (`fmtDag`'s short sibling). */
+export const fmtDagShort = (datum: number) => compactDag(toDag(datum));

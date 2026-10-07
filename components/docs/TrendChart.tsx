@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { bucketAt, cursorFraction, heldZoom } from "@/src/data/trendWindow";
 import { bucketStamp } from "@/src/util/localTime";
+import { compactNumber } from "@/src/util/format";
 
 // THE TRENDS DOC'S ONE CHART PRIMITIVE — a small-multiple line chart over the /api/trends
 // buckets, on RECHARTS (user, 2026-09-07: "why hand-roll charts if we have a neat library?" —
@@ -69,7 +70,8 @@ const plotInnerH = (plotH: number): number => plotH - PLOT_MARGIN.top - PLOT_MAR
  *  for every chart that states no formatter of its own — a default written in the parameter list
  *  is a fresh function every render, which is exactly the prop churn the memoised plot below
  *  exists to stop. (`useTrendRoster` restates this same shape for the rails, by the same rule.) */
-const PLAIN = (v: number) => v.toLocaleString(undefined, { maximumFractionDigits: 1 });
+// A magnitude, shortened ("1.7K"), like every History reading (user, 2026-10-07).
+const PLAIN = (v: number) => compactNumber(v);
 
 /** A bucket instant in words, at the precision its own cadence earns. Module-level because both
  *  halves of this file read it — the head's readout title and the plot's tooltip. */

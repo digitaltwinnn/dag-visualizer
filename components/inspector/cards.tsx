@@ -6,7 +6,7 @@ import { useStore } from "@/src/store/store";
 import { shortHash, metagraphById, getNetwork, SIGNER_GROUPS, nodeSigned, coLocatedNetworks, filterAccent } from "@/src/data/network";
 import { UNLISTED_ID, UNLISTED_HUE, observedUnlistedIds } from "@/src/data/unlisted";
 import { identityHudCss } from "@/src/palette/identity";
-import { fmtDag, fmtKB, midHash } from "@/src/util/format";
+import { fmtDagShort, fmtKB, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
 import { metaSnapDeepKey } from "@/src/data/types";
@@ -274,7 +274,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
               anchored" hung under the fee as a note about a different quantity. */}
           {exact.totalFee > 0 && (
             <Fact label="Fees paid">
-              <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap">{fmtDag(exact.totalFee)} DAG</span>
+              <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap">{fmtDagShort(exact.totalFee)} DAG</span>
             </Fact>
           )}
           {exact.totalSizeKB > 0 && (
@@ -284,7 +284,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
           )}
           {exact.rewardsDatum > 0 && (
             <Fact label="Rewards out">
-              <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap">{fmtDag(exact.rewardsDatum)} DAG</span>
+              <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap">{fmtDagShort(exact.rewardsDatum)} DAG</span>
             </Fact>
           )}
           {/* The signer count is a FACT about this tick — it reads. Its two hashes don't, so

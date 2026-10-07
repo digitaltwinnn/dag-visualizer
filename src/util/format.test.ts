@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { fmtBytes, fmtKB, midHash, fmtShareKB } from "./format";
+import { compactDag, compactNumber, fmtDagShort, fmtBytes, fmtKB, midHash, fmtShareKB } from "./format";
 
 // The sub-KB boundary is the whole reason `fmtBytes` exists, so it is pinned here: the
 // metagraph-snapshot card states an application state's size, and mainnet states routinely
@@ -51,5 +51,55 @@ describe("fmtShareKB", () => {
 
   it("keeps both units where they differ — a bare number against another unit would mislead", () => {
     expect(fmtShareKB(900, 1228.8)).toBe("900 KB of 1.2 MB");
+  });
+});
+
+// HISTORY'S READINGS ARE MAGNITUDES (user, 2026-10-07: "very large and precise; like 43.517 or
+// 26.961; can we shorten and simplify these numbers; like 43.5k"). One decimal below 100 of a unit,
+// none above; the suffix is always K / M / B whatever the locale (the browser's own compact form
+// leaves German thousands unabbreviated), the decimal mark the reader's own.
+describe("compactNumber — a magnitude, shortened", () => {
+  const n = (v: number) => compactNumber(v).replace(",", "."); // locale-neutral for the assertions
+  it("leaves numbers under a thousand as they are, rounded", () => {
+    expect(n(0)).toBe("0");
+    expect(n(7)).toBe("7");
+    expect(n(999.4)).toBe("999");
+  });
+  it("shortens thousands, millions and billions", () => {
+    expect(n(43_517)).toBe("43.5K");
+    expect(n(26_961)).toBe("27K");
+    expect(n(1_000)).toBe("1K");
+    expect(n(435_200)).toBe("435K");
+    expect(n(4_749_065)).toBe("4.7M");
+    expect(n(38_525_277)).toBe("38.5M");
+    expect(n(2_100_000_000)).toBe("2.1B");
+  });
+  it("rolls over at the boundary instead of printing 1000K", () => {
+    expect(n(999_960)).toBe("1M");
+  });
+});
+
+// A FEE, SHORTENED (user, 2026-10-07: "fees: instead of 0.0480 we could say 0.05"). Two decimals at
+// most — but a fee under a cent of a DAG keeps ONE significant digit, or 0.003 would print "0.00"
+// and read as free (rule 10: a real value is never shown as nothing).
+describe("compactDag — a DAG amount, shortened", () => {
+  const n = (v: number) => compactDag(v).replace(",", ".");
+  it("two decimals at most from a hundredth up", () => {
+    expect(n(0.048)).toBe("0.05");
+    expect(n(0.011)).toBe("0.01");
+    expect(n(1.5)).toBe("1.5");
+    expect(n(0.145)).toBe("0.15");
+  });
+  it("one significant digit below a hundredth — never 0.00 for a real fee", () => {
+    expect(n(0.003)).toBe("0.003");
+    expect(n(0.0045)).toBe("0.005");
+    expect(n(0)).toBe("0");
+  });
+  it("whole numbers from 10, magnitudes from a thousand", () => {
+    expect(n(12.34)).toBe("12");
+    expect(n(4_321)).toBe("4.3K");
+  });
+  it("fmtDagShort reads datums", () => {
+    expect(fmtDagShort(4_800_000).replace(",", ".")).toBe("0.05"); // 0.048 DAG
   });
 });

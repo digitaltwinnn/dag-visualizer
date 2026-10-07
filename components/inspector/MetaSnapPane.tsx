@@ -23,7 +23,7 @@ import { getNetwork, SIGNER_GROUPS, metagraphById } from "@/src/data/network";
 import { UNLISTED_HUE } from "@/src/data/unlisted";
 import { snapsAtTick } from "@/src/data/anchorLog";
 import { PAYLOAD_LANES } from "@/src/data/payloadKinds";
-import { fmtDag, fmtKB, midHash } from "@/src/util/format";
+import { fmtDagShort, fmtKB, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { useMinHold } from "@/components/useMinHold";
 import { CONTENT_EASE } from "@/components/RollSwap";
@@ -227,7 +227,7 @@ export default function MetaSnapPane({
                   {/* Fee leads, size rides under it — the global card's own two-line value, so
                       the pair reads identically on both storeys of the chain. */}
                   <Fact label="Fees paid">
-                    <span className="whitespace-nowrap">{fmtDag(row.fee)} DAG</span>
+                    <span className="whitespace-nowrap">{fmtDagShort(row.fee)} DAG</span>
                   </Fact>
                   <Fact label="Size">
                     <span className="flex flex-col items-end">
