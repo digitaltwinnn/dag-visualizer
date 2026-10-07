@@ -66,9 +66,12 @@ a component.
 
 ### `railSiblings` + `useSiblingState`
 
-- `SiblingState` gains the three picked figures (`geoMeasure`, `hyperMeasure`, `ledgerMeasure`) and,
-  for the ledger, the polled anchor rows of the shown tick; `useSiblingState` gathers them the way
-  it gathers the tick window today (the ledger slot subscribes only when it needs them).
+- `SiblingState` gains the two picked figures that ORDER a level (`geoMeasure`, `hyperMeasure`) and,
+  for the ledger, the shown tick's networks (`tickNets`, built from that tick's polled rows —
+  `tickPolledRows`, the same input the explorer uses — and its exact read); `useSiblingState`
+  builds them only for the cards whose steps read them (Global snapshot, Metagraph, Metagraph
+  snapshot). `ledgerMeasure` is deliberately NOT in it: the Snapshots explorer shows that figure
+  on its rows but never orders a level by it (networks by count, snapshots newest first).
 - `CHILD_OF[…].steps` and `siblingSet` build their items from the level functions. The copied
   `cohortsOf`, `nodeSort`, `machineRows`, `tickNetworks` and per-case sorts are deleted.
 - **Two explicit projections**, each named and commented where it is applied:

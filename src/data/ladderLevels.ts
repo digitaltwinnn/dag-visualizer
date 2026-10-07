@@ -36,7 +36,8 @@ export function nodesByCountry(selNodes: readonly NodeRow[]): Map<string, NodeRo
   return m;
 }
 
-/** THE COUNTRIES under the network, by the picked figure, node count breaking a tie. */
+/** THE COUNTRIES under the network, by the picked figure, node count then code breaking a tie —
+ *  a TOTAL order, so the explorer and the rail agree whatever order their inputs arrive in. */
 export function countriesLevel(
   countries: readonly CountryStat[],
   byCountry: ReadonlyMap<string, readonly NodeRow[]>,
@@ -44,7 +45,7 @@ export function countriesLevel(
 ): { c: CountryStat; v: number }[] {
   return countries
     .map((c) => ({ c, v: countryMeasure(measure, c.count, byCountry.get(c.country) ?? []) }))
-    .sort((a, b) => b.v - a.v || b.c.count - a.c.count);
+    .sort((a, b) => b.v - a.v || b.c.count - a.c.count || a.c.cc.localeCompare(b.c.cc));
 }
 
 /** One country's nodes, joined by NAME through the leaderboard (a node can carry a country and no code). */
@@ -102,7 +103,7 @@ export function networksLevel(metaList: readonly MetaInfo[], allNodes: readonly 
   }
   return metaList
     .map((m) => ({ m, v: networkMeasure(measure, m, byNet.get(m.id) ?? []) }))
-    .sort((a, b) => b.v - a.v || b.m.nodes.length - a.m.nodes.length);
+    .sort((a, b) => b.v - a.v || b.m.nodes.length - a.m.nodes.length || a.m.id.localeCompare(b.m.id));
 }
 
 // ── Snapshots ───────────────────────────────────────────────────────────────────────────────
@@ -153,7 +154,9 @@ export function tickPolledRows(metaSnaps: ReadonlyMap<string, readonly MetaSnapR
  *  UNION, and only the exact read makes it COMPLETE (user, 2026-09-14: "DED is missing"): the
  *  polled buffers hold `POLL.metaSnapBuffer` rows PER NETWORK — a depth in rows, not ticks.
  *  Listed networks by snapshot count, then name; the UNLISTED set last, one entry for every
- *  uncatalogued address (the exact read is its only source). */
+ *  uncatalogued address (the exact read is its only source) — the set is tick-local, so an
+ *  unregistered metagraph has a card to step to (user, 2026-10-02). It lists what is KNOWN: polled
+ *  rows alone before the exact read lands, exact rows alone once the buffer has aged out. */
 export function tickNetworksLevel(
   tick: GlobalSnapshot,
   polled: readonly AnchorLogRow[],
@@ -174,7 +177,7 @@ export function tickNetworksLevel(
     }
     n.snaps.push(snapOf(r));
   }
-  const listed = [...by.values()].sort((a, b) => b.snaps.length - a.snaps.length || a.name.localeCompare(b.name));
+  const listed = [...by.values()].sort((a, b) => b.snaps.length - a.snaps.length || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
   for (const n of listed) n.snaps.sort(newestFirst);
   const unl = buildChannelLog([tick], byOrd, (id) => !isListed(id)).map(snapOf).sort(newestFirst);
   return unl.length ? [...listed, { id: UNLISTED_ID, name: UNLISTED_LABEL, hue: UNLISTED_HUE, unlisted: true, snaps: unl }] : listed;

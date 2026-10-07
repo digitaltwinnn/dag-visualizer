@@ -206,9 +206,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // 2026-09-28). Desktop and tablet fill their host.
   const pageSize = useFitRows("ledger-view", bp !== "phone", openTick == null, bp === "phone" ? TICK_PAGE_PHONE : TICK_PAGE);
   const lastSize = useRef(pageSize);
-  // The pinned tick's row, read by the resize below without re-running it on every feed tick.
-  const pinnedRow = useRef(-1);
-  pinnedRow.current = pinnedOrd != null ? orderedSnaps.findIndex((d) => d.ordinal === pinnedOrd) : -1;
   useEffect(() => {
     if (lastSize.current === pageSize) return;
     // Read the OLD size before overwriting it: an updater runs lazily when another update is
@@ -216,7 +213,9 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
     const prev = lastSize.current;
     lastSize.current = pageSize;
     // The pinned row stays on screen through a resize — the fit re-measures while the card eases.
-    setTickPage((p) => pageOnResize(p, prev, pageSize, pinnedRow.current));
+    const pinnedRow = pinnedOrd != null ? orderedSnaps.findIndex((d) => d.ordinal === pinnedOrd) : -1;
+    setTickPage((p) => pageOnResize(p, prev, pageSize, pinnedRow));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a resize reads the pin as of the render that resized; a feed tick is not a resize
   }, [pageSize]);
   const pages = Math.max(1, Math.ceil(orderedSnaps.length / pageSize));
   const page = Math.min(tickPage, pages);
@@ -511,10 +510,12 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
             : `${leafName} snapshot ${r.ordinal.toLocaleString()} · anchored into global ${tick.ordinal.toLocaleString()}${signers.length ? ` · signed by ${signers.length} ${SIGNER_GROUPS.proof.who}` : ""}`,
           onClick: () => {
             applyClickActions(metaSnapSelectActions(sel, globalPick, { metaSnap, following, inspect: useStore.getState().inspect }));
-            // The AFFORDANCE FOLLOWS THE DATA: no exact read for this tick means no signers are
-            // knowable, so the row commits and stays — a level onto nothing would claim a fact
-            // we don't have. Re-clicking (the deselect) closes the level with it.
-            setPath((p) => ({ ...p, snap: !on && signers.length > 0 ? key : null }));
+            // A select opens the snapshot's signers — the path follows the selection
+            // (`syncLedgerPath`), so this states the same thing in the same commit — and the
+            // deselect closes them. THE AFFORDANCE FOLLOWS THE DATA at the level itself: the
+            // signer level renders only once the exact read names them, so until then the row
+            // commits and stays, and the level appears when they arrive.
+            setPath((p) => ({ ...p, snap: on ? null : key }));
           },
           // The pairing wash follows the FILTER, as the snapshot's card does (2026-10-03) — the
           // two ends of one pairing light in one hue. The dot keeps the network's own.

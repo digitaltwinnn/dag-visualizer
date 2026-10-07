@@ -156,3 +156,27 @@ describe("tickPolledRows — the one polled input both the explorer and the rail
     expect(tickPolledRows(new Map(), tick)).toEqual([]);
   });
 });
+
+// A full tie (same figure, same count / fleet, same name) is broken by the id, so the order never
+// depends on the input order — the explorer and the rail build their inputs differently.
+describe("the level sorts are total — input order never decides", () => {
+  it("countries: a full tie orders by country code", () => {
+    const a = { cc: "fi", country: "Finland", count: 2 };
+    const b = { cc: "de", country: "Germany", count: 2 };
+    const by = new Map<string, NodeRow[]>();
+    expect(countriesLevel([a, b], by, "nodes").map((x) => x.c.cc)).toEqual(["de", "fi"]);
+    expect(countriesLevel([b, a], by, "nodes").map((x) => x.c.cc)).toEqual(["de", "fi"]);
+  });
+  it("networks: a full tie orders by id", () => {
+    const net = (id: string) => ({ id, name: id, nodes: [] }) as unknown as MetaInfo;
+    expect(networksLevel([net("zz"), net("aa")], [], "nodes").map((x) => x.m.id)).toEqual(["aa", "zz"]);
+  });
+  it("a global snapshot's networks: two catalog ids sharing one name order by id", () => {
+    // BioFi's current address and its former one (config `formerIds`) resolve to the same name.
+    const tick = { ordinal: 1, timestamp: "T1" } as unknown as GlobalSnapshot;
+    const ids = ["DAG6A8Dw78yWv9z8pHqjJ4JVwSqq9V9Ha7CRUQnY", "DAG2JaVh5yYiPCGLLEFi6tfkKk77WA4FzivVdBek"];
+    const ex = (metaId: string) => ({ metaId, ordinal: 1, fee: 0, bytes: 0 });
+    const order = (rows: ReturnType<typeof ex>[]) => tickNetworksLevel(tick, [], rows, () => true).map((n) => n.id);
+    expect(order([ex(ids[0]!), ex(ids[1]!)])).toEqual(order([ex(ids[1]!), ex(ids[0]!)]));
+  });
+});

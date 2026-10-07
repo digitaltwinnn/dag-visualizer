@@ -197,15 +197,6 @@ const ordinalLabel = (r: { ordinal: number }): string =>
 
 // ---------------------------------------------------------------------------
 
-/** THE CHILDREN OF A LEDGER TICK (2026-09-29) — the networks that anchored into the shown global
- *  snapshot, busiest first (the order the tick card prints its anchors in). The ONE answer, read by
- *  the metagraph card's pager and the tick's ∨ step alike, so the two can't disagree about what is
- *  under a tick (they did: the pager walked the whole catalog). Null without a tick or its exact
- *  read — no pager then, rather than a guess.
- *  ⚠️ THE UNLISTED SET IS ONE OF THEM (user, 2026-10-02: an unregistered metagraph had "no
- *  corresponding details card", so stepping down "jumps straight to node"). Uncatalogued channels
- *  were filtered out here because they named no FILTER; the rung is tick-local now and the unlisted
- *  dossier exists, so every uncatalogued channel in the tick counts toward one `unlisted` entry. */
 /** A channel's NETWORK KEY against the networks this state knows: its own id, else the unlisted
  *  set's (the pager's twin of the click table's own key rule, read off `metaList` so it stays pure). */
 const keyOf = (s: SiblingState, metaId: string): string =>
@@ -229,7 +220,8 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       const net = netOf(s);
       if (net === "all") return null;
       // UNDER A LEDGER TICK the metagraph card is the tick's CHILD, so it steps the tick's own
-      // networks (`tickNetworks` — the set the tick's ∨ opens the first of), never the catalog;
+      // networks (`tickNets` — the explorer's own list, the set the tick's ghost opens the first of),
+      // never the catalog;
       // and a pinned tick stays pinned, since a filter commit in the ledger otherwise re-enters
       // live (the executor's rule) and a swipe would move the PARENT. Live stays live.
       // ⚠️ The DAG's own card has NO siblings here, deliberately: the base ledger is what the
