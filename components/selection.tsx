@@ -1,6 +1,4 @@
 import type { CSSProperties } from "react";
-import { Check } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 // The ONE committed-selection language for LIST ROWS (user-agreed: the filter picker's design,
 // shared by every row list — the picker's committed metagraph, GeoExplore's selected node row,
@@ -57,23 +55,4 @@ export function selectionHue(hue?: string | null): CSSProperties | undefined {
     "--sel-bg-dim": `color-mix(in oklch, ${hue} 5%, transparent)`,
     "--sel-border-dim": `color-mix(in oklch, ${hue} 22%, transparent)`,
   } as CSSProperties;
-}
-
-// The deliberate glyph cue that makes the mark unmistakably "selected" (not a stray hover): a
-// monochrome Check (lucide) in the accent — the same treatment as the view switch's on-glyph
-// (text-primary). Rows RESERVE the trailing slot (`pr-7` on every row) and the mark renders
-// absolutely inside it (`right-2`), the stock shadcn SelectItem pattern — so counts/status stay
-// column-aligned and nothing shifts when the selection moves.
-// `muted` is the ✓'s half of the ANCESTOR strength above: on a coarser committed rung the check
-// still says "committed" but stops competing with the focus row's own mark.
-export function SelectedRowMark({ className, muted, hue }: { className?: string; muted?: boolean; hue?: string | null }) {
-  return (
-    <Check
-      className={cn("size-3.5", muted ? "text-primary/55" : "text-primary", hue && muted && "opacity-55", className)}
-      // The ✓ rides the same identity rule as the wash (selectionHue) — inline hue where the
-      // subject has one, the accent otherwise; `muted` keeps its half-voice via opacity.
-      style={hue ? { color: hue } : undefined}
-      aria-hidden
-    />
-  );
 }

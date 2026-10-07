@@ -1,7 +1,7 @@
 "use client";
 
 import { netUrl } from "@/src/net/current";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, ChevronDown, Search, X } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useChainSpan } from "@/components/useArchive";
@@ -17,7 +17,7 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 import { fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { Empty, IdentityDot } from "@/components/inspector/parts";
-import { SelectedRowMark, selectionHue } from "@/components/selection";
+import { selectionHue } from "@/components/selection";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -1037,6 +1037,13 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         {/* PHONE SETS THE LOG AT THE LABEL STEP (2026-10-02, the phone pass): the type scale raised
             the table's 14px rows with everything else, and the four columns that survive on phone
             (see COLUMNS) outgrew the pane again — AGE was cut off at the right edge. */}
+        {/* GROUPED BY GLOBAL SNAPSHOT (user, 2026-10-07 — option 2 in the companion, "but it needs
+            some colour distinction to show what is the actual group"): in time order the rows sit
+            under one thin header per global snapshot — its number and age, said once instead of
+            on every row — and the SELECTED global snapshot's group is set apart in the accent:
+            its header, and a rail down its rows' leading edge. The selected row keeps the one
+            fill; the faint tick-mate wash and the ✓ retired with this ("the whole row is
+            highlighted"). Sorted by anything else the rows are not in time order, so no groups. */}
         <Table className="max-[700px]:block max-[700px]:[&_tbody]:block">
           {/* TWO-LINE ROWS ON PHONE (design 2026-10-02, option E): the header stands down — a row
               names its own parts there — and each row is network · snapshot · age over one muted
@@ -1076,8 +1083,12 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((r) => {
+            {rows.map((r, i) => {
               const cfg = displayNetwork(r.metaId) ?? null;
+              const grouped = sort.key === "age" || sort.key === "tick";
+              const prevTick = i > 0 ? rows[i - 1]!.global.ordinal : null;
+              const groupHead = grouped && !r.pending && prevTick !== r.global.ordinal;
+              const inSelGroup = grouped && !r.pending && snap?.data.ordinal === r.global.ordinal;
               // TWO selection strengths (user, 2026-08-07): the CLICKED metagraph snapshot wears
               // the full wash + ✓; its tick-mates keep a fainter wash. (Washes, not box-shadow —
               // it doesn't paint on a collapsed table row.)
@@ -1087,7 +1098,6 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
               // selection, the hover channel keyed on one, or the ✓ that marks it.
               const seam = r.metaId == null;
               const rowSel = !seam && metaSnap?.metaId === r.metaId && metaSnap?.ordinal === r.ordinal;
-              const tickMate = !rowSel && !r.pending && snap?.data.ordinal === r.global.ordinal;
               const pending = !!r.pending;
               // THE SIZE IS MEASURED OR IT IS ABSENT (user, 2026-10-03, two rounds: "focus on real size —
               // compressed, as it is used", then, of a "≤ 7.0 KB" stand-in, "I don't like any
@@ -1134,6 +1144,18 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                 );
               };
               return (
+                <Fragment key={r.metaId == null ? `tick:${r.global.ordinal}` : `${r.metaId}:${r.ordinal}`}>
+                {groupHead && (
+                  <TableRow className={cn("hover:bg-transparent max-[700px]:block", inSelGroup ? "border-[var(--primary)]" : "border-border")}>
+                    <TableCell colSpan={COLUMNS.length} className="pt-3 pb-1 max-[700px]:block">
+                      <span className={cn("flex items-baseline gap-2 text-label uppercase tracking-caps", inSelGroup ? "text-primary-ink" : "text-muted-foreground")}>
+                        Global
+                        <span className={cn("font-mono tabular-nums normal-case tracking-normal", inSelGroup ? "text-primary-ink" : "text-foreground-dim")}>{r.global.ordinal.toLocaleString()}</span>
+                        <span className="ml-auto normal-case tracking-normal">{relativeAge(now - Date.parse(r.ts))}</span>
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                )}
                 <TableRow
                   // ⚠️ A SEAM has no metaId and no ordinal, so every seam would key `null:0` —
                   // React then treats a whole page of them as one repeated child and reuses the
@@ -1149,11 +1171,15 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                     // 44px on a touch pointer (a tablet shows the desktop table at ~33px rows).
                     "pointer-coarse:h-11",
                     // Phone: the row is a three-column grid with the detail line spanning beneath.
-                    "max-[700px]:grid max-[700px]:grid-cols-[auto_minmax(0,1fr)_auto] max-[700px]:items-baseline max-[700px]:[&>td]:pb-0 max-[700px]:[&>td:last-child]:pb-2",
+                    "max-[700px]:grid max-[700px]:grid-cols-[auto_minmax(0,1fr)_auto]",
+                    // One line when grouped (fee and size beside the snapshot), so the padding is
+                    // even; two lines otherwise, the detail line tucked under the first.
+                    grouped
+                      ? "max-[700px]:items-center max-[700px]:[&>td]:py-2"
+                      : "max-[700px]:items-baseline max-[700px]:[&>td]:pb-0 max-[700px]:[&>td:last-child]:pb-2",
                     pending ? "cursor-default" : "cursor-pointer",
                     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                     rowSel && "bg-[var(--sel-bg)] text-foreground",
-                    tickMate && "bg-wash-faint",
                     // The jump's landing mark — an OUTLINE, never a wash: the two washes above are
                     // the selection language (committed row, its tick-mates), and a third fill
                     // would read as a third selection strength. An outline says "this is the one
@@ -1185,7 +1211,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   }}
                   onClick={commit}
                 >
-                  <TableCell>
+                  <TableCell className={cn(inSelGroup && "shadow-[inset_2px_0_0_var(--primary)]")}>
                     {seam ? (
                       // ⚠️ FOUR EM-DASHES, NOT FOUR ZEROS. Network, snapshot, fee and size are all
                       // facts about a METAGRAPH SNAPSHOT, and this tick has none — so a `0.00000000`
@@ -1215,17 +1241,14 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   </TableCell>
                   <TableCell className="font-mono tabular-nums text-foreground-dim">
                     {/* The ✓ slot is ALWAYS reserved so the column never shifts on select. */}
-                    <span className="inline-flex items-center gap-1.5">
-                      {seam ? <Dash /> : r.ordinal.toLocaleString()}
-                      <span className="inline-flex w-3.5 flex-none">{rowSel && <SelectedRowMark hue={cfg?.hue ?? "var(--core)"} />}</span>
-                    </span>
+                    {seam ? <Dash /> : r.ordinal.toLocaleString()}
                   </TableCell>
                   <TableCell className={cn("text-right tabular-nums", PHONE_HIDDEN)}>{seam ? <Dash /> : fmtDag(r.fee)}</TableCell>
                   <TableCell className={cn("text-right tabular-nums text-foreground-dim", PHONE_HIDDEN)}>{seam ? <Dash /> : size}</TableCell>
                   <TableCell className="text-right font-mono tabular-nums max-[700px]:hidden">
                     {pending ? <span className="text-muted-foreground">…</span> : r.global.ordinal.toLocaleString()}
                   </TableCell>
-                  <TableCell className="text-right text-muted-foreground">
+                  <TableCell className={cn("text-right text-muted-foreground", grouped && "max-[700px]:hidden")}>
                     {/* Phone drops the " ago" (the bare register — relativeAge's own note): the
                         AGE header names the quantity, and the suffix's width was the last thing
                         holding this table in sideways scroll. */}
@@ -1238,14 +1261,17 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   {/* THREE FACTS, THREE PLACES — no mid-dots (user, 2026-10-03: "likely separate facts
                       to show instead of a combined text"): where it anchored on the left, what it
                       paid and how big it is ranged right, each in its own cell of the line. */}
-                  <TableCell className="min-[700px]:hidden col-span-full pt-0 text-label text-muted-foreground whitespace-normal">
+                  {/* GROUPED, it joins the first line: the header holds the "into" and the age, so
+                      fee and size take the age's place instead of a line of their own. */}
+                  <TableCell className={cn("min-[700px]:hidden text-label text-muted-foreground whitespace-normal", grouped ? "self-center" : "col-span-full pt-0")}>
                     <span className="flex items-baseline gap-4 font-mono tabular-nums">
-                      <span className="mr-auto">into {pending ? "…" : r.global.ordinal.toLocaleString()}</span>
+                      {!grouped && <span className="mr-auto">into {pending ? "…" : r.global.ordinal.toLocaleString()}</span>}
                       {!seam && <span>{fmtDag(r.fee)} DAG</span>}
                       {!seam && <span className="min-w-[6ch] text-right">{size}</span>}
                     </span>
                   </TableCell>
                 </TableRow>
+                </Fragment>
               );
             })}
           </TableBody>

@@ -13,7 +13,7 @@ import { applyClickActions } from "@/src/store/applyClickActions";
 import { IdentityDot, QualifierChip, RoleChips } from "@/components/inspector/parts";
 import { COUNTRY_ICON, PROVIDER_ICON } from "@/components/icons";
 import { tickerOf } from "@/components/explorer/nodeRow";
-import { SelectedRowMark, selectionHue } from "@/components/selection";
+import { selectionHue } from "@/components/selection";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -178,8 +178,6 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
                 </button>
               </TableHead>
             ))}
-            {/* Reserved trailing slot for the selection ✓ — so columns never shift. */}
-            <TableHead className="w-7" />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -196,8 +194,8 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
             return (
               <TableRow
                 key={r.key}
-                // The committed-selection language, bent to a table: the `--sel-bg` wash + the
-                // shared ✓ mark. (SELECTED_ROW's box-shadow ring is skipped on purpose — a
+                // The committed-selection language, bent to a table: the `--sel-bg` wash alone — the
+                // ✓ retired on 2026-10-07 (user: "obsolete as the whole row is highlighted"). (SELECTED_ROW's box-shadow ring is skipped on purpose — a
                 // box-shadow doesn't paint on a border-collapsed table row.)
                 // Hover in the node's network hue (user, 2026-09-26) — the anchor log's recipe.
                 className={cn(
@@ -228,7 +226,6 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
                 {COLS[mode].map((c) => (
                   <TableCell key={c.key} className={PHONE_HIDDEN}>{cell(r, c.key)}</TableCell>
                 ))}
-                <TableCell className={cn("w-7", PHONE_HIDDEN)}>{selected && <SelectedRowMark hue={r.netId ? filterAccent(r.netId) : undefined} />}</TableCell>
                 {/* ONE FACT PER LINE ON PHONE (user, 2026-10-07 — the raw phone pass: "1 per row
                     looks clean, keep the tag also", then "add the icon to each"). The first line is
                     WHO — network, node id, and the make-up as the head's own qualifier chip — and
@@ -244,7 +241,6 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
                         const comp = compositionRows([{ roles: r.roles, layer: r.node.layer }])[0];
                         return comp ? <QualifierChip>{comp.label}</QualifierChip> : null;
                       })()}
-                      <span className="inline-flex w-3.5 flex-none">{selected && <SelectedRowMark hue={r.netId ? filterAccent(r.netId) : undefined} />}</span>
                     </span>
                   </span>
                 </TableCell>

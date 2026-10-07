@@ -1275,8 +1275,8 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
 
 - **`SELECTED_ROW`** is the one committed-selection language for list rows: the wash plus a 1px inset
   ring **as a single box-shadow** — deliberate, because the transient states it composes with are
-  background-based and box-shadow is an independent property — plus a reserved trailing check mark in a
-  fixed slot so columns never shift.
+  background-based and box-shadow is an independent property. **No ✓** (user, 2026-10-07: "obsolete
+  as the whole row is highlighted") — the raw tables' check mark and its reserved slot retired.
 - **`subjectPairing`** is the one scene↔HUD hover coupling: a subject is paired when its key equals its
   store channel's value, using the same channels the engine reads and writes. Hovering a card glows its
   3D object and vice versa. This coupling is rule 9; `components/useSubjectPairing.test.ts` asserts the
