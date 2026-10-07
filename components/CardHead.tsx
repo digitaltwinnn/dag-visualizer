@@ -420,7 +420,7 @@ function keepFocusOnRung(el: HTMLElement): void {
           // `absolute`, and the shared recipe's `relative` would un-pin it.
           className="absolute top-[8px] right-[10px] z-10 size-auto rounded-md py-1 px-2 leading-none text-muted-foreground pointer-coarse:after:absolute pointer-coarse:after:-inset-2 pointer-coarse:after:content-['']"
         >
-          <X aria-hidden className="size-4" />
+          <X aria-hidden className="size-4 pointer-coarse:size-[18px]" />
         </Button>
       )}
       <div className={cn(onToggle && "relative group")}>

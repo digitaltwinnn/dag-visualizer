@@ -208,7 +208,9 @@ export default function SectionShell({
           className="absolute top-4 right-3 z-20 text-muted-foreground hover:text-foreground pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:top-1.5 pointer-coarse:right-0.5"
           onClick={() => useStore.getState().setSection("scene")}
         >
-          <X aria-hidden />
+          {/* A close glyph is 18px on touch (user, 2026-10-07: "on mobile the X icon is tiny") —
+              the 44px target alone does not make the mark findable. */}
+          <X aria-hidden className="size-3 pointer-coarse:size-[18px]" />
         </Button>
       </section>
 

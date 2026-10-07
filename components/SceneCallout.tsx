@@ -147,7 +147,7 @@ export function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; cla
           // invisible × there would swallow a click on the scene (review, 2026-10-04).
           className="pointer-events-auto [[data-on='0']_&]:pointer-events-none absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-wash-hover hover:text-foreground after:absolute after:-inset-2 after:content-['']"
         >
-          <X aria-hidden className="size-3.5" />
+          <X aria-hidden className="size-3.5 pointer-coarse:size-[18px]" />
         </button>
       )}
       {/* The identity EDGE SPINE (user, 2026-08-15 — "the rails/hairline effect on the left

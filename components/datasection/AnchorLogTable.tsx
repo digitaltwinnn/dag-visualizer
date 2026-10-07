@@ -944,7 +944,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
             title="Clear search"
             className="inline-flex flex-none size-6 pointer-coarse:size-9 max-[700px]:size-9 items-center justify-center rounded-xs cursor-pointer text-muted-foreground hover:text-foreground hover:bg-wash-faint focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
           >
-            <X aria-hidden className="size-3.5" />
+            <X aria-hidden className="size-3.5 pointer-coarse:size-[18px]" />
           </button>
         </span>
       )}
