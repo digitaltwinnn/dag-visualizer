@@ -110,13 +110,14 @@ export default function ExplorerPath({ crumbs, hint, className }: { crumbs: read
                   )}
                 >
                   {/* A STEP BACK LOOKS LIKE A WAY BACK (user, 2026-10-07: the current step "looks the
-                      same as something that can be clicked"): the name wears the app's dotted
-                      there-is-more underline (`foldLabel`'s recipe), solid on hover, while the
-                      current step stays the filled "you are here" with none. */}
+                      same as something that can be clicked"). The breadcrumb convention: an earlier
+                      step is a LINK — its name in the accent ink, underlined on hover — and the
+                      current step is plain, the filled "you are here". A dotted underline was tried
+                      the same day and dropped: on the web it says "more information", not "go back". */}
                   {c.root ? (
-                    <House aria-hidden className="size-3.5 flex-none" />
+                    <House aria-hidden className="size-3.5 flex-none text-primary-ink" />
                   ) : (
-                    <span className="min-w-0 truncate underline underline-offset-[3px] decoration-[1px] decoration-dotted decoration-[var(--muted-foreground)] group-hover:decoration-solid group-hover:decoration-[var(--foreground)] [&>*]:align-middle">
+                    <span className="min-w-0 truncate text-primary-ink underline-offset-[3px] decoration-[1px] group-hover:underline [&>*]:align-middle">
                       {c.label}
                     </span>
                   )}
