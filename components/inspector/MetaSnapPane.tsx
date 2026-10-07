@@ -212,7 +212,8 @@ export default function MetaSnapPane({
                 opens one tier down, so the card states their SHAPE and the pane renders them.
                 Both always render, each honest about its own tier. */}
             <Lead aside={rel || undefined}>{lead}</Lead>
-            <Separator className="mb-2" />
+            {/* NO RULE ABOVE THE TABS (user, 2026-10-07): the tab row draws its own baseline, so a
+                separator here put two hairlines a row apart around one control. */}
             <PayloadBlock row={row} deep={deep ?? null} asked={deepAsked} decodeGaveUp={decodeGaveUp} />
 
             {/* ── DETAIL: the measured facts ─────────────────────────────────────────────── */}
