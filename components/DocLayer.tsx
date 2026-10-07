@@ -43,7 +43,6 @@ import RailThread from "@/components/RailThread";
 // defeat the bundler's static analysis). DOC_PAGES in views.ts carries everything else.
 const DOC_COMPONENTS: Record<DocPage, ReturnType<typeof dynamic>> = {
   about: dynamic(() => import("@/components/docs/AboutDoc")),
-  design: dynamic(() => import("@/components/docs/DesignDoc")),
 };
 
 // The one doc column (both documents read it). The MEASURE itself is docs/measure.ts, shared

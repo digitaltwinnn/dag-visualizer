@@ -38,7 +38,7 @@ Four views drive the 3D scene:
 The placeholder is ONE consolidated `soon` Mode, at `/soon` (2026-09-04; the old `status`/`transactions`/
 `staking` modes said the same nothing three times): the canvas fades out and `Blueprint.tsx` draws a
 wireframe GALLERY of the coming features, with no numbers, so it never reads as live data. The two
-doc pages (/about, /design) are an overlay over the same bare stage, not Modes.
+doc page (/about) is an overlay over the same bare stage, not a Mode.
 
 **The four 3D views are complementary projections of the same network: hyper = who/what, geo =
 where, ledger = when, trend = how it changed.** Structure belongs to hyper. Activity belongs to the
@@ -298,7 +298,7 @@ gathers to the staging grids and fades on the doc overlay's own clock (`fleetFad
 
 | Path | Responsibility |
 |---|---|
-| `app/` | Next App Router. `globals.css` is **the one stylesheet**; `[view]/` serves the four routed 3D views (`/trends` is the History VIEW — the measured-history document is that view's RAW register, not a route of its own); `/about` and `/design` are the **DOC OVERLAY** (2026-09-04) — they render AppShell with a scrollable document layer over the live scene (`components/DocLayer.tsx`; content in `components/docs/`, opened/closed by store `docPage` with no engine reboot; /about still server-renders its prose for crawlers and carries the **experimental disclosure** that used to be an always-on banner, retired 2026-08-09: a permanent banner over a live instrument reads as an alarm). The footer's About/Design entries toggle the overlay. `--warn-soft` is /about's amber (shared with the raw layer's JSON booleans and the pulse strip's STALE dot). `api/*` are the server-side data routes. |
+| `app/` | Next App Router. `globals.css` is **the one stylesheet**; `[view]/` serves the four routed 3D views (`/trends` is the History VIEW — the measured-history document is that view's RAW register, not a route of its own); `/about` is the **DOC OVERLAY** (2026-09-04) — they render AppShell with a scrollable document layer over the live scene (`components/DocLayer.tsx`; content in `components/docs/`, opened/closed by store `docPage` with no engine reboot; /about still server-renders its prose for crawlers and carries the **experimental disclosure** that used to be an always-on banner, retired 2026-08-09: a permanent banner over a live instrument reads as an alarm). The footer's About entry toggles the overlay. (The `/design` styleguide was deleted on 2026-10-07 — user: users don't need it; the tokens live in `globals.css` and the components are their own reference.) `--warn-soft` is /about's amber (shared with the raw layer's JSON booleans and the pulse strip's STALE dot). `api/*` are the server-side data routes. |
 | `components/` | React panels, each reading/writing the store. `SceneCanvas` mounts the engine (dynamic-imported so Three never enters the server bundle). `components/explorer/` is the ONE explorer card (2026-09-26): every view's tool card is a description handed to `Explorer.tsx`, never a layout of its own — the design and its deviations are in `docs/superpowers/design/2026-09-26-explorer-card/`. |
 | `components/ui/` | The adopted shadcn/Radix primitives. |
 | `src/store/store.ts` | The Zustand store — mode, filter, selection, hover channels, `section`, phone UI state. |
@@ -531,8 +531,7 @@ area — but a rule in **The rules** above is global and never overridden locall
 - **Feature work runs on the superpowers plugin flow**: brainstorm → written plan → subagent-driven
   implementation with per-task review gates, then a final whole-branch review before merging.
 - **Design work runs component-by-component against the LIVE app** — brainstorm on the real rendered
-  component in the running app, agree the outcome, implement immediately. `/design` is a token
-  reference, not the component surface. **No separate spec or plan documents for design sessions**;
+  component in the running app, agree the outcome, implement immediately. **No separate spec or plan documents for design sessions**;
   they drift out of sync. Light per-change gates (`tsc` + `vitest` + a targeted visual check) and one
   full verification pass at the end (prod build with dev stopped, a screenshot suite, reduced-motion,
   tablet and phone re-verifies).

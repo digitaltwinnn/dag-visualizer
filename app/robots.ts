@@ -5,7 +5,7 @@ import { SITE_ORIGIN } from "@/src/data/site";
 // search results) and /api serves JSON, not pages. Served at /robots.txt by Next.
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: { userAgent: "*", allow: "/", disallow: ["/api/", "/design"] },
+    rules: { userAgent: "*", allow: "/", disallow: ["/api/"] },
     sitemap: `${SITE_ORIGIN}/sitemap.xml`,
   };
 }

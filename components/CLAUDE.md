@@ -150,7 +150,7 @@ wordmark + filter on the left, the view switch centered, and on the right the vi
 (SCENE⇄HUD + RAW + ABOUT) followed by ONE settings gear (2026-09-08 — the theme/pages/network trio
 folded into `topbar/SettingsMenu.tsx`, labeled sections of one popover; their files are rows-only
 modules now. **The pages section left on 2026-09-28** — user: "doc pages are not settings"; the
-footer's About · Design row is their one door. One state survives on the trigger by rule: the
+footer's About link is their one door. One state survives on the trigger by rule: the
 network CODE in the live accent off mainnet — "which chain am I looking at" never goes missing.
 One mount at every width; the filter strip's second row, the trio's old phone home, retired with it). The bar has **one grow-downward slot with four tenants** (a which-strip enum makes
 them mutually exclusive by construction): the FILTER button opens the network-chip strip (hovering
@@ -875,7 +875,7 @@ inline in the return would quietly restore the bug for every consumer at once.
   at different sizes and slightly turned with empty dashed frames among them, so nothing reads
   as first — a captioned row was a roadmap. Static, takes no pointer events; a tall arrangement
   on phone keeps clear of the parked node columns.
-- **The doc pages' one door is the footer's About · Design row** (2026-09-28 — user: "doc pages
+- **The doc page's one door is the footer's About link** (2026-09-28 — user: "doc pages
   are not settings"; they rode the SettingsMenu as a Pages section from 2026-09-08 until then,
   and `InfoMenu.tsx` retired with it). The in-view ABOUT row in the bar is orientation for the
   current view, not a doc page.
@@ -898,14 +898,13 @@ inline in the return would quietly restore the bug for every consumer at once.
 - **`AppShell` is the app** — `/`, `app/[view]` AND the doc routes all render it; `RouteSync` is
   the URL↔state bridge (seed mode on mount, shallow pushState for `docPage ?? mode`, popstate
   back), `components/views.ts` the one view/doc vocabulary home (TopBar's VIEWS lives there).
-- **/about and /design are the DOC OVERLAY, not pages** (user: footer navigation must not reboot
+- **/about is the DOC OVERLAY, not a page** (user: footer navigation must not reboot
   the engine, and the live scene is the backdrop): `store.docPage` + `DocLayer` (scrollable
   veil over the scene, Escape closes; content in `components/docs/`, dynamic-imported so the
   chunks split; the routes pass `doc` so /about's prose still server-renders for crawlers) +
   `DocGate` (rails/dock/band/callout/sweep UNMOUNT while open — BottomStream's cleanup zeroes
   the reserve, which also folds the footer tuck). TopBar hides its scene-action controls
-  (filter, presentation) while a doc is open; `setMode` closes any open doc by design. The
-  /design specimen's generic hue is allowlisted in `noHardcodedColors.test.ts`.
+  (filter, presentation) while a doc is open; `setMode` closes any open doc by design.
   **The doc's edge rulers are `RailThread standalone`** — the SAME component, deriving its x
   from `--rail-margin` instead of measuring the (unmounted) rail columns, rendering ruler +
   identity spine with no card marks; DocLayer keys its `signal` prop on the RISEN document so
@@ -913,7 +912,7 @@ inline in the return would quietly restore the bug for every consumer at once.
   (column-flanking spans; an `.ig-sheet-edge` reuse whose comb pointed the wrong way) — the
   rails belong at the VIEW edges, drawn by the one existing instrument, never re-built.
 - **The footer is a full-width strip, one row, one separator species (the mid-dot)**: view links
-  (`FooterViewLinks`, store-committed) · About · Design (store toggles via `DocToggle`) ·
+  (`FooterViewLinks`, store-committed) · About (a store toggle via `DocToggle`) ·
   Source code (octocat) · Constellation (the $DAG mark + siteUrl via `metagraphById("dag")`).
   In-app it tucks `min(10px, --bottom-reserve)` under the vitals band (the corner-notch fix) and
   the band sits flush on it. The brand waveform's one `d` is `components/brand.tsx`.
@@ -996,14 +995,12 @@ instrument-channel rulers and threads, one cyan heartbeat, restrained identity h
 signals. **Bespoke design elements are the product — don't genericize them into stock-component
 defaults.**
 
-**Open `/design` before any design work.** It is the live reference: the colour lanes, the type scale
-and the sans/mono split read from `globals.css` and the palette generator, and the signature elements
-— the icon map, the ECG and Odometer, the four card states, the status pills, the state atoms,
-`SELECTED_ROW`, the three edge signal levels, the instrument ruler — render through the *real*
-components. It answers **what exists and what it looks like** by construction, so this file doesn't
-restate that. What a rendered page can't carry is the prohibitions and the traps; those are below. It
-is deliberately not a full component gallery — component *behaviour* is verified against the running
-app.
+**The reference is the running app and `globals.css`** — the `/design` styleguide page was deleted on
+2026-10-07 (user: users don't need it). The tokens (colour lanes, type scale, the sans/mono split)
+live in `globals.css` and the palette generator; the signature elements (the icon map in
+`components/icons.tsx`, the ECG and Odometer, the card states, the status pills, the state atoms,
+`SELECTED_ROW`, the edge signal levels, the instrument ruler) are their own components, verified
+against the running app. What neither carries is the prohibitions and the traps; those are below.
 
 **All styling lives in `app/globals.css`** plus Tailwind utilities in the JSX — **one name per token,
 no aliases**, and component code doesn't re-derive paddings, radii or cyan tints. The SVG `RailThread`
@@ -1028,8 +1025,9 @@ the lane. The shared "present, not your subject" dim is `opacity-65` (0.55 still
 
 ### Two colour lanes
 
-`/design` renders both lanes live, including the hue precedence (baked brand > `config.METAGRAPHS`
-colour > hash fallback) and the zone snapping. Rule 3 enforces the mechanics. What neither shows:
+The palette generator (`src/palette/`) owns both lanes, including the hue precedence (baked brand >
+`config.METAGRAPHS` colour > hash fallback) and the zone snapping. Rule 3 enforces the mechanics. What
+neither shows:
 
 - **Structural tokens are never repointed at an identity hue.** Structural cyan (`--primary`) is the
   sole accent/affordance signal — live dots, the ECG, selection washes, sparklines, blueprint chrome,
@@ -1074,8 +1072,7 @@ In one line: **thread = resting identity cue; card edge = purely transient signa
   there is no signal to re-measure on either. Dividing by the measured scale makes the numbers
   transform-agnostic and the missing event moot.
 - **Every card edge signal renders on the scene-facing (inner) edge**, in three levels whose hierarchy
-  must stay readable at a glance — **grey whisper < hued pairing < moving pulse** (all three run live
-  on `/design`). Pairing wins over the whisper by source order. The pulse fires once per subject
+  must stay readable at a glance — **grey whisper < hued pairing < moving pulse**. Pairing wins over the whisper by source order. The pulse fires once per subject
   change, skips mount, debounces, leaves nothing behind, and is **synchronized with the title's
   roll-in** so title and edge move as one moment.
 
@@ -1309,8 +1306,7 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
 
 ### State atoms & timing
 
-`components/state/StateAtoms.tsx` builds empty and loading states from the app's own marks (all four
-render on `/design`), so an absent feed reads as part of the instrument rather than a spinner. The
+`components/state/StateAtoms.tsx` builds empty and loading states from the app's own marks, so an absent feed reads as part of the instrument rather than a spinner. The
 sonar ring is remounted per retry, so the animation IS the retry.
 
 **`useMinHold`** gives every *transient* signal a minimum calm cycle even when data resolves instantly,

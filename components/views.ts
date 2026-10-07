@@ -119,7 +119,6 @@ export type DocDef = {
 
 export const DOC_PAGES = {
   about: { label: "About", title: "About — DAG Visualizer" },
-  design: { label: "Design", title: "Design — DAG Visualizer" },
 } satisfies Record<string, DocDef>;
 
 export type DocPage = keyof typeof DOC_PAGES;

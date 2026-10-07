@@ -199,7 +199,7 @@ interface AppState {
   // rebooted the WebGL engine on every footer navigation. A presentation axis like `section`,
   // never a Mode — a document is over the network, not a view of it. While set, the HUD's
   // scene furniture stands down (DocGate) and RouteSync publishes the doc page's own path.
-  docPage: "about" | "design" | null;
+  docPage: "about" | null;
   // ONE-SHOT HANDOFF down the observation ladder (convention 12, 2026-09-09): a /trends chart
   // range handed to the anchor log's search. The trends page writes it as it closes; the log
   // consumes it on sight (prefills the date criteria, seeks when it can) and clears it — a
@@ -412,7 +412,7 @@ interface AppState {
   setLatestSnapshot: (snap: GlobalSnapshot | null) => void;
   setActivity: (activity: Activity | null) => void;
   setMode: (mode: Mode) => void;
-  setDocPage: (docPage: "about" | "design" | null) => void;
+  setDocPage: (docPage: "about" | null) => void;
   setLogSeek: (logSeek: { metaId: string | null; fromMs: number; toMs: number; snapshot?: number } | null) => void;
   setDocStageReady: (ready: boolean) => void;
   setDocClosing: (closing: boolean) => void;

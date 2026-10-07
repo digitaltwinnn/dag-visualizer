@@ -17,8 +17,8 @@ import { cn } from "@/lib/utils";
 // the click card"): the hover Tooltip and the subject callout are the same species — HUD glass
 // tied to a scene subject — so they share one surface recipe. Identity never tints the frame; it
 // lives on the content (the hued ticker), the anchor ring and the `.edge-spine`. Lives HERE
-// (beside SELECTED_ROW, the shared-recipe home) rather than in SceneCallout so the server-side
-// /design page can render the specimen — a string export cannot cross a "use client" boundary.
+// (beside SELECTED_ROW, the shared-recipe home) rather than in either component, so neither owns
+// the other's surface.
 export const SCENE_GLASS =
   "rounded-md border border-border px-3 py-2 backdrop-blur-[8px] bg-[var(--panel-solid)]"; // the scale's own step below a card (was a literal 10px, the card's radius since 2026-10-03)
 
