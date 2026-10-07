@@ -29,13 +29,20 @@ export interface LedgerPathView {
   /** The committed tick's ordinal. */
   snapOrd: number | null;
   following: boolean;
+  /** The Metagraph snapshot CARD is the rail's open box (`store.boxedCard`). */
+  metaSnapBoxed: boolean;
 }
 
 const metaSnapKey = (m: LedgerPathView["metaSnap"]) => (m ? `${m.globalOrdinal}|${m.metaId}|${m.ordinal}` : null);
 
 /** Whether two views differ in anything the path answers to. */
 export function pathViewChanged(a: LedgerPathView, b: LedgerPathView): boolean {
-  return metaSnapKey(a.metaSnap) !== metaSnapKey(b.metaSnap) || a.snapOrd !== b.snapOrd || a.following !== b.following;
+  return (
+    metaSnapKey(a.metaSnap) !== metaSnapKey(b.metaSnap) ||
+    a.snapOrd !== b.snapOrd ||
+    a.following !== b.following ||
+    a.metaSnapBoxed !== b.metaSnapBoxed
+  );
 }
 
 /** The path after the store moved from `prev` to `next`. The rules, in order:
@@ -48,12 +55,30 @@ export function pathViewChanged(a: LedgerPathView, b: LedgerPathView): boolean {
  *    commits the network's newest snapshot every tick, and following it down left one row on
  *    screen while the trail showed many. The signer level stays open only for that same snapshot.
  * 3. **A tick pinned elsewhere while a tick is open re-points the path** — unless the same commit
- *    carried a snapshot of that tick, which rule 2 has already opened (review, 2026-09-26). */
+ *    carried a snapshot of that tick, which rule 2 has already opened (review, 2026-09-26).
+ *
+ * The one exception to rule 2's live-follow clause: **while LIVE, the path follows the Metagraph
+ * snapshot CARD** (user, 2026-10-07 — "when I'm on a metagraph snapshot card the explorer … should
+ * show the parent global snapshot → BioFi → the snapshot I see in my card"). With that card the
+ * open box, the path opens down to the snapshot itself (its signers) and moves with each new one
+ * the heartbeat commits; when the box moves off it, a path it opened goes back to the tick list.
+ * Any other box under live leaves the path alone, which is what 2026-10-04 asked for. */
 export function syncLedgerPath(path: LedgerPath, prev: LedgerPathView, next: LedgerPathView): LedgerPath {
   if (next.following && !prev.following) {
     return path.selfResume ? { ...path, selfResume: false } : CLOSED_PATH;
   }
-  if (next.following) return path;
+  if (next.following) {
+    const m = next.metaSnap;
+    if (next.metaSnapBoxed && m) {
+      if (metaSnapKey(m) === metaSnapKey(prev.metaSnap) && prev.metaSnapBoxed) return path;
+      return { tick: m.globalOrdinal, net: m.netKey, snap: `${m.metaId}|${m.ordinal}`, selfResume: path.selfResume };
+    }
+    const was = prev.metaSnapBoxed ? prev.metaSnap : null;
+    if (was && path.tick === was.globalOrdinal && path.snap === `${was.metaId}|${was.ordinal}`) {
+      return { ...CLOSED_PATH, selfResume: path.selfResume };
+    }
+    return path;
+  }
   const m = next.metaSnap;
   if (m && metaSnapKey(m) !== metaSnapKey(prev.metaSnap)) {
     const key = `${m.metaId}|${m.ordinal}`;

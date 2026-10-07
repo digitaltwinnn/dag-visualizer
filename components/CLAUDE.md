@@ -208,7 +208,10 @@ decisions inside them are design, not detail:
   network anchored into carries its count in the network's hue as the row's tag, one it sat out is
   `faint`, and inside a tick only the committed network's row is drillable (`outOfLens`); **the
   path follows a commit made elsewhere** (a tile, the rail's ‹ › plank, the raw log) but never
-  auto-opens from the root, because the newest tick changes every few seconds. The LIVE/PINNED
+  auto-opens from the root on the live heartbeat, because the newest tick changes every few
+  seconds — except while the Metagraph snapshot CARD is the box (user, 2026-10-07): then the path
+  opens down to that snapshot and follows it tick by tick, and steps back to the tick list when
+  another card is boxed (`src/data/ledgerPath.ts`). The LIVE/PINNED
   control rides the CARD HEAD's eyebrow row with the shown snapshot's ticking age (2026-09-28 —
   it rode the heading row as the level's setting, design decision 15, until then), and the pager
   states the TIME the rows span ("last 11 min") rather than "52 recent". Each level shows
@@ -508,11 +511,12 @@ out the two snapshot slots, which ride the lane with no focus rung at all.
 actually? … now the ghost is clickable"). `∧ ∨` (2026-09-11) re-boxed the coarser/finer committed
 card — both one click away on the cards themselves — and, with nothing finer committed, ∨ committed
 the rung's FIRST child. That one unique job moved into the **NEXT GHOST**: the ghost directly below
-the deepest committed rung, opened, offers the first `GHOST_PICKS` (3) children in the explorer's
-own order as quick picks (`childSteps` in railSiblings.ts, the list form of the old first-child
-step, read through the pager's own state builder `useSiblingState`), each running that row's own
-actions through the one executor. A metagraph snapshot's next ghost lists its first validators
-(`snapshotSignerRows`, the explorer's signer order). The plank is `‹` at the card's left edge, the
+the deepest committed rung IS the step — a click commits that rung's first child in the explorer's
+own order (`childStep` in railSiblings.ts, read through the pager's own state builder
+`useSiblingState`) through the one executor, and the ghost becomes the real card (user, 2026-10-07;
+the three quick picks it opened to on 2026-10-04 are retired). A metagraph snapshot's next ghost
+opens its first validator (`snapshotSignerRows`, the explorer's signer order). Only a ghost with no
+committed parent above it is a true ghost: it opens to its hint and offers no choice. The plank is `‹` at the card's left edge, the
 position squares centred, `›` at its right edge — the position DRAWN, never written: one small square
 per sibling with the current one lit, a set past fifteen sliding a fifteen-wide window whose ends
 are drawn small (`positionMarks`; user, 2026-10-04). An exhausted direction DIMS rather than

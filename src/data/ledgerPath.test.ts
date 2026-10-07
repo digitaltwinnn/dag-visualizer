@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CLOSED_PATH, pathViewChanged, syncLedgerPath, type LedgerPath, type LedgerPathView } from "./ledgerPath";
 
-const view = (p: Partial<LedgerPathView> = {}): LedgerPathView => ({ metaSnap: null, snapOrd: null, following: false, ...p });
+const view = (p: Partial<LedgerPathView> = {}): LedgerPathView => ({ metaSnap: null, snapOrd: null, following: false, metaSnapBoxed: false, ...p });
 const ms = (ordinal: number, globalOrdinal: number) => ({ metaId: "dor", ordinal, globalOrdinal, netKey: "dor" });
 const open: LedgerPath = { tick: 100, net: "dor", snap: "dor|5", selfResume: false };
 
@@ -39,6 +39,26 @@ describe("syncLedgerPath", () => {
   });
 });
 
+describe("syncLedgerPath — live, the path follows the Metagraph snapshot card", () => {
+  const live = (p: Partial<LedgerPathView> = {}) => view({ following: true, ...p });
+  it("opens down to the snapshot itself when that card becomes the box", () => {
+    const next = syncLedgerPath(CLOSED_PATH, live({ metaSnap: ms(7, 120) }), live({ metaSnap: ms(7, 120), metaSnapBoxed: true }));
+    expect(next).toEqual({ tick: 120, net: "dor", snap: "dor|7", selfResume: false });
+  });
+  it("moves with each snapshot the heartbeat commits while the card stays the box", () => {
+    const at7 = { tick: 120, net: "dor", snap: "dor|7", selfResume: false };
+    const next = syncLedgerPath(at7, live({ metaSnap: ms(7, 120), metaSnapBoxed: true }), live({ metaSnap: ms(8, 121), metaSnapBoxed: true }));
+    expect(next).toEqual({ tick: 121, net: "dor", snap: "dor|8", selfResume: false });
+  });
+  it("goes back to the tick list when the box moves off the card", () => {
+    const at7 = { tick: 120, net: "dor", snap: "dor|7", selfResume: false };
+    expect(syncLedgerPath(at7, live({ metaSnap: ms(7, 120), metaSnapBoxed: true }), live({ metaSnap: ms(7, 120) }))).toEqual(CLOSED_PATH);
+  });
+  it("…but leaves a path the reader opened elsewhere alone", () => {
+    expect(syncLedgerPath(open, live({ metaSnap: ms(7, 120), metaSnapBoxed: true }), live({ metaSnap: ms(7, 120) }))).toBe(open);
+  });
+});
+
 describe("syncLedgerPath — pinning the live tip", () => {
   it("re-points an open path when the followed tick is pinned in place", () => {
     // Browsing tick 100 while live; the card pins the live tip, 105 — no ordinal changes.
@@ -53,5 +73,6 @@ describe("pathViewChanged", () => {
     expect(pathViewChanged(view(), view({ snapOrd: 1 }))).toBe(true);
     expect(pathViewChanged(view(), view({ following: true }))).toBe(true);
     expect(pathViewChanged(view(), view({ metaSnap: ms(1, 2) }))).toBe(true);
+    expect(pathViewChanged(view(), view({ metaSnapBoxed: true }))).toBe(true);
   });
 });
