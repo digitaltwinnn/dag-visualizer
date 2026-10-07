@@ -260,7 +260,9 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
                     return (
                       <span className="flex flex-col gap-0.5">
                         {line(COUNTRY_ICON, place || "Unlocated", "text-foreground-dim")}
-                        {line(PROVIDER_ICON, r.isp ?? "Unknown provider", "text-muted-foreground")}
+                        {/* ONE INK for both facts (user, 2026-10-07): they are peers, told apart by
+                            their marks, not ranked by a colour step. */}
+                        {line(PROVIDER_ICON, r.isp ?? "Unknown provider", "text-foreground-dim")}
                       </span>
                     );
                   })()}
