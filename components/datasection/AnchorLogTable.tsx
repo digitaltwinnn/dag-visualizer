@@ -877,7 +877,18 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     <LogSearchBar
       networks={searchNets}
       metaId={searchNet}
-      setMetaId={setSearchMeta}
+      // THE LOG'S OWN SCOPE IS A LENS TOO (user, 2026-10-07): picking another network here clears
+      // what was picked under the old one, as a filter change does (the executor's filter step).
+      setMetaId={(id) => {
+        const st = useStore.getState();
+        if (id !== searchMeta && (st.metaSnap != null || st.tickNet != null)) {
+          applyClickActions([
+            { kind: "metaSnap", sel: null },
+            { kind: "tickNet", sel: null },
+          ]);
+        }
+        setSearchMeta(id);
+      }}
       // Locked only by the FILTER: under "all" the pick is the log's own scope, and changing it
       // pages the other network's chain.
       metaLocked={!!lensNet || !!doorMeta}
