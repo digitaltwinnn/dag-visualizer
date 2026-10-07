@@ -26,3 +26,8 @@ export function pageKeepingRow(page: number, oldSize: number, newSize: number): 
   const first = (Math.max(1, page) - 1) * Math.max(1, oldSize);
   return Math.floor(first / Math.max(1, newSize)) + 1;
 }
+
+/** The 1-based page holding a 0-based row, or null when the row is not in the list. */
+export function pageHolding(index: number, pageSize: number): number | null {
+  return index < 0 ? null : Math.floor(index / pageSize) + 1;
+}

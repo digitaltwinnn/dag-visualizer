@@ -6,7 +6,7 @@ import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 import Explorer, { type ExplorerLevelSpec, type ExplorerRowSpec } from "@/components/explorer/Explorer";
 import { NODE_GLYPH_W, nodeRowSpec, unknownNodeRowSpec } from "@/components/explorer/nodeRow";
 import TablePager from "@/components/datasection/TablePager";
-import { pageKeepingRow } from "@/components/explorer/fitRows";
+import { pageHolding, pageKeepingRow } from "@/components/explorer/fitRows";
 import useFitRows from "@/components/explorer/useFitRows";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { IdentityDot } from "@/components/inspector/parts";
@@ -249,9 +249,12 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
     if (next !== path) {
       setPath(next);
       if (next.tick == null && path.tick != null) setTickPage(1);
-      else if (pathView.metaSnap && next.tick === pathView.metaSnap.globalOrdinal && next.tick !== path.tick) {
-        const at = orderedSnaps.findIndex((d) => d.ordinal === next.tick);
-        if (at >= 0) setTickPage(Math.floor(at / pageSize) + 1);
+      // WHENEVER THE PATH OPENS A GLOBAL SNAPSHOT the list turns to the page holding it (user,
+      // 2026-10-07) — a pin from the card's ‹ ›, a bar or a tile, not only a metagraph snapshot's —
+      // so going back up via the crumb finds the pinned row on screen.
+      else if (next.tick != null && next.tick !== path.tick) {
+        const page = pageHolding(orderedSnaps.findIndex((d) => d.ordinal === next.tick), pageSize);
+        if (page != null) setTickPage(page);
       }
     }
   }
