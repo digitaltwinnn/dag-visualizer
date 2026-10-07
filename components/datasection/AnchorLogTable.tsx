@@ -1115,8 +1115,11 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
           <TableBody>
             {rows.map((r, i) => {
               const cfg = displayNetwork(r.metaId) ?? null;
-              const prevTick = i > 0 ? rows[i - 1]!.global.ordinal : null;
-              const groupHead = grouped && !r.pending && prevTick !== r.global.ordinal;
+              // A row whose anchoring global is not resolved yet has a group of its own — the
+              // placeholder the scene's forming block is (user, 2026-10-07: "add the row and say
+              // anchoring"). Its key is not an ordinal: there is none yet.
+              const groupKey = (x: ViewRow) => (x.pending ? "anchoring" : x.global.ordinal);
+              const groupHead = grouped && (i === 0 || groupKey(rows[i - 1]!) !== groupKey(r));
               const inSelGroup = grouped && !r.pending && snap?.data.ordinal === r.global.ordinal;
               // TWO selection strengths (user, 2026-08-07): the CLICKED metagraph snapshot wears
               // the full wash + ✓; its tick-mates keep a fainter wash. (Washes, not box-shadow —
@@ -1174,7 +1177,20 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
               };
               return (
                 <Fragment key={r.metaId == null ? `tick:${r.global.ordinal}` : `${r.metaId}:${r.ordinal}`}>
-                {groupHead && (
+                {groupHead && r.pending && (
+                  // THE ANCHORING PLACEHOLDER: these snapshots exist, but which global snapshot they
+                  // anchored into is still being read — said in words, never a guessed number
+                  // (rule 10), and nothing to click until it lands.
+                  <TableRow className="hover:bg-transparent border-border max-[700px]:block">
+                    <TableCell colSpan={columns.length + 1} className="pt-3 pb-1 max-[700px]:block">
+                      <span className="flex items-baseline gap-2 text-label text-muted-foreground">
+                        <span className="uppercase tracking-caps">Global</span>
+                        <span className="italic">anchoring…</span>
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {groupHead && !r.pending && (
                   // THE GLOBAL SNAPSHOT'S OWN ROW: its number and its age, each as label + value, and
                   // a click selects THAT global snapshot alone (no metagraph snapshot — the pane
                   // then has nothing to read, honestly), as an explorer row does; hovering it lights
@@ -1305,6 +1321,9 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                       {pending ? <span className="text-muted-foreground">…</span> : r.global.ordinal.toLocaleString()}
                     </TableCell>
                   )}
+                  {/* Grouped, the header's Age control stands over an otherwise empty column; the
+                      row still fills it, so a selected row's wash reaches the table's edge. */}
+                  {grouped && <TableCell className="max-[700px]:hidden" />}
                   {!grouped && (
                     <TableCell className="text-right text-muted-foreground">
                       {/* Phone drops the " ago" (the bare register — relativeAge's own note): the
