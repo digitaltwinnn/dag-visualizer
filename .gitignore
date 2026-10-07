@@ -30,3 +30,8 @@ next-env.d.ts
 
 # rebuild-trends crash-safety checkpoints (scripts/rebuild-trends.ts --resume)
 .rebuild-trends-ckpt/
+# …and a checkpoint set aside while another rebuild runs (it refuses to trample one)
+.rebuild-trends-ckpt.*/
+
+# Claude Code personal settings
+.claude/settings.local.json
