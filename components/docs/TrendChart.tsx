@@ -499,7 +499,11 @@ export default function TrendChart({
         )}
       </div>
       {note || !measured ? (
-        <div className="h-[138px] grid place-items-center rounded-md border border-border border-dashed">
+        // THE EMPTY STATE TAKES THE PLOT'S OWN HEIGHT (user, 2026-10-07: "BIOFI is missing while it
+        // is in the explorer"). It was a fixed 138px, so a network with nothing measured in the span
+        // drew a SHORTER card, and in the stack the card in front covered all of it, its header
+        // strip included. The plot plate is the plot plus its axis strip inside a 1px border.
+        <div className="grid place-items-center rounded-md border border-border border-dashed" style={{ height: plotHeight + AXIS_H + 2 }}>
           <span className="text-label text-muted-foreground">{note ?? "no measurements in this window"}</span>
         </div>
       ) : (
