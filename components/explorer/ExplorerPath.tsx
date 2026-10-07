@@ -105,11 +105,21 @@ export default function ExplorerPath({ crumbs, hint, className }: { crumbs: read
                     STEP,
                     shape,
                     pad,
-                    "cursor-pointer bg-wash-soft text-foreground-dim hover:bg-wash-hover hover:text-foreground",
+                    "group cursor-pointer bg-wash-soft text-foreground-dim hover:bg-wash-hover hover:text-foreground",
                     "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
                   )}
                 >
-                  {c.root ? <House aria-hidden className="size-3.5 flex-none" /> : <span className="min-w-0 truncate [&>*]:align-middle">{c.label}</span>}
+                  {/* A STEP BACK LOOKS LIKE A WAY BACK (user, 2026-10-07: the current step "looks the
+                      same as something that can be clicked"): the name wears the app's dotted
+                      there-is-more underline (`foldLabel`'s recipe), solid on hover, while the
+                      current step stays the filled "you are here" with none. */}
+                  {c.root ? (
+                    <House aria-hidden className="size-3.5 flex-none" />
+                  ) : (
+                    <span className="min-w-0 truncate underline underline-offset-[3px] decoration-[1px] decoration-dotted decoration-[var(--muted-foreground)] group-hover:decoration-solid group-hover:decoration-[var(--foreground)] [&>*]:align-middle">
+                      {c.label}
+                    </span>
+                  )}
                 </button>
               )}
             </BreadcrumbItem>
