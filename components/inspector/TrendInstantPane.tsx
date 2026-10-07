@@ -20,6 +20,7 @@ import { bucketAt, spanPhrase } from "@/src/data/trendWindow";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
+import Stamp from "@/components/Stamp";
 
 // THE CURSOR CARD (2026-09-19) — History's own facts slot, `instant`. The timeline commits one
 // moment and this card reads the whole stack AT it: what the subject network measured there, where
@@ -139,7 +140,8 @@ export default function TrendInstantPane({
           cursorMs != null ? (
             <span className="inline-flex items-center gap-2">
               <INSTANT_ICON aria-hidden className="size-4 flex-none text-[var(--filter-accent,var(--primary))]" />
-              {stampInstant(cursorMs, stepMs)}
+              {/* A finer-than-daily moment is a clock time: drawn by `Stamp`, its zone a tag. */}
+              {stepMs < 86_400_000 ? <Stamp ms={bucket ?? cursorMs} quietDate={false} /> : stampInstant(cursorMs, stepMs)}
             </span>
           ) : (
             "—"

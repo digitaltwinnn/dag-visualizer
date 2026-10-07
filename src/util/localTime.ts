@@ -18,7 +18,7 @@ export function bucketStamp(ms: number, stepMs: number, opts: { year?: boolean }
   if (stepMs >= DAY_MS) {
     return new Date(ms).toLocaleDateString(undefined, { year, month: "short", day: "numeric", timeZone: "UTC" });
   }
-  return new Date(ms).toLocaleString(undefined, { year, month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZoneName: "short" });
+  return new Date(ms).toLocaleString(undefined, { year, month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" });
 }
 
 /** One sealed record, to the SECOND (the raw layer's rung: a batching network seals dozens inside
@@ -41,4 +41,23 @@ export function utcDayKey(ms: number): string {
  *  reader matching our local stamp against one can read theirs off the tooltip. */
 export function utcStamp(ms: number): string {
   return new Date(ms).toISOString().slice(0, 19).replace("T", " ") + " UTC";
+}
+
+/** A CLOCK TIME SPLIT FOR DISPLAY (2026-10-07 — "looks a lot of text … maybe add timezone as a
+ *  tag? what is common practice?"): the time to be set in full ink, the date quieter beside it
+ *  with its year only when it is not this year, and the zone for a small tag. No leading zero on
+ *  the hour ("7:22 PM", not "07:22 PM"). `seconds` for a record (the raw rung); `now` for tests. */
+export function stampParts(ms: number, opts: { seconds?: boolean; now?: number } = {}): { date: string; time: string; zone: string } {
+  const d = new Date(ms);
+  const thisYear = new Date(opts.now ?? Date.now()).getFullYear() === d.getFullYear();
+  const date = d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: thisYear ? undefined : "numeric" });
+  const parts = new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+    second: opts.seconds ? "2-digit" : undefined,
+    timeZoneName: "short",
+  }).formatToParts(d);
+  const zone = parts.find((p) => p.type === "timeZoneName")?.value ?? "";
+  const time = parts.filter((p) => p.type !== "timeZoneName").map((p) => p.value).join("").trim();
+  return { date, time, zone };
 }

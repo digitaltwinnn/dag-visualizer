@@ -72,7 +72,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CABINET_BODY, CABINET_LIST, CABINET_TRIGGER } from "@/components/cabinetTabs";
 import { cn } from "@/lib/utils";
-import { recordStamp, utcStamp } from "@/src/util/localTime";
+import Stamp from "@/components/Stamp";
 
 /** Whether a decoded payload carries anything at all — `{}`, `[]` and `""` do NOT open a lane. */
 function nonEmpty(v: unknown): boolean {
@@ -89,19 +89,11 @@ function nonEmpty(v: unknown): boolean {
  *  is what gets compared. */
 const paneHash = (v: string): string => midHash(v, 46);
 
-/** The pane's absolute stamp: `Sep 14, 2026, 14:34:42` in the reader's own locale and zone
- *  (`recordStamp`, 2026-10-07 — it said UTC).
- *
- *  ⚠️ SECONDS, BECAUSE THIS IS THE RECORD RUNG. Everywhere else the app rounds a time to the
- *  minute — a chart axis, a range label — because there the stamp locates a BUCKET. Here it
- *  identifies one sealed artefact, and a batching network seals dozens inside a single minute, so
- *  a minute-rounded stamp would print the same value for rows the reader can see are different.
- *  Unparsed input yields the instrument's own absence rather than "Invalid Date" (rule 10). */
-const stampOfRecord = (ts: string): string => {
-  const ms = Date.parse(ts);
-  if (!Number.isFinite(ms)) return "—";
-  return recordStamp(ms);
-};
+// THE PANE'S TIME ROW is a `Stamp` WITH SECONDS, because this is the record rung: everywhere else
+// the app rounds a time to the minute — a chart axis, a range label — because there the stamp
+// locates a BUCKET. Here it identifies one sealed artefact, and a batching network seals dozens
+// inside a single minute, so a minute-rounded stamp would print the same value for rows the reader
+// can see are different. An unparsed stamp is the instrument's own absence, never "Invalid Date".
 
 type LaneId = "state" | "data" | "signers";
 type Lane = { id: LaneId; name: string; title: string };
@@ -623,8 +615,8 @@ export function ChannelStatePanel() {
                 says so: the explorer's own stamps are UTC, so a viewer's local midnight can never
                 silently re-date a snapshot. */}
             <Fact label="Time" title="The stamp this snapshot shares with the global snapshot it anchored into">
-              {/* The reader's own clock; UTC on hover, for matching an explorer (2026-10-07). */}
-              <span className="tabular-nums text-foreground-dim" title={Number.isFinite(Date.parse(sel.ts)) ? utcStamp(Date.parse(sel.ts)) : undefined}>{stampOfRecord(sel.ts)}</span>
+              {/* The reader's own clock, drawn as date · time · zone tag; UTC on hover (2026-10-07). */}
+              {Number.isFinite(Date.parse(sel.ts)) ? <Stamp ms={Date.parse(sel.ts)} seconds className="text-foreground-dim" /> : <span className="text-muted-foreground">—</span>}
             </Fact>
             <Fact label="Fee paid"><span className="tabular-nums">{fmtDag(deep.fee)} DAG</span></Fact>
             {/* "compressed" names the wire figure's basis against the lanes' decoded sizes. */}

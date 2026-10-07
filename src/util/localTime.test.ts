@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
-import { bucketStamp, recordStamp, utcDayKey, utcStamp } from "./localTime";
+import { bucketStamp, recordStamp, stampParts, utcDayKey, utcStamp } from "./localTime";
 
 // ONE RULE FOR EVERY DATE THE APP WRITES (user, 2026-10-07 — "so any figure shown with days will be
 // UTC right? … if a user shares a screenshot it should be the same for other users. If we show a
@@ -51,5 +51,22 @@ describe("utcDayKey — the UTC day of an instant, as the date fields hold it", 
 describe("utcStamp — the record's time in UTC, for the hover (cross-checking an explorer)", () => {
   it("states the UTC date and clock to the second, and says it is UTC", () => {
     expect(utcStamp(Date.UTC(2026, 9, 7, 17, 19, 4))).toBe("2026-10-07 17:19:04 UTC");
+  });
+});
+
+describe("stampParts — a clock time split for display: date, time, zone (2026-10-07)", () => {
+  // "Oct 7, 2026, 07:22:41 PM GMT+2" read as a lot of text: the common practice is the time in
+  // full ink, the date quieter, the year only when it is not this year, and the zone a small tag.
+  it("splits date, time and zone, with no leading zero on the hour", () => {
+    const p = stampParts(Date.UTC(2026, 8, 14, 14, 4, 2), { seconds: true, now: Date.UTC(2026, 9, 7) });
+    expect(p.date).toBe("Sep 14");
+    expect(p.time).toMatch(/^10:04:02/);
+    expect(p.zone).toBe("EDT");
+  });
+  it("carries the year only when it is not the current one", () => {
+    expect(stampParts(Date.UTC(2025, 8, 14, 14), { now: Date.UTC(2026, 9, 7) }).date).toBe("Sep 14, 2025");
+  });
+  it("seconds only where asked", () => {
+    expect(stampParts(Date.UTC(2026, 8, 14, 14, 4, 2), { now: Date.UTC(2026, 9, 7) }).time).toMatch(/^10:04(?!:)/);
   });
 });

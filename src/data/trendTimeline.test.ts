@@ -408,13 +408,14 @@ describe("the cursor's readout", () => {
     expect(s).not.toMatch(/:/);
   });
 
-  it("adds the READER'S clock once the stack's buckets are finer than a day — no zone suffix", () => {
-    // User, 2026-10-07: dates "in the actual locale" rather than UTC (`bucketStamp`).
+  it("adds the READER'S clock, naming its zone, once the stack's buckets are finer than a day", () => {
+    // User, 2026-10-07: a clock time is the reader's own and carries its zone, so a shared
+    // screenshot is never ambiguous (`bucketStamp`).
     const ms = Date.UTC(2026, 8, 18, 13, 45);
     const s = stampInstant(ms, HOUR);
-    expect(s).not.toMatch(/UTC/);
-    const local = new Date(ms).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-    expect(s).toContain(local);
+    const zone = new Intl.DateTimeFormat(undefined, { timeZoneName: "short" }).formatToParts(new Date(ms)).find((p) => p.type === "timeZoneName")!.value;
+    expect(s.endsWith(zone)).toBe(true);
+    expect(s).toContain(new Date(ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }));
   });
 });
 
