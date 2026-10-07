@@ -297,7 +297,19 @@ dossier, country, provider, composition, then the snapshot chain (global snapsho
 snapshot it anchors), then node. `components/railCards.ts` is the manifest and
 `components/railCards.test.ts` pins the order, the availability and every hint.
 
-**History's lane is the network dossier, then the MOMENT** (2026-09-19; named "Instant" until 2026-09-26) — the cursor card, a slot
+**History's lane is the network dossier, the RANGE, then the MOMENT** (the Range since 2026-10-07 —
+user: "range -> moment is also a logical parent - child relation"). The Range card is the brushed
+`trendRange` as a committed subject: a slot with no rung (the Moment's precedent, `selStack`
+place included), titled in the explorer's span words, with ONE lead sentence about the network
+above over the span (`rangePhrase` — a counter's total, a floor when a bucket is unmeasured; a
+gauge's average) and the shared `RecordsDoor`. No per-network list: the left rail's Networks list
+already IS that list over the span. Under a range the Moment's ‹ › steps the range's WHOLE buckets
+(`rangeBuckets` — the charts trim the part-buckets at the edges, so they are no moments), through
+the executor's `trendCursor` action, and the Range's next ghost opens its first moment. The Moment's
+lead is the same sentence shape for one bucket (`momentPhrase`: "DED anchored 7 snapshots in those
+5 minutes" — never a rate, never a rank).
+
+**History's lane was the network dossier, then the MOMENT** (2026-09-19; named "Instant" until 2026-09-26) — the cursor card, a slot
 with NO focus rung, exactly as the two snapshot slots are. Its subject is `trendCursorMs`, which the
 band's timeline writes at most once per BUCKET (`sameBucket`, both gestures since 2026-09-19), so the
 title roll, the edge pulse and the tray highlight fire once per bucket rather than once per

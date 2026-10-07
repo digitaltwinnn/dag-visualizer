@@ -32,6 +32,7 @@ import { useTrayActives } from "@/components/useTrayActives";
 import { countryToggleActions, cohortToggleActions, compositionToggleActions, snapshotClearActions } from "@/src/engine/domain/pickActions";
 import { CountryTitle, CountryAside, CountryCard, ProviderTitle, ProviderCard, ProviderAside, CompositionTitle, CompositionCard, CompositionAside } from "@/components/inspector/cards";
 import MetaSnapPane from "@/components/inspector/MetaSnapPane";
+import TrendRangePane from "@/components/inspector/TrendRangePane";
 import TrendInstantPane from "@/components/inspector/TrendInstantPane";
 import type { TabSignal } from "@/components/RailDock";
 import type { PickDescriptor } from "@/src/data/types";
@@ -290,7 +291,7 @@ function CompositionPane({ sel, onClose, collapsed, onToggle }: { sel: Compositi
 // same single source of truth the dock trays read.
 const GHOST_EYEBROW: Record<string, string> = {
   context: "Metagraph", country: "Country", cohort: "Provider", composition: "Composition", node: "Node", snap: "Global snapshot",
-  metaSnap: "Metagraph snapshot", instant: "Moment",
+  metaSnap: "Metagraph snapshot", range: "Range", instant: "Moment",
 };
 /** An EMPTY RUNG, drawn as a card like every other (user, 2026-10-04 — option A of
  *  `docs/superpowers/design/2026-10-04-ghost-cards`, with "like any other card it can be expanded
@@ -419,9 +420,10 @@ export default function Inspector() {
   const selNodes = useStore((s) => s.selNodes);
   const coarse = usePointerCoarse();
   const trendCursorMs = useStore((s) => s.trendCursorMs);
+  const trendRange = useStore((s) => s.trendRange);
   const tickHasFilter = useTickHasFilter();
   const manifest = detailsCards({
-    mode, filter, tickNet, tickHasFilter, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs,
+    mode, filter, tickNet, tickHasFilter, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs, trendRange,
     selNodesCount: selNodes.length,
     filterLabel: displayNetwork(filter)?.ticker ?? null, // one lookup — catalog + the unlisted pseudo-network
   });
@@ -511,6 +513,8 @@ export default function Inspector() {
     // purpose, unlike the two live-advancing ordinals above — a cursor never advances by itself,
     // and the timeline writes it at most once per bucket.
     trendCursorMs ?? "",
+    // …and the RANGE, the cursor's parent (2026-10-07), for the same reason.
+    trendRange ? `${trendRange.fromMs}-${trendRange.toMs}` : "",
     // While FOLLOWING, the auto-advancing ordinals are NOT a new selection moment — the heartbeat
     // must not drop the user's +/− overrides every ~4s (item 8; advanceSnap already keeps the
     // recency stack still for the same reason). Guards BOTH live-advanced cards: the global
@@ -613,6 +617,11 @@ export default function Inspector() {
     // channel and nothing cascades. It is NOT a selection write (`setTrendCursor` is deliberately
     // outside the pickActions table — see selectionBoundary.test.ts's scope note), so it calls
     // the setter rather than the executor.
+    // History's brushed RANGE (2026-10-07): a card slot with no rung, like the Moment below it;
+    // its × clears the range (a setting's setter, as the timeline's own × does).
+    range: trendRange ? (
+      <TrendRangePane key="range" onClose={() => useStore.getState().setTrendRange(null)} {...cx("range")} />
+    ) : null,
     instant: trendCursorMs != null ? (
       <TrendInstantPane key="instant" onClose={() => useStore.getState().setTrendCursor(null)} {...cx("instant")} />
     ) : null,

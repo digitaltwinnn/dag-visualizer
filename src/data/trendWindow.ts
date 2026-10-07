@@ -153,6 +153,22 @@ export function pickRangeTier(fromMs: number, toMs: number): "5m" | "1h" | "1d" 
   return "1d";
 }
 
+const TIER_STEP_MS = { "5m": 300_000, "1h": 3_600_000, "1d": 86_400_000 } as const;
+
+/** THE MOMENTS A RANGE HOLDS (user, 2026-10-07: "range -> moment is also a logical parent - child
+ *  relation … swipe through the moments within the range"): every WHOLE bucket inside the range,
+ *  at the tier its charts are cut in (`pickRangeTier`), oldest first. A part-bucket at either edge
+ *  is no moment — the charts trim it (`trimCounterEdges`), so stepping onto it only ever said "no
+ *  chart draws this". Bucket starts are epoch-aligned, as the stored tiers' are, so each one is a
+ *  bucket `bucketAt` will find. A whole bucket nothing measured is still a moment — the Moment
+ *  card says so in words when it lands on one. */
+export function rangeBuckets(range: { fromMs: number; toMs: number }): { buckets: number[]; stepMs: number } {
+  const stepMs = TIER_STEP_MS[pickRangeTier(range.fromMs, range.toMs)];
+  const buckets: number[] = [];
+  for (let b = Math.ceil(range.fromMs / stepMs) * stepMs; b + stepMs <= range.toMs; b += stepMs) buckets.push(b);
+  return { buckets, stepMs };
+}
+
 /** The tile units [fromMs, toMs] touches — day units for the 5m tier ("2026-09-08"), month
  *  units for hourly ("2026-08"); the API serves one immutable-cacheable payload per unit
  *  (the map-tile pattern: user ranges are snowflakes, their units are shared). */

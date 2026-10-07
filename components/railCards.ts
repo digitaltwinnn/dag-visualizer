@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { ledgerCardNetwork } from "@/src/engine/domain/tickNet";
 import type { TickNetSel } from "@/src/data/types";
-import { EXPLORE_ICON, INSTANT_ICON, iconForPick } from "@/components/icons";
+import { EXPLORE_ICON, INSTANT_ICON, RANGE_ICON, iconForPick } from "@/components/icons";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import type { Mode } from "@/src/store/store";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
@@ -30,7 +30,7 @@ import { is3D } from "@/src/engine/domain/viewTransition";
 // Hue + active-flag stay with the tray builders (per-rail presentation), not here.
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-export type RailCardKind = "tool" | "context" | "instant" | "metaSnap" | "country" | "cohort" | "composition" | "node" | "snap";
+export type RailCardKind = "tool" | "context" | "range" | "instant" | "metaSnap" | "country" | "cohort" | "composition" | "node" | "snap";
 
 // ── The rail LADDER lane (Inspector's descent spine, variant-A redesign 2026-07-19) ──────────
 // Which facts-rail slot stands for each FOCUS-LADDER rung. The lane's ORDER lives in
@@ -99,7 +99,10 @@ const DISPLAY_LANE: Partial<Record<Mode, readonly string[]>> = {
   // containment claim read coarse→fine: a network is the subject, and the cursor is one moment of
   // it. (A focused PLANE gets no card of its own: a plane IS its network's chart, and the dossier
   // above already stands for the network — which is also why it is no ladder rung.)
-  trend: ["context", "instant"],
+  // The RANGE sits between them (user, 2026-10-07: "range -> moment is also a logical parent -
+  // child relation"): a brushed span of the network, and the cursor one moment inside it. Like
+  // `instant`, a card slot with no rung.
+  trend: ["context", "range", "instant"],
 };
 
 export function ladderSlotIds(mode: Mode): string[] {
@@ -110,7 +113,7 @@ export function ladderSlotIds(mode: Mode): string[] {
  *  inputs (which can't change a slot's presence). */
 export type LadderState = Pick<
   RailManifestState,
-  "mode" | "filter" | "tickNet" | "tickHasFilter" | "inspect" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "trendCursorMs"
+  "mode" | "filter" | "tickNet" | "tickHasFilter" | "inspect" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "trendCursorMs" | "trendRange"
 > & {
   /** The store's selection recency (most-recent-FIRST) — the collapse rule reads it (item 8):
    *  the most recently selected present card is the ACTIVE one; the rest rest collapsed. */
@@ -196,6 +199,9 @@ export interface RailManifestState {
    *  pointer positions inside one bucket name the same reading to every surface, so the tray
    *  highlight and the title roll fire once per bucket rather than once per pointermove. */
   trendCursorMs?: number | null;
+  /** THE BRUSHED RANGE (History, 2026-10-07) — `store.trendRange`, the Moment's parent. Optional
+   *  for the same reason as the cursor: only History produces its card. */
+  trendRange?: { fromMs: number; toMs: number } | null;
   /** The selected metagraph-snapshot TILE — ledger's own card slot (spec 2026-08-04), not a
    *  ladder rung. Optional: the ladder derivation (`LadderState`) and its callers never carry
    *  this field, so `detailsCards` treats an absent key the same as `null`. */
@@ -332,6 +338,10 @@ function compositionHint(s: RailManifestState): string | null {
 function instantHint(s: RailManifestState): string | null {
   return s.mode === "trend" ? `${CLICK(s)} a chart, or the timeline below.` : null;
 }
+// The RANGE's gesture: a drag, on either surface that brushes one.
+function rangeHint(s: RailManifestState): string | null {
+  return s.mode === "trend" ? "Drag across a chart or the timeline." : null;
+}
 function metaSnapHint(s: RailManifestState): string | null {
   return s.mode === "ledger" ? `${CLICK(s)} a tile on a plane above the floor.` : null;
 }
@@ -391,6 +401,15 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     present: s.mode === "trend" && s.trendCursorMs != null,
     hint: instantHint(s),
   };
+  const range: RailCard = {
+    id: "range",
+    kind: "range",
+    icon: RANGE_ICON,
+    subjectKey: s.trendRange ? `${s.trendRange.fromMs}-${s.trendRange.toMs}` : null,
+    // View-scoped like the instant: a span is a reading OF THIS STACK.
+    present: s.mode === "trend" && s.trendRange != null,
+    hint: rangeHint(s),
+  };
   const metaSnap: RailCard = {
     id: "metaSnap",
     kind: "metaSnap",
@@ -443,6 +462,6 @@ export function detailsCards(s: RailManifestState): RailCard[] {
   // desktop lane above: tick → dossier → the tick's own metagraph snapshot → node. History's
   // `instant` sits directly under the dossier, which is exactly where its own lane puts it —
   // every slot between them is unreachable in that view, so the two orders agree.
-  return [snap, context, instant, country, cohort, composition, metaSnap, node];
+  return [snap, context, range, instant, country, cohort, composition, metaSnap, node];
 }
 

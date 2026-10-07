@@ -251,3 +251,19 @@ describe("the motion cause a click stamps", () => {
     expect(useStore.getState().motionCause).toEqual({ kind: "filter", id: "all" });
   });
 });
+
+describe("trendCursor action (a step through the moments of a Range, 2026-10-07)", () => {
+  it("moves the History cursor and nothing else", () => {
+    useStore.getState().setFilter("dor");
+    applyClickActions([{ kind: "trendCursor", ms: 1_726_704_000_000 }]);
+    const st = useStore.getState();
+    expect(st.trendCursorMs).toBe(1_726_704_000_000);
+    expect(st.filter).toBe("dor");
+    expect(st.selStack[0]).toBe("instant");
+  });
+  it("clears on null", () => {
+    applyClickActions([{ kind: "trendCursor", ms: 1 }]);
+    applyClickActions([{ kind: "trendCursor", ms: null }]);
+    expect(useStore.getState().trendCursorMs).toBeNull();
+  });
+});

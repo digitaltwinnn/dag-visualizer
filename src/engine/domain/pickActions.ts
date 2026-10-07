@@ -35,7 +35,10 @@ export type ClickAction =
   | { kind: "metaSnap"; sel: MetaSnapSel | null }
   // Bring a trend plane forward, or release the focused one (null) — a VIEW-LOCAL emphasis, not a
   // selection rung: see `trendPlaneActions`.
-  | { kind: "trendFocus"; id: string | null };
+  | { kind: "trendFocus"; id: string | null }
+  // Move History's time cursor — the Moment card's ‹ › through the moments of a committed Range
+  // (2026-10-07). Like `trendFocus`, a view-local subject, not a ladder rung: no pose, no cascade.
+  | { kind: "trendCursor"; ms: number | null };
 
 // The network a node pick belongs to: its metagraph, or the DAG core for a validator.
 export const pickNetId = (p: PickDescriptor): string | null =>

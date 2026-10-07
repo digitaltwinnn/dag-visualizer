@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { headWord, momentPhrase, spanAverage, spanWord, typeBands,
+import { headWord, momentPhrase, rangePhrase, sumMeasured, spanAverage, spanWord, typeBands,
   GLOBAL_METRIC_ROWS,
   GLOBAL_READING,
   TREND_METRICS,
@@ -668,5 +668,35 @@ describe("momentPhrase — a moment's reading as a sentence about its network (u
     expect(say("kb", DAY, "1.2 MB")).toBe("DED anchored 1.2 MB of data on that day");
     expect(say("nodes", DAY, "12")).toBe("DED ran 12 nodes");
     expect(say("continuity", DAY, "28s")).toBe("DED anchored a snapshot every 28s on that day");
+  });
+});
+
+describe("rangePhrase — a range's reading as a sentence about its network (2026-10-07)", () => {
+  const say = (m: Parameters<typeof rangePhrase>[0], spanMs: number, v: string, partial = false) => {
+    const p = rangePhrase(m, spanMs, partial);
+    return `DED ${p.verb} ${v} ${p.rest}`;
+  };
+  it("a counter is the TOTAL over the span, the span said in words", () => {
+    expect(say("snapshots", 7 * DAY, "52,140")).toBe("DED anchored 52,140 snapshots over those 7 days");
+    expect(say("fees", 36 * 3_600_000, "3.2")).toBe("DED paid 3.2 DAG in fees over those 36 hours");
+    expect(say("kb", 2 * DAY, "40 MB")).toBe("DED anchored 40 MB of data over those 2 days");
+  });
+  it("a total with unmeasured buckets is said as a floor", () => {
+    expect(say("snapshots", 7 * DAY, "52,140", true)).toBe("DED anchored at least 52,140 snapshots over those 7 days");
+  });
+  it("a gauge and the spacing are averages, and say so", () => {
+    expect(say("nodes", 7 * DAY, "12")).toBe("DED ran 12 nodes on average");
+    expect(say("continuity", 7 * DAY, "28s")).toBe("DED anchored a snapshot every 28s on average");
+  });
+});
+
+describe("sumMeasured — a counter's total over a span", () => {
+  it("adds what was measured and says whether any bucket was not", () => {
+    expect(sumMeasured([1, 2, 3])).toEqual({ sum: 6, partial: false });
+    expect(sumMeasured([1, null, 3])).toEqual({ sum: 4, partial: true });
+  });
+  it("nothing measured is no total, never a zero", () => {
+    expect(sumMeasured([null, null])).toBeNull();
+    expect(sumMeasured([])).toBeNull();
   });
 });

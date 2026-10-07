@@ -1,6 +1,5 @@
 "use client";
 
-import { ArrowUpRight, Table2 } from "lucide-react";
 import { INSTANT_ICON } from "@/components/icons";
 
 import CardHead, { RailPane } from "@/components/CardHead";
@@ -8,14 +7,14 @@ import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { Lead, FactGroup, UnitMarks, CUT_ROW, figWidth } from "@/components/inspector/parts";
 import { Separator } from "@/components/ui/separator";
 import { SELECTED_ROW, selectionHue } from "@/components/selection";
-import { openRecords, spanOfWindow } from "@/components/trendDoors";
+import { spanOfWindow } from "@/components/trendDoors";
+import RecordsDoor from "@/components/inspector/RecordsDoor";
 import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { cn } from "@/lib/utils";
 import { metagraphById } from "@/src/data/network";
 import { instantNote, momentPhrase, orderAt, placeInstant, valueAt } from "@/src/data/trendSeries";
-import { ageWords } from "@/src/util/relativeAge";
 import { stampInstant } from "@/src/data/trendTimeline";
 import { bucketAt } from "@/src/data/trendWindow";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
@@ -100,7 +99,7 @@ export default function TrendInstantPane({
 
   // The lead's one reading: the subject network's, else the whole network's — and who it is about.
   const lead = subject ? subjectValue : globalValue;
-  const who = subject ? metagraphById(subject)?.ticker || rows.get(subject)?.name || subject : "The whole network";
+  const who = subject ? metagraphById(subject)?.ticker || rows.get(subject)?.name || subject : "All networks";
   const phrase = momentPhrase(metric, stepMs);
 
   // THE SPAN THIS CARD'S DOOR CARRIES IS THE MOMENT (the search pass, 2026-10-02). It handed the
@@ -155,9 +154,10 @@ export default function TrendInstantPane({
               mean to the metagraph? that's what the section is for, relation to parent"). One
               sentence, the subject doing something in the moment's bucket ("DED anchored 7
               snapshots in those 5 minutes", `momentPhrase`); with no network committed the subject
-              is the whole network. The AGE rides the lead's chip — how long ago the bucket began. */}
+              is every network. No age chip: the title already dates the moment, and beside a chip the
+              sentence had ~22 characters a line and clipped (2026-10-07). */}
           {cursorMs != null && (
-            <Lead aside={`${ageWords(Date.now() - (bucket ?? cursorMs))} ago`}>
+            <Lead>
               {bucket != null && lead != null ? (
                 <>
                   {who} {phrase.verb} <span className="font-medium text-foreground tabular-nums">{format(lead)}</span> {phrase.rest}
@@ -238,44 +238,9 @@ export default function TrendInstantPane({
                 </>
               )}
 
-              {/* ── THE ONE EXIT, as the card's foot control (design 2026-09-26, `moment-door.html`
-                  A). The card marks one instant and its one real door is the anchor log at this
-                  span, through `components/trendDoors.ts` — the shared home the Trends document
-                  calls too, so the records door's four ordered steps are written once. It is a
-                  full-bleed control on the wash ladder every other control wears (user: the bare
-                  text links read as prose). "All charts" went with it: the RAW toggle in the
-                  command bar IS that door. */}
-              <button
-                type="button"
-                disabled={!span}
-                title={
-                  subject && subject !== "dag"
-                    ? "Opens the snapshot log at this moment, for this network."
-                    : "Opens the snapshot log. To jump to this moment, pick a network in the top bar first."
-                }
-                onClick={() => openRecords(subject, span)}
-                className={cn(
-                  "mt-3 flex w-[calc(100%+2*var(--card-pad))] items-center gap-2.5 text-left text-body text-foreground cursor-pointer",
-                  // THE CONTROL ENDS WHERE THE PLANK BEGINS (user, 2026-09-26, two rounds). A boxed
-                  // card under a filter carries the sibling pager's plank at its foot, and the plank
-                  // draws one inset hairline on its top edge; a control bleeding past that line wore
-                  // it as an underline. So the bleed is the card's padding LESS the plank's strip
-                  // (`--foot-mb`, which RailPager sets to 0; the card's padding otherwise), which puts
-                  // the control's bottom edge exactly on the plank's hairline — its bottom border —
-                  // and the corners square there (`--foot-radius`, which RailPager zeroes).
-                  "-mx-[var(--card-pad)] px-[var(--card-pad)] py-2.5",
-                  "mb-[var(--foot-mb,calc(0px-var(--card-pad)))]",
-                  "rounded-b-[var(--foot-radius,calc(var(--radius)-1px))] border-t border-wash-strong [background:light-dark(var(--wash-soft),var(--wash-faint))] hover:[background:light-dark(var(--wash-hover),var(--wash-soft))]", // the Door's own per-ground wash (parts.tsx)
-                  "disabled:opacity-45 disabled:pointer-events-none",
-                  "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-                )}
-              >
-                <Table2 aria-hidden className="size-3.5 flex-none text-primary" />
-                Snapshot records
-                {/* The document's own door glyph (↗), not a chevron: › is the sibling pager's
-                    step on the cards below, and one glyph must not mean two things (user). */}
-                <ArrowUpRight aria-hidden className="ml-auto size-3.5 flex-none text-muted-foreground" />
-              </button>
+              {/* ── THE ONE EXIT: the anchor log at this moment (`RecordsDoor`, shared with the
+                  Range card above). */}
+              <RecordsDoor subject={subject} span={span} what="moment" />
             </>
           )}
         </div>

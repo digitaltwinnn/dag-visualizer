@@ -79,6 +79,9 @@ export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boole
         }
         st.setTrendFocus(a.id);
         break;
+      case "trendCursor":
+        st.setTrendCursor(a.ms);
+        break;
     }
   }
   // THE MOTION CAUSE, stamped ONCE per click (2026-09-26): the hint (`domain/motionHint.ts`) says
@@ -128,6 +131,8 @@ export function motionCauseOf(actions: readonly ClickAction[]): MotionCause | nu
       case "tickNet": return { kind: "filter", id: a.sel?.metaId ?? "all" };
       case "metaSnap": return a.sel ? { kind: "metaSnap", metaId: a.sel.metaId, ordinal: a.sel.ordinal } : { kind: "metaSnap", metaId: null };
       case "trendFocus": return { kind: "focus", id: a.id };
+      // A cursor step moves no scene — the planes' line and the card answer it.
+      case "trendCursor": return null;
     }
   }
   return null;

@@ -77,11 +77,21 @@ describe("one door to the records", () => {
     expect(writers).toEqual(["components/trendDoors.ts"]);
   });
 
-  it("both exits to the records — the Moment card and History's RAW — reach it through that home", () => {
-    for (const path of ["components/topbar/PresentationToggle.tsx", "components/inspector/TrendInstantPane.tsx"]) {
+  it("every exit to the records — the cards' door and History's RAW — reaches it through that home", () => {
+    // The Range and Moment cards share ONE foot control (`RecordsDoor`, 2026-10-07), so the card
+    // side of the door is that file, and both cards must draw it rather than a copy.
+    for (const path of ["components/topbar/PresentationToggle.tsx", "components/inspector/RecordsDoor.tsx"]) {
       const code = stripComments(readFileSync(path, "utf8"));
       expect(code, `${path} must call the shared door`).toMatch(/openRecords\s*\(/);
       expect(code, `${path} must import it from components/trendDoors`).toMatch(/from\s+["']@\/components\/trendDoors["']/);
+    }
+  });
+
+  it("both History cards draw the one RecordsDoor", () => {
+    for (const path of ["components/inspector/TrendInstantPane.tsx", "components/inspector/TrendRangePane.tsx"]) {
+      const code = stripComments(readFileSync(path, "utf8"));
+      expect(code, `${path} must draw RecordsDoor`).toMatch(/<RecordsDoor\b/);
+      expect(code, `${path} must not call the door itself`).not.toMatch(/openRecords\s*\(/);
     }
   });
 

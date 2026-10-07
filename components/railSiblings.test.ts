@@ -10,6 +10,7 @@ import {
   snapshotSelectActions,
 } from "@/src/engine/domain/pickActions";
 import { compositionGroups } from "@/src/data/composition";
+import { rangeBuckets } from "@/src/data/trendWindow";
 import { cohortsLevel, countriesLevel, countryNodes, networksLevel, nodesByCountry, tickNetworksLevel } from "@/src/data/ladderLevels";
 import type { ChannelSnapRow, GlobalSnapshot, MetaInfo, NodeRow, PickDescriptor } from "@/src/data/types";
 
@@ -87,6 +88,8 @@ const base = (over: Partial<SiblingState>): SiblingState => ({
   hyperMeasure: "nodes",
   allNodes: [deA, deB, deC, fiA],
   tickNets: null,
+  trendRange: null,
+  trendCursorMs: null,
   ...over,
 });
 
@@ -682,7 +685,31 @@ describe("one list per level — the rail steps the explorer's own lists", () =>
     // A tripwire: a new CHILD_OF entry must earn a one-list assertion here.
     const pairs = Object.entries(CHILD_OF).flatMap(([mode, m]) => Object.keys(m ?? {}).map((k) => `${mode}:${k}`));
     expect(pairs.sort()).toEqual(
-      ["geo:context", "geo:country", "geo:cohort", "hyper:context", "hyper:composition", "ledger:snap", "ledger:context", "ledger:metaSnap"].sort(),
+      ["geo:context", "geo:country", "geo:cohort", "hyper:context", "hyper:composition", "ledger:snap", "ledger:context", "ledger:metaSnap", "trend:range"].sort(),
     );
+  });
+});
+
+// THE MOMENTS OF A RANGE (user, 2026-10-07: "range -> moment is also a logical parent - child
+// relation … swipe through the moments within the range"). The Moment card's ‹ › steps the range's
+// buckets, oldest → newest, at the tier the range's charts are cut in (`rangeBuckets`), and the
+// Range card's next ghost opens the first of them.
+describe("siblingSet — instant (a moment inside the committed range)", () => {
+  const H = 3_600_000;
+  const R = { fromMs: Date.UTC(2026, 8, 10), toMs: Date.UTC(2026, 8, 13) }; // 3 days: the hourly tier
+  const trend = (over: Partial<SiblingState>) => base({ mode: "trend", trendRange: R, ...over });
+
+  it("steps every bucket of the range, with the cursor's bucket at index", () => {
+    const set = siblingSet("instant", trend({ trendCursorMs: R.fromMs + 2 * H + 1_000 }))!;
+    expect(set.items.map((i) => Number(i.key))).toEqual(rangeBuckets(R).buckets);
+    expect(set.index).toBe(2);
+    expect(set.items[4]!.actions).toEqual([{ kind: "trendCursor", ms: R.fromMs + 4 * H }]);
+  });
+  it("has no pager without a range, or for a cursor outside it", () => {
+    expect(siblingSet("instant", trend({ trendRange: null, trendCursorMs: R.fromMs }))).toBeNull();
+    expect(siblingSet("instant", trend({ trendCursorMs: R.toMs + H }))).toBeNull();
+  });
+  it("the range's next ghost opens its first moment", () => {
+    expect(childStep("range", trend({}))!.actions).toEqual([{ kind: "trendCursor", ms: R.fromMs }]);
   });
 });

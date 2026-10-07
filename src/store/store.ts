@@ -50,7 +50,7 @@ export type MotionCause =
 export type TrendMetric = "snapshots" | "blocks" | "fees" | "kb" | "nodes" | "continuity";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
-export type SelSlot = "network" | "node" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "instant";
+export type SelSlot = "network" | "node" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "range" | "instant";
 
 // Move `slot` to the FRONT of the recency stack when it becomes active, or drop it when cleared.
 //
@@ -795,8 +795,13 @@ export const useStore = create<AppState>((set) => ({
   setTrendScale: (scale) => set({ trendScale: scale }),
   // A window and a range are the SAME statement about what is on screen, so picking one retires
   // the other (the document's zoom pills do exactly this).
-  setTrendWindow: (trendWindow) => set({ trendWindow, trendRange: null, motionCause: { kind: "window", id: trendWindow } }),
-  setTrendRange: (trendRange) => set({ trendRange, motionCause: { kind: "range", span: trendRange } }),
+  // The RANGE is History's other committed subject (2026-10-07 — the Range card, the Moment's
+  // parent), so it takes a place in the recency stack exactly as the cursor does; a window pick
+  // retires the range and so drops it.
+  setTrendWindow: (trendWindow) =>
+    set((s) => ({ trendWindow, trendRange: null, selStack: bumpStack(s.selStack, "range", false), motionCause: { kind: "window", id: trendWindow } })),
+  setTrendRange: (trendRange) =>
+    set((s) => ({ trendRange, selStack: bumpStack(s.selStack, "range", trendRange != null), motionCause: { kind: "range", span: trendRange } })),
   // Stored BY REFERENCE — the array the publisher hands in is the one the Engine compares with
   // `!==`. No copy, no sort, no normalising: any of those would mint a fresh reference per call
   // and turn a no-op publish into a retarget (see the channel note on `trendIds`).

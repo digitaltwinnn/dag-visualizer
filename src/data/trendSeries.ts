@@ -1,5 +1,6 @@
 import { bucketAt } from "@/src/data/trendWindow";
 import { roleKeyLabel } from "@/src/data/composition";
+import { ageWords } from "@/src/util/relativeAge";
 import type { TrendMetric } from "@/src/store/store";
 
 // THE PER-NETWORK SERIES MATHS — one home (2026-09-18, the 3D trends view). What a per-network
@@ -491,6 +492,33 @@ export function momentPhrase(metric: TrendMetric, stepMs: number): { verb: strin
     case "nodes": return { verb: "ran", rest: "nodes" };
     case "continuity": return { verb: "anchored a snapshot every", rest: inBucket };
   }
+}
+
+/** A RANGE'S READING AS A SENTENCE ABOUT ITS NETWORK (2026-10-07 — the Range card, the Moment's
+ *  parent; `momentPhrase`'s sibling). A counter is the TOTAL over the span ("DED anchored 52,140
+ *  snapshots over those 7 days") — what a reader asks of a range — and a total that skipped an
+ *  unmeasured bucket is a floor and says so ("at least", rule 10). A gauge and the spacing have no
+ *  total, so they are the span's average and say that instead. */
+export function rangePhrase(metric: TrendMetric, spanMs: number, partial: boolean): { verb: string; rest: string } {
+  const over = `over those ${ageWords(spanMs)}`;
+  const floor = partial ? " at least" : "";
+  switch (metric) {
+    case "snapshots": return { verb: `anchored${floor}`, rest: `snapshots ${over}` };
+    case "blocks": return { verb: `produced${floor}`, rest: `blocks ${over}` };
+    case "fees": return { verb: `paid${floor}`, rest: `DAG in fees ${over}` };
+    case "kb": return { verb: `anchored${floor}`, rest: `of data ${over}` };
+    case "nodes": return { verb: "ran", rest: "nodes on average" };
+    case "continuity": return { verb: "anchored a snapshot every", rest: "on average" };
+  }
+}
+
+/** A counter's total over a span: the measured buckets added, and whether any was not measured
+ *  (the total is then a floor). Nothing measured at all is no total — null, never a zero. */
+export function sumMeasured(points: readonly (number | null)[]): { sum: number; partial: boolean } | null {
+  let sum = 0;
+  let measured = 0;
+  for (const p of points) if (p != null) { sum += p; measured++; }
+  return measured === 0 ? null : { sum, partial: measured < points.length };
 }
 
 /** What a History card says it is showing: the measure's name with its unit, in one phrase.

@@ -51,6 +51,8 @@ import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { snapshotSignerRows } from "@/src/data/network";
 import { UNLISTED_ID } from "@/src/data/unlisted";
 import type { RailCardKind } from "@/components/railCards";
+import { rangeBuckets } from "@/src/data/trendWindow";
+import { stampInstant } from "@/src/data/trendTimeline";
 import { cohortsLevel, countriesLevel, countryNodes, machinesOf, networksLevel, nodeOrder, nodesByCountry, type Cohort, type TickNetwork, type TickSnap } from "@/src/data/ladderLevels";
 import type { GeoMeasure } from "@/src/data/geoMeasure";
 import type { HyperMeasure } from "@/src/data/hyperMeasure";
@@ -95,6 +97,9 @@ export interface SiblingState {
   /** The shown global snapshot's networks (`tickNetworksLevel`), filled by the caller because the
    *  polled half lives in the network singleton. Null outside the ledger or with no tick shown. */
   tickNets: TickNetwork[] | null;
+  /** History's brushed range and time cursor — the Range card and the Moment under it. */
+  trendRange: { fromMs: number; toMs: number } | null;
+  trendCursorMs: number | null;
 }
 
 export interface SiblingStep {
@@ -402,6 +407,16 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       return finish(slot, items, s.ticks.findIndex((t) => t.data.ordinal === cur.data.ordinal), "Snapshot stream", true);
     }
 
+    // THE MOMENTS OF THE RANGE (user, 2026-10-07): under a brushed range the Moment card steps its
+    // buckets, oldest → newest. No range, or a cursor outside it, is no set — the Moment then has
+    // no committed parent to step within.
+    case "instant": {
+      if (!s.trendRange || s.trendCursorMs == null) return null;
+      const { buckets, stepMs } = rangeBuckets(s.trendRange);
+      const cur = s.trendCursorMs;
+      return finish(slot, momentItems(buckets, stepMs), buckets.findIndex((b) => cur >= b && cur < b + stepMs), "Range");
+    }
+
     // About and the tool card never focus, so they never page.
     default:
       return null;
@@ -435,6 +450,19 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
  *  first, and so does the NEXT GHOST card that replaced it (user, 2026-10-07 — a click on it opens
  *  the first child, as ∨ did; the 2026-10-04 quick-pick list is retired). */
 interface ChildEntry { to: RailCardKind; steps: (s: SiblingState, n: number) => SiblingStep[] }
+
+/** The moments of a range as steps: each one moves the cursor into that bucket (one builder for
+ *  the Moment's pager and the Range's next ghost). */
+function momentItems(buckets: readonly number[], stepMs: number): SiblingStep[] {
+  return buckets.map((b) => ({ key: String(b), label: stampInstant(b, stepMs), actions: [{ kind: "trendCursor", ms: b }] }));
+}
+
+/** trend: the range's first moment. */
+const momentOfRangeChildren = (s: SiblingState, n: number): SiblingStep[] => {
+  if (!s.trendRange) return [];
+  const { buckets, stepMs } = rangeBuckets(s.trendRange);
+  return momentItems(buckets.slice(0, n), stepMs);
+};
 
 // geo: the explorer's own first rows, in the picked figure's order. Like every child-of-the-dossier step
 // it states its own precondition — the dossier only exists under a committed network, so at "all"
@@ -529,6 +557,9 @@ export const CHILD_OF: Partial<Record<Mode, Partial<Record<RailCardKind, ChildEn
     snap: { to: "context", steps: anchoringNetworkChildren },
     context: { to: "metaSnap", steps: metaSnapOfTickChildren },
     metaSnap: { to: "node", steps: signerOfMetaSnapChildren },
+  },
+  trend: {
+    range: { to: "instant", steps: momentOfRangeChildren },
   },
 };
 

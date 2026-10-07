@@ -4,7 +4,7 @@
 // as "no leading gap"; the client clock judging a CDN-cached payload's newest bucket; the
 // leading partial month drawn whole while the trailing one was trimmed).
 import { describe, expect, it } from "vitest";
-import { assembleTrendSlice, bucketAt, heldZoom, spanPhrase, cursorFraction, cutRange, leadingTrim, monthlySum, pickRangeTier, planTrendFetch, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, windowSpan, ZOOMS, type TrendsWindowData } from "./trendWindow";
+import { assembleTrendSlice, bucketAt, heldZoom, spanPhrase, cursorFraction, cutRange, leadingTrim, monthlySum, pickRangeTier, planTrendFetch, rangeBuckets, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, windowSpan, ZOOMS, type TrendsWindowData } from "./trendWindow";
 
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
@@ -486,5 +486,29 @@ describe("windowSpan — the span the History view has on screen", () => {
   });
   it("ALL has no span to hand over — the log opens on its newest page", () => {
     expect(windowSpan("all", null, now)).toBeNull();
+  });
+});
+
+describe("rangeBuckets — the moments a range holds (the Moment card's pager under a Range, 2026-10-07)", () => {
+  const D = 86_400_000;
+  const H = 3_600_000;
+  it("lists the WHOLE buckets inside the range, at the tier its charts are cut in", () => {
+    // A brush starting mid-hour: the part-hour at either edge is no moment (the charts trim it).
+    const from = Date.UTC(2026, 8, 10, 6, 30);
+    const r = rangeBuckets({ fromMs: from, toMs: from + 3 * D });
+    expect(r.stepMs).toBe(H);
+    expect(r.buckets[0]).toBe(Date.UTC(2026, 8, 10, 7));
+    expect(r.buckets.at(-1)).toBe(Date.UTC(2026, 8, 13, 5));
+    expect(r.buckets.length).toBe(71);
+  });
+  it("a range on bucket boundaries keeps every bucket", () => {
+    const from = Date.UTC(2026, 8, 10);
+    expect(rangeBuckets({ fromMs: from, toMs: from + 3 * D }).buckets.length).toBe(72);
+  });
+  it("a long range steps in days, aligned to UTC midnight", () => {
+    const r = rangeBuckets({ fromMs: Date.UTC(2026, 0, 1, 12), toMs: Date.UTC(2026, 5, 1) });
+    expect(r.stepMs).toBe(D);
+    expect(r.buckets[0]).toBe(Date.UTC(2026, 0, 2));
+    expect(r.buckets.every((b) => b % D === 0)).toBe(true);
   });
 });
