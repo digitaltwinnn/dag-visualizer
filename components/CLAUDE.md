@@ -517,12 +517,19 @@ box unique) — it is the tier's own `boxed` condition, and `railTierBoundary.te
 can't drift. Keying it to the FOCUS rung was the same mistake `data-tier` fixed above, and it also shut
 out the two snapshot slots, which ride the lane with no focus rung at all.
 
+**ONE LIST PER LEVEL** (user, 2026-10-07 — `docs/superpowers/specs/2026-10-07-one-list-per-level-design.md`):
+a level's subjects and order are defined once, in `src/data/ladderLevels.ts`, and the explorer,
+the next ghost and the pager all read it — including the figure picked in the explorer's heading.
+Two projections are declared where they are applied, never re-sorted: time levels step oldest →
+newest in the pager (› = forward), and the node pager steps nodes, not layer rows (`machinesOf`).
+`railSiblings.test.ts`' one-list block pins it; a new `CHILD_OF` entry trips it until it is covered.
+
 **The ladder pair is RETIRED; the plank is ONE AXIS** (user, 2026-10-04: "do we still need it
 actually? … now the ghost is clickable"). `∧ ∨` (2026-09-11) re-boxed the coarser/finer committed
 card — both one click away on the cards themselves — and, with nothing finer committed, ∨ committed
 the rung's FIRST child. That one unique job moved into the **NEXT GHOST**: the ghost directly below
-the deepest committed rung IS the step — a click commits that rung's first child in the explorer's
-own order (`childStep` in railSiblings.ts, read through the pager's own state builder
+the deepest committed rung IS the step — a click commits that rung's first child — the first row of
+the explorer's own list for that level (`src/data/ladderLevels.ts`, read by `childStep` through
 `useSiblingState`) through the one executor, and the ghost becomes the real card (user, 2026-10-07;
 the three quick picks it opened to on 2026-10-04 are retired). A metagraph snapshot's next ghost
 opens its first validator (`snapshotSignerRows`, the explorer's signer order). Only a ghost with no
