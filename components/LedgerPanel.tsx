@@ -545,11 +545,24 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           hue: leafHue,
           figure: snapMeasure(snapPick, r),
           on,
-          rung: "metaSnap",
+          // The committed row DRILLS rather than re-boxing: since the path mirrors the box
+          // (ledgerPath.ts), this row is on screen exactly while its card is the box, so the
+          // re-box would be a no-op and the deselect would undo what the reader is looking at.
+          rung: on && signers.length > 0 ? undefined : "metaSnap",
           title: isUnlisted
             ? `Unlisted channel ${r.metaId} · anchored into global ${tick.ordinal.toLocaleString()}${signers.length ? ` · signed by ${signers.length} ${SIGNER_GROUPS.proof.who}` : ""}`
             : `${leafName} snapshot ${r.ordinal.toLocaleString()} · anchored into global ${tick.ordinal.toLocaleString()}${signers.length ? ` · signed by ${signers.length} ${SIGNER_GROUPS.proof.who}` : ""}`,
           onClick: () => {
+            // THE COMMITTED ROW OPENS ITS SIGNERS (user, 2026-10-07 — "clicking the metagraph
+            // snapshot does not expand to the node row anymore"): the path stands here while the
+            // snapshot's card is the box, so a click on its washed row is the step down, not a
+            // deselect — the card's × is the release. A live row still converts to a pin, the
+            // click-scoped decode rule.
+            if (on && signers.length > 0) {
+              if (following) applyClickActions(metaSnapSelectActions(sel, globalPick, { metaSnap, following, inspect: useStore.getState().inspect }));
+              setPath((p) => ({ ...p, snap: key }));
+              return;
+            }
             applyClickActions(metaSnapSelectActions(sel, globalPick, { metaSnap, following, inspect: useStore.getState().inspect }));
             // The AFFORDANCE FOLLOWS THE DATA: no exact read for this tick means no signers are
             // knowable, so the row commits and stays — a level onto nothing would claim a fact

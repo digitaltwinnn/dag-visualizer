@@ -213,7 +213,8 @@ decisions inside them are design, not detail:
   it at the network's snapshots in the tick, that row washed; the Node card one level deeper, at
   the signers, the node's row washed. Live, the heartbeat is followed only while one of those two
   is the box, and the path steps back to the tick list when the box leaves them
-  (`src/data/ledgerPath.ts`). The LIVE/PINNED
+  (`src/data/ledgerPath.ts`). So the committed snapshot's washed row DRILLS into its signers
+  rather than deselecting — the card's × is its release. The LIVE/PINNED
   control rides the CARD HEAD's eyebrow row with the shown snapshot's ticking age (2026-09-28 —
   it rode the heading row as the level's setting, design decision 15, until then), and the pager
   states the TIME the rows span ("last 11 min") rather than "52 recent". Each level shows
