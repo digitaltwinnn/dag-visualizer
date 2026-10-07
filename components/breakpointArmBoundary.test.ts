@@ -71,7 +71,12 @@ describe("responsive tier arms name the boundary itself", () => {
     const foot = readFileSync(join("components", "SiteFooter.tsx"), "utf8");
     expect(foot).toContain("max-[700px]:bottom-[var(--phone-dock-h)]");
     expect(foot).toContain("max-[700px]:h-[var(--footer-phone-h)]");
+    // The raw pane no longer clears the row: on a phone the footer STANDS DOWN while RAW is open
+    // (user, 2026-10-07 — the raw phone pass), and the pane runs to the safe area. The pair is
+    // pinned the other way round now: the row hides under RAW, and the pane does not reserve it.
+    expect(foot).toContain('raw && "max-[700px]:hidden"');
     const shell = readFileSync(join("components", "SectionShell.tsx"), "utf8");
-    expect(shell).toContain("var(--footer-phone-h,22px)");
+    expect(shell).toContain("max-[700px]:bottom-[calc(env(safe-area-inset-bottom,0px)+6px)]");
+    expect(shell).not.toContain("--footer-phone-h");
   });
 });
