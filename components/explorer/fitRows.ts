@@ -31,3 +31,11 @@ export function pageKeepingRow(page: number, oldSize: number, newSize: number): 
 export function pageHolding(index: number, pageSize: number): number | null {
   return index < 0 ? null : Math.floor(index / pageSize) + 1;
 }
+
+/** The page after a page-SIZE change: the one holding the PINNED row when there is one (`pinned` ≥ 0),
+ *  else the one holding the row that was first on screen. The fit re-measures while a card's height
+ *  eases (seen 14 → 27 → 30 → 14 on the way back to the tick list), and first-row-keeping alone
+ *  walks a pinned row off the page in that sequence (2026-10-07). */
+export function pageOnResize(page: number, oldSize: number, newSize: number, pinned: number): number {
+  return pageHolding(pinned, newSize) ?? pageKeepingRow(page, oldSize, newSize);
+}

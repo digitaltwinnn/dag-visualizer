@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CLOSED_PATH, pathViewChanged, syncLedgerPath, type LedgerPath, type LedgerPathView } from "./ledgerPath";
 
-const view = (p: Partial<LedgerPathView> = {}): LedgerPathView => ({ metaSnap: null, snapOrd: null, following: false, ...p });
+const view = (p: Partial<LedgerPathView> = {}): LedgerPathView => ({ metaSnap: null, snapOrd: null, following: false, tickNet: null, ...p });
 const ms = (ordinal: number, globalOrdinal: number) => ({ metaId: "dor", ordinal, globalOrdinal, netKey: "dor" });
 const open: LedgerPath = { tick: 100, net: "dor", snap: "dor|5", selfResume: false };
 const signersOf = (ordinal: number, tick: number): LedgerPath => ({ tick, net: "dor", snap: `dor|${ordinal}`, selfResume: false });
@@ -22,6 +22,14 @@ describe("syncLedgerPath — the path follows the selection", () => {
   });
   it("a snapshot of another tick than the shown one is not followed", () => {
     expect(syncLedgerPath(CLOSED_PATH, view(), view({ metaSnap: ms(7, 90), snapOrd: 101 }))).toEqual({ ...CLOSED_PATH, tick: 101 });
+  });
+  it("a network selected inside a pinned tick opens that network's snapshots there", () => {
+    // The Metagraph ghost under a global snapshot, or the Metagraph card's ‹ ›, selects a network
+    // INSIDE the tick (store.tickNet); the explorer follows it one level down.
+    const next = syncLedgerPath({ ...CLOSED_PATH, tick: 100 }, view({ snapOrd: 100 }), view({ snapOrd: 100, tickNet: "dor" }));
+    expect(next).toEqual({ tick: 100, net: "dor", snap: null, selfResume: false });
+    // …and a step to another network moves it.
+    expect(syncLedgerPath(next, view({ snapOrd: 100, tickNet: "dor" }), view({ snapOrd: 100, tickNet: "ded" }))).toEqual({ tick: 100, net: "ded", snap: null, selfResume: false });
   });
   it("a deselect leaves the reader where they are", () => {
     expect(syncLedgerPath(open, view({ metaSnap: ms(5, 100), snapOrd: 100 }), view({ snapOrd: 100 }))).toBe(open);
@@ -51,5 +59,6 @@ describe("pathViewChanged", () => {
     expect(pathViewChanged(view(), view({ snapOrd: 1 }))).toBe(true);
     expect(pathViewChanged(view(), view({ following: true }))).toBe(true);
     expect(pathViewChanged(view(), view({ metaSnap: ms(1, 2) }))).toBe(true);
+    expect(pathViewChanged(view(), view({ tickNet: "dor" }))).toBe(true);
   });
 });

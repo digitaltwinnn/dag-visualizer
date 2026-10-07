@@ -29,6 +29,8 @@ export interface LedgerPathView {
   /** The committed tick's ordinal. */
   snapOrd: number | null;
   following: boolean;
+  /** The network committed INSIDE the shown tick (`store.tickNet`), by network key — or null. */
+  tickNet: string | null;
 }
 
 const metaSnapKey = (m: LedgerPathView["metaSnap"]) => (m ? `${m.globalOrdinal}|${m.metaId}|${m.ordinal}` : null);
@@ -38,7 +40,8 @@ export function pathViewChanged(a: LedgerPathView, b: LedgerPathView): boolean {
   return (
     metaSnapKey(a.metaSnap) !== metaSnapKey(b.metaSnap) ||
     a.snapOrd !== b.snapOrd ||
-    a.following !== b.following
+    a.following !== b.following ||
+    a.tickNet !== b.tickNet
   );
 }
 
@@ -52,7 +55,8 @@ export function pathViewChanged(a: LedgerPathView, b: LedgerPathView): boolean {
  *    scene's front row moves only when that network anchors a new one, so the path moves with it
  *    (the 2026-10-04 "too jumpy" ruling is the scene's front-row rule, not the explorer's).
  * 2. **A pinned global snapshot opens that tick** — wherever the pin came from (a tile, a bar, the
- *    rail's ‹ ›, the raw log).
+ *    rail's ‹ ›, the raw log) — and **a network selected inside it opens that network's snapshots
+ *    there** (the Metagraph ghost under a global snapshot, the Metagraph card's ‹ ›).
  * 3. **Live with no snapshot of a network selected — the unfiltered stream — the heartbeat leaves
  *    the path alone**: the tick list IS the stream there, and opening the newest tick every ~28s
  *    would throw it away. Resuming live closes the path, unless the resume is this explorer's own
@@ -70,9 +74,14 @@ export function syncLedgerPath(path: LedgerPath, prev: LedgerPathView, next: Led
     return path;
   }
   const ord = next.snapOrd;
+  if (ord == null) return path;
+  const net = next.tickNet;
+  if (net != null && (net !== prev.tickNet || ord !== prev.snapOrd || prev.following)) {
+    return path.tick === ord && path.net === net && path.snap == null ? path : { tick: ord, net, snap: null, selfResume: path.selfResume };
+  }
   // On a new pin — a different tick, OR the same tick going from followed to pinned (pinning the
   // live tip changes no ordinal; review, 2026-10-04).
-  if (ord != null && (ord !== prev.snapOrd || prev.following) && path.tick !== ord) {
+  if ((ord !== prev.snapOrd || prev.following) && path.tick !== ord) {
     return { ...CLOSED_PATH, tick: ord, selfResume: path.selfResume };
   }
   return path;

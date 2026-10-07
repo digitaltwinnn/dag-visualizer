@@ -6,7 +6,7 @@ import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 import Explorer, { type ExplorerLevelSpec, type ExplorerRowSpec } from "@/components/explorer/Explorer";
 import { NODE_GLYPH_W, nodeRowSpec, unknownNodeRowSpec } from "@/components/explorer/nodeRow";
 import TablePager from "@/components/datasection/TablePager";
-import { pageHolding, pageKeepingRow } from "@/components/explorer/fitRows";
+import { pageHolding, pageOnResize } from "@/components/explorer/fitRows";
 import useFitRows from "@/components/explorer/useFitRows";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { IdentityDot } from "@/components/inspector/parts";
@@ -209,13 +209,17 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // 2026-09-28). Desktop and tablet fill their host.
   const pageSize = useFitRows("ledger-view", bp !== "phone", openTick == null, bp === "phone" ? TICK_PAGE_PHONE : TICK_PAGE);
   const lastSize = useRef(pageSize);
+  // The pinned tick's row, read by the resize below without re-running it on every feed tick.
+  const pinnedRow = useRef(-1);
+  pinnedRow.current = pinnedOrd != null ? orderedSnaps.findIndex((d) => d.ordinal === pinnedOrd) : -1;
   useEffect(() => {
     if (lastSize.current === pageSize) return;
     // Read the OLD size before overwriting it: an updater runs lazily when another update is
     // pending on this fiber (the feed re-renders it often), and by then the ref would say new.
     const prev = lastSize.current;
     lastSize.current = pageSize;
-    setTickPage((p) => pageKeepingRow(p, prev, pageSize));
+    // The pinned row stays on screen through a resize — the fit re-measures while the card eases.
+    setTickPage((p) => pageOnResize(p, prev, pageSize, pinnedRow.current));
   }, [pageSize]);
   const pages = Math.max(1, Math.ceil(orderedSnaps.length / pageSize));
   const page = Math.min(tickPage, pages);
@@ -238,6 +242,9 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
       : null,
     snapOrd: activeSnapOrd,
     following,
+    // The network committed INSIDE the shown tick, by network key (an unlisted address is the
+    // unlisted set) — only when it belongs to this tick.
+    tickNet: tickNet && tickNet.globalOrdinal === activeSnapOrd ? (LISTED_IDS.has(tickNet.metaId) ? tickNet.metaId : UNLISTED_ID) : null,
   };
   const [seenView, setSeenView] = useState(pathView);
   if (pathViewChanged(seenView, pathView)) {
