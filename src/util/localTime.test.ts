@@ -1,9 +1,12 @@
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
-import { bucketStamp, recordStamp, localDayKey } from "./localTime";
+import { bucketStamp, recordStamp, utcDayKey, utcStamp } from "./localTime";
 
-// DATES IN THE READER'S OWN CLOCK (user, 2026-10-07: "Instead of saying UTC, can we show all the
-// dates in the actual locale? It will save some space here + more user friendly"). Pinned in a
-// zone far from UTC, so a formatter that still reads UTC fails here.
+// ONE RULE FOR EVERY DATE THE APP WRITES (user, 2026-10-07 — "so any figure shown with days will be
+// UTC right? … if a user shares a screenshot it should be the same for other users. If we show a
+// local date and/or time also use that label"):
+//  - a DAY-ONLY label is a UTC day — identical for every reader, so it needs no label;
+//  - a CLOCK TIME is the reader's own, in their locale, and names its zone.
+// Pinned in a zone far from UTC, so a formatter reading the wrong clock fails here.
 const prevTz = process.env.TZ;
 beforeAll(() => { process.env.TZ = "America/New_York"; });
 afterAll(() => { process.env.TZ = prevTz; });
@@ -12,16 +15,16 @@ const H = 3_600_000;
 const D = 86_400_000;
 
 describe("bucketStamp — a bucket at the precision its cadence earns", () => {
-  it("a sub-day bucket is the reader's local date and clock, with no zone suffix", () => {
+  it("a sub-day bucket is the reader's local date and clock, and names its zone", () => {
     const s = bucketStamp(Date.UTC(2026, 8, 22, 15), H); // 11:00 in New York
-    expect(s).not.toMatch(/UTC/);
     expect(s).toMatch(/Sep 22/);
     expect(s).toMatch(/11:00/);
+    expect(s).toMatch(/EDT/);
   });
-  it("a daily bucket is its own UTC day, never the evening before it in a western zone", () => {
+  it("a daily bucket is its own UTC day, the same for every reader, with no zone", () => {
     const s = bucketStamp(Date.UTC(2026, 8, 22), D);
     expect(s).toMatch(/Sep 22/);
-    expect(s).not.toMatch(/UTC|:/);
+    expect(s).not.toMatch(/UTC|EDT|GMT|:/);
   });
   it("the year rides only where asked", () => {
     expect(bucketStamp(Date.UTC(2026, 8, 22), D, { year: true })).toMatch(/2026/);
@@ -29,18 +32,24 @@ describe("bucketStamp — a bucket at the precision its cadence earns", () => {
   });
 });
 
-describe("recordStamp — one sealed record, to the second, in local time", () => {
-  it("dates and clocks the record locally, seconds included, no zone suffix", () => {
+describe("recordStamp — one sealed record, to the second, in local time with its zone", () => {
+  it("dates and clocks the record locally, seconds and zone included", () => {
     const s = recordStamp(Date.UTC(2026, 8, 14, 14, 34, 42));
-    expect(s).not.toMatch(/UTC/);
     expect(s).toMatch(/Sep 14, 2026/);
     expect(s).toMatch(/10:34:42/);
+    expect(s).toMatch(/EDT/);
   });
 });
 
-describe("localDayKey — the reader's calendar day of an instant, as YYYY-MM-DD", () => {
-  it("is the LOCAL day: 02:00 UTC is still the previous evening in New York", () => {
-    expect(localDayKey(Date.UTC(2026, 8, 22, 2))).toBe("2026-09-21");
-    expect(localDayKey(Date.UTC(2026, 8, 22, 15))).toBe("2026-09-22");
+describe("utcDayKey — the UTC day of an instant, as the date fields hold it", () => {
+  it("is the UTC day, whatever the reader's zone", () => {
+    expect(utcDayKey(Date.UTC(2026, 8, 22, 2))).toBe("2026-09-22");
+    expect(utcDayKey(Date.UTC(2026, 8, 21, 23, 59))).toBe("2026-09-21");
+  });
+});
+
+describe("utcStamp — the record's time in UTC, for the hover (cross-checking an explorer)", () => {
+  it("states the UTC date and clock to the second, and says it is UTC", () => {
+    expect(utcStamp(Date.UTC(2026, 9, 7, 17, 19, 4))).toBe("2026-10-07 17:19:04 UTC");
   });
 });

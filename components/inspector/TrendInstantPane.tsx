@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { metagraphById } from "@/src/data/network";
 import { instantNote, momentPhrase, orderAt, placeInstant, valueAt } from "@/src/data/trendSeries";
 import { stampInstant } from "@/src/data/trendTimeline";
-import { bucketAt } from "@/src/data/trendWindow";
+import { bucketAt, spanPhrase } from "@/src/data/trendWindow";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
@@ -107,7 +107,12 @@ export default function TrendInstantPane({
   // about a span. But this card states ONE instant, and its door landed the reader a month away
   // from it (the 30-day window's first day). The bucket the cursor sits in is the span here; the
   // window is only the fallback for a cursor with no bucket.
-  const span = bucket != null ? { fromMs: bucket, toMs: bucket + stepMs } : (range ?? spanOfWindow(buckets, stepMs));
+  // …and it carries the card's own words for that span, which the log's chip repeats (2026-10-07).
+  const windowSpanOnScreen = range ?? spanOfWindow(buckets, stepMs);
+  const span =
+    bucket != null
+      ? { fromMs: bucket, toMs: bucket + stepMs, label: stampInstant(bucket, stepMs) }
+      : windowSpanOnScreen && { ...windowSpanOnScreen, label: spanPhrase(windowId, range) };
 
   // THE UNMOUNT BACKSTOP (convention 9's other half): a row that leaves the roster under a
   // stationary pointer — a filter commit, a re-rank that drops it — never fires its own leave, and

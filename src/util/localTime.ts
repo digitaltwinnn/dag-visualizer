@@ -1,39 +1,44 @@
-// DATES IN THE READER'S OWN CLOCK — the one home for how the app writes a point in time (user,
-// 2026-10-07: "Instead of saying UTC, can we show all the dates in the actual locale? It will save
-// some space here + more user friendly"). Every stamp is in the reader's locale format (their
-// date order, their 12- or 24-hour clock) and their timezone, with no zone suffix.
+// HOW THE APP WRITES A DATE — one home, one rule (user, 2026-10-07: "Instead of saying UTC, can we
+// show all the dates in the actual locale?", then "any figure shown with days will be UTC right? …
+// if a user shares a screenshot it should be the same for other users. If we show a local date
+// and/or time also use that label"):
 //
-// ⚠️ ONE EXCEPTION, AND IT IS NOT A UTC LABEL: a DAILY bucket is a UTC day (the store cuts days at
-// UTC midnight), so its date is read in UTC — in a western zone the local reading of that midnight
-// is the evening BEFORE, and the chart's "Sep 22" bar would be labelled Sep 21. A date with no
-// clock names a day, and the day is the bucket's own.
+//  - A DAY-ONLY label is a UTC DAY. The store cuts days at UTC midnight, and a UTC day reads the
+//    same for every reader, so a shared screenshot says one thing and the label needs no zone.
+//  - A CLOCK TIME is the reader's own — their locale's date order and 12/24-hour clock, their zone —
+//    and NAMES that zone ("2:00 PM GMT+2"), so a screenshot of it is never ambiguous either.
+//  - UTC itself stays one hover away on a record (`utcStamp`), for matching an explorer.
 
 const DAY_MS = 86_400_000;
 
-/** A bucket at the precision its cadence earns: a daily bucket's own day; a finer one's local date
- *  and clock. `year` adds the year (the overview spans years, and "Sep 18" names five of them). */
+/** A bucket at the precision its cadence earns: a daily bucket's UTC day; a finer one's local date
+ *  and clock with its zone. `year` adds the year (the overview spans years). */
 export function bucketStamp(ms: number, stepMs: number, opts: { year?: boolean } = {}): string {
   const year = opts.year ? ("numeric" as const) : undefined;
   if (stepMs >= DAY_MS) {
     return new Date(ms).toLocaleDateString(undefined, { year, month: "short", day: "numeric", timeZone: "UTC" });
   }
-  return new Date(ms).toLocaleString(undefined, { year, month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  return new Date(ms).toLocaleString(undefined, { year, month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", timeZoneName: "short" });
 }
 
 /** One sealed record, to the SECOND (the raw layer's rung: a batching network seals dozens inside
- *  one minute, so a minute-rounded stamp would print the same value for different rows). */
+ *  one minute), in local time with its zone. */
 export function recordStamp(ms: number): string {
   const d = new Date(ms);
   return (
     d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) +
     ", " + // a comma, not a mid-dot (user, 2026-10-03)
-    d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZoneName: "short" })
   );
 }
 
-/** The reader's calendar day of an instant, as the `YYYY-MM-DD` the date fields hold. */
-export function localDayKey(ms: number): string {
-  const d = new Date(ms);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+/** The UTC day of an instant, as the `YYYY-MM-DD` the date fields hold (a day is a UTC day). */
+export function utcDayKey(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+/** The same instant in UTC, for a record's HOVER: explorers and community posts quote UTC, so a
+ *  reader matching our local stamp against one can read theirs off the tooltip. */
+export function utcStamp(ms: number): string {
+  return new Date(ms).toISOString().slice(0, 19).replace("T", " ") + " UTC";
 }

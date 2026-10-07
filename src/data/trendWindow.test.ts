@@ -461,14 +461,13 @@ describe("heldZoom", () => {
 });
 
 describe("spanPhrase", () => {
-  it("a pill says its own span; a brushed range names the READER'S days, end exclusive", () => {
-    // Local days since 2026-10-07 (user: dates "in the actual locale") — a brushed range is two
-    // instants, and the log the Range card's door opens dates them locally too.
+  it("a pill says its own span; a brushed range names its UTC days, end exclusive", () => {
+    // A day-only label is a UTC day for every reader, so a shared screenshot says one thing.
     expect(spanPhrase("7d", null)).toBe("last 7 days");
     expect(spanPhrase("all", null)).toBe("all measured");
-    const local = (mo: number, d: number, h = 0) => new Date(2026, mo, d, h).getTime();
-    expect(spanPhrase("30d", { fromMs: local(8, 20), toMs: local(8, 27) })).toBe("Sep 20 – Sep 26");
-    expect(spanPhrase("30d", { fromMs: local(8, 20, 3), toMs: local(8, 20, 9) })).toBe("Sep 20");
+    const d = (s: string) => Date.parse(s);
+    expect(spanPhrase("30d", { fromMs: d("2026-09-20T00:00Z"), toMs: d("2026-09-27T00:00Z") })).toBe("Sep 20 – Sep 26");
+    expect(spanPhrase("30d", { fromMs: d("2026-09-20T03:00Z"), toMs: d("2026-09-20T09:00Z") })).toBe("Sep 20");
   });
 });
 

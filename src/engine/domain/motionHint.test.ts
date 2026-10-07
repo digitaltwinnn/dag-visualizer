@@ -37,8 +37,8 @@ describe("motionHint", () => {
     expect(motionHint({ kind: "composition", on: false }, "hyper", NAMES)).toBeNull();
   });
 
-  it("stamps a range in the reader's days and names a window by its label", () => {
-    const span = { fromMs: new Date(2026, 3, 7).getTime(), toMs: new Date(2026, 4, 2).getTime() };
+  it("stamps a range in UTC days and names a window by its label", () => {
+    const span = { fromMs: Date.UTC(2026, 3, 7), toMs: Date.UTC(2026, 4, 2) };
     expect(motionHint({ kind: "range", span }, "trend", NAMES)).toBe("Zooming the history to Apr 7 – May 2");
     expect(motionHint({ kind: "range", span: null }, "trend", NAMES)).toBe("Showing the whole window");
     expect(motionHint({ kind: "window", id: "7d" }, "trend", NAMES)).toBe("Showing the last 7D");

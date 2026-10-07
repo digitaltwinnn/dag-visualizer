@@ -206,7 +206,7 @@ interface AppState {
   // navigation bridge, not a selection (the network commit itself rides the pickActions table).
   /** A door's hand-off to the anchor log: a span to land in, or — with `snapshot` — one metagraph
    *  snapshot to find (its card's "Show the raw data", 2026-10-04). */
-  logSeek: { metaId: string | null; fromMs: number; toMs: number; snapshot?: number } | null;
+  logSeek: { metaId: string | null; fromMs: number; toMs: number; snapshot?: number; label?: string } | null;
   // The doc overlay's STAGE-READY signal, written by the Engine (the one clock that knows the
   // choreography's real boundary — frame-driven, so ?slowmo and low FPS stretch it correctly,
   // where a wall-clock wait in the HUD desynced). DEFAULT TRUE so a document never waits on a
@@ -413,7 +413,7 @@ interface AppState {
   setActivity: (activity: Activity | null) => void;
   setMode: (mode: Mode) => void;
   setDocPage: (docPage: "about" | null) => void;
-  setLogSeek: (logSeek: { metaId: string | null; fromMs: number; toMs: number; snapshot?: number } | null) => void;
+  setLogSeek: (logSeek: { metaId: string | null; fromMs: number; toMs: number; snapshot?: number; label?: string } | null) => void;
   setDocStageReady: (ready: boolean) => void;
   setDocClosing: (closing: boolean) => void;
   setFilter: (filter: string) => void;

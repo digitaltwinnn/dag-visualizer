@@ -72,7 +72,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CABINET_BODY, CABINET_LIST, CABINET_TRIGGER } from "@/components/cabinetTabs";
 import { cn } from "@/lib/utils";
-import { recordStamp } from "@/src/util/localTime";
+import { recordStamp, utcStamp } from "@/src/util/localTime";
 
 /** Whether a decoded payload carries anything at all — `{}`, `[]` and `""` do NOT open a lane. */
 function nonEmpty(v: unknown): boolean {
@@ -623,7 +623,8 @@ export function ChannelStatePanel() {
                 says so: the explorer's own stamps are UTC, so a viewer's local midnight can never
                 silently re-date a snapshot. */}
             <Fact label="Time" title="The stamp this snapshot shares with the global snapshot it anchored into">
-              <span className="tabular-nums text-foreground-dim">{stampOfRecord(sel.ts)}</span>
+              {/* The reader's own clock; UTC on hover, for matching an explorer (2026-10-07). */}
+              <span className="tabular-nums text-foreground-dim" title={Number.isFinite(Date.parse(sel.ts)) ? utcStamp(Date.parse(sel.ts)) : undefined}>{stampOfRecord(sel.ts)}</span>
             </Fact>
             <Fact label="Fee paid"><span className="tabular-nums">{fmtDag(deep.fee)} DAG</span></Fact>
             {/* "compressed" names the wire figure's basis against the lanes' decoded sizes. */}

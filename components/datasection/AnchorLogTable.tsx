@@ -25,13 +25,20 @@ import TablePager from "@/components/datasection/TablePager";
 import LogSearchBar from "@/components/datasection/LogSearchBar";
 import { pageOfOrdinal, seekOrdinalByTime, dayStartMs, dayEndMs, tsInRange } from "@/src/data/chainSeek";
 import { POLL } from "@/src/engine/config";
-import { localDayKey } from "@/src/util/localTime";
+import { recordStamp, utcDayKey, utcStamp } from "@/src/util/localTime";
 import { dayWords } from "@/components/datasection/DateRange";
 
 // The retained global window the log joins against — the same buffer the strip's bars plot,
 // one row per anchored metagraph snapshot inside it.
 const MAX = POLL.maxSnapshots;
 const PAGE = 25;
+
+/** An age's hover: the record's time in the reader's clock, then in UTC for matching an explorer
+ *  (2026-10-07 — dates are local everywhere; UTC stays one hover away). */
+const whenTitle = (ts: string): string | undefined => {
+  const ms = Date.parse(ts);
+  return Number.isFinite(ms) ? `${recordStamp(ms)}\n${utcStamp(ms)}` : undefined;
+};
 
 // ONE COLUMN LIST, read by the header AND by the search row beneath it — a second literal is how the
 // two silently fall out of alignment when a column is added.
@@ -224,6 +231,11 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   const [qTick, setQTick] = useState("");
   const [qFrom, setQFrom] = useState("");
   const [qTo, setQTo] = useState("");
+  /** The DOOR'S OWN WORDS for the dates it filled (2026-10-07): a History card's span as the card
+   *  said it ("Sep 22, 2:00 PM GMT+2", "Sep 8 – Oct 8"). The fields can only hold whole days, so an
+   *  hour's Moment would otherwise read as its whole day — the chip repeats the card until the
+   *  reader edits the dates themselves. */
+  const [doorLabel, setDoorLabel] = useState<string | null>(null);
   const [seeking, setSeeking] = useState(false);
   // ⚠️ AN ARRIVAL SHOWS ITS SEARCH, NOT THE LIVE PAGE (user, 2026-09-29: coming to the raw page
   // from History with a network in scope "looks like it's loading something twice"). The door hands
@@ -766,6 +778,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       setDoorMeta(logSeek.metaId);
       setSearchOpen(true);
       setQFrom("");
+      setDoorLabel(null);
       setQTo("");
       setQTick("");
       setSearchMeta(logSeek.metaId);
@@ -782,10 +795,11 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       return;
     }
     setSearchOpen(true);
-    // The fields hold the reader's LOCAL days (2026-10-07); the span's end is exclusive, so its
-    // last day is the one holding the instant just before it.
-    setQFrom(localDayKey(logSeek.fromMs));
-    setQTo(localDayKey(logSeek.toMs - 1));
+    // The fields hold UTC DAYS (a day-only label is a UTC day for every reader); the span's end is
+    // exclusive, so its last day is the one holding the instant just before it.
+    setQFrom(utcDayKey(logSeek.fromMs));
+    setQTo(utcDayKey(logSeek.toMs - 1));
+    setDoorLabel(logSeek.label ?? null);
     if (logSeek.metaId) {
       setDoorMeta(logSeek.metaId);
       setSearchMeta(logSeek.metaId);
@@ -903,15 +917,15 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       miss={jumpMiss}
       onSnapshot={(v) => { setQSnapshot(v); if (v === "") { setMarked(null); setJumpMiss(null); } }}
       onTick={(v) => { setQTick(v); if (v === "") { setMarked(null); setJumpMiss(null); } }}
-      onFrom={setQFrom}
-      onTo={setQTo}
+      onFrom={(v) => { setDoorLabel(null); setQFrom(v); }}
+      onTo={(v) => { setDoorLabel(null); setQTo(v); }}
       onSubmit={onSubmit}
       onClose={() => setSearchOpen(false)}
     />
   );
 
   const clearSearch = () => {
-    setQSnapshot(""); setQTick(""); setQFrom(""); setQTo("");
+    setQSnapshot(""); setQTick(""); setQFrom(""); setQTo(""); setDoorLabel(null);
     // Clearing the search drops a door's scope, and under "all" the log's own pick too.
     setDoorMeta(null);
     if (!lensNet) setSearchMeta(null);
@@ -979,8 +993,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
             (qFrom || qTo) && {
               key: "age",
               // In the date picker's own words ("Mar 13 – Mar 20"), never the field's YYYY-MM-DD.
-              text: qFrom && qTo ? (qFrom === qTo ? dayWords(qFrom) : `${dayWords(qFrom)} – ${dayWords(qTo)}`) : qFrom ? `from ${dayWords(qFrom)}` : `to ${dayWords(qTo)}`,
-              clear: () => { setQFrom(""); setQTo(""); },
+              text: doorLabel ?? (qFrom && qTo ? (qFrom === qTo ? dayWords(qFrom) : `${dayWords(qFrom)} – ${dayWords(qTo)}`) : qFrom ? `from ${dayWords(qFrom)}` : `to ${dayWords(qTo)}`),
+              clear: () => { setQFrom(""); setQTo(""); setDoorLabel(null); },
             },
           ]
             .filter((c): c is { key: string; text: string; clear: () => void } => !!c)
@@ -1247,7 +1261,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                         <span className="uppercase tracking-caps">Global</span>
                         <span className={cn("font-mono tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground")}>{r.global.ordinal.toLocaleString()}</span>
                         <span className="ml-auto uppercase tracking-caps">Age</span>
-                        <span className={cn("tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground")}>{relativeAge(now - Date.parse(r.ts))}</span>
+                        <span className={cn("tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground")} title={whenTitle(r.ts)}>{relativeAge(now - Date.parse(r.ts))}</span>
                       </span>
                     </TableCell>
                   </TableRow>
@@ -1347,7 +1361,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                     </TableCell>
                   )}
                   {!grouped && (
-                    <TableCell className="text-right text-muted-foreground">
+                    <TableCell className="text-right text-muted-foreground" title={whenTitle(r.ts)}>
                       {/* Phone drops the " ago" (the bare register — relativeAge's own note): the
                           AGE header names the quantity, and the suffix's width was the last thing
                           holding this table in sideways scroll. */}

@@ -25,6 +25,10 @@ import { useStore } from "@/src/store/store";
 export interface RecordSpan {
   fromMs: number;
   toMs: number;
+  /** The span in the CARD'S OWN WORDS ("Sep 22, 2026", "Sep 8 – Oct 8", "last 30 days") — the log's
+   *  applied chip repeats it rather than re-deriving local days from the instants, which named two
+   *  days for a one-day (UTC) Moment (2026-10-07). */
+  label?: string;
 }
 
 /** The span the WINDOW on screen implies, from the buckets actually drawn.
@@ -61,7 +65,7 @@ export function openRecords(metaId: string | null, span: RecordSpan | null): voi
   // and every other view keep the lens the reader chose.
   // A null span (History's ALL window has none to hand over) opens the log on its newest page,
   // with no seek — the door still lands on the records.
-  if (span) st.setLogSeek({ metaId: scoped, fromMs: span.fromMs, toMs: span.toMs });
+  if (span) st.setLogSeek({ metaId: scoped, fromMs: span.fromMs, toMs: span.toMs, ...(span.label ? { label: span.label } : {}) });
   if (st.mode !== "ledger") {
     // Remember WHERE THE DOOR WAS (user, 2026-09-26): closing the layer goes back there, not to
     // Snapshots. Set after the mode step, which clears it.

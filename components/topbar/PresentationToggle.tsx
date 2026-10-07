@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
-import { windowSpan } from "@/src/data/trendWindow";
+import { spanPhrase, windowSpan } from "@/src/data/trendWindow";
 import { openRecords } from "@/components/trendDoors";
 
 // The command bar's trailing PRESENTATION group — TWO controls since 2026-08-30 (user: "scene
@@ -88,7 +88,8 @@ export default function PresentationToggle() {
           const st = useStore.getState();
           if (VIEW_POLICIES[st.mode].rawSurface === "door") {
             const net = st.trendFocus ?? (st.filter !== "all" ? st.filter : null);
-            return openRecords(net, windowSpan(st.trendWindow, st.trendRange, Date.now()));
+            const span = windowSpan(st.trendWindow, st.trendRange, Date.now());
+            return openRecords(net, span && { ...span, label: spanPhrase(st.trendWindow, st.trendRange) });
           }
           setSection("data");
         }}

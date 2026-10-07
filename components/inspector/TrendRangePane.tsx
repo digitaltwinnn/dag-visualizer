@@ -102,7 +102,7 @@ export default function TrendRangePane({
               <>{who} has no reading over this range</>
             )}
           </Lead>
-          <RecordsDoor subject={subject} span={range} what="range" />
+          <RecordsDoor subject={subject} span={{ ...range, label: spanPhrase(windowId, range) }} what="range" />
         </div>
       )}
       <PulseEdge pulseKey={pulseKey} rail="right" off={collapsed} />
