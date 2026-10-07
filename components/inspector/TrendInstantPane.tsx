@@ -154,7 +154,7 @@ export default function TrendInstantPane({
           {/* THE LEAD (the card skeleton, 2026-10-02): how long ago the moment was. It rode the
               head's aside, which is a qualifier or a state on every card now — an age is what a
               card SAYS, first. Measured from the bucket's start, as before. */}
-          {cursorMs != null && <Lead>{ageWords(Date.now() - (bucket ?? cursorMs))} ago.</Lead>}
+          {cursorMs != null && <Lead>{ageWords(Date.now() - (bucket ?? cursorMs))} ago</Lead>}
           {bucket != null && <Separator className="mb-2" />}
           {bucket == null ? (
             // AN HONEST TERMINAL, not an empty card. The sentence is `instantNote`'s: only the

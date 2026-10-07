@@ -177,7 +177,7 @@ export default function MetaSnapPane({
   // restates its ancestor (the pile rule — the same reason the ticker left this head on
   // 2026-08-10).
   // The AGE is the lead's chip, not a clause after a mid-dot (user, 2026-10-03).
-  const lead = `${following && !sameTick ? "Following live. " : ""}Anchored to ${anchor}.`;
+  const lead = `${following && !sameTick ? "Following live, anchored" : "Anchored"} to ${anchor}`;
 
   return (
     <RailPane

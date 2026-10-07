@@ -429,7 +429,7 @@ export default function DesignDoc() {
                 </span>
               </div>
               <div className="mt-2 mb-2.5 border-t border-border" />
-              <Lead>One sentence, in dim ink: what this is to the card above it.</Lead>
+              <Lead>What this is to the card above it, in dim ink</Lead>
               <div className="mb-2 border-t border-border" />
               <SectionLabel label="Section label" unit="per hour" total={42} className="mb-1.5" />
               <ScheduleTable

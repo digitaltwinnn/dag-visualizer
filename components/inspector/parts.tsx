@@ -62,8 +62,10 @@ export function Fact({ label, children, title, className }: { label: ReactNode; 
 // section is headed, how an empty value reads, how a way out is drawn. These are the one home for
 // each, beside `Fact` and `Foot`.
 
-/** THE LEAD — the one sentence a card says first, in dim ink, two lines at most: what this subject
- *  is in relation to its parent ("83% of Dor Technologies' online nodes."). Every card has one. */
+/** THE LEAD — the one line a card says first, in dim ink, two lines at most: what this subject
+ *  is in relation to its parent ("83% of Dor Technologies' online nodes"). Every child card has
+ *  one. NO FULL STOP (user, 2026-10-07: "remove the . — it's UI, not everything should be treated
+ *  like grammar"): it is a label on an instrument, not prose — two clauses join with a comma. */
 export function Lead({ children, aside, className }: { children: ReactNode; /** A second fact that would otherwise be glued on with a mid-dot — an age, a count — as a
    *  qualifier chip on the row's right (user, 2026-10-03, on "Anchored to N · 1 min ago": "should
    *  that second part be a pill on the right side? I don't like those dots separating texts").

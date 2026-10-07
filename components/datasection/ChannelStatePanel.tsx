@@ -617,7 +617,7 @@ export function ChannelStatePanel() {
               · the COUNTERS sit on a plate in mono, where bookkeeping goes — read to compare,
                 not to learn. The references (hash, previous, state) stay in the foot below. */}
           <Lead aside={relativeAge(Date.now() - Date.parse(sel.ts)) || undefined} className="flex-none">
-            Anchored into global snapshot <span className="font-mono tabular-nums text-foreground">{sel.globalOrdinal.toLocaleString()}</span>.
+            Anchored into global snapshot <span className="font-mono tabular-nums text-foreground">{sel.globalOrdinal.toLocaleString()}</span>
           </Lead>
           <FactGroup className="flex-none">
             {/* ⚠️ THE ABSOLUTE STAMP, to the second, in UTC (user, 2026-09-14: "add a date/time

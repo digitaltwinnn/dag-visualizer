@@ -1128,8 +1128,9 @@ bar, the share of its chain's ordinals it still serves (`archiveReach`, `compone
 **Every right-rail card is the same SIX SLOTS in one order** (user, 2026-10-02 — the design and its
 deviations are in `docs/superpowers/design/2026-10-02-right-rail-cards/`): **head · lead · breakdown
 · facts · doors · foot + pager**, and a card uses the slots it has content for. The primitives beside
-`Fact` and `Foot` in `inspector/parts.tsx` are the one way to draw each: `Lead` (the one dim sentence
-a card says first, two lines at most — what the subject is to its parent), `SectionLabel` (a caps
+`Fact` and `Foot` in `inspector/parts.tsx` are the one way to draw each: `Lead` (the one dim line
+a card says first, two lines at most — what the subject is to its parent; no full stop, it is a
+label, not prose — user, 2026-10-07), `SectionLabel` (a caps
 label with the section's one headline figure on the right), `Empty` (the ONE empty value: a dash,
 the reason on hover — the cards used to say "not known", "none" and "n/a"), `QualifierChip` and
 `Door`. Three rules ride them: **a head's aside is a qualifier chip or a state pill**, never bare
