@@ -4,7 +4,7 @@ import { RANGE_ICON } from "@/components/icons";
 
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { Lead } from "@/components/inspector/parts";
+import { Lead, QualifierChip } from "@/components/inspector/parts";
 import RecordsDoor from "@/components/inspector/RecordsDoor";
 import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
@@ -85,6 +85,9 @@ export default function TrendRangePane({
           )
         }
         titleKey={range ? `${range.fromMs}-${range.toMs}` : undefined}
+        // When the span ENDED rides the head (user, 2026-10-07: "move '10 days ago' in range card to
+        // its header") — a qualifier on the title's span, so the lead's sentence has the width.
+        aside={aside ? <QualifierChip className="tabular-nums">{aside}</QualifierChip> : undefined}
         onClose={onClose}
         collapsed={collapsed}
         onToggle={onToggle}
@@ -92,8 +95,8 @@ export default function TrendRangePane({
       {!collapsed && range && phrase && (
         <div>
           {/* THE LEAD: what the span was to the network above, in one sentence (the Moment's
-              grammar), with when it ended on the chip. */}
-          <Lead aside={aside} lines={3}>
+              grammar); when it ended rides the head. */}
+          <Lead lines={3}>
             {value != null ? (
               <>
                 {who} {phrase.verb} <span className="font-medium text-foreground tabular-nums">{format(value)}</span> {phrase.rest}
