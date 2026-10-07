@@ -943,7 +943,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     // ⚠️ LEGIBLE CONTROLS (design round, 2026-09-29, desktop A + phone A): the toggle was a 16px
     // line of micro caps and the applied search a whisper beside a caps "clear". Both are 32px
     // controls now (44px on touch and phone) on the bar's own type: the toggle a real button that
-    // shows pressed while open, the applied search ONE chip whose × clears it.
+    // shows pressed while open, the applied search one chip per criterion, each with its own ×.
     <div className="flex-none flex items-center justify-end gap-2 pb-2 max-[700px]:pr-10">
       {/* THE NETWORK'S CHAINS — only where there is more than one (see `lineage`). ONE SEGMENTED
           TOGGLE of one-word names (user, 2026-10-04: "two buttons with lots of text, even on
@@ -957,23 +957,46 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         </span>
       )}
       {searchSet && (
-        <span className="inline-flex min-w-0 items-center gap-1 h-8 pointer-coarse:h-11 max-[700px]:h-11 max-[700px]:flex-1 pl-3 pr-1 rounded-btn border border-border/70 bg-[var(--panel-plate)] text-body text-foreground-dim">
-          {/* Each applied criterion is its own item — a gap, not a mid-dot, between them. Ordinals
-              with their separators, as every other surface writes them. */}
-          <span className="min-w-0 truncate tabular-nums inline-flex items-center gap-3">
-            {[qSnapshot && `snapshot ${fmtOrd(qSnapshot)}`, qTick && `in global ${fmtOrd(qTick)}`, qFrom && `from ${qFrom}`, qTo && `to ${qTo}`]
-              .filter((x): x is string => !!x)
-              .map((x) => <span key={x}>{x}</span>)}
-          </span>
-          <button
-            type="button"
-            onClick={clearSearch}
-            aria-label="Clear search"
-            title="Clear search"
-            className="inline-flex flex-none size-6 pointer-coarse:size-9 max-[700px]:size-9 items-center justify-center rounded-xs cursor-pointer text-muted-foreground hover:text-foreground hover:bg-wash-faint focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
-          >
-            <X aria-hidden className="size-3.5 pointer-coarse:size-[18px]" />
-          </button>
+        // EACH APPLIED CRITERION IS ITS OWN CHIP with its own × (user, 2026-10-07): one chip per
+        // condition, and the metagraph snapshot names its chain beside the ordinal ("DED 2,617,537"),
+        // as the search bar's composite field does — an ordinal is per chain, bare it names nothing.
+        // The date range is ONE condition, so one chip. Clearing the last chip clears the search.
+        <span className="inline-flex min-w-0 flex-wrap items-center justify-end gap-2 max-[700px]:flex-1">
+          {[
+            qSnapshot && {
+              key: "snapshot",
+              text: `${searchNet ? (displayNetwork(searchNet)?.ticker ?? searchNet) + " " : ""}${fmtOrd(qSnapshot)}`,
+              clear: () => { setQSnapshot(""); setMarked(null); setJumpMiss(null); },
+            },
+            qTick && {
+              key: "tick",
+              text: `in global ${fmtOrd(qTick)}`,
+              clear: () => { setQTick(""); setMarked(null); setJumpMiss(null); },
+            },
+            (qFrom || qTo) && {
+              key: "age",
+              text: [qFrom && `from ${qFrom}`, qTo && `to ${qTo}`].filter(Boolean).join(" "),
+              clear: () => { setQFrom(""); setQTo(""); },
+            },
+          ]
+            .filter((c): c is { key: string; text: string; clear: () => void } => !!c)
+            .map((c, _i, all) => (
+              <span
+                key={c.key}
+                className="inline-flex min-w-0 items-center gap-1 h-8 pointer-coarse:h-11 max-[700px]:h-11 pl-3 pr-1 rounded-btn border border-border/70 bg-[var(--panel-plate)] text-body text-foreground-dim"
+              >
+                <span className="min-w-0 truncate tabular-nums">{c.text}</span>
+                <button
+                  type="button"
+                  onClick={all.length === 1 ? clearSearch : c.clear}
+                  aria-label={`Clear ${c.text}`}
+                  title="Clear"
+                  className="inline-flex flex-none size-6 pointer-coarse:size-9 max-[700px]:size-9 items-center justify-center rounded-xs cursor-pointer text-muted-foreground hover:text-foreground hover:bg-wash-faint focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
+                >
+                  <X aria-hidden className="size-3.5 pointer-coarse:size-[18px]" />
+                </button>
+              </span>
+            ))}
         </span>
       )}
       <button
