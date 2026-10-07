@@ -1,3 +1,4 @@
+import { rangeDays } from "@/src/util/localTime";
 // The trends WINDOW transforms — pure cuts over an /api/trends payload, ONE home (2026-09-09,
 // the branch review: these grew up inside components/useTrendsWindow.ts, the one directory
 // rule 4's export coverage cannot see, while TrendsDoc carried a second, divergent copy of the
@@ -524,13 +525,9 @@ const SPAN_WORDS: Record<ZoomId, string> = {
 };
 
 /** THE SPAN ON SCREEN, IN WORDS — what a span reading is OVER (design A, 2026-09-29): the window
- *  pill's own phrase, or a brushed range's dates (UTC days — a day-only label is a UTC day, the same for every
- *  reader, so a shared screenshot says one thing (user, 2026-10-07); the range's end is
- *  exclusive, so the last day named is the one it reaches into). */
+ *  pill's own phrase, or a brushed range FROM – TO by its UTC days (`rangeDays` — the one span
+ *  label; the exact times are the Range card's Start / End rows). */
 export function spanPhrase(zoom: ZoomId, range: { fromMs: number; toMs: number } | null): string {
   if (!range) return SPAN_WORDS[zoom];
-  const day = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
-  const a = day(range.fromMs);
-  const b = day(range.toMs - 1);
-  return a === b ? a : `${a} – ${b}`;
+  return rangeDays(range.fromMs, range.toMs);
 }

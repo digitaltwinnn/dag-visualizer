@@ -159,7 +159,6 @@ export default function TrendTimeline() {
             className="bg-transparent max-[700px]:flex-1"
             zoom={windowId}
             range={range}
-            stepMs={stepMs}
             onPick={setTrendWindow}
             onClearRange={() => setTrendRange(null)}
           />

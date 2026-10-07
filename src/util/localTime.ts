@@ -61,3 +61,15 @@ export function stampParts(ms: number, opts: { seconds?: boolean; now?: number }
   const time = parts.filter((p) => p.type !== "timeZoneName").map((p) => p.value).join("").trim();
   return { date, time, zone };
 }
+
+/** A SPAN'S LABEL — its UTC days ("Jul 7 – Aug 22", or "Sep 8" inside one day), the end exclusive:
+ *  ONE wording for the Range card's title, the explorer's span chip and the timeline's range chip
+ *  (2026-10-07 — the chip once read "Jul 7, 5:57 AM GMT+2–Aug 22, 3:27 PM GMT+2" beside a card
+ *  titled "Jul 7 – Aug 22"). A day-only label is a UTC day, the same for every reader; the exact
+ *  times are the Range card's Start / End rows, each a `Stamp` with its zone tag. */
+export function rangeDays(fromMs: number, toMs: number): string {
+  const day = (ms: number) => new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+  const a = day(fromMs);
+  const b = day(Math.max(fromMs, toMs - 1));
+  return a === b ? a : `${a} – ${b}`;
+}

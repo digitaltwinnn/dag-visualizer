@@ -672,21 +672,23 @@ describe("momentPhrase — a moment's reading as a sentence about its network (u
 });
 
 describe("rangePhrase — a range's reading as a sentence about its network (2026-10-07)", () => {
-  const say = (m: Parameters<typeof rangePhrase>[0], spanMs: number, v: string, partial = false) => {
-    const p = rangePhrase(m, spanMs, partial);
+  // The span itself is the card's Start / End / Length rows (user: "Start and end date should be in
+  // the card"), so the sentence says "in this range" rather than restating the length.
+  const say = (m: Parameters<typeof rangePhrase>[0], v: string, partial = false) => {
+    const p = rangePhrase(m, partial);
     return `DED ${p.verb} ${v} ${p.rest}`;
   };
-  it("a counter is the TOTAL over the span, the span said in words", () => {
-    expect(say("snapshots", 7 * DAY, "52,140")).toBe("DED anchored 52,140 snapshots over those 7 days");
-    expect(say("fees", 36 * 3_600_000, "3.2")).toBe("DED paid 3.2 DAG in fees over those 36 hours");
-    expect(say("kb", 2 * DAY, "40 MB")).toBe("DED anchored 40 MB of data over those 2 days");
+  it("a counter is the TOTAL over the range", () => {
+    expect(say("snapshots", "52,140")).toBe("DED anchored 52,140 snapshots in this range");
+    expect(say("fees", "3.2")).toBe("DED paid 3.2 DAG in fees in this range");
+    expect(say("kb", "40 MB")).toBe("DED anchored 40 MB of data in this range");
   });
   it("a total with unmeasured buckets is said as a floor", () => {
-    expect(say("snapshots", 7 * DAY, "52,140", true)).toBe("DED anchored at least 52,140 snapshots over those 7 days");
+    expect(say("snapshots", "52,140", true)).toBe("DED anchored at least 52,140 snapshots in this range");
   });
   it("a gauge and the spacing are averages, and say so", () => {
-    expect(say("nodes", 7 * DAY, "12")).toBe("DED ran 12 nodes on average");
-    expect(say("continuity", 7 * DAY, "28s")).toBe("DED anchored a snapshot every 28s on average");
+    expect(say("nodes", "12")).toBe("DED ran 12 nodes on average");
+    expect(say("continuity", "28s")).toBe("DED anchored a snapshot every 28s on average");
   });
 });
 

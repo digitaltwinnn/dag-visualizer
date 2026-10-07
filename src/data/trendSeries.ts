@@ -1,6 +1,5 @@
 import { bucketAt } from "@/src/data/trendWindow";
 import { roleKeyLabel } from "@/src/data/composition";
-import { ageWords } from "@/src/util/relativeAge";
 import type { TrendMetric } from "@/src/store/store";
 
 // THE PER-NETWORK SERIES MATHS — one home (2026-09-18, the 3D trends view). What a per-network
@@ -496,11 +495,12 @@ export function momentPhrase(metric: TrendMetric, stepMs: number): { verb: strin
 
 /** A RANGE'S READING AS A SENTENCE ABOUT ITS NETWORK (2026-10-07 — the Range card, the Moment's
  *  parent; `momentPhrase`'s sibling). A counter is the TOTAL over the span ("DED anchored 52,140
- *  snapshots over those 7 days") — what a reader asks of a range — and a total that skipped an
+ *  snapshots in this range") — what a reader asks of a range — and a total that skipped an
  *  unmeasured bucket is a floor and says so ("at least", rule 10). A gauge and the spacing have no
  *  total, so they are the span's average and say that instead. */
-export function rangePhrase(metric: TrendMetric, spanMs: number, partial: boolean): { verb: string; rest: string } {
-  const over = `over those ${ageWords(spanMs)}`;
+export function rangePhrase(metric: TrendMetric, partial: boolean): { verb: string; rest: string } {
+  // The span is the card's own Start / End / Length rows, so the sentence points at it.
+  const over = "in this range";
   const floor = partial ? " at least" : "";
   switch (metric) {
     case "snapshots": return { verb: `anchored${floor}`, rest: `snapshots ${over}` };

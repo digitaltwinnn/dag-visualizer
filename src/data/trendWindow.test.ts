@@ -5,6 +5,7 @@
 // leading partial month drawn whole while the trailing one was trimmed).
 import { describe, expect, it } from "vitest";
 import { assembleTrendSlice, bucketAt, heldZoom, spanPhrase, cursorFraction, cutRange, leadingTrim, monthlySum, pickRangeTier, planTrendFetch, rangeBuckets, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, windowSpan, ZOOMS, type TrendsWindowData } from "./trendWindow";
+import { rangeDays } from "@/src/util/localTime";
 
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
@@ -461,13 +462,14 @@ describe("heldZoom", () => {
 });
 
 describe("spanPhrase", () => {
-  it("a pill says its own span; a brushed range names its UTC days, end exclusive", () => {
-    // A day-only label is a UTC day for every reader, so a shared screenshot says one thing.
+  it("a pill says its own span; a brushed range is FROM – TO by its UTC days, end exclusive", () => {
     expect(spanPhrase("7d", null)).toBe("last 7 days");
     expect(spanPhrase("all", null)).toBe("all measured");
     const d = (s: string) => Date.parse(s);
     expect(spanPhrase("30d", { fromMs: d("2026-09-20T00:00Z"), toMs: d("2026-09-27T00:00Z") })).toBe("Sep 20 – Sep 26");
-    expect(spanPhrase("30d", { fromMs: d("2026-09-20T03:00Z"), toMs: d("2026-09-20T09:00Z") })).toBe("Sep 20");
+    const short = { fromMs: d("2026-09-20T03:00Z"), toMs: d("2026-09-20T09:00Z") };
+    expect(spanPhrase("30d", short)).toBe(rangeDays(short.fromMs, short.toMs));
+    expect(spanPhrase("30d", short)).toBe("Sep 20");
   });
 });
 

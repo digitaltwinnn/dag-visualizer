@@ -4,7 +4,8 @@ import { RANGE_ICON } from "@/components/icons";
 
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { Lead, QualifierChip } from "@/components/inspector/parts";
+import { Fact, FactGroup, Lead, QualifierChip } from "@/components/inspector/parts";
+import Stamp from "@/components/Stamp";
 import RecordsDoor from "@/components/inspector/RecordsDoor";
 import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
@@ -68,7 +69,13 @@ export default function TrendRangePane({
   // "keep the N months ago on the range").
   const endAge = range ? Date.now() - range.toMs : null;
   const aside = endAge == null ? undefined : endAge < stepMs ? "until now" : `${ageWords(endAge)} ago`;
-  const phrase = range ? rangePhrase(metric, range.toMs - range.fromMs, total?.partial ?? false) : null;
+  const phrase = range ? rangePhrase(metric, total?.partial ?? false) : null;
+  // THE SPAN'S OWN ROWS (user, 2026-10-07: "Start and end date should be in the card I think for
+  // clarity"): a span of two days or more is named by its UTC days, with the year (a day-only label
+  // is a UTC day); a shorter one by its clock times, drawn by `Stamp` with the zone as a tag.
+  const longSpan = range ? range.toMs - range.fromMs >= 2 * 86_400_000 : false;
+  const edge = (ms: number) =>
+    longSpan ? new Date(ms).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" }) : <Stamp ms={ms} />;
 
   return (
     <RailPane entry={collapsed}>
@@ -78,6 +85,7 @@ export default function TrendRangePane({
           range ? (
             <span className="inline-flex items-center gap-2">
               <RANGE_ICON aria-hidden className="size-4 flex-none text-[var(--filter-accent,var(--primary))]" />
+              {/* The one span label — its days; the exact times and zone are the Start / End rows. */}
               {spanPhrase(windowId, range)}
             </span>
           ) : (
@@ -105,6 +113,12 @@ export default function TrendRangePane({
               <>{who} has no reading over this range</>
             )}
           </Lead>
+          <FactGroup>
+            <Fact label="Start">{edge(range.fromMs)}</Fact>
+            {/* The end is exclusive, so a day-named span names the day it reaches into. */}
+            <Fact label="End">{edge(longSpan ? range.toMs - 1 : range.toMs)}</Fact>
+            <Fact label="Length">{ageWords(range.toMs - range.fromMs)}</Fact>
+          </FactGroup>
           <RecordsDoor subject={subject} span={{ ...range, label: spanPhrase(windowId, range) }} what="range" />
         </div>
       )}

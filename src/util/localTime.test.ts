@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
-import { bucketStamp, recordStamp, stampParts, utcDayKey, utcStamp } from "./localTime";
+import { bucketStamp, rangeDays, recordStamp, stampParts, utcDayKey, utcStamp } from "./localTime";
 
 // ONE RULE FOR EVERY DATE THE APP WRITES (user, 2026-10-07 — "so any figure shown with days will be
 // UTC right? … if a user shares a screenshot it should be the same for other users. If we show a
@@ -68,5 +68,18 @@ describe("stampParts — a clock time split for display: date, time, zone (2026-
   });
   it("seconds only where asked", () => {
     expect(stampParts(Date.UTC(2026, 8, 14, 14, 4, 2), { now: Date.UTC(2026, 9, 7) }).time).toMatch(/^10:04(?!:)/);
+  });
+});
+
+describe("rangeDays — a span's label: its UTC days, ONE wording for the card, the explorer and the timeline", () => {
+  // The exact times live in the Range card's Start / End rows, each with its zone tag (2026-10-07):
+  // a label with clock times and a zone wrapped the card's title onto three lines and truncated the
+  // explorer's chip, so every span LABEL is its days — and a day-only label is a UTC day.
+  it("names the span by its UTC days, end exclusive", () => {
+    expect(rangeDays(Date.UTC(2026, 6, 7, 3, 57), Date.UTC(2026, 7, 22, 19, 27))).toBe("Jul 7 – Aug 22");
+    expect(rangeDays(Date.UTC(2026, 8, 20), Date.UTC(2026, 8, 27))).toBe("Sep 20 – Sep 26");
+  });
+  it("a span inside one day is that day", () => {
+    expect(rangeDays(Date.UTC(2026, 8, 8, 18), Date.UTC(2026, 8, 8, 22))).toBe("Sep 8");
   });
 });

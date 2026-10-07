@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { SELECTED_ROW } from "@/components/selection";
 import { displayNetwork } from "@/src/data/unlisted";
 import { ZOOMS, type TrendRange, type ZoomId } from "@/src/data/trendWindow";
-import { bucketStamp } from "@/src/util/localTime";
+import { rangeDays } from "@/src/util/localTime";
 
 // THE TRENDS CONTROLS, ONE HOME (2026-09-18; widened 2026-09-19) — the window pills and the scale
 // switch, shared by the Trends DOCUMENT, the History view's band TIMELINE and that view's Network
@@ -54,12 +54,6 @@ export const zoomBtn = (pressed: boolean) =>
     pressed ? cn("font-bold text-foreground", SELECTED_ROW) : "text-muted-foreground hover:text-foreground hover:bg-wash-hover",
   );
 
-/** The instant stamps on a range chip — the document's own `stampRange` rule: a date, plus the
- *  clock only where the buckets on screen can actually resolve one. */
-function stampRange(ms: number, stepMs: number): string {
-  return bucketStamp(ms, stepMs);
-}
-
 /** THE WINDOW PICKER — the six windows, and, while a range stands, THE RANGE ITSELF as the group's
  *  one pressed chip with its own × (user, 2026-09-09: a chip beside the group read as a second
  *  control). A committed range IS a window statement, so it belongs inside the same group rather
@@ -71,15 +65,12 @@ function stampRange(ms: number, stepMs: number): string {
 export function WindowPicker({
   zoom,
   range,
-  stepMs,
   onPick,
   onClearRange,
   className,
 }: {
   zoom: ZoomId;
   range: TrendRange | null;
-  /** The bucket size ON SCREEN, which decides whether the chip's stamps carry a clock. */
-  stepMs: number;
   onPick: (id: ZoomId) => void;
   onClearRange: () => void;
   className?: string;
@@ -102,9 +93,8 @@ export function WindowPicker({
         <span className={cn("h-6 px-2 inline-flex items-center gap-1.5 rounded-md text-label font-bold text-foreground whitespace-nowrap", SELECTED_ROW)}>
           {/* The network and the span are two facts, set apart by the gap — no mid-dot. */}
           {range.metaId && <span>{displayNetwork(range.metaId)?.ticker ?? ""}</span>}
-          <span className="tabular-nums">
-            {stampRange(range.fromMs, stepMs)}–{stampRange(range.toMs, stepMs)}
-          </span>
+          {/* The one span label (`rangeDays`) — the Range card's title says the same. */}
+          <span className="tabular-nums">{rangeDays(range.fromMs, range.toMs)}</span>
           <button
             type="button"
             onClick={onClearRange}
