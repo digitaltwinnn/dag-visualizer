@@ -184,8 +184,10 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   const [sort, setSort] = useState<{ key: AnchorLogSortKey; dir: 1 | -1 }>({ key: "age", dir: 1 });
   // GROUPED BY GLOBAL SNAPSHOT whenever the rows are in time order (see the table below). Grouped,
   // the group's header row states the global snapshot and its age, so the two columns that said
-  // it on every row are DROPPED (user, 2026-10-07: "make the global row have label + value so the
-  // entire column can be dropped"); sorted by anything else they come back.
+  // it on every row are DROPPED — header and all (user, 2026-10-07: "make the global row have label
+  // + value so the entire column can be dropped", then "just the child column, with the header
+  // across it"). Grouped is newest first; sorted by anything else the two columns come back, and
+  // their Age header is the way back to the groups.
   const grouped = sort.key === "age" || sort.key === "tick";
   const columns = grouped ? COLUMNS.filter((c) => c.key !== "tick" && c.key !== "age") : COLUMNS;
   // THE JUMP'S LANDING MARK. A jump that only changed the page would leave the reader hunting the
@@ -1095,21 +1097,6 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   </button>
                 </TableHead>
               ))}
-              {/* Grouped, time order is the GROUPS' order: one control flips it (newest or oldest
-                  first), standing where the dropped Age column's header stood. */}
-              {grouped && (
-                <TableHead className="text-right">
-                  <button
-                    type="button"
-                    className="inline-flex flex-row-reverse items-center gap-1 text-label uppercase tracking-caps text-muted-foreground hover:text-foreground cursor-pointer"
-                    onClick={() => setSort((s) => ({ key: "age", dir: s.key === "age" ? ((s.dir * -1) as 1 | -1) : 1 }))}
-                    title={sort.dir === 1 ? "Newest first — click for oldest first" : "Oldest first — click for newest first"}
-                  >
-                    Age
-                    {sort.dir === 1 ? <ArrowUp className="size-3" aria-hidden /> : <ArrowDown className="size-3" aria-hidden />}
-                  </button>
-                </TableHead>
-              )}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1182,7 +1169,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   // anchored into is still being read — said in words, never a guessed number
                   // (rule 10), and nothing to click until it lands.
                   <TableRow className="hover:bg-transparent border-border max-[700px]:block">
-                    <TableCell colSpan={columns.length + 1} className="pt-3 pb-1 max-[700px]:block">
+                    <TableCell colSpan={columns.length} className="pt-3 pb-1 max-[700px]:block">
                       <span className="flex items-baseline gap-2 text-label text-muted-foreground">
                         <span className="uppercase tracking-caps">Global</span>
                         <span className="italic">anchoring…</span>
@@ -1217,7 +1204,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                     onFocus={() => setHoverSnapOrd(r.global.ordinal)}
                     onBlur={() => setHoverSnapOrd(null)}
                   >
-                    <TableCell colSpan={columns.length + 1} className="pt-3 pb-1 max-[700px]:block">
+                    <TableCell colSpan={columns.length} className="pt-3 pb-1 max-[700px]:block">
                       <span className={cn("flex items-baseline gap-2 text-label", inSelGroup ? "text-primary-ink" : "text-muted-foreground")}>
                         <span className="uppercase tracking-caps">Global</span>
                         <span className={cn("font-mono tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground")}>{r.global.ordinal.toLocaleString()}</span>
@@ -1321,9 +1308,6 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                       {pending ? <span className="text-muted-foreground">…</span> : r.global.ordinal.toLocaleString()}
                     </TableCell>
                   )}
-                  {/* Grouped, the header's Age control stands over an otherwise empty column; the
-                      row still fills it, so a selected row's wash reaches the table's edge. */}
-                  {grouped && <TableCell className="max-[700px]:hidden" />}
                   {!grouped && (
                     <TableCell className="text-right text-muted-foreground">
                       {/* Phone drops the " ago" (the bare register — relativeAge's own note): the
