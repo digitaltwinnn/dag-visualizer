@@ -183,7 +183,10 @@ export default function SectionShell({
           // …and NOT the dock's (2026-10-02, the phone pass): the dock fades out with the HUD while
           // this layer is up, and reserving its 56px left a blank strip under the footer. The footer
           // drops to the screen edge in the same state (SiteFooter), so the pane ends just above it.
-          "max-[700px]:bottom-[calc(env(safe-area-inset-bottom,0px)+var(--footer-phone-h,22px)+6px)]"
+          // THE PHONE FRAME IS TIGHT (user, 2026-10-07 — the raw phone pass, option B): 6px from the
+          // screen's edges, and down to the safe area, since the footer row stands down while RAW
+          // is open (SiteFooter). A 16px margin plus the panel's own padding left rows ~310px wide.
+          "max-[700px]:left-1.5 max-[700px]:right-1.5 max-[700px]:bottom-[calc(env(safe-area-inset-bottom,0px)+6px)]"
         }
         style={{ visibility: "hidden", willChange: "transform, opacity" }}
       >

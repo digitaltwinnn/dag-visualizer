@@ -52,7 +52,7 @@ export default function RecordsSurface() {
     // wide touch screen. The mark gets its own column there, level with the header row.
     <div
       className={
-        "h-full flex flex-col pl-6 max-[700px]:pr-4 max-[700px]:pl-4 py-3 " +
+        "h-full flex flex-col pl-6 max-[700px]:pr-3 max-[700px]:pl-3 py-3 max-[700px]:pt-2 " +
         (mode === "ledger" ? "pr-6 max-[1099px]:pr-10" : "pr-10")
       }
     >

@@ -125,6 +125,9 @@ export default function SiteFooter() {
         doc == null && !raw
           ? "max-[700px]:bottom-[var(--phone-dock-h)] max-[700px]:h-[var(--footer-phone-h)]"
           : "max-[700px]:bottom-[env(safe-area-inset-bottom)] max-[700px]:h-[var(--footer-phone-h)]",
+        // …and GONE on the phone while RAW is open (user, 2026-10-07 — the raw phone pass, B): a
+        // data pane needs the screen's height more than a row of links it can reach on return.
+        raw && "max-[700px]:hidden",
       )}
     >
       {/* Readability history, still load-bearing: no text-shadow halo (user, 2026-08-30 — the
