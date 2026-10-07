@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-r
 import { Button } from "@/components/ui/button";
 import { cn, TOUCH_HIT } from "@/lib/utils";
 import { fmtCount } from "@/src/util/format";
+import { NodeStars } from "@/components/state/StateAtoms";
 
 // The raw layer's ONE table pager (user, 2026-08-14 — "add a bottom row with pagination", the
 // anchor log and the signer groups alike): a quiet flex-none strip under a table, range left,
@@ -20,6 +21,8 @@ export default function TablePager({
   total,
   scope,
   compact = false,
+  exact = false,
+  totalPending = false,
   onPage,
 }: {
   page: number; // 1-based
@@ -51,6 +54,11 @@ export default function TablePager({
    *  there). The total and its scope word stay — they are the honest statement of how much
    *  there is and how far it reaches. */
   compact?: boolean;
+  /** Write the total out in full ("of 4,812,331") — the anchor log's count is an answer, not an
+   *  estimate (user, 2026-10-07: "I care about actual real totals"). */
+  exact?: boolean;
+  /** The total is still being counted: its slot twinkles (`NodeStars` — a value arriving). */
+  totalPending?: boolean;
   onPage: (p: number) => void;
 }) {
   // The scope term's explanation must be REACHABLE ON TOUCH (2026-09-03, the phone review's
@@ -69,7 +77,9 @@ export default function TablePager({
         {/* A compact pager WITH a scope states the scope alone (2026-09-28, user on the snapshot
             explorer's "52 · last 11 min": "remove the 52 — the time is what matters, 52 has no real
             meaning here"). The count stays wherever it is the statement (the full pager's range). */}
-        {compact && scope ? null : compact ? fmtCount(total) : `${from}–${to} of ${fmtCount(total)}`}
+        {compact && scope ? null : totalPending ? (
+          <span className="inline-flex items-center gap-1.5">{compact ? null : `${from}–${to} of `}<NodeStars count={3} /></span>
+        ) : compact ? fmtCount(total) : `${from}–${to} of ${exact ? total.toLocaleString() : fmtCount(total)}`}
         {scope ? (
           <>
             {compact ? null : " "}

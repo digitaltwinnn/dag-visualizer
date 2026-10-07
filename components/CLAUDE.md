@@ -63,13 +63,26 @@ and return the live tip), so it is the only criterion that walks. FEE and SIZE h
 layer — a field there could only filter the 25 rows on screen, and a reader who typed a fee and got
 "no match" would reasonably conclude no such snapshot exists when we looked at 25 of 1.1 million.
 
+⚠️ **UNDER ALL THE LOG IS EVERY NETWORK'S WHOLE CHAIN, MERGED BY TIME, WITH THE REAL TOTAL**
+(user, 2026-10-07: "I care about actual real totals not technical implementation … that should be
+solved under the hood and indifferent to the user"). It was a live window of the last minutes that
+called itself "recent" and explained its buffer on hover — terminology no reader has. Now
+`useMergedLog` (pure merge: `src/data/mergedLog.ts`) pages each listed network's chain together;
+a page boundary is a cursor per chain, so newest, oldest and each step are exact (no jump to an
+arbitrary page — the pager's four buttons are exactly those). The total is the sum of the chains'
+spans, written out in full. It reads ONLY while the raw layer is open (the table is mounted behind
+the scene — ungated it cost every Snapshots page load 28 requests). The unlisted lens keeps the
+live window and its one plain word, "recent": an unlisted channel has no public chain.
+
 ⚠️ **A DATE RANGE IS A FILTER, NOT A JUMP** (user, 2026-10-07 — the log reached from a Range card
 should keep to the range). On a chain `chainSeek.seekSpan` resolves the span's first and last
-ordinals; the pager pages only between them and its count reads "of N in range". Under All the
-recent rows are cut to the span, and the count keeps the word "recent" unless they hold the WHOLE
-span — "of 174 in range" for a month that holds 1.3M would be a count of this view's buffer, not
-of the range (rule 10). A door hands its exact instants and its own words for the chip; a typed
-range is whole UTC days. A snapshot or global search, a clear, or another chain drops the range.
+ordinals and the pager pages only between them; under All the same runs per network in parallel,
+and a global-snapshot search cuts the merged log to exactly what that global carries (its own
+manifest, one read). The count is the cut's real total. A door hands its exact instants and its own
+words for the chip; a typed range is whole UTC days. A snapshot or global search, a clear, or
+another chain drops the range. Waiting states follow the atom rules: a word beside the
+node-stars, held by `useMinHold`; a page turn dims the previous page rather than blanking it; a
+total being counted twinkles in its slot.
 
 **The toolbar carries the two states the first cuts had nowhere to put**, both named in every guide
 on table filtering: what is APPLIED (in words, so a folded bar can never leave the table on a search

@@ -27,6 +27,9 @@ import { pageOfOrdinal, seekSpan, dayStartMs, dayEndMs, tsInRange } from "@/src/
 import { POLL } from "@/src/engine/config";
 import { recordStamp, utcDayKey, utcStamp } from "@/src/util/localTime";
 import { dayWords } from "@/components/datasection/DateRange";
+import { useMergedLog, type MergedScope } from "@/components/datasection/useMergedLog";
+import { useMinHold } from "@/components/useMinHold";
+import { NodeStars } from "@/components/state/StateAtoms";
 
 // The retained global window the log joins against — the same buffer the strip's bars plot,
 // one row per anchored metagraph snapshot inside it.
@@ -190,6 +193,36 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   const histAddr = histNet ? (lineage[chainIdx] ?? histNet) : null;
   const setChain = (idx: number) => setChainSel({ net: histNet, idx });
 
+  // ── UNDER ALL: EVERY NETWORK'S CHAIN, MERGED BY TIME (user, 2026-10-07) ─────────────────────
+  // "I care about actual real totals not technical implementation … that should be solved under
+  // the hood". With no network in scope the log is every listed network's whole chain, newest
+  // first, with the exact total (`useMergedLog`). It replaced a live WINDOW of the last few minutes
+  // that called itself "recent" and explained the buffer on hover. The unlisted lens keeps the
+  // window: an unlisted channel has no public chain to page.
+  const mergedMode = !histNet && lens === "all";
+  const metaList = useStore((st) => st.metaList);
+  const mergedChains = useMemo(() => {
+    const out: string[] = [];
+    for (const m of metaList) {
+      if (m.isRoot || !metagraphById(m.id)) continue;
+      for (const addr of [m.id, ...(metagraphById(m.id)?.formerIds ?? [])]) if (!out.includes(addr)) out.push(addr);
+    }
+    return out;
+  }, [metaList]);
+  // The live buffer's newest ordinal per chain — the merged log's tips lead with it.
+  const liveTips: Record<string, number> = {};
+  if (net) for (const [addr, snaps] of net.metaSnaps) for (const r of snaps) if (r.ordinal > (liveTips[addr] ?? 0)) liveTips[addr] = r.ordinal;
+  /** What the merged log is cut to: a time span (the date search), or exactly the snapshots one
+   *  global snapshot carries (the global search). */
+  const [mergedScope, setMergedScope] = useState<MergedScope>({ kind: "all" });
+  // ⚠️ READ ONLY WHILE THE RAW LAYER IS OPEN: this table stays mounted behind the scene, and an
+  // ungated merge read every network's chain on every Snapshots page load (measured: 28 requests
+  // with RAW closed). Its caches survive closing, so reopening is instant.
+  const rawOpen = useStore((s) => s.section === "data");
+  const merged = useMergedLog(mergedMode && rawOpen, mergedChains, mergedScope, liveTips);
+  /** A merged search waiting for its page: land (mark) its first row, or go to the oldest end. */
+  const mergedLand = useRef<"newest" | "oldest" | null>(null);
+
   const [sort, setSort] = useState<{ key: AnchorLogSortKey; dir: 1 | -1 }>({ key: "age", dir: 1 });
   // GROUPED BY GLOBAL SNAPSHOT whenever the rows are in time order (see the table below). Grouped,
   // the group's header row states the global snapshot and its age, so the two columns that said
@@ -225,7 +258,6 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // therefore WINS over the local pick; under "all" there is no chain and the pick is the scope.
   // Changing which network is searched is the top bar's job, which is the same boundary the pager
   // and the explorer already keep.
-  const metaList = useStore((st) => st.metaList);
   const searchNet = histNet || searchMeta;
   const [qSnapshot, setQSnapshot] = useState("");
   const [qTick, setQTick] = useState("");
@@ -362,8 +394,9 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // Resolve the visible page's ANCHORED INTO ticks: buffer join first (free), the resolver
   // route for anything older. Timestamps are immutable, so each resolves at most once.
   useEffect(() => {
-    if (!histNet || !net) return;
-    const rows = hist.current.pages.get(page) ?? [];
+    if ((!histNet && !mergedMode) || !net) return;
+    // The merged log's rows resolve the same way — they are chain rows too.
+    const rows = mergedMode ? (merged.rows ?? []) : (hist.current.pages.get(page) ?? []);
     const byTs = new Map(net.globalSnapshots.map((g) => [g.timestamp, g]));
     for (const r of rows) {
       if (resolved.current.has(r.ts) || inFlight.current.has(r.ts)) continue;
@@ -385,7 +418,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         .finally(() => inFlight.current.delete(r.ts));
     }
     // `version` re-runs this when a page lands; rows are read from the ref.
-  }, [histNet, net, page, version]);
+  }, [histNet, mergedMode, merged.rows, net, page, version]);
 
   // ── The rows this render shows ──────────────────────────────────────────────────────────────
   // WINDOW mode builds from the live buffers (rebuilt per event-driven render on purpose — the
@@ -403,19 +436,30 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   let to = 0;
   let total = 0;
 
-  // Whether a range is CUTTING what this render shows (set in the branch that applies it).
-  let rangeActive = false;
-  if (!histNet) {
+  if (mergedMode) {
+    rows = (merged.rows ?? []).map((r) => {
+      const g = resolved.current.get(r.ts);
+      return {
+        metaId: r.addr,
+        ordinal: r.ordinal,
+        hash: r.hash,
+        fee: r.fee,
+        sizeInKB: r.sizeInKB,
+        ts: r.ts,
+        global: { ordinal: g?.ordinal ?? 0, timestamp: r.ts, hash: g?.hash ?? "", lastSnapshotHash: g?.lastSnapshotHash },
+        pending: !g,
+      };
+    });
+    allRows = rows;
+    total = merged.total ?? 0;
+    pages = merged.pages;
+    from = merged.from;
+    to = merged.to;
+  } else if (!histNet) {
     const listedRows = net ? buildAnchorLog(net.metaSnaps, net.globalSnapshots, filter) : [];
     const unlistedRows = net && (lens === "all" || lens === UNLISTED_ID) ? unlistedLog(net.globalSnapshots, snapshotExact) : [];
     allRowsUnbounded = sortAnchorLog([...listedRows, ...unlistedRows], sort.key, sort.dir, (metaId) => displayNetwork(metaId)?.ticker ?? metaId);
-    // A RANGE CUTS THE RECENT ROWS to its span (`bound`, addressed to no chain here).
-    // ⚠️ "IN RANGE" ONLY WHEN THE RECENT ROWS HOLD THE WHOLE RANGE (rule 10). Cut from the recent
-    // rows, a month's range showed "1–25 of 174 in range" — a count of what this view keeps, not of
-    // the range (1.29M). Where the range reaches past the oldest recent row, the count keeps the
-    // "recent" word, whose explanation is the route to the whole chain.
-    const oldestMs = allRowsUnbounded.reduce((m, r) => Math.min(m, Date.parse(r.ts) || Infinity), Infinity);
-    rangeActive = !!bound && bound.addr == null && bound.fromMs >= oldestMs;
+    // A RANGE CUTS THE LATEST ROWS to its span (`bound`, addressed to no chain) — the unlisted lens.
     const cut = !!bound && bound.addr == null;
     allRows = cut ? allRowsUnbounded.filter((r) => tsInRange(r.ts, bound!.fromMs, bound!.toMs)) : allRowsUnbounded;
     total = allRows.length;
@@ -435,7 +479,6 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     // ordinals sit on, and only the rows between them (the boundary pages hold neighbours too).
     const span = bound && bound.addr === histAddr && bound.first != null && bound.last != null && latest ? bound : null;
     if (span) rangePages = { lo: pageOfOrdinal(span.last!, latest, PAGE), hi: pageOfOrdinal(span.first!, latest, PAGE) };
-    rangeActive = !!span;
     const rawPage = hist.current.net === histAddr ? (hist.current.pages.get(page) ?? []) : [];
     const raw = span ? rawPage.filter((r) => r.ordinal >= span.first! && r.ordinal <= span.last!) : rawPage;
     const mapped: ViewRow[] = raw.map((r) => {
@@ -507,7 +550,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     // from seconds ago. The commit waits for the search and takes the row it lands on (below).
     // Read from the STORE: this effect is declared before the one that consumes `logSeek`, so in
     // the arriving commit no local flag has been raised yet.
-    if (useStore.getState().logSeek?.metaId) return;
+    if (useStore.getState().logSeek) return;
     armed.current = false;
     applyClickActions(
       metaSnapArrivalActions(
@@ -624,6 +667,34 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     const n = Number(qTick.replace(/[^\d]/g, ""));
     if (!Number.isFinite(n) || n < 1) return;
     setJumpMiss(null);
+    // UNDER ALL a global snapshot is exactly the snapshots it carries — its own manifest, one read —
+    // shown merged like any other cut of the log.
+    if (mergedMode) {
+      setSeeking(true);
+      try {
+        const res = await fetch(netUrl(`/api/snapshot/${n}`));
+        if (!res.ok) {
+          setJumpMiss(`global snapshot ${n.toLocaleString()} is no longer served — search by date instead`);
+          return;
+        }
+        const d = (await res.json()) as { rows?: { metaId: string; ordinal: number }[] };
+        const spans = new Map<string, { lo: number; hi: number }>();
+        for (const r of d.rows ?? []) {
+          if (!mergedChains.includes(r.metaId)) continue;
+          const s = spans.get(r.metaId);
+          spans.set(r.metaId, s ? { lo: Math.min(s.lo, r.ordinal), hi: Math.max(s.hi, r.ordinal) } : { lo: r.ordinal, hi: r.ordinal });
+        }
+        if (!spans.size) { setJumpMiss(`no listed network anchored into global snapshot ${n.toLocaleString()}`); return; }
+        setMarked(null);
+        setMergedScope({ kind: "spans", spans: mergedChains.filter((a) => spans.has(a)).map((addr) => ({ addr, ...spans.get(addr)! })) });
+        mergedLand.current = "newest";
+      } catch {
+        setJumpMiss("the read failed — try again");
+      } finally {
+        setSeeking(false);
+      }
+      return;
+    }
     if (!histNet) {
       const idx = allRows.findIndex((r) => r.global.ordinal === n);
       if (idx < 0) {
@@ -704,6 +775,15 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     exactTo.current = null;
     setJumpMiss(null);
     if (fromMs == null) { setJumpMiss("pick a from-date"); return; }
+    // UNDER ALL every network's chain is cut to the span, with its exact total: a closed span opens
+    // on its newest snapshot, a from-date alone on that date (the oldest end).
+    if (mergedMode) {
+      setBound(null);
+      setMarked(null);
+      setMergedScope({ kind: "time", fromMs, toMs });
+      mergedLand.current = toMs != null ? "newest" : "oldest";
+      return;
+    }
     if (!histNet) {
       // The recent rows are CUT to the range (the render applies `bound`), so the first in-range
       // row is page 1's first row.
@@ -866,6 +946,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       pendingSeek.current = true;
       exactFrom.current = logSeek.fromMs;
       exactTo.current = logSeek.toMs;
+      setArriving(true);
       setMarked(null);
       setJumpMiss(null);
     }
@@ -976,7 +1057,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   );
 
   const clearSearch = () => {
-    setQSnapshot(""); setQTick(""); setQFrom(""); setQTo(""); setDoorLabel(null); setBound(null);
+    setQSnapshot(""); setQTick(""); setQFrom(""); setQTo(""); setDoorLabel(null); setBound(null); setMergedScope({ kind: "all" });
     // Clearing the search drops a door's scope, and under "all" the log's own pick too.
     setDoorMeta(null);
     if (!lensNet) setSearchMeta(null);
@@ -1039,14 +1120,14 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
             qTick && {
               key: "tick",
               text: `in global ${fmtOrd(qTick)}`,
-              clear: () => { setQTick(""); setMarked(null); setJumpMiss(null); },
+              clear: () => { setQTick(""); setMarked(null); setJumpMiss(null); if (mergedScope.kind === "spans") setMergedScope({ kind: "all" }); },
             },
             (qFrom || qTo) && {
               key: "age",
               // In the date picker's own words ("Mar 13 – Mar 20"), never the field's YYYY-MM-DD.
               // The chain it searches leads, as on the snapshot chip ("DED Sep 8 – Oct 7").
               text: `${searchNet ? (displayNetwork(searchNet)?.ticker ?? searchNet) + " " : ""}${doorLabel ?? (qFrom && qTo ? (qFrom === qTo ? dayWords(qFrom) : `${dayWords(qFrom)} – ${dayWords(qTo)}`) : qFrom ? `from ${dayWords(qFrom)}` : `to ${dayWords(qTo)}`)}`,
-              clear: () => { setQFrom(""); setQTo(""); setDoorLabel(null); setBound(null); },
+              clear: () => { setQFrom(""); setQTo(""); setDoorLabel(null); setBound(null); if (mergedScope.kind === "time") setMergedScope({ kind: "all" }); },
             },
           ]
             .filter((c): c is { key: string; text: string; clear: () => void } => !!c)
@@ -1100,6 +1181,20 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     </div>
   );
 
+  // A MERGED SEARCH LANDS once its page is here: a from-date alone first goes to the oldest end
+  // (the date it asked for), then the page's first row is marked — and an arrival commits it below.
+  useEffect(() => {
+    if (!mergedMode || !mergedLand.current || merged.loading || !merged.rows) return;
+    if (mergedLand.current === "oldest") {
+      mergedLand.current = "newest";
+      if (merged.pages > 1) { merged.go(merged.pages); return; }
+    }
+    mergedLand.current = null;
+    const first = merged.rows[0];
+    if (first) setMarked(first.ordinal);
+    else { setArriving(false); setJumpMiss("no snapshots in that range"); }
+  });
+
   // The hold ends on the ANSWER'S ROWS, not on the walk: the walk lands on a page number and the
   // page still has to be read, and ending on the walk showed "reading the chain…" in between.
   useEffect(() => {
@@ -1126,14 +1221,38 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     );
   });
 
-  if (arriving && histNet)
+  // THE LOG'S WAITING STATES (the state-atom rules, components/CLAUDE.md): a block that is being
+  // read says so in a word beside the twinkling node-stars, and a transient one is HELD for a calm
+  // beat (`useMinHold`) so a fast answer never blinks it on and off. The first read of every chain
+  // under All is the long one — a page of each network, in parallel.
+  const firstRead = useMinHold(mergedMode && merged.rows == null && !merged.error);
+  const waiting = (words: string) => (
+    <p className="m-auto inline-flex items-center gap-2.5 text-label text-muted-foreground">
+      <NodeStars count={3} />
+      {words}
+    </p>
+  );
+
+  if (arriving && (histNet || mergedMode))
     return (
       <>
         {toolbar}
         {search}
-        <p className="m-auto text-label text-muted-foreground">
-          {`Finding the snapshots from ${qFrom || "that date"}…`}
-        </p>
+        {/* The span in the card's own words when a door brought it, else the day the reader typed. */}
+        {waiting(`Finding the snapshots ${doorLabel ? `in ${doorLabel}` : qFrom ? `from ${dayWords(qFrom)}` : "you asked for"}…`)}
+      </>
+    );
+
+  if (mergedMode && (firstRead.show || merged.rows == null))
+    return (
+      <>
+        {toolbar}
+        {search}
+        {merged.error ? (
+          <p className="m-auto text-label text-muted-foreground">The snapshot history could not be read — search again to retry</p>
+        ) : (
+          <div className={cn("m-auto", firstRead.fading && "animate-hold-fade-out motion-reduce:animate-none")}>{waiting("Reading every network's snapshots…")}</div>
+        )}
       </>
     );
 
@@ -1143,7 +1262,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         {toolbar}
         {search}
         <p className="m-auto text-label text-muted-foreground">
-          {!live ? "NO SIGNAL" : histNet ? (histErr ? "history unavailable — the explorer read failed; paging again retries" : "reading the chain…") : "Waiting for anchored metagraph snapshots…"}
+          {!live ? "NO SIGNAL" : mergedMode ? "No snapshots here" : histNet ? (histErr ? "history unavailable — the explorer read failed; paging again retries" : "reading the chain…") : "Waiting for anchored metagraph snapshots…"}
         </p>
       </>
     );
@@ -1154,7 +1273,9 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     <>
       {toolbar}
       {search}
-      <ScrollArea className="flex-1 min-h-0">
+      {/* A PAGE BEING READ keeps the previous page on screen, dimmed — a page turn never blanks the
+          table (the merged log reads a page of every network). */}
+      <ScrollArea className={cn("flex-1 min-h-0 transition-opacity duration-150", mergedMode && merged.loading && "opacity-60")} aria-busy={mergedMode && merged.loading}>
         {/* PHONE SETS THE LOG AT THE LABEL STEP (2026-10-02, the phone pass): the type scale raised
             the table's 14px rows with everything else, and the four columns that survive on phone
             (see COLUMNS) outgrew the pane again — AGE was cut off at the right edge. */}
@@ -1276,7 +1397,9 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                     <TableCell colSpan={columns.length} className="pt-3 pb-1 max-[700px]:block">
                       <span className="flex items-baseline gap-2 text-label text-muted-foreground">
                         <span className="uppercase tracking-caps">Global</span>
-                        <span className="italic">anchoring…</span>
+                        {/* A chain row IS anchored — only its global's number is still being read,
+                            so the number's slot twinkles; a live row is genuinely still anchoring. */}
+                        {histNet || mergedMode ? <NodeStars count={3} /> : <span className="italic">anchoring…</span>}
                       </span>
                     </TableCell>
                   </TableRow>
@@ -1451,11 +1574,16 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         <p className="flex-none pt-1 text-label text-[var(--warn-soft)]">{jumpMiss}</p>
       )}
       <TablePager
-        page={rangePages ? page - rangePages.lo + 1 : histNet ? page : Math.min(page, pages)}
+        page={mergedMode ? merged.page : rangePages ? page - rangePages.lo + 1 : histNet ? page : Math.min(page, pages)}
         pages={pages}
         from={from}
         to={to}
         total={total}
+        // REAL TOTALS, written out (user, 2026-10-07): the count is the answer, not an estimate.
+        exact
+        // While the networks' spans are still being measured, the count slot twinkles (NodeStars —
+        // a value arriving into its slot).
+        totalPending={mergedMode && merged.total == null}
         // The windowed lenses state their scope and the way further back (user, 2026-08-14) —
         // since 2026-09-02 as one underlined word with the explanation behind it, because the
         // spelled-out line ran too long. The word was "window" until 2026-09-13, which named
@@ -1463,13 +1591,12 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         // the Snapshots explorer's word too, so the qualifier is learned once. The title still
         // carries what the count actually is: the window is a span of TIME, and networks
         // snapshot at their own rates, so 262 here is not a fraction of anything.
-        // A RANGE says the count is the range's, in two words.
-        scope={rangeActive ? { word: "in range" } : histNet ? undefined : {
-          word: "recent",
-          title: "These are only the most recent snapshots, not a whole chain. This view keeps a short stretch of TIME, and every network snapshots at its own rate — so a busy network fills it with hundreds while a quiet one adds three, and the count says nothing about how long either chain is. Pick a network in the top-bar filter to page through all of its snapshots, back to the very first one.",
-        }}
+        // The one qualifier left is the unlisted lens's: an unlisted channel has no public chain, so
+        // that view holds only the latest snapshots — said in one plain word, no lecture behind it.
+        scope={!histNet && !mergedMode ? { word: "recent" } : undefined}
         onPage={(n) => {
           landCommit.current = null; // paging away from a landing leaves it uncommitted
+          if (mergedMode) { setMarked(null); merged.go(n); return; }
           setPageState(rangePages ? n + rangePages.lo - 1 : n);
           // Manual paging is the reader leaving the landing — release the row-follow, or the
           // next live tick would snap the view straight back to the mark.
