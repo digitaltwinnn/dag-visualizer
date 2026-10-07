@@ -87,7 +87,10 @@ export default function ExplorerPath({ crumbs, hint, className }: { crumbs: read
               )}
             >
               {last ? (
-                <BreadcrumbPage className={cn(STEP, shape, pad, "w-full bg-wash-strong text-foreground")} title={c.title}>
+                // "YOU ARE HERE" IS A LABEL, NOT TEXT (user, 2026-10-07: "the mouse pointer is |"): its
+                // list is already on screen, so it takes no click — the default cursor and no text
+                // selection keep it from reading as a broken link beside the steps that do.
+                <BreadcrumbPage className={cn(STEP, shape, pad, "w-full cursor-default select-none bg-wash-strong text-foreground")} title={c.title}>
                   {/* The root as the page — nothing opened yet: the house, then the root's word. */}
                   {c.root && <House aria-hidden className="size-3.5 flex-none" />}
                   <span className="min-w-0 truncate [&>*]:align-middle">{c.label}</span>
