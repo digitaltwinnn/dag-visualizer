@@ -12,6 +12,7 @@ import {
   calloutHangs,
   calloutPlacement,
   calloutPhonePlacement,
+  CALLOUT_PHONE_MAX_K,
 } from "./calloutPlacement";
 
 // The band the three supported tiers actually present, so the cases below read as real geometry
@@ -172,8 +173,12 @@ describe("calloutPhonePlacement — the label in the free strip above or below i
     expect(p).toEqual({ show: true, drop: false, left: -PW / 2, leader: 200 - (TOP + AIR + PH) });
   });
   it("drops the panel just above the dock when the bottom edge is nearer", () => {
-    const p = place(195, 330);
-    expect(p).toMatchObject({ show: true, drop: true, leader: BOTTOM - AIR - PH - 330 });
+    const p = place(195, 340);
+    expect(p).toMatchObject({ show: true, drop: true, leader: BOTTOM - AIR - PH - 340 });
+  });
+  it("…but never further than twice the old standoff — the label stays attached", () => {
+    const p = calloutPhonePlacement(195, 300, 0, W, TOP, 900, PW, PH);
+    expect(p.leader).toBe(rise * CALLOUT_PHONE_MAX_K);
   });
   it("nudges the panel inside the band near a side edge, keeping 8px of air", () => {
     expect(place(20, 200).left).toBe(8 - 20);

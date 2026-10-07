@@ -130,6 +130,8 @@ export function calloutHangs(x: number, y: number, bandL: number, bandR: number,
 /** The phone leader's SHORTEST length, as a share of the standing standoff's height (read as
  *  `--co-phone-k`); the label goes further out, to the free strip, wherever it can. */
 export const CALLOUT_PHONE_K = 0.4;
+/** The phone leader's LONGEST length, as a multiple of its shortest. */
+export const CALLOUT_PHONE_MAX_K = 2;
 const PHONE_AIR = 8;
 
 /**
@@ -164,5 +166,9 @@ export function calloutPhonePlacement(
   const lo = bandL + PHONE_AIR - x;
   const hi = bandR - PHONE_AIR - panelW - x;
   const left = Math.max(lo, Math.min(hi, -panelW / 2));
-  return { show: true, drop, left, leader: drop ? down : up };
+  // …but not ALL the way (user, same day: "now it's too long"): a label at the screen's edge on a
+  // 200px line stopped reading as attached. The leader stops at `CALLOUT_PHONE_MAX_K` × the old
+  // standoff, so the label moves OUT TOWARD the strip and stays near enough to read as its subject's.
+  const cap = rise * CALLOUT_PHONE_MAX_K;
+  return { show: true, drop, left, leader: Math.min(drop ? down : up, cap) };
 }
