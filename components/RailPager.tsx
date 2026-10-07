@@ -67,6 +67,7 @@ import { positionMarks, siblingSet } from "@/components/railSiblings";
 import { useSiblingState } from "@/components/useSiblingState";
 import { Button } from "@/components/ui/button";
 import type { RailCardKind } from "@/components/railCards";
+import { RailHoverHost, type RailHoverHandlers } from "@/components/CardHead";
 
 const ENGAGE_PX = 14; // horizontal travel before the drag claims the pointer
 const STEP_PX = 48; // release travel that commits a step
@@ -191,6 +192,9 @@ const PLANK_BTN = cn("size-6 disabled:opacity-30", TOUCH_HIT);
 export default function RailPager({ slot, children }: { slot: RailCardKind; children: ReactNode }) {
   // The rail's state, read by the ONE builder the next ghost's quick picks share (`useSiblingState`).
   const state = useSiblingState(slot);
+  // The card's hover handlers, registered by its RailPane (CardHead's `RailHoverHost`) and fired by
+  // this wrapper, which holds the panel AND the plank — one hover surface for the whole card.
+  const hover = useRef<RailHoverHandlers>({});
   const set = useMemo(() => siblingSet(slot, state), [slot, state]);
 
   // --- swipe state: ALL refs. Nothing here re-renders — the transform is written to the node. ---
@@ -563,8 +567,11 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
         onClickCapture={onClickCapture}
+        onMouseEnter={() => hover.current.enter?.()}
+        onMouseMove={() => hover.current.move?.()}
+        onMouseLeave={() => hover.current.leave?.()}
       >
-        {children}
+        <RailHoverHost.Provider value={hover}>{children}</RailHoverHost.Provider>
         {/* The plank's own DIVISION (user, 2026-08-10). The card-density redesign made the foot a
             small muted mono column, which left a CONTROL sitting directly under DATA at the same
             visual weight — the plank read as one more foot row. This is one inset hairline, the
