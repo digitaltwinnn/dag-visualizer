@@ -1,5 +1,6 @@
 "use client";
 
+import { Pin } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { ledgerNetwork } from "@/src/engine/domain/tickNet";
 
@@ -274,6 +275,9 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // `components/FollowControl.tsx`); the scene callout mirrors it and this explorer no longer
   // carries the pill or its hover preview.
 
+  // The shown tick's state mark (see the tick rows): the card's live dot while following, a pin while pinned.
+  const followMark = following ? <LiveDot /> : <Pin aria-hidden className="size-3 text-muted-foreground" />;
+
   // ---- level 0: the ticks, paged, measured by the heading's pick -------------------------------
   const tickValues = pagedSnaps.map((d) => tickMeasureValue(ledgerMeasure, d, snapshotExact[d.ordinal]));
   const maxTick = Math.max(1e-9, ...tickValues.map((v) => v ?? 0));
@@ -324,7 +328,16 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         const on = d.ordinal === activeSnapOrd;
         return {
           key: String(d.ordinal),
-          name: <span className="tabular-nums">{d.ordinal.toLocaleString()}</span>,
+          // THE SHOWN TICK SAYS WHETHER IT IS LIVE OR PINNED (user, 2026-10-07: on a phone the Global
+          // snapshot card — the one control, B1 — sits in the other sheet, so the explorer gave no
+          // indication at all). A quiet STATE MARK on the highlighted row, never a second control:
+          // the card's beating live dot while following, a pin while pinned.
+          name: (
+            <span className="inline-flex items-center gap-1.5 tabular-nums">
+              {d.ordinal.toLocaleString()}
+              {on && followMark}
+            </span>
+          ),
           // THE LENS IS THE BAR'S COLOUR, not a number beside it (user, 2026-10-04: "remove the
           // added '1' and instead use the colour"). The bar always measures the whole tick, as it
           // does unfiltered, so it keeps the default cyan; a tick the committed network anchored
@@ -341,7 +354,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           // state), which a re-box would swallow — and its Global snapshot card is the box anyway.
           faint: !!filterNet && count === 0 && !on,
           // The count the bar's colour stands for, in words — colour is never the only carrier.
-          title: `Global snapshot ${d.ordinal.toLocaleString()}, ${d.metagraphSnapshotCount ?? 0} snapshot${(d.metagraphSnapshotCount ?? 0) === 1 ? "" : "s"} anchored${filterNet ? (count > 0 ? `, ${count} from ${filterNet.name}` : `, none from ${filterNet.name}`) : ""}`,
+          title: `Global snapshot ${d.ordinal.toLocaleString()}${on ? (following ? ", live" : ", pinned") : ""}, ${d.metagraphSnapshotCount ?? 0} snapshot${(d.metagraphSnapshotCount ?? 0) === 1 ? "" : "s"} anchored${filterNet ? (count > 0 ? `, ${count} from ${filterNet.name}` : `, none from ${filterNet.name}`) : ""}`,
           onClick: () => {
             // THE SELECTED ROW DRILLS (user, 2026-10-07 — the explorer rests on this list, its axis,
             // so the highlighted row is always on screen and is the way DOWN): it opens the tick's
@@ -407,7 +420,13 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
       key: "networks",
       parent: "snap",
       crumb: {
-        label: <span className="tabular-nums">{tick.ordinal.toLocaleString()}</span>,
+        // The shown tick's live / pinned mark rides its path step too, so a drilled list still says it.
+        label: (
+          <span className="inline-flex items-center gap-1.5 tabular-nums">
+            {tick.ordinal.toLocaleString()}
+            {tick.ordinal === activeSnapOrd && followMark}
+          </span>
+        ),
         onRelease: () => setPath((p) => ({ ...p, net: null, snap: null })),
       },
       meaning: "Networks that anchored into it",
