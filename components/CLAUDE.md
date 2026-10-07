@@ -207,14 +207,11 @@ decisions inside them are design, not detail:
   every tick still lists (they all happened — rule 10 doesn't let a lens edit the facts), a tick the
   network anchored into carries its count in the network's hue as the row's tag, one it sat out is
   `faint`, and inside a tick only the committed network's row is drillable (`outOfLens`); **the
-  path follows a commit made elsewhere** (a tile, the rail's ‹ › plank, the raw log) but never
-  auto-opens from the root on the live heartbeat, because the newest tick changes every few
-  seconds — and it MIRRORS the snapshot chain's box (user, 2026-10-07): the Metagraph snapshot card stands
-  it at the network's snapshots in the tick, that row washed; the Node card one level deeper, at
-  the signers, the node's row washed. Live, the heartbeat is followed only while one of those two
-  is the box, and the path steps back to the tick list when the box leaves them
-  (`src/data/ledgerPath.ts`). So the committed snapshot's washed row DRILLS into its signers
-  rather than deselecting — the card's × is its release. The LIVE/PINNED
+  path follows the SELECTION** (`src/data/ledgerPath.ts`) — a commit made anywhere (a tile, the
+  rail's ‹ › plank, the raw log) opens it down to that subject, a selected metagraph snapshot to
+  its signers; live under a filter the heartbeat's selection is followed too (it moves only when
+  that network anchors a new snapshot), while the unfiltered live stream leaves it at the tick
+  list, which IS the stream. The LIVE/PINNED
   control rides the CARD HEAD's eyebrow row with the shown snapshot's ticking age (2026-09-28 —
   it rode the heading row as the level's setting, design decision 15, until then), and the pager
   states the TIME the rows span ("last 11 min") rather than "52 recent". Each level shows
@@ -286,7 +283,17 @@ country" names one measure of three). Eyebrows are bare role words, and each exp
 hint leads its card rather than trailing it. An explorer ROW is a browse target — mark, name, count,
 nothing more; **the prose that EXPLAINS a subject belongs to that subject's right-rail card, once**,
 and since a row commits its card in the same click, nothing is lost by keeping the sentence in one
-place. **Every row click shows its card** (user, 2026-10-04: "happens for some but not for all"):
+place. **THE EXPLORER SHOWS THE OPEN CARD'S CHILDREN** (user, 2026-10-07 — one rule for every view,
+after a day of per-case fixes): the selected child's row highlighted, and a card with no children
+(a node) showing its siblings. A view hands `Explorer` every level its SELECTION opens, each level
+naming the rail card whose children it lists (`ExplorerLevelSpec.parent`), and the Explorer cuts
+the path at `store.boxedCard` (`components/explorer/boxLevel.ts`). Every new selection opens its
+own card, so normally nothing is cut; opening an already-selected card higher up (Country while a
+node is held) steps the explorer up to that card's children without unselecting anything — the
+camera and the callout already follow the open card, and now so does the explorer. A crumb, by
+contrast, releases the finer selections. So every level's rows mark their selected child (`on`)
+and carry its card (`rung`), even where a deeper level used to hide it.
+**Every row click shows its card** (user, 2026-10-04: "happens for some but not for all"):
 a row tagged with its card's slot (`ExplorerRowSpec.rung`) that is already committed brings that card
 back to the front when another card is the box, and only deselects once its own card is in front
 (`openOrToggle` in `Explorer.tsx` — view state, no selection written). Snapshots' network row commits

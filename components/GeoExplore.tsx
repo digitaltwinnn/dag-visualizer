@@ -136,6 +136,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
   const levels: ExplorerLevelSpec[] = [
     {
       key: "countries",
+      parent: "context",
       crumb: { label: "Countries", onRelease: () => (country ? drill(country) : undefined) },
       measure: { options: GEO_MEASURE_OPTIONS, value: geoMeasure, onPick: (id) => setGeoMeasure(id as GeoMeasure) },
       hasFigure: true,
@@ -175,6 +176,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
     const maxRows = Math.max(1, ...cohorts.map((ch) => cohortMeasure(cohortPick, ch.rows)));
     levels.push({
       key: "cohorts",
+      parent: "country",
       crumb: {
         // The name alone (user, 2026-09-26: the crumb "does not need both DE and Germany").
         label: drilled.country,
@@ -234,6 +236,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
   if (drilled && openCohort) {
     levels.push({
       key: "nodes",
+      parent: "cohort",
       crumb: {
         label: cohortLabel(openCohort),
         title: cohortLabel(openCohort),

@@ -129,6 +129,7 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
     const maxRows = Math.max(1, ...groupValues);
     levels.push({
       key: "compositions",
+      parent: "context",
       crumb: {
         label: (
           <>
@@ -156,6 +157,11 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
           share: v / maxRows,
           hue: netHue,
           figure: v.toLocaleString(),
+          // The selected group, as every explorer marks its selected child — on screen with a
+          // group held when the Metagraph card is open (`levelsForBox`), where its click brings
+          // the Composition card to the front rather than releasing it.
+          on: openGroup?.key === g.key,
+          rung: "composition",
           title: `${g.label} · ${g.rows.length} node${g.rows.length === 1 ? "" : "s"}`,
           onClick: () => toggleComposition(g.key),
           pair: {
@@ -179,6 +185,7 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
     const clause = compositionClause(openGroup.codes);
     levels.push({
       key: "nodes",
+      parent: "composition",
       crumb: { label: openGroup.label },
       meaning: clause ? `Nodes that ${clause}` : "Each node running this composition",
       glyphW: NODE_GLYPH_W,

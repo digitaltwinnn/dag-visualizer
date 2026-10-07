@@ -184,7 +184,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   const selNodes = useStore((s) => s.selNodes);
   const metaList = useStore((s) => s.metaList); // co-location reads the full catalog (nodeRowSpec)
   const inspect = useStore((s) => s.inspect);
-  const boxed = useStore((s) => s.boxedCard);
   // ONE PICK FOR EVERY LEVEL (user, 2026-09-29 — `src/data/explorerMeasure.ts`): the lower levels
   // show the tick level's `ledgerMeasure` where they can state it and their own first measure where
   // they can't, and a pick at any level writes that one value — so stepping down and back up never
@@ -277,7 +276,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
       : null,
     snapOrd: activeSnapOrd,
     following,
-    boxed,
   };
   const [seenView, setSeenView] = useState(pathView);
   if (pathViewChanged(seenView, pathView)) {
@@ -428,6 +426,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
     levels.push({
       pager: spanFooter,
       key: "networks",
+      parent: "snap",
       crumb: {
         label: <span className="tabular-nums">{tick.ordinal.toLocaleString()}</span>,
         onRelease: () => setPath((p) => ({ ...p, net: null, snap: null })),
@@ -450,12 +449,14 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           hue: n.hue,
           figure: m.text,
           // The row IS a committed subject when its band is the live selection: this network's
-          // filter on this tick, with no finer snapshot pinned under it (the byte bar's band click).
-          // …or the network committed INSIDE this tick (the pager's ∨, a band — 2026-10-02).
-          on:
-            ledgerNetwork({ filter, tickNet, snapOrdinal: activeSnapOrd ?? null }) === n.id &&
-            activeSnapOrd === tick.ordinal &&
-            metaSnap == null,
+          // filter on this tick, or the network committed INSIDE this tick (the pager's ∨, a band —
+          // 2026-10-02) — with a snapshot of it selected or not: this level is on screen with a
+          // snapshot held exactly when the Global snapshot card is open (`levelsForBox`), and then
+          // the network is the selected child the rule highlights (user, 2026-10-07).
+          on: ledgerNetwork({ filter, tickNet, snapOrdinal: activeSnapOrd ?? null }) === n.id && activeSnapOrd === tick.ordinal,
+          // Selected, its click brings the Metagraph card to the front (`openOrToggle`) — the
+          // explorer then steps to that card's children — rather than re-committing the network.
+          rung: "context",
           // Out of the lens: listed (it really did anchor here), not drillable.
           faint: lensedOut,
           title: lensedOut
@@ -513,6 +514,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
     levels.push({
       pager: spanFooter,
       key: "snapshots",
+      parent: "context",
       crumb: {
         label: (
           <>
@@ -545,24 +547,11 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           hue: leafHue,
           figure: snapMeasure(snapPick, r),
           on,
-          // The committed row DRILLS rather than re-boxing: since the path mirrors the box
-          // (ledgerPath.ts), this row is on screen exactly while its card is the box, so the
-          // re-box would be a no-op and the deselect would undo what the reader is looking at.
-          rung: on && signers.length > 0 ? undefined : "metaSnap",
+          rung: "metaSnap",
           title: isUnlisted
             ? `Unlisted channel ${r.metaId} · anchored into global ${tick.ordinal.toLocaleString()}${signers.length ? ` · signed by ${signers.length} ${SIGNER_GROUPS.proof.who}` : ""}`
             : `${leafName} snapshot ${r.ordinal.toLocaleString()} · anchored into global ${tick.ordinal.toLocaleString()}${signers.length ? ` · signed by ${signers.length} ${SIGNER_GROUPS.proof.who}` : ""}`,
           onClick: () => {
-            // THE COMMITTED ROW OPENS ITS SIGNERS (user, 2026-10-07 — "clicking the metagraph
-            // snapshot does not expand to the node row anymore"): the path stands here while the
-            // snapshot's card is the box, so a click on its washed row is the step down, not a
-            // deselect — the card's × is the release. A live row still converts to a pin, the
-            // click-scoped decode rule.
-            if (on && signers.length > 0) {
-              if (following) applyClickActions(metaSnapSelectActions(sel, globalPick, { metaSnap, following, inspect: useStore.getState().inspect }));
-              setPath((p) => ({ ...p, snap: key }));
-              return;
-            }
             applyClickActions(metaSnapSelectActions(sel, globalPick, { metaSnap, following, inspect: useStore.getState().inspect }));
             // The AFFORDANCE FOLLOWS THE DATA: no exact read for this tick means no signers are
             // knowable, so the row commits and stays — a level onto nothing would claim a fact
@@ -584,6 +573,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
     levels.push({
       pager: spanFooter,
       key: "signers",
+      parent: "metaSnap",
       crumb: { label: <span className="tabular-nums">{leaf.ordinal > 0 ? leaf.ordinal.toLocaleString() : `${leaf.metaId.slice(0, 10)}…`}</span> },
       // The cards' own phrase ("Signed by N L0 validators") — the producing layer named before
       // the rows, because the constant count is most puzzling here (3 rows under a 20-node network).
