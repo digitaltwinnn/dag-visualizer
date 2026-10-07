@@ -472,6 +472,27 @@ export function holdOrder(held: readonly string[], ranked: readonly string[]): s
   return [...kept, ...ranked.filter((id) => !have.has(id))];
 }
 
+/** A MOMENT'S READING AS A SENTENCE ABOUT ITS NETWORK (user, 2026-10-07: "7 per 5 min … not very
+ *  clear", then "what does 'per 5 minutes' mean to the metagraph? — that's what the section is
+ *  for, relation to parent"). The lead says what the network above DID in the moment, so the reading
+ *  is a verb and its object around the number: "DED anchored 7 snapshots in those 5 minutes". A moment
+ *  IS one bucket, so the reading is what happened inside it, never a rate; the card's title says
+ *  which bucket and the closing words how wide it is. The caller writes the subject and the number;
+ *  this says the rest. Where the formatter already carries the noun ("1.2 MB") the object is "of
+ *  data"; a gauge is what stood, so it carries no bucket. The verb is ANCHORED, the app's word for
+ *  what a network does with a snapshot (user, same day: "sealed or anchored?"). */
+export function momentPhrase(metric: TrendMetric, stepMs: number): { verb: string; rest: string } {
+  const inBucket = stepMs >= 86400000 ? "on that day" : stepMs >= 3600000 ? "in that hour" : "in those 5 minutes";
+  switch (metric) {
+    case "snapshots": return { verb: "anchored", rest: `snapshots ${inBucket}` };
+    case "blocks": return { verb: "produced", rest: `blocks ${inBucket}` };
+    case "fees": return { verb: "paid", rest: `DAG in fees ${inBucket}` };
+    case "kb": return { verb: "anchored", rest: `of data ${inBucket}` };
+    case "nodes": return { verb: "ran", rest: "nodes" };
+    case "continuity": return { verb: "anchored a snapshot every", rest: inBucket };
+  }
+}
+
 /** What a History card says it is showing: the measure's name with its unit, in one phrase.
  *  The card's head used to carry the unit alone ("per day"), which was enough while the measure
  *  could only change in the rail's picker; once it can be stepped FROM the card (2026-09-19) the

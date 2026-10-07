@@ -5,7 +5,7 @@ import { INSTANT_ICON } from "@/components/icons";
 
 import CardHead, { RailPane } from "@/components/CardHead";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
-import { Lead, FactGroup, UnitMarks, CUT_ROW, TickerChip, figWidth } from "@/components/inspector/parts";
+import { Lead, FactGroup, UnitMarks, CUT_ROW, figWidth } from "@/components/inspector/parts";
 import { Separator } from "@/components/ui/separator";
 import { SELECTED_ROW, selectionHue } from "@/components/selection";
 import { openRecords, spanOfWindow } from "@/components/trendDoors";
@@ -14,7 +14,7 @@ import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { cn } from "@/lib/utils";
 import { metagraphById } from "@/src/data/network";
-import { instantNote, orderAt, placeInstant, rankAt, valueAt } from "@/src/data/trendSeries";
+import { instantNote, momentPhrase, orderAt, placeInstant, valueAt } from "@/src/data/trendSeries";
 import { ageWords } from "@/src/util/relativeAge";
 import { stampInstant } from "@/src/data/trendTimeline";
 import { bucketAt } from "@/src/data/trendWindow";
@@ -93,15 +93,15 @@ export default function TrendInstantPane({
   // The busiest network's reading at this instant — what a row's bar is a fraction of.
   const peak = readings.reduce((m, r) => (r.value != null && r.value > m ? r.value : m), 0);
   const subjectValue = subject ? valueOf(subject) : null;
-  const rank = rankAt(readings.map((r) => r.value), subjectValue);
   // WITH NO NETWORK AS THE SUBJECT, THE LEAD IS THE WHOLE NETWORK. The global row answers the same
   // question the planes answer per chain (`globalSeries`, one home with the band's own overview),
   // so a reader who has focused nothing still gets a reading rather than an invitation.
   const globalValue = cursorMs != null && !subject ? valueAt(roster.global, buckets, stepMs, cursorMs) : null;
 
-  // The tier no longer rides the aside (it said "daily" there until 2026-09-26; the aside is the
-  // moment's AGE now) — the note below still names the precision where a reader needs it.
-  const fmt = (v: number | null) => (v != null ? format(v) : NO_READING);
+  // The lead's one reading: the subject network's, else the whole network's — and who it is about.
+  const lead = subject ? subjectValue : globalValue;
+  const who = subject ? metagraphById(subject)?.ticker || rows.get(subject)?.name || subject : "The whole network";
+  const phrase = momentPhrase(metric, stepMs);
 
   // THE SPAN THIS CARD'S DOOR CARRIES IS THE MOMENT (the search pass, 2026-10-02). It handed the
   // brushed range, else the whole window on screen — the document's rule, where a chart's link is
@@ -151,10 +151,22 @@ export default function TrendInstantPane({
       />
       {!collapsed && (
         <div>
-          {/* THE LEAD (the card skeleton, 2026-10-02): how long ago the moment was. It rode the
-              head's aside, which is a qualifier or a state on every card now — an age is what a
-              card SAYS, first. Measured from the bucket's start, as before. */}
-          {cursorMs != null && <Lead>{ageWords(Date.now() - (bucket ?? cursorMs))} ago</Lead>}
+          {/* THE LEAD: WHAT THE MOMENT WAS TO THE NETWORK ABOVE (user, 2026-10-07 — "what does this
+              mean to the metagraph? that's what the section is for, relation to parent"). One
+              sentence, the subject doing something in the moment's bucket ("DED anchored 7
+              snapshots in those 5 minutes", `momentPhrase`); with no network committed the subject
+              is the whole network. The AGE rides the lead's chip — how long ago the bucket began. */}
+          {cursorMs != null && (
+            <Lead aside={`${ageWords(Date.now() - (bucket ?? cursorMs))} ago`}>
+              {bucket != null && lead != null ? (
+                <>
+                  {who} {phrase.verb} <span className="font-medium text-foreground tabular-nums">{format(lead)}</span> {phrase.rest}
+                </>
+              ) : (
+                <>{who} has no reading here</>
+              )}
+            </Lead>
+          )}
           {bucket != null && <Separator className="mb-2" />}
           {bucket == null ? (
             // AN HONEST TERMINAL, not an empty card. The sentence is `instantNote`'s: only the
@@ -163,64 +175,16 @@ export default function TrendInstantPane({
             <p className="text-label text-muted-foreground">{note}</p>
           ) : (
             <>
-              {/* ── LEAD: the one reading this card exists to say ───────────────────────────
-                  Merged onto one line with its unit, the lead grammar's own rule (no "Value:"
-                  label — the unit carries it), with the rank riding beside it. */}
-              {/* The SCOPE rides the lead's own line, right-aligned (user, 2026-09-26: a row of its
-                  own was one row too many) — the reading left, whose reading it is right. */}
-              <p className="flex items-baseline justify-between gap-3 text-title font-semibold text-foreground">
-                <span className="min-w-0">
-                {subject ? (
-                  <>
-                    <span className="tabular-nums">{fmt(subjectValue)}</span>
-                    {subjectValue != null && unit ? <span className="text-body font-normal text-muted-foreground"> {unit}</span> : null}
-                    {/* The rank only where there is a field to rank in: under a filter the stack is
-                        one network, and "1 of 1" says nothing (user, 2026-09-26). */}
-                    {rank && rank.of > 1 && (
-                      <span
-                        className="ml-2 text-body font-normal text-muted-foreground"
-                        title={`Ranked among the ${rank.of} network${rank.of === 1 ? "" : "s"} with a reading at this instant`}
-                      >
-                        <span className="tabular-nums">
-                          {rank.rank} of {rank.of}
-                        </span>
-                      </span>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <span className="tabular-nums">{fmt(globalValue)}</span>
-                    {globalValue != null && unit ? <span className="text-body font-normal text-muted-foreground"> {unit}</span> : null}
-                  </>
-                )}
-                </span>
-                {/* Under a filter the TICKER alone, as the one chip (`TickerChip`, 2026-10-02): the
-                    dossier above names the network in full, and the lead line has one line's width. */}
-                {subject ? (
-                  <TickerChip
-                    text={metagraphById(subject)?.ticker || rows.get(subject)?.name || subject}
-                    hue={rows.get(subject)?.hue}
-                    title={rows.get(subject)?.name}
-                    className="self-center font-normal"
-                  />
-                ) : (
-                  <span className="min-w-0 truncate text-right text-label font-normal text-muted-foreground">Across the whole network</span>
-                )}
-              </p>
-
               {/* ── DETAIL: every layer at the cursor ────────────────────────────────────────
                   Ordered by the reading itself (`orderAt` — nulls last, ties stable), so the list
                   IS the ranking the lead states. Each row pairs and clicks exactly like a Network breakdown
                   row: the same channel, the same builder. */}
               {ranked.length > 1 && (
                 <>
-                  {/* A resting division between the LEAD (the picked reading) and the roster
-                      beneath it (user, 2026-09-26): the card-head rule's hairline. */}
-                  <div aria-hidden className="mt-3 border-t border-border" />
                   {/* WHAT THE LIST IS ABOUT, said once (design A): these are readings AT THE
                       INSTANT, in the bucket's own unit — the Networks list beside it averages a
                       span, and the two looked identical without this line. */}
-                  <p className="mt-2 mb-0 flex items-baseline justify-between text-label tracking-caps uppercase text-muted-foreground">
+                  <p className="mt-0 mb-0 flex items-baseline justify-between text-label tracking-caps uppercase text-muted-foreground">
                     <span>At that moment</span>
                     {unit ? <span className="normal-case tracking-normal">{unit}</span> : null}
                   </p>

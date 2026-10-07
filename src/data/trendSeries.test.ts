@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { headWord, spanAverage, spanWord, typeBands,
+import { headWord, momentPhrase, spanAverage, spanWord, typeBands,
   GLOBAL_METRIC_ROWS,
   GLOBAL_READING,
   TREND_METRICS,
@@ -650,5 +650,23 @@ describe("the DAG's own nodes are a stored series, like any network's", () => {
     const series = { "f.nodes": [167], "f.nodes.dag": [135], "f.nodes.dor": [17] };
     expect(metricSeries("nodes", "dag", series).points).toEqual([135]);
     expect(globalSeries("nodes", series)).toEqual([167]);
+  });
+});
+
+describe("momentPhrase — a moment's reading as a sentence about its network (user, 2026-10-07)", () => {
+  const say = (m: Parameters<typeof momentPhrase>[0], step: number, v: string) => {
+    const p = momentPhrase(m, step);
+    return `DED ${p.verb} ${v} ${p.rest}`.trim();
+  };
+  // A moment is one bucket: what the network DID inside it, never a rate.
+  it("says what the network did in the moment's bucket", () => {
+    expect(say("snapshots", 300_000, "7")).toBe("DED anchored 7 snapshots in those 5 minutes");
+    expect(say("blocks", 3_600_000, "120")).toBe("DED produced 120 blocks in that hour");
+    expect(say("fees", DAY, "0.42")).toBe("DED paid 0.42 DAG in fees on that day");
+  });
+  it("leaves the noun to a formatter that carries it, and a gauge to what stood", () => {
+    expect(say("kb", DAY, "1.2 MB")).toBe("DED anchored 1.2 MB of data on that day");
+    expect(say("nodes", DAY, "12")).toBe("DED ran 12 nodes");
+    expect(say("continuity", DAY, "28s")).toBe("DED anchored a snapshot every 28s on that day");
   });
 });
