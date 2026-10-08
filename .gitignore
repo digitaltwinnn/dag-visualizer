@@ -33,5 +33,6 @@ next-env.d.ts
 # …and a checkpoint set aside while another rebuild runs (it refuses to trample one)
 .rebuild-trends-ckpt.*/
 
-# Claude Code personal settings
-.claude/settings.local.json
+# Claude Code: the shared project settings are tracked; everything else that lands here is personal
+.claude/*
+!.claude/settings.json
