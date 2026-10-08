@@ -13,7 +13,7 @@
 import { BandCard, MicroBars, DonutTotal, TypeGlyph, TYPE_ORDER, compositionCounts, staleFor, windowSpan, windowNote } from "@/components/vitals/bandParts";
 import { useStore } from "@/src/store/store";
 import { metagraphById, getAnchor } from "@/src/data/network";
-import { displayNetwork } from "@/src/data/unlisted";
+import { displayNetwork, UNLISTED_ID } from "@/src/data/unlisted";
 import { metaType, rolesOf, IdentityDot, RoleChips, TickerChip } from "@/components/inspector/parts";
 import { machineKey } from "@/src/data/composition";
 import { identityHudCss } from "@/src/palette/identity";
@@ -30,6 +30,7 @@ import { sliceWindow, trimNewestPartial, type TrendsWindowData } from "@/src/dat
 import { ageWords } from "@/src/util/relativeAge";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
+import { unlistedSeries } from "@/src/data/trendSeries";
 
 export function HyperCells({ accent }: { accent: string }) {
   const filter = useStore((s) => s.filter);
@@ -94,6 +95,30 @@ export function HyperCells({ accent }: { accent: string }) {
     { key: "cl1", label: <RoleChips compact codes={["cL1"]} />, count: layers.cl1! },
     { key: "dl1", label: <RoleChips compact codes={["dL1"]} />, count: layers.dl1! },
   ];
+
+  // UNKNOWABLE, NOT ZERO (the Unlisted audit, 2026-10-07): the unlisted channels publish no nodes,
+  // so "0 L0 · 0 cL1 · 0 dL1", an empty composition and a status that never resolved all read as
+  // "no nodes" — a claim the app cannot make. One card says what the set is, one says the nodes
+  // are not knowable, and nothing waits.
+  if (filter === UNLISTED_ID)
+    return (
+      <>
+        <BandCard
+          label="Network type"
+          lead={
+            <span className="flex flex-col items-center gap-1">
+              <TypeGlyph t="mixed set" className="size-4" color={accent} />
+              <span className="font-mono text-label text-foreground whitespace-nowrap">mixed set</span>
+            </span>
+          }
+        >
+          <span className="flex items-center self-stretch text-label text-muted-foreground">channels the catalog does not name</span>
+        </BandCard>
+        <BandCard label="Nodes" lead={<span className="font-mono font-bold text-muted-foreground whitespace-nowrap">unknown</span>}>
+          <span className="flex items-center self-stretch text-label text-muted-foreground">unlisted channels publish no nodes, so none can be counted</span>
+        </BandCard>
+      </>
+    );
 
   return (
     <>
@@ -189,6 +214,7 @@ export function HyperCells({ accent }: { accent: string }) {
 export function GeoCells({ accent }: { accent: string }) {
   const lb = useStore((s) => s.leaderboard);
   const selNodes = useStore((s) => s.selNodes);
+  const filter = useStore((s) => s.filter);
   const countries = lb?.countries ?? [];
   const total = selNodes.length;
   const { ispCounts, topIsps, located } = useMemo(() => {
@@ -228,6 +254,14 @@ export function GeoCells({ accent }: { accent: string }) {
   if (restC > 0) countryRing.other = restC;
   const ispRing: Record<string, number> = Object.fromEntries(topIsps);
   if (restI > 0) ispRing.other = restI;
+
+  // Unknowable, not "0 located · 0 unplaced" (the Unlisted audit, 2026-10-07) — the Hypergraph's rule.
+  if (filter === UNLISTED_ID)
+    return (
+      <BandCard label="Nodes" lead={<span className="font-mono font-bold text-muted-foreground whitespace-nowrap">unknown</span>}>
+        <span className="flex items-center self-stretch text-label text-muted-foreground">unlisted channels publish no nodes, so none can be placed</span>
+      </BandCard>
+    );
 
   return (
     <>
@@ -300,6 +334,9 @@ export function GeoCells({ accent }: { accent: string }) {
 // Filtered, a bar is that network's own anchors per bucket on its OWN scale in its identity
 // hue — the tick chart's scoped rule, at the store's resolution.
 const STACK_ORDER: string[] = METAGRAPHS.map((m) => m.id);
+
+/** The measured-series name the rate cards read for the unlisted channels (`unlistedSeries`). */
+const UNLISTED_SNAPS = "unlisted.snaps";
 
 /** THE GIVE-UP WORDS for a measured card whose store read FAILED (user, 2026-10-03: "fix" — the
  *  test pass found the rate cards saying "acquiring…" for as long as the trends store was down).
@@ -494,6 +531,8 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
    *  sampler covered the bucket (`g.ticks`, the coverage marker) and a gap where it didn't. */
   const measured = (name: string): (number | null)[] | undefined => {
     if (!windowed) return undefined;
+    // The unlisted channels' one measured quantity: the global count less every listed network.
+    if (name === UNLISTED_SNAPS) return unlistedSeries(windowed.series);
     return windowed.series[name] ?? windowed.series["g.ticks"]?.map((v) => (v != null ? 0 : null));
   };
   interface SparkSpec { data: (number | null)[] | undefined; value: number | undefined; unit: string; span: string; sr: string; offRim: boolean }
@@ -728,7 +767,16 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
           the public catalog — so it is a FLOOR, the same lower bound the snapshot card marks. It
           cannot be silent about that (rule 10), and a caveat about the reading has nowhere to sit
           but the card's title. */}
-      {filter === "dag"
+      {filter === UNLISTED_ID
+        ? // THE UNLISTED CHANNELS' FEES ARE NOT KEPT (the Unlisted audit, 2026-10-07: this card waited
+          // on "acquiring…" forever). The store keeps fees per listed network and only a listed
+          // floor in total, so there is nothing to subtract from: a final word, not a promise.
+          notApplicable(
+            "Snapshot fees",
+            "not measured for unlisted channels",
+            "Fees are kept per listed network. What unlisted channels pay is part of the global total, which is not stored, so it cannot be measured here.",
+          )
+        : filter === "dag"
         ? notApplicable(
             "Snapshot fees",
             "the base ledger is paid these, it pays none",
@@ -741,7 +789,8 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
           : rate("Snapshot fees", sparkOf("g.feeFloor", activity?.feesSeries, activity?.feesPerHour, true),
                  "$DAG paid to anchor snapshots into the global chain, every network summed. A floor: it counts only the metagraphs in the public catalog.",
                  "What every network pays in $DAG to anchor its snapshots into the global chain, summed — so this is also what the base ledger takes in. A lower bound: only the metagraphs in the public catalog are counted, so the real figure is higher.")}
-      {rate("Snapshots", sparkOf(scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries, activity?.snapsPerHour))}
+      {/* Under Unlisted, their measured count (the global total less every listed network). */}
+      {rate("Snapshots", sparkOf(filter === UNLISTED_ID ? UNLISTED_SNAPS : scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries, activity?.snapsPerHour))}
       {/* The chart states the same reach its rows do — it plots the very buckets the rate cards
           average, so a silent chart beside two captioned ones would read as a different window. */}
       <BandCard label="Anchors by metagraph" className="min-w-[220px]">

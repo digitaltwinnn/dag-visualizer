@@ -195,3 +195,32 @@ export async function seekOrdinalByTime(
   }
   return hi.ordinal - lo.ordinal <= 1 ? hi.ordinal : null;
 }
+
+/** THE ORDINALS A TIME SPAN HOLDS on one chain (user, 2026-10-07 — the log keeps to a range):
+ *  `first` is the first snapshot at or after `fromMs`, `last` the final one before `toMs` (the end
+ *  is exclusive), and `count` how many that is — 0 for a span that falls after the tip or between
+ *  two snapshots. Two walks of `seekOrdinalByTime` plus one look at each answer's own stamp,
+ *  because the walk answers "the tip" for any time after it. Null when a walk could not land. */
+export async function seekSpan(
+  fromMs: number,
+  toMs: number,
+  latest: number,
+  loadPage: (before: number) => Promise<SeekRow[]>,
+): Promise<{ first: number; last: number; count: number } | null> {
+  const tsOf = async (ordinal: number): Promise<number | null> => {
+    const row = (await loadPage(ordinal)).find((r) => r.ordinal === ordinal);
+    const ms = row ? Date.parse(row.ts) : NaN;
+    return Number.isFinite(ms) ? ms : null;
+  };
+  // The two walks are independent, so they run TOGETHER (the tester pass, 2026-10-07: a range
+  // search under All took ~20s, each chain's walks running one after the other).
+  const [start, end] = await Promise.all([seekOrdinalByTime(fromMs, latest, loadPage), seekOrdinalByTime(toMs, latest, loadPage)]);
+  if (start == null || end == null) return null;
+  const [startMs, endMs] = await Promise.all([tsOf(start), tsOf(end)]);
+  if (startMs == null || endMs == null) return null;
+  // The walk answers the tip for a time after it: a start the tip is still before holds nothing,
+  // and an end the tip is still before ends at the tip itself.
+  if (startMs < fromMs) return { first: start, last: start - 1, count: 0 };
+  const last = endMs >= toMs ? end - 1 : end;
+  return { first: start, last, count: Math.max(0, last - start + 1) };
+}

@@ -42,6 +42,21 @@ describe("listSince", () => {
     expect(recs.length).toBe(500);
     expect(gap).toBe(true); // oldest fetched (501) never touched cursor+1
   });
+  // A NEW CHAIN IS READ FROM ITS FIRST SNAPSHOT (2026-10-07: BioFi's new address began on Sep 18
+  // and its first days were never counted — a cold cursor took only the newest 60 records). Within
+  // the same 30K self-heal depth; past it the uncovered history is a gap, said as one.
+  it("a cold cursor reads the whole chain back to its first snapshot", async () => {
+    const calls: number[] = [];
+    const { recs, gap } = await listSince(pager(chain(2500), calls), -1);
+    expect(recs.length).toBe(2500);
+    expect(recs[0].ordinal).toBe(1);
+    expect(gap).toBe(false);
+  });
+  it("a cold cursor on a chain longer than the depth reads the depth and reports the gap", async () => {
+    const { recs, gap } = await listSince(pager(chain(40000), []), -1);
+    expect(recs.length).toBeGreaterThanOrEqual(30000 - 1000);
+    expect(gap).toBe(true);
+  });
   it("an empty tip page is empty, not a gap", async () => {
     const { recs, gap } = await listSince(async () => ({ data: [] }), 100);
     expect(recs).toEqual([]);

@@ -23,7 +23,7 @@ import { getNetwork, SIGNER_GROUPS, metagraphById } from "@/src/data/network";
 import { UNLISTED_HUE } from "@/src/data/unlisted";
 import { snapsAtTick } from "@/src/data/anchorLog";
 import { PAYLOAD_LANES } from "@/src/data/payloadKinds";
-import { fmtDag, fmtKB, midHash } from "@/src/util/format";
+import { fmtDagShort, fmtKB, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { useMinHold } from "@/components/useMinHold";
 import { CONTENT_EASE } from "@/components/RollSwap";
@@ -177,7 +177,7 @@ export default function MetaSnapPane({
   // restates its ancestor (the pile rule — the same reason the ticker left this head on
   // 2026-08-10).
   // The AGE is the lead's chip, not a clause after a mid-dot (user, 2026-10-03).
-  const lead = `${following && !sameTick ? "Following live. " : ""}Anchored to ${anchor}.`;
+  const lead = `${following && !sameTick ? "Following live, anchored" : "Anchored"} to ${anchor}`;
 
   return (
     <RailPane
@@ -212,7 +212,8 @@ export default function MetaSnapPane({
                 opens one tier down, so the card states their SHAPE and the pane renders them.
                 Both always render, each honest about its own tier. */}
             <Lead aside={rel || undefined}>{lead}</Lead>
-            <Separator className="mb-2" />
+            {/* NO RULE ABOVE THE TABS (user, 2026-10-07): the tab row draws its own baseline, so a
+                separator here put two hairlines a row apart around one control. */}
             <PayloadBlock row={row} deep={deep ?? null} asked={deepAsked} decodeGaveUp={decodeGaveUp} />
 
             {/* ── DETAIL: the measured facts ─────────────────────────────────────────────── */}
@@ -226,7 +227,7 @@ export default function MetaSnapPane({
                   {/* Fee leads, size rides under it — the global card's own two-line value, so
                       the pair reads identically on both storeys of the chain. */}
                   <Fact label="Fees paid">
-                    <span className="whitespace-nowrap">{fmtDag(row.fee)} DAG</span>
+                    <span className="whitespace-nowrap">{fmtDagShort(row.fee)} DAG</span>
                   </Fact>
                   <Fact label="Size">
                     <span className="flex flex-col items-end">

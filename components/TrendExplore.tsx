@@ -13,6 +13,8 @@ import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore, type TrendMetric } from "@/src/store/store";
 import { NodeStars } from "@/components/state/StateAtoms";
+import { metagraphById } from "@/src/data/network";
+import { UNLISTED_ID } from "@/src/data/unlisted";
 
 // HISTORY'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session 2026-09-26;
 // read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). The view breaks its
@@ -171,6 +173,7 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
           const row = rows.get(id);
           if (!row) return [];
           const on = focus === id;
+          const retiredAt = metagraphById(id)?.retiredAt;
           return [
             {
               key: id,
@@ -189,14 +192,38 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
                 // figure column (a quiet network may have measured nothing in the span).
                 // A HELD window's figures are the previous span's, under a hint naming the new one —
                 // so they wait (stars) until the new window lands rather than state the wrong span.
-                slice.stale ? <NodeStars count={3} /> : row.head != null ? format(row.head) : roster.pending || (roster.headKind === "day" && roster.dayPending) ? <NodeStars count={3} /> : <span className="text-muted-foreground" title={NO_READING}>—</span>,
+                // A RETIRED network keeps its row and its history (user, 2026-10-07): where it measured
+                // nothing in the span, the empty slot says WHY in one word instead of a dash; where
+                // it did, its real figure stands.
+                slice.stale ? <NodeStars count={3} /> : row.head != null ? format(row.head) : roster.pending || (roster.headKind === "day" && roster.dayPending) ? <NodeStars count={3} /> : retiredAt ? <span className="text-label text-muted-foreground">retired</span> : <span className="text-muted-foreground" title={NO_READING}>—</span>,
               on,
-              title: `${row.name} · ${row.head != null ? `${format(row.head)}${unit ? ` ${unit}` : ""} · ${headWord(metric, roster.headKind)}` : NO_READING}`,
+              title: `${row.name}${retiredAt ? ` (retired ${retiredAt})` : ""} · ${row.head != null ? `${format(row.head)}${unit ? ` ${unit}` : ""} · ${headWord(metric, roster.headKind)}` : NO_READING}`,
               onClick: () => applyClickActions(trendPlaneActions(id, focus)),
               pair: subjectPairing(hoverFilter, id, setHover, row.hue),
             },
           ];
-        }),
+        }).concat(
+          // THE UNLISTED CHANNELS, after the networks and outside their rank (the Unlisted audit,
+          // 2026-10-07): what the networks leave over of the global count, so the DAG total above is
+          // the rows ADDED UP. Present only while the span holds any (Snapshots only).
+          roster.unlisted && filter === "all"
+            ? [
+                {
+                  key: UNLISTED_ID,
+                  glyph: <IdentityDot hue={roster.unlisted.hue} />,
+                  name: roster.unlisted.name,
+                  share: roster.unlisted.head != null ? roster.unlisted.head / maxLast : undefined,
+                  hue: roster.unlisted.hue,
+                  faint: false,
+                  figure: slice.stale ? <NodeStars count={3} /> : roster.unlisted.head != null ? format(roster.unlisted.head) : <span className="text-muted-foreground" title={NO_READING}>—</span>,
+                  on: focus === UNLISTED_ID,
+                  title: `Unlisted channels: the global count less every listed network · ${roster.unlisted.head != null ? `${format(roster.unlisted.head)}${unit ? ` ${unit}` : ""}` : NO_READING}`,
+                  onClick: () => applyClickActions(trendPlaneActions(UNLISTED_ID, focus)),
+                  pair: subjectPairing(hoverFilter, UNLISTED_ID, setHover, roster.unlisted.hue),
+                },
+              ]
+            : [],
+        ),
   };
 
   return (

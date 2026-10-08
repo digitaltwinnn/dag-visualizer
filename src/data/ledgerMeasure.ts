@@ -1,5 +1,5 @@
 import type { GlobalSnapshot, SnapshotExact } from "@/src/data/types";
-import { fmtDag } from "@/src/util/format";
+import { fmtDagShort } from "@/src/util/format";
 import { levelOptions } from "@/src/data/explorerMeasure";
 
 // WHAT A TICK ROW LEADS WITH (user, 2026-09-26: "Snapshots view, like the new trends view, could
@@ -62,7 +62,7 @@ export function kbFigure(kb: number): string {
 export function tickMeasure(m: LedgerMeasure, snap: Pick<GlobalSnapshot, "metagraphSnapshotCount">, exact: SnapshotExact | undefined): string {
   switch (m) {
     case "fee":
-      return exact?.totalFee != null ? fmtDag(exact.totalFee) : NO_MEASURE;
+      return exact?.totalFee != null ? fmtDagShort(exact.totalFee) : NO_MEASURE;
     case "anchors": {
       const n = snap.metagraphSnapshotCount ?? exact?.anchored;
       return n != null ? n.toLocaleString() : NO_MEASURE;
@@ -84,7 +84,7 @@ export function tickMeasure(m: LedgerMeasure, snap: Pick<GlobalSnapshot, "metagr
  * answers the dash rather than a number (rule 10).
  */
 export function snapMeasure(m: SnapLevelMeasure, row: { fee: number; bytes?: number; sizeInKB?: number }): string {
-  if (m === "fee") return fmtDag(row.fee);
+  if (m === "fee") return fmtDagShort(row.fee);
   const kb = row.sizeInKB ?? (row.bytes != null ? row.bytes / 1024 : undefined);
   return kb != null ? kbFigure(kb) : NO_MEASURE;
 }
@@ -126,7 +126,7 @@ export function tickNetMeasure(m: TickNetMeasure, count: number, per: { fee: num
     case "anchors":
       return { value: count, text: count.toLocaleString() };
     case "fee":
-      return per ? { value: per.fee, text: fmtDag(per.fee) } : { value: null, text: NO_MEASURE };
+      return per ? { value: per.fee, text: fmtDagShort(per.fee) } : { value: null, text: NO_MEASURE };
     case "size":
       return per ? { value: per.bytes, text: kbFigure(per.bytes / 1024) } : { value: null, text: NO_MEASURE };
   }

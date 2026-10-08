@@ -72,6 +72,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CABINET_BODY, CABINET_LIST, CABINET_TRIGGER } from "@/components/cabinetTabs";
 import { cn } from "@/lib/utils";
+import Stamp from "@/components/Stamp";
 
 /** Whether a decoded payload carries anything at all — `{}`, `[]` and `""` do NOT open a lane. */
 function nonEmpty(v: unknown): boolean {
@@ -88,24 +89,11 @@ function nonEmpty(v: unknown): boolean {
  *  is what gets compared. */
 const paneHash = (v: string): string => midHash(v, 46);
 
-/** The pane's absolute stamp: `Sep 14, 2026 · 14:34:42 UTC`.
- *
- *  ⚠️ SECONDS, BECAUSE THIS IS THE RECORD RUNG. Everywhere else the app rounds a time to the
- *  minute — a chart axis, a range label — because there the stamp locates a BUCKET. Here it
- *  identifies one sealed artefact, and a batching network seals dozens inside a single minute, so
- *  a minute-rounded stamp would print the same value for rows the reader can see are different.
- *  Unparsed input yields the instrument's own absence rather than "Invalid Date" (rule 10). */
-const stampUtc = (ts: string): string => {
-  const ms = Date.parse(ts);
-  if (!Number.isFinite(ms)) return "—";
-  const d = new Date(ms);
-  return (
-    d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) +
-    ", " + // a comma, not a mid-dot (user, 2026-10-03)
-    d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false, timeZone: "UTC" }) +
-    " UTC"
-  );
-};
+// THE PANE'S TIME ROW is a `Stamp` WITH SECONDS, because this is the record rung: everywhere else
+// the app rounds a time to the minute — a chart axis, a range label — because there the stamp
+// locates a BUCKET. Here it identifies one sealed artefact, and a batching network seals dozens
+// inside a single minute, so a minute-rounded stamp would print the same value for rows the reader
+// can see are different. An unparsed stamp is the instrument's own absence, never "Invalid Date".
 
 type LaneId = "state" | "data" | "signers";
 type Lane = { id: LaneId; name: string; title: string };
@@ -617,7 +605,7 @@ export function ChannelStatePanel() {
               · the COUNTERS sit on a plate in mono, where bookkeeping goes — read to compare,
                 not to learn. The references (hash, previous, state) stay in the foot below. */}
           <Lead aside={relativeAge(Date.now() - Date.parse(sel.ts)) || undefined} className="flex-none">
-            Anchored into global snapshot <span className="font-mono tabular-nums text-foreground">{sel.globalOrdinal.toLocaleString()}</span>.
+            Anchored into global snapshot <span className="font-mono tabular-nums text-foreground">{sel.globalOrdinal.toLocaleString()}</span>
           </Lead>
           <FactGroup className="flex-none">
             {/* ⚠️ THE ABSOLUTE STAMP, to the second, in UTC (user, 2026-09-14: "add a date/time
@@ -627,7 +615,8 @@ export function ChannelStatePanel() {
                 says so: the explorer's own stamps are UTC, so a viewer's local midnight can never
                 silently re-date a snapshot. */}
             <Fact label="Time" title="The stamp this snapshot shares with the global snapshot it anchored into">
-              <span className="tabular-nums text-foreground-dim">{stampUtc(sel.ts)}</span>
+              {/* The reader's own clock, drawn as date · time · zone tag; UTC on hover (2026-10-07). */}
+              {Number.isFinite(Date.parse(sel.ts)) ? <Stamp ms={Date.parse(sel.ts)} seconds className="text-foreground-dim" /> : <span className="text-muted-foreground">—</span>}
             </Fact>
             <Fact label="Fee paid"><span className="tabular-nums">{fmtDag(deep.fee)} DAG</span></Fact>
             {/* "compressed" names the wire figure's basis against the lanes' decoded sizes. */}

@@ -32,13 +32,13 @@ Four views drive the 3D scene:
   come together on the global plane.
 - **History** (`trend`) — the measured past: one CHART PLANE per network, receding into depth over a
   ground that draws each plane's footprint, with a shared time cursor marking one instant on every
-  plane at once. The planes are DOM, not WebGL — the same `TrendChart` the document register uses —
+  plane at once. The planes are DOM, not WebGL — `TrendChart`, the app's one chart —
   and the bottom band is a scrubbable timeline rather than vitals cells.
 
 The placeholder is ONE consolidated `soon` Mode, at `/soon` (2026-09-04; the old `status`/`transactions`/
 `staking` modes said the same nothing three times): the canvas fades out and `Blueprint.tsx` draws a
 wireframe GALLERY of the coming features, with no numbers, so it never reads as live data. The two
-doc pages (/about, /design) are an overlay over the same bare stage, not Modes.
+doc page (/about) is an overlay over the same bare stage, not a Mode.
 
 **The four 3D views are complementary projections of the same network: hyper = who/what, geo =
 where, ledger = when, trend = how it changed.** Structure belongs to hyper. Activity belongs to the
@@ -88,8 +88,8 @@ React's cache — is `TrendStack`'s alone and is never read back by a component)
 `components/trendStackBoundary.test.ts` (the DOM chart planes' split with their projector: the two
 markers, the anchor's 0-size shape, no blur or shadow anywhere on a plane, the memoised plot and the
 plot box its cursor overlay is calculated against),
-`components/rawSurfaceBoundary.test.ts` (which surface the raw layer shows is a policy row, and the
-Trends document is a view's RAW register rather than a doc-overlay page),
+`components/rawSurfaceBoundary.test.ts` (what RAW does is a policy row — a view's own records, or
+History's door onto the anchor log through the shared `openRecords`),
 `components/trendRailBoundary.test.ts` (History's three "one home" rules: one plane-focus builder,
 one records door, one roster pass),
 `components/calloutBoundary.test.ts` (`#callout` has two homes, both consult `boxedCard`, both
@@ -132,21 +132,17 @@ scope from the table.
 12. **The observation ladder: live scene → measured history → individual records** (user,
     2026-09-09). Three depths, one subject: the 3D scene is the LIVE instrument, the measured
     history is rung 2, and the raw layer is the RECORD-level microscope.
-    **Rung 2 has TWO REGISTERS and they are one rung** (user, 2026-09-18): a SCENE face — the
-    History view at `/trends`, one chart plane per network receding in depth, read at a shared
-    instant — and a DOCUMENT face, that same view's RAW register (prose, sections, the same charts
-    laid out as a page). One subject, two presentations, which is exactly what `section` already
-    means everywhere else; `viewPolicy.rawSurface` is where a view says which one its RAW shows.
-    The raw layer stays rung 3, reached from either face. Charts stay 2D in BOTH registers — the
-    planes host the document's own `TrendChart` in DOM, so the type is crisp and the reading is
-    flat-on, and depth carries the ROSTER rather than pretending to be data.
-    Each step down is one deliberate gesture that CARRIES ITS CONTEXT (a chart range hands its
-    network and dates to the anchor log's search — one home, `components/trendDoors.ts`, shared by
-    both registers), and so is the step ACROSS: **the scene face hands its window and its range to
-    the document face** (2026-09-19 — `TrendsDoc` seeds its `zoom` from `store.trendWindow`
-    and its `range` from `store.trendRange`, once at mount, which is once per RAW open; after that
-    the document's pickers are its own and it never writes back). Every new surface must name its
-    rung, its register and its bridges rather than invent a fourth depth. The two lower RUNGS complement each other on purpose: the measured
+    **Rung 2 is the History view** at `/trends` — one chart plane per network receding in depth,
+    read at a shared instant. It had a second register, a long DOCUMENT behind RAW, until
+    2026-10-07 (user: "not really raw, and mostly replaced by the scene"): **RAW is the records in
+    every view.** History has no records of its own, so its RAW is a DOOR (`viewPolicy.rawSurface:
+    "door"`) onto the anchor log for the span on screen — the same `components/trendDoors.ts` door
+    the Moment card's "Snapshot records" runs — and closing the layer returns to History. Charts are
+    2D — the planes host `TrendChart` in DOM, so the type is crisp and the reading is flat-on, and
+    depth carries the ROSTER rather than pretending to be data.
+    Each step down is one deliberate gesture that CARRIES ITS CONTEXT (a chart range or the window
+    hands its network and dates to the anchor log's search — one home, `components/trendDoors.ts`).
+    Every new surface must name its rung and its bridges rather than invent a fourth depth. The two lower RUNGS complement each other on purpose: the measured
     history grows coarser with distance (tier retention) exactly where the raw layer's chain paging
     stays exact to genesis.
 
@@ -269,9 +265,8 @@ nodes.
 
 **History's chart planes are real DOM over the canvas, not WebGL** (2026-09-18). A chart is text, axis
 labels, a tooltip and a hairline; drawn into a texture it is either blurry or a re-raster every frame,
-and it would be a second chart implementation beside the document's. In DOM it is the SAME
-`TrendChart` both registers of convention 12's rung render, crisp at any scale, with its tooltips and
-its accessible names for free.
+and it would be a second chart implementation. In DOM it is `TrendChart`, crisp at any scale, with
+its tooltips and its accessible names for free.
 
 The split of labour is the subject callout's, exactly: **pure pose math in `domain/trendStack.ts`**
 (slots, stagger, the focus re-deal, paging — arithmetic over plain objects), **the projection in the engine
@@ -298,7 +293,7 @@ gathers to the staging grids and fades on the doc overlay's own clock (`fleetFad
 
 | Path | Responsibility |
 |---|---|
-| `app/` | Next App Router. `globals.css` is **the one stylesheet**; `[view]/` serves the four routed 3D views (`/trends` is the History VIEW — the measured-history document is that view's RAW register, not a route of its own); `/about` and `/design` are the **DOC OVERLAY** (2026-09-04) — they render AppShell with a scrollable document layer over the live scene (`components/DocLayer.tsx`; content in `components/docs/`, opened/closed by store `docPage` with no engine reboot; /about still server-renders its prose for crawlers and carries the **experimental disclosure** that used to be an always-on banner, retired 2026-08-09: a permanent banner over a live instrument reads as an alarm). The footer's About/Design entries toggle the overlay. `--warn-soft` is /about's amber (shared with the raw layer's JSON booleans and the pulse strip's STALE dot). `api/*` are the server-side data routes. |
+| `app/` | Next App Router. `globals.css` is **the one stylesheet**; `[view]/` serves the four routed 3D views (`/trends` is the History VIEW; its RAW is a door onto the anchor log); `/about` is the **DOC OVERLAY** (2026-09-04) — they render AppShell with a scrollable document layer over the live scene (`components/DocLayer.tsx`; content in `components/docs/`, opened/closed by store `docPage` with no engine reboot; /about still server-renders its prose for crawlers and carries the **experimental disclosure** that used to be an always-on banner, retired 2026-08-09: a permanent banner over a live instrument reads as an alarm). The footer's About entry toggles the overlay. (The `/design` styleguide was deleted on 2026-10-07 — user: users don't need it; the tokens live in `globals.css` and the components are their own reference.) `--warn-soft` is /about's amber (shared with the raw layer's JSON booleans and the pulse strip's STALE dot). `api/*` are the server-side data routes. |
 | `components/` | React panels, each reading/writing the store. `SceneCanvas` mounts the engine (dynamic-imported so Three never enters the server bundle). `components/explorer/` is the ONE explorer card (2026-09-26): every view's tool card is a description handed to `Explorer.tsx`, never a layout of its own — the design and its deviations are in `docs/superpowers/design/2026-09-26-explorer-card/`. |
 | `components/ui/` | The adopted shadcn/Radix primitives. |
 | `src/store/store.ts` | The Zustand store — mode, filter, selection, hover channels, `section`, phone UI state. |
@@ -319,8 +314,9 @@ you start:
 
 - **`viewPolicy.ts`** — the per-`Mode` allow-list behind convention 7: canvas, morph target, sim gates,
   shown geometry, pick sources, DoF eligibility, camera floors, which views publish `selNodes`, whether
-  the fleet is placed or parked, what the bottom band holds, which surface RAW shows, and whether the
-  camera idle-orbits.
+  the fleet is placed or parked, what the bottom band holds, which surface RAW shows, whether the
+  camera idle-orbits, and whether the explorer follows the open card down or rests on the view's
+  axis (`explorerDepth`).
 - **`focusLadder.ts`** — the focus/zoom ladder as data: one rung table per 3D view plus the cross-view
   carry policy. `finerLevels()` is the single source `pickActions` derives deselect stepping from.
 - **`pickActions.ts`** — the click/select decision table (see *Selection semantics*).
@@ -428,7 +424,7 @@ its claim is paper-only, so its one `intensity` already is its paper number.
    camera would skew the charts it exists to emphasise. A focus the visible window no longer holds
    (paged away, re-ranked out) answers 0: the lean releases rather than standing over a stack that
    did not move. The stack has ONE layout — a flat "Align to front" column was built and removed
-   (user, 2026-09-19): reading the charts laid out flat is what the view's RAW document is for. Three bespoke ledger framings (a lane nudge, a node
+   (user, 2026-09-19). Three bespoke ledger framings (a lane nudge, a node
    framing, a per-lane fly) were built and **retired** because each added a pose the user had to learn;
    don't grow a fourth. **Hyper's per-node framing went the same way** (2026-08-13): a node there is one
    bead on a shell, and diving to it lost the hub and shells that say what it belongs to, so the rung
@@ -517,7 +513,7 @@ file, and the rules above govern them.
 | Three adapters | `src/engine/scene/CLAUDE.md` | nodes/layers/the filter, the whole Snapshots chamber, and History's ground |
 | Pure logic | `src/engine/domain/CLAUDE.md` | the 3D↔3D transition, selection semantics |
 | Engine | `src/engine/CLAUDE.md` | live look-tuning under `?tune` |
-| Data layer | `src/data/CLAUDE.md` | the snapshot stream, anchoring & fees, the tick lifecycle, the measured-history path both registers read |
+| Data layer | `src/data/CLAUDE.md` | the snapshot stream, anchoring & fees, the tick lifecycle, the measured-history path the History view reads |
 | Networks | `src/net/CLAUDE.md` | `?net=` and the three networks |
 | Theme | `src/theme/CLAUDE.md` | light/dark and the ground questions it forces |
 | Server routes | `app/api/CLAUDE.md` | every `/api/*` route and its caching |
@@ -530,8 +526,7 @@ area — but a rule in **The rules** above is global and never overridden locall
 - **Feature work runs on the superpowers plugin flow**: brainstorm → written plan → subagent-driven
   implementation with per-task review gates, then a final whole-branch review before merging.
 - **Design work runs component-by-component against the LIVE app** — brainstorm on the real rendered
-  component in the running app, agree the outcome, implement immediately. `/design` is a token
-  reference, not the component surface. **No separate spec or plan documents for design sessions**;
+  component in the running app, agree the outcome, implement immediately. **No separate spec or plan documents for design sessions**;
   they drift out of sync. Light per-change gates (`tsc` + `vitest` + a targeted visual check) and one
   full verification pass at the end (prod build with dev stopped, a screenshot suite, reduced-motion,
   tablet and phone re-verifies).

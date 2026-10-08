@@ -45,3 +45,33 @@ describe("selStack keeps its reference when nothing about it changed", () => {
     expect(useStore.getState().selStack).toEqual(["network"]);
   });
 });
+
+describe("the RANGE takes a place in the stack (History's Range card, 2026-10-07)", () => {
+  beforeEach(() => {
+    useStore.setState({ selStack: [], trendCursorMs: null, trendRange: null, filter: "all" });
+  });
+  it("a brushed range bumps it, and a window pick — which retires the range — drops it", () => {
+    const s = useStore.getState();
+    s.setTrendRange({ fromMs: 0, toMs: 86_400_000 });
+    expect(useStore.getState().selStack).toEqual(["range"]);
+    s.setTrendCursor(1_000);
+    expect(useStore.getState().selStack).toEqual(["instant", "range"]);
+    s.setTrendWindow("30d");
+    expect(useStore.getState().selStack).toEqual(["instant"]);
+  });
+  it("clearing the range drops it", () => {
+    const s = useStore.getState();
+    s.setTrendRange({ fromMs: 0, toMs: 86_400_000 });
+    s.setTrendRange(null);
+    expect(useStore.getState().selStack).toEqual([]);
+  });
+});
+
+describe("a plane focus bumps the network slot (History's Metagraph card, 2026-10-07)", () => {
+  beforeEach(() => useStore.setState({ selStack: [], trendFocus: null, filter: "all" }));
+  it("focusing a plane makes the Metagraph card the active card", () => {
+    useStore.getState().setTrendCursor(1_000);
+    useStore.getState().setTrendFocus("dor");
+    expect(useStore.getState().selStack).toEqual(["network", "instant"]);
+  });
+});

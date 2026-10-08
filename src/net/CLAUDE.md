@@ -55,3 +55,33 @@ chain: a DATE picks the chain whose genesis precedes it, a GLOBAL snapshot the c
 anchored into it. A metagraph ORDINAL cannot (both chains have a #2), so it searches the chain on
 screen. ⚠️ A chain switch re-reads the tip, and a pending seek must wait for it (`walkReady`) —
 run against the previous chain's `latest` it pages to the wrong place.
+
+## A network is retired, never deleted (2026-10-07)
+
+User: "inactive networks like SWAP and PACA will be removed … how can we ensure that we can still
+view these networks in trend view history etc and keep their colors". The catalog row is what gives
+a network its name, ticker, colour and History row, and the trends store keeps its measured past
+forever — delete the row and that past becomes a raw address nothing shows.
+
+**Retirement normally happens in the brand bake** (`scripts/bake-brand-hues.ts`, user 2026-10-07:
+"can it be done when we bake/rebake the network?"). For each catalog network the bake asks two
+questions — is it still in the live directory, and when did its chain last anchor — and retires it
+only when BOTH say so: gone from the directory AND silent for a week (`src/net/retire.ts`). The date
+is the chain's LAST snapshot. It is written to `data/retired.json` (added to, never removed from),
+printed, and reviewed in the diff like the colours. Either fact alone is printed under "LOOK AT
+THESE" and changes nothing — a flaky directory read can never retire a network. A person can also
+retire one by hand with `retiredAt: "YYYY-MM-DD"` on its catalog row; `lineage.retiredAtOf` reads
+both. Then:
+
+- it stops being READ: the trends sampler (`lineage.sampledIds`) and the live poll (`activeRows`)
+  skip it;
+- History keeps its row and its plane; where it measured nothing in the span its figure says
+  "retired" instead of a dash, and the row's hover gives the date;
+- the raw log under All still pages its chain (the merged log reads the CATALOG's chains, former
+  addresses included), and the search's network picker lists it as "TICKER (retired)";
+- `scripts/bake-brand-hues.ts` carries its existing colour pin over even though the live directory
+  no longer lists it;
+- the live views (filter strip, Hypergraph, Geography) drop it on their own — they show what runs.
+
+`src/net/catalogKeeps.test.ts` lists every address the catalog has ever held and fails if one
+disappears. A new network or a re-registration adds its address there in the same change.

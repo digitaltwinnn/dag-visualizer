@@ -1,15 +1,12 @@
 "use client";
 
-import { useId } from "react";
 import { AlignEndHorizontal } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { SELECTED_ROW } from "@/components/selection";
-import { Switch } from "@/components/ui/switch";
 import { displayNetwork } from "@/src/data/unlisted";
 import { ZOOMS, type TrendRange, type ZoomId } from "@/src/data/trendWindow";
-import { filterToggleActions } from "@/src/engine/domain/pickActions";
-import { applyClickActions } from "@/src/store/applyClickActions";
+import { rangeDays } from "@/src/util/localTime";
 
 // THE TRENDS CONTROLS, ONE HOME (2026-09-18; widened 2026-09-19) — the window pills and the scale
 // switch, shared by the Trends DOCUMENT, the History view's band TIMELINE and that view's Network
@@ -57,17 +54,6 @@ export const zoomBtn = (pressed: boolean) =>
     pressed ? cn("font-bold text-foreground", SELECTED_ROW) : "text-muted-foreground hover:text-foreground hover:bg-wash-hover",
   );
 
-/** The instant stamps on a range chip — the document's own `stampRange` rule: a date, plus the
- *  clock only where the buckets on screen can actually resolve one. */
-function stampRange(ms: number, stepMs: number): string {
-  return new Date(ms).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    ...(stepMs < 86_400_000 ? { hour: "2-digit", minute: "2-digit", hour12: false } : {}),
-    timeZone: "UTC",
-  });
-}
-
 /** THE WINDOW PICKER — the six windows, and, while a range stands, THE RANGE ITSELF as the group's
  *  one pressed chip with its own × (user, 2026-09-09: a chip beside the group read as a second
  *  control). A committed range IS a window statement, so it belongs inside the same group rather
@@ -79,15 +65,12 @@ function stampRange(ms: number, stepMs: number): string {
 export function WindowPicker({
   zoom,
   range,
-  stepMs,
   onPick,
   onClearRange,
   className,
 }: {
   zoom: ZoomId;
   range: TrendRange | null;
-  /** The bucket size ON SCREEN, which decides whether the chip's stamps carry a clock. */
-  stepMs: number;
   onPick: (id: ZoomId) => void;
   onClearRange: () => void;
   className?: string;
@@ -110,9 +93,8 @@ export function WindowPicker({
         <span className={cn("h-6 px-2 inline-flex items-center gap-1.5 rounded-md text-label font-bold text-foreground whitespace-nowrap", SELECTED_ROW)}>
           {/* The network and the span are two facts, set apart by the gap — no mid-dot. */}
           {range.metaId && <span>{displayNetwork(range.metaId)?.ticker ?? ""}</span>}
-          <span className="tabular-nums">
-            {stampRange(range.fromMs, stepMs)}–{stampRange(range.toMs, stepMs)}
-          </span>
+          {/* The one span label (`rangeDays`) — the Range card's title says the same. */}
+          <span className="tabular-nums">{rangeDays(range.fromMs, range.toMs)}</span>
           <button
             type="button"
             onClick={onClearRange}
@@ -133,8 +115,7 @@ export function WindowPicker({
  *  segment of the windows' (user, same day: "pills or a button group?"): a segmented control
  *  holds mutually exclusive options, and an independent on/off inside it read as a seventh
  *  window. Two bars on one baseline say "compared on one footing"; the tooltip carries the words
- *  in both states. It replaced a label + switch that took its own line on phone. The Trends
- *  DOCUMENT keeps its `ScaleToggle` switch, where a page has room for the name. */
+ *  in both states. It replaced a label + switch that took its own line on phone. */
 export function ScalePill({ shared, onChange }: { shared: boolean; onChange: (shared: boolean) => void }) {
   return (
     <div role="group" aria-label="Chart scale" className={cn(PICKER_GROUP, "flex-none bg-transparent max-[700px]:flex-none")}>
@@ -153,108 +134,5 @@ export function ScalePill({ shared, onChange }: { shared: boolean; onChange: (sh
         <AlignEndHorizontal aria-hidden className="size-3.5" />
       </button>
     </div>
-  );
-}
-
-
-
-/** ONE SETTING, AS A NAME PLUS ITS STATE (2026-09-19).
- *
- *  ⚠️ A SWITCH IS NOT THE PRESSED-TOGGLE GRAMMAR, and the difference is why the scale control
- *  stopped being a pill (user, 2026-09-14, two rounds: first "should read like a simple toggle",
- *  then "make it a label with a simple on/off control"). The command bar's Scene⇄HUD and RAW name
- *  an ACTION the reader presses FOR, with the wash reporting that it is on — right for a control
- *  that pushes a surface in and pops it out. A SETTING is different: the reader is not doing
- *  something, they are choosing how the charts are DRAWN, and a setting reads as a name plus its
- *  state. History's `Same scale` is that species, which is why it wears this shape rather than
- *  borrowing the bar's.
- *
- *  The label is the switch's own `<label>`, so the words are a hit target too — the switch alone is
- *  28×16, well under the touch floor every other control here keeps. */
-export function SettingSwitch({
-  label,
-  on,
-  onChange,
-  title,
-  className,
-}: {
-  label: string;
-  on: boolean;
-  onChange: (on: boolean) => void;
-  /** What each state means, in the reader's words — both states stated, so the tooltip explains
-   *  the setting rather than only its current half. */
-  title?: string;
-  className?: string;
-}) {
-  const id = useId();
-  return (
-    <span className={cn("inline-flex items-center gap-2", className)}>
-      <label htmlFor={id} className="text-label tracking-caps uppercase text-muted-foreground cursor-pointer select-none">
-        {label}
-      </label>
-      <Switch id={id} checked={on} onCheckedChange={onChange} title={title} />
-    </span>
-  );
-}
-
-/** THE SCALE SETTING — shared by the Trends document's metagraphs tab and the History view's
- *  band, beside the window pills (2026-09-19; on the explorer's heading until 2026-09-28): it is
- *  the same question about the same charts, and the two would otherwise be the sort of near-copy
- *  this file exists to prevent. */
-export function ScaleToggle({
-  shared,
-  onChange,
-  className,
-}: {
-  shared: boolean;
-  onChange: (shared: boolean) => void;
-  className?: string;
-}) {
-  return (
-    <SettingSwitch
-      label="Same scale"
-      on={shared}
-      onChange={onChange}
-      className={className}
-      title={
-        shared
-          ? "Every chart shares the busiest network's scale, so the column compares. Switch off to let each chart scale to its own data."
-          : "Each chart scales to its own data. Switch on to put every chart on the busiest network's scale."
-      }
-    />
-  );
-}
-
-/** WHAT IS APPLIED, IN WORDS, AND A WAY TO CLEAR IT — the raw layer's search-toolbar rule, which
- *  answers the same problem: a surface showing a CUT of its data must say so on itself, or the
- *  reader is left inferring a missing column from a control one zone away. It is the same
- *  selected-row pill the range chip above wears, so the two scopes read as one species.
- *
- *  Clearing goes through `filterToggleActions` (rule 2's one write path) — toggling the committed
- *  network OFF is what returns the surface to every network, and it commits the same release the
- *  explorer row and the scene do. The DOCUMENT's alone since 2026-09-26 — the explorer shows no
- *  scope mark; the top bar's filter is the one place to see and clear it. */
-export function ScopeChip({ filter, className }: { filter: string; className?: string }) {
-  if (filter === "all") return null;
-  const net = displayNetwork(filter);
-  return (
-    <span
-      className={cn(
-        "h-6 px-2 inline-flex items-center gap-1.5 rounded-md text-label font-bold text-foreground whitespace-nowrap",
-        SELECTED_ROW,
-        className,
-      )}
-    >
-      <span className="inline-block size-2 rounded-full flex-none" style={{ background: net?.hue ?? "var(--primary)" }} aria-hidden />
-      {net?.name ?? filter} only
-      <button
-        type="button"
-        onClick={() => applyClickActions(filterToggleActions(filter, filter))}
-        title="Show every network again"
-        className="text-muted-foreground hover:text-foreground"
-      >
-        ×
-      </button>
-    </span>
   );
 }

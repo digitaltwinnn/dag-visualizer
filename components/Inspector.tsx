@@ -24,16 +24,15 @@ import { useBreakpoint } from "@/components/useBreakpoint";
 import { usePointerCoarse } from "@/components/usePointerCoarse";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { detailsCards, ladderSlotIds, type RailCard } from "@/components/railCards";
-import { CHILD_OF, childSteps, type SiblingStep } from "@/components/railSiblings";
+import { CHILD_OF, childStep, type SiblingStep } from "@/components/railSiblings";
 import { useSiblingState } from "@/components/useSiblingState";
 import { openRailCard } from "@/components/railOpen";
-import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
-import { midHash } from "@/src/util/format";
 import { useLadderFocus } from "@/components/useLadderFocus";
 import { useTrayActives } from "@/components/useTrayActives";
 import { countryToggleActions, cohortToggleActions, compositionToggleActions, snapshotClearActions } from "@/src/engine/domain/pickActions";
 import { CountryTitle, CountryAside, CountryCard, ProviderTitle, ProviderCard, ProviderAside, CompositionTitle, CompositionCard, CompositionAside } from "@/components/inspector/cards";
 import MetaSnapPane from "@/components/inspector/MetaSnapPane";
+import TrendRangePane from "@/components/inspector/TrendRangePane";
 import TrendInstantPane from "@/components/inspector/TrendInstantPane";
 import type { TabSignal } from "@/components/RailDock";
 import type { PickDescriptor } from "@/src/data/types";
@@ -292,7 +291,7 @@ function CompositionPane({ sel, onClose, collapsed, onToggle }: { sel: Compositi
 // same single source of truth the dock trays read.
 const GHOST_EYEBROW: Record<string, string> = {
   context: "Metagraph", country: "Country", cohort: "Provider", composition: "Composition", node: "Node", snap: "Global snapshot",
-  metaSnap: "Metagraph snapshot", instant: "Moment",
+  metaSnap: "Metagraph snapshot", range: "Range", instant: "Moment",
 };
 /** An EMPTY RUNG, drawn as a card like every other (user, 2026-10-04 — option A of
  *  `docs/superpowers/design/2026-10-04-ghost-cards`, with "like any other card it can be expanded
@@ -309,17 +308,13 @@ const GHOST_EYEBROW: Record<string, string> = {
  *  open state is the same per-selection `railCollapse` override (false = open), so a new selection
  *  folds every ghost back. `.rail-entry` keeps it in the thread's query and `data-ghost` keeps its
  *  dot hollow, open or folded. */
-/** How many quick picks the next ghost offers. */
-const GHOST_PICKS = 3;
-/** A pick labelled by a node's peer id (a long hex string) — shown short, as every node row is. */
-const NODE_ID = /^[0-9a-f]{40,}$/i;
-export function GhostCard({ card, open = false, onToggle, picks }: { card: RailCard; open?: boolean; onToggle?: () => void; picks?: SiblingStep[] }) {
+export function GhostCard({ card, open = false, onToggle, step }: { card: RailCard; open?: boolean; onToggle?: () => void; step?: SiblingStep }) {
   const Icon = card.icon;
   const label = GHOST_EYEBROW[card.id] ?? card.id;
   return (
     <aside
       data-ghost=""
-      data-open={open ? "" : undefined}
+      data-open={open && !step ? "" : undefined}
       aria-label={`${label}: nothing selected yet`}
       // ONE BOX IN BOTH STATES (user, 2026-10-04: "the ghost card flashes — header hides/shows and
       // text jumps"): the same padding and the same 1px dashed border, transparent while folded, so
@@ -330,14 +325,29 @@ export function GhostCard({ card, open = false, onToggle, picks }: { card: RailC
         // fully transparent — to read text"): `--panel-light` under a blur, a step below the
         // committed entry's `--panel-solid` + hairline ring, so empty still reads lighter than held.
         "px-[18px] py-2 rounded-[var(--radius)] border border-dashed bg-[var(--panel-light)] backdrop-blur-[8px] transition-colors duration-150 motion-reduce:transition-none",
-        open ? "border-border pb-3" : "border-transparent",
+        open && !step ? "border-border pb-3" : "border-transparent",
+        step && "hover:border-border hover:text-foreground",
       )}
     >
-      {/* THE WHOLE CARD IS THE TOGGLE (user, 2026-10-04: "the hint should be clickable as well to
-          close it again"), the entry's own stretched-button device: one invisible button over the
-          card, the head and hint drawn beneath it. The button persists across both states, so focus
-          simply stays on it — no hand-off needed. */}
-      {onToggle && (
+      {/* THE WHOLE CARD IS THE CONTROL, the entry's own stretched-button device: one invisible button
+          over the card, the head (and hint) drawn beneath it.
+          THE NEXT RUNG IS A STEP, NOT A HINT (user, 2026-10-07 — "without the buttons … it can just
+          open the actual 1st card when a ghost is clicked, like the down button did"): directly
+          below the deepest committed card, the click commits that rung's FIRST child (`childStep`,
+          the retired ∨'s own target, through the one executor — rule 2), and the ghost becomes the
+          real card. Only a rung with NO committed parent is a true ghost: nothing to choose from
+          yet, so it just opens to its hint ("the hint should be clickable as well to close it
+          again", 2026-10-04). */}
+      {step ? (
+        <button
+          type="button"
+          title={`Open ${step.label}`}
+          onClick={() => applyClickActions(step.actions)}
+          className="absolute inset-0 z-[1] appearance-none bg-transparent border-0 p-0 m-0 cursor-pointer rounded-[inherit] focus-visible:outline-1 focus-visible:outline-ring/60"
+        >
+          <span className="sr-only">{`Open ${label}: ${step.label}`}</span>
+        </button>
+      ) : onToggle && (
         <button
           type="button"
           aria-expanded={open}
@@ -357,31 +367,7 @@ export function GhostCard({ card, open = false, onToggle, picks }: { card: RailC
           it is the card's body now, not an aside. ONLY THE HINT ARRIVES (user, 2026-10-04, two rounds:
           it stood at full size before the frame grew, then a whole-card fade blinked the header):
           the lane's HeightEase grows the frame, and the hint alone fades in on the same tempo. */}
-      {open && <p className="ghost-hint-in m-0 mt-1.5 pl-6 text-body text-foreground-dim">{card.hint}</p>}
-      {/* THE QUICK PICKS (user, 2026-10-04): on the NEXT ghost only, the first few of the rows the
-          explorer would list here, in its order. A pick runs that row's own actions through the one
-          executor (rule 2), so it commits exactly what the explorer click would — and the ghost
-          becomes the real card. Raised above the card's stretched toggle so they take the click. */}
-      {open && picks && picks.length > 0 && (
-        <ul className="ghost-hint-in relative z-[2] m-0 mt-2 ml-6 p-0 list-none flex flex-col gap-0.5">
-          {picks.map((p) => (
-            <li key={p.key}>
-              <button
-                type="button"
-                onClick={() => applyClickActions(p.actions)}
-                title={p.label}
-                className={cn(
-                  "w-full text-left truncate rounded-sm px-2 py-1 -mx-2 text-body text-foreground cursor-pointer hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
-                  NODE_ID.test(p.label) && "font-mono tabular-nums",
-                )}
-              >
-                {/* A node is named by its id, in the short form every node row uses. */}
-                {NODE_ID.test(p.label) ? midHash(p.label, NODE_ID_GLYPHS) : p.label}
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      {open && !step && <p className="ghost-hint-in m-0 mt-1.5 pl-6 text-body text-foreground-dim">{card.hint}</p>}
     </aside>
   );
 }
@@ -434,9 +420,11 @@ export default function Inspector() {
   const selNodes = useStore((s) => s.selNodes);
   const coarse = usePointerCoarse();
   const trendCursorMs = useStore((s) => s.trendCursorMs);
+  const trendRange = useStore((s) => s.trendRange);
+  const trendFocus = useStore((s) => s.trendFocus);
   const tickHasFilter = useTickHasFilter();
   const manifest = detailsCards({
-    mode, filter, tickNet, tickHasFilter, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs,
+    mode, filter, tickNet, tickHasFilter, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs, trendRange, trendFocus,
     selNodesCount: selNodes.length,
     filterLabel: displayNetwork(filter)?.ticker ?? null, // one lookup — catalog + the unlisted pseudo-network
   });
@@ -472,21 +460,20 @@ export default function Inspector() {
   // open — single-open accordion semantics across the present ladder rungs, written as overrides
   // in one store update. Collapsing the open box just closes it (no box open is a legal rest).
   const presentLadderIds = ladderIds.filter(presentOf);
-  // THE NEXT GHOST (user, 2026-10-04 — the ladder pair retired for it): the rung directly below the
-  // deepest committed one, when the explorer's rows for it are known. Opened, it offers the first
-  // few of them as quick picks (`childSteps`, the same list and order the pager's old ∨ took its
-  // first child from), so stepping down to an unchosen level happens where that level is drawn.
-  // The rail's state is read by the pager's own builder, so the picks and the pager cannot disagree.
+  // THE NEXT RUNG (user, 2026-10-07 — the ∧∨ pair retired for it on 2026-10-04): the ghost directly
+  // below the deepest committed card is a STEP — clicking it commits that card's first child
+  // (`childStep`, the explorer's own first row), so stepping down happens where the level is drawn.
+  // The rail's state is read by the pager's own builder, so the step and the pager cannot disagree.
   const deepestId = presentLadderIds[presentLadderIds.length - 1] ?? null;
   const deepestKind = deepestId ? (manifest.find((c) => c.id === deepestId)?.kind ?? null) : null;
   const siblingState = useSiblingState(deepestKind);
-  const nextGhost = useMemo(() => {
+  const nextStep = useMemo(() => {
     if (!deepestId || !deepestKind) return null;
     const below = ladderIds[ladderIds.indexOf(deepestId) + 1];
     const to = CHILD_OF[mode]?.[deepestKind]?.to;
     if (!below || presentOf(below) || manifest.find((c) => c.id === below)?.kind !== to) return null;
-    const picks = childSteps(deepestKind, siblingState, GHOST_PICKS);
-    return picks.length ? { id: below, picks } : null;
+    const step = childStep(deepestKind, siblingState);
+    return step ? { id: below, step } : null;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `manifest`/`ladderIds` derive from the same store slices
   }, [deepestId, deepestKind, siblingState, mode]);
   // EXPAND-ONLY since the box lost its minimize (review find, 2026-09-11): every reachable
@@ -527,6 +514,11 @@ export default function Inspector() {
     // purpose, unlike the two live-advancing ordinals above — a cursor never advances by itself,
     // and the timeline writes it at most once per bucket.
     trendCursorMs ?? "",
+    // …and the RANGE, the cursor's parent (2026-10-07), for the same reason.
+    trendRange ? `${trendRange.fromMs}-${trendRange.toMs}` : "",
+    // …and the PLANE FOCUS, which names the Metagraph card here (2026-10-07): a row click is a
+    // new selection moment, or a fold override from before it keeps the card shut.
+    trendFocus ?? "",
     // While FOLLOWING, the auto-advancing ordinals are NOT a new selection moment — the heartbeat
     // must not drop the user's +/− overrides every ~4s (item 8; advanceSnap already keeps the
     // recency stack still for the same reason). Guards BOTH live-advanced cards: the global
@@ -629,6 +621,11 @@ export default function Inspector() {
     // channel and nothing cascades. It is NOT a selection write (`setTrendCursor` is deliberately
     // outside the pickActions table — see selectionBoundary.test.ts's scope note), so it calls
     // the setter rather than the executor.
+    // History's brushed RANGE (2026-10-07): a card slot with no rung, like the Moment below it;
+    // its × clears the range (a setting's setter, as the timeline's own × does).
+    range: trendRange ? (
+      <TrendRangePane key="range" onClose={() => useStore.getState().setTrendRange(null)} {...cx("range")} />
+    ) : null,
     instant: trendCursorMs != null ? (
       <TrendInstantPane key="instant" onClose={() => useStore.getState().setTrendCursor(null)} {...cx("instant")} />
     ) : null,
@@ -671,12 +668,17 @@ export default function Inspector() {
           id === "context" ? (
             <>
               <ContextCard {...cx("context")} />
-              {!card.present && card.hint != null && <GhostCard card={card} {...ghostCx(id)} />}
+              {/* Context is a ladder rung like any other, so it can be the NEXT rung too — in
+                  Snapshots it sits under the global snapshot, and its step opens the tick's
+                  first network. */}
+              {!card.present && card.hint != null && (
+                <GhostCard card={card} {...ghostCx(id)} step={id === nextStep?.id ? nextStep.step : undefined} />
+              )}
             </>
           ) : card.present ? (
             detailPane[id]
           ) : card.hint != null ? (
-            <GhostCard card={card} {...ghostCx(id)} picks={id === nextGhost?.id ? nextGhost.picks : undefined} />
+            <GhostCard card={card} {...ghostCx(id)} step={id === nextStep?.id ? nextStep.step : undefined} />
           ) : null;
         if (!body) return null;
         // The rung's PRESENTATION TIER, stated on the wrapper for the slab CSS (globals.css) —

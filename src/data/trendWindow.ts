@@ -1,3 +1,4 @@
+import { rangeDays } from "@/src/util/localTime";
 // The trends WINDOW transforms — pure cuts over an /api/trends payload, ONE home (2026-09-09,
 // the branch review: these grew up inside components/useTrendsWindow.ts, the one directory
 // rule 4's export coverage cannot see, while TrendsDoc carried a second, divergent copy of the
@@ -153,6 +154,22 @@ export function pickRangeTier(fromMs: number, toMs: number): "5m" | "1h" | "1d" 
   return "1d";
 }
 
+const TIER_STEP_MS = { "5m": 300_000, "1h": 3_600_000, "1d": 86_400_000 } as const;
+
+/** THE MOMENTS A RANGE HOLDS (user, 2026-10-07: "range -> moment is also a logical parent - child
+ *  relation … swipe through the moments within the range"): every WHOLE bucket inside the range,
+ *  at the tier its charts are cut in (`pickRangeTier`), oldest first. A part-bucket at either edge
+ *  is no moment — the charts trim it (`trimCounterEdges`), so stepping onto it only ever said "no
+ *  chart draws this". Bucket starts are epoch-aligned, as the stored tiers' are, so each one is a
+ *  bucket `bucketAt` will find. A whole bucket nothing measured is still a moment — the Moment
+ *  card says so in words when it lands on one. */
+export function rangeBuckets(range: { fromMs: number; toMs: number }): { buckets: number[]; stepMs: number } {
+  const stepMs = TIER_STEP_MS[pickRangeTier(range.fromMs, range.toMs)];
+  const buckets: number[] = [];
+  for (let b = Math.ceil(range.fromMs / stepMs) * stepMs; b + stepMs <= range.toMs; b += stepMs) buckets.push(b);
+  return { buckets, stepMs };
+}
+
 /** The tile units [fromMs, toMs] touches — day units for the 5m tier ("2026-09-08"), month
  *  units for hourly ("2026-08"); the API serves one immutable-cacheable payload per unit
  *  (the map-tile pattern: user ranges are snowflakes, their units are shared). */
@@ -291,6 +308,23 @@ export const ZOOMS = [
   { id: "all", label: "All" },
 ] as const;
 export type ZoomId = (typeof ZOOMS)[number]["id"];
+
+const H = 3_600_000; // an hour — `HOUR_MS` below is declared after this table is evaluated
+const WINDOW_MS: Record<Exclude<ZoomId, "all">, number> = {
+  "1h": H,
+  "24h": 24 * H,
+  "7d": 7 * 24 * H,
+  "30d": 30 * 24 * H,
+  "1y": 365 * 24 * H,
+};
+
+/** THE SPAN THE HISTORY VIEW HAS ON SCREEN — what its RAW hands the anchor log (user, 2026-10-07:
+ *  History's RAW is the records). A brushed range when one stands, else the window's trailing span
+ *  ending now; ALL has no span to hand over (null — the log opens on its newest page). */
+export function windowSpan(zoom: ZoomId, range: { fromMs: number; toMs: number } | null, nowMs: number): { fromMs: number; toMs: number } | null {
+  if (range) return { fromMs: range.fromMs, toMs: range.toMs };
+  return zoom === "all" ? null : { fromMs: nowMs - WINDOW_MS[zoom], toMs: nowMs };
+}
 
 /** A committed range — a drag on any chart (convention 12's zoom). `metaId` is whose chart the
  *  drag was drawn on (user, 2026-09-09: DOR committed, a range dragged on BIOFI's chart, "go to
@@ -491,12 +525,21 @@ const SPAN_WORDS: Record<ZoomId, string> = {
 };
 
 /** THE SPAN ON SCREEN, IN WORDS — what a span reading is OVER (design A, 2026-09-29): the window
- *  pill's own phrase, or a brushed range's dates (UTC, the axis's own zone; the range's end is
- *  exclusive, so the last day named is the one it reaches into). */
+ *  pill's own phrase, or a brushed range FROM – TO by its UTC days (`rangeDays` — the one span
+ *  label; the exact times are the Range card's Start / End rows). */
 export function spanPhrase(zoom: ZoomId, range: { fromMs: number; toMs: number } | null): string {
   if (!range) return SPAN_WORDS[zoom];
-  const day = (ms: number) => new Date(ms).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-  const a = day(range.fromMs);
-  const b = day(range.toMs - 1);
-  return a === b ? a : `${a} – ${b}`;
+  return rangeDays(range.fromMs, range.toMs);
+}
+
+/** A DAY-NAMED RANGE IS WHOLE DAYS (the tester pass, 2026-10-07): a range of two days or more is
+ *  labelled by its UTC days (`rangeDays`), so it snaps OUTWARD to UTC midnights — "May 21 – May 31"
+ *  then means exactly those days. A shorter range keeps its exact instants; its card states them as
+ *  clock times. Applied in the store's one range setter, so every gesture that brushes obeys it. */
+export function snapRange(r: { fromMs: number; toMs: number }, nowMs: number = Number.POSITIVE_INFINITY): { fromMs: number; toMs: number } {
+  const D = 86_400_000;
+  if (r.toMs - r.fromMs < 2 * D) return r;
+  // The end never snaps past NOW: a range brushed up to the present ends there ("until now").
+  const toMs = Math.ceil(r.toMs / D) * D;
+  return { fromMs: Math.floor(r.fromMs / D) * D, toMs: toMs > nowMs ? Math.max(r.toMs, Math.min(toMs, nowMs)) : toMs };
 }

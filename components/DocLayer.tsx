@@ -43,7 +43,6 @@ import RailThread from "@/components/RailThread";
 // defeat the bundler's static analysis). DOC_PAGES in views.ts carries everything else.
 const DOC_COMPONENTS: Record<DocPage, ReturnType<typeof dynamic>> = {
   about: dynamic(() => import("@/components/docs/AboutDoc")),
-  design: dynamic(() => import("@/components/docs/DesignDoc")),
 };
 
 // The one doc column (both documents read it). The MEASURE itself is docs/measure.ts, shared
@@ -288,7 +287,7 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
             className="absolute top-[calc(74px+var(--topbar-extra,0px))] right-2 pointer-events-auto text-muted-foreground hover:text-foreground pointer-coarse:min-h-11 pointer-coarse:min-w-11"
             onClick={() => setDocPage(null)}
           >
-            <X aria-hidden />
+            <X aria-hidden className="size-3 pointer-coarse:size-[18px]" />
           </Button>
         </div>
       </div>

@@ -18,6 +18,8 @@ beforeEach(() => {
   st.setCountry(null);
   st.setInspect(null);
   st.setSnap(null);
+  st.setMetaSnap(null);
+  st.setTickNet(null);
   st.setFollowing(true);
 });
 
@@ -128,6 +130,32 @@ describe("tickNet action (the network inside a tick)", () => {
   });
 });
 
+describe("a filter change clears what was selected under the old lens", () => {
+  // User, 2026-10-07: "if I change the filter … it should clear the details pane; currently it does
+  // not". The metagraph snapshot (and the network picked inside a tick) belonged to the old lens.
+  const sel = { metaId: "DAG0", ordinal: 7, hash: "h", globalOrdinal: 42, ts: "t" };
+  it("changing the filter clears the metagraph snapshot and the tick-local network", () => {
+    const st = useStore.getState();
+    st.setMetaSnap(sel);
+    st.setTickNet({ metaId: "dor", globalOrdinal: 42 });
+    applyClickActions([{ kind: "filter", id: "ded" }]);
+    expect(useStore.getState().metaSnap).toBeNull();
+    expect(useStore.getState().tickNet).toBeNull();
+  });
+  it("re-stating the same filter clears nothing", () => {
+    const st = useStore.getState();
+    st.setFilter("ded");
+    st.setMetaSnap(sel);
+    applyClickActions([{ kind: "filter", id: "ded" }]);
+    expect(useStore.getState().metaSnap).toEqual(sel);
+  });
+  it("a later step of the same click may set them again", () => {
+    useStore.getState().setMetaSnap(null);
+    applyClickActions([{ kind: "filter", id: "dor" }, { kind: "metaSnap", sel }]);
+    expect(useStore.getState().metaSnap).toEqual(sel);
+  });
+});
+
 describe("metaSnap action", () => {
   it("applies a metaSnap action to exactly the metaSnap channel", () => {
     const sel = { metaId: "DAG0", ordinal: 7, hash: "h", globalOrdinal: 42, ts: "t" };
@@ -221,5 +249,34 @@ describe("the motion cause a click stamps", () => {
     expect(useStore.getState().motionCause).toEqual({ kind: "rung", level: "network" });
     applyClickActions([{ kind: "filter", id: "all" }]);
     expect(useStore.getState().motionCause).toEqual({ kind: "filter", id: "all" });
+  });
+});
+
+describe("trendCursor action (a step through the moments of a Range, 2026-10-07)", () => {
+  it("moves the History cursor and nothing else", () => {
+    useStore.getState().setFilter("dor");
+    applyClickActions([{ kind: "trendCursor", ms: 1_726_704_000_000 }]);
+    const st = useStore.getState();
+    expect(st.trendCursorMs).toBe(1_726_704_000_000);
+    expect(st.filter).toBe("dor");
+    expect(st.selStack[0]).toBe("instant");
+  });
+  it("clears on null", () => {
+    applyClickActions([{ kind: "trendCursor", ms: 1 }]);
+    applyClickActions([{ kind: "trendCursor", ms: null }]);
+    expect(useStore.getState().trendCursorMs).toBeNull();
+  });
+});
+
+// A NEW LENS DROPS THE PLANE FOCUS TOO (the branch review's I6, 2026-10-07): the focus names
+// History's Metagraph card and scopes RAW, so a focus from under the old filter kept naming BioFi
+// after the top bar moved to DOR.
+describe("filter action clears a stale plane focus", () => {
+  it("a real filter change releases the focus; re-committing the same filter keeps it", () => {
+    useStore.setState({ filter: "all", trendFocus: "bio" });
+    applyClickActions([{ kind: "filter", id: "all" }]);
+    expect(useStore.getState().trendFocus).toBe("bio");
+    applyClickActions([{ kind: "filter", id: "dor" }]);
+    expect(useStore.getState().trendFocus).toBeNull();
   });
 });

@@ -1,10 +1,12 @@
 // OFFLINE bake — run manually when the metagraph set changes: `npx tsx scripts/bake-brand-hues.ts`.
 // Derives each metagraph's identity hue from its brand (logo, then site theme-color) and writes
 // data/brand-hues.json. NEVER imported by the app/runtime — jimp is a devDependency only.
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { Jimp } from "jimp";
 import { parseSvgFills, pickBrandColor, snapToAllowedZone, hexToOklch, spreadColliding } from "../src/palette/brand";
-import { NETWORKS, type NetworkId } from "../src/engine/config";
+import { CATALOG, NETWORKS, type NetworkId } from "../src/engine/config";
+import { lineageIds, retiredAtOf } from "../src/net/lineage";
+import { proposeRetirement } from "../src/net/retire";
 
 type Meta = { id: string; name: string; iconUrl: string; siteUrl: string };
 const overrides = JSON.parse(readFileSync("data/brand-hue-overrides.json", "utf8")) as Record<string, number>;
@@ -25,6 +27,19 @@ async function fetchDirectory(net: NetworkId): Promise<Meta[]> {
   return list.filter((m) => m.id).map((m) => ({
     id: m.id, name: m.name || m.id, iconUrl: m.iconUrl || "", siteUrl: m.siteUrl || "",
   }));
+}
+
+/** A chain's newest snapshot (epoch ms) from the network's block explorer, or null when unreadable. */
+async function lastSnapshotMs(net: NetworkId, id: string): Promise<number | null> {
+  try {
+    const r = await fetch(`${NETWORKS[net].be}/currency/${id}/snapshots?limit=1`, { signal: AbortSignal.timeout(10000), headers: { Accept: "application/json" } });
+    if (!r.ok) return null;
+    const ts = ((await r.json()) as { data?: { timestamp?: string }[] }).data?.[0]?.timestamp;
+    const ms = ts ? Date.parse(ts) : NaN;
+    return Number.isFinite(ms) ? ms : null;
+  } catch {
+    return null;
+  }
 }
 
 async function fetchBuf(url: string): Promise<Buffer | null> {
@@ -107,9 +122,24 @@ async function main() {
   const out: Record<string, { hueDeg: number; srcHex: string; source: string }> = {};
   const hueCache = new Map<string, { hueDeg: number; srcHex: string; source: string } | null>();
   let total = 0;
+  // RETIREMENTS (user, 2026-10-07: "can it be done when we bake/rebake the network?"). Added, never
+  // removed: a written retirement stands until a person edits the file.
+  const retired: Record<string, string> = existsSync("data/retired.json") ? JSON.parse(readFileSync("data/retired.json", "utf8")) : {};
+  const warnings: string[] = [];
   for (const net of Object.keys(NETWORKS) as NetworkId[]) {
     console.log(`--- ${net} ---`);
-    const metas = [...(await fetchDirectory(net)), dag];
+    const directory = await fetchDirectory(net);
+    // A catalog network the directory no longer lists, whose chain has also gone silent for a week,
+    // is retired on the day of its last snapshot (`proposeRetirement` — both facts, never one).
+    const listedIds = new Set(directory.map((m) => m.id));
+    for (const m of CATALOG[net]) {
+      if (!m.id || retiredAtOf(m) || retired[m.id]) continue;
+      const last = await lastSnapshotMs(net, m.id);
+      const p = proposeRetirement({ listed: listedIds.has(m.id), lastSnapshotMs: last, nowMs: Date.now() });
+      if (p.retireOn) { retired[m.id] = p.retireOn; console.log(`RETIRED ${m.name} (${m.id}) on ${p.retireOn}`); }
+      if (p.warn) warnings.push(`${net} ${m.name} (${m.id}): ${p.warn}`);
+    }
+    const metas = [...directory, dag];
     total += metas.length;
     const group: Record<string, { hueDeg: number; srcHex: string; source: string }> = {};
     for (const m of metas) {
@@ -128,7 +158,24 @@ async function main() {
     for (const [id, r] of Object.entries(group)) if (!(id in out)) out[id] = r;
   }
 
+  // ⚠️ A NETWORK THE DIRECTORY NO LONGER LISTS KEEPS ITS COLOUR (2026-10-07 — retirement). This
+  // bake reads the LIVE directory, so a removed network would silently lose its pin and fall back
+  // to another hue in History. Every address the catalog still tracks (retired networks and former
+  // chains included) carries its existing pin over unchanged.
+  const prior: Record<string, { hueDeg: number; srcHex: string; source: string }> = existsSync("data/brand-hues.json")
+    ? JSON.parse(readFileSync("data/brand-hues.json", "utf8"))
+    : {};
+  let kept = 0;
+  for (const net of Object.keys(NETWORKS) as NetworkId[]) {
+    for (const id of lineageIds(net)) {
+      if (!(id in out) && prior[id]) { out[id] = prior[id]; kept++; console.log(`kept the pin of ${id} (no longer in the directory)`); }
+    }
+  }
+  if (kept) console.log(`${kept} pin(s) carried over for catalog networks the directory no longer lists`);
+
   writeFileSync("data/brand-hues.json", JSON.stringify(out, null, 2) + "\n");
+  writeFileSync("data/retired.json", JSON.stringify(retired, null, 2) + "\n");
+  if (warnings.length) console.log(`\nLOOK AT THESE (nothing was changed for them):\n  ${warnings.join("\n  ")}`);
   console.log(`\nwrote data/brand-hues.json (${Object.keys(out).length} entries / ${total} rows probed)`);
 }
 

@@ -6,7 +6,7 @@ import { useStore } from "@/src/store/store";
 import { shortHash, metagraphById, getNetwork, SIGNER_GROUPS, nodeSigned, coLocatedNetworks, filterAccent } from "@/src/data/network";
 import { UNLISTED_ID, UNLISTED_HUE, observedUnlistedIds } from "@/src/data/unlisted";
 import { identityHudCss } from "@/src/palette/identity";
-import { fmtDag, fmtKB, midHash } from "@/src/util/format";
+import { fmtDagShort, fmtKB, midHash } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import type { GlobalSnapshot, MetaCfg, PickDescriptor } from "@/src/data/types";
 import { metaSnapDeepKey } from "@/src/data/types";
@@ -25,7 +25,8 @@ import { POLL } from "@/src/engine/config";
 import { cap, Desc, foldLabel, StatusMark, RoleChips, IdentityDot, networkKind, Fact, FactGroup, Foot, FootRow, LayerWho, ScheduleTable, partShade, Lead, Empty, QualifierChip, TickerChip, LayerCells, Door, SectionLabel, shareWords, type SchedulePart } from "./parts";
 import { statusItems } from "@/src/data/nodeStatus";
 import { compositionGroups, compositionRows, nodeCompositionLabel, parseCompositionKey } from "@/src/data/composition";
-import { pickNetId } from "@/src/engine/domain/pickActions";
+import { netKeyOf, pickNetId } from "@/src/engine/domain/pickActions";
+import { ladderSlotIds } from "@/components/railCards";
 import type { CohortSel, CompositionSel } from "@/src/engine/domain/focusLadder";
 import FollowControl from "@/components/FollowControl";
 import { NODE_ID_GLYPHS } from "@/components/explorer/nodeRow";
@@ -273,7 +274,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
               anchored" hung under the fee as a note about a different quantity. */}
           {exact.totalFee > 0 && (
             <Fact label="Fees paid">
-              <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap">{fmtDag(exact.totalFee)} DAG</span>
+              <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap">{fmtDagShort(exact.totalFee)} DAG</span>
             </Fact>
           )}
           {exact.totalSizeKB > 0 && (
@@ -283,7 +284,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
           )}
           {exact.rewardsDatum > 0 && (
             <Fact label="Rewards out">
-              <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap">{fmtDag(exact.rewardsDatum)} DAG</span>
+              <span className="animate-resolve-in motion-reduce:animate-none whitespace-nowrap">{fmtDagShort(exact.rewardsDatum)} DAG</span>
             </Fact>
           )}
           {/* The signer count is a FACT about this tick — it reads. Its two hashes don't, so
@@ -492,6 +493,18 @@ function ArchivalAcquiring() {
 export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const metaList = useStore((s) => s.metaList);
   const mg = metaList.find((x) => x.id === cfg.id) || null;
+  // THE RELATION TO THE CARD ABOVE (user, 2026-10-07: "should the metagraph card, when not the 1st
+  // card, have that section that describes its relation to its parent?"). Every child card leads
+  // with what it is to its parent; the Metagraph card is a child only where this view's lane puts
+  // the GLOBAL SNAPSHOT above it (`ladderSlotIds` — Snapshots), and there it is one of the networks
+  // that anchored into that snapshot. Counted off the snapshot's exact read, summed across the
+  // network's addresses (`netKeyOf`); before that read lands the line is simply absent (rule 10).
+  const lane = ladderSlotIds(useStore((s) => s.mode));
+  const underTick = lane.includes("snap") && lane.indexOf("snap") < lane.indexOf("context");
+  const tickExact = useStore((s) => (underTick && s.snap ? s.snapshotExact[s.snap.data.ordinal] : undefined));
+  let tickCount = 0;
+  if (tickExact) for (const [addr, v] of Object.entries(tickExact.perMeta)) if (netKeyOf(addr) === cfg.id) tickCount += v.count;
+  const tickLead = tickExact && tickCount > 0 ? `Anchored ${tickCount} of ${tickExact.anchored} snapshots` : null;
   // The UNLISTED dossier is THIS component (user, 2026-08-14 — shared components, not shared
   // grammar): its members are the distinct uncataloged addresses observed in the window's
   // exact reads, subscribed only while unlisted IS the subject so every other dossier pays
@@ -539,10 +552,10 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
     cfg.id === UNLISTED_ID
       ? "Metagraphs anchoring into Global L0 without an entry in the public catalog. " +
         (unlistedMembers.length === 0
-          ? "None was seen anchoring in the measured window."
+          ? "None has anchored while this page has been open."
           : unlistedMembers.length === 1
-            ? "One anchored in the measured window; its chain and owner address are public, its operator and nodes are not."
-            : `${unlistedMembers.length} anchored in the measured window; their chains and owner addresses are public, their operators and machines are not.`)
+            ? "One anchored while this page has been open. Its chain and owner address are public, its operator and nodes are not."
+            : `${unlistedMembers.length} anchored while this page has been open. Their chains and owner addresses are public, their operators and nodes are not.`)
       : mg?.description || cfg.blurb;
   // The site link rides the BODY now (MetaSiteRow — the aside slot carries the ticker). Falls
   // back to the config-level url for cores the live metaList doesn't carry a site for (the DAG).
@@ -558,6 +571,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
     <>
       {/* Keyed on the text so the expand state resets when the subject (or its description
           arriving from /api/metagraphs) changes — an expanded DOR must not leak into DED. */}
+{tickLead && <Lead>{tickLead}</Lead>}
       <Desc key={blurb} text={blurb} />
       {(nodes.length > 0 || (cfg.id !== "dag" && cfg.id !== UNLISTED_ID && metagraphById(cfg.id) != null)) && (
         <>
@@ -854,10 +868,10 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
                   : "This node is not among the committed metagraph snapshot's proof signers — a snapshot is signed by the metagraph's own L0 validators that were in that round."
               }
             >
-              {signed.signed ? "Signed" : "Did not sign"} snapshot {signed.ordinal.toLocaleString()}.
+              {signed.signed ? "Signed" : "Did not sign"} snapshot {signed.ordinal.toLocaleString()}
             </span>
           ) : (
-            `${place}.`
+            place
           )}
         </Lead>
       )}
@@ -1079,7 +1093,7 @@ export function CountryCard({ cc }: { cc: string }) {
     <>
       {/* THE LEAD: what this country is to the selection it sits in. The city count that followed
           ("…, in 8 cities") is gone (user, 2026-10-04). */}
-      {share && <Lead>Hosts {share} of the selection&apos;s nodes.</Lead>}
+      {share && <Lead>Hosts {share} of the selection&apos;s nodes</Lead>}
       {/* EACH CARD CUTS BY THE NEXT LEVEL DOWN (user, 2026-10-02 — `docs/superpowers/design/
           2026-10-02-country-provider`, option B: "country and provider cards have the same content …
           the node part"). Both cards used to cut their nodes by network, so the provider's table was
@@ -1136,7 +1150,7 @@ export function CompositionCard({ sel }: { sel: CompositionSel }) {
   return (
     <>
     {/* THE LEAD: the group's share of its network — the old "Share of network" fact. */}
-    {share && <Lead>{share[0].toUpperCase() + share.slice(1)} of this network&apos;s online nodes.</Lead>}
+    {share && <Lead>{share[0].toUpperCase() + share.slice(1)} of this network&apos;s online nodes</Lead>}
     {/* The divider every card draws between its lead and what follows (lost when the breakdown
         left this card on 2026-10-02). */}
     {share && <Separator className="mb-2" />}
@@ -1215,7 +1229,7 @@ export function ProviderCard({ sel }: { sel: CohortSel }) {
     <>
     {/* THE LEAD: this host's share of its country — the figure neither card showed (option B,
         2026-10-02). The city is the head's chip, so the lead does not repeat it. */}
-    {countryShare && <Lead>{countryShare[0].toUpperCase() + countryShare.slice(1)} of {where}&apos;s nodes.</Lead>}
+    {countryShare && <Lead>{countryShare[0].toUpperCase() + countryShare.slice(1)} of {where}&apos;s nodes</Lead>}
     {/* THE BREAKDOWN: the cohort's nodes cut by NETWORK — whose nodes these are — the level below
         the country card's cut by provider. */}
     <Separator className="mb-2" />

@@ -15,10 +15,12 @@ import {
   spanAverage,
   stepFor,
   trimCounterEdges,
+  unlistedSeries,
   type MetricSeries,
 } from "@/src/data/trendSeries";
-import { displayNetwork } from "@/src/data/unlisted";
+import { displayNetwork, UNLISTED_ID } from "@/src/data/unlisted";
 import type { TrendMetric } from "@/src/store/store";
+import { compactNumber } from "@/src/util/format";
 
 // ONE ROSTER PASS FOR THE STACK AND BOTH RAILS (2026-09-19).
 //
@@ -53,6 +55,9 @@ export interface TrendRosterRow {
   hue: string;
   /** The series as DRAWN: already cut by the metric's own edge rule. */
   series: MetricSeries;
+  /** The same points UNTRIMMED, on `rawBuckets` — for a sum over an exact span whose edges are
+   *  whole (the Range card's total; the branch review's I8). Never drawn. */
+  rawPoints: (number | null)[];
   /** The newest MEASURED value, which is not the newest bucket (`lastMeasured`). */
   last: number | null;
   /** The newest complete DAY (`latestDay`; user, 2026-09-29: "day should be the standard always")
@@ -76,11 +81,19 @@ export interface TrendRosterView {
   /** The whole network as ONE row — the DAG's own plane reading — under the "all" filter, else
    *  null. Never in `ranked`: it is what the ranked rows are read against, not one of them. */
   total: TrendRosterRow | null;
+  /** THE UNLISTED CHANNELS AS A ROW (the Unlisted audit, 2026-10-07): the global snapshot count less
+   *  every listed network (`unlistedSeries`). Snapshots only — no other measure is kept for them.
+   *  Under "all" it is listed AFTER the ranked networks, never ranked among them, and only while the
+   *  span holds any, so the DAG total is the rows ADDED UP; under the Unlisted filter it is the one
+   *  plane (and in `ranked`). Null otherwise. */
+  unlisted: TrendRosterRow | null;
   /** The WHOLE NETWORK's series for this metric (`globalSeries`) — the reading a surface states
    *  when no one network is the subject. Cut by the SAME edge rule as the per-network rows, which
    *  is exactly why it lives here: read straight off the payload it is one bucket out of step with
    *  the axis, and a cursor then quotes yesterday's number (caught live, 2026-09-19). */
   global: (number | null)[];
+  /** The whole network's series UNTRIMMED, on `rawBuckets` (see `TrendRosterRow.rawPoints`). */
+  rawGlobal: (number | null)[];
   /** The axis every row is drawn against, cut by the same rule the series were. */
   buckets: number[];
   /** The payload's OWN axis, before the counter edge trim. Exposed so a surface can tell the two
@@ -114,7 +127,8 @@ const NO_SERIES: Readonly<Record<string, (number | null)[]>> = {};
  *  metrics that state no formatter of their own (snapshots, blocks, nodes). */
 // Whole numbers: every metric that falls back to this is a COUNT (snapshots, blocks, nodes), and
 // an average of counts stated to a decimal ("1,978.7 a day") claims precision the reading lacks.
-const PLAIN = (v: number) => Math.round(v).toLocaleString();
+// History's readings are MAGNITUDES — "43.5K", not "43,517" (user, 2026-10-07).
+const PLAIN = (v: number) => compactNumber(v);
 
 /** WHAT AN UNMEASURED BUCKET SAYS, in words (rule 10). A gap is not a zero, and every surface that
  *  can show one — the Networks list's last reading, the cursor card's per-network rows — says it the
@@ -142,7 +156,10 @@ export default function useTrendRoster(
   // minutes over charts drawn in hours (2026-09-19).
   const stepMs = stepFor(slice, metric);
   // The SCENE's scope: the DAG is a network here (its own plane), not the document's empty state.
-  const scope = viewScope(filter);
+  // Under the Unlisted filter the SNAPSHOTS measure has a chart (their one measured quantity); every
+  // other measure keeps the honest empty scope and its sentence.
+  const unlistedFilter = filter === UNLISTED_ID;
+  const scope = unlistedFilter && metric === "snapshots" ? "network" : viewScope(filter);
   // The window's own span, from the payload's axis before any edge trim. A day's worth of the
   // finest tier is 288 five-minute buckets; one bucket short of a day still counts as the day.
   const headKind: "span" | "day" = rawAxis.length * stepMs >= 86_400_000 - stepMs ? "span" : "day";
@@ -151,7 +168,7 @@ export default function useTrendRoster(
   const pass = useMemo(() => {
     const counter = spec.kind === "counter";
     const cut = <T,>(a: readonly T[]): T[] => (counter ? trimCounterEdges(a, stepMs) : a.slice());
-    const ids = stackRoster(filter);
+    const ids = unlistedFilter ? [] : stackRoster(filter);
     const rows = new Map<string, TrendRosterRow>();
     const rowOf = (id: string): TrendRosterRow => {
       // THE HYPERGRAPH'S OWN SERIES is the global one (`globalSeries` — the same read the Moment
@@ -172,6 +189,7 @@ export default function useTrendRoster(
           sampled: s.sampled && cut(s.sampled),
           gaps: s.gaps && cut(s.gaps),
         },
+        rawPoints: s.points,
         last: lastMeasured(points),
         day: latestDay(metric, id, daily, points, stepMs),
         span: spanAverage(metric, points, stepMs, weights),
@@ -191,8 +209,10 @@ export default function useTrendRoster(
     const totalRow = (): TrendRosterRow => {
       const r = rowOf("dag");
       if (metric !== "nodes") return r;
-      const points = cut(metricSeries("nodes", "dag", series).points);
+      const rawNodes = metricSeries("nodes", "dag", series).points;
+      const points = cut(rawNodes);
       r.series = { points, sampled: undefined, gaps: undefined };
+      r.rawPoints = rawNodes;
       r.last = lastMeasured(points);
       r.day = stepMs >= 86_400_000 ? lastMeasured(points) : daily ? lastMeasured(metricSeries("nodes", "dag", daily).points) : null;
       r.span = spanAverage(metric, points, stepMs);
@@ -204,6 +224,30 @@ export default function useTrendRoster(
     // shared ceiling keep reading the layers alone.
     const total = filter === "all" ? totalRow() : null;
     if (total) rows.set("dag", total);
+    // The unlisted channels: Snapshots only, under "all" (while the span holds any) or their own filter.
+    let unlisted: TrendRosterRow | null = null;
+    if (metric === "snapshots" && (filter === "all" || unlistedFilter)) {
+      const rawUnlisted = unlistedSeries(series);
+      const points = cut(rawUnlisted);
+      const net = displayNetwork(UNLISTED_ID)!;
+      const r: TrendRosterRow = {
+        id: UNLISTED_ID,
+        name: net.name,
+        hue: net.hue,
+        series: { points, sampled: undefined, gaps: undefined },
+        rawPoints: rawUnlisted,
+        last: lastMeasured(points),
+        day: stepMs >= 86_400_000 ? lastMeasured(points) : daily ? lastMeasured(unlistedSeries(daily)) : null,
+        span: spanAverage(metric, points, stepMs),
+        head: null,
+      };
+      r.head = headKind === "span" ? r.span : r.day;
+      if (unlistedFilter || points.some((v) => (v ?? 0) > 0)) {
+        unlisted = r;
+        rows.set(UNLISTED_ID, r);
+      }
+    }
+    const order = unlistedFilter ? (unlisted ? [UNLISTED_ID] : []) : ranked;
     return {
       rows,
       // THE WHOLE NETWORK AS A ROW (2026-10-03 — the explorer's pinned DAG row under "all"): the
@@ -211,12 +255,14 @@ export default function useTrendRoster(
       // and the plane the row opens can never quote two numbers. Only under "all": a committed
       // network's list is that network, and under the DAG filter the DAG already is the row.
       total,
+      unlisted,
       // Busiest OVER THE SPAN the list states (design A) — the window on screen, so a new range
       // re-ranks the list and the stack together. The day, then the last reading, only where the
       // span has nothing measured, so a quiet network still sorts by what it last said.
-      order: ranked,
+      order,
       buckets: cut(rawAxis),
       global: cut(globalSeries(metric, series)),
+      rawGlobal: globalSeries(metric, series),
     };
   }, [filter, metric, series, rawAxis, stepMs, daily, headKind]);
 
@@ -248,7 +294,9 @@ export default function useTrendRoster(
       ranked,
       rows: pass.rows,
       total: pass.total,
+      unlisted: pass.unlisted,
       global: pass.global,
+      rawGlobal: pass.rawGlobal,
       buckets: pass.buckets,
       rawBuckets: rawAxis,
       stepMs,

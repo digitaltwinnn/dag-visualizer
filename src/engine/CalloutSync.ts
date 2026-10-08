@@ -252,6 +252,20 @@ export class CalloutSync {
     }
     const left = `${Math.round(p.left)}px`;
     if (el.style.getPropertyValue("--co-left") !== left) el.style.setProperty("--co-left", left);
+    // THE LEADER RUNS TO THE FREE STRIP (user, 2026-10-07): its length varies with where the
+    // subject sits, so the panel's distance rides `--co-phone-len` and the leader's panel end is
+    // written here, on the three lines SceneCallout draws (mask ink, casing, dashes) — the
+    // multi-leader's own discipline: position never renders React.
+    const len = Math.round(p.leader);
+    if (len !== this._ppLen || el !== this._ppLenEl) {
+      this._ppLen = len;
+      this._ppLenEl = el;
+      el.style.setProperty("--co-phone-len", `${len}px`);
+      const end = String(-(len - CALLOUT_LEG_INSET));
+      for (const line of el.querySelectorAll<SVGLineElement>(".co-leader line")) {
+        line.setAttribute(line.classList.contains("co-draw") ? "y1" : "y2", end);
+      }
+    }
     this._placedX = x;
     this._placedY = y;
     this._placedRect = r;
@@ -260,6 +274,8 @@ export class CalloutSync {
     return true;
   }
   private _ppEl: HTMLElement | null = null;
+  private _ppLen = -1;
+  private _ppLenEl: HTMLElement | null = null;
   private _ppIn = 0;
   private _ppW = 0;
   private _ppH = 0;

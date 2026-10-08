@@ -11,7 +11,6 @@ import {
   GEO_MEASURE_OPTIONS,
   cohortMeasure,
   COHORT_MEASURES,
-  countryMeasure,
   type GeoMeasure,
 } from "@/src/data/geoMeasure";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
@@ -25,6 +24,8 @@ import { useStore } from "@/src/store/store";
 import { NO_SIGNAL_COPY, useNoSignal } from "@/components/useNoSignal";
 import { ccMark } from "@/src/util/format";
 import { levelMeasure } from "@/src/data/explorerMeasure";
+import { cohortsLevel, countriesLevel, countryNodes, nodesByCountry } from "@/src/data/ladderLevels";
+import { UNLISTED_ID } from "@/src/data/unlisted";
 
 // THE GEOGRAPHY'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -87,55 +88,25 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
   const activeCfg = metagraphById(filter);
   const tickerOrName = activeCfg ? activeCfg.ticker || activeCfg.name : "This metagraph";
 
-  // The selection's nodes grouped by country NAME — the join key both the leaderboard and the node
-  // list derive from `geo.country` (`cc` can be absent, the name can't); sorted alphabetically by
-  // the displayed primary with the id as the tiebreak, so co-located nodes keep one order.
-  const nodesByCountry = useMemo(() => {
-    const m = new Map<string, NodeRow[]>();
-    for (const r of selNodes) {
-      const key = r.country || "Unknown";
-      (m.get(key) ?? m.set(key, []).get(key)!).push(r);
-    }
-    for (const rows of m.values())
-      rows.sort(
-        (a, b) =>
-          (a.city || a.label).localeCompare(b.city || b.label, undefined, { sensitivity: "base" }) ||
-          (a.id || "").localeCompare(b.id || ""),
-      );
-    return m;
-  }, [selNodes]);
+  // The level functions are the ONE list (src/data/ladderLevels.ts) — the rail's ghost and pager
+  // read the same ones, so this list and the card's ‹ › can never disagree about order.
+  const byCountry = useMemo(() => nodesByCountry(selNodes), [selNodes]);
 
   // ---- level 0: the countries, measured by the heading's pick ----------------------------------
-  const measured = useMemo(() => {
-    const valued = list.map((c) => ({ c, v: countryMeasure(geoMeasure, c.count, nodesByCountry.get(c.country) ?? []) }));
-    // Sorted by the measure, node count as the tiebreak: the order is what the eye reads off a
-    // ranked list. A selection never re-orders it.
-    valued.sort((a, b) => b.v - a.v || b.c.count - a.c.count);
-    return valued;
-  }, [list, geoMeasure, nodesByCountry]);
+  const measured = useMemo(() => countriesLevel(list, byCountry, geoMeasure), [list, byCountry, geoMeasure]);
   const maxV = Math.max(1, measured[0]?.v ?? 0);
 
   // ---- the drilled country and its cohorts --------------------------------------------------
   const drilled = country ? list.find((c) => c.cc === country) ?? null : null;
-  const drilledRows = drilled ? nodesByCountry.get(drilled.country) ?? [] : [];
+  const drilledRows = useMemo(() => (drilled ? countryNodes(drilled.cc, list, byCountry) : []), [drilled, list, byCountry]);
   // COHORT ROWS: a country's nodes collapse into one row per city × provider, biggest first.
-  type Cohort = { key: string; city: string | null; isp: string | null; rows: NodeRow[] };
-  const cohorts = useMemo((): Cohort[] => {
-    const by = new Map<string, Cohort>();
-    for (const r of drilledRows) {
-      const geo = "geo" in r.pick ? r.pick.geo : undefined;
-      const city = r.city || null;
-      const isp = geo?.isp || null;
-      const key = `${city ?? ""}|${isp ?? ""}`;
-      (by.get(key) ?? by.set(key, { key, city, isp, rows: [] }).get(key)!).rows.push(r);
-    }
-    return [...by.values()].sort((a, b) => b.rows.length - a.rows.length || (a.city ?? "￿").localeCompare(b.city ?? "￿"));
-  }, [drilledRows]);
+  const cohorts = useMemo(() => cohortsLevel(drilledRows), [drilledRows]);
   const openCohort = drilled && cohort && cohort.cc === drilled.cc ? cohorts.find((ch) => sameCohort(cohort, { cc: drilled.cc, city: ch.city, isp: ch.isp })) ?? null : null;
 
   const levels: ExplorerLevelSpec[] = [
     {
       key: "countries",
+      parent: "context",
       crumb: { label: "Countries", onRelease: () => (country ? drill(country) : undefined) },
       measure: { options: GEO_MEASURE_OPTIONS, value: geoMeasure, onPick: (id) => setGeoMeasure(id as GeoMeasure) },
       hasFigure: true,
@@ -150,7 +121,11 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
       ) : quietEmpty ? (
         <>
           <span className="block text-body text-foreground">No locatable nodes</span>
-          {tickerOrName} has no nodes we can place on the map right now. It still appears in the Hypergraph.
+          {/* The unlisted set is not one metagraph and publishes no nodes at all (the Unlisted
+              audit, 2026-10-07) — "right now" and "still appears in the Hypergraph" were false. */}
+          {filter === UNLISTED_ID
+            ? "Unlisted channels publish no nodes, so there is nothing to place on the map."
+            : `${tickerOrName} has no nodes we can place on the map right now. It still appears in the Hypergraph.`}
         </>
       ) : undefined,
       rows: measured.map(({ c, v }) => ({
@@ -175,6 +150,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
     const maxRows = Math.max(1, ...cohorts.map((ch) => cohortMeasure(cohortPick, ch.rows)));
     levels.push({
       key: "cohorts",
+      parent: "country",
       crumb: {
         // The name alone (user, 2026-09-26: the crumb "does not need both DE and Germany").
         label: drilled.country,
@@ -234,6 +210,7 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
   if (drilled && openCohort) {
     levels.push({
       key: "nodes",
+      parent: "cohort",
       crumb: {
         label: cohortLabel(openCohort),
         title: cohortLabel(openCohort),

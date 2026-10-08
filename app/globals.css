@@ -52,16 +52,26 @@
 /* Unboxed rail ENTRIES (card-redesign 2026-08-08 — the ancestor tier that shed its glass box):
    no frame to glow, so pairing reads as the row wash. Unlayered like its siblings so it beats
    the entry's own utilities. Two deliberate details for the SLAB (below): the wash rides
-   `background-image` so it COMPOSITES OVER the entry's `--panel-solid` fill instead of replacing
+   an inset shadow layer so it COMPOSITES OVER the entry's `--panel-solid` fill instead of replacing
    it (a translucent mix over nothing punches a transparent hole through the pile), and it sets
    NO border-radius — the slab squares interior corners, and a rounding change on hover jitters. */
-.rail-entry.subject-paired {
-  box-shadow: none;
-  background-image: linear-gradient(
-    color-mix(in oklch, var(--row-hue, var(--primary)) 12%, transparent) 0 100%
-  );
+/* ⚠️ THE WASH IS A BOX-SHADOW LAYER, AND THE ENTRY KEEPS ITS OWN FADES (user, 2026-10-07: "hover
+   over a node card when it's closed, it only flashes the moment we enter and exit"). The wash rode
+   `background-image`, which cannot transition, and `.subject-paired`'s `transition: box-shadow`
+   above REPLACED the entry's `opacity, filter` fade — so the hover's brighten started easing, the
+   pairing class landed a frame later and cut it to its end value, and on leave the wash vanished
+   in one frame while the brighten eased out. Now the wash is an inset shadow spread over the whole
+   padding box (it still composites OVER the `--panel-solid` fill, under the content) carried in
+   `--entry-wash`, and every one of the three — opacity, brightness, wash — eases on one clock. */
+.rail-entry {
+  box-shadow: inset 0 0 0 100vmax var(--entry-wash, transparent);
 }
-@media (prefers-reduced-motion: reduce) { .subject-paired { transition: none; } }
+.rail-entry.subject-paired {
+  --entry-wash: color-mix(in oklch, var(--row-hue, var(--primary)) 12%, transparent);
+  box-shadow: inset 0 0 0 100vmax var(--entry-wash);
+  transition: opacity 150ms, filter 150ms, box-shadow 150ms;
+}
+@media (prefers-reduced-motion: reduce) { .subject-paired, .rail-entry.subject-paired { transition: none; } }
 
 /* ── Card signal system (Task 12 — EdgePulse.tsx + the card's scene-facing edge) ─────────────
    THE MODEL (design evolution, agreed live): **thread = resting identity cue, card edge =
@@ -414,7 +424,10 @@
    `--co-phone-k` for the panel's standoff), so the leader takes no scale; a
    dropped label mirrors it below. The panel's left edge is the sync's `--co-left` (centred, clamped). */
 :is(#callout, #callout-2)[data-phone] { --co-k: var(--co-phone-k); }
-:is(#callout, #callout-2)[data-phone] .co-panel { left: var(--co-left, 0px); right: auto; }
+/* …and since 2026-10-07 the label stands out in the FREE STRIP (`calloutPhonePlacement`'s
+   `leader`), so the panel sits at the length the sync writes, `--co-phone-len`, not at a factor. */
+:is(#callout, #callout-2)[data-phone] .co-panel { left: var(--co-left, 0px); right: auto; bottom: var(--co-phone-len, calc(var(--co-off-y) * var(--co-k))); }
+:is(#callout, #callout-2)[data-phone][data-drop] .co-panel { bottom: auto; top: var(--co-phone-len, calc(var(--co-off-y) * var(--co-k))); }
 :is(#callout, #callout-2)[data-phone] .co-scale { transform: none; }
 :is(#callout, #callout-2)[data-phone][data-drop] .co-scale { transform: scale(1, -1); }
 
@@ -769,7 +782,8 @@
 .rail-ladder > [data-tier="entry"] .rail-entry {
   --ring-t: var(--border);
   --ring-b: var(--border);
-  box-shadow: inset 1px 0 0 var(--border), inset -1px 0 0 var(--border), inset 0 1px 0 var(--ring-t), inset 0 -1px 0 var(--ring-b);
+  box-shadow: inset 1px 0 0 var(--border), inset -1px 0 0 var(--border), inset 0 1px 0 var(--ring-t), inset 0 -1px 0 var(--ring-b),
+    inset 0 0 0 100vmax var(--entry-wash, transparent);
 }
 .rail-ladder > :is([data-tier="entry"], [data-tier="box"]) + [data-tier="entry"] .rail-entry { --ring-t: transparent; }
 .rail-ladder > [data-tier="entry"]:has(+ :is([data-tier="entry"], [data-tier="box"])) .rail-entry { --ring-b: transparent; }
@@ -824,13 +838,13 @@
   right: 0;
   height: var(--radius);
   /* The entry's own glass. No opacity or filter of its own — it INHERITS the entry's rendering, and
-     `background-image: inherit` finishes the job for the one state that isn't a filter: the pairing
-     wash rides `background-image` on `.rail-entry.subject-paired`, so inheriting it composites the
-     same mix over the same fill. Verified live — with a flat `--panel-solid` here the band stayed
-     COLD while the entry washed warm on a paired hover, which is the dead-corner read one state
-     further along. The wash is a flat `0 100%` gradient, so the pseudo's own box size is moot. */
+     the pairing wash, the one state that isn't a filter, reaches it through `--entry-wash` (a custom
+     property, so the pseudo inherits it): the same inset-shadow layer the entry paints, over the
+     same fill. Verified live — with a flat `--panel-solid` here the band stayed COLD while the entry
+     washed warm on a paired hover, which is the dead-corner read one state further along. */
   background-color: var(--panel-solid);
-  background-image: inherit;
+  box-shadow: inset 0 0 0 100vmax var(--entry-wash, transparent);
+  transition: box-shadow 150ms;
   backdrop-filter: blur(10px);
   pointer-events: none;
 }

@@ -52,7 +52,7 @@ export default function RecordsSurface() {
     // wide touch screen. The mark gets its own column there, level with the header row.
     <div
       className={
-        "h-full flex flex-col pl-6 max-[700px]:pr-4 max-[700px]:pl-4 py-3 " +
+        "h-full flex flex-col pl-6 max-[700px]:pr-3 max-[700px]:pl-3 py-3 max-[700px]:pt-2 " +
         (mode === "ledger" ? "pr-6 max-[1099px]:pr-10" : "pr-10")
       }
     >
@@ -79,7 +79,9 @@ export default function RecordsSurface() {
               // pr-2: the phone pane SCROLLS (document mode), and without it the value column's
               // right edge sat against the scrollbar (user, 2026-09-02).
               "max-[700px]:pr-2 " +
-              "max-[700px]:pl-0 max-[700px]:overflow-y-auto slim-scroll"
+              // The phone pane scrolls DOWN only: 2px of a full-bleed plate's overhang drew a
+              // horizontal scrollbar along its bottom (2026-10-07, the raw phone pass).
+              "max-[700px]:pl-0 max-[700px]:overflow-y-auto max-[700px]:overflow-x-hidden slim-scroll"
             }
           >
             {onDetail && (

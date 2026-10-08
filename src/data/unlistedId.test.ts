@@ -16,8 +16,9 @@ describe("the unlisted identity leaf", () => {
   it("the LABEL is a separate concern from the ID, even while they match", () => {
     // They are spelled alike today, and that coincidence is what previously hid the asymmetry:
     // the label is free to change, the id is not. Both exist so a rename can touch only one.
-    expect(UNLISTED_LABEL).toBe("unlisted");
-    expect(typeof UNLISTED_LABEL).toBe("string");
+    // The proof is now visible: the label is capitalised like every network name, the id is not.
+    expect(UNLISTED_LABEL).toBe("Unlisted");
+    expect(UNLISTED_LABEL).not.toBe(UNLISTED_ID);
   });
 
   it("the hue stays a TOKEN, never a raw colour", () => {

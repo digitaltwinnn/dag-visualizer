@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowDown, ArrowUp, type LucideIcon } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useStore } from "@/src/store/store";
 import { metagraphById, filterAccent, shortHash } from "@/src/data/network";
@@ -10,9 +10,10 @@ import { compositionRows } from "@/src/data/composition";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { nodeSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { IdentityDot, RoleChips } from "@/components/inspector/parts";
+import { IdentityDot, QualifierChip, RoleChips } from "@/components/inspector/parts";
+import { COUNTRY_ICON, PROVIDER_ICON } from "@/components/icons";
 import { tickerOf } from "@/components/explorer/nodeRow";
-import { SelectedRowMark, selectionHue } from "@/components/selection";
+import { selectionHue } from "@/components/selection";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -148,7 +149,15 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
   return (
     // `max-[700px]:mt-8`: the phone list has no header row, which is what used to sit beside the
     // panel's × — without the room the close mark covered the first row's right end.
-    <ScrollArea className="flex-1 min-h-0 max-[700px]:mt-8">
+    <>
+    {/* THE PHONE LIST NAMES ITSELF (user, 2026-10-07 — option B): the table has no header row on a
+        phone, which left the panel's × alone on an empty line. That line now says what the list is
+        and how many, with the × at its end. */}
+    <p className="min-[700px]:hidden m-0 h-9 flex items-center gap-2 pr-10 border-b border-border text-body">
+      <span className="font-medium text-foreground">Nodes</span>
+      <span className="tabular-nums text-muted-foreground">{rows.length}</span>
+    </p>
+    <ScrollArea className="flex-1 min-h-0">
       <Table className="max-[700px]:block max-[700px]:[&_tbody]:block max-[700px]:[&_tr]:grid">
         <TableHeader className="sticky top-0 z-10 bg-[var(--panel-solid)] backdrop-blur-md max-[700px]:hidden">
           <TableRow className="border-border">
@@ -169,8 +178,6 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
                 </button>
               </TableHead>
             ))}
-            {/* Reserved trailing slot for the selection ✓ — so columns never shift. */}
-            <TableHead className="w-7" />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -187,8 +194,8 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
             return (
               <TableRow
                 key={r.key}
-                // The committed-selection language, bent to a table: the `--sel-bg` wash + the
-                // shared ✓ mark. (SELECTED_ROW's box-shadow ring is skipped on purpose — a
+                // The committed-selection language, bent to a table: the `--sel-bg` wash alone — the
+                // ✓ retired on 2026-10-07 (user: "obsolete as the whole row is highlighted"). (SELECTED_ROW's box-shadow ring is skipped on purpose — a
                 // box-shadow doesn't paint on a border-collapsed table row.)
                 // Hover in the node's network hue (user, 2026-09-26) — the anchor log's recipe.
                 className={cn(
@@ -219,32 +226,42 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
                 {COLS[mode].map((c) => (
                   <TableCell key={c.key} className={PHONE_HIDDEN}>{cell(r, c.key)}</TableCell>
                 ))}
-                <TableCell className={cn("w-7", PHONE_HIDDEN)}>{selected && <SelectedRowMark hue={r.netId ? filterAccent(r.netId) : undefined} />}</TableCell>
-                {/* TWO-LINE ROWS ON PHONE (user, 2026-10-02 — the anchor log's option E, "do E also
-                    for the other raw pages"). The table could only keep two or three columns
-                    there; a row is now WHO (network and node id, with the ✓) over one muted line
-                    of WHERE and WHAT — place, host, make-up — so nothing is stood down and nothing
-                    can be cut off at the edge. One layout for both views: on a phone the lens is
-                    the view the reader came from, not a column order. */}
-                <TableCell className="min-[700px]:hidden pb-0">
+                {/* ONE FACT PER LINE ON PHONE (user, 2026-10-07 — the raw phone pass: "1 per row
+                    looks clean, keep the tag also", then "add the icon to each"). The first line is
+                    WHO — network, node id, and the make-up as the head's own qualifier chip — and
+                    each fact below takes a line of its own, led by the kind mark the cards use for
+                    it (the country pin, the provider rack). Nothing to separate, so no mid-dot and
+                    no wrapping run of three facts; nothing stands down. */}
+                <TableCell className="min-[700px]:hidden pb-0.5">
                   <span className="flex items-center gap-3">
                     {cell(r, "net")}
                     {cell(r, "id")}
-                    <span className="ml-auto inline-flex w-3.5 flex-none">{selected && <SelectedRowMark hue={r.netId ? filterAccent(r.netId) : undefined} />}</span>
+                    <span className="ml-auto flex items-center gap-2">
+                      {(() => {
+                        const comp = compositionRows([{ roles: r.roles, layer: r.node.layer }])[0];
+                        return comp ? <QualifierChip>{comp.label}</QualifierChip> : null;
+                      })()}
+                    </span>
                   </span>
                 </TableCell>
-                <TableCell className="min-[700px]:hidden pt-0 pb-2 text-label text-muted-foreground whitespace-normal">
-                  {/* Place, host and make-up are three facts: three items on a wrapping line. */}
-                  <span className="flex flex-wrap gap-x-3 gap-y-0.5">
-                    {(() => {
-                      const parts = [
-                        [r.node.city, r.node.country].filter(Boolean).join(", "),
-                        r.isp,
-                        compositionRows([{ roles: r.roles, layer: r.node.layer }])[0]?.label,
-                      ].filter((x): x is string => !!x);
-                      return parts.length ? parts.map((x) => <span key={x}>{x}</span>) : "—";
-                    })()}
-                  </span>
+                <TableCell className="min-[700px]:hidden pt-0 pb-2 text-label whitespace-normal">
+                  {(() => {
+                    const place = [r.node.city, r.node.country].filter(Boolean).join(", ");
+                    const line = (Icon: LucideIcon, text: string, ink: string) => (
+                      <span className={cn("flex items-center gap-1.5 min-w-0", ink)}>
+                        <Icon aria-hidden className="size-3 flex-none opacity-70" />
+                        <span className="truncate">{text}</span>
+                      </span>
+                    );
+                    return (
+                      <span className="flex flex-col gap-0.5">
+                        {line(COUNTRY_ICON, place || "Unlocated", "text-muted-foreground")}
+                        {/* ONE INK for both facts, the darker one (user, 2026-10-07): they are peers, told apart by
+                            their marks, not ranked by a colour step. */}
+                        {line(PROVIDER_ICON, r.isp ?? "Unknown provider", "text-muted-foreground")}
+                      </span>
+                    );
+                  })()}
                 </TableCell>
               </TableRow>
             );
@@ -252,5 +269,6 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
         </TableBody>
       </Table>
     </ScrollArea>
+    </>
   );
 }

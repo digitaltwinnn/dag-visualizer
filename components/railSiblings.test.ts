@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { childStep, childSteps, positionMarks, siblingSet, type SiblingState } from "@/components/railSiblings";
+import { CHILD_OF, childStep, positionMarks, siblingSet, type SiblingState } from "@/components/railSiblings";
 import {
   cohortToggleActions,
   compositionToggleActions,
@@ -10,15 +10,19 @@ import {
   snapshotSelectActions,
 } from "@/src/engine/domain/pickActions";
 import { compositionGroups } from "@/src/data/composition";
+import { rangeBuckets } from "@/src/data/trendWindow";
+import { cohortsLevel, countriesLevel, countryNodes, networksLevel, nodesByCountry, tickNetworksLevel } from "@/src/data/ladderLevels";
 import type { ChannelSnapRow, GlobalSnapshot, MetaInfo, NodeRow, PickDescriptor } from "@/src/data/types";
 
 // ---------------------------------------------------------------------------
 // Fixtures — realistic shapes, cast where the full interface carries scene baggage.
 
-const meta = (id: string, name: string, located: number, symbol?: string) =>
-  ({ id, name, symbol, located } as unknown as MetaInfo);
+const meta = (id: string, name: string, located: number, symbol?: string, nodes = 0) =>
+  ({ id, name, symbol, located, nodes: Array.from({ length: nodes }, () => ({})) } as unknown as MetaInfo);
 
-const metaList = [meta("ded", "Dedicated Energy", 3, "DED"), meta("dor", "DOR Technologies", 22, "DOR"), meta("tbc", "TBC", 0)];
+// Fleet sizes order the networks differently from `located` (ded, dor, tbc vs dor, ded, tbc), so a
+// pager that kept the filter strip's order fails the Hypergraph one-list assertion.
+const metaList = [meta("ded", "Dedicated Energy", 3, "DED", 5), meta("dor", "DOR Technologies", 22, "DOR", 2), meta("tbc", "TBC", 0, undefined, 1)];
 
 const node = (opts: {
   ip: string;
@@ -80,21 +84,40 @@ const base = (over: Partial<SiblingState>): SiblingState => ({
   exactRows: null,
   following: false,
   ticks: [],
+  geoMeasure: "nodes",
+  hyperMeasure: "nodes",
+  allNodes: [deA, deB, deC, fiA],
+  tickNets: null,
+  trendRange: null,
+  trendCursorMs: null,
   ...over,
 });
+
+// A ledger state whose tick networks are built by the SAME level function the hook calls, from the
+// fixture's exact rows (no polled rows: the tests' ids are not in the app catalog, so `isListed`
+// is the fixture's metaList, as `keyOf` already assumes).
+const isListed = (id: string) => metaList.some((m) => m.id === id);
+const ledger = (over: Partial<SiblingState>): SiblingState => {
+  const s = base({ mode: "ledger", ...over });
+  const t = s.snap ?? null;
+  const tickNets = t ? tickNetworksLevel(t.data, [], (s.exactRows ?? null) as never, isListed) : null;
+  return { ...s, isListed, tickNets };
+};
 
 // ---------------------------------------------------------------------------
 
 describe("siblingSet — context (network) rung", () => {
-  it("steps the picker's located-desc order, with the committed network at index", () => {
-    const set = siblingSet("context", base({ filter: "ded" }))!;
-    expect(set.items.map((i) => i.key)).toEqual(["dor", "ded", "tbc"]);
-    expect(set.index).toBe(1);
+  it("steps the explorer's network order (the picked figure), with the committed network at index", () => {
+    const s = base({ mode: "hyper", filter: "ded" });
+    const set = siblingSet("context", s)!;
+    expect(set.items.map((i) => i.key)).toEqual(networksLevel(metaList, s.allNodes, "nodes").map((x) => x.m.id));
+    expect(set.items[set.index]!.key).toBe("ded");
     expect(set.parentLabel).toBe("Networks");
   });
   it("a step to a DIFFERENT network is a plain filter select", () => {
     const set = siblingSet("context", base({ filter: "ded" }))!;
-    expect(set.items[0]!.actions).toEqual([{ kind: "filter", id: "dor" }]);
+    const other = set.items.find((i) => i.key !== "ded")!;
+    expect(other.actions).toEqual([{ kind: "filter", id: other.key }]);
   });
   it("the CURRENT item builds the deselect-toggle (documented: the pager never invokes it)", () => {
     const set = siblingSet("context", base({ filter: "ded" }))!;
@@ -227,7 +250,7 @@ describe("siblingSet — metagraph snapshot rung", () => {
   // and one undecodable unlisted channel.
   const rows: ChannelSnapRow[] = [row("ded", 100), row("dor", 900), row("DAG5unknownaddr", 0), row("ded", 101)];
   const cur = { metaId: "ded", ordinal: 100, hash: "h", globalOrdinal: 42, ts: "T" };
-  const s = base({ mode: "ledger", filter: "ded", metaSnap: cur, snap: snapPick, exactRows: rows });
+  const s = ledger({ filter: "ded", metaSnap: cur, snap: snapPick, exactRows: rows });
 
   // ⚠️ OLDEST → NEWEST, so `›` MEANS FORWARD IN TIME. This asserted ordinal DESC until
   // 2026-09-01, when the user named what that cost: "forward swipe goes to the parent, which is
@@ -262,28 +285,28 @@ describe("siblingSet — metagraph snapshot rung", () => {
   });
   it("a metagraph with a single snapshot in the tick gets NO pager", () => {
     const only = { ...cur, metaId: "dor", ordinal: 900 };
-    expect(siblingSet("metaSnap", base({ ...s, filter: "dor", metaSnap: only }))).toBeNull();
+    expect(siblingSet("metaSnap", ledger({ ...s, filter: "dor", metaSnap: only }))).toBeNull();
   });
   it("undecodable rows say so and get position-unique keys", () => {
     const two = [row("ded", 0), row("ded", 0)];
     const undec = { ...cur, ordinal: 0 };
-    const set = siblingSet("metaSnap", base({ ...s, metaSnap: undec, exactRows: two }))!;
+    const set = siblingSet("metaSnap", ledger({ ...s, metaSnap: undec, exactRows: two }))!;
     expect(set.items.map((i) => i.label)).toEqual(["undecoded", "undecoded"]);
     const keys = set.items.map((i) => i.key);
     expect(new Set(keys).size).toBe(keys.length);
   });
   it("needs the pinned global of the SAME tick — mismatch or no exact read → no set", () => {
-    expect(siblingSet("metaSnap", { ...s, snap: null })).toBeNull();
-    expect(siblingSet("metaSnap", { ...s, exactRows: null })).toBeNull();
+    expect(siblingSet("metaSnap", ledger({ ...s, snap: null }))).toBeNull();
+    expect(siblingSet("metaSnap", ledger({ ...s, exactRows: null }))).toBeNull();
     const otherTick = { kind: "snapshot", data: { ordinal: 41 } } as unknown as SiblingState["snap"];
-    expect(siblingSet("metaSnap", { ...s, snap: otherTick })).toBeNull();
+    expect(siblingSet("metaSnap", ledger({ ...s, snap: otherTick }))).toBeNull();
   });
 });
 
 describe("siblingSet — global snapshot slot (the OPEN set)", () => {
   // A window of four retained ticks with #44 live; the card is pinned to #42 (snapPick).
   const ticks = [tick(41), tick(42), tick(43), tick(44, true)];
-  const s = base({ mode: "ledger", filter: "all", snap: snapPick, ticks });
+  const s = ledger({ filter: "all", snap: snapPick, ticks });
 
   it("steps the retained window in the LiveStrip's own order (oldest→newest), index at the pin", () => {
     const set = siblingSet("snap", s)!;
@@ -361,7 +384,7 @@ describe("childStep — the first-child DOWN step", () => {
     );
   });
   it("the ledger network and 'all' have no first child to open", () => {
-    expect(childStep("context", base({ mode: "ledger", filter: "ded" }))).toBeNull();
+    expect(childStep("context", ledger({ filter: "ded" }))).toBeNull();
     expect(childStep("context", base({}))).toBeNull();
   });
   it("a country opens its first cohort (count-desc then city)", () => {
@@ -392,7 +415,7 @@ describe("childStep — the first-child DOWN step", () => {
       { metaId: "dor", ordinal: 901, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
       { metaId: "ded", ordinal: 500, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
     ] as unknown as SiblingState["exactRows"];
-    const s = base({ mode: "ledger", snap: snapPick, exactRows: rows });
+    const s = ledger({ snap: snapPick, exactRows: rows });
     const step = childStep("snap", s)!;
     expect(step.key).toBe("dor");
     expect(step.actions).toEqual(tickNetSelectActions("dor", snapPick, { metaSnap: null }));
@@ -407,7 +430,7 @@ describe("childStep — the first-child DOWN step", () => {
       { metaId: "ded", ordinal: 500, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
     ] as unknown as SiblingState["exactRows"];
     const ord = snapPick.data.ordinal;
-    const s = base({ mode: "ledger", snap: snapPick, exactRows: rows, tickNet: { metaId: "dor", globalOrdinal: ord } });
+    const s = ledger({ snap: snapPick, exactRows: rows, tickNet: { metaId: "dor", globalOrdinal: ord } });
     // The tick has its child, so ∨ from the tick has nothing new to open…
     expect(childStep("snap", s)).toBeNull();
     // …and the card's own ‹ › move the tick-local commit.
@@ -421,23 +444,23 @@ describe("childStep — the first-child DOWN step", () => {
   // 2026-09-15). An unlisted channel names no filter, so it cannot be the step — but a tick LED by
   // one still has committable networks under it, and dimming ∨ there would hide them behind an
   // anchor the reader cannot act on anyway.
-  it("an unlisted leader is a network like any other — the tick opens it", () => {
+  it("an unlisted leader is listed last, as the explorer lists it — the tick opens the top listed network", () => {
     const rows = [
       { metaId: "DAG-not-in-catalog", ordinal: 1, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
       { metaId: "DAG-not-in-catalog", ordinal: 2, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
       { metaId: "DAG-not-in-catalog", ordinal: 3, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
       { metaId: "ded", ordinal: 500, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
     ] as unknown as SiblingState["exactRows"];
-    const step = childStep("snap", base({ mode: "ledger", snap: snapPick, exactRows: rows }))!;
-    expect(step.key).toBe("unlisted");
-    expect(step.actions).toEqual(tickNetSelectActions("unlisted", snapPick, { metaSnap: null }));
+    const step = childStep("snap", ledger({ snap: snapPick, exactRows: rows }))!;
+    expect(step.key).toBe("ded");
+    expect(step.actions).toEqual(tickNetSelectActions("ded", snapPick, { metaSnap: null }));
   });
 
   it("a tick holding only an unlisted channel still has a rung to open, and a snapshot under it", () => {
     const rows = [
       { metaId: "DAG-not-in-catalog", ordinal: 7, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
     ] as unknown as SiblingState["exactRows"];
-    const tick = base({ mode: "ledger", snap: snapPick, exactRows: rows });
+    const tick = ledger({ snap: snapPick, exactRows: rows });
     expect(childStep("snap", tick)!.key).toBe("unlisted");
     // …and from the unlisted card, ∨ opens that channel's snapshot — the rung that used to be skipped.
     const under = { ...tick, tickNet: { metaId: "unlisted", globalOrdinal: snapPick.data.ordinal } };
@@ -450,7 +473,7 @@ describe("childStep — the first-child DOWN step", () => {
     const rows = [
       { metaId: "ded", ordinal: 500, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
     ] as unknown as SiblingState["exactRows"];
-    const s = base({ mode: "ledger", filter: "ded", snap: snapPick, exactRows: rows });
+    const s = ledger({ filter: "ded", snap: snapPick, exactRows: rows });
     const step = childStep("context", s)!;
     expect(step.label).toContain("500");
     expect(step.actions).toEqual(
@@ -466,7 +489,7 @@ describe("childStep — the first-child DOWN step", () => {
     const rows = [
       { metaId: "dor", ordinal: 900, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
     ] as unknown as SiblingState["exactRows"];
-    expect(childStep("context", base({ mode: "ledger", filter: "ded", snap: snapPick, exactRows: rows }))).toBeNull();
+    expect(childStep("context", ledger({ filter: "ded", snap: snapPick, exactRows: rows }))).toBeNull();
   });
 
   // The scope rule, restated for the new lane: a ∨ may commit the rung directly below it, and
@@ -477,7 +500,7 @@ describe("childStep — the first-child DOWN step", () => {
       { metaId: "ded", ordinal: 500, decoded: true, fee: 1, bytes: 10, signers: [], blocks: 0, hasState: false, stateBytes: 0, stateProof: null },
     ] as unknown as SiblingState["exactRows"];
     for (const slot of ["context", "metaSnap", "node"] as const) {
-      const step = childStep(slot, base({ mode: "ledger", filter: "ded", snap: snapPick, exactRows: rows, inspect: deA.pick }));
+      const step = childStep(slot, ledger({ filter: "ded", snap: snapPick, exactRows: rows, inspect: deA.pick }));
       if (!step) continue;
       for (const a of step.actions) {
         if (a.kind !== "filter") continue;
@@ -487,7 +510,7 @@ describe("childStep — the first-child DOWN step", () => {
   });
 
   it("an unread tick and the leaf rungs answer null", () => {
-    expect(childStep("snap", base({ mode: "ledger", snap: snapPick, exactRows: [] }))).toBeNull();
+    expect(childStep("snap", ledger({ snap: snapPick, exactRows: [] }))).toBeNull();
     expect(childStep("node", base({ inspect: deA.pick }))).toBeNull();
     expect(childStep("metaSnap", base({}))).toBeNull();
   });
@@ -505,8 +528,8 @@ describe("childStep — the first-child DOWN step", () => {
       { metaId: "dor", ordinal: 900 },
       { metaId: "ded", ordinal: 55 },
     ] as unknown as SiblingState["exactRows"];
-    expect(childStep("snap", base({ mode: "ledger", filter: "ded", snap: snapPick, exactRows: rows }))).toBeNull();
-    expect(childStep("snap", base({ mode: "ledger", filter: "paca", snap: snapPick, exactRows: rows }))).toBeNull();
+    expect(childStep("snap", ledger({ filter: "ded", snap: snapPick, exactRows: rows }))).toBeNull();
+    expect(childStep("snap", ledger({ filter: "paca", snap: snapPick, exactRows: rows }))).toBeNull();
   });
 });
 
@@ -524,29 +547,29 @@ describe("siblingSet — context rung under a ledger tick", () => {
     { metaId: "unlisted-x", ordinal: 2 },
     { metaId: "unlisted-x", ordinal: 3 },
   ] as unknown as SiblingState["exactRows"];
-  const s = base({ mode: "ledger", filter: "ded", snap: snapPick, exactRows: rows });
+  const s = ledger({ filter: "ded", snap: snapPick, exactRows: rows });
 
-  it("steps the tick's own networks, busiest first — the unlisted set included, never the whole catalog", () => {
+  it("steps the tick's own networks, busiest first, the unlisted set LAST — never the whole catalog", () => {
     const set = siblingSet("context", s)!;
-    expect(set.items.map((i) => i.key)).toEqual(["unlisted", "dor", "ded"]); // tbc never anchored here
-    expect(set.index).toBe(2);
+    expect(set.items.map((i) => i.key)).toEqual(["dor", "ded", "unlisted"]); // tbc never anchored here
+    expect(set.index).toBe(1);
   });
   it("a swipe commits the neighbour INSIDE the tick and pins it — never the filter", () => {
     const set = siblingSet("context", s)!;
-    expect(set.items[1]!.actions).toEqual(tickNetSelectActions("dor", snapPick, { metaSnap: null, hasInspect: false, net: "ded" }));
+    expect(set.items.find((i) => i.key === "dor")!.actions).toEqual(tickNetSelectActions("dor", snapPick, { metaSnap: null, hasInspect: false, net: "ded" }));
     expect(set.items.every((i) => i.actions.every((a) => a.kind !== "filter"))).toBe(true);
   });
   it("…and from LIVE a swipe pins the tick it steps inside (a network in a tick needs its tick)", () => {
     const set = siblingSet("context", { ...s, following: true })!;
-    expect(set.items[1]!.actions).toContainEqual({ kind: "snapshot", pick: snapPick, follow: false });
+    expect(set.items.find((i) => i.key === "dor")!.actions).toContainEqual({ kind: "snapshot", pick: snapPick, follow: false });
   });
   it("the tick's ∨ opens the FIRST of the same set", () => {
     const step = childStep("snap", { ...s, filter: "all" })!;
     expect(step.key).toBe(siblingSet("context", s)!.items[0]!.key);
   });
   it("no tick read yet → no pager rather than the catalog", () => {
-    expect(siblingSet("context", { ...s, exactRows: null })).toBeNull();
-    expect(siblingSet("context", { ...s, snap: null })).toBeNull();
+    expect(siblingSet("context", ledger({ ...s, exactRows: null }))).toBeNull();
+    expect(siblingSet("context", ledger({ ...s, snap: null }))).toBeNull();
   });
 });
 
@@ -558,7 +581,7 @@ describe("the ledger's node rung under a metagraph snapshot", () => {
   const s1 = signer("aa11ffff"), s2 = signer("bb22ffff"), other = signer("cc33ffff");
   const rows = [{ metaId: "ded", ordinal: 500, signers: ["bb22", "aa11", "zz99"] }] as unknown as SiblingState["exactRows"];
   const ms = { metaId: "ded", ordinal: 500, hash: "", globalOrdinal: 42, ts: "T" };
-  const s = base({ mode: "ledger", filter: "ded", snap: snapPick, metaSnap: ms, exactRows: rows, selNodes: [s1, s2, other] });
+  const s = ledger({ filter: "ded", snap: snapPick, metaSnap: ms, exactRows: rows, selNodes: [s1, s2, other] });
 
   it("∨ commits the FIRST signer the explorer lists", () => {
     const step = childStep("metaSnap", s)!;
@@ -606,18 +629,96 @@ describe("positionMarks", () => {
   });
 });
 
-describe("childSteps — the next ghost's quick picks", () => {
-  // The first few children in the explorer's own order (user, 2026-10-04): the ghost below the
-  // deepest commit offers them, so the list and the pager's old first-child step can never disagree.
-  it("lists a country's cohorts in the explorer's order, the first being childStep's", () => {
-    const s = base({ country: "de" });
-    const picks = childSteps("country", s, 3);
-    expect(picks.length).toBeGreaterThan(1);
-    expect(picks[0]).toEqual(childStep("country", s));
-    expect(picks.map((p) => p.label)).toEqual(["Hetzner, Falkenstein", ...picks.slice(1).map((p) => p.label)]);
+// ONE LIST PER LEVEL (2026-10-07): the next ghost opens the FIRST row the explorer lists, and the
+// pager steps the explorer's list in the explorer's order. A future copy cannot drift silently.
+describe("one list per level — the rail steps the explorer's own lists", () => {
+  // The leaderboard's count order (Finland first) and the PROVIDERS order (Germany's two beat
+  // Finland's one) disagree, so a rail that kept count order fails here.
+  const countries = [
+    { cc: "fi", country: "Finland", count: 5 },
+    { cc: "de", country: "Germany", count: 3 },
+  ];
+  it("geo: the network's ghost opens the explorer's top country, under a non-default figure too", () => {
+    for (const geoMeasure of ["nodes", "metagraphs", "providers"] as const) {
+      const s = base({ mode: "geo", filter: "ded", geoMeasure, countries });
+      const top = countriesLevel(s.countries, nodesByCountry(s.selNodes), geoMeasure)[0]!.c.cc;
+      expect(childStep("context", s)!.key).toBe(top);
+    }
   });
-  it("caps the list at n, and is empty where there is nothing finer", () => {
-    expect(childSteps("context", base({ filter: "ded" }), 1)).toHaveLength(1);
-    expect(childSteps("context", base({}), 3)).toEqual([]);
+  it("geo: the country pager steps the explorer's countries in order", () => {
+    const s = base({ mode: "geo", country: "de", geoMeasure: "providers", countries });
+    expect(siblingSet("country", s)!.items.map((i) => i.key)).toEqual(
+      countriesLevel(s.countries, nodesByCountry(s.selNodes), "providers").map((x) => x.c.cc),
+    );
+  });
+  it("geo: the country's ghost opens its top provider", () => {
+    const s = base({ mode: "geo", country: "de" });
+    const g = cohortsLevel(countryNodes("de", s.countries, nodesByCountry(s.selNodes)))[0]!;
+    expect(childStep("country", s)!.key).toBe(`de|${g.city}|${g.isp}`);
+  });
+  it("ledger: the tick's ghost and the Metagraph card's pager step the explorer's networks", () => {
+    const rows = [
+      { metaId: "dor", ordinal: 1 },
+      { metaId: "unlisted-x", ordinal: 1 },
+      { metaId: "ded", ordinal: 9 },
+      { metaId: "dor", ordinal: 2 },
+    ] as unknown as SiblingState["exactRows"];
+    const s = ledger({ snap: snapPick, exactRows: rows });
+    const ids = s.tickNets!.map((n) => n.id);
+    expect(childStep("snap", s)!.key).toBe(ids[0]);
+    const under = ledger({ snap: snapPick, exactRows: rows, tickNet: { metaId: "ded", globalOrdinal: snapPick.data.ordinal } });
+    expect(siblingSet("context", under)!.items.map((i) => i.key)).toEqual(ids);
+  });
+  it("ledger: the Metagraph card's ghost opens the explorer's newest snapshot; its pager steps the same list oldest first", () => {
+    const rows = [
+      { metaId: "ded", ordinal: 100 },
+      { metaId: "ded", ordinal: 102 },
+      { metaId: "ded", ordinal: 101 },
+    ] as unknown as SiblingState["exactRows"];
+    const s = ledger({ filter: "ded", snap: snapPick, exactRows: rows });
+    expect(childStep("context", s)!.key).toBe("ded:102");
+    const cur = { metaId: "ded", ordinal: 101, hash: "", globalOrdinal: 42, ts: "T" };
+    const set = siblingSet("metaSnap", ledger({ filter: "ded", snap: snapPick, exactRows: rows, metaSnap: cur }))!;
+    expect(set.items.map((i) => i.label)).toEqual(["100", "101", "102"]);
+  });
+  it("every parent with a child step is covered above or by the per-rung tests", () => {
+    // A tripwire: a new CHILD_OF entry must earn a one-list assertion here.
+    const pairs = Object.entries(CHILD_OF).flatMap(([mode, m]) => Object.keys(m ?? {}).map((k) => `${mode}:${k}`));
+    expect(pairs.sort()).toEqual(
+      ["geo:context", "geo:country", "geo:cohort", "hyper:context", "hyper:composition", "ledger:snap", "ledger:context", "ledger:metaSnap", "trend:range"].sort(),
+    );
+  });
+});
+
+// THE MOMENTS OF A RANGE (user, 2026-10-07: "range -> moment is also a logical parent - child
+// relation … swipe through the moments within the range"). The Moment card's ‹ › steps the range's
+// buckets, oldest → newest, at the tier the range's charts are cut in (`rangeBuckets`), and the
+// Range card's next ghost opens the first of them.
+describe("siblingSet — instant (a moment inside the committed range)", () => {
+  const H = 3_600_000;
+  const R = { fromMs: Date.UTC(2026, 8, 10), toMs: Date.UTC(2026, 8, 13) }; // 3 days: the hourly tier
+  const trend = (over: Partial<SiblingState>) => base({ mode: "trend", trendRange: R, ...over });
+
+  it("steps every bucket of the range, with the cursor's bucket at index", () => {
+    const set = siblingSet("instant", trend({ trendCursorMs: R.fromMs + 2 * H + 1_000 }))!;
+    expect(set.items.map((i) => Number(i.key))).toEqual(rangeBuckets(R).buckets);
+    expect(set.index).toBe(2);
+    expect(set.items[4]!.actions).toEqual([{ kind: "trendCursor", ms: R.fromMs + 4 * H }]);
+  });
+  it("has no pager without a range, or for a cursor outside it", () => {
+    expect(siblingSet("instant", trend({ trendRange: null, trendCursorMs: R.fromMs }))).toBeNull();
+    expect(siblingSet("instant", trend({ trendCursorMs: R.toMs + H }))).toBeNull();
+  });
+  it("the range's next ghost opens its first moment", () => {
+    expect(childStep("range", trend({}))!.actions).toEqual([{ kind: "trendCursor", ms: R.fromMs }]);
+  });
+});
+
+describe("siblingSet — History's Metagraph card on a plane focus", () => {
+  it("has no pager: a filter step would write the top bar", () => {
+    expect(siblingSet("context", base({ mode: "trend", filter: "all", trendFocus: "ded" }))).toBeNull();
+  });
+  it("…while one standing on the filter keeps the filter's pager", () => {
+    expect(siblingSet("context", base({ mode: "trend", filter: "ded", trendFocus: null }))).not.toBeNull();
   });
 });

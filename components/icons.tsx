@@ -21,6 +21,7 @@ import {
   GitMerge,
   FlaskConical,
   ChartSpline,
+  CalendarRange,
   Crosshair,
   type LucideIcon,
 } from "lucide-react";
@@ -88,6 +89,10 @@ export const METASNAP_ICON: LucideIcon = Boxes;
 // the view's own ChartSpline (that is the whole measured history) and not a clock (the subject is
 // a place in the data, not a time of day).
 export const INSTANT_ICON: LucideIcon = Crosshair;
+
+// THE BRUSHED RANGE's mark (History's Range card, 2026-10-07): a span of dates — the Moment's
+// parent, so a calendar span beside the crosshair's single point.
+export const RANGE_ICON: LucideIcon = CalendarRange;
 
 // The COUNTRY drill's mark (the geo focus ladder's country rung — card head, ghost, dock tray):
 // a place pin — distinct from VIEW_ICONS.geo (the whole globe) and the node's Globe mark.

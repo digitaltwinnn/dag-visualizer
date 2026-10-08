@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  cardNetwork,
   clampScroll,
   FOCUS_LEAN,
   OPACITY_FALLOFF,
@@ -659,5 +660,17 @@ describe("scrollToKeep — a focus that joins the roster with the publish is sho
   it("still declines a focus the reader had paged away from", () => {
     // "a" was in the roster and off screen at scroll 6 — the window was the reader's choice.
     expect(scrollToKeep(ELEVEN, [...ELEVEN].reverse().reverse().slice(), "a", 6)).toBe(6);
+  });
+});
+
+// THE METAGRAPH CARD IN HISTORY (user, 2026-10-07: "if we click a network in explorer, should we set
+// the metagraph card accordingly? (not the global filter though)") — the plane brought forward is the
+// card's network, else the filter; the filter itself is never written.
+describe("cardNetwork — the network History's Metagraph card stands on", () => {
+  it("the focused plane wins, else the filter", () => {
+    expect(cardNetwork("all", "dor")).toBe("dor");
+    expect(cardNetwork("all", null)).toBe("all");
+    expect(cardNetwork("ded", null)).toBe("ded");
+    expect(cardNetwork("ded", "dag")).toBe("dag");
   });
 });

@@ -5,6 +5,8 @@ import { Area, CartesianGrid, ComposedChart, Line, LineChart, ReferenceArea, Res
 import { cn } from "@/lib/utils";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { bucketAt, cursorFraction, heldZoom } from "@/src/data/trendWindow";
+import { bucketStamp } from "@/src/util/localTime";
+import { compactNumber } from "@/src/util/format";
 
 // THE TRENDS DOC'S ONE CHART PRIMITIVE — a small-multiple line chart over the /api/trends
 // buckets, on RECHARTS (user, 2026-09-07: "why hand-roll charts if we have a neat library?" —
@@ -68,14 +70,12 @@ const plotInnerH = (plotH: number): number => plotH - PLOT_MARGIN.top - PLOT_MAR
  *  for every chart that states no formatter of its own — a default written in the parameter list
  *  is a fresh function every render, which is exactly the prop churn the memoised plot below
  *  exists to stop. (`useTrendRoster` restates this same shape for the rails, by the same rule.) */
-const PLAIN = (v: number) => v.toLocaleString(undefined, { maximumFractionDigits: 1 });
+// A magnitude, shortened ("1.7K"), like every History reading (user, 2026-10-07).
+const PLAIN = (v: number) => compactNumber(v);
 
 /** A bucket instant in words, at the precision its own cadence earns. Module-level because both
  *  halves of this file read it — the head's readout title and the plot's tooltip. */
-const stampOf = (ts: number, stepMs: number): string =>
-  stepMs < 86400000
-    ? new Date(ts).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" }) + " UTC"
-    : new Date(ts).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+const stampOf = (ts: number, stepMs: number): string => bucketStamp(ts, stepMs);
 
 /** The axis's date formatters, built once: `toLocaleDateString` with options constructs a new
  *  formatter per call, and recharts asks for every candidate tick while it fits the labels. */
@@ -501,7 +501,11 @@ export default function TrendChart({
         )}
       </div>
       {note || !measured ? (
-        <div className="h-[138px] grid place-items-center rounded-md border border-border border-dashed">
+        // THE EMPTY STATE TAKES THE PLOT'S OWN HEIGHT (user, 2026-10-07: "BIOFI is missing while it
+        // is in the explorer"). It was a fixed 138px, so a network with nothing measured in the span
+        // drew a SHORTER card, and in the stack the card in front covered all of it, its header
+        // strip included. The plot plate is the plot plus its axis strip inside a 1px border.
+        <div className="grid place-items-center rounded-md border border-border border-dashed" style={{ height: plotHeight + AXIS_H + 2 }}>
           <span className="text-label text-muted-foreground">{note ?? "no measurements in this window"}</span>
         </div>
       ) : (

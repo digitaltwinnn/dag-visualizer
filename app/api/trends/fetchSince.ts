@@ -1,8 +1,8 @@
 // The sampler's grow-until-cursor pager — the same self-healing pattern the client's
 // _refreshOneMeta uses (src/data/api.ts:414-451): reach provably back to the cursor, capped.
 // Past the cap the gap is ACCEPTED and stays a gap in the series (rule 10: an honest hole
-// beats a fabricated bridge). A COLD cursor (-1) takes one page — history before the
-// feature's deploy simply doesn't exist (no backfill, per spec).
+// beats a fabricated bridge). A COLD cursor (-1) — a chain never read: a new network, or a
+// network's new address — is read back to its first snapshot within the same cap (2026-10-07).
 //
 // THE CAP IS THE SELF-HEAL DEPTH (30,000 records/chain — ~a day of the busiest chain, DOR at
 // ~29K/day; weeks of everything else), and it is walked by CURSOR PAGES, not one giant
@@ -30,7 +30,18 @@ export async function listSince<T extends { ordinal: number }>(
   let res = await page(60);
   let all = res.data;
   if (!all.length) return { recs: [], gap: false };
-  if (sinceOrdinal < 0) return { recs: all.slice().reverse(), gap: false }; // cold cursor
+  // A COLD CURSOR — a chain this store has never read: a new network, or a network's new address —
+  // is read back to its FIRST snapshot (2026-10-07: it took only the newest 60, so BioFi's new
+  // chain lost the days before its first sampler run, twice). Within the same self-heal depth; a
+  // chain longer than that is read to the depth and the rest is reported as the gap it is.
+  if (sinceOrdinal < 0) {
+    while (all.length < CAP && res.next) {
+      res = await page(PAGE, res.next);
+      if (!res.data.length) break;
+      all = all.concat(res.data);
+    }
+    return { recs: all.slice().reverse(), gap: res.next != null && all.length >= CAP };
+  }
   // Not reached yet: walk older pages by cursor until the cursor is provably covered,
   // the chain ends, or the self-heal depth is spent.
   while (all[all.length - 1].ordinal > sinceOrdinal + 1 && all.length < CAP && res.next) {

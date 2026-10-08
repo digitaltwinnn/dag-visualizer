@@ -11,9 +11,10 @@
 //   construction (every toggle builder deselects when handed the committed subject) — the pager
 //   must never invoke it. Stepping to a DIFFERENT sibling always resolves to a select, and the
 //   toggles' own drop-the-finer-rungs behaviour is exactly the wanted step semantics.
-// - Sibling ORDER mirrors the explorer that browses the same rung (picker located-desc,
-//   leaderboard count-desc, cohortsOf count-then-city, compositionGroups size-desc), so paging
-//   right walks the same sequence the left rail lists.
+// - Sibling ORDER IS the explorer's: every rung reads its level from `src/data/ladderLevels.ts`
+//   (one list per level, 2026-10-07), the picked figure included, so paging right walks the same
+//   sequence the left rail lists. Two projections are declared where applied: time steps oldest →
+//   newest, and the node pager steps nodes, not layer rows (`machinesOf`).
 // - The GLOBAL snapshot's set is OPEN (user, 2026-08-09: "it should always have the swipe
 //   left/right functionality only without 1/x count because it's ongoing"). Time has no parent and
 //   no total, so the set carries `open: true` and the plank drops its position readout: two
@@ -48,8 +49,13 @@ import {
 import { compositionGroups, type CompGroup } from "@/src/data/composition";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { snapshotSignerRows } from "@/src/data/network";
-import { UNLISTED_CFG, UNLISTED_ID } from "@/src/data/unlisted";
+import { UNLISTED_ID } from "@/src/data/unlisted";
 import type { RailCardKind } from "@/components/railCards";
+import { rangeBuckets } from "@/src/data/trendWindow";
+import { stampInstant } from "@/src/data/trendTimeline";
+import { cohortsLevel, countriesLevel, countryNodes, machinesOf, networksLevel, nodeOrder, nodesByCountry, type Cohort, type TickNetwork, type TickSnap } from "@/src/data/ladderLevels";
+import type { GeoMeasure } from "@/src/data/geoMeasure";
+import type { HyperMeasure } from "@/src/data/hyperMeasure";
 
 /** Everything the resolver needs, read from the store BY THE CALLER (this module stays pure). */
 export interface SiblingState {
@@ -83,6 +89,19 @@ export interface SiblingState {
    *  `undefined` meaning NO VERDICT (settling or unmeasured) — passed through untouched, because
    *  the story rule's own contract is to never release a filter on lag. */
   ticks: { data: GlobalSnapshot; isLiveTip: boolean; inStory: boolean | undefined }[];
+  /** The explorers' picked figures — a level's ORDER follows them (one list per level, 2026-10-07). */
+  geoMeasure: GeoMeasure;
+  hyperMeasure: HyperMeasure;
+  /** The whole fleet — Hypergraph's networks level counts over it, not the selection. */
+  allNodes: NodeRow[];
+  /** The shown global snapshot's networks (`tickNetworksLevel`), filled by the caller because the
+   *  polled half lives in the network singleton. Null outside the ledger or with no tick shown. */
+  tickNets: TickNetwork[] | null;
+  /** History's brushed range and time cursor — the Range card and the Moment under it. */
+  trendRange: { fromMs: number; toMs: number } | null;
+  trendCursorMs: number | null;
+  /** History's plane focus — the network its Metagraph card stands on when set. */
+  trendFocus?: string | null;
 }
 
 export interface SiblingStep {
@@ -108,53 +127,12 @@ export interface SiblingSet {
 const networkLabel = (s: SiblingState): string =>
   s.filter === "all" ? "All networks" : (s.metaList.find((m) => m.id === s.filter)?.name ?? s.filter);
 
-// The geo cohort grouping, matching GeoExplore's cohortsOf exactly: `|| null` normalization on
-// both fields (unresolved city/isp → null, which sameCohort's strict === needs), grouped by
-// city|isp, sorted count-desc then city asc.
-interface CohortGroup {
-  city: string | null;
-  isp: string | null;
-  rows: NodeRow[];
-}
-function cohortsOf(rows: NodeRow[]): CohortGroup[] {
-  const by = new Map<string, CohortGroup>();
-  for (const r of rows) {
-    const geo = "geo" in r.pick ? r.pick.geo : undefined;
-    const city = r.city || null;
-    const isp = geo?.isp || null;
-    const key = `${city ?? ""}|${isp ?? ""}`;
-    (by.get(key) ?? by.set(key, { city, isp, rows: [] }).get(key)!).rows.push(r);
-  }
-  return [...by.values()].sort(
-    (a, b) => b.rows.length - a.rows.length || (a.city ?? "￿").localeCompare(b.city ?? "￿"),
-  );
-}
-
 /** A provider cohort's one label — PROVIDER FIRST (user, 2026-09-29), with the unknowns NAMED
  *  rather than dropped. The rail's pager and the Geography explorer's crumb both read this, so a
  *  cohort can never be "Berlin" in one and "Unknown provider, Berlin" in the other. */
 export const cohortLabel = (c: { city: string | null; isp: string | null }): string =>
   // A comma, not a mid-dot (user, 2026-10-03): a provider in a place reads as one name.
   `${c.isp ?? "Unknown provider"}, ${c.city ?? "Unlocated"}`;
-
-// GeoExplore's within-country node order: city (falling back to label) then id.
-const nodeSort = (a: NodeRow, b: NodeRow) =>
-  (a.city || a.label).localeCompare(b.city || b.label, undefined, { sensitivity: "base" }) ||
-  (a.id || "").localeCompare(b.id || "");
-
-// Dedupe a node list to MACHINES by the shared hover key (a hybrid's layer-shells are one
-// machine — the same rule hoverKeyOf encodes for pairing); rows without a key aren't steppable.
-function machineRows(rows: NodeRow[]): NodeRow[] {
-  const seen = new Set<string>();
-  const out: NodeRow[] = [];
-  for (const r of rows) {
-    const k = hoverKeyOf(r.pick);
-    if (!k || seen.has(k)) continue;
-    seen.add(k);
-    out.push(r);
-  }
-  return out;
-}
 
 // A finished set — or null when a pager would be useless (nothing to step to) or the current
 // subject can't be located among its own siblings (stale state; a pager pointing nowhere lies).
@@ -181,7 +159,7 @@ const countryItem = (c: CountryStat, s: SiblingState): SiblingStep => ({
   actions: countryToggleActions(c.cc, { country: s.country, hasInspect: !!s.inspect, cohort: s.cohort }),
 });
 
-const cohortItem = (cc: string, g: CohortGroup, s: SiblingState): SiblingStep => ({
+const cohortItem = (cc: string, g: Cohort, s: SiblingState): SiblingStep => ({
   key: `${cc}|${g.city}|${g.isp}`,
   label: cohortLabel(g),
   actions: cohortToggleActions(
@@ -211,53 +189,35 @@ const nodeItem = (r: NodeRow, s: SiblingState, compositionSel?: CompositionSel |
   }),
 });
 
-// The exact read's row as a MetaSnapSel + its bare ordinal label — the hash-empty convention
-// and the undecoded-ordinal contract are load-bearing (sameMetaSnap keys on metaId+ordinal;
-// the route reports an undecodable payload as ordinal 0), so both live once.
-const metaSnapSelOf = (r: ChannelSnapRow, globalOrdinal: number, ts: string): MetaSnapSel => ({
+// A level's snapshot as a MetaSnapSel + its bare ordinal label — the undecoded-ordinal contract is
+// load-bearing (sameMetaSnap keys on metaId+ordinal; the route reports an undecodable payload as
+// ordinal 0), so both live once. `hash` is the polled row's where it had one, "" off the exact read.
+const metaSnapSelOf = (r: TickSnap, globalOrdinal: number): MetaSnapSel => ({
   metaId: r.metaId,
   ordinal: r.ordinal,
-  hash: "", // the exact read carries no hash; sameMetaSnap keys on metaId+ordinal
+  hash: r.hash,
   globalOrdinal,
-  ts,
+  ts: r.ts,
 });
-const ordinalLabel = (r: ChannelSnapRow): string =>
+const ordinalLabel = (r: { ordinal: number }): string =>
   r.ordinal > 0 ? r.ordinal.toLocaleString() : "undecoded";
 
 // ---------------------------------------------------------------------------
 
-/** THE CHILDREN OF A LEDGER TICK (2026-09-29) — the networks that anchored into the shown global
- *  snapshot, busiest first (the order the tick card prints its anchors in). The ONE answer, read by
- *  the metagraph card's pager and the tick's ∨ step alike, so the two can't disagree about what is
- *  under a tick (they did: the pager walked the whole catalog). Null without a tick or its exact
- *  read — no pager then, rather than a guess.
- *  ⚠️ THE UNLISTED SET IS ONE OF THEM (user, 2026-10-02: an unregistered metagraph had "no
- *  corresponding details card", so stepping down "jumps straight to node"). Uncatalogued channels
- *  were filtered out here because they named no FILTER; the rung is tick-local now and the unlisted
- *  dossier exists, so every uncatalogued channel in the tick counts toward one `unlisted` entry. */
 /** A channel's NETWORK KEY against the networks this state knows: its own id, else the unlisted
  *  set's (the pager's twin of the click table's own key rule, read off `metaList` so it stays pure). */
 const keyOf = (s: SiblingState, metaId: string): string =>
   ((s.isListed ? s.isListed(metaId) : s.metaList.some((m) => m.id === metaId)) ? metaId : UNLISTED_ID);
 
-function tickNetworks(s: SiblingState): { id: string; name: string }[] | null {
-  if (!s.snap || !s.exactRows?.length) return null;
-  const counts = new Map<string, number>();
-  for (const r of s.exactRows) {
-    const k = keyOf(s, r.metaId);
-    counts.set(k, (counts.get(k) ?? 0) + 1);
-  }
-  const nets = [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .map(([id]) => (id === UNLISTED_ID ? { id, name: UNLISTED_CFG.name } : s.metaList.find((m) => m.id === id)))
-    .filter((m): m is { id: string; name: string } => m != null);
-  return nets.length ? nets : null;
-}
-
 /** The network a ledger card stands on: the one committed inside the pinned tick, else the app
  *  filter (`domain/tickNet.ledgerNetwork`). Outside the ledger it is the filter. */
 const netOf = (s: SiblingState): string =>
   s.mode === "ledger" ? ledgerNetwork({ filter: s.filter, tickNet: s.tickNet, snapOrdinal: s.snap?.data.ordinal ?? null }) : s.filter;
+
+// The explorer's own lists (src/data/ladderLevels.ts) — so a step, a ghost and a row agree.
+const byCountryOf = (s: SiblingState) => nodesByCountry(s.selNodes);
+const countriesOf = (s: SiblingState) => countriesLevel(s.countries, byCountryOf(s), s.geoMeasure).map((x) => x.c);
+const cohortsIn = (s: SiblingState, cc: string) => cohortsLevel(countryNodes(cc, s.countries, byCountryOf(s)));
 
 export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | null {
   switch (slot) {
@@ -267,15 +227,16 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       const net = netOf(s);
       if (net === "all") return null;
       // UNDER A LEDGER TICK the metagraph card is the tick's CHILD, so it steps the tick's own
-      // networks (`tickNetworks` — the set the tick's ∨ opens the first of), never the catalog;
+      // networks (`tickNets` — the explorer's own list, the set the tick's ghost opens the first of),
+      // never the catalog;
       // and a pinned tick stays pinned, since a filter commit in the ledger otherwise re-enters
       // live (the executor's rule) and a swipe would move the PARENT. Live stays live.
       // ⚠️ The DAG's own card has NO siblings here, deliberately: the base ledger is what the
       // tick IS, not one of the networks that anchored into it, so it is never in that set and
       // stepping from it to a metagraph would change the parent's meaning, not its child.
       if (s.mode === "ledger") {
-        const nets = tickNetworks(s);
-        if (!nets) return null;
+        const nets = s.tickNets;
+        if (!nets?.length) return null;
         // ⚠️ A STEP IS ALWAYS THE TICK-LOCAL COMMIT (2026-10-02, twice the same day): first for a
         // card opened from the tick, then for one standing on the top bar's filter too — "a filter
         // should not be changed from the explorer", and a pager is the same kind of gesture. The
@@ -284,9 +245,17 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         const items = nets.map((m) => ({ key: m.id, label: m.name, actions: tickNetSelectActions(m.id, s.snap!, { metaSnap: s.metaSnap, hasInspect: s.inspect != null, net }) }));
         return finish(slot, items, nets.findIndex((m) => m.id === net), `Global ${s.snap!.data.ordinal.toLocaleString()}`);
       }
-      // The filter picker's own order: located-desc (0-located rows stay steppable, like the
-      // picker keeps them clickable).
-      const nets = [...s.metaList].sort((a, b) => (b.located ?? 0) - (a.located ?? 0));
+      // IN HISTORY, A CARD STANDING ON A PLANE FOCUS HAS NO PAGER (2026-10-07): the focus is not the
+      // filter, so a filter step would write the top bar, and History's network order is the
+      // stack's roster, which only React holds (`trendIds` is never read back by a component).
+      if (s.mode === "trend" && s.trendFocus != null && s.trendFocus !== s.filter) return null;
+      // Hypergraph steps its explorer's network list, in the picked figure's order (one list per
+      // level, 2026-10-07); elsewhere the Metagraph card has no explorer level above it and keeps the
+      // filter strip's located order (0-located rows stay steppable, as the strip keeps them clickable).
+      const nets =
+        s.mode === "hyper"
+          ? networksLevel(s.metaList, s.allNodes, s.hyperMeasure).map((x) => x.m)
+          : [...s.metaList].sort((a, b) => (b.located ?? 0) - (a.located ?? 0));
       const items = nets.map((m) => ({
         key: m.id,
         label: m.name,
@@ -297,14 +266,15 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
 
     case "country": {
       if (!s.country) return null;
-      const items = s.countries.map((c) => countryItem(c, s));
-      return finish(slot, items, s.countries.findIndex((c) => c.cc === s.country), networkLabel(s));
+      const cs = countriesOf(s);
+      const items = cs.map((c) => countryItem(c, s));
+      return finish(slot, items, cs.findIndex((c) => c.cc === s.country), networkLabel(s));
     }
 
     case "cohort": {
       if (!s.cohort) return null;
       const cc = s.cohort.cc;
-      const groups = cohortsOf(s.selNodes.filter((r) => r.cc === cc));
+      const groups = cohortsIn(s, cc);
       const items = groups.map((g) => cohortItem(cc, g, s));
       const index = groups.findIndex((g) => sameCohort(s.cohort, { cc, city: g.city, isp: g.isp }));
       const parent = s.countries.find((c) => c.cc === cc)?.country ?? cc;
@@ -329,11 +299,10 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       let groupOf: ((r: NodeRow) => CompositionSel | null) | null = null;
       if (s.cohort) {
         const c = s.cohort;
-        rows = cohortsOf(s.selNodes.filter((r) => r.cc === c.cc)).find((g) => sameCohort(c, { cc: c.cc, city: g.city, isp: g.isp }))?.rows ?? [];
-        rows = machineRows(rows).sort(nodeSort);
+        rows = machinesOf(cohortsIn(s, c.cc).find((g) => sameCohort(c, { cc: c.cc, city: g.city, isp: g.isp }))?.rows ?? []);
         parent = cohortLabel(c);
       } else if (s.country) {
-        rows = machineRows(s.selNodes.filter((r) => r.cc === s.country)).sort(nodeSort);
+        rows = machinesOf(countryNodes(s.country, s.countries, byCountryOf(s)));
         parent = s.countries.find((c) => c.cc === s.country)?.country ?? s.country;
       } else if (s.mode === "hyper") {
         // Hyper steps the explorer's own sequence — composition groups in size order, each row
@@ -359,7 +328,8 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         rows = snapshotSignerRows(s.selNodes, s.exactRows, s.metaSnap);
         parent = "Validators that signed";
       } else {
-        rows = machineRows(s.selNodes).sort(nodeSort);
+        // A network-wide node list has no explorer level; today's order is kept.
+        rows = machinesOf([...s.selNodes].sort(nodeOrder));
         parent = networkLabel(s);
       }
 
@@ -369,7 +339,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
 
     case "metaSnap": {
       const cur = s.metaSnap;
-      if (!cur || !s.exactRows) return null;
+      if (!cur) return null;
       // The step re-pins the same global, so the resolver needs the pinned global pick — and it
       // must BE that tick (whenever a metaSnap is committed the executor pinned its global, so a
       // mismatch is stale state, not a case to paper over).
@@ -393,11 +363,12 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       // The explorer's LIST keeps its newest-first order, which is right for a list and not in
       // conflict: a log reads back from now, a stepper advances.
       // Under the UNLISTED network the parent is "unlisted × this tick", which can hold several
-      // addresses — so the set is every uncatalogued row, grouped by address then ordinal.
-      const unlisted = keyOf(s, cur.metaId) === UNLISTED_ID;
-      const rows = s.exactRows
-        .filter((r) => (unlisted ? keyOf(s, r.metaId) === UNLISTED_ID : r.metaId === cur.metaId))
-        .sort((a, b) => (a.metaId === b.metaId ? a.ordinal - b.ordinal : a.metaId < b.metaId ? -1 : 1));
+      // addresses — so the set is the unlisted level's every row.
+      // THE ONE LIST, REVERSED: the explorer lists newest first, the pager steps OLDEST → NEWEST so
+      // `›` means forward in time — a declared projection, not a second order (2026-10-07).
+      const tn = s.tickNets?.find((x) => x.id === keyOf(s, cur.metaId));
+      if (!tn) return null;
+      const rows = [...tn.snaps].reverse();
       const meta = s.metaList.find((m) => m.id === cur.metaId);
       const who = meta?.symbol || meta?.name || `${cur.metaId.slice(0, 6)}…`;
       const items = rows.map((r, i) => ({
@@ -408,7 +379,7 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
         // other rendered ordinal — and an undecodable payload says so rather than claiming 0
         // (the route's contract).
         label: ordinalLabel(r),
-        actions: metaSnapSelectActions(metaSnapSelOf(r, cur.globalOrdinal, cur.ts), s.snap!, { metaSnap: cur, inspect: s.inspect }),
+        actions: metaSnapSelectActions(metaSnapSelOf(r, cur.globalOrdinal), s.snap!, { metaSnap: cur, inspect: s.inspect }),
       }));
       const index = rows.findIndex((r) => r.metaId === cur.metaId && r.ordinal === cur.ordinal);
       return finish(slot, items, index, `${who} in global ${cur.globalOrdinal.toLocaleString()}`);
@@ -442,6 +413,16 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
       return finish(slot, items, s.ticks.findIndex((t) => t.data.ordinal === cur.data.ordinal), "Snapshot stream", true);
     }
 
+    // THE MOMENTS OF THE RANGE (user, 2026-10-07): under a brushed range the Moment card steps its
+    // buckets, oldest → newest. No range, or a cursor outside it, is no set — the Moment then has
+    // no committed parent to step within.
+    case "instant": {
+      if (!s.trendRange || s.trendCursorMs == null) return null;
+      const { buckets, stepMs } = rangeBuckets(s.trendRange);
+      const cur = s.trendCursorMs;
+      return finish(slot, momentItems(buckets, stepMs), buckets.findIndex((b) => cur >= b && cur < b + stepMs), "Range");
+    }
+
     // About and the tool card never focus, so they never page.
     default:
       return null;
@@ -472,31 +453,42 @@ export function siblingSet(slot: RailCardKind, s: SiblingState): SiblingSet | nu
  *  so a rung's sibling set and its parent's child step still commit the same subject through the
  *  same pickActions builder. */
 /** A rung's CHILDREN in the explorer's own order — the first `n` of them. The pager's old ∨ took the
- *  first; the NEXT GHOST card offers the first few as quick picks (user, 2026-10-04 — "now the
- *  ghost is clickable; something more we can do with that?"), so the step is a list. */
+ *  first, and so does the NEXT GHOST card that replaced it (user, 2026-10-07 — a click on it opens
+ *  the first child, as ∨ did; the 2026-10-04 quick-pick list is retired). */
 interface ChildEntry { to: RailCardKind; steps: (s: SiblingState, n: number) => SiblingStep[] }
 
-// geo: the explorer's own first rows, countries count-desc. Like every child-of-the-dossier step
+/** The moments of a range as steps: each one moves the cursor into that bucket (one builder for
+ *  the Moment's pager and the Range's next ghost). */
+function momentItems(buckets: readonly number[], stepMs: number): SiblingStep[] {
+  return buckets.map((b) => ({ key: String(b), label: stampInstant(b, stepMs), actions: [{ kind: "trendCursor", ms: b }] }));
+}
+
+/** trend: the range's first moment. */
+const momentOfRangeChildren = (s: SiblingState, n: number): SiblingStep[] => {
+  if (!s.trendRange) return [];
+  const { buckets, stepMs } = rangeBuckets(s.trendRange);
+  return momentItems(buckets.slice(0, n), stepMs);
+};
+
+// geo: the explorer's own first rows, in the picked figure's order. Like every child-of-the-dossier step
 // it states its own precondition — the dossier only exists under a committed network, so at "all"
 // there is no card to open anything FROM (the same shape `cohortChildren` asserts with `s.country`).
 const countryChildren = (s: SiblingState, n: number): SiblingStep[] => {
   if (s.filter === "all") return [];
-  return s.countries.slice(0, n).map((c) => countryItem(c, s));
+  return countriesOf(s).slice(0, n).map((c) => countryItem(c, s));
 };
 // geo: the committed country's cohorts.
 const cohortChildren = (s: SiblingState, n: number): SiblingStep[] => {
   if (!s.country) return [];
   const cc = s.country;
-  return cohortsOf(s.selNodes.filter((r) => r.cc === cc)).slice(0, n).map((g) => cohortItem(cc, g, s));
+  return cohortsIn(s, cc).slice(0, n).map((g) => cohortItem(cc, g, s));
 };
 // geo: the committed cohort's machines.
 const nodeOfCohortChildren = (s: SiblingState, n: number): SiblingStep[] => {
   const c = s.cohort;
   if (!c) return [];
-  const g = cohortsOf(s.selNodes.filter((r) => r.cc === c.cc)).find((x) =>
-    sameCohort(c, { cc: c.cc, city: x.city, isp: x.isp }),
-  );
-  return g ? machineRows(g.rows).sort(nodeSort).slice(0, n).map((r) => nodeItem(r, s)) : [];
+  const g = cohortsIn(s, c.cc).find((x) => sameCohort(c, { cc: c.cc, city: x.city, isp: x.isp }));
+  return g ? machinesOf(g.rows).slice(0, n).map((r) => nodeItem(r, s)) : [];
 };
 // hyper: the explorer leads with the composition groups, size-desc (same dossier precondition).
 const compositionChildren = (s: SiblingState, n: number): SiblingStep[] => {
@@ -507,10 +499,10 @@ const compositionChildren = (s: SiblingState, n: number): SiblingStep[] => {
 const nodeOfCompositionChildren = (s: SiblingState, n: number): SiblingStep[] => {
   if (!s.composition) return [];
   const g = compositionGroups(s.selNodes).find((x) => x.key === s.composition!.key);
-  return g ? machineRows(g.rows).slice(0, n).map((r) => nodeItem(r, s, { netId: s.filter, key: g.key })) : [];
+  return g ? machinesOf(g.rows).slice(0, n).map((r) => nodeItem(r, s, { netId: s.filter, key: g.key })) : [];
 };
-/** ledger: the networks that anchored into this tick, MOST first — the order the tick card prints
- *  its anchors in. Opening the Metagraph card under a tick commits that network INSIDE the tick
+/** ledger: the networks that anchored into this tick, in the explorer's own order (`tickNets` —
+ *  busiest first, the unlisted set last). Opening the Metagraph card under a tick commits that network INSIDE the tick
  *  (`tickNetSelectActions`), never the app filter (user, 2026-10-02 — reversing 2026-09-15's "the
  *  filter IS the step": a card's pager re-scoped the whole app, and it dropped the pin on the way
  *  because a filter commit in the ledger re-enters live). An UNLISTED channel names no network,
@@ -523,7 +515,7 @@ const anchoringNetworkChildren = (s: SiblingState, n: number): SiblingStep[] => 
   const stoodDown = s.tickNet == null && s.ticks.find((t) => t.data.ordinal === s.snap!.data.ordinal)?.inStory === false;
   if (netOf(s) !== "all" && !stoodDown) return [];
   const snap = s.snap;
-  return (tickNetworks(s) ?? []).slice(0, n).map((meta) => ({
+  return (s.tickNets ?? []).slice(0, n).map((meta) => ({
     key: meta.id,
     label: meta.name,
     actions: tickNetSelectActions(meta.id, snap, { metaSnap: s.metaSnap, hasInspect: s.inspect != null, net: null }),
@@ -535,20 +527,17 @@ const anchoringNetworkChildren = (s: SiblingState, n: number): SiblingStep[] => 
  *  the honest answer. */
 const metaSnapOfTickChildren = (s: SiblingState, n: number): SiblingStep[] => {
   const net = netOf(s);
-  if (net === "all" || !s.snap || !s.exactRows) return [];
+  if (net === "all" || !s.snap) return [];
   const snap = s.snap;
-  // By network KEY: the unlisted network's snapshots carry their own raw addresses.
-  return s.exactRows
-    .filter((x) => keyOf(s, x.metaId) === net)
-    .slice(0, n)
-    .map((r) => {
-      const sel = metaSnapSelOf(r, snap.data.ordinal, snap.data.timestamp);
-      return {
-        key: `${r.metaId}:${r.ordinal}`,
-        label: ordinalLabel(r),
-        actions: metaSnapSelectActions(sel, snap, { metaSnap: s.metaSnap, inspect: s.inspect }),
-      };
-    });
+  // The explorer's own list for this network in this tick, NEWEST first — the ghost opens its top
+  // row. By network KEY: the unlisted set's snapshots carry their own raw addresses.
+  const tn = s.tickNets?.find((x) => x.id === net);
+  if (!tn) return [];
+  return tn.snaps.slice(0, n).map((r) => ({
+    key: `${r.metaId}:${r.ordinal}`,
+    label: ordinalLabel(r),
+    actions: metaSnapSelectActions(metaSnapSelOf(r, snap.data.ordinal), snap, { metaSnap: s.metaSnap, inspect: s.inspect }),
+  }));
 };
 
 /** ledger: a metagraph snapshot's validators (user, 2026-09-29 — "from the metagraph snapshot …
@@ -575,18 +564,15 @@ export const CHILD_OF: Partial<Record<Mode, Partial<Record<RailCardKind, ChildEn
     context: { to: "metaSnap", steps: metaSnapOfTickChildren },
     metaSnap: { to: "node", steps: signerOfMetaSnapChildren },
   },
+  trend: {
+    range: { to: "instant", steps: momentOfRangeChildren },
+  },
 };
 
 /** The rung's first child, or null when there is nothing finer to open.
  *  A node and a metagraph snapshot are leaves; About and the tool card never focus. */
 export function childStep(slot: RailCardKind, s: SiblingState): SiblingStep | null {
-  return childSteps(slot, s, 1)[0] ?? null;
-}
-
-/** The rung's first `n` children, in the explorer's own order, and the card they open (`to`) — the
- *  NEXT GHOST's quick picks (2026-10-04). Empty where there is nothing finer to open. */
-export function childSteps(slot: RailCardKind, s: SiblingState, n: number): SiblingStep[] {
-  return CHILD_OF[s.mode]?.[slot]?.steps(s, n) ?? [];
+  return CHILD_OF[s.mode]?.[slot]?.steps(s, 1)[0] ?? null;
 }
 
 /** Which of a sibling set's position marks the pager draws (user, 2026-10-04 — every card's pager

@@ -2415,8 +2415,10 @@ export class Engine {
     // aim and ease the winner, then release. No claim = the light eases out.
     this._stageLight.update(dt);
 
-    // Depth of field: only a single focused metagraph, and only where the policy allows it (hyper).
-    const metaSel = this.filter !== "all" && this.filter !== "dag";
+    // Depth of field: only a single focused metagraph WITH A HUB to focus on, and only where the
+    // policy allows it (hyper). Without a hub (the unlisted set, a network with no live nodes) the
+    // blur had nothing in focus and smeared the whole scene (the Unlisted audit, 2026-10-07).
+    const metaSel = this.filter !== "all" && this.filter !== "dag" && this._dofMeta != null;
     const dofMix = THREE.MathUtils.clamp(1 - (this.morph - 0.4) / 0.2, 0, 1);
     this.ctx.dof.enabled = policy.dofEligible && metaSel && dofMix > 0.001;
     if (this.ctx.dof.enabled) {

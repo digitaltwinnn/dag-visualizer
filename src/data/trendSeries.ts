@@ -1,6 +1,7 @@
 import { bucketAt } from "@/src/data/trendWindow";
 import { roleKeyLabel } from "@/src/data/composition";
 import type { TrendMetric } from "@/src/store/store";
+import { compactDag } from "@/src/util/format";
 
 // THE PER-NETWORK SERIES MATHS — one home (2026-09-18, the 3D trends view). What a per-network
 // chart draws for a metric used to live inside `components/docs/TrendsDoc.tsx` as three panel
@@ -56,7 +57,7 @@ export interface MetricSpec {
 // the same quantities for the whole network that these rows read per network, and two copies of
 // "how many decimals does a fee get" is two answers waiting to diverge.
 /** DAG: two decimals under 10, none above — a fee is read at two very different scales. */
-export const formatDag = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: v < 10 ? 2 : 0 })}`;
+export const formatDag = (v: number) => compactDag(v); // "0.05", "12", "4.3K" (user, 2026-10-07)
 export const formatMb = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 1 })} MB`;
 export const formatSeconds = (v: number) => `${v.toLocaleString(undefined, { maximumFractionDigits: 0 })}s`;
 
@@ -472,6 +473,55 @@ export function holdOrder(held: readonly string[], ranked: readonly string[]): s
   return [...kept, ...ranked.filter((id) => !have.has(id))];
 }
 
+/** A MOMENT'S READING AS A SENTENCE ABOUT ITS NETWORK (user, 2026-10-07: "7 per 5 min … not very
+ *  clear", then "what does 'per 5 minutes' mean to the metagraph? — that's what the section is
+ *  for, relation to parent"). The lead says what the network above DID in the moment, so the reading
+ *  is a verb and its object around the number: "DED anchored 7 snapshots in those 5 minutes". A moment
+ *  IS one bucket, so the reading is what happened inside it, never a rate; the card's title says
+ *  which bucket and the closing words how wide it is. The caller writes the subject and the number;
+ *  this says the rest. Where the formatter already carries the noun ("1.2 MB") the object is "of
+ *  data"; a gauge is what stood, so it carries no bucket. The verb is ANCHORED, the app's word for
+ *  what a network does with a snapshot (user, same day: "sealed or anchored?"). */
+export function momentPhrase(metric: TrendMetric, stepMs: number): { verb: string; rest: string } {
+  const inBucket = stepMs >= 86400000 ? "on that day" : stepMs >= 3600000 ? "in that hour" : "in those 5 minutes";
+  switch (metric) {
+    case "snapshots": return { verb: "anchored", rest: `snapshots ${inBucket}` };
+    case "blocks": return { verb: "produced", rest: `blocks ${inBucket}` };
+    case "fees": return { verb: "paid", rest: `DAG in fees ${inBucket}` };
+    case "kb": return { verb: "anchored", rest: `of data ${inBucket}` };
+    case "nodes": return { verb: "ran", rest: "nodes" };
+    case "continuity": return { verb: "anchored a snapshot every", rest: inBucket };
+  }
+}
+
+/** A RANGE'S READING AS A SENTENCE ABOUT ITS NETWORK (2026-10-07 — the Range card, the Moment's
+ *  parent; `momentPhrase`'s sibling). A counter is the TOTAL over the span ("DED anchored 52,140
+ *  snapshots in this range") — what a reader asks of a range — and a total that skipped an
+ *  unmeasured bucket is a floor and says so ("at least", rule 10). A gauge and the spacing have no
+ *  total, so they are the span's average and say that instead. */
+export function rangePhrase(metric: TrendMetric, partial: boolean): { verb: string; rest: string } {
+  // The span is the card's own Start / End / Length rows, so the sentence points at it.
+  const over = "in this range";
+  const floor = partial ? " at least" : "";
+  switch (metric) {
+    case "snapshots": return { verb: `anchored${floor}`, rest: `snapshots ${over}` };
+    case "blocks": return { verb: `produced${floor}`, rest: `blocks ${over}` };
+    case "fees": return { verb: `paid${floor}`, rest: `DAG in fees ${over}` };
+    case "kb": return { verb: `anchored${floor}`, rest: `of data ${over}` };
+    case "nodes": return { verb: "ran", rest: "nodes on average" };
+    case "continuity": return { verb: "anchored a snapshot every", rest: "on average" };
+  }
+}
+
+/** A counter's total over a span: the measured buckets added, and whether any was not measured
+ *  (the total is then a floor). Nothing measured at all is no total — null, never a zero. */
+export function sumMeasured(points: readonly (number | null)[]): { sum: number; partial: boolean } | null {
+  let sum = 0;
+  let measured = 0;
+  for (const p of points) if (p != null) { sum += p; measured++; }
+  return measured === 0 ? null : { sum, partial: measured < points.length };
+}
+
 /** What a History card says it is showing: the measure's name with its unit, in one phrase.
  *  The card's head used to carry the unit alone ("per day"), which was enough while the measure
  *  could only change in the rail's picker; once it can be stepped FROM the card (2026-09-19) the
@@ -540,7 +590,9 @@ const TIER_WORDS = (stepMs: number): { n: string; is: string; it: string } => {
 export function instantNote(place: InstantPlace, stepMs: number): string | null {
   if (place === "drawn") return null;
   if (place === "outside") {
-    return "This instant is outside the window on screen. Pick a wider window below, or move the cursor.";
+    // No route that a range would hide (the tester pass, 2026-10-07: "pick a wider window" while
+    // the window buttons were hidden under a range) — the cursor is always movable.
+    return "This moment is outside the charts on screen. Move the cursor onto them.";
   }
   const { n, is, it } = TIER_WORDS(stepMs);
   return place === "edge-newest"
@@ -587,4 +639,30 @@ export function typeBands(id: string, series: Readonly<Record<string, (number | 
     const { label, codes } = roleKeyLabel(key);
     return { key, label, codes, points: recorded.map((r, i) => (r ? (cols[j]![i] ?? 0) : null)) };
   });
+}
+
+/** UNLISTED ANCHORING, MEASURED (the Unlisted audit, 2026-10-07): the global snapshot count covers
+ *  every channel and the listed networks' series cover the catalog, so per bucket the difference
+ *  is what the unlisted channels anchored. Null where the global count or any listed network is
+ *  unmeasured — a difference over a hole is a guess (rule 10). Never below zero: at a bucket edge a
+ *  listed count can lead the global one. */
+export function unlistedSeries(series: Readonly<Record<string, readonly (number | null)[]>>): (number | null)[] {
+  const g = series["g.anchors"] ?? [];
+  const listed = Object.keys(series).filter((k) => k.startsWith("m.") && k.endsWith(".snaps"));
+  return g.map((total, i) => {
+    if (total == null) return null;
+    let sum = 0;
+    for (const k of listed) {
+      const v = series[k]![i];
+      if (v == null) return null;
+      sum += v;
+    }
+    return Math.max(0, total - sum);
+  });
+}
+
+/** The newest bucket a series measured something above zero in, or null. */
+export function lastSeen(points: readonly (number | null)[], buckets: readonly number[]): number | null {
+  for (let i = points.length - 1; i >= 0; i--) if ((points[i] ?? 0) > 0) return buckets[i] ?? null;
+  return null;
 }

@@ -60,7 +60,7 @@ describe("detailsCards — RIGHT rail (Details): fixed slots + ghost hints", () 
     // metagraph snapshot → node (user, 2026-09-15). This order also drives the phone flat stack
     // and the tray icons, so the two can never disagree.
     const ids = detailsCards(details({ filter: "dor", inspect: nodePick, snap: snapPick })).map((c) => c.id);
-    expect(ids).toEqual(["snap", "context", "instant", "country", "cohort", "composition", "metaSnap", "node"]);
+    expect(ids).toEqual(["snap", "context", "range", "instant", "country", "cohort", "composition", "metaSnap", "node"]);
   });
   it("ledger ghosts: snapshot + context + metaSnap + node invites (nodes pick in the chamber too)", () => {
     expect(ghostIds(detailsCards(details({})))).toEqual(["snap", "context", "metaSnap", "node"]);
@@ -165,7 +165,7 @@ describe("the instant slot — History's cursor card", () => {
   const trend = (over: Partial<RailManifestState> = {}) => details({ mode: "trend", ...over });
 
   it("sits under the network dossier in History's lane, and is not a rung", () => {
-    expect(ladderSlotIds("trend")).toEqual(["context", "instant"]);
+    expect(ladderSlotIds("trend")).toEqual(["context", "range", "instant"]);
     expect(ladderLevelOfSlot("instant")).toBeNull();
   });
 
@@ -187,8 +187,40 @@ describe("the instant slot — History's cursor card", () => {
     expect(c.subjectKey).toBe(1_726_704_000_000);
   });
 
-  it("History ghosts are exactly the network dossier and the cursor", () => {
-    expect(ghostIds(detailsCards(trend()))).toEqual(["context", "instant"]);
+  it("History ghosts are exactly the network dossier, the range and the cursor", () => {
+    expect(ghostIds(detailsCards(trend()))).toEqual(["context", "range", "instant"]);
+  });
+});
+
+// THE RANGE (user, 2026-10-07): a brushed span is a committed subject of History like the cursor,
+// and the cursor's PARENT — so it sits between the dossier and the Moment, and like the Moment it
+// is a card slot with no rung.
+describe("the range slot — History's brushed span", () => {
+  const trend = (over: Partial<RailManifestState> = {}) => details({ mode: "trend", ...over });
+  const R = { fromMs: 1_726_000_000_000, toMs: 1_726_600_000_000 };
+
+  it("sits between the dossier and the Moment, and is not a rung", () => {
+    expect(ladderLevelOfSlot("range")).toBeNull();
+  });
+  it("ghosts with the gesture while no range is brushed", () => {
+    const c = detailsCards(trend()).find((x) => x.id === "range")!;
+    expect(c.present).toBe(false);
+    expect(c.hint).toBe("Drag across a chart or the timeline.");
+  });
+  it("is History-scoped", () => {
+    for (const mode of ["hyper", "geo", "ledger"] as const) {
+      expect(detailsCards(details({ mode, trendRange: R })).find((c) => c.id === "range")?.present).toBe(false);
+      expect(detailsCards(details({ mode })).find((c) => c.id === "range")?.hint).toBeNull();
+    }
+  });
+  it("populates on a brushed range, keyed on its two ends", () => {
+    const c = detailsCards(trend({ trendRange: R })).find((x) => x.id === "range")!;
+    expect(c.present).toBe(true);
+    expect(c.subjectKey).toBe(`${R.fromMs}-${R.toMs}`);
+  });
+  it("is the focus slot when it is the most recent commit, and yields to a later moment", () => {
+    expect(focusSlotId({ ...trend({ trendRange: R }), selStack: ["range"] })).toBe("range");
+    expect(focusSlotId({ ...trend({ trendRange: R, trendCursorMs: R.fromMs }), selStack: ["instant", "range"] })).toBe("instant");
   });
 });
 
@@ -237,7 +269,7 @@ describe("ladderLevelOfSlot — the inverse read (which RUNG does a slot stand f
     for (const view of ["geo", "hyper", "ledger", "trend"] as const)
       for (const slot of ladderSlotIds(view)) {
         const level = ladderLevelOfSlot(slot);
-        if (!level) expect(["snap", "metaSnap", "instant"]).toContain(slot);
+        if (!level) expect(["snap", "metaSnap", "range", "instant"]).toContain(slot);
         else expect(LADDERS[view].some((r) => r.level === level)).toBe(true);
       }
   });
@@ -302,7 +334,7 @@ describe("ghost hints — the copy rule", () => {
   const OWN_NOUN: Record<string, string> = {
     context: "network", country: "country", cohort: "provider",
     composition: "composition", snap: "snapshot", metaSnap: "snapshot", node: "node",
-    instant: "instant",
+    instant: "instant", range: "range",
   };
   const hintsIn = (mode: (typeof VIEWS)[number]) =>
     detailsCards(details({ mode })).filter((c) => !c.present && c.hint).map((c) => ({ id: c.id, hint: c.hint! }));
@@ -379,5 +411,21 @@ describe("the ledger lane leads with the tick", () => {
   it("hyper and geo are untouched — their coarsest subject still needs a commit", () => {
     expect(ladderSlotIds("hyper")[0]).toBe("context");
     expect(ladderSlotIds("geo")[0]).toBe("context");
+  });
+});
+
+// History's Metagraph card stands on the plane brought forward (2026-10-07), never on a written filter.
+describe("the Metagraph card in History follows the plane focus", () => {
+  const trend = (over: Partial<RailManifestState> = {}) => details({ mode: "trend", ...over });
+  it("a focus under All populates it, keyed on the focused network", () => {
+    const c = detailsCards(trend({ trendFocus: "dor" })).find((x) => x.id === "context")!;
+    expect(c.present).toBe(true);
+    expect(c.subjectKey).toBe("dor");
+  });
+  it("is the focus slot after a plane click", () => {
+    expect(focusSlotId({ ...trend({ trendFocus: "dor" }), selStack: ["network"] })).toBe("context");
+  });
+  it("no focus and no filter is still the ghost", () => {
+    expect(detailsCards(trend()).find((x) => x.id === "context")!.present).toBe(false);
   });
 });

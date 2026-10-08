@@ -125,6 +125,9 @@ export default function SiteFooter() {
         doc == null && !raw
           ? "max-[700px]:bottom-[var(--phone-dock-h)] max-[700px]:h-[var(--footer-phone-h)]"
           : "max-[700px]:bottom-[env(safe-area-inset-bottom)] max-[700px]:h-[var(--footer-phone-h)]",
+        // …and GONE on the phone while RAW is open (user, 2026-10-07 — the raw phone pass, B): a
+        // data pane needs the screen's height more than a row of links it can reach on return.
+        raw && "max-[700px]:hidden",
       )}
     >
       {/* Readability history, still load-bearing: no text-shadow halo (user, 2026-08-30 — the
@@ -172,10 +175,6 @@ export default function SiteFooter() {
             and its document lives behind that view's RAW toggle. */}
         <DocToggle page="about" href={DOC_PATHS.about}>
           About
-        </DocToggle>
-        <span aria-hidden className="opacity-70 text-muted-foreground">·</span>
-        <DocToggle page="design" href={DOC_PATHS.design}>
-          Design
         </DocToggle>
         <span aria-hidden className="w-px h-3.5 self-center bg-muted-foreground/35" />
         <a

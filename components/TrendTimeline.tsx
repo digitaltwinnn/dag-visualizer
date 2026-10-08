@@ -159,27 +159,17 @@ export default function TrendTimeline() {
             className="bg-transparent max-[700px]:flex-1"
             zoom={windowId}
             range={range}
-            stepMs={stepMs}
             onPick={setTrendWindow}
             onClearRange={() => setTrendRange(null)}
           />
           {multiPlane && <ScalePill shared={scale === "shared"} onChange={(on) => setTrendScale(on ? "shared" : "own")} />}
         </div>
       </div>
-      {/* THE TRACK's column: what its line is, the gesture hint, then the track. */}
+      {/* THE TRACK's column: the track, then what its line is and the gesture hint. */}
       {/* ON THE PHONE the track is a TOUCH target in a sheet with room to spare (user, 2026-09-29:
           "the range selector is too small (height) on the mobile phone" — it measured 42px with its
           month labels, the plot under 30). 110px gives the brush and its grips a thumb's worth. */}
       <div className="flex-1 min-w-0 flex flex-col max-[700px]:min-h-[110px]">
-        <div className="flex items-baseline justify-between gap-3 pt-0.5 leading-none">
-          <span className="text-label text-muted-foreground truncate">{metricCaption(metric, 86_400_000)} across all networks</span>
-          {/* …and only over a track there is something to drag on. */}
-          {showHint && measured && (
-            <span className="flex-none text-label text-foreground-dim max-[700px]:hidden">
-              Drag to set a range, {coarse ? "tap" : "click"} to mark a moment
-            </span>
-          )}
-        </div>
         <div className="flex-1 min-h-0 flex flex-col justify-center">
         {/* HONESTY STATES (rule 10). THREE facts, not two — the third was a review find: an
             ARRIVED payload with nothing measured in it. `leadingTrim` answers that case with a
@@ -210,6 +200,18 @@ export default function TrendTimeline() {
             setTrendCursor={setTrendCursor}
           />
         )}
+        </div>
+        {/* THE CAPTION SITS UNDER THE TRACK (user, 2026-10-07: the dotted tethers from the charts land
+            on the track's top edge, and a caption above it covered them — "move those to the bottom
+            so that dotted lines are visually linked to the slider"). */}
+        <div className="flex items-baseline justify-between gap-3 pt-1 leading-none">
+          <span className="text-label text-muted-foreground truncate">{metricCaption(metric, 86_400_000)} across all networks</span>
+          {/* …and only over a track there is something to drag on. */}
+          {showHint && measured && (
+            <span className="flex-none text-label text-foreground-dim max-[700px]:hidden">
+              Drag to set a range, {coarse ? "tap" : "click"} to mark a moment
+            </span>
+          )}
         </div>
       </div>
     </div>

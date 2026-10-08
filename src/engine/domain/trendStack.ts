@@ -506,3 +506,11 @@ export function scrollToKeep(
   if (!focusInWindow(prev, scroll, focus)) return scroll;
   return scrollToShow(next, focus, scroll);
 }
+
+/** THE NETWORK HISTORY'S METAGRAPH CARD STANDS ON (user, 2026-10-07 — "if we click a network in
+ *  explorer, should we set the metagraph card accordingly? (not the global filter though)"): the
+ *  plane brought forward, else the filter. Snapshots' tick-local network is the precedent
+ *  (`tickNet.ledgerNetwork`): a view-local pick names the card without writing the top bar. */
+export function cardNetwork(filter: string, focus: string | null): string {
+  return focus ?? filter;
+}

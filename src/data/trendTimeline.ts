@@ -1,4 +1,5 @@
 import { pickRangeTier, type ZoomId } from "@/src/data/trendWindow";
+import { bucketStamp } from "@/src/util/localTime";
 
 // THE BAND TIMELINE'S GEOMETRY AND GESTURE MATHS (2026-09-18) — pure, so the component above it
 // (`components/TrendTimeline.tsx`) can stay a thin shell.
@@ -311,23 +312,11 @@ export function tickLabel(ms: number): string {
 
 /** The cursor's readout — the document's `stampRange` rule, one instant at a time: the DATE at
  *  the daily tier (an hour the charts cannot resolve would be an invented precision), the date
- *  plus the clock, stated as UTC, once the stack's buckets are finer than a day. The YEAR rides
- *  the daily form because the overview spans years, and "Sep 18" alone names five of them. */
+ *  plus the reader's own clock once the stack's buckets are finer than a day (`bucketStamp`, in
+ *  their locale and zone since 2026-10-07 — it said "UTC"). The YEAR rides the daily form because
+ *  the overview spans years, and "Sep 18" alone names five of them. */
 export function stampInstant(ms: number, stepMs: number): string {
-  const d = new Date(ms);
-  if (stepMs >= 86_400_000) {
-    return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
-  }
-  return (
-    d.toLocaleString(undefined, {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-      timeZone: "UTC",
-    }) + " UTC"
-  );
+  return bucketStamp(ms, stepMs, { year: stepMs >= 86_400_000 });
 }
 
 /** WHAT THE POINTER SAYS OVER EACH ZONE (user, 2026-09-29: "when I drag the selector it has a +

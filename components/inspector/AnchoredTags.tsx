@@ -71,14 +71,14 @@ export default function AnchoredTags({
     <>
       <Lead>
         {total === 0
-          ? "No metagraph anchored into this snapshot."
+          ? "No metagraph anchored into this snapshot"
           : channels != null && !acquiring
-            ? `Anchored by ${channels} metagraph${channels === 1 ? "" : "s"}.`
+            ? `Anchored by ${channels} metagraph${channels === 1 ? "" : "s"}`
             : missed && !resolveHold.show
               ? // Two words (user, 2026-10-04: "why so much text, just say 'read failed'"); the
                 // lead is the failure's one statement, so the line under the label is gone.
-                "Read failed."
-              : "Reading which metagraphs anchored into it."}
+                "Read failed"
+              : "Reading which metagraphs anchored into it"}
       </Lead>
       <Separator className="mb-2" />
       <SectionLabel label="Snapshots anchored" total={total != null ? total : <NodeStars count={3} />} className="mb-1.5" />

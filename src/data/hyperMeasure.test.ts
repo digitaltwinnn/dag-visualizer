@@ -8,54 +8,45 @@ import {
   networkMeasure,
 } from "./hyperMeasure";
 
-// The Hypergraph explorer's network-row figure, as a vocabulary (2026-09-26): nodes, distinct
-// countries, distinct providers — the Geography card's vocabulary turned around.
+// The Hypergraph explorer's network-row figure (user, 2026-10-07 — the view is the architecture,
+// so its figures count what the network is BUILT of): its nodes, and its nodes per layer. Countries
+// and providers were Geography's questions and left for it.
 
-type Row = Pick<NodeRow, "pick" | "cc" | "country">;
-const row = (cc: string | null, country: string | null, isp: string | null): Row =>
-  ({ pick: { kind: "metanode", geo: isp ? { isp } : undefined } as unknown as NodeRow["pick"], cc, country });
+type Row = Pick<NodeRow, "pick" | "roles" | "id" | "label">;
+const row = (ip: string, roles: string[]): Row =>
+  ({ pick: { kind: "metanode", node: { ip } } as unknown as NodeRow["pick"], roles, id: `id-${ip}`, label: ip });
 const net = (n: number): Pick<MetaInfo, "nodes"> => ({ nodes: Array.from({ length: n }, () => ({})) });
 
-const rows = [row("DE", "Germany", "Hetzner"), row("DE", "Germany", "OVH"), row("US", "United States", "Hetzner"), row(null, "Finland", null), row(null, null, null)];
+// A hybrid (L0 + cL1) listed once per layer it runs, a data node, a dedicated validator.
+const rows = [row("1", ["l0", "cl1"]), row("1", ["l0", "cl1"]), row("2", ["dl1"]), row("3", ["l0"])];
 
 describe("the order and its labels", () => {
-  it("leads with nodes and names every measure", () => {
-    expect(HYPER_MEASURE_ORDER[0]).toBe("nodes");
-    for (const m of HYPER_MEASURE_ORDER) expect(HYPER_MEASURE_LABELS[m].length).toBeGreaterThan(0);
+  it("leads with nodes, then the layers in the vocabulary's own order and codes", () => {
+    expect(HYPER_MEASURE_ORDER).toEqual(["nodes", "l0", "cl1", "dl1"]);
+    expect(HYPER_MEASURE_LABELS).toEqual({ nodes: "Nodes", l0: "L0", cl1: "cL1", dl1: "dL1" });
   });
-
-  it("lists every measure for the heading control, in order, each with its unit", () => {
-    expect(HYPER_MEASURE_OPTIONS.map((o) => o.id)).toEqual([...HYPER_MEASURE_ORDER]);
-    for (const o of HYPER_MEASURE_OPTIONS) {
-      expect(o.label).toBe(HYPER_MEASURE_LABELS[o.id]);
-      expect(o.unit.length).toBeGreaterThan(0);
-    }
+  it("lists every measure for the heading control, in order, each counted in nodes", () => {
+    expect(HYPER_MEASURE_OPTIONS.map((o) => o.id)).toEqual(HYPER_MEASURE_ORDER);
+    expect(HYPER_MEASURE_OPTIONS.every((o) => o.unit === "nodes")).toBe(true);
   });
+});
 
+describe("networkMeasure — a network row's figure", () => {
   it("nodes is the catalog's own fleet, whatever the placed rows say", () => {
     expect(networkMeasure("nodes", net(19), rows)).toBe(19);
-    expect(networkMeasure("nodes", net(0), rows)).toBe(0);
   });
-
-  it("countries counts distinct places by code, falling back to the name, skipping the unplaced", () => {
-    expect(networkMeasure("countries", net(19), rows)).toBe(3); // DE, US, Finland
-  });
-
-  it("providers counts distinct hosts and skips rows without one", () => {
-    expect(networkMeasure("providers", net(19), rows)).toBe(2); // Hetzner, OVH
-    expect(networkMeasure("providers", net(3), [])).toBe(0);
+  it("a layer counts the nodes that run it — a node listed once per layer counts once", () => {
+    expect(networkMeasure("l0", net(19), rows)).toBe(2); // the hybrid and the validator
+    expect(networkMeasure("cl1", net(19), rows)).toBe(1);
+    expect(networkMeasure("dl1", net(19), rows)).toBe(1);
+    expect(networkMeasure("dl1", net(3), [])).toBe(0);
   });
 });
 
 describe("groupMeasure — a composition row's figure, the network level's pick carried down", () => {
-  it("counts the group's rows for nodes and distinct places / providers otherwise", () => {
-    const rows = [
-      { pick: { kind: "metanode", geo: { isp: "Hetzner" } }, cc: "DE", country: "Germany" },
-      { pick: { kind: "metanode", geo: { isp: "Hetzner" } }, cc: "DE", country: "Germany" },
-      { pick: { kind: "metanode", geo: { isp: "OVH" } }, cc: "FR", country: "France" },
-    ] as unknown as Parameters<typeof groupMeasure>[1];
-    expect(groupMeasure("nodes", rows)).toBe(3);
-    expect(groupMeasure("countries", rows)).toBe(2);
-    expect(groupMeasure("providers", rows)).toBe(2);
+  it("counts the group's nodes, or those of them running the picked layer", () => {
+    expect(groupMeasure("nodes", rows)).toBe(4);
+    expect(groupMeasure("l0", rows)).toBe(2);
+    expect(groupMeasure("dl1", rows)).toBe(1);
   });
 });

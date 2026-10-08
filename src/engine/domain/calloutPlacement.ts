@@ -127,15 +127,22 @@ export function calloutHangs(x: number, y: number, bandL: number, bandR: number,
 // and the leader runs vertically into the subject, so it still says WHERE, which is what the old
 // ruling was protecting. Same factor family as the hanging label: one number shortens the leader.
 
-/** The phone leader's length, as a share of the standing standoff's height (read as `--co-phone-k`). */
+/** The phone leader's SHORTEST length, as a share of the standing standoff's height (read as
+ *  `--co-phone-k`); the label goes further out, to the free strip, wherever it can. */
 export const CALLOUT_PHONE_K = 0.4;
+/** The phone leader's LONGEST length, as a multiple of its shortest. */
+export const CALLOUT_PHONE_MAX_K = 2;
 const PHONE_AIR = 8;
 
 /**
- * Where the phone label stands for an anchor at `(x, y)`: `left` is the panel's left edge relative
- * to the anchor (centred, then clamped into the band with `PHONE_AIR` to spare); `drop` puts it
- * below. `top`/`bottom` bound the free canvas — the command bar and the open sheet's top edge. The
- * panel's measured size comes in, because its content (and so its width) varies by subject.
+ * Where the phone label stands for an anchor at `(x, y)`: out in the FREE STRIP at the nearer edge
+ * (user, 2026-10-07 — "the scene usually has some space at the top and bottom where it would fit
+ * better"): just under the command bar (`top`), or just above the dock / open sheet (`bottom`),
+ * with the vertical `leader` running from the subject to the panel — never shorter than the old
+ * fixed standoff, so a subject already in a strip has its label on the other side. `left` is the
+ * panel's left edge relative to the anchor (centred, then clamped into the band with `PHONE_AIR`
+ * to spare); `drop` puts it below. The panel's measured size comes in, because its content (and so
+ * its width) varies by subject.
  */
 export function calloutPhonePlacement(
   x: number,
@@ -146,15 +153,22 @@ export function calloutPhonePlacement(
   bottom: number,
   panelW: number,
   panelH: number,
-): { show: boolean; drop: boolean; left: number } {
-  const hidden = { show: false, drop: false, left: 0 };
+): { show: boolean; drop: boolean; left: number; leader: number } {
+  const hidden = { show: false, drop: false, left: 0, leader: 0 };
   if (!(bandR > bandL) || x < bandL || x > bandR || y < top || y > bottom) return hidden;
-  const reach = Math.round(CALLOUT_OFF_Y * CALLOUT_PHONE_K) + panelH;
-  const above = y - reach >= top;
-  const below = y + reach <= bottom;
-  if (!above && !below) return hidden;
+  const rise = Math.round(CALLOUT_OFF_Y * CALLOUT_PHONE_K);
+  const up = y - (top + PHONE_AIR + panelH); // subject → the panel's bottom edge, under the bar
+  const down = bottom - PHONE_AIR - panelH - y; // subject → the panel's top edge, above the dock
+  const fitsUp = up >= rise;
+  const fitsDown = down >= rise;
+  if (!fitsUp && !fitsDown) return hidden;
+  const drop = fitsDown && (!fitsUp || down < up);
   const lo = bandL + PHONE_AIR - x;
   const hi = bandR - PHONE_AIR - panelW - x;
   const left = Math.max(lo, Math.min(hi, -panelW / 2));
-  return { show: true, drop: !above, left };
+  // …but not ALL the way (user, same day: "now it's too long"): a label at the screen's edge on a
+  // 200px line stopped reading as attached. The leader stops at `CALLOUT_PHONE_MAX_K` × the old
+  // standoff, so the label moves OUT TOWARD the strip and stays near enough to read as its subject's.
+  const cap = rise * CALLOUT_PHONE_MAX_K;
+  return { show: true, drop, left, leader: Math.min(drop ? down : up, cap) };
 }

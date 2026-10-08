@@ -29,7 +29,9 @@ export const UNLISTED_ID = "unlisted";
  *  them is safe to change: rename the LABEL (to "Uncataloged", say) and nothing breaks; change the
  *  ID and every persisted filter, every `filter === UNLISTED_ID` branch and the domain twin
  *  UNLISTED_KEY must move together. Keeping one literal for both hid that asymmetry. */
-export const UNLISTED_LABEL = "unlisted";
+// Capitalised like every other network's name (the Unlisted audit, 2026-10-07: a lowercase
+// "unlisted" beside eleven proper names read as a stray word, not a choice).
+export const UNLISTED_LABEL = "Unlisted";
 
 // The unlisted set's NEUTRAL identity — gray in BOTH lanes (user, 2026-08-08: it wore three
 // different colours — core-blue chips, cyan scene blocks, and address-hashed hues on the

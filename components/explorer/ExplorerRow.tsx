@@ -144,7 +144,9 @@ export default function ExplorerRow({
   // a list of three-letter tickers does not hold a co-located pair's 56px open beside every id
   // (user, 2026-10-03). A dot or a code keeps its fixed 14px.
   const wideGlyph = glyphW > 14;
-  const glyphCol = wideGlyph ? `var(--glyph-w, ${glyphW}px)` : `${glyphW}px`;
+  // A level with NO glyphs has no glyph column at all (user, 2026-10-07: Snapshots' rows sat 14px
+  // in from the path's house, behind an empty column) — `glyphW` 0, decided by the Explorer.
+  const glyphCol = glyphW === 0 ? "" : wideGlyph ? `var(--glyph-w, ${glyphW}px) ` : `${glyphW}px `;
   return (
     <Tag
       ref={el}
@@ -184,11 +186,11 @@ export default function ExplorerRow({
         // rest. Stated against the token, so the grammar's one width stays the stylesheet's.
         gridTemplateColumns: hasFigure
           ? plain
-            ? `${glyphCol} auto minmax(0,1fr) 0px ${figureCol}`
+            ? `${glyphCol}auto minmax(0,1fr) 0px ${figureCol}`
             : wideBar
-            ? `${glyphCol} minmax(0,${nameCol}) 0px minmax(${nested ? 24 : 36}px,1fr) ${figureCol}`
-            : `${glyphCol} minmax(0,${nameCol}) minmax(0,1fr) ${nested ? 24 : 36}px ${figureCol}`
-          : `${glyphCol} minmax(0,1fr) auto`,
+            ? `${glyphCol}minmax(0,${nameCol}) 0px minmax(${nested ? 24 : 36}px,1fr) ${figureCol}`
+            : `${glyphCol}minmax(0,${nameCol}) minmax(0,1fr) ${nested ? 24 : 36}px ${figureCol}`
+          : `${glyphCol}minmax(0,1fr) auto`,
         ...(on ? selectionHue(hue) : undefined),
         ...pair?.style,
       }}
@@ -210,7 +212,9 @@ export default function ExplorerRow({
         pair?.onBlur();
       }}
     >
-      <span data-glyph={wideGlyph ? "" : undefined} className={cn("flex items-center min-w-0", wideGlyph ? "justify-start" : "justify-center")}>{glyph}</span>
+      {glyphW !== 0 && (
+        <span data-glyph={wideGlyph ? "" : undefined} className={cn("flex items-center min-w-0", wideGlyph ? "justify-start" : "justify-center")}>{glyph}</span>
+      )}
       <span
         className={cn(
           "min-w-0 truncate text-body",

@@ -8,6 +8,7 @@ import ExplorerPath, { type Crumb } from "@/components/explorer/ExplorerPath";
 import ExplorerRow from "@/components/explorer/ExplorerRow";
 import { useStore } from "@/src/store/store";
 import { openRailCard } from "@/components/railOpen";
+import { levelsForBox } from "@/components/explorer/boxLevel";
 import { cn } from "@/lib/utils";
 
 // THE EXPLORER — one component, four views (design session 2026-09-26; the agreed screens and
@@ -30,7 +31,8 @@ import { cn } from "@/lib/utils";
 //   the pager     · where a level pages
 //
 // What a view decides, and only this: which levels are open (read off the STORE's committed rungs,
-// never local open/closed state, so the scene, the rail and this card land the same level), what
+// never local open/closed state, so the scene, the rail and this card land the same level — and
+// cut back to the OPEN card's children here, `levelsForBox`), what
 // each row is and what its click commits (through the one executor — rule 2), what each level
 // measures, and the words. What a view can NOT decide is any of the layout, which is the point.
 
@@ -74,6 +76,9 @@ export interface ExplorerRowSpec {
 
 export interface ExplorerLevelSpec {
   key: string;
+  /** The rail card (slot id) whose subject this level lists the children of — how the Explorer
+   *  shows the OPEN card's children (`levelsForBox`). Absent on a root with no card above it. */
+  parent?: string;
   /** How this level appears as a crumb once a deeper level is on screen, and the release that
    *  brings the reader back to it — every rung finer than this one goes, through the executor.
    *  The ROOT's crumb is the house glyph (the title names the root; the house releases everything). */
@@ -127,7 +132,10 @@ function openOrToggle(rung: string, click: () => void): void {
   openRailCard(rung, [boxed]);
 }
 
-export default function Explorer({ id, title, hint, levels, onLeave, defaultCollapsed, aside }: ExplorerProps) {
+export default function Explorer({ id, title, hint, levels: selected, onLeave, defaultCollapsed, aside }: ExplorerProps) {
+  // The view hands every level its selection opens; the OPEN CARD decides how deep the path stands.
+  const boxed = useStore((s) => s.boxedCard);
+  const levels = levelsForBox(selected, boxed);
   const current = levels[levels.length - 1];
   const nested = levels.length > 1;
   // THE TICKER COLUMN FITS ITS LIST (user, 2026-10-03: "a lot of space between the ticker and the
@@ -140,6 +148,9 @@ export default function Explorer({ id, title, hint, levels, onLeave, defaultColl
   // rows change; the rows read the variable with `glyphW` as its fallback, so the first paint and
   // the server render keep the old width rather than collapsing.
   const cap = current?.glyphW ?? 14;
+  // A level whose rows carry no glyph drops the column (ExplorerRow), so its names line up with
+  // the path's house instead of sitting behind 14px of nothing.
+  const glyphW = current && (current.rows.some((r) => r.glyph != null) || current.lead?.glyph != null) ? current.glyphW : 0;
   const rowKeys = (current?.lead ? `${current.lead.key}||` : "") + (current?.rows.map((r) => r.key).join("|") ?? "");
   const figKey = (current?.lead && (typeof current.lead.figure === "string" || typeof current.lead.figure === "number") ? `${String(current.lead.figure).length}:` : "") + (current?.rows.map((r) => (typeof r.figure === "string" || typeof r.figure === "number" ? String(r.figure).length : 0)).join(",") ?? "");
   const listEl = useRef<HTMLDivElement | null>(null);
@@ -173,16 +184,17 @@ export default function Explorer({ id, title, hint, levels, onLeave, defaultColl
   }, [rowKeys, cap, figKey]);
   // The crumbs: the ROOT as the house glyph (its word is the accessible name — the card's title
   // already says it, and the word cost the width the crumbs need; user, 2026-09-26, two rounds),
-  // then every OPENED level, the current one last as the page.
-  const crumbs: Crumb[] = nested
-    ? levels.map((l, i) => ({
-        key: l.key,
-        label: l.crumb.label,
-        title: l.crumb.title ?? (typeof l.crumb.label === "string" ? l.crumb.label : undefined),
-        root: i === 0,
-        ...(i < levels.length - 1 ? { onSelect: l.crumb.onRelease } : {}),
-      }))
-    : [];
+  // then every OPENED level, the current one last as the page. THE PATH IS ALWAYS DRAWN (user,
+  // 2026-10-07 — "where there is no filter, the whole control is missing … shouldn't we indicate
+  // that there is a control there always?"): at the root it is the one filled step, house and word,
+  // so the control is in place before the first drill rather than appearing with it.
+  const crumbs: Crumb[] = levels.map((l, i) => ({
+    key: l.key,
+    label: l.crumb.label,
+    title: l.crumb.title ?? (typeof l.crumb.label === "string" ? l.crumb.label : undefined),
+    root: i === 0,
+    ...(i < levels.length - 1 ? { onSelect: l.crumb.onRelease } : {}),
+  }));
   const measure: MeasureControl | null =
     current && current.measure
       ? "options" in current.measure
@@ -231,7 +243,7 @@ export default function Explorer({ id, title, hint, levels, onLeave, defaultColl
                       hasFigure={current.hasFigure}
                       nameW={current.nameW}
                       figureW={current.figureW}
-                      glyphW={current.glyphW}
+                      glyphW={glyphW}
                       nested={nested}
                       plain
                       glyph={current.lead.glyph}
@@ -253,7 +265,7 @@ export default function Explorer({ id, title, hint, levels, onLeave, defaultColl
                     hasFigure={current.hasFigure}
                     nameW={current.nameW}
                     figureW={current.figureW}
-                    glyphW={current.glyphW}
+                    glyphW={glyphW}
                     nested={nested}
                     wideBar={!current.rows.some((x) => x.tag != null && x.tag !== false)}
                     glyph={r.glyph}

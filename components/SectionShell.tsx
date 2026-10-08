@@ -46,10 +46,9 @@ const SCENE_DIM = 0.26;
 /** How long the raw layer takes to SINK back into the scene, in seconds — the exit's first beat,
  *  after which the layer is `visibility:hidden` and out of the paint path entirely.
  *
- *  Exported because a surface inside the layer may need to outlive the store write that closed it:
- *  `datasection/DocumentSurface` unmounts the Trends document on close, and unmounting it the
- *  instant `section` flips would blank the layer while it is still receding. One number, read by
- *  the timeline below and by whoever has to wait for it — never a second constant that drifts. */
+ *  Exported for any surface inside the layer that has to outlive the store write that closed it
+ *  (unmounting the instant `section` flips would blank the layer while it is still receding). One
+ *  number, read by the timeline below and by whoever has to wait for it. */
 export const RAW_EXIT_S = 0.3;
 
 export default function SectionShell({
@@ -183,7 +182,10 @@ export default function SectionShell({
           // …and NOT the dock's (2026-10-02, the phone pass): the dock fades out with the HUD while
           // this layer is up, and reserving its 56px left a blank strip under the footer. The footer
           // drops to the screen edge in the same state (SiteFooter), so the pane ends just above it.
-          "max-[700px]:bottom-[calc(env(safe-area-inset-bottom,0px)+var(--footer-phone-h,22px)+6px)]"
+          // THE PHONE FRAME IS TIGHT (user, 2026-10-07 — the raw phone pass, option B): 6px from the
+          // screen's edges, and down to the safe area, since the footer row stands down while RAW
+          // is open (SiteFooter). A 16px margin plus the panel's own padding left rows ~310px wide.
+          "max-[700px]:left-1.5 max-[700px]:right-1.5 max-[700px]:bottom-[calc(env(safe-area-inset-bottom,0px)+6px)]"
         }
         style={{ visibility: "hidden", willChange: "transform, opacity" }}
       >
@@ -205,7 +207,9 @@ export default function SectionShell({
           className="absolute top-4 right-3 z-20 text-muted-foreground hover:text-foreground pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:top-1.5 pointer-coarse:right-0.5"
           onClick={() => useStore.getState().setSection("scene")}
         >
-          <X aria-hidden />
+          {/* A close glyph is 18px on touch (user, 2026-10-07: "on mobile the X icon is tiny") —
+              the 44px target alone does not make the mark findable. */}
+          <X aria-hidden className="size-3 pointer-coarse:size-[18px]" />
         </Button>
       </section>
 

@@ -29,42 +29,74 @@ export interface LedgerPathView {
   /** The committed tick's ordinal. */
   snapOrd: number | null;
   following: boolean;
+  /** The network committed INSIDE the shown tick (`store.tickNet`), by network key — or null. */
+  tickNet: string | null;
 }
 
 const metaSnapKey = (m: LedgerPathView["metaSnap"]) => (m ? `${m.globalOrdinal}|${m.metaId}|${m.ordinal}` : null);
 
 /** Whether two views differ in anything the path answers to. */
 export function pathViewChanged(a: LedgerPathView, b: LedgerPathView): boolean {
-  return metaSnapKey(a.metaSnap) !== metaSnapKey(b.metaSnap) || a.snapOrd !== b.snapOrd || a.following !== b.following;
+  return (
+    metaSnapKey(a.metaSnap) !== metaSnapKey(b.metaSnap) ||
+    a.snapOrd !== b.snapOrd ||
+    a.following !== b.following ||
+    a.tickNet !== b.tickNet
+  );
 }
 
-/** The path after the store moved from `prev` to `next`. The rules, in order:
+/** The path after the store moved from `prev` to `next`. THE PATH FOLLOWS THE SELECTION (user,
+ * 2026-10-07 — one rule for every explorer): it opens down to the deepest selected subject, and
+ * the Explorer then stands it at the OPEN card's children (`components/explorer/boxLevel.ts`), so
+ * which card is open is never this function's business.
  *
- * 1. **Resuming live closes the path** — a resume is a return to the stream (test pass,
- *    2026-10-03) — unless the resume is this explorer's own row click (`selfResume`), which keeps
- *    what that click opened and spends the flag.
- * 2. **A snapshot committed anywhere opens the path to it** (a tile, the rail's pager, the raw log)
- *    — but not the LIVE FOLLOW's own commit (user, 2026-10-04): under a filter the heartbeat
- *    commits the network's newest snapshot every tick, and following it down left one row on
- *    screen while the trail showed many. The signer level stays open only for that same snapshot.
- * 3. **A tick pinned elsewhere while a tick is open re-points the path** — unless the same commit
- *    carried a snapshot of that tick, which rule 2 has already opened (review, 2026-09-26). */
-export function syncLedgerPath(path: LedgerPath, prev: LedgerPathView, next: LedgerPathView): LedgerPath {
-  if (next.following && !prev.following) {
-    return path.selfResume ? { ...path, selfResume: false } : CLOSED_PATH;
-  }
-  if (next.following) return path;
+ * 1. **A selected metagraph snapshot opens to its signers** — tick › network › snapshot — pinned
+ *    or LIVE. Live under a filter the heartbeat selects the network's newest snapshot, and the
+ *    scene's front row moves only when that network anchors a new one, so the path moves with it
+ *    (the 2026-10-04 "too jumpy" ruling is the scene's front-row rule, not the explorer's).
+ * 2. **A pinned global snapshot opens that tick** — wherever the pin came from (a tile, a bar, the
+ *    rail's ‹ ›, the raw log) — and **a network selected inside it opens that network's snapshots
+ *    there** (the Metagraph ghost under a global snapshot, the Metagraph card's ‹ ›).
+ * 3. **Live with no snapshot of a network selected — the unfiltered stream — the heartbeat leaves
+ *    the path alone**: the tick list IS the stream there, and opening the newest tick every ~28s
+ *    would throw it away. Resuming live closes the path, unless the resume is this explorer's own
+ *    row click (`selfResume`), which keeps what that click opened and spends the flag. */
+export function syncLedgerPath(path: LedgerPath, prev: LedgerPathView, next: LedgerPathView, depth: "follow" | "axis" = "follow"): LedgerPath {
+  if (depth === "axis") return syncAxisPath(path, prev, next);
   const m = next.metaSnap;
-  if (m && metaSnapKey(m) !== metaSnapKey(prev.metaSnap)) {
+  // The selected snapshot belongs to the shown tick (a stale one from an older tick does not).
+  if (m && (next.snapOrd == null || m.globalOrdinal === next.snapOrd)) {
     const key = `${m.metaId}|${m.ordinal}`;
-    return { tick: m.globalOrdinal, net: m.netKey, snap: path.snap === key ? key : null, selfResume: path.selfResume };
+    if (path.tick === m.globalOrdinal && path.net === m.netKey && path.snap === key) return path.selfResume && next.following ? { ...path, selfResume: false } : path;
+    return { tick: m.globalOrdinal, net: m.netKey, snap: key, selfResume: false };
+  }
+  if (next.following) {
+    if (!prev.following) return path.selfResume ? { ...path, selfResume: false } : CLOSED_PATH;
+    return path;
   }
   const ord = next.snapOrd;
+  if (ord == null) return path;
+  const net = next.tickNet;
+  if (net != null && (net !== prev.tickNet || ord !== prev.snapOrd || prev.following)) {
+    return path.tick === ord && path.net === net && path.snap == null ? path : { tick: ord, net, snap: null, selfResume: path.selfResume };
+  }
   // On a new pin — a different tick, OR the same tick going from followed to pinned (pinning the
   // live tip changes no ordinal; review, 2026-10-04).
-  const pinMoved = ord !== prev.snapOrd || prev.following;
-  if (path.tick != null && ord != null && ord !== path.tick && pinMoved && !(m && m.globalOrdinal === ord)) {
+  if ((ord !== prev.snapOrd || prev.following) && path.tick !== ord) {
     return { ...CLOSED_PATH, tick: ord, selfResume: path.selfResume };
   }
   return path;
+}
+
+/** THE AXIS VIEW (user, 2026-10-07 — `viewPolicy.explorerDepth: "axis"`): the explorer RESTS on the
+ *  global snapshot list, the view's own axis. A selection made anywhere — live, a pin, a tile, the
+ *  rail's ghost or ‹ › — is a highlighted row on its page, never a drill; drilling is the
+ *  explorer's own click. Two store moves still touch a drill the reader made: a selection that
+ *  moves to ANOTHER tick returns it to the list (its new row highlighted there), and resuming live
+ *  closes it, unless the resume is that click's own (`selfResume`). The live heartbeat leaves it. */
+function syncAxisPath(path: LedgerPath, prev: LedgerPathView, next: LedgerPathView): LedgerPath {
+  if (next.following && !prev.following) return path.selfResume ? { ...path, selfResume: false } : CLOSED_PATH;
+  if (next.following || path.tick == null) return path;
+  const ord = next.snapOrd;
+  return ord != null && ord !== prev.snapOrd && ord !== path.tick ? CLOSED_PATH : path;
 }

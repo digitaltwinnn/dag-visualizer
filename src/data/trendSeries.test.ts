@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { headWord, spanAverage, spanWord, typeBands,
+import { headWord, lastSeen, momentPhrase, rangePhrase, sumMeasured, unlistedSeries, spanAverage, spanWord, typeBands,
   GLOBAL_METRIC_ROWS,
   GLOBAL_READING,
   TREND_METRICS,
@@ -377,10 +377,12 @@ describe("instantNote — why no chart draws this moment", () => {
     );
   });
 
-  it("keeps the WINDOW sentence for a genuinely out-of-window instant, with its route", () => {
+  it("says a genuinely out-of-view moment is outside the charts, with the one route that always works", () => {
+    // No "wider window" route: under a range the window buttons are hidden (the tester pass,
+    // 2026-10-07). The cursor can always be moved.
     const out = instantNote("outside", DAY)!;
-    expect(out).toMatch(/outside the window/);
-    expect(out).toMatch(/wider window/);
+    expect(out).toMatch(/outside the charts/);
+    expect(out).toMatch(/Move the cursor/);
   });
 
   // The app-wide plain-writing rule: two clauses get two sentences, never a dash clause.
@@ -650,5 +652,81 @@ describe("the DAG's own nodes are a stored series, like any network's", () => {
     const series = { "f.nodes": [167], "f.nodes.dag": [135], "f.nodes.dor": [17] };
     expect(metricSeries("nodes", "dag", series).points).toEqual([135]);
     expect(globalSeries("nodes", series)).toEqual([167]);
+  });
+});
+
+describe("momentPhrase — a moment's reading as a sentence about its network (user, 2026-10-07)", () => {
+  const say = (m: Parameters<typeof momentPhrase>[0], step: number, v: string) => {
+    const p = momentPhrase(m, step);
+    return `DED ${p.verb} ${v} ${p.rest}`.trim();
+  };
+  // A moment is one bucket: what the network DID inside it, never a rate.
+  it("says what the network did in the moment's bucket", () => {
+    expect(say("snapshots", 300_000, "7")).toBe("DED anchored 7 snapshots in those 5 minutes");
+    expect(say("blocks", 3_600_000, "120")).toBe("DED produced 120 blocks in that hour");
+    expect(say("fees", DAY, "0.42")).toBe("DED paid 0.42 DAG in fees on that day");
+  });
+  it("leaves the noun to a formatter that carries it, and a gauge to what stood", () => {
+    expect(say("kb", DAY, "1.2 MB")).toBe("DED anchored 1.2 MB of data on that day");
+    expect(say("nodes", DAY, "12")).toBe("DED ran 12 nodes");
+    expect(say("continuity", DAY, "28s")).toBe("DED anchored a snapshot every 28s on that day");
+  });
+});
+
+describe("rangePhrase — a range's reading as a sentence about its network (2026-10-07)", () => {
+  // The span itself is the card's Start / End / Length rows (user: "Start and end date should be in
+  // the card"), so the sentence says "in this range" rather than restating the length.
+  const say = (m: Parameters<typeof rangePhrase>[0], v: string, partial = false) => {
+    const p = rangePhrase(m, partial);
+    return `DED ${p.verb} ${v} ${p.rest}`;
+  };
+  it("a counter is the TOTAL over the range", () => {
+    expect(say("snapshots", "52,140")).toBe("DED anchored 52,140 snapshots in this range");
+    expect(say("fees", "3.2")).toBe("DED paid 3.2 DAG in fees in this range");
+    expect(say("kb", "40 MB")).toBe("DED anchored 40 MB of data in this range");
+  });
+  it("a total with unmeasured buckets is said as a floor", () => {
+    expect(say("snapshots", "52,140", true)).toBe("DED anchored at least 52,140 snapshots in this range");
+  });
+  it("a gauge and the spacing are averages, and say so", () => {
+    expect(say("nodes", "12")).toBe("DED ran 12 nodes on average");
+    expect(say("continuity", "28s")).toBe("DED anchored a snapshot every 28s on average");
+  });
+});
+
+describe("sumMeasured — a counter's total over a span", () => {
+  it("adds what was measured and says whether any bucket was not", () => {
+    expect(sumMeasured([1, 2, 3])).toEqual({ sum: 6, partial: false });
+    expect(sumMeasured([1, null, 3])).toEqual({ sum: 4, partial: true });
+  });
+  it("nothing measured is no total, never a zero", () => {
+    expect(sumMeasured([null, null])).toBeNull();
+    expect(sumMeasured([])).toBeNull();
+  });
+});
+
+// UNLISTED ANCHORING, MEASURED (the Unlisted audit, 2026-10-07): the global count covers every
+// channel, the listed networks' series cover the catalog, so the difference IS the unlisted
+// channels — Dec 2025 – Aug 2026 it ran at ~3.9K a day. A bucket with no global reading, or with
+// a listed network unmeasured, has no difference to state: null, never a guess (rule 10).
+describe("unlistedSeries — the global count minus every listed network", () => {
+  const series = {
+    "g.anchors": [10, 12, null, 9],
+    "m.A.snaps": [6, 7, 3, 9],
+    "m.B.snaps": [2, 5, 1, null],
+    "m.A.fee": [1, 1, 1, 1], // not a snapshot count — ignored
+  };
+  it("subtracts the listed snapshot counts, bucket by bucket", () => {
+    expect(unlistedSeries(series)).toEqual([2, 0, null, null]);
+  });
+  it("never goes below zero (a listed count can lead the global one by a bucket edge)", () => {
+    expect(unlistedSeries({ "g.anchors": [5], "m.A.snaps": [6] })).toEqual([0]);
+  });
+});
+
+describe("lastSeen — the last bucket a series measured something in", () => {
+  it("is the newest bucket above zero, or null when there is none", () => {
+    expect(lastSeen([3, 0, 2, 0, null], [10, 20, 30, 40, 50])).toBe(30);
+    expect(lastSeen([0, null], [10, 20])).toBeNull();
   });
 });

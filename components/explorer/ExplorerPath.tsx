@@ -82,13 +82,28 @@ export default function ExplorerPath({ crumbs, hint, className }: { crumbs: read
               // characters. The root is a glyph and never shrinks.
               className={cn(
                 "gap-0",
-                last ? "min-w-[40%] flex-1" : c.root ? "shrink-0" : "min-w-[3.25rem] max-w-[45%] shrink",
+                // The root as the only step HUGS its house — a full-width bar holding one glyph reads
+                // as an empty field.
+                last && c.root ? "shrink-0" : last ? "min-w-[40%] flex-1" : c.root ? "shrink-0" : "min-w-[3.25rem] max-w-[45%] shrink",
                 !first && "-ml-[5px]",
               )}
             >
               {last ? (
-                <BreadcrumbPage className={cn(STEP, shape, pad, "w-full bg-wash-strong text-foreground")} title={c.title}>
-                  <span className="min-w-0 truncate [&>*]:align-middle">{c.label}</span>
+                // "YOU ARE HERE" IS A LABEL, NOT TEXT (user, 2026-10-07: "the mouse pointer is |"): its
+                // list is already on screen, so it takes no click — the default cursor and no text
+                // selection keep it from reading as a broken link beside the steps that do.
+                <BreadcrumbPage className={cn(STEP, shape, pad, "cursor-default select-none bg-wash-strong text-foreground", !c.root && "w-full")} title={c.title}>
+                  {/* THE ROOT AS THE PAGE IS THE HOUSE ALONE (user, 2026-10-07): its word is the card's
+                      title one line above, so printing it here said the same thing twice. The word
+                      stays the step's accessible name; the bar gains a name once a level is opened. */}
+                  {c.root ? (
+                    <>
+                      <House aria-hidden className="size-3.5 flex-none" />
+                      <span className="sr-only">{c.label}</span>
+                    </>
+                  ) : (
+                    <span className="min-w-0 truncate [&>*]:align-middle">{c.label}</span>
+                  )}
                 </BreadcrumbPage>
               ) : (
                 <button
@@ -100,11 +115,22 @@ export default function ExplorerPath({ crumbs, hint, className }: { crumbs: read
                     STEP,
                     shape,
                     pad,
-                    "cursor-pointer bg-wash-soft text-foreground-dim hover:bg-wash-hover hover:text-foreground",
+                    "group cursor-pointer bg-wash-soft text-foreground-dim hover:bg-wash-hover hover:text-foreground",
                     "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
                   )}
                 >
-                  {c.root ? <House aria-hidden className="size-3.5 flex-none" /> : <span className="min-w-0 truncate [&>*]:align-middle">{c.label}</span>}
+                  {/* A STEP BACK LOOKS LIKE A WAY BACK (user, 2026-10-07: the current step "looks the
+                      same as something that can be clicked"). The breadcrumb convention: an earlier
+                      step is a LINK — its name in the accent ink, underlined on hover — and the
+                      current step is plain, the filled "you are here". A dotted underline was tried
+                      the same day and dropped: on the web it says "more information", not "go back". */}
+                  {c.root ? (
+                    <House aria-hidden className="size-3.5 flex-none text-primary-ink" />
+                  ) : (
+                    <span className="min-w-0 truncate text-primary-ink underline-offset-[3px] decoration-[1px] group-hover:underline [&>*]:align-middle">
+                      {c.label}
+                    </span>
+                  )}
                 </button>
               )}
             </BreadcrumbItem>

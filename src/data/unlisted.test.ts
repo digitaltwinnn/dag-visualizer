@@ -71,7 +71,7 @@ describe("the unlisted identity", () => {
 describe("displayNetwork", () => {
   it("answers the unlisted set with the virtual pseudo-record", () => {
     const d = displayNetwork(UNLISTED_ID);
-    expect(d).toEqual({ id: UNLISTED_ID, name: "unlisted", ticker: "unlisted", hue: UNLISTED_HUE, virtual: true });
+    expect(d).toEqual({ id: UNLISTED_ID, name: "Unlisted", ticker: "Unlisted", hue: UNLISTED_HUE, virtual: true });
   });
 
   it("answers a catalog metagraph with its own identity, not virtual", () => {

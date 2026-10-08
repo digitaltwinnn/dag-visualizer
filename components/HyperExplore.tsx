@@ -7,9 +7,8 @@ import { NODE_GLYPH_W, nodeRowSpec } from "@/components/explorer/nodeRow";
 import { IdentityDot, RoleChips } from "@/components/inspector/parts";
 import { subjectPairing } from "@/components/useSubjectPairing";
 import { compositionClause, compositionGroups } from "@/src/data/composition";
-import { networkOfRow } from "@/src/data/geoMeasure";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
-import { HYPER_MEASURE_OPTIONS, groupMeasure, networkMeasure, type HyperMeasure } from "@/src/data/hyperMeasure";
+import { HYPER_MEASURE_OPTIONS, groupMeasure, type HyperMeasure } from "@/src/data/hyperMeasure";
 import { metagraphById } from "@/src/data/network";
 import type { NodeRow } from "@/src/data/types";
 import { compositionToggleActions, filterToggleActions, nodeSelectActions } from "@/src/engine/domain/pickActions";
@@ -17,6 +16,7 @@ import { identityHudCss } from "@/src/palette/identity";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { useStore } from "@/src/store/store";
 import { useNoSignal } from "@/components/useNoSignal";
+import { networksLevel } from "@/src/data/ladderLevels";
 
 // THE HYPERGRAPH'S EXPLORER — a DESCRIPTION for the one `Explorer` component (design session
 // 2026-09-26; read `docs/superpowers/design/2026-09-26-explorer-card/README.md` first). This file
@@ -71,18 +71,8 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
   const selIp = sel?.ip ?? null;
 
   // ---- level 0: the networks, measured by the heading's pick ----------------------------------
-  const measured = useMemo(() => {
-    const byNet = new Map<string, NodeRow[]>();
-    for (const r of allNodes) {
-      const n = networkOfRow(r);
-      if (n) (byNet.get(n) ?? byNet.set(n, []).get(n)!).push(r);
-    }
-    return metaList
-      .map((m) => ({ m, v: networkMeasure(hyperMeasure, m, byNet.get(m.id) ?? []) }))
-      // Sorted by the measure, fleet size as the tiebreak: the order is what the eye reads off a
-      // ranked list. A selection never re-orders it (design: "selection stays in place").
-      .sort((a, b) => b.v - a.v || b.m.nodes.length - a.m.nodes.length);
-  }, [metaList, allNodes, hyperMeasure]);
+  // The ONE list (src/data/ladderLevels.ts) — the Metagraph card's ‹ › steps the same order.
+  const measured = useMemo(() => networksLevel(metaList, allNodes, hyperMeasure), [metaList, allNodes, hyperMeasure]);
   const maxV = Math.max(1, measured[0]?.v ?? 0);
 
   const netCfg = filter !== "all" ? metagraphById(filter) : null;
@@ -129,6 +119,7 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
     const maxRows = Math.max(1, ...groupValues);
     levels.push({
       key: "compositions",
+      parent: "context",
       crumb: {
         label: (
           <>
@@ -156,6 +147,11 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
           share: v / maxRows,
           hue: netHue,
           figure: v.toLocaleString(),
+          // The selected group, as every explorer marks its selected child — on screen with a
+          // group held when the Metagraph card is open (`levelsForBox`), where its click brings
+          // the Composition card to the front rather than releasing it.
+          on: openGroup?.key === g.key,
+          rung: "composition",
           title: `${g.label} · ${g.rows.length} node${g.rows.length === 1 ? "" : "s"}`,
           onClick: () => toggleComposition(g.key),
           pair: {
@@ -179,6 +175,7 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
     const clause = compositionClause(openGroup.codes);
     levels.push({
       key: "nodes",
+      parent: "composition",
       crumb: { label: openGroup.label },
       meaning: clause ? `Nodes that ${clause}` : "Each node running this composition",
       glyphW: NODE_GLYPH_W,

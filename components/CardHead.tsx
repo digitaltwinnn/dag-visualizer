@@ -1,7 +1,7 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
-import { useRef } from "react";
+import type { CSSProperties, MutableRefObject, ReactNode } from "react";
+import { createContext, useContext, useLayoutEffect, useRef } from "react";
 import { Plus, Minus, X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
@@ -112,7 +112,7 @@ export const RIGHT_CARD = "relative block w-auto pointer-events-auto [--spine:tr
 // shared, the header holds still across the tier swap; the BOTTOM stays compact — an entry is
 // still a one-liner, just seated at the box's own first-content line.
 const RAIL_ENTRY =
-  "rail-entry relative block w-auto pointer-events-auto [--spine:transparent] px-[18px] pt-[18px] pb-1.5 min-h-0 flex-none rounded-md bg-[var(--panel-solid)] [backdrop-filter:blur(10px)] opacity-[var(--entry-dim,1)] hover:opacity-100 hover:brightness-[1.18] transition-[opacity,filter] duration-150 motion-reduce:transition-none";
+  "rail-entry relative block w-auto pointer-events-auto [--spine:transparent] px-[18px] pt-[18px] pb-1.5 min-h-0 flex-none rounded-md bg-[var(--panel-solid)] [backdrop-filter:blur(10px)] opacity-[var(--entry-dim,1)] hover:opacity-100 hover:brightness-[1.18] transition-[opacity,filter,box-shadow] duration-150 motion-reduce:transition-none";
 
 // The ONE right-rail pane frame — every facts-rail pane renders through this switch:
 //   • `entry` false → the full glass panel (Card baseline supplies `.ig-panel`; RIGHT_CARD the
@@ -131,6 +131,22 @@ const RAIL_ENTRY =
 // Pairing className/style/handlers ride the outer element in both tiers, so scene↔HUD hover
 // pairing survives the swap. `onFocus`/`onBlur` are the keyboard mirror of the hover pair
 // (2026-08-13): focus inside the card previews exactly what hovering it previews.
+/** A card's hover handlers, as a host that wraps more than the card registers them. */
+export interface RailHoverHandlers {
+  enter?: () => void;
+  move?: () => void;
+  leave?: () => void;
+}
+/** THE HOVER HOST (user, 2026-10-07: "hover on the global snapshot's bottom section and move up
+ *  across the card gives flashes … looks like card ‹ › section has no hover"). A paged box's ‹ ›
+ *  plank is a SIBLING of the panel — it has to be: `#rightcol` is pointer-events:none and the
+ *  plank must take the pointer — so pairing handlers on the panel fired a LEAVE on the plank and an
+ *  ENTER back on the body: the pairing ring, the scene highlight and the callout blinked off and
+ *  on in one continuous gesture. RailPager's `.rail-card` wrapper contains both, so it is what
+ *  "the pointer is on this card" means — the same reason the whisper edge already keys on it
+ *  (globals.css). A RailPane inside a host hands its handlers to the host instead of its panel. */
+export const RailHoverHost = createContext<MutableRefObject<RailHoverHandlers> | null>(null);
+
 export function RailPane({
   entry = false,
   id,
@@ -156,6 +172,16 @@ export function RailPane({
   onBlur?: () => void;
   children: ReactNode;
 }) {
+  const host = useContext(RailHoverHost);
+  // The box registers with its host every render (fresh closures); an ENTRY never sits in one.
+  const hosted = host != null && !entry;
+  useLayoutEffect(() => {
+    if (!hosted) return;
+    host.current = { enter: onMouseEnter, move: onMouseMove, leave: onMouseLeave };
+    return () => {
+      host.current = {};
+    };
+  });
   if (entry) {
     return (
       <aside id={id} className={cn(RAIL_ENTRY, "sig-left", className)} style={style} onMouseEnter={onMouseEnter} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} onFocus={onFocus} onBlur={onBlur}>
@@ -165,7 +191,15 @@ export function RailPane({
   }
   return (
     <Card asChild className={cn(RIGHT_CARD, "sig-left", className)}>
-      <aside id={id} style={style} onMouseEnter={onMouseEnter} onMouseMove={onMouseMove} onMouseLeave={onMouseLeave} onFocus={onFocus} onBlur={onBlur}>
+      <aside
+        id={id}
+        style={style}
+        onMouseEnter={hosted ? undefined : onMouseEnter}
+        onMouseMove={hosted ? undefined : onMouseMove}
+        onMouseLeave={hosted ? undefined : onMouseLeave}
+        onFocus={onFocus}
+        onBlur={onBlur}
+      >
         {children}
       </aside>
     </Card>
@@ -386,7 +420,7 @@ function keepFocusOnRung(el: HTMLElement): void {
           // `absolute`, and the shared recipe's `relative` would un-pin it.
           className="absolute top-[8px] right-[10px] z-10 size-auto rounded-md py-1 px-2 leading-none text-muted-foreground pointer-coarse:after:absolute pointer-coarse:after:-inset-2 pointer-coarse:after:content-['']"
         >
-          <X aria-hidden className="size-4" />
+          <X aria-hidden className="size-4 pointer-coarse:size-[18px]" />
         </Button>
       )}
       <div className={cn(onToggle && "relative group")}>

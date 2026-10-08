@@ -1,7 +1,6 @@
 "use client";
 
 import { CircleHelp } from "lucide-react";
-import { ledgerCardNetwork } from "@/src/engine/domain/tickNet";
 import { useTickHasFilter } from "@/components/useTickHasFilter";
 import { tickNetClearActions } from "@/src/engine/domain/pickActions";
 import { useStore } from "@/src/store/store";
@@ -16,6 +15,7 @@ import { MetaCard } from "@/components/inspector/cards";
 import { PulseEdge, useEdgePulse } from "@/components/EdgePulse";
 import { KIND_MARK_CLASS } from "@/components/icons";
 import type { PickDescriptor } from "@/src/data/types";
+import { metagraphCardNetwork } from "@/components/railCards";
 
 // The Context (parent) card at the top of the right-rail subject stack. It mirrors the
 // top-bar filter: a metagraph selected there shows its dossier here; on "all" (no selection)
@@ -40,17 +40,20 @@ export default function ContextCard({
   // …and it STANDS DOWN ("all") under a tick the filtered network did not anchor into
   // (`ledgerCardNetwork`) — the filter itself is left alone.
   const tickHasFilter = useTickHasFilter();
-  const filter = useStore((s) =>
-    s.mode === "ledger"
-      ? ledgerCardNetwork({ filter: s.filter, tickNet: s.tickNet, snapOrdinal: s.snap?.data.ordinal ?? null, tickHasFilter })
-      : s.filter,
-  );
+  // In HISTORY it is the plane brought forward, else the filter (`trendStack.cardNetwork`, user
+  // 2026-10-07) — a network row there names this card without writing the top bar.
+  const filter = useStore((s) => metagraphCardNetwork({ ...s, tickHasFilter }));
   // The × clears what the card STANDS ON: a tick-local network clears itself and what hangs under
-  // it (the tick stays); the filter clears the filter, as it always did.
+  // it (the tick stays), a plane focus releases the focus, and the filter clears the filter, as it
+  // always did.
   const close = () => {
     const st = useStore.getState();
     applyClickActions(
-      filter !== appFilter ? tickNetClearActions({ metaSnap: st.metaSnap, hasInspect: !!st.inspect }) : [{ kind: "filter", id: "all" }],
+      filter === appFilter
+        ? [{ kind: "filter", id: "all" }]
+        : st.mode === "trend"
+          ? [{ kind: "trendFocus", id: null }]
+          : tickNetClearActions({ metaSnap: st.metaSnap, hasInspect: !!st.inspect }),
     );
   };
   // THE CARD'S EFFECTS WEAR THE NETWORK'S HUE ONLY WHILE IT IS THE FILTER (user, 2026-10-03: "a

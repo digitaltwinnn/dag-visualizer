@@ -4,7 +4,8 @@
 // as "no leading gap"; the client clock judging a CDN-cached payload's newest bucket; the
 // leading partial month drawn whole while the trailing one was trimmed).
 import { describe, expect, it } from "vitest";
-import { assembleTrendSlice, bucketAt, heldZoom, spanPhrase, cursorFraction, cutRange, leadingTrim, monthlySum, pickRangeTier, planTrendFetch, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, ZOOMS, type TrendsWindowData } from "./trendWindow";
+import { assembleTrendSlice, bucketAt, heldZoom, spanPhrase, cursorFraction, cutRange, leadingTrim, monthlySum, pickRangeTier, planTrendFetch, rangeBuckets, snapRange, sliceWindow, stitchWindows, TIER_SINCE, tilesFor, trimNewestPartial, windowSpan, ZOOMS, type TrendsWindowData } from "./trendWindow";
+import { rangeDays } from "@/src/util/localTime";
 
 const HOUR = 3_600_000;
 const DAY = 86_400_000;
@@ -461,11 +462,79 @@ describe("heldZoom", () => {
 });
 
 describe("spanPhrase", () => {
-  it("a pill says its own span; a brushed range names its UTC days, end exclusive", () => {
+  it("a pill says its own span; a brushed range is FROM – TO by its UTC days, end exclusive", () => {
     expect(spanPhrase("7d", null)).toBe("last 7 days");
     expect(spanPhrase("all", null)).toBe("all measured");
     const d = (s: string) => Date.parse(s);
     expect(spanPhrase("30d", { fromMs: d("2026-09-20T00:00Z"), toMs: d("2026-09-27T00:00Z") })).toBe("Sep 20 – Sep 26");
-    expect(spanPhrase("30d", { fromMs: d("2026-09-20T03:00Z"), toMs: d("2026-09-20T09:00Z") })).toBe("Sep 20");
+    const short = { fromMs: d("2026-09-20T03:00Z"), toMs: d("2026-09-20T09:00Z") };
+    expect(spanPhrase("30d", short)).toBe(rangeDays(short.fromMs, short.toMs));
+    expect(spanPhrase("30d", short)).toBe("Sep 20");
+  });
+});
+
+// HISTORY'S RAW IS THE RECORDS (user, 2026-10-07): RAW opens the anchor log for the span on screen —
+// a brushed range when one stands, else the window's trailing span ending now.
+describe("windowSpan — the span the History view has on screen", () => {
+  const now = Date.UTC(2026, 9, 7, 12);
+  it("a brushed range wins", () => {
+    expect(windowSpan("30d", { fromMs: 1, toMs: 2 }, now)).toEqual({ fromMs: 1, toMs: 2 });
+  });
+  it("else the window's trailing span, ending now", () => {
+    expect(windowSpan("1h", null, now)).toEqual({ fromMs: now - 3_600_000, toMs: now });
+    expect(windowSpan("24h", null, now)).toEqual({ fromMs: now - 86_400_000, toMs: now });
+    expect(windowSpan("7d", null, now)).toEqual({ fromMs: now - 7 * 86_400_000, toMs: now });
+    expect(windowSpan("30d", null, now)).toEqual({ fromMs: now - 30 * 86_400_000, toMs: now });
+    expect(windowSpan("1y", null, now)).toEqual({ fromMs: now - 365 * 86_400_000, toMs: now });
+  });
+  it("ALL has no span to hand over — the log opens on its newest page", () => {
+    expect(windowSpan("all", null, now)).toBeNull();
+  });
+});
+
+describe("rangeBuckets — the moments a range holds (the Moment card's pager under a Range, 2026-10-07)", () => {
+  const D = 86_400_000;
+  const H = 3_600_000;
+  it("lists the WHOLE buckets inside the range, at the tier its charts are cut in", () => {
+    // A brush starting mid-hour: the part-hour at either edge is no moment (the charts trim it).
+    const from = Date.UTC(2026, 8, 10, 6, 30);
+    const r = rangeBuckets({ fromMs: from, toMs: from + 3 * D });
+    expect(r.stepMs).toBe(H);
+    expect(r.buckets[0]).toBe(Date.UTC(2026, 8, 10, 7));
+    expect(r.buckets.at(-1)).toBe(Date.UTC(2026, 8, 13, 5));
+    expect(r.buckets.length).toBe(71);
+  });
+  it("a range on bucket boundaries keeps every bucket", () => {
+    const from = Date.UTC(2026, 8, 10);
+    expect(rangeBuckets({ fromMs: from, toMs: from + 3 * D }).buckets.length).toBe(72);
+  });
+  it("a long range steps in days, aligned to UTC midnight", () => {
+    const r = rangeBuckets({ fromMs: Date.UTC(2026, 0, 1, 12), toMs: Date.UTC(2026, 5, 1) });
+    expect(r.stepMs).toBe(D);
+    expect(r.buckets[0]).toBe(Date.UTC(2026, 0, 2));
+    expect(r.buckets.every((b) => b % D === 0)).toBe(true);
+  });
+});
+
+// A DAY-NAMED RANGE IS WHOLE DAYS (the tester pass, 2026-10-07: a brush from May 21 19:00 UTC read
+// "May 21 – May 31 · 9 days" — under the date rule a day-only label means whole UTC days). A range
+// of two days or more snaps outward to UTC midnights; a shorter one keeps its exact instants, which
+// its card states as clock times.
+describe("snapRange — a long range is whole UTC days", () => {
+  const D = 86_400_000;
+  it("snaps a multi-day range outward to UTC midnights", () => {
+    const r = snapRange({ fromMs: Date.UTC(2026, 4, 21, 19), toMs: Date.UTC(2026, 4, 31, 5) });
+    expect(r).toEqual({ fromMs: Date.UTC(2026, 4, 21), toMs: Date.UTC(2026, 5, 1) });
+  });
+  it("never snaps an end into the future — a range up to now ends now", () => {
+    const now = Date.UTC(2026, 9, 7, 18);
+    const r = snapRange({ fromMs: Date.UTC(2026, 8, 20, 7), toMs: now }, now);
+    expect(r).toEqual({ fromMs: Date.UTC(2026, 8, 20), toMs: now });
+  });
+  it("keeps a short range exact, and an already whole range as it is", () => {
+    const short = { fromMs: Date.UTC(2026, 4, 21, 19), toMs: Date.UTC(2026, 4, 22, 23) };
+    expect(snapRange(short)).toEqual(short);
+    const whole = { fromMs: Date.UTC(2026, 4, 1), toMs: Date.UTC(2026, 4, 1) + 10 * D };
+    expect(snapRange(whole)).toEqual(whole);
   });
 });

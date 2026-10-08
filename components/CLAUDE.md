@@ -63,6 +63,27 @@ and return the live tip), so it is the only criterion that walks. FEE and SIZE h
 layer — a field there could only filter the 25 rows on screen, and a reader who typed a fee and got
 "no match" would reasonably conclude no such snapshot exists when we looked at 25 of 1.1 million.
 
+⚠️ **UNDER ALL THE LOG IS EVERY NETWORK'S WHOLE CHAIN, MERGED BY TIME, WITH THE REAL TOTAL**
+(user, 2026-10-07: "I care about actual real totals not technical implementation … that should be
+solved under the hood and indifferent to the user"). It was a live window of the last minutes that
+called itself "recent" and explained its buffer on hover — terminology no reader has. Now
+`useMergedLog` (pure merge: `src/data/mergedLog.ts`) pages each listed network's chain together;
+a page boundary is a cursor per chain, so newest, oldest and each step are exact (no jump to an
+arbitrary page — the pager's four buttons are exactly those). The total is the sum of the chains'
+spans, written out in full. It reads ONLY while the raw layer is open (the table is mounted behind
+the scene — ungated it cost every Snapshots page load 28 requests). The unlisted lens keeps the
+live window and its one plain word, "recent": an unlisted channel has no public chain.
+
+⚠️ **A DATE RANGE IS A FILTER, NOT A JUMP** (user, 2026-10-07 — the log reached from a Range card
+should keep to the range). On a chain `chainSeek.seekSpan` resolves the span's first and last
+ordinals and the pager pages only between them; under All the same runs per network in parallel,
+and a global-snapshot search cuts the merged log to exactly what that global carries (its own
+manifest, one read). The count is the cut's real total. A door hands its exact instants and its own
+words for the chip; a typed range is whole UTC days. A snapshot or global search, a clear, or
+another chain drops the range. Waiting states follow the atom rules: a word beside the
+node-stars, held by `useMinHold`; a page turn dims the previous page rather than blanking it; a
+total being counted twinkles in its slot.
+
 **The toolbar carries the two states the first cuts had nowhere to put**, both named in every guide
 on table filtering: what is APPLIED (in words, so a folded bar can never leave the table on a search
 with nothing explaining it) and a way to CLEAR it.
@@ -109,32 +130,18 @@ fades, the scene recedes (still live behind), the raw layer surfaces out of that
 mirror, with three ways to ask for it — the switch, Escape, the layer's own × — all calling
 `setSection("scene")`. Reduced motion makes it an instant swap.
 
-⚠️ **WHAT THAT LAYER HOLDS IS A POLICY ROW, NOT A FIXED SURFACE** (2026-09-18). `section` is a
-PRESENTATION axis — one subject, two presentations — so `VIEW_POLICIES[mode].rawSurface` is where
-each view says which register it shows: `"records"` for the structural views (the anchor log, the
-node roster) and `"document"` for History, whose RAW is the measured-history DOCUMENT
-(`components/docs/TrendsDoc.tsx`, the view's other register under convention 12). The two live in
-`components/datasection/` as `RecordsSurface` / `DocumentSurface`, and `components/DataSection.tsx`
-is nothing but the keyed dispatch between them — a map, so a third register is a compile error
-rather than a silent fall-through, and gated on the row rather than a mode (convention 7). The mode
-compares that pick WHICH TABLE the records surface draws are records-internal, which is why they sit
-inside that surface and never in the dispatch; `components/rawSurfaceBoundary.test.ts` pins the
-split. The document's chunk is `dynamic()`-loaded — the raw layer mounts in every view — and it is
-set in the shared reading measure (`components/docs/measure.ts`) with no sheet of its own: the
-layer's `.ig-panel` glass IS its sheet, and a plate on a plate flattens both. Everything else about
-RAW is identical there: the toggle shows pressed, Escape and the × return to the scene, and the
-command bar keeps its whole ordinary face, filter included.
-
-⚠️ **AND THE DOCUMENT OPENS ON WHAT THE SCENE WAS SHOWING** (2026-09-19). The step ACROSS the
-rung carries its context exactly as the step DOWN does: `TrendsDoc` seeds its `zoom` from
-`store.trendWindow` and its `range` from `store.trendRange` — a brushed range arrives with
-`metaId: null`, since the timeline brushes the whole stack rather than one plane. These are its
-THIRD and first mount-once reads beside `initialTab`, and `DocumentSurface` remounts the component
-per open, so "at mount" is "when the reader asked to read it". **Seeded, not followed, and never
-written back**: after mount the pickers are the page's own, a subscription would fight the reader's
-own pill on the next cursor write, and a write the other way would make reading the page silently
-re-cut the scene behind it. `components/rawSurfaceBoundary.test.ts` pins all three halves — the
-`getState()` seed, the absent subscription, and the absent setter call.
+⚠️ **WHAT RAW DOES IS A POLICY ROW** (2026-09-18; RAW IS THE RECORDS in every view since
+2026-10-07). `VIEW_POLICIES[mode].rawSurface` is where each view says it: `"records"` for the
+structural views, whose own records the layer shows (the anchor log, the node roster), and
+`"door"` for History, which has none of its own — its RAW toggle runs `trendDoors.openRecords`
+over the span on screen (`trendWindow.windowSpan`: the brushed range, else the window), scoped to
+the plane brought forward, else the filter, and closing the layer returns to History. History's
+measured-history DOCUMENT, which RAW used to show there, was retired the same day (user: "not
+really raw, and mostly replaced by the scene"). `components/DataSection.tsx` is the keyed map from
+the row to a surface — a new answer is a compile error, never a silent fall-through, and gated on
+the row rather than a mode (convention 7); `components/rawSurfaceBoundary.test.ts` pins it and the
+toggle's door. The mode compares that pick WHICH TABLE the records surface draws are
+records-internal, which is why they sit inside that surface and never in the dispatch.
 
 **The page never scrolls.** The scene wrapper is `position:fixed; inset:0` with an identity transform
 from first paint, which makes it the containing block for every fixed descendant — see CSS trap 2,
@@ -150,7 +157,7 @@ wordmark + filter on the left, the view switch centered, and on the right the vi
 (SCENE⇄HUD + RAW + ABOUT) followed by ONE settings gear (2026-09-08 — the theme/pages/network trio
 folded into `topbar/SettingsMenu.tsx`, labeled sections of one popover; their files are rows-only
 modules now. **The pages section left on 2026-09-28** — user: "doc pages are not settings"; the
-footer's About · Design row is their one door. One state survives on the trigger by rule: the
+footer's About link is their one door. One state survives on the trigger by rule: the
 network CODE in the live accent off mainnet — "which chain am I looking at" never goes missing.
 One mount at every width; the filter strip's second row, the trio's old phone home, retired with it). The bar has **one grow-downward slot with four tenants** (a which-strip enum makes
 them mutually exclusive by construction): the FILTER button opens the network-chip strip (hovering
@@ -207,8 +214,13 @@ decisions inside them are design, not detail:
   every tick still lists (they all happened — rule 10 doesn't let a lens edit the facts), a tick the
   network anchored into carries its count in the network's hue as the row's tag, one it sat out is
   `faint`, and inside a tick only the committed network's row is drillable (`outOfLens`); **the
-  path follows a commit made elsewhere** (a tile, the rail's ‹ › plank, the raw log) but never
-  auto-opens from the root, because the newest tick changes every few seconds. The LIVE/PINNED
+  explorer RESTS ON THE GLOBAL SNAPSHOT LIST** — this view is the `"axis"` row of
+  `viewPolicy.explorerDepth` (user, 2026-10-07): its first level is the view's own axis, N
+  snapshots in time, the most valuable list it has. A selection made anywhere (live, a pin, a
+  tile, the rail's ghost or ‹ ›) is a highlighted row on its page, never a drill; the selected
+  row's click DRILLS (opens its networks, selection untouched — the pin's release is the card's);
+  a drill the reader made returns to the list when the selection moves to another tick
+  (`src/data/ledgerPath.ts`). The LIVE/PINNED
   control rides the CARD HEAD's eyebrow row with the shown snapshot's ticking age (2026-09-28 —
   it rode the heading row as the level's setting, design decision 15, until then), and the pager
   states the TIME the rows span ("last 11 min") rather than "52 recent". Each level shows
@@ -280,7 +292,20 @@ country" names one measure of three). Eyebrows are bare role words, and each exp
 hint leads its card rather than trailing it. An explorer ROW is a browse target — mark, name, count,
 nothing more; **the prose that EXPLAINS a subject belongs to that subject's right-rail card, once**,
 and since a row commits its card in the same click, nothing is lost by keeping the sentence in one
-place. **Every row click shows its card** (user, 2026-10-04: "happens for some but not for all"):
+place. **THE EXPLORER SHOWS THE OPEN CARD'S CHILDREN — UNLESS ITS FIRST LEVEL IS THE VIEW'S AXIS**
+(user, 2026-10-07 — one rule for every view, after a day of per-case fixes; the exception is the
+`viewPolicy.explorerDepth` row, `"follow"` | `"axis"`: a root of N records along the view's axis
+— Snapshots' global snapshots in time — is where the explorer rests, a selection a highlighted
+row there; a root of scopes — countries, networks — follows). Following: the selected child's row highlighted, and a card with no children
+(a node) showing its siblings. A view hands `Explorer` every level its SELECTION opens, each level
+naming the rail card whose children it lists (`ExplorerLevelSpec.parent`), and the Explorer cuts
+the path at `store.boxedCard` (`components/explorer/boxLevel.ts`). Every new selection opens its
+own card, so normally nothing is cut; opening an already-selected card higher up (Country while a
+node is held) steps the explorer up to that card's children without unselecting anything — the
+camera and the callout already follow the open card, and now so does the explorer. A crumb, by
+contrast, releases the finer selections. So every level's rows mark their selected child (`on`)
+and carry its card (`rung`), even where a deeper level used to hide it.
+**Every row click shows its card** (user, 2026-10-04: "happens for some but not for all"):
 a row tagged with its card's slot (`ExplorerRowSpec.rung`) that is already committed brings that card
 back to the front when another card is the box, and only deselects once its own card is in front
 (`openOrToggle` in `Explorer.tsx` — view state, no selection written). Snapshots' network row commits
@@ -293,7 +318,26 @@ dossier, country, provider, composition, then the snapshot chain (global snapsho
 snapshot it anchors), then node. `components/railCards.ts` is the manifest and
 `components/railCards.test.ts` pins the order, the availability and every hint.
 
-**History's lane is the network dossier, then the MOMENT** (2026-09-19; named "Instant" until 2026-09-26) — the cursor card, a slot
+**History's lane is the network dossier, the RANGE, then the MOMENT** (the Range since 2026-10-07 —
+user: "range -> moment is also a logical parent - child relation"). The Range card is the brushed
+`trendRange` as a committed subject: a slot with no rung (the Moment's precedent, `selStack`
+place included), titled in the explorer's span words, with ONE lead sentence about the network
+above over the span (`rangePhrase` — a counter's total, a floor when a bucket is unmeasured; a
+gauge's average) and the shared `RecordsDoor`. No per-network list: the left rail's Networks list
+already IS that list over the span. Under a range the Moment's ‹ › steps the range's WHOLE buckets
+(`rangeBuckets` — the charts trim the part-buckets at the edges, so they are no moments), through
+the executor's `trendCursor` action, and the Range's next ghost opens its first moment. The Moment's
+lead is the same sentence shape for one bucket (`momentPhrase`: "DED anchored 7 snapshots in those
+5 minutes" — never a rate, never a rank).
+
+**The Metagraph card stands on the plane brought forward** (user, 2026-10-07: "if we click a
+network in explorer, should we set the metagraph card accordingly? (not the global filter
+though)"): `trendStack.cardNetwork` — the focus, else the filter — read by the manifest and the
+card, the Snapshots tick-local network's precedent. A focus bumps the network slot so the card it
+opens is the box; its × releases the focus, never the filter; and it carries no ‹ › while it stands
+on a focus (a filter step would write the top bar, and the stack's order lives only in React).
+
+**History's lane was the network dossier, then the MOMENT** (2026-09-19; named "Instant" until 2026-09-26) — the cursor card, a slot
 with NO focus rung, exactly as the two snapshot slots are. Its subject is `trendCursorMs`, which the
 band's timeline writes at most once per BUCKET (`sameBucket`, both gestures since 2026-09-19), so the
 title roll, the edge pulse and the tray highlight fire once per bucket rather than once per
@@ -310,12 +354,11 @@ pointermove. Three rules are worth knowing before touching it:
   the pickActions table).
 - **THE ONE EXIT IS THE CARD'S FOOT CONTROL, and it is shared.** `Snapshot records` — a full-bleed
   control on the wash ladder at the card's foot (2026-09-26, `moment-door.html` A; the bare text
-  links read as prose) — and the Trends document's per-chart link call ONE helper
+  links read as prose) — and History's RAW toggle call ONE helper
   (`components/trendDoors.ts`): commit the network through the table (guarded — that builder
   TOGGLES), hand the span to the log, switch the mode, open the raw layer. Two copies of four
   ordered steps is how two surfaces start landing a reader in different places. The card's
-  `All charts` link went the same day: this view's RAW surface is the document, so the command
-  bar's RAW toggle already is that door. **And the door remembers where it was** (2026-09-26):
+  `All charts` link went the same day. **And the door remembers where it was** (2026-09-26):
   `openRecords` records the view it left in `store.rawReturnMode`, and `setSection("scene")` —
   the toggle, Escape and the layer's × all end there — returns to it and clears it; a view switch
   made inside the layer clears it too. Closing the log used to strand the reader in Snapshots.
@@ -340,8 +383,8 @@ timeline is WHEN, the depth of the stack is WHO, and UP/DOWN is WHAT — the mea
 the Networks card's HEADING CONTROL (the explorer's figure heading opening `METRIC_ORDER` as a radio
 list with each measure's unit at the current cadence — design 2026-09-26; `Same scale` rode the
 same heading row until 2026-09-28, when it moved to the band's pill group). It replaced a `∧ SNAPSHOTS ∨` stepper, which walked a
-list the reader could not see, which itself replaced the six-pill picker no other surface used:
-the document lays its measures out as sections), plus `↑`/`↓` from inside a card; both write
+list the reader could not see, which itself replaced the six-pill picker no other surface used),
+plus `↑`/`↓` from inside a card; both write
 `trendMetric` from `METRIC_ORDER` (`src/data/trendSeries.ts`), so the two controls are one list. It is a view-level control because
 every card steps together (a stack whose planes showed different measures would stop being a
 comparison) — it first rode the front card's header as two bare chevrons, which said the measure
@@ -366,7 +409,7 @@ A step taken mid-sequence RETARGETS, never queues; reduced motion skips the sequ
 exit with transitions off is a 140ms blank).
 
 ⚠️ **A DRAG ACROSS THE FRONT CHART BRUSHES THE RANGE** (2026-09-26; user: "create a window also
-in the main chart"). It is the document's own `onRange` gesture on `TrendChart`, and it commits
+in the main chart"). It is `TrendChart`'s `onRange` gesture, and it commits
 `trendRange` for the whole stack exactly as the band's timeline does. It replaced the orbit
 handoff (`orbitHandoff.ts`, 2026-09-19, retired): History lost its orbit the same day
 (`viewPolicy.rotate` is false — the cards hold their implied places, a click brings one forward,
@@ -504,15 +547,23 @@ box unique) — it is the tier's own `boxed` condition, and `railTierBoundary.te
 can't drift. Keying it to the FOCUS rung was the same mistake `data-tier` fixed above, and it also shut
 out the two snapshot slots, which ride the lane with no focus rung at all.
 
+**ONE LIST PER LEVEL** (user, 2026-10-07 — `docs/superpowers/specs/2026-10-07-one-list-per-level-design.md`):
+a level's subjects and order are defined once, in `src/data/ladderLevels.ts`, and the explorer,
+the next ghost and the pager all read it — including the figure picked in the explorer's heading.
+Two projections are declared where they are applied, never re-sorted: time levels step oldest →
+newest in the pager (› = forward), and the node pager steps nodes, not layer rows (`machinesOf`).
+`railSiblings.test.ts`' one-list block pins it; a new `CHILD_OF` entry trips it until it is covered.
+
 **The ladder pair is RETIRED; the plank is ONE AXIS** (user, 2026-10-04: "do we still need it
 actually? … now the ghost is clickable"). `∧ ∨` (2026-09-11) re-boxed the coarser/finer committed
 card — both one click away on the cards themselves — and, with nothing finer committed, ∨ committed
 the rung's FIRST child. That one unique job moved into the **NEXT GHOST**: the ghost directly below
-the deepest committed rung, opened, offers the first `GHOST_PICKS` (3) children in the explorer's
-own order as quick picks (`childSteps` in railSiblings.ts, the list form of the old first-child
-step, read through the pager's own state builder `useSiblingState`), each running that row's own
-actions through the one executor. A metagraph snapshot's next ghost lists its first validators
-(`snapshotSignerRows`, the explorer's signer order). The plank is `‹` at the card's left edge, the
+the deepest committed rung IS the step — a click commits that rung's first child — the first row of
+the explorer's own list for that level (`src/data/ladderLevels.ts`, read by `childStep` through
+`useSiblingState`) through the one executor, and the ghost becomes the real card (user, 2026-10-07;
+the three quick picks it opened to on 2026-10-04 are retired). A metagraph snapshot's next ghost
+opens its first validator (`snapshotSignerRows`, the explorer's signer order). Only a ghost with no
+committed parent above it is a true ghost: it opens to its hint and offers no choice. The plank is `‹` at the card's left edge, the
 position squares centred, `›` at its right edge — the position DRAWN, never written: one small square
 per sibling with the current one lit, a set past fifteen sliding a fifteen-wide window whose ends
 are drawn small (`positionMarks`; user, 2026-10-04). An exhausted direction DIMS rather than
@@ -579,6 +630,15 @@ the number is then the only thing saying which global this snapshot landed in. I
 from a body row on 2026-08-10 — a join is not a fact ABOUT the snapshot, it is the relation the aside
 already names — and the metagraph TICKER that shared that row went with it under the pile rule, since
 the METAGRAPH card sits directly above and this card's own mark already carries the hue.
+
+**ONE RULE FOR EVERY DATE: a day is a UTC day; a clock time is the reader's and names its zone**
+(user, 2026-10-07: "Instead of saying UTC, can we show all the dates in the actual locale?", then
+"any figure shown with days will be UTC right? … if a user shares a screenshot it should be the same
+for other users. If we show a local date and/or time also use that label"). A day-only label — a
+daily bucket, a range, the raw log's date fields — reads the same for every reader, so it needs no
+zone. A clock time is in the reader's locale and zone with that zone named ("2:00 PM GMT+2"), so a
+screenshot is never ambiguous. A record's age carries both on hover, UTC for matching an explorer.
+`src/util/localTime.ts` is the one home.
 
 **An ordinal is written BARE — no `#`** (user, 2026-08-10). Every surface that renders one as a value
 already did (the snapshot card titles, the explorer rows, the anchor-log cells, the old strip's tooltip
@@ -780,10 +840,7 @@ nothing (rule 9). Every decision a pointer makes is pure and tested in
 `TrendTimeline.tsx` is the band TENANT (which payload, the readout, the pills, the honesty
 states) and `TrendTrack.tsx` the INSTRUMENT (the SVG and every gesture), because the track's whole
 subject is a geometry it measures itself and nothing above it has those numbers. The window pills
-are shared with the Trends document through `components/trendPickers.tsx` — the two had already been
-caught drifting once (user, 2026-09-09), so the class strings have one home, and since 2026-09-19
-the setting SWITCH and the document's scope CHIP live there beside them for the same reason (the
-METRIC picker left on 2026-09-26 for the explorer's heading control).
+and the scale pill live in `components/trendPickers.tsx`.
 
 **THE SCRUB IS THIS VIEW'S PRIMARY GESTURE, AND FOUR SEPARATE MEMO FAILURES MADE IT UNUSABLE.** All
 four were invisible in review and visible only in a frame counter, so they are recorded with their
@@ -849,7 +906,7 @@ inline in the return would quietly restore the bug for every consumer at once.
   at different sizes and slightly turned with empty dashed frames among them, so nothing reads
   as first — a captioned row was a roadmap. Static, takes no pointer events; a tall arrangement
   on phone keeps clear of the parked node columns.
-- **The doc pages' one door is the footer's About · Design row** (2026-09-28 — user: "doc pages
+- **The doc page's one door is the footer's About link** (2026-09-28 — user: "doc pages
   are not settings"; they rode the SettingsMenu as a Pages section from 2026-09-08 until then,
   and `InfoMenu.tsx` retired with it). The in-view ABOUT row in the bar is orientation for the
   current view, not a doc page.
@@ -858,11 +915,8 @@ inline in the return would quietly restore the bug for every consumer at once.
   route file passing `doc`, a footer `DocToggle`. The engine's bare stage, both transition
   signals and the roll grammar follow automatically; the store's `docPage` union is the one
   deliberate duplicate, and tsc flags it the moment the registries disagree.
-  ⚠️ **The registry is for PROSE OVER THE BARE STAGE, and nothing else** (2026-09-18). A document
-  that is a VIEW's second register is not a doc page: it belongs to the raw layer, through that
-  view's `rawSurface` row. The Trends document was a third entry until History became a view, and
-  the two flags it needed there — `scoped` (keep the bar's filter up over it) and `routeless` (no
-  URL of its own) — were removed with it, since RAW gives both for free. Don't reintroduce either.
+  ⚠️ **The registry is for PROSE OVER THE BARE STAGE, and nothing else** (2026-09-18). A view's
+  data belongs to the raw layer through its `rawSurface` row, never to a doc page.
 
 - **The HUD arrives staged** (`useBootStage` + `BootFade`, wired in `AppShell`): command bar when
   the engine is up (or failed — chrome is controls), rails/dock/footer on first data, vitals band
@@ -872,14 +926,13 @@ inline in the return would quietly restore the bug for every consumer at once.
 - **`AppShell` is the app** — `/`, `app/[view]` AND the doc routes all render it; `RouteSync` is
   the URL↔state bridge (seed mode on mount, shallow pushState for `docPage ?? mode`, popstate
   back), `components/views.ts` the one view/doc vocabulary home (TopBar's VIEWS lives there).
-- **/about and /design are the DOC OVERLAY, not pages** (user: footer navigation must not reboot
+- **/about is the DOC OVERLAY, not a page** (user: footer navigation must not reboot
   the engine, and the live scene is the backdrop): `store.docPage` + `DocLayer` (scrollable
   veil over the scene, Escape closes; content in `components/docs/`, dynamic-imported so the
   chunks split; the routes pass `doc` so /about's prose still server-renders for crawlers) +
   `DocGate` (rails/dock/band/callout/sweep UNMOUNT while open — BottomStream's cleanup zeroes
   the reserve, which also folds the footer tuck). TopBar hides its scene-action controls
-  (filter, presentation) while a doc is open; `setMode` closes any open doc by design. The
-  /design specimen's generic hue is allowlisted in `noHardcodedColors.test.ts`.
+  (filter, presentation) while a doc is open; `setMode` closes any open doc by design.
   **The doc's edge rulers are `RailThread standalone`** — the SAME component, deriving its x
   from `--rail-margin` instead of measuring the (unmounted) rail columns, rendering ruler +
   identity spine with no card marks; DocLayer keys its `signal` prop on the RISEN document so
@@ -887,7 +940,7 @@ inline in the return would quietly restore the bug for every consumer at once.
   (column-flanking spans; an `.ig-sheet-edge` reuse whose comb pointed the wrong way) — the
   rails belong at the VIEW edges, drawn by the one existing instrument, never re-built.
 - **The footer is a full-width strip, one row, one separator species (the mid-dot)**: view links
-  (`FooterViewLinks`, store-committed) · About · Design (store toggles via `DocToggle`) ·
+  (`FooterViewLinks`, store-committed) · About (a store toggle via `DocToggle`) ·
   Source code (octocat) · Constellation (the $DAG mark + siteUrl via `metagraphById("dag")`).
   In-app it tucks `min(10px, --bottom-reserve)` under the vitals band (the corner-notch fix) and
   the band sits flush on it. The brand waveform's one `d` is `components/brand.tsx`.
@@ -970,14 +1023,12 @@ instrument-channel rulers and threads, one cyan heartbeat, restrained identity h
 signals. **Bespoke design elements are the product — don't genericize them into stock-component
 defaults.**
 
-**Open `/design` before any design work.** It is the live reference: the colour lanes, the type scale
-and the sans/mono split read from `globals.css` and the palette generator, and the signature elements
-— the icon map, the ECG and Odometer, the four card states, the status pills, the state atoms,
-`SELECTED_ROW`, the three edge signal levels, the instrument ruler — render through the *real*
-components. It answers **what exists and what it looks like** by construction, so this file doesn't
-restate that. What a rendered page can't carry is the prohibitions and the traps; those are below. It
-is deliberately not a full component gallery — component *behaviour* is verified against the running
-app.
+**The reference is the running app and `globals.css`** — the `/design` styleguide page was deleted on
+2026-10-07 (user: users don't need it). The tokens (colour lanes, type scale, the sans/mono split)
+live in `globals.css` and the palette generator; the signature elements (the icon map in
+`components/icons.tsx`, the ECG and Odometer, the card states, the status pills, the state atoms,
+`SELECTED_ROW`, the edge signal levels, the instrument ruler) are their own components, verified
+against the running app. What neither carries is the prohibitions and the traps; those are below.
 
 **All styling lives in `app/globals.css`** plus Tailwind utilities in the JSX — **one name per token,
 no aliases**, and component code doesn't re-derive paddings, radii or cyan tints. The SVG `RailThread`
@@ -1002,8 +1053,9 @@ the lane. The shared "present, not your subject" dim is `opacity-65` (0.55 still
 
 ### Two colour lanes
 
-`/design` renders both lanes live, including the hue precedence (baked brand > `config.METAGRAPHS`
-colour > hash fallback) and the zone snapping. Rule 3 enforces the mechanics. What neither shows:
+The palette generator (`src/palette/`) owns both lanes, including the hue precedence (baked brand >
+`config.METAGRAPHS` colour > hash fallback) and the zone snapping. Rule 3 enforces the mechanics. What
+neither shows:
 
 - **Structural tokens are never repointed at an identity hue.** Structural cyan (`--primary`) is the
   sole accent/affordance signal — live dots, the ECG, selection washes, sparklines, blueprint chrome,
@@ -1048,8 +1100,7 @@ In one line: **thread = resting identity cue; card edge = purely transient signa
   there is no signal to re-measure on either. Dividing by the measured scale makes the numbers
   transform-agnostic and the missing event moot.
 - **Every card edge signal renders on the scene-facing (inner) edge**, in three levels whose hierarchy
-  must stay readable at a glance — **grey whisper < hued pairing < moving pulse** (all three run live
-  on `/design`). Pairing wins over the whisper by source order. The pulse fires once per subject
+  must stay readable at a glance — **grey whisper < hued pairing < moving pulse**. Pairing wins over the whisper by source order. The pulse fires once per subject
   change, skips mount, debounces, leaves nothing behind, and is **synchronized with the title's
   roll-in** so title and edge move as one moment.
 
@@ -1102,8 +1153,9 @@ bar, the share of its chain's ordinals it still serves (`archiveReach`, `compone
 **Every right-rail card is the same SIX SLOTS in one order** (user, 2026-10-02 — the design and its
 deviations are in `docs/superpowers/design/2026-10-02-right-rail-cards/`): **head · lead · breakdown
 · facts · doors · foot + pager**, and a card uses the slots it has content for. The primitives beside
-`Fact` and `Foot` in `inspector/parts.tsx` are the one way to draw each: `Lead` (the one dim sentence
-a card says first, two lines at most — what the subject is to its parent), `SectionLabel` (a caps
+`Fact` and `Foot` in `inspector/parts.tsx` are the one way to draw each: `Lead` (the one dim line
+a card says first, two lines at most — what the subject is to its parent; no full stop, it is a
+label, not prose — user, 2026-10-07), `SectionLabel` (a caps
 label with the section's one headline figure on the right), `Empty` (the ONE empty value: a dash,
 the reason on hover — the cards used to say "not known", "none" and "n/a"), `QualifierChip` and
 `Door`. Three rules ride them: **a head's aside is a qualifier chip or a state pill**, never bare
@@ -1272,8 +1324,8 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
 
 - **`SELECTED_ROW`** is the one committed-selection language for list rows: the wash plus a 1px inset
   ring **as a single box-shadow** — deliberate, because the transient states it composes with are
-  background-based and box-shadow is an independent property — plus a reserved trailing check mark in a
-  fixed slot so columns never shift.
+  background-based and box-shadow is an independent property. **No ✓** (user, 2026-10-07: "obsolete
+  as the whole row is highlighted") — the raw tables' check mark and its reserved slot retired.
 - **`subjectPairing`** is the one scene↔HUD hover coupling: a subject is paired when its key equals its
   store channel's value, using the same channels the engine reads and writes. Hovering a card glows its
   3D object and vice versa. This coupling is rule 9; `components/useSubjectPairing.test.ts` asserts the
@@ -1282,8 +1334,7 @@ Every rail card leads with `CardHead`: eyebrow / title / inset hairline / body.
 
 ### State atoms & timing
 
-`components/state/StateAtoms.tsx` builds empty and loading states from the app's own marks (all four
-render on `/design`), so an absent feed reads as part of the instrument rather than a spinner. The
+`components/state/StateAtoms.tsx` builds empty and loading states from the app's own marks, so an absent feed reads as part of the instrument rather than a spinner. The
 sonar ring is remounted per retry, so the animation IS the retry.
 
 **`useMinHold`** gives every *transient* signal a minimum calm cycle even when data resolves instantly,

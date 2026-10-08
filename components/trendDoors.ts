@@ -25,6 +25,10 @@ import { useStore } from "@/src/store/store";
 export interface RecordSpan {
   fromMs: number;
   toMs: number;
+  /** The span in the CARD'S OWN WORDS ("Sep 22, 2026", "Sep 8 – Oct 8", "last 30 days") — the log's
+   *  applied chip repeats it rather than re-deriving local days from the instants, which named two
+   *  days for a one-day (UTC) Moment (2026-10-07). */
+  label?: string;
 }
 
 /** The span the WINDOW on screen implies, from the buckets actually drawn.
@@ -41,14 +45,13 @@ export function spanOfWindow(buckets: readonly number[], stepMs: number): Record
 /** ONE RUNG DOWN — the anchor log's records for `metaId` over `span`.
  *
  *  `metaId` null is the unscoped log: the global charts have no chain of their own, and neither
- *  does a cursor read with nothing focused. A null `span` is a no-op rather than a navigation to
- *  an unbounded search.
+ *  does a cursor read with nothing focused. A null `span` opens the log unseeked, on its newest
+ *  page (History's RAW under the ALL window).
  *
  *  The last two steps are a MODE step plus a section one, in that order: `mode` is what swaps the
- *  raw layer's surface from the trends document to the ledger's records, and `setSection("data")`
+ *  raw layer's surface to the ledger's records, and `setSection("data")`
  *  is what makes the door work from the scene as well (a no-op when the layer is already open). */
 export function openRecords(metaId: string | null, span: RecordSpan | null): void {
-  if (!span) return;
   const st = useStore.getState();
   // THE DAG IS UNSCOPED HERE: since the hypergraph has its own plane (2026-09-26) a Moment read
   // under the DAG filter names "dag" as its subject, but the anchor log's chain search knows only
@@ -60,13 +63,16 @@ export function openRecords(metaId: string | null, span: RecordSpan | null): voi
   // should not happen; only set the filter in the raw list / search section"). It hands the network
   // to the log, which scopes ITSELF to it (AnchorLogTable's `searchMeta`) — the top bar, the scene
   // and every other view keep the lens the reader chose.
-  st.setLogSeek({ metaId: scoped, fromMs: span.fromMs, toMs: span.toMs });
+  // A null span (History's ALL window has none to hand over) opens the log on its newest page,
+  // with no seek — the door still lands on the records.
+  if (span) st.setLogSeek({ metaId: scoped, fromMs: span.fromMs, toMs: span.toMs, ...(span.label ? { label: span.label } : {}) });
   if (st.mode !== "ledger") {
     // Remember WHERE THE DOOR WAS (user, 2026-09-26): closing the layer goes back there, not to
     // Snapshots. Set after the mode step, which clears it.
     const from = st.mode;
+    const focus = st.trendFocus; // the view switch clears it; the return restores it
     st.setMode("ledger");
-    st.setRawReturnMode(from);
+    st.setRawReturnMode(from, focus);
   }
   st.setSection("data");
 }

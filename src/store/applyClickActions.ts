@@ -21,6 +21,16 @@ export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boole
   for (const a of actions) {
     switch (a.kind) {
       case "filter":
+        // A NEW LENS CLEARS WHAT WAS PICKED UNDER THE OLD ONE (user, 2026-10-07: "if I change the
+        // filter … it should clear the details pane"): the metagraph snapshot and the network
+        // picked inside a tick belonged to the previous lens. Every filter writer runs through
+        // here, so the rule holds for all of them; a later step of the same click re-sets them.
+        if (a.id !== st.filter) {
+          if (st.metaSnap != null) st.setMetaSnap(null);
+          if (st.tickNet != null) st.setTickNet(null);
+          // …and History's plane focus, which names the Metagraph card and scopes RAW there (I6).
+          if (st.trendFocus != null) st.setTrendFocus(null);
+        }
         st.setFilter(a.id);
         // COMMITTING a filter in the ledger (re-)enters live mode (2026-08-08 — moved here
         // from FollowController's filter-dep effect, which fired AFTER any pin whose actions
@@ -71,6 +81,9 @@ export function applyClickActions(actions: ClickAction[], opts?: { quiet?: boole
         }
         st.setTrendFocus(a.id);
         break;
+      case "trendCursor":
+        st.setTrendCursor(a.ms);
+        break;
     }
   }
   // THE MOTION CAUSE, stamped ONCE per click (2026-09-26): the hint (`domain/motionHint.ts`) says
@@ -120,6 +133,8 @@ export function motionCauseOf(actions: readonly ClickAction[]): MotionCause | nu
       case "tickNet": return { kind: "filter", id: a.sel?.metaId ?? "all" };
       case "metaSnap": return a.sel ? { kind: "metaSnap", metaId: a.sel.metaId, ordinal: a.sel.ordinal } : { kind: "metaSnap", metaId: null };
       case "trendFocus": return { kind: "focus", id: a.id };
+      // A cursor step moves no scene — the planes' line and the card answer it.
+      case "trendCursor": return null;
     }
   }
   return null;

@@ -1,7 +1,8 @@
 import type { LucideIcon } from "lucide-react";
 import { ledgerCardNetwork } from "@/src/engine/domain/tickNet";
+import { cardNetwork } from "@/src/engine/domain/trendStack";
 import type { TickNetSel } from "@/src/data/types";
-import { EXPLORE_ICON, INSTANT_ICON, iconForPick } from "@/components/icons";
+import { EXPLORE_ICON, INSTANT_ICON, RANGE_ICON, iconForPick } from "@/components/icons";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import type { Mode } from "@/src/store/store";
 import type { PickDescriptor, MetaSnapSel } from "@/src/data/types";
@@ -30,7 +31,7 @@ import { is3D } from "@/src/engine/domain/viewTransition";
 // Hue + active-flag stay with the tray builders (per-rail presentation), not here.
 // ─────────────────────────────────────────────────────────────────────────────────────────────
 
-export type RailCardKind = "tool" | "context" | "instant" | "metaSnap" | "country" | "cohort" | "composition" | "node" | "snap";
+export type RailCardKind = "tool" | "context" | "range" | "instant" | "metaSnap" | "country" | "cohort" | "composition" | "node" | "snap";
 
 // ── The rail LADDER lane (Inspector's descent spine, variant-A redesign 2026-07-19) ──────────
 // Which facts-rail slot stands for each FOCUS-LADDER rung. The lane's ORDER lives in
@@ -97,9 +98,13 @@ const DISPLAY_LANE: Partial<Record<Mode, readonly string[]>> = {
   // focus rung — the two snapshot slots' precedent, and `railLadderBoundary.test.ts` asserts
   // rung → slot rather than the reverse. It sits UNDER the dossier because the lane is a
   // containment claim read coarse→fine: a network is the subject, and the cursor is one moment of
-  // it. (A focused PLANE gets no card of its own: a plane IS its network's chart, and the dossier
-  // above already stands for the network — which is also why it is no ladder rung.)
-  trend: ["context", "instant"],
+  // it. (A focused PLANE gets no card of its own: a plane IS its network's chart, so the dossier
+  // stands on it — `trendStack.cardNetwork`, the focus else the filter, 2026-10-07 — which is also
+  // why it is no ladder rung.)
+  // The RANGE sits between them (user, 2026-10-07: "range -> moment is also a logical parent -
+  // child relation"): a brushed span of the network, and the cursor one moment inside it. Like
+  // `instant`, a card slot with no rung.
+  trend: ["context", "range", "instant"],
 };
 
 export function ladderSlotIds(mode: Mode): string[] {
@@ -110,7 +115,7 @@ export function ladderSlotIds(mode: Mode): string[] {
  *  inputs (which can't change a slot's presence). */
 export type LadderState = Pick<
   RailManifestState,
-  "mode" | "filter" | "tickNet" | "tickHasFilter" | "inspect" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "trendCursorMs"
+  "mode" | "filter" | "tickNet" | "tickHasFilter" | "inspect" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "trendCursorMs" | "trendRange" | "trendFocus"
 > & {
   /** The store's selection recency (most-recent-FIRST) — the collapse rule reads it (item 8):
    *  the most recently selected present card is the ACTIVE one; the rest rest collapsed. */
@@ -196,6 +201,11 @@ export interface RailManifestState {
    *  pointer positions inside one bucket name the same reading to every surface, so the tray
    *  highlight and the title roll fire once per bucket rather than once per pointermove. */
   trendCursorMs?: number | null;
+  /** THE BRUSHED RANGE (History, 2026-10-07) — `store.trendRange`, the Moment's parent. Optional
+   *  for the same reason as the cursor: only History produces its card. */
+  trendRange?: { fromMs: number; toMs: number } | null;
+  /** History's plane focus (`store.trendFocus`) — the network its Metagraph card stands on. */
+  trendFocus?: string | null;
   /** The selected metagraph-snapshot TILE — ledger's own card slot (spec 2026-08-04), not a
    *  ladder rung. Optional: the ladder derivation (`LadderState`) and its callers never carry
    *  this field, so `detailsCards` treats an absent key the same as `null`. */
@@ -332,6 +342,10 @@ function compositionHint(s: RailManifestState): string | null {
 function instantHint(s: RailManifestState): string | null {
   return s.mode === "trend" ? `${CLICK(s)} a chart, or the timeline below.` : null;
 }
+// The RANGE's gesture: a drag, on either surface that brushes one.
+function rangeHint(s: RailManifestState): string | null {
+  return s.mode === "trend" ? "Drag across a chart or the timeline." : null;
+}
 function metaSnapHint(s: RailManifestState): string | null {
   return s.mode === "ledger" ? `${CLICK(s)} a tile on a plane above the floor.` : null;
 }
@@ -343,6 +357,24 @@ function metaSnapHint(s: RailManifestState): string | null {
 // `hint` above) — so the rail always shows the view's full possibility space and a deselect
 // returns a slot to its ghost in place (spatially stable; the old recency reordering made cards
 // jump). Callers filter to `present` for the tray icons.
+/** THE NETWORK THE METAGRAPH CARD STANDS ON — one home for the manifest and the card itself (the
+ *  branch review's M7: the same three-way rule was written in both). In the ledger, the network
+ *  committed inside the pinned tick (else the filter, standing down under a tick it did not anchor
+ *  into); in History, the plane brought forward (else the filter); everywhere else, the filter. */
+export function metagraphCardNetwork(s: {
+  mode: string;
+  filter: string;
+  tickNet?: TickNetSel | null;
+  snap?: { data: { ordinal: number } } | null;
+  tickHasFilter?: boolean;
+  trendFocus?: string | null;
+}): string {
+  if (s.mode === "ledger")
+    return ledgerCardNetwork({ filter: s.filter, tickNet: s.tickNet ?? null, snapOrdinal: s.snap?.data.ordinal ?? null, tickHasFilter: s.tickHasFilter });
+  if (s.mode === "trend") return cardNetwork(s.filter, s.trendFocus ?? null);
+  return s.filter;
+}
+
 export function detailsCards(s: RailManifestState): RailCard[] {
   // A PLACEHOLDER VIEW HAS NO FACTS SCOPE (user, 2026-08-10). `status`/`transactions`/`staking`
   // draw a wireframe captioned `preview · in development` and deliberately show no numbers, so
@@ -361,10 +393,9 @@ export function detailsCards(s: RailManifestState): RailCard[] {
   // committed inside the pinned tick, else the app filter (`ledgerNetwork`; user, 2026-10-02: a
   // snapshot row left this rung a ghost above its own snapshot card, because the rung had no
   // state but the filter). Everywhere else it is the filter, as it always was.
-  const net =
-    s.mode === "ledger"
-      ? ledgerCardNetwork({ filter: s.filter, tickNet: s.tickNet ?? null, snapOrdinal: s.snap?.data.ordinal ?? null, tickHasFilter: s.tickHasFilter })
-      : s.filter;
+  // IN HISTORY it is the plane brought forward, else the filter (`trendStack.cardNetwork`, user
+  // 2026-10-07) — a network row there names the card without writing the top bar.
+  const net = metagraphCardNetwork(s);
   const context: RailCard = {
     id: "context",
     kind: "context",
@@ -390,6 +421,15 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     // only the card stands down.
     present: s.mode === "trend" && s.trendCursorMs != null,
     hint: instantHint(s),
+  };
+  const range: RailCard = {
+    id: "range",
+    kind: "range",
+    icon: RANGE_ICON,
+    subjectKey: s.trendRange ? `${s.trendRange.fromMs}-${s.trendRange.toMs}` : null,
+    // View-scoped like the instant: a span is a reading OF THIS STACK.
+    present: s.mode === "trend" && s.trendRange != null,
+    hint: rangeHint(s),
   };
   const metaSnap: RailCard = {
     id: "metaSnap",
@@ -443,6 +483,6 @@ export function detailsCards(s: RailManifestState): RailCard[] {
   // desktop lane above: tick → dossier → the tick's own metagraph snapshot → node. History's
   // `instant` sits directly under the dossier, which is exactly where its own lane puts it —
   // every slot between them is unreachable in that view, so the two orders agree.
-  return [snap, context, instant, country, cohort, composition, metaSnap, node];
+  return [snap, context, range, instant, country, cohort, composition, metaSnap, node];
 }
 

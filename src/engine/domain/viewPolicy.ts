@@ -136,11 +136,21 @@ export interface ViewPolicy {
   // and has nowhere honest to put a node, so it reuses the doc overlay's park+fade path
   // (NodeFabric.tickFleetFade, the DOC_ROLL clock) rather than inventing node poses.
   fleet: "placed" | "parked";
-  // Which surface the RAW half of the `section` presentation axis shows. `section` is a
-  // PRESENTATION axis — same subject, two presentations — so the answer is per view rather than
-  // one hardcoded surface: the structural views show the records layer, and the trends view
-  // shows the measured-history DOCUMENT, which is its other register (CLAUDE.md convention 12).
-  rawSurface: "records" | "document";
+  // What the RAW half of the `section` presentation axis does in this view. RAW IS THE RECORDS
+  // in every view (user, 2026-10-07 — History's measured-history document was retired: the scene
+  // had replaced it). A structural view shows its OWN records in the layer ("records": the anchor
+  // log, the node roster); the History view has none of its own, so its RAW is a DOOR onto the
+  // anchor log for the span on screen ("door" — `trendDoors.openRecords`, the Moment card's door),
+  // and closing the layer returns to History.
+  rawSurface: "records" | "door";
+  // How deep the left rail's EXPLORER stands (user, 2026-10-07). The rule: the explorer shows the
+  // OPEN card's children (`components/explorer/boxLevel.ts`) — "follow" — UNLESS the view's first
+  // level is its own AXIS: N records along it rather than a set of scopes to choose one of. Then
+  // the explorer RESTS on that list — "axis" — a selection is a highlighted row on its page, and
+  // drilling is the reader's own click. Snapshots is the axis view: its root is the global
+  // snapshots in time, the view's most valuable list, and following a selection down replaced it
+  // with one snapshot's contents. Countries and networks are scopes, so those views follow.
+  explorerDepth: "follow" | "axis";
   // Does this view mount the DOM chart-plane stack (`components/TrendStack.tsx` gates on this —
   // convention 7: gate on the view a behaviour is FOR, never `mode === "x"`)?
   chartStack: boolean;
@@ -193,6 +203,7 @@ const FLAT: ViewPolicy = {
   chipEnv: 1,
   fleet: "placed",
   rawSurface: "records",
+  explorerDepth: "follow",
   chartStack: false,
   // Never read today — a flat view PARKS the fleet and applies no destination layout, so it is
   // the only row nothing consults. It keeps the value the old `mode !== "geo"` line would have
@@ -241,6 +252,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     chipEnv: 1,
     fleet: "placed",
     rawSurface: "records",
+    explorerDepth: "follow",
     chartStack: false,
     // TRUE, which is what the old `mode !== "geo"` line gave it — and it stays the row's answer
     // even though hyper's camera does not in fact idle-orbit today: `CameraDirector.focusFilter`
@@ -282,6 +294,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     chipEnv: 0.35,
     fleet: "placed",
     rawSurface: "records",
+    explorerDepth: "follow",
     chartStack: false,
     // OFF: the globe does its own spinning (sims.globeSpin) and it turns to face a selection —
     // a camera orbiting a spinning globe is two rotations fighting over one subject.
@@ -313,6 +326,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     chipEnv: 0.5, // low, not zero — coplanar trays wash at full sheen, go bland at none (field note)
     fleet: "placed",
     rawSurface: "records",
+    explorerDepth: "axis",
     chartStack: false,
     // OFF, and it always was: the chamber's branch in `_applyDestLayout` returns before the
     // generic line, so `mode !== "geo"` never reached it. The trail reads as a TIME axis running
@@ -353,7 +367,8 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     bloom: BLOOM_CALM,
     chipEnv: 1,
     fleet: "parked",
-    rawSurface: "document",
+    rawSurface: "door",
+    explorerDepth: "follow",
     chartStack: true,
     // ⚠️ OFF, and this row is why the field exists (2026-09-18). The planes are TEXT — a chart you
     // are reading has to hold still, and an idle orbit slid the whole stack sideways forever. It

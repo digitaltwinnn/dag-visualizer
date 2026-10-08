@@ -147,7 +147,7 @@ export function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; cla
           // invisible × there would swallow a click on the scene (review, 2026-10-04).
           className="pointer-events-auto [[data-on='0']_&]:pointer-events-none absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-wash-hover hover:text-foreground after:absolute after:-inset-2 after:content-['']"
         >
-          <X aria-hidden className="size-3.5" />
+          <X aria-hidden className="size-3.5 pointer-coarse:size-[18px]" />
         </button>
       )}
       {/* The identity EDGE SPINE (user, 2026-08-15 — "the rails/hairline effect on the left
@@ -616,7 +616,9 @@ function CalloutMark({ m, id, multi, phone, onDismiss }: { m: Model; id: "callou
           callout's line was drawn at 0.55 of the weight and dash of every other leader. */}
       <svg className="co-leader absolute left-0 top-0 overflow-visible" width="1" height="1" aria-hidden>
         <g className="co-scale">
-          <mask id={maskId} maskUnits="userSpaceOnUse" x={-20} y={-CALLOUT_OFF_Y - 40} width={CALLOUT_OFF_X + 60} height={CALLOUT_OFF_Y + 60}>
+          {/* The phone leader runs to the free strip at whatever length the sync writes, so its
+              mask region spans the screen's height rather than the standoff's. */}
+          <mask id={maskId} maskUnits="userSpaceOnUse" x={-20} y={phone ? -2000 : -CALLOUT_OFF_Y - 40} width={CALLOUT_OFF_X + 60} height={phone ? 2040 : CALLOUT_OFF_Y + 60}>
             <line
               className="co-draw"
               x1={ex}

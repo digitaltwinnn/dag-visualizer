@@ -63,7 +63,7 @@ describe("snapMeasure — a snapshot states its own fee or its own size, bare", 
   });
   it("leads with the fee for fee and with its own bytes for size", () => {
     const row = { fee: 4_600_000, bytes: 14 };
-    expect(snapMeasure("fee", row)).toBe("0.0460");
+    expect(snapMeasure("fee", row)).toBe("0.05"); // shortened (user, 2026-10-07: "instead of 0.0480 … 0.05")
     // Always KB, the unit the heading names — a 14-byte state is "0.01", never a bare "0".
     expect(snapMeasure("size", row)).toBe("0.01");
     expect(snapMeasure("size", { fee: 0, bytes: 20_480 })).toBe("20");
@@ -91,7 +91,7 @@ describe("the levels' lists and their numbers (design 2026-09-26: each level has
     expect(TICK_NET_MEASURE_OPTIONS.map((o) => o.label)).toEqual(["Fees", "Anchors", "Size"]);
     expect(TICK_NET_MEASURES).toEqual(["fee", "anchors", "size"]); // the tick's list minus Metagraphs
     expect(tickNetMeasure("anchors", 4, undefined)).toEqual({ value: 4, text: "4" });
-    expect(tickNetMeasure("fee", 4, { fee: 4_600_000, bytes: 20_480 })).toEqual({ value: 4_600_000, text: "0.0460" });
+    expect(tickNetMeasure("fee", 4, { fee: 4_600_000, bytes: 20_480 })).toEqual({ value: 4_600_000, text: "0.05" });
     expect(tickNetMeasure("size", 4, { fee: 0, bytes: 20_480 })).toEqual({ value: 20_480, text: "20" });
     expect(tickNetMeasure("fee", 4, undefined)).toEqual({ value: null, text: NO_MEASURE });
   });

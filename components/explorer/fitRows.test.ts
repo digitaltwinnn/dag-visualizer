@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FIT_MAX, FIT_MIN, pageKeepingRow, rowsThatFit } from "./fitRows";
+import { FIT_MAX, FIT_MIN, pageKeepingRow, rowsThatFit, pageHolding, pageOnResize } from "./fitRows";
 
 describe("rowsThatFit — the page size that fills the rail", () => {
   it("adds the whole pitches the free space holds, and drops the ones it overflows by", () => {
@@ -28,5 +28,28 @@ describe("pageKeepingRow — the reader's place survives a resize", () => {
   });
   it("tolerates degenerate inputs", () => {
     expect(pageKeepingRow(0, 0, 0)).toBe(1);
+  });
+});
+
+describe("pageHolding", () => {
+  it("is the 1-based page holding a 0-based row", () => {
+    expect(pageHolding(0, 15)).toBe(1);
+    expect(pageHolding(14, 15)).toBe(1);
+    expect(pageHolding(15, 15)).toBe(2);
+  });
+  it("a row that is not in the list holds no page", () => {
+    expect(pageHolding(-1, 15)).toBeNull();
+  });
+});
+
+describe("pageOnResize — a page-size change keeps the reader's place", () => {
+  it("keeps the PINNED row on screen when there is one", () => {
+    // Pinned at row 24 on page 2 of 14; the fit re-measures 14 → 30 → 14 while the card eases.
+    const mid = pageOnResize(2, 14, 30, 24);
+    expect(mid).toBe(1);
+    expect(pageOnResize(mid, 30, 14, 24)).toBe(2);
+  });
+  it("without a pin, keeps the row that was first on screen", () => {
+    expect(pageOnResize(3, 10, 20, -1)).toBe(pageKeepingRow(3, 10, 20));
   });
 });

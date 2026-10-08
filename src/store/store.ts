@@ -50,7 +50,7 @@ export type MotionCause =
 export type TrendMetric = "snapshots" | "blocks" | "fees" | "kb" | "nodes" | "continuity";
 
 // One slot in the right-rail card stack (extend with future card types — e.g. "tx").
-export type SelSlot = "network" | "node" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "instant";
+export type SelSlot = "network" | "node" | "snap" | "metaSnap" | "country" | "cohort" | "composition" | "range" | "instant";
 
 // Move `slot` to the FRONT of the recency stack when it becomes active, or drop it when cleared.
 //
@@ -73,6 +73,7 @@ function bumpStack(stack: SelSlot[], slot: SelSlot, active: boolean): SelSlot[] 
 // the new field type-errored against a type that no longer described the value it held.
 export type { Activity } from "@/src/data/api";
 import type { Activity } from "@/src/data/api";
+import { snapRange } from "@/src/data/trendWindow";
 
 // Panel-facing state only (Lane B). The 60fps scene + per-snapshot visuals subscribe
 // to NetworkData directly (Lane A) and never touch this store, so React renders stay
@@ -199,14 +200,14 @@ interface AppState {
   // rebooted the WebGL engine on every footer navigation. A presentation axis like `section`,
   // never a Mode — a document is over the network, not a view of it. While set, the HUD's
   // scene furniture stands down (DocGate) and RouteSync publishes the doc page's own path.
-  docPage: "about" | "design" | null;
+  docPage: "about" | null;
   // ONE-SHOT HANDOFF down the observation ladder (convention 12, 2026-09-09): a /trends chart
   // range handed to the anchor log's search. The trends page writes it as it closes; the log
   // consumes it on sight (prefills the date criteria, seeks when it can) and clears it — a
   // navigation bridge, not a selection (the network commit itself rides the pickActions table).
   /** A door's hand-off to the anchor log: a span to land in, or — with `snapshot` — one metagraph
    *  snapshot to find (its card's "Show the raw data", 2026-10-04). */
-  logSeek: { metaId: string | null; fromMs: number; toMs: number; snapshot?: number } | null;
+  logSeek: { metaId: string | null; fromMs: number; toMs: number; snapshot?: number; label?: string } | null;
   // The doc overlay's STAGE-READY signal, written by the Engine (the one clock that knows the
   // choreography's real boundary — frame-driven, so ?slowmo and low FPS stretch it correctly,
   // where a wall-clock wait in the HUD desynced). DEFAULT TRUE so a document never waits on a
@@ -246,6 +247,9 @@ interface AppState {
    *  to this view and clears it. A view switch made while the layer is open clears it too — the
    *  reader has chosen a view, and there is nothing to return to. */
   rawReturnMode: Mode | null;
+  /** …and the History plane that was in front when the door was taken, restored with the view
+   *  (the tester pass, 2026-10-07: the round trip lost it). */
+  rawReturnFocus: string | null;
   // DESKTOP ONLY (card-redesign follow-up, 2026-08-08): collapse the HUD's card rails to their
   // THREADS — BOTH rails together (user: the rails are symmetric and the motive, "spotlight the
   // scene", is whole-HUD; one command-bar toggle beats two subtle per-rail chevrons). Cards fade
@@ -412,8 +416,8 @@ interface AppState {
   setLatestSnapshot: (snap: GlobalSnapshot | null) => void;
   setActivity: (activity: Activity | null) => void;
   setMode: (mode: Mode) => void;
-  setDocPage: (docPage: "about" | "design" | null) => void;
-  setLogSeek: (logSeek: { metaId: string | null; fromMs: number; toMs: number; snapshot?: number } | null) => void;
+  setDocPage: (docPage: "about" | null) => void;
+  setLogSeek: (logSeek: { metaId: string | null; fromMs: number; toMs: number; snapshot?: number; label?: string } | null) => void;
   setDocStageReady: (ready: boolean) => void;
   setDocClosing: (closing: boolean) => void;
   setFilter: (filter: string) => void;
@@ -450,7 +454,7 @@ interface AppState {
   setDeepWanted: (key: string | null) => void;
   setPhoneDock: (dock: "explore" | "details" | "vitals" | null) => void;
   setSection: (section: "scene" | "data") => void;
-  setRawReturnMode: (mode: Mode | null) => void;
+  setRawReturnMode: (mode: Mode | null, focus?: string | null) => void;
   setRailsHidden: (hidden: boolean) => void;
   setSceneDragging: (dragging: boolean) => void;
   setCameraFlying: (flying: boolean) => void;
@@ -539,6 +543,7 @@ export const useStore = create<AppState>((set) => ({
   phoneDock: null,
   section: "scene",
   rawReturnMode: null,
+  rawReturnFocus: null,
   railsHidden: false,
   sceneDragging: false,
   cameraFlying: false,
@@ -723,10 +728,19 @@ export const useStore = create<AppState>((set) => ({
     set((s) => {
       const back = section === "scene" ? s.rawReturnMode : null;
       return back != null && back !== s.mode
-        ? { section, mode: back, rawReturnMode: null, motionCause: { kind: "view", from: s.mode, to: back } }
+        ? {
+            section,
+            mode: back,
+            rawReturnMode: null,
+            // The plane that was in front comes back with the view, as the card it names.
+            trendFocus: s.rawReturnFocus,
+            rawReturnFocus: null,
+            selStack: s.rawReturnFocus != null ? bumpStack(s.selStack, "network", true) : s.selStack,
+            motionCause: { kind: "view", from: s.mode, to: back },
+          }
         : { section, rawReturnMode: section === "scene" ? null : s.rawReturnMode };
     }),
-  setRawReturnMode: (rawReturnMode) => set({ rawReturnMode }),
+  setRawReturnMode: (rawReturnMode, focus = null) => set({ rawReturnMode, rawReturnFocus: focus }),
   setRailsHidden: (railsHidden) => set({ railsHidden }),
   setSceneDragging: (sceneDragging) => set({ sceneDragging }),
   setCameraFlying: (cameraFlying) => set({ cameraFlying }),
@@ -791,12 +805,24 @@ export const useStore = create<AppState>((set) => ({
   setGeoMeasure: (measure) => set({ geoMeasure: measure }),
   setHyperMeasure: (measure) => set({ hyperMeasure: measure }),
   setTrendScroll: (offset) => set({ trendScroll: offset, motionCause: { kind: "page" } }),
-  setTrendFocus: (id) => set({ trendFocus: id }),
+  // A plane focus names History's Metagraph card (`trendStack.cardNetwork`, 2026-10-07), so it
+  // bumps the network slot as a filter commit does — the card it opens becomes the active one. A
+  // release leaves the stack alone: the filter may still hold the card.
+  setTrendFocus: (id) => set((s) => ({ trendFocus: id, selStack: id != null ? bumpStack(s.selStack, "network", true) : s.selStack })),
   setTrendScale: (scale) => set({ trendScale: scale }),
   // A window and a range are the SAME statement about what is on screen, so picking one retires
   // the other (the document's zoom pills do exactly this).
-  setTrendWindow: (trendWindow) => set({ trendWindow, trendRange: null, motionCause: { kind: "window", id: trendWindow } }),
-  setTrendRange: (trendRange) => set({ trendRange, motionCause: { kind: "range", span: trendRange } }),
+  // The RANGE is History's other committed subject (2026-10-07 — the Range card, the Moment's
+  // parent), so it takes a place in the recency stack exactly as the cursor does; a window pick
+  // retires the range and so drops it.
+  setTrendWindow: (trendWindow) =>
+    set((s) => ({ trendWindow, trendRange: null, selStack: bumpStack(s.selStack, "range", false), motionCause: { kind: "window", id: trendWindow } })),
+  // A range of two days or more is WHOLE UTC DAYS (`snapRange`): it is labelled by its days.
+  setTrendRange: (range) =>
+    set((s) => {
+      const trendRange = range ? snapRange(range, Date.now()) : null;
+      return { trendRange, selStack: bumpStack(s.selStack, "range", trendRange != null), motionCause: { kind: "range", span: trendRange } };
+    }),
   // Stored BY REFERENCE — the array the publisher hands in is the one the Engine compares with
   // `!==`. No copy, no sort, no normalising: any of those would mint a fresh reference per call
   // and turn a no-op publish into a retarget (see the channel note on `trendIds`).
