@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
+import { UNLISTED_ID } from "@/src/data/unlistedId";
 import { appliedChips, clearedBy, logMode, rangePage, searchCriterion, spanOfSearch } from "./logSearch";
 
 // THE RAW LOG'S SEARCH RULES, PURE (2026-10-07 — the tester pass found four bugs in this logic
 // while it lived only in component state). Each block names the bug it pins.
 
 describe("logMode — which rows the log is reading", () => {
-  it("a network's chain when one is in scope, every chain merged under All, the latest rows otherwise", () => {
+  it("a network's chain when one is in scope; chains merged under All and under Unlisted; the latest rows otherwise", () => {
     expect(logMode({ chain: "DAGx", lens: "all" })).toBe("chain");
     expect(logMode({ chain: null, lens: "all" })).toBe("merged");
-    expect(logMode({ chain: null, lens: "unlisted" })).toBe("latest");
+    expect(logMode({ chain: null, lens: UNLISTED_ID })).toBe("merged"); // their chains page since 2026-10-08
+    expect(logMode({ chain: null, lens: "somethingElse" })).toBe("latest");
   });
 });
 

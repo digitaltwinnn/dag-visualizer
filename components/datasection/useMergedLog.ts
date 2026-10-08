@@ -181,6 +181,13 @@ export function useMergedLog(active: boolean, chains: readonly string[], scope: 
   }
 
   const [shown, setShown] = useState<{ key: string; where: Where; total: number; rows: (LogRow & { addr: string })[] } | null>(null);
+  // A NEW SET OF CHAINS IS A NEW SUBJECT (the review, 2026-10-08): the previous rows stay through a
+  // page turn on purpose, but All's rows dimmed under the Unlisted lens read as the wrong records.
+  const [shownFor, setShownFor] = useState(chainKey);
+  if (shownFor !== chainKey) {
+    setShownFor(chainKey);
+    setShown(null);
+  }
   const [reading, setReading] = useState(false);
   const pageKey = `${spanKey}|${where.side}:${where.n}`;
   useEffect(() => {

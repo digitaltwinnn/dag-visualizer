@@ -6,7 +6,7 @@ import { metagraphById, initNetwork, getNetwork, getAnchor, DEFAULT_META_COLOR, 
 import { ledgerLens } from "@/src/data/ledgerStory";
 import { reportPoll, touchPoll } from "@/src/data/api";
 import { STALE_FACTOR } from "@/src/data/pollStatus";
-import { LISTED_IDS, UNLISTED_ID, UNLISTED_SCENE_HEX_BY_THEME } from "@/src/data/unlisted";
+import { UNLISTED_ID, UNLISTED_SCENE_HEX_BY_THEME, unlistedLog } from "@/src/data/unlisted";
 import { countrySubject, hoverKeyOf, tooltipSubject } from "@/src/data/hoverSubject";
 import { identityMap, identitySceneHex } from "@/src/palette/identity";
 import { createScene, type SceneCtx } from "./scene/SceneContext";
@@ -16,7 +16,6 @@ import { LedgerView } from "./scene/views/LedgerView";
 import { TrendsView } from "./scene/views/TrendsView";
 import { UNLISTED_KEY } from "./domain/ledgerBands";
 
-// The public catalog's ids — the unknown-lane tile resolver splits listed from unlisted rows.
 import { StageLight } from "./scene/objects/StageLight";
 import { SceneRig } from "./scene/objects/SceneRig";
 import { loadGeoCache, resolveMissing } from "@/src/data/geoResolve";
@@ -625,16 +624,15 @@ export class Engine {
         title: `Global snapshot #${g.ordinal}`,
       } as Extract<PickDescriptor, { kind: "snapshot" }>;
       if (metaId === UNLISTED_KEY) {
-        // The UNKNOWN lane's tiles (user, 2026-08-07: inspectable like any other): the exact
-        // read is the only source that knows the unlisted channels — resolve tile `k` to the
-        // k-th unlisted row, whose real state-channel ADDRESS becomes the metaSnap subject
-        // (the deep read works for any address; the card names it by its address).
-        const ex = useStore.getState().snapshotExact[g.ordinal];
-        const row = ex?.rows?.filter((r) => !LISTED_IDS.has(r.metaId))[k];
+        // The UNKNOWN lane's tiles (user, 2026-08-07: inspectable like any other): tile `k` is
+        // the k-th unlisted row of this tick — the polled rows united with the exact read's
+        // (`unlistedLog`, the one source), whose real state-channel ADDRESS becomes the metaSnap
+        // subject (the deep read works for any address; the card names it by its address).
+        const row = unlistedLog([g], useStore.getState().snapshotExact, net.unlistedSnaps)[k];
         if (!row) return null;
         return {
           kind: "metaSnap",
-          sel: { metaId: row.metaId, ordinal: row.ordinal, hash: "", globalOrdinal: g.ordinal, ts },
+          sel: { metaId: row.metaId, ordinal: row.ordinal, hash: row.hash, globalOrdinal: g.ordinal, ts },
           global,
         };
       }

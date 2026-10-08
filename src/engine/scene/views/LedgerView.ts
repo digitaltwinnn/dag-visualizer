@@ -752,22 +752,25 @@ export class LedgerView implements SceneView {
     this._byTs.clear();
     for (const s of snaps) { this._byOrd.set(s.ordinal, s); this._byTs.set(s.timestamp, s); }
 
-    // The UNKNOWN lane's counts (user, 2026-08-07): fold the EXACT read's unlistedCount into the
-    // anchor aggregate as a pseudo-metagraph. Exact-only on purpose — the polled floor
-    // (total − identified) is transiently high while a tick settles, and lane tiles never
-    // shrink, so a floor-fed lane would show phantom snapshots. No exact read → no unknown
-    // tiles for that tick (the same honesty rule as the byte bar's bands).
+    // The UNKNOWN lane's counts: the unlisted chains are POLLED like the catalog's (2026-10-08),
+    // so the anchor index already counts them under UNLISTED_KEY, each from its own chain's
+    // records. Where the tick's EXACT read has landed, its unlistedCount wins — it is the global
+    // snapshot's own manifest, and it also counts a chain the hourly list has not caught yet.
     this._lastSnaps = snaps;
     this._lastGetAnchor = getAnchor;
     const wrapped = (ts: string): Anchor | null => {
       const a = getAnchor(ts);
       const snap = this._byTs.get(ts);
-      const u = snap ? this._exact[snap.ordinal]?.unlistedCount ?? 0 : 0;
-      if (u <= 0) return a;
+      const ex = snap ? this._exact[snap.ordinal] : undefined;
+      if (!ex) return a;
+      const u = ex.unlistedCount ?? 0;
+      const polled = a?.metaCounts.get(UNLISTED_KEY) ?? 0;
+      if (u === polled) return a;
       const metaCounts = new Map(a?.metaCounts ?? []); // event-time
-      metaCounts.set(UNLISTED_KEY, u);
+      if (u > 0) metaCounts.set(UNLISTED_KEY, u);
+      else metaCounts.delete(UNLISTED_KEY);
       return a
-        ? { fee: a.fee, count: a.count, metaIds: a.metaIds, metaCounts, touched: a.touched }
+        ? { fee: a.fee, count: a.count - polled + u, metaIds: a.metaIds, metaCounts, touched: a.touched }
         : { fee: 0, count: u, metaIds: new Set([UNLISTED_KEY]), metaCounts, touched: 0 };
     };
 

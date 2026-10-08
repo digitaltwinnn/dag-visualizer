@@ -55,28 +55,17 @@ describe("responsive tier arms name the boundary itself", () => {
   });
 
   it("the footer band's media query matches the Tailwind arm it mirrors", () => {
-    // globals.css zeroes --footer-h for the phone; SiteFooter RE-ANCHORS itself there with
-    // `max-[700px]` arms (above the dock, explicit height — user 2026-08-31: the footer stays
-    // visible on phone as overlay chrome, since it is the app's one /about route). Two homes
-    // for one boundary, so they are pinned together — this is the pair that was off by one and
-    // left --footer-h reserving 26px the layout wasn't using. The component arm must name the
-    // SAME 700 the media query does, and its phone height must NOT ride the zeroed token: it
-    // rides `--footer-phone-h`, the dedicated phone-height token (2026-09-02 — it was a px
-    // literal until the raw data layer needed the same number for its bottom inset, the one
-    // surface the floating row genuinely collides with). Both consumers are pinned here so the
-    // row and the pane's clearance can never disagree.
+    // globals.css zeroes --footer-h for the phone, and SiteFooter STANDS DOWN there with a
+    // `max-[700px]` arm (user, 2026-10-08, design A1 — its About and links moved into the ⚙
+    // menu; it rode above the dock as overlay chrome before). Two homes for one boundary, so they
+    // are pinned together: this is the pair that was once off by one and left --footer-h
+    // reserving 26px the layout wasn't using. The raw pane runs to the safe area and reserves no
+    // footer row.
     const css = readFileSync(join("app", "globals.css"), "utf8");
     expect(css).toMatch(/@media not \(min-width: 700px\) \{\s*:root \{ --footer-h: 0px; \}/);
-    expect(css).toMatch(/--footer-phone-h: \d+px/);
     const foot = readFileSync(join("components", "SiteFooter.tsx"), "utf8");
-    expect(foot).toContain("max-[700px]:bottom-[var(--phone-dock-h)]");
-    expect(foot).toContain("max-[700px]:h-[var(--footer-phone-h)]");
-    // The raw pane no longer clears the row: on a phone the footer STANDS DOWN while RAW is open
-    // (user, 2026-10-07 — the raw phone pass), and the pane runs to the safe area. The pair is
-    // pinned the other way round now: the row hides under RAW, and the pane does not reserve it.
-    expect(foot).toContain('raw && "max-[700px]:hidden"');
+    expect(foot).toContain('"max-[700px]:hidden"');
     const shell = readFileSync(join("components", "SectionShell.tsx"), "utf8");
     expect(shell).toContain("max-[700px]:bottom-[calc(env(safe-area-inset-bottom,0px)+6px)]");
-    expect(shell).not.toContain("--footer-phone-h");
   });
 });

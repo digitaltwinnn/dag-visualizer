@@ -70,7 +70,6 @@ export interface ExplorerRowProps {
   plain?: boolean;
   /** A real-but-empty subject (a 0-node network): present, dimmed. */
   faint?: boolean;
-  title?: string;
   onClick?: () => void;
   /** The hover pairing's classes and handlers (`useSubjectPairing.subjectPairing`). */
   pair?: {
@@ -101,7 +100,7 @@ function recentGesture(): boolean {
 }
 
 export default function ExplorerRow({
-  glyph, name, nameMono, tag, bar, figure, hasFigure, nameW = 84, figureW = 40, glyphW = 14, on, hue, nested, wideBar, plain, faint, title, onClick, pair, className,
+  glyph, name, nameMono, tag, bar, figure, hasFigure, nameW = 84, figureW = 40, glyphW = 14, on, hue, nested, wideBar, plain, faint, onClick, pair, className,
 }: ExplorerRowProps) {
   const el = useRef<HTMLButtonElement>(null);
   // A row with nothing to do is not a button: a pinned reading (the level's `lead`) may carry no
@@ -151,7 +150,6 @@ export default function ExplorerRow({
     <Tag
       ref={el}
       type={onClick ? "button" : undefined}
-      title={title}
       aria-pressed={on ? true : undefined}
       onClick={onClick}
       className={cn(

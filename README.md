@@ -10,7 +10,7 @@ can understand how it works and why it's powerful.
 
 - Live data from the public Constellation block-explorer API — no API key, and no backend for the 3D views.
 - **Views** using ThreeJs to drive the 3D scene
-- A per-view "About" card explains what each view shows
+- A per-view **About** row in the command bar explains what each view shows
 - Hover any element for a tooltip; **click** for an inspector with real on-chain values and other details alongside **live
   activity** cards
 - A bottom **vitals band** carries each view's own instruments — donut, micro-bars,
@@ -18,11 +18,16 @@ can understand how it works and why it's powerful.
   showing every data feed's last successful poll.
 - The **History** view (`/trends`) shows the network's measured history as the scene itself —
   one chart plane per network, receding into depth, with a shared time cursor reading every
-  chain at the same moment and a scrubbable timeline along the bottom. The same history reads
-  as a document behind that view's RAW toggle. Daily, hourly and 5-minute buckets, all
+  chain at the same moment and a scrubbable timeline along the bottom. Brush a range and its
+  card states the span; click an instant and its card reads every network at that moment.
+  Daily, hourly and 5-minute buckets, all
   reaching the same mid-2025 floor (`TIER_SINCE` in `src/data/trendWindow.ts`), summed from
   the chain's own records into an Upstash Redis timeseries by a 15-minute cron (the other
   three views need no backend at all; only this history does).
+- A **RAW** toggle drops from the scene into the records themselves: the node roster in the
+  Hypergraph and Geography views, and the snapshot log — every network's chain back to genesis,
+  merged by time under All, searchable by snapshot, global snapshot or date — in Snapshots. In
+  History it opens the snapshot records for the span on screen.
 
 ## Design language
 
@@ -30,9 +35,8 @@ can understand how it works and why it's powerful.
 network at one of three depths: the **3D scene** is the live instrument (what is happening right
 now), the **measured history** is what the chain's own records say happened, and the **raw data
 layer** is the record-level microscope (the snapshots themselves, back to genesis). The middle
-depth has two faces of one thing — the History view's chart planes, and the same history written
-out as a document — so you can read it as an instrument or as a page without changing subject.
-Each step down is one deliberate gesture that carries its context with it — zoom a chart into a
+depth is the History view's chart planes, and its RAW toggle steps down to the records for the
+span on screen. Each step down is one deliberate gesture that carries its context with it — zoom a chart into a
 range and you can hand that exact range to the snapshot search. The depths complement each other
 on purpose: history grows coarser the further back you look, precisely where the record microscope
 stays exact.
@@ -41,8 +45,8 @@ The HUD is four fixed zones over the canvas, each with **one role** that holds i
 view, so switching views never relearns the screen:
 
 - **Top** — the command bar: the heartbeat (pulse strip) + the global network filter +
-  the view switch + presentation/theme/network controls.
-- **Left rail** — explore & interact: a collapsed "About this view" card and view specific explorer cards
+  the view switch + the view's About row + presentation/theme/network controls.
+- **Left rail** — explore & interact: the view's explorer card
 - **Right rail** — facts on demand: a stack of selected-subject cards.
 - **Bottom** — the **vitals band**: per-view instrument cards (the ledger keeps the snapshot bar-chart as one of them); in History the same band holds the timeline you scrub
 
@@ -62,12 +66,12 @@ orthogonal question and owns one "signature" detail card, so the views never ove
 | **Hypergraph** | *who / what* — architecture + economic weight | Network breakdown (networks → compositions → nodes, with a measure heading) | **Node card**; structure counts live in the bottom vitals band |
 | **Node geography** | *where* — footprint & decentralization | Country breakdown (countries → city · provider cohorts → nodes) | **Node card** (state, roles, location) + country / provider cards |
 | **Snapshots** | *when* — how the ledger advances + cost | Snapshot breakdown (global ticks → networks in a tick → their snapshots → signers) | **Snapshot card** (DAG position, anchors, fees) |
-| **History** | *how it changed* — the measured past | Network breakdown (one chart plane per network, the measure as its heading) | **Moment card** (every network read at one instant) |
+| **History** | *how it changed* — the measured past | Network breakdown (one chart plane per network plus the unlisted channels, the measure as its heading) | **Range card** (a brushed span) over the **Moment card** (every network read at one instant) |
 
 Visual uniformity is enforced with shared design tokens in one stylesheet (`app/globals.css`):
 one spacing scale, one panel radius, one "selected" treatment (`--sel-bg` / `--sel-border`),
 and one `CardHead` header component on every card. The design tokens (colour lanes + type
-scale) are indexed at `/design`.
+scale) live in that one stylesheet, and the running app is their reference.
 
 **`globals.css` is the single source of truth for colour — even in the 3D scene.** The Three.js
 engine doesn't hardcode structural colours; at start-up it reads the CSS design tokens
@@ -114,6 +118,7 @@ Browser ──poll──> Constellation block explorer API   (snapshots / cluste
    │
    └── Next routes (server-side): /api/metagraphs (live cluster fetch + geo, ISR)
                                   /api/geo (validator geo seed)
+                                  /api/snapshot, /api/network (the raw records)
                                   /api/trends (tiered history out of Upstash Redis)
 
 Vercel Cron ──15 min──> /api/trends/sample ──> Upstash Redis (5m/1h/1d buckets) ──> /trends
@@ -131,8 +136,9 @@ export to be covered by its colocated test; the scene-view contract tests keep s
 mode-agnostic and views on the shared `SceneView` shape)*. `domain/` is pure logic and data —
 layout math, simulations, decision tables, camera framings; it may use THREE's math classes
 but never the scene, React, or store values, so every behaviour is unit-testable in
-isolation. `scene/` owns meshes and GPU writes; it reads domain, never the store. `Engine.ts`
-is the single bridge: it subscribes to the store and translates state into scene commands.
+isolation. `scene/` owns meshes and GPU writes; it reads domain, never the store. The engine
+layer — `Engine.ts` and a named allow-list of its siblings in `src/engine/` — is the single
+bridge: it subscribes to the store and translates state into scene commands.
 New logic goes into `domain/` with a test; the scene stays a dumb adapter.
 
 **2. Selections have one write path** *(enforced: `components/selectionBoundary.test.ts`)*.
@@ -163,7 +169,8 @@ ring-buffer events their owning adapter drains — never by mutating another vie
 
 **6. The scene↔HUD hover pairing is sacrosanct.** Hovering a row glows the 3D object and
 hovering the 3D object washes the row, through shared store channels (`hoverFilter`,
-`hoverNodeId`, `hoverSnapOrd`, `hoverCountry`) — previews never commit anything.
+`hoverNodeId`, `hoverSnapOrd`, `hoverMetaSnap`, `hoverCountry`, `hoverCohort`) — previews never
+commit anything.
 
 **7. Honesty over decoration.** Every bar, tile, count and border comes from live data;
 absent data reads as an instrument state (NO SIGNAL, acquiring), never as fabricated numbers.
@@ -172,11 +179,12 @@ absent data reads as an instrument state (NO SIGNAL, acquiring), never as fabric
 
 | Path | Purpose |
 |------|---------|
-| `app/` | Next App Router — `page.tsx` (mounts panels + canvas), `globals.css`, `api/{metagraphs,geo}/route.ts` (server-side data) |
+| `app/` | Next App Router — `page.tsx` (mounts panels + canvas), `[view]/` (the routed views: `/hypergraph`, `/geography`, `/snapshots`, `/trends`, `/soon`), `about/` (the doc overlay), `globals.css`, `api/*` (server-side data routes) |
 | `components/` | React panels (SceneCanvas, `TopBar` (heartbeat/pulse strip + filter + view switch + presentation), ExploreRail, Inspector, ContextCard, Tooltip, FollowController, …); `CardHead` (the shared card header), `BottomStream` + `VitalsBand` (the bottom per-view instrument band) + `useSnapshotFeed` (shared live feed), `GeoExplore` (geo country→nodes explorer), `Blueprint` (scaffolded-view schematics); `components/inspector/` holds the inspector cards |
 | `src/store/store.ts` | Zustand store (the React↔engine command/state bridge) |
-| `src/data/` | `network.ts` (wraps `NetworkData`), `follow.ts`, `types.ts` |
-| `src/util/format.ts` | Shared formatters — `hex` (colour), `fmtDag` (fee) |
+| `src/data/` | `api.ts` (the live `NetworkData` singleton), `network.ts` (its accessors), `follow.ts`, `types.ts`, and the pure row builders and rules — the explorer's levels, the raw log's merge and search, the History windows and series |
+| `src/net/` | The three networks (`?net=`), the catalog's address lineage and network retirement |
+| `src/util/` | Shared formatters — `hex` (colour), `fmtDag` (fee) — and `localTime.ts` (day-only labels are UTC days; clock times are local with a zone tag) |
 | `src/engine/` | `Engine.ts` (imperative Three.js engine: render loop, morph, camera focus, DoF, picking — the one store bridge) over `domain/` (pure, unit-tested layout/sim/policy logic) and `scene/` (the Three.js adapters: globe, hyper furniture, ledger chamber, node meshes) |
 
 ---

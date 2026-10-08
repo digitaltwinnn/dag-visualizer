@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { coLocatedNetworks, matchSignerRow, nodeSigned, resolveSigner, resolveSignerIps, SIGNER_GROUPS, SIGNER_UNKNOWN, snapshotSigners, snapshotSignerRows } from "@/src/data/network";
+import { coLocatedNetworks, matchSignerRow, nodeSigned, resolveSigner, resolveSignerIps, SIGNER_GROUPS, signerRoster, probableLineage, SIGNER_UNKNOWN, snapshotSigners, snapshotSignerRows } from "@/src/data/network";
 import type { MetaInfo, NodeRow } from "@/src/data/types";
 
 const meta = (id: string, nodes: { ip?: string; id?: string; ids?: string[] }[]): MetaInfo => ({
@@ -128,7 +128,7 @@ describe("SIGNER_GROUPS", () => {
     expect(SIGNER_GROUPS.proof.layer).not.toBe(SIGNER_GROUPS.dataBlocks.layer);
     expect(SIGNER_GROUPS.proof.who).not.toBe(SIGNER_GROUPS.dataBlocks.who);
     for (const g of [SIGNER_GROUPS.proof, SIGNER_GROUPS.dataBlocks, SIGNER_GROUPS.globalProof]) {
-      for (const s of [g.label, g.layer, g.who, g.title]) expect(s.length).toBeGreaterThan(0);
+      for (const s of [g.label, g.layer, g.who]) expect(s.length).toBeGreaterThan(0);
     }
   });
 
@@ -136,9 +136,7 @@ describe("SIGNER_GROUPS", () => {
     // The proof is the L0 cluster's; the blocks are the dL1 cluster's. A group whose words
     // don't say which layer signed is back to the bare number the user found confusing.
     expect(SIGNER_GROUPS.proof.who).toMatch(/L0/);
-    expect(SIGNER_GROUPS.proof.title).toMatch(/L0/);
     expect(SIGNER_GROUPS.dataBlocks.who).toMatch(/L1/);
-    expect(SIGNER_GROUPS.dataBlocks.title).toMatch(/L1/);
   });
 
   // The vocabulary rule made executable (user, 2026-08-10 — "why do we call it 'validators' for
@@ -156,7 +154,7 @@ describe("SIGNER_GROUPS", () => {
   // were a second dialect for the same three layers.
   it("spells layers in the app's own codes, not a long form", () => {
     for (const g of Object.values(SIGNER_GROUPS)) {
-      for (const s of [g.layer, g.who, g.title]) expect(s).not.toMatch(/data-L1|currency-L1/);
+      for (const s of [g.layer, g.who]) expect(s).not.toMatch(/data-L1|currency-L1/);
     }
   });
 });
@@ -165,6 +163,35 @@ describe("SIGNER_GROUPS", () => {
 // spot solution"). `resolveSigner` is the ONE decision both signer lists read, and it is keyed on
 // the DATA: the unlisted channel is not a special case, it is just the branch every network takes
 // when nothing about its cluster is published.
+describe("signerRoster (one row per node, a mark per layer)", () => {
+  const rows = [
+    nodeRow("dor", "abcdef0123456789", "Falkenstein"),
+    nodeRow("dor", "1234567890abcdef", "Helsinki"),
+  ];
+  it("folds a node that signed both layers into one row, signer ids hidden when they repeat the node id", () => {
+    const r = signerRoster(rows, "dor", ["abcdef01", "12345678"], ["abcdef01", "12345678"]);
+    expect(r.map((x) => [x.key, x.data, x.proof, x.otherKeys])).toEqual([
+      ["abcdef0123456789", "abcdef01", "abcdef01", []],
+      ["1234567890abcdef", "12345678", "12345678", []],
+    ]);
+  });
+  it("keeps a one-layer signer and an unknown signer, in production order (data first)", () => {
+    const r = signerRoster(rows, "dor", ["abcdef01", "zzzzzzzz"], ["12345678", "zzzzzzzz"]);
+    expect(r.map((x) => [x.key, x.data, x.proof])).toEqual([
+      ["abcdef0123456789", "abcdef01", null],
+      ["?zzzzzzzz", "zzzzzzzz", "zzzzzzzz"],
+      ["1234567890abcdef", null, "12345678"],
+    ]);
+    expect(r[1].res.known).toBe(false);
+  });
+  it("states a hybrid's other key — the signer id the node id does not repeat", () => {
+    const hybrid = [{ ...nodeRow("dor", "abcdef0123456789", "Falkenstein"), ids: ["abcdef0123456789", "99887766aabbccdd"] }];
+    const r = signerRoster(hybrid, "dor", ["99887766"], ["abcdef01"]);
+    expect(r).toHaveLength(1);
+    expect(r[0].otherKeys).toEqual(["99887766"]);
+  });
+});
+
 describe("resolveSigner", () => {
   const rows = [
     nodeRow("dor", "abcdef0123456789", "Falkenstein"),
@@ -196,7 +223,6 @@ describe("resolveSigner", () => {
     expect(SIGNER_UNKNOWN.network.label).not.toBe(SIGNER_UNKNOWN.node.label);
     for (const w of [SIGNER_UNKNOWN.network, SIGNER_UNKNOWN.node]) {
       expect(w.label.length).toBeGreaterThan(0);
-      expect(w.title.length).toBeGreaterThan(0);
     }
   });
 });
@@ -246,5 +272,30 @@ describe("snapshotSigners / snapshotSignerRows", () => {
   it("resolves to the KNOWN signer nodes, in signature order, never a non-signer of the network", () => {
     expect(snapshotSignerRows(sel, exRows, { metaId: "dor", ordinal: 7 }).map((r) => r.id)).toEqual(["aa11ffff", "bb22ffff"]);
     expect(snapshotSignerRows(sel, exRows, { metaId: "dor", ordinal: 8 }).map((r) => r.id)).toEqual(["cc33ffff"]);
+  });
+});
+
+describe("probableLineage (a known network anchoring under an untracked address)", () => {
+  const metaList = [
+    { id: "biofi", name: "BioFi", color: 0, nodes: [{ id: "9002807a9913ffff", ip: "1.1.1.1" }] },
+    { id: "dor", name: "DOR", color: 0, nodes: [{ id: "abcdef0123456789", ip: "2.2.2.2" }] },
+  ] as never;
+  const listed = (id: string) => id === "biofi" || id === "dor";
+  it("names the network whose nodes signed the untracked chain (the BioFi case)", () => {
+    expect(probableLineage([{ metaId: "DAG3eCKB", signers: ["9002807a"] }], metaList, listed)).toEqual([
+      { address: "DAG3eCKB", networkId: "biofi", networkName: "BioFi" },
+    ]);
+  });
+  it("is silent for listed chains, unknown signers, and mixed signers — evidence must be whole", () => {
+    expect(probableLineage([{ metaId: "dor", signers: ["abcdef01"] }], metaList, listed)).toEqual([]);
+    expect(probableLineage([{ metaId: "DAGx", signers: ["75d8f472"] }], metaList, listed)).toEqual([]);
+    expect(probableLineage([{ metaId: "DAGy", signers: ["9002807a", "75d8f472"] }], metaList, listed)).toEqual([]);
+    expect(probableLineage([{ metaId: "DAGz", signers: [] }], metaList, listed)).toEqual([]);
+    // Two networks whose nodes both carry the signer (a shared machine) name neither.
+    const shared = [
+      { id: "a", name: "A", color: 0, nodes: [{ id: "9002807a0000", ip: "1.1.1.1" }] },
+      { id: "b", name: "B", color: 0, nodes: [{ id: "9002807a0000", ip: "1.1.1.1" }] },
+    ] as never;
+    expect(probableLineage([{ metaId: "DAGw", signers: ["9002807a"] }], shared, () => false)).toEqual([]);
   });
 });

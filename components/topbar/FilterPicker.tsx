@@ -112,7 +112,6 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
             <button
               type="button"
               aria-pressed={filter === m.id}
-              title={`${m.name}${m.symbol ? ` · ${m.symbol}` : ""}`}
               className={chipClass(filter === m.id, off)}
               // The committed chip's wash/ring speak the metagraph's own hue (selection.tsx ·
               // selectionHue); "All" and unlisted keep the structural cyan — no single identity.
@@ -142,7 +141,6 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
       <button
         type="button"
         aria-pressed={filter === UNLISTED_ID}
-        title="Anchoring state channels not in the public catalog — their nodes are not knowable here"
         className={chipClass(filter === UNLISTED_ID, true)}
         onClick={() => pick(UNLISTED_ID)}
         onMouseEnter={() => setHoverFilter(UNLISTED_ID)}

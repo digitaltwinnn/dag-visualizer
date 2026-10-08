@@ -375,6 +375,20 @@ export function metagraphCardNetwork(s: {
   return s.filter;
 }
 
+/** A CHILD CARD STATES ITS PARENT OR IT DOES NOT RENDER (user, 2026-10-08: "I had a metagraph
+ *  snapshot card show that was no longer related to the global snapshot … it must be related to
+ *  the parent"). The action builders commit a child with its parent (`metaSnapArrivalActions`,
+ *  `cohortToggleActions`), but a path that writes one without the other — a live advance, a
+ *  stale write — would otherwise leave a card under a parent it does not belong to, presenting
+ *  facts as that parent's. Here the relation is checked where the card is decided: a child whose
+ *  stored parent key disagrees with the parent on screen stands down, exactly as it does when the
+ *  parent is cleared. No parent on screen is no disagreement (the ledger's global card can be a
+ *  ghost while its metagraph snapshot is populated — `MetaSnapPane`'s `sameTick` note). */
+export function parentHolds(s: Pick<RailManifestState, "snap" | "metaSnap" | "country" | "cohort">, child: "metaSnap" | "cohort"): boolean {
+  if (child === "metaSnap") return !s.snap || !s.metaSnap || s.snap.data.ordinal === s.metaSnap.globalOrdinal;
+  return !s.country || !s.cohort || s.country === s.cohort.cc;
+}
+
 export function detailsCards(s: RailManifestState): RailCard[] {
   // A PLACEHOLDER VIEW HAS NO FACTS SCOPE (user, 2026-08-10). `status`/`transactions`/`staking`
   // draw a wireframe captioned `preview · in development` and deliberately show no numbers, so
@@ -436,7 +450,7 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     kind: "metaSnap",
     icon: iconForPick("metaSnap"),
     subjectKey: s.metaSnap ? `${s.metaSnap.metaId}:${s.metaSnap.ordinal}` : null,
-    present: !!s.metaSnap,
+    present: !!s.metaSnap && parentHolds(s, "metaSnap"),
     hint: metaSnapHint(s),
   };
   const country: RailCard = {
@@ -452,7 +466,7 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     kind: "cohort",
     icon: iconForPick("cohort"),
     subjectKey: s.cohort ? `${s.cohort.cc}|${s.cohort.city}|${s.cohort.isp}` : null,
-    present: s.cohort != null,
+    present: s.cohort != null && parentHolds(s, "cohort"),
     hint: cohortHint(s),
   };
   const composition: RailCard = {

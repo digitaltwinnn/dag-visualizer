@@ -59,7 +59,6 @@ export interface ExplorerRowSpec {
   rung?: string;
   /** A real-but-empty subject: present, dimmed. */
   faint?: boolean;
-  title?: string;
   onClick?: () => void;
   /** The scene↔HUD hover pairing (`useSubjectPairing.subjectPairing`), when the subject has one. */
   pair?: {
@@ -253,7 +252,6 @@ export default function Explorer({ id, title, hint, levels: selected, onLeave, d
                       on={current.lead.on}
                       hue={current.lead.hue}
                       faint={current.lead.faint}
-                      title={current.lead.title}
                       onClick={current.lead.onClick}
                       pair={current.lead.pair}
                     />
@@ -277,7 +275,6 @@ export default function Explorer({ id, title, hint, levels: selected, onLeave, d
                     on={r.on}
                     hue={r.hue}
                     faint={r.faint}
-                    title={r.title}
                     onClick={r.on && r.rung && r.onClick ? () => openOrToggle(r.rung!, r.onClick!) : r.onClick}
                     pair={r.pair}
                   />

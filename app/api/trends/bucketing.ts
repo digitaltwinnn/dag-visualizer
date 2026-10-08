@@ -75,10 +75,10 @@ export function bucketGlobals(inc: IncMap, net: string, recs: GlobalRec[], prevT
 /** One metagraph's snapshots: exact per-net sums plus the tracked-total floors.
  *
  *  `gapChain` opts INTO per-network gap stats (m.{id}.gapSum / m.{id}.gapMax — the metagraph
- *  Continuity reading, 2026-09-07): pass the previous run's newest record timestamp (null to
+ *  Continuity reading, 2026-09-07) and the anchoring count (m.{id}.ticks, 2026-10-08): pass the previous run's newest record timestamp (null to
  *  open a fresh chain, e.g. after an accepted gap). Omit it entirely when record order isn't
  *  guaranteed oldest→newest — the rebuild script's page streams — and no gap is invented. */
-export function bucketMetas(inc: IncMap, net: string, id: string, recs: MetaRec[], gapChain?: number | null): void {
+export function bucketMetas(inc: IncMap, net: string, id: string, recs: MetaRec[], gapChain?: number | null, floors = true): void {
   let prev = gapChain === undefined ? undefined : gapChain;
   for (const r of recs) {
     const t = Date.parse(r.timestamp);
@@ -88,14 +88,25 @@ export function bucketMetas(inc: IncMap, net: string, id: string, recs: MetaRec[
     // Each network's own sealed blocks (2026-09-11 — transfers of its token and a data
     // network's application records ride in blocks; the raw cron records carry the array).
     addInc(inc, net, t, `m.${id}.blocks`, Array.isArray(r.blocks) ? r.blocks.length : 0);
-    addInc(inc, net, t, "g.feeFloor", r.fee || 0);
-    addInc(inc, net, t, "g.kbFloor", r.sizeInKB || 0);
+    // The floors are the CATALOG's (the fee card's "every network summed" lower bound): an unlisted
+    // chain sampled for its own count stays out of them (`floors: false`).
+    if (floors) {
+      addInc(inc, net, t, "g.feeFloor", r.fee || 0);
+      addInc(inc, net, t, "g.kbFloor", r.sizeInKB || 0);
+    }
     if (prev !== undefined) {
       if (prev != null) {
         const gap = Math.max(0, Math.round((t - prev) / 1000));
         addInc(inc, net, t, `m.${id}.gapSum`, gap);
         addInc(inc, net, t, `m.${id}.gapMax`, gap);
       }
+      // ANCHORINGS — the global ticks that carried this chain's snapshots (user, 2026-10-08: "I
+      // think they created one every 3s, but anchored to global only ~30s"). A metagraph snapshot
+      // carries the stamp of the global it anchored into, so a new stamp in an ordered stream is a
+      // new anchoring; a stamp equal to the previous run's newest is a tick that straddled two
+      // runs and was counted by the first. Rides the gap chain's ordering guarantee, for the same
+      // reason the gaps do.
+      if (t !== prev) addInc(inc, net, t, `m.${id}.ticks`, 1);
       prev = t;
     }
   }
@@ -113,4 +124,21 @@ export function bucketFleet(inc: IncMap, net: string, tsMs: number, fleet: Fleet
   for (const [id, types] of Object.entries(fleet.perNetTypes ?? {}))
     for (const [key, n] of Object.entries(types)) addInc(inc, net, tsMs, `f.type.${id}.${key}`, n, tiers);
   for (const [cc, n] of Object.entries(fleet.countries)) addInc(inc, net, tsMs, `f.cc.${cc}`, n, ["1d"]);
+}
+
+/** THE UNLISTED COVERAGE MARKER (2026-10-08). The unlisted channels' count is measured from their
+ *  own chains (`m.<address>.snaps`, sampled with `floors: false`), and a bucket in which nobody read
+ *  them must read as NOT MEASURED, never as zero unlisted — the honesty `g.ticks` gives the spine.
+ *  So every bucket the run's global batch covered (each `g.ticks` field it wrote, the spine's own
+ *  coverage) gets a `u.cov` field — called only when EVERY unlisted chain read succeeded. An hour or
+ *  a day is marked by any one good run inside it; a run that failed for a chain moved that chain's
+ *  cursor nowhere, so the next good run reads its records into the same buckets (they merge). */
+export function markUnlistedCoverage(inc: IncMap): void {
+  for (const fields of inc.values()) {
+    for (const f of [...fields.keys()]) {
+      if (!f.endsWith("|g.ticks")) continue;
+      const cov = f.slice(0, -"g.ticks".length) + "u.cov";
+      if (!fields.has(cov)) fields.set(cov, 0);
+    }
+  }
 }

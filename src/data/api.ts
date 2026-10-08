@@ -2,11 +2,16 @@
 // No simulation — if the API is unreachable the app shows a "no data" state and
 // keeps polling, recovering on its own once it responds again (`live` reflects this).
 
-import { METAGRAPHS, NET_DEF } from "@/src/net/current";
-import { COLORS, POLL, type MetaConfig } from "@/src/engine/config";
+import { METAGRAPHS, NET_DEF, netUrl } from "@/src/net/current";
+import { UNLISTED_ID } from "@/src/data/unlistedId";
+import { COLORS, POLL } from "@/src/engine/config";
 import type { Anchor, ClusterNode, DagCore, GlobalSnapshot } from "@/src/data/types";
 import { activeRows } from "@/src/net/lineage";
+import { RETIRE_QUIET_DAYS } from "@/src/net/retire";
 
+
+/** How often the unlisted chain list is re-read (the route caches it for an hour). */
+const UNLISTED_LIST_MS = 3_600_000;
 
 // ── POLL HEALTH — the pulse strip's read (user, 2026-08-30: clicking the heartbeat should show
 // "when did it last poll successfully? which polls do we have?"). One row per FEED, updated by
@@ -207,13 +212,28 @@ export class NetworkData {
   // read from these. Keyed by metagraph id.
   metaSnaps: Map<string, MetaSnapRecord[]>; // id -> [{ ordinal, hash, parent, ts, fee, sizeInKB, height, subHeight, blocks, epochProgress }] oldest->newest
   // global snapshot timestamp -> aggregate of the metagraph snapshots anchored into that tick
-  // (from the metagraphs we track). The authoritative anchored COUNT is the global snapshot's
-  // own `metagraphSnapshotCount`; `count` here is how many of those WE identified (the rest =
-  // the few genuinely-unlisted metagraphs, ~a couple per tick). To keep `count` accurate even
+  // (from the catalog's chains AND the polled unlisted ones, the latter under `UNLISTED_ID`). The
+  // authoritative anchored COUNT is the global snapshot's own `metagraphSnapshotCount`; `count`
+  // here is how many of those WE identified (the rest = a chain the hourly list has not caught,
+  // or a poll still catching up). To keep `count` accurate even
   // when a fast metagraph (Dor) batches 20+ snapshots into one tick, the live poll fetches a
   // deep tail every tick (POLL.metaSnapTail) — a too-shallow tail used to drop them and inflate
   // the "unlisted" gap. The summed fee is "from tracked metagraphs".
   anchorIndex: Map<string, Anchor>; // ts -> { fee (datum), count, metaIds:Set, metaCounts:Map(id->n) }
+  // THE UNLISTED CHAINS, POLLED LIKE THE CATALOG'S (user, 2026-10-08: "why treat it differently?").
+  // The explorer's own chain list less every tracked address (`/api/network/unlisted`), each chain
+  // polled every tick exactly as a listed one is, into its OWN buffer keyed by address — kept
+  // apart from `metaSnaps` because every reader of that map assumes a catalog network. In the
+  // anchor index their snapshots count under ONE key, `UNLISTED_ID`, the lane the scene draws.
+  unlistedSnaps: Map<string, MetaSnapRecord[]>;
+  private _unlistedIds: string[] = [];
+  private _unlistedAt = 0;
+  // A STOPPED unlisted chain is not polled every tick — the catalog's retirement test, minus the
+  // directory half it cannot have (an unlisted chain is never in the directory): no snapshot for
+  // `RETIRE_QUIET_DAYS`. It is re-checked with each hourly list read rather than retired for
+  // good, since nothing records its retirement; and a chain that wakes in between still shows at
+  // once through the exact read, which names every chain that anchored.
+  private _unlistedQuiet = new Set<string>();
 
   metagraphCount: number;
   clusters: { l0: ClusterNode[]; l1: ClusterNode[] }; // live validator membership (raw, two clusters)
@@ -234,6 +254,7 @@ export class NetworkData {
 
     this.metaSnaps = new Map();
     this.anchorIndex = new Map();
+    this.unlistedSnaps = new Map();
 
     this.metagraphCount = METAGRAPHS.length;
     this.clusters = { l0: [], l1: [] };
@@ -296,6 +317,7 @@ export class NetworkData {
     // here would be an unhandled rejection that silently leaves the app frozen on boot data.
     try {
       await this._fetchClusters();
+      await this._refreshUnlistedIds();
       await this._refreshMeta(POLL.metaSnapSeed); // seed each metagraph's history
     } finally {
       this.start(); // idempotent — guards on _timer
@@ -430,16 +452,33 @@ export class NetworkData {
     // cycle, so the strip's derived dot stayed green while a feed was down. One row per FEED means
     // the row must answer for the whole feed.
     // A RETIRED network is not polled (`activeRows`): it has stopped, and its history is the store's.
-    const results = await Promise.allSettled(activeRows(METAGRAPHS).map((m) => this._refreshOneMeta(m, limit)));
+    if (Date.now() - this._unlistedAt > UNLISTED_LIST_MS) void this._refreshUnlistedIds();
+    const results = await Promise.allSettled([
+      ...activeRows(METAGRAPHS).map((m) => this._refreshOneMeta(m.id, limit)),
+      ...this._unlistedIds.filter((id) => !this._unlistedQuiet.has(id)).map((id) => this._refreshOneMeta(id, limit, true)),
+    ]);
     reportPoll("metasnaps", cycleOk(results));
+  }
+
+  /** The unlisted chains' addresses, re-read hourly (the route caches the explorer's list for an
+   *  hour). A failed read keeps the last list and retries on the next cycle; it never blocks a poll. */
+  private async _refreshUnlistedIds(): Promise<void> {
+    this._unlistedAt = Date.now();
+    this._unlistedQuiet.clear(); // every chain gets its hourly look
+    try {
+      const j = await this._fetchJson(netUrl("/api/network/unlisted"));
+      if (Array.isArray(j?.chains)) this._unlistedIds = j.chains.filter((c: unknown): c is string => typeof c === "string");
+    } catch {
+      this._unlistedAt = 0; // ask again next cycle
+    }
   }
 
   /** Returns false when this metagraph's read failed — `_refreshMeta` aggregates the cycle's
    *  verdict into the one poll-health row. An empty or absent list is NOT a failure. */
-  private async _refreshOneMeta(m: MetaConfig, limit: number = POLL.metaSnapTail): Promise<boolean> {
-    if (!m.id) return true;
+  private async _refreshOneMeta(id: string, limit: number = POLL.metaSnapTail, unlisted = false): Promise<boolean> {
+    if (!id) return true;
     // The newest ordinal we already hold for this metagraph.
-    const have = this.metaSnaps.get(m.id);
+    const have = (unlisted ? this.unlistedSnaps : this.metaSnaps).get(id);
     const haveTo = have && have.length ? have[have.length - 1].ordinal : -1;
 
     // SELF-HEALING CATCH-UP. A fast metagraph (Dor) can dump dozens of snapshots into one global
@@ -453,19 +492,23 @@ export class NetworkData {
     for (let i = 0; i < 6; i++) {
       let json;
       try {
-        json = await this._get(`/currency/${m.id}/snapshots?limit=${lim}`);
+        json = await this._get(`/currency/${id}/snapshots?limit=${lim}`);
       } catch {
         return false; // no data this tick — stay factual, try again next poll
       }
       list = json.data || [];
-      if (!list.length) return true;
+      if (!list.length) {
+        if (unlisted) this._unlistedQuiet.add(id);
+        return true;
+      }
       const oldest = list[list.length - 1].ordinal; // newest-first → last is oldest
       if (haveTo < 0 || oldest <= haveTo + 1 || list.length < lim || lim >= 600) break;
       lim = Math.min(600, lim * 3); // gap not yet covered — fetch deeper and retry
     }
 
+    if (unlisted && Date.now() - Date.parse(list[0].timestamp) >= RETIRE_QUIET_DAYS * 86_400_000) this._unlistedQuiet.add(id);
     // Record full snapshot records (with fee/size) into the rolling buffer + anchor index.
-    this._recordMetaSnaps(m, list.map((s) => ({
+    this._recordMetaSnaps(id, unlisted, list.map((s) => ({
       ordinal: s.ordinal, hash: s.hash, parent: s.lastSnapshotHash,
       ts: s.timestamp, fee: s.fee || 0, sizeInKB: s.sizeInKB || 0,
       height: s.height || 0, subHeight: s.subHeight || 0,
@@ -479,8 +522,10 @@ export class NetworkData {
   // and fold them into the anchor index (grouped by the global-tick timestamp the
   // explorer stamps them with). Emits "anchor" with the timestamps touched so a
   // consumer can refresh a ribbon chip whose fee filled in after it arrived.
-  private _recordMetaSnaps(m: MetaConfig, records: MetaSnapRecord[]): void {
-    const buf = this.metaSnaps.get(m.id) || [];
+  private _recordMetaSnaps(id: string, unlisted: boolean, records: MetaSnapRecord[]): void {
+    const store = unlisted ? this.unlistedSnaps : this.metaSnaps;
+    const key = unlisted ? UNLISTED_ID : id; // the anchor index's network: one lane for the whole set
+    const buf = store.get(id) || [];
     const lastOrd = buf.length ? buf[buf.length - 1].ordinal : -1;
     const fresh = records
       .filter((r) => r.ordinal > lastOrd)
@@ -490,13 +535,13 @@ export class NetworkData {
     for (const r of fresh) {
       buf.push(r);
       const a: Anchor = this.anchorIndex.get(r.ts) || { fee: 0, count: 0, metaIds: new Set(), metaCounts: new Map(), touched: 0 };
-      a.fee += r.fee; a.count += 1; a.metaIds.add(m.id);
-      a.metaCounts.set(m.id, (a.metaCounts.get(m.id) || 0) + 1);
+      a.fee += r.fee; a.count += 1; a.metaIds.add(key);
+      a.metaCounts.set(key, (a.metaCounts.get(key) || 0) + 1);
       a.touched = Date.now(); // last time this tick's identified count grew → drives "settling"
       this.anchorIndex.set(r.ts, a);
     }
     if (buf.length > POLL.metaSnapBuffer) buf.splice(0, buf.length - POLL.metaSnapBuffer);
-    this.metaSnaps.set(m.id, buf);
+    store.set(id, buf);
 
     // Cap the anchor index by TICK AGE. This used to walk Map insertion order on the belief that
     // it was chronological; it is not, and the gap is not theoretical. Metagraphs seed in
@@ -512,7 +557,7 @@ export class NetworkData {
     for (const k of staleTickKeys(this.anchorIndex.keys(), POLL.anchorIndexMax)) {
       this.anchorIndex.delete(k);
     }
-    this._emit("anchor", { metaId: m.id, timestamps: fresh.map((r) => r.ts), seed: lastOrd === -1 });
+    this._emit("anchor", { metaId: key, timestamps: fresh.map((r) => r.ts), seed: lastOrd === -1 });
   }
 
   // Aggregate fee + count of the metagraph snapshots anchored into a given global

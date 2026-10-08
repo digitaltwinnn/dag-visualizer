@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { CATALOG } from "@/src/engine/config";
-import { activeRows, currentIdOf, foldLineage, isRetired, isTracked, lineageIds, retiredAtOf, sampledIds } from "./lineage";
+import { activeRows, currentIdOf, foldLineage, isRetired, isTracked, lineageIds, retiredAtOf, sampledIds, untrackedIds } from "./lineage";
 
 const op = (n: string) => (n.endsWith("gapMax") ? "max" : n.startsWith("f.") ? "set" : "add") as "add" | "max" | "set";
 // The catalog's own re-registered network — the fact these rules exist for.
@@ -24,6 +24,9 @@ describe("address lineage", () => {
     expect(ids).toContain(row.id);
     expect(ids).toContain(former);
     expect(ids.length).toBe(CATALOG.mainnet.length + CATALOG.mainnet.reduce((n, m) => n + (m.formerIds?.length ?? 0), 0));
+  });
+  it("untrackedIds keeps only the chains the catalog knows by no address — current or former", () => {
+    expect(untrackedIds("mainnet", [row.id, former, "DAGnotInTheCatalog", ""])).toEqual(["DAGnotInTheCatalog"]);
   });
   it("an unknown network folds nothing and lists nothing", () => {
     expect(lineageIds("nope")).toEqual([]);

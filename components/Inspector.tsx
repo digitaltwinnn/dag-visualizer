@@ -341,7 +341,6 @@ export function GhostCard({ card, open = false, onToggle, step }: { card: RailCa
       {step ? (
         <button
           type="button"
-          title={`Open ${step.label}`}
           onClick={() => applyClickActions(step.actions)}
           className="absolute inset-0 z-[1] appearance-none bg-transparent border-0 p-0 m-0 cursor-pointer rounded-[inherit] focus-visible:outline-1 focus-visible:outline-ring/60"
         >
@@ -351,7 +350,6 @@ export function GhostCard({ card, open = false, onToggle, step }: { card: RailCa
         <button
           type="button"
           aria-expanded={open}
-          title={open ? "Collapse" : "Expand"}
           onClick={onToggle}
           className="absolute inset-0 z-[1] appearance-none bg-transparent border-0 p-0 m-0 cursor-pointer rounded-[inherit] focus-visible:outline-1 focus-visible:outline-ring/60"
         >

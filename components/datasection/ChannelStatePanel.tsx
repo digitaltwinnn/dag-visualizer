@@ -36,8 +36,8 @@
 //      The payload lanes no longer do (user, 2026-08-13): their notes had shrunk to a bare
 //      decoded-KB reading, the number family retired everywhere else that day (card headlines,
 //      tab counts) for confusing against the wire size — so both open straight on their shape
-//      table, and only the signer groups keep notes (cluster + layer: real facts, not sizes);
-//   2. a two-column TABLE, `LaneTable`, so the shape of the payload is what the lane opens with —
+//      table; the signers lane opens on its roster (`SignerRoster`, layers as columns);
+//   2. a TABLE (`SchemaRows`), so the shape of the payload is what the lane opens with —
 //      the data lane's rows come from `payloadKinds`, the mechanical read that gives it the same
 //      shape table the server already computes for state;
 //   3. the RAW tree, behind ONE disclosure — OPEN by default since the redesign (2026-08-13):
@@ -48,20 +48,19 @@
 // The disclosure state is PANE-level: opening raw is the same request in either payload lane, so it
 // survives a lane switch instead of resetting under the user.
 import { useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
-import { ChevronRight, ChevronsDownUp, ChevronsUpDown } from "lucide-react";
+import { Check, ChevronRight, ChevronsDownUp, ChevronsUpDown, Minus } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DEEP_GIVE_UP_MS } from "@/components/RawSnapshotBridge";
 import { useStore } from "@/src/store/store";
 import { usePointerCoarse } from "@/components/usePointerCoarse";
 import { metaSnapDeepKey } from "@/src/data/types";
 import type { NodeRow } from "@/src/data/types";
-import { getNetwork, metagraphById, resolveSigner, shortHash, SIGNER_GROUPS, SIGNER_UNKNOWN } from "@/src/data/network";
+import { getNetwork, metagraphById, shortHash, SIGNER_GROUPS, SIGNER_UNKNOWN, signerRoster } from "@/src/data/network";
 import { snapsAtTick } from "@/src/data/anchorLog";
 import { UNLISTED_HUE } from "@/src/data/unlisted";
 import { PAYLOAD_LANES, parsePayload, payloadKinds, stateSchema, unifyFieldKinds } from "@/src/data/payloadKinds";
 import { identityHudCss } from "@/src/palette/identity";
-import { CopyButton, Fact, FactGroup, FootRow, IdentityDot, Lead, RoleChips, TickerChip } from "@/components/inspector/parts";
+import { CopyButton, Fact, FactGroup, FootRow, IdentityDot, Lead, TickerChip } from "@/components/inspector/parts";
 import { fmtDag, fmtKB, midHash } from "@/src/util/format";
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { relativeAge } from "@/src/util/relativeAge";
@@ -96,7 +95,7 @@ const paneHash = (v: string): string => midHash(v, 46);
 // can see are different. An unparsed stamp is the instrument's own absence, never "Invalid Date".
 
 type LaneId = "state" | "data" | "signers";
-type Lane = { id: LaneId; name: string; title: string };
+type Lane = { id: LaneId; name: string };
 
 const LANE_HEAD = "text-label uppercase tracking-caps text-muted-foreground font-normal";
 
@@ -118,44 +117,6 @@ const LANE_HEAD = "text-label uppercase tracking-caps text-muted-foreground font
  *  the chain the note above describes. */
 const schemaBox = (rawOpen: boolean): string =>
   rawOpen ? "flex-none max-h-[45%] overflow-auto slim-scroll" : "min-h-0 overflow-auto slim-scroll";
-
-/** A lane's TABLE — two columns, identical markup in every lane, so the three lanes read as three
- *  views of one pane rather than three designs.
- *
- *  `table-fixed` is load-bearing, not tidiness (found live, 2026-08-09): an auto-layout table sizes
- *  to its CONTENT, so a long first cell — DOR's record kind is its whole field list — widened the
- *  table past the pane, pushed the count column out of view and drew a horizontal scrollbar, while
- *  the cell's own `truncate` never engaged (there was always room, just not on screen). Fixed layout
- *  makes the pane the budget: the value column takes what it needs, the key column truncates. */
-function LaneTable({
-  head,
-  rows,
-}: {
-  head: [string, string];
-  rows: { key: string; a: ReactNode; b: ReactNode; title?: string; muted?: boolean }[];
-}) {
-  return (
-    <Table className="table-fixed">
-      <TableHeader>
-        <TableRow>
-          <TableHead className={LANE_HEAD}>{head[0]}</TableHead>
-          <TableHead className={cn(LANE_HEAD, "text-right w-[40%]")}>{head[1]}</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {rows.map((r) => (
-          <TableRow key={r.key} title={r.title}>
-            {/* text-label, not the Table default body size (user, 2026-08-13 — "the font of the
-                state key column looks unusually large"): the lane sits in the label/micro
-                register everywhere else, and a JSON key is an identifier, so mono. */}
-            <TableCell className={cn("truncate text-label font-mono", r.muted && "italic font-sans text-muted-foreground")}>{r.a}</TableCell>
-            <TableCell className="text-right tabular-nums truncate text-label">{r.b}</TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  );
-}
 
 /** ONE SCHEMA GRAMMAR, BOTH LANES (user, 2026-08-14 — third pass): a schema row is a
  *  DISCLOSURE — the row carries the name and the record count, and opening it reveals the
@@ -206,7 +167,7 @@ function SchemaRow({
   const openable = kinds.some((k) => k.fields != null || k.kind !== label);
   const row = (
     <>
-      <span className={cn("min-w-0 truncate text-label", mono && "font-mono")} title={label}>
+      <span className={cn("min-w-0 truncate text-label", mono && "font-mono")}>
         {label}
       </span>
       <span className="flex-1" />
@@ -333,11 +294,10 @@ function RawSection({
             <button
               type="button"
               aria-label={nextMode === "expand" ? "Expand all levels" : "Collapse to one level"}
-              title={nextMode === "expand" ? "Expand all levels" : "Collapse to one level"}
               className={cn(
                 "flex-none inline-flex items-center justify-center size-4 -my-0.5 rounded-xs cursor-pointer",
                 "text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
-                "opacity-0 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
+                "opacity-0 pointer-coarse:opacity-75 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
               )}
               onClick={() => setCmd({ mode: nextMode, epoch: (cmd?.epoch ?? 0) + 1 })}
             >
@@ -391,74 +351,80 @@ function RawSection({
  *  id. No click affordance: an unknown machine has no card to open, and the raw layer's signer list
  *  is a reading surface, not a browse target. */
 const SIGNER_PAGE = 3; // rows per page — the consensus MINIMUM, so one page is one quorum (user)
-function SignerGroup({
-  group,
-  ids,
-  metaId,
-  selNodes,
-}: {
-  group: keyof typeof SIGNER_GROUPS;
-  ids: string[];
-  metaId: string;
-  selNodes: NodeRow[];
-}) {
-  const g = SIGNER_GROUPS[group];
+/** THE SIGNERS AS ONE ROSTER (user, 2026-10-08, design D1 — `docs/superpowers/design/2026-10-08-
+ *  mobile-tuning/d-signers.html`). It was two `Node | Signer id` tables, one per producing layer, and
+ *  on a normal snapshot both held the same three nodes beside a signer id that was the node id's
+ *  first 8 characters. Now: a row per node, a column per LAYER in production order (dL1 then L0,
+ *  their codes from SIGNER_GROUPS, the one home), a check where that node signed
+ *  and a dash where it did not — one mark style, the column heads are the key. The signer id
+ *  survives only where it is news: a hybrid that signed with a key its node id does not repeat
+ *  says "signed as …" under its id (`signerRoster.otherKeys`). */
+function SignerRoster({ dataIds, proofIds, metaId, selNodes }: { dataIds: string[]; proofIds: string[]; metaId: string; selNodes: NodeRow[] }) {
+  const rows = useMemo(() => signerRoster(selNodes, metaId, dataIds, proofIds), [selNodes, metaId, dataIds, proofIds]);
   const [page, setPage] = useState(1);
-  const pages = Math.max(1, Math.ceil(ids.length / SIGNER_PAGE));
+  const pages = Math.max(1, Math.ceil(rows.length / SIGNER_PAGE));
   const p = Math.min(page, pages);
-  const slice = ids.slice((p - 1) * SIGNER_PAGE, p * SIGNER_PAGE);
+  const slice = rows.slice((p - 1) * SIGNER_PAGE, p * SIGNER_PAGE);
+  const lanes = [
+    { id: "data" as const, g: SIGNER_GROUPS.dataBlocks, shown: dataIds.length > 0 },
+    { id: "proof" as const, g: SIGNER_GROUPS.proof, shown: proofIds.length > 0 },
+  ].filter((l) => l.shown);
   return (
     <div className="flex flex-col gap-2">
-      {/* Label left, the producing LAYER as its squared chip right (user, 2026-08-14 — the
-          "snapshot proof · 3 · L0 cluster" run-on cleaned up): the count is gone because it
-          counted SIGNERS, not proofs — the rows below ARE that count — and "rotating" is the
-          title's nuance, not a header's. The chip code derives from SIGNER_GROUPS' own words
-          (the one home), so the two can't drift. */}
-      <div className="flex items-center justify-between gap-2.5" title={g.title}>
-        <span className={LANE_HEAD}>{g.label}</span>
-        {/* "signed by [L0]" (user, 2026-08-14) — the chip alone floated context-free. */}
-        <span className="inline-flex items-center gap-1.5">
-          <span className="text-label text-muted-foreground">signed by</span>
-          <RoleChips codes={[g.who.split(" ")[0]]} />
-        </span>
-      </div>
-      <LaneTable
-        head={["Node", "Signer id"]}
-        rows={slice.map((id) => {
-          const r = resolveSigner(selNodes, metaId, id);
-          const w = r.known ? null : SIGNER_UNKNOWN[r.reason];
-          return {
-            key: id,
-            // The NODE is the machine's own reference, never its city (user, 2026-08-13 —
-            // "Portland is not signing the data"; the same critique that retired the card's
-            // signer table on 2026-08-10, still living here). A signature ties to a MACHINE:
-            // its node id names it, the signer id beside it is the layer key it signed with —
-            // a hybrid's two ids differing is exactly the fact this table exists to show.
-            // The NODE id takes the copy control (user, 2026-08-13 — the machine's reference is
-            // the value you take elsewhere; the signer id is an 8-char server-truncated prefix,
-            // a match key rather than a reference worth carrying out).
-            a: r.known ? (
-              <span className="group/copy inline-flex items-center gap-1.5 min-w-0">
-                <span className="font-mono text-label truncate" title={r.row.id ?? undefined}>
-                  {r.row.id ? shortHash(r.row.id) : r.row.label}
-                </span>
-                {r.row.id && <CopyButton value={r.row.id} subject="node id" />}
-              </span>
-            ) : (
-              w!.label
-            ),
-            muted: !r.known,
-            title: w ? w.title : id,
-            b: <span className="font-mono text-label text-muted-foreground">{id}</span>,
-          };
-        })}
-      />
+      <Table className="table-fixed">
+        <TableHeader>
+          <TableRow>
+            <TableHead className={LANE_HEAD}>Node</TableHead>
+            {lanes.map((l) => (
+              <TableHead key={l.id} className={cn(LANE_HEAD, "w-12 text-center normal-case tracking-normal")}>
+                {l.g.who.split(" ")[0]}
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {slice.map((r) => {
+            const w = r.res.known ? null : SIGNER_UNKNOWN[r.res.reason];
+            const id = r.res.known ? r.res.row.id : null;
+            return (
+              <TableRow key={r.key} className="pointer-coarse:h-11">
+                <TableCell className="text-label">
+                  {r.res.known ? (
+                    <span className="group/copy flex items-center gap-1.5 min-w-0">
+                      <span className="min-w-0 flex flex-col">
+                        <span className="font-mono truncate">{id ? shortHash(id) : r.res.row.label}</span>
+                        {r.otherKeys.length > 0 && (
+                          <span className="font-mono text-muted-foreground truncate">
+                            signed as {r.otherKeys.join(", ")}
+                          </span>
+                        )}
+                      </span>
+                      {id && <CopyButton value={id} subject="node id" />}
+                    </span>
+                  ) : (
+                    <span className="italic text-muted-foreground">{w!.label}</span>
+                  )}
+                </TableCell>
+                {lanes.map((l) => (
+                  <TableCell key={l.id} className="text-center">
+                    {r[l.id] ? (
+                      <Check aria-label={`signed the ${l.g.label}`} className="inline size-3.5 text-primary-ink" />
+                    ) : (
+                      <Minus aria-label={`did not sign the ${l.g.label}`} className="inline size-3.5 text-muted-foreground/50" />
+                    )}
+                  </TableCell>
+                ))}
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
       <TablePager
         page={p}
         pages={pages}
         from={(p - 1) * SIGNER_PAGE + 1}
-        to={Math.min(p * SIGNER_PAGE, ids.length)}
-        total={ids.length}
+        to={Math.min(p * SIGNER_PAGE, rows.length)}
+        total={rows.length}
         onPage={setPage}
       />
     </div>
@@ -503,13 +469,13 @@ export function ChannelStatePanel() {
     if (!deep) return [];
     const out: Lane[] = [];
     if (deep.stateKeys.length > 0 || nonEmpty(state)) {
-      out.push({ id: "state", name: PAYLOAD_LANES.state.name, title: PAYLOAD_LANES.state.title });
+      out.push({ id: "state", name: PAYLOAD_LANES.state.name });
     }
     if (deep.dataTxCount > 0 || nonEmpty(dataTx)) {
-      out.push({ id: "data", name: PAYLOAD_LANES.data.name, title: PAYLOAD_LANES.data.title });
+      out.push({ id: "data", name: PAYLOAD_LANES.data.name });
     }
     if (deep.signers.length > 0 || deep.dataBlockSigners.length > 0) {
-      out.push({ id: "signers", name: "Signers", title: "The validators that signed this snapshot, by producing layer" });
+      out.push({ id: "signers", name: "Signers" });
     }
     return out;
   }, [deep, state, dataTx]);
@@ -601,9 +567,9 @@ export function ChannelStatePanel() {
 
               · the LEAD says that relation, with the age as its chip (a value that moves is a
                 chip, never a clause after a mid-dot);
-              · three FACTS, label left and value right: when, what it cost, how big;
-              · the COUNTERS sit on a plate in mono, where bookkeeping goes — read to compare,
-                not to learn. The references (hash, previous, state) stay in the foot below. */}
+              · four FACTS, label left and value right: when, what it cost, how big, how many blocks;
+              · the chain POSITION (height, sub-height) and the references (hash, previous, state)
+                share the foot below, split by a hairline. */}
           <Lead aside={relativeAge(Date.now() - Date.parse(sel.ts)) || undefined} className="flex-none">
             Anchored into global snapshot <span className="font-mono tabular-nums text-foreground">{sel.globalOrdinal.toLocaleString()}</span>
           </Lead>
@@ -614,22 +580,19 @@ export function ChannelStatePanel() {
                 record-level rung, the one place in the app a time can be QUOTED from. UTC and it
                 says so: the explorer's own stamps are UTC, so a viewer's local midnight can never
                 silently re-date a snapshot. */}
-            <Fact label="Time" title="The stamp this snapshot shares with the global snapshot it anchored into">
+            <Fact label="Time">
               {/* The reader's own clock, drawn as date · time · zone tag; UTC on hover (2026-10-07). */}
               {Number.isFinite(Date.parse(sel.ts)) ? <Stamp ms={Date.parse(sel.ts)} seconds className="text-foreground-dim" /> : <span className="text-muted-foreground">—</span>}
             </Fact>
             <Fact label="Fee paid"><span className="tabular-nums">{fmtDag(deep.fee)} DAG</span></Fact>
             {/* "compressed" names the wire figure's basis against the lanes' decoded sizes. */}
             <Fact label="Size"><span className="tabular-nums text-foreground-dim">{fmtKB(deep.bytes / 1024)} compressed</span></Fact>
+            {/* BLOCKS IS A FACT about what the snapshot carries (user, 2026-10-08: "blocks as fact,
+                it's not chain position"), so it reads with the others; Height and Sub-height are
+                WHERE it sits in its chain and joined the references in the foot (design C1). The
+                caps-mono plate that held all three between the facts and the tabs is gone. */}
+            <Fact label="Blocks"><span className="tabular-nums text-foreground-dim">{deep.blocks.toLocaleString()}</span></Fact>
           </FactGroup>
-          <div className="flex-none flex flex-wrap gap-x-6 gap-y-1 rounded-sm bg-[var(--panel-plate)] px-2.5 py-1.5 font-mono text-label">
-            {([["Height", deep.height], ["Sub-height", deep.subHeight], ["Blocks", deep.blocks]] as const).map(([k, v]) => (
-              <span key={k} className="inline-flex items-baseline gap-2">
-                <span className="uppercase tracking-caps text-muted-foreground">{k}</span>
-                <span className="tabular-nums text-foreground-dim">{v.toLocaleString()}</span>
-              </span>
-            ))}
-          </div>
 
           {/* THE IDLE LINE, the card's own remark in the same lead position (user, 2026-08-14):
               the read landed and neither payload lane exists — the bytes are the envelope and
@@ -696,7 +659,6 @@ export function ChannelStatePanel() {
                     <TabsTrigger
                       key={l.id}
                       value={l.id}
-                      title={l.title}
                       className={cn(CABINET_TRIGGER, "h-7 text-label")}
                     >
                       <LaneIcon aria-hidden className="size-3.5 flex-none" />
@@ -764,12 +726,7 @@ export function ChannelStatePanel() {
                         blocks are signed by their dL1 producers before the L0 cluster seals the
                         snapshot around them, so the lane reads in the order the signatures were
                         actually made. */}
-                    {deep.dataBlockSigners.length > 0 && (
-                      <SignerGroup group="dataBlocks" ids={deep.dataBlockSigners} metaId={deep.metaId} selNodes={selNodes} />
-                    )}
-                    {deep.signers.length > 0 && (
-                      <SignerGroup group="proof" ids={deep.signers} metaId={deep.metaId} selNodes={selNodes} />
-                    )}
+                    <SignerRoster key={metaSnapDeepKey(deep.globalOrdinal ?? sel.globalOrdinal, deep.metaId, sel.ordinal)} dataIds={deep.dataBlockSigners} proofIds={deep.signers} metaId={deep.metaId} selNodes={selNodes} />
                 </TabsContent>
               </div>
             </Tabs>
@@ -780,7 +737,7 @@ export function ChannelStatePanel() {
               card. Out of the reading path (they were the grid's second row and a caps note's
               tail), one register (FootRow: micro caps label, mono value), each with the shared
               copy control. Pinned below the scroll region, so an opened tree never buries them. */}
-          {(deep.lastSnapshotHash || deep.stateProof) && (
+          {(
             // The card FOOT's ground (user, 2026-08-13): same tier — look-up references with the
             // copy control — so the same `--panel-plate` lift under it, as a rounded plate at the
             // pane's own scale (the card bleeds to its panel edge; the pane's edge is the layer's,
@@ -801,17 +758,23 @@ export function ChannelStatePanel() {
             // own inset, so the values still share an edge — the tab box's, which is the pane's
             // visible frame on that tier.
             <div className="flex-none flex flex-col gap-1 rounded-md bg-[var(--panel-plate)] px-2.5 -mx-2.5 py-2 max-[700px]:mx-0">
-              {hash && <FootRow label="Hash" value={hashFor(hash, 24)} title={hash} copy={hash} />}
+              {/* CHAIN POSITION first, then the hashes, a subtle hairline between the two kinds
+                  (user, 2026-10-08, C1). Positions are values, not references to carry out, so
+                  they take no copy control. */}
+              <FootRow label="Height" value={deep.height.toLocaleString()} />
+              <FootRow label="Sub-height" value={deep.subHeight.toLocaleString()} />
+              {(hash || deep.lastSnapshotHash || deep.stateProof) && <div aria-hidden className="h-px my-1 bg-border/50" />}
+              {hash && <FootRow label="Hash" value={hashFor(hash, 24)} copy={hash} />}
               {deep.lastSnapshotHash && (
-                <FootRow label="Previous hash" value={hashFor(deep.lastSnapshotHash, 15)} title={deep.lastSnapshotHash} copy={deep.lastSnapshotHash} />
+                <FootRow label="Previous hash" value={hashFor(deep.lastSnapshotHash, 15)} copy={deep.lastSnapshotHash} />
               )}
               {deep.stateProof && (
                 // "State HASH", not "state proof" (user, 2026-08-14 — the SIGNERS tab says
                 // "snapshot proof" for the L0 SIGNATURE SET, so two unrelated species shared the
                 // word one screen apart and read as kin). It is a digest, the same species as
                 // its Hash/Parent siblings; the chain field stays calculatedStateProof (internal
-                // identifiers keep their names). The title carries the distinction.
-                <FootRow label="State hash" value={hashFor(deep.stateProof, 18)} title={"The hash of the application state this snapshot results in, covered by the snapshot's L0 signatures — the state's provability. Distinct from the SIGNERS tab's 'snapshot proof', which is the L0 signature set; this is a digest, and the signatures sign over it." + deep.stateProof} copy={deep.stateProof} />
+                // identifiers keep their names).
+                <FootRow label="State hash" value={hashFor(deep.stateProof, 18)} copy={deep.stateProof} />
               )}
             </div>
           )}

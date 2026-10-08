@@ -121,7 +121,13 @@ export const CATALOG: Record<NetworkId, MetaConfig[]> = {
     // (so its history stays the network's — `src/net/lineage.ts`) and re-key `data/brand-hues.json`. The Engine warns in dev when the live directory lists an id
     // this catalog does not (`_publishMetaList`).
     { name: "BioFi",               ticker: "BIOFI",    color: 0xed9bf4, id: "DAG6A8Dw78yWv9z8pHqjJ4JVwSqq9V9Ha7CRUQnY",
-      formerIds: ["DAG2JaVh5yYiPCGLLEFi6tfkKk77WA4FzivVdBek"], // its first chain, 2026-07-17 → 2026-08-16
+      // Oldest first. The SECOND address is a two-snapshot chain begun 2026-09-09 (snapshots 0 and 1,
+      // then silence) and signed by BioFi's own node `9002807a9913` (135.181.37.178, which signs the
+      // current chain too) — found 2026-10-08 as History's only "unlisted" snapshots in a month.
+      formerIds: [
+        "DAG2JaVh5yYiPCGLLEFi6tfkKk77WA4FzivVdBek", // its first chain, 2026-07-17 → 2026-08-16
+        "DAG3eCKB9FgkjM3s8yoCJzGtp8niQ4WqTxhzun7s", // a short restart, 2026-09-09 (two snapshots)
+      ],
       blurb: "A utility token uniting an ecosystem focused on safeguarding personal data and protecting users from fraud." },
     { name: "Digital Evidence",    ticker: "DED",      color: 0x36e29a, id: "DAG0eQr94qUQSUhmYGNXt6CoBKWu5K6htvRMGC6M",
       blurb: "DoD-vetted data-fingerprinting as a service — immutable proof of data authenticity, anchored to the Global L0." },

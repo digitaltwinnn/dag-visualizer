@@ -125,7 +125,7 @@ export default function PulseStrip() {
                       only when something failed — "100% ok" would restate the green run. Never
                       "100%" while anything failed; one decimal from 99 up, capped at 99.9. */}
                   {r.err > 0 && (
-                    <span className="text-label tabular-nums text-muted-foreground" title={`${r.ok.toLocaleString()} ok, ${r.err.toLocaleString()} failed`}>
+                    <span className="text-label tabular-nums text-muted-foreground">
                       {okShare(r.ok, r.err)} ok
                     </span>
                   )}

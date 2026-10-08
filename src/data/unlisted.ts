@@ -10,10 +10,10 @@
 //     mixed set, so none does; 2026-08-08 — italic by convention), or null for "all"/unknown.
 //     Note "dag" is NOT null: under the unified node model the core is a catalog metagraph, so it
 //     presents as an ordinary network here.
-//   · DATA — the polled buffers only track the public catalog, so the EXACT reads
-//     (store.snapshotExact) are the only honest source for unlisted snapshots.
-//     `unlistedLog` re-exports the pure builder; `latestUnlistedTick` answers the follow
-//     system's "newest tick this network anchored into".
+//   · DATA — the unlisted chains are POLLED like the catalog's (2026-10-08, `NetworkData.
+//     unlistedSnaps`, keyed by address), and united with the EXACT reads (store.snapshotExact),
+//     which also name a chain the hourly list has not caught yet. `unlistedLog` is that union;
+//     `latestUnlistedTick` answers the follow system's "newest tick this network anchored into".
 //
 // The ledger scene needs no import: `ledgerBands.UNLISTED_KEY` carries the same id string, so
 // the lane, band and dim machinery match by construction.
@@ -23,6 +23,7 @@ import { metagraphById } from "@/src/data/network";
 import { identityHudCss } from "@/src/palette/identity";
 import { buildUnlistedLog } from "@/src/data/anchorLog";
 import type { GlobalSnapshot, MetaCfg, SnapshotExact } from "@/src/data/types";
+import type { MetaSnapRecord } from "@/src/data/api";
 import type { Theme } from "@/src/theme/resolve";
 
 // The identity tokens live in a LEAF module so network.ts and ledgerStory.ts can reach them
@@ -85,8 +86,9 @@ export function displayNetwork(id: string | null | undefined): DisplayNetwork | 
 export function unlistedLog(
   globalSnapshots: readonly GlobalSnapshot[],
   exactByOrdinal: Readonly<Record<number, SnapshotExact | undefined>>,
+  polled?: ReadonlyMap<string, readonly MetaSnapRecord[]>,
 ) {
-  return buildUnlistedLog(globalSnapshots, exactByOrdinal, LISTED_IDS);
+  return buildUnlistedLog(globalSnapshots, exactByOrdinal, LISTED_IDS, polled);
 }
 
 /** Distinct uncataloged addresses observed in the measured window, newest first. Each IS a
@@ -96,10 +98,11 @@ export function unlistedLog(
 export function observedUnlistedIds(
   globalSnapshots: readonly GlobalSnapshot[],
   exactByOrdinal: Readonly<Record<number, SnapshotExact | undefined>>,
+  polled?: ReadonlyMap<string, readonly MetaSnapRecord[]>,
 ): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const row of unlistedLog(globalSnapshots, exactByOrdinal)) {
+  for (const row of unlistedLog(globalSnapshots, exactByOrdinal, polled)) {
     // `unlistedLog` never emits a seam (it is built from exact-read channel entries, which exist
     // only where something anchored) — the guard is the type's, not a real branch.
     if (row.metaId && !seen.has(row.metaId)) {
@@ -114,9 +117,15 @@ export function observedUnlistedIds(
 export function latestUnlistedTick(
   globalSnapshots: readonly GlobalSnapshot[],
   exactByOrdinal: Readonly<Record<number, SnapshotExact | undefined>>,
+  polled?: ReadonlyMap<string, readonly MetaSnapRecord[]>,
 ): GlobalSnapshot | null {
+  // A tick the set anchored into: its exact read counts an unlisted snapshot, or a polled
+  // unlisted chain holds a record stamped with it.
+  const polledTs = new Set<string>();
+  if (polled) for (const recs of polled.values()) for (const r of recs) polledTs.add(r.ts);
   for (let i = globalSnapshots.length - 1; i >= 0; i--) {
-    if ((exactByOrdinal[globalSnapshots[i].ordinal]?.unlistedCount ?? 0) > 0) return globalSnapshots[i];
+    const g = globalSnapshots[i];
+    if ((exactByOrdinal[g.ordinal]?.unlistedCount ?? 0) > 0 || polledTs.has(g.timestamp)) return g;
   }
   return null;
 }

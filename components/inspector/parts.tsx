@@ -44,10 +44,10 @@ export const ROLE_ORDER = ["l0", "cl1", "dl1"];
 // two-step (card states the SHAPE, raw layer renders the PAYLOAD) and a third tier inside the
 // card would be one gesture too many.
 
-// The one fact row. `title` carries the full value for anything the cell truncates.
-export function Fact({ label, children, title, className }: { label: ReactNode; children: ReactNode; title?: string; className?: string }) {
+// The one fact row.
+export function Fact({ label, children, className }: { label: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <div className={cn("flex items-start justify-between gap-2.5", className)} title={title}>
+    <div className={cn("flex items-start justify-between gap-2.5", className)}>
       <span className="shrink-0 text-body text-muted-foreground">{label}</span>
       <span className="min-w-0 text-body text-foreground tabular-nums text-right">{children}</span>
     </div>
@@ -100,7 +100,7 @@ export function shareWords(part: number, whole: number): string | null {
  *  it beside the dash in `text-label`. */
 export function Empty({ why }: { why?: string }) {
   return (
-    <span role="img" className="text-muted-foreground" title={why} aria-label={why ?? "No value"}>
+    <span role="img" className="text-muted-foreground" aria-label={why ?? "No value"}>
       —
     </span>
   );
@@ -147,10 +147,9 @@ export const foldLabel = (open: boolean): string =>
 /** THE HEAD'S QUALIFIER — one hairline chip: a ticker, a country code, a city, a role. The head's
  *  right slot is either this or a state pill (ready, live / pinned), never bare text, a relation
  *  or an age (those are the lead's). Same pill as `RoleChips`, one vocabulary. */
-export function QualifierChip({ children, className, style, title }: { children: ReactNode; className?: string; style?: CSSProperties; title?: string }) {
+export function QualifierChip({ children, className, style }: { children: ReactNode; className?: string; style?: CSSProperties }) {
   return (
     <span
-      title={title}
       style={style}
       className={cn(
         "inline-flex items-center max-w-full rounded-xs border border-border bg-wash-faint px-[6px] py-[3px] text-label leading-none text-muted-foreground",
@@ -168,9 +167,9 @@ export function QualifierChip({ children, className, style, title }: { children:
  *  scene callout and tooltip, the Moment's headline, the raw pane's head. A ticker in a COLUMN
  *  (node rows, the anchor log) or inside a SENTENCE stays plain hued text: twenty boxed tickers
  *  beside the role chips is a wall of boxes, and a chip mid-sentence reads as a button. */
-export function TickerChip({ text, hue, title, className }: { text: string; hue?: string; title?: string; className?: string }) {
+export function TickerChip({ text, hue, className }: { text: string; hue?: string; className?: string }) {
   return (
-    <QualifierChip title={title} className={cn("font-semibold tracking-[0.02em]", IDENT_INK, className)} style={hue ? { color: hue } : undefined}>
+    <QualifierChip className={cn("font-semibold tracking-[0.02em]", IDENT_INK, className)} style={hue ? { color: hue } : undefined}>
       {text}
     </QualifierChip>
   );
@@ -218,7 +217,6 @@ export function Door({
   href,
   onClick,
   glyph,
-  title,
   disabled,
   flushFoot,
 }: {
@@ -227,7 +225,6 @@ export function Door({
   href?: string;
   onClick?: () => void;
   glyph?: ReactNode;
-  title?: string;
   disabled?: boolean;
   /** Sits directly on the foot plate below it (cancels the foot's own top margin). */
   flushFoot?: boolean;
@@ -253,11 +250,11 @@ export function Door({
     </>
   );
   return href ? (
-    <a href={href} target="_blank" rel="noopener noreferrer" className={cls} title={title}>
+    <a href={href} target="_blank" rel="noopener noreferrer" className={cls}>
       {inner}
     </a>
   ) : (
-    <button type="button" onClick={onClick} disabled={disabled} title={title} className={cn(cls, "w-[calc(100%+2*var(--card-pad))] cursor-pointer")}>
+    <button type="button" onClick={onClick} disabled={disabled} className={cn(cls, "w-[calc(100%+2*var(--card-pad))] cursor-pointer")}>
       {inner}
     </button>
   );
@@ -311,7 +308,8 @@ export function Foot({ children, className }: { children: ReactNode; className?:
 // answers with the check for one calm cycle (~1.2s, the transient-signal tempo). The glyph swap
 // is information, so it stays under reduced motion. Quiet at rest — visible only while its ROW
 // is hovered or focused (the `group/copy` reveal) — but its slot is always reserved, so nothing
-// shifts under the pointer. Monochrome via currentColor; the check takes `--success` (the
+// shifts under the pointer. A touch screen has no hover to reveal it, so a coarse pointer holds it
+// at the `always` low ink instead. Monochrome via currentColor; the check takes `--success` (the
 // ready lane), never an identity hue.
 export function CopyButton({ value, subject, always = false, className }: { value: string; subject: string; /** Present at low ink at rest (the foot rows) rather than revealed on the row's hover. */ always?: boolean; className?: string }) {
   const [copied, setCopied] = useState(false);
@@ -321,11 +319,10 @@ export function CopyButton({ value, subject, always = false, className }: { valu
       variant="ghost"
       size="icon-xs"
       aria-label={`Copy ${subject}`}
-      title={`Copy ${subject}`}
       className={cn(
         "flex-none size-6 -my-1 rounded-xs text-muted-foreground",
         TOUCH_HIT,
-        always ? "opacity-75 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100" : "opacity-0 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
+        always ? "opacity-75 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100" : "opacity-0 pointer-coarse:opacity-75 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
         copied && "opacity-100 text-[var(--success)] hover:text-[var(--success)]",
         className,
       )}
@@ -336,7 +333,7 @@ export function CopyButton({ value, subject, always = false, className }: { valu
             if (timer.current) clearTimeout(timer.current);
             timer.current = setTimeout(() => setCopied(false), 1200);
           },
-          () => {}, // a denied clipboard stays quiet — the hover title still carries the value
+          () => {}, // a denied clipboard stays quiet
         );
       }}
     >
@@ -352,14 +349,12 @@ export function CopyButton({ value, subject, always = false, className }: { valu
 export function FootRow({
   label,
   value,
-  title,
   mono = true,
   copy,
   copyName,
 }: {
   label: string;
   value: ReactNode;
-  title?: string;
   mono?: boolean;
   copy?: string;
   /** What the copy control is called ("previous hash") — the visible label is cut short to save
@@ -375,7 +370,9 @@ export function FootRow({
   // for the same reason — the line is one column now, and every label character is a hash
   // character lost.
   return (
-    <div className="group/copy flex items-center gap-2.5" title={title}>
+    // min-h-6: the copy control's own 24px, so a row WITHOUT one (a chain position) keeps the
+    // same rhythm as the hash rows beside it.
+    <div className="group/copy flex items-center gap-2.5 min-h-6">
       <span className="inline-flex items-baseline min-w-0 flex-1 font-mono text-label">
         <span className="shrink-0 tracking-caps uppercase text-muted-foreground">{label}</span>
         <span aria-hidden className="shrink-0">&nbsp;&nbsp;</span>
@@ -600,13 +597,11 @@ export function Desc({ text }: { text?: string }) {
 // composition, status, archive depth — used to be three captioned tables under hairlines, which
 // read as three sections rather than three cuts of the same 19 nodes; three of these say "the
 // same total, three ways" at half the height. A zero-count part draws no segment (rule 10) and is
-// named muted in the legend, so an absent kind is still stated; the chips and depth tags a table
-// row carried ride each part's `title`.
+// named muted in the legend, so an absent kind is still stated.
 export interface SchedulePart {
   label: string;
   count: number;
   color: string;
-  title?: string;
 }
 
 /** A hue stepped down for the i-th part of a partition drawn in one colour (composition in the
@@ -681,7 +676,7 @@ export const figWidth = (figures: readonly (string | number)[]): CSSProperties =
  *  divided by a hairline, which makes the three cuts read as one table. A zero part is a plain
  *  muted row with no squares (it draws nothing, and is still named). Without an `axis` the table
  *  is the three-column `CUT_ROW` form. */
-export function ScheduleTable({ axis, axisTitle, parts, className }: { axis?: string; axisTitle?: string; parts: SchedulePart[]; className?: string }) {
+export function ScheduleTable({ axis, parts, className }: { axis?: string; parts: SchedulePart[]; className?: string }) {
   const total = parts.reduce((n, p) => n + p.count, 0);
   const units = countable(total);
   return (
@@ -695,13 +690,13 @@ export function ScheduleTable({ axis, axisTitle, parts, className }: { axis?: st
       style={figWidth(parts.map((p) => p.count))}
     >
       {axis != null && (
-        <span className="text-muted-foreground" title={axisTitle} style={{ gridRow: `span ${Math.max(1, parts.length)}` }}>
+        <span className="text-muted-foreground" style={{ gridRow: `span ${Math.max(1, parts.length)}` }}>
           {axis}
         </span>
       )}
       {parts.map((p, i) => (
         <Fragment key={i}>
-          <span className={cn("min-w-0 truncate", p.count > 0 ? "text-foreground-dim" : "text-muted-foreground")} title={p.title ?? p.label}>
+          <span className={cn("min-w-0 truncate", p.count > 0 ? "text-foreground-dim" : "text-muted-foreground")}>
             {p.label}
           </span>
           <UnitMarks count={p.count} color={p.color} units={units} frac={p.count / Math.max(1, total)} />

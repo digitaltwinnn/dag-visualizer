@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { NETWORKS } from "@/src/engine/config";
-import { sampledIds } from "@/src/net/lineage";
+import { sampledIds, untrackedIds } from "@/src/net/lineage";
 import { netOf } from "@/src/net/request";
 import { getLive } from "@/app/api/metagraphs/live";
+import { fetchChainIds } from "@/app/api/network/chainList";
 import { getLiveGeo } from "@/app/api/geo/live";
 import { runSample } from "../runSample";
 import { writeStore } from "../store";
@@ -100,6 +101,12 @@ export async function GET(req: Request) {
       // Every catalog network that is NOT RETIRED (`sampledIds`): a retired network keeps its stored
       // past and its row, and stops being read — paging a stopped chain every 15 minutes is waste.
       metaIds: sampledIds(net),
+      // THE UNLISTED CHAINS, MEASURED (2026-10-08): the explorer lists every chain it indexes
+      // (`/currency`), so the ones the catalog does not track are sampled for their own count — the
+      // History "unlisted" figure was anchors minus the listed networks, which turned a global's
+      // snapshots stamped into the NEXT bucket (an explorer skew, found on 2026-09-29 19:59) into
+      // phantom unlisted snapshots.
+      unlistedIds: async () => untrackedIds(net, await fetchChainIds(be)),
       store: writeStore(),
       // Catch-up pages ride the explorer's own `meta.next` cursor — one request can't go
       // past ~10K records (probed live: the global list returns EMPTY above 10K and the

@@ -17,7 +17,6 @@ import FollowController from "@/components/FollowController";
 import RawSnapshotBridge from "@/components/RawSnapshotBridge";
 import RouteSync from "@/components/RouteSync";
 import Tooltip from "@/components/Tooltip";
-import HintTips from "@/components/HintTips";
 import MotionHint from "@/components/MotionHint";
 import SceneCallout from "@/components/SceneCallout";
 import TrendStack from "@/components/TrendStack";
@@ -26,7 +25,6 @@ import SectionShell from "@/components/SectionShell";
 import DataSection from "@/components/DataSection";
 import SiteFooter from "@/components/SiteFooter";
 import type { DocPage } from "@/components/views";
-import UnlistedStage from "@/components/UnlistedStage";
 
 // THE app — one shell, rendered identically by `/`, every routed view page (app/[view]) AND the
 // two doc routes (/about, /design pass `doc`, which opens the DocLayer overlay over the live
@@ -97,7 +95,6 @@ export default function AppShell({ doc }: { doc?: DocPage }) {
           <TrendStack />
           <SceneCallout />
           <MotionHint />
-          <UnlistedStage />
         </DocGate>
         <BootFade at="data">
           <DocGate>
@@ -122,9 +119,6 @@ export default function AppShell({ doc }: { doc?: DocPage }) {
       <RouteSync />
       <ThemeController />
       <Tooltip />
-      {/* Styled replacement for the native `title` bubble — delegated, so every title= in the
-          app inherits the design (user, 2026-08-16). */}
-      <HintTips />
       <DevCssCanary />
     </main>
   );

@@ -175,7 +175,6 @@ export default function LogSearchBar({
           <SelectTrigger
             size="sm"
             aria-label="Which metagraph's chain"
-            title={metaLocked ? "The log is paging this network's chain — change it in the top bar's filter" : "Which metagraph's chain the number counts on"}
             // ⚠️ `h-6!` — CSS trap 4. The primitive sizes itself with `data-[size=sm]:h-8`, an
             // attribute selector at (0,2,0) that beats a plain `h-6` at (0,1,0), so the picker sat
             // 32px tall beside 24px inputs. The important modifier is the documented escape.
@@ -206,7 +205,6 @@ export default function LogSearchBar({
             <SelectItem
               value={ANY_NET}
               className="text-body"
-              title="No chain chosen. A date search reaches any of them; a snapshot number still needs one, since ordinals count per chain."
             >
               <span className="flex items-center gap-1.5">
                 <span aria-hidden className="size-2 flex-none rounded-full border border-muted-foreground/60" />

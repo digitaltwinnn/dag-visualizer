@@ -1,3 +1,4 @@
+import { withUnlisted } from "@/src/data/trendSeries";
 import { describe, it, expect } from "vitest";
 import { assemble, assembleSpan, WINDOWS } from "./assemble";
 
@@ -67,5 +68,23 @@ describe("assembleSpan (the tile body)", () => {
     expect(p.series["g.anchors"][i + 1]).toBe(0); // covered, empty → honest zero
     expect(p.series["g.anchors"][i + 2]).toBeNull(); // never sampled → null
     expect(p.window).toBe("tile");
+  });
+});
+
+describe("the unlisted coverage marker on the real read path (2026-10-08)", () => {
+  it("a covered bucket WITHOUT u.cov reads null, never the zero-fill that would look measured", () => {
+    const day = Date.UTC(2026, 8, 8);
+    const p = assembleSpan("mainnet", "tile", "5m", day, day + 86400000, Date.UTC(2026, 8, 10), {
+      "t:mainnet:5m:2026-09-08": {
+        "10:00|g.ticks": "3", "10:00|u.cov": "0", "10:00|m.UNL.snaps": "2",
+        "10:05|g.ticks": "2", // the spine measured it; the unlisted chains were not read
+      },
+    });
+    const i = p.buckets.indexOf(day + 10 * 3600000);
+    expect(p.series["u.cov"][i]).toBe(0);
+    expect(p.series["u.cov"][i + 1]).toBeNull();
+    const u = withUnlisted(p.series, () => false, "unl")["m.unl.snaps"]!;
+    expect(u[i]).toBe(2);
+    expect(u[i + 1]).toBeNull();
   });
 });

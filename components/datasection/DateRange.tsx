@@ -86,7 +86,6 @@ export default function DateRange({
             "data-[state=open]:border-transparent",
             armed ? "text-foreground" : "text-muted-foreground",
           )}
-          title={title}
           aria-label={`Date range: ${title}`}
         >
           <CalendarDays aria-hidden className="size-[15px] flex-none text-muted-foreground" />

@@ -114,6 +114,30 @@ export function resolveSignerIps(
   return ips.length ? ips : null;
 }
 
+/** A PROBABLE NEW ADDRESS of a known network (2026-10-08 — BioFi re-registered twice, and the second
+ *  time was found by accident, as History's only "unlisted" snapshots in a month). An untracked chain
+ *  whose every signer is a node of ONE catalog network is that network's operator anchoring under
+ *  another address — the evidence that settled BioFi's `DAG3eCKB…` (its sole signer was BioFi's own
+ *  node). It is EVIDENCE, not a decision: the dev warning names it, a human adds it to `formerIds`.
+ *  One home for the signer match (`carriesSigner`, the signerMatchBoundary rule). */
+export function probableLineage(
+  rows: readonly { metaId: string; signers?: readonly string[] }[],
+  metaList: readonly MetaInfo[],
+  isListed: (id: string) => boolean,
+): { address: string; networkId: string; networkName: string }[] {
+  const out = new Map<string, { address: string; networkId: string; networkName: string }>();
+  for (const r of rows) {
+    if (isListed(r.metaId) || out.has(r.metaId)) continue;
+    const signers = (r.signers ?? []).filter(Boolean);
+    if (!signers.length) continue;
+    // EXACTLY ONE owner: co-located networks can share a machine (`coLocatedNetworks`), and two
+    // candidates are no evidence for either (the review, 2026-10-08).
+    const owners = metaList.filter((m) => m.id !== r.metaId && signers.every((p) => m.nodes.some((n) => carriesSigner(n, p))));
+    if (owners.length === 1) out.set(r.metaId, { address: r.metaId, networkId: owners[0]!.id, networkName: owners[0]!.name });
+  }
+  return [...out.values()];
+}
+
 /** Whether ONE node is among a snapshot proof's signers, given the proof's truncated signer
  *  ids — the membership read behind the node card's "signed" relation (user, 2026-08-15).
  *  Matches across every LAYER id (`ids`), per the ⚠️ above — a proof is sealed by the L0
@@ -192,6 +216,50 @@ export function resolveSigner(selNodes: NodeRow[], metaId: string, signerPrefix:
   return { known: false, reason: selNodes.some((r) => pickNetId(r.pick) === metaId) ? "node" : "network" };
 }
 
+/** One node's signatures on one metagraph snapshot, across both producing layers. */
+export interface SignerRosterRow {
+  key: string;
+  res: SignerResolution;
+  /** The signer prefix this node signed the DATA blocks with (dL1), or null where it did not. */
+  data: string | null;
+  /** The signer prefix this node signed the SNAPSHOT with (L0), or null where it did not. */
+  proof: string | null;
+  /** Signer prefixes that are NOT the node id's own prefix — a hybrid signs one layer with a
+   *  different key, the one fact the old Signer id column existed to show. Empty when every
+   *  signature repeats the node id. */
+  otherKeys: string[];
+}
+
+/** THE SIGNERS AS ONE ROSTER (user, 2026-10-08, design D1): the raw pane listed the dL1 and L0
+ *  signatures as two tables of `Node | Signer id`, and on a normal snapshot both held the same
+ *  three nodes with a signer id that was the node id's first 8 characters — the tab said one thing
+ *  four times. A row per NODE, a mark per LAYER, and a signer id only where it differs. Rows key
+ *  on the resolved node (its id), so a node that signed both layers is one row; an unresolved
+ *  signer keys on its prefix (the same prefix in both layers is the same unknown machine). Order is
+ *  the production order, as before: the data signers first, then any snapshot-only signer. */
+export function signerRoster(
+  selNodes: NodeRow[],
+  metaId: string,
+  dataIds: readonly string[],
+  proofIds: readonly string[],
+): SignerRosterRow[] {
+  const rows = new Map<string, SignerRosterRow>();
+  const add = (prefix: string, lane: "data" | "proof") => {
+    const res = resolveSigner(selNodes, metaId, prefix);
+    const key = res.known && res.row.id ? res.row.id : `?${prefix}`;
+    let row = rows.get(key);
+    if (!row) rows.set(key, (row = { key, res, data: null, proof: null, otherKeys: [] }));
+    row[lane] ??= prefix;
+    // "Own" = the node id itself carries the prefix — asked through the ONE matcher, handed the
+    // node id alone (signerMatchBoundary: no second prefix comparison anywhere).
+    const own = res.known && res.row.id ? carriesSigner({ id: res.row.id }, prefix) : true;
+    if (!own && !row.otherKeys.includes(prefix)) row.otherKeys.push(prefix);
+  };
+  for (const p of dataIds) add(p, "data");
+  for (const p of proofIds) add(p, "proof");
+  return [...rows.values()];
+}
+
 const NO_SIGNERS: readonly string[] = [];
 
 /** WHO SIGNED ONE METAGRAPH SNAPSHOT — its signer ids from the tick's EXACT read, the one source
@@ -230,15 +298,9 @@ export function snapshotSignerRows(
  *  id differently. Both phrase what WE know, never what the network DID: we cannot tell a
  *  rotated-out node from an id-space miss, and a network's rows can be absent merely because this
  *  view didn't publish them. */
-export const SIGNER_UNKNOWN: Record<"network" | "node", { label: string; title: string }> = {
-  network: {
-    label: "unknown node",
-    title: "This network's nodes aren't known here — the signature is all we have.",
-  },
-  node: {
-    label: "not in live set",
-    title: "No node in the live set carries this signer id.",
-  },
+export const SIGNER_UNKNOWN: Record<"network" | "node", { label: string }> = {
+  network: { label: "unknown node" },
+  node: { label: "not in live set" },
 };
 
 /** WHICH LAYER produced a group of signatures — one home, so the surfaces that count or list signers
@@ -272,28 +334,21 @@ export const SIGNER_GROUPS = {
     layer: "L0 cluster",
     /** What the counted things ARE, read after a number ("3 L0 validators"). */
     who: "L0 validators",
-    title:
-      "A metagraph seals every snapshot with its own L0 cluster, so this list IS that cluster — the whole cluster, not a rotating subset.",
   },
   dataBlocks: {
     /** Matches the DATA tab's name 1:1 (user, 2026-08-14 — consistency in the tabs' direction);
-        the BLOCKS nuance lives in the title, where the union across them is already explained. */
+        the label stays the tab's word. */
     label: "data",
     layer: "dL1, rotating",
     who: "dL1 validators",
-    title:
-      "Data blocks are produced by the metagraph's dL1 cluster, EACH BLOCK by a rotating subset of that fleet — this list is the union: every dL1 validator that signed at least one of this snapshot's blocks (the per-block split lives on chain, not here). A hybrid node signs under its dL1 id rather than its L0 one.",
   },
   /** The GLOBAL snapshot's own seal. The DAG is a metagraph-shaped core under the unified node model,
    *  so its proof group is the same shape as a metagraph's — its own L0 cluster — and reads with the
-   *  same words. Its own title, because the metagraph one explains a 3-of-20 that has no analogue at
-   *  network scale. */
+   *  same words. */
   globalProof: {
     label: "snapshot proof",
     layer: "L0 cluster",
     who: "L0 validators",
-    title:
-      "The global snapshot is sealed by the DAG's own L0 cluster — one L0 validator per participating node, so this is how much of the network signed this tick.",
   },
 } as const;
 

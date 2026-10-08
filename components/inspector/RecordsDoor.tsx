@@ -4,7 +4,6 @@ import { ArrowUpRight, Table2 } from "lucide-react";
 
 import { openRecords, type RecordSpan } from "@/components/trendDoors";
 import { cn } from "@/lib/utils";
-import { UNLISTED_ID } from "@/src/data/unlisted";
 
 /** HISTORY'S ONE EXIT, as a card's foot control (design 2026-09-26, `moment-door.html` A): the
  *  anchor log over a span, through `components/trendDoors.ts` — the shared home the RAW toggle
@@ -21,43 +20,24 @@ import { UNLISTED_ID } from "@/src/data/unlisted";
 export default function RecordsDoor({
   subject,
   span,
-  what,
 }: {
   /** The network the log is scoped to (null or the DAG: unscoped — `openRecords` says why). */
   subject: string | null;
   span: RecordSpan | null;
-  /** What the card states, for the control's title: "moment" or "range". */
-  what: "moment" | "range";
 }) {
-  const at = what === "moment" ? "at this moment" : "over this range";
-  // The unlisted channels' own records cannot be paged yet: their addresses are not known to the
-  // log (the known-channel roster is the follow-up). The door says so rather than opening the
-  // listed networks' records under an Unlisted heading.
-  const unlisted = subject === UNLISTED_ID;
+  // The unlisted channels' door opens the log UNSCOPED, cut to the span (`openRecords` says why).
   return (
     <button
       type="button"
-      // aria-disabled, not `disabled`, for the unlisted case: a disabled button takes no hover, so
-      // its title — the reason — could never be read (the branch review's M8).
       disabled={!span}
-      aria-disabled={unlisted || undefined}
       // Under All the log reads every network's records too (2026-10-07), so the door always lands.
-      title={
-        unlisted
-          ? "Unlisted channels' own records cannot be listed here yet."
-          : subject && subject !== "dag"
-            ? `Opens the snapshot records ${at}, for this network.`
-            : `Opens the snapshot records ${at}, for every network.`
-      }
-      onClick={() => {
-        if (!unlisted) openRecords(subject, span);
-      }}
+      onClick={() => openRecords(subject, span)}
       className={cn(
         "mt-3 flex w-[calc(100%+2*var(--card-pad))] items-center gap-2.5 text-left text-body text-foreground cursor-pointer",
         "-mx-[var(--card-pad)] px-[var(--card-pad)] py-2.5",
         "mb-[var(--foot-mb,calc(0px-var(--card-pad)))]",
         "rounded-b-[var(--foot-radius,calc(var(--radius)-1px))] border-t border-wash-strong [background:light-dark(var(--wash-soft),var(--wash-faint))] hover:[background:light-dark(var(--wash-hover),var(--wash-soft))]", // the Door's own per-ground wash (parts.tsx)
-        "disabled:opacity-45 disabled:pointer-events-none aria-disabled:opacity-45 aria-disabled:cursor-not-allowed",
+        "disabled:opacity-45 disabled:pointer-events-none",
         "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
       )}
     >

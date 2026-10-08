@@ -164,10 +164,31 @@ export function buildChannelLog(
   return rows;
 }
 
+/** The unlisted channels' rows: the POLLED unlisted buffers (`NetworkData.unlistedSnaps`, keyed by
+ *  address — polled like the catalog's since 2026-10-08) united with the exact reads, the polled
+ *  row winning where both hold the same snapshot because it carries the hash. The listed lanes'
+ *  own union rule (`tickNetworksLevel`), so the two sets read the same way. Newest first. */
 export function buildUnlistedLog(
   globalSnapshots: readonly GlobalSnapshot[],
   exactByOrdinal: ExactByOrdinal,
   listedIds: ReadonlySet<string>,
+  polled?: ReadonlyMap<string, readonly MetaSnapRecord[]>,
 ): ChannelLogRow[] {
-  return buildChannelLog(globalSnapshots, exactByOrdinal, (id) => !listedIds.has(id));
+  const exact = buildChannelLog(globalSnapshots, exactByOrdinal, (id) => !listedIds.has(id));
+  if (!polled?.size) return exact;
+  const byTs = new Map(globalSnapshots.map((g) => [g.timestamp, g]));
+  const rows: ChannelLogRow[] = [];
+  const seen = new Set<string>();
+  for (const [metaId, recs] of polled) {
+    if (listedIds.has(metaId)) continue;
+    for (const rec of recs) {
+      const global = byTs.get(rec.ts);
+      if (!global) continue;
+      seen.add(`${metaId}|${rec.ordinal}`);
+      rows.push({ metaId, ordinal: rec.ordinal, hash: rec.hash, fee: rec.fee, sizeInKB: rec.sizeInKB, ts: rec.ts, global });
+    }
+  }
+  for (const r of exact) if (!seen.has(`${r.metaId}|${r.ordinal}`)) rows.push(r);
+  rows.sort((a, b) => (a.ts === b.ts ? b.ordinal - a.ordinal : a.ts < b.ts ? 1 : -1));
+  return rows;
 }

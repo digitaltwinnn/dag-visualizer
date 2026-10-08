@@ -199,22 +199,21 @@ export function archiveSummary(c: ArchiveCensus, chain: string): ArchiveNetSumma
 //   tagged with the SPAN they serve (latest − the era floor; round 8): the deep archives
 //   measurably share holes (~2.4-2.8M ordinals missing on all nine, probed 2026-08-14), so
 //   the hover says the count is the span, never a promise of every snapshot (rule 10).
-// - WINDOW nodes past the grace bucket by exact reach in the age grammar; when the distinct
-//   reaches overflow the remaining row budget (MAX_SCHED_ROWS total) they cluster into
-//   contiguous COUNT-BALANCED groups, labeled as a span ("3 – 6 months", "up to 18 days").
-//   Kept is the deepest single copy in the group — a per-node fact that never sums the chain
-//   against itself (the DED double-count, round 3).
+// - WINDOW nodes past the grace bucket fold into the fixed REACH_TIERS ladder below, on every
+//   chain. Kept is the deepest single copy in the tier — a per-node fact that never sums the
+//   chain against itself (the DED double-count, round 3).
 // The fleet's remainder stays "unmeasured" (an absent entry means the probe read nothing).
 export interface ArchiveScheduleRow { label: string; count: number; kept: number | null; fullCount: number; hint?: string }
-const MAX_SCHED_ROWS = 5;
 const GRACE_MS = 86_400_000;
 
-// The fixed reach LADDER a many-reach fleet folds into (user, round 6: the DAG's span
-// labels — "5 months – 2 years" — were "too much text; break it down into 1 month,
-// 6 months, >1 year, oldest"). Each window node lands in the shallowest tier that holds
-// its reach; a tier nobody occupies draws no row. "1 year" closes the 6-months-to-a-year
-// band his four labels would strand (the DAG keeps real nodes there). The hint carries the
-// tier's exact meaning for the row's hover.
+// THE FIXED REACH LADDER every window node folds into (user, round 6: the DAG's span labels —
+// "5 months – 2 years" — were "too much text; break it down into 1 month, 6 months, >1 year,
+// oldest"; then 2026-10-08: "bucket the depth in predefined and logically sized ranges (week,
+// month(s), etc), approx. max 5"). It used to apply only when the exact reaches overflowed the
+// row budget, so a three-node metagraph printed "1 year 1 month" while the DAG printed tiers;
+// now every chain speaks the same four tiers. Each node lands in the shallowest tier that holds
+// its reach, a tier nobody occupies draws no row, and with the full row and the deep row the
+// worst case (the DAG) is six. The hint carries the tier's exact meaning for the row's hover.
 const DAY_MS = 86_400_000;
 
 // The census's era string ("Nov 2023") back to a timestamp, so the deep row can state its
@@ -228,10 +227,10 @@ function eraMs(since: string): number | null {
   return mi < 0 ? null : Date.UTC(Number(m[2]), mi, 1);
 }
 const REACH_TIERS = [
-  { label: "> 1 year", minMs: 365.25 * DAY_MS, hint: "keeps more than a year of the chain" },
-  { label: "1 year", minMs: 6 * 30.44 * DAY_MS, hint: "keeps up to a year of the chain" },
+  { label: "> 6 months", minMs: 6 * 30.44 * DAY_MS, hint: "keeps more than six months of the chain" },
   { label: "6 months", minMs: 30.44 * DAY_MS, hint: "keeps up to six months of the chain" },
-  { label: "1 month", minMs: 0, hint: "keeps up to a month of the chain" },
+  { label: "1 month", minMs: 7 * DAY_MS, hint: "keeps up to a month of the chain" },
+  { label: "1 week", minMs: 0, hint: "keeps up to a week of the chain" },
 ];
 
 export function archiveSchedule(
@@ -287,39 +286,27 @@ export function archiveSchedule(
   }
   const win = entries.filter((e) => e.kind === "window" && !graced.has(e));
   if (win.length) {
-    // Exact-reach buckets first, deepest leading — small fleets keep their exact labels.
-    const buckets = new Map<string, { label: string; count: number; kept: number; ms: number }>();
-    for (const e of win) {
+    // A node with no measured floor has no reach to place, so it is its own row — never a tier
+    // it might not belong to.
+    const tierOf = (ms: number) => REACH_TIERS.find((t) => ms >= t.minMs) ?? REACH_TIERS[REACH_TIERS.length - 1];
+    const placed = win.map((e) => {
       const t = e.floorTs ? Date.parse(e.floorTs) : NaN;
-      const ms = Number.isNaN(t) ? 0 : now - t;
-      const label = (e.floorTs && fmtReach(e.floorTs, now)) || "recent window";
-      const kept = e.latest - e.floor;
-      const b = buckets.get(label);
-      if (b) {
-        b.count += 1;
-        b.kept = Math.max(b.kept, kept);
-        b.ms = Math.max(b.ms, ms);
-      } else buckets.set(label, { label, count: 1, kept, ms });
+      return { tier: Number.isNaN(t) ? null : tierOf(now - t), kept: e.latest - e.floor };
+    });
+    for (const tier of REACH_TIERS) {
+      const members = placed.filter((p) => p.tier === tier);
+      if (!members.length) continue;
+      rows.push({
+        label: tier.label,
+        count: members.length,
+        kept: Math.max(...members.map((p) => p.kept)),
+        fullCount: 0,
+        hint: tier.hint,
+      });
     }
-    const ordered = [...buckets.values()].sort((a, b) => b.ms - a.ms);
-    const slots = Math.max(1, MAX_SCHED_ROWS - rows.length);
-    if (ordered.length <= slots) {
-      for (const b of ordered) rows.push({ label: b.label, count: b.count, kept: b.kept, fullCount: 0 });
-    } else {
-      // Too many distinct reaches for the budget: fold into the fixed ladder — each
-      // bucket lands in the deepest tier whose floor its reach clears.
-      const tierOf = (ms: number) => REACH_TIERS.find((t) => ms >= t.minMs) ?? REACH_TIERS[REACH_TIERS.length - 1];
-      for (const tier of REACH_TIERS) {
-        const members = ordered.filter((b) => tierOf(b.ms) === tier);
-        if (!members.length) continue;
-        rows.push({
-          label: tier.label,
-          count: members.reduce((n, b) => n + b.count, 0),
-          kept: Math.max(...members.map((b) => b.kept)),
-          fullCount: 0,
-          hint: tier.hint,
-        });
-      }
+    const unplaced = placed.filter((p) => p.tier == null);
+    if (unplaced.length) {
+      rows.push({ label: "recent window", count: unplaced.length, kept: Math.max(...unplaced.map((p) => p.kept)), fullCount: 0 });
     }
   }
   return { rows, unmeasured: Math.max(0, fleetTotal - entries.length) };

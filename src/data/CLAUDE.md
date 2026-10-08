@@ -70,6 +70,16 @@ count column out of view and defeated the cell's own `truncate`.
 
 ## Anchoring, fees & the metagraph data layer
 
+⚠️ **THE TIMESTAMP JOIN HAS EXCEPTIONS — measure a quantity from its OWN records, never as the
+difference of two record kinds** (found 2026-10-08). The explorer normally stamps a metagraph
+snapshot with its anchoring global's own timestamp, and the join (`/api/global/at`, the raw log's
+ANCHORED INTO) relies on that. It is not always true: global 6976288 (2026-09-29 19:59:50.964Z)
+carried 38 listed snapshots the explorer stamped 20:00:30.735Z — a stamp no global carries. Any
+per-bucket arithmetic across the two kinds then splits one event over two buckets: History's
+unlisted count was "anchors − listed snapshots" and showed 38 phantom unlisted snapshots. That
+count is now measured from the unlisted chains themselves (`withUnlisted`), and the same rule
+holds for anything new: a figure about snapshots comes from snapshot records.
+
 **Vocabulary rule:** in user-facing copy the Snapshots stack **anchors state** — "settlement" is
 reserved for the DAG a snapshot actually pays. One word for both reads as if Snapshots were where
 *money* settles, which is what the separate Transactions view is for. So: "Anchoring layers", "the base
@@ -149,26 +159,29 @@ and the card shows "Data updates: N". This is structural, not per-network: probe
 channels over 12 live ticks, zero undecodable entries and three distinct payload shapes all rendering
 honestly through the same generic extraction.
 
-## The measured history — one data path, two registers
+## The measured history — one data path
 
-Everything the History view and the Trends DOCUMENT read about the past comes from `/api/trends`
-through four pure modules here. They exist because the two registers of convention 12's rung ask the
-same questions, and the honesty rules below are what the app ASSERTS about a network — two copies
-would be two chances to assert different things about the same reading.
+Everything the History view reads about the past — its chart planes, its rail cards and its
+timeline — comes from `/api/trends` through four pure modules here. They exist because those
+surfaces ask the same questions, and the honesty rules below are what the app ASSERTS about a
+network — two copies would be two chances to assert different things about the same reading.
 
 - **`trendWindow.ts` — WHAT IS ON SCREEN.** The window/range vocabulary (`ZOOMS`), the fetch PLAN a
   window implies (`planTrendFetch`: which stored tiers and tiles a span needs) and the assembled
   answer (`assembleTrendSlice`), plus the cuts themselves — `sliceWindow`, `cutRange`, `leadingTrim`,
   `monthlySum`, `stitchWindows`. Two readings live here too: `bucketAt`, which answers with the
   bucket CONTAINING an instant, and `cursorFraction`, which places that bucket on the chart's own
-  numeric axis as a pure fraction.
+  numeric axis as a pure fraction. A brushed range of two days or more snaps outward to whole UTC
+  days (`snapRange`, applied in the store's one range setter).
 - **`trendSeries.ts` — WHAT A METRIC IS.** Which stored row a metric reads, whether it rescales,
   whether it is a counter or a gauge, the formatter and unit word, the busiest-first rank, and the
   instant readings the cursor card quotes (`valueAt` / `rankAt` / `orderAt` / `placeInstant`).
 - **`trendScope.ts` — WHAT A COMMITTED FILTER DOES TO IT.** Four states, not two: every network, one
-  network, and the two commits the trends store has nothing for — the base ledger (which anchors
-  metagraph snapshots rather than producing them) and the unlisted channels. Those last two are a
-  FACT to state, never an empty list to draw, so the SENTENCES live here as well as the
+  network, and the two commits the trends store keeps no per-network record for — the base ledger
+  (which anchors metagraph snapshots rather than producing them) and the unlisted channels, measured
+  from their own chains and folded into one network on load (`trendSeries.withUnlisted`) — every
+  measure but nodes, which they do not publish. What is missing is a FACT to state, never an empty list to draw, so the
+  SENTENCES live here as well as the
   classification, split into a fact and a route because the route names a gesture available on
   whichever surface is saying it.
 - **`trendTimeline.ts` — WHAT A POINTER MEANS ON THE BAND'S TRACK.** Click versus drag, what is under

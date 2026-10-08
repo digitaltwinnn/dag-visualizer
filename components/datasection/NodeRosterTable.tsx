@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { ArrowDown, ArrowUp, type LucideIcon } from "lucide-react";
 import type { CSSProperties } from "react";
+import type { NodeRow } from "@/src/data/types";
 import { useStore } from "@/src/store/store";
 import { metagraphById, filterAccent, shortHash } from "@/src/data/network";
-import { buildRoster, sortRoster, type RosterRow, type RosterSortKey } from "@/src/data/roster";
+import { buildRoster, groupRosterByCountry, groupRosterByNetwork, sortRoster, type RosterCountryGroup, type RosterRow, type RosterSortKey } from "@/src/data/roster";
 import { compositionRows } from "@/src/data/composition";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { nodeSelectActions } from "@/src/engine/domain/pickActions";
@@ -15,6 +16,7 @@ import { COUNTRY_ICON, PROVIDER_ICON } from "@/components/icons";
 import { tickerOf } from "@/components/explorer/nodeRow";
 import { selectionHue } from "@/components/selection";
 import { cn } from "@/lib/utils";
+import { useBreakpoint } from "@/components/useBreakpoint";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -63,6 +65,26 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
   const setHoverNodeId = useStore((s) => s.setHoverNodeId);
   const [sort, setSort] = useState<{ key: RosterSortKey; dir: 1 | -1 }>({ key: COLS[mode][0].key, dir: 1 });
   const rows = sortRoster(buildRoster(selNodes, metaList), sort.key, sort.dir);
+  // GEOGRAPHY ON PHONE IS GROUPED BY COUNTRY, place first (design E1, 2026-10-08): the phone has
+  // no column heads to sort by, so the grouping IS its order. Desktop keeps the sortable table.
+  // HYPERGRAPH ON PHONE IS GROUPED BY NETWORK, layers first (design F1, same day): a machine on two
+  // networks is a row under each, carrying THAT network's record — what its click commits, what
+  // its hover glows, and the roles its row states.
+  const phone = useBreakpoint() === "phone";
+  const geoPhone = phone && mode === "geo";
+  const hyperPhone = phone && mode === "hyper";
+  type Item =
+    | { head: RosterCountryGroup }
+    | { net: { netId: string; count: number } }
+    | { row: RosterRow; rec?: NodeRow; recs?: NodeRow[]; roles?: string[]; netId?: string };
+  const items: Item[] = geoPhone
+    ? groupRosterByCountry(rows).flatMap((g) => [{ head: g }, ...g.rows.map((row) => ({ row }))])
+    : hyperPhone
+      ? groupRosterByNetwork(rows).flatMap((g) => [
+          { net: { netId: g.netId, count: g.entries.length } },
+          ...g.entries.map((e) => ({ row: e.row, rec: e.rec, recs: e.recs, roles: e.roles, netId: g.netId })),
+        ])
+      : rows.map((row) => ({ row }));
 
   if (rows.length === 0) {
     const cfg = metagraphById(filter);
@@ -83,7 +105,6 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
         return (
           <span
             className="flex items-center gap-3"
-            title={r.nets.map((id) => metagraphById(id)?.name ?? (id === "dag" ? "DAG" : id)).join(" + ")}
           >
             {r.nets.length === 0
               ? "—"
@@ -104,7 +125,7 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
         // the full id stays on the hover title and the node card — and the 29px it frees is what
         // keeps the four surviving columns out of sideways scroll.
         return (
-          <span className="font-mono tabular-nums text-foreground-dim" title={r.node.id ?? undefined}>
+          <span className="font-mono tabular-nums text-foreground-dim">
             {r.node.id ? (
               <>
                 <span className="max-[700px]:hidden">{shortHash(r.node.id)}</span>
@@ -115,7 +136,7 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
             )}
             {/* A machine that reports a different id to each network it serves: the rest are
                 counted, never dropped (the full list rides the title). */}
-            {r.ids.length > 1 && <span className="ml-1.5 text-muted-foreground" title={r.ids.join("\n")}>+{r.ids.length - 1}</span>}
+            {r.ids.length > 1 && <span className="ml-1.5 text-muted-foreground">+{r.ids.length - 1}</span>}
           </span>
         );
       case "layer": {
@@ -181,19 +202,58 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((r) => {
+          {items.map((it) => {
+            if ("head" in it) {
+              const g = it.head;
+              // The COUNTRY PLATE — the snapshot list's group header (design B1), so a group reads
+              // the same in every raw list. Not a target: the country is the scene's own rung, and
+              // a header that committed it would be a second way to write it from the raw layer.
+              return (
+                <TableRow key={`cc:${g.key}`} className="border-0 hover:bg-transparent">
+                  <TableCell className="p-0 pt-2.5 max-[700px]:px-0">
+                    <span className="flex items-center gap-2 h-[34px] px-1.5 rounded-t-md border-b border-[color-mix(in_oklch,var(--primary)_35%,transparent)] bg-[color-mix(in_oklch,var(--primary)_9%,var(--panel-plate))]">
+                      <span className="text-body font-medium text-foreground">{g.country ?? "Unlocated"}</span>
+                      <span className="ml-auto text-label tabular-nums text-foreground-dim">{g.rows.length}</span>
+                    </span>
+                  </TableCell>
+                </TableRow>
+              );
+            }
+            if ("net" in it) {
+              const { netId, count } = it.net;
+              // The NETWORK PLATE — the same group header as the country plate above and the
+              // snapshot list's (B1). Not a target: committing a network is the top bar's alone.
+              return (
+                <TableRow key={`net:${netId}`} className="border-0 hover:bg-transparent">
+                  <TableCell className="p-0 pt-2.5 max-[700px]:px-0">
+                    <span className="flex items-center gap-2 h-[34px] px-1.5 rounded-t-md border-b border-[color-mix(in_oklch,var(--primary)_35%,transparent)] bg-[color-mix(in_oklch,var(--primary)_9%,var(--panel-plate))]">
+                      <IdentityDot hue={filterAccent(netId)} />
+                      <span className="text-body font-medium text-foreground truncate">{metagraphById(netId)?.name ?? (netId === "dag" ? "DAG" : tickerOf(netId))}</span>
+                      <span className="ml-auto text-label tabular-nums text-foreground-dim">{count}</span>
+                    </span>
+                  </TableCell>
+                </TableRow>
+              );
+            }
+            const r = it.row;
+            const own = "rec" in it ? it.rec : undefined;
+            // The records this row stands for: in a network group, the machine's records IN THAT
+            // network; otherwise every record merged into the row.
+            const mine = "recs" in it && it.recs ? it.recs : r.recs;
             // A MERGED row is selected when ANY of its records is (a DAG bead committed in the scene
             // is this row as much as the metagraph record leading it), and its click then acts on
             // THAT record — so the re-click deselects what is committed rather than committing the
             // primary on top of it.
             const inspected = hoverKeyOf(inspect);
-            const hit = inspected == null ? undefined : r.recs.find((x) => hoverKeyOf(x.pick) === inspected);
+            const hit = inspected == null ? undefined : mine.find((x) => hoverKeyOf(x.pick) === inspected);
             const selected = hit != null;
             const commit = () =>
-              applyClickActions(nodeSelectActions((hit ?? r.node).pick, { mode, currentFilter: filter, deselect: selected, commitNetwork: false }));
+              applyClickActions(nodeSelectActions((hit ?? own ?? r.node).pick, { mode, currentFilter: filter, deselect: selected, commitNetwork: false }));
+            const hoverId = (own ?? r.node).id;
+            const hue = "netId" in it && it.netId ? it.netId : r.netId;
             return (
               <TableRow
-                key={r.key}
+                key={"netId" in it && it.netId ? `${r.key}|${it.netId}` : r.key}
                 // The committed-selection language, bent to a table: the `--sel-bg` wash alone — the
                 // ✓ retired on 2026-10-07 (user: "obsolete as the whole row is highlighted"). (SELECTED_ROW's box-shadow ring is skipped on purpose — a
                 // box-shadow doesn't paint on a border-collapsed table row.)
@@ -208,12 +268,12 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
                 tabIndex={0}
                 // The selection follows the subject's identity (selection.tsx · selectionHue).
                 style={{
-                  ...(r.netId ? { "--row-hue": filterAccent(r.netId) } : {}),
-                  ...(selected && r.netId ? selectionHue(filterAccent(r.netId)) : {}),
+                  ...(hue ? { "--row-hue": filterAccent(hue) } : {}),
+                  ...(selected && hue ? selectionHue(filterAccent(hue)) : {}),
                 } as CSSProperties}
-                onMouseEnter={() => r.node.id && setHoverNodeId(r.node.id)}
+                onMouseEnter={() => hoverId && setHoverNodeId(hoverId)}
                 onMouseLeave={() => setHoverNodeId(null)}
-                onFocus={() => r.node.id && setHoverNodeId(r.node.id)}
+                onFocus={() => hoverId && setHoverNodeId(hoverId)}
                 onBlur={() => setHoverNodeId(null)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
@@ -226,6 +286,44 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
                 {COLS[mode].map((c) => (
                   <TableCell key={c.key} className={PHONE_HIDDEN}>{cell(r, c.key)}</TableCell>
                 ))}
+                {hyperPhone ? (
+                  // LAYERS FIRST (design F1): the make-up word and its layer codes — what this node
+                  // runs in THIS network — at the left, the short id at the right edge. One line:
+                  // the place is Geography's lens (E1) and the node card's, one tap away.
+                  <TableCell className="py-1.5 whitespace-normal">
+                    <span className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 min-h-8">
+                      {(() => {
+                        const comp = compositionRows([{ roles: it.roles ?? r.roles, layer: (own ?? r.node).layer }])[0];
+                        return (
+                          <span className="flex items-center gap-2 min-w-0 text-foreground">
+                            <span className="truncate">{comp?.label ?? "Unknown"}</span>
+                            {comp && <RoleChips codes={comp.codes} />}
+                          </span>
+                        );
+                      })()}
+                      <span className="font-mono tabular-nums text-label text-foreground-dim">
+                        {hoverId ? `${hoverId.slice(0, 6)}…${hoverId.slice(-4)}` : (own ?? r.node).label}
+                      </span>
+                    </span>
+                  </TableCell>
+                ) : geoPhone ? (
+                  // PLACE FIRST (design E1): the city, its provider beneath; WHO it is at the right
+                  // edge, the network over the short id. The country is the plate above, and the
+                  // make-up chip is Hypergraph's lens — the node card states it one tap away.
+                  <TableCell className="py-1.5 whitespace-normal">
+                    <span className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 min-h-10">
+                      <span className="flex flex-col min-w-0">
+                        <span className="truncate text-foreground">{r.node.city ?? "Unknown city"}</span>
+                        <span className="truncate text-label text-muted-foreground">{r.isp ?? "Unknown provider"}</span>
+                      </span>
+                      <span className="flex flex-col items-end gap-0.5 text-label">
+                        {cell(r, "net")}
+                        {cell(r, "id")}
+                      </span>
+                    </span>
+                  </TableCell>
+                ) : (
+                <>
                 {/* ONE FACT PER LINE ON PHONE (user, 2026-10-07 — the raw phone pass: "1 per row
                     looks clean, keep the tag also", then "add the icon to each"). The first line is
                     WHO — network, node id, and the make-up as the head's own qualifier chip — and
@@ -263,6 +361,8 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
                     );
                   })()}
                 </TableCell>
+                </>
+                )}
               </TableRow>
             );
           })}

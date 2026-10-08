@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>B — Raw snapshot list</title>
+<link rel="stylesheet" href="page.css">
+<style>
+.tb{display:flex;justify-content:flex-end;gap:8px;padding:0 34px 8px 0}
+.tb .sb{display:flex;align-items:center;gap:7px;height:38px;padding:0 12px;border:1px solid var(--border);border-radius:6px;color:var(--dim)}
+.tb .sb svg{color:var(--primary)}
+.lr{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto auto;align-items:center;gap:10px;height:44px;padding:0 6px 0 10px;border-top:1px solid color-mix(in oklch,var(--border) 60%,transparent);font-size:var(--body)}
+.lr .who{display:flex;align-items:center;gap:8px}
+.lr .ord{font-family:var(--mono)}
+.lr .fee{font-family:var(--mono);font-size:13px;color:var(--muted);text-align:right}
+.lr .kb{font-family:var(--mono);font-size:13px;color:var(--dim);text-align:right;min-width:52px}
+.lr .chev{width:14px;color:color-mix(in oklch,var(--muted) 75%,transparent)}
+.lr.nochev{grid-template-columns:auto minmax(0,1fr) auto auto}
+.lr.sel{background:color-mix(in oklch,var(--h) 12%,transparent);box-shadow:inset 2px 0 0 var(--h)}
+.lr.sel .chev{color:var(--h)}
+/* global header variants */
+.gh0{display:flex;align-items:baseline;gap:8px;padding:12px 10px 4px;font-size:var(--label);color:var(--muted);border-bottom:1px solid var(--border)}
+.gh0 .v{font-family:var(--mono);color:var(--fg)}
+.gh{display:flex;align-items:center;gap:8px;height:34px;margin-top:10px;padding:0 10px;border-radius:6px 6px 0 0;
+  background:color-mix(in oklch,var(--primary) 9%,var(--plate));border-bottom:1px solid color-mix(in oklch,var(--primary) 35%,transparent);font-size:var(--label)}
+.gh .k{letter-spacing:var(--caps);text-transform:uppercase;color:color-mix(in oklch,var(--primary) 80%,var(--muted))}
+.gh .v{font-family:var(--mono);color:var(--fg);font-size:13.5px}
+.gh .age{margin-left:auto;color:var(--dim)}
+.gh.sel{background:color-mix(in oklch,var(--primary) 20%,transparent);border-bottom-color:var(--primary)}
+.gh.sel .k,.gh.sel .v{color:var(--primary)}
+.gh .count{color:var(--muted)}
+.gh2{display:flex;align-items:center;gap:8px;height:30px;margin-top:12px;padding:0 10px;font-size:var(--label);border-left:2px solid color-mix(in oklch,var(--primary) 60%,transparent)}
+.gh2 .k{letter-spacing:var(--caps);text-transform:uppercase;color:var(--muted)}
+.gh2 .v{font-family:var(--mono);color:var(--primary)}
+.gh2 .age{margin-left:auto;color:var(--dim)}
+.indent .lr{padding-left:20px}
+.hint{font-size:var(--label);color:var(--muted);padding:0 10px 8px}
+</style></head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<symbol id="cr" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+<symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+<symbol id="x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+</defs></svg>
+
+<h1>B — Raw snapshot list (phone)</h1>
+<p class="lede">Two asks: a row should look tappable (it opens the snapshot's page), and the GLOBAL header row should be clearly different from the metagraph rows under it. The selection fix you asked for (only the selected row carries the edge) is already built; it is drawn here as part of each option.</p>
+<nav class="pages"><a href="index.html">all pages</a></nav>
+
+<h2><span class="n now">0</span> Now</h2>
+<div class="row"><div class="crop" style="height:520px"><img src="now-list.png" alt="current raw list"></div></div>
+
+<h2><span class="n">B1</span> Header plate + row chevron <span class="rec">recommended</span></h2>
+<ul class="why">
+  <li><b>The global header is a plate</b>: an accent-tinted band with an accent hairline under it, "GLOBAL" in accent caps and the number in body mono, age on the right. It reads as the group's head and the rows below as its contents.</li>
+  <li><b>Every metagraph row ends in a quiet chevron</b> ›, the standard phone sign for "opens a page". The selected row takes its network's colour for the chevron, the edge and the wash.</li>
+  <li>When the <b>global</b> is the selection, its plate deepens to the selection accent and no row carries an edge.</li>
+  <li>Phone only. On desktop the snapshot opens beside the list, so a chevron would promise a page that never comes.</li>
+</ul>
+<div class="row">
+  <div>
+    <div class="cap">a metagraph snapshot selected</div>
+    <div class="phone"><div class="panel">
+      <div class="x"><svg class="i s"><use href="#x"/></svg></div>
+      <div class="tb"><span class="sb"><svg class="i s"><use href="#search"/></svg>Search</span></div>
+      <div class="gh"><span class="k">Global</span><span class="v">7,024,309</span><span class="age">17s ago</span></div>
+      <div class="lr"><span class="who"><span class="dot" style="background:var(--biofi)"></span>BIOFI</span><span class="ord">13,512</span><span class="fee">0.0040 DAG</span><span class="kb">1.6 KB</span><svg class="i s chev"><use href="#cr"/></svg></div>
+      <div class="lr sel" style="--h:var(--ded)"><span class="who"><span class="dot" style="background:var(--ded)"></span>DED</span><span class="ord">2,626,347</span><span class="fee">0.0070 DAG</span><span class="kb">4.3 KB</span><svg class="i s chev"><use href="#cr"/></svg></div>
+      <div class="lr"><span class="who"><span class="dot" style="background:var(--ded)"></span>DED</span><span class="ord">2,626,346</span><span class="fee">0.0030 DAG</span><span class="kb">1.2 KB</span><svg class="i s chev"><use href="#cr"/></svg></div>
+      <div class="lr"><span class="who"><span class="dot" style="background:var(--usdc)"></span>USDC.dag</span><span class="ord">790,101</span><span class="fee">0.0050 DAG</span><span class="kb">2.4 KB</span><svg class="i s chev"><use href="#cr"/></svg></div>
+      <div class="lr"><span class="who"><span class="dot" style="background:var(--dor)"></span>DOR</span><span class="ord">28,822,078</span><span class="fee">0.0050 DAG</span><span class="kb">2.6 KB</span><svg class="i s chev"><use href="#cr"/></svg></div>
+      <div class="gh"><span class="k">Global</span><span class="v">7,024,308</span><span class="age">32s ago</span></div>
+      <div class="lr"><span class="who"><span class="dot" style="background:var(--dor)"></span>DOR</span><span class="ord">28,822,077</span><span class="fee">0.0060 DAG</span><span class="kb">3.7 KB</span><svg class="i s chev"><use href="#cr"/></svg></div>
+      <div class="lr"><span class="who"><span class="dot" style="background:var(--dor)"></span>DOR</span><span class="ord">28,822,076</span><span class="fee">0.0070 DAG</span><span class="kb">4.1 KB</span><svg class="i s chev"><use href="#cr"/></svg></div>
+    </div></div>
+  </div>
+  <div>
+    <div class="cap">the global snapshot selected</div>
+    <div class="phone"><div class="panel">
+      <div class="x"><svg class="i s"><use href="#x"/></svg></div>
+      <div class="tb"><span class="sb"><svg class="i s"><use href="#search"/></svg>Search</span></div>
+      <div class="gh sel"><span class="k">Global</span><span class="v">7,024,309</span><span class="age">17s ago</span></div>
+      <div class="lr"><span class="who"><span class="dot" style="background:var(--biofi)"></span>BIOFI</span><span class="ord">13,512</span><span class="fee">0.0040 DAG</span><span class="kb">1.6 KB</span><svg class="i s chev"><use href="#cr"/></svg></div>
+      <div class="lr"><span class="who"><span class="dot" style="background:var(--ded)"></span>DED</span><span class="ord">2,626,347</span><span class="fee">0.0070 DAG</span><span class="kb">4.3 KB</span><svg class="i s chev"><use href="#cr"/></svg></div>
+      <div class="lr"><span class="who"><span class="dot" style="background:var(--ded)"></span>DED</span><span class="ord">2,626,346</span><span class="fee">0.0030 DAG</span><span class="kb">1.2 KB</span><svg class="i s chev"><use href="#cr"/></svg></div>
+      <div class="lr"><span class="who"><span class="dot" style="background:var(--usdc)"></span>USDC.dag</span><span class="ord">790,101</span><span class="fee">0.0050 DAG</span><span class="kb">2.4 KB</span><svg class="i s chev"><use href="#cr"/></svg></div>
+      <div class="lr"><span class="who"><span class="dot" style="background:var(--dor)"></span>DOR</span><span class="ord">28,822,078</span><span class="fee">0.0050 DAG</span><span class="kb">2.6 KB</span><svg class="i s chev"><use href="#cr"/></svg></div>
+      <div class="gh"><span class="k">Global</span><span class="v">7,024,308</span><span class="age">32s ago</span></div>
+      <div class="lr"><span class="who"><span class="dot" style="background:var(--dor)"></span>DOR</span><span class="ord">28,822,077</span><span class="fee">0.0060 DAG</span><span class="kb">3.7 KB</span><svg class="i s chev"><use href="#cr"/></svg></div>
+    </div></div>
+  </div>
+</div>
+<p class="note">Fee and size keep their right edge; the chevron takes 14px plus a gap from the space between the ordinal and the fee (DOR's 10-digit ordinals still fit at 390px). Today a tap on the global header only selects it (the page opens for metagraph snapshots only); that stays.</p>
+
+<h2><span class="n">B2</span> Accent rail header + indented rows</h2>
+<ul class="why">
+  <li>The header keeps today's open style but gains a 2px accent rail on its left and the number in accent; its rows are indented under it, the way a file tree shows containment.</li>
+  <li>Rows carry no chevron. Instead, a one-line hint over the list ("Tap a snapshot to open it") shows until the first tap.</li>
+  <li>Lighter than B1, but containment by indent costs 10px of every row, and a hint that disappears is no help the second time.</li>
+</ul>
+<div class="row">
+  <div class="phone"><div class="panel">
+    <div class="x"><svg class="i s"><use href="#x"/></svg></div>
+    <div class="tb"><span class="sb"><svg class="i s"><use href="#search"/></svg>Search</span></div>
+    <div class="hint">Tap a snapshot to open it</div>
+    <div class="gh2"><span class="k">Global</span><span class="v">7,024,309</span><span class="age">17s ago</span></div>
+    <div class="indent">
+      <div class="lr nochev"><span class="who"><span class="dot" style="background:var(--biofi)"></span>BIOFI</span><span class="ord">13,512</span><span class="fee">0.0070 DAG</span><span class="kb">1.6 KB</span></div>
+      <div class="lr nochev sel" style="--h:var(--ded)"><span class="who"><span class="dot" style="background:var(--ded)"></span>DED</span><span class="ord">2,626,347</span><span class="fee">0.0040 DAG</span><span class="kb">4.3 KB</span></div>
+      <div class="lr nochev"><span class="who"><span class="dot" style="background:var(--ded)"></span>DED</span><span class="ord">2,626,346</span><span class="fee">0.0070 DAG</span><span class="kb">1.2 KB</span></div>
+      <div class="lr nochev"><span class="who"><span class="dot" style="background:var(--usdc)"></span>USDC.dag</span><span class="ord">790,101</span><span class="fee">0.0030 DAG</span><span class="kb">2.4 KB</span></div>
+    </div>
+    <div class="gh2"><span class="k">Global</span><span class="v">7,024,308</span><span class="age">32s ago</span></div>
+    <div class="indent">
+      <div class="lr nochev"><span class="who"><span class="dot" style="background:var(--dor)"></span>DOR</span><span class="ord">28,822,077</span><span class="fee">0.0050 DAG</span><span class="kb">3.7 KB</span></div>
+    </div>
+  </div></div>
+</div>
+</body></html>

@@ -1,4 +1,6 @@
 "use client";
+import { withUnlisted } from "@/src/data/trendSeries";
+import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 
 import { netUrl } from "@/src/net/current";
 import { reportPoll, touchPoll } from "@/src/data/api";
@@ -39,7 +41,9 @@ async function load(url: string): Promise<TrendsWindowData | null> {
     const data: TrendsWindowData = {
       buckets: j.buckets,
       stepMs: j.stepMs,
-      series: j.series,
+      // The unlisted chains as ONE network and the whole totals (`withUnlisted`), once, here —
+      // every window and tile passes this loader, so no reader can see the raw shape.
+      series: withUnlisted(j.series, (id) => LISTED_IDS.has(id), UNLISTED_ID),
       // An older cached payload without the field: its receive time is the best honest bound.
       now: j.now ?? Date.now(),
     };

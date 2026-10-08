@@ -435,9 +435,12 @@ special-case for unlisted.
 
 **`unlisted` is a first-class network with one home** (`src/data/unlisted.ts`): the module owns its
 identity — **neutral gray in both lanes**, because no single identity can speak for a mixed set, so
-none does — and its data, derived from the exact reads, **the only honest source**, since the polled
-buffers only track the catalog. It is committable in every view: geo and hyper land in the honest
-quiet-empty state (no machines are knowable), the ledger lights its lane and dims the rest.
+none does — and its data, which reads like a listed network's (2026-10-08): its chains are POLLED
+into `NetworkData.unlistedSnaps` and counted under `UNLISTED_ID` in the anchor index, and the
+tick's exact read wins where it has landed (it also names a chain the hourly list has not caught).
+A chain silent for `RETIRE_QUIET_DAYS` is re-checked hourly instead of every tick. It is
+committable in every view with no stage note: hyper rests on the overview, geo's explorer says
+"No nodes reported.", the ledger lights its lane and dims the rest.
 
 `components/unlistedBoundary.test.ts` enforces the single home. Its two identity LITERALS sit one
 file down in `src/data/unlistedId.ts`, a leaf with no imports, re-exported by `unlisted.ts` — the

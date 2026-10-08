@@ -118,14 +118,14 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
       // all (test pass, 2026-10-03).
       empty: dead ? (
         NO_SIGNAL_COPY
+      ) : quietEmpty && filter === UNLISTED_ID ? (
+        // The unlisted set publishes no nodes at all — the same plain line the Hypergraph's
+        // explorer gives it (user, 2026-10-08: treat it like any other network, no stage note).
+        "No nodes reported."
       ) : quietEmpty ? (
         <>
           <span className="block text-body text-foreground">No locatable nodes</span>
-          {/* The unlisted set is not one metagraph and publishes no nodes at all (the Unlisted
-              audit, 2026-10-07) — "right now" and "still appears in the Hypergraph" were false. */}
-          {filter === UNLISTED_ID
-            ? "Unlisted channels publish no nodes, so there is nothing to place on the map."
-            : `${tickerOrName} has no nodes we can place on the map right now. It still appears in the Hypergraph.`}
+          {`${tickerOrName} has no nodes we can place on the map right now. It still appears in the Hypergraph.`}
         </>
       ) : undefined,
       rows: measured.map(({ c, v }) => ({
@@ -137,7 +137,6 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
         figure: v.toLocaleString(),
         on: c.cc === country,
         rung: "country",
-        title: `${c.country} · ${c.count} node${c.count === 1 ? "" : "s"}`,
         onClick: () => drill(c.cc),
         // The country's border on the globe previews while the row is hovered, and the scene's
         // own country hover washes this row — one channel, the filter's accent.
@@ -178,7 +177,6 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
           figure: v.toLocaleString(),
           on,
           rung: "cohort",
-          title: `${cohortLabel(ch)} · ${ch.rows.length} node${ch.rows.length === 1 ? "" : "s"}`,
           // A cohort of ONE is its node: the click selects the node outright (full ancestry
           // commits the cohort with it), so the reader never opens a list of one.
           onClick: () => {

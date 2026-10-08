@@ -50,8 +50,15 @@ describe("the filter-is-a-story membership rule (one home)", () => {
     expect(tickInStory(LISTED, a, undefined, STORY_SETTLE_MS + 1)).toBe(false);
   });
 
-  it("an unlisted question with NO exact read is unknown, not a zero", () => {
-    expect(tickInStory("unlisted", null, undefined)).toBeUndefined();
+  it("an unlisted question with NO exact read reads its POLLED count, like a listed network", () => {
+    expect(tickInStory("unlisted", anchor({ unlisted: 2 }), undefined)).toBe(true);
+    expect(tickInStory("unlisted", null, undefined)).toBe(false);
+    // a polled zero inside the settling window is unknown; once the exact read lands it is final
+    expect(tickInStory("unlisted", { ...anchor({ other: 1 }), touched: 1000 }, undefined, 2000)).toBeUndefined();
+    expect(tickInStory("unlisted", { ...anchor({ other: 1 }), touched: 1000 }, exact(0), 2000)).toBe(false);
+  });
+  it("the exact read wins over the polled unlisted count", () => {
+    expect(storyCount("unlisted", anchor({ unlisted: 2 }), exact(5))).toBe(5);
   });
 });
 

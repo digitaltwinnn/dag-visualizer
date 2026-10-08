@@ -3,12 +3,15 @@
 // a test that names the bug it pins (`logSearch.test.ts`). The component keeps the fetching and the
 // React state; every DECISION about what a search means is made here.
 import { dayEndMs, dayStartMs } from "@/src/data/chainSeek";
+import { UNLISTED_ID } from "@/src/data/unlistedId";
 
-/** Which rows the log reads: one network's chain, every catalog chain merged by time (All), or
- *  the latest rows the live buffer holds (the unlisted lens — no chain to page). */
+/** Which rows the log reads: one network's chain, or several chains merged by time — every catalog
+ *  chain under All, every UNLISTED chain under the Unlisted lens (2026-10-08: the explorer lists
+ *  them, so they page like any network) — or, for any other lens, the latest rows the live buffer
+ *  holds. */
 export function logMode(s: { chain: string | null; lens: string }): "chain" | "merged" | "latest" {
   if (s.chain) return "chain";
-  return s.lens === "all" ? "merged" : "latest";
+  return s.lens === "all" || s.lens === UNLISTED_ID ? "merged" : "latest";
 }
 
 export type Criterion = "snapshot" | "tick" | "date";

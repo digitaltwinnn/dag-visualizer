@@ -2,7 +2,8 @@
 
 import { cn } from "@/lib/utils";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { useBreakpoint } from "@/components/useBreakpoint";
 import { useStore } from "@/src/store/store";
@@ -23,9 +24,18 @@ import { useStore } from "@/src/store/store";
 // every frame. A read-and-write loop runs ONLY while something moves — the scene (`sceneMoving`,
 // which covers the stack's ease and the camera) or a store change that moves either end — and
 // stops on the frame after; at rest the tether costs nothing. The DOM is written only on change.
-// The phone draws it too (user, 2026-09-29: "on mobile I don't see the dotted lines"): the
-// timeline lives in the Vitals sheet, which opens directly under the stack, so the lines rise
-// from behind the sheet's top edge — the sheet paints over this layer — to the chart's axis.
+// The phone draws it too (user, 2026-09-29: "on mobile I don't see the dotted lines").
+//
+// ⚠️ THE LINES PAINT IN FRONT OF THE BAND (user, 2026-10-08: "the dotted lines from card to vitals
+// should be in front of the vitals section, not go behind it, so that they actually touch the
+// control"). They lived in the chart stack's layer (z-4), under the band (the strip, z-10) and the
+// phone's Vitals sheet, so their last stretch vanished behind the plate and they ended short of the
+// brush. The svg is now PORTALLED to the body as its own fixed layer just above the strip (z-11,
+// under the command bar's z-40; above the phone's sheet there) — and since it is no longer inside the stack, it MIRRORS the
+// stack's engine-written `data-on` (MutationObserver), so it still arrives and leaves with it.
+// Above the band it would also run ACROSS the Time range pills that stand over the band's corner,
+// so the pills' box (`[data-tether-avoid]`) is masked out of the lines: they pass behind the pills
+// and in front of everything else.
 
 const TETHER_STROKE = {
   stroke: "light-dark(color-mix(in oklch, var(--primary-ink) 80%, transparent), color-mix(in oklch, var(--primary) 45%, transparent))",
@@ -50,6 +60,23 @@ export default function TrendTether() {
   // is hidden but the dotted lines still show"): the lines run from the timeline, so with the
   // timeline stepped aside they point at nothing. They leave on the band's own exit tempo.
   const railsHidden = useStore((s) => s.railsHidden);
+  // The portal needs the document, which the server render does not have.
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  useEffect(() => setHost(document.body), []);
+
+  // Mirror the stack's arrival (`#trend-stack[data-on]`, written by the engine, not React).
+  useEffect(() => {
+    const el = svg.current;
+    const stack = document.getElementById("trend-stack");
+    if (!el || !stack) return;
+    const copy = () => {
+      el.dataset.on = stack.dataset.on ?? "";
+    };
+    copy();
+    const mo = new MutationObserver(copy);
+    mo.observe(stack, { attributes: true, attributeFilter: ["data-on"] });
+    return () => mo.disconnect();
+  }, [host]);
 
   useEffect(() => {
     const el = svg.current;
@@ -60,6 +87,7 @@ export default function TrendTether() {
       const brush = document.querySelector<SVGRectElement>("[data-brush]");
       const plot = document.querySelector<HTMLElement>("[data-plane][data-front] [data-plot]");
       const host = el.getBoundingClientRect();
+      const avoid = document.querySelector<HTMLElement>("[data-tether-avoid]")?.getBoundingClientRect();
       let d = "";
       if (brush && plot) {
         const b = brush.getBoundingClientRect();
@@ -74,16 +102,19 @@ export default function TrendTether() {
         const bl = b.left - host.left;
         const br = b.right - host.left;
         const bt = b.top - host.top;
-        if (p.width > 0 && b.width > 0) d = `${bl.toFixed(1)},${bt.toFixed(1)},${L.toFixed(1)},${y.toFixed(1)},${br.toFixed(1)},${R.toFixed(1)}`;
+        const hole = avoid && avoid.width > 0 ? [avoid.left - host.left, avoid.top - host.top, avoid.width, avoid.height] : [0, 0, 0, 0];
+        if (p.width > 0 && b.width > 0) d = [bl, bt, L, y, br, R, ...hole].map((v) => v.toFixed(1)).join(",");
       }
       if (d === last) return;
       last = d;
-      const [a, b2, c] = el.children as unknown as [SVGLineElement, SVGLineElement, SVGLineElement];
+      const [a, b2, c] = el.querySelectorAll("line") as unknown as [SVGLineElement, SVGLineElement, SVGLineElement];
+      const hole = el.querySelector<SVGRectElement>("[data-hole]")!;
       if (!d) {
         el.style.visibility = "hidden";
         return;
       }
-      const [bl, bt, L, y, br, R] = d.split(",").map(Number) as [number, number, number, number, number, number];
+      const [bl, bt, L, y, br, R, hx, hy, hw, hh] = d.split(",").map(Number) as number[];
+      hole.setAttribute("x", `${hx}`); hole.setAttribute("y", `${hy}`); hole.setAttribute("width", `${hw}`); hole.setAttribute("height", `${hh}`);
       a.setAttribute("x1", `${bl}`); a.setAttribute("y1", `${bt}`); a.setAttribute("x2", `${L}`); a.setAttribute("y2", `${y}`);
       b2.setAttribute("x1", `${br}`); b2.setAttribute("y1", `${bt}`); b2.setAttribute("x2", `${R}`); b2.setAttribute("y2", `${y}`);
       c.setAttribute("x1", `${L}`); c.setAttribute("y1", `${y}`); c.setAttribute("x2", `${R}`); c.setAttribute("y2", `${y}`);
@@ -127,15 +158,22 @@ export default function TrendTether() {
       window.removeEventListener("resize", onResize);
       mo?.disconnect();
     };
-  }, [bp, range, windowId, focus, scroll, moving, dock, sheetPx]);
+  }, [bp, range, windowId, focus, scroll, moving, dock, sheetPx, host]);
 
-  return (
+  if (!host) return null;
+  return createPortal(
     <svg
       ref={svg}
       aria-hidden
       className={cn(
-        "absolute inset-0 w-full h-full pointer-events-none overflow-visible transition-opacity duration-300 motion-reduce:transition-none",
-        railsHidden && "opacity-0",
+        // z-11 sits over the band (the strip, z-10); on the PHONE the timeline lives in the Vitals
+        // sheet (ui/sheet, z-41), so while THAT sheet is open the lines rise over it — z-42 shares
+        // the dock's number, which they never reach. Any other sheet (Explore, Details) keeps them
+        // under it, at z-11: they must not cross a card the reader opened (the branch review).
+        "fixed inset-0 z-[11] w-full h-full pointer-events-none overflow-visible",
+        dock === "vitals" && "max-[700px]:z-[42]",
+        "opacity-0 [transition:opacity_var(--tempo-nav)_ease] data-[on='1']:opacity-100 motion-reduce:!transition-none",
+        railsHidden && "!opacity-0",
       )}
       style={{ visibility: "hidden" }}
     >
@@ -144,9 +182,18 @@ export default function TrendTether() {
           pale thread on paper, where there is no bloom and the page is its own bright field. On
           paper it takes the accent's INK (`--primary-ink`) at 0.8; dark keeps what it had.
           `light-dark()` resolves colours only, so the alpha rides the colour, not `strokeOpacity`. */}
-      <line style={TETHER_STROKE} strokeWidth={1} strokeDasharray="3 4" />
-      <line style={TETHER_STROKE} strokeWidth={1} strokeDasharray="3 4" />
-      <line stroke="var(--primary)" strokeOpacity={0.9} strokeWidth={2} strokeLinecap="round" />
-    </svg>
+      <defs>
+        <mask id="trend-tether-mask" maskUnits="userSpaceOnUse" x="-10000" y="-10000" width="30000" height="30000">
+          <rect x="-10000" y="-10000" width="30000" height="30000" fill="white" />
+          <rect data-hole rx="8" fill="black" />
+        </mask>
+      </defs>
+      <g mask="url(#trend-tether-mask)">
+        <line style={TETHER_STROKE} strokeWidth={1} strokeDasharray="3 4" />
+        <line style={TETHER_STROKE} strokeWidth={1} strokeDasharray="3 4" />
+        <line stroke="var(--primary)" strokeOpacity={0.9} strokeWidth={2} strokeLinecap="round" />
+      </g>
+    </svg>,
+    host,
   );
 }

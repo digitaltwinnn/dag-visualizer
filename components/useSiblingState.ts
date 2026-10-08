@@ -67,7 +67,7 @@ export function useSiblingState(slot: RailCardKind | null): SiblingState {
     const tickNets = tickGlobal
       ? tickNetworksLevel(
           tickGlobal,
-          net ? tickPolledRows(net.metaSnaps, tickGlobal) : [],
+          net ? [...tickPolledRows(net.metaSnaps, tickGlobal), ...tickPolledRows(net.unlistedSnaps, tickGlobal)] : [],
           snapshotExact[tickGlobal.ordinal]?.rows,
           (id) => LISTED_IDS.has(id),
         )

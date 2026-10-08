@@ -10,7 +10,7 @@ the architecture map and the dev workflow; **its rules govern this file too**.
 
 The page is one fixed shell in **two layers at different depths** (`SectionShell` + `store.section`).
 **The raw layer's anchor log carries a SEARCH BAR** (`datasection/LogSearchBar.tsx` +
-`src/data/chainSeek.ts`): three named criteria in a hairline box, and ONE Search button, revealed by
+`src/data/chainSeek.ts`; every decision about what a search means is pure in `src/data/logSearch.ts`): three named criteria in a hairline box, and ONE Search button, revealed by
 a `search snapshots` toggle in a toolbar above the table.
 
 ⚠️ **SEARCHING IS ASKED FOR, AND THE TRIGGER SITS WITH WHAT IT REVEALS.** Two placements were
@@ -637,7 +637,7 @@ the METAGRAPH card sits directly above and this card's own mark already carries 
 for other users. If we show a local date and/or time also use that label"). A day-only label — a
 daily bucket, a range, the raw log's date fields — reads the same for every reader, so it needs no
 zone. A clock time is in the reader's locale and zone with that zone named ("2:00 PM GMT+2"), so a
-screenshot is never ambiguous. A record's age carries both on hover, UTC for matching an explorer.
+screenshot is never ambiguous.
 `src/util/localTime.ts` is the one home.
 
 **An ordinal is written BARE — no `#`** (user, 2026-08-10). Every surface that renders one as a value
@@ -1157,7 +1157,7 @@ deviations are in `docs/superpowers/design/2026-10-02-right-rail-cards/`): **hea
 a card says first, two lines at most — what the subject is to its parent; no full stop, it is a
 label, not prose — user, 2026-10-07), `SectionLabel` (a caps
 label with the section's one headline figure on the right), `Empty` (the ONE empty value: a dash,
-the reason on hover — the cards used to say "not known", "none" and "n/a"), `QualifierChip` and
+its reason only for assistive tech — the cards used to say "not known", "none" and "n/a"), `QualifierChip` and
 `Door`. Three rules ride them: **a head's aside is a qualifier chip or a state pill**, never bare
 text, a relation or an age (those are the lead's); **facts are regular weight** (the headline figure
 lives on the section label); **every way out of a card is a `Door`** — a full-bleed row on the wash

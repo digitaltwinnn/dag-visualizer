@@ -295,7 +295,7 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
               global snapshot is sealed by the DAG's OWN L0 cluster under the unified node model,
               so it is the same kind of fact and takes the same words. One home: SIGNER_GROUPS. */}
           {exact != null && (exact.signerCount ?? 0) > 0 && (
-            <Fact label="Signed by" title={SIGNER_GROUPS.globalProof.title}>
+            <Fact label="Signed by">
               <span className="animate-resolve-in motion-reduce:animate-none inline-flex items-center gap-1">
                 {exact.signerCount} <LayerWho who={SIGNER_GROUPS.globalProof.who} />
               </span>
@@ -317,9 +317,9 @@ export function SnapshotCard({ data: d }: { data: GlobalSnapshot }) {
             hashes attached to the label", then "the hash label still has extra room"): the
             value fills its own row toward its label, so a short label buys a longer value —
             head and tail both surviving. Budgets measured at the desktop rail width. */}
-        <FootRow label="Hash" value={midHash(d.hash, 23)} title={d.hash} copy={d.hash} copyName="hash" />
+        <FootRow label="Hash" value={midHash(d.hash, 23)} copy={d.hash} copyName="hash" />
         {d.lastSnapshotHash && (
-          <FootRow label="Previous" value={midHash(d.lastSnapshotHash, 18)} title={d.lastSnapshotHash} copy={d.lastSnapshotHash} copyName="previous hash" />
+          <FootRow label="Previous" value={midHash(d.lastSnapshotHash, 18)} copy={d.lastSnapshotHash} copyName="previous hash" />
         )}
       </Foot>
     </div>
@@ -347,14 +347,14 @@ function UnlistedMemberFacts({ id, last }: { id: string; last: boolean }) {
       {!last && (
         <div className="flex items-center justify-between gap-2">
           <span className="text-label tracking-caps uppercase text-muted-foreground">Network id</span>
-          <span className="font-mono text-label" title={id}>
+          <span className="font-mono text-label">
             {shortHash(id)}
           </span>
         </div>
       )}
       <div className={last ? undefined : "mt-1.5"}>
         <Fact label="Online nodes">
-          <span className="text-muted-foreground italic" title="This network publishes no node cluster, so its nodes are unknowable.">
+          <span className="text-muted-foreground italic">
             unknown
           </span>
         </Fact>
@@ -367,9 +367,6 @@ function UnlistedMemberFacts({ id, last }: { id: string; last: boolean }) {
         >
           <span
             className="flex flex-col items-end"
-            title={`Whether any node keeps this chain in full is unknowable — no cluster is published. The chain itself is real: ${
-              span ? `${span.latestOrdinal.toLocaleString()} snapshots${age ? ` since ~${age.replace("~", "")} ago` : ""}.` : "reading its span…"
-            }`}
           >
             <span className="text-muted-foreground italic">unknown</span>
             {age && <span className="text-label text-muted-foreground">chain ~{age}</span>}
@@ -381,7 +378,7 @@ function UnlistedMemberFacts({ id, last }: { id: string; last: boolean }) {
       </div>
       {!last && span?.owner && (
         <Fact label="Owner address">
-          <span className="font-mono" title={`The address that registered and controls this metagraph. ${span.owner}`}>
+          <span className="font-mono">
             {shortHash(span.owner)}
           </span>
         </Fact>
@@ -448,21 +445,18 @@ function ScheduleGroup({
 function ArchivalGroup({ sched }: { sched: ReturnType<typeof archiveSchedule> }) {
   return (
     <ScheduleGroup label="by archived snapshots" defaultOpen>
-      {sched ? <ScheduleTable axis="Depth" axisTitle="Archive depth — how far back each node's snapshot archive reaches" parts={archiveParts(sched)} /> : <ArchivalAcquiring />}
+      {sched ? <ScheduleTable axis="Depth" parts={archiveParts(sched)} /> : <ArchivalAcquiring />}
     </ScheduleGroup>
   );
 }
 
 /** The archive schedule's rows as the parts of one bar: the census's kinds in the neutral hue,
- *  stepped down per row, each part's title carrying what its tag column used to say. */
+ *  stepped down per row. */
 function archiveParts(sched: NonNullable<ReturnType<typeof archiveSchedule>>): SchedulePart[] {
   const parts: SchedulePart[] = sched.rows.map((row, i) => ({
     label: cap(row.label),
     count: row.count,
     color: partShade("var(--muted-foreground)", i),
-    title:
-      row.hint ??
-      (row.kept != null ? `${fmtSnapCount(row.kept)} snapshots kept${row.fullCount > 0 ? " · full archive" : ""}` : undefined),
   }));
   // The honest remainder (an absent probe entry proves nothing about what a node keeps) is a
   // part of the same bar, last and faintest, so the bar still sums to the fleet.
@@ -471,7 +465,6 @@ function archiveParts(sched: NonNullable<ReturnType<typeof archiveSchedule>>): S
       label: "Unknown",
       count: sched.unmeasured,
       color: partShade("var(--muted-foreground)", sched.rows.length + 1),
-      title: "The probe read nothing from these nodes — what they keep is unknown.",
     });
   return parts;
 }
@@ -512,7 +505,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const snapshotExact = useStore((s) => (cfg.id === UNLISTED_ID ? s.snapshotExact : null));
   const unlistedMembers =
     cfg.id === UNLISTED_ID && snapshotExact
-      ? observedUnlistedIds(getNetwork()?.globalSnapshots ?? [], snapshotExact).slice(0, 6)
+      ? observedUnlistedIds(getNetwork()?.globalSnapshots ?? [], snapshotExact, getNetwork()?.unlistedSnaps).slice(0, 6)
       : [];
   // The card's ONE foot subject: the catalog address, or the last observed unlisted member.
   const footId =
@@ -613,18 +606,17 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
                   THREE STACKED BARS, ONE PER PARTITION (design 2026-09-26, `dossier-breakdown` A;
                   the captioned tables under hairlines read as three sections): composition in
                   the network's hue, status in the bucket colours, archive depth in the neutral —
-                  each one bar of the same total, its parts named beneath. The chips and the
-                  depth tags ride the parts' titles. "Depth" in the column, "Archive depth" on hover (user, 2026-10-02: shorter — the two
-                  words wrapped); never the bare "archive" (user: it is
+                  each one bar of the same total, its parts named beneath. "Depth" in the column
+                  (user, 2026-10-02: shorter — "Archive depth" wrapped); never the bare "archive" (user: it is
                   how far back each node's archive reaches, not a size). */}
               <ScheduleGroup label="Online nodes" value={<b className="font-mono font-bold">{nodes.length}</b>} defaultOpen>
                 <ScheduleTable
                   axis="Composition"
-                  parts={compositionRows(nodes).map((r, i) => ({ label: r.label, count: r.count, color: partShade(hue, i), title: r.codes.join(" · ") }))}
+                  parts={compositionRows(nodes).map((r, i) => ({ label: r.label, count: r.count, color: partShade(hue, i) }))}
                 />
                 <ScheduleTable axis="Status" parts={statusItems(states).map((it) => ({ label: cap(it.label), count: it.count, color: it.color }))} />
                 {archSched != null ? (
-                  <ScheduleTable axis="Depth" axisTitle="Archive depth — how far back each node's snapshot archive reaches" parts={archiveParts(archSched)} />
+                  <ScheduleTable axis="Depth" parts={archiveParts(archSched)} />
                 ) : archAcquiring ? (
                   <ArchivalAcquiring />
                 ) : null}
@@ -670,13 +662,12 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
           {/* The snapshot cards' fill rule (user, 2026-08-14 — "the value takes up most of the
               space and sits against the label"): midHash at per-label budgets, so each address
               fills its own row toward its label. */}
-          <FootRow label="Id" value={midHash(footId, 25)} title={footId} copy={footId} copyName="network id" />
+          <FootRow label="Id" value={midHash(footId, 25)} copy={footId} copyName="network id" />
           {chainSpan?.owner && (
             <FootRow
               label="Owner"
               value={midHash(chainSpan.owner, 21)}
               copyName="owner address"
-              title={`The address that registered and controls this metagraph. ${chainSpan.owner}`}
               copy={chainSpan.owner}
             />
           )}
@@ -862,11 +853,6 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
         <Lead>
           {signed != null ? (
             <span
-              title={
-                signed.signed
-                  ? "This node is among the committed metagraph snapshot's proof signers — a snapshot is signed by the metagraph's own L0 validators."
-                  : "This node is not among the committed metagraph snapshot's proof signers — a snapshot is signed by the metagraph's own L0 validators that were in that round."
-              }
             >
               {signed.signed ? "Signed" : "Did not sign"} snapshot {signed.ordinal.toLocaleString()}
             </span>
@@ -912,13 +898,6 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           />
           {archState.kind === "value" && archEntry && archive && (
             <div
-              title={
-                archEntry.kind === "genesis"
-                  ? "Serves its chain's every snapshot, back to the first"
-                  : archEntry.kind === "deep"
-                    ? `Serves global snapshots back to the metagraph era (${archive.since}), with some gaps — one of ${archive.archivalCount} archival L0 validators of ${archive.total} probed`
-                    : `Serves the most recent ${(archEntry.latest - archEntry.floor).toLocaleString()} snapshots of its chain, back to ordinal ${archEntry.floor.toLocaleString()}; older history is discarded`
-              }
             >
               {archReach != null && (
                 <span aria-hidden className="block h-[5px] rounded-full bg-wash-strong overflow-hidden">
@@ -972,7 +951,6 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
         <Fact label={colo && colo.length > 0 ? "Networks" : "Network"}>
           <span
             className="inline-flex flex-wrap items-center justify-end gap-x-2.5 gap-y-0.5"
-            title={colo && colo.length > 0 ? "This machine answers in more than one network's cluster at the same IP." : undefined}
           >
             {[ownNet, ...(colo ?? [])].filter((c): c is { id: string; name: string } => c != null).map((c) => (
               <span key={c.id} className="inline-flex items-center gap-1.5">
@@ -989,7 +967,7 @@ function GeoLiveNode({ p }: { p: PickOf<"l0" | "l1" | "metanode"> }) {
           its own. Truncated display, full hash on hover. */}
       {p.node?.id && (
         <Foot>
-          <FootRow label="Node id" value={midHash(p.node.id, 20)} title={p.node.id} copy={p.node.id} copyName="node id" />
+          <FootRow label="Node id" value={midHash(p.node.id, 20)} copy={p.node.id} copyName="node id" />
         </Foot>
       )}
     </>
@@ -1053,7 +1031,7 @@ function networkParts(rows: { pick: Parameters<typeof pickNetId>[0] }[]): Schedu
   const parts: SchedulePart[] = [...by.entries()]
     .sort((x, y) => y[1] - x[1])
     .map(([id, count]) => ({ label: metagraphById(id)?.name || id, count, color: identityHudCss(id) }));
-  if (other > 0) parts.push({ label: "Other", count: other, color: "var(--muted-foreground)", title: "Nodes on no known network" });
+  if (other > 0) parts.push({ label: "Other", count: other, color: "var(--muted-foreground)" });
   return parts;
 }
 
@@ -1079,7 +1057,6 @@ function providerParts(rows: { pick: PickDescriptor }[]): SchedulePart[] {
       label: rest.length === 1 && unknown === 0 ? rest[0][0] : rest.length > 0 ? `${rest.length} others` : "Unknown host",
       count: restCount,
       color: partShade("var(--muted-foreground)", 3),
-      title: rest.length > 0 ? rest.map(([l, c]) => `${l} ${c}`).join(" · ") : "The lookup named no host for these nodes",
     });
   return parts;
 }
@@ -1198,7 +1175,7 @@ export function ProviderAside({ sel }: { sel: CohortSel }) {
   return (
     // A fixed cap, not a percentage: the head's aside is content-sized, so a percentage of it
     // resolves against the chip's own width and collapsed "Falkenstein" to "Fal…".
-    <QualifierChip className="max-w-[150px]" title={sel.city ?? undefined}>{sel.city ?? "Unlocated"}</QualifierChip>
+    <QualifierChip className="max-w-[150px]">{sel.city ?? "Unlocated"}</QualifierChip>
   );
 }
 

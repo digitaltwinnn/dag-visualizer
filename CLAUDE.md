@@ -37,7 +37,7 @@ Four views drive the 3D scene:
 
 The placeholder is ONE consolidated `soon` Mode, at `/soon` (2026-09-04; the old `status`/`transactions`/
 `staking` modes said the same nothing three times): the canvas fades out and `Blueprint.tsx` draws a
-wireframe GALLERY of the coming features, with no numbers, so it never reads as live data. The two
+wireframe GALLERY of the coming features, with no numbers, so it never reads as live data. The
 doc page (/about) is an overlay over the same bare stage, not a Mode.
 
 **The four 3D views are complementary projections of the same network: hyper = who/what, geo =
@@ -73,7 +73,7 @@ exemptions. `src/data/` holds the live singleton and the geo cache alongside the
 growing: a mechanical purity classifier was tried and rejected (its regex matched the words
 "window" and "fetch" inside this repo's own comments), and the header records why.
 
-Fourteen narrower boundary tests work the same way: `components/unlistedBoundary.test.ts` (the `"unlisted"`
+Fifteen narrower boundary tests work the same way: `components/unlistedBoundary.test.ts` (the `"unlisted"`
 id literal has exactly two homes), `components/railLadderBoundary.test.ts` (every committable focus
 rung maps to a hinted rail card slot), `components/railTierBoundary.test.ts` (`data-focus` has two
 homes and the slab's geometry — the pager included — keys on `data-tier`),
@@ -99,10 +99,11 @@ number on both arms), `src/data/signerMatchBoundary.test.ts` (a peer-id prefix c
 in `src/data/network.ts`), `src/engine/scene/rowBoundary.test.ts` (a scene module that places a
 ledger row consults the trail's boundaries), `src/engine/entryBeatBoundary.test.ts` (every 3D view's
 entry owner still defines the arrival beat's begin/release pair — the wiring was silently lost once)
-and `src/net/netUrlBoundary.test.ts` (every own-server fetch goes through `netUrl()`, or carries an
-exemption with a reason).
-`ls **/*Boundary.test.ts` is the live count: fifteen files, of which
-`components/selectionBoundary.test.ts` is rule 2's and the other fourteen are these.
+`src/net/netUrlBoundary.test.ts` (every own-server fetch goes through `netUrl()`, or carries an
+exemption with a reason) and `components/tooltipBoundary.test.ts` (no hover-only text: no `title=`
+on any HUD element — the UI explains itself on its surface, or not at all).
+`ls **/*Boundary.test.ts` is the live count: sixteen files, of which
+`components/selectionBoundary.test.ts` is rule 2's and the other fifteen are these.
 
 Each of these files opens with a header comment giving the rationale, the scope and every exemption
 with its reason. **That header is the rule's authoritative statement** — read it rather than inferring
@@ -155,7 +156,7 @@ micro-animation is CSS.
 ```bash
 npm install
 npm run dev        # http://localhost:3000, also serves the Next.js MCP at /_next/mcp
-npx tsc --noEmit   # the dev server tolerates type errors; run tsc to be sure
+npm run typecheck  # tsc over the app AND scripts/ (tsconfig.json excludes scripts/; the dev server tolerates type errors)
 npm test           # vitest
 ```
 
@@ -293,7 +294,7 @@ gathers to the staging grids and fades on the doc overlay's own clock (`fleetFad
 
 | Path | Responsibility |
 |---|---|
-| `app/` | Next App Router. `globals.css` is **the one stylesheet**; `[view]/` serves the four routed 3D views (`/trends` is the History VIEW; its RAW is a door onto the anchor log); `/about` is the **DOC OVERLAY** (2026-09-04) — they render AppShell with a scrollable document layer over the live scene (`components/DocLayer.tsx`; content in `components/docs/`, opened/closed by store `docPage` with no engine reboot; /about still server-renders its prose for crawlers and carries the **experimental disclosure** that used to be an always-on banner, retired 2026-08-09: a permanent banner over a live instrument reads as an alarm). The footer's About entry toggles the overlay. (The `/design` styleguide was deleted on 2026-10-07 — user: users don't need it; the tokens live in `globals.css` and the components are their own reference.) `--warn-soft` is /about's amber (shared with the raw layer's JSON booleans and the pulse strip's STALE dot). `api/*` are the server-side data routes. |
+| `app/` | Next App Router. `globals.css` is **the one stylesheet**; `[view]/` serves the four routed 3D views (`/trends` is the History VIEW; its RAW is a door onto the anchor log); `/about` is the **DOC OVERLAY** (2026-09-04) — it renders AppShell with a scrollable document layer over the live scene (`components/DocLayer.tsx`; content in `components/docs/`, opened/closed by store `docPage` with no engine reboot; /about still server-renders its prose for crawlers and carries the **experimental disclosure** that used to be an always-on banner, retired 2026-08-09: a permanent banner over a live instrument reads as an alarm). The footer's About entry toggles the overlay. (The `/design` styleguide was deleted on 2026-10-07 — user: users don't need it; the tokens live in `globals.css` and the components are their own reference.) `--warn-soft` is /about's amber (shared with the raw layer's JSON booleans and the pulse strip's STALE dot). `api/*` are the server-side data routes. |
 | `components/` | React panels, each reading/writing the store. `SceneCanvas` mounts the engine (dynamic-imported so Three never enters the server bundle). `components/explorer/` is the ONE explorer card (2026-09-26): every view's tool card is a description handed to `Explorer.tsx`, never a layout of its own — the design and its deviations are in `docs/superpowers/design/2026-09-26-explorer-card/`. |
 | `components/ui/` | The adopted shadcn/Radix primitives. |
 | `src/store/store.ts` | The Zustand store — mode, filter, selection, hover channels, `section`, phone UI state. |
@@ -303,6 +304,7 @@ gathers to the staging grids and fades on the doc overlay's own clock (`fleetFad
 | `src/engine/config.ts` | **Pure static data only** — endpoints, the `COLORS` mirror, the `METAGRAPHS` catalog, poll tuning. No math, no derived tables, no UI copy. |
 | `src/engine/domain/` | Pure logic + data (below). |
 | `src/engine/scene/` | The Three adapters — `SceneContext`, `Globe`, `objects/*`, `views/*`. |
+| `src/util/` | Shared formatters (`format.ts`) and the date rule's one home (`localTime.ts`: day-only labels are UTC days, clock times are local with a zone tag; `components/Stamp.tsx` renders it). |
 | `src/palette/` | The deterministic identity-hue generator. |
 | `lib/` | `utils.ts` (`cn()`), `mgVars.tsx` (**intentionally not yet mounted app-wide — don't delete as dead code**). |
 
@@ -486,6 +488,12 @@ can write. Don't "fix" a preview's 401 by adding the secret there. Deploys and d
 the cursor lives in Redis, and the next production run catches up to 30K records per chain (~a day
 of the busiest chain) with no hole; beyond that the gap is accepted and
 `scripts/rebuild-trends.ts --recompute-from` repairs the affected days.
+
+⚠️ **The store is shared by every deployment, so a change to WHAT IS STORED ships reader first**
+(learned 2026-10-08). A backfill run from a branch wrote new fields the deployed code then
+misread (its derivation subtracted them), and production's History was wrong until the branch
+shipped. Order: deploy the code that READS the new fields (and tolerates their absence), then run
+the backfill; or keep the new fields invisible to the deployed reader.
 
 ⚠️ Web Vitals do NOT capture the WebGL frame rate — use the engine's stats.js for that (dev-only, or in
 prod via `?stats`, so it never shows for real users).

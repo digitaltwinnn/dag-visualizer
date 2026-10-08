@@ -3,6 +3,7 @@ import { unstable_cache } from "next/cache";
 import { NETWORKS, type NetworkId } from "@/src/engine/config";
 import { isTracked } from "@/src/net/lineage";
 import { netOf } from "@/src/net/request";
+import { unlistedChains } from "../../unlistedChains";
 
 // A NETWORK'S SNAPSHOT HISTORY, ordinal-addressed (user, 2026-08-14 — "the pagination should be
 // based on the total number of snapshots", then "jump to first and latest"): ordinals are
@@ -15,9 +16,10 @@ import { netOf } from "@/src/net/request";
 //     in parallel and cached immutably (history never changes). This is what makes «/» jumps —
 //     including straight to genesis, ordinal 1 — one request deep.
 //
-// Only CATALOG addresses are served (retired networks and former addresses included). Under "all"
-// the client merges these chains itself (`components/datasection/useMergedLog.ts`); the unlisted
-// lens has no catalog address to page.
+// Served: CATALOG addresses (retired networks and former addresses included) and, since 2026-10-08,
+// the UNLISTED chains the explorer itself lists (`../../unlistedChains.ts`) — never an arbitrary
+// address. The client merges them itself (`components/datasection/useMergedLog.ts`): the catalog's
+// under "all", the unlisted chains under the Unlisted lens.
 
 export const maxDuration = 15;
 
@@ -82,7 +84,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ address: string
   const { address } = await ctx.params;
   const net = netOf(req);
   // Former addresses are served too: a re-registered network's first chain is still its history.
-  if (!isTracked(net, address)) {
+  if (!isTracked(net, address) && !(await unlistedChains(net).catch(() => [] as string[])).includes(address)) {
     return NextResponse.json({ error: "unknown network" }, { status: 404 });
   }
   const beforeRaw = new URL(req.url).searchParams.get("before");

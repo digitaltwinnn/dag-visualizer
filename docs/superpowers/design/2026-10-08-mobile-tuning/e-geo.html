@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>E — Geography raw rows</title>
+<link rel="stylesheet" href="page.css">
+<style>
+.ttl{display:flex;align-items:baseline;gap:8px;height:34px;font-size:var(--title)}
+.ttl .c{color:var(--muted);font-size:var(--body)}
+.gh{display:flex;align-items:center;gap:8px;height:34px;margin-top:10px;padding:0 10px;border-radius:6px 6px 0 0;
+  background:color-mix(in oklch,var(--primary) 9%,var(--plate));border-bottom:1px solid color-mix(in oklch,var(--primary) 35%,transparent);font-size:var(--label)}
+.gh .k{color:var(--fg);font-size:var(--body);font-weight:600}
+.gh .cc{font-family:var(--mono);color:color-mix(in oklch,var(--primary) 80%,var(--muted));letter-spacing:.08em}
+.gh .n{margin-left:auto;color:var(--dim);font-variant-numeric:tabular-nums}
+.r{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;min-height:52px;padding:6px 6px 6px 10px;border-top:1px solid color-mix(in oklch,var(--border) 60%,transparent)}
+.r:first-of-type{border-top:0}
+.r .place{font-size:var(--body);color:var(--fg)}
+.r .host{font-size:var(--label);color:var(--muted)}
+.r .who{display:flex;align-items:center;gap:7px;justify-content:flex-end;font-size:var(--label);color:var(--dim)}
+.r .who .id{font-family:var(--mono);color:var(--muted);font-size:12.5px}
+.r .who .t{color:var(--fg)}
+.r .stack{display:flex;flex-direction:column;align-items:flex-end;gap:1px}
+.r2{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;min-height:52px;padding:6px 6px 6px 10px;border-top:1px solid color-mix(in oklch,var(--border) 60%,transparent)}
+.r2 .place{font-size:var(--body);color:var(--fg)}
+.r2 .place .ctry{color:var(--muted)}
+.r2 .host{font-size:var(--label);color:var(--muted)}
+.r2 .who{display:flex;align-items:center;gap:7px;font-size:var(--label);color:var(--fg)}
+.flag{display:inline-flex;width:22px;height:16px;border-radius:2px;align-items:center;justify-content:center;font:600 9px/1 var(--mono);color:#06121a;background:color-mix(in oklch,var(--primary) 70%,white)}
+</style></head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<symbol id="x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+</defs></svg>
+
+<h1>E — Geography raw rows (phone)</h1>
+<p class="lede">Today the phone rows are the same in Hypergraph and Geography: network + node id first, then layer chip, location and provider. That order answers Hypergraph's question ("what is it in the architecture"). Geography's question is <b>where</b>, so its row should lead with the place. (Counts in the mockups are illustrative.)</p>
+<nav class="pages"><a href="index.html">all pages</a></nav>
+
+<h2><span class="n now">0</span> Now (Geography)</h2>
+<div class="row"><div class="crop" style="height:560px"><img src="now-geo.png" alt="current geo raw list"></div></div>
+
+<h2><span class="n">E1</span> Grouped by country, place first <span class="rec">recommended</span></h2>
+<ul class="why">
+  <li><b>Country header plates</b> with the node count on the right, in the same plate the snapshot list gets in B1 (one header style for a group in every raw list). Countries in the order the explorer lists them (most nodes first).</li>
+  <li>Each row leads with the <b>city</b>, the provider under it in muted type. The network and node id move to the right edge, ticker over short id.</li>
+  <li>The layer chip leaves this row: it is Hypergraph's lens, and the node card one tap away states it.</li>
+  <li>Hypergraph keeps today's row; the two views now differ only where their questions do.</li>
+</ul>
+<div class="row">
+  <div class="phone"><div class="panel">
+    <div class="x"><svg class="i s"><use href="#x"/></svg></div>
+    <div class="ttl">Nodes <span class="c">158</span></div>
+    <div class="gh"><span class="k">United States</span><span class="n">54</span></div>
+    <div class="r"><div><div class="place">San Jose</div><div class="host">Amazon.com, Inc.</div></div><div class="stack"><span class="who"><span class="dot" style="background:var(--usdc)"></span><span class="t">CMC</span></span><span class="who"><span class="id">77f7f6…c194</span></span></div></div>
+    <div class="r"><div><div class="place">San Jose</div><div class="host">Amazon.com, Inc.</div></div><div class="stack"><span class="who"><span class="dot" style="background:var(--usdc)"></span><span class="t">CMC</span></span><span class="who"><span class="id">ddec0a…6c26</span></span></div></div>
+    <div class="r"><div><div class="place">Kansas City</div><div class="host">IONOS SE</div></div><div class="stack"><span class="who"><span class="dot" style="background:var(--core)"></span><span class="t">DAG</span></span><span class="who"><span class="id">0b2b7e…5f38</span></span></div></div>
+    <div class="gh"><span class="k">Germany</span><span class="n">41</span></div>
+    <div class="r"><div><div class="place">Falkenstein</div><div class="host">Hetzner Online GmbH</div></div><div class="stack"><span class="who"><span class="dot" style="background:var(--core)"></span><span class="t">DAG</span></span><span class="who"><span class="id">0d9216…0385</span></span></div></div>
+    <div class="r"><div><div class="place">Nuremberg</div><div class="host">Hetzner Online GmbH</div></div><div class="stack"><span class="who"><span class="dot" style="background:var(--core)"></span><span class="t">DAG</span></span><span class="who"><span class="id">38ab8…d331</span></span></div></div>
+    <div class="gh"><span class="k">Finland</span><span class="n">12</span></div>
+    <div class="r"><div><div class="place">Helsinki</div><div class="host">Hetzner Online GmbH</div></div><div class="stack"><span class="who"><span class="dot" style="background:var(--biofi)"></span><span class="t">BIOFI</span></span><span class="who"><span class="id">900280…cdc8</span></span></div></div>
+  </div></div>
+</div>
+<p class="note">Sorting by a column header (desktop) still works; on phone the grouping is the sort. Under a committed country, the list shows that country's plate only.</p>
+
+<h2><span class="n">E2</span> Flat rows, place first</h2>
+<ul class="why">
+  <li>No groups: each row reads "City, Country" with the provider beneath, network + id on the right. Sorted by country, then city.</li>
+  <li>Simpler, but every row repeats its country, and 54 "United States" in a column is what grouping exists to remove.</li>
+</ul>
+<div class="row">
+  <div class="phone"><div class="panel">
+    <div class="x"><svg class="i s"><use href="#x"/></svg></div>
+    <div class="ttl">Nodes <span class="c">158</span></div>
+    <div class="r2"><div><div class="place">San Jose<span class="ctry">, United States</span></div><div class="host">Amazon.com, Inc.</div></div><span class="who"><span class="dot" style="background:var(--usdc)"></span>CMC</span></div>
+    <div class="r2"><div><div class="place">San Jose<span class="ctry">, United States</span></div><div class="host">Amazon.com, Inc.</div></div><span class="who"><span class="dot" style="background:var(--usdc)"></span>CMC</span></div>
+    <div class="r2"><div><div class="place">Kansas City<span class="ctry">, United States</span></div><div class="host">IONOS SE</div></div><span class="who"><span class="dot" style="background:var(--core)"></span>DAG</span></div>
+    <div class="r2"><div><div class="place">Falkenstein<span class="ctry">, Germany</span></div><div class="host">Hetzner Online GmbH</div></div><span class="who"><span class="dot" style="background:var(--core)"></span>DAG</span></div>
+    <div class="r2"><div><div class="place">Helsinki<span class="ctry">, Finland</span></div><div class="host">Hetzner Online GmbH</div></div><span class="who"><span class="dot" style="background:var(--biofi)"></span>BIOFI</span></div>
+  </div></div>
+</div>
+</body></html>

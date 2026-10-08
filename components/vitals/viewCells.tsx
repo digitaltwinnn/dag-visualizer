@@ -13,7 +13,7 @@
 import { BandCard, MicroBars, DonutTotal, TypeGlyph, TYPE_ORDER, compositionCounts, staleFor, windowSpan, windowNote } from "@/components/vitals/bandParts";
 import { useStore } from "@/src/store/store";
 import { metagraphById, getAnchor } from "@/src/data/network";
-import { displayNetwork, UNLISTED_ID } from "@/src/data/unlisted";
+import { displayNetwork, UNLISTED_HUE, UNLISTED_ID } from "@/src/data/unlisted";
 import { metaType, rolesOf, IdentityDot, RoleChips, TickerChip } from "@/components/inspector/parts";
 import { machineKey } from "@/src/data/composition";
 import { identityHudCss } from "@/src/palette/identity";
@@ -30,7 +30,8 @@ import { sliceWindow, trimNewestPartial, type TrendsWindowData } from "@/src/dat
 import { ageWords } from "@/src/util/relativeAge";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
-import { unlistedSeries } from "@/src/data/trendSeries";
+import { unlistedUnmeasured } from "@/src/data/trendSeries";
+import { nodesBySubregion } from "@/src/data/subregions";
 
 export function HyperCells({ accent }: { accent: string }) {
   const filter = useStore((s) => s.filter);
@@ -217,18 +218,15 @@ export function GeoCells({ accent }: { accent: string }) {
   const filter = useStore((s) => s.filter);
   const countries = lb?.countries ?? [];
   const total = selNodes.length;
-  const { ispCounts, topIsps, located } = useMemo(() => {
+  const { ispCounts, topIsps, byRegion } = useMemo(() => {
     const ispCounts = new Map<string, number>();
-    let located = 0;
     for (const r of selNodes) {
       const isp = "geo" in r.pick ? r.pick.geo?.isp : undefined;
       if (isp) ispCounts.set(isp, (ispCounts.get(isp) ?? 0) + 1);
-      // PLACED = the row resolved to a country, which is exactly the test the country ring below
-      // is built on. Reading the same field is the point: the two cards can then never disagree
-      // about how many nodes this view is actually able to draw.
-      if (r.cc) located++;
     }
-    return { ispCounts, topIsps: [...ispCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3), located };
+    // The sub-region reads the same `cc` the country ring is built on, so the two cards can never
+    // disagree about which nodes this view is able to place.
+    return { ispCounts, topIsps: [...ispCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3), byRegion: nodesBySubregion(selNodes) };
   }, [selNodes]);
   const topCountries = countries.slice(0, 3);
   const restC = countries.slice(3).reduce((s, c) => s + c.count, 0);
@@ -265,23 +263,22 @@ export function GeoCells({ accent }: { accent: string }) {
 
   return (
     <>
-      {/* THE FLEET, AND WHETHER GEO CAN ACTUALLY DRAW IT (user, 2026-09-01: the lone numeral
-          "looks very boring, is there a nicer way to present the 1 number?"). A card with no
-          breakdown is the boring case by construction — the band's grammar is lead + detail — and
-          this is the one breakdown that belongs to THIS view rather than to its neighbours: a node
-          the lookup could not place sits in no country ring and no provider ring, so the split is
-          also the basis both cards beside it silently assume. Rule 10: an unplaced node is an
-          instrument state, not a rounding error, and stating it is how the fleet total and the
-          rings are allowed to differ honestly. `unplaced` reading 0 is itself a reading — the
-          fleet is fully drawn — and MicroBars renders no bar for it, only the numeral. */}
+      {/* THE FLEET BY SUB-REGION (user, 2026-10-08: "nodes located/unplaced — unplaced never
+          happens; what is a better node breakdown related to geo?", then continents, then "room for
+          sub-regions?"). The lone total was a boring card by construction (2026-09-01) and its
+          located/unplaced split answered a question the lookup never fails. The UN M49 sub-region
+          is the world view of WHERE — the level above the Top countries card beside it — busiest
+          first, the band's four-row height kept by folding the rest into a muted `other`.
+          `unplaced` is a row only while it is not zero: an instrument state worth stating, never a
+          standing "0". */}
       <BandCard label="Nodes"
         lead={<span className="font-mono font-bold text-xl text-foreground tabular-nums"><Odometer int value={total || null} /></span>}>
-        {/* "unplaced" takes the neutral, like hyper's "unknown" type bucket: a node the lookup
-            could not place claims no location, so its bar should not wear the accent the located
-            split does (user, 2026-09-03). */}
-        <MicroBars accent={accent} labelW={56} rows={[
-          { key: "located", label: "located", count: located },
-          { key: "unplaced", label: "unplaced", count: Math.max(0, total - located), hue: "var(--muted-foreground)" },
+        <MicroBars accent={accent} labelW={120} rows={[
+          ...byRegion.rows.slice(0, byRegion.rows.length > 4 ? 3 : 4).map((c) => ({ key: c.region, label: c.region, count: c.count })),
+          ...(byRegion.rows.length > 4
+            ? [{ key: "other", label: "other", count: byRegion.rows.slice(3).reduce((n, c) => n + c.count, 0), hue: "var(--muted-foreground)" }]
+            : []),
+          ...(byRegion.unplaced > 0 ? [{ key: "unplaced", label: "unplaced", count: byRegion.unplaced, hue: "var(--muted-foreground)" }] : []),
         ]} />
       </BandCard>
       {/* "Top countries", not "Nodes by country" (user, 2026-09-01): the card shows the top three
@@ -294,7 +291,10 @@ export function GeoCells({ accent }: { accent: string }) {
       {topCountries.length > 0 && (
         <BandCard label="Top countries"
           lead={<DonutTotal counts={countryRing} accent={accent} total={countries.length} />}>
-          <MicroBars accent={accent} labelW={18} rows={topCountries.map((c) => ({ key: c.cc, label: c.cc, count: c.count }))} />
+          {/* The country's NAME, not its code (user, 2026-10-08: "top countries can use full country
+              names?") — the same label width as the sub-region card beside it, so "United States"
+              reads in full and the two cards' bars start on one line. */}
+          <MicroBars accent={accent} labelW={120} rows={topCountries.map((c) => ({ key: c.cc, label: c.country || c.cc, count: c.count }))} />
         </BandCard>
       )}
       {topIsps.length > 0 && (
@@ -335,8 +335,9 @@ export function GeoCells({ accent }: { accent: string }) {
 // hue — the tick chart's scoped rule, at the store's resolution.
 const STACK_ORDER: string[] = METAGRAPHS.map((m) => m.id);
 
-/** The measured-series name the rate cards read for the unlisted channels (`unlistedSeries`). */
-const UNLISTED_SNAPS = "unlisted.snaps";
+/** The measured-series name the rate cards read for the unlisted channels — their chains folded
+ *  into one network on load (`withUnlisted`). */
+const UNLISTED_SNAPS = `m.${UNLISTED_ID}.snaps`;
 
 /** THE GIVE-UP WORDS for a measured card whose store read FAILED (user, 2026-10-03: "fix" — the
  *  test pass found the rate cards saying "acquiring…" for as long as the trends store was down).
@@ -369,10 +370,13 @@ function StackBars({ accent, isMeta, filter, data, down }: { accent: string; isM
         const n = data.series[`m.${id}.snaps`]?.[i];
         if (n) { segs.push({ key: id, n, color: identityHudCss(id) }); named += n; }
       }
+      // The unlisted chains as one network, measured from their own chains (`withUnlisted`).
+      const u = data.series[`m.${UNLISTED_ID}.snaps`]?.[i];
+      if (u) { segs.push({ key: UNLISTED_ID, n: u, color: UNLISTED_HUE }); named += u; }
       // THE REMAINDER IS "UNATTRIBUTED", NEVER "UNLISTED" (review, 2026-09-09): the store
-      // advances each chain's cursor independently, so a lagging catalog chain's anchors
-      // land here beside the genuinely-unlisted ones — the neutral says only "not
-      // attributable from the store", the tick chart's own old rule. And the bar must
+      // advances each chain's cursor independently, so a lagging chain's anchors land here
+      // — the neutral says only "not attributable from the store", the tick chart's own old
+      // rule. (The unlisted chains have their own segment above since 2026-10-08.) And the bar must
       // CONTAIN its segments: live edge skew can put named above the global total, so the
       // bar takes the larger (a negative remainder must not silently vanish while the
       // segments clip past 100%).
@@ -510,6 +514,10 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
   // The bars and the lines share the windowed buckets exactly — one window, one payload, so
   // the chart and the roster that legends it can never rank over different reaches.
   const barData = windowed;
+  /** Whether the band's window holds a bucket whose unlisted chains were NOT read — the one case
+   *  the summed fee figure is a floor (`g.fee` adds their fees wherever they were measured), and
+   *  the only case the card may mention unlisted channels at all. */
+  const unlistedGap = useMemo(() => (windowed ? unlistedUnmeasured(windowed.series).some(Boolean) : false), [windowed]);
   /** The fetch errored and nothing is held from before (a failed REFRESH keeps its last data). */
   const storeDown = t7.error && !t7.data;
   const span = "last 24 hours";
@@ -531,8 +539,6 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
    *  sampler covered the bucket (`g.ticks`, the coverage marker) and a gap where it didn't. */
   const measured = (name: string): (number | null)[] | undefined => {
     if (!windowed) return undefined;
-    // The unlisted channels' one measured quantity: the global count less every listed network.
-    if (name === UNLISTED_SNAPS) return unlistedSeries(windowed.series);
     return windowed.series[name] ?? windowed.series["g.ticks"]?.map((v) => (v != null ? 0 : null));
   };
   interface SparkSpec { data: (number | null)[] | undefined; value: number | undefined; unit: string; span: string; sr: string; offRim: boolean }
@@ -597,11 +603,10 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
    *  pay and didn't, and the sum is a real number answering a question nobody asked at this scope.
    *  The reason line carries the fact that makes the absence interesting — this is the end fees
    *  arrive at — and the summed reading is one filter step away, under All, where it belongs. */
-  const notApplicable = (label: string, reason: string, title: string) => (
+  const notApplicable = (label: string, reason: string) => (
     <BandCard
       key={label}
       label={label}
-      title={title}
       lead={
         <span className="flex flex-col items-start">
           <span className="font-mono font-bold text-muted-foreground tabular-nums whitespace-nowrap">n/a</span>
@@ -611,14 +616,13 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
       <span className="flex items-center self-stretch text-label text-muted-foreground">{reason}</span>
     </BandCard>
   );
-  const rate = (label: string, spark: SparkSpec, note?: string, title?: string) => {
+  const rate = (label: string, spark: SparkSpec, note?: string, tag?: string) => {
     // The store failed and this card reads from it: say so, in the lead's own stacked grammar.
     if (storeDown && spark.data == null) {
       return (
         <BandCard
           key={label}
           label={label}
-          title={title}
           lead={
             <span className="flex flex-col items-start">
               <span className="font-mono font-bold text-xl text-muted-foreground tabular-nums whitespace-nowrap">—</span>
@@ -652,7 +656,6 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
         <BandCard
           key={label}
           label={label}
-          title={title}
           aside={spark.data != null ? ownSpan(spark.span) : undefined}
           lead={
             <span className="flex flex-col items-start">
@@ -675,7 +678,6 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
     return (
     <BandCard
       label={label}
-      title={title}
       // THE LABEL NAMES THE QUANTITY, THE NUMERAL CARRIES ITS OWN UNIT (user, 2026-09-08,
       // two rounds: "ANCHORS/HOUR" over a year-long line put the lead's unit on the whole
       // card, and an aside saying "live · /hour" was hard to read and repeated on every
@@ -692,7 +694,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
       // the right words per card and needs no new rule: the measured cards say the band's
       // window, and the live fallback keeps saying its own — which is the one case where the
       // two genuinely differ, and the reason this is one expression rather than a constant.
-      aside={ownSpan(spark.span)}
+      aside={tag ?? ownSpan(spark.span)}
       lead={
         <span className="flex flex-col items-start">
           {/* NodeStars while the window's mean is still in flight (user, 2026-09-08: the
@@ -763,33 +765,25 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
           Anchors lose nothing by leaving: the roster to the left counts who anchored and the chart
           to the right plots how much, both over this same window. This slot was their third home.
           ⚠️ THE TWO SCOPES ARE NOT EQUALLY EXACT, though, and the card says so. A network's own
-          fees are every fee it paid; the summed figure covers only the chains the sampler sees —
-          the public catalog — so it is a FLOOR, the same lower bound the snapshot card marks. It
-          cannot be silent about that (rule 10), and a caveat about the reading has nowhere to sit
-          but the card's title. */}
-      {filter === UNLISTED_ID
-        ? // THE UNLISTED CHANNELS' FEES ARE NOT KEPT (the Unlisted audit, 2026-10-07: this card waited
-          // on "acquiring…" forever). The store keeps fees per listed network and only a listed
-          // floor in total, so there is nothing to subtract from: a final word, not a promise.
-          notApplicable(
-            "Snapshot fees",
-            "not measured for unlisted channels",
-            "Fees are kept per listed network. What unlisted channels pay is part of the global total, which is not stored, so it cannot be measured here.",
-          )
-        : filter === "dag"
-        ? notApplicable(
-            "Snapshot fees",
-            "the base ledger is paid these, it pays none",
-            "A snapshot fee is what a metagraph pays to anchor into the global chain. The DAG core has nothing to anchor into — it is the chain they anchor into — so a global snapshot carries no fee at all. What flows IN is every network's fees summed; commit All to read it.",
-          )
+          fees are every fee it paid; the summed figure (`g.fee`) is the catalog's floor plus the
+          unlisted chains' own fees wherever the sampler read them (`u.cov`), so it is a FLOOR only
+          over a bucket where they were not read.
+          The card SAYS so, in its corner, exactly then (user, 2026-10-08: "unlisted are temporary
+          and by exception; an explanation is only worth it where there is an unlisted metagraph on
+          screen, otherwise it must not be mentioned at all"). It was a hover title until the
+          tooltips went the same day. */}
+      {filter === "dag"
+        ? // Says WHAT the DAG is before what it does (user, 2026-10-08: "explain hypergraph = base
+          // ledger, make it better readable"), in the dossier card's own words ("the Hypergraph's
+          // base network"), so two cards on one screen never name it two ways.
+          notApplicable("Snapshot fees", "The DAG is the Hypergraph's base network: it receives these fees and pays none")
         : scoped
-          ? rate("Snapshot fees", sparkOf(cfg ? `m.${cfg.id}.fee` : null, activity?.feesSeries, activity?.feesPerHour, true),
-                 "$DAG this network pays to anchor its snapshots into the global chain.",
-                 "What this network pays in $DAG to anchor its snapshots into the global chain. Its own fees, in full.")
-          : rate("Snapshot fees", sparkOf("g.feeFloor", activity?.feesSeries, activity?.feesPerHour, true),
-                 "$DAG paid to anchor snapshots into the global chain, every network summed. A floor: it counts only the metagraphs in the public catalog.",
-                 "What every network pays in $DAG to anchor its snapshots into the global chain, summed — so this is also what the base ledger takes in. A lower bound: only the metagraphs in the public catalog are counted, so the real figure is higher.")}
-      {/* Under Unlisted, their measured count (the global total less every listed network). */}
+          ? rate("Snapshot fees", sparkOf(filter === UNLISTED_ID ? `m.${UNLISTED_ID}.fee` : cfg ? `m.${cfg.id}.fee` : null, activity?.feesSeries, activity?.feesPerHour, true),
+                 "$DAG this network pays to anchor its snapshots into the global chain.")
+          : rate("Snapshot fees", sparkOf("g.fee", activity?.feesSeries, activity?.feesPerHour, true),
+                 `$DAG paid to anchor snapshots into the global chain, every network summed.${unlistedGap ? " Unlisted channels' fees are not counted where they were not read." : ""}`,
+                 unlistedGap ? "without unlisted" : undefined)}
+      {/* Under Unlisted, their measured count (their own chains, folded by `withUnlisted`). */}
       {rate("Snapshots", sparkOf(filter === UNLISTED_ID ? UNLISTED_SNAPS : scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries, activity?.snapsPerHour))}
       {/* The chart states the same reach its rows do — it plots the very buckets the rate cards
           average, so a silent chart beside two captioned ones would read as a different window. */}

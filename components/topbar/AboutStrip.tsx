@@ -4,6 +4,9 @@ import { ABOUT } from "@/components/aboutCopy";
 import { ABOUT_ICON } from "@/components/icons";
 import { VIEWS } from "@/components/views";
 import { useStore } from "@/src/store/store";
+import { X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 // "ABOUT THIS VIEW" AS A STRIP TENANT (2026-09-28) — the command bar's fourth grow-downward row,
 // opened by the info button in the bar's view-scoped island. It replaced the left rail's About
@@ -26,7 +29,7 @@ import { useStore } from "@/src/store/store";
 // left-aligned, the bar's right half was empty glass). The text inside stays left-aligned: a
 // ragged-left paragraph reads worse than the space it would fill. On phone the row still caps its
 // height and scrolls.
-export default function AboutStrip() {
+export default function AboutStrip({ onClose }: { onClose?: () => void }) {
   const mode = useStore((s) => s.mode);
   const { title, text, caption } = ABOUT[mode];
   // THE EYEBROW IS "<THE VIEW'S NAME> VIEW", NOT "ABOUT" (user, 2026-09-28, two rounds): the
@@ -50,6 +53,21 @@ export default function AboutStrip() {
           <Icon aria-hidden className="size-3.5 text-[var(--filter-accent,var(--primary))]" />
           {eyebrow}
           {caption && <span className="ml-auto text-muted-foreground">{caption}</span>}
+          {/* THE PHONE STRIP CLOSES ITSELF (user, 2026-10-08): it opens from the ⚙ menu there
+              (design A1 took the ⓘ off the phone bar), so without its own × the way out was back
+              through the menu. Desktop keeps the ⓘ toggle beside it in the bar. The house
+              card-close treatment, at the touch floor. */}
+          {onClose && (
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Close About this view"
+              className={cn("min-[700px]:hidden -my-2 -mr-2 text-muted-foreground hover:text-foreground pointer-coarse:min-h-11 pointer-coarse:min-w-11", !caption && "ml-auto")}
+              onClick={onClose}
+            >
+              <X aria-hidden className="size-3 pointer-coarse:size-[18px]" />
+            </Button>
+          )}
         </span>
         <span className="text-title font-semibold tracking-[-0.01em] text-foreground">{title}</span>
       </div>

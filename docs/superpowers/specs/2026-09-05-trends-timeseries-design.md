@@ -56,9 +56,21 @@ Buckets are assigned by each record's **own timestamp**, never fetch time. Per b
 - `snaps` — snapshot count
 - `fee` — Σ datum (exact)
 - `kb` — Σ sizeInKB (exact)
+- `ticks` — the global snapshots that carried this chain (distinct stamps; added 2026-10-08, the
+  user: a chain CREATES snapshots every few seconds and ANCHORS them every ~30s, "both are
+  relevant"). Written only where record order is guaranteed (the cron, the rebuild's ordered
+  walks and `--backfill-gaps`); buckets before it read as not measured, never as zero.
 
-Deliberately absent: distinct-ticks-landed (near-redundant with `snaps`, per the api.ts note),
-height/subHeight/epochProgress (counters that answer no trend question — the culled-facts rule).
+**Unlisted channels** (2026-10-08): every chain the explorer lists (`/currency`) that the catalog
+does not track — by its current id or a former one — is sampled like a catalog chain under its own
+address (`m.<address>.*`), but stays OUT of `feeFloor`/`kbFloor`. A bucket in which they were all
+read carries `u.cov` = 0 (the coverage marker, written beside the spine's `g.ticks` only when every
+unlisted chain answered); History's unlisted count is the sum of their `snaps` where `u.cov` is
+present and NOT MEASURED elsewhere. It replaced "anchors minus every listed network", which an
+explorer timestamp skew (a global's snapshots stamped into the next bucket) turned into phantoms.
+`scripts/rebuild-trends.ts --backfill-unlisted` writes their whole history and the marker.
+
+Deliberately absent: height/subHeight/epochProgress (counters that answer no trend question — the culled-facts rule).
 
 **Fleet gauges** (hourly + daily tiers only; last-write-wins point samples):
 - `nodes` total, `nodes:{id}` per network (12 incl. DAG), `layer:{l0|cl1|dl1}` totals

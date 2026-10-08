@@ -30,7 +30,13 @@ them — but the Next Node server can.
   (TTL_S all-null; the finite era's pending expiries were PERSISTed away one-time); history's
   FLOORS — where fine grain begins to exist — live in `src/data/trendWindow.ts` TIER_SINCE; **`/api/trends/sample`** is the Vercel-Cron sampler (15 min,
   `CRON_SECRET` auth) that pages the explorer stream since a Redis cursor and
-  merge-writes 5m/1h/1d hash tiers. Spec:
+  merge-writes 5m/1h/1d hash tiers. It also samples the UNLISTED chains — the explorer's `/currency`
+  list less every tracked address — for their own counts, outside the fee/size floors, marking the
+  buckets it measured them in with `u.cov` (History's unlisted figure is measured, not derived).
+  ⚠️ **A PRESENCE MARKER MUST NOT BE A COUNTER.** The read route zero-fills an absent ADD field in
+  every covered bucket (an honest "measured, none"), so a marker classed as a counter reads 0 where
+  it is missing — the same value it has where it is present. `u.cov` is classed `set` in
+  `merge.ts` `opOf` for exactly that reason; any new marker must be too. Spec:
   `docs/superpowers/specs/2026-09-05-trends-timeseries-design.md` — the key/field grammar,
   command budget, honesty rules (null = not measured, 0 = measured none; `g.ticks` is the
   coverage marker) and the Upstash usage contract (single region, eviction OFF, read-only
@@ -50,10 +56,13 @@ them — but the Next Node server can.
   deployment only; previews share the store read-only** — `CRON_SECRET` is deliberately absent
   from the Preview scope and the sampler fails closed. Self-heal: the cursor lives in Redis, a
   catch-up reaches 30K records per chain (~a day of DOR); beyond that the gap is ACCEPTED
-  (rule 10) and `--recompute-from` repairs. The `/trends` doc page is the read route's first
-  consumer (tabs + zoom over the 24h/7d/30d/1y windows).
+  (rule 10) and `--recompute-from` repairs. A chain the store has never read (a new network, or a
+  network's new address) is read back to its FIRST snapshot within the same depth
+  (`fetchSince.ts`), not just its newest page. The History view (`/trends`) is the read route's
+  consumer.
 - **`/api/global/at?ts=`** binary-searches ~23 tiny per-ordinal records to find the global carrying
-  that exact stamp (the anchor join is timestamp EQUALITY). Its one consumer is the anchor log's
+  that exact stamp (the anchor join is timestamp EQUALITY — which has exceptions: see the
+  timestamp note in `src/data/CLAUDE.md`; such a row answers 404 here, honestly). Its one consumer is the anchor log's
   ANCHORED INTO column resolution. ⚠️ An `?ordinal=` mode was added and then **removed** the same day
   (2026-09-01): it existed only to let the raw log's anchored-into search fall back to a timestamp
   walk for globals the payload host no longer serves, and that fallback was cut as a second mechanism
@@ -74,6 +83,20 @@ them — but the Next Node server can.
   decode. **A deterministic miss (the channel provably isn't in this immutable global) is cached
   like a success** — throwing it made every repeat of the same bad `(ordinal, address)` re-download
   the whole global, an anonymous amplification loop; only transient failures throw and retry.
+- **`/api/network/unlisted`** lists the UNLISTED chains — the explorer's `/currency` list less every
+  tracked address — cached an hour (`app/api/network/unlistedChains.ts`, also the gate below).
+- **`/api/network/[address]/snapshots`** pages one CATALOG chain (retired networks and former
+  addresses included) or one of those unlisted chains — never an arbitrary address — for the anchor log: no params is the live tip, fetched fresh; `?before=N` is
+  the ~25 ordinals below N as individual records, cached immutably (a day). Under All the client
+  merges these chains itself (`components/datasection/useMergedLog.ts`), and under the Unlisted
+  lens it merges the unlisted chains the same way.
+  **`/api/network/[address]/snapshots/[ordinal]`** is one record of ANY currency chain, catalog or
+  not (immutable, a day), and **`/api/network/[address]/chain`** is any chain's span — genesis date
+  and newest ordinal (5 min); those two are gated by address shape only.
+- **`/api/archive`** is the archive census behind the node card's Archive fact (1h,
+  stale-while-revalidate 6h); **`/api/node-names`** is the Global L0's delegated-staking registry —
+  validator names and opt-in (1h, `s-maxage`); **`/api/dev/css-stamp`** is the dev CSS canary's
+  source hash (404 in production). All answer 503 on upstream failure.
 
 ⚠️ **The snapshot routes' PAST bound is DROPPED** (user, 2026-08-14 — the anchor log pages a
 network's whole history and the payload follows the rows; "if abused I'll switch to Pro for DDoS
@@ -96,7 +119,8 @@ provider.**
 **There is intentionally no `$DAG` price networking** — don't add a market-data fetch unless something
 in the UI actually consumes it.
 
-**`data/` holds only baked BUILD artifacts.** `brand-hues.json` is baked offline by
+**`data/` holds only baked BUILD artifacts.** `retired.json` is written by the same brand bake
+(see `src/net/CLAUDE.md`, retirement). `brand-hues.json` is baked offline by
 `scripts/bake-brand-hues.ts` (run manually whenever the metagraph set changes) — it extracts each
 metagraph's hue from its real brand, snapped into the palette's allowed zones, with
 `brand-hue-overrides.json` as the manual escape hatch. `country-codes.json` is baked by

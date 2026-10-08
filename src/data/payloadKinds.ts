@@ -14,18 +14,12 @@
 /** The two payload lanes' words. ONE home, because the same two reads are disclosed at two
  *  levels — as SECTIONS on the metagraph-snapshot card (the shape) and as LANES in the raw
  *  layer's channel pane (the payload) — and a card whose sections disagreed with the pane's tabs
- *  would read as two different subjects rather than one subject twice. The titles carry the
- *  nuance the short values can't: `State` is the accumulated on-chain state, `Data` is what THIS
- *  snapshot's blocks carried, which is why a bare "none" means a different thing in each. */
+ *  would read as two different subjects rather than one subject twice. `State` is the accumulated
+ *  on-chain state, `Data` is what THIS snapshot's blocks carried. (Their hover titles — the size
+ *  distinction between decoded content and the anchored KB — went with the tooltips, 2026-10-08.) */
 export const PAYLOAD_LANES = {
-  // The titles carry the SIZE distinction (user, 2026-08-13 — "state size plus data size does
-  // not match Fees paid's anchored KB. Why?"): each section's size is its DECODED content, while
-  // the anchored figure is the whole snapshot's compressed wire footprint — brotli is applied to
-  // the whole payload, so a per-section as-carried size does not exist, and the envelope (proofs,
-  // header) belongs to neither section. The two readings can never sum, and the titles say which
-  // one each number is.
-  state: { name: "State", title: "The metagraph's on-chain application state. Its size is the decoded content; the anchored KB is the whole snapshot's compressed footprint." },
-  data: { name: "Data", title: "Data records carried in this snapshot's blocks. Its size is the decoded content; the anchored KB is the whole snapshot's compressed footprint." },
+  state: { name: "State" },
+  data: { name: "Data" },
 } as const;
 
 /** A decoded payload string → a tree-renderable value, tolerating an undecodable one (which

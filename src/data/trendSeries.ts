@@ -314,8 +314,9 @@ export const GLOBAL_METRIC_ROWS: Record<TrendMetric, { key: string | null; scale
   // snapshots, which is the hypergraph's own cadence, not the chains' production.
   snapshots: { key: "g.anchors", scale: 1 },
   blocks: { key: "g.blocks", scale: 1 },
-  fees: { key: "g.feeFloor", scale: 1e-8 },
-  kb: { key: "g.kbFloor", scale: 1 / 1024 },
+  // The WHOLE totals (`withUnlisted`): the catalog floor plus the unlisted chains where measured.
+  fees: { key: "g.fee", scale: 1e-8 },
+  kb: { key: "g.kb", scale: 1 / 1024 },
   nodes: { key: "f.nodes", scale: 1 },
   continuity: { key: null, scale: 1 },
 };
@@ -481,7 +482,10 @@ export function holdOrder(held: readonly string[], ranked: readonly string[]): s
  *  which bucket and the closing words how wide it is. The caller writes the subject and the number;
  *  this says the rest. Where the formatter already carries the noun ("1.2 MB") the object is "of
  *  data"; a gauge is what stood, so it carries no bucket. The verb is ANCHORED, the app's word for
- *  what a network does with a snapshot (user, same day: "sealed or anchored?"). */
+ *  what a network does with a snapshot (user, same day: "sealed or anchored?") — except the SPACING,
+ *  which is CREATED (user, 2026-10-08: "I think they created one every 3s, but anchored it to global
+ *  only occurs ~30sec"): the gap is between the chain's own snapshots, not between the global
+ *  snapshots that carried them, and the anchoring cadence is not a stored series. */
 export function momentPhrase(metric: TrendMetric, stepMs: number): { verb: string; rest: string } {
   const inBucket = stepMs >= 86400000 ? "on that day" : stepMs >= 3600000 ? "in that hour" : "in those 5 minutes";
   switch (metric) {
@@ -490,8 +494,28 @@ export function momentPhrase(metric: TrendMetric, stepMs: number): { verb: strin
     case "fees": return { verb: "paid", rest: `DAG in fees ${inBucket}` };
     case "kb": return { verb: "anchored", rest: `of data ${inBucket}` };
     case "nodes": return { verb: "ran", rest: "nodes" };
-    case "continuity": return { verb: "anchored a snapshot every", rest: inBucket };
+    case "continuity": return { verb: "created a snapshot every", rest: inBucket };
   }
+}
+
+/** HOW MANY GLOBAL SNAPSHOTS CARRIED A CHAIN, per bucket (`m.<id>.ticks`, sampled since
+ *  2026-10-08 — the user: "I think they created one every 3s, but anchored it to global only
+ *  ~30sec, so both are relevant"). Creating and anchoring are two cadences: a fast chain seals many
+ *  snapshots between two global ticks, and each tick carries the batch. A COPY, untrimmed like
+ *  `metricSeries`; empty where the store never measured it (null per bucket, never a zero). */
+export function anchorSeries(id: string, series: Readonly<Record<string, (number | null)[]>>): (number | null)[] {
+  // ⚠️ A ZERO BESIDE SNAPSHOTS IS "NOT MEASURED", NOT NONE. The read route fills a covered bucket's
+  // absent counter with an honest 0 (assemble.ts), which is right for a field the sampler always
+  // wrote — but this one began on 2026-10-08, so every older bucket arrives as 0. A chain that
+  // created snapshots in a bucket was anchored at least once in it (a snapshot carries its
+  // global's stamp), so 0 there can only be the field's absence (rule 10: null, never a zero).
+  const snaps = series[`m.${id}.snaps`] ?? [];
+  return (series[`m.${id}.ticks`] ?? []).map((a, i) => (a === 0 && (snaps[i] ?? 0) > 0 ? null : a));
+}
+
+/** The Moment lead's second clause, beside the creation spacing: "and anchored {n} times". */
+export function anchorClause(n: number): { before: string; after: string } {
+  return { before: "and anchored", after: n === 1 ? "time" : "times" };
 }
 
 /** A RANGE'S READING AS A SENTENCE ABOUT ITS NETWORK (2026-10-07 — the Range card, the Moment's
@@ -509,7 +533,7 @@ export function rangePhrase(metric: TrendMetric, partial: boolean): { verb: stri
     case "fees": return { verb: `paid${floor}`, rest: `DAG in fees ${over}` };
     case "kb": return { verb: `anchored${floor}`, rest: `of data ${over}` };
     case "nodes": return { verb: "ran", rest: "nodes on average" };
-    case "continuity": return { verb: "anchored a snapshot every", rest: "on average" };
+    case "continuity": return { verb: "created a snapshot every", rest: "on average" };
   }
 }
 
@@ -641,24 +665,56 @@ export function typeBands(id: string, series: Readonly<Record<string, (number | 
   });
 }
 
-/** UNLISTED ANCHORING, MEASURED (the Unlisted audit, 2026-10-07): the global snapshot count covers
- *  every channel and the listed networks' series cover the catalog, so per bucket the difference
- *  is what the unlisted channels anchored. Null where the global count or any listed network is
- *  unmeasured — a difference over a hole is a guess (rule 10). Never below zero: at a bucket edge a
- *  listed count can lead the global one. */
-export function unlistedSeries(series: Readonly<Record<string, readonly (number | null)[]>>): (number | null)[] {
-  const g = series["g.anchors"] ?? [];
-  const listed = Object.keys(series).filter((k) => k.startsWith("m.") && k.endsWith(".snaps"));
-  return g.map((total, i) => {
-    if (total == null) return null;
-    let sum = 0;
-    for (const k of listed) {
-      const v = series[k]![i];
-      if (v == null) return null;
-      sum += v;
-    }
-    return Math.max(0, total - sum);
-  });
+/** THE UNLISTED CHANNELS AS ONE NETWORK, AND THE TOTALS MADE WHOLE (2026-10-08 — the user: "why is
+ *  this different, doesn't have to be different"). The sampler measures every unlisted chain under
+ *  its own address (`m.<address>.*`, every field a catalog chain has), marking the buckets it read
+ *  them all in with `u.cov`. This folds them into ONE synthetic network, `m.<id>.*` — `id` is the
+ *  app's unlisted id — so every reader that handles a network (metricSeries, the planes, the
+ *  explorer rows, the Moment and Range cards) handles them with no special case: snapshots, fees,
+ *  size, blocks, spacing and anchorings alike. A bucket without the marker reads NULL, never zero.
+ *
+ *  It also writes the WHOLE totals, `g.fee` and `g.kb`: the catalog floor (`g.feeFloor`/`g.kbFloor`)
+ *  plus the unlisted chains' measured amounts wherever they were measured — the floor alone where
+ *  they were not (the reader may say so). They replace "anchors minus every listed network", which an
+ *  explorer timestamp skew broke (2026-09-29: 38 phantom unlisted snapshots).
+ *
+ *  `isListed` is the catalog's judgement (current and former ids), passed in so this stays pure. */
+const UNLISTED_FIELDS = ["snaps", "fee", "kb", "blocks", "gapSum", "gapMax", "ticks"] as const;
+
+export function withUnlisted(
+  series: Readonly<Record<string, (number | null)[]>>,
+  isListed: (id: string) => boolean,
+  id: string,
+): Record<string, (number | null)[]> {
+  const out: Record<string, (number | null)[]> = { ...series };
+  const cov = series["u.cov"];
+  const n = (series["g.ticks"] ?? cov ?? []).length;
+  const chains = [...new Set(Object.keys(series).filter((k) => k.startsWith("m.")).map((k) => k.split(".")[1]!))].filter(
+    (a) => a !== id && !isListed(a),
+  );
+  for (const f of UNLISTED_FIELDS) {
+    const cols = chains.map((a) => series[`m.${a}.${f}`]).filter((c): c is (number | null)[] => !!c);
+    out[`m.${id}.${f}`] = Array.from({ length: n }, (_, i) => {
+      if (cov?.[i] == null) return null;
+      let v = 0;
+      for (const c of cols) v = f === "gapMax" ? Math.max(v, c[i] ?? 0) : v + (c[i] ?? 0);
+      return v;
+    });
+  }
+  for (const [total, floor, f] of [["g.fee", "g.feeFloor", "fee"], ["g.kb", "g.kbFloor", "kb"]] as const) {
+    const fl = series[floor];
+    if (!fl) continue;
+    const unl = out[`m.${id}.${f}`]!;
+    out[total] = fl.map((v, i) => (v == null ? null : v + (unl[i] ?? 0)));
+  }
+  return out;
+}
+
+/** The buckets in which the unlisted channels were NOT measured although the spine was — where a
+ *  whole total (`g.fee`) is only its catalog floor. */
+export function unlistedUnmeasured(series: Readonly<Record<string, readonly (number | null)[]>>): boolean[] {
+  const cov = series["u.cov"];
+  return (series["g.ticks"] ?? []).map((t, i) => t != null && cov?.[i] == null);
 }
 
 /** The newest bucket a series measured something above zero in, or null. */

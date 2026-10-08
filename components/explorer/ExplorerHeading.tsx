@@ -65,7 +65,6 @@ export function MeasureMenu({ measure }: { measure: MeasureControl | null }) {
           "hover:bg-wash-hover data-[state=open]:bg-wash-soft",
           "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
         )}
-        title="What this list's figure is — pick another measure"
         aria-label={`Measure: ${current.label}. Pick another`}
       >
         {current.label}

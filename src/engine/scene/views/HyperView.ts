@@ -109,6 +109,30 @@ const PKT_POOL = 14; // reusable packet meshes per metagraph (caps simultaneous 
 // so there is nothing to dispose and no reason for N copies of one icosahedron.
 const HUB_ORB = new THREE.IcosahedronGeometry(0.9, 4);
 
+// THE SNAPSHOT RIPPLE (user, 2026-10-08: "make the flash on the center sphere a bit more visible by
+// animating some circle moving and fading outwards — like a drop falling in water"). The core's
+// flash was a brief swell and emissive lift, easy to miss at rest. Each new global snapshot now
+// also sends rings OUT from the core: a lead ring and a fainter follower a beat behind, as a drop
+// makes. They face the camera (a disc seen edge-on would vanish), ease out as they grow, and fade
+// as they go, so the eye reads one wave leaving the sphere. They carry the core's
+// own light and dim with it — its reveal on the morph, its off-subject drop, the view's fade —
+// and are pooled up front: the render loop writes, never builds.
+// Unit radius; the scale IS the radius. The band is a fraction of it, ONE PER GROUND (user,
+// 2026-10-08: "a bit too thick, especially in light mode"): on dark the ring is additive light the
+// bloom softens, on paper it is normal-blended ink with nothing to soften it, so the same band reads
+// heavier there — paper gets the thinner one.
+const RIPPLE_GEO = new THREE.RingGeometry(0.94, 1, 96);
+const RIPPLE_GEO_PAPER = new THREE.RingGeometry(0.965, 1, 96);
+const RIPPLE_POOL = 6; // three overlapping flashes' worth of pairs
+const RIPPLE_DUR = 1.9; // seconds, birth to gone
+const RIPPLE_FROM = 1.05; // radii of the core orb (HUB_ORB) at birth — just outside its surface
+// Radii it travels over its life. It must stay INSIDE the DAG's node rings (user, 2026-10-08: "so
+// that it does not touch the dag node rings"): the inner shell is tilted, so seen from the resting
+// pose its narrowest projected reach is ~5.5 core radii — 1.05 + 3.0 stops the ring at ~4.
+const RIPPLE_REACH = 3.0;
+const RIPPLE_OP = 0.9; // peak opacity at strength 1
+const RIPPLE_FOLLOW = { delay: 0.26, strength: 0.5 }; // the second, fainter ring
+
 // Give a single (non-instanced) emissive sphere the SAME fresnel-rim ORB look as the node instances
 // (NodeFabric._makeNodeMaterial): a view-dependent rim multiplied onto its emissive so the core /
 // hub read as lit 3D orbs, not flat faceted suns (user). The nodes are instanced (per-instance
@@ -185,6 +209,11 @@ export class HyperView implements SceneView {
   coreFlash?: number;
   private _coreRings: THREE.LineLoop[] = []; // the DAG core's cyan "sun" hoops (rebuilt on node load)
   private _coreFills: THREE.Mesh[] = []; // the DAG core's shell rim-fill disks (same as a metagraph's)
+  /** The snapshot ripple pool (RIPPLE_GEO's note): `age` counts from the flash, `delay` holds the
+   *  follower back, `strength` is the flash's. */
+  private _ripples: { mesh: THREE.Mesh; age: number; delay: number; strength: number; on: boolean }[] = [];
+  private _rippleNext = 0;
+  private _qRipple = new THREE.Quaternion(); // scratch: the camera's turn in the core group's frame
   private _fillTex?: THREE.Texture; // shared rim-weighted radial gradient for the ring fill disks
   // The focus spotlight (see SPOT_* above) + per-frame scratch. The light itself is shared and
   // owned by the Engine — this view only CLAIMS it while a subject is focused.
@@ -320,6 +349,16 @@ export class HyperView implements SceneView {
       sub: "Security & settlement layer",
     };
     this.coreGroup.add(this.core);
+    for (let i = 0; i < RIPPLE_POOL; i++) {
+      const mesh = new THREE.Mesh(
+        this._paper ? RIPPLE_GEO_PAPER : RIPPLE_GEO,
+        new THREE.MeshBasicMaterial({ color: this._core, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: glowBlend(this._colors) }),
+      );
+      mesh.visible = false;
+      joinBloom(mesh); // the core's own glow: the ring is its light leaving it
+      this.coreGroup.add(mesh);
+      this._ripples.push({ mesh, age: 0, delay: 0, strength: 0, on: false });
+    }
 
     // The core lives directly in the scene (not under `root`), so the morph's root-collapse
     // doesn't shrink it — instead it dissolves in place (coreReveal) in update() while the globe
@@ -332,7 +371,21 @@ export class HyperView implements SceneView {
   // bottom snapshot stream. `strength` scales the flash by how many metagraphs the
   // snapshot anchored (more anchored = brighter). Math.max so overlapping flashes
   // don't cut each other short.
-  flashCore(strength = 1) { this.coreFlash = Math.max(this.coreFlash || 0, strength); }
+  flashCore(strength = 1) {
+    this.coreFlash = Math.max(this.coreFlash || 0, strength);
+    this._launchRipple(0, strength);
+    this._launchRipple(RIPPLE_FOLLOW.delay, strength * RIPPLE_FOLLOW.strength);
+  }
+
+  private _launchRipple(delay: number, strength: number) {
+    if (!this._ripples.length) return;
+    const r = this._ripples[this._rippleNext];
+    this._rippleNext = (this._rippleNext + 1) % this._ripples.length;
+    r.age = 0;
+    r.delay = delay;
+    r.strength = strength;
+    r.on = true;
+  }
 
   // Fire an "anchored into L0" packet from a metagraph's hub toward the core —
   // called when that metagraph actually records a snapshot that anchored into a
@@ -447,6 +500,10 @@ export class HyperView implements SceneView {
     const bl = glowBlend(c);
     const reblend = (m: THREE.Material) => { m.blending = bl; m.needsUpdate = true; };
     for (const f of this._coreFills) reblend(f.material as THREE.Material);
+    for (const r of this._ripples) {
+      reblend(r.mesh.material as THREE.Material);
+      r.mesh.geometry = this._paper ? RIPPLE_GEO_PAPER : RIPPLE_GEO;
+    }
     for (const m of this.metas) {
       reblend(m.tether.material as THREE.Material);
       for (const pk of m.pool) reblend(pk.material as THREE.Material);
@@ -457,6 +514,7 @@ export class HyperView implements SceneView {
     coreMat.emissive.setHex(this._core);
     for (const h of this._coreRings) (h.material as THREE.LineDashedMaterial).color.setHex(this._core);
     for (const f of this._coreFills) (f.material as THREE.MeshBasicMaterial).color.setHex(this._core);
+    for (const r of this._ripples) (r.mesh.material as THREE.MeshBasicMaterial).color.setHex(this._core);
     for (const m of this.metas) {
       for (const h of m.hoops) (h.material as THREE.LineDashedMaterial).color.setHex(this._core);
       for (const f of m.fills) (f.material as THREE.MeshBasicMaterial).color.setHex(this._core);
@@ -655,8 +713,12 @@ export class HyperView implements SceneView {
     const t = this.clock;
 
     // Snapshots view: the hubs/tethers are hidden (set once in setLedger) and ledger.js owns the
-    // metagraph blocks, so there's nothing to orbit here.
-    if (this.ledger) return;
+    // metagraph blocks, so there's nothing to orbit here. A ripple started meanwhile is DROPPED, not
+    // paused: it belongs to the moment its snapshot landed, and must not play on the way back.
+    if (this.ledger) {
+      for (const r of this._ripples) if (r.on) { r.on = false; r.mesh.visible = false; }
+      return;
+    }
 
     // ⚠️ THE HUBS TAKE LONGER TO GO, AND GO ON A CURVE (user, 2026-09-13: "make the hub appear /
     // disappear a bit slower when we change mode"). One expression covers both directions — the
@@ -730,6 +792,30 @@ export class HyperView implements SceneView {
     const coreFillOp = inkPresence(FILL_OP * coreOffMul, paper) * coreReveal;
     for (const f of this._coreFills) (f.material as THREE.MeshBasicMaterial).opacity = coreFillOp * this._fades.alpha;
     if (this.coreFlash) this.coreFlash = Math.max(0, this.coreFlash - dt * 1.6);
+
+    // The ripples (RIPPLE_GEO's note). The core group hangs straight off the scene, so its own
+    // quaternion is its world turn: the camera's, expressed in that frame, faces every ring at it.
+    if (_cam) this._qRipple.copy(this.coreGroup.quaternion).invert().multiply(_cam.quaternion);
+    const rippleLight = coreReveal * this._fades.alpha;
+    for (const r of this._ripples) {
+      if (!r.on) continue;
+      r.age += dt;
+      const p = (r.age - r.delay) / RIPPLE_DUR;
+      if (p >= 1) {
+        r.on = false;
+        r.mesh.visible = false;
+        continue;
+      }
+      if (p < 0 || rippleLight <= 0.001) {
+        r.mesh.visible = false;
+        continue;
+      }
+      const grow = 1 - (1 - p) * (1 - p) * (1 - p); // ease-out: fast off the surface, slowing as it spreads
+      r.mesh.scale.setScalar(0.9 * (RIPPLE_FROM + grow * RIPPLE_REACH));
+      r.mesh.quaternion.copy(this._qRipple);
+      (r.mesh.material as THREE.MeshBasicMaterial).opacity = inkPresence(RIPPLE_OP * r.strength * Math.pow(1 - p, 1.5) * coreOffMul, paper) * rippleLight;
+      r.mesh.visible = true;
+    }
 
     // Metagraphs — orbit, spin, tether pulses. While ANY metagraph is selected (focusId), the
     // whole constellation holds still — every hub's orbit AND its own axis spin freeze, not just

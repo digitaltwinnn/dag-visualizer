@@ -2,9 +2,8 @@
 
 import { METAGRAPHS, netUrl } from "@/src/net/current";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, ChevronDown, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Search, X } from "lucide-react";
 import type { CSSProperties } from "react";
-import { useChainSpan } from "@/components/useArchive";
 import { useStore } from "@/src/store/store";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { getNetwork, metagraphById } from "@/src/data/network";
@@ -25,27 +24,22 @@ import TablePager from "@/components/datasection/TablePager";
 import LogSearchBar from "@/components/datasection/LogSearchBar";
 import { pageOfOrdinal, seekSpan, tsInRange } from "@/src/data/chainSeek";
 import { POLL } from "@/src/engine/config";
-import { recordStamp, utcDayKey, utcStamp } from "@/src/util/localTime";
+import { utcDayKey } from "@/src/util/localTime";
 import { dayWords } from "@/components/datasection/DateRange";
 import { useMergedLog, type MergedScope } from "@/components/datasection/useMergedLog";
 import { appliedChips, logMode, rangePage, searchCriterion, spanOfSearch } from "@/src/data/logSearch";
 import type { ChainSpan } from "@/src/data/mergedLog";
 import { useMinHold } from "@/components/useMinHold";
-import { useUnlistedLastSeen } from "@/components/UnlistedStage";
+import { useUnlistedLastSeen } from "@/components/useUnlistedLastSeen";
+import { useUnlistedChains } from "@/components/datasection/useUnlistedChains";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { isRetired } from "@/src/net/lineage";
 
 // The retained global window the log joins against — the same buffer the strip's bars plot,
 // one row per anchored metagraph snapshot inside it.
 const MAX = POLL.maxSnapshots;
+const NO_CHAINS: readonly string[] = [];
 const PAGE = 25;
-
-/** An age's hover: the record's time in the reader's clock, then in UTC for matching an explorer
- *  (2026-10-07 — dates are local everywhere; UTC stays one hover away). */
-const whenTitle = (ts: string): string | undefined => {
-  const ms = Date.parse(ts);
-  return Number.isFinite(ms) ? `${recordStamp(ms)}\n${utcStamp(ms)}` : undefined;
-};
 
 // ONE COLUMN LIST, read by the header AND by the search row beneath it — a second literal is how the
 // two silently fall out of alignment when a column is added.
@@ -102,8 +96,9 @@ const Dash = () => (
 // number of snapshots, not what we see in our buffers"):
 //
 //   · Under "all" (and DAG, through the ledger lens) the log is EVERY catalog chain merged by
-//     time with the real total (`useMergedLog`, 2026-10-07); under the unlisted lens it is the
-//     latest rows the live buffer holds — an unlisted channel has no chain to page.
+//     time with the real total (`useMergedLog`, 2026-10-07); under the unlisted lens it is every
+//     UNLISTED chain merged the same way (2026-10-08 — the explorer lists them), falling back to
+//     the latest rows the live buffer holds only when their list cannot be read.
 //   · Under a committed CATALOG network the log pages that network's ENTIRE chain through
 //     /api/network/[address]/snapshots. Ordinals are sequential and gapless, so the newest
 //     ordinal IS the lifetime total and EVERY page is pure arithmetic — page N asks for
@@ -118,17 +113,13 @@ const Dash = () => (
 // the (snapshot, tick) pair, and committing half of it would break every downstream consumer.
 /** One chain's label in the toolbar: the current one says so, an earlier one says when it ran —
  *  its genesis date, read from the chain's own span (the same lookup the dossier uses). */
-/** One segment of the chain toggle: a one-word name, the chain's start and address on hover. */
-function ChainSegment({ address, idx, on, onPick }: { address: string; idx: number; on: boolean; onPick: () => void }) {
-  const span = useChainSpan(address);
-  // A day-only label is a UTC day (M5).
-  const since = span?.genesisTs ? new Date(span.genesisTs).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : null;
+/** One segment of the chain toggle: a one-word name. */
+function ChainSegment({ idx, on, onPick }: { idx: number; on: boolean; onPick: () => void }) {
   const name = idx === 0 ? "Current" : idx === 1 ? "Earlier" : `Earlier ${idx}`;
   return (
     <button
       type="button"
       aria-pressed={on}
-      title={`${idx === 0 ? "The current chain" : "An earlier chain"}${since ? `, from ${since}` : ""} · ${address}`}
       onClick={onPick}
       className={cn(
         "h-7 pointer-coarse:h-10 px-2.5 rounded-sm cursor-pointer text-label",
@@ -195,17 +186,31 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // "I care about actual real totals not technical implementation … that should be solved under
   // the hood". With no network in scope the log is every listed network's whole chain, newest
   // first, with the exact total (`useMergedLog`). It replaced a live WINDOW of the last few minutes
-  // that called itself "recent" and explained the buffer on hover. The unlisted lens keeps the
-  // window: an unlisted channel has no public chain to page.
-  const mergedMode = logMode({ chain: histNet, lens }) === "merged";
+  // that called itself "recent" and explained the buffer on hover. The UNLISTED lens merges the
+  // unlisted chains the same way (2026-10-08): the explorer lists them by address, so their whole
+  // history pages like a network's — it used to be the live window alone.
+  // …while the unlisted chain list is in hand: a list that failed or holds nothing falls back to the
+  // live window (the "latest" rows) rather than merging nothing and waiting forever (the review).
+  const unlisted = useUnlistedChains(lens === UNLISTED_ID);
+  const unlistedReady = !!unlisted.chains?.length;
+  const unlistedFallback = lens === UNLISTED_ID && (unlisted.failed || (unlisted.chains != null && !unlisted.chains.length));
+  const mergedMode = logMode({ chain: histNet, lens }) === "merged" && !unlistedFallback;
   const metaList = useStore((st) => st.metaList);
   // THE CATALOG'S CHAINS, not the live directory's (2026-10-07 — retirement): every network the
   // catalog has, RETIRED ones included, with their former addresses, so the all-time total and the
   // records of a network Constellation no longer lists survive its removal.
-  const mergedChains = useMemo(() => METAGRAPHS.flatMap((m) => [m.id, ...(m.formerIds ?? [])]).filter((a, i, all) => !!a && all.indexOf(a) === i), []);
+  const catalogChains = useMemo(() => METAGRAPHS.flatMap((m) => [m.id, ...(m.formerIds ?? [])]).filter((a, i, all) => !!a && all.indexOf(a) === i), []);
+  const mergedChains = lens === UNLISTED_ID ? (unlisted.chains ?? NO_CHAINS) : catalogChains;
   // The live buffer's newest ordinal per chain — the merged log's tips lead with it.
   const liveTips: Record<string, number> = {};
   if (net) for (const [addr, snaps] of net.metaSnaps) for (const r of snaps) if (r.ordinal > (liveTips[addr] ?? 0)) liveTips[addr] = r.ordinal;
+  // The UNLISTED chains are in no live buffer (the polls track the catalog), so their tips come from
+  // the decoded live ticks — otherwise the Unlisted log's newest page never followed (the review).
+  if (net && lens === UNLISTED_ID) {
+    for (const r of unlistedLog(net.globalSnapshots, snapshotExact, net.unlistedSnaps)) {
+      if (r.metaId && r.ordinal > (liveTips[r.metaId] ?? 0)) liveTips[r.metaId] = r.ordinal;
+    }
+  }
   /** What the merged log is cut to: a time span (the date search), or exactly the snapshots one
    *  global snapshot carries (the global search). */
   // ⚠️ THE TIME CUT IS THE ONE SOURCE OF TRUTH for a date filter (the tester pass, 2026-10-07:
@@ -228,7 +233,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   const rawOpen = useStore((s) => s.section === "data");
   // Under the Unlisted lens an empty log says when one last anchored, never "waiting" forever.
   const unlistedLastSeen = useUnlistedLastSeen(rawOpen && lens === UNLISTED_ID);
-  const merged = useMergedLog(mergedMode && rawOpen, mergedChains, mergedScope, liveTips);
+  // Under Unlisted the merge waits for the chain list — an empty list would read as "no snapshots".
+  const merged = useMergedLog(mergedMode && rawOpen && (lens !== UNLISTED_ID || unlistedReady), mergedChains, mergedScope, liveTips);
   /** A merged search waiting for its page: land (mark) its first row, or go to the oldest end. */
   const mergedLand = useRef<"newest" | "oldest" | "landed-oldest" | null>(null);
 
@@ -499,7 +505,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     to = merged.to;
   } else if (!histNet) {
     const listedRows = net ? buildAnchorLog(net.metaSnaps, net.globalSnapshots, filter) : [];
-    const unlistedRows = net && (lens === "all" || lens === UNLISTED_ID) ? unlistedLog(net.globalSnapshots, snapshotExact) : [];
+    const unlistedRows = net && (lens === "all" || lens === UNLISTED_ID) ? unlistedLog(net.globalSnapshots, snapshotExact, net.unlistedSnaps) : [];
     allRowsUnbounded = sortAnchorLog([...listedRows, ...unlistedRows], sort.key, sort.dir, (metaId) => displayNetwork(metaId)?.ticker ?? metaId);
     // A RANGE CUTS THE LATEST ROWS to its span (`bound`, addressed to no chain) — the unlisted lens.
     allRows = timeCut ? allRowsUnbounded.filter((r) => tsInRange(r.ts, timeCut.fromMs, timeCut.toMs)) : allRowsUnbounded;
@@ -730,13 +736,23 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
           const s = spans.get(r.metaId);
           spans.set(r.metaId, s ? { lo: Math.min(s.lo, r.ordinal), hi: Math.max(s.hi, r.ordinal) } : { lo: r.ordinal, hi: r.ordinal });
         }
-        const unlistedN = (d.rows ?? []).filter((r) => !mergedChains.includes(r.metaId)).length;
-        setGlobalUnlisted(unlistedN);
+        // The REMAINDER is the snapshots outside the lens's own chains: unlisted ones under All, the
+        // listed ones under Unlisted — each said in its own words (the review: under Unlisted the
+        // remainder WAS the listed snapshots, and the miss called them unlisted).
+        const otherN = (d.rows ?? []).filter((r) => !mergedChains.includes(r.metaId)).length;
+        const unlistedLens = lens === UNLISTED_ID;
+        setGlobalUnlisted(unlistedLens ? 0 : otherN);
         if (!spans.size) {
+          const g = n.toLocaleString();
+          const s = otherN === 1 ? "" : "s";
           setJumpMiss(
-            unlistedN
-              ? `global snapshot ${n.toLocaleString()} carried only ${unlistedN} unlisted snapshot${unlistedN === 1 ? "" : "s"}, which cannot be listed here`
-              : `no listed network anchored into global snapshot ${n.toLocaleString()}`,
+            unlistedLens
+              ? otherN
+                ? `no unlisted chain anchored into global snapshot ${g} — it carried ${otherN} listed snapshot${s}, under All`
+                : `nothing anchored into global snapshot ${g}`
+              : otherN
+                ? `global snapshot ${g} carried only ${otherN} unlisted snapshot${s} — the Unlisted filter lists them`
+                : `no listed network anchored into global snapshot ${g}`,
           );
           return;
         }
@@ -1186,6 +1202,9 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     setDoorMeta(null);
     if (!lensNet) setSearchMeta(null);
     setMarked(null); setJumpMiss(null);
+    // Removing the search IS the unfiltered log (user, 2026-10-08: "when we remove the filter tag,
+    // it should apply it"): back to its live head, not left on the page the search landed on.
+    setPageState(1);
     // Clearing the arrival's search cancels it: nothing is being found any more.
     pendingSeek.current = false;
     landCommit.current = null;
@@ -1225,7 +1244,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       {lineage.length > 1 && (
         <span className="mr-auto inline-flex items-center gap-0.5 p-0.5 rounded-btn border border-border" role="group" aria-label="Which of this network's chains to page">
           {lineage.map((addr, i) => (
-            <ChainSegment key={addr} address={addr} idx={i} on={i === chainIdx} onPick={() => { setMarked(null); setJumpMiss(null); setChain(i); }} />
+            <ChainSegment key={addr} idx={i} on={i === chainIdx} onPick={() => { setMarked(null); setJumpMiss(null); setChain(i); }} />
           ))}
         </span>
       )}
@@ -1259,7 +1278,6 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   type="button"
                   onClick={all.length === 1 ? clearSearch : c.clear}
                   aria-label={`Clear ${c.text}`}
-                  title="Clear"
                   className="inline-flex flex-none size-6 pointer-coarse:size-9 max-[700px]:size-9 items-center justify-center rounded-xs cursor-pointer text-muted-foreground hover:text-foreground hover:bg-wash-faint focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
                 >
                   <X aria-hidden className="size-3.5 pointer-coarse:size-[18px]" />
@@ -1387,7 +1405,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
             </button>
           </p>
         ) : (
-          <div className={cn("m-auto", firstRead.fading && "animate-hold-fade-out motion-reduce:animate-none")}>{waiting("Reading every network's snapshots…")}</div>
+          <div className={cn("m-auto", firstRead.fading && "animate-hold-fade-out motion-reduce:animate-none")}>{waiting(lens === UNLISTED_ID ? "Reading the unlisted chains…" : "Reading every network's snapshots…")}</div>
         )}
       </>
     );
@@ -1409,7 +1427,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         {toolbar}
         {search}
         <p className="m-auto text-label text-muted-foreground">
-          {!live ? "NO SIGNAL" : lens === UNLISTED_ID && !timeCut ? `No unlisted snapshots among the latest global snapshots. ${unlistedLastSeen}` : timeCut || globalSpans ? "No snapshots in that range" : mergedMode ? "No snapshots here" : histNet && bound?.addr === histAddr ? "No snapshots in that range" : histNet ? (histErr ? "history unavailable — the explorer read failed; paging again retries" : "reading the chain…") : "Waiting for anchored metagraph snapshots…"}
+          {!live ? "NO SIGNAL" : lens === UNLISTED_ID && !timeCut && !mergedMode ? `No unlisted snapshots among the latest global snapshots. ${unlistedLastSeen}` : timeCut || globalSpans ? "No snapshots in that range" : mergedMode ? "No snapshots here" : histNet && bound?.addr === histAddr ? "No snapshots in that range" : histNet ? (histErr ? "history unavailable — the explorer read failed; paging again retries" : "reading the chain…") : "Waiting for anchored metagraph snapshots…"}
         </p>
       </>
     );
@@ -1433,7 +1451,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       {/* THE UNLISTED REMAINDER OF A GLOBAL SNAPSHOT, said rather than dropped. */}
       {mergedMode && globalSpans && globalUnlisted > 0 && (
         <p className="flex-none m-0 pb-2 text-label text-muted-foreground">
-          This global snapshot also carried {globalUnlisted} snapshot{globalUnlisted === 1 ? "" : "s"} from unlisted channels, which cannot be listed here.
+          This global snapshot also carried {globalUnlisted} snapshot{globalUnlisted === 1 ? "" : "s"} from unlisted channels — the Unlisted filter lists them.
         </p>
       )}
       {/* A PAGE BEING READ keeps the previous page on screen, dimmed — a page turn never blanks the
@@ -1574,12 +1592,14 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   // the snapshot in the scene on its own channel (rule 9: hover what a click commits).
                   <TableRow
                     className={cn(
-                      "cursor-pointer max-[700px]:block hover:bg-[color-mix(in_oklch,var(--primary)_10%,transparent)]",
+                      // THE HEADER IS A PLATE (user, 2026-10-08, design B1: "the header in the
+                      // snapshot list is not clearly distinguishable from the body rows"). The plate
+                      // lives on the cell's inner block, not the row: a <tr> takes neither margin
+                      // nor radius, and the gap ABOVE the plate is what separates two groups.
+                      "group/gh cursor-pointer max-[700px]:block border-0 hover:bg-transparent",
                       "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-                      inSelGroup ? "border-[var(--primary)]" : "border-border",
                     )}
                     tabIndex={0}
-                    title={`Select global snapshot ${r.global.ordinal.toLocaleString()}`}
                     onClick={() => {
                       applyClickActions(metaSnapArrivalActions(null, { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot }));
                     }}
@@ -1594,12 +1614,22 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                     onFocus={() => setHoverSnapOrd(r.global.ordinal)}
                     onBlur={() => setHoverSnapOrd(null)}
                   >
-                    <TableCell colSpan={columns.length} className="pt-3 pb-1 max-[700px]:block">
-                      <span className={cn("flex items-baseline gap-2 text-label", inSelGroup ? "text-primary-ink" : "text-muted-foreground")}>
-                        <span className="uppercase tracking-caps">Global</span>
+                    <TableCell colSpan={columns.length} className="p-0 pt-2.5 max-[700px]:px-0 max-[700px]:block">
+                      {/* Accent-tinted band + accent hairline; the SELECTED global deepens to the
+                          selection accent — the group's head carries that selection, never its rows.
+                          The age needs no "Age" label: "17s ago" names itself. */}
+                      <span
+                        className={cn(
+                          // px matches the rows' own cell inset, so "GLOBAL" stands on the identity dots' edge.
+                          "flex items-center gap-2 h-[34px] px-2 max-[700px]:px-1.5 rounded-t-md border-b text-label transition-colors",
+                          inSelGroup
+                            ? "bg-[color-mix(in_oklch,var(--primary)_20%,transparent)] border-[var(--primary)]"
+                            : "bg-[color-mix(in_oklch,var(--primary)_9%,var(--panel-plate))] border-[color-mix(in_oklch,var(--primary)_35%,transparent)] group-hover/gh:bg-[color-mix(in_oklch,var(--primary)_14%,var(--panel-plate))]",
+                        )}
+                      >
+                        <span className={cn("uppercase tracking-caps", inSelGroup ? "text-primary-ink" : "text-[color-mix(in_oklch,var(--primary-ink)_80%,var(--muted-foreground))]")}>Global</span>
                         <span className={cn("font-mono tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground")}>{r.global.ordinal.toLocaleString()}</span>
-                        <span className="ml-auto uppercase tracking-caps">Age</span>
-                        <span className={cn("tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground")} title={whenTitle(r.ts)}>{relativeAge(now - Date.parse(r.ts))}</span>
+                        <span className={cn("ml-auto tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground-dim")}>{relativeAge(now - Date.parse(r.ts))}</span>
                       </span>
                     </TableCell>
                   </TableRow>
@@ -1639,7 +1669,6 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   // A <tr> is not natively focusable — tabIndex + Enter/Space give the keyboard
                   // the same commit, and focus previews what hover previews (rule 9).
                   tabIndex={0}
-                  title={pending ? "resolving the anchoring tick…" : undefined}
                   // The selection follows the subject's identity (selectionHue).
                   style={{
                     ...(r.metaId ? { "--row-hue": cfg?.hue ?? "var(--core)" } : {}),
@@ -1659,7 +1688,11 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   }}
                   onClick={commit}
                 >
-                  <TableCell className={cn(inSelGroup && "shadow-[inset_2px_0_0_var(--primary)]")}>
+                  {/* THE EDGE MARKS THE ONE SELECTED ROW (user, 2026-10-08: "only add a | to the
+                      metagraph row that is the selection"). It used to run down every row anchored
+                      into the selected global, which read as N selections when the global itself was
+                      the subject — that case is the group's header, which wears the accent. */}
+                  <TableCell className={cn(rowSel && "shadow-[inset_2px_0_0_var(--row-hue,var(--primary))]")}>
                     {seam ? (
                       // ⚠️ FOUR EM-DASHES, NOT FOUR ZEROS. Network, snapshot, fee and size are all
                       // facts about a METAGRAPH SNAPSHOT, and this tick has none — so a `0.00000000`
@@ -1679,7 +1712,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                         // over says `DED 1,978,733` in exactly this register, so the log and the
                         // pane now name a row the same way. The full name remains one click away
                         // (the pane head's own subject line + the rail card).
-                        <span title={cfg.name}>{cfg.ticker}</span>
+                        <span>{cfg.ticker}</span>
                       ) : (
                         // An uncataloged channel: the core tone + its address, honestly unnamed.
                         <span className="inline-flex items-baseline gap-2 text-muted-foreground"><span className="italic">unlisted</span><span className="font-mono text-label">{r.metaId?.slice(0, 10)}…</span></span>
@@ -1699,7 +1732,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                     </TableCell>
                   )}
                   {!grouped && (
-                    <TableCell className="text-right text-muted-foreground" title={whenTitle(r.ts)}>
+                    <TableCell className="text-right text-muted-foreground">
                       {/* Phone drops the " ago" (the bare register — relativeAge's own note): the
                           AGE header names the quantity, and the suffix's width was the last thing
                           holding this table in sideways scroll. */}
@@ -1720,6 +1753,15 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                       {!grouped && <span className="mr-auto">into {pending ? "…" : r.global.ordinal.toLocaleString()}</span>}
                       {!seam && <span>{fmtDag(r.fee)} DAG</span>}
                       {!seam && <span className="min-w-[6ch] text-right">{size}</span>}
+                      {/* THE ROW OPENS A PAGE (design B1): the phone's chevron says so — this cell
+                          exists only on the phone, where list and snapshot are two pages. The
+                          selected row's chevron takes its network's hue, like its edge. */}
+                      {!seam && !pending && onOpen && (
+                        <ChevronRight
+                          aria-hidden
+                          className={cn("size-3.5 self-center -mr-1", rowSel ? "text-[var(--row-hue,var(--primary))]" : "text-muted-foreground/75")}
+                        />
+                      )}
                     </span>
                   </TableCell>
                 </TableRow>

@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>D — Signers tab</title>
+<link rel="stylesheet" href="page.css">
+<style>
+.tabs{display:flex;gap:18px;border-bottom:1px solid var(--border)}
+.tabs span{padding:8px 2px;font-size:var(--label);letter-spacing:var(--caps);text-transform:uppercase;color:var(--muted)}
+.tabs span.on{color:var(--fg);box-shadow:inset 0 -2px 0 var(--primary)}
+.lane{margin-top:12px}
+.lh{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:var(--label);color:var(--muted);margin-bottom:4px}
+.lh .t{letter-spacing:var(--caps);text-transform:uppercase}
+.role{display:inline-flex;align-items:center;height:20px;padding:0 6px;border:1px solid var(--border);border-radius:4px;background:var(--plate);font-size:12px;color:var(--dim)}
+.role.on{border-color:color-mix(in oklch,var(--primary) 45%,transparent);background:var(--wash);color:var(--primary)}
+.role.off{opacity:.28}
+.nr{display:flex;align-items:center;gap:10px;min-height:44px;border-top:1px solid color-mix(in oklch,var(--border) 60%,transparent)}
+.nr .id{font-family:var(--mono);font-size:13.5px;color:var(--fg)}
+.nr .cp{color:var(--muted);opacity:.75}
+.nr .roles{margin-left:auto;display:flex;gap:6px}
+.nr .as{display:block;font-size:12px;color:var(--muted);font-family:var(--mono)}
+.colh{display:flex;align-items:center;gap:10px;font-size:11px;letter-spacing:var(--caps);text-transform:uppercase;color:var(--muted);padding:2px 0 6px}
+.colh .r{margin-left:auto;display:flex;gap:6px}
+.colh .r span{width:34px;text-align:center}
+.mark{width:34px;display:flex;justify-content:center;color:var(--primary)}
+.mark.no{color:color-mix(in oklch,var(--muted) 45%,transparent)}
+.sentence{font-size:var(--body);color:var(--dim);margin:12px 0 4px}
+.sentence b{color:var(--fg);font-weight:600}
+</style></head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<symbol id="copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></symbol>
+<symbol id="chk" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+<symbol id="dash" viewBox="0 0 24 24"><path d="M7 12h10"/></symbol>
+</defs></svg>
+
+<h1>D — Signers tab</h1>
+<p class="lede">Today: two groups ("Data, signed by dL1" and "Snapshot (state & data), signed by L0"), each a two-column table, Node and Signer id. The same three nodes usually appear in both groups, and the signer id is the node id's first 8 characters, so most of the tab says the same thing four times.</p>
+<p class="lede">Two earlier rulings hold: a signature belongs to a <b>node</b> (its id, never its city), and the signer id exists to show when a hybrid node signs with a <b>different key</b>. So the column goes only where it repeats the node id.</p>
+<nav class="pages"><a href="index.html">all pages</a></nav>
+
+<h2><span class="n now">0</span> Now</h2>
+<div class="row"><div class="crop" style="height:420px"><img src="now-signers.png" alt="current signers tab" style="margin-top:-430px"></div></div>
+
+<h2><span class="n">D1</span> One roster, a column per layer <span class="rec">recommended</span></h2>
+<ul class="why">
+  <li>One row per node that signed anything; two narrow columns, <b>dL1</b> (the data) and <b>L0</b> (the snapshot), with a check where that node signed. "Who signed what" reads at a glance, and a node that signed only one layer shows a dash in the other.</li>
+  <li>The node id keeps its copy control. The signer id is gone from the row unless it differs from the node id; then it shows as a second line, "signed as 1a2b3c4d" (the hybrid case the column was for).</li>
+  <li>One check style only, no colour key: the column heads are the key.</li>
+  <li>Paging by three (one quorum) stays for chains with more signers.</li>
+</ul>
+<div class="row">
+  <div>
+    <div class="cap">the usual case: the same three nodes sign both</div>
+    <div class="phone"><div class="panel">
+      <div class="tabs"><span>State</span><span>Data</span><span class="on">Signers</span></div>
+      <div class="lane">
+        <div class="colh">Node<span class="r"><span>dL1</span><span>L0</span></span></div>
+        <div class="nr"><span class="id">79c986a5…e2bfe0</span><svg class="i s cp"><use href="#copy"/></svg><span class="roles"><span class="mark"><svg class="i s"><use href="#chk"/></svg></span><span class="mark"><svg class="i s"><use href="#chk"/></svg></span></span></div>
+        <div class="nr"><span class="id">dbb8bd3f…4cee0f</span><svg class="i s cp"><use href="#copy"/></svg><span class="roles"><span class="mark"><svg class="i s"><use href="#chk"/></svg></span><span class="mark"><svg class="i s"><use href="#chk"/></svg></span></span></div>
+        <div class="nr"><span class="id">e19449fa…397768</span><svg class="i s cp"><use href="#copy"/></svg><span class="roles"><span class="mark"><svg class="i s"><use href="#chk"/></svg></span><span class="mark"><svg class="i s"><use href="#chk"/></svg></span></span></div>
+      </div>
+    </div></div>
+  </div>
+  <div>
+    <div class="cap">a mixed case: a hybrid key, a one-layer signer</div>
+    <div class="phone"><div class="panel">
+      <div class="tabs"><span>State</span><span>Data</span><span class="on">Signers</span></div>
+      <div class="lane">
+        <div class="colh">Node<span class="r"><span>dL1</span><span>L0</span></span></div>
+        <div class="nr"><span><span class="id">79c986a5…e2bfe0</span><span class="as">signed as 1a2b3c4d</span></span><svg class="i s cp"><use href="#copy"/></svg><span class="roles"><span class="mark"><svg class="i s"><use href="#chk"/></svg></span><span class="mark"><svg class="i s"><use href="#chk"/></svg></span></span></div>
+        <div class="nr"><span class="id">dbb8bd3f…4cee0f</span><svg class="i s cp"><use href="#copy"/></svg><span class="roles"><span class="mark"><svg class="i s"><use href="#chk"/></svg></span><span class="mark no"><svg class="i s"><use href="#dash"/></svg></span></span></div>
+        <div class="nr"><span class="id">e19449fa…397768</span><svg class="i s cp"><use href="#copy"/></svg><span class="roles"><span class="mark no"><svg class="i s"><use href="#dash"/></svg></span><span class="mark"><svg class="i s"><use href="#chk"/></svg></span></span></div>
+        <div class="nr" style="color:var(--muted)"><span>Unknown node</span><span class="roles"><span class="mark"><svg class="i s"><use href="#chk"/></svg></span><span class="mark no"><svg class="i s"><use href="#dash"/></svg></span></span></div>
+      </div>
+    </div></div>
+  </div>
+</div>
+<p class="note">The layer names come from the same source as today's "signed by" chips (SIGNER_GROUPS), so they cannot drift; their full titles stay on hover/long-press of the column head.</p>
+
+<h2><span class="n">D2</span> Two groups, folded when equal</h2>
+<ul class="why">
+  <li>Keeps today's two groups, but each is a plain list of node ids (no Signer id column unless it differs, as in D1).</li>
+  <li>When both layers were signed by the same nodes, the groups fold into one with a sentence head: "Data and snapshot, signed by the same 3 nodes".</li>
+  <li>Closer to today, but a reader has to compare two lists by eye whenever they differ.</li>
+</ul>
+<div class="row">
+  <div class="phone"><div class="panel">
+    <div class="tabs"><span>State</span><span>Data</span><span class="on">Signers</span></div>
+    <div class="lane">
+      <div class="lh"><span class="t">Data and snapshot</span><span>signed by <span class="role">dL1</span> <span class="role">L0</span></span></div>
+      <div class="nr"><span class="id">79c986a5…e2bfe0</span><svg class="i s cp"><use href="#copy"/></svg></div>
+      <div class="nr"><span class="id">dbb8bd3f…4cee0f</span><svg class="i s cp"><use href="#copy"/></svg></div>
+      <div class="nr"><span class="id">e19449fa…397768</span><svg class="i s cp"><use href="#copy"/></svg></div>
+    </div>
+  </div></div>
+</div>
+</body></html>
