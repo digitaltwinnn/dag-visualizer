@@ -130,8 +130,10 @@ export function probableLineage(
     if (isListed(r.metaId) || out.has(r.metaId)) continue;
     const signers = (r.signers ?? []).filter(Boolean);
     if (!signers.length) continue;
-    const owner = metaList.find((m) => m.id !== r.metaId && signers.every((p) => m.nodes.some((n) => carriesSigner(n, p))));
-    if (owner) out.set(r.metaId, { address: r.metaId, networkId: owner.id, networkName: owner.name });
+    // EXACTLY ONE owner: co-located networks can share a machine (`coLocatedNetworks`), and two
+    // candidates are no evidence for either (the review, 2026-10-08).
+    const owners = metaList.filter((m) => m.id !== r.metaId && signers.every((p) => m.nodes.some((n) => carriesSigner(n, p))));
+    if (owners.length === 1) out.set(r.metaId, { address: r.metaId, networkId: owners[0]!.id, networkName: owners[0]!.name });
   }
   return [...out.values()];
 }

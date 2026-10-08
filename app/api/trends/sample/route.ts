@@ -3,6 +3,7 @@ import { NETWORKS } from "@/src/engine/config";
 import { sampledIds, untrackedIds } from "@/src/net/lineage";
 import { netOf } from "@/src/net/request";
 import { getLive } from "@/app/api/metagraphs/live";
+import { fetchChainIds } from "@/app/api/network/chainList";
 import { getLiveGeo } from "@/app/api/geo/live";
 import { runSample } from "../runSample";
 import { writeStore } from "../store";
@@ -105,10 +106,7 @@ export async function GET(req: Request) {
       // History "unlisted" figure was anchors minus the listed networks, which turned a global's
       // snapshots stamped into the NEXT bucket (an explorer skew, found on 2026-09-29 19:59) into
       // phantom unlisted snapshots.
-      unlistedIds: async () => {
-        const j = (await getJson(`${be}/currency`)) as { data?: { id?: string }[] };
-        return untrackedIds(net, (j.data ?? []).map((c) => c.id ?? ""));
-      },
+      unlistedIds: async () => untrackedIds(net, await fetchChainIds(be)),
       store: writeStore(),
       // Catch-up pages ride the explorer's own `meta.next` cursor — one request can't go
       // past ~10K records (probed live: the global list returns EMPTY above 10K and the

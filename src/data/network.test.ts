@@ -291,5 +291,11 @@ describe("probableLineage (a known network anchoring under an untracked address)
     expect(probableLineage([{ metaId: "DAGx", signers: ["75d8f472"] }], metaList, listed)).toEqual([]);
     expect(probableLineage([{ metaId: "DAGy", signers: ["9002807a", "75d8f472"] }], metaList, listed)).toEqual([]);
     expect(probableLineage([{ metaId: "DAGz", signers: [] }], metaList, listed)).toEqual([]);
+    // Two networks whose nodes both carry the signer (a shared machine) name neither.
+    const shared = [
+      { id: "a", name: "A", color: 0, nodes: [{ id: "9002807a0000", ip: "1.1.1.1" }] },
+      { id: "b", name: "B", color: 0, nodes: [{ id: "9002807a0000", ip: "1.1.1.1" }] },
+    ] as never;
+    expect(probableLineage([{ metaId: "DAGw", signers: ["9002807a"] }], shared, () => false)).toEqual([]);
   });
 });

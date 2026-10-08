@@ -241,6 +241,8 @@ async function walkChain<T extends { timestamp: string }>(
   return total;
 }
 
+class Abort extends Error {}
+
 async function main(): Promise<void> {
   loadEnvLocal();
   const { net, days, wipeOnly, extendToMs, recomputeFromMs, gapsFromMs, blocksFromMs, unlisted, resume } = parseArgs();
@@ -251,6 +253,7 @@ async function main(): Promise<void> {
   // Every address the catalog has EVER tracked — a re-registered network's retired chain keeps its
   // days in the store, so a rebuild or recompute must walk it too (`src/net/lineage.ts`).
   const { lineageIds, untrackedIds } = await import("../src/net/lineage");
+  const { fetchChainIds } = await import("../app/api/network/chainList");
   const { TIER_SINCE } = await import("../src/data/trendWindow");
   const { TTL_S, slotOf, cursorKeyOf, lockKeyOf } = await import("../app/api/trends/keys");
   const { bucketGlobals, bucketMetas, addInc, markUnlistedCoverage } = await import("../app/api/trends/bucketing");
@@ -303,14 +306,20 @@ async function main(): Promise<void> {
   // `finally` does not run on a signal, so SIGINT/SIGTERM release it explicitly before exiting. A
   // checkpointed walk resumes with --resume as before; nothing else holds the lock once it is gone.
   let releasing = false;
-  const releaseOnSignal = (sig: string) => {
+  // Only a REBUILD-CLASS lock is released (TTL > 900 s): a long walk lets its own 6-hour lock lapse
+  // and the cron re-takes it every 15 minutes, so an unconditional delete could remove a running
+  // cron's lock — the --resume takeover refuses exactly that, and so does this (the review). The
+  // release is bounded to 5 s; a second signal still exits at once (`once` restores the default).
+  const releaseOnSignal = (sig: string, code: number) => {
     if (releasing) return;
     releasing = true;
     console.error(`\n${sig}: releasing the sampler lock before exit …`);
-    lockStore.releaseLock(lockKeyOf(net)).finally(() => process.exit(130));
+    const release = redis.ttl(lockKeyOf(net)).then((ttl) => (ttl > 900 ? lockStore.releaseLock(lockKeyOf(net)) : undefined));
+    Promise.race([release, new Promise((r) => setTimeout(r, 5000))]).finally(() => process.exit(code));
   };
-  process.once("SIGINT", () => releaseOnSignal("SIGINT"));
-  process.once("SIGTERM", () => releaseOnSignal("SIGTERM"));
+  process.once("SIGINT", () => releaseOnSignal("SIGINT", 130));
+  process.once("SIGTERM", () => releaseOnSignal("SIGTERM", 143));
+  process.once("SIGHUP", () => releaseOnSignal("SIGHUP", 129));
   try {
 
   const be0 = NETWORKS[net].be;
@@ -390,20 +399,20 @@ async function main(): Promise<void> {
     if (resume === "no") {
       if (existing) {
         console.error(`a checkpoint exists in ${CKPT_ROOT} — pass --resume to continue it, or delete that directory to start over`);
-        process.exit(1);
+        throw new Abort();
       }
       writeJson("_meta", { mode, fromMs, boundaryMs } satisfies CkptMeta);
       return;
     }
     if (!existing || existing.mode !== mode || existing.fromMs !== fromMs) {
       console.error(`--resume: no matching checkpoint in ${CKPT_ROOT} (wanted ${mode} from ${new Date(fromMs).toISOString().slice(0, 10)})`);
-      process.exit(1);
+      throw new Abort();
     }
     if (existing.boundaryMs !== boundaryMs) {
       const seam = new Date(existing.boundaryMs).toISOString().slice(0, 10);
       if (resume !== "force") {
         console.error(`--resume: UTC midnight passed since the checkpoint — finished chains stop at ${seam}. Pass --resume=force to continue (later chains reach further), then sweep the seam with --recompute-from=${seam}.`);
-        process.exit(1);
+        throw new Abort();
       }
       console.log(`  resuming across a day boundary — remember the follow-up sweep: --recompute-from=${seam}`);
     }
@@ -539,8 +548,7 @@ async function main(): Promise<void> {
   // store's spine covered (`g.ticks`), since every unlisted record of every one of them is now in.
   if (unlisted) {
     const tierOf = (key: string): Tier => key.split(":")[2] as Tier;
-    const list = await getPage<{ id?: string }>(`${be0}/currency`);
-    const ids = untrackedIds(net, (list.data ?? []).map((c) => c.id ?? ""));
+    const ids = untrackedIds(net, await fetchChainIds(be0));
     console.log(`backfilling ${ids.length} unlisted chain(s): ${ids.map((i) => i.slice(0, 10)).join(", ") || "none"} …`);
     const inc: IncMap = new Map();
     const cursorMap: Record<string, string | number> = {};
@@ -692,7 +700,7 @@ async function main(): Promise<void> {
   // ---- RECOMPUTE mode: repair recent days whole, crash-safely (see the header) ----
   if (recomputeFromMs != null) {
     const todayStartMs = dayFloor(Date.now());
-    if (recomputeFromMs >= todayStartMs) { console.error("recompute-from must be before today (UTC)"); process.exit(1); }
+    if (recomputeFromMs >= todayStartMs) { console.error("recompute-from must be before today (UTC)"); throw new Abort(); }
     ensureCkptMeta("recompute", recomputeFromMs, todayStartMs);
     console.log(`recomputing ${new Date(recomputeFromMs).toISOString().slice(0, 10)} → yesterday, whole days, from the tip (all tiers; flush + checkpoint every ${FLUSH_EVERY / 1000}K records${resume !== "no" ? "; resuming" : ""}) …`);
     await walkGlobalCkpt(recomputeFromMs, todayStartMs);
@@ -716,7 +724,7 @@ async function main(): Promise<void> {
       const m = readJson<CkptMeta>("_meta");
       if (!m || m.mode !== "extend" || m.fromMs !== extendToMs) {
         console.error(`--resume: no matching extend checkpoint in ${CKPT_ROOT}`);
-        process.exit(1);
+        throw new Abort();
       }
       d1StartMs = m.boundaryMs;
       console.log(`resuming the extension to ${new Date(extendToMs).toISOString().slice(0, 10)} (boundary pinned at ${new Date(d1StartMs).toISOString().slice(0, 10)})`);
@@ -731,12 +739,12 @@ async function main(): Promise<void> {
       }
       if (!oldest) {
         console.error("extend: no covered days found in the daily tier — extending needs existing history (run a plain --days rebuild first, or check --net)");
-        process.exit(1);
+        throw new Abort();
       }
       d1StartMs = Date.UTC(oldest.year, +oldest.d.slice(0, 2) - 1, +oldest.d.slice(3)) + 86400000;
       if (extendToMs >= d1StartMs) {
         console.error(`extend: the store already reaches ${oldest.year}-${oldest.d} — nothing to extend to ${new Date(extendToMs).toISOString().slice(0, 10)}`);
-        process.exit(1);
+        throw new Abort();
       }
       ensureCkptMeta("extend", extendToMs, d1StartMs);
       console.log(`extending ${new Date(extendToMs).toISOString().slice(0, 10)} → ${oldest.year}-${oldest.d} (boundary day recomputed whole; all tiers; metagraphs first, the global spine last; flush + checkpoint every ${FLUSH_EVERY / 1000}K records)`);
@@ -767,7 +775,7 @@ async function main(): Promise<void> {
           d1StartMs,
         );
         if (!bnd) { console.log(`  ${label}: born at/after the boundary — nothing older`); writeJson(label, { done: true } satisfies ChainCkpt); continue; }
-        if (!bnd.hash) { console.error(`  ${label}: boundary record has no hash — cannot seek`); process.exit(1); }
+        if (!bnd.hash) { console.error(`  ${label}: boundary record has no hash — cannot seek`); throw new Abort(); }
         seed = craftCurrencyCursor(bnd.hash);
       }
       await walkMetaCkpt(id, extendToMs, d1StartMs, seed);
@@ -783,7 +791,7 @@ async function main(): Promise<void> {
         Number(cur.g ?? 0) || 1,
         d1StartMs,
       );
-      if (!gBoundary) { console.error("extend: could not seek the global boundary"); process.exit(1); }
+      if (!gBoundary) { console.error("extend: could not seek the global boundary"); throw new Abort(); }
       seedG = craftGlobalCursor(gBoundary.timestamp, gBoundary.ordinal);
     }
     await walkGlobalCkpt(extendToMs, d1StartMs, seedG);
@@ -849,7 +857,7 @@ async function main(): Promise<void> {
   // ---- metagraphs: stream pages straight into the IncMap (bounded — records aren't retained) ----
   // The UNLISTED chains ride along (2026-10-08): a wipe-and-rebuild that skipped them would erase
   // their measured counts and the coverage marker; they stay out of the catalog floors.
-  const unlistedList = await getPage<{ id?: string }>(`${be}/currency`).then((p) => untrackedIds(net, (p.data ?? []).map((c) => c.id ?? ""))).catch(() => null);
+  const unlistedList = await fetchChainIds(be).then((ids) => untrackedIds(net, ids)).catch(() => null);
   const unlistedSet = new Set(unlistedList ?? []);
   const metaIds = [...lineageIds(net), ...(unlistedList ?? [])];
   const newestMetaOrd: Record<string, number> = {};
@@ -901,4 +909,10 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+// An ABORT has already said why on stderr; it is thrown (not process.exit) so the `finally` that
+// releases the sampler lock runs — `process.exit` skips it, which left the cron blocked for hours
+// (the branch review, 2026-10-08).
+main().catch((e) => {
+  if (!(e instanceof Abort)) console.error(e);
+  process.exit(1);
+});
