@@ -77,7 +77,7 @@ ANCHORED INTO) relies on that. It is not always true: global 6976288 (2026-09-29
 carried 38 listed snapshots the explorer stamped 20:00:30.735Z — a stamp no global carries. Any
 per-bucket arithmetic across the two kinds then splits one event over two buckets: History's
 unlisted count was "anchors − listed snapshots" and showed 38 phantom unlisted snapshots. That
-count is now measured from the unlisted chains themselves (`unlistedSeries`), and the same rule
+count is now measured from the unlisted chains themselves (`withUnlisted`), and the same rule
 holds for anything new: a figure about snapshots comes from snapshot records.
 
 **Vocabulary rule:** in user-facing copy the Snapshots stack **anchors state** — "settlement" is
@@ -178,9 +178,9 @@ network — two copies would be two chances to assert different things about the
   instant readings the cursor card quotes (`valueAt` / `rankAt` / `orderAt` / `placeInstant`).
 - **`trendScope.ts` — WHAT A COMMITTED FILTER DOES TO IT.** Four states, not two: every network, one
   network, and the two commits the trends store keeps no per-network record for — the base ledger
-  (which anchors metagraph snapshots rather than producing them) and the unlisted channels, whose
-  one measured series is their snapshot count (`trendSeries.unlistedSeries`: the global count less
-  every listed network). What is missing is a FACT to state, never an empty list to draw, so the
+  (which anchors metagraph snapshots rather than producing them) and the unlisted channels, measured
+  from their own chains and folded into one network on load (`trendSeries.withUnlisted`) — every
+  measure but nodes, which they do not publish. What is missing is a FACT to state, never an empty list to draw, so the
   SENTENCES live here as well as the
   classification, split into a fact and a route because the route names a gesture available on
   whichever surface is saying it.
