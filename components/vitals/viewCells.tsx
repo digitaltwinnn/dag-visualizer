@@ -886,7 +886,7 @@ function AnchoringNetworks({ windowed, snaps, filter }: { windowed: TrendsWindow
                   literal has two homes, and this is not one of them). With no name to give, the
                   dot stands alone rather than being captioned with a guess. */}
               {label ? (
-                <TickerChip text={label} hue={hue} className={on ? "border-current" : undefined} />
+                <TickerChip text={label} hue={hue} className={on ? "border-current bg-[color-mix(in_oklch,currentColor_14%,transparent)]" : undefined} />
               ) : (
                 <IdentityDot hue={hue} />
               )}
