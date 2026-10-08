@@ -32,7 +32,11 @@ them — but the Next Node server can.
   `CRON_SECRET` auth) that pages the explorer stream since a Redis cursor and
   merge-writes 5m/1h/1d hash tiers. It also samples the UNLISTED chains — the explorer's `/currency`
   list less every tracked address — for their own counts, outside the fee/size floors, marking the
-  buckets it measured them in with `u.cov` (History's unlisted figure is measured, not derived). Spec:
+  buckets it measured them in with `u.cov` (History's unlisted figure is measured, not derived).
+  ⚠️ **A PRESENCE MARKER MUST NOT BE A COUNTER.** The read route zero-fills an absent ADD field in
+  every covered bucket (an honest "measured, none"), so a marker classed as a counter reads 0 where
+  it is missing — the same value it has where it is present. `u.cov` is classed `set` in
+  `merge.ts` `opOf` for exactly that reason; any new marker must be too. Spec:
   `docs/superpowers/specs/2026-09-05-trends-timeseries-design.md` — the key/field grammar,
   command budget, honesty rules (null = not measured, 0 = measured none; `g.ticks` is the
   coverage marker) and the Upstash usage contract (single region, eviction OFF, read-only
