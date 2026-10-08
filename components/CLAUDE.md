@@ -10,7 +10,7 @@ the architecture map and the dev workflow; **its rules govern this file too**.
 
 The page is one fixed shell in **two layers at different depths** (`SectionShell` + `store.section`).
 **The raw layer's anchor log carries a SEARCH BAR** (`datasection/LogSearchBar.tsx` +
-`src/data/chainSeek.ts`): three named criteria in a hairline box, and ONE Search button, revealed by
+`src/data/chainSeek.ts`; every decision about what a search means is pure in `src/data/logSearch.ts`): three named criteria in a hairline box, and ONE Search button, revealed by
 a `search snapshots` toggle in a toolbar above the table.
 
 ⚠️ **SEARCHING IS ASKED FOR, AND THE TRIGGER SITS WITH WHAT IT REVEALS.** Two placements were
