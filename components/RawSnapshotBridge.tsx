@@ -6,6 +6,11 @@ import { useStore } from "@/src/store/store";
 import type { SnapshotExact, ChannelSnapDeep } from "@/src/data/types";
 import { metaSnapDeepKey } from "@/src/data/types";
 import { reportPoll } from "@/src/data/api";
+import { probableLineage } from "@/src/data/network";
+import { LISTED_IDS } from "@/src/data/unlisted";
+
+// Addresses already named this session — the warning says each once.
+const warnedLineage = new Set<string>();
 
 // Keeps the EXACT per-snapshot totals (fee + listed/unlisted breakdown) in the store for the
 // snapshots currently in focus — the LIVE tick and any SELECTED one — by pulling them from
@@ -112,6 +117,16 @@ function ensure(ordinal: number | null | undefined, retry = false) {
       const ok = !!data && typeof data.totalFee === "number";
       reportPoll("exact", ok); // the pulse strip's "Snapshot reads" row
       if (ok) st.setSnapshotExact(data);
+      // A NETWORK'S NEW ADDRESS, NAMED (2026-10-08): an untracked chain signed only by one catalog
+      // network's nodes is that network re-registered — say so in dev so it lands in `formerIds`
+      // (src/engine/config.ts) instead of reading as unlisted. Evidence for a human, never applied.
+      if (ok && process.env.NODE_ENV !== "production") {
+        for (const p of probableLineage(data.rows ?? [], st.metaList, (id) => LISTED_IDS.has(id))) {
+          if (warnedLineage.has(p.address)) continue;
+          warnedLineage.add(p.address);
+          console.warn(`[catalog] untracked chain ${p.address} is signed only by ${p.networkName}'s nodes — probably its new address; add it to ${p.networkName}'s formerIds after checking`);
+        }
+      }
       // On unavailable (transient blip / outside the served window) record the MISS instead of
       // storing nothing: the acquiring surfaces (fee node-stars, "resolving", "reading…") key
       // their give-up on it, so a failed read on a pinned tick terminates honestly instead of

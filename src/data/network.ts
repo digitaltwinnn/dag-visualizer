@@ -114,6 +114,28 @@ export function resolveSignerIps(
   return ips.length ? ips : null;
 }
 
+/** A PROBABLE NEW ADDRESS of a known network (2026-10-08 — BioFi re-registered twice, and the second
+ *  time was found by accident, as History's only "unlisted" snapshots in a month). An untracked chain
+ *  whose every signer is a node of ONE catalog network is that network's operator anchoring under
+ *  another address — the evidence that settled BioFi's `DAG3eCKB…` (its sole signer was BioFi's own
+ *  node). It is EVIDENCE, not a decision: the dev warning names it, a human adds it to `formerIds`.
+ *  One home for the signer match (`carriesSigner`, the signerMatchBoundary rule). */
+export function probableLineage(
+  rows: readonly { metaId: string; signers?: readonly string[] }[],
+  metaList: readonly MetaInfo[],
+  isListed: (id: string) => boolean,
+): { address: string; networkId: string; networkName: string }[] {
+  const out = new Map<string, { address: string; networkId: string; networkName: string }>();
+  for (const r of rows) {
+    if (isListed(r.metaId) || out.has(r.metaId)) continue;
+    const signers = (r.signers ?? []).filter(Boolean);
+    if (!signers.length) continue;
+    const owner = metaList.find((m) => m.id !== r.metaId && signers.every((p) => m.nodes.some((n) => carriesSigner(n, p))));
+    if (owner) out.set(r.metaId, { address: r.metaId, networkId: owner.id, networkName: owner.name });
+  }
+  return [...out.values()];
+}
+
 /** Whether ONE node is among a snapshot proof's signers, given the proof's truncated signer
  *  ids — the membership read behind the node card's "signed" relation (user, 2026-08-15).
  *  Matches across every LAYER id (`ids`), per the ⚠️ above — a proof is sealed by the L0

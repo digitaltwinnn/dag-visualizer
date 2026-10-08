@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { coLocatedNetworks, matchSignerRow, nodeSigned, resolveSigner, resolveSignerIps, SIGNER_GROUPS, signerRoster, SIGNER_UNKNOWN, snapshotSigners, snapshotSignerRows } from "@/src/data/network";
+import { coLocatedNetworks, matchSignerRow, nodeSigned, resolveSigner, resolveSignerIps, SIGNER_GROUPS, signerRoster, probableLineage, SIGNER_UNKNOWN, snapshotSigners, snapshotSignerRows } from "@/src/data/network";
 import type { MetaInfo, NodeRow } from "@/src/data/types";
 
 const meta = (id: string, nodes: { ip?: string; id?: string; ids?: string[] }[]): MetaInfo => ({
@@ -272,5 +272,24 @@ describe("snapshotSigners / snapshotSignerRows", () => {
   it("resolves to the KNOWN signer nodes, in signature order, never a non-signer of the network", () => {
     expect(snapshotSignerRows(sel, exRows, { metaId: "dor", ordinal: 7 }).map((r) => r.id)).toEqual(["aa11ffff", "bb22ffff"]);
     expect(snapshotSignerRows(sel, exRows, { metaId: "dor", ordinal: 8 }).map((r) => r.id)).toEqual(["cc33ffff"]);
+  });
+});
+
+describe("probableLineage (a known network anchoring under an untracked address)", () => {
+  const metaList = [
+    { id: "biofi", name: "BioFi", color: 0, nodes: [{ id: "9002807a9913ffff", ip: "1.1.1.1" }] },
+    { id: "dor", name: "DOR", color: 0, nodes: [{ id: "abcdef0123456789", ip: "2.2.2.2" }] },
+  ] as never;
+  const listed = (id: string) => id === "biofi" || id === "dor";
+  it("names the network whose nodes signed the untracked chain (the BioFi case)", () => {
+    expect(probableLineage([{ metaId: "DAG3eCKB", signers: ["9002807a"] }], metaList, listed)).toEqual([
+      { address: "DAG3eCKB", networkId: "biofi", networkName: "BioFi" },
+    ]);
+  });
+  it("is silent for listed chains, unknown signers, and mixed signers — evidence must be whole", () => {
+    expect(probableLineage([{ metaId: "dor", signers: ["abcdef01"] }], metaList, listed)).toEqual([]);
+    expect(probableLineage([{ metaId: "DAGx", signers: ["75d8f472"] }], metaList, listed)).toEqual([]);
+    expect(probableLineage([{ metaId: "DAGy", signers: ["9002807a", "75d8f472"] }], metaList, listed)).toEqual([]);
+    expect(probableLineage([{ metaId: "DAGz", signers: [] }], metaList, listed)).toEqual([]);
   });
 });
