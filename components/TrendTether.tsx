@@ -31,7 +31,7 @@ import { useStore } from "@/src/store/store";
 // control"). They lived in the chart stack's layer (z-4), under the band (the strip, z-10) and the
 // phone's Vitals sheet, so their last stretch vanished behind the plate and they ended short of the
 // brush. The svg is now PORTALLED to the body as its own fixed layer just above the strip (z-11,
-// under the command bar's z-40) — and since it is no longer inside the stack, it MIRRORS the
+// under the command bar's z-40; above the phone's sheet there) — and since it is no longer inside the stack, it MIRRORS the
 // stack's engine-written `data-on` (MutationObserver), so it still arrives and leaves with it.
 // Above the band it would also run ACROSS the Time range pills that stand over the band's corner,
 // so the pills' box (`[data-tether-avoid]`) is masked out of the lines: they pass behind the pills
@@ -166,7 +166,10 @@ export default function TrendTether() {
       ref={svg}
       aria-hidden
       className={cn(
-        "fixed inset-0 z-[11] w-full h-full pointer-events-none overflow-visible",
+        // z-11 sits over the band (the strip, z-10); on the PHONE the timeline lives in the Vitals
+        // sheet (ui/sheet, z-41), so the lines rise over that instead — z-42 shares the dock's
+        // number, which they never reach, and stays under nothing they cross.
+        "fixed inset-0 z-[11] max-[700px]:z-[42] w-full h-full pointer-events-none overflow-visible",
         "opacity-0 [transition:opacity_var(--tempo-nav)_ease] data-[on='1']:opacity-100 motion-reduce:!transition-none",
         railsHidden && "!opacity-0",
       )}
