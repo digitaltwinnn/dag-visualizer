@@ -194,6 +194,11 @@ export interface RailManifestState {
   cohort: CohortSel | null;
   /** The committed composition group — hyper's rung between a network and a node. */
   composition: CompositionSel | null;
+  /** THE PLANE IN FRONT (`store.trendFront`, published by the stack): it stands the Metagraph card
+   *  up under All (`cardNetwork`). Optional: every other view reads none. */
+  trendFront?: string | null;
+  /** History's window pill (`store.trendWindow`) — the Range card's subject while no range is brushed. */
+  trendWindow?: string;
   /** THE COMMITTED TIME CURSOR (History, 2026-09-19) — `store.trendCursorMs`. Optional like
    *  `metaSnap`: no other view can produce the card, so every existing caller reads unchanged.
    *  ⚠️ It is the INSTANT, not a stamp, and that is safe as a subject key because the timeline is
@@ -368,10 +373,11 @@ export function metagraphCardNetwork(s: {
   snap?: { data: { ordinal: number } } | null;
   tickHasFilter?: boolean;
   trendFocus?: string | null;
+  trendFront?: string | null;
 }): string {
   if (s.mode === "ledger")
     return ledgerCardNetwork({ filter: s.filter, tickNet: s.tickNet ?? null, snapOrdinal: s.snap?.data.ordinal ?? null, tickHasFilter: s.tickHasFilter });
-  if (s.mode === "trend") return cardNetwork(s.filter, s.trendFocus ?? null);
+  if (s.mode === "trend") return cardNetwork(s.filter, s.trendFocus ?? null, s.trendFront ?? null);
   return s.filter;
 }
 
@@ -440,9 +446,13 @@ export function detailsCards(s: RailManifestState): RailCard[] {
     id: "range",
     kind: "range",
     icon: RANGE_ICON,
-    subjectKey: s.trendRange ? `${s.trendRange.fromMs}-${s.trendRange.toMs}` : null,
+    // THE WINDOW STANDS WHEN NO RANGE IS BRUSHED (user, 2026-10-08: "range card should be populated
+    // by default (default range is 30d)"): the card is the span on screen, which is always one —
+    // the brushed range, else the window pill's own span. Keyed so a brush and a pill hop each
+    // pulse once.
+    subjectKey: s.trendRange ? `${s.trendRange.fromMs}-${s.trendRange.toMs}` : `window:${s.trendWindow ?? ""}`,
     // View-scoped like the instant: a span is a reading OF THIS STACK.
-    present: s.mode === "trend" && s.trendRange != null,
+    present: s.mode === "trend",
     hint: rangeHint(s),
   };
   const metaSnap: RailCard = {

@@ -208,8 +208,8 @@ describe("the instant slot — History's cursor card", () => {
     expect(c.subjectKey).toBe(1_726_704_000_000);
   });
 
-  it("History ghosts are exactly the network dossier, the range and the cursor", () => {
-    expect(ghostIds(detailsCards(trend()))).toEqual(["context", "range", "instant"]);
+  it("History ghosts are the network dossier and the cursor — the range always stands (the window)", () => {
+    expect(ghostIds(detailsCards(trend()))).toEqual(["context", "instant"]);
   });
 });
 
@@ -223,9 +223,10 @@ describe("the range slot — History's brushed span", () => {
   it("sits between the dossier and the Moment, and is not a rung", () => {
     expect(ladderLevelOfSlot("range")).toBeNull();
   });
-  it("ghosts with the gesture while no range is brushed", () => {
-    const c = detailsCards(trend()).find((x) => x.id === "range")!;
-    expect(c.present).toBe(false);
+  it("stands on the window while no range is brushed, keyed on the window pill", () => {
+    const c = detailsCards(trend({ trendWindow: "30d" })).find((x) => x.id === "range")!;
+    expect(c.present).toBe(true);
+    expect(c.subjectKey).toBe("window:30d");
     expect(c.hint).toBe("Drag across a chart or the timeline.");
   });
   it("is History-scoped", () => {
@@ -446,7 +447,11 @@ describe("the Metagraph card in History follows the plane focus", () => {
   it("is the focus slot after a plane click", () => {
     expect(focusSlotId({ ...trend({ trendFocus: "dor" }), selStack: ["network"] })).toBe("context");
   });
-  it("no focus and no filter is still the ghost", () => {
+  it("no focus and no filter stands on the plane in front, and is the ghost only while no stack is mounted", () => {
     expect(detailsCards(trend()).find((x) => x.id === "context")!.present).toBe(false);
+    const c = detailsCards(trend({ trendFront: "ded" })).find((x) => x.id === "context")!;
+    expect(c.present).toBe(true);
+    expect(c.subjectKey).toBe("ded");
+    expect(detailsCards(trend({ filter: "up", trendFront: "ded" })).find((x) => x.id === "context")!.subjectKey).toBe("up");
   });
 });

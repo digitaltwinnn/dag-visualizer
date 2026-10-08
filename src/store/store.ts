@@ -406,6 +406,12 @@ interface AppState {
    *  array would never reach the Engine at all.
    *  `[]` whenever the stack is not mounted — honest: no planes, nothing to place. */
   trendIds: readonly string[];
+  /** THE PLANE IN FRONT (2026-10-08) — what the Metagraph card stands on under All (`cardNetwork`).
+   *  Published by the same pass that renders the planes (`TrendStack`, beside `trendIds`), so the
+   *  card and the deck cannot disagree; unlike `trendIds` it is FOR React — `trendIds` is the
+   *  Engine's one-way channel, which no component may render from (publishChannelBoundary). Null
+   *  while the stack is not mounted, which leaves the card its ghost. */
+  trendFront: string | null;
 
   setLive: (live: boolean, lastGoodAt?: number) => void;
   setEngineReady: (v: boolean) => void;
@@ -486,6 +492,7 @@ interface AppState {
   setTrendRange: (range: { fromMs: number; toMs: number } | null) => void;
   /** Publish the ranked roster (see `trendIds`). Pass a fresh array only on a content change. */
   setTrendIds: (ids: readonly string[]) => void;
+  setTrendFront: (id: string | null) => void;
   // THEME (light/dark spec §2). Unlike the network (a frozen page parameter), theme is genuine
   // runtime state: the resolved value drives the Engine's colour re-thread and any component
   // that renders theme-conditionally. ONE writer: ThemeController. `theme` boots "dark" (the
@@ -567,6 +574,7 @@ export const useStore = create<AppState>((set) => ({
   trendWindow: "30d" as ZoomId,
   trendRange: null,
   trendIds: [],
+  trendFront: null,
   phoneSheetPx: null,
   sceneCoverL: 0,
   sceneCoverR: 0,
@@ -830,5 +838,6 @@ export const useStore = create<AppState>((set) => ({
   // in front is kept on screen through a re-rank (`scrollToKeep`), and two writes would release the
   // camera's lean and re-apply it in the same tick.
   setTrendIds: (trendIds) => set((s) => ({ trendIds, trendScroll: scrollToKeep(s.trendIds, trendIds, s.trendFocus, s.trendScroll) })),
+  setTrendFront: (trendFront) => set((s) => (s.trendFront === trendFront ? s : { trendFront })),
   setTheme: (pref, resolved) => set({ themePref: pref, theme: resolved }),
 }));

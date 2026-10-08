@@ -509,8 +509,17 @@ export function scrollToKeep(
 
 /** THE NETWORK HISTORY'S METAGRAPH CARD STANDS ON (user, 2026-10-07 — "if we click a network in
  *  explorer, should we set the metagraph card accordingly? (not the global filter though)"): the
- *  plane brought forward, else the filter. Snapshots' tick-local network is the precedent
- *  (`tickNet.ledgerNetwork`): a view-local pick names the card without writing the top bar. */
-export function cardNetwork(filter: string, focus: string | null): string {
-  return focus ?? filter;
+ *  plane brought forward, else the filter, else THE PLANE IN FRONT (user, 2026-10-08: "always one
+ *  card sits in the front and when that changes it also populates that card"). Snapshots'
+ *  tick-local network is the precedent (`tickNet.ledgerNetwork`): a view-local pick names the
+ *  card without writing the top bar. `front` is `frontPlane()` — null while the stack is not
+ *  mounted, which leaves the card its ghost. */
+export function cardNetwork(filter: string, focus: string | null, front: string | null = null): string {
+  return focus ?? (filter !== "all" ? filter : (front ?? filter));
+}
+
+/** THE PLANE IN FRONT with no focus re-deal: the first slot of the window the scroll shows
+ *  (`stackPoses`' own arithmetic — slot 0 is `ids[clampScroll(…)]`). Null for an empty roster. */
+export function frontPlane(ids: readonly string[], scroll: number): string | null {
+  return ids.length ? (ids[clampScroll(ids.length, scroll)] ?? null) : null;
 }
