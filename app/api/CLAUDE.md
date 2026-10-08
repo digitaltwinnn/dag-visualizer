@@ -61,7 +61,8 @@ them — but the Next Node server can.
   (`fetchSince.ts`), not just its newest page. The History view (`/trends`) is the read route's
   consumer.
 - **`/api/global/at?ts=`** binary-searches ~23 tiny per-ordinal records to find the global carrying
-  that exact stamp (the anchor join is timestamp EQUALITY). Its one consumer is the anchor log's
+  that exact stamp (the anchor join is timestamp EQUALITY — which has exceptions: see the
+  timestamp note in `src/data/CLAUDE.md`; such a row answers 404 here, honestly). Its one consumer is the anchor log's
   ANCHORED INTO column resolution. ⚠️ An `?ordinal=` mode was added and then **removed** the same day
   (2026-09-01): it existed only to let the raw log's anchored-into search fall back to a timestamp
   walk for globals the payload host no longer serves, and that fallback was cut as a second mechanism

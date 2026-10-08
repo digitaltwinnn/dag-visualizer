@@ -489,6 +489,12 @@ the cursor lives in Redis, and the next production run catches up to 30K records
 of the busiest chain) with no hole; beyond that the gap is accepted and
 `scripts/rebuild-trends.ts --recompute-from` repairs the affected days.
 
+⚠️ **The store is shared by every deployment, so a change to WHAT IS STORED ships reader first**
+(learned 2026-10-08). A backfill run from a branch wrote new fields the deployed code then
+misread (its derivation subtracted them), and production's History was wrong until the branch
+shipped. Order: deploy the code that READS the new fields (and tolerates their absence), then run
+the backfill; or keep the new fields invisible to the deployed reader.
+
 ⚠️ Web Vitals do NOT capture the WebGL frame rate — use the engine's stats.js for that (dev-only, or in
 prod via `?stats`, so it never shows for real users).
 

@@ -70,6 +70,16 @@ count column out of view and defeated the cell's own `truncate`.
 
 ## Anchoring, fees & the metagraph data layer
 
+⚠️ **THE TIMESTAMP JOIN HAS EXCEPTIONS — measure a quantity from its OWN records, never as the
+difference of two record kinds** (found 2026-10-08). The explorer normally stamps a metagraph
+snapshot with its anchoring global's own timestamp, and the join (`/api/global/at`, the raw log's
+ANCHORED INTO) relies on that. It is not always true: global 6976288 (2026-09-29 19:59:50.964Z)
+carried 38 listed snapshots the explorer stamped 20:00:30.735Z — a stamp no global carries. Any
+per-bucket arithmetic across the two kinds then splits one event over two buckets: History's
+unlisted count was "anchors − listed snapshots" and showed 38 phantom unlisted snapshots. That
+count is now measured from the unlisted chains themselves (`unlistedSeries`), and the same rule
+holds for anything new: a figure about snapshots comes from snapshot records.
+
 **Vocabulary rule:** in user-facing copy the Snapshots stack **anchors state** — "settlement" is
 reserved for the DAG a snapshot actually pays. One word for both reads as if Snapshots were where
 *money* settles, which is what the separate Transactions view is for. So: "Anchoring layers", "the base
