@@ -114,15 +114,18 @@ const HUB_ORB = new THREE.IcosahedronGeometry(0.9, 4);
 // flash was a brief swell and emissive lift, easy to miss at rest. Each new global snapshot now
 // also sends rings OUT from the core: a lead ring and a fainter follower a beat behind, as a drop
 // makes. They face the camera (a disc seen edge-on would vanish), ease out as they grow, and fade
-// on the square of their age, so the eye reads one wave leaving the sphere. They carry the core's
+// as they go, so the eye reads one wave leaving the sphere. They carry the core's
 // own light and dim with it — its reveal on the morph, its off-subject drop, the view's fade —
 // and are pooled up front: the render loop writes, never builds.
-const RIPPLE_GEO = new THREE.RingGeometry(0.955, 1, 96); // unit radius; the scale IS the radius
+const RIPPLE_GEO = new THREE.RingGeometry(0.9, 1, 96); // unit radius; the scale IS the radius (a 10% band: thin enough to read as a ring, thick enough to see at ~40px)
 const RIPPLE_POOL = 6; // three overlapping flashes' worth of pairs
-const RIPPLE_DUR = 2.4; // seconds, birth to gone
+const RIPPLE_DUR = 1.9; // seconds, birth to gone
 const RIPPLE_FROM = 1.05; // radii of the core orb (HUB_ORB) at birth — just outside its surface
-const RIPPLE_REACH = 7; // radii it travels outward over its life — out to about the inner L0 shell
-const RIPPLE_OP = 0.7; // peak opacity at strength 1
+// Radii it travels over its life. It must stay INSIDE the DAG's node rings (user, 2026-10-08: "so
+// that it does not touch the dag node rings"): the inner shell is tilted, so seen from the resting
+// pose its narrowest projected reach is ~5.5 core radii — 1.05 + 3.0 stops the ring at ~4.
+const RIPPLE_REACH = 3.0;
+const RIPPLE_OP = 0.9; // peak opacity at strength 1
 const RIPPLE_FOLLOW = { delay: 0.26, strength: 0.5 }; // the second, fainter ring
 
 // Give a single (non-instanced) emissive sphere the SAME fresnel-rim ORB look as the node instances
@@ -702,8 +705,12 @@ export class HyperView implements SceneView {
     const t = this.clock;
 
     // Snapshots view: the hubs/tethers are hidden (set once in setLedger) and ledger.js owns the
-    // metagraph blocks, so there's nothing to orbit here.
-    if (this.ledger) return;
+    // metagraph blocks, so there's nothing to orbit here. A ripple started meanwhile is DROPPED, not
+    // paused: it belongs to the moment its snapshot landed, and must not play on the way back.
+    if (this.ledger) {
+      for (const r of this._ripples) if (r.on) { r.on = false; r.mesh.visible = false; }
+      return;
+    }
 
     // ⚠️ THE HUBS TAKE LONGER TO GO, AND GO ON A CURVE (user, 2026-09-13: "make the hub appear /
     // disappear a bit slower when we change mode"). One expression covers both directions — the
@@ -798,7 +805,7 @@ export class HyperView implements SceneView {
       const grow = 1 - (1 - p) * (1 - p) * (1 - p); // ease-out: fast off the surface, slowing as it spreads
       r.mesh.scale.setScalar(0.9 * (RIPPLE_FROM + grow * RIPPLE_REACH));
       r.mesh.quaternion.copy(this._qRipple);
-      (r.mesh.material as THREE.MeshBasicMaterial).opacity = inkPresence(RIPPLE_OP * r.strength * (1 - p) * (1 - p) * coreOffMul, paper) * rippleLight;
+      (r.mesh.material as THREE.MeshBasicMaterial).opacity = inkPresence(RIPPLE_OP * r.strength * Math.pow(1 - p, 1.5) * coreOffMul, paper) * rippleLight;
       r.mesh.visible = true;
     }
 
