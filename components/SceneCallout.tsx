@@ -518,7 +518,11 @@ export default function SceneCallout() {
     }
   }
   if (phone) {
-    // One label on a phone — the subject's, else the global snapshot's — head only.
+    // One label on a phone — the subject's, else the global snapshot's — head only. The GLOBAL
+    // label wins while the Global snapshot card is the box (user, 2026-10-08: the metagraph's
+    // anchor "is shown when global snapshot card is active"): the one label points at the open card's
+    // subject, as the two-label desktop pairs each with its card.
+    if (m && m2 && boxedCard === "snap") m = null;
     if (m) m2 = null;
     if (m) m = { ...m, lead: undefined };
     if (m2) m2 = { ...m2, lead: undefined };

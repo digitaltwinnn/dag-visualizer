@@ -149,9 +149,11 @@ export class CalloutSync {
             ? this._ledgerCalloutAnchor(v)
             : this._hyperCalloutAnchor(v)) &&
         this._placeCallout(el, v, false, phone);
-      // No multi-leader on a phone: its legs fan from the diagonal standoff's corner.
-      if (on && !phone) this._syncCalloutMulti(el, this._placedX, this._placedY, this._placedRect, this._placedFlip, this._placedDrop);
-      else this._syncCalloutMulti(el, 0, 0, null, false, false);
+      // The multi-leader on a phone fans from the VERTICAL leader's panel end (user, 2026-10-08: a
+      // hybrid node "should be multiple" spheres there too) — `_placePhone`'s own length, not the
+      // diagonal standoff's corner.
+      if (on) this._syncCalloutMulti(el, this._placedX, this._placedY, this._placedRect, this._placedFlip, this._placedDrop, phone ? this._ppLen : 0);
+      else this._syncCalloutMulti(el, 0, 0, null, false, false, 0);
       // Guard on the ELEMENT's own attribute, not a cached flag: React remounts the wrapper on a
       // subject change (fresh data-on="0"), so a field would go stale exactly then.
       const flag = on ? "1" : "0";
@@ -316,7 +318,7 @@ export class CalloutSync {
   private _mlegHost: HTMLElement | null = null;
   private _mlegs: { g: SVGGElement; line: SVGLineElement; ring: SVGCircleElement }[] = [];
   private _mlegShown = 0;
-  private _syncCalloutMulti(el: HTMLElement, ax: number, ay: number, r: DOMRect | null, flip: boolean, drop: boolean): void {
+  private _syncCalloutMulti(el: HTMLElement, ax: number, ay: number, r: DOMRect | null, flip: boolean, drop: boolean, phoneLen: number): void {
     const want = r != null && this.h.mode === "hyper" && this._calloutNodeAnchor;
     if (!want && this._mlegShown === 0 && this._mlegHost === el) return;
     if (this._mlegHost !== el) {
@@ -328,8 +330,10 @@ export class CalloutSync {
     }
     const legs = this._mlegs;
     if (legs.length === 0) return;
-    const cx = flip ? -CALLOUT_OFF_X : CALLOUT_OFF_X;
-    const cy = drop ? CALLOUT_OFF_Y - CALLOUT_LEG_INSET : -(CALLOUT_OFF_Y - CALLOUT_LEG_INSET);
+    // The panel end of the leader: the diagonal standoff's corner, or — on a phone (`phoneLen` > 0,
+    // the vertical leader's written length) — straight above or below the anchor.
+    const cx = phoneLen > 0 ? 0 : flip ? -CALLOUT_OFF_X : CALLOUT_OFF_X;
+    const cy = phoneLen > 0 ? (drop ? phoneLen - CALLOUT_LEG_INSET : -(phoneLen - CALLOUT_LEG_INSET)) : drop ? CALLOUT_OFF_Y - CALLOUT_LEG_INSET : -(CALLOUT_OFF_Y - CALLOUT_LEG_INSET);
     let n = 0;
     if (want && r) {
       const count = this.h.globe.selectedNodeHyperAnchors(this._calloutSibs);
