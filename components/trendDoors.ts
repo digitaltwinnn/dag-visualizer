@@ -1,6 +1,7 @@
 "use client";
 
 import { useStore } from "@/src/store/store";
+import { UNLISTED_ID } from "@/src/data/unlisted";
 
 // THE MEASURED HISTORY'S TWO DOORS — ONE HOME (2026-09-19).
 //
@@ -58,7 +59,13 @@ export function openRecords(metaId: string | null, span: RecordSpan | null): voi
   // metagraphs (`searchNets` skips the root) and the ledger lens already treats a committed DAG
   // as every network. Handing "dag" through left the chain picker empty and the seek waiting
   // forever (review, 2026-09-26).
-  const scoped = metaId && metaId !== "dag" ? metaId : null;
+  // …and so are the UNLISTED channels (user, 2026-10-08: "is it possible to see the actual snapshot
+  // — in the past I was able to see what's inside"). They have no chain the log can page, so a
+  // scoped seek waited forever for a walk that never starts — the reason this door was dead for
+  // them. Unscoped, the log cuts its RECENT rows to the span (the unlisted rows among them; only
+  // them under the Unlisted filter's lens), and a row opens its snapshot's contents like any other.
+  // A span older than the recent rows answers the way every unscoped seek does.
+  const scoped = metaId && metaId !== "dag" && metaId !== UNLISTED_ID ? metaId : null;
   // ⚠️ THE DOOR NEVER WRITES THE APP FILTER (user, 2026-10-04: "it sets the global filter, that
   // should not happen; only set the filter in the raw list / search section"). It hands the network
   // to the log, which scopes ITSELF to it (AnchorLogTable's `searchMeta`) — the top bar, the scene

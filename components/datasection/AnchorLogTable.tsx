@@ -808,6 +808,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
    *  implementation, and a reader who asked for a date in August is owed the route to August, not a
    *  description of the buffer that failed to hold it. */
   const PICK_A_CHAIN = "pick a network in the top-bar filter to search its history by date";
+  const UNLISTED_REACH = "unlisted snapshots can only be listed from the latest global snapshots";
 
   /** AGE — a FILTER since 2026-10-07: the log keeps to [from, to) (`bound`). A closed span lands on
    *  its newest snapshot, an open one (a from-date alone) on the date it asked for. A door's span is
@@ -858,7 +859,9 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         const ms = Date.parse(r.ts);
         return Number.isFinite(ms) && (acc == null || ms < acc) ? ms : acc;
       }, null);
-      setJumpMiss(oldest != null && fromMs >= oldest ? "no snapshots in that range" : PICK_A_CHAIN);
+      // Under the UNLISTED lens there is no network to pick — their snapshots are read only from the
+      // latest global snapshots, so the honest answer is the reach itself (2026-10-08).
+      setJumpMiss(oldest != null && fromMs >= oldest ? "no snapshots in that range" : lens === UNLISTED_ID ? UNLISTED_REACH : PICK_A_CHAIN);
       return;
     }
     // WHICH CHAIN HOLDS THAT DATE. With more than one, the date picks it: the newest chain that

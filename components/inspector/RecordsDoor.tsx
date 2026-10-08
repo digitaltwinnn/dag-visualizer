@@ -4,7 +4,6 @@ import { ArrowUpRight, Table2 } from "lucide-react";
 
 import { openRecords, type RecordSpan } from "@/components/trendDoors";
 import { cn } from "@/lib/utils";
-import { UNLISTED_ID } from "@/src/data/unlisted";
 
 /** HISTORY'S ONE EXIT, as a card's foot control (design 2026-09-26, `moment-door.html` A): the
  *  anchor log over a span, through `components/trendDoors.ts` — the shared home the RAW toggle
@@ -26,11 +25,7 @@ export default function RecordsDoor({
   subject: string | null;
   span: RecordSpan | null;
 }) {
-  // The unlisted channels' own records cannot be paged yet: their addresses are not known to the
-  // log (the known-channel roster is the follow-up). The door is ABSENT for them (user, 2026-10-08:
-  // there are no hover reasons, and the unlisted set is the exception — it must not be explained
-  // where it is not on screen); a dead door with its reason in a tooltip was the old answer.
-  if (subject === UNLISTED_ID) return null;
+  // The unlisted channels' door opens the log UNSCOPED, cut to the span (`openRecords` says why).
   return (
     <button
       type="button"
