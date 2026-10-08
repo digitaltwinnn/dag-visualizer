@@ -31,6 +31,7 @@ import { ageWords } from "@/src/util/relativeAge";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
 import { unlistedSeries } from "@/src/data/trendSeries";
+import { nodesByContinent } from "@/src/data/continents";
 
 export function HyperCells({ accent }: { accent: string }) {
   const filter = useStore((s) => s.filter);
@@ -217,18 +218,15 @@ export function GeoCells({ accent }: { accent: string }) {
   const filter = useStore((s) => s.filter);
   const countries = lb?.countries ?? [];
   const total = selNodes.length;
-  const { ispCounts, topIsps, located } = useMemo(() => {
+  const { ispCounts, topIsps, byContinent } = useMemo(() => {
     const ispCounts = new Map<string, number>();
-    let located = 0;
     for (const r of selNodes) {
       const isp = "geo" in r.pick ? r.pick.geo?.isp : undefined;
       if (isp) ispCounts.set(isp, (ispCounts.get(isp) ?? 0) + 1);
-      // PLACED = the row resolved to a country, which is exactly the test the country ring below
-      // is built on. Reading the same field is the point: the two cards can then never disagree
-      // about how many nodes this view is actually able to draw.
-      if (r.cc) located++;
     }
-    return { ispCounts, topIsps: [...ispCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3), located };
+    // The continent reads the same `cc` the country ring is built on, so the two cards can never
+    // disagree about which nodes this view is able to place.
+    return { ispCounts, topIsps: [...ispCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3), byContinent: nodesByContinent(selNodes) };
   }, [selNodes]);
   const topCountries = countries.slice(0, 3);
   const restC = countries.slice(3).reduce((s, c) => s + c.count, 0);
@@ -265,23 +263,21 @@ export function GeoCells({ accent }: { accent: string }) {
 
   return (
     <>
-      {/* THE FLEET, AND WHETHER GEO CAN ACTUALLY DRAW IT (user, 2026-09-01: the lone numeral
-          "looks very boring, is there a nicer way to present the 1 number?"). A card with no
-          breakdown is the boring case by construction — the band's grammar is lead + detail — and
-          this is the one breakdown that belongs to THIS view rather than to its neighbours: a node
-          the lookup could not place sits in no country ring and no provider ring, so the split is
-          also the basis both cards beside it silently assume. Rule 10: an unplaced node is an
-          instrument state, not a rounding error, and stating it is how the fleet total and the
-          rings are allowed to differ honestly. `unplaced` reading 0 is itself a reading — the
-          fleet is fully drawn — and MicroBars renders no bar for it, only the numeral. */}
+      {/* THE FLEET BY CONTINENT (user, 2026-10-08: "nodes located/unplaced — unplaced never
+          happens; what is a better node breakdown related to geo?"). The lone total was a boring
+          card by construction (2026-09-01) and its located/unplaced split answered a question the
+          lookup never fails. The continent is the world view of WHERE — the level above the Top
+          countries card beside it — busiest first, the band's four-row height kept by folding any
+          further continents into a muted `other`. `unplaced` is a row only while it is not zero:
+          an instrument state worth stating, never a standing "0". */}
       <BandCard label="Nodes"
         lead={<span className="font-mono font-bold text-xl text-foreground tabular-nums"><Odometer int value={total || null} /></span>}>
-        {/* "unplaced" takes the neutral, like hyper's "unknown" type bucket: a node the lookup
-            could not place claims no location, so its bar should not wear the accent the located
-            split does (user, 2026-09-03). */}
-        <MicroBars accent={accent} labelW={56} rows={[
-          { key: "located", label: "located", count: located },
-          { key: "unplaced", label: "unplaced", count: Math.max(0, total - located), hue: "var(--muted-foreground)" },
+        <MicroBars accent={accent} labelW={104} rows={[
+          ...byContinent.rows.slice(0, byContinent.rows.length > 4 ? 3 : 4).map((c) => ({ key: c.continent, label: c.continent, count: c.count })),
+          ...(byContinent.rows.length > 4
+            ? [{ key: "other", label: "other", count: byContinent.rows.slice(3).reduce((n, c) => n + c.count, 0), hue: "var(--muted-foreground)" }]
+            : []),
+          ...(byContinent.unplaced > 0 ? [{ key: "unplaced", label: "unplaced", count: byContinent.unplaced, hue: "var(--muted-foreground)" }] : []),
         ]} />
       </BandCard>
       {/* "Top countries", not "Nodes by country" (user, 2026-09-01): the card shows the top three
