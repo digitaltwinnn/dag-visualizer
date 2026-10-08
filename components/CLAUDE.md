@@ -59,9 +59,10 @@ answer is ONE exact read, measured: one request, zero walk probes. It is also th
 can say *this network did not anchor there* — a time-based search answers that case by landing on
 whatever came next, which reads as a hit. AGE is a date, and there is no date lookup upstream
 (verified: `startTime`/`endTime`, `timestamp`, `from`, `startDate`, `before` are all silently ignored
-and return the live tip), so it is the only criterion that walks. FEE and SIZE have no index at any
-layer — a field there could only filter the 25 rows on screen, and a reader who typed a fee and got
-"no match" would reasonably conclude no such snapshot exists when we looked at 25 of 1.1 million.
+and return the live tip), so it is the only criterion that walks. SIZE (and the fee, which the log
+no longer lists) has no index at any layer — a field there could only filter the 25 rows on screen,
+and a reader who typed a size and got "no match" would reasonably conclude no such snapshot exists
+when we looked at 25 of 1.1 million.
 
 ⚠️ **UNDER ALL THE LOG IS EVERY NETWORK'S WHOLE CHAIN, MERGED BY TIME, WITH THE REAL TOTAL**
 (user, 2026-10-07: "I care about actual real totals not technical implementation … that should be
@@ -88,12 +89,13 @@ total being counted twinkles in its slot.
 on table filtering: what is APPLIED (in words, so a folded bar can never leave the table on a search
 with nothing explaining it) and a way to CLEAR it.
 
-⚠️ **AND TWO COLUMNS STAND DOWN ON PHONE.** Six columns cannot fit a 500px viewport — measured, the
+⚠️ **AND SIZE STANDS DOWN ON PHONE.** Six columns cannot fit a 500px viewport — measured, the
 table ran 494px inside a 403px pane and took the log into horizontal scroll, which on a log you SCAN
-is worse than showing less of each row. FEE and SIZE go: the other four IDENTIFY a row (whose chain,
-which snapshot, where it anchored, when) while those two are measures ABOUT it, stated in full on the
-snapshot card one tap away — and they are the only two the search bar cannot answer for anyway. One
-class on the header cell and its body cells, so a column can never half-hide.
+is worse than showing less of each row. SIZE goes: the other four IDENTIFY a row (whose chain,
+which snapshot, where it anchored, when) while size is a measure ABOUT it, stated in full on the
+snapshot card one tap away — and it is the one the search bar cannot answer for anyway. One
+class on the header cell and its body cells, so a column can never half-hide. **The log has no FEE
+column on any tier** (user, 2026-10-08: "too crowded"): the fee is the snapshot card's reading.
 
 ⚠️ **AND ANCHORED INTO HAS NO FALLBACK, DELIBERATELY.** The payload host serves only the recent band
 of global ordinals and 404s older ones. A first cut answered that by resolving the ordinal to a

@@ -162,8 +162,10 @@ export function HyperCells({ accent }: { accent: string }) {
             "zero LOCATABLE machines to read roles from", not zero activity: BIOFI sits here while
             anchoring hundreds of snapshots an hour, so "inactive" would fabricate an activity
             claim, rule 10). It takes the neutral instead: not one more type in the vocabulary. */}
-        <MicroBars accent={accent} labelW={58}
-          rows={TYPE_ORDER.map((t) => ({ key: t, label: t === "data + currency" ? "both" : t, count: types[t]!, hue: t === "unknown" ? "var(--muted-foreground)" : undefined }))} />
+        {/* The pair is said in words (user, 2026-10-08: "both" = "data and currency"): a reader
+            meets the row before the two single-type rows have taught them what "both" joins. */}
+        <MicroBars accent={accent} labelW={96}
+          rows={TYPE_ORDER.map((t) => ({ key: t, label: t === "data + currency" ? "data and currency" : t, count: types[t]!, hue: t === "unknown" ? "var(--muted-foreground)" : undefined }))} />
       </BandCard>
       )}
       {/* NO SEPARATE "NODES" CARD (user, 2026-08-31). The composition counts PARTITION the fleet,

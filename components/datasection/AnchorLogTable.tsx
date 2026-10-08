@@ -13,7 +13,7 @@ import { ledgerLens } from "@/src/data/ledgerStory";
 import { metaSnapHoverKey, type GlobalSnapshot } from "@/src/data/types";
 import { metaSnapArrivalActions, metaSnapSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { fmtDag, fmtKB } from "@/src/util/format";
+import { fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { Empty, IdentityDot } from "@/components/inspector/parts";
 import { selectionHue } from "@/components/selection";
@@ -47,23 +47,25 @@ const PAGE = 25;
  *  holds several searches' worth without letting a long session grow unbounded. */
 const PROBE_CACHE = 64;
 
-/** ⚠️ TWO COLUMNS STAND DOWN ON PHONE. Six columns cannot fit a 500px viewport — measured, the
+/** ⚠️ SIZE STANDS DOWN ON PHONE. Six columns cannot fit a 500px viewport — measured, the
  *  table ran 494px inside a 403px pane and took the whole log into horizontal scroll, which on a
  *  log you SCAN is worse than showing less of each row. This table already answered the same
  *  question the same way once (2026-08-15: the full network NAME became the TICKER because "the
  *  name column alone pushed the log into horizontal scroll") — shrink what is shown, do not hand
  *  the reader a sideways scroll.
  *
- *  FEE and SIZE are the two that go, and the choice is not arbitrary: the other four are what
- *  IDENTIFIES a row — whose chain, which snapshot, where it anchored, when — while fee and size
- *  are measures ABOUT it, and both are stated in full on the snapshot card one tap away. They are
- *  also the two columns the search bar cannot answer for, having no index at any layer, so a phone
- *  loses nothing it could have acted on. `max-[700px]` is `breakpointOf`'s own phone boundary and
- *  the same arm every other phone gate names (CSS trap 8: it stops applying AT 700). */
+ *  SIZE is the one that goes, and the choice is not arbitrary: the other four are what
+ *  IDENTIFIES a row — whose chain, which snapshot, where it anchored, when — while size is a
+ *  measure ABOUT it, stated in full on the snapshot card one tap away. It is also a column the
+ *  search bar cannot answer for, having no index at any layer, so a phone loses nothing it could
+ *  have acted on. `max-[700px]` is `breakpointOf`'s own phone boundary and the same arm every
+ *  other phone gate names (CSS trap 8: it stops applying AT 700).
+ *  NO FEE COLUMN AT ALL (user, 2026-10-08: "it gets too crowded here"): the fee is a reading about
+ *  one snapshot, on the snapshot card where the size also is; the log identifies rows. The
+ *  `fee` sort key stays in the vocabulary (`sortAnchorLog`) — nothing in this table offers it. */
 const COLUMNS: { key: AnchorLogSortKey; label: string; phone?: false; phoneLabel?: string }[] = [
   { key: "net", label: "Network" },
   { key: "ordinal", label: "Snapshot" },
-  { key: "fee", label: "Fee (DAG)", phone: false },
   { key: "size", label: "Size", phone: false },
   // `phoneLabel` — the same axis under its shorter name where the wide one alone kept the four
   // surviving columns in sideways scroll (2026-09-02: measured 366px of columns in a 309px pane,
@@ -1724,7 +1726,6 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                     {/* The ✓ slot is ALWAYS reserved so the column never shifts on select. */}
                     {seam ? <Dash /> : r.ordinal.toLocaleString()}
                   </TableCell>
-                  <TableCell className={cn("text-right tabular-nums", PHONE_HIDDEN)}>{seam ? <Dash /> : fmtDag(r.fee)}</TableCell>
                   <TableCell className={cn("text-right tabular-nums text-foreground-dim", PHONE_HIDDEN)}>{seam ? <Dash /> : size}</TableCell>
                   {!grouped && (
                     <TableCell className="text-right font-mono tabular-nums max-[700px]:hidden">
@@ -1740,18 +1741,17 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                       <span className="min-[700px]:hidden">{relativeAge(now - Date.parse(r.ts), true)}</span>
                     </TableCell>
                   )}
-                  {/* The phone row's SECOND LINE — where it anchored, what it paid, how big it was.
-                      One muted line under the row's identity; absent from the table tiers, whose
-                      columns state the same three. A seam has only its tick. */}
-                  {/* THREE FACTS, THREE PLACES — no mid-dots (user, 2026-10-03: "likely separate facts
-                      to show instead of a combined text"): where it anchored on the left, what it
-                      paid and how big it is ranged right, each in its own cell of the line. */}
+                  {/* The phone row's SECOND LINE — where it anchored and how big it was. One muted
+                      line under the row's identity; absent from the table tiers, whose columns
+                      state the same two. A seam has only its tick. */}
+                  {/* TWO FACTS, TWO PLACES — no mid-dots (user, 2026-10-03: "likely separate facts
+                      to show instead of a combined text"): where it anchored on the left, how big
+                      it is ranged right, each in its own cell of the line. */}
                   {/* GROUPED, it joins the first line: the header holds the "into" and the age, so
-                      fee and size take the age's place instead of a line of their own. */}
+                      the size takes the age's place instead of a line of its own. */}
                   <TableCell className={cn("min-[700px]:hidden text-label text-muted-foreground whitespace-normal", grouped ? "self-center" : "col-span-full pt-0")}>
                     <span className="flex items-baseline gap-4 font-mono tabular-nums">
                       {!grouped && <span className="mr-auto">into {pending ? "…" : r.global.ordinal.toLocaleString()}</span>}
-                      {!seam && <span>{fmtDag(r.fee)} DAG</span>}
                       {!seam && <span className="min-w-[6ch] text-right">{size}</span>}
                       {/* THE ROW OPENS A PAGE (design B1): the phone's chevron says so — this cell
                           exists only on the phone, where list and snapshot are two pages. The
