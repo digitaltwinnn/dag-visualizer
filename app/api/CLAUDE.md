@@ -83,10 +83,13 @@ them — but the Next Node server can.
   decode. **A deterministic miss (the channel provably isn't in this immutable global) is cached
   like a success** — throwing it made every repeat of the same bad `(ordinal, address)` re-download
   the whole global, an anonymous amplification loop; only transient failures throw and retry.
+- **`/api/network/unlisted`** lists the UNLISTED chains — the explorer's `/currency` list less every
+  tracked address — cached an hour (`app/api/network/unlistedChains.ts`, also the gate below).
 - **`/api/network/[address]/snapshots`** pages one CATALOG chain (retired networks and former
-  addresses included) for the anchor log: no params is the live tip, fetched fresh; `?before=N` is
+  addresses included) or one of those unlisted chains — never an arbitrary address — for the anchor log: no params is the live tip, fetched fresh; `?before=N` is
   the ~25 ordinals below N as individual records, cached immutably (a day). Under All the client
-  merges these chains itself (`components/datasection/useMergedLog.ts`).
+  merges these chains itself (`components/datasection/useMergedLog.ts`), and under the Unlisted
+  lens it merges the unlisted chains the same way.
   **`/api/network/[address]/snapshots/[ordinal]`** is one record of ANY currency chain, catalog or
   not (immutable, a day), and **`/api/network/[address]/chain`** is any chain's span — genesis date
   and newest ordinal (5 min); those two are gated by address shape only.

@@ -31,12 +31,14 @@ import { appliedChips, logMode, rangePage, searchCriterion, spanOfSearch } from 
 import type { ChainSpan } from "@/src/data/mergedLog";
 import { useMinHold } from "@/components/useMinHold";
 import { useUnlistedLastSeen } from "@/components/UnlistedStage";
+import { useUnlistedChains } from "@/components/datasection/useUnlistedChains";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { isRetired } from "@/src/net/lineage";
 
 // The retained global window the log joins against — the same buffer the strip's bars plot,
 // one row per anchored metagraph snapshot inside it.
 const MAX = POLL.maxSnapshots;
+const NO_CHAINS: readonly string[] = [];
 const PAGE = 25;
 
 // ONE COLUMN LIST, read by the header AND by the search row beneath it — a second literal is how the
@@ -183,14 +185,17 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // "I care about actual real totals not technical implementation … that should be solved under
   // the hood". With no network in scope the log is every listed network's whole chain, newest
   // first, with the exact total (`useMergedLog`). It replaced a live WINDOW of the last few minutes
-  // that called itself "recent" and explained the buffer on hover. The unlisted lens keeps the
-  // window: an unlisted channel has no public chain to page.
+  // that called itself "recent" and explained the buffer on hover. The UNLISTED lens merges the
+  // unlisted chains the same way (2026-10-08): the explorer lists them by address, so their whole
+  // history pages like a network's — it used to be the live window alone.
   const mergedMode = logMode({ chain: histNet, lens }) === "merged";
   const metaList = useStore((st) => st.metaList);
   // THE CATALOG'S CHAINS, not the live directory's (2026-10-07 — retirement): every network the
   // catalog has, RETIRED ones included, with their former addresses, so the all-time total and the
   // records of a network Constellation no longer lists survive its removal.
-  const mergedChains = useMemo(() => METAGRAPHS.flatMap((m) => [m.id, ...(m.formerIds ?? [])]).filter((a, i, all) => !!a && all.indexOf(a) === i), []);
+  const catalogChains = useMemo(() => METAGRAPHS.flatMap((m) => [m.id, ...(m.formerIds ?? [])]).filter((a, i, all) => !!a && all.indexOf(a) === i), []);
+  const unlistedChains = useUnlistedChains(lens === UNLISTED_ID);
+  const mergedChains = lens === UNLISTED_ID ? (unlistedChains ?? NO_CHAINS) : catalogChains;
   // The live buffer's newest ordinal per chain — the merged log's tips lead with it.
   const liveTips: Record<string, number> = {};
   if (net) for (const [addr, snaps] of net.metaSnaps) for (const r of snaps) if (r.ordinal > (liveTips[addr] ?? 0)) liveTips[addr] = r.ordinal;
@@ -216,7 +221,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   const rawOpen = useStore((s) => s.section === "data");
   // Under the Unlisted lens an empty log says when one last anchored, never "waiting" forever.
   const unlistedLastSeen = useUnlistedLastSeen(rawOpen && lens === UNLISTED_ID);
-  const merged = useMergedLog(mergedMode && rawOpen, mergedChains, mergedScope, liveTips);
+  // Under Unlisted the merge waits for the chain list — an empty list would read as "no snapshots".
+  const merged = useMergedLog(mergedMode && rawOpen && (lens !== UNLISTED_ID || unlistedChains != null), mergedChains, mergedScope, liveTips);
   /** A merged search waiting for its page: land (mark) its first row, or go to the oldest end. */
   const mergedLand = useRef<"newest" | "oldest" | "landed-oldest" | null>(null);
 
@@ -719,7 +725,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
           spans.set(r.metaId, s ? { lo: Math.min(s.lo, r.ordinal), hi: Math.max(s.hi, r.ordinal) } : { lo: r.ordinal, hi: r.ordinal });
         }
         const unlistedN = (d.rows ?? []).filter((r) => !mergedChains.includes(r.metaId)).length;
-        setGlobalUnlisted(unlistedN);
+        // Under the Unlisted lens the chains ARE the unlisted ones: there is no remainder to state.
+        setGlobalUnlisted(lens === UNLISTED_ID ? 0 : unlistedN);
         if (!spans.size) {
           setJumpMiss(
             unlistedN
@@ -808,7 +815,6 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
    *  implementation, and a reader who asked for a date in August is owed the route to August, not a
    *  description of the buffer that failed to hold it. */
   const PICK_A_CHAIN = "pick a network in the top-bar filter to search its history by date";
-  const UNLISTED_REACH = "unlisted snapshots can only be listed from the latest global snapshots";
 
   /** AGE — a FILTER since 2026-10-07: the log keeps to [from, to) (`bound`). A closed span lands on
    *  its newest snapshot, an open one (a from-date alone) on the date it asked for. A door's span is
@@ -859,9 +865,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         const ms = Date.parse(r.ts);
         return Number.isFinite(ms) && (acc == null || ms < acc) ? ms : acc;
       }, null);
-      // Under the UNLISTED lens there is no network to pick — their snapshots are read only from the
-      // latest global snapshots, so the honest answer is the reach itself (2026-10-08).
-      setJumpMiss(oldest != null && fromMs >= oldest ? "no snapshots in that range" : lens === UNLISTED_ID ? UNLISTED_REACH : PICK_A_CHAIN);
+      setJumpMiss(oldest != null && fromMs >= oldest ? "no snapshots in that range" : PICK_A_CHAIN);
       return;
     }
     // WHICH CHAIN HOLDS THAT DATE. With more than one, the date picks it: the newest chain that
