@@ -192,6 +192,50 @@ export function resolveSigner(selNodes: NodeRow[], metaId: string, signerPrefix:
   return { known: false, reason: selNodes.some((r) => pickNetId(r.pick) === metaId) ? "node" : "network" };
 }
 
+/** One node's signatures on one metagraph snapshot, across both producing layers. */
+export interface SignerRosterRow {
+  key: string;
+  res: SignerResolution;
+  /** The signer prefix this node signed the DATA blocks with (dL1), or null where it did not. */
+  data: string | null;
+  /** The signer prefix this node signed the SNAPSHOT with (L0), or null where it did not. */
+  proof: string | null;
+  /** Signer prefixes that are NOT the node id's own prefix — a hybrid signs one layer with a
+   *  different key, the one fact the old Signer id column existed to show. Empty when every
+   *  signature repeats the node id. */
+  otherKeys: string[];
+}
+
+/** THE SIGNERS AS ONE ROSTER (user, 2026-10-08, design D1): the raw pane listed the dL1 and L0
+ *  signatures as two tables of `Node | Signer id`, and on a normal snapshot both held the same
+ *  three nodes with a signer id that was the node id's first 8 characters — the tab said one thing
+ *  four times. A row per NODE, a mark per LAYER, and a signer id only where it differs. Rows key
+ *  on the resolved node (its id), so a node that signed both layers is one row; an unresolved
+ *  signer keys on its prefix (the same prefix in both layers is the same unknown machine). Order is
+ *  the production order, as before: the data signers first, then any snapshot-only signer. */
+export function signerRoster(
+  selNodes: NodeRow[],
+  metaId: string,
+  dataIds: readonly string[],
+  proofIds: readonly string[],
+): SignerRosterRow[] {
+  const rows = new Map<string, SignerRosterRow>();
+  const add = (prefix: string, lane: "data" | "proof") => {
+    const res = resolveSigner(selNodes, metaId, prefix);
+    const key = res.known && res.row.id ? res.row.id : `?${prefix}`;
+    let row = rows.get(key);
+    if (!row) rows.set(key, (row = { key, res, data: null, proof: null, otherKeys: [] }));
+    row[lane] ??= prefix;
+    // "Own" = the node id itself carries the prefix — asked through the ONE matcher, handed the
+    // node id alone (signerMatchBoundary: no second prefix comparison anywhere).
+    const own = res.known && res.row.id ? carriesSigner({ id: res.row.id }, prefix) : true;
+    if (!own && !row.otherKeys.includes(prefix)) row.otherKeys.push(prefix);
+  };
+  for (const p of dataIds) add(p, "data");
+  for (const p of proofIds) add(p, "proof");
+  return [...rows.values()];
+}
+
 const NO_SIGNERS: readonly string[] = [];
 
 /** WHO SIGNED ONE METAGRAPH SNAPSHOT — its signer ids from the tick's EXACT read, the one source

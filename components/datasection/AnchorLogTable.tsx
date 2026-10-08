@@ -2,7 +2,7 @@
 
 import { METAGRAPHS, netUrl } from "@/src/net/current";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, ChevronDown, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Search, X } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useChainSpan } from "@/components/useArchive";
 import { useStore } from "@/src/store/store";
@@ -1577,9 +1577,12 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   // the snapshot in the scene on its own channel (rule 9: hover what a click commits).
                   <TableRow
                     className={cn(
-                      "cursor-pointer max-[700px]:block hover:bg-[color-mix(in_oklch,var(--primary)_10%,transparent)]",
+                      // THE HEADER IS A PLATE (user, 2026-10-08, design B1: "the header in the
+                      // snapshot list is not clearly distinguishable from the body rows"). The plate
+                      // lives on the cell's inner block, not the row: a <tr> takes neither margin
+                      // nor radius, and the gap ABOVE the plate is what separates two groups.
+                      "group/gh cursor-pointer max-[700px]:block border-0 hover:bg-transparent",
                       "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
-                      inSelGroup ? "border-[var(--primary)]" : "border-border",
                     )}
                     tabIndex={0}
                     title={`Select global snapshot ${r.global.ordinal.toLocaleString()}`}
@@ -1597,12 +1600,22 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                     onFocus={() => setHoverSnapOrd(r.global.ordinal)}
                     onBlur={() => setHoverSnapOrd(null)}
                   >
-                    <TableCell colSpan={columns.length} className="pt-3 pb-1 max-[700px]:block">
-                      <span className={cn("flex items-baseline gap-2 text-label", inSelGroup ? "text-primary-ink" : "text-muted-foreground")}>
-                        <span className="uppercase tracking-caps">Global</span>
+                    <TableCell colSpan={columns.length} className="p-0 pt-2.5 max-[700px]:px-0 max-[700px]:block">
+                      {/* Accent-tinted band + accent hairline; the SELECTED global deepens to the
+                          selection accent — the group's head carries that selection, never its rows.
+                          The age needs no "Age" label: "17s ago" names itself. */}
+                      <span
+                        className={cn(
+                          // px matches the rows' own cell inset, so "GLOBAL" stands on the identity dots' edge.
+                          "flex items-center gap-2 h-[34px] px-2 max-[700px]:px-1.5 rounded-t-md border-b text-label transition-colors",
+                          inSelGroup
+                            ? "bg-[color-mix(in_oklch,var(--primary)_20%,transparent)] border-[var(--primary)]"
+                            : "bg-[color-mix(in_oklch,var(--primary)_9%,var(--panel-plate))] border-[color-mix(in_oklch,var(--primary)_35%,transparent)] group-hover/gh:bg-[color-mix(in_oklch,var(--primary)_14%,var(--panel-plate))]",
+                        )}
+                      >
+                        <span className={cn("uppercase tracking-caps", inSelGroup ? "text-primary-ink" : "text-[color-mix(in_oklch,var(--primary-ink)_80%,var(--muted-foreground))]")}>Global</span>
                         <span className={cn("font-mono tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground")}>{r.global.ordinal.toLocaleString()}</span>
-                        <span className="ml-auto uppercase tracking-caps">Age</span>
-                        <span className={cn("tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground")} title={whenTitle(r.ts)}>{relativeAge(now - Date.parse(r.ts))}</span>
+                        <span className={cn("ml-auto tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground-dim")} title={whenTitle(r.ts)}>{relativeAge(now - Date.parse(r.ts))}</span>
                       </span>
                     </TableCell>
                   </TableRow>
@@ -1727,6 +1740,15 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                       {!grouped && <span className="mr-auto">into {pending ? "…" : r.global.ordinal.toLocaleString()}</span>}
                       {!seam && <span>{fmtDag(r.fee)} DAG</span>}
                       {!seam && <span className="min-w-[6ch] text-right">{size}</span>}
+                      {/* THE ROW OPENS A PAGE (design B1): the phone's chevron says so — this cell
+                          exists only on the phone, where list and snapshot are two pages. The
+                          selected row's chevron takes its network's hue, like its edge. */}
+                      {!seam && !pending && onOpen && (
+                        <ChevronRight
+                          aria-hidden
+                          className={cn("size-3.5 self-center -mr-1", rowSel ? "text-[var(--row-hue,var(--primary))]" : "text-muted-foreground/75")}
+                        />
+                      )}
                     </span>
                   </TableCell>
                 </TableRow>

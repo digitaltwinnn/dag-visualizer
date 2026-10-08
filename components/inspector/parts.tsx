@@ -376,7 +376,9 @@ export function FootRow({
   // for the same reason — the line is one column now, and every label character is a hash
   // character lost.
   return (
-    <div className="group/copy flex items-center gap-2.5" title={title}>
+    // min-h-6: the copy control's own 24px, so a row WITHOUT one (a chain position) keeps the
+    // same rhythm as the hash rows beside it.
+    <div className="group/copy flex items-center gap-2.5 min-h-6" title={title}>
       <span className="inline-flex items-baseline min-w-0 flex-1 font-mono text-label">
         <span className="shrink-0 tracking-caps uppercase text-muted-foreground">{label}</span>
         <span aria-hidden className="shrink-0">&nbsp;&nbsp;</span>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { coLocatedNetworks, matchSignerRow, nodeSigned, resolveSigner, resolveSignerIps, SIGNER_GROUPS, SIGNER_UNKNOWN, snapshotSigners, snapshotSignerRows } from "@/src/data/network";
+import { coLocatedNetworks, matchSignerRow, nodeSigned, resolveSigner, resolveSignerIps, SIGNER_GROUPS, signerRoster, SIGNER_UNKNOWN, snapshotSigners, snapshotSignerRows } from "@/src/data/network";
 import type { MetaInfo, NodeRow } from "@/src/data/types";
 
 const meta = (id: string, nodes: { ip?: string; id?: string; ids?: string[] }[]): MetaInfo => ({
@@ -165,6 +165,35 @@ describe("SIGNER_GROUPS", () => {
 // spot solution"). `resolveSigner` is the ONE decision both signer lists read, and it is keyed on
 // the DATA: the unlisted channel is not a special case, it is just the branch every network takes
 // when nothing about its cluster is published.
+describe("signerRoster (one row per node, a mark per layer)", () => {
+  const rows = [
+    nodeRow("dor", "abcdef0123456789", "Falkenstein"),
+    nodeRow("dor", "1234567890abcdef", "Helsinki"),
+  ];
+  it("folds a node that signed both layers into one row, signer ids hidden when they repeat the node id", () => {
+    const r = signerRoster(rows, "dor", ["abcdef01", "12345678"], ["abcdef01", "12345678"]);
+    expect(r.map((x) => [x.key, x.data, x.proof, x.otherKeys])).toEqual([
+      ["abcdef0123456789", "abcdef01", "abcdef01", []],
+      ["1234567890abcdef", "12345678", "12345678", []],
+    ]);
+  });
+  it("keeps a one-layer signer and an unknown signer, in production order (data first)", () => {
+    const r = signerRoster(rows, "dor", ["abcdef01", "zzzzzzzz"], ["12345678", "zzzzzzzz"]);
+    expect(r.map((x) => [x.key, x.data, x.proof])).toEqual([
+      ["abcdef0123456789", "abcdef01", null],
+      ["?zzzzzzzz", "zzzzzzzz", "zzzzzzzz"],
+      ["1234567890abcdef", null, "12345678"],
+    ]);
+    expect(r[1].res.known).toBe(false);
+  });
+  it("states a hybrid's other key — the signer id the node id does not repeat", () => {
+    const hybrid = [{ ...nodeRow("dor", "abcdef0123456789", "Falkenstein"), ids: ["abcdef0123456789", "99887766aabbccdd"] }];
+    const r = signerRoster(hybrid, "dor", ["99887766"], ["abcdef01"]);
+    expect(r).toHaveLength(1);
+    expect(r[0].otherKeys).toEqual(["99887766"]);
+  });
+});
+
 describe("resolveSigner", () => {
   const rows = [
     nodeRow("dor", "abcdef0123456789", "Falkenstein"),
