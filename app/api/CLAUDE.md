@@ -30,7 +30,9 @@ them — but the Next Node server can.
   (TTL_S all-null; the finite era's pending expiries were PERSISTed away one-time); history's
   FLOORS — where fine grain begins to exist — live in `src/data/trendWindow.ts` TIER_SINCE; **`/api/trends/sample`** is the Vercel-Cron sampler (15 min,
   `CRON_SECRET` auth) that pages the explorer stream since a Redis cursor and
-  merge-writes 5m/1h/1d hash tiers. Spec:
+  merge-writes 5m/1h/1d hash tiers. It also samples the UNLISTED chains — the explorer's `/currency`
+  list less every tracked address — for their own counts, outside the fee/size floors, marking the
+  buckets it measured them in with `u.cov` (History's unlisted figure is measured, not derived). Spec:
   `docs/superpowers/specs/2026-09-05-trends-timeseries-design.md` — the key/field grammar,
   command budget, honesty rules (null = not measured, 0 = measured none; `g.ticks` is the
   coverage marker) and the Upstash usage contract (single region, eviction OFF, read-only

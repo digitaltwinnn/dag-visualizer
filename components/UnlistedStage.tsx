@@ -2,7 +2,7 @@
 
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { lastSeen, unlistedSeries } from "@/src/data/trendSeries";
-import { UNLISTED_ID } from "@/src/data/unlisted";
+import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { useStore } from "@/src/store/store";
 import { bucketStamp } from "@/src/util/localTime";
@@ -12,7 +12,7 @@ import { bucketStamp } from "@/src/util/localTime";
 export function useUnlistedLastSeen(on: boolean): string {
   const slice = useTrendsSlice(on ? "all" : null, null);
   const series = slice.p?.series;
-  const last = series ? lastSeen(unlistedSeries(series), slice.buckets) : undefined;
+  const last = series ? lastSeen(unlistedSeries(series, (id) => LISTED_IDS.has(id)), slice.buckets) : undefined;
   if (slice.error && last === undefined) return "When one last anchored could not be read.";
   return last === undefined
     ? "Reading when one last anchored…"

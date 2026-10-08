@@ -664,23 +664,31 @@ export function typeBands(id: string, series: Readonly<Record<string, (number | 
   });
 }
 
-/** UNLISTED ANCHORING, MEASURED (the Unlisted audit, 2026-10-07): the global snapshot count covers
- *  every channel and the listed networks' series cover the catalog, so per bucket the difference
- *  is what the unlisted channels anchored. Null where the global count or any listed network is
- *  unmeasured — a difference over a hole is a guess (rule 10). Never below zero: at a bucket edge a
- *  listed count can lead the global one. */
-export function unlistedSeries(series: Readonly<Record<string, readonly (number | null)[]>>): (number | null)[] {
-  const g = series["g.anchors"] ?? [];
-  const listed = Object.keys(series).filter((k) => k.startsWith("m.") && k.endsWith(".snaps"));
-  return g.map((total, i) => {
-    if (total == null) return null;
+/** UNLISTED ANCHORING, MEASURED FROM THEIR OWN CHAINS (2026-10-08). The sampler reads the
+ *  explorer's list of every chain and samples the ones the catalog does not track, so each unlisted
+ *  channel has its own `m.<address>.snaps`; the bucket's unlisted count is their sum. A bucket the
+ *  sampler did not measure them in carries no `u.cov` marker and reads NULL — never zero.
+ *
+ *  It replaced a DERIVATION (2026-10-07: the global count minus every listed network), which a
+ *  single explorer skew broke: on 2026-09-29 one global stamped 19:59:50 carried 38 listed
+ *  snapshots the explorer stamped 20:00:30, so its anchors and its snapshots fell in two buckets and
+ *  the difference read as 38 unlisted snapshots that never existed. `isListed` is the catalog's
+ *  judgement (current ids and former ones — `LISTED_IDS`), passed in so this stays pure. */
+export function unlistedSeries(
+  series: Readonly<Record<string, readonly (number | null)[]>>,
+  isListed: (id: string) => boolean,
+): (number | null)[] {
+  const cov = series["u.cov"];
+  if (!cov) return (series["g.ticks"] ?? []).map(() => null);
+  const mine = Object.keys(series).filter((k) => {
+    if (!k.startsWith("m.") || !k.endsWith(".snaps")) return false;
+    return !isListed(k.slice(2, -".snaps".length));
+  });
+  return cov.map((c, i) => {
+    if (c == null) return null;
     let sum = 0;
-    for (const k of listed) {
-      const v = series[k]![i];
-      if (v == null) return null;
-      sum += v;
-    }
-    return Math.max(0, total - sum);
+    for (const k of mine) sum += series[k]![i] ?? 0;
+    return sum;
   });
 }
 

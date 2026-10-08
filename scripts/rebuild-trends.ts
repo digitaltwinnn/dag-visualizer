@@ -8,6 +8,7 @@
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --recompute-from=2026-09-06 --resume
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --backfill-gaps=2026-01-01
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --backfill-blocks=2025-07-01
+//   npx tsx scripts/rebuild-trends.ts --net=mainnet --backfill-unlisted
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --wipe-only
 //
 // CRASH SAFETY (2026-09-11 — the overnight recompute died at hour 13 with every write still
@@ -94,11 +95,12 @@ function loadEnvLocal(): void {
   }
 }
 
-interface Args { net: "mainnet" | "integrationnet" | "testnet"; days: number; wipeOnly: boolean; extendToMs: number | null; recomputeFromMs: number | null; gapsFromMs: number | null; blocksFromMs: number | null; resume: "no" | "yes" | "force" }
+interface Args { net: "mainnet" | "integrationnet" | "testnet"; days: number; wipeOnly: boolean; extendToMs: number | null; recomputeFromMs: number | null; gapsFromMs: number | null; blocksFromMs: number | null; unlisted: boolean; resume: "no" | "yes" | "force" }
 function parseArgs(): Args {
-  const a: Args = { net: "mainnet", days: 90, wipeOnly: false, extendToMs: null, recomputeFromMs: null, gapsFromMs: null, blocksFromMs: null, resume: "no" };
+  const a: Args = { net: "mainnet", days: 90, wipeOnly: false, extendToMs: null, recomputeFromMs: null, gapsFromMs: null, blocksFromMs: null, unlisted: false, resume: "no" };
   for (const arg of process.argv.slice(2)) {
     if (arg === "--wipe-only") a.wipeOnly = true;
+    else if (arg === "--backfill-unlisted") a.unlisted = true;
     else if (arg === "--resume") a.resume = "yes";
     else if (arg === "--resume=force") a.resume = "force";
     else if (arg.startsWith("--net=")) a.net = arg.slice(6) as Args["net"];
@@ -235,17 +237,17 @@ async function walkChain<T extends { timestamp: string }>(
 
 async function main(): Promise<void> {
   loadEnvLocal();
-  const { net, days, wipeOnly, extendToMs, recomputeFromMs, gapsFromMs, blocksFromMs, resume } = parseArgs();
+  const { net, days, wipeOnly, extendToMs, recomputeFromMs, gapsFromMs, blocksFromMs, unlisted, resume } = parseArgs();
 
   // Deferred imports: store.ts reads env at construction, so env must be loaded first.
   const { Redis } = await import("@upstash/redis");
   const { NETWORKS, CATALOG } = await import("../src/engine/config");
   // Every address the catalog has EVER tracked — a re-registered network's retired chain keeps its
   // days in the store, so a rebuild or recompute must walk it too (`src/net/lineage.ts`).
-  const { lineageIds } = await import("../src/net/lineage");
+  const { lineageIds, untrackedIds } = await import("../src/net/lineage");
   const { TIER_SINCE } = await import("../src/data/trendWindow");
   const { TTL_S, slotOf, cursorKeyOf, lockKeyOf } = await import("../app/api/trends/keys");
-  const { bucketGlobals, bucketMetas, addInc } = await import("../app/api/trends/bucketing");
+  const { bucketGlobals, bucketMetas, addInc, markUnlistedCoverage } = await import("../app/api/trends/bucketing");
   const addIncGap = (inc: import("../app/api/trends/bucketing").IncMap, n: string, tsMs: number, id: string, gap: number) => {
     addInc(inc, n, tsMs, `m.${id}.gapSum`, gap);
     addInc(inc, n, tsMs, `m.${id}.gapMax`, gap);
@@ -508,6 +510,67 @@ async function main(): Promise<void> {
     console.log(`  floors: ${n} shared fee/size fields written (every chain folded in); checkpoint cleared.`);
   };
 
+  // ---- UNLISTED BACKFILL: the unlisted channels' own counts, and where they were measured ----
+  // (2026-10-08 — History's unlisted figure became MEASURED from their own chains, `u.cov` marking
+  // the buckets measured; before this walk every old bucket reads "not measured", never zero.)
+  // The unlisted chains are few and small, so each is walked WHOLE and written EXACT (HSET
+  // overwrite, never a merge), today included — the run holds the sampler lock, so no cron run
+  // interleaves — and each chain's cron CURSOR is set to its tip, or the next cron run would read
+  // the chain from genesis again and ADD it a second time. Coverage then goes on every bucket the
+  // store's spine covered (`g.ticks`), since every unlisted record of every one of them is now in.
+  if (unlisted) {
+    const tierOf = (key: string): Tier => key.split(":")[2] as Tier;
+    const list = await getPage<{ id?: string }>(`${be0}/currency`);
+    const ids = untrackedIds(net, (list.data ?? []).map((c) => c.id ?? ""));
+    console.log(`backfilling ${ids.length} unlisted chain(s): ${ids.map((i) => i.slice(0, 10)).join(", ") || "none"} …`);
+    const inc: IncMap = new Map();
+    const cursorMap: Record<string, string | number> = {};
+    for (const id of ids) {
+      const recs: MetaRec[] = [];
+      await walkChain<MetaRec & { timestamp: string }>(`${be0}/currency/${id}/snapshots`, 0, (page) => {
+        for (const r of page) recs.push({ ordinal: r.ordinal, timestamp: r.timestamp, fee: r.fee, sizeInKB: r.sizeInKB, blocks: r.blocks });
+      }, id.slice(0, 10));
+      recs.sort((a, b) => a.ordinal - b.ordinal);
+      // Ordered, so the gap and anchoring counts are written too; outside the catalog floors.
+      bucketMetas(inc, net, id, recs, null, false);
+      const tip = recs[recs.length - 1];
+      if (tip) { cursorMap[`m.${id}`] = tip.ordinal; cursorMap[`mTs.${id}`] = Date.parse(tip.timestamp); }
+      console.log(`  ${id.slice(0, 10)}: ${recs.length} snapshot(s)`);
+    }
+    // Fine grain is never invented backward (TIER_SINCE): an old record keeps its daily bucket only.
+    const floor5m = slotOf(net, "5m", TIER_SINCE["5m"]).key;
+    const floor1h = slotOf(net, "1h", TIER_SINCE["1h"]).key;
+    for (const key of [...inc.keys()]) {
+      if ((tierOf(key) === "5m" && key < floor5m) || (tierOf(key) === "1h" && key < floor1h)) inc.delete(key);
+    }
+    // Coverage: every bucket the spine covered — read each stored key's g.ticks fields.
+    let scan = "0";
+    do {
+      const [c, keys]: [string, string[]] = await redis.scan(scan, { match: `t:${net}:*`, count: 200 });
+      scan = c;
+      for (const key of keys) {
+        if (key === cursorKeyOf(net) || key === lockKeyOf(net)) continue;
+        const h = (await redis.hgetall<Record<string, string>>(key)) ?? {};
+        const ticks = Object.keys(h).filter((f) => f.endsWith("|g.ticks"));
+        if (!ticks.length) continue;
+        let m = inc.get(key);
+        if (!m) { m = new Map(); inc.set(key, m); }
+        for (const f of ticks) m.set(f.slice(0, -"g.ticks".length) + "u.cov", 0);
+      }
+    } while (String(scan) !== "0");
+    let fields = 0;
+    for (const [key, map] of inc) {
+      const entries = [...map.entries()];
+      for (let i = 0; i < entries.length; i += 400) {
+        await store.applyWrites([{ key, map: Object.fromEntries(entries.slice(i, i + 400)), ttlS: TTL_S[tierOf(key)] }]);
+      }
+      fields += entries.length;
+    }
+    if (Object.keys(cursorMap).length) await store.applyWrites([{ key: cursorKeyOf(net), map: cursorMap, ttlS: null }]);
+    console.log(`  ${fields} fields written (exact), ${Object.keys(cursorMap).length / 2} cron cursor(s) set to the chains' tips.`);
+    return;
+  }
+
   // ---- GAPS BACKFILL mode: per-network continuity history (see the header) ----
   // ---- BLOCKS BACKFILL: per-network sealed-block counts from the chain's own records ----
   // (2026-09-11 — m.{id}.blocks joined bucketMetas for the cron; history needs this walk
@@ -747,7 +810,11 @@ async function main(): Promise<void> {
   }
 
   // ---- metagraphs: stream pages straight into the IncMap (bounded — records aren't retained) ----
-  const metaIds = lineageIds(net);
+  // The UNLISTED chains ride along (2026-10-08): a wipe-and-rebuild that skipped them would erase
+  // their measured counts and the coverage marker; they stay out of the catalog floors.
+  const unlistedList = await getPage<{ id?: string }>(`${be}/currency`).then((p) => untrackedIds(net, (p.data ?? []).map((c) => c.id ?? ""))).catch(() => null);
+  const unlistedSet = new Set(unlistedList ?? []);
+  const metaIds = [...lineageIds(net), ...(unlistedList ?? [])];
   const newestMetaOrd: Record<string, number> = {};
   const POOL = 3; // polite: a few chains at a time
   for (let i = 0; i < metaIds.length; i += POOL) {
@@ -755,7 +822,7 @@ async function main(): Promise<void> {
       await walkChain<MetaRec & { timestamp: string; lastSnapshotHash?: string }>(
         `${be}/currency/${id}/snapshots`, cutoffMs, (recs) => {
           if (!(id in newestMetaOrd)) newestMetaOrd[id] = recs[0].ordinal; // first page is the newest
-          bucketMetas(inc, net, id, recs.map((r) => ({ ordinal: r.ordinal, timestamp: r.timestamp, fee: r.fee, sizeInKB: r.sizeInKB, blocks: r.blocks })));
+          bucketMetas(inc, net, id, recs.map((r) => ({ ordinal: r.ordinal, timestamp: r.timestamp, fee: r.fee, sizeInKB: r.sizeInKB, blocks: r.blocks })), undefined, !unlistedSet.has(id));
         }, id.slice(0, 10));
       // A DORMANT chain (nothing inside the window) still gets a cursor — parked at its TIP,
       // or the cron's cold cursor would page its ancient records into pre-window buckets as
@@ -768,6 +835,9 @@ async function main(): Promise<void> {
     }));
     prune5m();
   }
+
+  // The unlisted channels were measured wherever the spine was — when their list was read.
+  if (unlistedList) markUnlistedCoverage(inc);
 
   // ---- write: chunked applyWrites transactions + the cursor the cron resumes from ----
   console.log("writing …");

@@ -19,7 +19,10 @@ import {
   unlistedSeries,
   type MetricSeries,
 } from "@/src/data/trendSeries";
-import { displayNetwork, UNLISTED_ID } from "@/src/data/unlisted";
+import { displayNetwork, LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
+
+/** The catalog's judgement for the unlisted count (current ids and former ones). */
+const isListed = (id: string) => LISTED_IDS.has(id);
 import type { TrendMetric } from "@/src/store/store";
 import { compactNumber } from "@/src/util/format";
 
@@ -232,7 +235,7 @@ export default function useTrendRoster(
     // The unlisted channels: Snapshots only, under "all" (while the span holds any) or their own filter.
     let unlisted: TrendRosterRow | null = null;
     if (metric === "snapshots" && (filter === "all" || unlistedFilter)) {
-      const rawUnlisted = unlistedSeries(series);
+      const rawUnlisted = unlistedSeries(series, isListed);
       const points = cut(rawUnlisted);
       const net = displayNetwork(UNLISTED_ID)!;
       const r: TrendRosterRow = {
@@ -242,7 +245,7 @@ export default function useTrendRoster(
         series: { points, sampled: undefined, gaps: undefined },
         rawPoints: rawUnlisted,
         last: lastMeasured(points),
-        day: stepMs >= 86_400_000 ? lastMeasured(points) : daily ? lastMeasured(unlistedSeries(daily)) : null,
+        day: stepMs >= 86_400_000 ? lastMeasured(points) : daily ? lastMeasured(unlistedSeries(daily, isListed)) : null,
         span: spanAverage(metric, points, stepMs),
         head: null,
       };

@@ -109,6 +109,35 @@ describe("runSample", () => {
     expect(store.data.get("t:mainnet:cursor")!.get("m.abc")).toBeUndefined();
     expect(store.data.get("t:mainnet:cursor")!.get("g")).toBe("102"); // global still advanced
   });
+  it("samples the UNLISTED chains for their own count, outside the floors, and marks the buckets it measured them in", async () => {
+    const store = memStore();
+    const res = await runSample(deps(store, {
+      unlistedIds: async () => ["unl"],
+      pageMeta: async (id) => ({ data: [{ ordinal: 1, timestamp: iso(14, 0, 8), fee: id === "unl" ? 200 : 500, sizeInKB: 2 }] }),
+    }));
+    expect(res.metaErrors).toEqual([]);
+    const day = store.data.get("t:mainnet:5m:2026-09-06")!;
+    expect(day.get("14:00|m.unl.snaps")).toBe("1");
+    expect(day.get("14:00|g.feeFloor")).toBe("500"); // the catalog chain alone
+    expect(day.get("14:00|u.cov")).toBe("0");
+  });
+
+  it("no unlisted coverage when their list failed or one of their chains did — never a claimed zero", async () => {
+    const listDown = memStore();
+    await runSample(deps(listDown, { unlistedIds: async () => null }));
+    expect(listDown.data.get("t:mainnet:5m:2026-09-06")!.get("14:00|u.cov")).toBeUndefined();
+    const chainDown = memStore();
+    const res = await runSample(deps(chainDown, {
+      unlistedIds: async () => ["unl"],
+      pageMeta: async (id) => {
+        if (id === "unl") throw new Error("504");
+        return { data: [{ ordinal: 9, timestamp: iso(14, 0, 8), fee: 500, sizeInKB: 10 }] };
+      },
+    }));
+    expect(res.metaErrors).toEqual(["unl"]);
+    expect(chainDown.data.get("t:mainnet:5m:2026-09-06")!.get("14:00|u.cov")).toBeUndefined();
+  });
+
   it("skips when locked", async () => {
     const store = memStore();
     store.locked = true;

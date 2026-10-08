@@ -13,7 +13,9 @@
 import { BandCard, MicroBars, DonutTotal, TypeGlyph, TYPE_ORDER, compositionCounts, staleFor, windowSpan, windowNote } from "@/components/vitals/bandParts";
 import { useStore } from "@/src/store/store";
 import { metagraphById, getAnchor } from "@/src/data/network";
-import { displayNetwork, UNLISTED_ID } from "@/src/data/unlisted";
+import { displayNetwork, LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
+
+const isListed = (id: string) => LISTED_IDS.has(id);
 import { metaType, rolesOf, IdentityDot, RoleChips, TickerChip } from "@/components/inspector/parts";
 import { machineKey } from "@/src/data/composition";
 import { identityHudCss } from "@/src/palette/identity";
@@ -512,7 +514,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
   const barData = windowed;
   /** Whether any UNLISTED channel anchored in the band's window — the one case the summed fee
    *  figure is a floor, and the only case the card may mention unlisted channels at all. */
-  const unlistedInWindow = useMemo(() => (windowed ? unlistedSeries(windowed.series).some((v) => v != null && v > 0) : false), [windowed]);
+  const unlistedInWindow = useMemo(() => (windowed ? unlistedSeries(windowed.series, isListed).some((v) => v != null && v > 0) : false), [windowed]);
   /** The fetch errored and nothing is held from before (a failed REFRESH keeps its last data). */
   const storeDown = t7.error && !t7.data;
   const span = "last 24 hours";
@@ -535,7 +537,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
   const measured = (name: string): (number | null)[] | undefined => {
     if (!windowed) return undefined;
     // The unlisted channels' one measured quantity: the global count less every listed network.
-    if (name === UNLISTED_SNAPS) return unlistedSeries(windowed.series);
+    if (name === UNLISTED_SNAPS) return unlistedSeries(windowed.series, isListed);
     return windowed.series[name] ?? windowed.series["g.ticks"]?.map((v) => (v != null ? 0 : null));
   };
   interface SparkSpec { data: (number | null)[] | undefined; value: number | undefined; unit: string; span: string; sr: string; offRim: boolean }

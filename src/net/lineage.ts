@@ -48,6 +48,13 @@ export function lineageIds(net: string): string[] {
   return catalogOf(net).flatMap((m) => [m.id, ...(m.formerIds ?? [])]).filter((id): id is string => !!id);
 }
 
+/** The chains among `ids` (the explorer's own list, `/currency`) that the catalog does not track —
+ *  neither a current id nor a former one. These are the UNLISTED channels (user, 2026-10-08: their
+ *  count is MEASURED from their own chains, never derived as anchors minus the listed networks). */
+export function untrackedIds(net: string, ids: readonly string[]): string[] {
+  return ids.filter((id) => !!id && !isTracked(net, id));
+}
+
 /** The CURRENT id of the network an address belongs to; an address the catalog does not know is
  *  returned unchanged (and is, to every caller, unlisted). */
 export function currentIdOf(net: string, id: string): string {

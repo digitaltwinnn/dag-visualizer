@@ -13,7 +13,7 @@
 import { TTL_S, cursorKeyOf, lockKeyOf, slotOf, fieldOf, type Tier } from "./keys";
 import { mergeVals } from "./merge";
 import {
-  bucketGlobals, bucketMetas, bucketFleet,
+  bucketGlobals, bucketMetas, bucketFleet, markUnlistedCoverage,
   type FleetCounts, type GlobalRec, type IncMap, type MetaRec,
 } from "./bucketing";
 import { listSince, type ChainPage } from "./fetchSince";
@@ -22,6 +22,9 @@ import type { TrendsStore, TrendsWrite } from "./store";
 export interface SampleDeps {
   net: string;
   metaIds: string[];
+  /** The UNLISTED chains to sample for their own count (the explorer's list less every tracked
+   *  address), or null when that list could not be read — then no unlisted coverage is marked. */
+  unlistedIds?: () => Promise<string[] | null>;
   store: TrendsStore;
   pageGlobals(limit: number, next?: string): Promise<ChainPage<GlobalRec>>;
   pageMeta(id: string, limit: number, next?: string): Promise<ChainPage<MetaRec>>;
@@ -67,9 +70,13 @@ export async function runSample(deps: SampleDeps): Promise<SampleResult> {
     }
 
     // Per-metagraph, in parallel; a failure moves nothing for that id (self-heals next run).
+    // The UNLISTED chains ride the same walk (their own cursors), counted but kept out of the floors.
     const metaErrors: string[] = [];
+    const unlisted = deps.unlistedIds ? await deps.unlistedIds().catch(() => null) : null;
+    const unlistedSet = new Set(unlisted ?? []);
+    const ids = [...deps.metaIds, ...(unlisted ?? []).filter((id) => !deps.metaIds.includes(id))];
     const settled = await Promise.allSettled(
-      deps.metaIds.map(async (id) => {
+      ids.map(async (id) => {
         const since = cur[`m.${id}`] != null ? Number(cur[`m.${id}`]) : -1;
         const r = await listSince((limit, next) => deps.pageMeta(id, limit, next), since);
         return { id, r };
@@ -77,17 +84,21 @@ export async function runSample(deps: SampleDeps): Promise<SampleResult> {
     );
     for (let i = 0; i < settled.length; i++) {
       const s = settled[i];
-      if (s.status === "rejected") { metaErrors.push(deps.metaIds[i]); continue; }
+      if (s.status === "rejected") { metaErrors.push(ids[i]); continue; }
       const { id, r } = s.value;
       if (r.recs.length) {
         // The per-chain gap chain rides its own timestamp cursor; an accepted gap breaks the
         // chain (null) exactly as the global spine's does.
         const prevTs = cur[`mTs.${id}`] != null ? Number(cur[`mTs.${id}`]) : null;
-        bucketMetas(inc, net, id, r.recs, r.gap ? null : prevTs);
+        bucketMetas(inc, net, id, r.recs, r.gap ? null : prevTs, !unlistedSet.has(id));
         cursorNext[`m.${id}`] = r.recs[r.recs.length - 1].ordinal;
         cursorNext[`mTs.${id}`] = Date.parse(r.recs[r.recs.length - 1].timestamp);
       }
     }
+
+    // The buckets this run measured the unlisted channels in — only when their list was read and
+    // every one of their chains answered (a partial read must not claim the bucket's whole count).
+    if (unlisted && !metaErrors.some((id) => unlistedSet.has(id))) markUnlistedCoverage(inc);
 
     // Fleet gauge, once per hour: sample only when the CURRENT hour slot has no reading yet
     // (idempotent across runs and restarts — no boundary bookkeeping).

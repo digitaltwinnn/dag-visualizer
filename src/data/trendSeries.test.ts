@@ -709,18 +709,24 @@ describe("sumMeasured — a counter's total over a span", () => {
 // channel, the listed networks' series cover the catalog, so the difference IS the unlisted
 // channels — Dec 2025 – Aug 2026 it ran at ~3.9K a day. A bucket with no global reading, or with
 // a listed network unmeasured, has no difference to state: null, never a guess (rule 10).
-describe("unlistedSeries — the global count minus every listed network", () => {
-  const series = {
-    "g.anchors": [10, 12, null, 9],
-    "m.A.snaps": [6, 7, 3, 9],
-    "m.B.snaps": [2, 5, 1, null],
-    "m.A.fee": [1, 1, 1, 1], // not a snapshot count — ignored
-  };
-  it("subtracts the listed snapshot counts, bucket by bucket", () => {
-    expect(unlistedSeries(series)).toEqual([2, 0, null, null]);
+describe("unlistedSeries — the unlisted chains' own counts, where they were measured", () => {
+  const listed = (id: string) => id === "A" || id === "B";
+  it("sums the chains the catalog does not list, in the buckets the sampler covered", () => {
+    const series = {
+      "u.cov": [0, 0, null, 0],
+      "m.A.snaps": [6, 7, 3, 9], // listed — never counted
+      "m.U1.snaps": [1, 0, 5, null],
+      "m.U2.snaps": [2, null, 0, 0],
+      "m.U1.fee": [9, 9, 9, 9], // not a snapshot count — ignored
+    };
+    expect(unlistedSeries(series, listed)).toEqual([3, 0, null, 0]);
   });
-  it("never goes below zero (a listed count can lead the global one by a bucket edge)", () => {
-    expect(unlistedSeries({ "g.anchors": [5], "m.A.snaps": [6] })).toEqual([0]);
+  it("is NOT MEASURED (null) wherever the coverage marker is absent — before the sampler read them", () => {
+    expect(unlistedSeries({ "g.ticks": [3, 4], "g.anchors": [10, 12], "m.A.snaps": [6, 7] }, listed)).toEqual([null, null]);
+  });
+  it("a global's snapshots stamped into the next bucket can no longer appear as unlisted (the 2026-09-29 skew)", () => {
+    const series = { "u.cov": [0, 0], "g.anchors": [181, 201], "m.A.snaps": [143, 239] };
+    expect(unlistedSeries(series, listed)).toEqual([0, 0]);
   });
 });
 
