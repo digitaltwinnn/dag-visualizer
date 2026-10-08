@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRoster, sortRoster } from "@/src/data/roster";
+import { buildRoster, groupRosterByCountry, sortRoster } from "@/src/data/roster";
 import type { NodeRow } from "@/src/data/types";
 
 const row = (over: Partial<NodeRow> & { pick: NodeRow["pick"] }): NodeRow => ({
@@ -73,5 +73,23 @@ describe("sortRoster", () => {
       row({ pick: { kind: "metanode", meta: { id: biofi } as never }, id: "b" }),
     ]);
     expect(sortRoster(rows, "net", 1).map((r) => r.netName)).toEqual(["BIOFI", "DOR"]);
+  });
+});
+
+describe("groupRosterByCountry (the phone Geography roster)", () => {
+  it("runs countries busiest first, cities in order inside, the unlocated last", () => {
+    const at = (id: string, country: string | null, city: string | null) =>
+      row({ pick: { kind: "l0", geo: { cc: "xx", city: city ?? undefined } } as never, id, country, city });
+    const rows = buildRoster([
+      at("a", "Germany", "Nuremberg"), at("b", "Finland", "Helsinki"), at("c", "Germany", "Falkenstein"),
+      at("d", null, null), at("e", "Austria", "Vienna"),
+    ]);
+    const g = groupRosterByCountry(rows);
+    expect(g.map((x) => [x.country, x.rows.map((r) => r.node.city)])).toEqual([
+      ["Germany", ["Falkenstein", "Nuremberg"]],
+      ["Austria", ["Vienna"]],
+      ["Finland", ["Helsinki"]],
+      [null, [null]],
+    ]);
   });
 });

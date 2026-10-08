@@ -116,3 +116,31 @@ export function sortRoster(rows: readonly RosterRow[], key: RosterSortKey, dir: 
     return va.localeCompare(vb) * dir;
   });
 }
+
+/** One country's nodes in the phone Geography roster. `country` is null for the unlocated. */
+export interface RosterCountryGroup {
+  key: string;
+  country: string | null;
+  rows: RosterRow[];
+}
+
+/** THE GEOGRAPHY ROSTER IS GROUPED BY COUNTRY ON PHONE (user, 2026-10-08, design E1 —
+ *  `docs/superpowers/design/2026-10-08-mobile-tuning/e-geo.html`): the view's question is WHERE,
+ *  so each country is a plate with its node count and its rows lead with the city. Countries run
+ *  busiest first (the explorer's order), ties by name; rows inside by city, then provider; the
+ *  unlocated close the list rather than pretend to a place. */
+export function groupRosterByCountry(rows: readonly RosterRow[]): RosterCountryGroup[] {
+  const by = new Map<string, RosterCountryGroup>();
+  for (const r of rows) {
+    const key = r.node.country ?? "";
+    let g = by.get(key);
+    if (!g) by.set(key, (g = { key: key || "unlocated", country: r.node.country ?? null, rows: [] }));
+    g.rows.push(r);
+  }
+  const groups = [...by.values()];
+  for (const g of groups) g.rows = sortRoster(sortRoster(g.rows, "isp", 1), "city", 1);
+  return groups.sort((a, b) => {
+    if ((a.country == null) !== (b.country == null)) return a.country == null ? 1 : -1;
+    return b.rows.length - a.rows.length || (a.country ?? "").localeCompare(b.country ?? "");
+  });
+}

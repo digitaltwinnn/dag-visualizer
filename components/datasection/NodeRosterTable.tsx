@@ -5,7 +5,7 @@ import { ArrowDown, ArrowUp, type LucideIcon } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useStore } from "@/src/store/store";
 import { metagraphById, filterAccent, shortHash } from "@/src/data/network";
-import { buildRoster, sortRoster, type RosterRow, type RosterSortKey } from "@/src/data/roster";
+import { buildRoster, groupRosterByCountry, sortRoster, type RosterCountryGroup, type RosterRow, type RosterSortKey } from "@/src/data/roster";
 import { compositionRows } from "@/src/data/composition";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { nodeSelectActions } from "@/src/engine/domain/pickActions";
@@ -15,6 +15,7 @@ import { COUNTRY_ICON, PROVIDER_ICON } from "@/components/icons";
 import { tickerOf } from "@/components/explorer/nodeRow";
 import { selectionHue } from "@/components/selection";
 import { cn } from "@/lib/utils";
+import { useBreakpoint } from "@/components/useBreakpoint";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -63,6 +64,12 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
   const setHoverNodeId = useStore((s) => s.setHoverNodeId);
   const [sort, setSort] = useState<{ key: RosterSortKey; dir: 1 | -1 }>({ key: COLS[mode][0].key, dir: 1 });
   const rows = sortRoster(buildRoster(selNodes, metaList), sort.key, sort.dir);
+  // GEOGRAPHY ON PHONE IS GROUPED BY COUNTRY, place first (design E1, 2026-10-08): the phone has
+  // no column heads to sort by, so the grouping IS its order. Desktop keeps the sortable table.
+  const geoPhone = useBreakpoint() === "phone" && mode === "geo";
+  const items: ({ head: RosterCountryGroup } | { row: RosterRow })[] = geoPhone
+    ? groupRosterByCountry(rows).flatMap((g) => [{ head: g }, ...g.rows.map((row) => ({ row }))])
+    : rows.map((row) => ({ row }));
 
   if (rows.length === 0) {
     const cfg = metagraphById(filter);
@@ -181,7 +188,24 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((r) => {
+          {items.map((it) => {
+            if ("head" in it) {
+              const g = it.head;
+              // The COUNTRY PLATE — the snapshot list's group header (design B1), so a group reads
+              // the same in every raw list. Not a target: the country is the scene's own rung, and
+              // a header that committed it would be a second way to write it from the raw layer.
+              return (
+                <TableRow key={`cc:${g.key}`} className="border-0 hover:bg-transparent">
+                  <TableCell className="p-0 pt-2.5 max-[700px]:px-0">
+                    <span className="flex items-center gap-2 h-[34px] px-1.5 rounded-t-md border-b border-[color-mix(in_oklch,var(--primary)_35%,transparent)] bg-[color-mix(in_oklch,var(--primary)_9%,var(--panel-plate))]">
+                      <span className="text-body font-medium text-foreground">{g.country ?? "Unlocated"}</span>
+                      <span className="ml-auto text-label tabular-nums text-foreground-dim">{g.rows.length}</span>
+                    </span>
+                  </TableCell>
+                </TableRow>
+              );
+            }
+            const r = it.row;
             // A MERGED row is selected when ANY of its records is (a DAG bead committed in the scene
             // is this row as much as the metagraph record leading it), and its click then acts on
             // THAT record — so the re-click deselects what is committed rather than committing the
@@ -226,6 +250,24 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
                 {COLS[mode].map((c) => (
                   <TableCell key={c.key} className={PHONE_HIDDEN}>{cell(r, c.key)}</TableCell>
                 ))}
+                {geoPhone ? (
+                  // PLACE FIRST (design E1): the city, its provider beneath; WHO it is at the right
+                  // edge, the network over the short id. The country is the plate above, and the
+                  // make-up chip is Hypergraph's lens — the node card states it one tap away.
+                  <TableCell className="py-1.5 whitespace-normal">
+                    <span className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 min-h-10">
+                      <span className="flex flex-col min-w-0">
+                        <span className="truncate text-foreground">{r.node.city ?? "Unknown city"}</span>
+                        <span className="truncate text-label text-muted-foreground">{r.isp ?? "Unknown provider"}</span>
+                      </span>
+                      <span className="flex flex-col items-end gap-0.5 text-label">
+                        {cell(r, "net")}
+                        {cell(r, "id")}
+                      </span>
+                    </span>
+                  </TableCell>
+                ) : (
+                <>
                 {/* ONE FACT PER LINE ON PHONE (user, 2026-10-07 — the raw phone pass: "1 per row
                     looks clean, keep the tag also", then "add the icon to each"). The first line is
                     WHO — network, node id, and the make-up as the head's own qualifier chip — and
@@ -263,6 +305,8 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
                     );
                   })()}
                 </TableCell>
+                </>
+                )}
               </TableRow>
             );
           })}
