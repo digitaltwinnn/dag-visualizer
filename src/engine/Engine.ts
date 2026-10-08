@@ -27,6 +27,7 @@ import { readSceneColors, type SceneColors, LIGHT_TUNE } from "./sceneColors";
 import { setNodeDimTarget, setNodeEnv } from "./scene/objects/NodeFabric";
 import { THEME_KEY, parseThemePref, resolveTheme, type Theme } from "@/src/theme/resolve";
 import { VIEW_POLICIES, type ViewPolicy } from "./domain/viewPolicy";
+import { liveArrivals } from "./domain/arrivals";
 import { SHEET_SHIFT_K, chromeShiftPx, sheetShiftPx } from "./domain/sheetShift";
 import { ChromeBounds } from "./ChromeBounds";
 import { FOCI, nodeFraming, cohortFraming, ledgerCommitTilt, trendFocusPush, trendFit } from "./domain/cameraRig";
@@ -1033,7 +1034,10 @@ export class Engine {
     // global tick, fire a packet from its hub along the tether into the core; flash the core
     // itself on each new global snapshot (scaled by how many metagraphs it anchored).
     net?.on("anchor", ({ metaId, timestamps, seed }: { metaId: string; timestamps: string[]; seed: boolean }) => {
-      if (!seed) this.layers.pulseMeta(metaId, timestamps?.length ?? 1); // one packet per LIVE snapshot (skip the history seed)
+      // One packet per snapshot that ARRIVED — not per snapshot a catch-up batch recorded (the
+      // history seed, and the backlog a background tab's throttled polls pile up: `liveArrivals`).
+      const arrived = seed ? 0 : liveArrivals(timestamps ?? [], Date.now());
+      if (arrived > 0) this.layers.pulseMeta(metaId, arrived);
       if (this.mode === "ledger") this._ledgerDirty = true; // the per-tick breakdown filled in
     });
     net?.on("global", (evt: { latest: GlobalSnapshot | null }) => {
