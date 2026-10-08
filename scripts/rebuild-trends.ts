@@ -543,21 +543,39 @@ async function main(): Promise<void> {
     for (const key of [...inc.keys()]) {
       if ((tierOf(key) === "5m" && key < floor5m) || (tierOf(key) === "1h" && key < floor1h)) inc.delete(key);
     }
-    // Coverage: every bucket the spine covered — read each stored key's g.ticks fields.
+    // Coverage: every bucket of every stored key, up to now. Writing the marker where the spine
+    // has no `g.ticks` is harmless — the read side treats such a bucket as unmeasured whatever else
+    // it holds (assemble's coverage rule) — and it spares reading every stored hash: only the key
+    // NAMES are listed (the Upstash read-bandwidth watch item), the buckets are generated.
+    const nowMs = Date.now();
+    const unitStart = (unit: string): number => {
+      const [y, mo = "01", da = "01"] = unit.split("-");
+      return Date.UTC(+y, +mo - 1, +da);
+    };
+    const unitEnd = (tier: Tier, start: number): number => {
+      const d = new Date(start);
+      if (tier === "5m") return start + 86400000;
+      if (tier === "1h") return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
+      return Date.UTC(d.getUTCFullYear() + 1, 0, 1);
+    };
+    const STEP: Record<Tier, number> = { "5m": 300000, "1h": 3600000, "1d": 86400000 };
     let scan = "0";
     do {
       const [c, keys]: [string, string[]] = await redis.scan(scan, { match: `t:${net}:*`, count: 200 });
       scan = c;
       for (const key of keys) {
-        if (key === cursorKeyOf(net) || key === lockKeyOf(net)) continue;
-        const h = (await redis.hgetall<Record<string, string>>(key)) ?? {};
-        const ticks = Object.keys(h).filter((f) => f.endsWith("|g.ticks"));
-        if (!ticks.length) continue;
+        const parts = key.split(":");
+        const tier = parts[2] as Tier;
+        if (parts.length !== 4 || !(tier in STEP)) continue; // the cursor and the lock are not tier keys
+        const start = unitStart(parts[3]!);
         let m = inc.get(key);
         if (!m) { m = new Map(); inc.set(key, m); }
-        for (const f of ticks) m.set(f.slice(0, -"g.ticks".length) + "u.cov", 0);
+        for (let t = start; t < unitEnd(tier, start) && t <= nowMs; t += STEP[tier]) {
+          const slot = slotOf(net, tier, t);
+          if (slot.key === key) m.set(`${slot.bucket}|u.cov`, 0);
+        }
       }
-    } while (String(scan) !== "0");
+    } while (scan !== "0");
     let fields = 0;
     for (const [key, map] of inc) {
       const entries = [...map.entries()];
