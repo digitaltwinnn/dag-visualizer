@@ -110,6 +110,9 @@ export default function ExplorerHeading({
   setting?: ReactNode;
   className?: string;
 }) {
+  // NOTHING TO SAY, NO ROW (user, 2026-10-08): the list explorers moved their sentence into the
+  // path plate as its placeholder, and an empty 22px row between two hairlines was what remained.
+  if (hint == null && setting == null) return null;
   return (
     <div className={cn("flex items-end justify-between gap-2.5 min-h-[22px] border-b border-border pb-[5px] mb-1.5", className)}>
       {/* `flex-1`: the hint OWNS the row's width, so a hint that carries a right-hand indicator

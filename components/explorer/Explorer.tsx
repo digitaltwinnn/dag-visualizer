@@ -113,6 +113,9 @@ export interface ExplorerProps {
   id: string;
   title: string;
   hint: ReactNode | null;
+  /** The root's one-line placeholder in the path plate (`ExplorerPath`) — what opening a row does.
+   *  The list explorers say it here instead of a hint sentence over the list. */
+  placeholder?: string;
   /** The open levels, root first; the last is on screen. */
   levels: readonly ExplorerLevelSpec[];
   onLeave?: () => void;
@@ -131,7 +134,7 @@ function openOrToggle(rung: string, click: () => void): void {
   openRailCard(rung, [boxed]);
 }
 
-export default function Explorer({ id, title, hint, levels: selected, onLeave, defaultCollapsed, aside }: ExplorerProps) {
+export default function Explorer({ id, title, hint, placeholder, levels: selected, onLeave, defaultCollapsed, aside }: ExplorerProps) {
   // The view hands every level its selection opens; the OPEN CARD decides how deep the path stands.
   const boxed = useStore((s) => s.boxedCard);
   const levels = levelsForBox(selected, boxed);
@@ -225,7 +228,7 @@ export default function Explorer({ id, title, hint, levels: selected, onLeave, d
       {current && (
         <>
           <ExplorerHeading hint={hint} setting={current.setting} />
-          <ExplorerPath crumbs={crumbs} hint={current.meaning} />
+          <ExplorerPath crumbs={crumbs} hint={current.meaning} placeholder={placeholder} />
           {/* Inside a level the list HANGS FROM THE PATH on a spine in the path's own accent (user,
               2026-09-26: "a vertical line on the left side to show that the section underneath
               belongs to it"). The spine starts at the plate's left edge, under the house step. */}

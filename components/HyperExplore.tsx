@@ -200,7 +200,8 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
     <Explorer
       id="hyperexplore"
       title="Networks"
-      hint="Every network on the hypergraph. Open one for the roles its nodes play."
+      hint={null}
+      placeholder="Open one for its node roles"
       levels={levels}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => {

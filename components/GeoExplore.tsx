@@ -239,7 +239,8 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
     <Explorer
       id="geoexplore"
       title="Countries"
-      hint={quietEmpty ? null : "Every country hosting nodes. Open one to explore where its nodes sit."}
+      hint={null}
+      placeholder={quietEmpty ? undefined : "Open one for its cities"}
       levels={levels}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => {
