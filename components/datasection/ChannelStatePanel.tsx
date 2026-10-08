@@ -726,7 +726,7 @@ export function ChannelStatePanel() {
                         blocks are signed by their dL1 producers before the L0 cluster seals the
                         snapshot around them, so the lane reads in the order the signatures were
                         actually made. */}
-                    <SignerRoster dataIds={deep.dataBlockSigners} proofIds={deep.signers} metaId={deep.metaId} selNodes={selNodes} />
+                    <SignerRoster key={metaSnapDeepKey(deep.globalOrdinal ?? sel.globalOrdinal, deep.metaId, sel.ordinal)} dataIds={deep.dataBlockSigners} proofIds={deep.signers} metaId={deep.metaId} selNodes={selNodes} />
                 </TabsContent>
               </div>
             </Tabs>

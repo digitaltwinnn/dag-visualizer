@@ -108,6 +108,7 @@ describe("groupRosterByNetwork (the phone Hypergraph roster)", () => {
       ["dor", ["m4"]],
     ]);
     expect(g[0].entries[0].roles.sort()).toEqual(["cl1", "l0"]);
+    expect(g[1].entries[0].recs).toEqual([upRec]);
     expect(g[1].entries[0].roles).toEqual(["dl1"]);
   });
   it("a catalog co-tenant the list does not show adds no plate", () => {

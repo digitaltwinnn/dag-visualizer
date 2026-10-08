@@ -88,8 +88,8 @@ export interface TrendRosterView {
   /** The whole network as ONE row — the DAG's own plane reading — under the "all" filter, else
    *  null. Never in `ranked`: it is what the ranked rows are read against, not one of them. */
   total: TrendRosterRow | null;
-  /** THE UNLISTED CHANNELS AS A ROW (the Unlisted audit, 2026-10-07): the global snapshot count less
-   *  every listed network (`unlistedSeries`). Snapshots only — no other measure is kept for them.
+  /** THE UNLISTED CHANNELS AS A ROW (the Unlisted audit, 2026-10-07): their own chains' counts where
+   *  the sampler measured them (`unlistedSeries`, 2026-10-08). Snapshots only on this row.
    *  Under "all" it is listed AFTER the ranked networks, never ranked among them, and only while the
    *  span holds any, so the DAG total is the rows ADDED UP; under the Unlisted filter it is the one
    *  plane (and in `ranked`). Null otherwise. */

@@ -167,9 +167,11 @@ export default function TrendTether() {
       aria-hidden
       className={cn(
         // z-11 sits over the band (the strip, z-10); on the PHONE the timeline lives in the Vitals
-        // sheet (ui/sheet, z-41), so the lines rise over that instead — z-42 shares the dock's
-        // number, which they never reach, and stays under nothing they cross.
-        "fixed inset-0 z-[11] max-[700px]:z-[42] w-full h-full pointer-events-none overflow-visible",
+        // sheet (ui/sheet, z-41), so while THAT sheet is open the lines rise over it — z-42 shares
+        // the dock's number, which they never reach. Any other sheet (Explore, Details) keeps them
+        // under it, at z-11: they must not cross a card the reader opened (the branch review).
+        "fixed inset-0 z-[11] w-full h-full pointer-events-none overflow-visible",
+        dock === "vitals" && "max-[700px]:z-[42]",
         "opacity-0 [transition:opacity_var(--tempo-nav)_ease] data-[on='1']:opacity-100 motion-reduce:!transition-none",
         railsHidden && "!opacity-0",
       )}

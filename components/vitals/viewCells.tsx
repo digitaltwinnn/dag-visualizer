@@ -536,7 +536,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
    *  sampler covered the bucket (`g.ticks`, the coverage marker) and a gap where it didn't. */
   const measured = (name: string): (number | null)[] | undefined => {
     if (!windowed) return undefined;
-    // The unlisted channels' one measured quantity: the global count less every listed network.
+    // The unlisted channels' one measured quantity: their own chains' counts (`unlistedSeries`).
     if (name === UNLISTED_SNAPS) return unlistedSeries(windowed.series, isListed);
     return windowed.series[name] ?? windowed.series["g.ticks"]?.map((v) => (v != null ? 0 : null));
   };
@@ -786,7 +786,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
           : rate("Snapshot fees", sparkOf("g.feeFloor", activity?.feesSeries, activity?.feesPerHour, true),
                  `$DAG paid to anchor snapshots into the global chain, every network summed.${unlistedInWindow ? " Unlisted channels' fees are not counted." : ""}`,
                  unlistedInWindow ? "without unlisted" : undefined)}
-      {/* Under Unlisted, their measured count (the global total less every listed network). */}
+      {/* Under Unlisted, their measured count (their own chains, `unlistedSeries`). */}
       {rate("Snapshots", sparkOf(filter === UNLISTED_ID ? UNLISTED_SNAPS : scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries, activity?.snapsPerHour))}
       {/* The chart states the same reach its rows do — it plots the very buckets the rate cards
           average, so a silent chart beside two captioned ones would read as a different window. */}

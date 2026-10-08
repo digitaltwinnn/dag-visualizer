@@ -130,7 +130,9 @@ export function bucketFleet(inc: IncMap, net: string, tsMs: number, fleet: Fleet
  *  own chains (`m.<address>.snaps`, sampled with `floors: false`), and a bucket in which nobody read
  *  them must read as NOT MEASURED, never as zero unlisted — the honesty `g.ticks` gives the spine.
  *  So every bucket the run's global batch covered (each `g.ticks` field it wrote, the spine's own
- *  coverage) gets a `u.cov` field — called only when EVERY unlisted chain read succeeded. */
+ *  coverage) gets a `u.cov` field — called only when EVERY unlisted chain read succeeded. An hour or
+ *  a day is marked by any one good run inside it; a run that failed for a chain moved that chain's
+ *  cursor nowhere, so the next good run reads its records into the same buckets (they merge). */
 export function markUnlistedCoverage(inc: IncMap): void {
   for (const fields of inc.values()) {
     for (const f of [...fields.keys()]) {

@@ -76,13 +76,13 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
   type Item =
     | { head: RosterCountryGroup }
     | { net: { netId: string; count: number } }
-    | { row: RosterRow; rec?: NodeRow; roles?: string[]; netId?: string };
+    | { row: RosterRow; rec?: NodeRow; recs?: NodeRow[]; roles?: string[]; netId?: string };
   const items: Item[] = geoPhone
     ? groupRosterByCountry(rows).flatMap((g) => [{ head: g }, ...g.rows.map((row) => ({ row }))])
     : hyperPhone
       ? groupRosterByNetwork(rows).flatMap((g) => [
           { net: { netId: g.netId, count: g.entries.length } },
-          ...g.entries.map((e) => ({ row: e.row, rec: e.rec, roles: e.roles, netId: g.netId })),
+          ...g.entries.map((e) => ({ row: e.row, rec: e.rec, recs: e.recs, roles: e.roles, netId: g.netId })),
         ])
       : rows.map((row) => ({ row }));
 
@@ -237,12 +237,15 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
             }
             const r = it.row;
             const own = "rec" in it ? it.rec : undefined;
+            // The records this row stands for: in a network group, the machine's records IN THAT
+            // network; otherwise every record merged into the row.
+            const mine = "recs" in it && it.recs ? it.recs : r.recs;
             // A MERGED row is selected when ANY of its records is (a DAG bead committed in the scene
             // is this row as much as the metagraph record leading it), and its click then acts on
             // THAT record — so the re-click deselects what is committed rather than committing the
             // primary on top of it.
             const inspected = hoverKeyOf(inspect);
-            const hit = inspected == null ? undefined : (own ? [own] : r.recs).find((x) => hoverKeyOf(x.pick) === inspected);
+            const hit = inspected == null ? undefined : mine.find((x) => hoverKeyOf(x.pick) === inspected);
             const selected = hit != null;
             const commit = () =>
               applyClickActions(nodeSelectActions((hit ?? own ?? r.node).pick, { mode, currentFilter: filter, deselect: selected, commitNetwork: false }));

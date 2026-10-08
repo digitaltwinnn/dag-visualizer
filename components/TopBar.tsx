@@ -406,11 +406,14 @@ export default function TopBar() {
                 const Icon = VIEW_ICONS[mode];
                 return <Icon aria-hidden className="size-4 flex-none text-primary" />;
               })()}
+              {/* While a DOC covers the scene the face names the DOC (the review's find, 2026-10-08):
+                  the hanging caption that used to say so stands down on the phone, so the bar is the
+                  one place left to name what is on screen. */}
               <span className={cn("text-body font-semibold leading-none", strip === "views" ? "text-primary-ink" : "text-foreground")}>
-                {VIEWS.find((v) => v.id === mode)?.name}
+                {doc ? DOC_PAGES[doc].label : VIEWS.find((v) => v.id === mode)?.name}
               </span>
             </span>
-            <span aria-hidden className="flex items-center gap-1">
+            <span aria-hidden className={cn("flex items-center gap-1", doc && "invisible")}>
               {LISTED_VIEWS.map((v) => (
                 <span
                   key={v.id}

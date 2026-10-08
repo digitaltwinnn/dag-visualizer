@@ -26,7 +26,7 @@ export function useUnlistedLastSeen(on: boolean): string {
 // show). Unlisted channels anchor into the global ledger without a catalog entry: no hub, no
 // nodes, no place on the globe. The structural views therefore have no SUBJECT to draw for them,
 // and this one quiet line says so — and says what IS known: when the last one anchored, measured
-// as the global count less every listed network (`unlistedSeries`, the History row's own reading).
+// from their own chains (`unlistedSeries`, the History row's own reading).
 //
 // Only in the views that draw a scene and no chart stack: History states its own scope.
 export default function UnlistedStage() {

@@ -149,7 +149,10 @@ export function groupRosterByCountry(rows: readonly RosterRow[]): RosterCountryG
  *  record and roles it has IN THIS network. */
 export interface RosterNetworkGroup {
   netId: string;
-  entries: { row: RosterRow; rec: NodeRow; roles: string[] }[];
+  /** `rec` is the record a click commits when none of `recs` is selected; `recs` is every record
+   *  the machine has IN THIS network (a DAG validator answers as L0 and L1 under two node ids), so a
+   *  selection of any of them is this row's — the branch review's find, 2026-10-08. */
+  entries: { row: RosterRow; rec: NodeRow; recs: NodeRow[]; roles: string[] }[];
 }
 
 /** THE HYPERGRAPH ROSTER IS GROUPED BY NETWORK ON PHONE (user, 2026-10-08, design F1 —
@@ -174,7 +177,7 @@ export function groupRosterByNetwork(rows: readonly RosterRow[]): RosterNetworkG
     for (const [netId, recs] of perNet) {
       let g = by.get(netId);
       if (!g) by.set(netId, (g = { netId, entries: [] }));
-      g.entries.push({ row, rec: recs[0]!, roles: [...new Set(recs.flatMap((r) => r.roles ?? []))] });
+      g.entries.push({ row, rec: recs[0]!, recs, roles: [...new Set(recs.flatMap((r) => r.roles ?? []))] });
     }
   }
   const tick = (id: string) => metagraphById(id)?.ticker || metagraphById(id)?.name || (id === "dag" ? "DAG" : id);

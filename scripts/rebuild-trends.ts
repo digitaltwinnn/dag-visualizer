@@ -9,6 +9,11 @@
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --backfill-gaps=2026-01-01
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --backfill-blocks=2025-07-01
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --backfill-unlisted
+//
+// ⚠️ THE UNLISTED COVERAGE MARKER (`u.cov`, 2026-10-08) is written by the cron, the full rebuild and
+// --backfill-unlisted — NOT by --recompute-from (it keeps the marker already there) or --extend-to
+// (the older days it adds read "unlisted: not measured" until a --backfill-unlisted follows it).
+// After an --extend-to, run --backfill-unlisted. It is idempotent: whole chains, exact values.
 //   npx tsx scripts/rebuild-trends.ts --net=mainnet --wipe-only
 //
 // CRASH SAFETY (2026-09-11 — the overnight recompute died at hour 13 with every write still
