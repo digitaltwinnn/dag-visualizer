@@ -5,10 +5,6 @@ import { Focus, Table2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useStore } from "@/src/store/store";
 import { useBreakpoint } from "@/components/useBreakpoint";
-import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
-import { spanPhrase, windowSpan } from "@/src/data/trendWindow";
-import { openRecords } from "@/components/trendDoors";
-import { UNLISTED_ID } from "@/src/data/unlisted";
 
 // The command bar's trailing PRESENTATION group — TWO controls since 2026-08-30 (user: "scene
 // vs hud [is] a toggle; raw is still separate because that's unrelated"), splitting the one
@@ -81,22 +77,10 @@ export default function PresentationToggle() {
         type="button"
         aria-pressed={section === "data"}
         aria-label="Raw data"
-        onClick={() => {
-          if (section === "data") return setSection("scene");
-          // A view whose RAW is a DOOR (History — `viewPolicy.rawSurface`, user 2026-10-07) opens
-          // the anchor log for the span on screen, scoped to the plane brought forward, else the
-          // filter: the Moment card's own door, so the two land in the same place.
-          const st = useStore.getState();
-          if (VIEW_POLICIES[st.mode].rawSurface === "door") {
-            // The Unlisted plane names no chain the log can page, so its RAW is the span's records for
-            // every network, unscoped — never a log scoped to "unlisted" that lists the others (I7).
-            const pick = st.trendFocus ?? (st.filter !== "all" ? st.filter : null);
-            const net = pick === UNLISTED_ID ? null : pick;
-            const span = windowSpan(st.trendWindow, st.trendRange, Date.now());
-            return openRecords(net, span && { ...span, label: spanPhrase(st.trendWindow, st.trendRange) });
-          }
-          setSection("data");
-        }}
+        // The layer's surface is the view's own answer (`viewPolicy.rawSurface`, read by the
+        // dispatch); the toggle only raises it. (For one day, 2026-10-07, History's RAW ran the
+        // anchor log's door from here; its records are the stored buckets now.)
+        onClick={() => setSection(section === "data" ? "scene" : "data")}
         className={SEG}
       >
         <Table2 aria-hidden className="size-4" />

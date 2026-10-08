@@ -139,10 +139,11 @@ export interface ViewPolicy {
   // What the RAW half of the `section` presentation axis does in this view. RAW IS THE RECORDS
   // in every view (user, 2026-10-07 — History's measured-history document was retired: the scene
   // had replaced it). A structural view shows its OWN records in the layer ("records": the anchor
-  // log, the node roster); the History view has none of its own, so its RAW is a DOOR onto the
-  // anchor log for the span on screen ("door" — `trendDoors.openRecords`, the Moment card's door),
-  // and closing the layer returns to History.
-  rawSurface: "records" | "door";
+  // log, the node roster); History's records are the STORED BUCKETS of the measured history
+  // ("buckets" — `TrendBucketsSurface`, user 2026-10-08: "just show upstash records"), for the
+  // span on screen and the scope its cards stand on. (It was a door onto the anchor log for one
+  // day, 2026-10-07; the cards' "Snapshot records" still is.)
+  rawSurface: "records" | "buckets";
   // How deep the left rail's EXPLORER stands (user, 2026-10-07). The rule: the explorer shows the
   // OPEN card's children (`components/explorer/boxLevel.ts`) — "follow" — UNLESS the view's first
   // level is its own AXIS: N records along it rather than a set of scopes to choose one of. Then
@@ -367,7 +368,7 @@ export const VIEW_POLICIES: Record<Mode, ViewPolicy> = {
     bloom: BLOOM_CALM,
     chipEnv: 1,
     fleet: "parked",
-    rawSurface: "door",
+    rawSurface: "buckets",
     explorerDepth: "follow",
     chartStack: true,
     // ⚠️ OFF, and this row is why the field exists (2026-09-18). The planes are TEXT — a chart you

@@ -77,10 +77,11 @@ describe("one door to the records", () => {
     expect(writers).toEqual(["components/trendDoors.ts"]);
   });
 
-  it("every exit to the records — the cards' door and History's RAW — reaches it through that home", () => {
+  it("the cards' exit to the records reaches it through that home", () => {
     // The Range and Moment cards share ONE foot control (`RecordsDoor`, 2026-10-07), so the card
-    // side of the door is that file, and both cards must draw it rather than a copy.
-    for (const path of ["components/topbar/PresentationToggle.tsx", "components/inspector/RecordsDoor.tsx"]) {
+    // side of the door is that file, and both cards must draw it rather than a copy. (History's RAW
+    // toggle ran the same door for one day; its records are the stored buckets since 2026-10-08.)
+    for (const path of ["components/inspector/RecordsDoor.tsx"]) {
       const code = stripComments(readFileSync(path, "utf8"));
       expect(code, `${path} must call the shared door`).toMatch(/openRecords\s*\(/);
       expect(code, `${path} must import it from components/trendDoors`).toMatch(/from\s+["']@\/components\/trendDoors["']/);

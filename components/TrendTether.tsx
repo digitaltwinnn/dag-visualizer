@@ -60,6 +60,9 @@ export default function TrendTether() {
   // is hidden but the dotted lines still show"): the lines run from the timeline, so with the
   // timeline stepped aside they point at nothing. They leave on the band's own exit tempo.
   const railsHidden = useStore((s) => s.railsHidden);
+  // Portalled above everything, the thread would draw across the RAW layer (2026-10-08: a hairline
+  // and two dashed legs through the buckets table) — it stands down while the layer is up.
+  const rawOpen = useStore((s) => s.section === "data");
   // The portal needs the document, which the server render does not have.
   const [host, setHost] = useState<HTMLElement | null>(null);
   useEffect(() => setHost(document.body), []);
@@ -160,7 +163,7 @@ export default function TrendTether() {
     };
   }, [bp, range, windowId, focus, scroll, moving, dock, sheetPx, host]);
 
-  if (!host) return null;
+  if (!host || rawOpen) return null;
   return createPortal(
     <svg
       ref={svg}

@@ -135,15 +135,19 @@ mirror, with three ways to ask for it — the switch, Escape, the layer's own ×
 ⚠️ **WHAT RAW DOES IS A POLICY ROW** (2026-09-18; RAW IS THE RECORDS in every view since
 2026-10-07). `VIEW_POLICIES[mode].rawSurface` is where each view says it: `"records"` for the
 structural views, whose own records the layer shows (the anchor log, the node roster), and
-`"door"` for History, which has none of its own — its RAW toggle runs `trendDoors.openRecords`
-over the span on screen (`trendWindow.windowSpan`: the brushed range, else the window), scoped to
-the plane brought forward, else the filter, and closing the layer returns to History. History's
-measured-history DOCUMENT, which RAW used to show there, was retired the same day (user: "not
-really raw, and mostly replaced by the scene"). `components/DataSection.tsx` is the keyed map from
-the row to a surface — a new answer is a compile error, never a silent fall-through, and gated on
-the row rather than a mode (convention 7); `components/rawSurfaceBoundary.test.ts` pins it and the
-toggle's door. The mode compares that pick WHICH TABLE the records surface draws are
-records-internal, which is why they sit inside that surface and never in the dispatch.
+`"buckets"` for History — the STORED BUCKETS of the measured history
+(`datasection/TrendBucketsSurface.tsx`, user 2026-10-08: "just show upstash records"): one row
+per bucket of the window or range on screen, the fields of the scope the cards stand on (the
+plane brought forward, else the filter — `trendBuckets.bucketScope`), named as the sampler names
+them, a dash where a bucket holds no reading. It reads the planes' own payload (`useTrendsSlice`).
+For one day (2026-10-07) History's RAW was a door onto the anchor log; the Range and Moment
+cards' "Snapshot records" still is (`trendDoors.openRecords`). History's measured-history
+DOCUMENT, which RAW showed before that, was retired on 2026-10-07 (user: "not really raw, and
+mostly replaced by the scene"). `components/DataSection.tsx` is the keyed map from the row to a
+surface — a new answer is a compile error, never a silent fall-through, and gated on the row
+rather than a mode (convention 7); `components/rawSurfaceBoundary.test.ts` pins it, and that the
+toggle only raises the layer. The mode compares that pick WHICH TABLE the records surface draws
+are records-internal, which is why they sit inside that surface and never in the dispatch.
 
 **The page never scrolls.** The scene wrapper is `position:fixed; inset:0` with an identity transform
 from first paint, which makes it the containing block for every fixed descendant — see CSS trap 2,

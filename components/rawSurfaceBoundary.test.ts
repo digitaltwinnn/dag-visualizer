@@ -6,15 +6,16 @@ import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 
 // WHAT RAW DOES IS A POLICY ROW (2026-09-18; rewritten 2026-10-07 when History's document was
 // retired — user: "the raw page for trends is not really raw and has been mostly replaced by the
-// scene"). RAW IS THE RECORDS in every view: a structural view shows its own records in the layer
-// ("records"), and the History view, which has none of its own, opens a DOOR onto the anchor log for
-// the span on screen ("door"). Three agreements keep that from drifting:
+// scene"; and again 2026-10-08, when History's RAW became the stored buckets — user: "just show
+// upstash records"). RAW IS THE RECORDS in every view: a structural view shows its own records in
+// the layer ("records"), History the buckets of the measured history ("buckets"). Three agreements
+// keep that from drifting:
 //
 //  1. THE DISPATCH READS `VIEW_POLICIES[mode].rawSurface`, and `DataSection` carries no mode
 //     compare at all (convention 7: a new view answers for itself by filling in a row).
-//  2. A DOOR VIEW'S RAW RUNS THE SHARED DOOR — `trendDoors.openRecords`, the Moment card's own —
-//     over the span the view has on screen (`windowSpan`), so the two exits can never land a reader
-//     in different places. The toggle decides by the policy row, never by a mode.
+//  2. THE TOGGLE ONLY RAISES THE LAYER: it opens no door and decides nothing by mode — which surface
+//     rises is the dispatch's reading of the row. (The one-day door of 2026-10-07 lived in the
+//     toggle; the cards' "Snapshot records" is the anchor log's only exit from History now.)
 //  3. THE COMMAND BAR NEVER GATES ON A DOC ID (convention 7's shape for docs).
 const ROOTS = ["components", "app"];
 const DISPATCH = "components/DataSection.tsx";
@@ -52,14 +53,13 @@ describe("raw-surface boundary", () => {
     }
   });
 
-  it("a door view's RAW runs the shared door over the span on screen, decided by the policy row", () => {
+  it("the RAW toggle only raises the layer — no door, no mode compare", () => {
     const code = read(TOGGLE);
-    expect(code).toMatch(/rawSurface\s*===\s*["']door["']/);
-    expect(code).toMatch(/openRecords\s*\(/);
-    expect(code).toMatch(/windowSpan\s*\(/);
-    expect(code).toMatch(/from\s+["']@\/components\/trendDoors["']/);
+    expect(code).not.toMatch(/openRecords\s*\(/);
+    expect(code).not.toMatch(/from\s+["']@\/components\/trendDoors["']/);
+    expect(code).not.toMatch(/rawSurface/);
     for (const form of [/mode\s*===\s*["']trend["']/, /mode\s*!==\s*["']trend["']/]) {
-      expect(code, `the RAW door is the policy's, never a mode compare (${form.source})`).not.toMatch(form);
+      expect(code, `the toggle decides nothing by mode (${form.source})`).not.toMatch(form);
     }
   });
 
