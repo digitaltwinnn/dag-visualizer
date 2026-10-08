@@ -1,0 +1,44 @@
+:root{
+  --bg:oklch(0.09 0.02 265);--fg:oklch(0.94 0.02 255);--dim:#c7d0ea;--muted:oklch(0.66 0.04 265);
+  --primary:oklch(0.88 0.13 195);--border:rgba(90,140,255,.22);--card:oklch(0.15 0.03 265);
+  --plate:rgba(255,255,255,.045);--wash:color-mix(in oklch,var(--primary) 10%,transparent);
+  --wash-strong:color-mix(in oklch,var(--primary) 22%,transparent);
+  --dor:#ff7a3d;--ded:#1fb6ff;--biofi:#7ac943;--usdc:#2aa7ff;--core:oklch(0.66 0.16 265);
+  --label:12.5px;--body:14.5px;--title:16.5px;--caps:.13em;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}html{color-scheme:dark}
+body{margin:0;background:radial-gradient(1200px 600px at 60% 0%,#0b1230 0%,var(--bg) 60%);color:var(--fg);
+  font:var(--body)/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:28px 32px 96px}
+a{color:var(--primary)}
+h1{font-size:24px;font-weight:600;margin:0 0 6px}
+p.lede{color:var(--dim);max-width:80ch;margin:0 0 4px}
+h2{font-size:18px;font-weight:600;margin:40px 0 6px;display:flex;gap:12px;align-items:center}
+h2 .n{flex:none;min-width:26px;height:26px;border-radius:13px;padding:0 7px;background:var(--primary);color:#06121a;font:700 14px/26px system-ui;text-align:center}
+h2 .n.now{background:var(--muted)}
+h2 .rec{font:600 11px/1 system-ui;letter-spacing:.13em;text-transform:uppercase;color:var(--primary);border:1px solid color-mix(in oklch,var(--primary) 50%,transparent);border-radius:4px;padding:4px 6px}
+ul.why{color:var(--dim);max-width:78ch;margin:0 0 14px 38px;padding-left:18px}
+ul.why li{margin:2px 0}
+.row{display:flex;gap:28px;flex-wrap:wrap;margin-left:38px;align-items:flex-start}
+.cap{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.shot{display:block;width:390px;border:1px solid var(--border);border-radius:10px}
+.crop{width:390px;overflow:hidden;border:1px solid var(--border);border-radius:10px}
+.crop img{display:block;width:390px}
+nav.pages{display:flex;gap:14px;flex-wrap:wrap;margin:8px 0 0}
+nav.pages a{font-size:13px}
+
+/* ── a phone screen, real CSS px ─────────────────────────────────────────── */
+.phone{position:relative;width:390px;border:1px solid var(--border);border-radius:14px;overflow:hidden;
+  background:radial-gradient(260px 220px at 50% 60%,rgba(42,245,255,.08),transparent 70%),#03040a}
+.panel{margin:8px 6px;border:1px solid var(--border);border-radius:10px;background:linear-gradient(180deg,#111729,#0b0f1e);padding:10px 12px 12px;position:relative}
+.ink{color:var(--primary)} .mut{color:var(--muted)} .dimc{color:var(--dim)}
+.mono{font-family:var(--mono)} .num{font-variant-numeric:tabular-nums}
+.caps{font-size:var(--label);letter-spacing:var(--caps);text-transform:uppercase}
+.lbl{font-size:var(--label)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;flex:none}
+.chip{display:inline-flex;align-items:center;height:22px;padding:0 7px;border:1px solid var(--border);border-radius:5px;background:var(--plate);font-size:var(--label);color:var(--dim)}
+svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+svg.s{width:14px;height:14px}
+.note{margin:10px 0 0 38px;color:var(--muted);font-size:13px;max-width:78ch}
+.x{position:absolute;top:8px;right:8px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+.hair{height:1px;background:var(--border)}

@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A — Phone header</title>
+<link rel="stylesheet" href="page.css">
+<style>
+.bar{margin:10px 8px 0;height:60px;border:1px solid var(--border);border-radius:10px;background:linear-gradient(180deg,rgba(20,26,48,.92),rgba(12,16,32,.92));display:flex;align-items:center;gap:6px;padding:0 6px 0 10px;position:relative;touch-action:pan-y}
+.ecg{width:34px;height:20px;color:var(--primary);flex:none}
+.flt{display:flex;align-items:center;gap:6px;font-size:var(--body);color:var(--fg);padding:0 6px;height:40px;border-radius:7px;flex:none}
+.ib{width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:var(--dim);border-radius:7px;flex:none}
+.ib.on{color:var(--primary);background:var(--wash);box-shadow:inset 0 0 0 1px color-mix(in oklch,var(--primary) 45%,transparent)}
+.grow{flex:1;min-width:0}
+/* the view name */
+.vname{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;height:52px;position:relative}
+.vname .t{display:flex;align-items:center;gap:7px;font-size:var(--title);font-weight:600;color:var(--fg);white-space:nowrap}
+.vname .t svg{color:var(--primary)}
+.pips{display:flex;gap:5px}
+.pips i{width:5px;height:5px;border-radius:50%;background:color-mix(in oklch,var(--muted) 55%,transparent)}
+.pips i.on{width:14px;border-radius:3px;background:var(--primary)}
+.ghost{position:absolute;top:50%;translate:0 -70%;font-size:var(--label);color:color-mix(in oklch,var(--muted) 60%,transparent);white-space:nowrap}
+.ghost.l{left:2px}.ghost.r{right:2px}
+.scene{height:430px;position:relative;display:flex;align-items:center;justify-content:center}
+.chamber{width:260px;height:120px;border:1px solid rgba(42,245,255,.35);border-radius:6px;transform:perspective(500px) rotateX(55deg);box-shadow:0 0 40px rgba(42,245,255,.18) inset}
+.dock{display:flex;border-top:1px solid var(--border);height:58px;background:rgba(10,14,28,.95)}
+.dock div{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;color:var(--dim);border-left:1px solid var(--border);font-size:var(--body)}
+.dock div:first-child{border-left:0}
+.foot{height:34px;display:flex;align-items:center;justify-content:center;gap:12px;font-size:var(--label);color:var(--dim);border-top:1px solid var(--border);background:rgba(10,14,28,.9)}
+.swipe{position:absolute;left:50%;top:70px;translate:-50% 0;display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--primary);opacity:.9}
+.swipe .hand{width:26px;height:26px;border:1.5px dashed var(--primary);border-radius:50%}
+/* the settings sheet */
+.sheet{margin:0 8px;border:1px solid var(--border);border-top:0;border-radius:0 0 10px 10px;background:rgba(12,16,32,.97);padding:6px 0}
+.sheet .r{display:flex;align-items:center;gap:10px;height:44px;padding:0 14px;color:var(--fg);font-size:var(--body)}
+.sheet .r .mut{margin-left:auto;font-size:var(--label)}
+.sheet .sec{padding:8px 14px 2px;font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted)}
+.sheet .seg{margin-left:auto;display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.sheet .seg span{padding:3px 9px;font-size:var(--label);color:var(--dim)}
+.sheet .seg span.on{background:var(--wash-strong);color:var(--primary)}
+.strip{margin:0 8px;border:1px solid var(--border);border-top:0;border-radius:0 0 10px 10px;background:rgba(12,16,32,.97);padding:12px 14px;color:var(--dim);font-size:var(--body)}
+.strip b{color:var(--fg);font-weight:600}
+.strip .more{display:flex;align-items:center;gap:6px;margin-top:10px;color:var(--primary);font-size:var(--body)}
+</style></head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<symbol id="ecg" viewBox="0 0 34 20"><path d="M0 11h9l3-8 4 15 3-9h15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+<symbol id="raw" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></symbol>
+<symbol id="gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+<symbol id="info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+<symbol id="layers" viewBox="0 0 24 24"><path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></symbol>
+<symbol id="down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="ext" viewBox="0 0 24 24"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+<symbol id="book" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15z"/><path d="M6.5 17A2.5 2.5 0 0 0 4 19.5 2.5 2.5 0 0 0 6.5 22H20v-5"/></symbol>
+<symbol id="chart" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 6-6"/></symbol>
+<symbol id="list" viewBox="0 0 24 24"><path d="M3 6h18M7 12h14M11 18h10"/></symbol>
+</defs></svg>
+
+<h1>A — Phone header</h1>
+<p class="lede">Your three asks: swipe the header to change view, the view's name in the header, and a better home for About. Today the name hangs under the bar in small caps, VIEW opens a list, and About exists twice: ⓘ in the bar ("About this view") and the About page link in the footer row above the dock.</p>
+<nav class="pages"><a href="index.html">all pages</a></nav>
+
+<h2><span class="n now">0</span> Now</h2>
+<div class="row"><div class="crop" style="height:300px"><img src="now-header.png" alt="current phone header"></div></div>
+
+<h2><span class="n">A1</span> The name IS the switcher <span class="rec">recommended</span></h2>
+<ul class="why">
+  <li>The middle of the bar is the view's name with its icon, and a pip row under it shows where you are among the four views.</li>
+  <li><b>Swipe the bar</b> left or right to step to the next or previous view (the name slides; the scene runs its normal transition). <b>Tap the name</b> to open today's view list, for a jump of more than one.</li>
+  <li>The hanging caption under the bar and the word VIEW go: the name says it.</li>
+  <li>ⓘ leaves the bar. <b>About this view</b> and the <b>About page</b> move into the ⚙ sheet together with Source code and Constellation, and the footer row above the dock stands down on phone (36px back for the scene).</li>
+</ul>
+<div class="row">
+  <div>
+    <div class="cap">resting</div>
+    <div class="phone">
+      <div class="bar">
+        <svg class="ecg"><use href="#ecg"/></svg>
+        <span class="flt"><span class="dot" style="background:var(--primary)"></span>All</span>
+        <div class="vname">
+          <span class="t"><svg class="i s"><use href="#layers"/></svg>Snapshots</span>
+          <span class="pips"><i></i><i></i><i class="on"></i><i></i></span>
+        </div>
+        <span class="ib"><svg class="i"><use href="#raw"/></svg></span>
+        <span class="ib"><svg class="i"><use href="#gear"/></svg></span>
+      </div>
+      <div class="scene"><div class="chamber"></div></div>
+      <div class="dock"><div><svg class="i s"><use href="#list"/></svg>Explore</div><div><svg class="i s"><use href="#chart"/></svg>Vitals</div><div><svg class="i s"><use href="#list"/></svg>Details</div></div>
+    </div>
+  </div>
+  <div>
+    <div class="cap">mid-swipe (finger moving left)</div>
+    <div class="phone">
+      <div class="bar">
+        <svg class="ecg"><use href="#ecg"/></svg>
+        <span class="flt"><span class="dot" style="background:var(--primary)"></span>All</span>
+        <div class="vname" style="overflow:hidden">
+          <span class="t" style="translate:-46px 0;opacity:.45"><svg class="i s"><use href="#layers"/></svg>Snapshots</span>
+          <span class="ghost r" style="color:var(--fg);font-size:var(--body);font-weight:600;translate:0 -78%">History</span>
+          <span class="pips"><i></i><i></i><i class="on"></i><i></i></span>
+        </div>
+        <span class="ib"><svg class="i"><use href="#raw"/></svg></span>
+        <span class="ib"><svg class="i"><use href="#gear"/></svg></span>
+      </div>
+      <div class="scene" style="height:120px"><div class="swipe"><span class="hand"></span>swipe the bar</div></div>
+    </div>
+    <div class="cap" style="margin-top:22px">⚙ open — About lives here</div>
+    <div class="phone">
+      <div class="bar">
+        <svg class="ecg"><use href="#ecg"/></svg>
+        <span class="flt"><span class="dot" style="background:var(--primary)"></span>All</span>
+        <div class="vname"><span class="t"><svg class="i s"><use href="#layers"/></svg>Snapshots</span><span class="pips"><i></i><i></i><i class="on"></i><i></i></span></div>
+        <span class="ib"><svg class="i"><use href="#raw"/></svg></span>
+        <span class="ib on"><svg class="i"><use href="#gear"/></svg></span>
+      </div>
+      <div class="sheet">
+        <div class="sec">About</div>
+        <div class="r"><svg class="i s"><use href="#info"/></svg>This view<span class="mut">Snapshots</span></div>
+        <div class="r"><svg class="i s"><use href="#book"/></svg>This site</div>
+        <div class="sec">Theme</div>
+        <div class="r" style="color:var(--dim)">Light · <span class="ink">Dark</span> · System <span class="mut">(today's rows)</span></div>
+        <div class="sec">Network</div>
+        <div class="r" style="color:var(--dim)"><span class="ink">Mainnet</span>&nbsp;· Integrationnet · Testnet</div>
+        <div class="sec">Links</div>
+        <div class="r"><svg class="i s"><use href="#ext"/></svg>Source code</div>
+        <div class="r"><svg class="i s"><use href="#ext"/></svg>Constellation</div>
+      </div>
+      <div style="height:30px"></div>
+    </div>
+  </div>
+</div>
+<p class="note">With a long filter the face shows the network's ticker (DOR), so the name keeps the middle. Swipe is horizontal only (vertical drags stay the page's), needs about 40px of travel, and Raw/⚙ taps never count as a swipe.</p>
+
+<h2><span class="n">A2</span> Name with its own ⓘ</h2>
+<ul class="why">
+  <li>The same swipe and pips as A1, but ⓘ stays attached to the name it explains ("Snapshots ⓘ"); tapping ⓘ opens today's About strip under the bar.</li>
+  <li>The About page joins ⚙ with the footer links, as in A1.</li>
+  <li>Costs about 26px of the middle, so a long view name ("Hypergraph") gets tight beside a filter.</li>
+</ul>
+<div class="row">
+  <div>
+    <div class="cap">resting</div>
+    <div class="phone">
+      <div class="bar">
+        <svg class="ecg"><use href="#ecg"/></svg>
+        <span class="flt"><span class="dot" style="background:var(--primary)"></span>All</span>
+        <div class="vname">
+          <span class="t"><svg class="i s"><use href="#layers"/></svg>Snapshots<svg class="i s mut" style="color:var(--muted)"><use href="#info"/></svg></span>
+          <span class="pips"><i></i><i></i><i class="on"></i><i></i></span>
+        </div>
+        <span class="ib"><svg class="i"><use href="#raw"/></svg></span>
+        <span class="ib"><svg class="i"><use href="#gear"/></svg></span>
+      </div>
+      <div class="strip"><b>Snapshots</b> shows each network's snapshots landing on its own plane and anchoring into the global ledger below.<div class="more">Read more on the About page</div></div>
+      <div style="height:30px"></div>
+    </div>
+  </div>
+</div>
+
+<h2><span class="n">A3</span> Two rows: name above, controls below</h2>
+<ul class="why">
+  <li>A title row (big name + pips, the swipe surface) above today's control row. Clearest name, easiest swipe target.</li>
+  <li>Costs about 40px of scene height on every view; About goes to ⚙ as in A1.</li>
+</ul>
+<div class="row">
+  <div class="phone">
+    <div class="bar" style="height:auto;flex-direction:column;align-items:stretch;padding:6px 6px 4px 10px;gap:0">
+      <div class="vname" style="height:44px"><span class="t" style="font-size:19px"><svg class="i"><use href="#layers"/></svg>Snapshots</span><span class="pips"><i></i><i></i><i class="on"></i><i></i></span></div>
+      <div style="display:flex;align-items:center;gap:6px;border-top:1px solid var(--border);padding-top:4px">
+        <svg class="ecg"><use href="#ecg"/></svg>
+        <span class="flt"><span class="dot" style="background:var(--primary)"></span>All</span>
+        <span class="grow"></span>
+        <span class="ib"><svg class="i"><use href="#raw"/></svg></span>
+        <span class="ib"><svg class="i"><use href="#gear"/></svg></span>
+      </div>
+    </div>
+    <div class="scene" style="height:200px"><div class="chamber"></div></div>
+  </div>
+</div>
+</body></html>

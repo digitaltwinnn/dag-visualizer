@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>C — Snapshot page</title>
+<link rel="stylesheet" href="page.css">
+<style>
+.back{display:flex;align-items:center;gap:4px;height:40px;color:var(--primary);font-size:var(--body)}
+.eyebrow{font-size:var(--label);letter-spacing:var(--caps);text-transform:uppercase;color:var(--muted);margin-top:4px}
+.head{display:flex;align-items:center;gap:9px;font-size:var(--title);font-weight:600;margin-top:3px}
+.tick{display:inline-flex;align-items:center;height:22px;padding:0 7px;border:1px solid color-mix(in oklch,var(--ded) 45%,transparent);border-radius:5px;background:color-mix(in oklch,var(--ded) 12%,transparent);color:var(--ded);font-size:var(--label);font-weight:600}
+.lead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-top:12px}
+.lead .mono{font-family:var(--mono)}
+.facts{margin-top:12px}
+.f{display:flex;align-items:baseline;justify-content:space-between;gap:12px;height:28px}
+.f .k{color:var(--muted)}
+.f .v{color:var(--fg);font-variant-numeric:tabular-nums}
+.f .v .u{color:var(--muted)}
+.plate0{margin-top:10px;background:var(--plate);border-radius:6px;padding:9px 12px;font-family:var(--mono);font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);line-height:1.9}
+.plate0 b{color:var(--fg);font-weight:400;letter-spacing:0;margin-left:6px}
+.tabs{display:flex;gap:18px;margin-top:16px;border-bottom:1px solid var(--border)}
+.tabs span{padding:8px 2px;font-size:var(--label);letter-spacing:var(--caps);text-transform:uppercase;color:var(--muted)}
+.tabs span.on{color:var(--fg);box-shadow:inset 0 -2px 0 var(--primary)}
+.body{height:70px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:var(--label)}
+.foot{margin:12px -12px -12px;background:var(--plate);padding:8px 12px;border-radius:0 0 10px 10px}
+.foot .r{display:flex;align-items:center;justify-content:space-between;gap:10px;height:30px;font-size:var(--label)}
+.foot .r .k{color:var(--muted)}
+.foot .r .v{font-family:var(--mono);color:var(--dim);font-size:12.5px}
+.foot .sub{font-size:11px;letter-spacing:var(--caps);text-transform:uppercase;color:var(--muted);padding:6px 0 2px}
+.inline{color:var(--muted);font-size:var(--label);margin-top:6px}
+.inline b{color:var(--dim);font-weight:400;font-variant-numeric:tabular-nums}
+</style></head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<symbol id="cl" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></symbol>
+<symbol id="x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+<symbol id="copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></symbol>
+</defs></svg>
+
+<h1>C — Snapshot page (phone)</h1>
+<p class="lede">Ask: Height / Sub-height / Blocks take a lot of space; make the page feel less cluttered. Today they are a caps-mono plate between the facts and the tabs, a third type style on a page that already has two (fact rows, and the hash plate at the foot).</p>
+<nav class="pages"><a href="index.html">all pages</a></nav>
+
+<h2><span class="n now">0</span> Now</h2>
+<div class="row"><div class="crop" style="height:960px"><img src="now-detail.png" alt="current snapshot page"></div></div>
+
+<h2><span class="n">C1</span> Chain position moves to the foot <span class="rec">recommended</span></h2>
+<ul class="why">
+  <li>The top of the page keeps the <b>human facts</b> only: what it is, where it anchored, when, what it cost, how big.</li>
+  <li>Height, Sub-height and Blocks are <b>chain references</b>, the same kind of fact as the hashes, so they join the foot plate in the same row style (label left, value right, mono). The plate has a short section label for each group.</li>
+  <li>Result: the plate between facts and tabs is gone, the tabs move up by about 70px, and the page uses two type styles instead of three.</li>
+</ul>
+<div class="row">
+  <div class="phone"><div class="panel">
+    <div class="x"><svg class="i s"><use href="#x"/></svg></div>
+    <div class="back"><svg class="i s"><use href="#cl"/></svg>Snapshots</div>
+    <div class="eyebrow">Metagraph snapshot</div>
+    <div class="head"><span class="dot" style="background:var(--ded)"></span>2,626,347<span class="tick">DED</span></div>
+    <div class="lead"><span>Anchored into global snapshot <span class="mono">7,024,309</span></span><span class="chip">56s ago</span></div>
+    <div class="facts">
+      <div class="f"><span class="k">Time</span><span class="v"><span class="u">Oct 8</span> 9:19:05 AM <span class="chip">GMT+2</span></span></div>
+      <div class="f"><span class="k">Fee paid</span><span class="v">0.0070 DAG</span></div>
+      <div class="f"><span class="k">Size</span><span class="v">4.3 KB <span class="u">compressed</span></span></div>
+    </div>
+    <div class="tabs"><span class="on">State</span><span>Data</span><span>Signers</span></div>
+    <div class="body">tab content (unchanged)</div>
+    <div class="foot">
+      <div class="sub">Chain position</div>
+      <div class="r"><span class="k">Height</span><span class="v">0</span></div>
+      <div class="r"><span class="k">Sub-height</span><span class="v">2,626,347</span></div>
+      <div class="r"><span class="k">Blocks</span><span class="v">0</span></div>
+      <div class="sub">Hashes</div>
+      <div class="r"><span class="k">Hash</span><span class="v">c566aede…9a2ccee11 <svg class="i s" style="vertical-align:-3px;color:var(--muted)"><use href="#copy"/></svg></span></div>
+      <div class="r"><span class="k">Previous</span><span class="v">b63d7371…e2342 <svg class="i s" style="vertical-align:-3px;color:var(--muted)"><use href="#copy"/></svg></span></div>
+      <div class="r"><span class="k">State</span><span class="v">2d33c5b8…568498 <svg class="i s" style="vertical-align:-3px;color:var(--muted)"><use href="#copy"/></svg></span></div>
+    </div>
+  </div></div>
+</div>
+<p class="note">The hash labels shorten to "Previous" and "State" under a "Hashes" label, so they stop restating "hash" three times. Desktop takes the same order (its pane has the same three styles today).</p>
+
+<h2><span class="n">C2</span> Fact rows, same list</h2>
+<ul class="why">
+  <li>Height, Sub-height and Blocks become three more rows of the fact list, in the same type as Time / Fee / Size. One style, nothing new to read.</li>
+  <li>The page gets no shorter (six rows instead of three plus a plate), and chain references now sit among the human facts.</li>
+</ul>
+<div class="row">
+  <div class="phone"><div class="panel">
+    <div class="x"><svg class="i s"><use href="#x"/></svg></div>
+    <div class="back"><svg class="i s"><use href="#cl"/></svg>Snapshots</div>
+    <div class="eyebrow">Metagraph snapshot</div>
+    <div class="head"><span class="dot" style="background:var(--ded)"></span>2,626,347<span class="tick">DED</span></div>
+    <div class="lead"><span>Anchored into global snapshot <span class="mono">7,024,309</span></span><span class="chip">56s ago</span></div>
+    <div class="facts">
+      <div class="f"><span class="k">Time</span><span class="v"><span class="u">Oct 8</span> 9:19:05 AM <span class="chip">GMT+2</span></span></div>
+      <div class="f"><span class="k">Fee paid</span><span class="v">0.0070 DAG</span></div>
+      <div class="f"><span class="k">Size</span><span class="v">4.3 KB <span class="u">compressed</span></span></div>
+      <div class="f"><span class="k">Height</span><span class="v">0</span></div>
+      <div class="f"><span class="k">Sub-height</span><span class="v">2,626,347</span></div>
+      <div class="f"><span class="k">Blocks</span><span class="v">0</span></div>
+    </div>
+    <div class="tabs"><span class="on">State</span><span>Data</span><span>Signers</span></div>
+    <div class="body">tab content (unchanged)</div>
+  </div></div>
+</div>
+
+<h2><span class="n">C3</span> One quiet line under the facts</h2>
+<ul class="why">
+  <li>The three values become one muted line of label + value pairs under the fact list: "Height 0   Sub-height 2,626,347   Blocks 0". Smallest footprint (one line).</li>
+  <li>Three facts on one line is close to the "two facts in one item" pattern you have rejected before.</li>
+</ul>
+<div class="row">
+  <div class="phone"><div class="panel">
+    <div class="x"><svg class="i s"><use href="#x"/></svg></div>
+    <div class="back"><svg class="i s"><use href="#cl"/></svg>Snapshots</div>
+    <div class="eyebrow">Metagraph snapshot</div>
+    <div class="head"><span class="dot" style="background:var(--ded)"></span>2,626,347<span class="tick">DED</span></div>
+    <div class="lead"><span>Anchored into global snapshot <span class="mono">7,024,309</span></span><span class="chip">56s ago</span></div>
+    <div class="facts">
+      <div class="f"><span class="k">Time</span><span class="v"><span class="u">Oct 8</span> 9:19:05 AM <span class="chip">GMT+2</span></span></div>
+      <div class="f"><span class="k">Fee paid</span><span class="v">0.0070 DAG</span></div>
+      <div class="f"><span class="k">Size</span><span class="v">4.3 KB <span class="u">compressed</span></span></div>
+    </div>
+    <div class="inline">Height <b>0</b>&emsp;Sub-height <b>2,626,347</b>&emsp;Blocks <b>0</b></div>
+    <div class="tabs"><span class="on">State</span><span>Data</span><span>Signers</span></div>
+    <div class="body">tab content (unchanged)</div>
+  </div></div>
+</div>
+</body></html>
