@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>F — Hypergraph raw rows</title>
+<link rel="stylesheet" href="page.css">
+<style>
+.ttl{display:flex;align-items:baseline;gap:8px;height:34px;font-size:var(--title)}
+.ttl .c{color:var(--muted);font-size:var(--body)}
+.gh{display:flex;align-items:center;gap:8px;height:34px;margin-top:10px;padding:0 6px;border-radius:6px 6px 0 0;
+  background:color-mix(in oklch,var(--primary) 9%,var(--plate));border-bottom:1px solid color-mix(in oklch,var(--primary) 35%,transparent)}
+.gh .k{color:var(--fg);font-size:var(--body);font-weight:600}
+.gh .n{margin-left:auto;color:var(--dim);font-size:var(--label);font-variant-numeric:tabular-nums}
+.r{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;height:44px;padding:0 6px;border-top:1px solid color-mix(in oklch,var(--border) 60%,transparent)}
+.gh + .r{border-top:0}
+.r .mk{display:flex;align-items:center;gap:8px;font-size:var(--body);color:var(--fg)}
+.code{display:inline-flex;align-items:center;height:19px;padding:0 5px;border:1px solid var(--border);border-radius:4px;background:var(--plate);font-size:11.5px;color:var(--dim)}
+.r .id{font-family:var(--mono);font-size:13px;color:var(--dim)}
+.r2{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;height:44px;padding:0 6px;border-top:1px solid color-mix(in oklch,var(--border) 60%,transparent)}
+.r2 .who{display:flex;align-items:center;gap:8px;font-size:var(--body)}
+.r2 .id{font-family:var(--mono);font-size:13px;color:var(--dim)}
+</style></head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<symbol id="x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+</defs></svg>
+
+<h1>F — Hypergraph raw rows (phone)</h1>
+<p class="lede">Today each row is three lines: network + node id + make-up chip, then location, then provider. Location and provider are Geography's lens (E1 now leads with them there); Hypergraph's question is <b>what each node is in the architecture</b>: which network, which layers it runs. (Counts in the mockups are illustrative.)</p>
+<nav class="pages"><a href="index.html">all pages</a></nav>
+
+<h2><span class="n now">0</span> Now (Hypergraph)</h2>
+<div class="row"><div class="crop" style="height:560px"><img src="now-hyper.png" alt="current hypergraph raw list"></div></div>
+
+<h2><span class="n">F1</span> Grouped by network, layers first <span class="rec">recommended</span></h2>
+<ul class="why">
+  <li><b>Network plates</b> (the same group header as B1 and E1): the network's dot and name, its node count on the right. The DAG core first, then the metagraphs busiest first, as the explorer lists them.</li>
+  <li>Each row is <b>one line</b>: the make-up word with its layer codes (Hybrid · L0 cL1 dL1, the node card's own vocabulary) on the left, the short node id on the right.</li>
+  <li>Location and provider leave the row: they are Geography's (E1), and the node card states them one tap away. Three lines become one, so a screen shows about three times as many nodes.</li>
+  <li>A node that serves several networks appears under each, as the scene draws it under each hub.</li>
+</ul>
+<div class="row">
+  <div class="phone"><div class="panel">
+    <div class="x"><svg class="i s"><use href="#x"/></svg></div>
+    <div class="ttl">Nodes <span class="c">158</span></div>
+    <div class="gh"><span class="dot" style="background:var(--core)"></span><span class="k">DAG</span><span class="n">88</span></div>
+    <div class="r"><span class="mk">Hybrid <span class="code">L0</span><span class="code">L1</span></span><span class="id">0b2b7e…5f38</span></div>
+    <div class="r"><span class="mk">Consensus <span class="code">L0</span></span><span class="id">0d9216…0385</span></div>
+    <div class="r"><span class="mk">Hybrid <span class="code">L0</span><span class="code">L1</span></span><span class="id">0fbd00…df5d</span></div>
+    <div class="gh"><span class="dot" style="background:var(--dor)"></span><span class="k">Dor Technologies</span><span class="n">20</span></div>
+    <div class="r"><span class="mk">Consensus <span class="code">L0</span></span><span class="id">4c1e8a…77b2</span></div>
+    <div class="r"><span class="mk">Data <span class="code">dL1</span></span><span class="id">8e02f4…a915</span></div>
+    <div class="gh"><span class="dot" style="background:var(--biofi)"></span><span class="k">BioFi</span><span class="n">3</span></div>
+    <div class="r"><span class="mk">Hybrid <span class="code">L0</span><span class="code">cL1</span><span class="code">dL1</span></span><span class="id">900280…cdc8</span></div>
+    <div class="r"><span class="mk">Hybrid <span class="code">L0</span><span class="code">cL1</span><span class="code">dL1</span></span><span class="id">866d3c…ffe7</span></div>
+    <div class="r"><span class="mk">Hybrid <span class="code">L0</span><span class="code">cL1</span><span class="code">dL1</span></span><span class="id">772fc1…d687</span></div>
+  </div></div>
+</div>
+<p class="note">Under a committed network the list shows that network's plate only. The layer codes come from the same composition vocabulary the node card and the desktop Layer column use, so the three cannot disagree.</p>
+
+<h2><span class="n">F2</span> Flat, one line per node</h2>
+<ul class="why">
+  <li>No groups: each row reads network dot + ticker, short node id, and the make-up chip at the right edge (today's first line, alone).</li>
+  <li>The smallest change (the two place lines go), but the ticker repeats down the list and the layer codes stay hidden behind the make-up word.</li>
+</ul>
+<div class="row">
+  <div class="phone"><div class="panel">
+    <div class="x"><svg class="i s"><use href="#x"/></svg></div>
+    <div class="ttl">Nodes <span class="c">158</span></div>
+    <div class="r2"><span class="who"><span class="dot" style="background:var(--biofi)"></span>BIOFI</span><span class="id">900280…cdc8</span><span class="chip">Hybrid</span></div>
+    <div class="r2"><span class="who"><span class="dot" style="background:var(--biofi)"></span>BIOFI</span><span class="id">866d3c…ffe7</span><span class="chip">Hybrid</span></div>
+    <div class="r2"><span class="who"><span class="dot" style="background:var(--usdc)"></span>CMC</span><span class="id">77f7f6…c194</span><span class="chip">Consensus</span></div>
+    <div class="r2"><span class="who"><span class="dot" style="background:var(--usdc)"></span>CMC</span><span class="id">ddec0a…6c26</span><span class="chip">Consensus</span></div>
+    <div class="r2"><span class="who"><span class="dot" style="background:var(--core)"></span>DAG</span><span class="id">0b2b7e…5f38</span><span class="chip">Hybrid</span></div>
+    <div class="r2"><span class="who"><span class="dot" style="background:var(--core)"></span>DAG</span><span class="id">0d9216…0385</span><span class="chip">Consensus</span></div>
+  </div></div>
+</div>
+</body></html>
