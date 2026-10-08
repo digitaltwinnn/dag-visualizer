@@ -144,3 +144,44 @@ export function groupRosterByCountry(rows: readonly RosterRow[]): RosterCountryG
     return b.rows.length - a.rows.length || (a.country ?? "").localeCompare(b.country ?? "");
   });
 }
+
+/** One network's nodes in the phone Hypergraph roster — each entry the machine's row plus the
+ *  record and roles it has IN THIS network. */
+export interface RosterNetworkGroup {
+  netId: string;
+  entries: { row: RosterRow; rec: NodeRow; roles: string[] }[];
+}
+
+/** THE HYPERGRAPH ROSTER IS GROUPED BY NETWORK ON PHONE (user, 2026-10-08, design F1 —
+ *  `docs/superpowers/design/2026-10-08-mobile-tuning/f-hyper.html`): the view's question is what
+ *  each node IS in the architecture, so each network is a plate and its rows lead with the layers
+ *  the node runs there. A machine serving two networks appears under each, as the scene draws it
+ *  under each hub — with THAT network's record and roles, so a DAG validator that also hosts a
+ *  metagraph reads as a validator under DAG. Only networks the machine's own records name group it:
+ *  a catalog co-tenant the current list does not show (a committed filter) adds no plate. The DAG
+ *  core leads, then the metagraphs busiest first, ties by ticker; rows inside by node id. */
+export function groupRosterByNetwork(rows: readonly RosterRow[]): RosterNetworkGroup[] {
+  const by = new Map<string, RosterNetworkGroup>();
+  for (const row of rows) {
+    const perNet = new Map<string, NodeRow[]>();
+    for (const rec of row.recs) {
+      const id = pickNetId(rec.pick);
+      if (!id) continue;
+      const list = perNet.get(id);
+      if (list) list.push(rec);
+      else perNet.set(id, [rec]);
+    }
+    for (const [netId, recs] of perNet) {
+      let g = by.get(netId);
+      if (!g) by.set(netId, (g = { netId, entries: [] }));
+      g.entries.push({ row, rec: recs[0]!, roles: [...new Set(recs.flatMap((r) => r.roles ?? []))] });
+    }
+  }
+  const tick = (id: string) => metagraphById(id)?.ticker || metagraphById(id)?.name || (id === "dag" ? "DAG" : id);
+  const groups = [...by.values()];
+  for (const g of groups) g.entries.sort((a, b) => (a.rec.id ?? a.rec.label).localeCompare(b.rec.id ?? b.rec.label));
+  return groups.sort((a, b) => {
+    if ((a.netId === "dag") !== (b.netId === "dag")) return a.netId === "dag" ? -1 : 1;
+    return b.entries.length - a.entries.length || tick(a.netId).localeCompare(tick(b.netId));
+  });
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRoster, groupRosterByCountry, sortRoster } from "@/src/data/roster";
+import { buildRoster, groupRosterByCountry, groupRosterByNetwork, sortRoster } from "@/src/data/roster";
 import type { NodeRow } from "@/src/data/types";
 
 const row = (over: Partial<NodeRow> & { pick: NodeRow["pick"] }): NodeRow => ({
@@ -91,5 +91,30 @@ describe("groupRosterByCountry (the phone Geography roster)", () => {
       ["Finland", ["Helsinki"]],
       [null, [null]],
     ]);
+  });
+});
+
+describe("groupRosterByNetwork (the phone Hypergraph roster)", () => {
+  const at = (ip: string) => ({ ip }) as never;
+  it("puts a shared machine under each of its networks with that network's roles; the DAG leads, then busiest first", () => {
+    const dagRec = row({ pick: { kind: "l0", node: at("1.2.3.4") } as never, id: "m1", roles: ["l0", "cl1"] });
+    const upRec = row({ pick: { kind: "metanode", meta: { id: "up" } as never, node: at("1.2.3.4") } as never, id: "m1", roles: ["dl1"] });
+    const up2 = row({ pick: { kind: "metanode", meta: { id: "up" } as never, node: at("5.5.5.5") } as never, id: "m3", roles: ["l0"] });
+    const dor = row({ pick: { kind: "metanode", meta: { id: "dor" } as never, node: at("6.6.6.6") } as never, id: "m4", roles: ["l0"] });
+    const g = groupRosterByNetwork(buildRoster([dagRec, upRec, up2, dor]));
+    expect(g.map((x) => [x.netId, x.entries.map((e) => e.rec.id)])).toEqual([
+      ["dag", ["m1"]],
+      ["up", ["m1", "m3"]],
+      ["dor", ["m4"]],
+    ]);
+    expect(g[0].entries[0].roles.sort()).toEqual(["cl1", "l0"]);
+    expect(g[1].entries[0].roles).toEqual(["dl1"]);
+  });
+  it("a catalog co-tenant the list does not show adds no plate", () => {
+    const upOnly = row({ pick: { kind: "metanode", meta: { id: "up" } as never, node: at("1.2.3.4") } as never, id: "m1" });
+    const metaList = [{ id: "dag", nodes: [{ ip: "1.2.3.4" }] }] as never;
+    const rows = buildRoster([upOnly], metaList);
+    expect(rows[0].nets).toContain("dag");
+    expect(groupRosterByNetwork(rows).map((x) => x.netId)).toEqual(["up"]);
   });
 });
