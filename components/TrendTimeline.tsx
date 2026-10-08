@@ -156,7 +156,7 @@ export default function TrendTimeline() {
           `right-0` left the group 7px short of the plate's edge (user: "should align with the
           bottom section"). The offset is that inset, measured — the group's right edge IS the
           band's. */}
-      <div className="absolute bottom-full -right-[7px] mb-3 z-[1] flex items-center rounded-lg p-1 [background:var(--topbar-glass)] backdrop-blur-sm max-[700px]:static max-[700px]:order-last max-[700px]:mb-0 max-[700px]:p-0 max-[700px]:[background:none] max-[700px]:backdrop-blur-none">
+      <div data-tether-avoid className="absolute bottom-full -right-[7px] mb-3 z-[1] flex items-center rounded-lg p-1 [background:var(--topbar-glass)] backdrop-blur-sm max-[700px]:static max-[700px]:order-last max-[700px]:mb-0 max-[700px]:p-0 max-[700px]:[background:none] max-[700px]:backdrop-blur-none">
         <div className="flex items-center gap-1.5 max-[700px]:flex-1">
           <WindowPicker
             className="bg-transparent max-[700px]:flex-1"
