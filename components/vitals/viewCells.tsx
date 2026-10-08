@@ -31,7 +31,7 @@ import { ageWords } from "@/src/util/relativeAge";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
 import { unlistedSeries } from "@/src/data/trendSeries";
-import { nodesByContinent } from "@/src/data/continents";
+import { nodesBySubregion } from "@/src/data/subregions";
 
 export function HyperCells({ accent }: { accent: string }) {
   const filter = useStore((s) => s.filter);
@@ -218,15 +218,15 @@ export function GeoCells({ accent }: { accent: string }) {
   const filter = useStore((s) => s.filter);
   const countries = lb?.countries ?? [];
   const total = selNodes.length;
-  const { ispCounts, topIsps, byContinent } = useMemo(() => {
+  const { ispCounts, topIsps, byRegion } = useMemo(() => {
     const ispCounts = new Map<string, number>();
     for (const r of selNodes) {
       const isp = "geo" in r.pick ? r.pick.geo?.isp : undefined;
       if (isp) ispCounts.set(isp, (ispCounts.get(isp) ?? 0) + 1);
     }
-    // The continent reads the same `cc` the country ring is built on, so the two cards can never
+    // The sub-region reads the same `cc` the country ring is built on, so the two cards can never
     // disagree about which nodes this view is able to place.
-    return { ispCounts, topIsps: [...ispCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3), byContinent: nodesByContinent(selNodes) };
+    return { ispCounts, topIsps: [...ispCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3), byRegion: nodesBySubregion(selNodes) };
   }, [selNodes]);
   const topCountries = countries.slice(0, 3);
   const restC = countries.slice(3).reduce((s, c) => s + c.count, 0);
@@ -263,21 +263,22 @@ export function GeoCells({ accent }: { accent: string }) {
 
   return (
     <>
-      {/* THE FLEET BY CONTINENT (user, 2026-10-08: "nodes located/unplaced — unplaced never
-          happens; what is a better node breakdown related to geo?"). The lone total was a boring
-          card by construction (2026-09-01) and its located/unplaced split answered a question the
-          lookup never fails. The continent is the world view of WHERE — the level above the Top
-          countries card beside it — busiest first, the band's four-row height kept by folding any
-          further continents into a muted `other`. `unplaced` is a row only while it is not zero:
-          an instrument state worth stating, never a standing "0". */}
+      {/* THE FLEET BY SUB-REGION (user, 2026-10-08: "nodes located/unplaced — unplaced never
+          happens; what is a better node breakdown related to geo?", then continents, then "room for
+          sub-regions?"). The lone total was a boring card by construction (2026-09-01) and its
+          located/unplaced split answered a question the lookup never fails. The UN M49 sub-region
+          is the world view of WHERE — the level above the Top countries card beside it — busiest
+          first, the band's four-row height kept by folding the rest into a muted `other`.
+          `unplaced` is a row only while it is not zero: an instrument state worth stating, never a
+          standing "0". */}
       <BandCard label="Nodes"
         lead={<span className="font-mono font-bold text-xl text-foreground tabular-nums"><Odometer int value={total || null} /></span>}>
-        <MicroBars accent={accent} labelW={104} rows={[
-          ...byContinent.rows.slice(0, byContinent.rows.length > 4 ? 3 : 4).map((c) => ({ key: c.continent, label: c.continent, count: c.count })),
-          ...(byContinent.rows.length > 4
-            ? [{ key: "other", label: "other", count: byContinent.rows.slice(3).reduce((n, c) => n + c.count, 0), hue: "var(--muted-foreground)" }]
+        <MicroBars accent={accent} labelW={120} rows={[
+          ...byRegion.rows.slice(0, byRegion.rows.length > 4 ? 3 : 4).map((c) => ({ key: c.region, label: c.region, count: c.count })),
+          ...(byRegion.rows.length > 4
+            ? [{ key: "other", label: "other", count: byRegion.rows.slice(3).reduce((n, c) => n + c.count, 0), hue: "var(--muted-foreground)" }]
             : []),
-          ...(byContinent.unplaced > 0 ? [{ key: "unplaced", label: "unplaced", count: byContinent.unplaced, hue: "var(--muted-foreground)" }] : []),
+          ...(byRegion.unplaced > 0 ? [{ key: "unplaced", label: "unplaced", count: byRegion.unplaced, hue: "var(--muted-foreground)" }] : []),
         ]} />
       </BandCard>
       {/* "Top countries", not "Nodes by country" (user, 2026-09-01): the card shows the top three
