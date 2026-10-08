@@ -44,8 +44,9 @@ async function main() {
   let offset = 6 + 16 * pngs.length;
   const entries = pngs.map((png, i) => {
     const e = Buffer.alloc(16);
-    e.writeUInt8(SIZES[i] === 256 ? 0 : SIZES[i], 0); // 0 encodes 256 — none of ours, but state it
-    e.writeUInt8(SIZES[i] === 256 ? 0 : SIZES[i], 1);
+    const px: number = SIZES[i]; // widened: the format's 256 → 0 rule is stated even though no size is 256
+    e.writeUInt8(px === 256 ? 0 : px, 0); // 0 encodes 256 — none of ours, but state it
+    e.writeUInt8(px === 256 ? 0 : px, 1);
     e.writeUInt8(0, 2); // palette size — 0 for truecolour
     e.writeUInt8(0, 3); // reserved
     e.writeUInt16LE(1, 4); // colour planes

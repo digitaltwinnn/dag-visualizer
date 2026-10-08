@@ -231,9 +231,10 @@ async function walkChain<T extends { timestamp: string }>(
     if (recs.length) onPage(recs);
     pages++;
     if (pages % 25 === 0) process.stdout.write(`\r  ${label}: ${total} records (${pages} pages)…`);
-    const done = !page.meta?.next || (page.data ?? []).length === 0 || recs.length < (page.data ?? []).length;
+    const nextCursor = page.meta?.next;
+    const done = !nextCursor || (page.data ?? []).length === 0 || recs.length < (page.data ?? []).length;
     if (done) break;
-    next = page.meta.next;
+    next = nextCursor;
     if (onPageEnd) await onPageEnd(next);
   }
   process.stdout.write(`\r  ${label}: ${total} records (${pages} pages)\n`);
@@ -297,6 +298,19 @@ async function main(): Promise<void> {
       process.exit(1);
     }
   }
+  // ⚠️ AN INTERRUPTED RUN RELEASES THE LOCK (2026-10-08 — a run killed by a shell timeout left its
+  // 6-hour lock standing, and the production cron skipped every run until it was released by hand).
+  // `finally` does not run on a signal, so SIGINT/SIGTERM release it explicitly before exiting. A
+  // checkpointed walk resumes with --resume as before; nothing else holds the lock once it is gone.
+  let releasing = false;
+  const releaseOnSignal = (sig: string) => {
+    if (releasing) return;
+    releasing = true;
+    console.error(`\n${sig}: releasing the sampler lock before exit …`);
+    lockStore.releaseLock(lockKeyOf(net)).finally(() => process.exit(130));
+  };
+  process.once("SIGINT", () => releaseOnSignal("SIGINT"));
+  process.once("SIGTERM", () => releaseOnSignal("SIGTERM"));
   try {
 
   const be0 = NETWORKS[net].be;

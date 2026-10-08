@@ -12,7 +12,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.scripts.json"
   },
   "dependencies": {
     "@upstash/redis": "^1.38.4",

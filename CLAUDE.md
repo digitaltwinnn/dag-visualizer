@@ -156,7 +156,7 @@ micro-animation is CSS.
 ```bash
 npm install
 npm run dev        # http://localhost:3000, also serves the Next.js MCP at /_next/mcp
-npx tsc --noEmit   # the dev server tolerates type errors; run tsc to be sure
+npm run typecheck  # tsc over the app AND scripts/ (tsconfig.json excludes scripts/; the dev server tolerates type errors)
 npm test           # vitest
 ```
 
