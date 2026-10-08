@@ -13,10 +13,10 @@
 // add `--topbar-extra` at the top; `--bottom-reserve` keeps its meaning as the lane's own band
 // above the footer.
 //
-// On the PHONE the dock owns bottom:0, so the row rides directly ABOVE it (user, 2026-08-31 —
-// "keep footer link visible in phone"). It is overlay chrome there, like the dock itself:
-// `--footer-h` still zeroes on the phone boundary so no consumer reserves a band for it. While a
-// DOC overlay is open the dock is stood down (DocGate), so the row drops to the safe-area bottom.
+// On the PHONE the row stands down (user, 2026-10-08, design A1): About and the two external links
+// live in the ⚙ menu there (topbar/SettingsMenu), and the scene takes the height back. It rode
+// above the dock as overlay chrome from 2026-08-31; `--footer-h` still zeroes on the phone
+// boundary, so no consumer reserves a band for it.
 //
 // About/Design are STORE TOGGLES now, not navigations — a navigation would reboot the engine the
 // overlay deliberately keeps alive; the hrefs stay real so middle-click/new-tab work. The view
@@ -32,14 +32,14 @@ import { metagraphById } from "@/src/data/network";
 import { DOC_PATHS, type DocPage } from "@/components/views";
 import { cn } from "@/lib/utils";
 
-const GITHUB = "https://github.com/digitaltwinnn/dag-visualizer";
-const CONSTELLATION = "https://constellationnetwork.io";
+export const GITHUB = "https://github.com/digitaltwinnn/dag-visualizer";
+export const CONSTELLATION = "https://constellationnetwork.io";
 
 // The GitHub BRAND mark, inline (2026-09-04): lucide dropped its brand icons, and the house
 // rule is monochrome SVG on currentColor, never emoji — the same reasoning that keeps the ECG
 // mark and identity dots bespoke. The octocat sets the external repo link apart from the
 // internal doc links beside it (user: "make a visual distinction … gh icon").
-function GithubMark() {
+export function GithubMark() {
   return (
     <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor" aria-hidden className="flex-none">
       <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
@@ -72,10 +72,6 @@ export default function SiteFooter() {
   // The DAG core's one-home config: the official site URL and the $DAG brand mark the
   // Constellation link below wears (same record the dossier avatar reads).
   const dag = metagraphById("dag");
-  const doc = useStore((s) => s.docPage);
-  // The raw layer hides the dock with the rest of the HUD, so on phone the row rides the screen's
-  // bottom edge there, as it does under a doc page — and the raw panel takes the strip it leaves.
-  const raw = useStore((s) => s.section === "data");
   // SCENE mode takes the strip FULL-BLEED (user, 2026-09-14: "expand the footer to full width —
   // the vitals it attached to is no longer there"). The `--bar-margin` inset is not a margin for
   // its own sake: it exists so this row's edges line up with the two BARS and the rail cards
@@ -113,21 +109,10 @@ export default function SiteFooter() {
         // and the doc overlay (DocGate unmounts BottomStream, whose cleanup zeroes the reserve)
         // all fold it away.
         "h-[calc(var(--footer-h)+min(10px,var(--bottom-reserve,0px)))]",
-        // Phone: above the dock normally; at the safe-area bottom while a doc overlay has the
-        // dock stood down. And FULL-BLEED there (user, 2026-09-12): the two bars' shared
-        // `--bar-margin` inset exists so their edges align with the rail cards and clear the
-        // RailThread rulers — neither of which exists on the phone, where this strip's
-        // neighbour is the DOCK, and the dock is full-bleed. Inset, the veil fell 16px short
-        // of the screen on each side directly above a full-width bar, which read as a broken
-        // join rather than one bottom chrome block. `max-[700px]` is the same arm the two
-        // rules below already use (CSS trap 8: one number, both arms).
-        "max-[700px]:inset-x-0",
-        doc == null && !raw
-          ? "max-[700px]:bottom-[var(--phone-dock-h)] max-[700px]:h-[var(--footer-phone-h)]"
-          : "max-[700px]:bottom-[env(safe-area-inset-bottom)] max-[700px]:h-[var(--footer-phone-h)]",
-        // …and GONE on the phone while RAW is open (user, 2026-10-07 — the raw phone pass, B): a
-        // data pane needs the screen's height more than a row of links it can reach on return.
-        raw && "max-[700px]:hidden",
+        // …and GONE on the phone (user, 2026-10-08, design A1 — it was gone only while RAW was
+        // open, 2026-10-07): its About and its two links moved into the ⚙ menu, so the row above
+        // the dock gives its height back to the scene.
+        "max-[700px]:hidden",
       )}
     >
       {/* Readability history, still load-bearing: no text-shadow halo (user, 2026-08-30 — the
@@ -146,20 +131,10 @@ export default function SiteFooter() {
           // read and hit, and 12px is the floor for secondary text, not a target. 14px fits both
           // bands (26px on the phone, 28 on the desktop) at its own 1.45 leading; on the phone the
           // gaps tighten so the row still fits a 360px screen.
-          "flex-1 flex items-center justify-center gap-2.5 max-[700px]:gap-1.5 whitespace-nowrap text-body text-foreground-dim [&_a]:pointer-events-auto bg-[var(--footer-glass)] backdrop-blur-sm",
-          "max-[700px]:[&_a]:pt-[26px] max-[700px]:[&_a]:-mt-[26px] max-[700px]:[&_a]:pb-1.5 max-[700px]:[&_a]:-mb-1.5 max-[700px]:[&_a]:px-1.5 max-[700px]:[&_a]:-mx-1.5",
-          "pt-[min(10px,var(--bottom-reserve,0px))] max-[700px]:pt-0",
+          "flex-1 flex items-center justify-center gap-2.5 whitespace-nowrap text-body text-foreground-dim [&_a]:pointer-events-auto bg-[var(--footer-glass)] backdrop-blur-sm",
+          "pt-[min(10px,var(--bottom-reserve,0px))]",
         )}
       >
-        {/* ⚠️ On phone every anchor wears padding CANCELLED by an equal negative margin (the
-            utility pairs above): the row keeps its 22px visual height while each link's HIT BOX
-            grows to ~43px — measured 11px tall before, a quarter of the 44px touch floor, and on
-            phone this row rides above the dock as live chrome, not decoration. The expansion is
-            ASYMMETRIC on purpose: upward 26px into inert canvas, downward only to the dock's own
-            top edge — measured, a symmetric pad reached 14px INTO the dock and this nav's
-            stacking order let the links win those taps off the dock's buttons (the z the dock
-            carries lives inside the shell's own stacking context, so it never competes here).
-            Desktop is untouched: a pointer needs no floor. */}
         {/* THE ROW IS THREE GROUPS, ONE SEPARATOR (user, 2026-09-04, two rounds): app
             navigation, the off-scene doc pages, then the external world. Group hairlines were
             tried and pulled the same day — with the tuck they ran the strip's full height and

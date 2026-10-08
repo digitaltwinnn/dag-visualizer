@@ -16,7 +16,8 @@ import SettingsMenu from "@/components/topbar/SettingsMenu";
 import ViewPicker from "@/components/topbar/ViewPicker";
 import { NET_SWITCH_VIEW } from "@/components/topbar/NetworkSwitch";
 import { useBreakpoint } from "@/components/useBreakpoint";
-import { DOC_PAGES, VIEWS } from "@/components/views";
+import { DOC_PAGES, LISTED_VIEWS, VIEWS } from "@/components/views";
+import { stepView, swipeDirection } from "@/src/engine/domain/viewSwipe";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import type { Mode } from "@/src/store/store";
 
@@ -48,7 +49,6 @@ export default function TopBar() {
   // whole ordinary face over it, filter included, exactly as it does over the anchor log. The
   // exception had no second user, so it left with the doc (views.ts records the flags' removal).
   const doc = useStore((s) => s.docPage);
-  const rawOpen = useStore((s) => s.section === "data");
   const filterOff = doc != null;
   // The presentation pair is VIEW-SCOPED (SCENE⇄HUD and RAW act on the 3D view under the bar),
   // so it stands down wherever there is no such view: a doc overlay, or the flat "soon" view
@@ -134,6 +134,36 @@ export default function TopBar() {
   // shipped twice (the labeled switch at 1100, then at 1210). Every breakpoint in the JSX below is
   // tuned against measured content, so measured content is what should complain when it drifts.
   const barRow = useRef<HTMLDivElement>(null);
+
+  // SWIPE THE BAR TO STEP VIEWS — phone only (user, 2026-10-08, design A1; the rules are
+  // `domain/viewSwipe.ts`). The gesture starts anywhere on the bar's row, so a swipe that began
+  // on the filter face must not also open the filter: a counted swipe eats the click it ends in.
+  // Not while a doc covers the scene (the bar names the doc there, not a view) — and not for a
+  // mouse: a fine pointer has the switch.
+  const swipeFrom = useRef<{ x: number; y: number; id: number } | null>(null);
+  // WHEN the last swipe ended: only a click arriving right after it is the swipe's own. A touch
+  // that travelled usually ends in no click at all, so a bare flag would wait and swallow the
+  // NEXT real tap (found live: the gear stopped opening after one swipe).
+  const swipedAt = useRef(0);
+  const LISTED_IDS = LISTED_VIEWS.map((v) => v.id);
+  const onSwipeDown = (e: React.PointerEvent) => {
+    swipedAt.current = 0;
+    if (bp !== "phone" || doc || e.pointerType === "mouse") return;
+    swipeFrom.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
+  };
+  const onSwipeUp = (e: React.PointerEvent) => {
+    const from = swipeFrom.current;
+    swipeFrom.current = null;
+    if (!from || from.id !== e.pointerId) return;
+    const dir = swipeDirection(e.clientX - from.x, e.clientY - from.y);
+    if (dir === 0) return;
+    swipedAt.current = e.timeStamp;
+    const next = stepView(LISTED_IDS, mode, dir);
+    if (next) {
+      setStrip(null);
+      setMode(next);
+    }
+  };
   useEffect(() => {
     if (process.env.NODE_ENV === "production") return;
     const el = barRow.current;
@@ -185,6 +215,16 @@ export default function TopBar() {
       >
       <div
         ref={barRow}
+        onPointerDown={onSwipeDown}
+        onPointerUp={onSwipeUp}
+        onPointerCancel={() => { swipeFrom.current = null; }}
+        onClickCapture={(e) => {
+          const at = swipedAt.current;
+          swipedAt.current = 0;
+          if (!at || e.timeStamp - at > 400) return;
+          e.preventDefault();
+          e.stopPropagation();
+        }}
         className={cn(
           // A 3-zone grid at EVERY width (left cluster | view switch | right cluster) so the
           // switch is TRULY centred in the bar. Flex spacers only centre it when the side
@@ -203,6 +243,8 @@ export default function TopBar() {
           "max-[1260px]:gap-2.5",
           "max-[940px]:gap-2 max-[940px]:px-2.5 max-[940px]:py-2",
           "max-[700px]:gap-1.5 max-[700px]:p-2",
+          // The bar owns HORIZONTAL drags on the phone (the view swipe); vertical stays the page's.
+          "max-[700px]:touch-pan-y",
         )}
       >
         {/* LEFT zone: brand + filter. A real flex container at every width now that the grid
@@ -331,10 +373,10 @@ export default function TopBar() {
             segmented switch from 700px up, and below it ONE face — the current view's icon with
             a chevron — that opens the view list in the strip (topbar/ViewPicker.tsx has the
             argument: a row of 44px icons cannot scale with the view count, and per-tier hides
-            are a patch). The face carried the view's NAME for a round; it went the same day,
-            because the switch must stay CENTRED (the grid note above) and the phone's side zones
-            each need 128px, which leaves the middle 74 — the icon-only face fits it with slack and
-            the caption under the bar names the view, exactly as it does for every icon-only tier.
+            are a patch). The phone face carries the view's NAME again since design A1
+            (2026-10-08): the switch stays CENTRED (the grid note above), and moving About into the
+            ⚙ menu shrank the right zone to two controls, which gave the middle the name's width.
+            The caption under the bar stands down on the phone with it.
             Both stay in the DOM and CSS picks, so SSR and the first client render agree (the
             useBreakpoint-at-first-render hydration trap, ExplorerShell's note). The wrapper is a plain
             flex box, not `contents`, so the grid still sees one middle item. */}
@@ -355,25 +397,34 @@ export default function TopBar() {
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
           )}
         >
-          {(() => {
-            const Icon = VIEW_ICONS[mode];
-            return <Icon aria-hidden className="size-4 flex-none text-primary" />;
-          })()}
-          {/* THE FACE SAYS WHAT IT IS (user, 2026-09-28: "only an icon; it does not say it's a
-              view"): the control's ROLE in the desktop filter face's own micro-caps ("FILTER"),
-              which fits the 74px the centred cell has where the view's name (107px) did not.
-              WHICH view stays the caption's under the bar. The chevron went for the room, the
-              phone filter face's own precedent; the open state reads from the wash and
-              `aria-expanded`. Accent while open, like the FILTER word. */}
-          <span
-            className={cn(
-              "text-label tracking-caps uppercase transition-colors duration-150 motion-reduce:transition-none",
-              strip === "views" ? "text-primary-ink" : "text-muted-foreground",
-            )}
-          >
-            View
+          {/* THE NAME IS THE SWITCHER (user, 2026-10-08, design A1: "have the view name" in the
+              header). The face says WHICH view — icon and name — with a pip row under it for where
+              that view sits among the four; tapping still opens the list, swiping the bar steps.
+              The 2026-09-28 "VIEW" word went with it: it named the control's role because the
+              centred cell had 74px, and A1 freed the room by moving About out of the bar. */}
+          <span className="flex flex-col items-center gap-[3px]">
+            <span key={doc ?? mode} className="roll-in flex items-center gap-1.5">
+              {(() => {
+                const Icon = VIEW_ICONS[mode];
+                return <Icon aria-hidden className="size-4 flex-none text-primary" />;
+              })()}
+              <span className={cn("text-body font-semibold leading-none", strip === "views" ? "text-primary-ink" : "text-foreground")}>
+                {VIEWS.find((v) => v.id === mode)?.name}
+              </span>
+            </span>
+            <span aria-hidden className="flex items-center gap-1">
+              {LISTED_VIEWS.map((v) => (
+                <span
+                  key={v.id}
+                  className={cn(
+                    "h-[4px] rounded-full transition-[width,background-color] duration-200 motion-reduce:transition-none",
+                    v.id === mode ? "w-3 bg-primary" : "w-[4px] bg-muted-foreground/45",
+                  )}
+                />
+              ))}
+            </span>
           </span>
-          <span className="sr-only">: {VIEWS.find((v) => v.id === mode)?.name}</span>
+          <span className="sr-only"> — switch view (or swipe the bar)</span>
         </button>
         <ToggleGroup
           type="single"
@@ -454,7 +505,9 @@ export default function TopBar() {
             title="About this view"
             onClick={() => setStrip((cur) => (cur === "about" ? null : "about"))}
             onKeyDown={(e) => { if (e.key === "Escape") setStrip(null); }}
-            className={cn(SEG, strip === "about" && "bg-wash-soft text-foreground")}
+            // Off the PHONE bar (design A1): there it is the ⚙ menu's "This view" row, which opens
+            // this same strip — the bar's middle needed the room for the view's name.
+            className={cn(SEG, "max-[700px]:hidden", strip === "about" && "bg-wash-soft text-foreground")}
           >
             <AboutIcon aria-hidden className="size-4" />
             <span className="sr-only">About this view</span>
@@ -471,7 +524,7 @@ export default function TopBar() {
             carries the network CODE in the live accent off mainnet. One mount at EVERY width —
             a single icon fits the phone bar, which the trio never did (the old strip-row
             homes retired with this). */}
-        <SettingsMenu />
+        <SettingsMenu onAboutView={viewControls ? () => setStrip("about") : undefined} />
         </div>
       </div>
 
@@ -500,7 +553,7 @@ export default function TopBar() {
             ) : shownStrip === "views" ? (
               <ViewPicker onPicked={() => setStrip(null)} />
             ) : shownStrip === "about" ? (
-              <AboutStrip />
+              <AboutStrip onClose={() => setStrip(null)} />
             ) : (
               <FilterPicker onPicked={() => setStrip(null)} />
             )}
@@ -534,7 +587,8 @@ export default function TopBar() {
           where the view's name lives there, as on every icon-only tier. */}
       {/* On phone the raw panel starts where this caption hangs, so the word showed half-covered
           behind the panel's top edge; the pressed RAW toggle and the panel itself name the place. */}
-      <div className={cn("hidden max-[1299px]:flex justify-end pr-2.5 mt-1.5", rawOpen && "max-[700px]:!hidden")} aria-hidden>
+      {/* …and NOT on the phone since design A1 (2026-10-08): the bar's own face names the view. */}
+      <div className="hidden max-[1299px]:flex max-[700px]:!hidden justify-end pr-2.5 mt-1.5" aria-hidden>
         <span key={doc ?? mode} className="roll-in text-label tracking-caps uppercase text-muted-foreground leading-none">
           {doc ? DOC_PAGES[doc].label : VIEWS.find((v) => v.id === mode)?.name}
         </span>
