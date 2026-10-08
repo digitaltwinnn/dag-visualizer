@@ -337,7 +337,7 @@ function RawSection({
               className={cn(
                 "flex-none inline-flex items-center justify-center size-4 -my-0.5 rounded-xs cursor-pointer",
                 "text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
-                "opacity-0 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
+                "opacity-0 pointer-coarse:opacity-75 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
               )}
               onClick={() => setCmd({ mode: nextMode, epoch: (cmd?.epoch ?? 0) + 1 })}
             >

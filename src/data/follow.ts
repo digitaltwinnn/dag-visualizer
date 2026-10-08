@@ -42,27 +42,41 @@ export function followLatest() {
   // facts rail's collapse rule reads (store.selStack — a tick is not a user act).
   const { filter: rawFilter, snap, metaSnap, advanceSnap, advanceMetaSnap } = useStore.getState();
   const filter = ledgerLens(rawFilter); // dag = the base ledger's own follow (see latestRelevant)
-  const latest = latestRelevant(filter);
-  if (latest) advanceSnap({ kind: "snapshot", title: `Global snapshot #${latest.ordinal}`, data: latest });
-  else if (snap) advanceSnap(null);
+  const net = getNetwork();
 
   // LIVE METAGRAPH MODE (user, 2026-08-07): while following with a metagraph committed, the
-  // metagraph-snapshot card rides the heartbeat too — always that network's newest buffered
-  // snapshot (non-bumping, and only on real change so the card doesn't churn). The deep read
-  // stays gated to EXPLICIT selections (RawSnapshotBridge skips it while following).
-  const net = getNetwork();
+  // metagraph-snapshot card rides the heartbeat too — that network's newest buffered snapshot
+  // (non-bumping, and only on real change so the card doesn't churn). The deep read stays gated
+  // to EXPLICIT selections (RawSnapshotBridge skips it while following).
+  // ⚠️ THE PAIR ADVANCES TOGETHER (user, 2026-10-08: "a metagraph snapshot card show that was no
+  // longer related to the global snapshot"). The global used to come from the anchor index
+  // (`latestRelevant`) and the metagraph snapshot from the network's own buffer, which can lag it
+  // by a poll — so the global moved on while the card kept the older snapshot, anchored into a
+  // tick no longer on screen. The global is now the one THIS snapshot anchored into: newest
+  // snapshot whose tick is buffered, and both cards step to it at once.
   if (metagraphById(filter) && net) {
     const list = net.metaSnaps?.get(filter);
     if (list?.length) {
-      let m = list[0];
-      for (const x of list) if (x.ordinal > m.ordinal) m = x;
-      const g = net.globalSnapshots?.find((gs) => gs.timestamp === m.ts);
-      if (g && (metaSnap?.metaId !== filter || metaSnap.ordinal !== m.ordinal)) {
-        advanceMetaSnap({ metaId: filter, ordinal: m.ordinal, hash: m.hash, globalOrdinal: g.ordinal, ts: m.ts });
+      let best: { m: (typeof list)[number]; g: GlobalSnapshot } | null = null;
+      for (const x of list) {
+        if (best && x.ordinal <= best.m.ordinal) continue;
+        const g = net.globalSnapshots?.find((gs) => gs.timestamp === x.ts);
+        if (g) best = { m: x, g };
       }
-      return;
+      if (best) {
+        const { m, g } = best;
+        if (snap?.data.ordinal !== g.ordinal) advanceSnap({ kind: "snapshot", title: `Global snapshot #${g.ordinal}`, data: g });
+        if (metaSnap?.metaId !== filter || metaSnap.ordinal !== m.ordinal) {
+          advanceMetaSnap({ metaId: filter, ordinal: m.ordinal, hash: m.hash, globalOrdinal: g.ordinal, ts: m.ts });
+        }
+        return;
+      }
     }
   }
+
+  const latest = latestRelevant(filter);
+  if (latest) advanceSnap({ kind: "snapshot", title: `Global snapshot #${latest.ordinal}`, data: latest });
+  else if (snap) advanceSnap(null);
   if (filter === UNLISTED_ID && latest) {
     // Same live card chain: the newest unlisted row (the one-home log source, newest first).
     const row = unlistedLog([latest], useStore.getState().snapshotExact)[0];

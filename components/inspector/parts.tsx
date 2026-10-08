@@ -311,7 +311,8 @@ export function Foot({ children, className }: { children: ReactNode; className?:
 // answers with the check for one calm cycle (~1.2s, the transient-signal tempo). The glyph swap
 // is information, so it stays under reduced motion. Quiet at rest — visible only while its ROW
 // is hovered or focused (the `group/copy` reveal) — but its slot is always reserved, so nothing
-// shifts under the pointer. Monochrome via currentColor; the check takes `--success` (the
+// shifts under the pointer. A touch screen has no hover to reveal it, so a coarse pointer holds it
+// at the `always` low ink instead. Monochrome via currentColor; the check takes `--success` (the
 // ready lane), never an identity hue.
 export function CopyButton({ value, subject, always = false, className }: { value: string; subject: string; /** Present at low ink at rest (the foot rows) rather than revealed on the row's hover. */ always?: boolean; className?: string }) {
   const [copied, setCopied] = useState(false);
@@ -325,7 +326,7 @@ export function CopyButton({ value, subject, always = false, className }: { valu
       className={cn(
         "flex-none size-6 -my-1 rounded-xs text-muted-foreground",
         TOUCH_HIT,
-        always ? "opacity-75 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100" : "opacity-0 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
+        always ? "opacity-75 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100" : "opacity-0 pointer-coarse:opacity-75 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
         copied && "opacity-100 text-[var(--success)] hover:text-[var(--success)]",
         className,
       )}

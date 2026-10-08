@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { exploreCards, detailsCards, focusSlotId, ladderLevelOfSlot, ladderSlotIds, type RailManifestState } from "@/components/railCards";
+import { exploreCards, detailsCards, parentHolds, focusSlotId, ladderLevelOfSlot, ladderSlotIds, type RailManifestState } from "@/components/railCards";
 import { LADDERS } from "@/src/engine/domain/focusLadder";
 import type { PickDescriptor } from "@/src/data/types";
 
@@ -153,6 +153,27 @@ describe("the metagraph snapshot slot", () => {
     const c = detailsCards({ ...base, metaSnap: sel }).find((x) => x.id === "metaSnap")!;
     expect(c.present).toBe(true);
     expect(c.subjectKey).toBe("DAG0:745190");
+  });
+  it("stands down under a global snapshot it did not anchor into (user, 2026-10-08)", () => {
+    const sel = { metaId: "DAG0", ordinal: 745190, hash: "abc", globalOrdinal: 42, ts: "t" };
+    const snapAt = (ordinal: number) => ({ kind: "snapshot", title: "", data: { ordinal } }) as unknown as typeof base.snap;
+    const at = (ordinal: number) => detailsCards({ ...base, metaSnap: sel, snap: snapAt(ordinal) }).find((x) => x.id === "metaSnap")!;
+    expect(at(42).present).toBe(true);
+    expect(at(43).present).toBe(false);
+  });
+});
+
+describe("parentHolds (a child card states its parent or does not render)", () => {
+  const none = { snap: null, metaSnap: null, country: null, cohort: null };
+  it("a cohort belongs to the committed country", () => {
+    const cohort = { cc: "de", city: null, isp: null };
+    expect(parentHolds({ ...none, country: "de", cohort }, "cohort")).toBe(true);
+    expect(parentHolds({ ...none, country: "fr", cohort }, "cohort")).toBe(false);
+    expect(parentHolds({ ...none, cohort }, "cohort")).toBe(true);
+  });
+  it("no parent on screen is no disagreement", () => {
+    const metaSnap = { metaId: "DAG0", ordinal: 1, hash: "", globalOrdinal: 9, ts: "t" };
+    expect(parentHolds({ ...none, metaSnap }, "metaSnap")).toBe(true);
   });
 });
 

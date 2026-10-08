@@ -140,20 +140,21 @@ describe("archiveSchedule (the dossier's by-archival partition)", () => {
     ]), "x", 22, now);
     // b joined 12h after birth → graced into the full row; c at 38h stays a window row
     // sharing the reach label but never the row — the tag distinguishes them.
+    // c lands in a tier like every window node; d's floor is the probe instant (zero reach).
     expect(s2!.rows).toEqual([
       { label: "16 months", count: 2, kept: 100, fullCount: 2 },
-      { label: "16 months", count: 1, kept: 60, fullCount: 0 },
-      { label: "recent window", count: 1, kept: 1, fullCount: 0 },
+      { label: "> 6 months", count: 1, kept: 60, fullCount: 0, hint: "keeps more than six months of the chain" },
+      { label: "1 week", count: 1, kept: 1, fullCount: 0, hint: "keeps up to a week of the chain" },
     ]);
     expect(s2!.unmeasured).toBe(18);
   });
-  it("a many-reach fleet folds into the fixed reach ladder (round 6: the DAG's span labels were 'too much text — 1 month, 6 months, >1 year, oldest'); deep archives state their age and served span (rounds 7-8), era + gaps in the hint", () => {
+  it("every window node folds into the fixed reach ladder (round 6, then 2026-10-08: 'predefined and logically sized ranges (week, month(s)), approx. max 5'); deep archives state their age and served span (rounds 7-8), era + gaps in the hint", () => {
     const day = (n: number) => new Date(now - n * 86_400_000).toISOString();
     const win = (ip: string, days: number, kept: number) =>
       ({ ip, chain: "g", kind: "window", floor: 1000 - kept, latest: 1000, floorTs: day(days) });
     const s = archiveSchedule(census([
       { ip: "dp", chain: "g", kind: "deep", floor: 100, latest: 1000, floorTs: null },
-      // 8 distinct reaches, 16 nodes — far more reaches than the 4 slots left after the deep row
+      // 8 distinct reaches, 16 nodes — four tiers
       win("a", 730, 900), win("b", 540, 800),
       win("c1", 180, 500), win("c2", 180, 490), win("c3", 180, 480),
       win("d1", 120, 400), win("d2", 120, 390),
@@ -163,16 +164,17 @@ describe("archiveSchedule (the dossier's by-archival partition)", () => {
       win("h1", 0.5, 10), win("h2", 0.5, 8),
     ]), "g", 20, now);
     // A tier holds every node whose reach clears its floor but not the next tier's; an
-    // empty tier (nothing between 6 and 12 months here) draws no row. Kept is still the
+    // empty tier draws no row. Kept is still the
     // deepest single copy per tier.
     expect(s!.rows).toEqual([
       // Nov 2023 aged from the pinned now (2026-09-10) — the age grammar's year rounding
       // its tag is what a full archive WOULD hold — the chain's tip at probe time
       { label: "full archive", count: 0, kept: 1000, fullCount: 0, hint: "No probed node keeps this whole chain, back to its first snapshot." },
       { label: "3 years", count: 1, kept: 900, fullCount: 0, hint: "keeps deep history back to Nov 2023 — the deep archives share gaps, so the count is the span, not a promise of every snapshot" },
-      { label: "> 1 year", count: 2, kept: 900, fullCount: 0, hint: "keeps more than a year of the chain" },
+      { label: "> 6 months", count: 2, kept: 900, fullCount: 0, hint: "keeps more than six months of the chain" },
       { label: "6 months", count: 10, kept: 500, fullCount: 0, hint: "keeps up to six months of the chain" },
-      { label: "1 month", count: 4, kept: 100, fullCount: 0, hint: "keeps up to a month of the chain" },
+      { label: "1 month", count: 2, kept: 100, fullCount: 0, hint: "keeps up to a month of the chain" },
+      { label: "1 week", count: 2, kept: 10, fullCount: 0, hint: "keeps up to a week of the chain" },
     ]);
     expect(s!.unmeasured).toBe(3);
   });

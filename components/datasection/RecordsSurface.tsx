@@ -75,13 +75,7 @@ export default function RecordsSurface() {
               // Phone: the pane is its own PAGE (see above) — the whole panel while open, absent
               // while the list is up.
               (phone && !onDetail ? "max-[700px]:hidden " : "") +
-              "max-[700px]:w-auto max-[700px]:max-w-none max-[700px]:flex-1 max-[700px]:min-h-0 max-[700px]:border-l-0 " +
-              // pr-2: the phone pane SCROLLS (document mode), and without it the value column's
-              // right edge sat against the scrollbar (user, 2026-09-02).
-              "max-[700px]:pr-2 " +
-              // The phone pane scrolls DOWN only: 2px of a full-bleed plate's overhang drew a
-              // horizontal scrollbar along its bottom (2026-10-07, the raw phone pass).
-              "max-[700px]:pl-0 max-[700px]:overflow-y-auto max-[700px]:overflow-x-hidden slim-scroll"
+              "max-[700px]:w-auto max-[700px]:max-w-none max-[700px]:flex-1 max-[700px]:min-h-0 max-[700px]:border-l-0 max-[700px]:pl-0"
             }
           >
             {onDetail && (
@@ -94,7 +88,23 @@ export default function RecordsSurface() {
                 Snapshots
               </button>
             )}
-            <ChannelStatePanel />
+            {/* THE PHONE PAGE SCROLLS BELOW ITS HEAD ROW (user, 2026-10-08: "the x button
+                overlaps the scrollbar"). The whole pane scrolled, so its bar ran up the right edge
+                beneath the layer's ×; the back control and the × now share a row that stays put,
+                and the document scrolls under it. At desktop the wrapper is `contents` — the
+                pane's own height chain is untouched. */}
+            <div
+              className={
+                "contents max-[700px]:block max-[700px]:flex-1 max-[700px]:min-h-0 " +
+                // pr-2: the value column's right edge sat against the scrollbar (user, 2026-09-02).
+                "max-[700px]:pr-2 " +
+                // DOWN only: 2px of a full-bleed plate's overhang drew a horizontal scrollbar along
+                // its bottom (2026-10-07, the raw phone pass).
+                "max-[700px]:overflow-y-auto max-[700px]:overflow-x-hidden slim-scroll"
+              }
+            >
+              <ChannelStatePanel />
+            </div>
           </div>
         </div>
       ) : mode === "hyper" || mode === "geo" ? (

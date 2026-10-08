@@ -1186,6 +1186,9 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     setDoorMeta(null);
     if (!lensNet) setSearchMeta(null);
     setMarked(null); setJumpMiss(null);
+    // Removing the search IS the unfiltered log (user, 2026-10-08: "when we remove the filter tag,
+    // it should apply it"): back to its live head, not left on the page the search landed on.
+    setPageState(1);
     // Clearing the arrival's search cancels it: nothing is being found any more.
     pendingSeek.current = false;
     landCommit.current = null;
@@ -1659,7 +1662,11 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   }}
                   onClick={commit}
                 >
-                  <TableCell className={cn(inSelGroup && "shadow-[inset_2px_0_0_var(--primary)]")}>
+                  {/* THE EDGE MARKS THE ONE SELECTED ROW (user, 2026-10-08: "only add a | to the
+                      metagraph row that is the selection"). It used to run down every row anchored
+                      into the selected global, which read as N selections when the global itself was
+                      the subject — that case is the group's header, which wears the accent. */}
+                  <TableCell className={cn(rowSel && "shadow-[inset_2px_0_0_var(--row-hue,var(--primary))]")}>
                     {seam ? (
                       // ⚠️ FOUR EM-DASHES, NOT FOUR ZEROS. Network, snapshot, fee and size are all
                       // facts about a METAGRAPH SNAPSHOT, and this tick has none — so a `0.00000000`

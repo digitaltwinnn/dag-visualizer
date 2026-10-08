@@ -481,7 +481,10 @@ export function holdOrder(held: readonly string[], ranked: readonly string[]): s
  *  which bucket and the closing words how wide it is. The caller writes the subject and the number;
  *  this says the rest. Where the formatter already carries the noun ("1.2 MB") the object is "of
  *  data"; a gauge is what stood, so it carries no bucket. The verb is ANCHORED, the app's word for
- *  what a network does with a snapshot (user, same day: "sealed or anchored?"). */
+ *  what a network does with a snapshot (user, same day: "sealed or anchored?") — except the SPACING,
+ *  which is CREATED (user, 2026-10-08: "I think they created one every 3s, but anchored it to global
+ *  only occurs ~30sec"): the gap is between the chain's own snapshots, not between the global
+ *  snapshots that carried them, and the anchoring cadence is not a stored series. */
 export function momentPhrase(metric: TrendMetric, stepMs: number): { verb: string; rest: string } {
   const inBucket = stepMs >= 86400000 ? "on that day" : stepMs >= 3600000 ? "in that hour" : "in those 5 minutes";
   switch (metric) {
@@ -490,7 +493,7 @@ export function momentPhrase(metric: TrendMetric, stepMs: number): { verb: strin
     case "fees": return { verb: "paid", rest: `DAG in fees ${inBucket}` };
     case "kb": return { verb: "anchored", rest: `of data ${inBucket}` };
     case "nodes": return { verb: "ran", rest: "nodes" };
-    case "continuity": return { verb: "anchored a snapshot every", rest: inBucket };
+    case "continuity": return { verb: "created a snapshot every", rest: inBucket };
   }
 }
 
@@ -509,7 +512,7 @@ export function rangePhrase(metric: TrendMetric, partial: boolean): { verb: stri
     case "fees": return { verb: `paid${floor}`, rest: `DAG in fees ${over}` };
     case "kb": return { verb: `anchored${floor}`, rest: `of data ${over}` };
     case "nodes": return { verb: "ran", rest: "nodes on average" };
-    case "continuity": return { verb: "anchored a snapshot every", rest: "on average" };
+    case "continuity": return { verb: "created a snapshot every", rest: "on average" };
   }
 }
 

@@ -669,7 +669,7 @@ describe("momentPhrase — a moment's reading as a sentence about its network (u
   it("leaves the noun to a formatter that carries it, and a gauge to what stood", () => {
     expect(say("kb", DAY, "1.2 MB")).toBe("DED anchored 1.2 MB of data on that day");
     expect(say("nodes", DAY, "12")).toBe("DED ran 12 nodes");
-    expect(say("continuity", DAY, "28s")).toBe("DED anchored a snapshot every 28s on that day");
+    expect(say("continuity", DAY, "28s")).toBe("DED created a snapshot every 28s on that day");
   });
 });
 
@@ -690,7 +690,7 @@ describe("rangePhrase — a range's reading as a sentence about its network (202
   });
   it("a gauge and the spacing are averages, and say so", () => {
     expect(say("nodes", "12")).toBe("DED ran 12 nodes on average");
-    expect(say("continuity", "28s")).toBe("DED anchored a snapshot every 28s on average");
+    expect(say("continuity", "28s")).toBe("DED created a snapshot every 28s on average");
   });
 });
 
