@@ -30,7 +30,7 @@ import { useMergedLog, type MergedScope } from "@/components/datasection/useMerg
 import { appliedChips, logMode, rangePage, searchCriterion, spanOfSearch } from "@/src/data/logSearch";
 import type { ChainSpan } from "@/src/data/mergedLog";
 import { useMinHold } from "@/components/useMinHold";
-import { useUnlistedLastSeen } from "@/components/UnlistedStage";
+import { useUnlistedLastSeen } from "@/components/useUnlistedLastSeen";
 import { useUnlistedChains } from "@/components/datasection/useUnlistedChains";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { isRetired } from "@/src/net/lineage";

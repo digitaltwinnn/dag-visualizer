@@ -118,14 +118,14 @@ export default function GeoExplore({ defaultCollapsed }: { defaultCollapsed?: bo
       // all (test pass, 2026-10-03).
       empty: dead ? (
         NO_SIGNAL_COPY
+      ) : quietEmpty && filter === UNLISTED_ID ? (
+        // The unlisted set publishes no nodes at all — the same plain line the Hypergraph's
+        // explorer gives it (user, 2026-10-08: treat it like any other network, no stage note).
+        "No nodes reported."
       ) : quietEmpty ? (
         <>
           <span className="block text-body text-foreground">No locatable nodes</span>
-          {/* The unlisted set is not one metagraph and publishes no nodes at all (the Unlisted
-              audit, 2026-10-07) — "right now" and "still appears in the Hypergraph" were false. */}
-          {filter === UNLISTED_ID
-            ? "Unlisted channels publish no nodes, so there is nothing to place on the map."
-            : `${tickerOrName} has no nodes we can place on the map right now. It still appears in the Hypergraph.`}
+          {`${tickerOrName} has no nodes we can place on the map right now. It still appears in the Hypergraph.`}
         </>
       ) : undefined,
       rows: measured.map(({ c, v }) => ({

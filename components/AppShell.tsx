@@ -25,7 +25,6 @@ import SectionShell from "@/components/SectionShell";
 import DataSection from "@/components/DataSection";
 import SiteFooter from "@/components/SiteFooter";
 import type { DocPage } from "@/components/views";
-import UnlistedStage from "@/components/UnlistedStage";
 
 // THE app — one shell, rendered identically by `/`, every routed view page (app/[view]) AND the
 // two doc routes (/about, /design pass `doc`, which opens the DocLayer overlay over the live
@@ -96,7 +95,6 @@ export default function AppShell({ doc }: { doc?: DocPage }) {
           <TrendStack />
           <SceneCallout />
           <MotionHint />
-          <UnlistedStage />
         </DocGate>
         <BootFade at="data">
           <DocGate>
