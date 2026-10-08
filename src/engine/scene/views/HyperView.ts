@@ -117,7 +117,12 @@ const HUB_ORB = new THREE.IcosahedronGeometry(0.9, 4);
 // as they go, so the eye reads one wave leaving the sphere. They carry the core's
 // own light and dim with it — its reveal on the morph, its off-subject drop, the view's fade —
 // and are pooled up front: the render loop writes, never builds.
-const RIPPLE_GEO = new THREE.RingGeometry(0.9, 1, 96); // unit radius; the scale IS the radius (a 10% band: thin enough to read as a ring, thick enough to see at ~40px)
+// Unit radius; the scale IS the radius. The band is a fraction of it, ONE PER GROUND (user,
+// 2026-10-08: "a bit too thick, especially in light mode"): on dark the ring is additive light the
+// bloom softens, on paper it is normal-blended ink with nothing to soften it, so the same band reads
+// heavier there — paper gets the thinner one.
+const RIPPLE_GEO = new THREE.RingGeometry(0.94, 1, 96);
+const RIPPLE_GEO_PAPER = new THREE.RingGeometry(0.965, 1, 96);
 const RIPPLE_POOL = 6; // three overlapping flashes' worth of pairs
 const RIPPLE_DUR = 1.9; // seconds, birth to gone
 const RIPPLE_FROM = 1.05; // radii of the core orb (HUB_ORB) at birth — just outside its surface
@@ -346,7 +351,7 @@ export class HyperView implements SceneView {
     this.coreGroup.add(this.core);
     for (let i = 0; i < RIPPLE_POOL; i++) {
       const mesh = new THREE.Mesh(
-        RIPPLE_GEO,
+        this._paper ? RIPPLE_GEO_PAPER : RIPPLE_GEO,
         new THREE.MeshBasicMaterial({ color: this._core, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: glowBlend(this._colors) }),
       );
       mesh.visible = false;
@@ -495,7 +500,10 @@ export class HyperView implements SceneView {
     const bl = glowBlend(c);
     const reblend = (m: THREE.Material) => { m.blending = bl; m.needsUpdate = true; };
     for (const f of this._coreFills) reblend(f.material as THREE.Material);
-    for (const r of this._ripples) reblend(r.mesh.material as THREE.Material);
+    for (const r of this._ripples) {
+      reblend(r.mesh.material as THREE.Material);
+      r.mesh.geometry = this._paper ? RIPPLE_GEO_PAPER : RIPPLE_GEO;
+    }
     for (const m of this.metas) {
       reblend(m.tether.material as THREE.Material);
       for (const pk of m.pool) reblend(pk.material as THREE.Material);
