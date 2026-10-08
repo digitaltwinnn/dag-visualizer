@@ -774,7 +774,10 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
           // floor in total, so there is nothing to subtract from: a final word, not a promise.
           notApplicable("Snapshot fees", "not measured for unlisted channels")
         : filter === "dag"
-        ? notApplicable("Snapshot fees", "the base ledger is paid these, it pays none")
+        ? // Says WHAT the DAG is before what it does (user, 2026-10-08: "explain hypergraph = base
+          // ledger, make it better readable"), in the dossier card's own words ("the Hypergraph's
+          // base network"), so two cards on one screen never name it two ways.
+          notApplicable("Snapshot fees", "The DAG is the Hypergraph's base network: it receives these fees and pays none")
         : scoped
           ? rate("Snapshot fees", sparkOf(cfg ? `m.${cfg.id}.fee` : null, activity?.feesSeries, activity?.feesPerHour, true),
                  "$DAG this network pays to anchor its snapshots into the global chain.")
