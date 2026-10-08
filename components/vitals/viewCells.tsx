@@ -13,7 +13,7 @@
 import { BandCard, MicroBars, DonutTotal, TypeGlyph, TYPE_ORDER, compositionCounts, staleFor, windowSpan, windowNote } from "@/components/vitals/bandParts";
 import { useStore } from "@/src/store/store";
 import { metagraphById, getAnchor } from "@/src/data/network";
-import { displayNetwork, UNLISTED_ID } from "@/src/data/unlisted";
+import { displayNetwork, UNLISTED_HUE, UNLISTED_ID } from "@/src/data/unlisted";
 import { metaType, rolesOf, IdentityDot, RoleChips, TickerChip } from "@/components/inspector/parts";
 import { machineKey } from "@/src/data/composition";
 import { identityHudCss } from "@/src/palette/identity";
@@ -370,10 +370,13 @@ function StackBars({ accent, isMeta, filter, data, down }: { accent: string; isM
         const n = data.series[`m.${id}.snaps`]?.[i];
         if (n) { segs.push({ key: id, n, color: identityHudCss(id) }); named += n; }
       }
+      // The unlisted chains as one network, measured from their own chains (`withUnlisted`).
+      const u = data.series[`m.${UNLISTED_ID}.snaps`]?.[i];
+      if (u) { segs.push({ key: UNLISTED_ID, n: u, color: UNLISTED_HUE }); named += u; }
       // THE REMAINDER IS "UNATTRIBUTED", NEVER "UNLISTED" (review, 2026-09-09): the store
-      // advances each chain's cursor independently, so a lagging catalog chain's anchors
-      // land here beside the genuinely-unlisted ones — the neutral says only "not
-      // attributable from the store", the tick chart's own old rule. And the bar must
+      // advances each chain's cursor independently, so a lagging chain's anchors land here
+      // — the neutral says only "not attributable from the store", the tick chart's own old
+      // rule. (The unlisted chains have their own segment above since 2026-10-08.) And the bar must
       // CONTAIN its segments: live edge skew can put named above the global total, so the
       // bar takes the larger (a negative remainder must not silently vanish while the
       // segments clip past 100%).

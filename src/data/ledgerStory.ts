@@ -26,7 +26,9 @@ export function storyCount(
 ): number | null {
   if (filter === "all" || filter === "dag") return null; // no per-network story (NB:
   // metagraphById resolves "dag" through the identity map, so the guard must come first)
-  if (filter === UNLISTED_ID) return exact?.unlistedCount ?? 0;
+  // The unlisted set reads like a listed network (its chains are polled too, 2026-10-08), with the
+  // exact read winning where it landed: it is the tick's own manifest.
+  if (filter === UNLISTED_ID) return exact ? exact.unlistedCount : (anchor?.metaCounts?.get(UNLISTED_ID) ?? 0);
   if (metagraphById(filter)) return anchor?.metaCounts?.get(filter) ?? 0;
   return null;
 }
@@ -49,8 +51,8 @@ export const ledgerLens = (filter: string): string => (filter === "dag" ? "all" 
 export const STORY_SETTLE_MS = 7000;
 
 /** The release rule's input: is this tick part of the filter's story? `undefined` = unknown or
- *  no story — the release rule must not fire. Unknown covers a LISTED zero still inside the
- *  settling window, and an UNLISTED question with no exact read yet (2026-08-08, review fix). */
+ *  no story — the release rule must not fire. Unknown covers a POLLED zero still inside the
+ *  settling window — a listed network's, or the unlisted set's before its exact read lands. */
 export function tickInStory(
   filter: string,
   anchor: Anchor | null | undefined,
@@ -59,8 +61,10 @@ export function tickInStory(
 ): boolean | undefined {
   const n = storyCount(filter, anchor, exact);
   if (n == null) return undefined;
-  if (filter === UNLISTED_ID && !exact) return undefined; // no exact read = no verdict
-  if (n === 0 && filter !== UNLISTED_ID && anchor && now - anchor.touched < STORY_SETTLE_MS)
-    return undefined; // the count may still be settling — never release on lag
+  // A polled zero may still be settling — never release on lag. The unlisted count is exact once
+  // the tick's read has landed, so only its polled fallback waits.
+  const polled = filter !== UNLISTED_ID || !exact;
+  if (n === 0 && polled && anchor && now - anchor.touched < STORY_SETTLE_MS)
+    return undefined;
   return n > 0;
 }

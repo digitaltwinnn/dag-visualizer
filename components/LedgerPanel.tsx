@@ -402,7 +402,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
   // ---- level 1: the networks that anchored into the open tick ---------------------------------
   // The ONE list (src/data/ladderLevels.ts): the Metagraph card's ‹ › and the tick's ghost step the
   // same networks in the same order.
-  const tickNets = tick ? tickNetworksLevel(tick, net ? tickPolledRows(net.metaSnaps, tick) : [], exact?.rows, (id) => LISTED_IDS.has(id)) : [];
+  const tickNets = tick ? tickNetworksLevel(tick, net ? [...tickPolledRows(net.metaSnaps, tick), ...tickPolledRows(net.unlistedSnaps, tick)] : [], exact?.rows, (id) => LISTED_IDS.has(id)) : [];
   if (tick) {
     const netRows: { id: string; name: string; hue: string; count: number; italic?: boolean }[] = tickNets.map((n) => ({
       id: n.id,

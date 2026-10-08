@@ -154,7 +154,7 @@ export function tickPolledRows(metaSnaps: ReadonlyMap<string, readonly MetaSnapR
  *  UNION, and only the exact read makes it COMPLETE (user, 2026-09-14: "DED is missing"): the
  *  polled buffers hold `POLL.metaSnapBuffer` rows PER NETWORK — a depth in rows, not ticks.
  *  Listed networks by snapshot count, then name; the UNLISTED set last, one entry for every
- *  uncatalogued address (the exact read is its only source) — the set is tick-local, so an
+ *  uncatalogued address (its polled rows united with the exact read's, the same rule) — the set is tick-local, so an
  *  unregistered metagraph has a card to step to (user, 2026-10-02). It lists what is KNOWN: polled
  *  rows alone before the exact read lands, exact rows alone once the buffer has aged out. */
 export function tickNetworksLevel(
@@ -164,7 +164,7 @@ export function tickNetworksLevel(
   isListed: (metaId: string) => boolean,
 ): TickNetwork[] {
   const byOrd = exactRows ? { [tick.ordinal]: { rows: exactRows } } : {};
-  const mine = polled.filter((r) => r.metaId != null && r.global.ordinal === tick.ordinal);
+  const mine = polled.filter((r) => r.metaId != null && isListed(r.metaId) && r.global.ordinal === tick.ordinal);
   const seen = new Set(mine.map((r) => `${r.metaId}|${r.ordinal}`));
   const extra = buildChannelLog([tick], byOrd, isListed).filter((r) => !seen.has(`${r.metaId}|${r.ordinal}`));
   const by = new Map<string, TickNetwork>();
@@ -179,6 +179,12 @@ export function tickNetworksLevel(
   }
   const listed = [...by.values()].sort((a, b) => b.snaps.length - a.snaps.length || a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
   for (const n of listed) n.snaps.sort(newestFirst);
-  const unl = buildChannelLog([tick], byOrd, (id) => !isListed(id)).map(snapOf).sort(newestFirst);
+  // The unlisted set by the SAME union: its polled rows first (they carry the hash), then what
+  // only the exact read knows.
+  const unlPolled = polled.filter((r) => r.metaId != null && !isListed(r.metaId) && r.global.ordinal === tick.ordinal);
+  const unlSeen = new Set(unlPolled.map((r) => `${r.metaId}|${r.ordinal}`));
+  const unl = [...unlPolled, ...buildChannelLog([tick], byOrd, (id) => !isListed(id)).filter((r) => !unlSeen.has(`${r.metaId}|${r.ordinal}`))]
+    .map(snapOf)
+    .sort(newestFirst);
   return unl.length ? [...listed, { id: UNLISTED_ID, name: UNLISTED_LABEL, hue: UNLISTED_HUE, unlisted: true, snaps: unl }] : listed;
 }

@@ -505,7 +505,7 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
   const snapshotExact = useStore((s) => (cfg.id === UNLISTED_ID ? s.snapshotExact : null));
   const unlistedMembers =
     cfg.id === UNLISTED_ID && snapshotExact
-      ? observedUnlistedIds(getNetwork()?.globalSnapshots ?? [], snapshotExact).slice(0, 6)
+      ? observedUnlistedIds(getNetwork()?.globalSnapshots ?? [], snapshotExact, getNetwork()?.unlistedSnaps).slice(0, 6)
       : [];
   // The card's ONE foot subject: the catalog address, or the last observed unlisted member.
   const footId =

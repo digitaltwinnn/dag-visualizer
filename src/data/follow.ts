@@ -28,7 +28,7 @@ export function latestRelevant(rawFilter: string): GlobalSnapshot | null {
   if (filter === UNLISTED_ID) {
     // The same rule as a listed metagraph: the newest tick it actually anchored into. The
     // one-home module owns the exact-read scan (src/data/unlisted.ts).
-    return latestUnlistedTick(list, useStore.getState().snapshotExact);
+    return latestUnlistedTick(list, useStore.getState().snapshotExact, net?.unlistedSnaps);
   }
   return list[list.length - 1];
 }
@@ -79,11 +79,11 @@ export function followLatest() {
   else if (snap) advanceSnap(null);
   if (filter === UNLISTED_ID && latest) {
     // Same live card chain: the newest unlisted row (the one-home log source, newest first).
-    const row = unlistedLog([latest], useStore.getState().snapshotExact)[0];
+    const row = unlistedLog([latest], useStore.getState().snapshotExact, net?.unlistedSnaps)[0];
     // Same guard as above: an unlisted row always names its channel, so `row.metaId` is present —
     // the check is what keeps a follow from ever advancing onto a subject that has no network.
     if (row?.metaId && (metaSnap?.metaId !== row.metaId || metaSnap.ordinal !== row.ordinal)) {
-      advanceMetaSnap({ metaId: row.metaId, ordinal: row.ordinal, hash: "", globalOrdinal: latest.ordinal, ts: latest.timestamp });
+      advanceMetaSnap({ metaId: row.metaId, ordinal: row.ordinal, hash: row.hash, globalOrdinal: latest.ordinal, ts: latest.timestamp });
     }
     return;
   }

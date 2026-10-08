@@ -207,7 +207,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // The UNLISTED chains are in no live buffer (the polls track the catalog), so their tips come from
   // the decoded live ticks — otherwise the Unlisted log's newest page never followed (the review).
   if (net && lens === UNLISTED_ID) {
-    for (const r of unlistedLog(net.globalSnapshots, snapshotExact)) {
+    for (const r of unlistedLog(net.globalSnapshots, snapshotExact, net.unlistedSnaps)) {
       if (r.metaId && r.ordinal > (liveTips[r.metaId] ?? 0)) liveTips[r.metaId] = r.ordinal;
     }
   }
@@ -505,7 +505,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     to = merged.to;
   } else if (!histNet) {
     const listedRows = net ? buildAnchorLog(net.metaSnaps, net.globalSnapshots, filter) : [];
-    const unlistedRows = net && (lens === "all" || lens === UNLISTED_ID) ? unlistedLog(net.globalSnapshots, snapshotExact) : [];
+    const unlistedRows = net && (lens === "all" || lens === UNLISTED_ID) ? unlistedLog(net.globalSnapshots, snapshotExact, net.unlistedSnaps) : [];
     allRowsUnbounded = sortAnchorLog([...listedRows, ...unlistedRows], sort.key, sort.dir, (metaId) => displayNetwork(metaId)?.ticker ?? metaId);
     // A RANGE CUTS THE LATEST ROWS to its span (`bound`, addressed to no chain) — the unlisted lens.
     allRows = timeCut ? allRowsUnbounded.filter((r) => tsInRange(r.ts, timeCut.fromMs, timeCut.toMs)) : allRowsUnbounded;
