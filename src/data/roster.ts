@@ -1,6 +1,7 @@
 import type { GeoInfo, MetaInfo, NodeRow } from "@/src/data/types";
 import { pickNetId } from "@/src/engine/domain/pickActions";
 import { coLocatedNetworks, metagraphById } from "@/src/data/network";
+import { compareComposition } from "@/src/data/composition";
 
 // The raw layer's node-roster rows (spec 2026-08-01): a flat, sortable projection of
 // `store.selNodes` — the same records the explorers browse, denser. Pure so the sorting/
@@ -182,7 +183,9 @@ export function groupRosterByNetwork(rows: readonly RosterRow[]): RosterNetworkG
   }
   const tick = (id: string) => metagraphById(id)?.ticker || metagraphById(id)?.name || (id === "dag" ? "DAG" : id);
   const groups = [...by.values()];
-  for (const g of groups) g.entries.sort((a, b) => (a.rec.id ?? a.rec.label).localeCompare(b.rec.id ?? b.rec.label));
+  // BY COMPOSITION, then id (user, 2026-10-08): the plate's question is what each node runs, so the
+  // widest make-ups lead and the dedicated layers follow in the vocabulary order.
+  for (const g of groups) g.entries.sort((a, b) => compareComposition({ roles: a.roles }, { roles: b.roles }) || (a.rec.id ?? a.rec.label).localeCompare(b.rec.id ?? b.rec.label));
   return groups.sort((a, b) => {
     if ((a.netId === "dag") !== (b.netId === "dag")) return a.netId === "dag" ? -1 : 1;
     return b.entries.length - a.entries.length || tick(a.netId).localeCompare(tick(b.netId));
