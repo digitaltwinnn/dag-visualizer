@@ -564,8 +564,16 @@ export function MetaCard({ cfg }: { cfg: MetaCfg }) {
     <>
       {/* Keyed on the text so the expand state resets when the subject (or its description
           arriving from /api/metagraphs) changes — an expanded DOR must not leak into DED. */}
-{tickLead && <Lead>{tickLead}</Lead>}
       <Desc key={blurb} text={blurb} />
+      {/* THE RELATION IS ITS OWN SECTION, AFTER THE DESCRIPTION (user, 2026-10-08: the two "merged"
+          — "first description, then relation, use separator"): the dossier opens with what the
+          network IS, and what it was to the snapshot above follows behind a hairline. */}
+      {tickLead && (
+        <>
+          <Separator className="my-2.5" />
+          <Lead className="mb-0">{tickLead}</Lead>
+        </>
+      )}
       {(nodes.length > 0 || (cfg.id !== "dag" && cfg.id !== UNLISTED_ID && metagraphById(cfg.id) != null)) && (
         <>
           {/* The skeleton's separator between the lead and the breakdown (user, 2026-10-02). */}
