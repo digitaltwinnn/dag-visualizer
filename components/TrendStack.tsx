@@ -533,7 +533,6 @@ export default function TrendStack() {
                   // A held window's head is the PREVIOUS span's — it waits for the new one.
                   value: slice.stale ? null : row.head,
                   word: headWord(metric, roster.headKind),
-                  title: roster.headKind === "span" ? "The average per day over the window on screen" : undefined,
                   pending: slice.stale || (roster.headKind === "day" ? roster.dayPending : roster.pending),
                 }}
                 format={roster.format}

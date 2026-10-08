@@ -98,7 +98,7 @@ export function WindowPicker({
           <button
             type="button"
             onClick={onClearRange}
-            title="Clear the selected range"
+            aria-label="Clear the selected range"
             className="text-muted-foreground hover:text-foreground"
           >
             ×
@@ -123,11 +123,6 @@ export function ScalePill({ shared, onChange }: { shared: boolean; onChange: (sh
         type="button"
         aria-pressed={shared}
         aria-label="Same scale"
-        title={
-          shared
-            ? "Same scale: every chart shares the busiest network's scale, so the column compares. Click to let each chart scale to its own data."
-            : "Own scale: each chart scales to its own data. Click to put every chart on the busiest network's scale."
-        }
         onClick={() => onChange(!shared)}
         className={cn(zoomBtn(shared), "inline-flex items-center justify-center w-7 px-0", shared && "text-primary")}
       >

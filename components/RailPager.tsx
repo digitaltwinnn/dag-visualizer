@@ -595,7 +595,6 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
         <div
           role="group"
           aria-label={set.open ? `Step through ${set.parentLabel}` : `Siblings in ${set.parentLabel}`}
-          title={set.parentLabel}
           className="pointer-events-auto absolute bottom-1 inset-x-[19px] flex h-5 items-center justify-between"
         >
           {/* ONE AXIS, EDGE TO EDGE (user, 2026-10-04 — "why not < on the left and > on the right?",
@@ -611,7 +610,6 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
             disabled={!prev}
             onClick={() => commitStep(-1)}
             aria-label={prev ? `Previous: ${prev.label}` : "Previous"}
-            title={prev?.label}
           >
             <ChevronLeft aria-hidden className="size-4" />
           </Button>
@@ -632,7 +630,6 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
                 <div
                   role="img"
                   aria-label={`${set.index + 1} of ${set.items.length}`}
-                  title={`${set.index + 1} of ${set.items.length}`}
                   className="flex items-center gap-[3px] px-0.5"
                 >
                   {Array.from({ length: w.end - w.start }, (_, j) => {
@@ -662,7 +659,6 @@ export default function RailPager({ slot, children }: { slot: RailCardKind; chil
             disabled={!next}
             onClick={() => commitStep(1)}
             aria-label={next ? `Next: ${next.label}` : "Next"}
-            title={next?.label}
           >
             <ChevronRight aria-hidden className="size-4" />
           </Button>

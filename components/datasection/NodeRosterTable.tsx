@@ -105,7 +105,6 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
         return (
           <span
             className="flex items-center gap-3"
-            title={r.nets.map((id) => metagraphById(id)?.name ?? (id === "dag" ? "DAG" : id)).join(" + ")}
           >
             {r.nets.length === 0
               ? "—"
@@ -126,7 +125,7 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
         // the full id stays on the hover title and the node card — and the 29px it frees is what
         // keeps the four surviving columns out of sideways scroll.
         return (
-          <span className="font-mono tabular-nums text-foreground-dim" title={r.node.id ?? undefined}>
+          <span className="font-mono tabular-nums text-foreground-dim">
             {r.node.id ? (
               <>
                 <span className="max-[700px]:hidden">{shortHash(r.node.id)}</span>
@@ -137,7 +136,7 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
             )}
             {/* A machine that reports a different id to each network it serves: the rest are
                 counted, never dropped (the full list rides the title). */}
-            {r.ids.length > 1 && <span className="ml-1.5 text-muted-foreground" title={r.ids.join("\n")}>+{r.ids.length - 1}</span>}
+            {r.ids.length > 1 && <span className="ml-1.5 text-muted-foreground">+{r.ids.length - 1}</span>}
           </span>
         );
       case "layer": {
@@ -299,7 +298,7 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
                           </span>
                         );
                       })()}
-                      <span className="font-mono tabular-nums text-label text-foreground-dim" title={hoverId ?? undefined}>
+                      <span className="font-mono tabular-nums text-label text-foreground-dim">
                         {hoverId ? `${hoverId.slice(0, 6)}…${hoverId.slice(-4)}` : (own ?? r.node).label}
                       </span>
                     </span>

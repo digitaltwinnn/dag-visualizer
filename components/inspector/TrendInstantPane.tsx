@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { SELECTED_ROW, selectionHue } from "@/components/selection";
 import { spanOfWindow } from "@/components/trendDoors";
 import RecordsDoor from "@/components/inspector/RecordsDoor";
-import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
+import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { cn } from "@/lib/utils";
@@ -223,7 +223,6 @@ export default function TrendInstantPane({
                         // doing).
                         aria-pressed={focus === id}
                         onClick={() => applyClickActions(trendPlaneActions(id, focus))}
-                        title={`${row.name} · ${v != null ? `${format(v)}${unit ? ` ${unit}` : ""}` : NO_READING}`}
                         className={cn(
                           // `block w-full`: this is the one `.nb-row` whose content is a single
                           // flex row rather than its own flex children, so it has to claim the
@@ -259,7 +258,7 @@ export default function TrendInstantPane({
 
               {/* ── THE ONE EXIT: the anchor log at this moment (`RecordsDoor`, shared with the
                   Range card above). */}
-              <RecordsDoor subject={subject} span={span} what="moment" />
+              <RecordsDoor subject={subject} span={span} />
             </>
           )}
         </div>

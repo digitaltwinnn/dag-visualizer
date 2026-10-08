@@ -249,7 +249,7 @@ export default function MetaSnapPane({
                       section at all — NDT's envelope-only heartbeat is sealed like any other.
                       Free tier (the exact row carries the proofs), so it never waits on the
                       deep read; the dL1 signers stay inside the Data section they produce. */}
-                  <Fact label="Signed by" title={SIGNER_GROUPS.proof.title}>
+                  <Fact label="Signed by">
                     <span className="inline-flex items-center gap-1">
                       {(deep?.signers ?? row.signers)?.length ?? 0} <LayerWho who={SIGNER_GROUPS.proof.who} />
                     </span>
@@ -317,18 +317,15 @@ export default function MetaSnapPane({
                 you to come back is worse than no button. (The raw layer reads on ARRIVAL, because
                 unlike this card it is the payload surface and nothing else is down there.)
 
-                The cost rides the BUTTON's title, not the Data row's: `PAYLOAD_LANES` is one home
-                shared with the raw layer's tabs, and "only when you ask" is stale the moment the
-                read has landed. The cost belongs to the action — and it is stated as the SERVER's
-                fetch, because the decoded row that reaches the browser is ~0.6–4.4 KB (measured):
-                what is being rationed is the whole-global pull and the ~1.8s wait, not local
-                bytes.
+                The cost (the server pulls the whole ~2.5 MB global, ~1.8s) is no longer stated:
+                it rode the button's hover title until the tooltips went (user, 2026-10-08), and
+                the button's own decompressing state already shows the wait.
 
                 ONE VERB FAMILY: compressed → Decompress → decompressing (user, 2026-08-13).
                 "uncompress" was REJECTED on 2026-08-10 for putting the cost on local bytes —
                 but that was before the lead printed "anchored · compressed" directly above this
                 button. With the basis named, the verb closes the loop the old copy left open
-                (WHY a read is needed at all), and the cost still rides this button's title.
+                (WHY a read is needed at all).
                 "Read"/"decoding" made three word families for one action. */}
             {deep != null ? (
               <div className="mt-2.5">
@@ -348,7 +345,6 @@ export default function MetaSnapPane({
             ) : !deepAsked && row?.decoded === true && snap && sel ? (
               <div className="mt-2.5">
                 <Door
-                  title="Decompresses this snapshot's payload — the server pulls the whole ~2.5 MB global to reach this one channel, so it runs only when you ask. Holds the card on this snapshot instead of following the live one."
                   glyph={<ArrowDownToLine className="size-3.5" />}
                   flushFoot
                   onClick={() => {
@@ -387,14 +383,14 @@ export default function MetaSnapPane({
                   like `stateProof` does: descriptor first, polled buffer behind it. The em-dash
                   survives for the one case that is genuinely unknown — a snapshot stepped to
                   after it aged out of the retained buffer — where stating the gap is the point. */}
-              {hash && <FootRow label="Hash" value={midHash(hash, 23)} title={hash} copy={hash} copyName="hash" />}
+              {hash && <FootRow label="Hash" value={midHash(hash, 23)} copy={hash} copyName="hash" />}
               {parent && (
-                <FootRow label="Previous" value={midHash(parent, 18)} title={parent} copy={parent} copyName="previous hash" />
+                <FootRow label="Previous" value={midHash(parent, 18)} copy={parent} copyName="previous hash" />
               )}
               {stateProof && (
                 // "State HASH" (user, 2026-08-14 — "state proof" collided with the signers tab's
                 // "snapshot proof", a signature set; this is a DIGEST, kin to Hash/Parent above).
-                <FootRow label="State" copyName="state hash" value={midHash(stateProof, 22)} title={"The hash of the application state this snapshot results in, covered by the snapshot's L0 signatures — the state's provability. Distinct from the SIGNERS tab's 'snapshot proof', which is the L0 signature set; this is a digest, and the signatures sign over it." + stateProof} copy={stateProof} />
+                <FootRow label="State" copyName="state hash" value={midHash(stateProof, 22)} copy={stateProof} />
               )}
             </Foot>
           </div>
@@ -517,10 +513,10 @@ function PayloadBlock({
           two stacked caps headers, which read as eyebrows with nothing under them until a read. */}
       <Tabs defaultValue="state" className="gap-0">
         <TabsList variant="line" className={CABINET_LIST} aria-label="Which part of the snapshot's payload to read">
-          <TabsTrigger value="state" title={PAYLOAD_LANES.state.title} className={cn(CABINET_TRIGGER, "h-7 text-label")}>
+          <TabsTrigger value="state" className={cn(CABINET_TRIGGER, "h-7 text-label")}>
             {PAYLOAD_LANES.state.name}
           </TabsTrigger>
-          <TabsTrigger value="data" title={PAYLOAD_LANES.data.title} className={cn(CABINET_TRIGGER, "h-7 text-label")}>
+          <TabsTrigger value="data" className={cn(CABINET_TRIGGER, "h-7 text-label")}>
             {PAYLOAD_LANES.data.name}
           </TabsTrigger>
         </TabsList>
@@ -537,7 +533,7 @@ function PayloadBlock({
               // difference (dL1 vs the body's L0), SIGNER_GROUPS owns the words.
               signers={
                 deep && deep.dataBlockSigners.length > 0
-                  ? { label: "Signed by", title: SIGNER_GROUPS.dataBlocks.title, count: deep.dataBlockSigners.length, who: SIGNER_GROUPS.dataBlocks.who }
+                  ? { label: "Signed by", count: deep.dataBlockSigners.length, who: SIGNER_GROUPS.dataBlocks.who }
                   : null
               }
             />
@@ -566,7 +562,7 @@ function PayloadSection({
   read: boolean;
   /** The one read's in-flight/give-up word, rendered under EVERY section it is decompressing. */
   pending?: string | null;
-  signers?: { label: string; title: string; count: number; who: string } | null;
+  signers?: { label: string; count: number; who: string } | null;
 }) {
   return (
     <div className="flex flex-col gap-1">
@@ -585,13 +581,13 @@ function PayloadSection({
       {/* The shape rows ease in as the read lands (the no-pop arrival ease) — keyed, so they
           play once and never on a re-render. */}
       {rows.map((r) => (
-        <div key={r.name} className={cn("flex items-start justify-between gap-2.5", CONTENT_EASE)} title={r.name}>
+        <div key={r.name} className={cn("flex items-start justify-between gap-2.5", CONTENT_EASE)}>
           <span className="min-w-0 truncate text-label text-foreground-dim">{r.name}</span>
           <span className="shrink-0 text-label text-foreground-dim tabular-nums">{r.count.toLocaleString()}</span>
         </div>
       ))}
       {signers && (
-        <div className={cn("flex items-start justify-between gap-2.5", CONTENT_EASE)} title={signers.title}>
+        <div className={cn("flex items-start justify-between gap-2.5", CONTENT_EASE)}>
           <span className="min-w-0 truncate text-label text-muted-foreground">{signers.label}</span>
           <span className="shrink-0 text-label text-foreground-dim tabular-nums">
             <span className="inline-flex items-center gap-1">{signers.count} <LayerWho who={signers.who} /></span>

@@ -128,7 +128,7 @@ describe("SIGNER_GROUPS", () => {
     expect(SIGNER_GROUPS.proof.layer).not.toBe(SIGNER_GROUPS.dataBlocks.layer);
     expect(SIGNER_GROUPS.proof.who).not.toBe(SIGNER_GROUPS.dataBlocks.who);
     for (const g of [SIGNER_GROUPS.proof, SIGNER_GROUPS.dataBlocks, SIGNER_GROUPS.globalProof]) {
-      for (const s of [g.label, g.layer, g.who, g.title]) expect(s.length).toBeGreaterThan(0);
+      for (const s of [g.label, g.layer, g.who]) expect(s.length).toBeGreaterThan(0);
     }
   });
 
@@ -136,9 +136,7 @@ describe("SIGNER_GROUPS", () => {
     // The proof is the L0 cluster's; the blocks are the dL1 cluster's. A group whose words
     // don't say which layer signed is back to the bare number the user found confusing.
     expect(SIGNER_GROUPS.proof.who).toMatch(/L0/);
-    expect(SIGNER_GROUPS.proof.title).toMatch(/L0/);
     expect(SIGNER_GROUPS.dataBlocks.who).toMatch(/L1/);
-    expect(SIGNER_GROUPS.dataBlocks.title).toMatch(/L1/);
   });
 
   // The vocabulary rule made executable (user, 2026-08-10 — "why do we call it 'validators' for
@@ -156,7 +154,7 @@ describe("SIGNER_GROUPS", () => {
   // were a second dialect for the same three layers.
   it("spells layers in the app's own codes, not a long form", () => {
     for (const g of Object.values(SIGNER_GROUPS)) {
-      for (const s of [g.layer, g.who, g.title]) expect(s).not.toMatch(/data-L1|currency-L1/);
+      for (const s of [g.layer, g.who]) expect(s).not.toMatch(/data-L1|currency-L1/);
     }
   });
 });
@@ -225,7 +223,6 @@ describe("resolveSigner", () => {
     expect(SIGNER_UNKNOWN.network.label).not.toBe(SIGNER_UNKNOWN.node.label);
     for (const w of [SIGNER_UNKNOWN.network, SIGNER_UNKNOWN.node]) {
       expect(w.label.length).toBeGreaterThan(0);
-      expect(w.title.length).toBeGreaterThan(0);
     }
   });
 });

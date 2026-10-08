@@ -334,7 +334,6 @@ export default function CardHead({
                 <button
                   type="button"
                   aria-expanded={!collapsed}
-                  title={collapsed ? "Expand" : "Collapse"}
                   onClick={onToggle}
                   className="appearance-none bg-transparent border-0 p-0 m-0 [font:inherit] text-inherit text-left inline-flex items-center gap-2 min-w-0 rounded-sm focus-visible:outline-1 focus-visible:outline-ring/60 after:absolute after:inset-0 after:cursor-pointer after:content-['']"
                 >
@@ -413,7 +412,6 @@ function keepFocusOnRung(el: HTMLElement): void {
         <Button
           variant="ghost"
           size="icon-xs"
-          title={closeTitle}
           aria-label={closeTitle}
           onClick={onClose}
           // `after:` hit area on touch, written out rather than `TOUCH_HIT`: this button is already
@@ -428,7 +426,6 @@ function keepFocusOnRung(el: HTMLElement): void {
           <button
             type="button"
             aria-expanded={false}
-            title="Expand"
             // ⚠️ FOCUS FIRST, THEN TOGGLE — the order is the whole fix (see keepFocusOnRung).
             onClick={(e) => {
               keepFocusOnRung(e.currentTarget);

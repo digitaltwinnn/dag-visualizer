@@ -7,7 +7,7 @@ import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
-import { GLOBAL_READING, METRIC_LABELS, METRIC_ORDER, headWord, metricUnit, spanWord } from "@/src/data/trendSeries";
+import { GLOBAL_READING, METRIC_LABELS, METRIC_ORDER, metricUnit, spanWord } from "@/src/data/trendSeries";
 import { spanPhrase } from "@/src/data/trendWindow";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -68,7 +68,6 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   // range selector visibly answer one question, while the Moment card states one INSTANT. It used
   // to state the latest full day, which read as a second, unlabelled copy of the Moment's list.
   const { ranked, rows, format } = roster;
-  const unit = metricUnit(metric, 86_400_000);
   // ⚠️ THE FIGURE IS THE ROSTER'S `head` — the very number the plane's headline states (user,
   // 2026-09-29: "didn't we agree to keep it consistent … like the card"). Over a window of a day
   // or more that is the span's average per day; under a day (1H, a short brush) there is no
@@ -126,7 +125,6 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   // itself, which needs no tag because an untagged row is a network's own. Three tags for three
   // shades of meaning was the randomness; `GLOBAL_READING` is the one distinction left.
   const isTotal = GLOBAL_READING[metric] === "total";
-  const totalWhy = isTotal ? "The networks below, added up" : "The DAG's own, like each network below";
   const lead =
     total && !empty
       ? {
@@ -136,8 +134,7 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
           tag: isTotal ? <QualifierChip>total</QualifierChip> : undefined,
           hue: total.hue,
           figure:
-            slice.stale ? <NodeStars count={3} /> : total.head != null ? format(total.head) : roster.pending || (roster.headKind === "day" && roster.dayPending) ? <NodeStars count={3} /> : <span className="text-muted-foreground" title={NO_READING}>—</span>,
-          title: `DAG. ${totalWhy}. ${total.head != null ? `${format(total.head)}${unit ? ` ${unit}` : ""}, ${headWord(metric, roster.headKind)}` : NO_READING}`,
+            slice.stale ? <NodeStars count={3} /> : total.head != null ? format(total.head) : roster.pending || (roster.headKind === "day" && roster.dayPending) ? <NodeStars count={3} /> : <span className="text-muted-foreground" aria-label={NO_READING}>—</span>,
           // THE ROW BRINGS THE DAG'S CHART FORWARD, like every row below it (user, 2026-10-03:
           // "why is the dag pinned row not clickable? we have the chart data, no?"). Its plane
           // joins the front of the deck while it is the focus (`TrendStack`), so this is the same
@@ -195,9 +192,8 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
                 // A RETIRED network keeps its row and its history (user, 2026-10-07): where it measured
                 // nothing in the span, the empty slot says WHY in one word instead of a dash; where
                 // it did, its real figure stands.
-                slice.stale ? <NodeStars count={3} /> : row.head != null ? format(row.head) : roster.pending || (roster.headKind === "day" && roster.dayPending) ? <NodeStars count={3} /> : retiredAt ? <span className="text-label text-muted-foreground">retired</span> : <span className="text-muted-foreground" title={NO_READING}>—</span>,
+                slice.stale ? <NodeStars count={3} /> : row.head != null ? format(row.head) : roster.pending || (roster.headKind === "day" && roster.dayPending) ? <NodeStars count={3} /> : retiredAt ? <span className="text-label text-muted-foreground">retired</span> : <span className="text-muted-foreground" aria-label={NO_READING}>—</span>,
               on,
-              title: `${row.name}${retiredAt ? ` (retired ${retiredAt})` : ""} · ${row.head != null ? `${format(row.head)}${unit ? ` ${unit}` : ""} · ${headWord(metric, roster.headKind)}` : NO_READING}`,
               onClick: () => applyClickActions(trendPlaneActions(id, focus)),
               pair: subjectPairing(hoverFilter, id, setHover, row.hue),
             },
@@ -215,9 +211,8 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
                   share: roster.unlisted.head != null ? roster.unlisted.head / maxLast : undefined,
                   hue: roster.unlisted.hue,
                   faint: false,
-                  figure: slice.stale ? <NodeStars count={3} /> : roster.unlisted.head != null ? format(roster.unlisted.head) : <span className="text-muted-foreground" title={NO_READING}>—</span>,
+                  figure: slice.stale ? <NodeStars count={3} /> : roster.unlisted.head != null ? format(roster.unlisted.head) : <span className="text-muted-foreground" aria-label={NO_READING}>—</span>,
                   on: focus === UNLISTED_ID,
-                  title: `Unlisted channels: the global count less every listed network · ${roster.unlisted.head != null ? `${format(roster.unlisted.head)}${unit ? ` ${unit}` : ""}` : NO_READING}`,
                   onClick: () => applyClickActions(trendPlaneActions(UNLISTED_ID, focus)),
                   pair: subjectPairing(hoverFilter, UNLISTED_ID, setHover, roster.unlisted.hue),
                 },

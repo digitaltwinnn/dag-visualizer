@@ -274,15 +274,9 @@ export function snapshotSignerRows(
  *  id differently. Both phrase what WE know, never what the network DID: we cannot tell a
  *  rotated-out node from an id-space miss, and a network's rows can be absent merely because this
  *  view didn't publish them. */
-export const SIGNER_UNKNOWN: Record<"network" | "node", { label: string; title: string }> = {
-  network: {
-    label: "unknown node",
-    title: "This network's nodes aren't known here — the signature is all we have.",
-  },
-  node: {
-    label: "not in live set",
-    title: "No node in the live set carries this signer id.",
-  },
+export const SIGNER_UNKNOWN: Record<"network" | "node", { label: string }> = {
+  network: { label: "unknown node" },
+  node: { label: "not in live set" },
 };
 
 /** WHICH LAYER produced a group of signatures — one home, so the surfaces that count or list signers
@@ -316,28 +310,21 @@ export const SIGNER_GROUPS = {
     layer: "L0 cluster",
     /** What the counted things ARE, read after a number ("3 L0 validators"). */
     who: "L0 validators",
-    title:
-      "A metagraph seals every snapshot with its own L0 cluster, so this list IS that cluster — the whole cluster, not a rotating subset.",
   },
   dataBlocks: {
     /** Matches the DATA tab's name 1:1 (user, 2026-08-14 — consistency in the tabs' direction);
-        the BLOCKS nuance lives in the title, where the union across them is already explained. */
+        the label stays the tab's word. */
     label: "data",
     layer: "dL1, rotating",
     who: "dL1 validators",
-    title:
-      "Data blocks are produced by the metagraph's dL1 cluster, EACH BLOCK by a rotating subset of that fleet — this list is the union: every dL1 validator that signed at least one of this snapshot's blocks (the per-block split lives on chain, not here). A hybrid node signs under its dL1 id rather than its L0 one.",
   },
   /** The GLOBAL snapshot's own seal. The DAG is a metagraph-shaped core under the unified node model,
    *  so its proof group is the same shape as a metagraph's — its own L0 cluster — and reads with the
-   *  same words. Its own title, because the metagraph one explains a 3-of-20 that has no analogue at
-   *  network scale. */
+   *  same words. */
   globalProof: {
     label: "snapshot proof",
     layer: "L0 cluster",
     who: "L0 validators",
-    title:
-      "The global snapshot is sealed by the DAG's own L0 cluster — one L0 validator per participating node, so this is how much of the network signed this tick.",
   },
 } as const;
 

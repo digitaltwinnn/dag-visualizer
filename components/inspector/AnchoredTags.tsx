@@ -148,7 +148,6 @@ export default function AnchoredTags({
               <span
                 className={cn("min-w-0 truncate", !r.hue ? "italic text-muted-foreground" : isSel ? "font-semibold" : "text-foreground-dim")}
                 style={isSel && r.hue ? { color: r.hue } : undefined}
-                title={r.label}
               >
                 {r.label}
               </span>

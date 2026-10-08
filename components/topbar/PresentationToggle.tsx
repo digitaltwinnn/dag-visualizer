@@ -68,7 +68,7 @@ export default function PresentationToggle() {
       <button
         type="button"
         aria-pressed={railsHidden}
-        title={railsHidden ? "Scene: just the 3D — click for the HUD cards" : "HUD: the info cards — click for just the 3D"}
+        aria-label={railsHidden ? "Show the info cards" : "Show just the 3D scene"}
         onClick={() => setRailsHidden(!railsHidden)}
         className={cn(SEG, "max-[1099px]:hidden")}
       >
@@ -80,7 +80,7 @@ export default function PresentationToggle() {
       <button
         type="button"
         aria-pressed={section === "data"}
-        title="Raw: the data behind the view"
+        aria-label="Raw data"
         onClick={() => {
           if (section === "data") return setSection("scene");
           // A view whose RAW is a DOOR (History — `viewPolicy.rawSurface`, user 2026-10-07) opens

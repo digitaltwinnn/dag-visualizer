@@ -17,7 +17,6 @@ import FollowController from "@/components/FollowController";
 import RawSnapshotBridge from "@/components/RawSnapshotBridge";
 import RouteSync from "@/components/RouteSync";
 import Tooltip from "@/components/Tooltip";
-import HintTips from "@/components/HintTips";
 import MotionHint from "@/components/MotionHint";
 import SceneCallout from "@/components/SceneCallout";
 import TrendStack from "@/components/TrendStack";
@@ -122,9 +121,6 @@ export default function AppShell({ doc }: { doc?: DocPage }) {
       <RouteSync />
       <ThemeController />
       <Tooltip />
-      {/* Styled replacement for the native `title` bubble — delegated, so every title= in the
-          app inherits the design (user, 2026-08-16). */}
-      <HintTips />
       <DevCssCanary />
     </main>
   );

@@ -510,6 +510,9 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
   // The bars and the lines share the windowed buckets exactly — one window, one payload, so
   // the chart and the roster that legends it can never rank over different reaches.
   const barData = windowed;
+  /** Whether any UNLISTED channel anchored in the band's window — the one case the summed fee
+   *  figure is a floor, and the only case the card may mention unlisted channels at all. */
+  const unlistedInWindow = useMemo(() => (windowed ? unlistedSeries(windowed.series).some((v) => v != null && v > 0) : false), [windowed]);
   /** The fetch errored and nothing is held from before (a failed REFRESH keeps its last data). */
   const storeDown = t7.error && !t7.data;
   const span = "last 24 hours";
@@ -597,11 +600,10 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
    *  pay and didn't, and the sum is a real number answering a question nobody asked at this scope.
    *  The reason line carries the fact that makes the absence interesting — this is the end fees
    *  arrive at — and the summed reading is one filter step away, under All, where it belongs. */
-  const notApplicable = (label: string, reason: string, title: string) => (
+  const notApplicable = (label: string, reason: string) => (
     <BandCard
       key={label}
       label={label}
-      title={title}
       lead={
         <span className="flex flex-col items-start">
           <span className="font-mono font-bold text-muted-foreground tabular-nums whitespace-nowrap">n/a</span>
@@ -611,14 +613,13 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
       <span className="flex items-center self-stretch text-label text-muted-foreground">{reason}</span>
     </BandCard>
   );
-  const rate = (label: string, spark: SparkSpec, note?: string, title?: string) => {
+  const rate = (label: string, spark: SparkSpec, note?: string, tag?: string) => {
     // The store failed and this card reads from it: say so, in the lead's own stacked grammar.
     if (storeDown && spark.data == null) {
       return (
         <BandCard
           key={label}
           label={label}
-          title={title}
           lead={
             <span className="flex flex-col items-start">
               <span className="font-mono font-bold text-xl text-muted-foreground tabular-nums whitespace-nowrap">—</span>
@@ -652,7 +653,6 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
         <BandCard
           key={label}
           label={label}
-          title={title}
           aside={spark.data != null ? ownSpan(spark.span) : undefined}
           lead={
             <span className="flex flex-col items-start">
@@ -675,7 +675,6 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
     return (
     <BandCard
       label={label}
-      title={title}
       // THE LABEL NAMES THE QUANTITY, THE NUMERAL CARRIES ITS OWN UNIT (user, 2026-09-08,
       // two rounds: "ANCHORS/HOUR" over a year-long line put the lead's unit on the whole
       // card, and an aside saying "live · /hour" was hard to read and repeated on every
@@ -692,7 +691,7 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
       // the right words per card and needs no new rule: the measured cards say the band's
       // window, and the live fallback keeps saying its own — which is the one case where the
       // two genuinely differ, and the reason this is one expression rather than a constant.
-      aside={ownSpan(spark.span)}
+      aside={tag ?? ownSpan(spark.span)}
       lead={
         <span className="flex flex-col items-start">
           {/* NodeStars while the window's mean is still in flight (user, 2026-09-08: the
@@ -764,31 +763,24 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
           to the right plots how much, both over this same window. This slot was their third home.
           ⚠️ THE TWO SCOPES ARE NOT EQUALLY EXACT, though, and the card says so. A network's own
           fees are every fee it paid; the summed figure covers only the chains the sampler sees —
-          the public catalog — so it is a FLOOR, the same lower bound the snapshot card marks. It
-          cannot be silent about that (rule 10), and a caveat about the reading has nowhere to sit
-          but the card's title. */}
+          the public catalog — so it is a FLOOR wherever an unlisted channel anchored in the window.
+          The card SAYS so, in its corner, exactly then (user, 2026-10-08: "unlisted are temporary
+          and by exception; an explanation is only worth it where there is an unlisted metagraph on
+          screen, otherwise it must not be mentioned at all"). It was a hover title until the
+          tooltips went the same day. */}
       {filter === UNLISTED_ID
         ? // THE UNLISTED CHANNELS' FEES ARE NOT KEPT (the Unlisted audit, 2026-10-07: this card waited
           // on "acquiring…" forever). The store keeps fees per listed network and only a listed
           // floor in total, so there is nothing to subtract from: a final word, not a promise.
-          notApplicable(
-            "Snapshot fees",
-            "not measured for unlisted channels",
-            "Fees are kept per listed network. What unlisted channels pay is part of the global total, which is not stored, so it cannot be measured here.",
-          )
+          notApplicable("Snapshot fees", "not measured for unlisted channels")
         : filter === "dag"
-        ? notApplicable(
-            "Snapshot fees",
-            "the base ledger is paid these, it pays none",
-            "A snapshot fee is what a metagraph pays to anchor into the global chain. The DAG core has nothing to anchor into — it is the chain they anchor into — so a global snapshot carries no fee at all. What flows IN is every network's fees summed; commit All to read it.",
-          )
+        ? notApplicable("Snapshot fees", "the base ledger is paid these, it pays none")
         : scoped
           ? rate("Snapshot fees", sparkOf(cfg ? `m.${cfg.id}.fee` : null, activity?.feesSeries, activity?.feesPerHour, true),
-                 "$DAG this network pays to anchor its snapshots into the global chain.",
-                 "What this network pays in $DAG to anchor its snapshots into the global chain. Its own fees, in full.")
+                 "$DAG this network pays to anchor its snapshots into the global chain.")
           : rate("Snapshot fees", sparkOf("g.feeFloor", activity?.feesSeries, activity?.feesPerHour, true),
-                 "$DAG paid to anchor snapshots into the global chain, every network summed. A floor: it counts only the metagraphs in the public catalog.",
-                 "What every network pays in $DAG to anchor its snapshots into the global chain, summed — so this is also what the base ledger takes in. A lower bound: only the metagraphs in the public catalog are counted, so the real figure is higher.")}
+                 `$DAG paid to anchor snapshots into the global chain, every network summed.${unlistedInWindow ? " Unlisted channels' fees are not counted." : ""}`,
+                 unlistedInWindow ? "without unlisted" : undefined)}
       {/* Under Unlisted, their measured count (the global total less every listed network). */}
       {rate("Snapshots", sparkOf(filter === UNLISTED_ID ? UNLISTED_SNAPS : scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries, activity?.snapsPerHour))}
       {/* The chart states the same reach its rows do — it plots the very buckets the rate cards

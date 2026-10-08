@@ -104,7 +104,6 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
           // `useNoSignal`). The row still lists: the catalog is ours and the network exists.
           figure: dead ? "—" : v.toLocaleString(),
           faint: dead || m.nodes.length === 0,
-          title: `${name} · ${m.nodes.length} node${m.nodes.length === 1 ? "" : "s"}`,
           onClick: () => toggleNetwork(m.id),
           pair: subjectPairing(hoverFilter, m.id, setHoverFilter, hue),
         };
@@ -152,7 +151,6 @@ export default function HyperExplore({ defaultCollapsed }: { defaultCollapsed?: 
           // the Composition card to the front rather than releasing it.
           on: openGroup?.key === g.key,
           rung: "composition",
-          title: `${g.label} · ${g.rows.length} node${g.rows.length === 1 ? "" : "s"}`,
           onClick: () => toggleComposition(g.key),
           pair: {
             ...pair,

@@ -273,7 +273,6 @@ export default function TopBar() {
           type="button"
           aria-expanded={strip === "pulse"}
           aria-controls="filter-strip"
-          title="App liveliness — the polls behind the numbers"
           onClick={() => setStrip((cur) => (cur === "pulse" ? null : "pulse"))}
           onKeyDown={(e) => { if (e.key === "Escape") setStrip(null); }}
           className={cn(
@@ -385,7 +384,6 @@ export default function TopBar() {
           type="button"
           aria-expanded={strip === "views"}
           aria-controls="filter-strip"
-          title="Switch view"
           onClick={() => setStrip((cur) => (cur === "views" ? null : "views"))}
           onKeyDown={(e) => { if (e.key === "Escape") setStrip(null); }}
           className={cn(
@@ -441,7 +439,7 @@ export default function TopBar() {
             <ToggleGroupItem
               key={v.id}
               value={v.id}
-              title={v.name}
+              aria-label={v.name}
               className={cn(
                 // The design OWNS its sizing/rounding here (not inherited from the shadcn
                 // toggle primitive): explicit h-9 (== today's rendered 36px — the primitive's
@@ -502,7 +500,6 @@ export default function TopBar() {
             type="button"
             aria-expanded={strip === "about"}
             aria-controls="filter-strip"
-            title="About this view"
             onClick={() => setStrip((cur) => (cur === "about" ? null : "about"))}
             onKeyDown={(e) => { if (e.key === "Escape") setStrip(null); }}
             // Off the PHONE bar (design A1): there it is the ⚙ menu's "This view" row, which opens

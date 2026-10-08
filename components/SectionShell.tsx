@@ -200,7 +200,6 @@ export default function SectionShell({
           variant="ghost"
           size="icon-xs"
           aria-label="Close the raw data layer"
-          title="Close the raw data layer"
           // The coarse-pointer arms grow the 24px ghost to the 44px touch floor AND re-anchor it
           // (top-4→1.5, right-3→0.5) so the × GLYPH stays where the fine-pointer one sits — grown
           // in place, the box's centre drifted 10px down-left onto the table header's AGE cell.

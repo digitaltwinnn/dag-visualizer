@@ -94,7 +94,6 @@ export default function TablePager({
               aria-expanded={explain}
               onClick={() => setExplain((e) => !e)}
               className="inline-flex items-center min-h-6 underline decoration-dotted decoration-border underline-offset-2 cursor-help uppercase tracking-caps text-label text-muted-foreground hover:text-foreground p-0 bg-transparent border-0"
-              title={scope.title}
             >
               {scope.word}
             </button>

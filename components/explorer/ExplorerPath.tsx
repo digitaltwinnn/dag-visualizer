@@ -92,7 +92,7 @@ export default function ExplorerPath({ crumbs, hint, className }: { crumbs: read
                 // "YOU ARE HERE" IS A LABEL, NOT TEXT (user, 2026-10-07: "the mouse pointer is |"): its
                 // list is already on screen, so it takes no click — the default cursor and no text
                 // selection keep it from reading as a broken link beside the steps that do.
-                <BreadcrumbPage className={cn(STEP, shape, pad, "cursor-default select-none bg-wash-strong text-foreground", !c.root && "w-full")} title={c.title}>
+                <BreadcrumbPage className={cn(STEP, shape, pad, "cursor-default select-none bg-wash-strong text-foreground", !c.root && "w-full")}>
                   {/* THE ROOT AS THE PAGE IS THE HOUSE ALONE (user, 2026-10-07): its word is the card's
                       title one line above, so printing it here said the same thing twice. The word
                       stays the step's accessible name; the bar gains a name once a level is opened. */}
@@ -109,7 +109,6 @@ export default function ExplorerPath({ crumbs, hint, className }: { crumbs: read
                 <button
                   type="button"
                   onClick={c.onSelect}
-                  title={c.root ? `${c.title ?? "Back to the start"} — back to the start` : c.title ? `${c.title} — back up to this level` : "Back up to this level"}
                   aria-label={c.root ? (c.title ?? "Back to the start") : undefined}
                   className={cn(
                     STEP,

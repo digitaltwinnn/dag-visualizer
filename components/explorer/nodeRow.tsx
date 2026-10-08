@@ -5,7 +5,7 @@ import type { CSSProperties } from "react";
 import type { ExplorerRowSpec } from "@/components/explorer/Explorer";
 import { RoleChips } from "@/components/inspector/parts";
 import { layerCodesOf } from "@/src/data/composition";
-import { coLocatedNetworks, metagraphById, shortHash } from "@/src/data/network";
+import { coLocatedNetworks, metagraphById } from "@/src/data/network";
 import { identityHudCss } from "@/src/palette/identity";
 import { nodeStatus } from "@/src/data/nodeStatus";
 import type { MetaInfo, NodeRow } from "@/src/data/types";
@@ -44,7 +44,6 @@ export function StateDot({ state }: { state?: string | null }) {
     <span
       role="img"
       aria-label={s.label}
-      title={s.label}
       className={cn("inline-block size-1.5 flex-none rounded-full", !ready && "border-[1.5px]")}
       style={
         {
@@ -107,7 +106,6 @@ export function nodeRowSpec(args: {
   const also = coLocatedNetworks(ip, netId, args.metaList);
   const id = row.id ?? row.label;
   const codes = layerCodesOf([row]);
-  const status = nodeStatus(row.state);
   return {
     key: args.key,
     glyph: (
@@ -134,7 +132,6 @@ export function nodeRowSpec(args: {
     hue,
     // The hover names the row's facts in words; the id stays in its SHORT form (a full 128-glyph
     // id was "a very long text" — user, 2026-09-26). The whole id is the Node card's, one click on.
-    title: `${shortHash(id)} · ${[ticker, ...also.map((m) => tickerOf(m.id))].join(" + ")}${codes.length ? ` · ${codes.join(" ")}` : ""} · ${status.label}`,
     onClick: args.onClick,
     pair: args.pair,
   };
@@ -142,13 +139,12 @@ export function nodeRowSpec(args: {
 
 /** A signer that resolves to no node: the same row, faint, with the honest word for its tag and
  *  no affordance — there is no node to commit. */
-export function unknownNodeRowSpec(args: { key: string; id: string; label: string; title: string; hue: string }): ExplorerRowSpec {
+export function unknownNodeRowSpec(args: { key: string; id: string; label: string; hue: string }): ExplorerRowSpec {
   return {
     key: args.key,
     name: midHash(args.id, NODE_ID_GLYPHS),
     nameMono: true,
     tag: <span className="italic">{args.label}</span>,
     faint: true,
-    title: args.title,
   };
 }

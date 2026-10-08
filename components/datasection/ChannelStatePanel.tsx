@@ -95,7 +95,7 @@ const paneHash = (v: string): string => midHash(v, 46);
 // can see are different. An unparsed stamp is the instrument's own absence, never "Invalid Date".
 
 type LaneId = "state" | "data" | "signers";
-type Lane = { id: LaneId; name: string; title: string };
+type Lane = { id: LaneId; name: string };
 
 const LANE_HEAD = "text-label uppercase tracking-caps text-muted-foreground font-normal";
 
@@ -167,7 +167,7 @@ function SchemaRow({
   const openable = kinds.some((k) => k.fields != null || k.kind !== label);
   const row = (
     <>
-      <span className={cn("min-w-0 truncate text-label", mono && "font-mono")} title={label}>
+      <span className={cn("min-w-0 truncate text-label", mono && "font-mono")}>
         {label}
       </span>
       <span className="flex-1" />
@@ -294,7 +294,6 @@ function RawSection({
             <button
               type="button"
               aria-label={nextMode === "expand" ? "Expand all levels" : "Collapse to one level"}
-              title={nextMode === "expand" ? "Expand all levels" : "Collapse to one level"}
               className={cn(
                 "flex-none inline-flex items-center justify-center size-4 -my-0.5 rounded-xs cursor-pointer",
                 "text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
@@ -356,7 +355,7 @@ const SIGNER_PAGE = 3; // rows per page — the consensus MINIMUM, so one page i
  *  mobile-tuning/d-signers.html`). It was two `Node | Signer id` tables, one per producing layer, and
  *  on a normal snapshot both held the same three nodes beside a signer id that was the node id's
  *  first 8 characters. Now: a row per node, a column per LAYER in production order (dL1 then L0,
- *  their codes and hover titles from SIGNER_GROUPS, the one home), a check where that node signed
+ *  their codes from SIGNER_GROUPS, the one home), a check where that node signed
  *  and a dash where it did not — one mark style, the column heads are the key. The signer id
  *  survives only where it is news: a hybrid that signed with a key its node id does not repeat
  *  says "signed as …" under its id (`signerRoster.otherKeys`). */
@@ -377,7 +376,7 @@ function SignerRoster({ dataIds, proofIds, metaId, selNodes }: { dataIds: string
           <TableRow>
             <TableHead className={LANE_HEAD}>Node</TableHead>
             {lanes.map((l) => (
-              <TableHead key={l.id} className={cn(LANE_HEAD, "w-12 text-center normal-case tracking-normal")} title={`${l.g.label}: ${l.g.title}`}>
+              <TableHead key={l.id} className={cn(LANE_HEAD, "w-12 text-center normal-case tracking-normal")}>
                 {l.g.who.split(" ")[0]}
               </TableHead>
             ))}
@@ -388,14 +387,14 @@ function SignerRoster({ dataIds, proofIds, metaId, selNodes }: { dataIds: string
             const w = r.res.known ? null : SIGNER_UNKNOWN[r.res.reason];
             const id = r.res.known ? r.res.row.id : null;
             return (
-              <TableRow key={r.key} title={w ? w.title : undefined} className="pointer-coarse:h-11">
+              <TableRow key={r.key} className="pointer-coarse:h-11">
                 <TableCell className="text-label">
                   {r.res.known ? (
                     <span className="group/copy flex items-center gap-1.5 min-w-0">
                       <span className="min-w-0 flex flex-col">
-                        <span className="font-mono truncate" title={id ?? undefined}>{id ? shortHash(id) : r.res.row.label}</span>
+                        <span className="font-mono truncate">{id ? shortHash(id) : r.res.row.label}</span>
                         {r.otherKeys.length > 0 && (
-                          <span className="font-mono text-muted-foreground truncate" title="This node signed with a layer key its node id does not repeat">
+                          <span className="font-mono text-muted-foreground truncate">
                             signed as {r.otherKeys.join(", ")}
                           </span>
                         )}
@@ -403,7 +402,7 @@ function SignerRoster({ dataIds, proofIds, metaId, selNodes }: { dataIds: string
                       {id && <CopyButton value={id} subject="node id" />}
                     </span>
                   ) : (
-                    <span className="italic text-muted-foreground" title={`${w!.title} Signer id ${r.data ?? r.proof}.`}>{w!.label}</span>
+                    <span className="italic text-muted-foreground">{w!.label}</span>
                   )}
                 </TableCell>
                 {lanes.map((l) => (
@@ -470,13 +469,13 @@ export function ChannelStatePanel() {
     if (!deep) return [];
     const out: Lane[] = [];
     if (deep.stateKeys.length > 0 || nonEmpty(state)) {
-      out.push({ id: "state", name: PAYLOAD_LANES.state.name, title: PAYLOAD_LANES.state.title });
+      out.push({ id: "state", name: PAYLOAD_LANES.state.name });
     }
     if (deep.dataTxCount > 0 || nonEmpty(dataTx)) {
-      out.push({ id: "data", name: PAYLOAD_LANES.data.name, title: PAYLOAD_LANES.data.title });
+      out.push({ id: "data", name: PAYLOAD_LANES.data.name });
     }
     if (deep.signers.length > 0 || deep.dataBlockSigners.length > 0) {
-      out.push({ id: "signers", name: "Signers", title: "The validators that signed this snapshot, by producing layer" });
+      out.push({ id: "signers", name: "Signers" });
     }
     return out;
   }, [deep, state, dataTx]);
@@ -581,7 +580,7 @@ export function ChannelStatePanel() {
                 record-level rung, the one place in the app a time can be QUOTED from. UTC and it
                 says so: the explorer's own stamps are UTC, so a viewer's local midnight can never
                 silently re-date a snapshot. */}
-            <Fact label="Time" title="The stamp this snapshot shares with the global snapshot it anchored into">
+            <Fact label="Time">
               {/* The reader's own clock, drawn as date · time · zone tag; UTC on hover (2026-10-07). */}
               {Number.isFinite(Date.parse(sel.ts)) ? <Stamp ms={Date.parse(sel.ts)} seconds className="text-foreground-dim" /> : <span className="text-muted-foreground">—</span>}
             </Fact>
@@ -660,7 +659,6 @@ export function ChannelStatePanel() {
                     <TabsTrigger
                       key={l.id}
                       value={l.id}
-                      title={l.title}
                       className={cn(CABINET_TRIGGER, "h-7 text-label")}
                     >
                       <LaneIcon aria-hidden className="size-3.5 flex-none" />
@@ -766,17 +764,17 @@ export function ChannelStatePanel() {
               <FootRow label="Height" value={deep.height.toLocaleString()} />
               <FootRow label="Sub-height" value={deep.subHeight.toLocaleString()} />
               {(hash || deep.lastSnapshotHash || deep.stateProof) && <div aria-hidden className="h-px my-1 bg-border/50" />}
-              {hash && <FootRow label="Hash" value={hashFor(hash, 24)} title={hash} copy={hash} />}
+              {hash && <FootRow label="Hash" value={hashFor(hash, 24)} copy={hash} />}
               {deep.lastSnapshotHash && (
-                <FootRow label="Previous hash" value={hashFor(deep.lastSnapshotHash, 15)} title={deep.lastSnapshotHash} copy={deep.lastSnapshotHash} />
+                <FootRow label="Previous hash" value={hashFor(deep.lastSnapshotHash, 15)} copy={deep.lastSnapshotHash} />
               )}
               {deep.stateProof && (
                 // "State HASH", not "state proof" (user, 2026-08-14 — the SIGNERS tab says
                 // "snapshot proof" for the L0 SIGNATURE SET, so two unrelated species shared the
                 // word one screen apart and read as kin). It is a digest, the same species as
                 // its Hash/Parent siblings; the chain field stays calculatedStateProof (internal
-                // identifiers keep their names). The title carries the distinction.
-                <FootRow label="State hash" value={hashFor(deep.stateProof, 18)} title={"The hash of the application state this snapshot results in, covered by the snapshot's L0 signatures — the state's provability. Distinct from the SIGNERS tab's 'snapshot proof', which is the L0 signature set; this is a digest, and the signatures sign over it." + deep.stateProof} copy={deep.stateProof} />
+                // identifiers keep their names).
+                <FootRow label="State hash" value={hashFor(deep.stateProof, 18)} copy={deep.stateProof} />
               )}
             </div>
           )}

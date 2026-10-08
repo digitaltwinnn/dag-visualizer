@@ -127,7 +127,7 @@ export default function TrendRangePane({
             <Fact label="End">{edge(longSpan ? range.toMs - 1 : range.toMs)}</Fact>
             <Fact label="Length">{ageWords(range.toMs - range.fromMs)}</Fact>
           </FactGroup>
-          <RecordsDoor subject={subject} span={{ ...range, label: spanPhrase(windowId, range) }} what="range" />
+          <RecordsDoor subject={subject} span={{ ...range, label: spanPhrase(windowId, range) }} />
         </div>
       )}
       <PulseEdge pulseKey={pulseKey} rail="right" off={collapsed} />

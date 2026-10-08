@@ -32,7 +32,7 @@ function Val({ v }: { v: unknown }) {
     case "string": {
       const long = v.length > MAX_STR;
       return (
-        <span className="text-foreground-dim break-all" title={long ? v : undefined}>
+        <span className="text-foreground-dim break-all">
           &quot;{long ? v.slice(0, MAX_STR) + "…" : v}&quot;
         </span>
       );

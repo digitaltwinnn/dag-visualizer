@@ -73,7 +73,7 @@ exemptions. `src/data/` holds the live singleton and the geo cache alongside the
 growing: a mechanical purity classifier was tried and rejected (its regex matched the words
 "window" and "fetch" inside this repo's own comments), and the header records why.
 
-Fourteen narrower boundary tests work the same way: `components/unlistedBoundary.test.ts` (the `"unlisted"`
+Fifteen narrower boundary tests work the same way: `components/unlistedBoundary.test.ts` (the `"unlisted"`
 id literal has exactly two homes), `components/railLadderBoundary.test.ts` (every committable focus
 rung maps to a hinted rail card slot), `components/railTierBoundary.test.ts` (`data-focus` has two
 homes and the slab's geometry — the pager included — keys on `data-tier`),
@@ -99,10 +99,11 @@ number on both arms), `src/data/signerMatchBoundary.test.ts` (a peer-id prefix c
 in `src/data/network.ts`), `src/engine/scene/rowBoundary.test.ts` (a scene module that places a
 ledger row consults the trail's boundaries), `src/engine/entryBeatBoundary.test.ts` (every 3D view's
 entry owner still defines the arrival beat's begin/release pair — the wiring was silently lost once)
-and `src/net/netUrlBoundary.test.ts` (every own-server fetch goes through `netUrl()`, or carries an
-exemption with a reason).
-`ls **/*Boundary.test.ts` is the live count: fifteen files, of which
-`components/selectionBoundary.test.ts` is rule 2's and the other fourteen are these.
+`src/net/netUrlBoundary.test.ts` (every own-server fetch goes through `netUrl()`, or carries an
+exemption with a reason) and `components/tooltipBoundary.test.ts` (no hover-only text: no `title=`
+on any HUD element — the UI explains itself on its surface, or not at all).
+`ls **/*Boundary.test.ts` is the live count: sixteen files, of which
+`components/selectionBoundary.test.ts` is rule 2's and the other fifteen are these.
 
 Each of these files opens with a header comment giving the rationale, the scope and every exemption
 with its reason. **That header is the rule's authoritative statement** — read it rather than inferring

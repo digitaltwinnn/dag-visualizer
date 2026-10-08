@@ -31,7 +31,7 @@ import {
   TICK_NET_MEASURES,
 } from "@/src/data/ledgerMeasure";
 import { ledgerLens, storyCount } from "@/src/data/ledgerStory";
-import { filterAccent, getAnchor, getNetwork, resolveSigner, SIGNER_GROUPS, SIGNER_UNKNOWN, snapshotSigners } from "@/src/data/network";
+import { filterAccent, getAnchor, getNetwork, resolveSigner, SIGNER_UNKNOWN, snapshotSigners } from "@/src/data/network";
 import { metaSnapHoverKey, type GlobalSnapshot, type NodeRow, type SnapshotExact } from "@/src/data/types";
 import { displayNetwork, LISTED_IDS, UNLISTED_HUE, UNLISTED_ID } from "@/src/data/unlisted";
 import { POLL } from "@/src/engine/config";
@@ -307,7 +307,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
         held.newer > 0 && snap ? (
           <button
             type="button"
-            title={`${held.newer} snapshot${held.newer === 1 ? "" : "s"} arrived since this one was pinned. Follow live again.`}
             onClick={() => applyClickActions(followToggleActions(snap, false))}
             className="inline-flex items-center gap-1.5 rounded-sm px-1.5 -mr-1.5 py-[3px] min-h-6 text-label text-foreground whitespace-nowrap cursor-pointer select-none hover:bg-wash-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
           >
@@ -354,7 +353,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           // state), which a re-box would swallow — and its Global snapshot card is the box anyway.
           faint: !!filterNet && count === 0 && !on,
           // The count the bar's colour stands for, in words — colour is never the only carrier.
-          title: `Global snapshot ${d.ordinal.toLocaleString()}${on ? (following ? ", live" : ", pinned") : ""}, ${d.metagraphSnapshotCount ?? 0} snapshot${(d.metagraphSnapshotCount ?? 0) === 1 ? "" : "s"} anchored${filterNet ? (count > 0 ? `, ${count} from ${filterNet.name}` : `, none from ${filterNet.name}`) : ""}`,
           onClick: () => {
             // THE SELECTED ROW DRILLS (user, 2026-10-07 — the explorer rests on this list, its axis,
             // so the highlighted row is always on screen and is the way DOWN): it opens the tick's
@@ -457,9 +455,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           rung: "context",
           // Out of the lens: listed (it really did anchor here), not drillable.
           faint: lensedOut,
-          title: lensedOut
-            ? `${n.name} · ${n.count} snapshot${n.count === 1 ? "" : "s"} anchored here — outside the committed filter`
-            : `${n.name} · ${n.count} snapshot${n.count === 1 ? "" : "s"} anchored into ${tick.ordinal.toLocaleString()}`,
           // OPENS ITS CARD TOO (user, 2026-10-04: "clicking a row in the explorer should open the
           // related card; happens for some but not for all" — this row was the one that only
           // drilled, ruled "opens, never commits" on 2026-08-10, before a network could be
@@ -516,7 +511,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
       empty: "No snapshots identified for this network here.",
       rows: leaves.map((r, i): ExplorerRowSpec => {
         const sel = { metaId: r.metaId, ordinal: r.ordinal, hash: r.hash, globalOrdinal: tick.ordinal, ts: r.ts };
-        const signers = signersOf(exact, r.metaId, r.ordinal);
         const on = sameMetaSnap(metaSnap, sel);
         const key = `${r.metaId}|${r.ordinal}`;
         const isUnlisted = openNet === UNLISTED_ID;
@@ -533,9 +527,6 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           figure: snapMeasure(snapPick, r),
           on,
           rung: "metaSnap",
-          title: isUnlisted
-            ? `Unlisted channel ${r.metaId} · anchored into global ${tick.ordinal.toLocaleString()}${signers.length ? ` · signed by ${signers.length} ${SIGNER_GROUPS.proof.who}` : ""}`
-            : `${leafName} snapshot ${r.ordinal.toLocaleString()} · anchored into global ${tick.ordinal.toLocaleString()}${signers.length ? ` · signed by ${signers.length} ${SIGNER_GROUPS.proof.who}` : ""}`,
           onClick: () => {
             applyClickActions(metaSnapSelectActions(sel, globalPick, { metaSnap, following, inspect: useStore.getState().inspect }));
             // A select opens the snapshot's signers — the path follows the selection
@@ -577,7 +568,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
           // (`resolveSigner` + `SIGNER_UNKNOWN`, the one shared rule). Every unlisted channel's
           // signers take this branch by construction; a listed network's can too.
           const w = SIGNER_UNKNOWN[r.reason];
-          return unknownNodeRowSpec({ key: sid, id: sid, label: w.label, title: w.title, hue: UNLISTED_HUE });
+          return unknownNodeRowSpec({ key: sid, id: sid, label: w.label, hue: UNLISTED_HUE });
         }
         const row = r.row;
         const on = nodeOn(row);

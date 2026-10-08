@@ -56,13 +56,9 @@ describe("payloadKinds", () => {
 // The lane words are shared by the metagraph-snapshot CARD's two sections and the raw layer's two
 // lane tabs — one subject disclosed at two levels, so they must be the same two words.
 describe("PAYLOAD_LANES", () => {
-  it("names both lanes and titles each, since a bare `none` means a different thing in each", () => {
-    for (const lane of [PAYLOAD_LANES.state, PAYLOAD_LANES.data]) {
-      expect(lane.name.length).toBeGreaterThan(0);
-      expect(lane.title.length).toBeGreaterThan(0);
-    }
+  it("names both lanes, distinctly", () => {
+    for (const lane of [PAYLOAD_LANES.state, PAYLOAD_LANES.data]) expect(lane.name.length).toBeGreaterThan(0);
     expect(PAYLOAD_LANES.state.name).not.toBe(PAYLOAD_LANES.data.name);
-    expect(PAYLOAD_LANES.state.title).not.toBe(PAYLOAD_LANES.data.title);
   });
 });
 

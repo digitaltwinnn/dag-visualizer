@@ -70,7 +70,6 @@ export default function FollowControl({ className }: { className?: string }) {
     <button
       type="button"
       aria-pressed={following}
-      title={following ? "Following the live snapshot — click to pin the one on screen" : "Follow the live snapshot"}
       onClick={() => {
         const target = snap ?? (latestSnapshot ? ({ kind: "snapshot", title: `Global snapshot #${latestSnapshot.ordinal}`, data: latestSnapshot } as const) : null);
         if (target) applyClickActions(followToggleActions(target, following));

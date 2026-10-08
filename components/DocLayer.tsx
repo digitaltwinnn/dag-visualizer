@@ -283,7 +283,6 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
             variant="ghost"
             size="icon-xs"
             aria-label={`Close ${DOC_PAGES[render].label}`}
-            title={`Close ${DOC_PAGES[render].label}`}
             className="absolute top-[calc(74px+var(--topbar-extra,0px))] right-2 pointer-events-auto text-muted-foreground hover:text-foreground pointer-coarse:min-h-11 pointer-coarse:min-w-11"
             onClick={() => setDocPage(null)}
           >

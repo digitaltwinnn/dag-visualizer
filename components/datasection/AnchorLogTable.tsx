@@ -4,7 +4,6 @@ import { METAGRAPHS, netUrl } from "@/src/net/current";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Search, X } from "lucide-react";
 import type { CSSProperties } from "react";
-import { useChainSpan } from "@/components/useArchive";
 import { useStore } from "@/src/store/store";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
 import { getNetwork, metagraphById } from "@/src/data/network";
@@ -25,7 +24,7 @@ import TablePager from "@/components/datasection/TablePager";
 import LogSearchBar from "@/components/datasection/LogSearchBar";
 import { pageOfOrdinal, seekSpan, tsInRange } from "@/src/data/chainSeek";
 import { POLL } from "@/src/engine/config";
-import { recordStamp, utcDayKey, utcStamp } from "@/src/util/localTime";
+import { utcDayKey } from "@/src/util/localTime";
 import { dayWords } from "@/components/datasection/DateRange";
 import { useMergedLog, type MergedScope } from "@/components/datasection/useMergedLog";
 import { appliedChips, logMode, rangePage, searchCriterion, spanOfSearch } from "@/src/data/logSearch";
@@ -39,13 +38,6 @@ import { isRetired } from "@/src/net/lineage";
 // one row per anchored metagraph snapshot inside it.
 const MAX = POLL.maxSnapshots;
 const PAGE = 25;
-
-/** An age's hover: the record's time in the reader's clock, then in UTC for matching an explorer
- *  (2026-10-07 — dates are local everywhere; UTC stays one hover away). */
-const whenTitle = (ts: string): string | undefined => {
-  const ms = Date.parse(ts);
-  return Number.isFinite(ms) ? `${recordStamp(ms)}\n${utcStamp(ms)}` : undefined;
-};
 
 // ONE COLUMN LIST, read by the header AND by the search row beneath it — a second literal is how the
 // two silently fall out of alignment when a column is added.
@@ -118,17 +110,13 @@ const Dash = () => (
 // the (snapshot, tick) pair, and committing half of it would break every downstream consumer.
 /** One chain's label in the toolbar: the current one says so, an earlier one says when it ran —
  *  its genesis date, read from the chain's own span (the same lookup the dossier uses). */
-/** One segment of the chain toggle: a one-word name, the chain's start and address on hover. */
-function ChainSegment({ address, idx, on, onPick }: { address: string; idx: number; on: boolean; onPick: () => void }) {
-  const span = useChainSpan(address);
-  // A day-only label is a UTC day (M5).
-  const since = span?.genesisTs ? new Date(span.genesisTs).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : null;
+/** One segment of the chain toggle: a one-word name. */
+function ChainSegment({ idx, on, onPick }: { idx: number; on: boolean; onPick: () => void }) {
   const name = idx === 0 ? "Current" : idx === 1 ? "Earlier" : `Earlier ${idx}`;
   return (
     <button
       type="button"
       aria-pressed={on}
-      title={`${idx === 0 ? "The current chain" : "An earlier chain"}${since ? `, from ${since}` : ""} · ${address}`}
       onClick={onPick}
       className={cn(
         "h-7 pointer-coarse:h-10 px-2.5 rounded-sm cursor-pointer text-label",
@@ -1228,7 +1216,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
       {lineage.length > 1 && (
         <span className="mr-auto inline-flex items-center gap-0.5 p-0.5 rounded-btn border border-border" role="group" aria-label="Which of this network's chains to page">
           {lineage.map((addr, i) => (
-            <ChainSegment key={addr} address={addr} idx={i} on={i === chainIdx} onPick={() => { setMarked(null); setJumpMiss(null); setChain(i); }} />
+            <ChainSegment key={addr} idx={i} on={i === chainIdx} onPick={() => { setMarked(null); setJumpMiss(null); setChain(i); }} />
           ))}
         </span>
       )}
@@ -1262,7 +1250,6 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   type="button"
                   onClick={all.length === 1 ? clearSearch : c.clear}
                   aria-label={`Clear ${c.text}`}
-                  title="Clear"
                   className="inline-flex flex-none size-6 pointer-coarse:size-9 max-[700px]:size-9 items-center justify-center rounded-xs cursor-pointer text-muted-foreground hover:text-foreground hover:bg-wash-faint focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
                 >
                   <X aria-hidden className="size-3.5 pointer-coarse:size-[18px]" />
@@ -1585,7 +1572,6 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                       "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
                     )}
                     tabIndex={0}
-                    title={`Select global snapshot ${r.global.ordinal.toLocaleString()}`}
                     onClick={() => {
                       applyClickActions(metaSnapArrivalActions(null, { kind: "snapshot", title: `Global snapshot #${r.global.ordinal}`, data: r.global as GlobalSnapshot }));
                     }}
@@ -1615,7 +1601,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                       >
                         <span className={cn("uppercase tracking-caps", inSelGroup ? "text-primary-ink" : "text-[color-mix(in_oklch,var(--primary-ink)_80%,var(--muted-foreground))]")}>Global</span>
                         <span className={cn("font-mono tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground")}>{r.global.ordinal.toLocaleString()}</span>
-                        <span className={cn("ml-auto tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground-dim")} title={whenTitle(r.ts)}>{relativeAge(now - Date.parse(r.ts))}</span>
+                        <span className={cn("ml-auto tabular-nums", inSelGroup ? "text-primary-ink" : "text-foreground-dim")}>{relativeAge(now - Date.parse(r.ts))}</span>
                       </span>
                     </TableCell>
                   </TableRow>
@@ -1655,7 +1641,6 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   // A <tr> is not natively focusable — tabIndex + Enter/Space give the keyboard
                   // the same commit, and focus previews what hover previews (rule 9).
                   tabIndex={0}
-                  title={pending ? "resolving the anchoring tick…" : undefined}
                   // The selection follows the subject's identity (selectionHue).
                   style={{
                     ...(r.metaId ? { "--row-hue": cfg?.hue ?? "var(--core)" } : {}),
@@ -1699,7 +1684,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                         // over says `DED 1,978,733` in exactly this register, so the log and the
                         // pane now name a row the same way. The full name remains one click away
                         // (the pane head's own subject line + the rail card).
-                        <span title={cfg.name}>{cfg.ticker}</span>
+                        <span>{cfg.ticker}</span>
                       ) : (
                         // An uncataloged channel: the core tone + its address, honestly unnamed.
                         <span className="inline-flex items-baseline gap-2 text-muted-foreground"><span className="italic">unlisted</span><span className="font-mono text-label">{r.metaId?.slice(0, 10)}…</span></span>
@@ -1719,7 +1704,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                     </TableCell>
                   )}
                   {!grouped && (
-                    <TableCell className="text-right text-muted-foreground" title={whenTitle(r.ts)}>
+                    <TableCell className="text-right text-muted-foreground">
                       {/* Phone drops the " ago" (the bare register — relativeAge's own note): the
                           AGE header names the quantity, and the suffix's width was the last thing
                           holding this table in sideways scroll. */}
