@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   cardNetwork,
   clampScroll,
+  frontPlane,
   FOCUS_LEAN,
   OPACITY_FALLOFF,
   PLANE_GAP,
@@ -672,5 +673,23 @@ describe("cardNetwork — the network History's Metagraph card stands on", () =>
     expect(cardNetwork("all", null)).toBe("all");
     expect(cardNetwork("ded", null)).toBe("ded");
     expect(cardNetwork("ded", "dag")).toBe("dag");
+  });
+  it("…else the plane in front, which never beats a filter or a focus", () => {
+    expect(cardNetwork("all", null, "up")).toBe("up");
+    expect(cardNetwork("ded", null, "up")).toBe("ded");
+    expect(cardNetwork("all", "dor", "up")).toBe("dor");
+    expect(cardNetwork("all", null, null)).toBe("all");
+  });
+});
+
+describe("frontPlane — the first slot of the shown window", () => {
+  const ids = ["a", "b", "c", "d", "e", "f", "g"];
+  it("is the scroll's first plane, clamped like the stack clamps", () => {
+    expect(frontPlane(ids, 0)).toBe("a");
+    expect(frontPlane(ids, 1)).toBe("b");
+    expect(frontPlane(ids, 99)).toBe(ids[clampScroll(ids.length, 99)]);
+  });
+  it("is null for an empty roster", () => {
+    expect(frontPlane([], 0)).toBeNull();
   });
 });

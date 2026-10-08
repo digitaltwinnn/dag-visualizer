@@ -3,6 +3,7 @@
 import { CircleHelp } from "lucide-react";
 import { useTickHasFilter } from "@/components/useTickHasFilter";
 import { tickNetClearActions } from "@/src/engine/domain/pickActions";
+import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { useStore } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { UNLISTED_ID, UNLISTED_CFG, displayNetwork } from "@/src/data/unlisted";
@@ -46,6 +47,11 @@ export default function ContextCard({
   // The × clears what the card STANDS ON: a tick-local network clears itself and what hangs under
   // it (the tick stays), a plane focus releases the focus, and the filter clears the filter, as it
   // always did.
+  // THE PLANE IN FRONT stands the card up with nothing committed (2026-10-08): no filter, no focus —
+  // so there is nothing for an × to clear, and the head shows none.
+  const trendFocus = useStore((s) => s.trendFocus);
+  const chartStack = useStore((s) => VIEW_POLICIES[s.mode].chartStack);
+  const clearable = filter === appFilter || !chartStack || trendFocus != null;
   const close = () => {
     const st = useStore.getState();
     applyClickActions(
@@ -102,7 +108,7 @@ export default function ContextCard({
             </span>
           }
           titleKey={dn.id}
-          onClose={close}
+          onClose={clearable ? close : undefined}
           collapsed={collapsed}
           onToggle={onToggle}
         />
@@ -138,7 +144,7 @@ export default function ContextCard({
       <InspectorCard
         p={context}
         eyebrow="Metagraph"
-        onClose={close}
+        onClose={clearable ? close : undefined}
         collapsed={collapsed}
         onToggle={onToggle}
       />

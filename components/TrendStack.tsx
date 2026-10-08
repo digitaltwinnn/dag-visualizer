@@ -72,7 +72,8 @@ import { cn } from "@/lib/utils";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
 import { headWord, metricCaption, sharedCeiling, stepMetric } from "@/src/data/trendSeries";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
-import { MORE_ID, moreCount, morePose, planeFormat, stackPoses } from "@/src/engine/domain/trendStack";
+import {
+  frontPlane, MORE_ID, moreCount, morePose, planeFormat, stackPoses } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -227,9 +228,22 @@ export default function TrendStack() {
   // screen through a re-rank, in the same write), and that must land before paint — a passive
   // effect would paint one frame of the new order under the old window, mounting the wrong planes.
   const setTrendIds = useStore((s) => s.setTrendIds);
+  // THE PLANE IN FRONT, for React (store `trendFront`, 2026-10-08): the Metagraph card stands on
+  // it under All. Published in the SAME layout effect, from the scroll the publish has just kept
+  // or moved (`scrollToKeep` runs inside `setTrendIds`): read back from the store after the
+  // write, not from this render's `trendScroll`, which is one commit behind on a re-rank (the PR
+  // review — a stale front for one commit remounted the card twice).
+  const setTrendFront = useStore((s) => s.setTrendFront);
   useLayoutEffect(() => {
     setTrendIds(on ? order : NO_IDS);
-  }, [on, order, setTrendIds]);
+    setTrendFront(on ? frontPlane(order, useStore.getState().trendScroll) : null);
+  }, [on, order, setTrendIds, setTrendFront]);
+  // …and again when the PAGER moves the scroll on its own (the publish above does not re-run).
+  const storeScroll = useStore((s) => s.trendScroll);
+  useEffect(() => {
+    if (on) setTrendFront(frontPlane(order, storeScroll));
+  }, [on, order, storeScroll, setTrendFront]);
+  useEffect(() => () => setTrendFront(null), [setTrendFront]);
   // ⚠️ The UNMOUNT clear is its own effect. As the publish's cleanup it ran between every two
   // orders, so the store went old → [] → new and never saw a re-rank at all — only an empty roster
   // being filled — which is exactly the case `scrollToKeep` declines.

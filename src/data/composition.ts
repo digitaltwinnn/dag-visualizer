@@ -30,6 +30,20 @@ export function roleKey(node: { roles?: string[]; layer?: string | null }): stri
   return ROLE_ORDER.filter((r) => roles.includes(r)).join("+") || "none";
 }
 
+/** THE COMPOSITION ORDER (user, 2026-10-08: the raw roster's nodes "sorted by composition"): the
+ *  rows' own order — hybrids first, the widest make-up leading, then the dedicated layers in the
+ *  vocabulary order, a node that states no role last. Equal make-ups answer 0, so a stable sort
+ *  keeps whatever order it was given inside a make-up. */
+export function compareComposition(a: { roles?: string[]; layer?: string | null }, b: { roles?: string[]; layer?: string | null }): number {
+  return compositionRank(roleKey(a)) - compositionRank(roleKey(b));
+}
+function compositionRank(key: string): number {
+  if (key === "none") return 100;
+  const roles = key.split("+");
+  // A hybrid ranks by how many layers it runs (three before two); a dedicated node by its layer.
+  return roles.length > 1 ? ROLE_ORDER.length - roles.length : ROLE_ORDER.length + ROLE_ORDER.indexOf(roles[0]!);
+}
+
 /** A stored type key in the composition vocabulary — the same label and codes the hypergraph's
  *  composition rows wear ("Hybrid" L0 cL1, "Data" dL1). */
 export function roleKeyLabel(key: string): { label: string; codes: string[] } {

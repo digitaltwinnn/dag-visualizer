@@ -340,6 +340,8 @@ async function load(): Promise<ArchiveCensus | null> {
 export interface ChainSpan {
   genesisTs: string | null;
   latestOrdinal: number;
+  /** The newest snapshot's stamp — with `genesisTs`, the months a retired chain ran. */
+  latestTs: string | null;
   /** The channel's owner address off its newest record — the closest thing to an operator
    *  identity an uncataloged chain publishes. */
   owner: string | null;
@@ -351,8 +353,8 @@ async function loadSpan(address: string): Promise<ChainSpan | null> {
     // ?v busts any browser-cached previous response shape (the route is public, max-age 5m).
     const r = await fetch(netUrl(`/api/network/${address}/chain?v=3`));
     if (!r.ok) return null;
-    const j = (await r.json()) as { genesisTs: string | null; latestOrdinal: number; owner: string | null };
-    return { genesisTs: j.genesisTs, latestOrdinal: j.latestOrdinal, owner: j.owner ?? null };
+    const j = (await r.json()) as { genesisTs: string | null; latestOrdinal: number; latestTs?: string | null; owner: string | null };
+    return { genesisTs: j.genesisTs, latestOrdinal: j.latestOrdinal, latestTs: j.latestTs ?? null, owner: j.owner ?? null };
   } catch {
     return null;
   }

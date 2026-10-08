@@ -7,7 +7,7 @@ import type { NodeRow } from "@/src/data/types";
 import { useStore } from "@/src/store/store";
 import { metagraphById, filterAccent, shortHash } from "@/src/data/network";
 import { buildRoster, groupRosterByCountry, groupRosterByNetwork, sortRoster, type RosterCountryGroup, type RosterRow, type RosterSortKey } from "@/src/data/roster";
-import { compositionRows } from "@/src/data/composition";
+import { compareComposition, compositionRows } from "@/src/data/composition";
 import { hoverKeyOf } from "@/src/data/hoverSubject";
 import { nodeSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -64,7 +64,12 @@ export default function NodeRosterTable({ mode }: { mode: "hyper" | "geo" }) {
   const inspect = useStore((s) => s.inspect);
   const setHoverNodeId = useStore((s) => s.setHoverNodeId);
   const [sort, setSort] = useState<{ key: RosterSortKey; dir: 1 | -1 }>({ key: COLS[mode][0].key, dir: 1 });
-  const rows = sortRoster(buildRoster(selNodes, metaList), sort.key, sort.dir);
+  // HYPERGRAPH'S TIE-BREAK IS COMPOSITION (user, 2026-10-08): under the sorted column — the network
+  // by default — nodes run widest make-up first, then the dedicated layers in the vocabulary order,
+  // the phone plates' own order (`groupRosterByNetwork`). Stable sorts compose, so the inner order
+  // survives the outer one. Geography keeps place first.
+  const built = buildRoster(selNodes, metaList);
+  const rows = sortRoster(mode === "hyper" ? [...built].sort((a, b) => compareComposition({ roles: a.roles }, { roles: b.roles })) : built, sort.key, sort.dir);
   // GEOGRAPHY ON PHONE IS GROUPED BY COUNTRY, place first (design E1, 2026-10-08): the phone has
   // no column heads to sort by, so the grouping IS its order. Desktop keeps the sortable table.
   // HYPERGRAPH ON PHONE IS GROUPED BY NETWORK, layers first (design F1, same day): a machine on two

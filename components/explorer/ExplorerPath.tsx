@@ -54,8 +54,14 @@ const SHAPE_FIRST = "rounded-l-[5px] [clip-path:polygon(0_0,calc(100%-7px)_0,100
 const SHAPE_MID = "[clip-path:polygon(0_0,calc(100%-7px)_0,100%_50%,calc(100%-7px)_100%,0_100%,7px_50%)]";
 const SHAPE_LAST = "rounded-r-[5px] [clip-path:polygon(0_0,100%_0,100%_100%,0_100%,7px_50%)]";
 
-export default function ExplorerPath({ crumbs, hint, className }: { crumbs: readonly Crumb[]; hint?: string; className?: string }) {
+export default function ExplorerPath({ crumbs, hint, placeholder, className }: { crumbs: readonly Crumb[]; hint?: string;
+  /** THE ROOT'S PLACEHOLDER (user, 2026-10-08: the explorer's sentence "inside the control next to
+   *  the home icon as a placeholder … short, one line, related to the control"): what opening a row
+   *  does, in the plate's empty field beside the house — like a search field's placeholder, it is
+   *  the control explaining itself, and it goes the moment a step is taken. One line, truncated. */
+  placeholder?: string; className?: string }) {
   if (crumbs.length === 0) return null;
+  const atRoot = crumbs.length === 1 && !!crumbs[0]!.root;
   return (
     // The plate takes the ROWS' outset (6px each side, `ExplorerRow`'s box), not the heading's inset:
     // the rows' wash boxes are what the reader sees the plate against, and 6px of overhang on the
@@ -135,6 +141,9 @@ export default function ExplorerPath({ crumbs, hint, className }: { crumbs: read
             </BreadcrumbItem>
           );
         })}
+        {atRoot && placeholder && (
+          <li className="min-w-0 flex-1 truncate px-2 text-label leading-none text-muted-foreground">{placeholder}</li>
+        )}
       </BreadcrumbList>
       {/* The clause FOLLOWS the list in the DOM so AT reads the path first; on the plate it is
           the control's own caption. */}

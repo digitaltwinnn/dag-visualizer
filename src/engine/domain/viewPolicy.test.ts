@@ -143,7 +143,7 @@ describe("the trends view is registered and inert", () => {
   });
 
   it("answers RAW with a door onto the records, which History has none of its own", () => {
-    expect(VIEW_POLICIES.trend.rawSurface).toBe("door");
+    expect(VIEW_POLICIES.trend.rawSurface).toBe("buckets");
     expect(VIEW_POLICIES.ledger.rawSurface).toBe("records");
   });
 

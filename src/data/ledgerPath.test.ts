@@ -86,8 +86,17 @@ describe("syncLedgerPath — axis: the explorer rests on the global snapshot lis
     const drilled = { tick: 100, net: "dor", snap: null, selfResume: false };
     expect(axis(drilled, view({ snapOrd: 100 }), view({ snapOrd: 101 }))).toEqual(CLOSED_PATH);
   });
-  it("live leaves a drill alone, and resuming closes it unless the resume is the explorer's own click", () => {
-    expect(axis(open, view({ following: true, snapOrd: 120 }), view({ following: true, snapOrd: 121 }))).toBe(open);
+  it("a drill into the live tick rides the heartbeat: same network open in the new tick, signers only when the pair advanced", () => {
+    const live = { tick: 120, net: "dor", snap: null, selfResume: false };
+    expect(axis(live, view({ following: true, snapOrd: 120 }), view({ following: true, snapOrd: 121 }))).toEqual({ ...live, tick: 121 });
+    const signers = { ...live, snap: "dor|7" };
+    expect(axis(signers, view({ following: true, snapOrd: 120, metaSnap: ms(7, 120) }), view({ following: true, snapOrd: 121, metaSnap: ms(8, 121) }))).toEqual({ ...live, tick: 121, snap: "dor|8" });
+    expect(axis(signers, view({ following: true, snapOrd: 120, metaSnap: ms(7, 120) }), view({ following: true, snapOrd: 121, metaSnap: ms(7, 120) }))).toEqual({ ...live, tick: 121, snap: null });
+    // A drill on an older tick is the reader's own and stays put.
+    const older = { ...live, tick: 100 };
+    expect(axis(older, view({ following: true, snapOrd: 120 }), view({ following: true, snapOrd: 121 }))).toBe(older);
+  });
+  it("resuming live closes a drill unless the resume is the explorer's own click", () => {
     expect(axis(open, view({ snapOrd: 100 }), view({ following: true, snapOrd: 130 }))).toBe(CLOSED_PATH);
     expect(axis({ ...open, selfResume: true }, view({ snapOrd: 100 }), view({ following: true, snapOrd: 130 }))).toEqual({ ...open, selfResume: false });
   });

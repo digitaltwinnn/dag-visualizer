@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A — Filter strip</title>
+<link rel="stylesheet" href="page.css">
+<style>
+.bar{margin:8px 8px 0;border:1px solid var(--border);border-radius:10px 10px 0 0;border-bottom:0;background:linear-gradient(180deg,rgba(20,26,48,.95),rgba(12,16,32,.95));height:60px;display:flex;align-items:center;gap:8px;padding:0 10px}
+.bar .flt{display:inline-flex;align-items:center;gap:6px;height:40px;padding:0 8px;border-radius:7px;background:var(--wash-strong);box-shadow:inset 0 0 0 1px color-mix(in oklch,var(--primary) 45%,transparent);font-size:var(--body);color:var(--fg)}
+.bar .t{flex:1;text-align:center;font-size:var(--title);font-weight:600;color:var(--fg)}
+.strip{margin:0 8px;border:1px solid var(--border);border-top:0;border-radius:0 0 10px 10px;background:rgba(12,16,32,.97);padding:0 8px 8px}
+.hair{height:1px;background:var(--border);margin:0 2px}
+/* rows */
+.row1{display:flex;align-items:center;gap:10px;height:44px;padding:0 10px;border-radius:7px;font-size:var(--body);color:var(--fg)}
+.row1 .n{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row1 .c{font-family:var(--mono);font-size:var(--label);color:var(--muted);font-variant-numeric:tabular-nums}
+.row1.on{background:var(--wash-strong);box-shadow:inset 0 0 0 1px color-mix(in oklch,var(--primary) 45%,transparent)}
+.row1.off{color:var(--muted)}
+.row1.off .dot{opacity:.6}
+.scroll{max-height:390px;overflow:hidden;position:relative}
+.scroll:after{content:"";position:absolute;left:0;right:0;bottom:0;height:40px;background:linear-gradient(180deg,transparent,rgba(12,16,32,.97))}
+/* grid */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 6px}
+.cell{display:flex;align-items:center;gap:8px;height:44px;padding:0 10px;border-radius:7px;font-size:var(--body);color:var(--fg);min-width:0}
+.cell .n{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cell .c{font-family:var(--mono);font-size:var(--label);color:var(--muted);font-variant-numeric:tabular-nums}
+.cell.on{background:var(--wash-strong);box-shadow:inset 0 0 0 1px color-mix(in oklch,var(--primary) 45%,transparent)}
+.cell.off{color:var(--muted)}
+.cell.wide{grid-column:1/-1}
+.cell.wide.hr{height:auto;padding:5px 0}
+/* grouped chips */
+.gcap{font-size:11px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);padding:10px 4px 4px}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{display:inline-flex;align-items:center;gap:7px;height:40px;padding:0 10px;border-radius:7px;font-size:var(--body);color:var(--fg)}
+.chip .c{font-family:var(--mono);font-size:var(--label);color:var(--muted)}
+.chip.on{background:var(--wash-strong);box-shadow:inset 0 0 0 1px color-mix(in oklch,var(--primary) 45%,transparent)}
+.chip.off{color:var(--muted)}
+</style></head>
+<body>
+<h1>A — Filter strip (phone)</h1>
+<p class="lede">Today the strip is chips of every width wrapped into rows, with two thin vertical bars where the groups change (networks with nodes, then the catalog's without, then unlisted), capped at four rows with a scroll. The counts land wherever the chip ends, so nothing lines up, and the bars read as stray marks rather than a division. The three groups are kept in every option: they carry a fact (which networks have nodes you can see).</p>
+<nav class="pages"><a href="index.html">all pages</a> · <a href="b-views.html">B — View strip</a></nav>
+
+<h2><span class="n now">0</span> Now</h2>
+<div class="row"><div class="crop" style="height:300px"><img src="now-filter.png" alt="current filter strip"></div></div>
+
+<h2><span class="n">A1</span> One network per row <span class="rec">recommended</span></h2>
+<ul class="why">
+  <li>Every network is a 44px row: its dot and name on the left, its node count on <b>one right edge</b> — the explorer's own row, so the strip reads like the list it is.</li>
+  <li>The three groups are separated by a hairline, nothing more: the counts stop where the nodes stop, and the last row is unlisted. No captions, no bars.</li>
+  <li>The strip opens to about half the screen and scrolls for the rest (the same cap rule as today, taller). The committed network wears the on-state and is the first row of its group, so it is on screen without scrolling.</li>
+  <li>On a desktop the same rows stand in three or four equal columns, counts on each column's right edge — one rule for both tiers.</li>
+</ul>
+<div class="row">
+  <div class="phone">
+    <div class="bar"><span class="flt"><span class="dot" style="background:var(--primary)"></span>All</span><span class="t">Hypergraph</span></div>
+    <div class="strip"><div class="hair"></div><div class="scroll">
+      <div class="row1 on"><span class="dot" style="background:var(--primary)"></span><span class="n">All</span><span class="c">161</span></div>
+      <div class="row1"><span class="dot" style="background:var(--core)"></span><span class="n">DAG</span><span class="c">129</span></div>
+      <div class="row1"><span class="dot" style="background:var(--dor)"></span><span class="n">Dor Technologies</span><span class="c">17</span></div>
+      <div class="row1"><span class="dot" style="background:var(--biofi)"></span><span class="n">BioFi</span><span class="c">3</span></div>
+      <div class="row1"><span class="dot" style="background:var(--ded)"></span><span class="n">Digital Evidence</span><span class="c">3</span></div>
+      <div class="row1"><span class="dot" style="background:var(--usdc)"></span><span class="n">USDC.dag</span><span class="c">3</span></div>
+      <div class="row1"><span class="dot" style="background:#ff9a3d"></span><span class="n">The Upsider AI</span><span class="c">3</span></div>
+      <div class="row1"><span class="dot" style="background:#2ad4ff"></span><span class="n">Common Crawl</span><span class="c">3</span></div>
+      <div class="hair"></div>
+      <div class="row1 off"><span class="dot" style="background:#d94fd0"></span><span class="n">Cyberlete</span></div>
+      <div class="row1 off"><span class="dot" style="background:#e0c43a"></span><span class="n">PacaSwap</span></div>
+    </div></div>
+  </div>
+</div>
+<p class="note">Below the fold, in the same list: National Digifoundry, Toughbook Connect, El Paca, a hairline, then <i>unlisted</i> with its neutral dot.</p>
+
+<h2><span class="n">A2</span> Two equal columns</h2>
+<ul class="why">
+  <li>The same rows in a two-column grid of equal cells, so all thirteen fit in seven rows without a scroll. Each cell is dot, name, count on the cell's right edge — two aligned edges instead of one.</li>
+  <li>The group breaks are hairlines across both columns; unlisted takes a full-width cell at the end.</li>
+  <li>Denser than A1, and the strip never has to scroll; the price is that long names (Digital Evidence, National Digifoundry) ellipsise at 390px.</li>
+</ul>
+<div class="row">
+  <div class="phone">
+    <div class="bar"><span class="flt"><span class="dot" style="background:var(--primary)"></span>All</span><span class="t">Hypergraph</span></div>
+    <div class="strip"><div class="hair" style="margin-bottom:6px"></div>
+      <div class="grid">
+        <div class="cell on"><span class="dot" style="background:var(--primary)"></span><span class="n">All</span><span class="c">161</span></div>
+        <div class="cell"><span class="dot" style="background:var(--core)"></span><span class="n">DAG</span><span class="c">129</span></div>
+        <div class="cell"><span class="dot" style="background:var(--dor)"></span><span class="n">Dor Technologies</span><span class="c">17</span></div>
+        <div class="cell"><span class="dot" style="background:var(--biofi)"></span><span class="n">BioFi</span><span class="c">3</span></div>
+        <div class="cell"><span class="dot" style="background:var(--ded)"></span><span class="n">Digital Evidence</span><span class="c">3</span></div>
+        <div class="cell"><span class="dot" style="background:var(--usdc)"></span><span class="n">USDC.dag</span><span class="c">3</span></div>
+        <div class="cell"><span class="dot" style="background:#ff9a3d"></span><span class="n">The Upsider AI</span><span class="c">3</span></div>
+        <div class="cell"><span class="dot" style="background:#2ad4ff"></span><span class="n">Common Crawl</span><span class="c">3</span></div>
+        <div class="cell wide hr"><div class="hair" style="width:100%"></div></div>
+        <div class="cell off"><span class="dot" style="background:#d94fd0"></span><span class="n">Cyberlete</span></div>
+        <div class="cell off"><span class="dot" style="background:#e0c43a"></span><span class="n">PacaSwap</span></div>
+        <div class="cell off"><span class="dot" style="background:#6cc7ff"></span><span class="n">National Digifoundry</span></div>
+        <div class="cell off"><span class="dot" style="background:#9a8cff"></span><span class="n">Toughbook Connect</span></div>
+        <div class="cell off"><span class="dot" style="background:#ffb13d"></span><span class="n">El Paca</span></div>
+        <div class="cell wide hr"><div class="hair" style="width:100%"></div></div>
+        <div class="cell off wide"><span class="dot" style="background:var(--muted)"></span><span class="n"><i>unlisted</i></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2><span class="n">A3</span> Chips, but grouped under captions</h2>
+<ul class="why">
+  <li>The smallest change: the chips stay, the vertical bars go, and each group gets a one-word caption above it — <b>Nodes</b>, <b>No nodes</b>, <b>Unlisted</b> — so the breaks read as sections.</li>
+  <li>Counts still land where each chip ends, so this is tidier, not aligned. Shown for completeness.</li>
+</ul>
+<div class="row">
+  <div class="phone">
+    <div class="bar"><span class="flt"><span class="dot" style="background:var(--primary)"></span>All</span><span class="t">Hypergraph</span></div>
+    <div class="strip"><div class="hair"></div>
+      <div class="gcap">Nodes</div>
+      <div class="chips">
+        <span class="chip on"><span class="dot" style="background:var(--primary)"></span>All <span class="c">161</span></span>
+        <span class="chip"><span class="dot" style="background:var(--core)"></span>DAG <span class="c">129</span></span>
+        <span class="chip"><span class="dot" style="background:var(--dor)"></span>Dor Technologies <span class="c">17</span></span>
+        <span class="chip"><span class="dot" style="background:var(--biofi)"></span>BioFi <span class="c">3</span></span>
+        <span class="chip"><span class="dot" style="background:var(--ded)"></span>Digital Evidence <span class="c">3</span></span>
+        <span class="chip"><span class="dot" style="background:var(--usdc)"></span>USDC.dag <span class="c">3</span></span>
+        <span class="chip"><span class="dot" style="background:#ff9a3d"></span>The Upsider AI <span class="c">3</span></span>
+        <span class="chip"><span class="dot" style="background:#2ad4ff"></span>Common Crawl <span class="c">3</span></span>
+      </div>
+      <div class="gcap">No nodes</div>
+      <div class="chips">
+        <span class="chip off"><span class="dot" style="background:#d94fd0"></span>Cyberlete</span>
+        <span class="chip off"><span class="dot" style="background:#e0c43a"></span>PacaSwap</span>
+        <span class="chip off"><span class="dot" style="background:#6cc7ff"></span>National Digifoundry</span>
+        <span class="chip off"><span class="dot" style="background:#9a8cff"></span>Toughbook Connect</span>
+        <span class="chip off"><span class="dot" style="background:#ffb13d"></span>El Paca</span>
+      </div>
+      <div class="gcap">Unlisted</div>
+      <div class="chips"><span class="chip off"><span class="dot" style="background:var(--muted)"></span><i>unlisted</i></span></div>
+    </div>
+  </div>
+</div>
+</body></html>

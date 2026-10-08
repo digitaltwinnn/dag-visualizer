@@ -93,10 +93,24 @@ export function syncLedgerPath(path: LedgerPath, prev: LedgerPathView, next: Led
  *  rail's ghost or ‹ › — is a highlighted row on its page, never a drill; drilling is the
  *  explorer's own click. Two store moves still touch a drill the reader made: a selection that
  *  moves to ANOTHER tick returns it to the list (its new row highlighted there), and resuming live
- *  closes it, unless the resume is that click's own (`selfResume`). The live heartbeat leaves it. */
+ *  closes it, unless the resume is that click's own (`selfResume`).
+ *
+ *  A DRILL INTO THE LIVE TICK RIDES THE HEARTBEAT (user, 2026-10-08: the explorer "says on
+ *  current" while the scene and the card had moved on, "no live icon but no pin either"). While
+ *  following, the subject is the live lane, not an ordinal — the callout's and the card's own rule
+ *  — so a drill opened on the live tick moves to each new live tick: the same network stays open
+ *  inside it, and an open snapshot's signers move to the network's new snapshot when the follow
+ *  advanced the pair, else close. A drill on an OLDER tick (not the one the heartbeat left) is the
+ *  reader's and stays. */
 function syncAxisPath(path: LedgerPath, prev: LedgerPathView, next: LedgerPathView): LedgerPath {
   if (next.following && !prev.following) return path.selfResume ? { ...path, selfResume: false } : CLOSED_PATH;
-  if (next.following || path.tick == null) return path;
+  if (path.tick == null) return path;
   const ord = next.snapOrd;
+  if (next.following) {
+    if (ord == null || ord === path.tick || path.tick !== prev.snapOrd) return path;
+    const m = next.metaSnap;
+    const snap = path.snap != null && m && m.globalOrdinal === ord && m.netKey === path.net ? `${m.metaId}|${m.ordinal}` : null;
+    return { tick: ord, net: path.net, snap, selfResume: path.selfResume };
+  }
   return ord != null && ord !== prev.snapOrd && ord !== path.tick ? CLOSED_PATH : path;
 }

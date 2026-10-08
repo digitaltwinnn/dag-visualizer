@@ -89,7 +89,7 @@ React's cache — is `TrendStack`'s alone and is never read back by a component)
 markers, the anchor's 0-size shape, no blur or shadow anywhere on a plane, the memoised plot and the
 plot box its cursor overlay is calculated against),
 `components/rawSurfaceBoundary.test.ts` (what RAW does is a policy row — a view's own records, or
-History's door onto the anchor log through the shared `openRecords`),
+History's stored buckets — and the toggle only raises the layer),
 `components/trendRailBoundary.test.ts` (History's three "one home" rules: one plane-focus builder,
 one records door, one roster pass),
 `components/calloutBoundary.test.ts` (`#callout` has two homes, both consult `boxedCard`, both
@@ -136,9 +136,12 @@ scope from the table.
     **Rung 2 is the History view** at `/trends` — one chart plane per network receding in depth,
     read at a shared instant. It had a second register, a long DOCUMENT behind RAW, until
     2026-10-07 (user: "not really raw, and mostly replaced by the scene"): **RAW is the records in
-    every view.** History has no records of its own, so its RAW is a DOOR (`viewPolicy.rawSurface:
-    "door"`) onto the anchor log for the span on screen — the same `components/trendDoors.ts` door
-    the Moment card's "Snapshot records" runs — and closing the layer returns to History. Charts are
+    every view.** History's records are the STORED BUCKETS of the measured history
+    (`viewPolicy.rawSurface: "buckets"`, `components/datasection/TrendBucketsSurface.tsx`, user
+    2026-10-08: "just show upstash records") for the span on screen and the committed scope (the
+    plane brought forward, else the filter) — stored fields only, never the fold's derived totals;
+    the Range and Moment cards' "Snapshot records" is the DOOR onto the anchor log
+    (`components/trendDoors.ts`) — the snapshots behind the measurement. Charts are
     2D — the planes host `TrendChart` in DOM, so the type is crisp and the reading is flat-on, and
     depth carries the ROSTER rather than pretending to be data.
     Each step down is one deliberate gesture that CARRIES ITS CONTEXT (a chart range or the window
@@ -294,7 +297,7 @@ gathers to the staging grids and fades on the doc overlay's own clock (`fleetFad
 
 | Path | Responsibility |
 |---|---|
-| `app/` | Next App Router. `globals.css` is **the one stylesheet**; `[view]/` serves the four routed 3D views (`/trends` is the History VIEW; its RAW is a door onto the anchor log); `/about` is the **DOC OVERLAY** (2026-09-04) — it renders AppShell with a scrollable document layer over the live scene (`components/DocLayer.tsx`; content in `components/docs/`, opened/closed by store `docPage` with no engine reboot; /about still server-renders its prose for crawlers and carries the **experimental disclosure** that used to be an always-on banner, retired 2026-08-09: a permanent banner over a live instrument reads as an alarm). The footer's About entry toggles the overlay. (The `/design` styleguide was deleted on 2026-10-07 — user: users don't need it; the tokens live in `globals.css` and the components are their own reference.) `--warn-soft` is /about's amber (shared with the raw layer's JSON booleans and the pulse strip's STALE dot). `api/*` are the server-side data routes. |
+| `app/` | Next App Router. `globals.css` is **the one stylesheet**; `[view]/` serves the four routed 3D views (`/trends` is the History VIEW; its RAW is the stored buckets); `/about` is the **DOC OVERLAY** (2026-09-04) — it renders AppShell with a scrollable document layer over the live scene (`components/DocLayer.tsx`; content in `components/docs/`, opened/closed by store `docPage` with no engine reboot; /about still server-renders its prose for crawlers and carries the **experimental disclosure** that used to be an always-on banner, retired 2026-08-09: a permanent banner over a live instrument reads as an alarm). The footer's About entry toggles the overlay. (The `/design` styleguide was deleted on 2026-10-07 — user: users don't need it; the tokens live in `globals.css` and the components are their own reference.) `--warn-soft` is /about's amber (shared with the raw layer's JSON booleans and the pulse strip's STALE dot). `api/*` are the server-side data routes. |
 | `components/` | React panels, each reading/writing the store. `SceneCanvas` mounts the engine (dynamic-imported so Three never enters the server bundle). `components/explorer/` is the ONE explorer card (2026-09-26): every view's tool card is a description handed to `Explorer.tsx`, never a layout of its own — the design and its deviations are in `docs/superpowers/design/2026-09-26-explorer-card/`. |
 | `components/ui/` | The adopted shadcn/Radix primitives. |
 | `src/store/store.ts` | The Zustand store — mode, filter, selection, hover channels, `section`, phone UI state. |

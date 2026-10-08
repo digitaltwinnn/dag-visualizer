@@ -590,7 +590,9 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
     <Explorer
       id="ledger-view"
       title="Snapshots"
-      hint="Recent global snapshots. Open one for the networks that anchored into it."
+      // The sentence is the path's own placeholder now (user, 2026-10-08): one line beside the house.
+      hint={null}
+      placeholder="Open one for its networks"
       levels={levels}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => {

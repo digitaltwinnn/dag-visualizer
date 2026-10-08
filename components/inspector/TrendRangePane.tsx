@@ -11,7 +11,7 @@ import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { metagraphById } from "@/src/data/network";
 import { rangePhrase, sumMeasured, TREND_METRICS } from "@/src/data/trendSeries";
-import { spanPhrase } from "@/src/data/trendWindow";
+import { spanPhrase, windowSpan } from "@/src/data/trendWindow";
 import { ageWords } from "@/src/util/relativeAge";
 import { useStore } from "@/src/store/store";
 
@@ -44,7 +44,8 @@ export default function TrendRangePane({
   collapsed,
   onToggle,
 }: {
-  onClose: () => void;
+  /** Absent while the card stands on the window: there is no range to clear. */
+  onClose?: () => void;
   collapsed: boolean;
   onToggle: () => void;
 }) {
@@ -56,7 +57,19 @@ export default function TrendRangePane({
 
   const roster = useTrendRoster(useTrendsSlice(windowId, range), filter, metric);
   const { ranked, rows, format, stepMs } = roster;
-  const pulseKey = useEdgePulse(range ? `${range.fromMs}-${range.toMs}` : null);
+  // THE WINDOW STANDS WHEN NOTHING IS BRUSHED (user, 2026-10-08): the card is the span on screen —
+  // the brushed range, else the pill's trailing span ending now, else (ALL, which has no fixed
+  // span) the measured axis itself. The key is the manifest's: a brush or a pill hop pulses once.
+  const axis = roster.rawBuckets;
+  // The trailing window's start SNAPS TO THE BUCKET STEP (the PR review): built from the clock on
+  // every render it drifted a few seconds per poll, and a short window's Start row is a clock.
+  const trailing = windowSpan(windowId, null, Date.now());
+  const span =
+    range ??
+    (trailing ? { fromMs: Math.floor(trailing.fromMs / stepMs) * stepMs, toMs: trailing.toMs } : null) ??
+    (axis.length ? { fromMs: axis[0]!, toMs: axis[axis.length - 1]! + stepMs } : null);
+  const spanKey = range ? `${range.fromMs}-${range.toMs}` : `window:${windowId}`;
+  const pulseKey = useEdgePulse(spanKey);
 
   const subject = subjectOf(focus, filter, ranked, (id) => id !== "dag" && rows.has(id));
   const who = subject ? metagraphById(subject)?.ticker || rows.get(subject)?.name || subject : "All networks";
@@ -64,9 +77,8 @@ export default function TrendRangePane({
   // the drawn series drop a counter's partial EDGE buckets, which for a range snapped to whole days
   // dropped its whole first day. A snapped range's edges are whole, so nothing is trimmed here; a
   // bucket that starts before the range is left out rather than counted partially.
-  const axis = roster.rawBuckets;
   const rawAll = subject ? (rows.get(subject)?.rawPoints ?? []) : roster.rawGlobal;
-  const points = !range ? [] : rawAll.filter((_, i) => axis[i]! >= range.fromMs && axis[i]! < range.toMs);
+  const points = !span ? [] : rawAll.filter((_, i) => axis[i]! >= span.fromMs && axis[i]! < span.toMs);
 
   // A COUNTER is the span's total; a gauge and the spacing are its average (the roster's own span
   // reading, the figure the Networks list states).
@@ -75,13 +87,13 @@ export default function TrendRangePane({
   const value = counter ? (total?.sum ?? null) : subject ? (rows.get(subject)?.span ?? null) : (roster.total?.span ?? null);
   // How long ago the span ENDED — "until now" when it runs to the newest bucket (user, 2026-10-07:
   // "keep the N months ago on the range").
-  const endAge = range ? Date.now() - range.toMs : null;
+  const endAge = span ? Date.now() - span.toMs : null;
   const aside = endAge == null ? undefined : endAge < stepMs ? "until now" : `${ageWords(endAge)} ago`;
-  const phrase = range ? rangePhrase(metric, total?.partial ?? false) : null;
+  const phrase = span ? rangePhrase(metric, total?.partial ?? false) : null;
   // THE SPAN'S OWN ROWS (user, 2026-10-07: "Start and end date should be in the card I think for
   // clarity"): a span of two days or more is named by its UTC days, with the year (a day-only label
   // is a UTC day); a shorter one by its clock times, drawn by `Stamp` with the zone as a tag.
-  const longSpan = range ? range.toMs - range.fromMs >= 2 * 86_400_000 : false;
+  const longSpan = span ? span.toMs - span.fromMs >= 2 * 86_400_000 : false;
   const edge = (ms: number) =>
     longSpan ? new Date(ms).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" }) : <Stamp ms={ms} />;
 
@@ -90,17 +102,14 @@ export default function TrendRangePane({
       <CardHead
         eyebrow="Range"
         title={
-          range ? (
-            <span className="inline-flex items-center gap-2">
-              <RANGE_ICON aria-hidden className="size-4 flex-none text-[var(--filter-accent,var(--primary))]" />
-              {/* The one span label — its days; the exact times and zone are the Start / End rows. */}
-              {spanPhrase(windowId, range)}
-            </span>
-          ) : (
-            "—"
-          )
+          <span className="inline-flex items-center gap-2">
+            <RANGE_ICON aria-hidden className="size-4 flex-none text-[var(--filter-accent,var(--primary))]" />
+            {/* The one span label — its days, or the window pill's own words; the exact times and
+                zone are the Start / End rows. */}
+            {spanPhrase(windowId, range)}
+          </span>
         }
-        titleKey={range ? `${range.fromMs}-${range.toMs}` : undefined}
+        titleKey={spanKey}
         // When the span ENDED rides the head (user, 2026-10-07: "move '10 days ago' in range card to
         // its header") — a qualifier on the title's span, so the lead's sentence has the width.
         aside={aside ? <QualifierChip className="tabular-nums">{aside}</QualifierChip> : undefined}
@@ -108,7 +117,7 @@ export default function TrendRangePane({
         collapsed={collapsed}
         onToggle={onToggle}
       />
-      {!collapsed && range && phrase && (
+      {!collapsed && span && phrase && (
         <div>
           {/* THE LEAD: what the span was to the network above, in one sentence (the Moment's
               grammar); when it ended rides the head. */}
@@ -122,12 +131,13 @@ export default function TrendRangePane({
             )}
           </Lead>
           <FactGroup>
-            <Fact label="Start">{edge(range.fromMs)}</Fact>
-            {/* The end is exclusive, so a day-named span names the day it reaches into. */}
-            <Fact label="End">{edge(longSpan ? range.toMs - 1 : range.toMs)}</Fact>
-            <Fact label="Length">{ageWords(range.toMs - range.fromMs)}</Fact>
+            <Fact label="Start">{edge(span.fromMs)}</Fact>
+            {/* The end is exclusive, so a day-named span names the day it reaches into. A trailing
+                window ends now, and says so rather than printing a clock that drifts each poll. */}
+            <Fact label="End">{range ? edge(longSpan ? span.toMs - 1 : span.toMs) : "now"}</Fact>
+            <Fact label="Length">{ageWords(span.toMs - span.fromMs)}</Fact>
           </FactGroup>
-          <RecordsDoor subject={subject} span={{ ...range, label: spanPhrase(windowId, range) }} />
+          <RecordsDoor subject={subject} span={{ ...span, label: spanPhrase(windowId, range) }} />
         </div>
       )}
       <PulseEdge pulseKey={pulseKey} rail="right" off={collapsed} />

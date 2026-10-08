@@ -59,9 +59,10 @@ answer is ONE exact read, measured: one request, zero walk probes. It is also th
 can say *this network did not anchor there* — a time-based search answers that case by landing on
 whatever came next, which reads as a hit. AGE is a date, and there is no date lookup upstream
 (verified: `startTime`/`endTime`, `timestamp`, `from`, `startDate`, `before` are all silently ignored
-and return the live tip), so it is the only criterion that walks. FEE and SIZE have no index at any
-layer — a field there could only filter the 25 rows on screen, and a reader who typed a fee and got
-"no match" would reasonably conclude no such snapshot exists when we looked at 25 of 1.1 million.
+and return the live tip), so it is the only criterion that walks. SIZE (and the fee, which the log
+no longer lists) has no index at any layer — a field there could only filter the 25 rows on screen,
+and a reader who typed a size and got "no match" would reasonably conclude no such snapshot exists
+when we looked at 25 of 1.1 million.
 
 ⚠️ **UNDER ALL THE LOG IS EVERY NETWORK'S WHOLE CHAIN, MERGED BY TIME, WITH THE REAL TOTAL**
 (user, 2026-10-07: "I care about actual real totals not technical implementation … that should be
@@ -88,12 +89,13 @@ total being counted twinkles in its slot.
 on table filtering: what is APPLIED (in words, so a folded bar can never leave the table on a search
 with nothing explaining it) and a way to CLEAR it.
 
-⚠️ **AND TWO COLUMNS STAND DOWN ON PHONE.** Six columns cannot fit a 500px viewport — measured, the
+⚠️ **AND SIZE STANDS DOWN ON PHONE.** Six columns cannot fit a 500px viewport — measured, the
 table ran 494px inside a 403px pane and took the log into horizontal scroll, which on a log you SCAN
-is worse than showing less of each row. FEE and SIZE go: the other four IDENTIFY a row (whose chain,
-which snapshot, where it anchored, when) while those two are measures ABOUT it, stated in full on the
-snapshot card one tap away — and they are the only two the search bar cannot answer for anyway. One
-class on the header cell and its body cells, so a column can never half-hide.
+is worse than showing less of each row. SIZE goes: the other four IDENTIFY a row (whose chain,
+which snapshot, where it anchored, when) while size is a measure ABOUT it, stated in full on the
+snapshot card one tap away — and it is the one the search bar cannot answer for anyway. One
+class on the header cell and its body cells, so a column can never half-hide. **The log has no FEE
+column on any tier** (user, 2026-10-08: "too crowded"): the fee is the snapshot card's reading.
 
 ⚠️ **AND ANCHORED INTO HAS NO FALLBACK, DELIBERATELY.** The payload host serves only the recent band
 of global ordinals and 404s older ones. A first cut answered that by resolving the ordinal to a
@@ -133,15 +135,22 @@ mirror, with three ways to ask for it — the switch, Escape, the layer's own ×
 ⚠️ **WHAT RAW DOES IS A POLICY ROW** (2026-09-18; RAW IS THE RECORDS in every view since
 2026-10-07). `VIEW_POLICIES[mode].rawSurface` is where each view says it: `"records"` for the
 structural views, whose own records the layer shows (the anchor log, the node roster), and
-`"door"` for History, which has none of its own — its RAW toggle runs `trendDoors.openRecords`
-over the span on screen (`trendWindow.windowSpan`: the brushed range, else the window), scoped to
-the plane brought forward, else the filter, and closing the layer returns to History. History's
-measured-history DOCUMENT, which RAW used to show there, was retired the same day (user: "not
-really raw, and mostly replaced by the scene"). `components/DataSection.tsx` is the keyed map from
-the row to a surface — a new answer is a compile error, never a silent fall-through, and gated on
-the row rather than a mode (convention 7); `components/rawSurfaceBoundary.test.ts` pins it and the
-toggle's door. The mode compares that pick WHICH TABLE the records surface draws are
-records-internal, which is why they sit inside that surface and never in the dispatch.
+`"buckets"` for History — the STORED BUCKETS of the measured history
+(`datasection/TrendBucketsSurface.tsx`, user 2026-10-08: "just show upstash records"): one row
+per bucket of the window or range on screen, the STORED fields of the committed scope (the plane
+brought forward, else the filter — `trendStack.cardNetwork`; the resting front plane is a reading
+of the deck, not a commit), named as the sampler names them, a dash where a bucket holds no
+reading. The fold's derived totals (`g.fee`/`g.kb` = floor + unlisted, the summed `m.unlisted.*`)
+are not stored and are left out; under Unlisted the per-address chains show as stored. It reads
+the planes' own payload (`useTrendsSlice`).
+For one day (2026-10-07) History's RAW was a door onto the anchor log; the Range and Moment
+cards' "Snapshot records" still is (`trendDoors.openRecords`). History's measured-history
+DOCUMENT, which RAW showed before that, was retired on 2026-10-07 (user: "not really raw, and
+mostly replaced by the scene"). `components/DataSection.tsx` is the keyed map from the row to a
+surface — a new answer is a compile error, never a silent fall-through, and gated on the row
+rather than a mode (convention 7); `components/rawSurfaceBoundary.test.ts` pins it, and that the
+toggle only raises the layer. The mode compares that pick WHICH TABLE the records surface draws
+are records-internal, which is why they sit inside that surface and never in the dispatch.
 
 **The page never scrolls.** The scene wrapper is `position:fixed; inset:0` with an identity transform
 from first paint, which makes it the containing block for every fixed descendant — see CSS trap 2,

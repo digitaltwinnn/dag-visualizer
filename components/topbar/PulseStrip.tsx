@@ -123,10 +123,13 @@ export default function PulseStrip() {
                   </span>
                   {/* ONE READING, no mid-dot (user, 2026-10-03): the share that succeeded, shown
                       only when something failed — "100% ok" would restate the green run. Never
-                      "100%" while anything failed; one decimal from 99 up, capped at 99.9. */}
+                      "100%" while anything failed; one decimal from 99 up, capped at 99.9. The bare
+                      share, no word (user, 2026-10-08): beside a green-and-red run a percentage
+                      can only mean the green part. It recounts every second the strip is open
+                      (`useNowTick`) from the registry, so a poll that lands while it is open moves it. */}
                   {r.err > 0 && (
                     <span className="text-label tabular-nums text-muted-foreground">
-                      {okShare(r.ok, r.err)} ok
+                      {okShare(r.ok, r.err)}
                     </span>
                   )}
                 </span>

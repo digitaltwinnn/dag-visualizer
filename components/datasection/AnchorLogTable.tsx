@@ -2,7 +2,7 @@
 
 import { METAGRAPHS, netUrl } from "@/src/net/current";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronDown, ChevronRight, Search, X } from "lucide-react";
 import type { CSSProperties } from "react";
 import { useStore } from "@/src/store/store";
 import { useSnapshotFeed } from "@/components/useSnapshotFeed";
@@ -13,7 +13,7 @@ import { ledgerLens } from "@/src/data/ledgerStory";
 import { metaSnapHoverKey, type GlobalSnapshot } from "@/src/data/types";
 import { metaSnapArrivalActions, metaSnapSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { fmtDag, fmtKB } from "@/src/util/format";
+import { fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { Empty, IdentityDot } from "@/components/inspector/parts";
 import { selectionHue } from "@/components/selection";
@@ -32,6 +32,9 @@ import type { ChainSpan } from "@/src/data/mergedLog";
 import { useMinHold } from "@/components/useMinHold";
 import { useUnlistedLastSeen } from "@/components/useUnlistedLastSeen";
 import { useUnlistedChains } from "@/components/datasection/useUnlistedChains";
+import { useChainSpan } from "@/components/useArchive";
+import LiveDot from "@/components/LiveDot";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { NodeStars } from "@/components/state/StateAtoms";
 import { isRetired } from "@/src/net/lineage";
 
@@ -47,23 +50,25 @@ const PAGE = 25;
  *  holds several searches' worth without letting a long session grow unbounded. */
 const PROBE_CACHE = 64;
 
-/** ⚠️ TWO COLUMNS STAND DOWN ON PHONE. Six columns cannot fit a 500px viewport — measured, the
+/** ⚠️ SIZE STANDS DOWN ON PHONE. Six columns cannot fit a 500px viewport — measured, the
  *  table ran 494px inside a 403px pane and took the whole log into horizontal scroll, which on a
  *  log you SCAN is worse than showing less of each row. This table already answered the same
  *  question the same way once (2026-08-15: the full network NAME became the TICKER because "the
  *  name column alone pushed the log into horizontal scroll") — shrink what is shown, do not hand
  *  the reader a sideways scroll.
  *
- *  FEE and SIZE are the two that go, and the choice is not arbitrary: the other four are what
- *  IDENTIFIES a row — whose chain, which snapshot, where it anchored, when — while fee and size
- *  are measures ABOUT it, and both are stated in full on the snapshot card one tap away. They are
- *  also the two columns the search bar cannot answer for, having no index at any layer, so a phone
- *  loses nothing it could have acted on. `max-[700px]` is `breakpointOf`'s own phone boundary and
- *  the same arm every other phone gate names (CSS trap 8: it stops applying AT 700). */
+ *  SIZE is the one that goes, and the choice is not arbitrary: the other four are what
+ *  IDENTIFIES a row — whose chain, which snapshot, where it anchored, when — while size is a
+ *  measure ABOUT it, stated in full on the snapshot card one tap away. It is also a column the
+ *  search bar cannot answer for, having no index at any layer, so a phone loses nothing it could
+ *  have acted on. `max-[700px]` is `breakpointOf`'s own phone boundary and the same arm every
+ *  other phone gate names (CSS trap 8: it stops applying AT 700).
+ *  NO FEE COLUMN AT ALL (user, 2026-10-08: "it gets too crowded here"): the fee is a reading about
+ *  one snapshot, on the snapshot card where the size also is; the log identifies rows. The
+ *  `fee` sort key stays in the vocabulary (`sortAnchorLog`) — nothing in this table offers it. */
 const COLUMNS: { key: AnchorLogSortKey; label: string; phone?: false; phoneLabel?: string }[] = [
   { key: "net", label: "Network" },
   { key: "ordinal", label: "Snapshot" },
-  { key: "fee", label: "Fee (DAG)", phone: false },
   { key: "size", label: "Size", phone: false },
   // `phoneLabel` — the same axis under its shorter name where the wide one alone kept the four
   // surviving columns in sideways scroll (2026-09-02: measured 366px of columns in a 309px pane,
@@ -111,23 +116,65 @@ const Dash = () => (
 // explorer stamps metagraph snapshots with the anchoring global's own timestamp). Until it
 // resolves the cell reads "…" and the row does not commit: a metagraph-snapshot selection IS
 // the (snapshot, tick) pair, and committing half of it would break every downstream consumer.
-/** One chain's label in the toolbar: the current one says so, an earlier one says when it ran —
- *  its genesis date, read from the chain's own span (the same lookup the dossier uses). */
-/** One segment of the chain toggle: a one-word name. */
-function ChainSegment({ idx, on, onPick }: { idx: number; on: boolean; onPick: () => void }) {
-  const name = idx === 0 ? "Current" : idx === 1 ? "Earlier" : `Earlier ${idx}`;
+/** One segment of the chain toggle: a one-word name, or the months an earlier chain ran. */
+const SEGMENT = "inline-flex items-center gap-1 h-7 pointer-coarse:h-10 px-2.5 rounded-sm cursor-pointer text-label whitespace-nowrap";
+const SEGMENT_ON = "bg-[var(--sel-bg)] text-foreground";
+const SEGMENT_OFF = "text-muted-foreground hover:text-foreground";
+function ChainSegment({ label, on, onPick }: { label: string; on: boolean; onPick: () => void }) {
   return (
-    <button
-      type="button"
-      aria-pressed={on}
-      onClick={onPick}
-      className={cn(
-        "h-7 pointer-coarse:h-10 px-2.5 rounded-sm cursor-pointer text-label",
-        on ? "bg-[var(--sel-bg)] text-foreground" : "text-muted-foreground hover:text-foreground",
-      )}
-    >
-      {name}
+    <button type="button" aria-pressed={on} onClick={onPick} className={cn(SEGMENT, on ? SEGMENT_ON : SEGMENT_OFF)}>
+      {label}
     </button>
+  );
+}
+/** WHEN A CHAIN RAN — its first and last snapshot's months, UTC like every day-only label (the
+ *  date rule, `src/util/localTime`). One month when both fall in it; null until the span is read. */
+function chainMonths(span: { genesisTs: string | null; latestTs: string | null } | null): string | null {
+  if (!span?.genesisTs) return null;
+  const month = (ts: string) => new Date(ts).toLocaleDateString(undefined, { month: "short", year: "numeric", timeZone: "UTC" });
+  const a = month(span.genesisTs);
+  const b = span.latestTs ? month(span.latestTs) : null;
+  return b && b !== a ? `${a} – ${b}` : a;
+}
+/** One earlier chain as a menu row: the months it ran (its ordinal count while they load). */
+function ChainChoice({ addr, idx, on, onPick }: { addr: string; idx: number; on: boolean; onPick: () => void }) {
+  const months = chainMonths(useChainSpan(addr));
+  return (
+    <DropdownMenuItem onSelect={onPick} className="gap-2 text-label">
+      <span className="min-w-0 flex-1 truncate">{months ?? `Earlier ${idx}`}</span>
+      <Check aria-hidden className={cn("size-3.5 flex-none", on ? "opacity-100" : "opacity-0")} />
+    </DropdownMenuItem>
+  );
+}
+/** THE NETWORK'S CHAINS (user, 2026-10-04: "can't we just have a simple toggle?"; 2026-10-08:
+ *  "limit the control to current / earlier and use a drop-down for multiple earlier versions, and
+ *  show also the date range"): Current | Earlier. One earlier chain is a plain segment; several
+ *  make the segment a menu of them, each named by the months it ran, and the pressed segment then
+ *  says which months are being paged. */
+function ChainControl({ lineage, chainIdx, onPick }: { lineage: readonly string[]; chainIdx: number; onPick: (idx: number) => void }) {
+  const chosen = chainMonths(useChainSpan(chainIdx > 0 ? (lineage[chainIdx] ?? null) : null));
+  const several = lineage.length > 2;
+  return (
+    <span className="inline-flex items-center gap-0.5 p-0.5 rounded-btn border border-border" role="group" aria-label="Which of this network's chains to page">
+      <ChainSegment label="Current" on={chainIdx === 0} onPick={() => onPick(0)} />
+      {!several ? (
+        <ChainSegment label="Earlier" on={chainIdx === 1} onPick={() => onPick(1)} />
+      ) : (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button type="button" aria-pressed={chainIdx > 0} className={cn(SEGMENT, chainIdx > 0 ? SEGMENT_ON : SEGMENT_OFF)}>
+              {chainIdx > 0 ? (chosen ?? "Earlier") : "Earlier"}
+              <ChevronDown aria-hidden className="size-3 opacity-70" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" sideOffset={6} className="min-w-[11rem]">
+            {lineage.slice(1).map((addr, i) => (
+              <ChainChoice key={addr} addr={addr} idx={i + 1} on={chainIdx === i + 1} onPick={() => onPick(i + 1)} />
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    </span>
   );
 }
 
@@ -191,7 +238,15 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // history pages like a network's — it used to be the live window alone.
   // …while the unlisted chain list is in hand: a list that failed or holds nothing falls back to the
   // live window (the "latest" rows) rather than merging nothing and waiting forever (the review).
-  const unlisted = useUnlistedChains(lens === UNLISTED_ID);
+  // ⚠️ READ ONLY WHILE THE RAW LAYER IS OPEN: this table stays mounted behind the scene, and an
+  // ungated merge read every network's chain on every Snapshots page load (measured: 28 requests
+  // with RAW closed). Its caches survive closing, so reopening is instant.
+  const rawOpen = useStore((s) => s.section === "data");
+  // …AND UNDER ALL (user, 2026-10-08: "can't see unlisted in the raw snapshot list — I came from a
+  // range in History that does show it anchoring"): unlisted is a network like any other, so the
+  // unscoped log merges the unlisted chains with the catalog's once their list is in hand. Under
+  // Unlisted the list is the whole merge, so the merge waits for it (below).
+  const unlisted = useUnlistedChains(lens === UNLISTED_ID || (lens === "all" && rawOpen));
   const unlistedReady = !!unlisted.chains?.length;
   const unlistedFallback = lens === UNLISTED_ID && (unlisted.failed || (unlisted.chains != null && !unlisted.chains.length));
   const mergedMode = logMode({ chain: histNet, lens }) === "merged" && !unlistedFallback;
@@ -200,7 +255,10 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // catalog has, RETIRED ones included, with their former addresses, so the all-time total and the
   // records of a network Constellation no longer lists survive its removal.
   const catalogChains = useMemo(() => METAGRAPHS.flatMap((m) => [m.id, ...(m.formerIds ?? [])]).filter((a, i, all) => !!a && all.indexOf(a) === i), []);
-  const mergedChains = lens === UNLISTED_ID ? (unlisted.chains ?? NO_CHAINS) : catalogChains;
+  const mergedChains = useMemo(
+    () => (lens === UNLISTED_ID ? (unlisted.chains ?? NO_CHAINS) : unlisted.chains?.length ? [...catalogChains, ...unlisted.chains] : catalogChains),
+    [lens, unlisted.chains, catalogChains],
+  );
   // The live buffer's newest ordinal per chain — the merged log's tips lead with it.
   const liveTips: Record<string, number> = {};
   if (net) for (const [addr, snaps] of net.metaSnaps) for (const r of snaps) if (r.ordinal > (liveTips[addr] ?? 0)) liveTips[addr] = r.ordinal;
@@ -227,14 +285,13 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     () => (globalSpans ? { kind: "spans", spans: globalSpans } : timeCut ? { kind: "time", fromMs: timeCut.fromMs, toMs: timeCut.toMs } : { kind: "all" }),
     [globalSpans, timeCut],
   );
-  // ⚠️ READ ONLY WHILE THE RAW LAYER IS OPEN: this table stays mounted behind the scene, and an
-  // ungated merge read every network's chain on every Snapshots page load (measured: 28 requests
-  // with RAW closed). Its caches survive closing, so reopening is instant.
-  const rawOpen = useStore((s) => s.section === "data");
   // Under the Unlisted lens an empty log says when one last anchored, never "waiting" forever.
   const unlistedLastSeen = useUnlistedLastSeen(rawOpen && lens === UNLISTED_ID);
   // Under Unlisted the merge waits for the chain list — an empty list would read as "no snapshots".
-  const merged = useMergedLog(mergedMode && rawOpen && (lens !== UNLISTED_ID || unlistedReady), mergedChains, mergedScope, liveTips);
+  // …and under ALL it waits for the list too (or its failure), so the merge reads once rather than
+  // walking the catalog and restarting when the unlisted chains land (the PR review).
+  const unlistedSettled = unlisted.chains != null || unlisted.failed;
+  const merged = useMergedLog(mergedMode && rawOpen && (lens === UNLISTED_ID ? unlistedReady : lens !== "all" || unlistedSettled), mergedChains, mergedScope, liveTips);
   /** A merged search waiting for its page: land (mark) its first row, or go to the oldest end. */
   const mergedLand = useRef<"newest" | "oldest" | "landed-oldest" | null>(null);
 
@@ -296,6 +353,12 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
    *  `addr` is the chain the ordinals count on — another chain's ordinals mean nothing here. A
    *  snapshot or global search, a clear, or another chain drops it. */
   const [bound, setBound] = useState<{ addr: string; fromMs: number; toMs: number | null; first: number; last: number } | null>(null);
+  /** A SNAPSHOT SEARCH CUTS THE CHAIN AT ITS ANSWER (user, 2026-10-08: "why would we show any newer
+   *  global snapshots before our search results? … it also refreshes while a search is active"):
+   *  the found snapshot is the first row and the log pages back from it, through `bound` with the
+   *  snapshot as `last` — the range's own path, so the page grid counts from the answer and the
+   *  live page is not read while it stands. The flag says the bound is a snapshot's, not a date's. */
+  const [snapCut, setSnapCut] = useState(false);
   const [seeking, setSeeking] = useState(false);
   // ⚠️ AN ARRIVAL SHOWS ITS SEARCH, NOT THE LIVE PAGE (user, 2026-09-29: coming to the raw page
   // from History with a network in scope "looks like it's loading something twice"). The door hands
@@ -392,7 +455,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // PAGES INSIDE A RANGE COUNT FROM THE RANGE'S NEWEST SNAPSHOT (the tester pass, 2026-10-07: they
   // were cut from the chain's own page grid, so page 1 of a range held 11 rows, then 25). A range's
   // pages are their own reads, keyed by the range, so every page but the last is full.
-  const rangeSpan = timeCut && bound && bound.addr === histAddr ? bound : null;
+  const rangeSpan = (timeCut || snapCut) && bound && bound.addr === histAddr ? bound : null;
   const rangeRows = useRef(new Map<string, HistRow[]>());
   const rangeKey = (n: number) => (rangeSpan ? `${rangeSpan.addr}:${rangeSpan.last}:${n}` : "");
   useEffect(() => {
@@ -668,7 +731,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   const seekSnapshot = () => {
     // ONE SEARCH AT A TIME (the tester pass, 2026-10-07: a global search with a date range applied
     // showed both chips while only one was in force). An exact address replaces the other criteria.
-    setBound(null); setTimeCut(null); setGlobalSpans(null); setDoorLabel(null); setDoorSpan(null);
+    setBound(null); setSnapCut(false); setTimeCut(null); setGlobalSpans(null); setDoorLabel(null); setDoorSpan(null);
     setQTick(""); setQFrom(""); setQTo("");
     setApplied({ snapshot: qSnapshot, tick: "", from: "", to: "", doorLabel: null });
     const n = Number(qSnapshot.replace(/[^\d]/g, ""));
@@ -692,7 +755,13 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     }
     if (!latest) { setJumpMiss("still reading the chain"); return; }
     if (n > latest) { setJumpMiss(`newest is ${latest.toLocaleString()}`); return; }
-    landOn(n);
+    // The answer leads: the chain is cut at it (`snapCut`), page 1 of the cut is the answer and the
+    // 24 before it, and the mark lands on the first row.
+    if (histNet && latest) hist.current.latest = latest;
+    setBound({ addr: histAddr!, fromMs: 0, toMs: null, first: 1, last: n });
+    setSnapCut(true);
+    setPageState(1);
+    setMarked(n);
   };
 
   /** ANCHORED INTO — ASK THE GLOBAL SNAPSHOT ITSELF (user, 2026-09-01: "why if you search a
@@ -713,7 +782,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
    *  message names the route that does work. */
   const seekTick = async () => {
     // One search at a time: a global snapshot replaces a snapshot number or a date range.
-    setBound(null); setTimeCut(null); setDoorLabel(null); setDoorSpan(null);
+    setBound(null); setSnapCut(false); setTimeCut(null); setDoorLabel(null); setDoorSpan(null);
     setQSnapshot(""); setQFrom(""); setQTo("");
     setApplied({ snapshot: "", tick: qTick, from: "", to: "", doorLabel: null });
     const n = Number(qTick.replace(/[^\d]/g, ""));
@@ -1151,6 +1220,9 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
    *  silently in force with nothing on screen to explain the rows you are looking at. */
   // What is IN FORCE (the applied record), not what is typed — the chips say only that.
   const searchSet = applied != null;
+  /** The rows follow the chain: the newest page, nothing in force, and the live tip being read. */
+  const liveNow =
+    !searchSet && !(mergedMode ? merged.error : histErr) && (mergedMode ? mergedScope.kind === "all" && merged.page === 1 : histNet ? !rangeSpan && page === 1 : true);
 
   // A SEARCH THAT LANDS FOLDS THE BAR (design round, 2026-09-29): the landing mark on the row and
   // the toolbar's applied chip say what is in force, so the fields step aside and the log gets its
@@ -1197,7 +1269,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   );
 
   const clearSearch = () => {
-    setQSnapshot(""); setQTick(""); setQFrom(""); setQTo(""); setDoorLabel(null); setDoorSpan(null); setBound(null); setTimeCut(null); setGlobalSpans(null); setApplied(null);
+    setQSnapshot(""); setQTick(""); setQFrom(""); setQTo(""); setDoorLabel(null); setDoorSpan(null); setBound(null); setSnapCut(false); setTimeCut(null); setGlobalSpans(null); setApplied(null);
     // Clearing the search drops a door's scope, and under "all" the log's own pick too.
     setDoorMeta(null);
     if (!lensNet) setSearchMeta(null);
@@ -1241,13 +1313,20 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
           TOGGLE of one-word names (user, 2026-10-04: "two buttons with lots of text, even on
           mobile … can't we just have a simple toggle?"): Current | Earlier, the pressed segment the
           chain this table pages; each chain's start date and address are its segment's title. */}
-      {lineage.length > 1 && (
-        <span className="mr-auto inline-flex items-center gap-0.5 p-0.5 rounded-btn border border-border" role="group" aria-label="Which of this network's chains to page">
-          {lineage.map((addr, i) => (
-            <ChainSegment key={addr} idx={i} on={i === chainIdx} onPick={() => { setMarked(null); setJumpMiss(null); setChain(i); }} />
-          ))}
-        </span>
-      )}
+      <span className="mr-auto inline-flex items-center gap-2.5">
+        {/* THE LOG IS LIVE ON ITS NEWEST PAGE WITH NO SEARCH IN FORCE (user, 2026-10-08): the card's
+            own beating dot and word, so the page that follows the chain says so — and a search or
+            a page back, which freezes it, drops the word. */}
+        {liveNow && (
+          <span className="inline-flex items-center gap-1.5 text-label text-muted-foreground">
+            <LiveDot />
+            live
+          </span>
+        )}
+        {lineage.length > 1 && (
+          <ChainControl lineage={lineage} chainIdx={chainIdx} onPick={(i) => { setMarked(null); setJumpMiss(null); setChain(i); }} />
+        )}
+      </span>
       {searchSet && (
         // EACH APPLIED CRITERION IS ITS OWN CHIP with its own × (user, 2026-10-07): one chip per
         // condition, and the metagraph snapshot names its chain beside the ordinal ("DED 2,617,537"),
@@ -1263,7 +1342,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
               ...c,
               clear:
                 c.key === "snapshot"
-                  ? () => { setQSnapshot(""); setMarked(null); setJumpMiss(null); setApplied(null); }
+                  ? () => { setQSnapshot(""); setMarked(null); setJumpMiss(null); setApplied(null); setBound(null); setSnapCut(false); setPageState(1); }
                   : c.key === "tick"
                     ? () => { setQTick(""); setMarked(null); setJumpMiss(null); setGlobalSpans(null); setApplied(null); }
                     : () => { setQFrom(""); setQTo(""); setDoorLabel(null); setDoorSpan(null); setBound(null); setTimeCut(null); setApplied(null); },
@@ -1724,7 +1803,6 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                     {/* The ✓ slot is ALWAYS reserved so the column never shifts on select. */}
                     {seam ? <Dash /> : r.ordinal.toLocaleString()}
                   </TableCell>
-                  <TableCell className={cn("text-right tabular-nums", PHONE_HIDDEN)}>{seam ? <Dash /> : fmtDag(r.fee)}</TableCell>
                   <TableCell className={cn("text-right tabular-nums text-foreground-dim", PHONE_HIDDEN)}>{seam ? <Dash /> : size}</TableCell>
                   {!grouped && (
                     <TableCell className="text-right font-mono tabular-nums max-[700px]:hidden">
@@ -1740,18 +1818,17 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                       <span className="min-[700px]:hidden">{relativeAge(now - Date.parse(r.ts), true)}</span>
                     </TableCell>
                   )}
-                  {/* The phone row's SECOND LINE — where it anchored, what it paid, how big it was.
-                      One muted line under the row's identity; absent from the table tiers, whose
-                      columns state the same three. A seam has only its tick. */}
-                  {/* THREE FACTS, THREE PLACES — no mid-dots (user, 2026-10-03: "likely separate facts
-                      to show instead of a combined text"): where it anchored on the left, what it
-                      paid and how big it is ranged right, each in its own cell of the line. */}
+                  {/* The phone row's SECOND LINE — where it anchored and how big it was. One muted
+                      line under the row's identity; absent from the table tiers, whose columns
+                      state the same two. A seam has only its tick. */}
+                  {/* TWO FACTS, TWO PLACES — no mid-dots (user, 2026-10-03: "likely separate facts
+                      to show instead of a combined text"): where it anchored on the left, how big
+                      it is ranged right, each in its own cell of the line. */}
                   {/* GROUPED, it joins the first line: the header holds the "into" and the age, so
-                      fee and size take the age's place instead of a line of their own. */}
+                      the size takes the age's place instead of a line of its own. */}
                   <TableCell className={cn("min-[700px]:hidden text-label text-muted-foreground whitespace-normal", grouped ? "self-center" : "col-span-full pt-0")}>
                     <span className="flex items-baseline gap-4 font-mono tabular-nums">
                       {!grouped && <span className="mr-auto">into {pending ? "…" : r.global.ordinal.toLocaleString()}</span>}
-                      {!seam && <span>{fmtDag(r.fee)} DAG</span>}
                       {!seam && <span className="min-w-[6ch] text-right">{size}</span>}
                       {/* THE ROW OPENS A PAGE (design B1): the phone's chevron says so — this cell
                           exists only on the phone, where list and snapshot are two pages. The

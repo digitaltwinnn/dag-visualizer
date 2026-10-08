@@ -6,8 +6,8 @@ import { openRecords, type RecordSpan } from "@/components/trendDoors";
 import { cn } from "@/lib/utils";
 
 /** HISTORY'S ONE EXIT, as a card's foot control (design 2026-09-26, `moment-door.html` A): the
- *  anchor log over a span, through `components/trendDoors.ts` — the shared home the RAW toggle
- *  calls too, so the records door's ordered steps are written once. One control for both History
+ *  anchor log over a span, through `components/trendDoors.ts` — the one home of the door's ordered
+ *  steps (History's RAW shows the stored buckets since 2026-10-08; this is the way to the snapshots). One control for both History
  *  cards (the Range and the Moment under it, 2026-10-07): the span is what each card states.
  *
  *  It is a full-bleed control on the wash ladder every other control wears (user: the bare text

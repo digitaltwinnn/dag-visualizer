@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>B — View strip</title>
+<link rel="stylesheet" href="page.css">
+<style>
+.bar{margin:8px 8px 0;border:1px solid var(--border);border-radius:10px 10px 0 0;border-bottom:0;background:linear-gradient(180deg,rgba(20,26,48,.95),rgba(12,16,32,.95));height:60px;display:flex;align-items:center;gap:8px;padding:0 10px}
+.bar .t{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;font-size:var(--title);font-weight:600;color:var(--primary)}
+.bar .t .vn{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 10px;border-radius:7px;background:var(--wash-strong);box-shadow:inset 0 0 0 1px color-mix(in oklch,var(--primary) 45%,transparent)}
+.strip{margin:0 8px;border:1px solid var(--border);border-top:0;border-radius:0 0 10px 10px;background:rgba(12,16,32,.97);padding:0 8px 8px}
+.hair{height:1px;background:var(--border);margin:0 2px 6px}
+.row1{display:flex;align-items:center;gap:12px;height:44px;padding:0 10px;border-radius:7px;font-size:var(--body);color:var(--dim)}
+.row1 svg{color:var(--dim)}
+.row1.on{background:var(--wash-strong);box-shadow:inset 0 0 0 1px color-mix(in oklch,var(--primary) 45%,transparent);color:var(--fg)}
+.row1.on svg{color:var(--primary)}
+.row1 .m{margin-left:auto;font-size:var(--label);color:var(--muted)}
+.row1.soon{opacity:.65}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 6px}
+.cell{display:flex;align-items:center;gap:10px;height:44px;padding:0 10px;border-radius:7px;font-size:var(--body);color:var(--dim)}
+.cell svg{color:var(--dim)}
+.cell.on{background:var(--wash-strong);box-shadow:inset 0 0 0 1px color-mix(in oklch,var(--primary) 45%,transparent);color:var(--fg)}
+.cell.on svg{color:var(--primary)}
+.cell.wide{grid-column:1/-1}
+.cell.soon{opacity:.65}
+</style></head>
+<body>
+<svg width="0" height="0" style="position:absolute"><defs>
+<symbol id="orbit" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><path d="M10.4 21.9a10 10 0 0 0 9.941-15.416M13.5 2.1a10 10 0 0 0-9.841 15.416"/></symbol>
+<symbol id="globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20M2 12h20"/></symbol>
+<symbol id="layers" viewBox="0 0 24 24"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83ZM2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"/></symbol>
+<symbol id="chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="m19 9-5 5-4-4-3 3"/></symbol>
+<symbol id="soon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-dasharray="3 3"/></symbol>
+</defs></svg>
+
+<h1>B — View strip (phone)</h1>
+<p class="lede">Today the five views are chips wrapped into two uneven rows (two, then three), each its own width, with Coming soon dimmed at the end. Same strip, same two species as page A — whichever is picked there should be picked here, so the three tenants of the bar read as one control.</p>
+<nav class="pages"><a href="index.html">all pages</a> · <a href="a-filter.html">A — Filter strip</a></nav>
+
+<h2><span class="n now">0</span> Now</h2>
+<div class="row"><div class="crop" style="height:220px"><img src="now-views.png" alt="current view strip"></div></div>
+
+<h2><span class="n">B1</span> One view per row <span class="rec">recommended</span></h2>
+<ul class="why">
+  <li>Five 44px rows: the view's glyph and name on the left, the current view in the on-state. The same row as A1 — the filter and the views are then one control with different rows.</li>
+  <li>Each row's right edge carries the view's one-word question — <b>who</b>, <b>where</b>, <b>when</b>, <b>how it changed</b> — the four projections the About page already names. It says what a view is FOR in one word; drop it if it reads as a lecture.</li>
+  <li>Coming soon stays the last row at its dimmed weight, no question.</li>
+</ul>
+<div class="row">
+  <div class="phone">
+    <div class="bar"><svg class="i" style="color:var(--primary)"><use href="#orbit"/></svg><span class="t"><span class="vn"><svg class="i s"><use href="#orbit"/></svg>Hypergraph</span></span><svg class="i"><use href="#layers"/></svg></div>
+    <div class="strip"><div class="hair"></div>
+      <div class="row1 on"><svg class="i"><use href="#orbit"/></svg>Hypergraph<span class="m">who</span></div>
+      <div class="row1"><svg class="i"><use href="#globe"/></svg>Geography<span class="m">where</span></div>
+      <div class="row1"><svg class="i"><use href="#layers"/></svg>Snapshots<span class="m">when</span></div>
+      <div class="row1"><svg class="i"><use href="#chart"/></svg>History<span class="m">how it changed</span></div>
+      <div class="row1 soon"><svg class="i"><use href="#soon"/></svg>Coming soon</div>
+    </div>
+  </div>
+</div>
+
+<h2><span class="n">B2</span> Two equal columns</h2>
+<ul class="why">
+  <li>The same cells in a two-column grid: four views in two rows, Coming soon a full-width cell under them. Three rows, 140px — the strip stays short.</li>
+  <li>The pair to A2: equal cells, glyph and name, no question word (a cell has no room for it).</li>
+</ul>
+<div class="row">
+  <div class="phone">
+    <div class="bar"><svg class="i" style="color:var(--primary)"><use href="#orbit"/></svg><span class="t"><span class="vn"><svg class="i s"><use href="#orbit"/></svg>Hypergraph</span></span><svg class="i"><use href="#layers"/></svg></div>
+    <div class="strip"><div class="hair"></div>
+      <div class="grid">
+        <div class="cell on"><svg class="i"><use href="#orbit"/></svg>Hypergraph</div>
+        <div class="cell"><svg class="i"><use href="#globe"/></svg>Geography</div>
+        <div class="cell"><svg class="i"><use href="#layers"/></svg>Snapshots</div>
+        <div class="cell"><svg class="i"><use href="#chart"/></svg>History</div>
+        <div class="cell wide soon"><svg class="i"><use href="#soon"/></svg>Coming soon</div>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="note">Either way the bar's swipe and the pips under the view name stay as they are; only the opened list changes.</p>
+</body></html>

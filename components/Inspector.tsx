@@ -420,9 +420,11 @@ export default function Inspector() {
   const trendCursorMs = useStore((s) => s.trendCursorMs);
   const trendRange = useStore((s) => s.trendRange);
   const trendFocus = useStore((s) => s.trendFocus);
+  const trendFront = useStore((s) => s.trendFront);
+  const trendWindow = useStore((s) => s.trendWindow);
   const tickHasFilter = useTickHasFilter();
   const manifest = detailsCards({
-    mode, filter, tickNet, tickHasFilter, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs, trendRange, trendFocus,
+    mode, filter, tickNet, tickHasFilter, inspect, snap, country, cohort, composition, metaSnap, coarse, trendCursorMs, trendRange, trendFocus, trendFront, trendWindow,
     selNodesCount: selNodes.length,
     filterLabel: displayNetwork(filter)?.ticker ?? null, // one lookup — catalog + the unlisted pseudo-network
   });
@@ -621,8 +623,10 @@ export default function Inspector() {
     // the setter rather than the executor.
     // History's brushed RANGE (2026-10-07): a card slot with no rung, like the Moment below it;
     // its × clears the range (a setting's setter, as the timeline's own × does).
-    range: trendRange ? (
-      <TrendRangePane key="range" onClose={() => useStore.getState().setTrendRange(null)} {...cx("range")} />
+    // …and it STANDS ON THE WINDOW while nothing is brushed (2026-10-08), so it mounts in History
+    // whenever the view is on; the × then has nothing to clear and the pane hides it.
+    range: VIEW_POLICIES[mode].chartStack ? (
+      <TrendRangePane key="range" onClose={trendRange ? () => useStore.getState().setTrendRange(null) : undefined} {...cx("range")} />
     ) : null,
     instant: trendCursorMs != null ? (
       <TrendInstantPane key="instant" onClose={() => useStore.getState().setTrendCursor(null)} {...cx("instant")} />

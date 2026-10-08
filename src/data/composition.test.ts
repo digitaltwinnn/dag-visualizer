@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { roleKey, roleKeyLabel, compositionRows, nodeCompositionLabel, compositionKey, parseCompositionKey, compositionClause, ROLE_SHORT, layerCodesOf, compositionGroups, machineKey } from "./composition";
+import { compareComposition, roleKey, roleKeyLabel, compositionRows, nodeCompositionLabel, compositionKey, parseCompositionKey, compositionClause, ROLE_SHORT, layerCodesOf, compositionGroups, machineKey } from "./composition";
 import type { NodeInfo, NodeRow } from "@/src/data/types";
 
 const n = (roles: string[]): NodeInfo => ({ ip: "x", state: "Ready", layer: roles[0], roles }) as NodeInfo;
@@ -131,6 +131,17 @@ describe("machineKey", () => {
     expect(machineKey(undefined, "peerid")).toBe("peerid");
     expect(machineKey(null, "peerid")).toBe("peerid");
     expect(machineKey("", "peerid")).toBe("peerid");
+  });
+});
+
+describe("compareComposition — hybrids first, widest leading, then the layers in order", () => {
+  it("orders a mixed list the way the composition rows read", () => {
+    const list = [{ roles: ["dl1"] }, { roles: ["l0"] }, { roles: ["l0", "cl1"] }, { roles: [] as string[] }, { roles: ["l0", "cl1", "dl1"] }, { roles: ["cl1"] }];
+    expect([...list].sort(compareComposition).map((n) => roleKey(n))).toEqual(["l0+cl1+dl1", "l0+cl1", "l0", "cl1", "dl1", "none"]);
+  });
+  it("equal make-ups tie, whatever the role order given", () => {
+    expect(compareComposition({ roles: ["cl1", "l0"] }, { roles: ["l0", "cl1"] })).toBe(0);
+    expect(compareComposition({ layer: "dl1" }, { roles: ["dl1"] })).toBe(0);
   });
 });
 
