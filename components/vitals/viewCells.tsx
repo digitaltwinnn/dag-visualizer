@@ -291,7 +291,10 @@ export function GeoCells({ accent }: { accent: string }) {
       {topCountries.length > 0 && (
         <BandCard label="Top countries"
           lead={<DonutTotal counts={countryRing} accent={accent} total={countries.length} />}>
-          <MicroBars accent={accent} labelW={18} rows={topCountries.map((c) => ({ key: c.cc, label: c.cc, count: c.count }))} />
+          {/* The country's NAME, not its code (user, 2026-10-08: "top countries can use full country
+              names?") — the same label width as the sub-region card beside it, so "United States"
+              reads in full and the two cards' bars start on one line. */}
+          <MicroBars accent={accent} labelW={120} rows={topCountries.map((c) => ({ key: c.cc, label: c.country || c.cc, count: c.count }))} />
         </BandCard>
       )}
       {topIsps.length > 0 && (
