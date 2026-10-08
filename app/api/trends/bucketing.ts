@@ -75,7 +75,7 @@ export function bucketGlobals(inc: IncMap, net: string, recs: GlobalRec[], prevT
 /** One metagraph's snapshots: exact per-net sums plus the tracked-total floors.
  *
  *  `gapChain` opts INTO per-network gap stats (m.{id}.gapSum / m.{id}.gapMax — the metagraph
- *  Continuity reading, 2026-09-07): pass the previous run's newest record timestamp (null to
+ *  Continuity reading, 2026-09-07) and the anchoring count (m.{id}.ticks, 2026-10-08): pass the previous run's newest record timestamp (null to
  *  open a fresh chain, e.g. after an accepted gap). Omit it entirely when record order isn't
  *  guaranteed oldest→newest — the rebuild script's page streams — and no gap is invented. */
 export function bucketMetas(inc: IncMap, net: string, id: string, recs: MetaRec[], gapChain?: number | null): void {
@@ -96,6 +96,13 @@ export function bucketMetas(inc: IncMap, net: string, id: string, recs: MetaRec[
         addInc(inc, net, t, `m.${id}.gapSum`, gap);
         addInc(inc, net, t, `m.${id}.gapMax`, gap);
       }
+      // ANCHORINGS — the global ticks that carried this chain's snapshots (user, 2026-10-08: "I
+      // think they created one every 3s, but anchored to global only ~30s"). A metagraph snapshot
+      // carries the stamp of the global it anchored into, so a new stamp in an ordered stream is a
+      // new anchoring; a stamp equal to the previous run's newest is a tick that straddled two
+      // runs and was counted by the first. Rides the gap chain's ordering guarantee, for the same
+      // reason the gaps do.
+      if (t !== prev) addInc(inc, net, t, `m.${id}.ticks`, 1);
       prev = t;
     }
   }

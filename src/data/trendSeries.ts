@@ -497,6 +497,26 @@ export function momentPhrase(metric: TrendMetric, stepMs: number): { verb: strin
   }
 }
 
+/** HOW MANY GLOBAL SNAPSHOTS CARRIED A CHAIN, per bucket (`m.<id>.ticks`, sampled since
+ *  2026-10-08 — the user: "I think they created one every 3s, but anchored it to global only
+ *  ~30sec, so both are relevant"). Creating and anchoring are two cadences: a fast chain seals many
+ *  snapshots between two global ticks, and each tick carries the batch. A COPY, untrimmed like
+ *  `metricSeries`; empty where the store never measured it (null per bucket, never a zero). */
+export function anchorSeries(id: string, series: Readonly<Record<string, (number | null)[]>>): (number | null)[] {
+  // ⚠️ A ZERO BESIDE SNAPSHOTS IS "NOT MEASURED", NOT NONE. The read route fills a covered bucket's
+  // absent counter with an honest 0 (assemble.ts), which is right for a field the sampler always
+  // wrote — but this one began on 2026-10-08, so every older bucket arrives as 0. A chain that
+  // created snapshots in a bucket was anchored at least once in it (a snapshot carries its
+  // global's stamp), so 0 there can only be the field's absence (rule 10: null, never a zero).
+  const snaps = series[`m.${id}.snaps`] ?? [];
+  return (series[`m.${id}.ticks`] ?? []).map((a, i) => (a === 0 && (snaps[i] ?? 0) > 0 ? null : a));
+}
+
+/** The Moment lead's second clause, beside the creation spacing: "and anchored {n} times". */
+export function anchorClause(n: number): { before: string; after: string } {
+  return { before: "and anchored", after: n === 1 ? "time" : "times" };
+}
+
 /** A RANGE'S READING AS A SENTENCE ABOUT ITS NETWORK (2026-10-07 — the Range card, the Moment's
  *  parent; `momentPhrase`'s sibling). A counter is the TOTAL over the span ("DED anchored 52,140
  *  snapshots in this range") — what a reader asks of a range — and a total that skipped an

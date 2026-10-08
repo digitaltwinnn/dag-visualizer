@@ -94,6 +94,22 @@ describe("bucketMetas", () => {
     ], null);
     expect(get(inc3, day, "14:00|m.abc.gapSum")).toBe(20);
   });
+  it("counts ANCHORINGS — distinct global stamps — and not a tick the previous run already counted", () => {
+    const day = "t:mainnet:5m:2026-09-06";
+    const rec = (ordinal: number, t: string) => ({ ordinal, timestamp: t, fee: 0, sizeInKB: 0 });
+    // Three snapshots in two global ticks: two anchorings.
+    const inc: IncMap = new Map();
+    bucketMetas(inc, "mainnet", "abc", [rec(9, ts(14, 0, 0)), rec(10, ts(14, 0, 0)), rec(11, ts(14, 0, 30))], null);
+    expect(get(inc, day, "14:00|m.abc.ticks")).toBe(2);
+    // The previous run's newest stamp IS this batch's first tick: it straddled the runs.
+    const inc2: IncMap = new Map();
+    bucketMetas(inc2, "mainnet", "abc", [rec(12, ts(14, 0, 30)), rec(13, ts(14, 1, 0))], Date.parse(ts(14, 0, 30)));
+    expect(get(inc2, day, "14:00|m.abc.ticks")).toBe(1);
+    // Unordered streams (no opt-in) count nothing rather than guess.
+    const inc3: IncMap = new Map();
+    bucketMetas(inc3, "mainnet", "abc", [rec(9, ts(14, 0, 0))]);
+    expect(get(inc3, day, "14:00|m.abc.ticks")).toBeUndefined();
+  });
   it("also feeds the global floors", () => {
     const inc: IncMap = new Map();
     bucketMetas(inc, "mainnet", "abc", [{ ordinal: 9, timestamp: ts(14, 2), fee: 400000, sizeInKB: 12.5 }]);

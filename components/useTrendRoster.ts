@@ -6,6 +6,7 @@ import type { TrendsSlice } from "@/components/useTrendsSlice";
 import { stackRoster, viewScope, type TrendScope } from "@/src/data/trendScope";
 import {
   TREND_METRICS,
+  anchorSeries,
   globalSeries,
   lastMeasured,
   latestDay,
@@ -71,6 +72,9 @@ export interface TrendRosterRow {
    *  figure, the plane's headline and the rank (user, 2026-09-29: "didn't we agree to keep it
    *  consistent"). `span` where the window holds at least a day, else `day` — see `headKind`. */
   head: number | null;
+  /** CONTINUITY only: the global snapshots that carried this chain per bucket, cut like `series`
+   *  (`anchorSeries`) — the Moment lead's second cadence. Absent for every other measure. */
+  anchors?: (number | null)[];
 }
 
 export interface TrendRosterView {
@@ -194,6 +198,7 @@ export default function useTrendRoster(
         day: latestDay(metric, id, daily, points, stepMs),
         span: spanAverage(metric, points, stepMs, weights),
         head: null,
+        anchors: metric === "continuity" && id !== "dag" ? cut(anchorSeries(id, series)) : undefined,
       };
       r.head = headKind === "span" ? r.span : r.day;
       return r;

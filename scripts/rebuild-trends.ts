@@ -22,10 +22,10 @@
 // field, so no single chain may HSET them) divert into the checkpoints and are written once,
 // after the last chain. The checkpoint directory is cleared only then.
 //
-// --backfill-gaps writes the per-network CONTINUITY series (m.{id}.gapSum/gapMax) for
-// history: the ordinary backfills never kept record timestamps, so measuring gaps
-// retroactively means re-walking each chain — but ONLY the timestamps are collected, only
-// the two gap fields are written (complete-day recomputations, HSET overwrite), TODAY is
+// --backfill-gaps writes the per-network CONTINUITY series (m.{id}.gapSum/gapMax) and, since
+// 2026-10-08, the ANCHORING count (m.{id}.ticks) for history: the ordinary backfills never
+// kept record timestamps, so measuring gaps retroactively means re-walking each chain — but ONLY
+// the timestamps are collected, only those three fields are written (complete-day recomputations, HSET overwrite), TODAY is
 // excluded (the live sampler's accruing bucket must not be double-counted), and every other
 // field is untouched. Runs under the sampler lock like everything else here.
 //
@@ -466,6 +466,9 @@ async function main(): Promise<void> {
         // collected (the walk descends) — so gaps at/above the cut are final. The span's
         // oldest record opens the chain: no invented gap (i > 0), same as the one-shot path.
         if (i > 0 && stamps[i] >= cut) addIncGap(cinc, net, stamps[i], id, Math.max(0, Math.round((stamps[i] - stamps[i - 1]) / 1000)));
+        // ANCHORINGS (m.{id}.ticks — bucketMetas' note): a distinct stamp is one global tick.
+        // The 2-day cut margin keeps every record of one tick on the same side of the cut.
+        if (stamps[i] >= cut && (i === 0 || stamps[i] !== stamps[i - 1])) addInc(cinc, net, stamps[i], `m.${id}.ticks`, 1);
         if (stamps[i] < cut) keep.push(stamps[i]);
       }
       stamps = keep;
@@ -553,7 +556,7 @@ async function main(): Promise<void> {
     let fields = 0;
     for (const id of lineageIds(net)) {
       // Timestamps only — the walk's records are otherwise discarded, and the two gap
-      // fields are the only thing this mode may write. Each chain WRITES as soon as its
+      // fields plus the anchoring count are the only things this mode may write. Each chain WRITES as soon as its
       // walk ends (complete-day HSET recomputations are idempotent), so a crash mid-run
       // loses one chain's walk, not the whole night's (learned at 83% of DOR, 2026-09-08).
       const stamps: number[] = [];
@@ -569,6 +572,9 @@ async function main(): Promise<void> {
         const gap = Math.max(0, Math.round((stamps[i] - stamps[i - 1]) / 1000));
         addIncGap(inc, net, stamps[i], id, gap);
       }
+      // …and the anchoring count from the same sorted stamps (2026-10-08): this mode is its
+      // backfill route too — a distinct stamp is one global tick that carried the chain.
+      for (let i = 0; i < stamps.length; i++) if (i === 0 || stamps[i] !== stamps[i - 1]) addInc(inc, net, stamps[i], `m.${id}.ticks`, 1);
       for (const [key, map] of inc) {
         const tier = tierOf(key);
         if (tier === "5m" && key < fresh5m) continue;

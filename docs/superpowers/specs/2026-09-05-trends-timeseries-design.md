@@ -56,9 +56,12 @@ Buckets are assigned by each record's **own timestamp**, never fetch time. Per b
 - `snaps` — snapshot count
 - `fee` — Σ datum (exact)
 - `kb` — Σ sizeInKB (exact)
+- `ticks` — the global snapshots that carried this chain (distinct stamps; added 2026-10-08, the
+  user: a chain CREATES snapshots every few seconds and ANCHORS them every ~30s, "both are
+  relevant"). Written only where record order is guaranteed (the cron, the rebuild's ordered
+  walks and `--backfill-gaps`); buckets before it read as not measured, never as zero.
 
-Deliberately absent: distinct-ticks-landed (near-redundant with `snaps`, per the api.ts note),
-height/subHeight/epochProgress (counters that answer no trend question — the culled-facts rule).
+Deliberately absent: height/subHeight/epochProgress (counters that answer no trend question — the culled-facts rule).
 
 **Fleet gauges** (hourly + daily tiers only; last-write-wins point samples):
 - `nodes` total, `nodes:{id}` per network (12 incl. DAG), `layer:{l0|cl1|dl1}` totals

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { headWord, lastSeen, momentPhrase, rangePhrase, sumMeasured, unlistedSeries, spanAverage, spanWord, typeBands,
+import { anchorClause, anchorSeries, headWord, lastSeen, momentPhrase, rangePhrase, sumMeasured, unlistedSeries, spanAverage, spanWord, typeBands,
   GLOBAL_METRIC_ROWS,
   GLOBAL_READING,
   TREND_METRICS,
@@ -728,5 +728,24 @@ describe("lastSeen — the last bucket a series measured something in", () => {
   it("is the newest bucket above zero, or null when there is none", () => {
     expect(lastSeen([3, 0, 2, 0, null], [10, 20, 30, 40, 50])).toBe(30);
     expect(lastSeen([0, null], [10, 20])).toBeNull();
+  });
+});
+
+describe("anchorSeries / anchorClause (the second cadence)", () => {
+  it("reads a chain's anchoring counts as a copy, empty where never measured", () => {
+    const series = { "m.dor.ticks": [120, null, 3] };
+    const a = anchorSeries("dor", series);
+    expect(a).toEqual([120, null, 3]);
+    a[0] = 0;
+    expect(series["m.dor.ticks"][0]).toBe(120);
+    expect(anchorSeries("ded", series)).toEqual([]);
+  });
+  it("a zero beside snapshots is the field's absence (buckets older than the sampler's start), never a reading", () => {
+    const series = { "m.dor.ticks": [0, 0, 12], "m.dor.snaps": [300, 0, 290] };
+    expect(anchorSeries("dor", series)).toEqual([null, 0, 12]);
+  });
+  it("says the clause around the count, singular for one", () => {
+    expect(anchorClause(120)).toEqual({ before: "and anchored", after: "times" });
+    expect(anchorClause(1).after).toBe("time");
   });
 });

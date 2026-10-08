@@ -14,7 +14,7 @@ import useTrendsSlice from "@/components/useTrendsSlice";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { cn } from "@/lib/utils";
 import { metagraphById } from "@/src/data/network";
-import { instantNote, momentPhrase, orderAt, placeInstant, valueAt } from "@/src/data/trendSeries";
+import { anchorClause, instantNote, momentPhrase, orderAt, placeInstant, valueAt } from "@/src/data/trendSeries";
 import { stampInstant } from "@/src/data/trendTimeline";
 import { bucketAt, spanPhrase } from "@/src/data/trendWindow";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
@@ -104,6 +104,10 @@ export default function TrendInstantPane({
   const lead = subject ? subjectValue : globalValue;
   const who = subject ? metagraphById(subject)?.ticker || rows.get(subject)?.name || subject : "All networks";
   const phrase = momentPhrase(metric, stepMs);
+  // The SECOND CADENCE beside the spacing (2026-10-08): how many global snapshots carried this
+  // chain in the moment. Only a network has it (the global row IS the ticks), and only where the
+  // store measured it — the sampler writes it since that day; before, the clause is simply absent.
+  const anchored = subject && cursorMs != null ? valueAt(rows.get(subject)?.anchors ?? [], buckets, stepMs, cursorMs) : null;
 
   // THE SPAN THIS CARD'S DOOR CARRIES IS THE MOMENT (the search pass, 2026-10-02). It handed the
   // brushed range, else the whole window on screen — the document's rule, where a chart's link is
@@ -169,7 +173,13 @@ export default function TrendInstantPane({
             <Lead lines={3}>
               {bucket != null && lead != null ? (
                 <>
-                  {who} {phrase.verb} <span className="font-medium text-foreground tabular-nums">{format(lead)}</span> {phrase.rest}
+                  {who} {phrase.verb} <span className="font-medium text-foreground tabular-nums">{format(lead)}</span>{" "}
+                  {anchored != null && (
+                    <>
+                      {anchorClause(anchored).before} <span className="font-medium text-foreground tabular-nums">{anchored.toLocaleString()}</span> {anchorClause(anchored).after}{" "}
+                    </>
+                  )}
+                  {phrase.rest}
                 </>
               ) : (
                 <>No reading in this moment</>
