@@ -3,6 +3,7 @@
 import { CircleHelp } from "lucide-react";
 import { useTickHasFilter } from "@/components/useTickHasFilter";
 import { tickNetClearActions } from "@/src/engine/domain/pickActions";
+import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { useStore } from "@/src/store/store";
 import { applyClickActions } from "@/src/store/applyClickActions";
 import { UNLISTED_ID, UNLISTED_CFG, displayNetwork } from "@/src/data/unlisted";
@@ -49,8 +50,8 @@ export default function ContextCard({
   // THE PLANE IN FRONT stands the card up with nothing committed (2026-10-08): no filter, no focus —
   // so there is nothing for an × to clear, and the head shows none.
   const trendFocus = useStore((s) => s.trendFocus);
-  const mode = useStore((s) => s.mode);
-  const clearable = filter === appFilter || mode !== "trend" || trendFocus != null;
+  const chartStack = useStore((s) => VIEW_POLICIES[s.mode].chartStack);
+  const clearable = filter === appFilter || !chartStack || trendFocus != null;
   const close = () => {
     const st = useStore.getState();
     applyClickActions(

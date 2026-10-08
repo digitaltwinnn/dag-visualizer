@@ -1,29 +1,30 @@
 import { describe, expect, it } from "vitest";
 
-import { bucketColumns, bucketPage, bucketScope, shortKey, tierWord } from "./trendBuckets";
+import { bucketColumns, bucketPage, chainGroups, shortAddr, shortKey, tierWord } from "./trendBuckets";
 
 const ID = "DAG0CyySf35ftDQDQBnd1bdQ9aPyUdacMghpnCuM";
+const UNL_A = "DAG4QSG19fPchE5xVpEDA6Y1fE2F7XcSFXJvzvHo";
+const UNL_B = "DAG55nwjLR1JhY4a2Wri6Cni2GWPL7Vupu5znnJi";
 const KEYS = [
-  "g.kb", "g.ticks", "g.anchors", "g.fee", "g.zzz", "u.cov", "f.nodes", "f.layer.dl1", "f.layer.l0", "f.cc.DE",
+  "g.kb", "g.fee", "g.ticks", "g.anchors", "g.feeFloor", "g.kbFloor", "g.zzz", "u.cov", "f.nodes", "f.layer.dl1", "f.layer.l0", "f.cc.DE",
   `m.${ID}.fee`, `m.${ID}.snaps`, `m.${ID}.kb`, `f.nodes.${ID}`, `f.layer.${ID}.cl1`, `f.layer.${ID}.l0`, `f.type.${ID}.l0+cl1`,
   "m.other.snaps", "f.nodes.other",
+  `m.${UNL_B}.snaps`, `m.${UNL_A}.fee`, `m.${UNL_A}.snaps`, "m.unlisted.snaps", "m.unlisted.fee",
 ];
+const UNL = { id: "unlisted", listed: (a: string) => a === ID || a === "other" };
 
-describe("bucketScope — the plane in front, else the filter", () => {
-  it("reads like the card rule", () => {
-    expect(bucketScope("all", null)).toBe("all");
-    expect(bucketScope("all", "dor")).toBe("dor");
-    expect(bucketScope("ded", null)).toBe("ded");
-  });
-});
-
-describe("bucketColumns — the fields a scope owns, in the vocabulary's order", () => {
-  it("the global row: counters, fleet gauges, coverage; never per-country or per-network fields", () => {
-    expect(bucketColumns(KEYS, "all")).toEqual(["g.ticks", "g.anchors", "g.fee", "g.kb", "f.nodes", "f.layer.l0", "f.layer.dl1", "u.cov", "g.zzz"]);
+describe("bucketColumns — the STORED fields a scope owns, in the vocabulary's order", () => {
+  it("the global row: counters, floors, fleet gauges, coverage; never the fold's derived totals, per-country or per-network fields", () => {
+    expect(bucketColumns(KEYS, "all")).toEqual(["g.ticks", "g.anchors", "g.feeFloor", "g.kbFloor", "f.nodes", "f.layer.l0", "f.layer.dl1", "u.cov", "g.zzz"]);
     expect(bucketColumns(KEYS, "dag")).toEqual(bucketColumns(KEYS, "all"));
   });
   it("a network: its counters, node count, layer gauges and node types — nobody else's", () => {
     expect(bucketColumns(KEYS, ID)).toEqual([`m.${ID}.snaps`, `m.${ID}.fee`, `m.${ID}.kb`, `f.nodes.${ID}`, `f.layer.${ID}.l0`, `f.layer.${ID}.cl1`, `f.type.${ID}.l0+cl1`]);
+  });
+  it("the unlisted scope: every unlisted chain's own fields, chain by chain — never the folded sum", () => {
+    expect(bucketColumns(KEYS, "unlisted", UNL)).toEqual([`m.${UNL_A}.snaps`, `m.${UNL_A}.fee`, `m.${UNL_B}.snaps`]);
+    // Without the catalog's word on who is listed, the unlisted scope is just a network with no fields.
+    expect(bucketColumns(KEYS, "unlisted")).toEqual(["m.unlisted.snaps", "m.unlisted.fee"]);
   });
   it("is empty for a scope with nothing stored, and drops duplicates", () => {
     expect(bucketColumns(KEYS, "nobody")).toEqual([]);
@@ -37,6 +38,24 @@ describe("shortKey — the scope's address said once, in the head", () => {
     expect(shortKey(`f.nodes.${ID}`, ID)).toBe("f.nodes");
     expect(shortKey(`f.type.${ID}.l0+cl1`, ID)).toBe("f.type.l0+cl1");
     expect(shortKey("g.ticks", "all")).toBe("g.ticks");
+  });
+  it("keeps a shortened address under the unlisted scope, where every column is another chain's", () => {
+    expect(shortKey(`m.${UNL_A}.snaps`, "unlisted", "unlisted")).toBe("m.DAG4QS…vzvHo.snaps");
+  });
+});
+
+describe("chainGroups / shortAddr — the unlisted scope, one group per chain", () => {
+  it("groups a scope's columns by address, keeping the tails' order", () => {
+    const cols = bucketColumns(KEYS, "unlisted", UNL);
+    expect(chainGroups(cols)).toEqual([
+      { addr: UNL_A, tails: ["snaps", "fee"], keys: [`m.${UNL_A}.snaps`, `m.${UNL_A}.fee`] },
+      { addr: UNL_B, tails: ["snaps"], keys: [`m.${UNL_B}.snaps`] },
+    ]);
+    expect(chainGroups(["g.ticks"])).toEqual([]);
+  });
+  it("shortens an address to its ends and leaves a short id alone", () => {
+    expect(shortAddr(UNL_A)).toBe("DAG4QS…vzvHo");
+    expect(shortAddr("dor")).toBe("dor");
   });
 });
 

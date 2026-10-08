@@ -228,16 +228,20 @@ export default function TrendStack() {
   // screen through a re-rank, in the same write), and that must land before paint — a passive
   // effect would paint one frame of the new order under the old window, mounting the wrong planes.
   const setTrendIds = useStore((s) => s.setTrendIds);
+  // THE PLANE IN FRONT, for React (store `trendFront`, 2026-10-08): the Metagraph card stands on
+  // it under All. Published in the SAME layout effect, from the scroll the publish has just kept
+  // or moved (`scrollToKeep` runs inside `setTrendIds`): read back from the store after the
+  // write, not from this render's `trendScroll`, which is one commit behind on a re-rank (the PR
+  // review — a stale front for one commit remounted the card twice).
+  const setTrendFront = useStore((s) => s.setTrendFront);
   useLayoutEffect(() => {
     setTrendIds(on ? order : NO_IDS);
-  }, [on, order, setTrendIds]);
-  // THE PLANE IN FRONT, for React (store `trendFront`, 2026-10-08): the Metagraph card stands on
-  // it under All. Published from the same order the planes render in, after the store has kept
-  // or moved the scroll — a passive effect, since nothing paints from it in the same frame.
-  const setTrendFront = useStore((s) => s.setTrendFront);
+    setTrendFront(on ? frontPlane(order, useStore.getState().trendScroll) : null);
+  }, [on, order, setTrendIds, setTrendFront]);
+  // …and again when the PAGER moves the scroll on its own (the publish above does not re-run).
   const storeScroll = useStore((s) => s.trendScroll);
   useEffect(() => {
-    setTrendFront(on ? frontPlane(order, storeScroll) : null);
+    if (on) setTrendFront(frontPlane(order, storeScroll));
   }, [on, order, storeScroll, setTrendFront]);
   useEffect(() => () => setTrendFront(null), [setTrendFront]);
   // ⚠️ The UNMOUNT clear is its own effect. As the publish's cleanup it ran between every two

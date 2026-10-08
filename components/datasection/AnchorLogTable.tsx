@@ -152,7 +152,7 @@ function ChainChoice({ addr, idx, on, onPick }: { addr: string; idx: number; on:
  *  make the segment a menu of them, each named by the months it ran, and the pressed segment then
  *  says which months are being paged. */
 function ChainControl({ lineage, chainIdx, onPick }: { lineage: readonly string[]; chainIdx: number; onPick: (idx: number) => void }) {
-  const chosen = chainMonths(useChainSpan(chainIdx > 1 ? (lineage[chainIdx] ?? null) : null));
+  const chosen = chainMonths(useChainSpan(chainIdx > 0 ? (lineage[chainIdx] ?? null) : null));
   const several = lineage.length > 2;
   return (
     <span className="inline-flex items-center gap-0.5 p-0.5 rounded-btn border border-border" role="group" aria-label="Which of this network's chains to page">
@@ -288,7 +288,10 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // Under the Unlisted lens an empty log says when one last anchored, never "waiting" forever.
   const unlistedLastSeen = useUnlistedLastSeen(rawOpen && lens === UNLISTED_ID);
   // Under Unlisted the merge waits for the chain list — an empty list would read as "no snapshots".
-  const merged = useMergedLog(mergedMode && rawOpen && (lens !== UNLISTED_ID || unlistedReady), mergedChains, mergedScope, liveTips);
+  // …and under ALL it waits for the list too (or its failure), so the merge reads once rather than
+  // walking the catalog and restarting when the unlisted chains land (the PR review).
+  const unlistedSettled = unlisted.chains != null || unlisted.failed;
+  const merged = useMergedLog(mergedMode && rawOpen && (lens === UNLISTED_ID ? unlistedReady : lens !== "all" || unlistedSettled), mergedChains, mergedScope, liveTips);
   /** A merged search waiting for its page: land (mark) its first row, or go to the oldest end. */
   const mergedLand = useRef<"newest" | "oldest" | "landed-oldest" | null>(null);
 
@@ -1218,7 +1221,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // What is IN FORCE (the applied record), not what is typed — the chips say only that.
   const searchSet = applied != null;
   /** The rows follow the chain: the newest page, nothing in force, and the live tip being read. */
-  const liveNow = !searchSet && (mergedMode ? mergedScope.kind === "all" && merged.page === 1 : histNet ? !rangeSpan && page === 1 : true);
+  const liveNow =
+    !searchSet && !(mergedMode ? merged.error : histErr) && (mergedMode ? mergedScope.kind === "all" && merged.page === 1 : histNet ? !rangeSpan && page === 1 : true);
 
   // A SEARCH THAT LANDS FOLDS THE BAR (design round, 2026-09-29): the landing mark on the row and
   // the toolbar's applied chip say what is in force, so the fields step aside and the log gets its

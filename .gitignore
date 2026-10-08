@@ -33,6 +33,5 @@ next-env.d.ts
 # …and a checkpoint set aside while another rebuild runs (it refuses to trample one)
 .rebuild-trends-ckpt.*/
 
-# Claude Code: the shared project settings are tracked; everything else that lands here is personal
-.claude/*
-!.claude/settings.json
+# Claude Code: nothing under .claude is the repo's (settings.json was untracked on 2026-10-08)
+.claude/

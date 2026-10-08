@@ -137,9 +137,12 @@ mirror, with three ways to ask for it — the switch, Escape, the layer's own ×
 structural views, whose own records the layer shows (the anchor log, the node roster), and
 `"buckets"` for History — the STORED BUCKETS of the measured history
 (`datasection/TrendBucketsSurface.tsx`, user 2026-10-08: "just show upstash records"): one row
-per bucket of the window or range on screen, the fields of the scope the cards stand on (the
-plane brought forward, else the filter — `trendBuckets.bucketScope`), named as the sampler names
-them, a dash where a bucket holds no reading. It reads the planes' own payload (`useTrendsSlice`).
+per bucket of the window or range on screen, the STORED fields of the committed scope (the plane
+brought forward, else the filter — `trendStack.cardNetwork`; the resting front plane is a reading
+of the deck, not a commit), named as the sampler names them, a dash where a bucket holds no
+reading. The fold's derived totals (`g.fee`/`g.kb` = floor + unlisted, the summed `m.unlisted.*`)
+are not stored and are left out; under Unlisted the per-address chains show as stored. It reads
+the planes' own payload (`useTrendsSlice`).
 For one day (2026-10-07) History's RAW was a door onto the anchor log; the Range and Moment
 cards' "Snapshot records" still is (`trendDoors.openRecords`). History's measured-history
 DOCUMENT, which RAW showed before that, was retired on 2026-10-07 (user: "not really raw, and

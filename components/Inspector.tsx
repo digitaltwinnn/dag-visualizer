@@ -625,7 +625,7 @@ export default function Inspector() {
     // its × clears the range (a setting's setter, as the timeline's own × does).
     // …and it STANDS ON THE WINDOW while nothing is brushed (2026-10-08), so it mounts in History
     // whenever the view is on; the × then has nothing to clear and the pane hides it.
-    range: mode === "trend" ? (
+    range: VIEW_POLICIES[mode].chartStack ? (
       <TrendRangePane key="range" onClose={trendRange ? () => useStore.getState().setTrendRange(null) : undefined} {...cx("range")} />
     ) : null,
     instant: trendCursorMs != null ? (

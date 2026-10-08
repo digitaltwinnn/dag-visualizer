@@ -1036,7 +1036,7 @@ export class Engine {
     net?.on("anchor", ({ metaId, timestamps, seed }: { metaId: string; timestamps: string[]; seed: boolean }) => {
       // One packet per snapshot that ARRIVED — not per snapshot a catch-up batch recorded (the
       // history seed, and the backlog a background tab's throttled polls pile up: `liveArrivals`).
-      const arrived = seed ? 0 : liveArrivals(timestamps ?? [], Date.now());
+      const arrived = seed ? 0 : liveArrivals(timestamps ?? []);
       if (arrived > 0) this.layers.pulseMeta(metaId, arrived);
       if (this.mode === "ledger") this._ledgerDirty = true; // the per-tick breakdown filled in
     });

@@ -61,9 +61,12 @@ export default function TrendRangePane({
   // the brushed range, else the pill's trailing span ending now, else (ALL, which has no fixed
   // span) the measured axis itself. The key is the manifest's: a brush or a pill hop pulses once.
   const axis = roster.rawBuckets;
+  // The trailing window's start SNAPS TO THE BUCKET STEP (the PR review): built from the clock on
+  // every render it drifted a few seconds per poll, and a short window's Start row is a clock.
+  const trailing = windowSpan(windowId, null, Date.now());
   const span =
     range ??
-    windowSpan(windowId, null, Date.now()) ??
+    (trailing ? { fromMs: Math.floor(trailing.fromMs / stepMs) * stepMs, toMs: trailing.toMs } : null) ??
     (axis.length ? { fromMs: axis[0]!, toMs: axis[axis.length - 1]! + stepMs } : null);
   const spanKey = range ? `${range.fromMs}-${range.toMs}` : `window:${windowId}`;
   const pulseKey = useEdgePulse(spanKey);

@@ -138,8 +138,9 @@ scope from the table.
     2026-10-07 (user: "not really raw, and mostly replaced by the scene"): **RAW is the records in
     every view.** History's records are the STORED BUCKETS of the measured history
     (`viewPolicy.rawSurface: "buckets"`, `components/datasection/TrendBucketsSurface.tsx`, user
-    2026-10-08: "just show upstash records") for the span on screen and the scope the cards stand
-    on; the Range and Moment cards' "Snapshot records" is the DOOR onto the anchor log
+    2026-10-08: "just show upstash records") for the span on screen and the committed scope (the
+    plane brought forward, else the filter) — stored fields only, never the fold's derived totals;
+    the Range and Moment cards' "Snapshot records" is the DOOR onto the anchor log
     (`components/trendDoors.ts`) — the snapshots behind the measurement. Charts are
     2D — the planes host `TrendChart` in DOM, so the type is crisp and the reading is flat-on, and
     depth carries the ROSTER rather than pretending to be data.

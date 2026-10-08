@@ -5,8 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useStore } from "@/src/store/store";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import { spanPhrase } from "@/src/data/trendWindow";
-import { displayNetwork } from "@/src/data/unlisted";
-import { bucketColumns, bucketPage, bucketScope, shortKey, tierWord } from "@/src/data/trendBuckets";
+import { displayNetwork, LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
+import { cardNetwork } from "@/src/engine/domain/trendStack";
+import { bucketColumns, bucketPage, chainGroups, shortAddr, shortKey, tierWord } from "@/src/data/trendBuckets";
 import { stampParts, utcDayKey } from "@/src/util/localTime";
 import TablePager from "@/components/datasection/TablePager";
 import { QualifierChip } from "@/components/inspector/parts";
@@ -17,17 +18,21 @@ import { cn } from "@/lib/utils";
 // HISTORY'S RAW IS THE STORED BUCKETS (user, 2026-10-08: "its raw page should just show upstash
 // records, not the raw page for snapshots, should work with the app filter as well"). The measured
 // history is a store of buckets — one row per five minutes, hour or day — and this lists them as
-// they are stored, for the window or range on screen and the scope History's cards stand on (the
-// plane brought forward, else the filter: `bucketScope`). Each row is one bucket's START and its
-// fields, named as the sampler names them; a field a bucket does not hold is the dash (not
-// measured), never a zero (rule 10). It reads the SAME payload the planes draw from
-// (`useTrendsSlice`), so a row here is a point there. The pure half is `src/data/trendBuckets.ts`.
+// they are stored, for the window or range on screen and the COMMITTED scope (the plane brought
+// forward, else the filter — `trendStack.cardNetwork`, the cards' own rule; the resting front plane
+// is a reading of the deck, not a commit, so it does not scope the records). Each row is one
+// bucket's START and its STORED fields, named as the sampler names them — the fold's derived totals
+// are left out (`trendBuckets`), and the Unlisted scope lists the chains the fold sums; a field a
+// bucket does not hold is the dash (not measured), never a zero (rule 10). It reads the SAME
+// payload the planes draw from (`useTrendsSlice`), so a row here is a point there.
 //
 // It replaced the door onto the anchor log (2026-10-07 → 2026-10-08): the cards' "Snapshot records"
 // still opens the log for their span — those are the snapshots; this is the measurement.
 
 const PAGE = 25;
 const PHONE_HIDDEN = "max-[700px]:hidden";
+/** The Unlisted scope's word on which addresses the catalog holds (`bucketColumns`). */
+const UNLISTED_SCOPE = { id: UNLISTED_ID, listed: (a: string) => LISTED_IDS.has(a) };
 
 const Dash = () => (
   <>
@@ -48,8 +53,15 @@ export default function TrendBucketsSurface() {
   const rawOpen = useStore((s) => s.section === "data");
   const slice = useTrendsSlice(rawOpen ? windowId : null, range);
   const p = slice.p;
-  const scope = bucketScope(filter, focus);
-  const columns = useMemo(() => bucketColumns(p ? Object.keys(p.series) : [], scope), [p, scope]);
+  const scope = cardNetwork(filter, focus);
+  const columns = useMemo(() => bucketColumns(p ? Object.keys(p.series) : [], scope, UNLISTED_SCOPE), [p, scope]);
+  // THE UNLISTED SCOPE IS ONE ROW PER BUCKET AND CHAIN (the PR review's follow-up: five chains'
+  // seven fields are thirty-five columns across, which is a sideways scroll — never by design).
+  // The chain is a column, the seven stored tails are the others; a chain a bucket holds nothing
+  // of draws no row, so a quiet month lists only the chains that anchored in it.
+  const byChain = scope === UNLISTED_ID ? chainGroups(columns) : null;
+  const tails = byChain ? [...new Set(byChain.flatMap((g) => g.tails))] : [];
+  const cellKeys = byChain ? tails.map((t) => `.${t}`) : columns;
   const count = p?.buckets.length ?? 0;
   const pages = Math.max(1, Math.ceil(count / PAGE));
   const [page, setPage] = useState(1);
@@ -85,46 +97,49 @@ export default function TrendBucketsSurface() {
               <TableHeader className="sticky top-0 z-10 bg-[var(--panel-solid)] backdrop-blur-md max-[700px]:hidden">
                 <TableRow className="border-border">
                   <TableHead className="text-label uppercase tracking-caps text-muted-foreground">Bucket</TableHead>
-                  {columns.map((k) => (
+                  {byChain && <TableHead className="text-label uppercase tracking-caps text-muted-foreground">Chain</TableHead>}
+                  {cellKeys.map((k) => (
                     <TableHead key={k} className="text-right px-1.5">
-                      <span className="font-mono text-label text-muted-foreground">{shortKey(k, scope)}</span>
+                      <span className="font-mono text-label text-muted-foreground">{byChain ? `m${k}` : shortKey(k, scope, UNLISTED_ID)}</span>
                     </TableHead>
                   ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pg.idx.map((i) => {
+                {pg.idx.flatMap((i) => {
                   const ms = p.buckets[i]!;
-                  return (
-                    <TableRow key={ms} className="max-[700px]:grid-cols-1 max-[700px]:py-1">
+                  // One row per bucket — or, under Unlisted, one per chain that holds a reading in it.
+                  const rows: { key: string; addr: string | null; vals: (number | null)[] }[] = byChain
+                    ? byChain
+                        .map((g) => ({ key: `${ms}:${g.addr}`, addr: g.addr, vals: tails.map((t) => p.series[`m.${g.addr}.${t}`]?.[i] ?? null) }))
+                        .filter((r) => r.vals.some((v) => v != null))
+                    : [{ key: String(ms), addr: null, vals: columns.map((k) => p.series[k]?.[i] ?? null) }];
+                  return rows.map((r) => (
+                    <TableRow key={r.key} className="max-[700px]:grid-cols-1 max-[700px]:py-1">
                       {/* A day bucket is a UTC day; a finer one is a clock time with its zone (the date rule). */}
                       <TableCell className="whitespace-nowrap text-label text-foreground-dim tabular-nums">
                         {daily ? utcDayKey(ms) : (() => { const t = stampParts(ms); return <><span className="text-muted-foreground">{t.date}</span> {t.time}</>; })()}
                       </TableCell>
-                      {columns.map((k) => {
-                        const v = p.series[k]?.[i] ?? null;
-                        return (
-                          <TableCell key={k} className={cn("text-right font-mono text-label tabular-nums px-1.5", PHONE_HIDDEN)}>
-                            {v == null ? <Dash /> : fmt(v)}
-                          </TableCell>
-                        );
-                      })}
+                      {r.addr != null && <TableCell className={cn("font-mono text-label text-foreground-dim", PHONE_HIDDEN)}>{shortAddr(r.addr)}</TableCell>}
+                      {r.vals.map((v, c) => (
+                        <TableCell key={cellKeys[c]} className={cn("text-right font-mono text-label tabular-nums px-1.5", PHONE_HIDDEN)}>
+                          {v == null ? <Dash /> : fmt(v)}
+                        </TableCell>
+                      ))}
                       {/* PHONE: the fields wrap under the bucket as "name value" pairs — no sideways scroll. */}
                       <TableCell className="min-[700px]:hidden whitespace-normal pt-0">
                         <span className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-label tabular-nums">
-                          {columns.map((k) => {
-                            const v = p.series[k]?.[i] ?? null;
-                            return (
-                              <span key={k} className="inline-flex items-baseline gap-1">
-                                <span className="text-muted-foreground">{shortKey(k, scope)}</span>
-                                {v == null ? <Dash /> : fmt(v)}
-                              </span>
-                            );
-                          })}
+                          {r.addr != null && <span className="text-foreground-dim">{shortAddr(r.addr)}</span>}
+                          {r.vals.map((v, c) => (
+                            <span key={cellKeys[c]} className="inline-flex items-baseline gap-1">
+                              <span className="text-muted-foreground">{byChain ? `m${cellKeys[c]}` : shortKey(cellKeys[c]!, scope, UNLISTED_ID)}</span>
+                              {v == null ? <Dash /> : fmt(v)}
+                            </span>
+                          ))}
                         </span>
                       </TableCell>
                     </TableRow>
-                  );
+                  ));
                 })}
               </TableBody>
             </Table>
