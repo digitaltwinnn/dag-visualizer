@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { anchorClause, anchorSeries, headWord, lastSeen, momentPhrase, rangePhrase, sumMeasured, unlistedSeries, spanAverage, spanWord, typeBands,
+import { anchorClause, anchorSeries, headWord, lastSeen, momentPhrase, rangePhrase, sumMeasured, unlistedUnmeasured, withUnlisted, spanAverage, spanWord, typeBands,
   GLOBAL_METRIC_ROWS,
   GLOBAL_READING,
   TREND_METRICS,
@@ -195,17 +195,17 @@ describe("the global (whole-network) series", () => {
   it("names one stored row per stored metric, with the unit the reader is shown", () => {
     expect(GLOBAL_METRIC_ROWS.snapshots).toEqual({ key: "g.anchors", scale: 1 });
     expect(GLOBAL_METRIC_ROWS.blocks).toEqual({ key: "g.blocks", scale: 1 });
-    expect(GLOBAL_METRIC_ROWS.fees).toEqual({ key: "g.feeFloor", scale: 1e-8 });
-    expect(GLOBAL_METRIC_ROWS.kb).toEqual({ key: "g.kbFloor", scale: 1 / 1024 });
+    expect(GLOBAL_METRIC_ROWS.fees).toEqual({ key: "g.fee", scale: 1e-8 });
+    expect(GLOBAL_METRIC_ROWS.kb).toEqual({ key: "g.kb", scale: 1 / 1024 });
     expect(GLOBAL_METRIC_ROWS.nodes).toEqual({ key: "f.nodes", scale: 1 });
     // Derived from two rows, so it names none — the same shape TREND_METRICS.continuity has.
     expect(GLOBAL_METRIC_ROWS.continuity.key).toBeNull();
   });
 
   it("rescales a stored row into the unit the formatter states, and keeps nulls null", () => {
-    const series = { "g.feeFloor": [100_000_000, null, 0] };
+    const series = { "g.fee": [100_000_000, null, 0] };
     expect(globalSeries("fees", series)).toEqual([1, null, 0]);
-    expect(globalSeries("kb", { "g.kbFloor": [1024, null] })).toEqual([1, null]);
+    expect(globalSeries("kb", { "g.kb": [1024, null] })).toEqual([1, null]);
   });
 
   it("copies rather than aliasing the payload's own row", () => {
@@ -705,28 +705,45 @@ describe("sumMeasured — a counter's total over a span", () => {
   });
 });
 
-// UNLISTED ANCHORING, MEASURED (the Unlisted audit, 2026-10-07): the global count covers every
-// channel, the listed networks' series cover the catalog, so the difference IS the unlisted
-// channels — Dec 2025 – Aug 2026 it ran at ~3.9K a day. A bucket with no global reading, or with
-// a listed network unmeasured, has no difference to state: null, never a guess (rule 10).
-describe("unlistedSeries — the unlisted chains' own counts, where they were measured", () => {
+// UNLISTED CHANNELS AS ONE NETWORK (2026-10-08): the sampler reads each untracked chain under its
+// own address and marks the buckets where it read them all (`u.cov`); `withUnlisted` folds them into
+// `m.<id>.*` and adds their fees and size to the totals — null wherever they were not read (rule 10).
+describe("withUnlisted — the unlisted chains folded into one network, and the whole totals", () => {
   const listed = (id: string) => id === "A" || id === "B";
+  const series = {
+    "g.ticks": [3, 3, 3, 3],
+    "u.cov": [0, 0, null, 0],
+    "g.feeFloor": [10, 10, 10, 10],
+    "m.A.snaps": [6, 7, 3, 9], // listed — never counted
+    "m.A.fee": [10, 10, 10, 10],
+    "m.U1.snaps": [1, 0, 5, null],
+    "m.U2.snaps": [2, null, 0, 0],
+    "m.U1.fee": [4, 0, 9, 0],
+    "m.U1.gapMax": [30, 0, 0, 0],
+    "m.U2.gapMax": [50, 0, 0, 0],
+  };
+  const out = withUnlisted(series, listed, "unl");
   it("sums the chains the catalog does not list, in the buckets the sampler covered", () => {
-    const series = {
-      "u.cov": [0, 0, null, 0],
-      "m.A.snaps": [6, 7, 3, 9], // listed — never counted
-      "m.U1.snaps": [1, 0, 5, null],
-      "m.U2.snaps": [2, null, 0, 0],
-      "m.U1.fee": [9, 9, 9, 9], // not a snapshot count — ignored
-    };
-    expect(unlistedSeries(series, listed)).toEqual([3, 0, null, 0]);
+    expect(out["m.unl.snaps"]).toEqual([3, 0, null, 0]);
+    expect(out["m.unl.fee"]).toEqual([4, 0, null, 0]);
+  });
+  it("takes the longest gap, not the sum", () => {
+    expect(out["m.unl.gapMax"]![0]).toBe(50);
+  });
+  it("adds their fees to the floor where covered, and leaves the floor where they were not read", () => {
+    expect(out["g.fee"]).toEqual([14, 10, 10, 10]);
   });
   it("is NOT MEASURED (null) wherever the coverage marker is absent — before the sampler read them", () => {
-    expect(unlistedSeries({ "g.ticks": [3, 4], "g.anchors": [10, 12], "m.A.snaps": [6, 7] }, listed)).toEqual([null, null]);
+    expect(withUnlisted({ "g.ticks": [3, 4], "m.A.snaps": [6, 7] }, listed, "unl")["m.unl.snaps"]).toEqual([null, null]);
   });
   it("a global's snapshots stamped into the next bucket can no longer appear as unlisted (the 2026-09-29 skew)", () => {
-    const series = { "u.cov": [0, 0], "g.anchors": [181, 201], "m.A.snaps": [143, 239] };
-    expect(unlistedSeries(series, listed)).toEqual([0, 0]);
+    expect(withUnlisted({ "u.cov": [0, 0], "g.anchors": [181, 201], "m.A.snaps": [143, 239] }, listed, "unl")["m.unl.snaps"]).toEqual([0, 0]);
+  });
+});
+
+describe("unlistedUnmeasured — the buckets the spine measured but the unlisted chains were not read", () => {
+  it("is true only where g.ticks is measured and u.cov is absent", () => {
+    expect(unlistedUnmeasured({ "g.ticks": [3, 3, null], "u.cov": [0, null, null] })).toEqual([false, true, false]);
   });
 });
 

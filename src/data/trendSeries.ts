@@ -314,8 +314,9 @@ export const GLOBAL_METRIC_ROWS: Record<TrendMetric, { key: string | null; scale
   // snapshots, which is the hypergraph's own cadence, not the chains' production.
   snapshots: { key: "g.anchors", scale: 1 },
   blocks: { key: "g.blocks", scale: 1 },
-  fees: { key: "g.feeFloor", scale: 1e-8 },
-  kb: { key: "g.kbFloor", scale: 1 / 1024 },
+  // The WHOLE totals (`withUnlisted`): the catalog floor plus the unlisted chains where measured.
+  fees: { key: "g.fee", scale: 1e-8 },
+  kb: { key: "g.kb", scale: 1 / 1024 },
   nodes: { key: "f.nodes", scale: 1 },
   continuity: { key: null, scale: 1 },
 };
@@ -664,32 +665,56 @@ export function typeBands(id: string, series: Readonly<Record<string, (number | 
   });
 }
 
-/** UNLISTED ANCHORING, MEASURED FROM THEIR OWN CHAINS (2026-10-08). The sampler reads the
- *  explorer's list of every chain and samples the ones the catalog does not track, so each unlisted
- *  channel has its own `m.<address>.snaps`; the bucket's unlisted count is their sum. A bucket the
- *  sampler did not measure them in carries no `u.cov` marker and reads NULL — never zero.
+/** THE UNLISTED CHANNELS AS ONE NETWORK, AND THE TOTALS MADE WHOLE (2026-10-08 — the user: "why is
+ *  this different, doesn't have to be different"). The sampler measures every unlisted chain under
+ *  its own address (`m.<address>.*`, every field a catalog chain has), marking the buckets it read
+ *  them all in with `u.cov`. This folds them into ONE synthetic network, `m.<id>.*` — `id` is the
+ *  app's unlisted id — so every reader that handles a network (metricSeries, the planes, the
+ *  explorer rows, the Moment and Range cards) handles them with no special case: snapshots, fees,
+ *  size, blocks, spacing and anchorings alike. A bucket without the marker reads NULL, never zero.
  *
- *  It replaced a DERIVATION (2026-10-07: the global count minus every listed network), which a
- *  single explorer skew broke: on 2026-09-29 one global stamped 19:59:50 carried 38 listed
- *  snapshots the explorer stamped 20:00:30, so its anchors and its snapshots fell in two buckets and
- *  the difference read as 38 unlisted snapshots that never existed. `isListed` is the catalog's
- *  judgement (current ids and former ones — `LISTED_IDS`), passed in so this stays pure. */
-export function unlistedSeries(
-  series: Readonly<Record<string, readonly (number | null)[]>>,
+ *  It also writes the WHOLE totals, `g.fee` and `g.kb`: the catalog floor (`g.feeFloor`/`g.kbFloor`)
+ *  plus the unlisted chains' measured amounts wherever they were measured — the floor alone where
+ *  they were not (the reader may say so). They replace "anchors minus every listed network", which an
+ *  explorer timestamp skew broke (2026-09-29: 38 phantom unlisted snapshots).
+ *
+ *  `isListed` is the catalog's judgement (current and former ids), passed in so this stays pure. */
+const UNLISTED_FIELDS = ["snaps", "fee", "kb", "blocks", "gapSum", "gapMax", "ticks"] as const;
+
+export function withUnlisted(
+  series: Readonly<Record<string, (number | null)[]>>,
   isListed: (id: string) => boolean,
-): (number | null)[] {
+  id: string,
+): Record<string, (number | null)[]> {
+  const out: Record<string, (number | null)[]> = { ...series };
   const cov = series["u.cov"];
-  if (!cov) return (series["g.ticks"] ?? []).map(() => null);
-  const mine = Object.keys(series).filter((k) => {
-    if (!k.startsWith("m.") || !k.endsWith(".snaps")) return false;
-    return !isListed(k.slice(2, -".snaps".length));
-  });
-  return cov.map((c, i) => {
-    if (c == null) return null;
-    let sum = 0;
-    for (const k of mine) sum += series[k]![i] ?? 0;
-    return sum;
-  });
+  const n = (series["g.ticks"] ?? cov ?? []).length;
+  const chains = [...new Set(Object.keys(series).filter((k) => k.startsWith("m.")).map((k) => k.split(".")[1]!))].filter(
+    (a) => a !== id && !isListed(a),
+  );
+  for (const f of UNLISTED_FIELDS) {
+    const cols = chains.map((a) => series[`m.${a}.${f}`]).filter((c): c is (number | null)[] => !!c);
+    out[`m.${id}.${f}`] = Array.from({ length: n }, (_, i) => {
+      if (cov?.[i] == null) return null;
+      let v = 0;
+      for (const c of cols) v = f === "gapMax" ? Math.max(v, c[i] ?? 0) : v + (c[i] ?? 0);
+      return v;
+    });
+  }
+  for (const [total, floor, f] of [["g.fee", "g.feeFloor", "fee"], ["g.kb", "g.kbFloor", "kb"]] as const) {
+    const fl = series[floor];
+    if (!fl) continue;
+    const unl = out[`m.${id}.${f}`]!;
+    out[total] = fl.map((v, i) => (v == null ? null : v + (unl[i] ?? 0)));
+  }
+  return out;
+}
+
+/** The buckets in which the unlisted channels were NOT measured although the spine was — where a
+ *  whole total (`g.fee`) is only its catalog floor. */
+export function unlistedUnmeasured(series: Readonly<Record<string, readonly (number | null)[]>>): boolean[] {
+  const cov = series["u.cov"];
+  return (series["g.ticks"] ?? []).map((t, i) => t != null && cov?.[i] == null);
 }
 
 /** The newest bucket a series measured something above zero in, or null. */

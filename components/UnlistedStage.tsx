@@ -1,8 +1,8 @@
 "use client";
 
 import useTrendsSlice from "@/components/useTrendsSlice";
-import { lastSeen, unlistedSeries } from "@/src/data/trendSeries";
-import { LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
+import { lastSeen } from "@/src/data/trendSeries";
+import { UNLISTED_ID } from "@/src/data/unlisted";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { useStore } from "@/src/store/store";
 import { bucketStamp } from "@/src/util/localTime";
@@ -12,7 +12,7 @@ import { bucketStamp } from "@/src/util/localTime";
 export function useUnlistedLastSeen(on: boolean): string {
   const slice = useTrendsSlice(on ? "all" : null, null);
   const series = slice.p?.series;
-  const last = series ? lastSeen(unlistedSeries(series, (id) => LISTED_IDS.has(id)), slice.buckets) : undefined;
+  const last = series ? lastSeen(series[`m.${UNLISTED_ID}.snaps`] ?? [], slice.buckets) : undefined;
   if (slice.error && last === undefined) return "When one last anchored could not be read.";
   return last === undefined
     ? "Reading when one last anchored…"
@@ -26,7 +26,7 @@ export function useUnlistedLastSeen(on: boolean): string {
 // show). Unlisted channels anchor into the global ledger without a catalog entry: no hub, no
 // nodes, no place on the globe. The structural views therefore have no SUBJECT to draw for them,
 // and this one quiet line says so — and says what IS known: when the last one anchored, measured
-// from their own chains (`unlistedSeries`, the History row's own reading).
+// from their own chains (`withUnlisted`, the History row's own reading).
 //
 // Only in the views that draw a scene and no chart stack: History states its own scope.
 export default function UnlistedStage() {

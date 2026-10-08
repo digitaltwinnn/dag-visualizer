@@ -13,9 +13,7 @@
 import { BandCard, MicroBars, DonutTotal, TypeGlyph, TYPE_ORDER, compositionCounts, staleFor, windowSpan, windowNote } from "@/components/vitals/bandParts";
 import { useStore } from "@/src/store/store";
 import { metagraphById, getAnchor } from "@/src/data/network";
-import { displayNetwork, LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
-
-const isListed = (id: string) => LISTED_IDS.has(id);
+import { displayNetwork, UNLISTED_ID } from "@/src/data/unlisted";
 import { metaType, rolesOf, IdentityDot, RoleChips, TickerChip } from "@/components/inspector/parts";
 import { machineKey } from "@/src/data/composition";
 import { identityHudCss } from "@/src/palette/identity";
@@ -32,7 +30,7 @@ import { sliceWindow, trimNewestPartial, type TrendsWindowData } from "@/src/dat
 import { ageWords } from "@/src/util/relativeAge";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
-import { unlistedSeries } from "@/src/data/trendSeries";
+import { unlistedUnmeasured } from "@/src/data/trendSeries";
 import { nodesBySubregion } from "@/src/data/subregions";
 
 export function HyperCells({ accent }: { accent: string }) {
@@ -337,8 +335,9 @@ export function GeoCells({ accent }: { accent: string }) {
 // hue — the tick chart's scoped rule, at the store's resolution.
 const STACK_ORDER: string[] = METAGRAPHS.map((m) => m.id);
 
-/** The measured-series name the rate cards read for the unlisted channels (`unlistedSeries`). */
-const UNLISTED_SNAPS = "unlisted.snaps";
+/** The measured-series name the rate cards read for the unlisted channels — their chains folded
+ *  into one network on load (`withUnlisted`). */
+const UNLISTED_SNAPS = `m.${UNLISTED_ID}.snaps`;
 
 /** THE GIVE-UP WORDS for a measured card whose store read FAILED (user, 2026-10-03: "fix" — the
  *  test pass found the rate cards saying "acquiring…" for as long as the trends store was down).
@@ -512,9 +511,10 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
   // The bars and the lines share the windowed buckets exactly — one window, one payload, so
   // the chart and the roster that legends it can never rank over different reaches.
   const barData = windowed;
-  /** Whether any UNLISTED channel anchored in the band's window — the one case the summed fee
-   *  figure is a floor, and the only case the card may mention unlisted channels at all. */
-  const unlistedInWindow = useMemo(() => (windowed ? unlistedSeries(windowed.series, isListed).some((v) => v != null && v > 0) : false), [windowed]);
+  /** Whether the band's window holds a bucket whose unlisted chains were NOT read — the one case
+   *  the summed fee figure is a floor (`g.fee` adds their fees wherever they were measured), and
+   *  the only case the card may mention unlisted channels at all. */
+  const unlistedGap = useMemo(() => (windowed ? unlistedUnmeasured(windowed.series).some(Boolean) : false), [windowed]);
   /** The fetch errored and nothing is held from before (a failed REFRESH keeps its last data). */
   const storeDown = t7.error && !t7.data;
   const span = "last 24 hours";
@@ -536,8 +536,6 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
    *  sampler covered the bucket (`g.ticks`, the coverage marker) and a gap where it didn't. */
   const measured = (name: string): (number | null)[] | undefined => {
     if (!windowed) return undefined;
-    // The unlisted channels' one measured quantity: their own chains' counts (`unlistedSeries`).
-    if (name === UNLISTED_SNAPS) return unlistedSeries(windowed.series, isListed);
     return windowed.series[name] ?? windowed.series["g.ticks"]?.map((v) => (v != null ? 0 : null));
   };
   interface SparkSpec { data: (number | null)[] | undefined; value: number | undefined; unit: string; span: string; sr: string; offRim: boolean }
@@ -764,29 +762,25 @@ export function LedgerCells({ accent, filter, paused }: { accent: string; filter
           Anchors lose nothing by leaving: the roster to the left counts who anchored and the chart
           to the right plots how much, both over this same window. This slot was their third home.
           ⚠️ THE TWO SCOPES ARE NOT EQUALLY EXACT, though, and the card says so. A network's own
-          fees are every fee it paid; the summed figure covers only the chains the sampler sees —
-          the public catalog — so it is a FLOOR wherever an unlisted channel anchored in the window.
+          fees are every fee it paid; the summed figure (`g.fee`) is the catalog's floor plus the
+          unlisted chains' own fees wherever the sampler read them (`u.cov`), so it is a FLOOR only
+          over a bucket where they were not read.
           The card SAYS so, in its corner, exactly then (user, 2026-10-08: "unlisted are temporary
           and by exception; an explanation is only worth it where there is an unlisted metagraph on
           screen, otherwise it must not be mentioned at all"). It was a hover title until the
           tooltips went the same day. */}
-      {filter === UNLISTED_ID
-        ? // THE UNLISTED CHANNELS' FEES ARE NOT KEPT (the Unlisted audit, 2026-10-07: this card waited
-          // on "acquiring…" forever). The store keeps fees per listed network and only a listed
-          // floor in total, so there is nothing to subtract from: a final word, not a promise.
-          notApplicable("Snapshot fees", "not measured for unlisted channels")
-        : filter === "dag"
+      {filter === "dag"
         ? // Says WHAT the DAG is before what it does (user, 2026-10-08: "explain hypergraph = base
           // ledger, make it better readable"), in the dossier card's own words ("the Hypergraph's
           // base network"), so two cards on one screen never name it two ways.
           notApplicable("Snapshot fees", "The DAG is the Hypergraph's base network: it receives these fees and pays none")
         : scoped
-          ? rate("Snapshot fees", sparkOf(cfg ? `m.${cfg.id}.fee` : null, activity?.feesSeries, activity?.feesPerHour, true),
+          ? rate("Snapshot fees", sparkOf(filter === UNLISTED_ID ? `m.${UNLISTED_ID}.fee` : cfg ? `m.${cfg.id}.fee` : null, activity?.feesSeries, activity?.feesPerHour, true),
                  "$DAG this network pays to anchor its snapshots into the global chain.")
-          : rate("Snapshot fees", sparkOf("g.feeFloor", activity?.feesSeries, activity?.feesPerHour, true),
-                 `$DAG paid to anchor snapshots into the global chain, every network summed.${unlistedInWindow ? " Unlisted channels' fees are not counted." : ""}`,
-                 unlistedInWindow ? "without unlisted" : undefined)}
-      {/* Under Unlisted, their measured count (their own chains, `unlistedSeries`). */}
+          : rate("Snapshot fees", sparkOf("g.fee", activity?.feesSeries, activity?.feesPerHour, true),
+                 `$DAG paid to anchor snapshots into the global chain, every network summed.${unlistedGap ? " Unlisted channels' fees are not counted where they were not read." : ""}`,
+                 unlistedGap ? "without unlisted" : undefined)}
+      {/* Under Unlisted, their measured count (their own chains, folded by `withUnlisted`). */}
       {rate("Snapshots", sparkOf(filter === UNLISTED_ID ? UNLISTED_SNAPS : scoped ? (cfg ? `m.${cfg.id}.snaps` : null) : "g.ticks", activity?.cadenceSeries, activity?.snapsPerHour))}
       {/* The chart states the same reach its rows do — it plots the very buckets the rate cards
           average, so a silent chart beside two captioned ones would read as a different window. */}

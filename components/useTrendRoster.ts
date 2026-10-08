@@ -16,13 +16,11 @@ import {
   spanAverage,
   stepFor,
   trimCounterEdges,
-  unlistedSeries,
   type MetricSeries,
 } from "@/src/data/trendSeries";
-import { displayNetwork, LISTED_IDS, UNLISTED_ID } from "@/src/data/unlisted";
+import { displayNetwork, UNLISTED_ID } from "@/src/data/unlisted";
 
-/** The catalog's judgement for the unlisted count (current ids and former ones). */
-const isListed = (id: string) => LISTED_IDS.has(id);
+
 import type { TrendMetric } from "@/src/store/store";
 import { compactNumber } from "@/src/util/format";
 
@@ -89,7 +87,7 @@ export interface TrendRosterView {
    *  null. Never in `ranked`: it is what the ranked rows are read against, not one of them. */
   total: TrendRosterRow | null;
   /** THE UNLISTED CHANNELS AS A ROW (the Unlisted audit, 2026-10-07): their own chains' counts where
-   *  the sampler measured them (`unlistedSeries`, 2026-10-08). Snapshots only on this row.
+   *  the sampler measured them (`withUnlisted`, 2026-10-08) — every measure but nodes.
    *  Under "all" it is listed AFTER the ranked networks, never ranked among them, and only while the
    *  span holds any, so the DAG total is the rows ADDED UP; under the Unlisted filter it is the one
    *  plane (and in `ranked`). Null otherwise. */
@@ -163,10 +161,10 @@ export default function useTrendRoster(
   // minutes over charts drawn in hours (2026-09-19).
   const stepMs = stepFor(slice, metric);
   // The SCENE's scope: the DAG is a network here (its own plane), not the document's empty state.
-  // Under the Unlisted filter the SNAPSHOTS measure has a chart (their one measured quantity); every
-  // other measure keeps the honest empty scope and its sentence.
+  // Under the Unlisted filter every measure has a chart since their chains are measured (2026-10-08,
+  // `withUnlisted`) — all but NODES: they publish no cluster, so that one keeps its empty scope.
   const unlistedFilter = filter === UNLISTED_ID;
-  const scope = unlistedFilter && metric === "snapshots" ? "network" : viewScope(filter);
+  const scope = unlistedFilter && metric !== "nodes" ? "network" : viewScope(filter);
   // The window's own span, from the payload's axis before any edge trim. A day's worth of the
   // finest tier is 288 five-minute buckets; one bucket short of a day still counts as the day.
   const headKind: "span" | "day" = rawAxis.length * stepMs >= 86_400_000 - stepMs ? "span" : "day";
@@ -232,25 +230,12 @@ export default function useTrendRoster(
     // shared ceiling keep reading the layers alone.
     const total = filter === "all" ? totalRow() : null;
     if (total) rows.set("dag", total);
-    // The unlisted channels: Snapshots only, under "all" (while the span holds any) or their own filter.
+    // The unlisted channels, as ONE network (`withUnlisted` folded their chains into `m.<id>.*` on
+    // load): every measure but nodes, under "all" (while the span holds any) or their own filter.
     let unlisted: TrendRosterRow | null = null;
-    if (metric === "snapshots" && (filter === "all" || unlistedFilter)) {
-      const rawUnlisted = unlistedSeries(series, isListed);
-      const points = cut(rawUnlisted);
-      const net = displayNetwork(UNLISTED_ID)!;
-      const r: TrendRosterRow = {
-        id: UNLISTED_ID,
-        name: net.name,
-        hue: net.hue,
-        series: { points, sampled: undefined, gaps: undefined },
-        rawPoints: rawUnlisted,
-        last: lastMeasured(points),
-        day: stepMs >= 86_400_000 ? lastMeasured(points) : daily ? lastMeasured(unlistedSeries(daily, isListed)) : null,
-        span: spanAverage(metric, points, stepMs),
-        head: null,
-      };
-      r.head = headKind === "span" ? r.span : r.day;
-      if (unlistedFilter || points.some((v) => (v ?? 0) > 0)) {
+    if (metric !== "nodes" && (filter === "all" || unlistedFilter)) {
+      const r = rowOf(UNLISTED_ID);
+      if (unlistedFilter || r.series.points.some((v) => (v ?? 0) > 0)) {
         unlisted = r;
         rows.set(UNLISTED_ID, r);
       }

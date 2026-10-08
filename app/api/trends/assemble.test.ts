@@ -1,4 +1,4 @@
-import { unlistedSeries } from "@/src/data/trendSeries";
+import { withUnlisted } from "@/src/data/trendSeries";
 import { describe, it, expect } from "vitest";
 import { assemble, assembleSpan, WINDOWS } from "./assemble";
 
@@ -83,7 +83,7 @@ describe("the unlisted coverage marker on the real read path (2026-10-08)", () =
     const i = p.buckets.indexOf(day + 10 * 3600000);
     expect(p.series["u.cov"][i]).toBe(0);
     expect(p.series["u.cov"][i + 1]).toBeNull();
-    const u = unlistedSeries(p.series, () => false);
+    const u = withUnlisted(p.series, () => false, "unl")["m.unl.snaps"]!;
     expect(u[i]).toBe(2);
     expect(u[i + 1]).toBeNull();
   });
