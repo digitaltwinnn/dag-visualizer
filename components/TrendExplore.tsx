@@ -5,6 +5,7 @@ import Explorer, { type ExplorerLevelSpec } from "@/components/explorer/Explorer
 import { IdentityDot, QualifierChip } from "@/components/inspector/parts";
 import useTrendRoster, { NO_READING } from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
+import TablePager from "@/components/datasection/TablePager";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
 import { GLOBAL_READING, METRIC_LABELS, METRIC_ORDER, metricUnit, spanWord } from "@/src/data/trendSeries";
@@ -73,20 +74,19 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   // or more that is the span's average per day; under a day (1H, a short brush) there is no
   // measured day inside the span to average, so both say the latest full day.
   // THE SPAN IS A CHIP, NOT A CLAUSE (user, 2026-10-03: "same for 'last 30 days' in the explorer —
-  // such dynamic values shouldn't be plain text"). The hint's words are fixed; the span is the one
-  // part that changes with the Time range, so it wears the qualifier chip the cards' leads use for
-  // a value that moves (the snapshot card's age) instead of trailing a mid-dot.
-  const over =
+  // such dynamic values shouldn't be plain text"): the words are fixed; the span is the one part
+  // that changes with the Time range, so it wears the qualifier chip the cards' leads use for a
+  // value that moves, at the right end as an indicator (user, same day: "right align it").
+  // …IN THE FOOTER, NOT A ROW ABOVE THE LIST (user, 2026-10-09: "the extra row saying 'average per
+  // day' with a 'last 30 days' tag … looks a bit off"). The Snapshots explorer states its cache
+  // span in its footer strip ("LAST 11 MIN"); this list states its span the same way, in the
+  // same strip — the words on the left in the strip's caps, the span chip where a cluster would
+  // stand — so the heading hairline runs straight into the plate.
+  const foot =
     roster.headKind === "span" ? (
-      // The chip is an INDICATOR at the row's right end, not a word in the sentence (user, same
-      // day: "right align it, as an indicator, not part of the actual text") — the Lead's own
-      // sentence-left, chip-right row.
-      <span className="flex items-center justify-between gap-2">
-        <span className="min-w-0">{spanWord(metric)}.</span>
-        <QualifierChip className="flex-none">{spanPhrase(windowId, range)}</QualifierChip>
-      </span>
+      <TablePager page={1} pages={1} from={1} to={ranked.length} total={ranked.length} compact scope={{ word: spanWord(metric) }} aside={<QualifierChip className="flex-none">{spanPhrase(windowId, range)}</QualifierChip>} onPage={() => {}} />
     ) : (
-      "Latest full day."
+      <TablePager page={1} pages={1} from={1} to={ranked.length} total={ranked.length} compact scope={{ word: "Latest full day" }} onPage={() => {}} />
     );
   const empty = scopeEmptyCopy(roster.scope, "view");
 
@@ -120,10 +120,11 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
   const total = roster.total;
   // ONE TAG, AND ONLY WHERE IT IS TRUE (user, 2026-10-03, after "total"/"base ledger", then
   // "sum of rows below"/"DAG's own", then "sum"/"all"/"only": "make it consistent where
-  // possible, it's too random"). The row is either the rows below added up — tagged "total",
-  // his own word for it — or the DAG's own figure, the same kind every row below states for
-  // itself, which needs no tag because an untagged row is a network's own. Three tags for three
-  // shades of meaning was the randomness; `GLOBAL_READING` is the one distinction left.
+  // possible, it's too random"). The row is either the rows below added up — tagged in his own
+  // words, "sum of the networks below" (2026-10-09; "total" before that) — or the DAG's own
+  // figure, the same kind every row below states for itself, which needs no tag because an
+  // untagged row is a network's own. Three tags for three shades of meaning was the randomness;
+  // `GLOBAL_READING` is the one distinction left.
   const isTotal = GLOBAL_READING[metric] === "total";
   const lead =
     total && !empty
@@ -131,7 +132,9 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
           key: "dag-total",
           glyph: <IdentityDot hue={total.hue} />,
           name: "DAG",
-          tag: isTotal ? <QualifierChip>total</QualifierChip> : undefined,
+          // A sentence, so a caption under the name rather than a chip beside it (ExplorerRow's
+          // plain-row rule).
+          tag: isTotal ? "sum of the networks below" : undefined,
           hue: total.hue,
           figure:
             slice.stale ? <NodeStars count={3} /> : total.head != null ? format(total.head) : roster.pending || (roster.headKind === "day" && roster.dayPending) ? <NodeStars count={3} /> : <span className="text-muted-foreground" aria-label={NO_READING}>—</span>,
@@ -155,6 +158,8 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
       onPick: (id) => setTrendMetric(id as TrendMetric),
     },
     hasFigure: true,
+    // The span, under the list (`foot` above).
+    pager: empty ? undefined : foot,
     // No tags at this level, so the name takes the tag home's room; the readings run long
     // ("12,345.6"), so the figure column takes the fee width.
     nameW: 112,
@@ -235,7 +240,7 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
       // which time it is about.
       // The span alone (user, 2026-10-03: remove "Pick one to bring it forward."): rows that
       // highlight under the pointer already say they can be picked.
-      hint={empty ? null : over}
+      hint={null}
       // The plate placeholder every explorer carries (user, 2026-10-09): what selecting a row does.
       placeholder={empty ? undefined : "Select a network to view the chart."}
       levels={[level]}

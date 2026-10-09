@@ -225,12 +225,18 @@ export default function ExplorerRow({
       {/* A TEXT tag ellipsises; a flex container cannot do that for a bare string (its
           `text-overflow` has no inline box to act on), so "Falkenstein" was cut to "Falkens" with
           no mark that anything was missing. Chips and dots stay direct children. */}
-      <span className="min-w-0 truncate flex items-center gap-1 text-label text-muted-foreground">
+      {/* A PINNED row's tag is a CAPTION ON ITS OWN LINE (user, 2026-10-09: the DAG row says "sum of
+          the networks below" — a sentence, which a chip beside the name ellipsised at the rail's
+          264px floor). It takes the second grid row from the name's column to the figure's edge,
+          in the tag home's own muted label; the name, bar and figure keep the first row. */}
+      <span className={cn("min-w-0 truncate flex items-center gap-1 text-label text-muted-foreground", plain && tag != null && "col-start-2 col-end-[-1] row-start-2 -mt-0.5")}>
         {typeof tag === "string" ? <span className="min-w-0 truncate">{tag}</span> : tag}
       </span>
       {hasFigure && (
         <>
-          <span className={cn("h-[5px] rounded-[3px] overflow-hidden", !plain && "bg-wash-faint")}>
+          {/* With the caption on row 2 the bar and the figure name their columns: auto-placement
+              would otherwise slide them left into the tag's freed column and the 0px bar column. */}
+          <span className={cn("h-[5px] rounded-[3px] overflow-hidden", !plain && "bg-wash-faint", plain && tag != null && "col-start-4 row-start-1")}>
             {bar && (
               <span
                 className="block h-full rounded-[3px]"
@@ -238,7 +244,7 @@ export default function ExplorerRow({
               />
             )}
           </span>
-          <span className={cn("min-w-0 truncate text-right font-mono text-body tabular-nums", nested ? "text-foreground-dim" : "text-foreground")}>
+          <span className={cn("min-w-0 truncate text-right font-mono text-body tabular-nums", nested ? "text-foreground-dim" : "text-foreground", plain && tag != null && "col-start-5 row-start-1")}>
             {/* An inline box, so its width is the figure's own — what the Explorer measures. */}
             <span data-fit-fig="">{figure}</span>
           </span>

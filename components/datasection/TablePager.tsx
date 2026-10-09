@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 
@@ -24,8 +26,13 @@ export default function TablePager({
   exact = false,
   totalPending = false,
   floor = false,
+  aside,
   onPage,
 }: {
+  /** A CHIP AT THE STRIP'S RIGHT END where a single page has no cluster (2026-10-09 — History's
+   *  explorer states its span here, the way the Snapshots explorer's footer states its cache span:
+   *  the row it rode above the list "looks a bit off", user). Rendered only without a cluster. */
+  aside?: ReactNode;
   page: number; // 1-based
   pages: number;
   from: number; // 1-based row range of the current slice
@@ -103,6 +110,7 @@ export default function TablePager({
       </span>
       {/* A single page has nothing to navigate, so the cluster is ABSENT rather than a dead
           ‹ 1 / 1 › (the plank's rule: permanently dead chrome is not a control); the span stays. */}
+      {pages <= 1 && aside}
       {pages > 1 && (
       <span className="inline-flex flex-none items-center gap-1">
         {/* First/last jumps (user, 2026-08-14 — "I want to see the genesis block; now I have to
