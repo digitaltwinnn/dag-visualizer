@@ -1,5 +1,8 @@
 "use client";
 
+import { Pin } from "lucide-react";
+import { cn } from "@/lib/utils";
+
 // Shared empty/loading-state ATOMS — built from the app's own marks (node-dot, ring, halo) so a
 // loading/absent state reads as part of the instrument, not a bolt-on. Motion keyframes live in
 // app/globals.css (the `--animate-st-*` theme vars, beside `breathe`/`ecg-scan`); each is paired
@@ -52,4 +55,14 @@ export function StandbyHalo() {
       <span className="absolute left-2 top-1/2 -mt-[4.5px] w-[9px] h-[9px] rounded-full bg-primary animate-st-standby-node motion-reduce:animate-none" />
     </span>
   );
+}
+
+// PINNED — the Snapshots view's word for a committed tick held against the live stream, as ONE
+// mark everywhere it is said (user, 2026-10-09: "sometimes it's present differently … keep it
+// consistent and use the icon, and ensure it's not too tiny"). The explorer's selected tick row,
+// the Global snapshot card's control, the scene callout, the raw log's selected row and the raw
+// pane's head all wear this glyph beside the word, the way the live state wears `LiveDot`. 14px
+// (was 12 on the one row that had it); the ink is the caller's — muted at rest, full on a wash.
+export function PinMark({ className }: { className?: string }) {
+  return <Pin aria-hidden className={cn("size-3.5 flex-none", className)} />;
 }

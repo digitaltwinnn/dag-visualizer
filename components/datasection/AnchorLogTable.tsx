@@ -35,7 +35,7 @@ import { useUnlistedChains } from "@/components/datasection/useUnlistedChains";
 import { useChainSpan } from "@/components/useArchive";
 import LiveDot from "@/components/LiveDot";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { NodeStars } from "@/components/state/StateAtoms";
+import { NodeStars, PinMark } from "@/components/state/StateAtoms";
 import { isRetired } from "@/src/net/lineage";
 
 // The retained global window the log joins against — the same buffer the strip's bars plot,
@@ -1800,8 +1800,13 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                     )}
                   </TableCell>
                   <TableCell className="font-mono tabular-nums text-foreground-dim">
-                    {/* The ✓ slot is ALWAYS reserved so the column never shifts on select. */}
-                    {seam ? <Dash /> : r.ordinal.toLocaleString()}
+                    {/* THE SELECTED ROW SAYS WHETHER IT IS LIVE OR PINNED (user, 2026-10-09: the
+                        pinned snapshot "should show that also in the raw list") — the Snapshots
+                        explorer's own state mark on its highlighted row, the same two glyphs. */}
+                    <span className="inline-flex items-center gap-1.5">
+                      {seam ? <Dash /> : r.ordinal.toLocaleString()}
+                      {rowSel && !seam && (following ? <LiveDot /> : <PinMark className="text-muted-foreground" />)}
+                    </span>
                   </TableCell>
                   <TableCell className={cn("text-right tabular-nums text-foreground-dim", PHONE_HIDDEN)}>{seam ? <Dash /> : size}</TableCell>
                   {!grouped && (

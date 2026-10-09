@@ -52,6 +52,8 @@ import { Check, ChevronRight, ChevronsDownUp, ChevronsUpDown, Minus } from "luci
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DEEP_GIVE_UP_MS } from "@/components/RawSnapshotBridge";
 import { useStore } from "@/src/store/store";
+import LiveDot from "@/components/LiveDot";
+import { PinMark } from "@/components/state/StateAtoms";
 import { useTouch } from "@/components/useTouch";
 import { metaSnapDeepKey } from "@/src/data/types";
 import type { NodeRow } from "@/src/data/types";
@@ -534,6 +536,13 @@ export function ChannelStatePanel() {
           <span className="tabular-nums">{sel.ordinal.toLocaleString()}</span>
           {/* The ordinal is the title; the network qualifies it — the one ticker chip. */}
           <TickerChip text={ticker} hue={hue} />
+          {/* LIVE OR PINNED, as the card head says it (user, 2026-10-09: the pinned snapshot
+              "should show that also in the details pane"): the same two marks and words, a state
+              line rather than a control — the switch stays the Global snapshot card's. */}
+          <span className="ml-auto inline-flex items-center gap-1.5 text-label font-normal text-muted-foreground">
+            {following ? <LiveDot /> : <PinMark className="text-muted-foreground" />}
+            {following ? "live" : "pinned"}
+          </span>
         </span>
       </div>
 
