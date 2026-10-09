@@ -551,3 +551,15 @@ export function focusOnReturn(
 ): string | null {
   return committedChain != null ? planeOf(committedChain) : saved;
 }
+
+/** THE CARD BEHIND THE FRONT ONE (2026-10-09 — a swipe up on the front card "sends it back", which
+ *  a single focus can only say as "bring the next one forward"). The front is the focus when one
+ *  stands (re-dealt to slot 0, `stackPoses`), else the window's first card; behind it is the first
+ *  card of the window that is not the front. Null for a lone card. */
+export function planeBehind(ids: readonly string[], scroll: number, focus: string | null): string | null {
+  if (ids.length < 2) return null;
+  const front = focus && ids.includes(focus) ? focus : frontPlane(ids, scroll);
+  const from = clampScroll(ids.length, scroll);
+  for (let i = from; i < ids.length; i++) if (ids[i] !== front) return ids[i]!;
+  return null;
+}

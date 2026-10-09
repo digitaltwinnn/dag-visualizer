@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   focusOnReturn,
+  planeBehind,
   planeOfChain,
   cardNetwork,
   clampScroll,
@@ -720,5 +721,21 @@ describe("focusOnReturn — closing the log brings forward what was committed in
   it("nothing committed in the log: the plane that was in front comes back", () => {
     expect(focusOnReturn(null, "dor", planeOf)).toBe("dor");
     expect(focusOnReturn(null, null, planeOf)).toBeNull();
+  });
+});
+
+describe("planeBehind — the card a swipe up on the front card brings forward", () => {
+  const ids = ["a", "b", "c", "d", "e", "f", "g"];
+  it("with no focus, the card after the window's first — a paged window included", () => {
+    expect(planeBehind(ids, 0, null)).toBe("b");
+    expect(planeBehind(ids, 2, null)).toBe("d");
+  });
+  it("with a focus re-dealt to the front, the window's first card that is not the focus", () => {
+    expect(planeBehind(ids, 0, "c")).toBe("a");
+    expect(planeBehind(ids, 0, "a")).toBe("b");
+  });
+  it("a lone card has nothing behind it", () => {
+    expect(planeBehind(["a"], 0, null)).toBeNull();
+    expect(planeBehind([], 0, null)).toBeNull();
   });
 });

@@ -71,9 +71,10 @@ import useStagedMeasure, { ROLL_CLASS, useHeldOrder } from "@/components/useStag
 import { cn } from "@/lib/utils";
 import { scopeEmptyCopy } from "@/src/data/trendScope";
 import { headWord, metricCaption, sharedCeiling, stepMetric } from "@/src/data/trendSeries";
+import { swipeIntent, swipeOf } from "@/src/engine/domain/planeSwipe";
 import { trendPlaneActions } from "@/src/engine/domain/pickActions";
 import {
-  frontPlane, MORE_ID, moreCount, morePose, planeFormat, stackPoses } from "@/src/engine/domain/trendStack";
+  frontPlane, MORE_ID, moreCount, morePose, planeFormat, stackPoses, planeBehind } from "@/src/engine/domain/trendStack";
 import { VIEW_POLICIES } from "@/src/engine/domain/viewPolicy";
 import { subjectPairing, useHoverRelease } from "@/components/useSubjectPairing";
 import { applyClickActions } from "@/src/store/applyClickActions";
@@ -297,7 +298,7 @@ export default function TrendStack() {
   // THE DRAG GUARD (see the header): pointerdown records where the press started, pointerup says
   // whether it travelled, and `activate` drops a click that did. Refs, not state — a gesture must
   // never re-render five charts.
-  const down = useRef<{ x: number; y: number } | null>(null);
+  const down = useRef<{ x: number; y: number; at: number; touch: boolean; onPlot: boolean } | null>(null);
   const dragged = useRef(false);
   // ⚠️ WHETHER THIS PRESS MADE A RANGE — the gate for the plot's pick (user, 2026-09-29: a click on
   // the chart set the Moment "only when we click the tiny dot"). The pick used to be gated on
@@ -308,7 +309,12 @@ export default function TrendStack() {
   // bring-forward click, where travel is the right test.)
   const rangedThisPress = useRef(false);
   const onPointerDown = (e: React.PointerEvent) => {
-    down.current = { x: e.clientX, y: e.clientY };
+    // What a SWIPE needs to know about the press (`onPointerUp`): when it began, whether it is a
+    // finger, and whether it began on the plot — whose horizontal drag is the brush.
+    down.current = {
+      x: e.clientX, y: e.clientY, at: performance.now(), touch: e.pointerType !== "mouse",
+      onPlot: !!(e.target as Element | null)?.closest?.("[data-plot]"),
+    };
     dragged.current = false;
     rangedThisPress.current = false;
   };
@@ -326,10 +332,24 @@ export default function TrendStack() {
     if (Math.hypot(e.clientX - d.x, e.clientY - d.y) <= DRAG_SLOP) return;
     dragged.current = true;
   };
-  const onPointerUp = (e: React.PointerEvent) => {
+  const onPointerUp = (e: React.PointerEvent, id: string) => {
     const d = down.current;
     down.current = null;
     dragged.current = dragged.current || (!!d && Math.hypot(e.clientX - d.x, e.clientY - d.y) > DRAG_SLOP);
+    // A SWIPE ON A CARD (user, 2026-10-09; `domain/planeSwipe.ts` has the rules): a finger's flick
+    // along one axis — down brings this card forward, up on the front card sends it back (the card
+    // behind comes forward), left and right step the measure, the keys' own steps. Touch only; the
+    // plot keeps its horizontal drag for the brush, so only its vertical answers. The click the
+    // browser synthesises after the release is dropped by `dragged` above, so a swipe never also
+    // lands as a tap. Read through the ONE write path and the ONE setter the keys use (rule 2).
+    if (!d?.touch) return;
+    const dir = swipeOf(e.clientX - d.x, e.clientY - d.y, performance.now() - d.at, { horizontal: !d.onPlot });
+    if (!dir) return;
+    const st = useStore.getState();
+    const intent = swipeIntent(dir, id, { front: st.trendFocus ?? frontPlane(order, st.trendScroll), behind: planeBehind(order, st.trendScroll, st.trendFocus) });
+    if (!intent) return;
+    if (intent.kind === "measure") stepMeasure(intent.step);
+    else applyClickActions(trendPlaneActions(intent.id, st.trendFocus));
   };
   // UP / DOWN IS THE VIEW'S THIRD AXIS (user, 2026-09-19). Left/right on the timeline is WHEN, the
   // depth of the stack is WHO, and the measure — WHAT — had no gesture on the canvas. The control
@@ -338,10 +358,12 @@ export default function TrendStack() {
   // measure would stop being a comparison), through the ONE order the picker reads, and the ends
   // go inactive rather than wrapping. A SETTING, not a selection — it writes its setter directly,
   // as the picker does (`selectionBoundary` names it out of scope).
-  // ⚠️ THERE IS NO SWIPE. A vertical touch swipe on a card stepped the measure for a few hours —
-  // until a drag on a card became a gesture of its own (the orbit then, the brush now), and one
-  // gesture cannot mean both. The rail's heading control is a finger-sized target, so touch lost
-  // nothing.
+  // THE SWIPE IS A FLICK, NOT A DRAG (2026-10-09, user: "swipe the chart cards up/down … left/right
+  // changes what the chart displays"). A vertical touch swipe once stepped the measure and was
+  // removed the day a drag on a card became a gesture of its own (the orbit then, the brush now),
+  // because one gesture cannot mean both. It is back as a DIFFERENT gesture — fast and short, one
+  // axis, recognised in `onPointerUp` by `domain/planeSwipe.ts` — and the plot's horizontal axis
+  // stays the brush's. The rail's heading control and the keys remain the mouse's routes.
   const stepMeasure = (dir: -1 | 1) => {
     const next = stepMetric(useStore.getState().trendMetric, dir);
     if (next) setMetric(next);
@@ -466,8 +488,11 @@ export default function TrendStack() {
               // translate — see this file's header.
               // `touch-none`: a finger that drags the front card is brushing a range (see
               // `onPointerMove`), so the browser must not claim the gesture for a pan and cancel the
-              // pointer mid-drag.
-              "absolute left-0 top-0 origin-top-left invisible touch-none",
+              // pointer mid-drag. …AND ON THE PLOT TOO (2026-10-09): the chart's plot declares
+              // `touch-pan-y` for the document it was built for, which let a vertical finger move
+              // be a page pan — a `pointercancel` before the release this plane's swipe listens for.
+              // Nothing under a card pans, so the plot takes none here.
+              "absolute left-0 top-0 origin-top-left invisible touch-none [&_[data-plot]]:touch-none",
               // The body takes no pointer events — the wheel's zoom belongs to the canvas beneath.
               // The one plane the pose marks interactive is the exception, and its header strip
               // re-enables them below whatever the pose says. `pointer-events` inherits, so the
@@ -476,7 +501,7 @@ export default function TrendStack() {
             )}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
+            onPointerUp={(e) => onPointerUp(e, pose.id)}
             // THE INTERACTIVE PLANE'S WHOLE BODY is a target too — it is the one plane a click
             // cannot be ambiguous about, and asking for the header strip alone on a plane that is
             // already in front reads as a dead surface. Every other plane keeps the body inert, so
