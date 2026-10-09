@@ -588,8 +588,12 @@ export default function TopBar() {
       {/* On phone the raw panel starts where this caption hangs, so the word showed half-covered
           behind the panel's top edge; the pressed RAW toggle and the panel itself name the place. */}
       {/* …and NOT on the phone since design A1 (2026-10-08): the bar's own face names the view. */}
+      {/* BODY SIZE, not the label step (user, 2026-10-09: "the header text for the views appears too
+          small, the proportion is wrong compared to the rest of the page"): it names the view the
+          36px icon buttons above it have just stopped naming, so it carries the body face the bar's
+          own labels wear, in the caption's caps and tracking. */}
       <div className="hidden max-[1299px]:flex max-[700px]:!hidden justify-end pr-2.5 mt-1.5" aria-hidden>
-        <span key={doc ?? mode} className="roll-in text-label tracking-caps uppercase text-muted-foreground leading-none">
+        <span key={doc ?? mode} className="roll-in text-body tracking-caps uppercase text-muted-foreground leading-none">
           {doc ? DOC_PAGES[doc].label : VIEWS.find((v) => v.id === mode)?.name}
         </span>
       </div>

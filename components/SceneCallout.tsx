@@ -133,24 +133,7 @@ const geoOf = (p: { kind: string }): GeoInfo | undefined =>
  *  which wraps it in its own cursor-follow box instead of the Engine-anchored `.co-panel`. */
 export function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; className?: string; onDismiss?: () => void }) {
   return (
-    <div key={m.key} className={cn("roll-in whitespace-nowrap", SCENE_GLASS, onDismiss && "pr-9", className)}>
-      {/* THE ×, TOP-RIGHT (user, 2026-10-04: "put the callout x button at the top right", then
-          "always"): hides this label for its view until that view's subject changes. The one
-          control on a pointer-inert label, so it opts back into the pointer; out of the tab order
-          because the label is aria-hidden — it mirrors the card, which keyboard and screen-reader
-          users have whole. A thumb-sized hit area around a quiet glyph. */}
-      {onDismiss && (
-        <button
-          type="button"
-          tabIndex={-1}
-          onClick={onDismiss}
-          // Live only while the label is ON: a faded-out label keeps its place on screen, and an
-          // invisible × there would swallow a click on the scene (review, 2026-10-04).
-          className="pointer-events-auto [[data-on='0']_&]:pointer-events-none absolute top-1.5 right-1.5 flex size-6 items-center justify-center rounded-md text-muted-foreground hover:bg-wash-hover hover:text-foreground after:absolute after:-inset-2 after:content-['']"
-        >
-          <X aria-hidden className="size-3.5 touch:size-[18px]" />
-        </button>
-      )}
+    <div key={m.key} className={cn("roll-in whitespace-nowrap", SCENE_GLASS, className)}>
       {/* The identity EDGE SPINE (user, 2026-08-15 — "the rails/hairline effect on the left
           side, attached", then "let it fade into the corners"): the sheets' single-identity-
           cue language at callout scale, as the shared `.edge-spine` recipe (globals.css) — a
@@ -161,7 +144,32 @@ export function CalloutPanel({ m, className, onDismiss }: { m: CalloutModel; cla
       {/* The card eyebrow's own ink (CardHead: EYEBROW + text-primary-ink), not a muted caption —
           this is the same slot noun the rail card wears (user, 2026-08-15). It follows the card
           to the accent's INK (2026-10-02): the bare accent measured 4.2:1 here on paper. */}
-      <div className="text-label font-bold tracking-[0.1em] uppercase leading-none text-primary-ink mb-1.5">{m.eyebrow}</div>
+      {/* THE × RIDES THE EYEBROW ROW (user, 2026-10-09: "on the same row as its header, make space
+          for content to go to the right side of the card"). It stood absolute at the top-right with
+          a 36px reserve down the whole panel, so the title row and the lead ended short of the
+          edge. Now the eyebrow and the × share one row — the button's box overhangs the 12px line
+          by 6px each way into the glass's own 8px padding, so the row keeps its height — and the
+          rows beneath run the panel's full width.
+          THE ×'s RULE (user, 2026-10-04: "put the callout x button at the top right", then
+          "always"): hides this label for its view until that view's subject changes. The one
+          control on a pointer-inert label, so it opts back into the pointer; out of the tab order
+          because the label is aria-hidden — it mirrors the card, which keyboard and screen-reader
+          users have whole. A thumb-sized hit area around a quiet glyph. */}
+      <div className="flex items-center justify-between gap-3 mb-1.5">
+        <div className="text-label font-bold tracking-[0.1em] uppercase leading-none text-primary-ink">{m.eyebrow}</div>
+        {onDismiss && (
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={onDismiss}
+            // Live only while the label is ON: a faded-out label keeps its place on screen, and an
+            // invisible × there would swallow a click on the scene (review, 2026-10-04).
+            className="pointer-events-auto [[data-on='0']_&]:pointer-events-none relative -my-1.5 -mr-1.5 flex size-6 flex-none items-center justify-center rounded-md text-muted-foreground hover:bg-wash-hover hover:text-foreground after:absolute after:-inset-2 after:content-['']"
+          >
+            <X aria-hidden className="size-3.5 touch:size-[18px]" />
+          </button>
+        )}
+      </div>
       {/* No identity dot here (user, 2026-08-15): the hued aside already carries the identity
           on this row, and the anchor ring is the subject mark at the scene end of the tie. */}
       <div className="flex items-center gap-[7px]">
