@@ -243,12 +243,6 @@ export interface LightTune {
   selBleed: number;  // how far the halo multiplies the ground toward the mark's own hue
   selGlow: number;   // the additive term beside it — light added at the mark's own core
   selRadius: number; // the halo's spread
-  // The studio backdrop (scene/SceneContext.ts · paperBackdrop). Both are BAKED into a canvas at
-  // event time, not read per frame — the "light look" group's onChange already ends in
-  // refreshTheme(), which re-applies the background, so an edit rebuilds the texture for free.
-  bgTint: number;  // how far the sweep settles into its cool hue — 1 is the shipped ramp, 0 grey
-  bgGrid: number;  // the backdrop grid's peak ink — 0 is a plain lit wall, no grid drawn
-  bgSweep: number; // how much of the cyclorama (sky-to-stage sweep + lit pool) is painted — 1 is the lit wall, 0 a FLAT PLATE at the ground token's own level
 }
 export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
   // Settled from the user's own EXPORT (2026-08-28, second round): with the inactive marks
@@ -294,20 +288,14 @@ export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
   // which on paper is a stain rather than emphasis. Both terms now a whisper; the committed subject
   // keeps its tint, the resting field keeps its paper.
   selBleed: 0.18, selGlow: 0.05, selRadius: 1.35,
-  // bgTint returned (0 → 0.5 → 1 across the user's exports, 2026-08-30): the ivory drift read
-  // BROWN at the first shipped chroma and was zeroed the same day — re-picked at half and then
-  // full strength as the quiet-tray glass, the brighter halo and the lighter wall (groundL 0.88)
-  // changed what the tint sits over.
-  // Print: the plate is flat (bgSweep 0 leaves the sweep and the pool at identity, so the token's
-  // level is the whole wall) and the grid is OFF (user, 2026-10-09: a hairline grid "might conflict
-  // with the scene subject"). bgTint is inert at bgSweep 0 — the drift rides the sweep's k column.
-  bgTint: 1, bgGrid: 0, bgSweep: 0,
+  // (The lit wall's backdrop knobs — bgTint, bgGrid, bgSweep — left with the cyclorama, 2026-10-09:
+  // the Print plate is one flat colour, SceneContext.applyBackground.)
 });
 export const LIGHT_TUNE: LightTune = { ...LIGHT_TUNE_DEFAULTS };
 export const LIGHT_TUNE_SCHEMA: import("./tune").TuneSchema<LightTune> = {
   laneL: { min: 0.4, max: 0.85, step: 0.01, label: "lane L" },
   laneC: { min: 0.05, max: 0.3, step: 0.005, label: "lane C" },
-  groundL: { min: 0.5, max: 0.95, step: 0.005, label: "ground L" },
+  groundL: { min: 0.5, max: 0.99, step: 0.005, label: "ground L" }, // max raised past the Print default (0.955)
   inkGamma: { min: 0.05, max: 1, step: 0.01, label: "ink gamma" },
   inkDimG: { min: 0.2, max: 2, step: 0.05, label: "ink dim curve" },
   inkLift: { min: 0.1, max: 4, step: 0.05, label: "ink focus lift" },
@@ -316,9 +304,6 @@ export const LIGHT_TUNE_SCHEMA: import("./tune").TuneSchema<LightTune> = {
   selBleed: { min: 0, max: 4, step: 0.05, label: "halo bleed" },
   selGlow: { min: 0, max: 2, step: 0.05, label: "halo glow" },
   selRadius: { min: 0.1, max: 1.5, step: 0.05, label: "halo spread" },
-  bgTint: { min: 0, max: 2.5, step: 0.05, label: "backdrop tint" },
-  bgGrid: { min: 0, max: 0.25, step: 0.005, label: "backdrop grid" },
-  bgSweep: { min: 0, max: 1, step: 0.05, label: "backdrop sweep" },
 };
 
 /**

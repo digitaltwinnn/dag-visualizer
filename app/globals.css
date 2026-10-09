@@ -920,10 +920,10 @@
   --background: light-dark(oklch(0.985 0.003 265), oklch(0.09 0.02 265));         /* light: the PRINT page — white paper (direction A, 2026-10-09; was the 0.94 grey-blue page). #05060e app bg (dark) */
   /* The SCENE's own light ground. Since the Print pass (2026-10-09) it is a FLAT PLATE one step
      below the page — the printed sheet the instruments are drawn on, not a lit wall. (Design
-     fork C of 2026-08-25 made it a deeper SILVER screen so a bloom could exceed it; that wall is
-     retired as the look and kept behind LIGHT_TUNE.bgSweep.) Dark side is --background's dark
-     verbatim, so the dark scene is byte-identical. */
-  --scene-ground: light-dark(oklch(0.955 0.01 250), oklch(0.09 0.02 265)); /* PRINT: a flat plate ONE step below the white page (0.955 vs 0.985), no sweep (LIGHT_TUNE.bgSweep 0). Was the 0.88 cool-silver lit wall (2026-08-30). Keep LIGHT_TUNE.groundL AND devTune's ground override in sync — groundSync.test.ts holds this arm to the struct */
+     fork C of 2026-08-25 made it a deeper SILVER screen so a bloom could exceed it; that wall and
+     its cyclorama are deleted.) Dark side is --background's dark verbatim, so the dark scene is
+     byte-identical. */
+  --scene-ground: light-dark(oklch(0.955 0.01 250), oklch(0.09 0.02 265)); /* PRINT: a flat plate ONE step below the white page (0.955 vs 0.985), one flat colour — no sweep. Was the 0.88 cool-silver lit wall (2026-08-30). Keep LIGHT_TUNE.groundL AND devTune's ground override in sync — groundSync.test.ts holds this arm to the struct */
   /* The card elevation pair, ONE home for three recipes (`.ig-panel`, `.subject-paired`, the boxed
      rail rung) — they must keep matching, and a token matches by construction where the previous
      "restate the literal" arrangement matched by discipline. Theme-aware since 2026-08-29 (light

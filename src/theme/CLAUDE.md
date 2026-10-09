@@ -102,9 +102,9 @@ frame, and both knobs at zero skip the sub-pipeline rather than neutralising it.
 **Light mode is a PRINTED SHEET, not a lit wall** (design direction A, chosen by the user over a
 blueprint plate and a lit stage, on real screenshots in the brainstorming companion). The lit
 silver wall, its sky-to-stage sweep, the pool of light and the engineering grid — the 2026-08
-"wave" work — are retired as the shipped look; the code stays behind knobs so the wall can be
-dialled back live (`LIGHT_TUNE.bgSweep` 0 = flat, 1 = the wall; `bgGrid` 0; `bgTint` is inert at
-sweep 0). The dark look is byte-identical throughout by construction: every change is the light
+"wave" work — are DELETED, not parked (user, same day: "clean dead code also"); git carries them,
+and `SceneContext.applyBackground` is one flat colour on both grounds. The dark look is
+byte-identical throughout by construction: every change is the light
 arm of a `light-dark()` or the `paper ? … : …` branch, and the chamber's dark shader branch
 returns before any Print term is read.
 
@@ -125,10 +125,11 @@ rim fills are OFF (`FILL_OP_PAPER` — their stacked bands read as a milky disc 
 measured as contrast, not light), the globe's land is a fill (`LAND_GLASS_BODY` 0.35, the Fresnel
 ramp to the rim kept) over a paper-only OCEAN PLATE (`buildOcean`, 7% ink at sea level, hidden on
 dark, pick-inert because geo resolves its surface by sphere maths), and the chamber's panes are
-MATTE SHEETS: `GLASS_TUNE` holds body 0.10, every reflection term (sky, window, softboxes, polished
-lip) at 0, a whisper of Fresnel, and `line` — `glassFill.uLine`, an ink hairline ~1.5px inside
-every pane's rim measured in screen space (`fwidth`), the HUD card's edge recipe one layer down.
-The reflection knobs keep their ranges and their 2026-08 history so the glass can be dialled back.
+MATTE SHEETS: `GLASS_TUNE` holds body 0.10, a whisper of Fresnel (rim 0.10), the trays' body, and
+`line` — `glassFill.uLine`, an ink hairline ~1.5px inside every pane's rim measured in screen
+space (`fwidth`), the HUD card's edge recipe one layer down. The day glass's reflection terms
+(room, window, softboxes, polished lip, the lamp lobe and its uniform push) are deleted with the
+wall; the ledger still claims the stage light on paper because the lamp lights the tray CHIPS.
 
 **The paper halo is a whisper** (`selBleed` 0.18, `selGlow` 0.05): on the flat plate the bleed alone
 tinted the plate blue inside the DAG's shells, which on paper is a stain, not emphasis.

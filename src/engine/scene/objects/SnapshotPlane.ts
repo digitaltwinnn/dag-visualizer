@@ -52,56 +52,24 @@ export const PLANE_TUNE_SCHEMA: TuneSchema<PlaneTune> = {
  *  chamber. The channels still separate — every term below is multiplied by the caller's own
  *  furniture alpha and fill boost — so the committed lane still leads. */
 export interface GlassTune {
-  body: number;     // the pane's own tint: what the glass costs the ground beneath it
-  sky: number;      // the reflected room's gradient — bright above the horizon, lit silver below
-  rim: number;      // the Fresnel grazing sheen, CAPPED: a full mirror would hide the trail
-  spec: number;     // the reflected window
-  specPow: number;  // its tightness
-  edge: number;     // the polished edge the SDF band already measures
-  env: number;      // the studio SOFTBOXES in the reflected room — what makes orbiting sweep it
-  trayBody: number; // the trays face the camera head-on: no sky, little Fresnel, so more body
+  body: number;     // the pane's own tint: what the sheet costs the ground beneath it
+  rim: number;      // the Fresnel sheen, CAPPED: a full mirror would hide the trail
+  trayBody: number; // the trays face the camera head-on: little Fresnel, so a touch more body
   line: number;     // the PRINT hairline — ink along every pane's rim, in screen space (glassFill.uLine)
-  // ── THE COMMITTED LANE, on paper. Dark answers a commit by lifting the edge fill; the day glass
-  // has no such term, and multiplying the REFLECTION terms instead is what blew the committed
-  // plane to white (user, 2026-08-28: "the active metagraph plane is white") — the shader mixes
-  // uColor toward white by those very terms, so twice the reflection IS white. Emphasis on paper
-  // therefore rides the two channels that CAN'T bleach: the body tint's alpha, and hue.
+  // ── THE COMMITTED LANE, on paper. Emphasis rides the two channels that cannot bleach: the body
+  // tint's alpha, and hue.
   laneBody: number; // how much more of its own tint the committed lane's pane holds
   laneTint: number; // how far that tint moves from the neutral pane toward the lane's identity
 }
 
 export const GLASS_TUNE_DEFAULTS: Readonly<GlassTune> = Object.freeze({
-  // Settled from the user's own EXPORT (2026-08-28) after the chamber blew out near-white
-  // under a committed filter: the polished edge was the hot term (0.32 → 0.08), rim and the
-  // reflection lobes came down a step — and the TRAYS came UP (0.12 → 0.42): with the planes
-  // calmed, the trays finally earn real presence.
-  // 2026-08-30 first pass at "too glossy, want shiny but not too much" (user): the DIFFUSE film
-  // steps down (sky 0.33 → 0.26, env 0.48 → 0.40 — the milky all-over gloss) and the CRISP terms
-  // step up and tighten (spec 0.5 → 0.62, specPow 19 → 30, edge 0.16 → 0.22, rim 0.3 → 0.34) —
-  // sheen concentrated into highlights instead of spread as film.
-  // Second pass same day ("more glass, less gloss"): the film comes down again (sky 0.26 → 0.17,
-  // env 0.40 → 0.28, rim 0.34 → 0.26) and GLASSNESS is bought with clarity instead — body tint
-  // thinner (0.185 → 0.155, you see more THROUGH the pane) and the polished edge up
-  // (0.22 → 0.28, the one term that says "cut glass" without filming the face).
-  // 2026-08-30 third pass — "I want them more shiny glass" (user), after the chip-env wash was
-  // fixed (viewPolicy.chipEnv): while every tray chip washed white, the glass terms were visually
-  // swamped and the knobs read as dead; with the chips back to ink the same terms show again, and
-  // shine comes UP across the board — bought with the crisp terms (edge, window, softboxes) plus a
-  // step of rim/sky, while body stays at the second pass's clarity so the trail stays readable.
-  // Settled from the user's own EXPORT (same day): edge 0.45 → 0.25 (the white border calmed),
-  // trayBody 0.42 → 0.075 (the milky plates behind the chips were half of what read as washed
-  // nodes — quiet trays let the chips carry their own colour), laneTint 0.8 → 1 (the committed
-  // pane goes fully to its lane's identity). Next export the same day trades edge for body —
-  // 0.25 → 0.15 and body 0.155 → 0.26: the pane's presence moves from the cut border into the
-  // tint itself, more pane and less outline over the lighter 0.88 wall.
-  // PRINT (design direction A, user 2026-10-09): the panes are SHEETS, not glass. The light
-  // instrument is a printed page, so the reflected room, the window, the softboxes and the
-  // polished lip — every term that lifted the pane toward white over the lit silver wall — are off,
-  // and a pane is a faint matte tint of the furniture ink with a hairline along its rim, exactly the
-  // HUD's card recipe one layer down. The reflection terms keep their knobs (and their 2026-08-28/30
-  // history above) so the glass look can be dialled back in live; the shipped page is matte.
-  // A whisper of Fresnel (rim 0.10) survives so a pane read along its plane still firms a little.
-  body: 0.10, sky: 0, rim: 0.10, spec: 0, specPow: 18, edge: 0, env: 0, trayBody: 0.06, line: 0.55,
+  // PRINT (design direction A, user 2026-10-09): the panes are SHEETS, not glass — a faint matte
+  // tint of the furniture ink with a hairline along the rim, the HUD's card recipe one layer down.
+  // A whisper of Fresnel survives so a pane read along its plane still firms a little. The day
+  // GLASS's reflection terms (sky, window, softboxes, polished lip, lamp lobe — tuned across
+  // 2026-08-28/30 against the lit silver wall) were zeroed with the wall and then deleted (user,
+  // same day: "clean dead code also"); git carries their history.
+  body: 0.10, rim: 0.10, trayBody: 0.06, line: 0.55,
   laneBody: 1.75, laneTint: 1,
 });
 /** The live struct the `?tune` panel binds; DEFAULTS above is the shipped look and what tests pin. */
@@ -109,12 +77,7 @@ export const GLASS_TUNE: GlassTune = { ...GLASS_TUNE_DEFAULTS };
 
 export const GLASS_TUNE_SCHEMA: TuneSchema<GlassTune> = {
   body: { min: 0, max: 0.4, step: 0.005, label: "body tint" },
-  sky: { min: 0, max: 1, step: 0.02, label: "room colour" },
   rim: { min: 0, max: 1.5, step: 0.02, label: "reflectance" },
-  spec: { min: 0, max: 1.5, step: 0.02, label: "window" },
-  specPow: { min: 1, max: 64, step: 1, label: "window tightness" },
-  edge: { min: 0, max: 1.5, step: 0.02, label: "polished edge" },
-  env: { min: 0, max: 1.5, step: 0.02, label: "softboxes" },
   trayBody: { min: 0, max: 0.5, step: 0.005, label: "tray body" },
   line: { min: 0, max: 1, step: 0.02, label: "hairline (print)" },
   laneBody: { min: 1, max: 4, step: 0.05, label: "lane body ×" },
@@ -219,9 +182,6 @@ export class SnapshotPlane {
   private _paper: boolean;
   private _tray: THREE.Mesh | null = null;
   private _trayU: GlassFillUniforms | null = null;
-  /** The staged light's own eased intensity, pushed by setSpot and spent by applyAlpha (which owns
-   *  the alpha scaling every other glass term goes through). 0 whenever nothing is staged. */
-  private _spotI = 0;
   /** The pane's own neutral tone, captured from the theme — what a lane tint lerps AWAY from, and
    *  what it must return to the moment the commit is released. */
   private _base = 0;
@@ -293,17 +253,6 @@ export class SnapshotPlane {
     this._fillU.uFadeSpan.value = span;
   }
 
-  /** THE MOVABLE HIGHLIGHT — the app's one StageLight, handed to the glass as a WORLD POSITION so
-   *  an unlit ShaderMaterial can still compute a Blinn-Phong lobe from it (glassFill's `uSpot*`).
-   *  Per frame, uniform writes only, no allocation. `i` is the light's own eased intensity, so the
-   *  lobe fades in and out with the lamp and is exactly 0 whenever the ledger has not claimed it —
-   *  which on the dark ground is always. */
-  setSpot(pos: THREE.Vector3, i: number): void {
-    this._spotI = i;
-    this._fillU.uSpotPos.value.copy(pos);
-    if (this._trayU) this._trayU.uSpotPos.value.copy(pos);
-  }
-
   /** Per-frame look: the caller passes ITS tune channel (global vs metagraph planes) and the
    *  furniture alpha. `rimRef` is the shared drop-off reference depth so the rim reads as one
    *  width across planes; narrow pieces clamp it to stay a rim. `fillBoost` lifts the edge
@@ -330,14 +279,8 @@ export class SnapshotPlane {
       this._fillU.uOpacity.value = 0;
       this._fillU.uInner.value = 0;
       this._fillU.uBody.value = g.body * alpha * (lane ? g.laneBody : 1);
-      this._fillU.uSky.value = g.sky * alpha;
       this._fillU.uRim.value = g.rim * alpha;
-      this._fillU.uSpec.value = g.spec * alpha;
-      this._fillU.uSpecPow.value = g.specPow;
-      this._fillU.uEdgeA.value = g.edge * alpha;
       this._fillU.uLine.value = g.line * alpha;
-      this._fillU.uEnv.value = g.env * alpha;
-      this._fillU.uSpotI.value = this._spotI * alpha;
       // Written every frame, both ways: a released commit must return the pane to neutral.
       const uc = this._fillU.uColor.value.setHex(this._base);
       if (lane && hue != null) uc.lerp(_hue.setHex(hue), g.laneTint);
@@ -345,14 +288,8 @@ export class SnapshotPlane {
         this._trayU.uOpacity.value = 0;
         this._trayU.uInner.value = 0;
         this._trayU.uBody.value = g.trayBody * alpha;
-        this._trayU.uSky.value = g.sky * alpha;
         this._trayU.uRim.value = g.rim * alpha;
-        this._trayU.uSpec.value = g.spec * alpha;
-        this._trayU.uSpecPow.value = g.specPow;
-        this._trayU.uEdgeA.value = g.edge * alpha;
         this._trayU.uLine.value = g.line * alpha;
-        this._trayU.uEnv.value = g.env * alpha;
-        this._trayU.uSpotI.value = this._spotI * alpha;
       }
       return;
     }
