@@ -39,7 +39,13 @@ export interface TrendLine {
 export interface TrendBand {
   label: string;
   points: (number | null)[];
+  /** A STABLE identity when two bands may share a label (two hybrid make-ups are both "Hybrid"):
+   *  the data key and the React key, so one band can never overwrite another's column. Defaults
+   *  to the label. */
+  key?: string;
 }
+/** The row/data key a band's points are filed under. */
+const bandKey = (b: TrendBand): string => `s:${b.key ?? b.label}`;
 /** A stack is ONE hue, so its bands are told apart by opacity — the donut's own device for
  *  adjacent parts of one colour — base band strongest. Every band is also NAMED (legend, tooltip),
  *  so the step is never the only channel. */
@@ -437,7 +443,7 @@ export default function TrendChart({
         {(lines.length > 1 || (stack?.length ?? 0) > 0) && (
           <span className="ml-auto inline-flex items-center gap-2 text-label text-muted-foreground">
             {stack?.map((b, i) => (
-              <span key={`s:${b.label}`} className="inline-flex items-center gap-1">
+              <span key={bandKey(b)} className="inline-flex items-center gap-1">
                 <svg width="10" height="10" aria-hidden>
                   <rect x="0.5" y="0.5" width="9" height="9" rx="2" fill={lines[0]?.hue ?? "var(--primary)"} fillOpacity={STACK_STEPS[i % STACK_STEPS.length]} stroke={lines[0]?.hue ?? "var(--primary)"} strokeOpacity={0.5} />
                 </svg>
@@ -746,7 +752,7 @@ const TrendPlot = memo(function TrendPlot({
   const rows = buckets.map((ts, i) => {
     const row: Record<string, number | null> = { ts };
     for (const l of lines) row[l.label] = l.points[i];
-    for (const b of stack ?? []) row[`s:${b.label}`] = b.points[i];
+    for (const b of stack ?? []) row[bandKey(b)] = b.points[i];
     return row;
   });
 
@@ -983,8 +989,8 @@ const TrendPlot = memo(function TrendPlot({
                   its hue at one opacity step with a faint edge, no dots, gaps kept open. */}
               {stack?.map((b, i) => (
                 <Area
-                  key={`s:${b.label}`}
-                  dataKey={`s:${b.label}`}
+                  key={bandKey(b)}
+                  dataKey={bandKey(b)}
                   stackId="parts"
                   type="linear"
                   stroke={hue0}
@@ -1019,9 +1025,9 @@ const TrendPlot = memo(function TrendPlot({
                         );
                       })}
                       {stack?.map((b) => {
-                        const v = payload.find((e) => e.dataKey === `s:${b.label}`)?.value;
+                        const v = payload.find((e) => e.dataKey === bandKey(b))?.value;
                         return v == null ? null : (
-                          <span key={`s:${b.label}`}>
+                          <span key={bandKey(b)}>
                             <span className="ml-2 text-muted-foreground">{b.label} </span>
                             {format(Number(v))}
                           </span>

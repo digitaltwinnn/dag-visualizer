@@ -203,7 +203,13 @@ export default function useTrendRoster(
           gaps: s.gaps && cut(s.gaps),
         },
         rawPoints: s.points,
-        stack: metric === "nodes" && id !== "dag" && id !== UNLISTED_ID ? typeBands(id, series) : undefined,
+        // Each band keyed by its stored type (two hybrid make-ups are both "Hybrid" — found live as a
+        // duplicate-key warning that dropped one band), and a hybrid NAMED BY ITS LAYERS ("Hybrid
+        // L0+cL1") so the legend tells them apart; a one-layer type keeps its word.
+        stack:
+          metric === "nodes" && id !== "dag" && id !== UNLISTED_ID
+            ? typeBands(id, series).map((b) => ({ ...b, label: b.codes.length > 1 ? `${b.label} ${b.codes.join("+")}` : b.label }))
+            : undefined,
         last: lastMeasured(points),
         day: latestDay(metric, id, daily, points, stepMs),
         span: spanAverage(metric, points, stepMs, weights),
