@@ -692,6 +692,29 @@ export class Engine {
       // be what depends on that being exact.
       d.style.bottom = "calc(var(--bottom-reserve, 112px) + 24px)";
       document.body.appendChild(d);
+      // ?stats also exposes a READ-ONLY perf handle for measurement sessions (2026-10-09, the
+      // Edge perf spike): three's own render counters for the last frame, and the live pixel
+      // ratio. Dev chrome, same gate as the meter — never reached by a real user, and it only
+      // reads what the renderer already counts.
+      (window as unknown as { __dagPerf?: unknown }).__dagPerf = {
+        // ONE WHOLE FRAME's counters. three resets `info.render` on every `render()` call, and a
+        // composed frame is several (the scene pass, the bloom's mips, the output quad), so a
+        // read at an arbitrary moment sees only the last pass — one quad, one triangle. Hold the
+        // auto-reset off across two animation frames and read the accumulation: every pass of
+        // one full frame (occasionally two — stated, not hidden).
+        frame: async () => {
+          const info = this.ctx.renderer.info;
+          const raf = () => new Promise<void>((res) => requestAnimationFrame(() => res()));
+          await raf();
+          info.autoReset = false;
+          info.reset();
+          await raf();
+          await raf();
+          const r = { calls: info.render.calls, triangles: info.render.triangles, lines: info.render.lines, points: info.render.points };
+          info.autoReset = true;
+          return { ...r, programs: info.programs?.length ?? 0, geometries: info.memory.geometries, textures: info.memory.textures, pixelRatio: this.ctx.renderer.getPixelRatio() };
+        },
+      };
     }
 
     // ?clickdebug — WHY a click did or did not select (the ?stats/?slowmo idiom). A discarded click
