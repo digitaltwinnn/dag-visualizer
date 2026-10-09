@@ -707,12 +707,15 @@ export class Engine {
           const raf = () => new Promise<void>((res) => requestAnimationFrame(() => res()));
           await raf();
           info.autoReset = false;
-          info.reset();
-          await raf();
-          await raf();
-          const r = { calls: info.render.calls, triangles: info.render.triangles, lines: info.render.lines, points: info.render.points };
-          info.autoReset = true;
-          return { ...r, programs: info.programs?.length ?? 0, geometries: info.memory.geometries, textures: info.memory.textures, pixelRatio: this.ctx.renderer.getPixelRatio() };
+          try {
+            info.reset();
+            await raf();
+            await raf();
+            const r = { calls: info.render.calls, triangles: info.render.triangles, lines: info.render.lines, points: info.render.points };
+            return { ...r, programs: info.programs?.length ?? 0, geometries: info.memory.geometries, textures: info.memory.textures, pixelRatio: this.ctx.renderer.getPixelRatio() };
+          } finally {
+            info.autoReset = true; // never left off — the counters would accumulate forever
+          }
         },
       };
     }

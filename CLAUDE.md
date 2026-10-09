@@ -357,7 +357,7 @@ elevation follows the camera's PITCH as a delta from the view's resting pitch
 dive or vertical orbit carries the whole rig, the geo sun included (was world-absolute, which died
 at any pose off the resting pitch — user, 2026-08-30). **A light is a TEMPERATURE, not a palette hue** — rows carry a −1…+1
 axis resolved by `tempTint`, which is why lighting owns no colour literal and no allowlist entry.
-`RIG_PAPER` takes every channel down on the light ground (ambient hardest, key least): a ~0.8-L page
+`RIG_PAPER` takes every channel down on the light ground (ambient hardest, key least): a ~0.95-L page
 is its own bounce card, so on paper the rig narrows to FORM and presence keeps riding the ink system.
 ⚠️ When every view's weight is ~0 the blend HOLDS the last frame — normalising a zero would black the
 scene out at the gather boundary.

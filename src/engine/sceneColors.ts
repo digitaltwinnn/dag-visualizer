@@ -390,7 +390,7 @@ export function readSceneColors(): SceneColors {
   return {
     core: readColorToken("--primary"),
     dagCore: readColorToken("--core"),
-    bg: readColorToken("--scene-ground"), // the scene's OWN ground — silver in light, --background's dark verbatim in dark
+    bg: readColorToken("--scene-ground"), // the scene's OWN ground — the flat Print plate in light, --background's dark verbatim in dark
     border: readColorToken("--border"),
     panel: readColorToken("--panel"),
     muted: readColorToken("--muted-foreground"),
