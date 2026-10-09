@@ -90,8 +90,8 @@ export default function AboutDoc() {
         <p className="mt-2 text-prose text-muted-foreground">
           Node locations come from their public internet addresses, so they are accurate to a
           city and a hosting provider, not to a street. The only thing stored behind this site
-          is the network&apos;s own public history — daily activity totals summed from the chain
-          for the History view. Nothing about you: the page keeps a short memory of recent
+          is the network&apos;s own public history — activity totals summed from the chain for
+          the History view. Nothing about you: the page keeps a short memory of recent
           snapshots while it is open, and forgets it when you close the tab.
         </p>
         <p className="mt-2 text-prose text-muted-foreground">
@@ -136,14 +136,19 @@ export default function AboutDoc() {
           already stated by the card above it isn&apos;t repeated below; and the label floating
           in the scene follows whichever card you open, just as the camera does.
         </p>
-        {/* The observation ladder, in the human register (user, 2026-09-09 — the same
-            principle CLAUDE.md carries as convention 12 and the README states in its own
-            voice; this page keeps it to one warm paragraph). */}
+        {/* One selection across the views, and RAW as the one step down (user, 2026-10-09:
+            the "three depths" paragraph this replaces called History a depth below the scene,
+            while the switch shows it as a sibling of the other three — "we have a separate
+            trend page now rather than a 3rd depth"). The observation ladder CLAUDE.md carries
+            as convention 12 still holds in the app; this page states the part a reader can
+            see: the selection travels, and RAW opens the records under whatever view they are in. */}
         <p>
-          And everything here comes at <strong>three depths</strong>: the scene shows the
-          network <em>live</em>, the History view shows its <em>measured history</em>, and the
-          raw data view opens the <em>individual snapshots</em> themselves — each one step
-          deeper, and each step carries along what you were looking at.
+          <strong>One selection carries across all four views.</strong> Pick a network in the
+          Hypergraph and the globe, the snapshot chamber and the charts all open on it. And every
+          view has a <strong>RAW</strong> switch that drops one level down to the records
+          underneath — the actual snapshots in the live views, the stored measurements behind the
+          charts in History — with the card you had open coming along, so the records open where
+          you were looking.
         </p>
       </Section>
 
