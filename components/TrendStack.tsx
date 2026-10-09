@@ -64,7 +64,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 
-import TrendChart, { type TrendLine } from "@/components/docs/TrendChart";
+import TrendChart, { type TrendBand, type TrendLine } from "@/components/docs/TrendChart";
 import useTrendRoster from "@/components/useTrendRoster";
 import useTrendsSlice from "@/components/useTrendsSlice";
 import useStagedMeasure, { ROLL_CLASS, useHeldOrder } from "@/components/useStagedMeasure";
@@ -283,6 +283,16 @@ export default function TrendStack() {
     for (const [id, row] of rows) m.set(id, [{ label: shown, points: row.series.points, hue: row.hue }]);
     return m;
   }, [rows, shown]);
+  // THE NODE-TYPE STACK under the Nodes measure (user, 2026-10-09): the roster's own bands
+  // (`TrendRosterRow.stack`), drawn under the line in the plane's hue — the chart's `stack`, which
+  // the retired document used for the same partition. Held still on the roster's deps like the
+  // lines; a network without bands (the DAG, the unlisted set, a window before the type sampler)
+  // keeps its plain line.
+  const stackById = useMemo(() => {
+    const m = new Map<string, TrendBand[]>();
+    for (const [id, row] of rows) if (row.stack?.length) m.set(id, row.stack);
+    return m;
+  }, [rows]);
 
   // THE DRAG GUARD (see the header): pointerdown records where the press started, pointerup says
   // whether it travelled, and `activate` drops a click that did. Refs, not state — a gesture must
@@ -557,6 +567,7 @@ export default function TrendStack() {
                 sampled={row.series.sampled}
                 gaps={row.series.gaps}
                 lines={linesById.get(pose.id)!}
+                stack={stackById.get(pose.id)}
                 // The DAG's plane keeps its own scale: on the networks' shared ceiling the sum of
                 // them all would run off the top, and with it IN the ceiling they would all go flat.
                 scaleMax={pose.id === "dag" ? undefined : sharedMax}

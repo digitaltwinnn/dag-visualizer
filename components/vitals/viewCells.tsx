@@ -14,7 +14,7 @@ import { BandCard, MicroBars, DonutTotal, TypeGlyph, TYPE_ORDER, compositionCoun
 import { useStore } from "@/src/store/store";
 import { metagraphById, getAnchor } from "@/src/data/network";
 import { displayNetwork, UNLISTED_HUE, UNLISTED_ID } from "@/src/data/unlisted";
-import { metaType, rolesOf, IdentityDot, RoleChips, TickerChip } from "@/components/inspector/parts";
+import { cap, metaType, rolesOf, IdentityDot, RoleChips, TickerChip } from "@/components/inspector/parts";
 import { machineKey } from "@/src/data/composition";
 import { identityHudCss } from "@/src/palette/identity";
 import { METAGRAPHS } from "@/src/net/current";
@@ -143,7 +143,9 @@ export function HyperCells({ accent }: { accent: string }) {
               {(singleWord === "data + currency" ? ["data", "currency"] : [singleWord]).map((t) => (
                 <span key={t} className="flex flex-col items-center gap-1">
                   <TypeGlyph t={t} className="size-4" color={accent} />
-                  <span className="font-mono text-label text-foreground whitespace-nowrap">{t}</span>
+                  {/* Capitalised, like every word this band states (user, 2026-10-09: "Data, Currency … for
+                      consistency"; the dossier's status table already `cap`s its words). */}
+                  <span className="font-mono text-label text-foreground whitespace-nowrap">{cap(t)}</span>
                 </span>
               ))}
             </span>
@@ -165,7 +167,7 @@ export function HyperCells({ accent }: { accent: string }) {
         {/* The pair is said in words (user, 2026-10-08: "both" = "data and currency"): a reader
             meets the row before the two single-type rows have taught them what "both" joins. */}
         <MicroBars accent={accent} labelW={96}
-          rows={TYPE_ORDER.map((t) => ({ key: t, label: t === "data + currency" ? "data and currency" : t, count: types[t]!, hue: t === "unknown" ? "var(--muted-foreground)" : undefined }))} />
+          rows={TYPE_ORDER.map((t) => ({ key: t, label: cap(t === "data + currency" ? "data and currency" : t), count: types[t]!, hue: t === "unknown" ? "var(--muted-foreground)" : undefined }))} />
       </BandCard>
       )}
       {/* NO SEPARATE "NODES" CARD (user, 2026-08-31). The composition counts PARTITION the fleet,
@@ -189,7 +191,7 @@ export function HyperCells({ accent }: { accent: string }) {
           the status lane's own bucket tokens; every row is named (never colour-alone). */}
       <BandCard label="Node status">
         <MicroBars accent={accent} labelW={52}
-          rows={statusRows.map((it) => ({ key: it.label, label: it.label, count: it.count, hue: it.color }))} />
+          rows={statusRows.map((it) => ({ key: it.label, label: cap(it.label), count: it.count, hue: it.color }))} />
       </BandCard>
       {/* Unfiltered only — under a commit these rows are the type card's own evidence, above. */}
       {singleWord == null && (

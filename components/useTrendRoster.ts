@@ -17,6 +17,8 @@ import {
   stepFor,
   trimCounterEdges,
   type MetricSeries,
+  typeBands,
+  type TypeBand,
 } from "@/src/data/trendSeries";
 import { displayNetwork, UNLISTED_ID } from "@/src/data/unlisted";
 
@@ -60,6 +62,12 @@ export interface TrendRosterRow {
   /** The same points UNTRIMMED, on `rawBuckets` — for a sum over an exact span whose edges are
    *  whole (the Range card's total; the branch review's I8). Never drawn. */
   rawPoints: (number | null)[];
+  /** THE NODE-TYPE STACK under the Nodes measure (user, 2026-10-09: "can we now make it a stacked
+   *  chart to show the composition?") — the bands that PARTITION this network's nodes, on the drawn
+   *  axis (`typeBands`; a gauge is never edge-trimmed, so the raw axis IS the drawn one). Stored
+   *  per metagraph since 2026-09-29, so earlier buckets are a gap in every band, never a guess;
+   *  the DAG and the unlisted set carry none (the sampler keys types by catalog network). */
+  stack?: TypeBand[];
   /** The newest MEASURED value, which is not the newest bucket (`lastMeasured`). */
   last: number | null;
   /** The newest complete DAY (`latestDay`; user, 2026-09-29: "day should be the standard always")
@@ -195,6 +203,7 @@ export default function useTrendRoster(
           gaps: s.gaps && cut(s.gaps),
         },
         rawPoints: s.points,
+        stack: metric === "nodes" && id !== "dag" && id !== UNLISTED_ID ? typeBands(id, series) : undefined,
         last: lastMeasured(points),
         day: latestDay(metric, id, daily, points, stepMs),
         span: spanAverage(metric, points, stepMs, weights),
