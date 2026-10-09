@@ -567,15 +567,22 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     // [105,121,155], DARKER than the flat ground this replaced — the frame read lighter overall and
     // still had a heavy floor. The levels below are lifted and the k column left climbing, so the
     // bottom settles by getting BLUER rather than by getting dimmer.
+    // ⚠️ PRINT (2026-10-09): `bgSweep` scales the whole cyclorama — every level toward 1 (the
+    // token's own byte, a multiply's identity) and every drift toward 0 — so at 0 both passes
+    // below paint the plate FLAT at `--scene-ground` and the page is a printed sheet. The stops
+    // keep their lit-wall numbers so the knob can bring the wall back by degrees.
+    const sw = LIGHT_TUNE.bgSweep;
+    const lv = (m: number) => 1 + (m - 1) * sw;
+    const dr = (k: number) => k * sw;
     const sweep = g.createLinearGradient(0, 0, 0, S);
     // Top pair lifted 1.13/1.09 -> 1.20/1.14 (user, 2026-08-29: "a bit lighter at the top") —
     // still inside the byte headroom the ceiling note above measured; the stage band down is
     // untouched, so the instruments' anchor holds and only the sky end brightens.
-    sweep.addColorStop(0, hex(1.2, 0.5));
-    sweep.addColorStop(0.28, hex(1.14, 0.35));
-    sweep.addColorStop(0.55, hex(1.02, 0.6));
-    sweep.addColorStop(0.78, hex(0.96, 1.05));
-    sweep.addColorStop(1, hex(0.87, 1.6));
+    sweep.addColorStop(0, hex(lv(1.2), dr(0.5)));
+    sweep.addColorStop(0.28, hex(lv(1.14), dr(0.35)));
+    sweep.addColorStop(0.55, hex(lv(1.02), dr(0.6)));
+    sweep.addColorStop(0.78, hex(lv(0.96), dr(1.05)));
+    sweep.addColorStop(1, hex(lv(0.87), dr(1.6)));
     g.fillStyle = sweep;
     g.fillRect(0, 0, S, S);
 
@@ -593,9 +600,9 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     // corners go cool and deep, and the two passes now cross rather than stack. That crossing is
     // what makes it read as a lit room instead of a gradient.
     const fall = g.createRadialGradient(S / 2, S * 0.332, S * 0.117, S / 2, S * 0.332, S * 0.977);
-    fall.addColorStop(0, grey(1, -0.55));
-    fall.addColorStop(0.5, grey(0.98, -0.2));
-    fall.addColorStop(1, grey(0.89, 0.7));
+    fall.addColorStop(0, grey(1, dr(-0.55)));
+    fall.addColorStop(0.5, grey(lv(0.98), dr(-0.2)));
+    fall.addColorStop(1, grey(lv(0.89), dr(0.7)));
     g.globalCompositeOperation = "multiply";
     g.fillStyle = fall;
     g.fillRect(0, 0, S, S);

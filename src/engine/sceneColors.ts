@@ -230,6 +230,7 @@ export interface LightTune {
   // refreshTheme(), which re-applies the background, so an edit rebuilds the texture for free.
   bgTint: number;  // how far the sweep settles into its cool hue — 1 is the shipped ramp, 0 grey
   bgGrid: number;  // the backdrop grid's peak ink — 0 is a plain lit wall, no grid drawn
+  bgSweep: number; // how much of the cyclorama (sky-to-stage sweep + lit pool) is painted — 1 is the lit wall, 0 a FLAT PLATE at the ground token's own level
 }
 export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
   // Settled from the user's own EXPORT (2026-08-28, second round): with the inactive marks
@@ -240,7 +241,11 @@ export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
   // once (found 2026-08-30: a fresh load baked the lane at a stale 0.70 and the shipped look
   // only appeared after a slider touch, which routes through setSceneLaneLight); deriving makes
   // boot and knob agree by construction. Bake a user's laneL/laneC export in identity.ts.
-  laneL: SCENE_L_LIGHT, laneC: SCENE_C_LIGHT, groundL: 0.88, // groundL settled 0.72 → 0.78 → 0.80 → 0.81 → 0.88 across the wall iterations (user, 2026-08-29/30); keep globals.css --scene-ground AND devTune's override in sync
+  // PRINT (design direction A, user 2026-10-09): the light instrument is a printed sheet, not a lit
+  // wall. The ground is a flat plate one step below the white page (0.955 against the page's 0.985),
+  // with no sweep and no grid — the subject stands on paper. groundL had settled 0.72 → … → 0.88
+  // across the 2026-08 wall iterations; that whole ladder was the lit-stage direction this replaces.
+  laneL: SCENE_L_LIGHT, laneC: SCENE_C_LIGHT, groundL: 0.955, // keep globals.css --scene-ground AND devTune's override in sync (groundSync.test.ts holds the token)
   inkGamma: 0.15, inkDimG: 1.35, inkLift: 0.6,
   // THE WHOLE-FRAME PASS IS OFF ON PAPER. It is a luminance highpass over the finished frame, and
   // on paper the marks are INK — darker than the ground they lie on — so no threshold selects them;
@@ -262,12 +267,23 @@ export const LIGHT_TUNE_DEFAULTS: Readonly<LightTune> = Object.freeze({
   // eased both a step back (bleed 0.3 → 0.2, glow 0.27 → 0.22) against the lighter 0.88 wall.
   // Fifth (same day, with the chamber's halo input lift landed): bleed back UP 0.2 → 0.35 — the
   // lift feeds the tint term real input from the snapshots, so the bleed now has ink to spend.
-  selBleed: 0.35, selGlow: 0.22, selRadius: 1.35,
+  // PRINT (2026-10-09): the additive `glow` term, blurred over a ring of twenty chips, painted a
+  // MILKY DISC inside every hub's hoop on the flat plate (it had been hidden in the lit wall's own
+  // pool of light). Print's emphasis is separation you take away, so the halo is now almost all
+  // bleed (tint toward the mark's hue, which can only darken) with a whisper of glow left.
+  // Measured on the plate with the halo off: the bleed alone tinted the whole inside of the DAG's
+  // shells from the plate's (235,241,247) to (223,231,241) — a blue wash around 160 resting chips,
+  // which on paper is a stain rather than emphasis. Both terms now a whisper; the committed subject
+  // keeps its tint, the resting field keeps its paper.
+  selBleed: 0.18, selGlow: 0.05, selRadius: 1.35,
   // bgTint returned (0 → 0.5 → 1 across the user's exports, 2026-08-30): the ivory drift read
   // BROWN at the first shipped chroma and was zeroed the same day — re-picked at half and then
   // full strength as the quiet-tray glass, the brighter halo and the lighter wall (groundL 0.88)
   // changed what the tint sits over.
-  bgTint: 1, bgGrid: 0.05, // grid eased 0.07 → 0.05 (user export, 2026-08-30 — a touch quieter under the full ivory)
+  // Print: the plate is flat (bgSweep 0 leaves the sweep and the pool at identity, so the token's
+  // level is the whole wall) and the grid is OFF (user, 2026-10-09: a hairline grid "might conflict
+  // with the scene subject"). bgTint is inert at bgSweep 0 — the drift rides the sweep's k column.
+  bgTint: 1, bgGrid: 0, bgSweep: 0,
 });
 export const LIGHT_TUNE: LightTune = { ...LIGHT_TUNE_DEFAULTS };
 export const LIGHT_TUNE_SCHEMA: import("./tune").TuneSchema<LightTune> = {
@@ -284,6 +300,7 @@ export const LIGHT_TUNE_SCHEMA: import("./tune").TuneSchema<LightTune> = {
   selRadius: { min: 0.1, max: 1.5, step: 0.05, label: "halo spread" },
   bgTint: { min: 0, max: 2.5, step: 0.05, label: "backdrop tint" },
   bgGrid: { min: 0, max: 0.25, step: 0.005, label: "backdrop grid" },
+  bgSweep: { min: 0, max: 1, step: 0.05, label: "backdrop sweep" },
 };
 
 /**

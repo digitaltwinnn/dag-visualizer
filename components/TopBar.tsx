@@ -210,7 +210,9 @@ export default function TopBar() {
           "relative flex flex-col overflow-hidden pointer-events-auto",
           "border border-border rounded-lg backdrop-blur-md",
           "[background:var(--topbar-glass)]",
-          "shadow-[inset_0_1px_0_rgba(255,255,255,0.05),0_8px_30px_rgba(0,0,0,0.35)]",
+          // The card elevation pair, by TOKEN (Print, 2026-10-09): the literal restated `--card-ambient`'s
+          // dark bytes and so kept casting a drop on light after the token went to zero there.
+          "[box-shadow:var(--card-ambient)]",
         )}
       >
       <div

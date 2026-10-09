@@ -917,27 +917,27 @@
      travel in the first third, so it reads quick with a soft landing, not slow. */
   --ease-spring: linear(0, 0.056, 0.204, 0.404, 0.6, 0.766 25%, 0.937 32.5%, 1.022 40%, 1.056 47.5%, 1.055 55%, 1.035 65%, 1.012 77.5%, 1.001 90%, 1);
 
-  --background: light-dark(oklch(0.94 0.012 265), oklch(0.09 0.02 265));         /* #05060e app bg (dark) */
+  --background: light-dark(oklch(0.985 0.003 265), oklch(0.09 0.02 265));         /* light: the PRINT page — white paper (direction A, 2026-10-09; was the 0.94 grey-blue page). #05060e app bg (dark) */
   /* The SCENE's own light ground (design fork C, user 2026-08-25): the canvas is the
      instrument's SCREEN, and light mode lightens it from black to SILVER, not to paper — a
      deeper grey than the page so ink pops, marks can exceed the ground, and a calm bloom is
      physically possible again. The HUD page keeps --background's paper; dark side is
      --background's dark verbatim, so the dark scene is byte-identical. */
-  --scene-ground: light-dark(oklch(0.88 0.01 250), oklch(0.09 0.02 265)); /* cool silver oklch(0.88 0.01 250) — the warm greige read brown; L raised 0.81 → 0.88 with the user's 2026-08-30 export (pairs with bgTint 1); keep LIGHT_TUNE.groundL AND devTune's ground override in sync */
+  --scene-ground: light-dark(oklch(0.955 0.01 250), oklch(0.09 0.02 265)); /* PRINT: a flat plate ONE step below the white page (0.955 vs 0.985), no sweep (LIGHT_TUNE.bgSweep 0). Was the 0.88 cool-silver lit wall (2026-08-30). Keep LIGHT_TUNE.groundL AND devTune's ground override in sync — groundSync.test.ts holds this arm to the struct */
   /* The card elevation pair, ONE home for three recipes (`.ig-panel`, `.subject-paired`, the boxed
      rail rung) — they must keep matching, and a token matches by construction where the previous
      "restate the literal" arrangement matched by discipline. Theme-aware since 2026-08-29: pure
      black at dark-ground alphas read as smudges at the slab's corner joints on the light panel
      (user), so light casts a soft ink-navy at a third the weight; dark keeps the original bytes. */
   --card-ambient: inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 8px 30px light-dark(rgba(15, 23, 42, 0.14), rgba(0, 0, 0, 0.35));
+    0 8px 30px light-dark(rgba(15, 23, 42, 0), rgba(0, 0, 0, 0.35)); /* PRINT (2026-10-09): light casts NO drop — a printed card is a hairline on paper, and the lift moved to the border. Dark keeps its bytes. */
   /* The vitals band's lift — the card ambient cast UPWARD (user, 2026-10-04): the band sits flush on
      the footer, so a downward shadow would fall on the strip under it; above, it is the same layer
      the top bar and the cards are. The -4px spread keeps its side reach inside the 24px the band's
      clip allows. */
-  --band-ambient: 0 -8px 28px -4px light-dark(rgba(15, 23, 42, 0.14), rgba(0, 0, 0, 0.35));
-  --box-lift: 0 10px 26px -12px light-dark(rgba(15, 23, 42, 0.32), rgba(0, 0, 0, 0.85)),
-    0 -8px 22px -14px light-dark(rgba(15, 23, 42, 0.28), rgba(0, 0, 0, 0.8));
+  --band-ambient: 0 -8px 28px -4px light-dark(rgba(15, 23, 42, 0), rgba(0, 0, 0, 0.35)); /* light: none (Print) */
+  --box-lift: 0 10px 26px -12px light-dark(rgba(15, 23, 42, 0), rgba(0, 0, 0, 0.85)),
+    0 -8px 22px -14px light-dark(rgba(15, 23, 42, 0), rgba(0, 0, 0, 0.8)); /* light: none (Print) — the box's lift is its border weight there */
   --foreground: light-dark(oklch(0.21 0.035 265), oklch(0.94 0.02 255));       /* #e8eefc text (dark) */
   /* Light's muted ink 0.44 → 0.40 (design review 2026-10-02): the uppercase eyebrows and cell titles
      are 10.5–12.5px, where WCAG wants 4.5:1, and on paper they measured 3.1:1. 0.40 clears it with the
@@ -1021,7 +1021,7 @@
      alpha pulls it toward the ground. */
   --warn-soft: light-dark(oklch(0.55 0.17 55), oklch(0.78 0.16 60));
 
-  --border: light-dark(rgba(30, 60, 140, 0.38), rgba(90, 140, 255, 0.22));        /* panel/hairline border (was the --panel-border alias) */
+  --border: light-dark(rgba(22, 30, 60, 0.30), rgba(90, 140, 255, 0.22));        /* panel/hairline border (was the --panel-border alias). Light: a NEUTRAL ink hairline (Print, 2026-10-09 — was the blue-tinted rgba(30,60,140,.38)); with the drop shadow gone this line IS the card's edge */
   --input: var(--border);
   --surface-muted: light-dark(oklch(0.92 0.01 265), oklch(0.18 0.03 265));
   --secondary: var(--surface-muted);
@@ -1115,8 +1115,8 @@
      title text-shadow at its OWN alpha (0.7) — same near-black tint, two different call-site
      strengths, so one token can't serve both without shifting one of the looks. */
   --topbar-glass: linear-gradient(180deg,
-    light-dark(rgba(250, 252, 255, 0.86), rgba(20, 26, 46, 0.82)),
-    light-dark(rgba(240, 244, 252, 0.80), rgba(10, 14, 28, 0.76)));
+    light-dark(rgba(255, 255, 255, 0.96), rgba(20, 26, 46, 0.82)),
+    light-dark(rgba(255, 255, 255, 0.94), rgba(10, 14, 28, 0.76))); /* light: Print white, same sheet as the cards */
   /* The site footer's lozenge — a VEIL, not a panel. It first borrowed --topbar-glass and read
      "too dominant white" on the light ground (user, 2026-09-01), which is right: that token is a
      0.86-alpha lit SURFACE for a full-width bar, and a 22px pill has no room to be a surface. This
@@ -1767,8 +1767,8 @@
        (0.88/0.82), not `--panel`'s own (lower) alphas — the raise here was for legibility over a
        busy scene and applies to both grounds equally. */
     background: linear-gradient(180deg,
-      light-dark(rgba(252, 253, 255, 0.88), rgba(20, 26, 46, 0.88)),
-      light-dark(rgba(252, 253, 255, 0.82), rgba(10, 14, 28, 0.82)));
+      light-dark(rgba(255, 255, 255, 0.96), rgba(20, 26, 46, 0.88)),
+      light-dark(rgba(255, 255, 255, 0.94), rgba(10, 14, 28, 0.82))); /* light: Print — a near-opaque white sheet; the glass idiom is dark's */
     border: 1px solid var(--border);
     border-radius: var(--radius);
     backdrop-filter: blur(14px);
