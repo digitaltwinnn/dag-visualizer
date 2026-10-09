@@ -439,9 +439,9 @@ export default function TrendChart({
           </button>
         )}
         {/* The pair legend — only when there IS a pair (one series needs no legend, its name is
-            the title). */}
+            the title). `gap-x-3`, not 2 (user, 2026-10-09: "the legend is too tight"). */}
         {(lines.length > 1 || (stack?.length ?? 0) > 0) && (
-          <span className="ml-auto inline-flex items-center gap-2 text-label text-muted-foreground">
+          <span className="ml-auto inline-flex items-center gap-x-3 text-label text-muted-foreground">
             {stack?.map((b, i) => (
               <span key={bandKey(b)} className="inline-flex items-center gap-1">
                 <svg width="10" height="10" aria-hidden>
@@ -450,7 +450,10 @@ export default function TrendChart({
                 {b.label}
               </span>
             ))}
-            {lines.map((l) => (
+            {/* UNDER A STACK THE LINE IS THE BANDS' TOP EDGE, so it needs no entry of its own (user,
+                2026-10-09: "do we need the nodes line? if stacked it will already be at that
+                height") — the bands name every part, and the title names the whole. */}
+            {(stack?.length ? [] : lines).map((l) => (
               <span key={l.label} className="inline-flex items-center gap-1">
                 <svg width="14" height="4" aria-hidden>
                   <line x1="0" y1="2" x2="14" y2="2" stroke={l.hue ?? hue0} strokeWidth="2" strokeDasharray={typeof l.dash === "string" ? l.dash : l.dash ? "3 3" : undefined} />
