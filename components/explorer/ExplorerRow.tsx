@@ -229,14 +229,16 @@ export default function ExplorerRow({
           the networks below" — a sentence, which a chip beside the name ellipsised at the rail's
           264px floor). It takes the second grid row from the name's column to the figure's edge,
           in the tag home's own muted label; the name, bar and figure keep the first row. */}
-      <span className={cn("min-w-0 truncate flex items-center gap-1 text-label text-muted-foreground", plain && tag != null && "col-start-2 col-end-[-1] row-start-2 -mt-0.5")}>
+      <span className={cn("min-w-0 truncate flex items-center gap-1 text-label text-muted-foreground", plain && tag != null && (glyphW !== 0 ? "col-start-2" : "col-start-1"), plain && tag != null && "col-end-[-1] row-start-2 -mt-0.5")}>
         {typeof tag === "string" ? <span className="min-w-0 truncate">{tag}</span> : tag}
       </span>
       {hasFigure && (
         <>
           {/* With the caption on row 2 the bar and the figure name their columns: auto-placement
-              would otherwise slide them left into the tag's freed column and the 0px bar column. */}
-          <span className={cn("h-[5px] rounded-[3px] overflow-hidden", !plain && "bg-wash-faint", plain && tag != null && "col-start-4 row-start-1")}>
+              would otherwise slide them left into the tag's freed column and the 0px bar column.
+              Counted from the END (review, 2026-10-09): a glyph-less level has one column fewer,
+              and `col-start-4/5` would then place the figure outside the template. */}
+          <span className={cn("h-[5px] rounded-[3px] overflow-hidden", !plain && "bg-wash-faint", plain && tag != null && "col-start-[-3] row-start-1")}>
             {bar && (
               <span
                 className="block h-full rounded-[3px]"
@@ -244,7 +246,7 @@ export default function ExplorerRow({
               />
             )}
           </span>
-          <span className={cn("min-w-0 truncate text-right font-mono text-body tabular-nums", nested ? "text-foreground-dim" : "text-foreground", plain && tag != null && "col-start-5 row-start-1")}>
+          <span className={cn("min-w-0 truncate text-right font-mono text-body tabular-nums", nested ? "text-foreground-dim" : "text-foreground", plain && tag != null && "col-start-[-2] row-start-1")}>
             {/* An inline box, so its width is the figure's own — what the Explorer measures. */}
             <span data-fit-fig="">{figure}</span>
           </span>

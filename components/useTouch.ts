@@ -1,12 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
 
-/** THE TOUCH TIER'S QUERY — the one string `globals.css`'s `touch:` variant also names (pinned by
- *  `components/touchTierBoundary.test.ts`): a coarse pointer on the phone or tablet tier. The
- *  desktop tier is a mouse layout whatever the primary pointer says (2026-10-09, user: a touch
- *  laptop's desktop rail grew 44px rows "like mobile controls"); 1100 is `breakpointOf`'s own
- *  boundary, named on the same arm the sheets use (CSS trap 8). */
-export const TOUCH_QUERY = "(pointer: coarse) and (not (min-width: 1100px))";
+/** THE TOUCH TIER'S TWO QUERIES — the strings `globals.css`'s `touch:` variant nests, in the same
+ *  order (pinned by `components/touchTierBoundary.test.ts`): a coarse pointer, on the phone or
+ *  tablet tier. The desktop tier is a mouse layout whatever the primary pointer says (2026-10-09,
+ *  user: a touch laptop's desktop rail grew 44px rows "like mobile controls"); 1100 is
+ *  `breakpointOf`'s own boundary, on the very arm `useBreakpoint` uses (CSS trap 8).
+ *  Two queries, not one Level-4 `and (not (…))` string (review, 2026-10-09): the hook then names
+ *  the tier on the very arm `useBreakpoint` uses, and the stylesheet nests the same two blocks.
+ *  (The compiled sheet already carries Tailwind's Level-4 `not (min-width: …)` for every `max-[…]`
+ *  arm, so this is one rule written one way, not a compatibility rescue.) */
+export const TOUCH_QUERIES = ["(pointer: coarse)", "not all and (min-width: 1100px)"] as const;
 
 // THE POINTER'S OWN WORD — one home (2026-09-04, the phone review's copy item). The teaching
 // copy names the gesture ("Click one in a stack"), and on a phone that named a device the reader
@@ -21,11 +25,11 @@ export const TOUCH_QUERY = "(pointer: coarse) and (not (min-width: 1100px))";
 export function useTouch(): boolean {
   const [touch, setTouch] = useState(false);
   useEffect(() => {
-    const mq = window.matchMedia(TOUCH_QUERY);
-    const apply = () => setTouch(mq.matches);
+    const mqs = TOUCH_QUERIES.map((q) => window.matchMedia(q));
+    const apply = () => setTouch(mqs.every((m) => m.matches));
     apply();
-    mq.addEventListener("change", apply);
-    return () => mq.removeEventListener("change", apply);
+    for (const m of mqs) m.addEventListener("change", apply);
+    return () => { for (const m of mqs) m.removeEventListener("change", apply); };
   }, []);
   return touch;
 }

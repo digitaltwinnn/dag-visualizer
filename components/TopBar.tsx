@@ -318,10 +318,10 @@ export default function TopBar() {
             "hover:bg-wash-soft",
             strip === "filter" && "bg-wash-soft",
             filterOff && "hidden",
-            // The 44px tap minimum keys on the POINTER, not the width (user, 2026-08-14 —
-      // resizing a desktop window smaller made the bar GROW): a coarse pointer is a
-      // touch device wherever the window edge sits; a fine pointer never needs it.
-      "touch:min-h-11",
+            // The 44px tap minimum is the TOUCH TIER's (`touch:`, 2026-10-09 — a coarse pointer
+            // on the phone or tablet tier; it keyed on the pointer alone from 2026-08-14, until a
+            // touch laptop's desktop bar grew with it). A fine pointer never needs it.
+            "touch:min-h-11",
             // PHONE: the face must fit its grid column beside the fixed 3×44px switch (user,
             // 2026-08-15 — the button used to run UNDER the switch and read as unclickable):
             // trimmed paddings/gaps, and `min-w-0` + the label's truncate below so a long

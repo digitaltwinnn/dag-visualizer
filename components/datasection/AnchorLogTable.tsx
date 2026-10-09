@@ -941,8 +941,11 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     // The span: an arrival's exact one (a chain switch re-arming the seek, or the door's own span
     // while its words stand), else the typed whole UTC days.
     const typed = spanOfSearch({ door: doorSpan, from: qFrom, to: qTo });
-    // The reader's own search, or a door's span re-run (see `cutIsOwn`).
-    cutIsOwn.current = exactFrom.current === null && doorSpan == null;
+    // The reader's own search, or a door's span (see `cutIsOwn`) — decided on the PRESS, which is
+    // the run with no exact instant in hand; a chain-switch re-arm (below) re-runs with
+    // `exactFrom` set and must not re-decide (review, 2026-10-09: it read the reader's own search
+    // as a door's and dropped it from `logCut`). A door arrival sets it false itself.
+    if (exactFrom.current === null) cutIsOwn.current = doorSpan == null;
     const fromMs = exactFrom.current ?? typed?.fromMs ?? null;
     // An exact start carries its own end (open where the re-armed cut was open).
     const toMs = exactFrom.current !== null ? exactTo.current : (typed?.toMs ?? null);
@@ -1166,6 +1169,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     setQTo(utcDayKey(logSeek.toMs - 1));
     setDoorLabel(logSeek.label ?? null);
     setDoorSpan({ fromMs: logSeek.fromMs, toMs: logSeek.toMs });
+    // A door's span is History's own and never returns to it as a range (`cutIsOwn`).
+    cutIsOwn.current = false;
     if (logSeek.metaId) {
       setDoorMeta(logSeek.metaId);
       setSearchMeta(logSeek.metaId);

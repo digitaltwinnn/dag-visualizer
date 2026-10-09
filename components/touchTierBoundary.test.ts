@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { TOUCH_QUERY } from "@/components/useTouch";
+import { TOUCH_QUERIES } from "@/components/useTouch";
 
 // THE TOUCH TIER HAS ONE QUERY (2026-10-09). The 44px floors and the thumb hit areas ride the
 // `touch:` variant in `app/globals.css`; the copy ("Tap" / "Click") and the rail's touch rules read
@@ -24,15 +24,21 @@ const stripComments = (src: string): string =>
 describe("touch tier boundary", () => {
   const css = readFileSync("app/globals.css", "utf8");
 
-  it("the stylesheet's `touch:` variant names the hook's query, verbatim", () => {
-    // The block form: the shorthand `@custom-variant touch (@media …)` compiled to nothing under
-    // Tailwind 4.3 (found 2026-10-09 — the served sheet held no `.touch\:` utility at all).
-    expect(css).toContain(`@custom-variant touch {\n  @media ${TOUCH_QUERY} {\n    @slot;\n  }\n}`);
+  it("the stylesheet's `touch:` variant nests the hook's two queries, verbatim and in order", () => {
+    // Nested blocks, one per query (the shorthand `@custom-variant touch (@media …)` compiled to
+    // nothing under Tailwind 4.3); the hook reads the same two strings, so neither can drift.
+    const [pointer, tier] = TOUCH_QUERIES;
+    expect(css).toContain(`@custom-variant touch {
+  @media ${pointer} {
+    @media ${tier} {
+      @slot;
+    }
+  }
+}`);
   });
 
-  it("the query gates on the tier, at breakpointOf's own 1100 boundary", () => {
-    expect(TOUCH_QUERY).toContain("(pointer: coarse)");
-    expect(TOUCH_QUERY).toContain("(not (min-width: 1100px))");
+  it("the queries gate on the pointer and on the tier, at breakpointOf's own 1100 arm", () => {
+    expect(TOUCH_QUERIES).toEqual(["(pointer: coarse)", "not all and (min-width: 1100px)"]);
   });
 
   it("no utility rides Tailwind's pointer-only variant any more", () => {

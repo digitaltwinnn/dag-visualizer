@@ -26,17 +26,21 @@ describe("swipeOf — a flick along one axis", () => {
 });
 
 describe("swipeIntent — what a swipe on a card asks for", () => {
-  const deck = { front: "a", behind: "b" };
+  const deck = { front: "a", behind: "b", focus: null };
   it("down on any card brings IT forward", () => {
     expect(swipeIntent("down", "c", deck)).toEqual({ kind: "forward", id: "c" });
     expect(swipeIntent("down", "a", deck)).toEqual({ kind: "forward", id: "a" });
+  });
+  it("down on the card that already is the focus asks nothing — the focus write is a toggle (review)", () => {
+    expect(swipeIntent("down", "a", { front: "a", behind: "b", focus: "a" })).toBeNull();
+    expect(swipeIntent("down", "c", { front: "a", behind: "b", focus: "a" })).toEqual({ kind: "forward", id: "c" });
   });
   it("up on the front card sends it back by bringing the card behind it forward", () => {
     expect(swipeIntent("up", "a", deck)).toEqual({ kind: "forward", id: "b" });
   });
   it("up on a card already behind, or on a lone front card, asks nothing", () => {
     expect(swipeIntent("up", "c", deck)).toBeNull();
-    expect(swipeIntent("up", "a", { front: "a", behind: null })).toBeNull();
+    expect(swipeIntent("up", "a", { front: "a", behind: null, focus: null })).toBeNull();
   });
   it("left is the next measure, right the previous — the keys' own steps", () => {
     expect(swipeIntent("left", "a", deck)).toEqual({ kind: "measure", step: 1 });

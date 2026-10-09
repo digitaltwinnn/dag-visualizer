@@ -38,13 +38,16 @@ export function swipeOf(dx: number, dy: number, ms: number, opts: { horizontal?:
 export type SwipeIntent = { kind: "forward"; id: string } | { kind: "measure"; step: 1 | -1 };
 
 /** WHAT A SWIPE ON CARD `id` ASKS FOR. Down pulls the card to the front (the same focus a click
- *  commits — depth recedes upward on screen, so the finger follows the stack). Up on the FRONT card
- *  sends it back, which the stack's single focus can only express as bringing the card behind it
- *  forward (`planeBehind`); up on a card already behind asks nothing. Left is the next measure,
- *  right the previous — the ↑/↓ keys' own steps, so the ends stop rather than wrap. */
-export function swipeIntent(dir: SwipeDir, id: string, deck: { front: string | null; behind: string | null }): SwipeIntent | null {
+ *  commits — depth recedes upward on screen, so the finger follows the stack); down on the card
+ *  that already IS the focus asks nothing, because the focus write is a toggle and would send it
+ *  back (review, 2026-10-09). Up on the FRONT card sends it back, which the stack's single focus
+ *  can only express as bringing the card behind it forward (`planeBehind`); up on a card already
+ *  behind asks nothing. Left is the next measure, right the previous — the ↑/↓ keys' own steps,
+ *  so the ends stop rather than wrap. `front` is the card in slot 0 as the STACK has it — the
+ *  focus only while the window still holds it, else the window's first card. */
+export function swipeIntent(dir: SwipeDir, id: string, deck: { front: string | null; behind: string | null; focus: string | null }): SwipeIntent | null {
   switch (dir) {
-    case "down": return { kind: "forward", id };
+    case "down": return id === deck.focus ? null : { kind: "forward", id };
     case "up": return id === deck.front && deck.behind ? { kind: "forward", id: deck.behind } : null;
     case "left": return { kind: "measure", step: 1 };
     case "right": return { kind: "measure", step: -1 };

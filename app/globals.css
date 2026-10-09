@@ -23,11 +23,16 @@
    touch-first. The boundary is `breakpointOf`'s own 1100, named on the same arm the hook and the
    tablet sheets use (CSS trap 8). An iPad Pro in landscape is wide enough for the desktop tier and
    loses the floor there — the accepted edge of this rule.
-   ⚠️ `components/useTouch.ts` answers the SAME query for copy ("Tap" / "Click") and the rail's
-   touch rules; `components/touchTierBoundary.test.ts` pins the two to one string. */
+   ⚠️ `components/useTouch.ts` answers the SAME two queries for copy ("Tap" / "Click") and the
+   rail's touch rules; `components/touchTierBoundary.test.ts` pins them to one pair of strings.
+   Nested blocks, one per query, in the hook's order — the tier on the very arm `useBreakpoint`
+   uses (review, 2026-10-09). Tailwind compiles every `max-[…]` arm to the Level-4
+   `not (min-width: …)` anyway, so this is about one rule written one way, not browser support. */
 @custom-variant touch {
-  @media (pointer: coarse) and (not (min-width: 1100px)) {
-    @slot;
+  @media (pointer: coarse) {
+    @media not all and (min-width: 1100px) {
+      @slot;
+    }
   }
 }
 

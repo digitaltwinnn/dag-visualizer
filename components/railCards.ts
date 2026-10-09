@@ -171,8 +171,8 @@ export interface RailCard {
 // old pickHintText rule, preserved verbatim).
 export interface RailManifestState {
   mode: Mode;
-  /** Coarse pointer (useTouch — `(pointer: coarse)`, the same key the touch floors
-   *  ride): the hints say the gesture the reader's device actually has — Tap, not Click.
+  /** The touch tier (useTouch — a coarse pointer on the phone or tablet tier, the same rule the
+   *  `touch:` floors ride): the hints say the gesture the reader's device actually has — Tap, not Click.
    *  Optional so every fine-pointer caller and test reads unchanged. */
   coarse?: boolean;
   filter: string;

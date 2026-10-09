@@ -300,6 +300,11 @@ export default function TrendStack() {
   // never re-render five charts.
   const down = useRef<{ x: number; y: number; at: number; touch: boolean; onPlot: boolean } | null>(null);
   const dragged = useRef(false);
+  // THE GESTURE'S AXIS, decided on the first travel past the slop and held for the press: a
+  // VERTICAL gesture on the card is the plane's (a swipe), never the chart's brush — see the
+  // `onTouch*Capture` handlers on the plane root. Pointer events fire before their touch
+  // counterparts, so this is set before the chart's own touch handlers could read the move.
+  const vertical = useRef(false);
   // ⚠️ WHETHER THIS PRESS MADE A RANGE — the gate for the plot's pick (user, 2026-09-29: a click on
   // the chart set the Moment "only when we click the tiny dot"). The pick used to be gated on
   // `dragged`, a 4px slop, while the brush only commits past ONE BUCKET — so a press that wobbled a
@@ -330,7 +335,20 @@ export default function TrendStack() {
     const d = down.current;
     if (!d || e.buttons === 0) return;
     if (Math.hypot(e.clientX - d.x, e.clientY - d.y) <= DRAG_SLOP) return;
+    if (!dragged.current) vertical.current = Math.abs(e.clientY - d.y) > Math.abs(e.clientX - d.x);
     dragged.current = true;
+  };
+  // A VERTICAL TOUCH GESTURE NEVER REACHES THE CHART'S BRUSH (review, 2026-10-09: with the plot's
+  // `touch-action` now `none`, a flick up with a few px of drift would otherwise land in
+  // TrendChart's touch brush as a sliver range — one swipe both re-dealing the stack and rewriting
+  // the time). Capture-phase, so the stop lands before the chart's own handlers; the axis is the
+  // one `onPointerMove` decided. A horizontal-dominant gesture passes through and brushes as before.
+  const stopVerticalTouch = (e: React.TouchEvent) => {
+    if (vertical.current) e.stopPropagation();
+  };
+  const onTouchEndCapture = (e: React.TouchEvent) => {
+    stopVerticalTouch(e);
+    vertical.current = false;
   };
   const onPointerUp = (e: React.PointerEvent, id: string) => {
     const d = down.current;
@@ -346,7 +364,10 @@ export default function TrendStack() {
     const dir = swipeOf(e.clientX - d.x, e.clientY - d.y, performance.now() - d.at, { horizontal: !d.onPlot });
     if (!dir) return;
     const st = useStore.getState();
-    const intent = swipeIntent(dir, id, { front: st.trendFocus ?? frontPlane(order, st.trendScroll), behind: planeBehind(order, st.trendScroll, st.trendFocus) });
+    // The front as the STACK has it: the focus only while the window still holds it (a paged-away
+    // or re-ranked-out focus is nobody's front — `planeBehind` applies the same guard).
+    const focus = st.trendFocus && order.includes(st.trendFocus) ? st.trendFocus : null;
+    const intent = swipeIntent(dir, id, { front: focus ?? frontPlane(order, st.trendScroll), behind: planeBehind(order, st.trendScroll, st.trendFocus), focus: st.trendFocus });
     if (!intent) return;
     if (intent.kind === "measure") stepMeasure(intent.step);
     else applyClickActions(trendPlaneActions(intent.id, st.trendFocus));
@@ -502,6 +523,8 @@ export default function TrendStack() {
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={(e) => onPointerUp(e, pose.id)}
+            onTouchMoveCapture={stopVerticalTouch}
+            onTouchEndCapture={onTouchEndCapture}
             // THE INTERACTIVE PLANE'S WHOLE BODY is a target too — it is the one plane a click
             // cannot be ambiguous about, and asking for the header strip alone on a plane that is
             // already in front reads as a dead surface. Every other plane keeps the body inert, so
