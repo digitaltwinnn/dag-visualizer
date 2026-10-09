@@ -798,11 +798,12 @@ async function buildLand(globe: GeoViewHost) {
 // shader's. Low enough that the far-side walls and graticule read through the near hemisphere —
 // the see-through hologram dark has always had — and high enough that the continents still read
 // as a ground for the chips standing on them. Dark never sees it (`uPaper` gates the whole term).
-// Raised 0.24 → 0.45 for Print (2026-10-09): on the flat white plate the 0.24 centre was within a
-// few points of the page and the continents read as outlines; a printed map's land is a FILL.
-// Still a Fresnel ramp to `paperBase` at the limb, so the glass character (clear middle, firm rim)
-// survives — it is just less clear.
-const LAND_GLASS_BODY = 0.45;
+// Raised 0.24 → 0.45 → settled 0.35 for Print (2026-10-09): on the flat white plate the 0.24
+// centre was within a few points of the page and the continents read as outlines; a printed map's
+// land is a FILL — but at 0.45 a drilled continent was a mid-grey CARD at country range, where the
+// Fresnel flattens (user: lighter). Still a ramp to `paperBase` at the limb, so the glass character
+// (clear middle, firm rim) survives.
+const LAND_GLASS_BODY = 0.35;
 
 // How much the drilled country's land glass brightens inside the mask. The land fill's
 // resting additive contribution is TINY (texel luminance ~0.055 × the 0.38 base), so small

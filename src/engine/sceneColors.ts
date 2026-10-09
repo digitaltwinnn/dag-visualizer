@@ -156,6 +156,24 @@ export function labelInk(c: SceneColors, weight: "name" | "readout" | "hud" = "n
   return weight === "readout" ? c.fg : c.muted;
 }
 
+/**
+ * THE STRUCTURE INK — the tone for in-scene FURNITURE LINES (Print, 2026-10-09): hyper's hoops and
+ * tethers, the globe's graticule, coastal walls, rose and land tint. Fourth member of the ground
+ * family, between `labelInk` and the accent. Dark answers the accent, as every structural line
+ * always has. Paper first took `labelInk`'s muted tone outright and the user read it as "a bit of
+ * a dark colour for light mode — before it was cyan, maybe both?": so paper answers the MIDPOINT
+ * of the two — the muted ink lifted toward the accent, a light teal-grey that is still a drawn
+ * line rather than a lamp. One home, so a hoop and a graticule can never disagree about what a
+ * structural line is made of; derived from the two tokens at event time, never a literal.
+ */
+const _structA = new THREE.Color();
+const _structB = new THREE.Color();
+const STRUCT_INK_MIX = 0.5; // 0 = labelInk's muted tone, 1 = the accent
+export function structureInk(c: SceneColors): number {
+  if (!isLightGround(c)) return c.core;
+  return _structA.setHex(c.muted).lerp(_structB.setHex(c.core), STRUCT_INK_MIX).getHex();
+}
+
 const _ground = new THREE.Color();
 
 /**

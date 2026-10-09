@@ -22,7 +22,7 @@ import { metaTrayLayout, dagTrayLayout, containerChipPos, type ContainerSpec } f
 import { LANE_IDS } from "../domain/ledgerModel";
 import { gatherSlots, gatherExtent, gatherSpread, gatherRows, type GatherExtent, type GatherSlot } from "../domain/gatherLayout";
 import type { ViewTransition } from "../domain/viewTransition";
-import { glowBlend, inkPresence, isLightGround, labelInk, type SceneColors } from "../sceneColors";
+import { glowBlend, inkPresence, isLightGround, labelInk, structureInk, type SceneColors } from "../sceneColors";
 import * as geoStats from "../domain/geoStats";
 import { R, LAND_H, CHIP_PITCH, HEX_H, VALIDATOR_HEX_R, META_HEX_R, latLonToVec3, vec3ToLatLon } from "../domain/geoLayout";
 import { armillaryFrame, ringFramePos, ringNormal, armillaryRings, armillaryPos, nodeRoles, spreadCoLocated } from "../domain/nodeLayout";
@@ -333,9 +333,9 @@ export class Globe implements GeoViewHost {
     this.layers = layers; // for gluing metagraph nodes to their orbiting hubs
     this.camera = camera; // for the view-dependent disc falloff at the limb
     // The geo hologram's STRUCTURE — wall + grid + graticule + land tint. Dark: the accent (calm via
-    // opacity). Paper: the furniture ink (Print, 2026-10-09) — `labelInk` answers `core` on dark by
-    // construction, so this one call is the whole theme split, the same split hyper's hoops take.
-    this.geoColor = labelInk(colors);
+    // opacity). Paper: the structure ink (Print, 2026-10-09) — `structureInk` answers `core` on dark
+    // by construction, so this one call is the whole theme split, the same split hyper's hoops take.
+    this.geoColor = structureInk(colors);
     // Set BEFORE buildGeoView: each furniture material picks its blend mode at creation, so booting
     // straight into light needs no second pass (and the async land build inherits it for free).
     this._colorsRef = colors;
@@ -726,7 +726,7 @@ export class Globe implements GeoViewHost {
    */
   setColors(c: SceneColors): void {
     this._colorsRef = c;
-    this.geoColor = labelInk(c); // structure ink — see the constructor
+    this.geoColor = structureInk(c); // structure ink — see the constructor
     this._dagCore = c.dagCore;
     // BOTH ends of the eased coastal-wall colour: the flip is an instant snap (spec §3), and
     // easing only the target would leave the walls crawling toward the new accent for a second.

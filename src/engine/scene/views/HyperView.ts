@@ -17,7 +17,7 @@ import { FadeSet } from "../objects/FadeSet";
 import { ORB_FRESNEL_GLSL, ORB_FRESNEL_MIX } from "../objects/NodeFabric";
 import { offNetMul } from "../../domain/dimModel";
 import { makeRadialGradientTexture } from "../objects/gradientTexture";
-import { glowBlend, inkMix, inkPresence, isLightGround, labelInk, type SceneColors } from "../../sceneColors";
+import { glowBlend, inkMix, inkPresence, isLightGround, structureInk, type SceneColors } from "../../sceneColors";
 import type { TuneSchema } from "../../tune";
 import type { SceneView } from "./SceneView";
 import { joinBloom } from "../SceneContext";
@@ -235,9 +235,8 @@ export class HyperView implements SceneView {
   private _coreDim = 0; // eased 0→1: the DAG core fades back when a specific metagraph is the subject
   private _core: number; // the structural accent (colors.core) — the core sphere hue
   /** THE STRUCTURE INK — hoops, tethers and ring fills (Print, 2026-10-09). Dark: the accent, as
-   *  ever. Paper: `labelInk`'s furniture tone — structure lines are furniture too, and the accent
-   *  blue at a hoop's weight read as pale blue-grey on the white plate while the muted ink reads as
-   *  a drawn line. One home (`labelInk`), so the floor's name and the ring around a hub agree. */
+   *  ever. Paper: `structureInk`'s teal-grey — the accent at a hoop's weight read as pale blue-grey
+   *  on the white plate, the muted ink alone read too dark. One home, shared with the globe. */
   private _ink: number;
   /** The live palette. The furniture here is additive GLOW on the dark ground and normal-blended
    *  INK on paper, and the tether bakes its tip-fade as presence — both need the ground. */
@@ -260,7 +259,7 @@ export class HyperView implements SceneView {
   constructor(scene: THREE.Scene, colors: SceneColors, stage: StageLight, sceneColors?: Record<string, number>) {
     this.scene = scene;
     this._core = colors.core;
-    this._ink = labelInk(colors);
+    this._ink = structureInk(colors);
     this._colors = colors;
     this._paper = isLightGround(colors);
     this.stage = stage;
@@ -504,7 +503,7 @@ export class HyperView implements SceneView {
    */
   setColors(c: SceneColors) {
     this._core = c.core;
-    this._ink = labelInk(c);
+    this._ink = structureInk(c);
     this._colors = c;
     this._paper = isLightGround(c);
     // The GROUND changed, so hyper's furniture switches between additive glow and normal-blended
