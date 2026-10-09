@@ -1027,7 +1027,7 @@
      alpha pulls it toward the ground. */
   --warn-soft: light-dark(oklch(0.55 0.17 55), oklch(0.78 0.16 60));
 
-  --border: light-dark(rgba(22, 30, 60, 0.16), rgba(90, 140, 255, 0.22));        /* panel/hairline border (was the --panel-border alias). Light: a NEUTRAL ink hairline (Print, 2026-10-09 — was the blue-tinted rgba(30,60,140,.38)); with the drop shadow gone this line IS the card's edge. 0.30 → 0.16 the same day (user: white cards with a hard rule read as cut-outs "a thousand feet above" the page) — the rule whispers, and the card is a region of the SAME sheet, one step lighter */
+  --border: light-dark(rgba(22, 30, 60, 0.22), rgba(90, 140, 255, 0.22));        /* panel/hairline border (was the --panel-border alias). Light: a NEUTRAL ink hairline (Print, 2026-10-09 — was the blue-tinted rgba(30,60,140,.38)); with the drop shadow gone this line IS the card's edge. 0.30 → 0.16 the same day (user: white cards with a hard rule read as cut-outs "a thousand feet above" the page) — the rule whispers, and the card is a region of the SAME sheet, one step lighter. 0.16 → 0.22 an hour later (user: the ghost cards almost vanished — "slight increase in the left-card and top/bottom bars outline") */
   --input: var(--border);
   --surface-muted: light-dark(oklch(0.92 0.01 265), oklch(0.18 0.03 265));
   --secondary: var(--surface-muted);
@@ -1094,7 +1094,7 @@
      structural literal (NOT an alias). --panel-light is its lighter sibling (same RGB, lower
      alpha) for the tablet/phone dock glass; --panel-solid is the near-opaque tooltip/tip glass. */
   --panel: light-dark(rgba(252, 253, 255, 0.85), rgba(12, 16, 32, 0.72));
-  --panel-light: light-dark(rgba(252, 253, 255, 0.40), rgba(12, 16, 32, 0.35));
+  --panel-light: light-dark(rgba(246, 247, 250, 0.72), rgba(12, 16, 32, 0.35)); /* light: the ghost card's fill (Print, 2026-10-09) — a FOLDED ghost has no outline by design, so on the sheet its fill is what says it is there: the sheet tone at 0.72, a step below --panel-solid's 0.96 (was white at 0.40, which on the 0.955 plate was nothing) */
   --panel-solid: light-dark(rgba(246, 247, 250, 0.96), rgba(8, 12, 26, 0.92)); /* light: the Print sheet — one step above the 0.955 plate, never white (user, 2026-10-09) */
   /* The SWITCH's OFF knob (components/ui/switch.tsx, 2026-09-14) — PALE ON BOTH LANES, which is
      why it needs a token of its own. Off, the knob sits on the faint --border hairline over
