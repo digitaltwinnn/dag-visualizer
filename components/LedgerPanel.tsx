@@ -592,7 +592,7 @@ export default function LedgerPanel({ defaultCollapsed }: { defaultCollapsed?: b
       title="Snapshots"
       // The sentence is the path's own placeholder now (user, 2026-10-08): one line beside the house.
       hint={null}
-      placeholder="Open one for its networks"
+      placeholder="Select a snapshot to view its anchors."
       levels={levels}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => {

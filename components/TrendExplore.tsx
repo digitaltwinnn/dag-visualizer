@@ -236,6 +236,8 @@ export default function TrendExplore({ defaultCollapsed }: { defaultCollapsed?: 
       // The span alone (user, 2026-10-03: remove "Pick one to bring it forward."): rows that
       // highlight under the pointer already say they can be picked.
       hint={empty ? null : over}
+      // The plate placeholder every explorer carries (user, 2026-10-09): what selecting a row does.
+      placeholder={empty ? undefined : "Select a network to view the chart."}
       levels={[level]}
       defaultCollapsed={defaultCollapsed}
       onLeave={() => setHover(null)}
