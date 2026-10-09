@@ -26,6 +26,10 @@ export interface GlassFillUniforms {
   uSpec: { value: number };     // the reflected light source ("the window")
   uSpecPow: { value: number };  // its tightness
   uEdgeA: { value: number };    // the polished edge
+  // THE PRINT HAIRLINE (2026-10-09): an INK line one or two pixels wide along the pane's rim, in
+  // screen space (fwidth of the SDF), so every sheet is edged the way the HUD's cards are — a
+  // hairline on paper rather than a polished white lip, which a white page cannot show. Paper only.
+  uLine: { value: number };
   uLightDir: { value: THREE.Vector3 }; // the virtual window's WORLD direction (see makeGlassFill)
   // THE ROOM HAS FEATURES (user, 2026-08-26: "I would expect the glass to show some light
   // reflection? It just looks gray transparent with a bright(?) white edge"). A room term that is a
@@ -97,6 +101,7 @@ export function makeGlassFill(c: SceneColors, halfW: number, halfH: number, radi
       uSpec: { value: 0 },
       uSpecPow: { value: 12 },
       uEdgeA: { value: 0 },
+      uLine: { value: 0 },
       uLightDir: { value: WINDOW_DIR },
       uEnv: { value: 0 },
       uSpotPos: { value: new THREE.Vector3() },
@@ -122,7 +127,7 @@ export function makeGlassFill(c: SceneColors, halfW: number, halfH: number, radi
       uniform vec2 uHalf; uniform float uRadius; varying vec2 vP;
       uniform vec2 uFadeDir; uniform float uFadeAt; uniform float uFadeSpan;
       uniform float uPaper; uniform float uBody; uniform float uSky; uniform float uRim;
-      uniform float uSpec; uniform float uSpecPow; uniform float uEdgeA; uniform vec3 uLightDir;
+      uniform float uSpec; uniform float uSpecPow; uniform float uEdgeA; uniform float uLine; uniform vec3 uLightDir;
       uniform float uEnv; uniform vec3 uSpotPos; uniform float uSpotI;
       varying vec3 vWorld; varying vec3 vNormal;
       // One studio softbox: a soft band centred on azimuth \`c\`, \`s\` wide. The angular distance is
@@ -228,15 +233,22 @@ export function makeGlassFill(c: SceneColors, halfW: number, halfH: number, radi
         float lobe = uSpotI * pow(max(dot(N, Hv), 0.0), uSpecPow * 1.5);
         float win = pow(max(dot(R, uLightDir), 0.0), uSpecPow);  // its window
         float pol = uEdgeA * band * band;                        // the polished rim
+        // The Print hairline: ~1.5px of ink just inside the rim, measured in screen space so it
+        // is the same weight on the near floor and the far lane plane. Pure ink, no lift.
+        float aa = max(fwidth(d), 1e-4);
+        float line = uLine * (1.0 - smoothstep(0.8 * aa, 2.2 * aa, -d));
 
         // Reflectance is CAPPED below 1: real glass at grazing is a full mirror, and a full mirror
         // in the lane storey hides the tiles and ribbons the chamber exists to show. uRim is that
         // cap — the pane stays a pane you read the trail through.
-        float a = clamp(uBody + uRim * fres + uSpec * win + lobe + rig * 0.5 + pol, 0.0, 1.0) * fade;
+        float glass = clamp(uBody + uRim * fres + uSpec * win + lobe + rig * 0.5 + pol, 0.0, 1.0);
+        float a = max(glass, line) * fade;
         if (a <= 0.002) discard;
         // uColor is the muted ink: a ray that reflects nothing above the horizon costs the ground a
         // little, which is the transmission tint. Sky, rig, window, lamp and rim lift it toward the room.
-        vec3 col = mix(uColor, vec3(1.0), clamp(uSky * room + rig + uSpec * win + lobe + pol, 0.0, 1.0));
+        // The hairline stays ink: where it is the stronger term the lift is held off.
+        float lift = clamp(uSky * room + rig + uSpec * win + lobe + pol, 0.0, 1.0) * (1.0 - clamp(line / max(a, 1e-4), 0.0, 1.0));
+        vec3 col = mix(uColor, vec3(1.0), lift);
         gl_FragColor = vec4(col, a);
       }`,
   });

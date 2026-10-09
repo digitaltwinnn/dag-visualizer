@@ -60,6 +60,7 @@ export interface GlassTune {
   edge: number;     // the polished edge the SDF band already measures
   env: number;      // the studio SOFTBOXES in the reflected room — what makes orbiting sweep it
   trayBody: number; // the trays face the camera head-on: no sky, little Fresnel, so more body
+  line: number;     // the PRINT hairline — ink along every pane's rim, in screen space (glassFill.uLine)
   // ── THE COMMITTED LANE, on paper. Dark answers a commit by lifting the edge fill; the day glass
   // has no such term, and multiplying the REFLECTION terms instead is what blew the committed
   // plane to white (user, 2026-08-28: "the active metagraph plane is white") — the shader mixes
@@ -93,7 +94,14 @@ export const GLASS_TUNE_DEFAULTS: Readonly<GlassTune> = Object.freeze({
   // pane goes fully to its lane's identity). Next export the same day trades edge for body —
   // 0.25 → 0.15 and body 0.155 → 0.26: the pane's presence moves from the cut border into the
   // tint itself, more pane and less outline over the lighter 0.88 wall.
-  body: 0.26, sky: 0.3, rim: 0.4, spec: 0.85, specPow: 18, edge: 0.15, env: 0.5, trayBody: 0.075,
+  // PRINT (design direction A, user 2026-10-09): the panes are SHEETS, not glass. The light
+  // instrument is a printed page, so the reflected room, the window, the softboxes and the
+  // polished lip — every term that lifted the pane toward white over the lit silver wall — are off,
+  // and a pane is a faint matte tint of the furniture ink with a hairline along its rim, exactly the
+  // HUD's card recipe one layer down. The reflection terms keep their knobs (and their 2026-08-28/30
+  // history above) so the glass look can be dialled back in live; the shipped page is matte.
+  // A whisper of Fresnel (rim 0.10) survives so a pane read along its plane still firms a little.
+  body: 0.10, sky: 0, rim: 0.10, spec: 0, specPow: 18, edge: 0, env: 0, trayBody: 0.06, line: 0.55,
   laneBody: 1.75, laneTint: 1,
 });
 /** The live struct the `?tune` panel binds; DEFAULTS above is the shipped look and what tests pin. */
@@ -108,6 +116,7 @@ export const GLASS_TUNE_SCHEMA: TuneSchema<GlassTune> = {
   edge: { min: 0, max: 1.5, step: 0.02, label: "polished edge" },
   env: { min: 0, max: 1.5, step: 0.02, label: "softboxes" },
   trayBody: { min: 0, max: 0.5, step: 0.005, label: "tray body" },
+  line: { min: 0, max: 1, step: 0.02, label: "hairline (print)" },
   laneBody: { min: 1, max: 4, step: 0.05, label: "lane body ×" },
   laneTint: { min: 0, max: 1, step: 0.02, label: "lane tint" },
 };
@@ -326,6 +335,7 @@ export class SnapshotPlane {
       this._fillU.uSpec.value = g.spec * alpha;
       this._fillU.uSpecPow.value = g.specPow;
       this._fillU.uEdgeA.value = g.edge * alpha;
+      this._fillU.uLine.value = g.line * alpha;
       this._fillU.uEnv.value = g.env * alpha;
       this._fillU.uSpotI.value = this._spotI * alpha;
       // Written every frame, both ways: a released commit must return the pane to neutral.
@@ -340,6 +350,7 @@ export class SnapshotPlane {
         this._trayU.uSpec.value = g.spec * alpha;
         this._trayU.uSpecPow.value = g.specPow;
         this._trayU.uEdgeA.value = g.edge * alpha;
+        this._trayU.uLine.value = g.line * alpha;
         this._trayU.uEnv.value = g.env * alpha;
         this._trayU.uSpotI.value = this._spotI * alpha;
       }
