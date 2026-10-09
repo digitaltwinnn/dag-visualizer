@@ -468,8 +468,10 @@ export default function TrendChart({
             ))}
             {/* UNDER A STACK THE LINE IS THE BANDS' TOP EDGE, so it needs no entry of its own (user,
                 2026-10-09: "do we need the nodes line? if stacked it will already be at that
-                height") — the bands name every part, and the title names the whole. */}
-            {(stack?.length ? [] : lines).map((l) => (
+                height") — the bands name every part, and the title names the whole. The entry
+                returns only where the plot draws the total over buckets no band is recorded in
+                (the gap line below) — then it names the one line that IS on screen. */}
+            {(stack?.length && !(lines[0] && lines[0].points.some((v, i) => v != null && !stack.some((b) => b.points[i] != null))) ? [] : lines).map((l) => (
               <span key={l.label} className="inline-flex items-center gap-1">
                 <svg width="14" height="4" aria-hidden>
                   <line x1="0" y1="2" x2="14" y2="2" stroke={l.hue ?? hue0} strokeWidth="2" strokeDasharray={typeof l.dash === "string" ? l.dash : l.dash ? "3 3" : undefined} />
@@ -768,10 +770,25 @@ const TrendPlot = memo(function TrendPlot({
   const ownMax = Math.max(1e-9, ...lines.flatMap((l) => l.points.filter((v): v is number => v != null)));
   const max = (scaleMax != null && scaleMax > 0 ? scaleMax : ownMax) * 1.12;
 
+  // THE TOTAL WHERE THE STACK HAS NOTHING (2026-10-09). Under a stack the first line is not drawn —
+  // the top band's edge is the total — but the bands exist only where the composition was
+  // recorded (node types since 2026-09-29), while the total reaches further back. Hiding the line
+  // outright emptied the plot before that day. So the total is drawn ONLY over the buckets no
+  // band is recorded in: bands where the make-up is known, the plain line where only the whole
+  // is — never both, never neither (rule 10).
+  const gapPoints: (number | null)[] =
+    stack?.length && lines[0]
+      ? lines[0].points.map((v, i) => (stack.some((b) => b.points[i] != null) ? null : v))
+      : [];
+  const hasGap = gapPoints.some((v) => v != null);
+  const gapLine: TrendLine | null = hasGap && lines[0] ? { label: `${lines[0].label} (total)`, points: gapPoints, hue: lines[0].hue } : null;
+  const GAP_KEY = "s:total-gap";
+
   const rows = buckets.map((ts, i) => {
     const row: Record<string, number | null> = { ts };
     for (const l of lines) row[l.label] = l.points[i];
     for (const b of stack ?? []) row[bandKey(b)] = b.points[i];
+    if (gapLine) row[GAP_KEY] = gapPoints[i];
     return row;
   });
 
@@ -1080,6 +1097,24 @@ const TrendPlot = memo(function TrendPlot({
                   }}
                 />
               ))}
+              {gapLine && (
+                <Line
+                  dataKey={GAP_KEY}
+                  type="linear"
+                  stroke={gapLine.hue ?? hue0}
+                  strokeWidth={lineWidth}
+                  connectNulls={false}
+                  isAnimationActive={false}
+                  legendType="none"
+                  tooltipType="none"
+                  activeDot={false}
+                  dot={!gapLine.points.some((_, i) => isolated(gapLine, i)) ? false : (props: { key?: React.Key | null; index?: number; cx?: number; cy?: number }) => {
+                    const { key, index, cx, cy } = props;
+                    if (index == null || cx == null || cy == null || !isolated(gapLine, index)) return <g key={key ?? undefined} />;
+                    return <circle key={key ?? undefined} cx={cx} cy={cy} r={2.5} fill={gapLine.hue ?? hue0} />;
+                  }}
+                />
+              )}
             </Chart>
           </ResponsiveContainer>
           {/* The y scale's one number, with its ROLE said (user, 2026-09-09: a bare number
