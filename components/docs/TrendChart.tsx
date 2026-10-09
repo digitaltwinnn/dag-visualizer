@@ -4,6 +4,7 @@ import { ArrowUpRight } from "lucide-react";
 import { Area, CartesianGrid, ComposedChart, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { cn } from "@/lib/utils";
 import { NodeStars } from "@/components/state/StateAtoms";
+import { RoleChips } from "@/components/inspector/parts";
 import { bucketAt, cursorFraction, heldZoom } from "@/src/data/trendWindow";
 import { bucketStamp } from "@/src/util/localTime";
 import { compactNumber } from "@/src/util/format";
@@ -43,13 +44,28 @@ export interface TrendBand {
    *  the data key and the React key, so one band can never overwrite another's column. Defaults
    *  to the label. */
   key?: string;
+  /** The LAYER CODES that make the band up ("L0", "cL1", "dL1"), shown as the app's role pills
+   *  beside the label where there is more than one (user, 2026-10-09: "hybrid L0+cL1+dL1 can look
+   *  nicer by using the L0, L1 pills instead of + and text"). */
+  codes?: string[];
+}
+/** A band's name as the legend and the tooltip print it: the word, then its layer pills. */
+function BandName({ b }: { b: TrendBand }) {
+  return (
+    <>
+      {b.label}
+      {b.codes && b.codes.length > 1 && <RoleChips compact codes={b.codes} />}
+    </>
+  );
 }
 /** The row/data key a band's points are filed under. */
 const bandKey = (b: TrendBand): string => `s:${b.key ?? b.label}`;
 /** A stack is ONE hue, so its bands are told apart by opacity — the donut's own device for
  *  adjacent parts of one colour — base band strongest. Every band is also NAMED (legend, tooltip),
- *  so the step is never the only channel. */
-const STACK_STEPS = [0.36, 0.2, 0.11, 0.06, 0.03];
+ *  so the step is never the only channel. The ramp FLOORS at a readable step (user, 2026-10-09:
+ *  "are they truly stacked? I feel the overlap" — the fourth band, Data at 14 of DOR's 17 nodes,
+ *  sat at 6% and read as the card's own tint, so the stack looked like one area with a sliver). */
+const STACK_STEPS = [0.6, 0.44, 0.32, 0.22, 0.15];
 
 const PLOT_H = 120;
 const AXIS_H = 18;
@@ -447,7 +463,7 @@ export default function TrendChart({
                 <svg width="10" height="10" aria-hidden>
                   <rect x="0.5" y="0.5" width="9" height="9" rx="2" fill={lines[0]?.hue ?? "var(--primary)"} fillOpacity={STACK_STEPS[i % STACK_STEPS.length]} stroke={lines[0]?.hue ?? "var(--primary)"} strokeOpacity={0.5} />
                 </svg>
-                {b.label}
+                <BandName b={b} />
               </span>
             ))}
             {/* UNDER A STACK THE LINE IS THE BANDS' TOP EDGE, so it needs no entry of its own (user,
@@ -997,7 +1013,7 @@ const TrendPlot = memo(function TrendPlot({
                   stackId="parts"
                   type="linear"
                   stroke={hue0}
-                  strokeOpacity={0.45}
+                  strokeOpacity={0.7}
                   strokeWidth={1}
                   fill={hue0}
                   fillOpacity={STACK_STEPS[i % STACK_STEPS.length]}
@@ -1031,7 +1047,7 @@ const TrendPlot = memo(function TrendPlot({
                         const v = payload.find((e) => e.dataKey === bandKey(b))?.value;
                         return v == null ? null : (
                           <span key={bandKey(b)}>
-                            <span className="ml-2 text-muted-foreground">{b.label} </span>
+                            <span className="ml-2 inline-flex items-center gap-1 text-muted-foreground"><BandName b={b} /> </span>
                             {format(Number(v))}
                           </span>
                         );

@@ -3,6 +3,7 @@ import { openRecords } from "@/components/trendDoors";
 import { useStore } from "@/src/store/store";
 import { UNLISTED_ID } from "@/src/data/unlisted";
 import { METAGRAPHS } from "@/src/net/current";
+import { snapRange } from "@/src/data/trendWindow";
 
 // THE DOOR CARRIES THE CARD'S OWN WORDS FOR ITS SPAN (user, 2026-10-07). A daily Moment is a UTC
 // day; turned into the reader's local days it read as two ("Sep 22 – Sep 23" east of Greenwich), so
@@ -67,5 +68,36 @@ describe("closing the log brings forward the network committed in it", () => {
     useStore.setState({ metaSnap: { metaId: "DAGnotinthecatalog", ordinal: 1, hash: "", globalOrdinal: 2, ts: "2026-10-09T00:00:00Z" } });
     useStore.getState().setSection("scene");
     expect(useStore.getState().trendFocus).toBe(UNLISTED_ID);
+  });
+});
+
+// …AND THE SPAN SEARCHED IN THE LOG COMES BACK AS THE RANGE (2026-10-09, user: "do a new search and
+// select 1 or 2 days: when we close the raw page I would expect the range to be updated").
+describe("closing the log takes the reader's own date search as History's range", () => {
+  const D = 86_400_000;
+  beforeEach(() => useStore.setState({ logSeek: null, logCut: null, mode: "trend", section: "scene", trendFocus: null, trendRange: null, rawReturnMode: null, metaSnap: null, tickNet: null }));
+
+  it("a closed span becomes the range, snapped as a brush is", () => {
+    openRecords(null, { fromMs: 1_000, toMs: 2_000 });
+    const cut = { fromMs: 10 * D + 5, toMs: 12 * D + 5 };
+    useStore.getState().setLogCut(cut);
+    useStore.getState().setSection("scene");
+    expect(useStore.getState().mode).toBe("trend");
+    expect(useStore.getState().trendRange).toEqual(snapRange(cut, Date.now()));
+  });
+  it("an open end closes at now", () => {
+    openRecords(null, { fromMs: 1_000, toMs: 2_000 });
+    useStore.getState().setLogCut({ fromMs: 10 * D, toMs: null });
+    const before = Date.now();
+    useStore.getState().setSection("scene");
+    const r = useStore.getState().trendRange!;
+    expect(r.fromMs).toBe(10 * D);
+    expect(r.toMs).toBeGreaterThanOrEqual(before);
+  });
+  it("with no search of the reader's own the range is left as it was", () => {
+    useStore.setState({ trendRange: { fromMs: 1, toMs: 2 } });
+    openRecords(null, { fromMs: 1_000, toMs: 2_000 });
+    useStore.getState().setSection("scene");
+    expect(useStore.getState().trendRange).toEqual({ fromMs: 1, toMs: 2 });
   });
 });

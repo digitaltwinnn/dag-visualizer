@@ -593,6 +593,10 @@ export default function TrendStack() {
                 gaps={row.series.gaps}
                 lines={linesById.get(pose.id)!}
                 stack={stackById.get(pose.id)}
+                // THE STACK IS THE FILL (user, 2026-10-09: "are they truly stacked? I feel the
+                // overlap"): under the Nodes measure the bands partition the area the fill would
+                // paint, and the fill's gradient over them washed the steps out. One or the other.
+                fill={!stackById.get(pose.id)?.length}
                 // The DAG's plane keeps its own scale: on the networks' shared ceiling the sum of
                 // them all would run off the top, and with it IN the ceiling they would all go flat.
                 scaleMax={pose.id === "dag" ? undefined : sharedMax}
@@ -612,7 +616,6 @@ export default function TrendStack() {
                 // THE PLANE CARRIES ITS COLOUR AS AN AREA, and only here — on the card's solid face
                 // it reads as the network's own tint. A plain boolean, so it holds the plot's memo
                 // as still as every other prop on this call.
-                fill
                 // A card is ONE chart read on its own, so its plot is taller than the document's
                 // small-multiples. The number is the domain's: the ground's drop and the flat
                 // column's pitch are derived from the card's height.

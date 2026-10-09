@@ -285,6 +285,17 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
   // its own — the merged log as its scope, a chain as its ordinals (`bound`, re-resolved whenever
   // the chain changes), the unlisted lens as a cut of its rows.
   const [timeCut, setTimeCut] = useState<{ fromMs: number; toMs: number | null } | null>(null);
+  // THE READER'S OWN CUT GOES BACK TO HISTORY (2026-10-09, `store.logCut`): a date search typed
+  // here — never a door's span, which came FROM History — is mirrored into the store, and closing
+  // a log a History door opened takes it as the committed range. `cutIsOwn` is decided where the
+  // search runs (`seekAge`): a typed search has no door span and no exact arrival instant.
+  const cutIsOwn = useRef(false);
+  const setLogCut = useStore((st) => st.setLogCut);
+  useEffect(() => {
+    setLogCut(cutIsOwn.current && timeCut ? timeCut : null);
+  }, [timeCut, setLogCut]);
+  // The table leaves with the layer (History mounts no log), so its cut leaves the store with it.
+  useEffect(() => () => setLogCut(null), [setLogCut]);
   /** A global-snapshot search under All: exactly the snapshots that global carries. */
   const [globalSpans, setGlobalSpans] = useState<ChainSpan[] | null>(null);
   /** How many of that global's snapshots came from UNLISTED channels — said, never silently dropped
@@ -930,6 +941,8 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
     // The span: an arrival's exact one (a chain switch re-arming the seek, or the door's own span
     // while its words stand), else the typed whole UTC days.
     const typed = spanOfSearch({ door: doorSpan, from: qFrom, to: qTo });
+    // The reader's own search, or a door's span re-run (see `cutIsOwn`).
+    cutIsOwn.current = exactFrom.current === null && doorSpan == null;
     const fromMs = exactFrom.current ?? typed?.fromMs ?? null;
     // An exact start carries its own end (open where the re-armed cut was open).
     const toMs = exactFrom.current !== null ? exactTo.current : (typed?.toMs ?? null);
