@@ -13,7 +13,7 @@ import { ledgerLens } from "@/src/data/ledgerStory";
 import { metaSnapHoverKey, type GlobalSnapshot } from "@/src/data/types";
 import { metaSnapArrivalActions, metaSnapSelectActions } from "@/src/engine/domain/pickActions";
 import { applyClickActions } from "@/src/store/applyClickActions";
-import { fmtKB } from "@/src/util/format";
+import { fmtDag, fmtKB } from "@/src/util/format";
 import { relativeAge } from "@/src/util/relativeAge";
 import { Empty, IdentityDot } from "@/components/inspector/parts";
 import { selectionHue } from "@/components/selection";
@@ -63,12 +63,15 @@ const PROBE_CACHE = 64;
  *  search bar cannot answer for, having no index at any layer, so a phone loses nothing it could
  *  have acted on. `max-[700px]` is `breakpointOf`'s own phone boundary and the same arm every
  *  other phone gate names (CSS trap 8: it stops applying AT 700).
- *  NO FEE COLUMN AT ALL (user, 2026-10-08: "it gets too crowded here"): the fee is a reading about
- *  one snapshot, on the snapshot card where the size also is; the log identifies rows. The
- *  `fee` sort key stays in the vocabulary (`sortAnchorLog`) — nothing in this table offers it. */
+ *  THE FEE STANDS DOWN ON PHONE TOO, and only there (user, 2026-10-09: "re-add the fee column but
+ *  hide it in phone mode — only there it doesn't really fit"). It left every tier on 2026-10-08
+ *  ("it gets too crowded here"), which the phone's 403px pane meant and the desktop's did not: on a
+ *  wide pane the fee is what distinguishes one snapshot from the next at a glance, and the pane
+ *  one click away states it for one row at a time. Same arm as the size. */
 const COLUMNS: { key: AnchorLogSortKey; label: string; phone?: false; phoneLabel?: string }[] = [
   { key: "net", label: "Network" },
   { key: "ordinal", label: "Snapshot" },
+  { key: "fee", label: "Fee (DAG)", phone: false },
   { key: "size", label: "Size", phone: false },
   // `phoneLabel` — the same axis under its shorter name where the wide one alone kept the four
   // surviving columns in sideways scroll (2026-09-02: measured 366px of columns in a 309px pane,
@@ -1808,6 +1811,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                       {rowSel && !seam && (following ? <LiveDot /> : <PinMark className="text-muted-foreground" />)}
                     </span>
                   </TableCell>
+                  <TableCell className={cn("text-right tabular-nums", PHONE_HIDDEN)}>{seam ? <Dash /> : fmtDag(r.fee)}</TableCell>
                   <TableCell className={cn("text-right tabular-nums text-foreground-dim", PHONE_HIDDEN)}>{seam ? <Dash /> : size}</TableCell>
                   {!grouped && (
                     <TableCell className="text-right font-mono tabular-nums max-[700px]:hidden">
