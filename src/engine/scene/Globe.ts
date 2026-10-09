@@ -22,7 +22,7 @@ import { metaTrayLayout, dagTrayLayout, containerChipPos, type ContainerSpec } f
 import { LANE_IDS } from "../domain/ledgerModel";
 import { gatherSlots, gatherExtent, gatherSpread, gatherRows, type GatherExtent, type GatherSlot } from "../domain/gatherLayout";
 import type { ViewTransition } from "../domain/viewTransition";
-import { glowBlend, inkPresence, isLightGround, labelInk, type SceneColors } from "../sceneColors";
+import { glowBlend, inkPresence, isLightGround, labelInk, structureInk, type SceneColors } from "../sceneColors";
 import * as geoStats from "../domain/geoStats";
 import { R, LAND_H, CHIP_PITCH, HEX_H, VALIDATOR_HEX_R, META_HEX_R, latLonToVec3, vec3ToLatLon } from "../domain/geoLayout";
 import { armillaryFrame, ringFramePos, ringNormal, armillaryRings, armillaryPos, nodeRoles, spreadCoLocated } from "../domain/nodeLayout";
@@ -332,14 +332,17 @@ export class Globe implements GeoViewHost {
     this.stage = stage;
     this.layers = layers; // for gluing metagraph nodes to their orbiting hubs
     this.camera = camera; // for the view-dependent disc falloff at the limb
-    this.geoColor = colors.core;   // the geo hologram = the accent (calm via opacity); wall + grid + graticule
+    // The geo hologram's STRUCTURE — wall + grid + graticule + land tint. Dark: the accent (calm via
+    // opacity). Paper: the structure ink (Print, 2026-10-09) — `structureInk` answers `core` on dark
+    // by construction, so this one call is the whole theme split, the same split hyper's hoops take.
+    this.geoColor = structureInk(colors);
     // Set BEFORE buildGeoView: each furniture material picks its blend mode at creation, so booting
     // straight into light needs no second pass (and the async land build inherits it for free).
     this._colorsRef = colors;
     this.geoPaper = isLightGround(colors);
     this._dagCore = colors.dagCore;  // DAG validator-node fallback hue
-    this._edgeColor.setHex(colors.core);
-    this._edgeTarget.setHex(colors.core);
+    this._edgeColor.setHex(this.geoColor);
+    this._edgeTarget.setHex(this.geoColor);
 
     this.nodeGroup = new THREE.Group();
     this.group.add(this.nodeGroup);
@@ -723,12 +726,12 @@ export class Globe implements GeoViewHost {
    */
   setColors(c: SceneColors): void {
     this._colorsRef = c;
-    this.geoColor = c.core;
+    this.geoColor = structureInk(c); // structure ink — see the constructor
     this._dagCore = c.dagCore;
     // BOTH ends of the eased coastal-wall colour: the flip is an instant snap (spec §3), and
     // easing only the target would leave the walls crawling toward the new accent for a second.
-    this._edgeColor.setHex(c.core);
-    this._edgeTarget.setHex(c.core);
+    this._edgeColor.setHex(this.geoColor);
+    this._edgeTarget.setHex(this.geoColor);
     this.geoPaper = isLightGround(c);
     this.fabric.applyGroundEnv(); // the chip env sheen is the GROUND's — see NodeFabric
     retintGeoView(this);

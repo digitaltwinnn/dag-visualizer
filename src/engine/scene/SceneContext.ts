@@ -462,197 +462,17 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
     sel?.composer.dispose();
     sel?.bloom.dispose();
     composer.dispose();
-    backdrop?.dispose(); // the paper cyclorama's CanvasTexture (null on a dark-only session)
     nodeEnvTex?.dispose(); // the chips' PMREM studio env (null if no chip material ever built)
   }
 
-  // The clear colour is the one construction-time capture of a threaded token in this module
-  // (`scene.background`), so it is the one thing a theme flip has to re-apply here — plus the
-  // tone-mapping pair above, which keys on the same ground question (the OutputPass reads
-  // renderer.toneMapping per render, so no material invalidation is needed).
-  //
-  // On PAPER the ground is a STUDIO BACKDROP, not a flat fill (user, 2026-08-25: "this dull
-  // white background"; 2026-08-26: "gray background looks ugly/boring too"). A flat wall plus a
-  // symmetric vignette is a photograph of nothing; a cyclorama is lit from ABOVE and sweeps
-  // into depth below, which is what makes a product sit ON something instead of floating in
-  // grey. So two composed passes, in this order:
-  //
-  //   1. a VERTICAL sweep — near-white high, settling through the lower third where the
-  //      instruments stand, and gaining CHROMA as it settles;
-  //   2. a radial fall-off MULTIPLIED over it, its hot spot high rather than centred, so the
-  //      key light and the vignette agree about where the light comes from.
-  //
-  // The depth colour is not a new hue: `--background` is already oklch(… 265), the same
-  // blue-grey family the HUD's own depth tokens live in, so the sweep just stops washing it
-  // out. Probed at fixed L, chroma 0.012 → 0.030 moves the sRGB bytes R ×0.974, G ×1.0,
-  // B ×1.049 — that vector IS `coolDrift`, which is why the drift is a per-channel bias here
-  // rather than an oklch round-trip.
-  //
-  // A CanvasTexture as scene.background renders screen-stretched (flipY puts the canvas's
-  // bottom row at the screen's bottom, so the canvas is in screen orientation). Built at event
-  // time only (theme flip / token re-read); the dark ground stays the flat Color it always
-  // was — byte-identical.
-  let backdrop: THREE.CanvasTexture | null = null;
+  // The scene's ground is ONE flat colour on both grounds: the dark token verbatim, and on paper
+  // the Print plate (`--scene-ground`, a step below the page). The lit-wall cyclorama that paper
+  // carried from 2026-08-25 to 2026-10-09 — a baked sky-to-stage sweep, a lit pool, an engineering
+  // grid, a warm/cool tint axis — was retired as the look (design direction A, "Print") and then
+  // deleted (user, 2026-10-09: "clean dead code also"); git carries it.
   let isPaper = isLightGround(colors);
-  /**
-   * The tint axis, and it is SIGNED: +k drifts the stop toward the blue depth, −k back the other
-   * way into a warm cream. One vector, two directions, because a cyclorama's whole colour story is
-   * a single warm/cool axis — the sky end and the lit end are not two unrelated hues, they are the
-   * two ends of where the light came from.
-   *
-   * Widened from the ±(2.6%, 0, 4.9%) this started at (user, 2026-08-29: the ground "is a dull gray
-   * currently … make it lighter or more colourful"). At the old width the whole frame sat inside one
-   * grey-blue, which is exactly the complaint: a drift you have to be told about is not colour.
-   */
-  // WARM GREIGE, not blue (user, 2026-08-29: "blue... is a bit of a cold color"): the drift
-  // axis now runs toward ivory (+R, −B) high on the wall — the gallery-wall answer, and the
-  // cool instruments pop by complement. Signed use unchanged (+k warm, −k cool at the stage).
-  // ⚠️ SHIPPED INERT since 2026-08-30: even halved, the ivory read BROWN across the lower wall
-  // (measured R−B +18 at the floor) — `bgTint` now defaults 0 and the cool-silver token carries
-  // the wall's colour alone. The vector stays as the knob's axis, not the shipped look.
-  const coolDrift = [1 + 0.028, 1 + 0.006, 1 - 0.030]; // halved: full ivory read DIRTY at wall lightness — a whisper of warmth is the ceiling (user, 2026-08-29)
-  // The multiply pass's base — white is a multiply's identity, so its stops read as fractions of
-  // whatever the sweep already laid down. Grayscale, so rule 3 has nothing to say about it.
-  const WHITE_BYTES = [255, 255, 255];
-  function paperBackdrop(bg: number): THREE.CanvasTexture {
-    // 1024, not the 512 this started at: the GRID below is a ONE-TEXEL line and the backdrop
-    // renders screen-stretched, so the texel size IS the line weight. At 512 a hairline arrives
-    // ~6px wide on a 1600px frame, which is a drawn rule rather than paper.
-    const S = 1024;
-    const cv = document.createElement("canvas");
-    cv.width = cv.height = S;
-    const g = cv.getContext("2d")!;
-    // Scale the sRGB BYTES, not THREE.Color channels — those are linear, and a linear value
-    // drawn into a 2D canvas as if it were sRGB shifts the paper's near-neutral hue visibly
-    // (first cut of this read lavender).
-    // `m` is the level on the stop's base, `k` how far it has drifted along the warm/cool axis
-    // (see coolDrift: +k cool, −k warm).
-    const tint = (base: readonly number[], m: number, k: number) =>
-      "#" + base
-        .map((u, i) => Math.round(Math.min(255, u * m * (1 + (coolDrift[i] - 1) * k * LIGHT_TUNE.bgTint)))
-          .toString(16).padStart(2, "0")).join("");
-    // The two passes' bases: the sweep paints the GROUND itself, the fall-off MULTIPLIES over it,
-    // so its base is white (a multiply's identity) and its levels read as fractions of what the
-    // sweep already laid down. Sharing `tint` is what keeps both passes on the ONE warm/cool axis
-    // — and it is why the vignette needs no colour literal of its own (rule 3: the hue comes from
-    // the token, the drift from the one vector, and `bgTint` 0 still returns the whole frame to
-    // neutral grey in BOTH passes).
-    const bgBytes = [(bg >> 16) & 255, (bg >> 8) & 255, bg & 255];
-    const hex = (m: number, k = 0) => tint(bgBytes, m, k);
-    const grey = (m: number, k = 0) => tint(WHITE_BYTES, m, k);
-
-    // ⚠️ THE CEILING THAT SHAPED THIS SWEEP WAS THE PAGE'S, NOT THIS GROUND'S (measured
-    // 2026-08-29). The rule here used to read "the paper token's blue is already 243/255, so ANY
-    // composite over ~1.049 clips" — and every level below was solved downward against it. That
-    // 243 is `--background`, the HUD's paper. This backdrop is built from `--scene-ground`, which
-    // design fork C turned to SILVER: probed live it is [176,184,198], so the blue has ~57 bytes
-    // of headroom and the sweep can spend range UPWARD as well as down. The old ceiling was real
-    // when it was written and simply stopped being about this texture; it is why the wall kept
-    // being asked to buy hue with level, and why it kept coming back grey.
-    //
-    // The level is still anchored where the INSTRUMENTS stand — a cyclorama is lit for the
-    // subject, and they occupy the middle band — but the anchor itself moved up with the token
-    // (user, 2026-08-29: "make the background of the scene lighter"). Both halves of "lighter"
-    // are spent: the token carries the ground, this carries the light on it.
-    //
-    // 1. The sweep — a SKY-TO-STAGE ramp, not a grey fade. Bright and cool at the top where a
-    // studio wall catches the most light, easing through the lit band, then falling into a deep
-    // saturated blue at the bottom: the floor of the cyclorama, where the light has run out and
-    // the hue is all that is left. The k column is what makes it a colour ramp rather than a
-    // brightness ramp — it climbs the whole way down, so the frame gets BLUER as it gets darker,
-    // which is what depth actually looks like and what a uniform grey-blue never says.
-    // ⚠️ DEPTH IS BOUGHT WITH CHROMA HERE, NOT WITH LEVEL — the ask was "lighter" and a cyclorama's
-    // floor is the one part that naturally wants to go dark, so the two pull against each other.
-    // Measured at the first cut (m 0.9 / 0.76 down the bottom): the corners composited to
-    // [105,121,155], DARKER than the flat ground this replaced — the frame read lighter overall and
-    // still had a heavy floor. The levels below are lifted and the k column left climbing, so the
-    // bottom settles by getting BLUER rather than by getting dimmer.
-    const sweep = g.createLinearGradient(0, 0, 0, S);
-    // Top pair lifted 1.13/1.09 -> 1.20/1.14 (user, 2026-08-29: "a bit lighter at the top") —
-    // still inside the byte headroom the ceiling note above measured; the stage band down is
-    // untouched, so the instruments' anchor holds and only the sky end brightens.
-    sweep.addColorStop(0, hex(1.2, 0.5));
-    sweep.addColorStop(0.28, hex(1.14, 0.35));
-    sweep.addColorStop(0.55, hex(1.02, 0.6));
-    sweep.addColorStop(0.78, hex(0.96, 1.05));
-    sweep.addColorStop(1, hex(0.87, 1.6));
-    g.fillStyle = sweep;
-    g.fillRect(0, 0, S, S);
-
-    // 2. The fall-off, multiplied so it only ever takes light away — the sweep alone owns the
-    // levels, and a second additive pass would fight it for the top end. Centred high (y 0.332)
-    // so the brightest point of the wall is where the key light lands, not the middle of the
-    // frame.
-    //
-    // ⚠️ THIS PASS IS NOW THE WARM POOL, AND THAT IS THE OTHER HALF OF THE COLOUR (2026-08-29).
-    // Its stops used to be neutral greys, on the rule that "the hue is the sweep's business" —
-    // which left one axis doing all the work and the result reading as one tinted grey. A key
-    // light is WARM and it lands in a SPOT, so the warmth belongs to the radial pass, not to a
-    // horizontal band of the vertical one. Multiply can only darken, so warm is expressed by
-    // taking blue away at the centre and taking red away at the rim: the pool goes cream, the
-    // corners go cool and deep, and the two passes now cross rather than stack. That crossing is
-    // what makes it read as a lit room instead of a gradient.
-    const fall = g.createRadialGradient(S / 2, S * 0.332, S * 0.117, S / 2, S * 0.332, S * 0.977);
-    fall.addColorStop(0, grey(1, -0.55));
-    fall.addColorStop(0.5, grey(0.98, -0.2));
-    fall.addColorStop(1, grey(0.89, 0.7));
-    g.globalCompositeOperation = "multiply";
-    g.fillStyle = fall;
-    g.fillRect(0, 0, S, S);
-
-    // 3. THE ENGINEERING-PAPER GRID — the app's own blueprint idiom (components/Blueprint.tsx)
-    // brought to the backdrop, because a lit wall with no structure in it is still a wall you
-    // look THROUGH rather than a surface the instruments stand on. Three rules keep it from
-    // becoming a pattern you look AT:
-    //   - it is a MULTIPLY at a few percent, so it can only ever take light away and the sweep
-    //     keeps owning the levels;
-    //   - it is masked to an ANNULUS around the subject: transparent under the middle, where the
-    //     instruments stand and where it must never fight the trail's own dotted label columns,
-    //     and gone again before the corners, where the fall-off has already taken the ground —
-    //     so the grid is only ever visible on the empty wall between the two;
-    //   - the cell is square ON SCREEN, not on the canvas. The backdrop stretches to fill, so a
-    //     square canvas cell arrives as a widescreen one; the horizontal pitch carries the live
-    //     aspect to cancel that. (It is baked, so a later window resize skews the cells until the
-    //     next theme flip — the same approximation the vignette's own circle already makes.)
-    if (LIGHT_TUNE.bgGrid > 0) {
-      const grid = document.createElement("canvas");
-      grid.width = grid.height = S;
-      const gg = grid.getContext("2d")!;
-      const aspect = Math.min(3, Math.max(0.5, window.innerWidth / Math.max(1, window.innerHeight)));
-      const pitchY = S / 9;
-      const pitchX = pitchY / aspect;
-      gg.strokeStyle = "#000";
-      gg.lineWidth = 1;
-      gg.beginPath();
-      // The half-texel offset is what keeps a 1px stroke ON one texel instead of split across two.
-      for (let x = pitchX; x < S; x += pitchX) { gg.moveTo(Math.round(x) + 0.5, 0); gg.lineTo(Math.round(x) + 0.5, S); }
-      for (let y = pitchY; y < S; y += pitchY) { gg.moveTo(0, Math.round(y) + 0.5); gg.lineTo(S, Math.round(y) + 0.5); }
-      gg.stroke();
-      const a = LIGHT_TUNE.bgGrid;
-      const ring = gg.createRadialGradient(S / 2, S * 0.52, 0, S / 2, S * 0.52, S * 0.62);
-      ring.addColorStop(0, "rgba(0,0,0,0)");
-      ring.addColorStop(0.42, `rgba(0,0,0,${a})`);
-      ring.addColorStop(0.74, `rgba(0,0,0,${a})`);
-      ring.addColorStop(1, "rgba(0,0,0,0)");
-      gg.globalCompositeOperation = "destination-in"; // dest alpha *= source alpha — the mask
-      gg.fillStyle = ring;
-      gg.fillRect(0, 0, S, S);
-      g.globalCompositeOperation = "multiply";
-      g.drawImage(grid, 0, 0);
-    }
-
-    const tex = new THREE.CanvasTexture(cv);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    return tex;
-  }
   function applyBackground() {
-    if (isPaper) {
-      backdrop?.dispose();
-      backdrop = paperBackdrop(bgColor.getHex());
-      scene.background = backdrop;
-    } else {
-      scene.background = bgColor;
-    }
+    scene.background = bgColor;
   }
   function setClearColor(bg: number) {
     bgColor.setHex(bg);
@@ -672,8 +492,8 @@ export function createScene(canvas: HTMLCanvasElement, colors: SceneColors): Sce
   // material PARAMETER can answer from above. A reflection can: the env lookup rides the
   // per-fragment view vector, so the cap carries a sheen that sweeps as the camera orbits, from
   // any angle. Deliberately the BUILT-IN room (user: "check the three.js capabilities … before
-  // custom shaders, keep it simple") — its lit boxes are the softbox structure the sweep
-  // reveals, and the material side stays plain envMap/envMapIntensity. Built lazily ONCE (PMREM
+  // custom shaders, keep it simple") — its lit boxes are what the chips' sheen reveals, and the
+  // material side stays plain envMap/envMapIntensity. Built lazily ONCE (PMREM
   // needs the renderer), shared by every chip material; the spheres skip it — hyper's orb look
   // is fresnel-carried and tuned.
   let nodeEnvTex: THREE.Texture | null = null;

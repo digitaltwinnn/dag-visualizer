@@ -518,24 +518,16 @@ export class LedgerView implements SceneView {
     // blueprint, two knobs; user 2026-08-07). FLOOR_D/2 is the shared drop-off reference so the
     // rim reads as one width everywhere; narrow pieces clamp it inside SnapshotPlane.
     const a = this._fades.alpha;
-    // ── THE STAGE LIGHT, CLAIMED ON PAPER ONLY (user, 2026-08-26: "I would expect the glass to show
-    // some light reflection?"). The dark chamber stages NOTHING and always has: an additive whisper
-    // over black is already a glow, so a lamp there would be a second light source with nothing to
-    // do. The day glass is the opposite — a reflective pane needs something to reflect, and a rig
-    // baked into the shader can only be aimed by editing the shader. So the ledger claims the app's
-    // one light here, gated on the ground, and the existing `?tune` spotlight knobs become the aim.
-    // Not claiming IS off, so on dark this branch simply never runs and nothing else changes.
-    //
-    // The uniform push reads the light's PREVIOUS frame (StageLight.update resolves claims after
-    // every view has had its turn). That is deliberate: re-deriving `subject + normal × height` here
-    // would put the staging formula in two homes, and one frame of lag on a lamp that eases at
-    // ~3/sec over a chamber whose subject never moves is not observable.
+    // ── THE STAGE LIGHT, CLAIMED ON PAPER ONLY (user, 2026-08-26). The dark chamber stages NOTHING
+    // and always has: an additive whisper over black is already a glow, so a lamp there would be a
+    // second light source with nothing to do. On paper the lamp is what lights the CHIPS in the
+    // trays (MeshStandardMaterial, lit by the real SpotLight) — the four colour dim tiers need its
+    // help on the sheet, see the lamp rule in CLAUDE.md. (Until 2026-10-09 the day GLASS also took
+    // the lamp as a Blinn-Phong lobe through a uniform push; the sheets are matte and that path is
+    // deleted.) Not claiming IS off, so on dark this branch simply never runs.
     if (this._paper) {
       this._spot.claim("ledger", this._stageSubject, this._stageNormal, STAGE_LIGHTS.ledger.height, a);
     }
-    const spotI = this._paper ? this._spot.light.intensity : 0;
-    for (const p of this._globalPlanes) p.setSpot(this._spot.light.position, spotI);
-    for (const p of this._metaPlanes.values()) p.setSpot(this._spot.light.position, spotI);
     for (const p of this._globalPlanes) p.applyAlpha(this.globalTune, a, FLOOR_D / 2);
     // The committed (or hover-previewed) network's OWN plane glows a step brighter — the
     // plane-level twin of the colored dim (user, 2026-08-07).

@@ -72,7 +72,7 @@ under light.
 ⚠️ **BLOOM IS THE SAME QUESTION, AND ON PAPER THE ANSWER IS A SECOND LAYER.**
 `UnrealBloomPass` is a luminance highpass over the FINISHED frame, so it can only ever select
 what is BRIGHTER than its surroundings — and on paper an identity mark is INK (a DOR band sits
-at ~0.42 relative luminance against the ~0.8-L ground). No threshold reaches it, which is why
+at ~0.42 relative luminance against the ~0.95-L plate). No threshold reaches it, which is why
 `LIGHT_TUNE.bloomMul` is **0**: the whole-frame pass is skipped outright on light (Engine's
 `bloom.enabled = _bloomMul > 0`), and all it did there was blow the one place light DID clear it
 — the lead bar, the ribbon foot — to white. `bloomFloor` is inert while that is 0. The marks get
@@ -91,16 +91,50 @@ proportion to its own instance colour, so the emphasis system does the selection
 mesh — at the cost of occlusion (a mark behind glass still halos), accepted because the planes are
 translucent and the paper halo is faint.
 ⚠️ **And the composite's primary term is a MULTIPLY, not an add** — the ground question one level
-up. Paper is L ~0.8 and the chamber glass sits within ~12/255 of it, so light added there clips to
+up. Paper is L ~0.95 and the chamber's sheets sit within a few points of it, so light added there clips to
 white; `bleed` multiplies the ground toward the mark's own hue, which can only darken and tint,
-keeps the ground's level and vignette underneath, and cannot blow out. `glow` is a whisper beside
-it (0.06). Extends the backdrop rule: **on paper, emphasis is separation you take AWAY, not light
+keeps the ground's level and vignette underneath, and cannot blow out. `glow` is a whisper beside it (0.05 since the Print pass, `bleed` 0.18 — measured on the flat plate, the bleed alone tinted the whole inside of the DAG's shells blue, so both came down to what a committed subject needs and no more). Extends the backdrop rule: **on paper, emphasis is separation you take AWAY, not light
 you add.** Dark is untouched by construction — the sub-composer is built lazily on the first paper
 frame, and both knobs at zero skip the sub-pipeline rather than neutralising it.
 
-**Sub-project 2 (per-view day-look refinement) is open.** ⚠️ **Dark's byte-identity guardrail is
-RETIRED for LIGHTING** (user, 2026-08-29): the rig, the follow-spot and geo's sun evolve BOTH themes,
-deliberately and documented, judged as design rather than diff-matched. Everything outside lighting
-keeps the discipline. Geo's day pass is closed (sun + terminator, the paper border ladder, the
-density pools' contact shade, chips reading as objects on silver); wave 8's record, including the
-remaining look-debt, is `.superpowers/light-wave8-report.md`.
+## Print — the light look since 2026-10-09
+
+**Light mode is a PRINTED SHEET, not a lit wall** (design direction A, chosen by the user over a
+blueprint plate and a lit stage, on real screenshots in the brainstorming companion). The lit
+silver wall, its sky-to-stage sweep, the pool of light and the engineering grid — the 2026-08
+"wave" work — are DELETED, not parked (user, same day: "clean dead code also"); git carries them,
+and `SceneContext.applyBackground` is one flat colour on both grounds. The dark look is
+byte-identical throughout by construction: every change is the light
+arm of a `light-dark()` or the `paper ? … : …` branch, and the chamber's dark shader branch
+returns before any Print term is read.
+
+The sheet, in numbers: the page `--background` is 0.985 white; the scene plate `--scene-ground` is
+0.955, one step below it, FLAT; the HUD's cards, top bar, vitals band and `--panel-solid` are one
+sheet at 0.97, one step ABOVE the plate and never white (user: white cards with a hard rule read
+as cut-outs "a thousand feet above" the page); every light drop shadow (`--card-ambient`,
+`--band-ambient`, `--box-lift`) is zero, so `--border` (a neutral ink at 0.22) IS the edge, and the
+open rung is told apart from an entry by `--box-rule`, a heavier inset ring whose dark arm is
+transparent; a folded ghost carries `--panel-light` at 0.72 so it reads as a strip.
+
+**The structure ink is one home**: `structureInk()` (`src/engine/sceneColors.ts`) answers the
+accent on dark and, on paper, the MIDPOINT of `labelInk`'s muted tone and the accent (the muted
+ink alone read "a bit dark for light mode — before it was cyan, maybe both"). Hyper's hoops,
+tethers and ring fills and the globe's graticule, coastal walls, compass rose, land tint and
+country borders all take it, so a hoop and a graticule are made of the same thing. On paper hyper's
+rim fills are OFF (`FILL_OP_PAPER` — their stacked bands read as a milky disc under every hub,
+measured as contrast, not light), the globe's land is a fill (`LAND_GLASS_BODY` 0.35, the Fresnel
+ramp to the rim kept) over a paper-only OCEAN PLATE (`buildOcean`, 7% ink at sea level, hidden on
+dark, pick-inert because geo resolves its surface by sphere maths), and the chamber's panes are
+MATTE SHEETS: `GLASS_TUNE` holds body 0.10, a whisper of Fresnel (rim 0.10), the trays' body, and
+`line` — `glassFill.uLine`, an ink hairline ~1.5px inside every pane's rim measured in screen
+space (`fwidth`), the HUD card's edge recipe one layer down. The day glass's reflection terms
+(room, window, softboxes, polished lip, the lamp lobe and its uniform push) are deleted with the
+wall; the ledger still claims the stage light on paper because the lamp lights the tray CHIPS.
+
+**The paper halo is a whisper** (`selBleed` 0.18, `selGlow` 0.05): on the flat plate the bleed alone
+tinted the plate blue inside the DAG's shells, which on paper is a stain, not emphasis.
+
+⚠️ **What this leaves on the lamp rule above:** a claim's `intensityPaper` still has to be higher
+than its dark level (the test pins the direction), and on the sheet the stage light's pool is the
+one lit thing a paper view shows — judge any retune of it against the flat plate, not the old wall.
+Wave 8's record (`.superpowers/light-wave8-report.md`) is history: it describes the wall.

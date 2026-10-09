@@ -17,7 +17,7 @@ import { FadeSet } from "../objects/FadeSet";
 import { ORB_FRESNEL_GLSL, ORB_FRESNEL_MIX } from "../objects/NodeFabric";
 import { offNetMul } from "../../domain/dimModel";
 import { makeRadialGradientTexture } from "../objects/gradientTexture";
-import { glowBlend, inkMix, inkPresence, isLightGround, type SceneColors } from "../../sceneColors";
+import { glowBlend, inkMix, inkPresence, isLightGround, structureInk, type SceneColors } from "../../sceneColors";
 import type { TuneSchema } from "../../tune";
 import type { SceneView } from "./SceneView";
 import { joinBloom } from "../SceneContext";
@@ -82,6 +82,13 @@ const HOOP_OP = 0.08;
 // Resting opacity of the soft rim-fill disk under each ring (populated layers only) — more cyan
 // presence + anchors the layer label, which otherwise floated between the thin rings (user).
 const FILL_OP = 0.09;
+// ON PAPER THE RIM FILL IS OFF (Print, 2026-10-09). Measured on the flat plate: a hub's three rings'
+// rim bands, near-coplanar at the resting tilt, stacked into one soft grey wash that read as a
+// milky disc under every hub and the core (the plate inside it was byte-identical to the plate
+// outside — the disc was contrast against the wash, not light). On a printed sheet the hoop line
+// IS the ring; the band was dark's answer to a glow that needed body. Not through `inkPresence`:
+// that curve lifts a resting level toward ink, and the level wanted here is none.
+const FILL_OP_PAPER = 0;
 // How much of hyper's off-focus `elem` dim the hub BODY takes, versus the glow/tether/hoops/fills
 // that take all of it: the solid orb keeps a hub legible as a place in the structure while its
 // light recedes. A fraction OF the knob rather than its own number, so `elem` stays one knob with
@@ -227,6 +234,10 @@ export class HyperView implements SceneView {
   private _stageNodeOn = false;
   private _coreDim = 0; // eased 0→1: the DAG core fades back when a specific metagraph is the subject
   private _core: number; // the structural accent (colors.core) — the core sphere hue
+  /** THE STRUCTURE INK — hoops, tethers and ring fills (Print, 2026-10-09). Dark: the accent, as
+   *  ever. Paper: `structureInk`'s teal-grey — the accent at a hoop's weight read as pale blue-grey
+   *  on the white plate, the muted ink alone read too dark. One home, shared with the globe. */
+  private _ink: number;
   /** The live palette. The furniture here is additive GLOW on the dark ground and normal-blended
    *  INK on paper, and the tether bakes its tip-fade as presence — both need the ground. */
   private _colors: SceneColors;
@@ -248,6 +259,7 @@ export class HyperView implements SceneView {
   constructor(scene: THREE.Scene, colors: SceneColors, stage: StageLight, sceneColors?: Record<string, number>) {
     this.scene = scene;
     this._core = colors.core;
+    this._ink = structureInk(colors);
     this._colors = colors;
     this._paper = isLightGround(colors);
     this.stage = stage;
@@ -491,6 +503,7 @@ export class HyperView implements SceneView {
    */
   setColors(c: SceneColors) {
     this._core = c.core;
+    this._ink = structureInk(c);
     this._colors = c;
     this._paper = isLightGround(c);
     // The GROUND changed, so hyper's furniture switches between additive glow and normal-blended
@@ -512,14 +525,14 @@ export class HyperView implements SceneView {
     const coreMat = this.core.material as THREE.MeshStandardMaterial;
     coreMat.color.setHex(this._core);
     coreMat.emissive.setHex(this._core);
-    for (const h of this._coreRings) (h.material as THREE.LineDashedMaterial).color.setHex(this._core);
-    for (const f of this._coreFills) (f.material as THREE.MeshBasicMaterial).color.setHex(this._core);
+    for (const h of this._coreRings) (h.material as THREE.LineDashedMaterial).color.setHex(this._ink);
+    for (const f of this._coreFills) (f.material as THREE.MeshBasicMaterial).color.setHex(this._ink);
     for (const r of this._ripples) (r.mesh.material as THREE.MeshBasicMaterial).color.setHex(this._core);
     for (const m of this.metas) {
-      for (const h of m.hoops) (h.material as THREE.LineDashedMaterial).color.setHex(this._core);
-      for (const f of m.fills) (f.material as THREE.MeshBasicMaterial).color.setHex(this._core);
+      for (const h of m.hoops) (h.material as THREE.LineDashedMaterial).color.setHex(this._ink);
+      for (const f of m.fills) (f.material as THREE.MeshBasicMaterial).color.setHex(this._ink);
     }
-    this._bakeTethers(); // the tether profile is baked from _core into vertex colours
+    this._bakeTethers(); // the tether profile is baked from _ink into vertex colours
   }
 
   /**
@@ -553,7 +566,7 @@ export class HyperView implements SceneView {
   // `_write*`/`_apply*` name on purpose — event-time work, outside the render loop rule 5 polices.)
   private _bakeTethers() {
     const { coreFade, hubFade, brightness } = this.tetherTune;
-    _tcol.setHex(this._core);
+    _tcol.setHex(this._ink);
     const col = this._tetherCol;
     for (let j = 0; j <= TETHER_SEG; j++) {
       const t = TETHER_F[j];
@@ -563,7 +576,7 @@ export class HyperView implements SceneView {
       // The profile is PRESENCE, so it resolves toward the ground: black under additive (where
       // black is absent), the paper colour under normal blending (where black is the loudest ink
       // there is, and the tips would land as two dark blobs). See inkMix.
-      _tcol.setHex(this._core);
+      _tcol.setHex(this._ink);
       inkMix(_tcol, a, this._colors);
       col.setXYZ(j, _tcol.r, _tcol.g, _tcol.b);
     }
@@ -613,7 +626,7 @@ export class HyperView implements SceneView {
     for (let i = 0; i < seg; i++) pts.push(ringFramePos(i, seg, radius, frame));
     // Dash-capable material: a populated layer renders SOLID (gapSize 0), an empty layer renders
     // DOTTED (set by setHoopPresence) to show the layer exists in the architecture but has no nodes.
-    const mat = new THREE.LineDashedMaterial({ color: this._core, transparent: true, opacity: HOOP_OP, dashSize: 1e3, gapSize: 0 });
+    const mat = new THREE.LineDashedMaterial({ color: this._ink, transparent: true, opacity: HOOP_OP, dashSize: 1e3, gapSize: 0 });
     const loop = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), mat);
     loop.computeLineDistances(); // required for the dashed (empty-layer) style
     return loop;
@@ -637,7 +650,7 @@ export class HyperView implements SceneView {
     }
     const geo = new THREE.CircleGeometry(radius, 96);
     const mat = new THREE.MeshBasicMaterial({
-      map: this._fillTex, color: new THREE.Color(this._core), transparent: true,
+      map: this._fillTex, color: new THREE.Color(this._ink), transparent: true,
       blending: glowBlend(this._colors), depthWrite: false, opacity: FILL_OP, side: THREE.DoubleSide,
     });
     const mesh = new THREE.Mesh(geo, mat);
@@ -789,7 +802,7 @@ export class HyperView implements SceneView {
     const coreHoopOp = inkPresence(HOOP_OP * coreOffMul, paper) * coreReveal;
     for (const h of this._coreRings) (h.material as THREE.LineBasicMaterial).opacity = coreHoopOp * this._fades.alpha;
     // The core shells' rim-fill disks fade the same way (same treatment as a metagraph's fills).
-    const coreFillOp = inkPresence(FILL_OP * coreOffMul, paper) * coreReveal;
+    const coreFillOp = (paper ? FILL_OP_PAPER * coreOffMul : inkPresence(FILL_OP * coreOffMul, paper)) * coreReveal;
     for (const f of this._coreFills) (f.material as THREE.MeshBasicMaterial).opacity = coreFillOp * this._fades.alpha;
     if (this.coreFlash) this.coreFlash = Math.max(0, this.coreFlash - dt * 1.6);
 
@@ -881,7 +894,7 @@ export class HyperView implements SceneView {
       const hoopOp = inkPresence(HOOP_OP * (m.active ? 1 : 0.7) * fdim, paper) * metaF;
       for (const h of m.hoops) (h.material as THREE.LineBasicMaterial).opacity = hoopOp * this._fades.alpha;
       // The rim-fill disks fade with the hoops (populated rings only — empty ones were hidden).
-      const fillOp = inkPresence(FILL_OP * (m.active ? 1 : 0.7) * fdim, paper) * metaF;
+      const fillOp = (paper ? FILL_OP_PAPER * (m.active ? 1 : 0.7) * fdim : inkPresence(FILL_OP * (m.active ? 1 : 0.7) * fdim, paper)) * metaF;
       for (const f of m.fills) (f.material as THREE.MeshBasicMaterial).opacity = fillOp * this._fades.alpha;
 
 

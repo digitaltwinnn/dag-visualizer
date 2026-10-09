@@ -103,6 +103,8 @@ export interface GeoViewHost {
   // shader — inside the mask the additive land glass brightens (see setCountryFillMask).
   countryMaskUniforms?: { uCountryMask: { value: THREE.Texture }; uMaskBoost: { value: number } };
   onCountriesReady?: () => void;
+  /** The OCEAN PLATE (Print, 2026-10-09) — paper only; see buildOcean. */
+  oceanMesh?: THREE.Mesh;
 }
 
 /** THE SUN's look (contract: src/engine/tune.ts). Read per frame by Globe and pushed into
@@ -136,9 +138,33 @@ export const SUN_TUNE_SCHEMA: TuneSchema<SunTune> = {
 // the hologram). All surface colours come from config.COLORS' geo family (scene structural
 // lane — never identity-tinted).
 export function buildGeoView(globe: GeoViewHost): void {
+  buildOcean(globe);
   buildGraticule(globe);
   buildCompassRose(globe);
   buildLand(globe);
+}
+
+// THE OCEAN PLATE — paper only (Print, 2026-10-09). The hologram's ocean is the void between
+// coastlines, and on the dark ground the void IS the ground, so the sphere reads as a body for
+// free. On a printed sheet the same void is the page, and a line drawing of a globe with the page
+// showing through its middle has no mass: the user read it as "the globe floats". One plain sphere
+// at sea level, a few percent of the furniture ink, normal-blended, under the land glass — enough
+// that the disc is a shade below the page and the sphere is an object again, never enough to hide
+// the far-side walls the hologram shows through. Dark never draws it: its `base` is 0, so the fade
+// loop resolves it to nothing, and `retintGeoView` hides the mesh outright so it costs no draw.
+const OCEAN_PAPER = 0.07;
+function buildOcean(globe: GeoViewHost) {
+  const mat = new THREE.MeshBasicMaterial({
+    color: new THREE.Color(globe.geoColor), transparent: true, opacity: 0,
+    depthWrite: false, side: THREE.FrontSide, blending: THREE.NormalBlending,
+  });
+  globe.geoTints.push(mat.color);
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(R, 96, 64), mat);
+  mesh.renderOrder = -2; // under the land glass (-1)
+  mesh.visible = globe.geoPaper;
+  globe.oceanMesh = mesh;
+  globe.geoFades.push({ mat, base: 0, paperBase: OCEAN_PAPER });
+  globe.surface.add(mesh);
 }
 
 /** The blend mode the globe's furniture draws with on the current ground — see GeoViewHost.geoPaper.
@@ -164,6 +190,7 @@ export function retintGeoView(globe: GeoViewHost): void {
   // The blend mode themes too (GeoViewHost.geoPaper): additive ink is invisible on paper.
   const bl = geoBlend(globe);
   if (globe.landPaperUniform) globe.landPaperUniform.value = globe.geoPaper ? 1 : 0;
+  if (globe.oceanMesh) globe.oceanMesh.visible = globe.geoPaper; // the plate is paper-only
   for (const m of globe.geoBlends) {
     m.blending = bl;
     m.needsUpdate = true;
@@ -771,7 +798,12 @@ async function buildLand(globe: GeoViewHost) {
 // shader's. Low enough that the far-side walls and graticule read through the near hemisphere —
 // the see-through hologram dark has always had — and high enough that the continents still read
 // as a ground for the chips standing on them. Dark never sees it (`uPaper` gates the whole term).
-const LAND_GLASS_BODY = 0.24;
+// Raised 0.24 → 0.45 → settled 0.35 for Print (2026-10-09): on the flat white plate the 0.24
+// centre was within a few points of the page and the continents read as outlines; a printed map's
+// land is a FILL — but at 0.45 a drilled continent was a mid-grey CARD at country range, where the
+// Fresnel flattens (user: lighter). Still a ramp to `paperBase` at the limb, so the glass character
+// (clear middle, firm rim) survives.
+const LAND_GLASS_BODY = 0.35;
 
 // How much the drilled country's land glass brightens inside the mask. The land fill's
 // resting additive contribution is TINY (texel luminance ~0.055 × the 0.38 base), so small
