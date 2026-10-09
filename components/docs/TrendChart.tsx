@@ -1056,12 +1056,16 @@ const TrendPlot = memo(function TrendPlot({
                   );
                 }}
               />
-              {lines.map((l) => (
+              {lines.map((l, li) => (
                 <Line
                   key={l.label}
                   dataKey={l.label}
                   type="linear"
-                  stroke={l.hue ?? hue0}
+                  // UNDER A STACK THE FIRST LINE IS NOT DRAWN (user, 2026-10-09: "do we need the
+                  // total line? the legend removed it but it's still drawn") — the top band's own
+                  // edge is the total. The series stays MOUNTED, stroke-less, because the tooltip
+                  // reads the total from its payload and the hover cursor snaps to it.
+                  stroke={li === 0 && stack?.length ? "none" : (l.hue ?? hue0)}
                   strokeWidth={lineWidth}
                   strokeDasharray={typeof l.dash === "string" ? l.dash : l.dash ? "4 4" : undefined}
                   connectNulls={false}
@@ -1069,7 +1073,7 @@ const TrendPlot = memo(function TrendPlot({
                   // ⚠️ ONLY A LINE THAT HAS ONE gets the dot renderer (measured 2026-09-29: ~300ms of a
                   // window change). Given a function, recharts builds a dot element for EVERY point —
                   // 720 hourly buckets × five planes of empty `<g>`s — to draw the rare isolated one.
-                  dot={!l.points.some((_, i) => isolated(l, i)) ? false : (props: { key?: React.Key | null; index?: number; cx?: number; cy?: number }) => {
+                  dot={(li === 0 && stack?.length) || !l.points.some((_, i) => isolated(l, i)) ? false : (props: { key?: React.Key | null; index?: number; cx?: number; cy?: number }) => {
                     const { key, index, cx, cy } = props;
                     if (index == null || cx == null || cy == null || !isolated(l, index)) return <g key={key ?? undefined} />;
                     return <circle key={key ?? undefined} cx={cx} cy={cy} r={2.5} fill={l.hue ?? hue0} />;
