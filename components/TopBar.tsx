@@ -286,7 +286,7 @@ export default function TopBar() {
             "h-9 rounded-btn -mx-1 px-1 py-0.5 bg-transparent border-0 cursor-pointer text-left",
             // The same pointer-keyed 44px touch floor as the filter button beside it (its note
             // has the rationale) — the ECG mark alone measured 42×28 on phone.
-            "pointer-coarse:min-h-11 pointer-coarse:min-w-11",
+            "touch:min-h-11 touch:min-w-11",
             "hover:bg-wash-soft transition-colors duration-150 motion-reduce:transition-none",
             strip === "pulse" && "bg-wash-soft",
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
@@ -321,7 +321,7 @@ export default function TopBar() {
             // The 44px tap minimum keys on the POINTER, not the width (user, 2026-08-14 —
       // resizing a desktop window smaller made the bar GROW): a coarse pointer is a
       // touch device wherever the window edge sits; a fine pointer never needs it.
-      "pointer-coarse:min-h-11",
+      "touch:min-h-11",
             // PHONE: the face must fit its grid column beside the fixed 3×44px switch (user,
             // 2026-08-15 — the button used to run UNDER the switch and read as unclickable):
             // trimmed paddings/gaps, and `min-w-0` + the label's truncate below so a long
@@ -329,7 +329,7 @@ export default function TopBar() {
             // …but never below the touch floor's WIDTH either (user, 2026-09-03: the "All" face
             // measured 35px). The coarse floor beats the shrink for short faces; long tickers
             // still truncate — 44px is a floor, not a width.
-            "min-w-0 pointer-coarse:min-w-11 max-[700px]:px-1 max-[700px]:py-1.5 max-[700px]:gap-[4px]",
+            "min-w-0 touch:min-w-11 max-[700px]:px-1 max-[700px]:py-1.5 max-[700px]:gap-[4px]",
           )}
         >
           {/* The "FILTER" text label on wide bars; on the condensed breakpoints (≤940px) it
@@ -390,7 +390,7 @@ export default function TopBar() {
             // The filter face's own recipe — a face plus its open-state wash — at the touch floor.
             "hidden max-[700px]:flex items-center justify-center gap-1.5 h-9 py-1.5 px-2 rounded-btn",
             "bg-transparent border-0 cursor-pointer whitespace-nowrap",
-            "hover:bg-wash-soft pointer-coarse:min-h-11 pointer-coarse:min-w-11",
+            "hover:bg-wash-soft touch:min-h-11 touch:min-w-11",
             strip === "views" && "bg-wash-soft",
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--primary)]",
           )}
@@ -455,7 +455,7 @@ export default function TopBar() {
                 "hover:text-foreground hover:bg-wash-soft",
                 "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",
                 "data-[state=on]:shadow-[inset_0_0_0_1px_var(--sel-border)]",
-                "pointer-coarse:min-h-11 pointer-coarse:min-w-11 max-[1299px]:justify-center",
+                "touch:min-h-11 touch:min-w-11 max-[1299px]:justify-center",
                 "max-[1120px]:px-2 max-[1120px]:py-1.5 max-[1120px]:text-label",
                 // The three "soon" placeholders also stand down on a NARROW TABLET (700–859px):
                 // measured, the six-icon switch needs 771px and the bar is clipped below that, so

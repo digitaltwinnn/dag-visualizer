@@ -14,6 +14,23 @@
 @source not "../**/*.test.ts";
 @source not "../**/*.test.tsx";
 
+/* ── THE TOUCH TIER — one variant, one query (2026-10-09) ─────────────────────
+   `touch:` is where a fingertip's 44px floor and its hit areas apply: a COARSE pointer on the
+   PHONE or TABLET tier. It replaced Tailwind's own `pointer-coarse:` (the pointer alone), which
+   turned a touch laptop's DESKTOP rail into 44px rows and a History list that ran off the
+   viewport (user: "look like mobile controls on normal view"). The desktop tier is a mouse layout
+   whatever the primary pointer says; below 1100px the rails are sheets and the layout is already
+   touch-first. The boundary is `breakpointOf`'s own 1100, named on the same arm the hook and the
+   tablet sheets use (CSS trap 8). An iPad Pro in landscape is wide enough for the desktop tier and
+   loses the floor there — the accepted edge of this rule.
+   ⚠️ `components/useTouch.ts` answers the SAME query for copy ("Tap" / "Click") and the rail's
+   touch rules; `components/touchTierBoundary.test.ts` pins the two to one string. */
+@custom-variant touch {
+  @media (pointer: coarse) and (not (min-width: 1100px)) {
+    @slot;
+  }
+}
+
 /* ── Shared subject-pairing highlight (useSubjectPairing.ts) ───────────────────
    A subject hovered in the 3D scene (or in chrome) lights its paired card/row in ITS identity hue
    (`--row-hue`, set inline only while paired) — the same hue the 3D object glows, so the two read

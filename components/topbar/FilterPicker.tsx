@@ -68,7 +68,7 @@ export default function FilterPicker({ onPicked }: { onPicked?: () => void }) {
       "hover:bg-wash-hover",
       "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
       // The 44px tap minimum keys on the POINTER, not the width (user, 2026-08-14).
-      "pointer-coarse:min-h-11",
+      "touch:min-h-11",
       active && SELECTED_ROW,
       off && "opacity-65",
     );

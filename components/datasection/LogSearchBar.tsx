@@ -87,7 +87,7 @@ export default function LogSearchBar({
   // and on the phone, where the inputs also take 16px text — iOS zooms the page into any focused
   // input set smaller, which on this layer would throw the reader off the log.
   const field =
-    "min-w-0 h-8 pointer-coarse:h-11 max-[700px]:h-11 px-2.5 py-0 bg-[var(--panel-plate)] border border-border/70 rounded-xs max-[700px]:rounded-btn " +
+    "min-w-0 h-8 touch:h-11 max-[700px]:h-11 px-2.5 py-0 bg-[var(--panel-plate)] border border-border/70 rounded-xs max-[700px]:rounded-btn " +
     "font-mono text-body max-[700px]:text-base tabular-nums text-foreground " +
     "hover:border-border focus:border-transparent " +
     "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] transition-colors";
@@ -178,7 +178,7 @@ export default function LogSearchBar({
             // ⚠️ `h-6!` — CSS trap 4. The primitive sizes itself with `data-[size=sm]:h-8`, an
             // attribute selector at (0,2,0) that beats a plain `h-6` at (0,1,0), so the picker sat
             // 32px tall beside 24px inputs. The important modifier is the documented escape.
-            className="h-8! pointer-coarse:h-11! max-[700px]:h-11! w-[112px] max-[700px]:w-[124px] flex-none rounded-l-xs max-[700px]:rounded-l-btn rounded-r-none border-r-0 border-border/70 bg-[var(--panel-plate)] px-2.5 py-0! text-body max-[700px]:text-base focus-visible:ring-0 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
+            className="h-8! touch:h-11! max-[700px]:h-11! w-[112px] max-[700px]:w-[124px] flex-none rounded-l-xs max-[700px]:rounded-l-btn rounded-r-none border-r-0 border-border/70 bg-[var(--panel-plate)] px-2.5 py-0! text-body max-[700px]:text-base focus-visible:ring-0 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
           >
             <SelectValue placeholder="network" />
           </SelectTrigger>
@@ -270,7 +270,7 @@ export default function LogSearchBar({
           // ⚠️ FILLED, the bar's one primary action (design round, 2026-09-29): the washed caps
           // button at 30% disabled read as absent. Disabled keeps the fill at a legible 45%, so
           // the control says it exists and waits for a criterion.
-          "ml-auto inline-flex flex-none items-center justify-center gap-2 h-8 pointer-coarse:h-11 max-[700px]:h-12 px-4 rounded-btn cursor-pointer max-[700px]:w-full max-[700px]:mt-1",
+          "ml-auto inline-flex flex-none items-center justify-center gap-2 h-8 touch:h-11 max-[700px]:h-12 px-4 rounded-btn cursor-pointer max-[700px]:w-full max-[700px]:mt-1",
           "text-body max-[700px]:text-base font-semibold transition-colors",
           // THE ACCENT AS A FILL UNDER TEXT IS `--primary-ink` (light-theme pass, 2026-10-03): on paper
           // near-white on the bare accent measured 4.21:1; on the ink (a third toward black there,

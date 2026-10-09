@@ -283,10 +283,10 @@ export default function DocLayer({ initial }: { initial: DocPage | null }) {
             variant="ghost"
             size="icon-xs"
             aria-label={`Close ${DOC_PAGES[render].label}`}
-            className="absolute top-[calc(74px+var(--topbar-extra,0px))] right-2 pointer-events-auto text-muted-foreground hover:text-foreground pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+            className="absolute top-[calc(74px+var(--topbar-extra,0px))] right-2 pointer-events-auto text-muted-foreground hover:text-foreground touch:min-h-11 touch:min-w-11"
             onClick={() => setDocPage(null)}
           >
-            <X aria-hidden className="size-3 pointer-coarse:size-[18px]" />
+            <X aria-hidden className="size-3 touch:size-[18px]" />
           </Button>
         </div>
       </div>

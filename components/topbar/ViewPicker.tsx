@@ -55,7 +55,7 @@ export default function ViewPicker({ onPicked }: { onPicked?: () => void }) {
               "hover:text-foreground hover:bg-wash-soft",
               "data-[state=on]:text-foreground data-[state=on]:bg-[var(--sel-bg)]",
               "data-[state=on]:shadow-[inset_0_0_0_1px_var(--sel-border)]",
-              "pointer-coarse:min-h-11",
+              "touch:min-h-11",
               v.soon && "opacity-65",
             )}
           >

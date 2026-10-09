@@ -117,7 +117,7 @@ const Dash = () => (
 // resolves the cell reads "…" and the row does not commit: a metagraph-snapshot selection IS
 // the (snapshot, tick) pair, and committing half of it would break every downstream consumer.
 /** One segment of the chain toggle: a one-word name, or the months an earlier chain ran. */
-const SEGMENT = "inline-flex items-center gap-1 h-7 pointer-coarse:h-10 px-2.5 rounded-sm cursor-pointer text-label whitespace-nowrap";
+const SEGMENT = "inline-flex items-center gap-1 h-7 touch:h-10 px-2.5 rounded-sm cursor-pointer text-label whitespace-nowrap";
 const SEGMENT_ON = "bg-[var(--sel-bg)] text-foreground";
 const SEGMENT_OFF = "text-muted-foreground hover:text-foreground";
 function ChainSegment({ label, on, onPick }: { label: string; on: boolean; onPick: () => void }) {
@@ -1350,16 +1350,16 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
             .map((c, _i, all) => (
               <span
                 key={c.key}
-                className="inline-flex min-w-0 items-center gap-1 h-8 pointer-coarse:h-11 max-[700px]:h-11 pl-3 pr-1 rounded-btn border border-border/70 bg-[var(--panel-plate)] text-body text-foreground-dim"
+                className="inline-flex min-w-0 items-center gap-1 h-8 touch:h-11 max-[700px]:h-11 pl-3 pr-1 rounded-btn border border-border/70 bg-[var(--panel-plate)] text-body text-foreground-dim"
               >
                 <span className="min-w-0 truncate tabular-nums">{c.text}</span>
                 <button
                   type="button"
                   onClick={all.length === 1 ? clearSearch : c.clear}
                   aria-label={`Clear ${c.text}`}
-                  className="inline-flex flex-none size-6 pointer-coarse:size-9 max-[700px]:size-9 items-center justify-center rounded-xs cursor-pointer text-muted-foreground hover:text-foreground hover:bg-wash-faint focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
+                  className="inline-flex flex-none size-6 touch:size-9 max-[700px]:size-9 items-center justify-center rounded-xs cursor-pointer text-muted-foreground hover:text-foreground hover:bg-wash-faint focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]"
                 >
-                  <X aria-hidden className="size-3.5 pointer-coarse:size-[18px]" />
+                  <X aria-hidden className="size-3.5 touch:size-[18px]" />
                 </button>
               </span>
             ))}
@@ -1370,7 +1370,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
         aria-expanded={searchOpen}
         onClick={() => setSearchOpen((o) => !o)}
         className={cn(
-          "inline-flex flex-none items-center gap-2 h-8 pointer-coarse:h-11 max-[700px]:h-11 px-3 rounded-btn border cursor-pointer",
+          "inline-flex flex-none items-center gap-2 h-8 touch:h-11 max-[700px]:h-11 px-3 rounded-btn border cursor-pointer",
           "text-body font-medium transition-colors",
           "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
           searchOpen
@@ -1726,7 +1726,7 @@ export default function AnchorLogTable({ onOpen }: { /** PHONE: a row tap opens 
                   className={cn(
                     "text-body hover:bg-[color-mix(in_oklch,var(--row-hue,var(--primary))_12%,transparent)]",
                     // 44px on a touch pointer (a tablet shows the desktop table at ~33px rows).
-                    "pointer-coarse:h-11",
+                    "touch:h-11",
                     // Phone: the row is a three-column grid with the detail line spanning beneath.
                     "max-[700px]:grid max-[700px]:grid-cols-[auto_minmax(0,1fr)_auto]",
                     // One line when grouped (fee and size beside the snapshot), so the padding is

@@ -238,7 +238,7 @@ export function Door({
     // a bit too faint in light mode"). 6% of the accent is a visible plate on the dark glass and
     // very nearly the card's own white on paper, so the row stopped reading as a control there:
     // paper rests at `soft` and hovers at `hover`, dark keeps `faint` → `soft`.
-    "flex items-center gap-2 -mx-[var(--card-pad)] px-[var(--card-pad)] py-2 pointer-coarse:min-h-11 border-t border-wash-strong [background:light-dark(var(--wash-soft),var(--wash-faint))] text-body text-foreground text-left",
+    "flex items-center gap-2 -mx-[var(--card-pad)] px-[var(--card-pad)] py-2 touch:min-h-11 border-t border-wash-strong [background:light-dark(var(--wash-soft),var(--wash-faint))] text-body text-foreground text-left",
     "hover:[background:light-dark(var(--wash-hover),var(--wash-soft))] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)] focus-visible:outline-offset-[-2px]",
     disabled && "opacity-65 pointer-events-none",
   );
@@ -322,7 +322,7 @@ export function CopyButton({ value, subject, always = false, className }: { valu
       className={cn(
         "flex-none size-6 -my-1 rounded-xs text-muted-foreground",
         TOUCH_HIT,
-        always ? "opacity-75 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100" : "opacity-0 pointer-coarse:opacity-75 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
+        always ? "opacity-75 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100" : "opacity-0 touch:opacity-75 group-hover/copy:opacity-100 group-focus-within/copy:opacity-100 focus-visible:opacity-100",
         copied && "opacity-100 text-[var(--success)] hover:text-[var(--success)]",
         className,
       )}

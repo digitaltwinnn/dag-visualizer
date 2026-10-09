@@ -725,7 +725,7 @@ export default function RailDock({
             "fixed z-[39] top-1/2 -translate-y-1/2 w-8 h-16 hidden items-center justify-center cursor-pointer",
             "bg-[var(--panel)] border border-border text-foreground backdrop-blur-[14px]",
             "transition-[left,right] duration-[280ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
-            "pointer-coarse:after:absolute pointer-coarse:after:-inset-x-2 pointer-coarse:after:inset-y-0 pointer-coarse:after:content-['']",
+            "touch:after:absolute touch:after:-inset-x-2 touch:after:inset-y-0 touch:after:content-['']",
             "min-[700px]:max-[1099px]:flex",
             side === "left" ? "rounded-r-[var(--radius)] border-l-0" : "rounded-l-[var(--radius)] border-r-0",
           )}

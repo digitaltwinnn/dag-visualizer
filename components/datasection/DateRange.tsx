@@ -80,7 +80,7 @@ export default function DateRange({
           // their 24px height. One recipe, three controls, one line.
           className={cn(
             // The bar's one height recipe (LogSearchBar's `FIELD_H`): 32px, 44px on touch and phone.
-            "flex h-8 pointer-coarse:h-11 max-[700px]:h-11 min-w-0 max-[700px]:flex-1 items-center gap-2 rounded-xs max-[700px]:rounded-btn border border-border/70 bg-[var(--panel-plate)] px-2.5 py-0",
+            "flex h-8 touch:h-11 max-[700px]:h-11 min-w-0 max-[700px]:flex-1 items-center gap-2 rounded-xs max-[700px]:rounded-btn border border-border/70 bg-[var(--panel-plate)] px-2.5 py-0",
             "text-body max-[700px]:text-base font-sans transition-colors hover:border-border",
             "focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--primary)]",
             "data-[state=open]:border-transparent",

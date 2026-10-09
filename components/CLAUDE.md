@@ -1017,7 +1017,7 @@ later, the portal trap), fits its content live, and shrinks back on a
 render-phase-derived exit. Dismissing a sheet only collapses it — it does not clear the selection.
 On phone the Explore card opens EXPANDED like everywhere else (2026-09-28 — it opened collapsed
 while the About card shared the sheet, as a two-head chooser; one card has nothing to choose
-between), and the teaching copy says the pointer's own word (`usePointerCoarse` — Tap/Click, one
+between), and the teaching copy says the pointer's own word (`useTouch` — Tap/Click, one
 home; geo's node ghost alone advertises the long-press preview).
 
 **No auto-open, ever** (global): a pick never opens a sheet or dock. The dock's icon tray announces it;

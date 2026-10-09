@@ -62,10 +62,10 @@ export default function AboutStrip({ onClose }: { onClose?: () => void }) {
               variant="ghost"
               size="icon-xs"
               aria-label="Close About this view"
-              className={cn("min-[700px]:hidden -my-2 -mr-2 text-muted-foreground hover:text-foreground pointer-coarse:min-h-11 pointer-coarse:min-w-11", !caption && "ml-auto")}
+              className={cn("min-[700px]:hidden -my-2 -mr-2 text-muted-foreground hover:text-foreground touch:min-h-11 touch:min-w-11", !caption && "ml-auto")}
               onClick={onClose}
             >
-              <X aria-hidden className="size-3 pointer-coarse:size-[18px]" />
+              <X aria-hidden className="size-3 touch:size-[18px]" />
             </Button>
           )}
         </span>
